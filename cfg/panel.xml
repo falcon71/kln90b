@@ -1,0 +1,30 @@
+<PlaneHTMLConfig>
+    <Instrument>
+        <Name>KLN90B</Name>
+        <VFROnly>false</VFROnly> <!-- true, if this instrument is not rated for IFR -->
+        <Input>
+            <AltimeterInterfaced>true</AltimeterInterfaced> <!-- true if the altimeter is interfaced via gray code. Required for IFR. Irrelevant when Airdata.IsInterfaced is set to true  -->
+            <ObsSource>1</ObsSource> <!-- 0 to disable, otherwise 1 or 2. Required for approach approval. -->
+            <HeadingInput>false</HeadingInput> <!-- true, when the KLN receives heading input -->
+            <Airdata>
+                <IsInterfaced>false</IsInterfaced> <!-- Will also provide altitude data -->
+                <BaroSource>0</BaroSource> <!-- 1 or 2 if the baro setting of the respective altimeter is transmitted -->
+            </Airdata>
+            <FuelComputer>
+                <IsInterfaced>false</IsInterfaced>
+                <Unit>GAL</Unit> <!-- GAL,IMP,L,KG or LB -->
+                <FOBTransmitted>true</FOBTransmitted> <!-- false if Fuel On Board must be entered by the pilot manually -->
+                <FuelUsedTransmitted>true</FuelUsedTransmitted> <!-- false if this fuel computer does not transmit Fuel Used -->
+            </FuelComputer>
+            <ExternalSwitches>
+                <LegObsSwitchInstalled>false</LegObsSwitchInstalled> <!-- true, when an external switch is installed, that toggles between LEG/OBS mode. Recommended for approaches. -->
+                <AppArmSwitchInstalled>false</AppArmSwitchInstalled> <!-- true, when an external switch is installed, that arms approach mode. Required for approach approval. -->
+            </ExternalSwitches>
+        </Input>
+        <Output>
+            <ObsTarget>1</ObsTarget> <!-- 0 to disable. If 1 or 2 is set, the KLN writes the OBS to this device -->
+            <AltitudeAlertEnabled>false</AltitudeAlertEnabled> <!-- false if altitude alert is disabled completely. even if true, you will need to include an AvionicSounds entry for kln_short_beep and kln_long_beep in your sound.xml-->
+            <WriteGPSLvars>true</WriteGPSLvars> <!-- if true, the KLN90 will write various GPS Lvars, which can be used for the HSI, RMI etc. -->
+        </Output>
+    </Instrument>
+</PlaneHTMLConfig>

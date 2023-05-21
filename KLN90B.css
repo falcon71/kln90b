@@ -1,0 +1,160 @@
+@font-face {
+  font-family: "KLN90B";
+  src: url("/Fonts/kln90b.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: "KLN90BMap";
+  src: url("/Fonts/kln90b-map.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+kln-90b {
+  width: 100%;
+  height: 100%;
+}
+
+.dummy {
+  font-family: KLN90BMap, monospace;
+}
+
+kln-90b #Mainframe #InstrumentsContainer {
+  font-family: KLN90B, monospace;
+  font-size: 44px;
+  background-color: black;
+  color: #00D109;
+  line-height: 52px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  margin: 12px 16px;
+}
+
+.statusline {
+  position: fixed;
+  left: 16px;
+  top: 324px;
+  width: 828px;
+  border-top: 4px solid #00D109;
+  padding-top: 4px;
+}
+
+pre {
+  font-family: KLN90B, monospace;
+}
+
+.inverted {
+  background-color: #00D109;
+  color: black;
+}
+
+.inverted-blink {
+  color: #00D109;
+  background-color: black;
+}
+
+.blink {
+  color: black;
+  background-color: black;
+}
+
+.d-none {
+  display: none;
+}
+
+.left-page {
+  position: fixed;
+  top: 12px;
+  left: 16px;
+  height: 312px;
+}
+
+.right-page {
+  border-left: 4px solid #00D109;
+  padding-left: 18px;
+  position: fixed;
+  top: 12px;
+  left: 430px;
+  height: 312px;
+}
+
+.full-page {
+  position: fixed;
+  top: 12px;
+  left: 16px;
+}
+
+.canvas-halfpage {
+  width: 396px;
+  height: 312px;
+  image-rendering: pixelated;
+}
+
+.canvas-fullpage {
+  position: fixed;
+  top: 12px;
+  left: 252px;
+  width: 592px;
+  height: 364px;
+  image-rendering: pixelated;
+}
+
+.super-deviation-bar {
+  line-height: 104px;
+}
+
+.use-invert {
+  margin-left: -396px;
+}
+
+.nav-5-bottom-controls {
+  position: absolute;
+  top: 260px;
+  left: 0;
+}
+
+.super-nav5-left-controls {
+  position: fixed;
+  top: 12px;
+  left: 16px;
+  height: 364px;
+  width: 236px;
+  border-right: 4px solid #00D109;
+}
+
+.super-nav5-mgs-range {
+  position: fixed;
+  top: 272px;
+  left: 256px;
+}
+
+.super-nav5-right-controls {
+  position: fixed;
+  top: 12px;
+  left: 556px;
+  height: 208px;
+  width: 288px;
+  background-color: black;
+  border-left: 4px solid #00D109;
+  border-bottom: 4px solid #00D109;
+}
+
+.super-nav5-directto-window {
+  position: fixed;
+  top: 324px;
+  left: 628px;
+  height: 52px;
+  width: 216px;
+}
+
+.apt-8-iaf-list {
+  position: fixed;
+  top: 64px;
+  left: 592px;
+}
+
+.offset-left-cursor {
+  margin-left: 36px;
+}

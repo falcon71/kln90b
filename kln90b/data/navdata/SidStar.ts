@@ -1,0 +1,552 @@
+import {
+    AirportFacility,
+    ApproachProcedure,
+    ApproachTransition,
+    BitFlags, EnrouteTransition,
+    Facility,
+    FacilityType, FixTypeFlags,
+    FlightPlanLeg,
+    GeoCircle,
+    GeoPoint,
+    ICAO, LatLonInterface,
+    LegType,
+    Procedure,
+    RunwayTransition,
+    RunwayUtils,
+    UnitType,
+    UserFacility,
+    UserFacilityType,
+    VorFacility,
+} from "@microsoft/msfs-sdk";
+import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "../flightplan/Flightplan";
+import {KLNFacilityLoader} from "./KLNFacilityLoader";
+import {Degrees, NauticalMiles} from "../Units";
+import {format} from "numerable";
+import {Sensors} from "../../Sensors";
+import {NavPageState} from "../VolatileMemory";
+
+export interface ArcData {
+    beginRadial: Degrees, //The published beginning radial
+    beginPoint: LatLonInterface, //Coordinates of the beginning
+    entryFacility: Facility, //The point where the aircraft will enter the arc. Somewhere between begin and end
+
+    endRadial: Degrees,
+    endFacility: Facility, //The end waypoint of the arc
+
+    vor: VorFacility, //The VOR
+
+    circle: GeoCircle,
+}
+
+export class SidStar {
+
+
+    public constructor(private readonly facilityLoader: KLNFacilityLoader, private readonly sensors: Sensors) {
+    }
+
+    /**
+     * Returns true, if the enroute segment of the flightplan contains legs from the procedure
+     * @param fplLegs
+     * @param procedureLegs
+     */
+
+    public static hasDuplicates(fplLegs: KLNFlightplanLeg[], procedureLegs: KLNFlightplanLeg[]): boolean {
+        const procedureIcaos = procedureLegs.map(leg => leg.wpt.icao);
+
+        for (const fplLeg of fplLegs) {
+            if (procedureIcaos.includes(fplLeg.wpt.icao)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static getWptSuffix(fixType: KLNFixType | undefined | null): string {
+        switch (fixType) {
+            case KLNFixType.IAF:
+                return "à";
+            case KLNFixType.FAF:
+                return "á";
+            case KLNFixType.MAP:
+                return "ã";
+            case KLNFixType.MAHP:
+                return "â";
+            default:
+                return "";
+        }
+    }
+
+    public static formatApproachName(app: ApproachProcedure, facility: AirportFacility): string {
+        let prefix: string;
+
+        switch (app.approachType) {
+            case ApproachType.APPROACH_TYPE_GPS:
+                prefix = "R";
+                break;
+            case ApproachType.APPROACH_TYPE_VOR:
+            case ApproachType.APPROACH_TYPE_VORDME:
+                prefix = "V";
+                break;
+            case ApproachType.APPROACH_TYPE_NDB:
+            case ApproachType.APPROACH_TYPE_NDBDME:
+                prefix = "N";
+                break;
+            default:
+                throw Error(`Unsupported approachtype: ${app}`);
+        }
+
+        let runway: string;
+        //Figure 6-18, no padding with spaces in the name
+        if (app.runway === "") {
+            runway = "-"; //See figure 3-149 -A or -B
+        } else {
+            runway = RunwayUtils.getRunwayNameString(app.runwayNumber, app.runwayDesignator, true);
+        }
+
+        return prefix + runway + app.approachSuffix + "-" + ICAO.getIdent(facility.icao);
+    }
+
+    /**
+     * 6-17. Scan was pulled from the Super NAV 5 page to recalculate the arc entry based on the current track
+     */
+    public static recalculateArcEntryData(leg: KLNFlightplanLeg, sensors: Sensors): ArcData | null {
+        const arcData = leg.arcData!;
+
+        const track = sensors.in.gps.getTrackTrueRespectingGroundspeed();
+        if (track === null) {
+            return null;
+        }
+
+        const to = new GeoPoint(sensors.in.gps.coords.lat, sensors.in.gps.coords.lon);
+        to.offset(track, UnitType.NMILE.convertTo(1000, UnitType.GA_RADIAN));
+
+        const aircraftPath = new GeoCircle(new Float64Array(3), 0);
+        aircraftPath.setAsGreatCircle(sensors.in.gps.coords, to);
+
+        const intersections: Float64Array[] = [];
+
+        arcData.circle.intersection(aircraftPath, intersections);
+
+        const entryPoints = intersections.map(int => {
+            const p = new GeoPoint(0, 0);
+            return p.setFromCartesian(int);
+        }).sort((a, b) => a.distance(sensors.in.gps.coords) - b.distance(sensors.in.gps.coords)); //Max two, doesn't really matter
+
+        for (const entryPoint of entryPoints) {
+            const vorPoint = new GeoPoint(arcData.vor.lat, arcData.vor.lon);
+            const radial = vorPoint.bearingTo(entryPoint);
+            const dist = UnitType.GA_RADIAN.convertTo(arcData.circle.radius, UnitType.NMILE);
+
+
+            if (this.isRadialInArc(radial, arcData.beginRadial, arcData.endRadial)) {
+                const entryFacility: UserFacility = {
+                    icao: `UXY    ${this.getArcEntryName(radial, dist)}`, //XY marks this as temporyry
+                    name: "",
+                    lat: entryPoint.lat,
+                    lon: entryPoint.lon,
+                    region: "XX",
+                    city: "",
+                    magvar: 0,
+                    isTemporary: false, //irrelevant, because this flag is not persisted
+                    userFacilityType: UserFacilityType.LAT_LONG,
+                    reference1Icao: arcData.vor.icao,
+                    reference1Radial: radial,
+                    reference1Distance: dist,
+                };
+
+                /*
+                try {
+                    //Not sure, but I would expect this to behave like the REF page
+                    this.facilityLoader.facilityRepo.add(entryFacility);
+                } catch (e) {
+                    //DB full. Oh well, what's the worst that could possibly happen?
+                }
+                 */
+
+                return {
+                    beginRadial: arcData.beginRadial,
+                    beginPoint: arcData.beginPoint,
+                    entryFacility: entryFacility,
+                    endRadial: arcData.endRadial,
+                    endFacility: arcData.endFacility,
+                    vor: arcData.vor,
+                    circle: arcData.circle,
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public static isApproachRecognized(app: ApproachProcedure): boolean {
+        switch (app.approachType) {
+            case ApproachType.APPROACH_TYPE_GPS:
+            case ApproachType.APPROACH_TYPE_VOR:
+            case ApproachType.APPROACH_TYPE_NDB:
+            case ApproachType.APPROACH_TYPE_VORDME:
+            case ApproachType.APPROACH_TYPE_NDBDME:
+                return SidStar.appHasNoRFLegs(app);
+            default:
+                return false;
+        }
+    }
+
+    public static isProcedureRecognized(proc: Procedure): boolean {
+        //The real device does not include RNAV procedures: https://www.euroga.org/forums/maintenance-avionics/5573-rnav-retrofit
+        //It seems, that we can't recognize those here
+        return SidStar.procHasNoRFLegs(proc);
+    }
+
+    /**
+     * 3-32, 6-18
+     */
+    public static getVorIfWithin30NMOfArc(navState: NavPageState, fpl0: Flightplan): VorFacility | null {
+        const fplIdx = navState.activeWaypoint.getActiveFplIdx();
+        if (fplIdx === -1) {
+            return null;
+        }
+
+
+        const from = navState.activeWaypoint.getFromLeg();
+        if (from?.path.isGreatCircle() === false) {
+            //Currently on an arc. -1 must exist for this to happen
+            const legs = fpl0.getLegs();
+            return legs[fplIdx - 1].arcData!.vor;
+        }
+
+
+
+        const futureLegs = navState.activeWaypoint.getFutureLegs();
+        let dist = navState.distToActive!;
+
+
+        for (let i = 0; i < futureLegs.length; i++) {
+            const next = futureLegs[i];
+            if(i > 0) {
+                const prev = futureLegs[i - 1];
+                //The manual states, distance is to the arc, not the VOR:
+                dist += UnitType.GA_RADIAN.convertTo(new GeoPoint(prev.wpt.lat, prev.wpt.lon).distance(next.wpt), UnitType.NMILE);
+            }
+
+            if (dist > 30) {
+                return null;
+            }
+
+            if (next.arcData !== undefined) {
+                return next.arcData.vor;
+            }
+
+        }
+
+        return null;
+    }
+
+    private static isRadialInArc(radial: Degrees, arcFrom: Degrees, arcTo: Degrees): boolean {
+        const from = arcFrom < arcTo ? arcFrom : arcTo; //Smaller value
+        const to = arcTo > arcFrom ? arcTo : arcFrom; //Bigger value
+
+        if (to - from >= 180) {
+            return radial <= from || radial >= to;
+        } else {
+            return radial >= from && radial <= to;
+        }
+    }
+
+    /**
+     * 6-16
+     * @param radial
+     * @param dist
+     */
+    private static getArcEntryName(radial: Degrees, dist: NauticalMiles): string {
+        const ALPHABET = [' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+
+        return `D${format(radial, "000")}${ALPHABET[Math.round(dist)]}`;
+    }
+
+    private static appHasNoRFLegs(app: ApproachProcedure): boolean {
+        for (const transition of app.transitions) {
+            if (transition.legs.some(leg => leg.type === LegType.RF)) {
+                return false;
+            }
+        }
+
+        return !app.finalLegs.concat(app.missedLegs).some(leg => leg.type === LegType.RF);
+    }
+
+    private static procHasNoRFLegs(proc: Procedure): boolean {
+        for (const transition of proc.enRouteTransitions) {
+            if (transition.legs.some(leg => leg.type === LegType.RF)) {
+                return false;
+            }
+        }
+        for (const transition of proc.runwayTransitions) {
+            if (transition.legs.some(leg => leg.type === LegType.RF)) {
+                return false;
+            }
+        }
+
+        return !proc.commonLegs.some(leg => leg.type === LegType.RF);
+    }
+
+    /**
+     * Builds the list of legs.
+     * Filters out duplicates and legs that are not supported by the KLN
+     * Async, because we may need the facilities for DME arcs.
+     * @param facility
+     * @param app
+     * @param iaf
+     */
+
+    public async getKLNApproachLegList(facility: AirportFacility, app: ApproachProcedure, iaf: ApproachTransition | null): Promise<KLNFlightplanLeg[]> {
+        const legs: FlightPlanLeg[] = [];
+
+        if (iaf != null) {
+            legs.push(...iaf.legs);
+        }
+
+        legs.push(...app.finalLegs, ...app.missedLegs);
+
+        const cleaned = this.filterOutDuplicates(legs.filter(leg => this.isLegSupported(leg)));
+        const approachName = SidStar.formatApproachName(app, facility);
+        return await this.convertToKLN(facility, approachName, KLNLegType.APP, cleaned);
+    }
+
+    /**
+     * Builds the list of legs.
+     * Filters out duplicates and legs that are not supported by the KLN.
+     * Async, because we may need the facilities for DME arcs.
+     * @param facility
+     * @param type
+     * @param proc
+     * @param rwy
+     * @param trans
+     */
+
+    public async getKLNProcedureLegList(facility: AirportFacility, proc: Procedure, type: KLNLegType, rwy: RunwayTransition | null, trans: EnrouteTransition | null): Promise<KLNFlightplanLeg[]> {
+        const legs: FlightPlanLeg[] = [];
+
+        if (type === KLNLegType.SID) {
+            if (rwy != null) {
+                legs.push(...rwy.legs);
+            }
+
+            legs.push(...proc.commonLegs);
+
+            if (trans != null) {
+                legs.push(...trans.legs);
+            }
+        } else {
+
+            if (trans != null) {
+                legs.push(...trans.legs);
+            }
+
+            legs.push(...proc.commonLegs);
+
+            if (rwy != null) {
+                legs.push(...rwy.legs);
+            }
+        }
+
+        const cleaned = this.filterOutDuplicates(legs.filter(leg => this.isLegSupported(leg)));
+        const procedureName = `${proc.name}-${type === KLNLegType.SID ? "SID" : "Æ"}`;
+        return await this.convertToKLN(facility, procedureName, type, cleaned);
+
+    }
+
+    private filterOutDuplicates(legs: FlightPlanLeg[]): FlightPlanLeg[] {
+        const filtered: FlightPlanLeg[] = [];
+
+        for (let i = 0; i < legs.length; i++) {
+            const leg = legs[i];
+            if (i === legs.length - 1 || BitFlags.isAny(leg.fixTypeFlags, BitFlags.union(FixTypeFlags.IAF, FixTypeFlags.FAF, FixTypeFlags.MAP, FixTypeFlags.MAHP))) { //We always keep IAF, FAF, MAP!
+                this.mergeAFsIfNecessary(leg, legs, i);
+                filtered.push(leg);
+            } else {
+                const next = legs[i + 1];
+                const bothAreAF = leg.type === LegType.AF && next.type === LegType.AF; //The KLN does not support step down fixes. We merge multiple arcs
+
+                const nextIsSameWpt = next.fixIcao === leg.fixIcao;
+                const isAlreadyLastInList = filtered.length > 0 && filtered[filtered.length - 1].fixIcao === leg.fixIcao;
+                if (!bothAreAF && !nextIsSameWpt && !isAlreadyLastInList) { //We prefer the following WPT, because those might be holds
+                    this.mergeAFsIfNecessary(leg, legs, i);
+                    filtered.push(leg);
+                }
+            }
+        }
+
+        return filtered;
+    }
+
+    private mergeAFsIfNecessary(leg: FlightPlanLeg, legs: FlightPlanLeg[], i: number) {
+        //If this is an arc, we must check the previous waypoint if that was an arc to. If so, we merge themn
+        if (leg.type === LegType.AF) {
+            let iPrev = i - 1;
+            while (iPrev >= 0 && legs[iPrev].type === LegType.AF) {
+                const prev = legs[iPrev];
+                leg.course = prev.course; //Our new arc goes from the prev start to this ones theta
+                iPrev--;
+            }
+        }
+    }
+
+    /**
+     * Converts the FlightPlanLegs to KLNFlightplanLegs.
+     * Also resolves DME Arc entries.
+     * @param facility
+     * @param procedureName
+     * @param legType
+     * @param legs
+     * @private
+     */
+    private async convertToKLN(facility: AirportFacility, procedureName: string, legType: KLNLegType, legs: FlightPlanLeg[]): Promise<KLNFlightplanLeg[]> {
+        const promises = legs.map(leg =>
+            this.facilityLoader.getFacility(ICAO.getFacilityType(leg.fixIcao), leg.fixIcao).then(fac => ({
+                    leg: leg,
+                    facility: fac,
+                }),
+            ));
+
+
+        const enriched = await Promise.all(promises);
+        const klnLegs: KLNFlightplanLeg[] = [];
+
+        for (const enrichedLeg of enriched) {
+            if (enrichedLeg.leg.type === LegType.AF) {
+                //Entry here and exits below for arcs
+
+                //The KLN calculates its own entry
+                const originalEntry = klnLegs.pop()!;
+
+
+                const arcData = await this.getArcEntryData(enrichedLeg);
+                klnLegs.push({
+                    wpt: arcData.entryFacility,
+                    type: legType,
+                    parentFacility: facility,
+                    procedureName: procedureName,
+                    arcData: arcData,
+                    fixType: originalEntry.fixType,
+                });
+            }
+
+
+            const askObs = this.shouldAskObs(enrichedLeg.leg.type);
+            klnLegs.push({
+                wpt: enrichedLeg.facility,
+                type: legType,
+                parentFacility: facility,
+                procedureName: procedureName,
+                flyOver: enrichedLeg.leg.flyOver || askObs,
+                askObs: askObs,
+                fixType: this.getKLNFixType(enrichedLeg.leg),
+            });
+
+        }
+        return klnLegs;
+
+    }
+
+    private isLegSupported(leg: FlightPlanLeg): boolean {
+        return leg.fixIcao.trim() !== "" && leg.type != LegType.RF;
+    }
+
+    private getKLNFixType(leg: FlightPlanLeg): KLNFixType | undefined {
+        if (BitFlags.isAll(leg.fixTypeFlags, FixTypeFlags.FAF)) {
+            return KLNFixType.FAF; //This one is most important, we check this first
+        } else if (BitFlags.isAll(leg.fixTypeFlags, FixTypeFlags.MAP)) {
+            return KLNFixType.MAP;
+        } else if (BitFlags.isAll(leg.fixTypeFlags, FixTypeFlags.IAF)) {
+            return KLNFixType.IAF;
+        } else if (BitFlags.isAll(leg.fixTypeFlags, FixTypeFlags.MAHP)) {
+            return KLNFixType.MAHP;
+        } else {
+            return undefined;
+        }
+    }
+
+    /**
+     * B-2. KLN asks for OBS in holds and procedure turns
+     * @param legType
+     */
+
+    private shouldAskObs(legType: LegType): boolean {
+        switch (legType) {
+            case LegType.HA:
+            case LegType.HF:
+            case LegType.HM:
+            case LegType.PI:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * 6-16
+     * "Normal" systems use the published CI point as an entry. The KLN-90B does not support that type.
+     * Therefore, it generates an artificialy entry waypoint based on the radial of the current position to the VOR.
+     */
+    private async getArcEntryData(convertedLeg: { facility: Facility; leg: FlightPlanLeg }): Promise<ArcData> {
+        const vor = await this.facilityLoader.getFacility(FacilityType.VOR, convertedLeg.leg.originIcao);
+        const vorPoint = new GeoPoint(vor.lat, vor.lon);
+
+        const circleCenter = new Float64Array(3);
+        vorPoint.toCartesian(circleCenter);
+
+        const circle = new GeoCircle(circleCenter, UnitType.METER.convertTo(convertedLeg.leg.rho, UnitType.GA_RADIAN));
+
+        //Published beginning
+        const beginPoint = new GeoPoint(0, 0);
+        vorPoint.offset(convertedLeg.leg.course, UnitType.METER.convertTo(convertedLeg.leg.rho, UnitType.GA_RADIAN), beginPoint);
+
+        //Entry based on current position
+        const entryPoint = new GeoPoint(0, 0);
+        circle.closest(this.sensors.in.gps.coords, entryPoint);
+
+        let radial = vorPoint.bearingTo(entryPoint);
+        const dist = UnitType.METER.convertTo(convertedLeg.leg.rho, UnitType.NMILE);
+
+
+        if (!SidStar.isRadialInArc(radial, convertedLeg.leg.course, convertedLeg.leg.theta)) {
+            //Outside of arc, then it defaults to the beginning of the arc
+            entryPoint.set(beginPoint);
+            radial = convertedLeg.leg.course;
+        }
+
+        const entryFacility: UserFacility = {
+            icao: `UXY    ${SidStar.getArcEntryName(radial, dist)}`, //XY marks this as temporyry
+            name: "",
+            lat: entryPoint.lat,
+            lon: entryPoint.lon,
+            region: "XX",
+            city: "",
+            magvar: 0,
+            isTemporary: false, //irrelevant, because this flag is not persisted
+            userFacilityType: UserFacilityType.LAT_LONG,
+            reference1Icao: vor.icao,
+            reference1Radial: radial,
+            reference1Distance: dist,
+        };
+
+        try {
+            //Not sure, but I would expect this to behave like the REF page
+            this.facilityLoader.facilityRepo.add(entryFacility);
+        } catch (e) {
+            //DB full. Oh well, what's the worst that could possibly happen?
+        }
+
+        return {
+            beginRadial: convertedLeg.leg.course,
+            beginPoint: beginPoint,
+            entryFacility: entryFacility,
+            endRadial: convertedLeg.leg.theta,
+            endFacility: convertedLeg.facility,
+
+
+            vor: vor,
+            circle: circle,
+        }
+    }
+
+}
