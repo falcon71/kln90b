@@ -1,12 +1,10 @@
 import {FuelUnit, KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {
     ClockEvents,
-    ClockPublisher,
     EventBus,
     GeoPoint, GNSSEvents,
     GPSSatComputer, GPSSatComputerEvents,
-    GPSSystemState, Handler,
-    LatLonInterface, Publisher,
+    GPSSystemState, LatLonInterface, Publisher,
     SimVarValueType,
     Unit,
     UnitFamily,
@@ -537,6 +535,17 @@ export class SensorsOut {
     }
 
 
+    public setETE(ete: Seconds | null) {
+        if(!this.options.output.writeGPSLvars){
+            return;
+        }
+        if (ete === null) {
+            SimVar.SetSimVarValue('GPS WP ETE', SimVarValueType.Seconds, 0);
+        } else {
+            SimVar.SetSimVarValue('GPS WP ETE', SimVarValueType.Seconds, ete);
+        }
+    }
+
     public reset() {
         if(!this.options.output.writeGPSLvars){
             return;
@@ -550,6 +559,7 @@ export class SensorsOut {
         this.setDesiredTrack(null);
         this.setWpBearing(null, null);
         this.setDistance(null);
+        this.setETE(null);
         this.setPos(null, null, null);
     }
 }

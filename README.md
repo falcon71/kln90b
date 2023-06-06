@@ -3,7 +3,7 @@
 This is a simulation of the Bendix/King KLN 90B GPS for the Microsoft Flight Simulator.
 
 ## Users
-Download the current version on releases page. This package only contains the GPS device. To use the KLN 90B, you will need an aircraft that incorporates this project.
+Download the current version on the [releases page](https://github.com/falcon71/kln90b/releases). This package only contains the GPS device. To use the KLN 90B, you will need an [aircraft that incorporates this project](https://github.com/falcon71/kln90b/wiki/Aircraft-using-the-KLN-90B).
 
 Documentation for the real device:
 
@@ -31,7 +31,7 @@ texture=$KLN90B_Screen
 htmlgauge00=NavSystems/GPS/KLN90B/KLN90B.html, 0, 0, 860,388
 ```
 
-It is also advisable to use a panel.xml for configuration. An example panel.xml is included in the cfg folder.
+It is also advisable to use a [panel.xml](https://github.com/falcon71/kln90b/wiki/panel.xml-customization) for configuration.
 
 Aircraft should only interact with the KLN 90B via H Events. The events are listed in HEvents.ts. A few LVARs are available for animations. 
 
@@ -43,10 +43,9 @@ You are free to include the KLN 90B into your aircraft. If you do, write me a me
 
 Feel free to open issues or send pull requests.
 
-The entry class is KLN90B.tsx. Other interesting classes are MainPage.tst and PageTreeController.tsx.
+The entry class is KLN90B.tsx. Other interesting classes are MainPage.tsx and PageTreeController.tsx.
 
-Numbers in the comments in the format 1-12 reference a page in the manual that contains further information and reference:
-https://www.bendixking.com/content/dam/bendixking/en/documents/document-lists/downloads-and-manuals/006-08773-0000-KLN-90B-Pilots-Guide.pdf
+Numbers in the comments in the format 1-12 reference a page in the [manual](https://www.bendixking.com/content/dam/bendixking/en/documents/document-lists/downloads-and-manuals/006-08773-0000-KLN-90B-Pilots-Guide.pdf) that contains further information and reference.
 
 ## License
 This project is licensed under The GNU General Public License v3.0.

@@ -159,6 +159,7 @@ export class NavCalculator implements CalcTickable {
         this.sensors.out.setDesiredTrack(obsOut);
         this.sensors.out.setWpBearing(this.magvar.trueToMag(nav.bearingToActive, magvar), nav.bearingToActive);
         this.sensors.out.setDistance(nav.distToActive);
+        this.sensors.out.setETE(nav.eteToActive);
         this.sensors.out.setPos(this.sensors.in.gps.coords, this.sensors.in.gps.groundspeed, this.sensors.in.gps.getTrackTrueRespectingGroundspeed());
     }
 
