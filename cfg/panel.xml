@@ -3,24 +3,19 @@
         <Name>KLN90B</Name>
         <VFROnly>false</VFROnly> <!-- true, if this instrument is not rated for IFR -->
         <Input>
-            <AltimeterInterfaced>true
-            </AltimeterInterfaced> <!-- true if the altimeter is interfaced via gray code. Required for IFR. Irrelevant when Airdata.IsInterfaced is set to true  -->
+            <AltimeterInterfaced>true</AltimeterInterfaced> <!-- true if the altimeter is interfaced via gray code. Required for IFR. Irrelevant when Airdata.IsInterfaced is set to true  -->
             <ObsSource>1</ObsSource> <!-- 0 to disable, otherwise 1 or 2. Required for approach approval. -->
             <HeadingInput>false</HeadingInput> <!-- true, when the KLN receives heading input -->
-            <ElectricityLvar>CIRCUIT ON:1
-            </ElectricityLvar> <!-- this boolean LVar will be used to determine if the KLN 90B receives electricity -->
+            <ElectricityLvar>CIRCUIT ON:1</ElectricityLvar> <!-- this boolean LVar will be used to determine if the KLN 90B receives electricity -->
             <Airdata>
                 <IsInterfaced>false</IsInterfaced> <!-- Will also provide altitude data -->
-                <BaroSource>0
-                </BaroSource> <!-- 1 or 2 if the baro setting of the respective altimeter is transmitted -->
+                <BaroSource>0</BaroSource> <!-- 1 or 2 if the baro setting of the respective altimeter is transmitted -->
             </Airdata>
             <FuelComputer>
                 <IsInterfaced>false</IsInterfaced>
                 <Unit>GAL</Unit> <!-- GAL,IMP,L,KG or LB -->
-                <FOBTransmitted>true
-                </FOBTransmitted> <!-- false if Fuel On Board must be entered by the pilot manually -->
-                <FuelUsedTransmitted>true
-                </FuelUsedTransmitted> <!-- false if this fuel computer does not transmit Fuel Used -->
+                <FOBTransmitted>true</FOBTransmitted> <!-- false if Fuel On Board must be entered by the pilot manually -->
+                <FuelUsedTransmitted>true</FuelUsedTransmitted> <!-- false if this fuel computer does not transmit Fuel Used -->
             </FuelComputer>
             <ExternalSwitches>
                 <LegObsSwitchInstalled>false</LegObsSwitchInstalled> <!-- true, when an external switch is installed, that toggles between LEG/OBS mode. Recommended for approaches. -->

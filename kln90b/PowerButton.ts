@@ -75,7 +75,7 @@ export class PowerButton {
         this.setPowerSwitch(!this.powerSwitchOn);
     }
 
-    private setPowerSwitch(powerSwitchOn: boolean): void {
+    public setPowerSwitch(powerSwitchOn: boolean): void {
         if (this.powerSwitchOn === powerSwitchOn) {
             return;
         }
