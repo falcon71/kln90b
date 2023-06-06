@@ -6,7 +6,7 @@ import {WelcomePage, WelcomePageProps} from "./pages/WelcomePage";
 import {NullPage} from "./pages/NullPage";
 import {PageProps} from "./pages/Page";
 import {PropsReadyEvent} from "./KLN90B";
-import {LVAR_BRIGHTNESS, LVAR_POWER, LVAR_RIGHT_SCAN} from "./LVars";
+import {LVAR_POWER} from "./LVars";
 import {HOURS_TO_SECONDS} from "./data/navdata/NavCalculator";
 
 export interface PowerEventData {
@@ -23,7 +23,11 @@ export class PowerButton {
 
 
     private readonly brightnessManager: BrightnessManager;
-    private isPowered: boolean = false;
+
+    private powerSwitchOn: boolean = false; //State of the knob
+    private electricityAvailable: boolean = true; //State of the electrical system / circuit braker
+    private isPowered: boolean = false; //If the device is actually on or off
+
     private readonly isPoweredPublisher: Publisher<PowerEvent>;
     private readonly powerCyclesSettings: UserSetting<NonNullable<KLN90BUserSettingsTypes["powercycles"]>>;
     private lastPowerChangeTime: number = Date.now() - HOURS_TO_SECONDS * 1000;
@@ -39,7 +43,7 @@ export class PowerButton {
             } else if (e === EVT_BRT_DEC) {
                 this.brightnessManager.decBrightness();
             } else if (e === EVT_POWER) {
-                this.togglePower();
+                this.togglePowerSwitch();
             }
         });
 
@@ -47,7 +51,7 @@ export class PowerButton {
 
         this.powerCyclesSettings = this.props.userSettings.getSetting("powercycles");
 
-        SimVar.SetSimVarValue(LVAR_POWER, SimVarValueType.Bool, this.isPowered);
+        SimVar.SetSimVarValue(LVAR_POWER, SimVarValueType.Bool, this.powerSwitchOn);
 
         this.props.bus.getSubscriber<PropsReadyEvent>().on("propsReady").handle(this.handlePropsReady.bind(this));
     }
@@ -56,23 +60,44 @@ export class PowerButton {
         this.props = props;
     }
 
-    private togglePower() {
-        this.setPowered(!this.isPowered);
-    }
-
-    public setPowered(isPowered: boolean): void{
-        if(this.isPowered === isPowered){
+    public setElectricityAvailable(electricityAvailable: boolean): void {
+        if (electricityAvailable === this.electricityAvailable) {
             return;
         }
 
-        console.log("Power", isPowered);
-        this.isPowered = isPowered;
+        console.log("electricityAvailable", electricityAvailable);
 
-        SimVar.SetSimVarValue(LVAR_POWER, SimVarValueType.Bool, isPowered);
+        this.electricityAvailable = electricityAvailable;
+        this.refreshPowerState();
+    }
+
+    private togglePowerSwitch() {
+        this.setPowerSwitch(!this.powerSwitchOn);
+    }
+
+    private setPowerSwitch(powerSwitchOn: boolean): void {
+        if (this.powerSwitchOn === powerSwitchOn) {
+            return;
+        }
+
+        console.log("Power", powerSwitchOn);
+        this.powerSwitchOn = powerSwitchOn;
+
+        SimVar.SetSimVarValue(LVAR_POWER, SimVarValueType.Bool, powerSwitchOn);
+        this.refreshPowerState();
+    }
+
+    private refreshPowerState(): void {
+        const isPowered = this.powerSwitchOn && this.electricityAvailable;
+        if (this.isPowered === isPowered) {
+            return;
+        }
+
+        this.isPowered = isPowered;
 
         const now = Date.now();
         const timePoweredOff = now - this.lastPowerChangeTime;
-        if (this.isPowered) {
+        if (isPowered) {
             this.powerCyclesSettings.set(this.powerCyclesSettings.value + 1);
             console.log("Powercycles: ", this.powerCyclesSettings.value);
             this.props.pageManager.setCurrentPage(WelcomePage, this.props);
@@ -80,14 +105,9 @@ export class PowerButton {
             this.props.pageManager.setCurrentPage(NullPage, {});
         }
         this.isPoweredPublisher.pub("powerEvent", {
-            isPowered: this.isPowered,
+            isPowered: isPowered,
             timeSincePowerChange: timePoweredOff,
         });
         this.lastPowerChangeTime = now;
     }
-
-    public setBrightness(brightness: number): void{
-        this.brightnessManager.setBrightness(brightness);
-    }
-
 }

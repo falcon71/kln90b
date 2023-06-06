@@ -27,15 +27,11 @@ export class BrightnessManager {
     }
 
     public incBrightness(): void {
-        this.brightnessSetting = Math.min(this.brightnessSetting + BRIGHTNESS_STEP, 1);
-        this.updateLvar();
-        this.refreshElement();
+        this.setBrightness(Math.min(this.brightnessSetting + BRIGHTNESS_STEP, 1));
     }
 
     public decBrightness(): void {
-        this.brightnessSetting = Math.max(this.brightnessSetting - BRIGHTNESS_STEP, 0);
-        this.updateLvar();
-        this.refreshElement();
+        this.setBrightness(Math.max(this.brightnessSetting - BRIGHTNESS_STEP, 0));
     }
 
     public setBrightness(brightness: number): void{

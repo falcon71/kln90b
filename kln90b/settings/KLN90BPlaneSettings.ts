@@ -16,6 +16,7 @@ export interface KLN90PlaneSettings {
         altimeterInterfaced: boolean; //example for no input: https://youtu.be/S1lt2W95bLA?t=176
         obsSource: number;
         headingInput: boolean;
+        electricityLvar: string,
         airdata: {
             isInterfaced: boolean,
             baroSource: number;
@@ -55,6 +56,7 @@ export class KLN90BPlaneSettingsParser {
                 altimeterInterfaced: this.getOption(instrumentsTag, "Input.AltimeterInterfaced", true),
                 obsSource: this.getOption(instrumentsTag, "Input.ObsSource", 1),
                 headingInput: this.getOption(instrumentsTag, "Input.HeadingInput", false),
+                electricityLvar: this.getOption(instrumentsTag, "Input.ElectricityLvar", ""),
                 airdata: {
                     isInterfaced: this.getOption(instrumentsTag, "Input.Airdata.IsInterfaced", false),
                     baroSource: this.getOption(instrumentsTag, "Input.Airdata.BaroSource", 0),
