@@ -14,7 +14,8 @@ https://www.bendixking.com/content/dam/bendixking/en/documents/document-lists/do
 ## FAQ
 ### I press the power button and the device stays off
 
-Make sure your aircraft is powered. It will also take a few seconds for the screen to warm up, before the welcome page will be shown.
+Make sure your aircraft is powered. It will also take a few seconds for the screen to warm up, before the welcome page
+will be shown. Also check that the aircraft has electricity and no circuit brakers are pulled.
 
 ### It takes a long time until a GPS signal is acquired
 

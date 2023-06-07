@@ -2,9 +2,13 @@ import {FuelUnit, KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {
     ClockEvents,
     EventBus,
-    GeoPoint, GNSSEvents,
-    GPSSatComputer, GPSSatComputerEvents,
-    GPSSystemState, LatLonInterface, Publisher,
+    GeoPoint,
+    GNSSEvents,
+    GPSSatComputer,
+    GPSSatComputerEvents,
+    GPSSystemState,
+    LatLonInterface,
+    Publisher,
     SimVarValueType,
     Unit,
     UnitFamily,
@@ -451,14 +455,14 @@ export class SensorsOut {
     }
 
     public setMagvar(magvar: number) {
-        if(!this.options.output.writeGPSLvars){
+        if (!this.options.output.writeGPSSimVars) {
             return;
         }
         SimVar.SetSimVarValue('GPS MAGVAR', SimVarValueType.Radians, magvar);
     }
 
     public setXTK(xtk: number | null, scaling: number) {
-        if(!this.options.output.writeGPSLvars){
+        if (!this.options.output.writeGPSSimVars) {
             return;
         }
         SimVar.SetSimVarValue('GPS CDI SCALING', SimVarValueType.Meters, UnitType.NMILE.convertTo(scaling, UnitType.METER));
@@ -472,7 +476,7 @@ export class SensorsOut {
     }
 
     public setDesiredTrack(dtkMag: number | null) {
-        if(!this.options.output.writeGPSLvars){
+        if (!this.options.output.writeGPSSimVars) {
             return;
         }
         if (dtkMag === null) {
@@ -485,7 +489,7 @@ export class SensorsOut {
     }
 
     public setWpBearing(bearingMag: number | null, bearingTrue: number | null) {
-        if(!this.options.output.writeGPSLvars){
+        if (!this.options.output.writeGPSSimVars) {
             return;
         }
         if (bearingMag === null) {
@@ -501,7 +505,7 @@ export class SensorsOut {
     }
 
     public setDistance(distance: number | null) {
-        if(!this.options.output.writeGPSLvars){
+        if (!this.options.output.writeGPSSimVars) {
             return;
         }
         if (distance === null) {
@@ -512,7 +516,7 @@ export class SensorsOut {
     }
 
     public setPos(pos: LatLonInterface | null, speed: Knots | null, track: Degrees | null) {
-        if(!this.options.output.writeGPSLvars){
+        if (!this.options.output.writeGPSSimVars) {
             return;
         }
         if (pos === null) {
@@ -536,7 +540,7 @@ export class SensorsOut {
 
 
     public setETE(ete: Seconds | null) {
-        if(!this.options.output.writeGPSLvars){
+        if (!this.options.output.writeGPSSimVars) {
             return;
         }
         if (ete === null) {
@@ -547,7 +551,7 @@ export class SensorsOut {
     }
 
     public reset() {
-        if(!this.options.output.writeGPSLvars){
+        if (!this.options.output.writeGPSSimVars) {
             return;
         }
 

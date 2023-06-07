@@ -16,7 +16,7 @@ export interface KLN90PlaneSettings {
         altimeterInterfaced: boolean; //example for no input: https://youtu.be/S1lt2W95bLA?t=176
         obsSource: number;
         headingInput: boolean;
-        electricityLvar: string,
+        electricitySimVar: string,
         airdata: {
             isInterfaced: boolean,
             baroSource: number;
@@ -35,7 +35,7 @@ export interface KLN90PlaneSettings {
     output: {
         obsTarget: number;
         altitudeAlertEnabled: boolean;
-        writeGPSLvars: boolean;
+        writeGPSSimVars: boolean;
     }
 
 
@@ -56,7 +56,7 @@ export class KLN90BPlaneSettingsParser {
                 altimeterInterfaced: this.getOption(instrumentsTag, "Input.AltimeterInterfaced", true),
                 obsSource: this.getOption(instrumentsTag, "Input.ObsSource", 1),
                 headingInput: this.getOption(instrumentsTag, "Input.HeadingInput", false),
-                electricityLvar: this.getOption(instrumentsTag, "Input.ElectricityLvar", ""),
+                electricitySimVar: this.getOption(instrumentsTag, "Input.ElectricitySimVar", ""),
                 airdata: {
                     isInterfaced: this.getOption(instrumentsTag, "Input.Airdata.IsInterfaced", false),
                     baroSource: this.getOption(instrumentsTag, "Input.Airdata.BaroSource", 0),
@@ -75,7 +75,7 @@ export class KLN90BPlaneSettingsParser {
             output: {
                 obsTarget: this.getOption(instrumentsTag, "Output.ObsTarget", 0),
                 altitudeAlertEnabled: this.getOption(instrumentsTag, "Output.AltitudeAlertEnabled", true),
-                writeGPSLvars: this.getOption(instrumentsTag, "Output.WriteGPSLvars", true),
+                writeGPSSimVars: this.getOption(instrumentsTag, "Output.WriteGPSSimVars", true),
             },
             debugMode: false,
             showErrorsAsMessage: this.getOption(instrumentsTag, "ShowErrorsAsMessage", true),

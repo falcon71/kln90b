@@ -67,7 +67,7 @@ import {KLNMagvar} from "./data/navdata/KLNMagvar";
 import {buildPersistentMessages} from "./data/PersistentMessages";
 import {Flightplan} from "./data/flightplan/Flightplan";
 import {SidStar} from "./data/navdata/SidStar";
-import {LVarSync} from "./LVarSync";
+import {SimVarSync} from "./SimVarSync";
 
 export interface PropsReadyEvent {
     propsReady: PageProps;
@@ -93,7 +93,7 @@ class KLN90B extends BaseInstrument {
     private userWaypointPersistor: UserWaypointPersistor | undefined;
     private userFlightplanPersistor: UserFlightplanPersistor | undefined;
     private hardware: Hardware = new Hardware();
-    private lvarSync: LVarSync | undefined;
+    private simvarSync: SimVarSync | undefined;
 
     private audioGenerator: AudioGenerator | undefined;
     private readonly userSettings: KLN90BUserSettings;
@@ -194,7 +194,7 @@ class KLN90B extends BaseInstrument {
             planeSettings: this.planeSettings,
             pageManager: this.pageManager,
         });
-        this.lvarSync = new LVarSync(this.powerButton, this.planeSettings);
+        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings);
 
         this.hEventPublisher.startPublish();
         console.log("KLN 90B ready to show welcome page");
