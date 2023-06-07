@@ -10,6 +10,10 @@ export const SURFACE_HRD = false;
 export const FLT_TIMER_GS30 = false;
 export const FLT_TIMER_POWER = true;
 
+export const GPS_ACQUISITION_REAL = false;
+export const GPS_ACQUISITION_FAST = true;
+
+
 export const enum Nav5Orientation {
     NORTH_UP = 0,
     DTK_UP = 1,
@@ -75,6 +79,7 @@ export type KLN90BUserSettingsTypes = {
     superNav5Ndb: boolean,
     superNav5Apt: boolean,
     flightTimer: boolean,
+    fastGpsAcquisition: boolean,
 }
 
 export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSettingsTypes> {
@@ -205,6 +210,10 @@ export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSett
             {
                 name: "flightTimer",
                 defaultValue: FLT_TIMER_GS30,
+            },
+            {
+                name: "fastGpsAcquisition",
+                defaultValue: GPS_ACQUISITION_REAL,
             },
         ]);
     }

@@ -12,6 +12,7 @@ https://www.bendixking.com/content/dam/bendixking/en/documents/document-lists/do
 https://www.bendixking.com/content/dam/bendixking/en/documents/document-lists/downloads-and-manuals/006-08773-0000-KLN-90B-Pilots-Guide.pdf
 
 ## FAQ
+
 ### I press the power button and the device stays off
 
 Make sure your aircraft is powered. It will also take a few seconds for the screen to warm up, before the welcome page
@@ -19,11 +20,16 @@ will be shown. Also check that the aircraft has electricity and no circuit brake
 
 ### It takes a long time until a GPS signal is acquired
 
-The KLN 90B remembers your last position. If this differs from you actual position, it may take up the 12 minutes until a GPS signal is acquired. In this case, enter your position on the SET 1 page. 
+The KLN 90B remembers your last position. If this differs from you actual position, it may take up the 12 minutes until
+a GPS signal is acquired. In this case, enter your position on the SET 1 page.
+
+Alternativly, you can set the GPS acquisition time to fast on the SET 10 page. In this case, GPS acquisition will take
+less than 30 seconds.
 
 ## Aircraft developers
 
 Include the following entry in your panel.cfg:
+
 ```
 [VcockpitXX]
 size_mm = 860,388

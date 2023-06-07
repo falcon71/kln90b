@@ -63,7 +63,7 @@ export class GPS {
         );
         bus.getSubscriber<GPSSatComputerEvents>().on('gps_system_state_changed_1').handle(state => {
             const valid = state === GPSSystemState.SolutionAcquired || state === GPSSystemState.DiffSolutionAcquired;
-            if(valid){
+            if (valid) {
                 this.gpsAcquired();
             }
         });
@@ -108,7 +108,7 @@ export class GPS {
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + TICK_TIME_CALC);
         } else {
 
-            if(this.isStarted){
+            if (this.isStarted) {
                 this.clockPublisher.pub('simTime', unixTime);
                 this.gnssPublisher.pub('gps-position', new LatLongAlt(lat, lon, alt));
                 this.gpsSatComputer.onUpdate();
@@ -164,10 +164,35 @@ export class GPS {
     }
 
     /**
+     * Recalculated the time to first fix, such as when the assumed position or time changes
+     */
+    public recalcTTF(): void {
+        const ttf = this.getTimeToFirstFix();
+        for (const sat of this.gpsSatComputer.sats) {
+            const anySat = sat as any;
+            let stateChangeTime;
+            if (this.userSettings.getSetting("fastGpsAcquisition").get()) {
+                stateChangeTime = (5 + (10 * Math.random())) * 1000; // 5 to 15 seconds like Working Title
+            } else {
+                const randomFactor = ttf / -2 + Math.random() * ttf * 1.5; //For 60 Seconds, this gives the range 30-120. 6 Minutes gives the range 3-12 minutes
+                stateChangeTime = (ttf + randomFactor) * 1000 / NUM_STATE_CHANGES;
+            }
+
+            anySat.stateChangeTime = stateChangeTime; //A hack to lengthen the time for the transition to aquired
+            anySat.stateChangeTimeRemaining = Math.min(anySat.stateChangeTimeRemaining, anySat.stateChangeTime);
+        }
+    }
+
+    public isValid(): boolean {
+        //todo this is not entirely correct. GPSSatComputer assumes navigation is only possible with 4 sats. 5-29 states that navigation may be possible with 3 sats when an altitude input is used in the solution
+        return this.gpsSatComputer.state === GPSSystemState.SolutionAcquired || this.gpsSatComputer.state === GPSSystemState.DiffSolutionAcquired;
+    }
+
+    /**
      * 3-17 Normally 2 min, but 12 min if positon or time is wrong
      * @private
      */
-    private getTimeToFirstFix(): Seconds{
+    private getTimeToFirstFix(): Seconds {
         const lat = SimVar.GetSimVarValue('PLANE LATITUDE', SimVarValueType.Degree);
         const lon = SimVar.GetSimVarValue('PLANE LONGITUDE', SimVarValueType.Degree);
         const actualPos = new GeoPoint(lat, lon);
@@ -179,25 +204,6 @@ export class GPS {
         const ttf = (posDist / MAX_POS_DIFF + secondsDiff / MAX_TIME_DIFF) * 600;
         console.log("TTF", posDist, secondsDiff, ttf);
         return Utils.Clamp(ttf, 60, 600);
-    }
-
-    /**
-     * Recalculated the time to first fix, such as when the assumed position or time changes
-     */
-    public recalcTTF(): void{
-        const ttf = this.getTimeToFirstFix();
-        for (const sat of this.gpsSatComputer.sats) {
-            const anySat = sat as any;
-            const randomFactor = ttf / -2 + Math.random() * ttf * 1.5; //For 60 Seconds, this gives the range 30-120. 6 Minutes gives the range 3-12 minutes
-
-            anySat.stateChangeTime = (ttf + randomFactor) * 1000 / NUM_STATE_CHANGES; //A hack to lengthen the time for the transition to aquired
-            anySat.stateChangeTimeRemaining = Math.min(anySat.stateChangeTimeRemaining, anySat.stateChangeTime);
-        }
-    }
-
-    public isValid(): boolean{
-        //todo this is not entirely correct. GPSSatComputer assumes navigation is only possible with 4 sats. 5-29 states that navigation may be possible with 3 sats when an altitude input is used in the solution
-        return this.gpsSatComputer.state === GPSSystemState.SolutionAcquired || this.gpsSatComputer.state === GPSSystemState.DiffSolutionAcquired;
     }
 
     reset(): void {

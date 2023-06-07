@@ -94,6 +94,7 @@ import {Apt7Page} from "./right/Apt7Page";
 import {Sta2Page} from "./left/Sta2Page";
 import {Sta5Page} from "./left/Sta5Page";
 import {Sta1Page} from "./left/Sta1Page";
+import {Set10Page} from "./left/Set10Page";
 
 export const LEFT_PAGE_TREE = [
     [Tri0Page, Tri1Page, Tri2Page, Tri3Page, Tri4Page, Tri5Page, Tri6Page],
@@ -102,7 +103,7 @@ export const LEFT_PAGE_TREE = [
     [Nav1Page, Nav2Page, Nav3Page, Nav4LeftPage, Nav5Page],
     [Cal1Page, Cal2Page, Cal3Page, Cal4Page, Cal5Page, Cal6Page, Cal7Page],
     [Sta1Page, Sta2Page, Sta3Page, Sta4Page, Sta5Page],
-    [Set1Page, Set2Page, Set3Page, Set4Page, Set5Page, Set6Page, Set7Page, Set8Page, Set9Page, Set0DummyPage],
+    [Set1Page, Set2Page, Set3Page, Set4Page, Set5Page, Set6Page, Set7Page, Set8Page, Set9Page, Set10Page, Set0DummyPage],
     [Oth1Page, Oth2Page, Oth3Page, Oth4Page, Oth5Page, Oth6Page, Oth7Page, Oth8Page, Oth9Page, Oth10Page],
 ];
 
