@@ -11,8 +11,8 @@ export class Hardware {
 
     public setScanPulled(scanPulled: boolean): void{
         if(scanPulled !== this.isScanPulled){
-            SimVar.SetSimVarValue(LVAR_RIGHT_SCAN, SimVarValueType.Bool, this.isScanPulled);
             this.isScanPulled = scanPulled;
+            SimVar.SetSimVarValue(LVAR_RIGHT_SCAN, SimVarValueType.Bool, scanPulled);
         }
     }
 
