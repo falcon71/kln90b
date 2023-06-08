@@ -1,1 +1,1 @@
-export const VERSION = "0.1 B2"; // 6 chars maximum!
+export const VERSION = "0.1 B3"; // 6 chars maximum!

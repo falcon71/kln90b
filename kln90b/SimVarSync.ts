@@ -2,6 +2,7 @@ import {SimVarValueType} from "@microsoft/msfs-sdk";
 import {PowerButton} from "./PowerButton";
 import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {LVAR_DISABLE} from "./LVars";
+import {TickController} from "./TickController";
 
 const SYNC_TICK = 100;
 
@@ -12,7 +13,7 @@ export class SimVarSync {
 
     private disabled: boolean = false;
 
-    constructor(private readonly powerButton: PowerButton, private readonly settings: KLN90PlaneSettings) {
+    constructor(private readonly powerButton: PowerButton, private readonly settings: KLN90PlaneSettings, private readonly tickController: TickController) {
         window.setInterval(this.tick.bind(this), SYNC_TICK);
     }
 
@@ -32,13 +33,13 @@ export class SimVarSync {
         }
 
         this.disabled = disabled;
-        if (disabled) {
-            this.powerButton.setPowerSwitch(false); //This also stops all ticks
 
-            if (this.settings.output.writeGPSSimVars) {
-                SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, false); //Allows other devices to write GPS vars
-            }
-        } //Nothing to do for disabling. GPS OVERRIDDEN will be written once the device is turned on again
+        this.tickController.setEnabled(!disabled);
+
+        if (this.settings.output.writeGPSSimVars) {
+            SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, !disabled); //Allows other devices to write GPS vars
+        }
+
     }
 
 

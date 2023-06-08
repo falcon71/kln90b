@@ -199,7 +199,6 @@ class KLN90B extends BaseInstrument {
             pageManager: this.pageManager,
             forceReadyToUse: forceReadyToUse,
         });
-        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings);
 
         //From now on, the welcome page may be shown. This gives us time to initialize everything here.
         //Lots of coherent calls, might take a while
@@ -287,6 +286,8 @@ class KLN90B extends BaseInstrument {
                 modeController,
                 this.messageHandler,
             ], this.messageHandler, this.planeSettings);
+
+        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager);
 
         const msa = new MSA();
 

@@ -31,6 +31,9 @@ export class TickController {
     private displayIntervallID: number = 0;
     private calcIntervallID: number = 0;
 
+    private isEnabled = true;
+    private isPowered = false;
+
     /**
      *
      * @param bus
@@ -76,8 +79,22 @@ export class TickController {
         }
     }
 
+    public setEnabled(enabled: boolean): void {
+        if (this.isEnabled === enabled) {
+            return;
+        }
+
+        this.isEnabled = enabled;
+        this.setupLoops();
+    }
+
     private handlePowerChange(evt: PowerEventData): void {
-        if (evt.isPowered) {
+        this.isPowered = evt.isPowered;
+        this.setupLoops();
+    }
+
+    private setupLoops() {
+        if (this.isPowered && this.isEnabled) {
             console.log("starting ticks");
             this.displayIntervallID = window.setInterval(this.tickDisplay.bind(this), TICK_TIME_DISPLAY);
             this.calcIntervallID = window.setInterval(this.tickCalc.bind(this), TICK_TIME_CALC);
