@@ -75,6 +75,16 @@ export class PowerButton {
         this.setPowerSwitch(!this.powerSwitchOn);
     }
 
+    /**
+     * When the flight is not loaded cold and dark, then this forces the device on.
+     * We assume that it was startet before, as such the screen must be warm.
+     * Only works if it actually receives electricity.
+     */
+    public forceReadyToUse() {
+        this.lastPowerChangeTime = Date.now(); //Forces the screen to be warm
+        this.setPowerSwitch(true);
+    }
+
     public setPowerSwitch(powerSwitchOn: boolean): void {
         if (this.powerSwitchOn === powerSwitchOn) {
             return;

@@ -30,7 +30,6 @@ type WelcomePageChildTypes = {
 }
 
 const TEST_TIME = 17000; //https://youtube.com/shorts/9We5fcd2-VE?feature=share https://www.youtube.com/watch?v=8esFTk7Noj8
-const TEST_TIME_DEBUG = 0;
 
 export interface WelcomePageProps extends ComponentProps {
     bus: EventBus;
@@ -40,6 +39,8 @@ export interface WelcomePageProps extends ComponentProps {
     userSettings: KLN90BUserSettings,
 
     pageManager: PageManager,
+
+    forceReadyToUse: boolean,
 }
 
 export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> implements Page {
@@ -48,16 +49,22 @@ export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> 
     readonly children;
     private readonly startTime = Date.now();
 
+    private readonly forceReadyToUse; //True if the aircraft was started on the runway. We skip all test pages
     constructor(props: WelcomePageProps | PageProps) {
         super(props);
 
-        console.log("Welcome page shown");
+        console.log("Welcome page shown", props);
 
         const welcome1 = this.props.userSettings.getSetting("welcome1").get();
         const welcome2 = this.props.userSettings.getSetting("welcome2").get();
         const welcome3 = this.props.userSettings.getSetting("welcome3").get();
         const welcome4 = this.props.userSettings.getSetting("welcome4").get();
 
+        if ("forceReadyToUse" in props && props.forceReadyToUse) {
+            this.forceReadyToUse = props.forceReadyToUse;
+        } else {
+            this.forceReadyToUse = this.props.planeSettings.debugMode;
+        }
 
         this.children = new UIElementChildren<WelcomePageChildTypes>({
             welcome1: new FreetextEditor(this.props.bus, welcome1, 23, this.saveWelcome1.bind(this)),
@@ -126,12 +133,10 @@ export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> 
     public tick(blink: boolean): void {
         const now = Date.now();
 
-        const testTime = this.props.planeSettings.debugMode ? TEST_TIME_DEBUG : TEST_TIME;
-
         //The real device takes about 15 seconds. That's plenty of time to initialize all sorts of facilityLoaders,
         // searchsessions and caches
-        if (now - this.startTime > testTime && !this.lCursorController.cursorActive && this.arePropsReady(this.props)) {
-            if (this.props.planeSettings.debugMode) {
+        if ((now - this.startTime > TEST_TIME || this.forceReadyToUse) && !this.lCursorController.cursorActive && this.arePropsReady(this.props)) {
+            if (this.forceReadyToUse) {
                 //We got no time for that
                 this.props.sensors.in.gps.startGPSSearch();
                 this.props.sensors.in.gps.gpsSatComputer.acquireAndUseSatellites();

@@ -187,17 +187,19 @@ class KLN90B extends BaseInstrument {
         //The xml is not available before init!
         this.planeSettings = new KLN90BPlaneSettingsParser().parsePlaneSettings(this.xmlConfig);
 
+        const forceReadyToUse = this.isForceReadyToUse();
+
+        console.log("forceReadyToUse", forceReadyToUse);
+
         this.pageManager.Init();
         this.powerButton = new PowerButton({
             bus: this.bus,
             userSettings: this.userSettings,
             planeSettings: this.planeSettings,
             pageManager: this.pageManager,
+            forceReadyToUse: forceReadyToUse,
         });
         this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings);
-
-        this.hEventPublisher.startPublish();
-        console.log("KLN 90B ready to show welcome page");
 
         //From now on, the welcome page may be shown. This gives us time to initialize everything here.
         //Lots of coherent calls, might take a while
@@ -205,6 +207,14 @@ class KLN90B extends BaseInstrument {
 
         this.audioGenerator = new AudioGenerator(this.bus, this.planeSettings);
         const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, this.audioGenerator, this.messageHandler);
+
+        this.hEventPublisher.startPublish();
+        console.log("KLN 90B ready to show welcome page");
+
+        if (forceReadyToUse) {
+            this.powerButton.forceReadyToUse();
+        }
+
         let restoreSuccessFull = true;
 
         const facilityLoader = new KLNFacilityLoader(
@@ -321,6 +331,13 @@ class KLN90B extends BaseInstrument {
         });
     }
 
+    /**
+     * True if this is not a cold and dark start. The KLN90B should be started running and ready to use
+     * @private
+     */
+    private isForceReadyToUse(): boolean {
+        return !!SimVar.GetSimVarValue("ENG COMBUSTION:1", SimVarValueType.Bool);
+    }
 
 
 }
