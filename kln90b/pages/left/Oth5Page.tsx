@@ -11,8 +11,6 @@ import {OthFuelDisplay} from "../../controls/displays/FuelDisplay";
 import {OthFuelFieldset, TripFuelFieldset} from "../../controls/selects/FuelFieldset";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {IcaoFixedLength} from "../../data/navdata/IcaoFixedLength";
-import {calcDistToDestination} from "../../services/FlightplanUtils";
-import {NauticalMiles, Seconds} from "../../data/Units";
 
 
 type Oth5PageTypes = {
@@ -83,17 +81,14 @@ export class Oth5Page extends SixLineHalfPage {
         this.children.get("dest").text = IcaoFixedLength.getIdentFromFacility(destLeg?.wpt ?? null);
 
 
-        const destDis = calcDistToDestination(this.props.memory.navPage, futureLegs);
-        const destEte = this.calcEte(destDis);
-
         const fob = this.props.sensors.in.fuelComputer.fob;
         const ff = this.props.sensors.in.fuelComputer.fuelFlow1 + this.props.sensors.in.fuelComputer.fuelFlow2;
 
         let reqd = null;
         let lfob = null;
         let extra = null;
-        if (destEte !== null) {
-            reqd = ff * destEte / 3600;
+        if (this.props.memory.navPage.eteToDest !== null) {
+            reqd = ff * this.props.memory.navPage.eteToDest / 3600;
             lfob = fob - reqd;
             extra = lfob - this.props.memory.othPage.reserve;
         }
@@ -107,16 +102,6 @@ export class Oth5Page extends SixLineHalfPage {
         this.props.memory.othPage.reserve = reserve;
     }
 
-    private calcEte(dist: NauticalMiles | null): Seconds | null {
-        if (dist === null) {
-            return null;
-        }
-        if (this.props.sensors.in.gps.groundspeed > 2) {
-            return dist / this.props.sensors.in.gps.groundspeed * 60 * 60;
-        } else {
-            return null;
-        }
-    }
 }
 
 class FuelOnBoardSelect implements Field {

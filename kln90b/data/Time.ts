@@ -92,6 +92,10 @@ export class TimeStamp {
         return this.date.getTime();
     }
 
+    public getSecondsSinceMidnight() {
+        return this.getHours() * 3600 + this.getMinutes() * 60 + this.getSeconds();
+    }
+
     public setTimestamp(timestamp: number): void {
         this.date.setTime(timestamp);
     }

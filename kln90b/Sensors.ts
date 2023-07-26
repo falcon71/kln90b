@@ -2,11 +2,13 @@ import {FuelUnit, KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {
     ClockEvents,
     EventBus,
+    Facility,
     GeoPoint,
     GNSSEvents,
     GPSSatComputer,
     GPSSatComputerEvents,
     GPSSystemState,
+    ICAO,
     LatLonInterface,
     Publisher,
     SimVarValueType,
@@ -16,7 +18,7 @@ import {
     UserSetting,
 } from "@microsoft/msfs-sdk";
 import {pressureAlt2IndicatedAlt} from "./data/Conversions";
-import {Celsius, Degrees, Feet, Inhg, Knots, Seconds} from "./data/Units";
+import {Celsius, Degrees, Feet, Inhg, Knots, NauticalMiles, Seconds} from "./data/Units";
 import {TimeStamp} from "./data/Time";
 import {PowerEvent, PowerEventData} from "./PowerButton";
 import {KLN90BUserSettings} from "./settings/KLN90BUserSettings";
@@ -474,11 +476,20 @@ export class SensorsOut {
         SimVar.SetSimVarValue('GPS CDI SCALING', SimVarValueType.Meters, UnitType.NMILE.convertTo(scaling, UnitType.METER));
         if (xtk === null) {
             SimVar.SetSimVarValue('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, false);
+            SimVar.SetSimVarValue('GPS IS ACTIVE WAY POINT', SimVarValueType.Number, false);
             SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, 0);
         } else {
             SimVar.SetSimVarValue('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, true);
+            SimVar.SetSimVarValue('GPS IS ACTIVE WAY POINT', SimVarValueType.Number, true);
             SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, UnitType.NMILE.convertTo(-xtk, UnitType.METER));
         }
+
+        //The KLN does not output vertical information
+        SimVar.SetSimVarValue('GPS GSI SCALING', SimVarValueType.Meters, 0);
+        SimVar.SetSimVarValue('GPS VERTICAL ANGLE', SimVarValueType.Degree, 0);
+        SimVar.SetSimVarValue('GPS VERTICAL ANGLE ERROR', SimVarValueType.Degree, 0);
+        SimVar.SetSimVarValue('GPS VERTICAL ERROR', SimVarValueType.Meters, 0);
+        SimVar.SetSimVarValue('GPS HAS GLIDEPATH', SimVarValueType.Bool, false);
     }
 
     public setDesiredTrack(dtkMag: number | null) {
@@ -510,7 +521,7 @@ export class SensorsOut {
         }
     }
 
-    public setDistance(distance: number | null) {
+    public setDistance(distance: NauticalMiles | null) {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
@@ -544,8 +555,7 @@ export class SensorsOut {
         }
     }
 
-
-    public setETE(ete: Seconds | null) {
+    public setWPTETE(ete: Seconds | null, eta: Seconds | null) {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
@@ -553,6 +563,67 @@ export class SensorsOut {
             SimVar.SetSimVarValue('GPS WP ETE', SimVarValueType.Seconds, 0);
         } else {
             SimVar.SetSimVarValue('GPS WP ETE', SimVarValueType.Seconds, ete);
+        }
+        if (eta === null) {
+            SimVar.SetSimVarValue('GPS WP ETA', SimVarValueType.Seconds, 0);
+        } else {
+            SimVar.SetSimVarValue('GPS WP ETA', SimVarValueType.Seconds, eta);
+        }
+    }
+
+    public setDestETE(ete: Seconds | null, eta: Seconds | null) {
+        if (!this.options.output.writeGPSSimVars) {
+            return;
+        }
+        if (ete === null) {
+            SimVar.SetSimVarValue('GPS ETE', SimVarValueType.Seconds, 0);
+        } else {
+            SimVar.SetSimVarValue('GPS ETE', SimVarValueType.Seconds, ete);
+        }
+        if (eta === null) {
+            SimVar.SetSimVarValue('GPS ETA', SimVarValueType.Seconds, 0);
+        } else {
+            SimVar.SetSimVarValue('GPS ETA', SimVarValueType.Seconds, eta);
+        }
+    }
+
+    public setWPIndex(index: number, countTotal: number) {
+        if (!this.options.output.writeGPSSimVars) {
+            return;
+        }
+        SimVar.SetSimVarValue('GPS FLIGHT PLAN WP COUNT', SimVarValueType.Number, countTotal);
+        SimVar.SetSimVarValue('GPS FLIGHT PLAN WP INDEX', SimVarValueType.Number, index + 1);
+    }
+
+    public setNextWpt(wpt: Facility | null) {
+        if (!this.options.output.writeGPSSimVars) {
+            return;
+        }
+        if (wpt === null) {
+            SimVar.SetSimVarValue('GPS WP NEXT ID', SimVarValueType.String, '');
+            SimVar.SetSimVarValue('GPS WP NEXT LAT', SimVarValueType.Degree, 0);
+            SimVar.SetSimVarValue('GPS WP NEXT LON', SimVarValueType.String, 0);
+        } else {
+            SimVar.SetSimVarValue('GPS WP NEXT ID', SimVarValueType.String, ICAO.getIdent(wpt.icao));
+            SimVar.SetSimVarValue('GPS WP NEXT LAT', SimVarValueType.Degree, wpt.lat);
+            SimVar.SetSimVarValue('GPS WP NEXT LON', SimVarValueType.String, wpt.lon);
+        }
+    }
+
+    public setPrevWpt(wpt: Facility | null) {
+        if (!this.options.output.writeGPSSimVars) {
+            return;
+        }
+        if (wpt === null) {
+            SimVar.SetSimVarValue('GPS WP PREV VALID', SimVarValueType.Bool, false);
+            SimVar.SetSimVarValue('GPS WP PREV ID', SimVarValueType.String, '');
+            SimVar.SetSimVarValue('GPS WP PREV LAT', SimVarValueType.Degree, 0);
+            SimVar.SetSimVarValue('GPS WP PREV LON', SimVarValueType.String, 0);
+        } else {
+            SimVar.SetSimVarValue('GPS WP PREV VALID', SimVarValueType.Bool, true);
+            SimVar.SetSimVarValue('GPS WP PREV ID', SimVarValueType.String, ICAO.getIdent(wpt.icao));
+            SimVar.SetSimVarValue('GPS WP PREV LAT', SimVarValueType.Degree, wpt.lat);
+            SimVar.SetSimVarValue('GPS WP PREV LON', SimVarValueType.String, wpt.lon);
         }
     }
 
@@ -569,8 +640,12 @@ export class SensorsOut {
         this.setDesiredTrack(null);
         this.setWpBearing(null, null);
         this.setDistance(null);
-        this.setETE(null);
+        this.setWPTETE(null, null);
+        this.setDestETE(null, null);
         this.setPos(null, null, null);
+        this.setWPIndex(0, 0)
+        this.setPrevWpt(null);
+        this.setNextWpt(null);
     }
 }
 

@@ -5,11 +5,9 @@ import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {TimeDisplay} from "../../controls/displays/TimeDisplay";
 import {IcaoFixedLength} from "../../data/navdata/IcaoFixedLength";
-import {NauticalMiles, Seconds} from "../../data/Units";
 import {SelectField} from "../../controls/selects/SelectField";
 import {TIMEZONES} from "../../data/Time";
 import {DurationDisplay} from "../../controls/displays/DurationDisplay";
-import {calcDistToDestination} from "../../services/FlightplanUtils";
 
 
 type Dt4PageTypes = {
@@ -48,7 +46,7 @@ export class Dt4Page extends SixLineHalfPage {
             time: new TimeDisplay(now),
             eta: new TimeDisplay(null),
             flightTime: new DurationDisplay(this.props.memory.dtPage.flightTimer),
-            ete: new DurationDisplay(null),
+            ete: new DurationDisplay(this.props.memory.navPage.eteToDest),
         });
 
         this.cursorController = new CursorController(this.children);
@@ -75,9 +73,6 @@ export class Dt4Page extends SixLineHalfPage {
         const futureLegs = this.props.memory.navPage.activeWaypoint.getFutureLegs();
         const destLeg = futureLegs.length > 0 ? futureLegs[futureLegs.length - 1] : null;
 
-        const destDis = calcDistToDestination(this.props.memory.navPage, futureLegs);
-        const destEte = this.calcEte(destDis);
-
 
         const now = this.props.sensors.in.gps.timeZulu.atTimezone(TIMEZONES[this.timezoneSetting.get()]);
 
@@ -85,24 +80,14 @@ export class Dt4Page extends SixLineHalfPage {
         this.children.get("timezone").value = this.timezoneSetting.get();
         this.children.get("depTime").time = this.props.memory.dtPage.departureTime?.atTimezone(TIMEZONES[this.timezoneSetting.get()]) ?? null;
         this.children.get("time").time = now;
-        this.children.get("eta").time = destEte ? now.addSeconds(destEte) : null;
+        this.children.get("eta").time = this.props.memory.navPage.eteToDest ? now.addSeconds(this.props.memory.navPage.eteToDest) : null;
         this.children.get("flightTime").time = this.props.memory.dtPage.flightTimer;
-        this.children.get("ete").time = destEte;
+        this.children.get("ete").time = this.props.memory.navPage.eteToDest;
     }
 
     private saveTimezone(tzIndex: number): void {
         this.props.userSettings.getSetting("timezone").set(tzIndex);
     }
 
-    private calcEte(dist: NauticalMiles | null): Seconds | null {
-        if (dist === null) {
-            return null;
-        }
-        if (this.props.sensors.in.gps.groundspeed > 2) {
-            return dist / this.props.sensors.in.gps.groundspeed * 60 * 60;
-        } else {
-            return null;
-        }
-    }
 
 }

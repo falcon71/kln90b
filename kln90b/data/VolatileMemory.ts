@@ -63,6 +63,8 @@ export class NavPageState {
     public xtkToActive: NauticalMiles | null = null;
     public distToActive: NauticalMiles | null = null;
     public eteToActive: Seconds | null = null;
+    public distToDest: NauticalMiles | null = null;
+    public eteToDest: Seconds | null = null;
     public bearingToActive: Degrees | null = null; //true
     public desiredTrack: Degrees | null = null;  //true
     public obsMag: Degrees = 0; //Magnetic!!

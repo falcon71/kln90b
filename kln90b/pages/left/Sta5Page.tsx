@@ -3,11 +3,9 @@ import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {WaypointEditor} from "../../controls/editors/WaypointEditor";
-import {NauticalMiles, Seconds} from "../../data/Units";
 import {TimeEditor} from "../../controls/editors/TimeEditor";
 import {SelectField} from "../../controls/selects/SelectField";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {calcDistToDestination} from "../../services/FlightplanUtils";
 import {TimeStamp, TIMEZONES} from "../../data/Time";
 
 
@@ -41,10 +39,8 @@ export class Sta5Page extends SixLineHalfPage {
         const futureLegs = this.props.memory.navPage.activeWaypoint.getFutureLegs();
         this.wpt = futureLegs.length > 0 ? futureLegs[futureLegs.length - 1].wpt : null;
 
-        const destDis = calcDistToDestination(this.props.memory.navPage, futureLegs);
-        const destEte = this.calcEte(destDis);
-        if (destEte !== null) {
-            this.etaZulu = this.props.sensors.in.gps.timeZulu.addSeconds(destEte);
+        if (this.props.memory.navPage.eteToDest !== null) {
+            this.etaZulu = this.props.sensors.in.gps.timeZulu.addSeconds(this.props.memory.navPage.eteToDest);
         }
 
         this.children = new UIElementChildren<Sta5PageTypes>({
@@ -72,17 +68,6 @@ export class Sta5Page extends SixLineHalfPage {
             {this.children.get("result").render()}<br/>
             -15&nbsp&nbsp0&nbsp&nbsp•15
         </pre>);
-    }
-
-    private calcEte(dist: NauticalMiles | null): Seconds | null {
-        if (dist === null) {
-            return null;
-        }
-        if (this.props.sensors.in.gps.groundspeed > 2) {
-            return dist / this.props.sensors.in.gps.groundspeed * 60 * 60;
-        } else {
-            return null;
-        }
     }
 
     private setWpt(waypoint: Facility | null) {

@@ -6,9 +6,7 @@ import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {DurationDisplay} from "../../controls/displays/DurationDisplay";
 import {IcaoFixedLength} from "../../data/navdata/IcaoFixedLength";
-import {NauticalMiles, Seconds} from "../../data/Units";
 import {Alignment, RoundedDistanceDisplay} from "../../controls/displays/RoundedDistanceDisplay";
-import {calcDistToDestination} from "../../services/FlightplanUtils";
 
 
 type Dt1OtherPageTypes = {
@@ -53,8 +51,8 @@ export class Dt1OtherPage extends SixLineHalfPage {
             activeEte: new DurationDisplay(navState.eteToActive),
             destIdx: new TextDisplay(""),
             destIdent: new TextDisplay(""),
-            destDis: new RoundedDistanceDisplay(Alignment.right, null),
-            destEte: new DurationDisplay(null),
+            destDis: new RoundedDistanceDisplay(Alignment.right, this.props.memory.navPage.distToDest),
+            destEte: new DurationDisplay(this.props.memory.navPage.eteToDest),
         });
     }
 
@@ -96,26 +94,15 @@ export class Dt1OtherPage extends SixLineHalfPage {
         if (destLeg === null) {
             this.lastRef.instance.classList.add("d-none");
         } else {
-            const destDis = calcDistToDestination(this.props.memory.navPage, futureLegs);
             this.children.get("destIdx").text = (legs.indexOf(destLeg) + 1).toString().padStart(2, " ");
             this.children.get("destIdent").text = IcaoFixedLength.getIdentFromFacility(destLeg.wpt);
-            this.children.get("destDis").distance = destDis;
-            this.children.get("destEte").time = this.calcEte(destDis);
+            this.children.get("destDis").distance = this.props.memory.navPage.distToDest;
+            this.children.get("destEte").time = this.props.memory.navPage.eteToDest;
             this.lastRef.instance.classList.remove("d-none");
         }
 
 
     }
 
-    private calcEte(dist: NauticalMiles | null): Seconds | null {
-        if (dist === null) {
-            return null;
-        }
-        if (this.props.sensors.in.gps.groundspeed > 2) {
-            return dist / this.props.sensors.in.gps.groundspeed * 60 * 60;
-        } else {
-            return null;
-        }
-    }
 
 }

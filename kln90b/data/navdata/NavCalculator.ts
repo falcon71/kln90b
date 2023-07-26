@@ -3,10 +3,11 @@ import {Sensors} from "../../Sensors";
 import {FROM, TO, VolatileMemory} from "../VolatileMemory";
 import {GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
-import {Degrees, Knots} from "../Units";
+import {Degrees, Knots, Seconds} from "../Units";
 import {ModeController} from "../../services/ModeController";
 import {KLNFixType} from "../flightplan/Flightplan";
 import {KLNMagvar} from "./KLNMagvar";
+import {calcDistToDestination} from "../../services/FlightplanUtils";
 
 
 //4-8
@@ -37,6 +38,8 @@ export class NavCalculator implements CalcTickable {
             nav.distToActive = 34.5;
             nav.desiredTrack = 130;
             nav.eteToActive = null;
+            nav.distToDest = null;
+            nav.eteToDest = null;
             nav.bearingToActive = 130;
             nav.toFrom = FROM;
             nav.waypointAlert = false;
@@ -67,6 +70,10 @@ export class NavCalculator implements CalcTickable {
 
         //6-18 Always direct distance, even for arcs
         nav.distToActive = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(toLeg.wpt), UnitType.NMILE);
+
+        const futureLegs = nav.activeWaypoint.getFutureLegs();
+        nav.distToDest = calcDistToDestination(nav, futureLegs);
+
         nav.bearingToActive = this.sensors.in.gps.coords.bearingTo(toLeg.wpt);
 
         let dtk: Degrees;
@@ -81,8 +88,11 @@ export class NavCalculator implements CalcTickable {
 
         if (this.sensors.in.gps.groundspeed > 2) {
             nav.eteToActive = nav.distToActive / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
+            nav.eteToDest = nav.distToDest ? nav.distToDest / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS : 0;
+
         } else {
             nav.eteToActive = null;
+            nav.eteToDest = null;
             nav.waypointAlert = false;
         }
 
@@ -139,8 +149,10 @@ export class NavCalculator implements CalcTickable {
         const nav = this.memory.navPage;
         nav.xtkToActive = null;
         nav.distToActive = null;
+        nav.distToDest = null;
         nav.desiredTrack = null;
         nav.eteToActive = null;
+        nav.eteToDest = null;
         nav.bearingToActive = null;
         nav.toFrom = TO;
         nav.waypointAlert = false;
@@ -159,9 +171,24 @@ export class NavCalculator implements CalcTickable {
         this.sensors.out.setDesiredTrack(obsOut);
         this.sensors.out.setWpBearing(this.magvar.trueToMag(nav.bearingToActive, magvar), nav.bearingToActive);
         this.sensors.out.setDistance(nav.distToActive);
-        this.sensors.out.setETE(nav.eteToActive);
+        this.sensors.out.setWPTETE(nav.eteToActive, this.eteToEta(nav.eteToActive));
+        this.sensors.out.setDestETE(nav.eteToDest, this.eteToEta(nav.eteToDest));
         this.sensors.out.setPos(this.sensors.in.gps.coords, this.sensors.in.gps.groundspeed, this.sensors.in.gps.getTrackTrueRespectingGroundspeed());
+
+        this.sensors.out.setWPIndex(nav.activeWaypoint.getActiveFplIdx(), nav.activeWaypoint.fpl0.getLegs().length);
+
+        this.sensors.out.setPrevWpt(nav.activeWaypoint.getFromWpt());
+        this.sensors.out.setNextWpt(nav.activeWaypoint.getActiveWpt());
     }
+
+    private eteToEta(ete: Seconds | null): Seconds | null {
+        if (ete === null) {
+            return null;
+        }
+
+        return this.sensors.in.gps.timeZulu.getSecondsSinceMidnight() + ete;
+    }
+
 
     /**
      * https://edwilliams.org/avform147.htm#Turns

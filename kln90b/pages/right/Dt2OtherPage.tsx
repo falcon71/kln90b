@@ -6,11 +6,9 @@ import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {TimeDisplay} from "../../controls/displays/TimeDisplay";
 import {IcaoFixedLength} from "../../data/navdata/IcaoFixedLength";
-import {NauticalMiles, Seconds} from "../../data/Units";
 import {Alignment, RoundedDistanceDisplay} from "../../controls/displays/RoundedDistanceDisplay";
 import {SelectField} from "../../controls/selects/SelectField";
 import {TIMEZONES} from "../../data/Time";
-import {calcDistToDestination} from "../../services/FlightplanUtils";
 
 
 type Dt2OtherPageTypes = {
@@ -63,8 +61,8 @@ export class Dt2OtherPage extends SixLineHalfPage {
             timezone: new SelectField(TIMEZONES.map(t => t.code), this.timezoneSetting.get(), this.saveTimezone.bind(this)),
             destIdx: new TextDisplay(""),
             destIdent: new TextDisplay(""),
-            destDis: new RoundedDistanceDisplay(Alignment.right, null),
-            destEta: new TimeDisplay(null),
+            destDis: new RoundedDistanceDisplay(Alignment.right, this.props.memory.navPage.distToDest),
+            destEta: new TimeDisplay(navState.eteToDest ? now.addSeconds(navState.eteToDest) : null),
             destTimezone: new TextDisplay(TIMEZONES[this.timezoneSetting.get()].code),
         });
 
@@ -113,12 +111,10 @@ export class Dt2OtherPage extends SixLineHalfPage {
         if (destLeg === null) {
             this.lastRef.instance.classList.add("d-none");
         } else {
-            const destDis = calcDistToDestination(this.props.memory.navPage, futureLegs);
-            const destEte = this.calcEte(destDis);
             this.children.get("destIdx").text = (legs.indexOf(destLeg) + 1).toString().padStart(2, " ");
             this.children.get("destIdent").text = IcaoFixedLength.getIdentFromFacility(destLeg.wpt);
-            this.children.get("destDis").distance = destDis;
-            this.children.get("destEta").time = destEte ? now.addSeconds(destEte) : null;
+            this.children.get("destDis").distance = this.props.memory.navPage.distToDest;
+            this.children.get("destEta").time = this.props.memory.navPage.eteToDest ? now.addSeconds(this.props.memory.navPage.eteToDest) : null;
             this.children.get("destTimezone").text = TIMEZONES[this.timezoneSetting.get()].code;
             this.lastRef.instance.classList.remove("d-none");
         }
@@ -130,15 +126,5 @@ export class Dt2OtherPage extends SixLineHalfPage {
         this.props.userSettings.getSetting("timezone").set(tzIndex);
     }
 
-    private calcEte(dist: NauticalMiles | null): Seconds | null {
-        if (dist === null) {
-            return null;
-        }
-        if (this.props.sensors.in.gps.groundspeed > 2) {
-            return dist / this.props.sensors.in.gps.groundspeed * 60 * 60;
-        } else {
-            return null;
-        }
-    }
 
 }

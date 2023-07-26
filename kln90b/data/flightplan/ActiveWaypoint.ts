@@ -21,7 +21,7 @@ export class ActiveWaypoint {
 
     private fplIdx: number = -1; //The index of the active waypoint (to) in the flightplan
 
-    constructor(userSettings: KLN90BUserSettings, private readonly sensors: Sensors, private readonly fpl0: Flightplan, public lastactiveWaypoint: Facility | null) {
+    constructor(userSettings: KLN90BUserSettings, private readonly sensors: Sensors, public readonly fpl0: Flightplan, public lastactiveWaypoint: Facility | null) {
         this.setting = userSettings.getSetting("activeWaypoint");
     }
 
