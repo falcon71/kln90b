@@ -602,11 +602,11 @@ export class SensorsOut {
         if (wpt === null) {
             SimVar.SetSimVarValue('GPS WP NEXT ID', SimVarValueType.String, '');
             SimVar.SetSimVarValue('GPS WP NEXT LAT', SimVarValueType.Degree, 0);
-            SimVar.SetSimVarValue('GPS WP NEXT LON', SimVarValueType.String, 0);
+            SimVar.SetSimVarValue('GPS WP NEXT LON', SimVarValueType.Degree, 0);
         } else {
             SimVar.SetSimVarValue('GPS WP NEXT ID', SimVarValueType.String, ICAO.getIdent(wpt.icao));
             SimVar.SetSimVarValue('GPS WP NEXT LAT', SimVarValueType.Degree, wpt.lat);
-            SimVar.SetSimVarValue('GPS WP NEXT LON', SimVarValueType.String, wpt.lon);
+            SimVar.SetSimVarValue('GPS WP NEXT LON', SimVarValueType.Degree, wpt.lon);
         }
     }
 
@@ -618,12 +618,12 @@ export class SensorsOut {
             SimVar.SetSimVarValue('GPS WP PREV VALID', SimVarValueType.Bool, false);
             SimVar.SetSimVarValue('GPS WP PREV ID', SimVarValueType.String, '');
             SimVar.SetSimVarValue('GPS WP PREV LAT', SimVarValueType.Degree, 0);
-            SimVar.SetSimVarValue('GPS WP PREV LON', SimVarValueType.String, 0);
+            SimVar.SetSimVarValue('GPS WP PREV LON', SimVarValueType.Degree, 0);
         } else {
             SimVar.SetSimVarValue('GPS WP PREV VALID', SimVarValueType.Bool, true);
             SimVar.SetSimVarValue('GPS WP PREV ID', SimVarValueType.String, ICAO.getIdent(wpt.icao));
             SimVar.SetSimVarValue('GPS WP PREV LAT', SimVarValueType.Degree, wpt.lat);
-            SimVar.SetSimVarValue('GPS WP PREV LON', SimVarValueType.String, wpt.lon);
+            SimVar.SetSimVarValue('GPS WP PREV LON', SimVarValueType.Degree, wpt.lon);
         }
     }
 

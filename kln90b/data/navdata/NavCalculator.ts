@@ -88,7 +88,7 @@ export class NavCalculator implements CalcTickable {
 
         if (this.sensors.in.gps.groundspeed > 2) {
             nav.eteToActive = nav.distToActive / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
-            nav.eteToDest = nav.distToDest ? nav.distToDest / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS : 0;
+            nav.eteToDest = nav.distToDest ? nav.distToDest / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS : null;
 
         } else {
             nav.eteToActive = null;
