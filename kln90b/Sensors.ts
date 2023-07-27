@@ -26,6 +26,7 @@ import {CalcTickable, TICK_TIME_CALC} from "./TickController";
 import {AudioGenerator} from "./services/AudioGenerator";
 import {MessageHandler, OneTimeMessage} from "./data/MessageHandler";
 import {HOURS_TO_SECONDS} from "./data/navdata/NavCalculator";
+import {NavMode} from "./data/VolatileMemory";
 
 const SAVE_INTERVALL = 60000;
 
@@ -447,7 +448,7 @@ export class SensorsOut {
         this.reset();
     }
 
-    public setObs(obsMag: number | null, isActive: boolean) {
+    public setObs(obsMag: number | null) {
         this.obsOut = obsMag;
         if (obsMag !== null) {
             switch (this.options.output.obsTarget) {
@@ -463,7 +464,6 @@ export class SensorsOut {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
-        SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, isActive);
         if (obsMag === null) {
             SimVar.SetSimVarValue('GPS OBS VALUE', SimVarValueType.Degree, 0);
         } else {
@@ -638,12 +638,39 @@ export class SensorsOut {
         }
     }
 
-    public setApproachData(isActive: boolean) {
+    public setMode(mode: NavMode) {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
 
-        SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, isActive);
+        switch (mode) {
+            case NavMode.ENR_LEG:
+                SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
+                SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, false);
+                SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, 0);
+                break
+            case NavMode.ENR_OBS:
+                SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, true);
+                SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, false);
+                SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, 0);
+                break
+            case NavMode.ARM_LEG:
+                SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
+                SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
+                SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, 1);
+                break
+            case NavMode.ARM_OBS:
+                SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, true);
+                SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
+                SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, 1);
+                break
+            case NavMode.APR_LEG:
+                SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
+                SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
+                SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, 2);
+                break
+
+        }
     }
 
     public reset() {
@@ -654,7 +681,7 @@ export class SensorsOut {
         SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, true);
 
         this.setXTK(null, 5);
-        this.setObs(null, false);
+        this.setObs(null);
         this.setMagvar(0);
         this.setDesiredTrack(null);
         this.setWpBearing(null, null);
@@ -665,7 +692,7 @@ export class SensorsOut {
         this.setWPIndex(0, 0)
         this.setPrevWpt(null);
         this.setNextWpt(null);
-        this.setApproachData(false);
+        this.setMode(NavMode.ENR_LEG);
     }
 }
 

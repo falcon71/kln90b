@@ -1,6 +1,6 @@
 import {CalcTickable} from "../../TickController";
 import {Sensors} from "../../Sensors";
-import {FROM, NavMode, TO, VolatileMemory} from "../VolatileMemory";
+import {FROM, TO, VolatileMemory} from "../VolatileMemory";
 import {GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Degrees, Knots, Seconds} from "../Units";
@@ -166,7 +166,7 @@ export class NavCalculator implements CalcTickable {
         const magvar = this.magvar.getCurrentMagvar();
 
         this.sensors.out.setXTK(nav.xtkToActive, nav.xtkScale);
-        this.sensors.out.setObs(obsOut, this.modeController.isObsModeActive());
+        this.sensors.out.setObs(obsOut);
         this.sensors.out.setMagvar(magvar);
         this.sensors.out.setDesiredTrack(obsOut);
         this.sensors.out.setWpBearing(this.magvar.trueToMag(nav.bearingToActive, magvar), nav.bearingToActive);
@@ -180,7 +180,7 @@ export class NavCalculator implements CalcTickable {
         this.sensors.out.setPrevWpt(nav.activeWaypoint.getFromWpt());
         this.sensors.out.setNextWpt(nav.activeWaypoint.getActiveWpt());
 
-        this.sensors.out.setApproachData(nav.navmode === NavMode.APR_LEG);
+        this.sensors.out.setMode(nav.navmode);
     }
 
     private eteToEta(ete: Seconds | null): Seconds | null {
