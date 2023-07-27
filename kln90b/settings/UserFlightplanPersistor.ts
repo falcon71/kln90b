@@ -4,6 +4,8 @@ import {Flightplan, FlightplanEvents, KLNFlightplanLeg, KLNLegType} from "../dat
 import {KLNFacilityLoader} from "../data/navdata/KLNFacilityLoader";
 import {AsoboFlightplanLoader} from "./AsoboFlightplanLoader";
 import {MessageHandler, OneTimeMessage} from "../data/MessageHandler";
+import {AsoboFlightplanSaver} from "./AsoboFlightplanSaver";
+import {KLN90PlaneSettings} from "./KLN90BPlaneSettings";
 
 /**
  * In the real unit, FPL 0 is also persisted: https://youtu.be/S1lt2W95bLA?t=181
@@ -11,9 +13,10 @@ import {MessageHandler, OneTimeMessage} from "../data/MessageHandler";
  */
 export class UserFlightplanPersistor {
     private manager: DefaultUserSettingManager<KLN90BUserFlightplansTypes>;
+    private asoboFlightplanSaver: AsoboFlightplanSaver = new AsoboFlightplanSaver();
 
 
-    constructor(private bus: EventBus, private facilityLoader: KLNFacilityLoader, private messageHandler: MessageHandler) {
+    constructor(private readonly bus: EventBus, private readonly facilityLoader: KLNFacilityLoader, private readonly messageHandler: MessageHandler, private readonly planeSettings: KLN90PlaneSettings) {
         bus.getSubscriber<FlightplanEvents>().on("flightplanChanged").handle(this.persistFlightplan.bind(this));
         this.manager = KLN90BUserFlightplansSettings.getManager(bus);
     }
@@ -47,8 +50,9 @@ export class UserFlightplanPersistor {
     }
 
     private persistFlightplan(fpl: Flightplan) {
-        if (fpl.idx === 0) {
-            return; //todo, do we want to sync 0 back to the simulator?
+        if (fpl.idx === 0 && this.planeSettings.output.writeGPSSimVars) {
+            this.asoboFlightplanSaver.saveToAsoboFlightplan(fpl);
+            return;
         }
 
         const setting = this.manager.getSetting(`fpl${fpl.idx - 1}`);

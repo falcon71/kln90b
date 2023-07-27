@@ -2,7 +2,8 @@ import {
     AirportFacility,
     ApproachTransition,
     ArrivalProcedure,
-    DepartureProcedure, EnrouteTransition,
+    DepartureProcedure,
+    EnrouteTransition,
     FSComponent,
     ICAO,
     NodeReference,
@@ -407,11 +408,13 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         const type = this.getProcedureType();
 
         const fpl0 = this.props.memory.fplPage.flightplans[0];
+        fpl0.startBatchInsert();
         fpl0.removeProcedure(type); //I don't think you can have two approaches at the same time
         const fpl0Legs = fpl0.getLegs();
         const facility = unpackFacility(this.facility)!;
         let idx = fpl0Legs.findIndex(wpt => wpt.wpt.icao === facility.icao);
         if (idx === -1) {
+            //Airport not in FPL?
             idx = type === KLNLegType.SID ? 0 : fpl0Legs.length;
 
             try {
@@ -419,6 +422,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             } catch (e) {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
                 console.error(e);
+                fpl0.finishBatchInsert();
                 return;
             }
         }
@@ -426,7 +430,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             //After the airport
             idx++;
         } else {
-            //We want to insert the start before the APP
+            //We want to insert the STAR before the APP
             while (idx > 0 && fpl0Legs[idx - 1].type === KLNLegType.APP) {
                 idx--;
             }
@@ -443,9 +447,11 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             } catch (e) {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
                 console.error(e);
+                fpl0.finishBatchInsert();
                 return;
             }
         }
+        fpl0.finishBatchInsert();
 
         this.currentApt7Page = new Apt7ProcedurePage({
             ...this.props,

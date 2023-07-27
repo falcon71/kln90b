@@ -487,11 +487,11 @@ export class SensorsOut {
         SimVar.SetSimVarValue('GPS CDI SCALING', SimVarValueType.Meters, UnitType.NMILE.convertTo(scaling, UnitType.METER));
         if (xtk === null) {
             SimVar.SetSimVarValue('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, false);
-            SimVar.SetSimVarValue('GPS IS ACTIVE WAY POINT', SimVarValueType.Number, false);
+            SimVar.SetSimVarValue('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, false);
             SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, 0);
         } else {
             SimVar.SetSimVarValue('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, true);
-            SimVar.SetSimVarValue('GPS IS ACTIVE WAY POINT', SimVarValueType.Number, true);
+            SimVar.SetSimVarValue('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, true);
             SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, UnitType.NMILE.convertTo(-xtk, UnitType.METER));
         }
 
@@ -648,22 +648,22 @@ export class SensorsOut {
                 SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
                 SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, false);
                 SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, 0);
-                break
+                break;
             case NavMode.ENR_OBS:
                 SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, true);
                 SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, false);
                 SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, 0);
-                break
+                break;
             case NavMode.ARM_LEG:
                 SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
                 SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
                 SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, 1);
-                break
+                break;
             case NavMode.ARM_OBS:
                 SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, true);
                 SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
                 SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, 1);
-                break
+                break;
             case NavMode.APR_LEG:
                 SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
                 SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
@@ -689,7 +689,7 @@ export class SensorsOut {
         this.setWPTETE(null, null);
         this.setDestETE(null, null);
         this.setPos(null, null, null);
-        this.setWPIndex(0, 0)
+        this.setWPIndex(0, 0);
         this.setPrevWpt(null);
         this.setNextWpt(null);
         this.setMode(NavMode.ENR_LEG);

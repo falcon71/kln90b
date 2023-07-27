@@ -202,17 +202,20 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
         console.log("load", app, iaf, legs);
 
         const fpl0 = this.props.memory.fplPage.flightplans[0];
+        fpl0.startBatchInsert();
         fpl0.removeProcedure(KLNLegType.APP); //I don't think you can have two approaches at the same time
         const fpl0Legs = fpl0.getLegs();
         const facility = unpackFacility(this.facility)!;
         let idx = fpl0Legs.findIndex(wpt => wpt.wpt.icao === facility.icao);
         if (idx === -1) {
+            //Airport not in FPL?
             idx = fpl0Legs.length;
             try {
                 insertLegIntoFpl(fpl0, this.props.memory.navPage, fpl0Legs.length, {wpt: facility, type: KLNLegType.USER});
             } catch (e) {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
                 console.error(e);
+                fpl0.finishBatchInsert();
                 return;
             }
         }
@@ -228,9 +231,11 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
             } catch (e) {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
                 console.error(e);
+                fpl0.finishBatchInsert();
                 break;
             }
         }
+        fpl0.finishBatchInsert();
 
         this.currentApt8Page = new Apt8IAPPage({
             ...this.props,

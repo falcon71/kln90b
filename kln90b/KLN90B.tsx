@@ -231,7 +231,7 @@ class KLN90B extends BaseInstrument {
             console.error(e);
         }
 
-        this.userFlightplanPersistor = new UserFlightplanPersistor(this.bus, facilityLoader, this.messageHandler);
+        this.userFlightplanPersistor = new UserFlightplanPersistor(this.bus, facilityLoader, this.messageHandler, this.planeSettings);
 
         const nearestLists = new Nearestlists(facilityLoader, sensors, this.userSettings);
         const nearestUtils = new NearestUtils(facilityLoader);
