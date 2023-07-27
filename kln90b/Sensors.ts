@@ -447,19 +447,30 @@ export class SensorsOut {
         this.reset();
     }
 
-    public setObs(obsMag: number | null) {
+    public setObs(obsMag: number | null, isActive: boolean) {
         this.obsOut = obsMag;
-        if (obsMag === null) {
+        if (obsMag !== null) {
+            switch (this.options.output.obsTarget) {
+                case 1:
+                    SimVar.SetSimVarValue('VOR1_SET', SimVarValueType.Number, obsMag);
+                    break;
+                case 2:
+                    SimVar.SetSimVarValue('VOR2_SET', SimVarValueType.Number, obsMag);
+                    break;
+            }
+        }
+
+        if (!this.options.output.writeGPSSimVars) {
             return;
         }
-        switch (this.options.output.obsTarget) {
-            case 1:
-                SimVar.SetSimVarValue('VOR1_SET', SimVarValueType.Number, obsMag);
-                break;
-            case 2:
-                SimVar.SetSimVarValue('VOR2_SET', SimVarValueType.Number, obsMag);
-                break;
+        SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, isActive);
+        if (obsMag === null) {
+            SimVar.SetSimVarValue('GPS OBS VALUE', SimVarValueType.Degree, 0);
+        } else {
+            SimVar.SetSimVarValue('GPS OBS VALUE', SimVarValueType.Degree, obsMag);
         }
+
+
     }
 
     public setMagvar(magvar: number) {
@@ -627,6 +638,14 @@ export class SensorsOut {
         }
     }
 
+    public setApproachData(isActive: boolean) {
+        if (!this.options.output.writeGPSSimVars) {
+            return;
+        }
+
+        SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, isActive);
+    }
+
     public reset() {
         if (!this.options.output.writeGPSSimVars) {
             return;
@@ -635,7 +654,7 @@ export class SensorsOut {
         SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, true);
 
         this.setXTK(null, 5);
-        this.setObs(null);
+        this.setObs(null, false);
         this.setMagvar(0);
         this.setDesiredTrack(null);
         this.setWpBearing(null, null);
@@ -646,6 +665,7 @@ export class SensorsOut {
         this.setWPIndex(0, 0)
         this.setPrevWpt(null);
         this.setNextWpt(null);
+        this.setApproachData(false);
     }
 }
 
