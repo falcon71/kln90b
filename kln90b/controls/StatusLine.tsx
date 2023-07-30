@@ -128,7 +128,11 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
             this.statusRef.instance.classList.add("d-none");
         }
 
-        this.modeRef.instance.textContent = this.getModeString();
+        if (this.props.screen.leftPageName() === "SET 0") {
+            this.modeRef.instance.textContent = "       "; //3-7, this page is a bit special
+        } else {
+            this.modeRef.instance.textContent = this.getModeString();
+        }
 
 
         if (this.props.screen.isLeftCursorActive()) {
@@ -144,7 +148,11 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
             this.rightPageRef.instance.textContent = "CRSR";
             this.rightPageRef.instance.classList.add("inverted");
         } else {
-            this.rightPageRef.instance.textContent = this.props.screen.rightPageName().padEnd(5, " ");
+            if (this.props.screen.leftPageName() === "SET 0") {
+                this.rightPageRef.instance.textContent = "     ";  //3-7, this page is a bit special
+            } else {
+                this.rightPageRef.instance.textContent = this.props.screen.rightPageName().padEnd(5, " ");
+            }
             this.rightPageRef.instance.classList.remove("inverted");
         }
 

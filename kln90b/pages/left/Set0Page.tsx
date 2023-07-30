@@ -5,15 +5,22 @@ import {CursorController, NO_CURSOR_CONTROLLER} from "../CursorController";
 import {Button} from "../../controls/Button";
 import {SixLinePage} from "../FourSegmentPage";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {Inverted} from "../../controls/Inverted";
 
 
 type Set0PageTypes = {
+    line2: TextDisplay,
     line3: TextDisplay,
-    line4: TextDisplay,
+    line5: TextDisplay,
 
     button: Button,
 }
+
+const key = "C70220BE";
+
+/**
+ * We fake the update screen as far as you would get without a connection.
+ * The whole procedure can be seen here: https://youtu.be/7l57UDAuz8A
+ */
 
 export class Set0Page extends SixLinePage {
 
@@ -35,8 +42,9 @@ export class Set0Page extends SixLinePage {
 
 
         this.children = new UIElementChildren<Set0PageTypes>({
-            line3: new TextDisplay("   O N   G R O U N D"),
-            line4: new TextDisplay("        O N L Y "),
+            line2: new TextDisplay("   O N   G R O U N D"),
+            line3: new TextDisplay("        O N L Y "),
+            line5: new TextDisplay(`     KEY ${key}`),
             button: new Button("UPDATE PUBLISHED DB", this.next.bind(this)),
         });
 
@@ -65,11 +73,13 @@ export class Set0Page extends SixLinePage {
             this.children.get("button").isVisible = this.lCursorController.cursorActive;
 
             if (this.lCursorController.cursorActive) {
-                this.children.get("line3").text = "   ";
-                this.children.get("line4").text = "   ";
+                this.children.get("line2").text = "  ";
+                this.children.get("line3").text = "  ";
+                this.children.get("line5").text = "  ";
             } else {
-                this.children.get("line3").text = "   O N   G R O U N D";
-                this.children.get("line4").text = "        O N L Y ";
+                this.children.get("line2").text = "   O N   G R O U N D";
+                this.children.get("line3").text = "        O N L Y ";
+                this.children.get("line5").text = `     KEY ${key}`;
             }
         }
     }
@@ -94,9 +104,10 @@ export class Set0Page extends SixLinePage {
                 return (<pre>
                     &nbsp&nbsp&nbsp&nbsp&nbsp&nbspU P D A T E<br/>
                     &nbsp&nbsp&nbspD A T A&nbsp&nbsp&nbspB A S E<br/>
-                    <br/>
+                    {this.children.get("line2").render()}<br/>
                     {this.children.get("line3").render()}{this.children.get("button").render()}<br/>
-                    {this.children.get("line4").render()}
+                    <br/>
+                    {this.children.get("line5").render()}
                 </pre>);
             case 1:
                 this.children.get("button").text = "U P D A T E ?";
@@ -110,24 +121,14 @@ export class Set0Page extends SixLinePage {
                     &nbsp&nbsp&nbsp&nbsp&nbsp{this.children.get("button").render()}
                 </pre>);
             case 2:
-                this.children.get("button").text = "A P P R O V E ?";
-                this.children.get("button").isReadonly = false;
-                return (<pre>
-                    &nbsp&nbsp&nbsp&nbsp&nbsp&nbspU P D A T E<br/>
-                    &nbsp&nbsp&nbspD A T A&nbsp&nbsp&nbspB A S E<br/>
-                    <br/>
-                    &nbsp&nbsp&nbspE S T .&nbsp&nbsp&nbspL O A D<br/>
-                    &nbsp&nbsp&nbspT I M E :&nbsp&nbsp&nbsp10 MIN<br/>
-                    &nbsp&nbsp&nbsp&nbsp{this.children.get("button").render()}
-                </pre>);
-            case 3:
                 this.lCursorController.setCursorActive(false);
                 this.children.get("button").isReadonly = true;
                 return (<pre>
                     &nbsp&nbsp&nbsp&nbsp&nbsp&nbspU P D A T E<br/>
                     &nbsp&nbsp&nbspD A T A&nbsp&nbsp&nbspB A S E<br/>
                     <br/>
-                    &nbsp&nbsp&nbsp<Inverted>LOADER NOT READY</Inverted>
+                    &nbsp&nbsp&nbsp&nbsp&nbsp&nbspL O A D E R<br/>
+                    &nbsp&nbsp&nbspN O T&nbsp&nbsp&nbspR E A D Y
                 </pre>);
             default:
                 throw Error(`Unexpected step: ${this.step}`);
