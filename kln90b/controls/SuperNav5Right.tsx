@@ -34,12 +34,14 @@ export class SuperNav5Right implements UiElement {
     }
 
     public render(): VNode {
-        return (<pre ref={this.ref} class="super-nav5-right-controls d-none">
-            ÜVOR:{this.children.get("vor").render()}<br/>
-            ÝNDB:{this.children.get("ndb").render()}<br/>
-            ŸAPT:{this.children.get("apt").render()}<br/>
-            &nbsp{this.children.get("orientationValue").render()}{this.children.get("orientation").render()}<br/>
-        </pre>);
+        return (<div ref={this.ref} class="super-nav5-right-controls d-none">
+            <pre class="super-nav5-right-controls-inner">
+                ÜVOR:{this.children.get("vor").render()}<br/>
+                ÝNDB:{this.children.get("ndb").render()}<br/>
+                ŸAPT:{this.children.get("apt").render()}<br/>
+                &nbsp{this.children.get("orientationValue").render()}{this.children.get("orientation").render()}<br/>
+            </pre>
+        </div>);
     }
 
     public tick(blink: boolean): void {

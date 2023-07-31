@@ -11,6 +11,10 @@ $green: #00D109;
 $xMarginPx: $xMargin * $zoom-factor;
 $yMarginPx: $yMargin * $zoom-factor;
 
+$glow: blur(0.5px) //The KLN never appears sharp in all photos I have ssen
+drop-shadow(0 0 1px $green) //On photos, the letters apear a little bit larger than our pixel grid. This achieves a similiar effect
+drop-shadow(0 0 10px $green); //This larger shadow creates the distinct glow on larger areas
+
 
 @font-face {
     font-family: "KLN90B";
@@ -36,6 +40,7 @@ kln-90b {
     font-family: KLN90BMap, monospace;
 }
 
+
 kln-90b #Mainframe #InstrumentsContainer {
     font-family: KLN90B, monospace;
     font-size: 11px * $zoom-factor;
@@ -51,6 +56,9 @@ kln-90b #Mainframe #InstrumentsContainer {
 
     z-index: 0;
     margin: $yMarginPx $xMarginPx;
+
+    filter: $glow;
+
 }
 
 .statusline{
@@ -60,7 +68,6 @@ kln-90b #Mainframe #InstrumentsContainer {
     width: $xChars * $charWidth * $zoom-factor;
     border-top: 1px*$zoom-factor solid $green ;
     padding-top: 1px*$zoom-factor;
-
 }
 
 pre {
@@ -72,14 +79,14 @@ pre {
     color: black;
 }
 
-.inverted-blink{
+.inverted-blink {
     color: $green;
-    background-color: black;
+    background-color: unset;
 }
 
-.blink{
+.blink {
     color: black;
-    background-color: black;
+    background-color: unset;
 }
 
 .d-none{
@@ -160,8 +167,14 @@ pre {
     height: 4 * $charHeight * $zoom-factor;
     width: 8 * $charWidth * $zoom-factor;
     background-color: black;
-    border-left: 1px*$zoom-factor solid $green ;
-    border-bottom: 1px*$zoom-factor solid $green ;
+    border-left: 1px*$zoom-factor solid $green;
+    border-bottom: 1px*$zoom-factor solid $green;
+
+    filter: blur(0.5px); //Otherwise there will be a glow effect on the top and right around the black background..
+}
+
+.super-nav5-right-controls-inner {
+    filter: $glow; //.. but we do want the glow back for the text
 }
 
 .super-nav5-directto-window {

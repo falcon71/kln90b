@@ -3,11 +3,14 @@ import {CHAR_HEIGHT, CHAR_HEIGHT_MAP, CHAR_WIDTH, CHAR_WIDTH_MAP, ZOOM_FACTOR} f
 import {
     FSComponent,
     GeoCircle,
-    GeoCircleResampler, GeoCircleResamplerVector,
+    GeoCircleResampler,
+    GeoCircleResamplerVector,
     GeoPoint,
-    GeoPointInterface, LatLonInterface,
+    GeoPointInterface,
+    LatLonInterface,
     MapProjection,
-    NodeReference, ReadonlyFloat64Array,
+    NodeReference,
+    ReadonlyFloat64Array,
     UnitType,
     VNode,
 } from "@microsoft/msfs-sdk";
@@ -293,7 +296,7 @@ export class CanvasDrawContext {
     }
 
     /**
-     * x and y are the positon of the element that the text describes. The actual position will me different,
+     * x and y are the positon of the element that the text describes. The actual position will be different,
      * because a location will be choosen where the least pixels are overdrawn.
      * @param x
      * @param y
@@ -302,31 +305,34 @@ export class CanvasDrawContext {
     public drawLabel(x: number, y: number, text: string) {
         const width = text.length * CHAR_WIDTH_MAP;
         const height = CHAR_HEIGHT_MAP;
+        //Add a little bit of spacing for the symbol
+        const offsetX = CHAR_WIDTH_MAP / 3;
+        const offsetY = CHAR_HEIGHT_MAP / 3;
 
         //Our coordinate system uses x and y for top left!
 
         const checks = [
-            [x - width, y - height], //top left
-            [x - width / 2, y - height], //top
-            [x, y - height], //top right
-            [x - width, Math.round(y - height / 2)], //left
-            [x - width / 2, Math.round(y - height / 2)], //center
-            [x, Math.round(y - height / 2)], //right
-            [x - width, y], //bottom left
-            [x - width / 2, y], //bottom
-            [x, y], //bottom right
+            [x - offsetX - width, y - offsetY - height], //top left
+            [x - width / 2, y - offsetY - height], //top
+            [x + offsetX, y - offsetY - height], //top right
+            [x - offsetX - width, y - height / 2], //left
+            [x - width / 2, y - height / 2], //center
+            [x + offsetX, y - height / 2], //right
+            [x - offsetX - width, y + offsetY], //bottom left
+            [x - width / 2, y + offsetY], //bottom
+            [x + offsetX, y + offsetY], //bottom right
         ];
 
         const scores = checks.map(c => ({
             pos: c,
-            score: this.getTextPositionScore(c[0], c[1], width, height),
+            score: this.getTextPositionScore(Math.round(c[0]), Math.round(c[1]), width, height),
         })).sort((a, b) => b.score - a.score);
 
-        const bestX = scores[0].pos[0];
-        const bestY = scores[0].pos[1];
+        const bestX = Math.round(scores[0].pos[0]);
+        const bestY = Math.round(scores[0].pos[1]);
 
         //In the real device, the labels have an outline of one pixel. This here does not look exactly right, but is still quite convincing
-        this.ctx.strokeText(text, bestX * ZOOM_FACTOR, bestY * ZOOM_FACTOR);
+        //this.ctx.strokeText(text, bestX * ZOOM_FACTOR, bestY * ZOOM_FACTOR);
 
         this.ctx.fillText(text, bestX * ZOOM_FACTOR, bestY * ZOOM_FACTOR);
 
@@ -342,7 +348,7 @@ export class CanvasDrawContext {
 
 
         //In the real device, the labels have an outline of one pixel. This here does not look exactly right, but is still quite convincing
-        this.ctx.strokeText(text, leftX * ZOOM_FACTOR, topY * ZOOM_FACTOR);
+        //this.ctx.strokeText(text, leftX * ZOOM_FACTOR, topY * ZOOM_FACTOR);
 
         this.ctx.fillText(text, leftX * ZOOM_FACTOR, topY * ZOOM_FACTOR);
 
@@ -564,17 +570,18 @@ export class Canvas implements UiElement {
          */
 
 
-        ctx.fillStyle = "#000000";
-        ctx.fillRect(0, 0, this.ref.instance.width, this.ref.instance.height);
+        //ctx.fillStyle = "#000000";
+        //ctx.fillRect(0, 0, this.ref.instance.width, this.ref.instance.height);
+        ctx.clearRect(0, 0, this.ref.instance.width, this.ref.instance.height);
 
         ctx.font = `${7 * ZOOM_FACTOR}px KLN90BMap`;
         ctx.textBaseline = "top";
         ctx.fillStyle = "#00D109";
 
-        ctx.strokeStyle = "#000000";
+        //  ctx.strokeStyle = "#000000";
         //ctx.strokeStyle = "#FF0000";
         //There seems to be a maximum that is rendered for strokeText
-        ctx.lineWidth = ZOOM_FACTOR * 10;
+        //ctx.lineWidth = ZOOM_FACTOR * 10;
 
         return new CanvasDrawContext(ctx, this.getWidth(), this.getHeight());
     }
