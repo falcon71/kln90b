@@ -89,7 +89,10 @@ export class SuperNav1Page extends SixLinePage {
     }
 
     private getIdent(): string {
-        const leg = this.props.memory.navPage.activeWaypoint.getActiveLeg()!;
+        const leg = this.props.memory.navPage.activeWaypoint.getActiveLeg();
+        if (leg === null) {
+            return "";
+        }
         return ICAO.getIdent(leg.wpt.icao) + SidStar.getWptSuffix(leg.fixType);
     }
 
