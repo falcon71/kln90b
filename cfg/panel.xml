@@ -4,7 +4,7 @@
         <VFROnly>false</VFROnly> <!-- true, if this instrument is not rated for IFR -->
         <Input>
             <AltimeterInterfaced>true</AltimeterInterfaced> <!-- true if the altimeter is interfaced via gray code. Required for IFR. Irrelevant when Airdata.IsInterfaced is set to true  -->
-            <ObsSource>1</ObsSource> <!-- 0 to disable, otherwise 1 or 2. Required for approach approval. -->
+            <ObsSource>1</ObsSource> <!-- 0 to disable, otherwise 1 or 2. Required for approach approval. Synced with L:KLN90B_ObsSource -->
             <HeadingInput>false</HeadingInput> <!-- true, when the KLN receives heading input -->
             <ElectricitySimVar>CIRCUIT ON:1</ElectricitySimVar> <!-- this boolean SimVar will be used to determine if the KLN 90B receives electricity -->
             <Airdata>
@@ -23,9 +23,9 @@
             </ExternalSwitches>
         </Input>
         <Output>
-            <ObsTarget>1</ObsTarget> <!-- 0 to disable. If 1 or 2 is set, the KLN writes the OBS to this device -->
+            <ObsTarget>1</ObsTarget> <!-- 0 to disable. If 1 or 2 is set, the KLN writes the OBS to this device. Synced with L:KLN90B_ObsTarget -->
             <AltitudeAlertEnabled>false</AltitudeAlertEnabled> <!-- false if altitude alert is disabled completely. even if true, you will need to include an AvionicSounds entry for kln_short_beep and kln_long_beep in your sound.xml-->
-            <WriteGPSSimVars>true</WriteGPSSimVars> <!-- if true, the KLN90 will write various GPS SimVars, which can be used for the HSI, RMI etc. -->
+            <WriteGPSSimVars>true</WriteGPSSimVars> <!-- if true, the KLN90 will write various GPS SimVars, which can be used for the HSI, RMI etc. Synced with L:KLN90B_WriteGpsSimvars -->
         </Output>
     </Instrument>
 </PlaneHTMLConfig>

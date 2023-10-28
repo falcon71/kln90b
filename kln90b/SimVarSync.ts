@@ -1,7 +1,7 @@
 import {SimVarValueType} from "@microsoft/msfs-sdk";
 import {PowerButton} from "./PowerButton";
 import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
-import {LVAR_DISABLE} from "./LVars";
+import {LVAR_DISABLE, LVAR_GPS_SIMVARS, LVAR_OBS_SOURCE, LVAR_OBS_TARGET} from "./LVars";
 import {TickController} from "./TickController";
 
 const SYNC_TICK = 100;
@@ -25,6 +25,15 @@ export class SimVarSync {
 
         const disabled = !!SimVar.GetSimVarValue(LVAR_DISABLE, SimVarValueType.Bool);
         this.setDisabled(disabled);
+
+        this.settings.input.obsSource = SimVar.GetSimVarValue(LVAR_OBS_SOURCE, SimVarValueType.Number);
+        this.settings.output.obsTarget = SimVar.GetSimVarValue(LVAR_OBS_TARGET, SimVarValueType.Number);
+
+        const writeGpsSimvars = !!SimVar.GetSimVarValue(LVAR_GPS_SIMVARS, SimVarValueType.Bool);
+        if (writeGpsSimvars !== this.settings.output.writeGPSSimVars) {
+            this.settings.output.writeGPSSimVars = writeGpsSimvars;
+            SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, writeGpsSimvars);
+        }
     }
 
     private setDisabled(disabled: boolean): void {
