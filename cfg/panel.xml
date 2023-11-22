@@ -6,7 +6,7 @@
             <AltimeterInterfaced>true</AltimeterInterfaced> <!-- true if the altimeter is interfaced via gray code. Required for IFR. Irrelevant when Airdata.IsInterfaced is set to true  -->
             <ObsSource>1</ObsSource> <!-- 0 to disable, otherwise 1 or 2. Required for approach approval. Synced with L:KLN90B_ObsSource -->
             <HeadingInput>false</HeadingInput> <!-- true, when the KLN receives heading input -->
-            <ElectricitySimVar>CIRCUIT ON:1</ElectricitySimVar> <!-- this boolean SimVar will be used to determine if the KLN 90B receives electricity -->
+            <ElectricitySimVar>CIRCUIT ON:1</ElectricitySimVar> <!-- this boolean SimVar will be used to determine if the KLN 90B receives electricity.If an index is used, it is synced with L:KLN90B_ElectricitySimVarIndex -->
             <Airdata>
                 <IsInterfaced>false</IsInterfaced> <!-- Will also provide altitude data -->
                 <BaroSource>0</BaroSource> <!-- 1 or 2 if the baro setting of the respective altimeter is transmitted -->

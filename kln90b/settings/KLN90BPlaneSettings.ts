@@ -1,5 +1,5 @@
 import {SimVarValueType} from "@microsoft/msfs-sdk";
-import {LVAR_GPS_SIMVARS, LVAR_OBS_SOURCE, LVAR_OBS_TARGET} from "../LVars";
+import {LVAR_ELECTRICITY_INDEX, LVAR_GPS_SIMVARS, LVAR_OBS_SOURCE, LVAR_OBS_TARGET} from "../LVars";
 
 export const enum FuelUnit {
     GAL = "GAL",
@@ -89,6 +89,10 @@ export class KLN90BPlaneSettingsParser {
         SimVar.SetSimVarValue(LVAR_OBS_SOURCE, SimVarValueType.Number, options.input.obsSource);
         SimVar.SetSimVarValue(LVAR_OBS_TARGET, SimVarValueType.Number, options.output.obsTarget);
         SimVar.SetSimVarValue(LVAR_GPS_SIMVARS, SimVarValueType.Bool, options.output.writeGPSSimVars);
+        if (options.input.electricitySimVar.includes(":")) {
+            SimVar.SetSimVarValue(LVAR_ELECTRICITY_INDEX, SimVarValueType.Number, options.input.electricitySimVar.split(":")[1]);
+        }
+
         return options;
     }
 

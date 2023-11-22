@@ -1,7 +1,7 @@
 import {SimVarValueType} from "@microsoft/msfs-sdk";
 import {PowerButton} from "./PowerButton";
 import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
-import {LVAR_DISABLE, LVAR_GPS_SIMVARS, LVAR_OBS_SOURCE, LVAR_OBS_TARGET} from "./LVars";
+import {LVAR_DISABLE, LVAR_ELECTRICITY_INDEX, LVAR_GPS_SIMVARS, LVAR_OBS_SOURCE, LVAR_OBS_TARGET} from "./LVars";
 import {TickController} from "./TickController";
 
 const SYNC_TICK = 100;
@@ -17,9 +17,14 @@ export class SimVarSync {
         window.setInterval(this.tick.bind(this), SYNC_TICK);
     }
 
-
     private tick(): void {
         if (this.settings.input.electricitySimVar) {
+            if (this.settings.input.electricitySimVar.includes(":")) {
+                const split = this.settings.input.electricitySimVar.split(":");
+                split[1] = SimVar.GetSimVarValue(LVAR_ELECTRICITY_INDEX, SimVarValueType.Number);
+                this.settings.input.electricitySimVar = split.join(":");
+            }
+
             this.powerButton.setElectricityAvailable(!!SimVar.GetSimVarValue(this.settings.input.electricitySimVar, SimVarValueType.Bool));
         }
 
