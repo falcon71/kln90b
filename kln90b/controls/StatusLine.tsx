@@ -100,18 +100,19 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
                 } else {
                     this.msgEntRef.instance.classList.remove("blink");
                 }
+                this.msgEntRef.instance.classList.remove("inverted");
             } else if (this.props.messageHandler.hasMessages()) {
+                this.msgEntRef.instance.classList.add("inverted");
                 this.msgEntRef.instance.textContent = "msg";
 
                 if (this.props.messageHandler.hasUnreadMessages()) {
-                    this.msgEntRef.instance.classList.add("inverted");
                     if (blink) {
                         this.msgEntRef.instance.classList.add("inverted-blink");
                     } else {
                         this.msgEntRef.instance.classList.remove("inverted-blink");
                     }
                 } else {
-                    this.msgEntRef.instance.classList.remove("inverted", "inverted-blink");
+                    this.msgEntRef.instance.classList.remove("inverted-blink");
                 }
             } else if (this.props.screen.isMessagePageShown()) {
                 //https://youtu.be/-7xleA3Hz3Y?t=137
@@ -154,6 +155,19 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
                 this.rightPageRef.instance.textContent = this.props.screen.rightPageName().padEnd(5, " ");
             }
             this.rightPageRef.instance.classList.remove("inverted");
+        }
+
+        //Odd place to put this, but the problem is, we need access to blink
+        if (this.props.memory.navPage.isSelfTestActive) {
+            this.props.sensors.out.setMessageLight(true);
+        } else if (this.props.messageHandler.hasMessages()) {
+            if (this.props.messageHandler.hasUnreadMessages()) {
+                this.props.sensors.out.setMessageLight(!blink); //Flashing https://youtu.be/S1lt2W95bLA?si=C45kt8pik15Iodoy&t=2245
+            } else {
+                this.props.sensors.out.setMessageLight(true);  //Alway on: https://youtu.be/S1lt2W95bLA?si=RZ0ki0BAj-BOQwSD&t=822
+            }
+        } else {
+            this.props.sensors.out.setMessageLight(false);
         }
 
     }

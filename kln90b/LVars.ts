@@ -6,3 +6,7 @@ export const LVAR_OBS_SOURCE = "L:KLN90B_ObsSource"; // Changes Input.ObsSource 
 export const LVAR_ELECTRICITY_INDEX = "L:KLN90B_ElectricitySimVarIndex"; // Changes the index of Input.ElectricitySimVar from the panel.xml on the fly
 export const LVAR_OBS_TARGET = "L:KLN90B_ObsTarget"; // Changes Output.ObsTarget from the panel.xml on the fly
 export const LVAR_GPS_SIMVARS = "L:KLN90B_WriteGpsSimvars"; // Changes Output.WriteGPSSimVars from the panel.xml on the fly
+
+export const LVAR_MSG_LIGHT = "L:KLN90B_MsgLight"; //Boolean. true whenever the MSG light flashes
+export const LVAR_WPT_LIGHT = "L:KLN90B_WptLight"; //Boolean. true if the waypoint alert is active
+

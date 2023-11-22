@@ -1,6 +1,7 @@
 import {DisplayComponent, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {
     EVT_ALT,
+    EVT_APPR_ARM,
     EVT_CLR,
     EVT_DCT,
     EVT_ENT,
@@ -485,6 +486,10 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     page.getCursorController().setCursorActive(true);
                     this.pushRightPage(page, altPage);
                 }
+                return true;
+            case EVT_APPR_ARM:
+                this.props.modeController.armApproachPressed();
+                return true;
         }
         return false;
     }

@@ -42,7 +42,7 @@ export class NavCalculator implements CalcTickable {
             nav.eteToDest = null;
             nav.bearingToActive = 130;
             nav.toFrom = FROM;
-            nav.waypointAlert = false;
+            nav.waypointAlert = true;
             nav.xtkScale = 5;
             this.lastDistance = 9999;
             this.setOutput();
@@ -181,6 +181,7 @@ export class NavCalculator implements CalcTickable {
         this.sensors.out.setNextWpt(nav.activeWaypoint.getActiveWpt());
 
         this.sensors.out.setMode(nav.navmode);
+        this.sensors.out.setWptAlertLight(nav.waypointAlert); //The manual says flashing, but it's steady in this video (left light) https://youtu.be/S1lt2W95bLA?si=C45kt8pik15Iodoy&t=2245
     }
 
     private eteToEta(ete: Seconds | null): Seconds | null {

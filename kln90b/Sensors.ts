@@ -27,6 +27,7 @@ import {AudioGenerator} from "./services/AudioGenerator";
 import {MessageHandler, OneTimeMessage} from "./data/MessageHandler";
 import {HOURS_TO_SECONDS} from "./data/navdata/NavCalculator";
 import {NavMode} from "./data/VolatileMemory";
+import {LVAR_MSG_LIGHT, LVAR_WPT_LIGHT} from "./LVars";
 
 const SAVE_INTERVALL = 60000;
 
@@ -636,6 +637,14 @@ export class SensorsOut {
             SimVar.SetSimVarValue('GPS WP PREV LAT', SimVarValueType.Degree, wpt.lat);
             SimVar.SetSimVarValue('GPS WP PREV LON', SimVarValueType.Degree, wpt.lon);
         }
+    }
+
+    public setMessageLight(lightOn: boolean) {
+        SimVar.SetSimVarValue(LVAR_MSG_LIGHT, SimVarValueType.Bool, lightOn);
+    }
+
+    public setWptAlertLight(lightOn: boolean) {
+        SimVar.SetSimVarValue(LVAR_WPT_LIGHT, SimVarValueType.Bool, lightOn);
     }
 
     public setMode(mode: NavMode) {

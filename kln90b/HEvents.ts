@@ -30,3 +30,6 @@ export const EVT_R_SCAN = "KLN90B_RightScan_Toggle";
 
 export const EVT_R_SCAN_LEFT = "KLN90B_RightScan_Left";
 export const EVT_R_SCAN_RIGHT = "KLN90B_RightScan_Right";
+
+//External Devices
+export const EVT_APPR_ARM = "KLN90B_ApprArm_Push";
