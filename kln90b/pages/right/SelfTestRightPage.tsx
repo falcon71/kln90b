@@ -14,6 +14,7 @@ import {AiracPage} from "../AiracPage";
 import {VFROnlyPage} from "../VFROnlyPage";
 import {format} from "numerable";
 import {Inhg} from "../../data/Units";
+import {ObswarningPage} from "../ObsWarningPage";
 
 
 type SelftTestRightPageChildTypes = {
@@ -148,10 +149,18 @@ export class SelfTestRightPage extends SixLineHalfPage {
                 page: new VFROnlyPage(this.props),
             });
         } else {
-            this.props.pageManager.setCurrentPage(FourSegmentPage, {
-                ...this.props,
-                page: new AiracPage(this.props),
-            });
+            if (this.props.modeController.isObsModeActive()) {
+                this.props.pageManager.setCurrentPage(FourSegmentPage, {
+                    ...this.props,
+                    page: new ObswarningPage(this.props),
+                });
+            } else {
+                this.props.pageManager.setCurrentPage(FourSegmentPage, {
+                    ...this.props,
+                    page: new AiracPage(this.props),
+                });
+            }
+
         }
 
     }

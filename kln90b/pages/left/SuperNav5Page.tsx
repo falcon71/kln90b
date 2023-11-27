@@ -1,12 +1,15 @@
 import {
-    AirportFacility, AirportRunway,
+    AirportFacility,
+    AirportRunway,
     Facility,
     FacilityType,
     FSComponent,
     GeoPoint,
-    ICAO, OneWayRunway,
+    ICAO,
+    OneWayRunway,
     RunwayUtils,
-    UnitType, UserSetting,
+    UnitType,
+    UserSetting,
     VNode,
     VorClass,
     VorFacility,
@@ -153,7 +156,6 @@ export class SuperNav5Page extends SevenLinePage {
         }
 
         const activeWaypoint = this.props.memory.navPage.activeWaypoint;
-        const actIdx = activeWaypoint.getActiveFplIdx();
 
         const legs = this.props.memory.fplPage.flightplans[0].getLegs();
 
@@ -171,7 +173,7 @@ export class SuperNav5Page extends SevenLinePage {
             this.drawAirports(ctx, legs, range)
         }
 
-        if (this.props.modeController.isObsModeActive()) {
+        if (this.props.modeController.isObsModeActive() && activeWaypoint.getActiveWpt() !== null) {
             this.drawObs(ctx, activeWaypoint, range);
         } else if (activeWaypoint.isDctNavigation()) {
             this.drawDirectTo(ctx, activeWaypoint);

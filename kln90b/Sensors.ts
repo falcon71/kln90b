@@ -402,7 +402,7 @@ export class SensorsIn implements CalcTickable {
     public airdata: Airdata;
 
 
-    constructor(bus: EventBus, private readonly userSettings: KLN90BUserSettings, private readonly options: KLN90PlaneSettings, messageHandler: MessageHandler) {
+    constructor(bus: EventBus, userSettings: KLN90BUserSettings, private readonly options: KLN90PlaneSettings, messageHandler: MessageHandler) {
         this.gps = new GPS(bus, userSettings, options, messageHandler);
         this.fuelComputer = new FuelComputer(options);
         this.airdata = new Airdata(userSettings, options);
@@ -652,35 +652,52 @@ export class SensorsOut {
      * @param mode
      * @param isSelfTestActive For selftest, we set GPS APPROACH MODE to 3, to signal that ARM AND APPR lights should
      * both light up on external annunciators. 3 is not used during normal operation
+     * @param writeObs GPS OBS ACTIVE will become readonly when an external mode switch is installed
      */
-    public setMode(mode: NavMode, isSelfTestActive: boolean) {
+    public setMode(mode: NavMode, isSelfTestActive: boolean, writeObs: boolean) {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
 
         switch (mode) {
             case NavMode.ENR_LEG:
-                SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
+                if (writeObs) {
+                    //GPS OBS ACTIVE is marked writable in the docs, but appears to be readonly
+                    SimVar.SetSimVarValue('K:GPS_OBS_OFF', SimVarValueType.Bool, true);
+                    //SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
+                }
                 SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, false);
                 SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 0);
                 break;
             case NavMode.ENR_OBS:
-                SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, true);
+                if (writeObs) {
+                    SimVar.SetSimVarValue('K:GPS_OBS_ON', SimVarValueType.Bool, true);
+                    //SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, true);
+                }
                 SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, false);
                 SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 0);
                 break;
             case NavMode.ARM_LEG:
-                SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
+                if (writeObs) {
+                    SimVar.SetSimVarValue('K:GPS_OBS_OFF', SimVarValueType.Bool, true);
+                    //SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
+                }
                 SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
                 SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 1);
                 break;
             case NavMode.ARM_OBS:
-                SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, true);
+                if (writeObs) {
+                    SimVar.SetSimVarValue('K:GPS_OBS_ON', SimVarValueType.Bool, true);
+                    //SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, true);
+                }
                 SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
                 SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 1);
                 break;
             case NavMode.APR_LEG:
-                SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
+                if (writeObs) {
+                    SimVar.SetSimVarValue('K:GPS_OBS_OFF', SimVarValueType.Bool, true);
+                    //SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
+                }
                 SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
                 SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 2);
                 break
@@ -707,7 +724,7 @@ export class SensorsOut {
         this.setWPIndex(0, 0);
         this.setPrevWpt(null);
         this.setNextWpt(null);
-        this.setMode(NavMode.ENR_LEG, false);
+        this.setMode(NavMode.ENR_LEG, false, !this.options.input.externalSwitches.legObsSwitchInstalled);
     }
 }
 

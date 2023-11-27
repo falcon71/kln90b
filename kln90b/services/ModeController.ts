@@ -6,7 +6,8 @@ import {
     FacilityType,
     GeoCircle,
     GeoPoint,
-    ICAO, LatLonInterface,
+    ICAO,
+    LatLonInterface,
     NavMath,
     UnitType,
     UserFacilityUtils,
@@ -29,24 +30,6 @@ export class ModeController implements CalcTickable {
     constructor(private readonly bus: EventBus, private readonly navState: NavPageState, private readonly fpl0: Flightplan, private readonly planeSettings: KLN90PlaneSettings, private readonly sensors: Sensors, private readonly magvar: KLNMagvar) {
     }
 
-    public switchToEnrLegMode() {
-        this.navState.navmode = this.navState.navmode === NavMode.ARM_OBS ? NavMode.ARM_LEG : NavMode.ENR_LEG;
-
-        const active = this.navState.activeWaypoint.getActiveWpt();
-        if (active !== null) {
-            if (this.navState.toFrom === FROM && this.navState.activeWaypoint.getActiveFplIdx() !== -1) {
-                this.navState.activeWaypoint.activateFpl0();
-                const from = UserFacilityUtils.createFromLatLon("UXX        d", this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, true);
-                const to = this.reorientFlightplanLeg(this.sensors.in.gps.coords) ?? active;
-
-                this.navState.activeWaypoint.directTo(from, to);
-            } else {
-                const fromCoords: LatLonInterface = this.navState.activeWaypoint.getFromWpt()!;
-                const from = UserFacilityUtils.createFromLatLon("UXX        d", fromCoords.lat, fromCoords.lon, true);
-                this.navState.activeWaypoint.directTo(from, active);
-            }
-        }
-    }
 
     public armApproachPressed() {
         let apt: AirportFacility | null;
@@ -101,26 +84,82 @@ export class ModeController implements CalcTickable {
         this.navState.xtkScale = 1;
     }
 
+    /**
+     * 5-36 When the user switched to ENR-LEG via the MOD 1 page
+     */
+    public switchToEnrLegMode() {
+        this.navState.navmode = this.navState.navmode === NavMode.ARM_OBS ? NavMode.ARM_LEG : NavMode.ENR_LEG;
+
+        const active = this.navState.activeWaypoint.getActiveWpt();
+        if (active !== null) {
+            if (this.navState.toFrom === FROM && this.navState.activeWaypoint.getActiveFplIdx() !== -1) {
+                this.navState.activeWaypoint.activateFpl0();
+                const from = UserFacilityUtils.createFromLatLon("UXX        d", this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, true);
+                const to = this.reorientFlightplanLeg(this.sensors.in.gps.coords) ?? active;
+
+                this.navState.activeWaypoint.directTo(from, to);
+            } else {
+                const fromCoords: LatLonInterface = this.navState.activeWaypoint.getFromWpt()!;
+                const from = UserFacilityUtils.createFromLatLon("UXX        d", fromCoords.lat, fromCoords.lon, true);
+                this.navState.activeWaypoint.directTo(from, active);
+            }
+        }
+    }
+
+    /**
+     * 5-36 When the user switched to ENR-LEG via the MOD 2 page
+     */
     public switchToEnrObsMode() {
         const active = this.navState.activeWaypoint.getActiveWpt();
         if (active === null) {
             this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO ACTV WPT");
         } else {
-            if (this.navState.navmode === NavMode.APR_LEG) {
-                //6-3 Switching to OBS cancels an active approach
-                this.navState.navmode = NavMode.ARM_OBS;
-                this.navState.xtkScale = 1;
-            } else {
-                this.navState.navmode = this.navState.navmode === NavMode.ARM_LEG ? NavMode.ARM_OBS : NavMode.ENR_OBS;
-            }
+            this.forceSwitchToEnrObsMode();
+        }
+    }
 
-            if (this.sensors.in.obsMag !== null && this.planeSettings.output.obsTarget === 0) {
-                this.setObs(this.sensors.in.obsMag);
-            } else {
-                const obsTrue = this.navState.desiredTrack!;
-                const magvar = this.getMagvarForObs(active);
-                this.setObs(this.magvar.trueToMag(obsTrue, magvar));
+    /**
+     * When the user switches the mode via an external switch.
+     * TODO: What happens if there is no active waypoint? Is the warning screen from 3-7 only shown during startup or
+     * also during normal operation?
+     * @param isObsActive
+     */
+    public setExternalObsMode(isObsActive: boolean) {
+        if (isObsActive === this.isObsModeActive()) {
+            return;
+        }
+
+        if (isObsActive) {
+            const active = this.navState.activeWaypoint.getActiveWpt();
+            if (active === null) {
+                //We cann tell the status line in the warning screen from 3-7 that the device does indeed enter OBS-LEG
+                // mode without a waypoint
+                this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO ACTV WPT")
             }
+            this.forceSwitchToEnrObsMode();
+        } else {
+            this.switchToEnrLegMode();
+        }
+
+    }
+
+    private forceSwitchToEnrObsMode() {
+        const active = this.navState.activeWaypoint.getActiveWpt();
+
+        if (this.navState.navmode === NavMode.APR_LEG) {
+            //6-3 Switching to OBS cancels an active approach
+            this.navState.navmode = NavMode.ARM_OBS;
+            this.navState.xtkScale = 1;
+        } else {
+            this.navState.navmode = this.navState.navmode === NavMode.ARM_LEG ? NavMode.ARM_OBS : NavMode.ENR_OBS;
+        }
+
+        if (this.sensors.in.obsMag !== null && this.planeSettings.output.obsTarget === 0) {
+            this.setObs(this.sensors.in.obsMag);
+        } else if (active !== null) {
+            const obsTrue = this.navState.desiredTrack!;
+            const magvar = this.getMagvarForObs(active);
+            this.setObs(this.magvar.trueToMag(obsTrue, magvar));
         }
     }
 

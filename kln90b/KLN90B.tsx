@@ -277,7 +277,7 @@ class KLN90B extends BaseInstrument {
                 nearestLists.ndbNearestList,
                 nearestLists.aptNearestList,
                 nearestLists.vorNearestList,
-                new NavCalculator(sensors, memory, magvar, this.userSettings, modeController),
+                new NavCalculator(sensors, memory, magvar, this.userSettings, modeController, this.planeSettings),
                 airspaceAlert,
                 new HtAboveAirportAlert(memory.navPage, this.planeSettings, sensors, this.userSettings),
                 new AltAlert(memory, this.planeSettings, sensors),
@@ -287,7 +287,7 @@ class KLN90B extends BaseInstrument {
                 this.messageHandler,
             ], this.messageHandler, this.planeSettings);
 
-        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager);
+        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController);
 
         const msa = new MSA();
 

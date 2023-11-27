@@ -4,6 +4,7 @@ import {FourSegmentPage, SixLinePage} from "./FourSegmentPage";
 import {PageProps, UIElementChildren} from "./Page";
 import {Button} from "../controls/Button";
 import {AiracPage} from "./AiracPage";
+import {ObswarningPage} from "./ObsWarningPage";
 
 
 type VFROnlyPageChildTypes = {
@@ -36,9 +37,16 @@ export class VFROnlyPage extends SixLinePage {
 
 
     private acknowledge(): void {
-        this.props.pageManager.setCurrentPage(FourSegmentPage, {
-            ...this.props,
-            page: new AiracPage(this.props),
-        });
+        if (this.props.modeController.isObsModeActive()) {
+            this.props.pageManager.setCurrentPage(FourSegmentPage, {
+                ...this.props,
+                page: new ObswarningPage(this.props),
+            });
+        } else {
+            this.props.pageManager.setCurrentPage(FourSegmentPage, {
+                ...this.props,
+                page: new AiracPage(this.props),
+            });
+        }
     }
 }

@@ -58,7 +58,8 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
     constructor(props: StatusLineProps) {
         super(props);
 
-        this.sub = props.bus.getSubscriber<StatusLineMessageEvents>().on("statusLineMessage").handle(this.showMessage.bind(this));
+        this.sub = props.bus.getSubscriber<StatusLineMessageEvents>().on("statusLineMessage").handle(this.showMessage.bind(this), true);
+        this.sub.resume(false); //We don't care about old notifications from ages ago
     }
 
     render(): VNode {

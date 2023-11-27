@@ -95,7 +95,6 @@ export class Nav5Page extends SixLineHalfPage {
 
 
         const activeWaypoint = this.props.memory.navPage.activeWaypoint;
-        const actIdx = activeWaypoint.getActiveFplIdx();
 
         const legs = this.props.memory.fplPage.flightplans[0].getLegs();
 
@@ -103,7 +102,7 @@ export class Nav5Page extends SixLineHalfPage {
             this.drawFlightplan(ctx, legs, activeWaypoint);
         }
 
-        if (this.props.modeController.isObsModeActive()) {
+        if (this.props.modeController.isObsModeActive() && activeWaypoint.getActiveWpt() !== null) {
             this.drawObs(ctx, activeWaypoint, this.rangeSetting.get());
         } else if (activeWaypoint.isDctNavigation()) {
             this.drawDirectTo(ctx, activeWaypoint);

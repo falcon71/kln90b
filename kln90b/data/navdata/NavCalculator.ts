@@ -8,6 +8,7 @@ import {ModeController} from "../../services/ModeController";
 import {KLNFixType} from "../flightplan/Flightplan";
 import {KLNMagvar} from "./KLNMagvar";
 import {calcDistToDestination} from "../../services/FlightplanUtils";
+import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 
 
 //4-8
@@ -26,7 +27,7 @@ export class NavCalculator implements CalcTickable {
     private lastDistance = 9999;
 
 
-    constructor(private readonly sensors: Sensors, private readonly memory: VolatileMemory, private readonly magvar: KLNMagvar, userSettings: KLN90BUserSettings, private readonly modeController: ModeController) {
+    constructor(private readonly sensors: Sensors, private readonly memory: VolatileMemory, private readonly magvar: KLNMagvar, userSettings: KLN90BUserSettings, private readonly modeController: ModeController, private readonly planeSettings: KLN90PlaneSettings) {
         this.turnAnticipation = userSettings.getSetting("turnAnticipation");
     }
 
@@ -180,7 +181,7 @@ export class NavCalculator implements CalcTickable {
         this.sensors.out.setPrevWpt(nav.activeWaypoint.getFromWpt());
         this.sensors.out.setNextWpt(nav.activeWaypoint.getActiveWpt());
 
-        this.sensors.out.setMode(nav.navmode, nav.isSelfTestActive);
+        this.sensors.out.setMode(nav.navmode, nav.isSelfTestActive, !this.planeSettings.input.externalSwitches.legObsSwitchInstalled);
         this.sensors.out.setWptAlertLight(nav.waypointAlert); //The manual says flashing, but it's steady in this video (left light) https://youtu.be/S1lt2W95bLA?si=C45kt8pik15Iodoy&t=2245
     }
 

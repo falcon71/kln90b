@@ -46,10 +46,13 @@ export class Mod1Page extends SixLineHalfPage {
     }
 
     public isEnterAccepted(): boolean {
-        return this.props.modeController.isObsModeActive();
+        return this.props.modeController.isObsModeActive() && !this.props.planeSettings.input.externalSwitches.legObsSwitchInstalled;
     }
 
     public enter(): Promise<EnterResult> {
+        if (!this.props.modeController.isObsModeActive() || this.props.planeSettings.input.externalSwitches.legObsSwitchInstalled) {
+            return Promise.resolve(EnterResult.Not_Handled);
+        }
         this.props.modeController.switchToEnrLegMode();
         return Promise.resolve(EnterResult.Handled_Keep_Focus);
     }
@@ -62,7 +65,7 @@ export class Mod1Page extends SixLineHalfPage {
     protected redraw(): void {
         if (this.props.modeController.isObsModeActive()) {
             if (this.props.planeSettings.input.externalSwitches.legObsSwitchInstalled) {
-                this.children.get("title1").text = "PRESS GRPS";
+                this.children.get("title1").text = "PRESS GPS";
                 this.children.get("title2").text = "CRS FOR";
             } else {
                 this.children.get("title1").text = "PRESS ENT";
