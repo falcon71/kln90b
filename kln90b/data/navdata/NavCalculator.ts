@@ -180,7 +180,7 @@ export class NavCalculator implements CalcTickable {
         this.sensors.out.setPrevWpt(nav.activeWaypoint.getFromWpt());
         this.sensors.out.setNextWpt(nav.activeWaypoint.getActiveWpt());
 
-        this.sensors.out.setMode(nav.navmode);
+        this.sensors.out.setMode(nav.navmode, nav.isSelfTestActive);
         this.sensors.out.setWptAlertLight(nav.waypointAlert); //The manual says flashing, but it's steady in this video (left light) https://youtu.be/S1lt2W95bLA?si=C45kt8pik15Iodoy&t=2245
     }
 
