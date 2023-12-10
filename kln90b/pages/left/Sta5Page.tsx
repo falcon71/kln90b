@@ -1,4 +1,15 @@
-import {DebounceTimer, Facility, FSComponent, UserSetting, VNode} from '@microsoft/msfs-sdk';
+import {
+    ClockEvents,
+    DebounceTimer,
+    EventBus,
+    Facility,
+    FSComponent,
+    GNSSEvents,
+    GPSSatComputer,
+    GPSSystemState,
+    UserSetting,
+    VNode,
+} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
@@ -7,6 +18,7 @@ import {TimeEditor} from "../../controls/editors/TimeEditor";
 import {SelectField} from "../../controls/selects/SelectField";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {TimeStamp, TIMEZONES} from "../../data/Time";
+import {HOURS_TO_SECONDS} from "../../data/navdata/NavCalculator";
 
 
 type Sta5PageTypes = {
@@ -18,6 +30,9 @@ type Sta5PageTypes = {
 
 const RAIM_CALCULATION_TIME = 10 * 1000; //No idea, the manual mentions a few seconds
 
+/**
+ * 6-20
+ */
 export class Sta5Page extends SixLineHalfPage {
 
     public readonly cursorController;
@@ -92,12 +107,57 @@ export class Sta5Page extends SixLineHalfPage {
             return;
         }
 
+        let actualTimeStamp = this.props.sensors.in.gps.timeZulu.withTime(this.etaZulu.getHours(), this.etaZulu.getMinutes()).getTimestamp();
+        if (actualTimeStamp < this.props.sensors.in.gps.timeZulu.getTimestamp()) {
+            actualTimeStamp += 24 * HOURS_TO_SECONDS * 1000;
+        }
+
 
         this.children.get("result").text = " COMPUTING";
 
-        this.refDebounce.schedule(async () => {
-            this.children.get("result").text = "  èèèèèèè"; //Yeah, we are not simulating raim yet...
+        const tempBus = new EventBus();
+        const clockPublisher = tempBus.getPublisher<ClockEvents>();
+        const gnssPublisher = tempBus.getPublisher<GNSSEvents>();
+
+        const gps = new GPSSatComputer(
+            1,
+            tempBus,
+            'coui://html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B/Assets/gps_ephemeris.json',
+            'coui://html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B/Assets/gps_sbas.json',
+            5000,
+            [],
+            'primary',
+        );
+
+
+        clockPublisher.pub('simTime', this.etaZulu.getTimestamp());
+        gnssPublisher.pub('gps-position', new LatLongAlt(this.wpt.lat, this.wpt.lon, 0));
+
+        gps.init();
+
+        this.refDebounce.schedule(async () => { //init needs some time to load the json, but we need to simulate the calculation time anyway
+            let result = "";
+            for (let timeOffset = -15; timeOffset <= 15; timeOffset += 5) {
+                gps.reset();
+                const timestamp = actualTimeStamp + (timeOffset * 60 * 1000);
+                clockPublisher.pub('simTime', timestamp);
+                gps.acquireAndUseSatellites();
+
+                console.log(timeOffset, gps.state);
+
+                const isRaimAvailable = gps.state === GPSSystemState.SolutionAcquired || gps.state === GPSSystemState.DiffSolutionAcquired;
+
+                if (isRaimAvailable) {
+                    result += "è";
+                } else {
+                    result += "é";
+                }
+            }
+
+            this.children.get("result").text = "  " + result;
         }, RAIM_CALCULATION_TIME);
+
+
     }
 
 
