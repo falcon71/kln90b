@@ -1,4 +1,4 @@
-import {FSComponent, GPSSatellite, GPSSatelliteState, NodeReference, VNode} from '@microsoft/msfs-sdk';
+import {FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
@@ -38,31 +38,13 @@ export class Sta2Page extends SixLineHalfPage {
         super.tick(blink);
     }
 
-
     protected redraw(): void {
-
-
         if (this.props.sensors.in.gps.isValid()) {
-            const inUse = this.props.sensors.in.gps.gpsSatComputer.getChannels().filter(this.filterSat).length;
-            let posError: number;
-            //hdop is not an absolute value. Let's cheat like the GNSS
-            if (inUse >= 6) {
-                posError = 3;
-            } else if (inUse === 5) {
-                posError = 5;
-            } else if (inUse === 4) {
-                posError = 8;
-            } else {
-                posError = 99;
-            }
+            const posError = this.props.sensors.in.gps.gpsSatComputer.hdop * 4;
             this.children.get("posError").text = `.${format(posError, "00")}`;
         } else {
             this.children.get("posError").text = ".--";
         }
 
-    }
-
-    private filterSat(sat: GPSSatellite | null): boolean {
-        return sat !== null && (sat.state.get() == GPSSatelliteState.InUse || sat.state.get() == GPSSatelliteState.InUseDiffApplied) && sat.sbasGroup === undefined;
     }
 }
