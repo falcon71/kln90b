@@ -100,7 +100,7 @@ export class Set1Page extends SixLineHalfPage {
         );
         gps.groundspeed = this.groundspeed;
         gps.trackTrue = this.track;
-        gps.recalcTTF();
+        gps.gpsSatComputer.syncLastKnownPosition(gps.coords);
         this.cursorController.setCursorActive(false);
     }
 

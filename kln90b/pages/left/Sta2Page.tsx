@@ -39,15 +39,11 @@ export class Sta2Page extends SixLineHalfPage {
     }
 
 
-    private filterSat(sat: GPSSatellite): boolean{
-        return (sat.state.get() == GPSSatelliteState.InUse || sat.state.get() == GPSSatelliteState.InUseDiffApplied) && sat.sbasGroup === undefined;
-    }
-
     protected redraw(): void {
 
 
         if (this.props.sensors.in.gps.isValid()) {
-            const inUse = this.props.sensors.in.gps.gpsSatComputer.sats.filter(this.filterSat).length;
+            const inUse = this.props.sensors.in.gps.gpsSatComputer.getChannels().filter(this.filterSat).length;
             let posError: number;
             //hdop is not an absolute value. Let's cheat like the GNSS
             if (inUse >= 6) {
@@ -64,5 +60,9 @@ export class Sta2Page extends SixLineHalfPage {
             this.children.get("posError").text = ".--";
         }
 
+    }
+
+    private filterSat(sat: GPSSatellite | null): boolean {
+        return sat !== null && (sat.state.get() == GPSSatelliteState.InUse || sat.state.get() == GPSSatelliteState.InUseDiffApplied) && sat.sbasGroup === undefined;
     }
 }

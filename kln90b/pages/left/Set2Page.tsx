@@ -10,7 +10,8 @@ import {TimeStamp, TIMEZONES, UTC} from "../../data/Time";
 import {format} from "numerable";
 import {MagvarEditor} from "../../controls/editors/MagvarEditor";
 import {OneTimeMessage} from "../../data/MessageHandler";
-import {GPSEvents} from "../../Sensors";
+
+import {GPSEvents} from "../../Gps";
 
 
 type Set2PageTypes = {
@@ -128,7 +129,6 @@ export class Set2Page extends SixLineHalfPage {
         const newDate = oldDate.withDate(date.getYear(), date.getMonth(), date.getDate());
 
         this.props.sensors.in.gps.timeZulu = newDate.atTimezone(UTC);
-        this.props.sensors.in.gps.recalcTTF();
         const dbValidAfter = this.props.database.isAiracCurrent();
         if (dbValdiBefore !== dbValidAfter) {
             this.props.messageHandler.addMessage(new OneTimeMessage(["RECYLCE POWER TO USE", "CORRECT DATA BASE DATA"]))
@@ -146,7 +146,6 @@ export class Set2Page extends SixLineHalfPage {
         const newDate = oldDate.withTime(date.getHours(), date.getMinutes());
 
         this.props.sensors.in.gps.timeZulu = newDate.atTimezone(UTC);
-        this.props.sensors.in.gps.recalcTTF();
         const dbValidAfter = this.props.database.isAiracCurrent();
         if (dbValdiBefore !== dbValidAfter) {
             this.props.messageHandler.addMessage(new OneTimeMessage(["RECYLCE POWER TO USE", "CORRECT DATA BASE DATA"]))

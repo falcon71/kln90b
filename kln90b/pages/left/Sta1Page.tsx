@@ -46,7 +46,7 @@ export class Sta1Page extends SixLineHalfPage {
     constructor(props: PageProps) {
         super(props);
 
-        this.numPages = 1 + Math.ceil((this.props.sensors.in.gps.gpsSatComputer.sats.filter(this.filterSat).length - 4) / 6);
+        this.numPages = this.getSats().length <= 4 ? 1 : 2;
     }
 
     public render(): VNode {
@@ -104,21 +104,21 @@ export class Sta1Page extends SixLineHalfPage {
             this.children.get("line1").text = this.drawSat(sats[5]);
             this.children.get("line2").text = this.drawSat(sats[6]);
             this.children.get("line3").text = this.drawSat(sats[7]);
-            this.children.get("line4").text = "";
-            this.children.get("line5").text = "";
+            if (this.props.planeSettings.debugMode) {
+                this.children.get("line4").text = "ALM:" + (this.props.sensors.in.gps.gpsSatComputer.isAlmanacValid() ? "Y" : "N") + " " + Math.round((this.props.sensors.in.gps.gpsSatComputer as any).almanacProgress * 100);
+                const ttf = Math.max(...sats.map(sat => (sat as any).timeToAcquire / 1000).filter(ttf => !Number.isNaN(ttf)));
+                this.children.get("line5").text = `TTF:${Math.round(ttf)}`;
+            } else {
+                this.children.get("line4").text = "";
+                this.children.get("line5").text = "";
+            }
         }
     }
 
     private getSats(): GPSSatellite[]{
-        return this.props.sensors.in.gps.gpsSatComputer.sats
-            .filter(this.filterSat)
-            .sort((a, b) => b.signalStrength.get() - a.signalStrength.get())
-            .slice(0,8) // 5-29 maximum 8, we take those with the best signal strength
-            .sort((a, b) => a.prn - b.prn);
-    }
-
-    private filterSat(sat: GPSSatellite): boolean{
-        return sat.state.get() !== GPSSatelliteState.Unreachable && sat.sbasGroup === undefined;
+        const notNullSats = this.props.sensors.in.gps.gpsSatComputer.getChannels()
+            .filter(sat => sat !== null) as GPSSatellite[];
+        return notNullSats.sort((a, b) => a.prn - b.prn);
     }
 
     private drawSat(sat: GPSSatellite | undefined): string{
@@ -130,7 +130,7 @@ export class Sta1Page extends SixLineHalfPage {
         let used: string;
         let health: string;
         let snr: number;
-        const ele = 90 - UnitType.RADIAN.convertTo(sat.position.get()[0], UnitType.DEGREE); //[0] is zenith angle, we display elevation
+        const ele = Math.abs(90 - UnitType.RADIAN.convertTo(sat.position.get()[0], UnitType.DEGREE)); //[0] is zenith angle, we display elevation
         switch (state) {
             case GPSSatelliteState.InUse:
             case GPSSatelliteState.InUseDiffApplied:
@@ -139,6 +139,10 @@ export class Sta1Page extends SixLineHalfPage {
                 snr = 35 + sat.signalStrength.get() * 20; //5-30: Values range 35 to 55
                 break;
             case GPSSatelliteState.Unreachable:
+                used = '*';
+                health = '-';
+                snr = 0;
+                break;
             case GPSSatelliteState.Faulty:
                 used = '*';
                 health = 'B';

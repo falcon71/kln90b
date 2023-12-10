@@ -59,6 +59,7 @@ export type KLN90BUserSettingsTypes = {
     barosetting: number;
     lastLatitude: number;
     lastLongitude: number;
+    lastAlmanacDownload: number;
     nearestAptSurface: boolean;
     nearestAptMinRunwayLength: number;
     activeWaypoint: string;
@@ -129,6 +130,10 @@ export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSett
             },
             {
                 name: "lastLongitude",
+                defaultValue: 0,
+            },
+            {
+                name: "lastAlmanacDownload",
                 defaultValue: 0,
             },
             {

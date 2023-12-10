@@ -1,6 +1,7 @@
 import {
     AirportFacility,
-    AirportPrivateType, AirportRunway,
+    AirportPrivateType,
+    AirportRunway,
     DefaultUserSettingManager,
     EventBus,
     Facility,
@@ -21,7 +22,7 @@ import {
     VorType,
 } from "@microsoft/msfs-sdk";
 import {
-    FacilityRepositoryCacheSyncData,
+    FacilityRepositorySyncData,
     FacilityRepositorySyncType,
     KLNFacilityRepository,
 } from "../data/navdata/KLNFacilityRepository";
@@ -39,13 +40,12 @@ export class UserWaypointPersistor {
 
     public restoreWaypoints() {
         const wpts = this.deserializeAllWpts();
-        this.bus.pub(KLNFacilityRepository.SYNC_TOPIC, {
-            type: FacilityRepositorySyncType.DumpResponse,
-            facs: wpts,
-        }, true, false);
+        for (const wpt of wpts) {
+            this.repo.add(wpt);
+        }
     }
 
-    private persistWaypoints(data: FacilityRepositoryCacheSyncData) {
+    private persistWaypoints(data: FacilityRepositorySyncData) {
         if (data.type !== FacilityRepositorySyncType.Add && data.type !== FacilityRepositorySyncType.Remove && data.type !== FacilityRepositorySyncType.Update) {
             return;
         }
@@ -144,7 +144,7 @@ export class UserWaypointPersistor {
      * @private
      */
     private serializetLon(lon: number): string {
-        const degreesString = format(lon, "+000", {rounding: "truncate", zeroFormat: "+00"});
+        const degreesString = format(lon, "+000", {rounding: "truncate", zeroFormat: "+000"});
 
         const minutes = (Math.abs(lon) % 1) * 60;
         const minutesString = format(minutes, "00.00");

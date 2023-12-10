@@ -20,11 +20,14 @@ will be shown. Also check that the aircraft has electricity and no circuit brake
 
 ### It takes a long time until a GPS signal is acquired
 
-The KLN 90B remembers your last position. If this differs from you actual position, it may take up the 12 minutes until
-a GPS signal is acquired. In this case, enter your position on the SET 1 page.
+If you have not used the KLN in the past three months (or ever), it will need to search the entire sky for valid GPS
+satelites . Afterwards, this catalogue will be saved, so the next time will be faster.
+The KLN 90B also remembers your last position. If this differs from you actual position, GPS acquisition will take
+longer.
+In this case, enter your position on the SET 1 page.
 
-Alternativly, you can set the GPS acquisition time to fast on the SET 10 page. In this case, GPS acquisition will take
-less than 30 seconds.
+Alternativly, you can set the GPS acquisition time to fast on the SET 10 page. GPS acquisition will then take less than
+30 seconds.
 
 ## Aircraft developers
 

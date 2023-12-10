@@ -1,6 +1,7 @@
 import {
     EventBus,
     Facility,
+    FacilityRepositoryEvents,
     FacilityType,
     GeoKdTree,
     GeoKdTreeSearchFilter,
@@ -20,24 +21,91 @@ export declare type KLNRepoSearchableFacilityTypes =
     | FacilityType.Intersection;
 
 
+/**
+ * Types of facility repository sync events.
+ */
 export enum FacilityRepositorySyncType {
-    Add,
-    Remove,
-    DumpRequest,
-    DumpResponse,
-    Update,
+    Add = 'Add',
+    Remove = 'Remove',
+    DumpRequest = 'DumpRequest',
+    DumpResponse = 'DumpResponse',
+    Update = 'Update',
+}
+
+/**
+ * A facility repository sync event describing the addition of a facility.
+ */
+type FacilityRepositoryAdd = {
+    /** The type of this event. */
+    type: FacilityRepositorySyncType.Add;
+
+    /** The facilities that were added. */
+    facs: Facility[];
+}
+
+/**
+ * A facility repository sync event describing the removal of a facility.
+ */
+type FacilityRepositoryRemove = {
+    /** The type of this event. */
+    type: FacilityRepositorySyncType.Remove;
+
+    /** The ICAOs of the facilities that were removed. */
+    facs: string[];
+}
+
+/**
+ * A request for a dump of all facilities registered with the facility repository.
+ */
+type FacilityRepositoryDumpRequest = {
+    /** The type of this event. */
+    type: FacilityRepositorySyncType.DumpRequest;
+
+    /** The unique ID associated with this event. */
+    uid: number;
+}
+/**
+ * A facility repository sync event describing the addition of a facility.
+ */
+type FacilityRepositoryUpdate = {
+    /** The type of this event. */
+    type: FacilityRepositorySyncType.Update;
+
+    /** The facilities that were updated. */
+    facs: Facility[];
+}
+
+/**
+ * A response to a facility repository dump request.
+ */
+type FacilityRepositoryDumpResponse = {
+    /** The type of this event. */
+    type: FacilityRepositorySyncType.DumpResponse;
+
+    /** The unique ID associated with the dump request that this event is responding to. */
+    uid: number;
+
+    /** All facilities registered with the repository that sent the response. */
+    facs: Facility[];
 }
 
 /**
  * Data provided by a sync event.
  */
-export type FacilityRepositoryCacheSyncData = {
-    /** The type of sync event. */
-    type: FacilityRepositorySyncType;
+export type FacilityRepositorySyncData =
+    FacilityRepositoryAdd
+    | FacilityRepositoryRemove
+    | FacilityRepositoryDumpRequest
+    | FacilityRepositoryDumpResponse
+    | FacilityRepositoryUpdate;
 
-    /** This event's facilities. */
-    facs?: Facility[];
-};
+/**
+ * Events related to data sync between facility repository instances.
+ */
+interface FacilityRepositorySyncEvents {
+    /** A facility repository sync event. */
+    KLNfacilityrepo_sync: FacilityRepositorySyncData;
+}
 
 type UserWaypoint<T extends Facility> = {
     -readonly [K in keyof T]: T[K]
@@ -51,8 +119,12 @@ type UserWaypoint<T extends Facility> = {
  */
 export class KLNFacilityRepository {
     public static readonly SYNC_TOPIC = 'KLNfacilityrepo_sync';
+
+    private readonly publisher = this.bus.getPublisher<FacilityRepositoryEvents & FacilityRepositorySyncEvents>();
+
     private static INSTANCE: KLNFacilityRepository | undefined;
-    private readonly repos: Partial<Record<FacilityType, Map<string, Facility>>> = {};
+    private readonly repos = new Map<FacilityType, Map<string, Facility>>();
+    private lastDumpRequestUid?: number;
     private readonly trees: Record<KLNRepoSearchableFacilityTypes, GeoKdTree<Facility>> = {
         [FacilityType.USR]: new GeoKdTree(KLNFacilityRepository.treeKeyFunc),
         [FacilityType.Airport]: new GeoKdTree(KLNFacilityRepository.treeKeyFunc),
@@ -68,7 +140,37 @@ export class KLNFacilityRepository {
      */
     private constructor(private readonly bus: EventBus) {
         bus.getSubscriber<any>().on(KLNFacilityRepository.SYNC_TOPIC).handle(this.onSyncEvent.bind(this));
-        this.pubSyncEvent(FacilityRepositorySyncType.DumpRequest);
+
+        // Request a dump from any existing instances on other instruments to initialize the repository.
+        this.pubSyncEvent({
+            type: FacilityRepositorySyncType.DumpRequest,
+            uid: this.lastDumpRequestUid = Math.random() * Number.MAX_SAFE_INTEGER,
+        });
+    }
+
+    private static readonly treeKeyFunc = (fac: Facility, out: Float64Array): Float64Array => {
+        return GeoPoint.sphericalToCartesian(fac, out);
+    };
+
+    /**
+     * Gets the number of facilities stored in this repository.
+     * @param types The types of facilities to count. Defaults to all facility types.
+     * @returns The number of facilities stored in this repository.
+     */
+    public size(types?: readonly FacilityType[]): number {
+        let size = 0;
+
+        if (types === undefined) {
+            for (const repo of this.repos.values()) {
+                size += repo.size;
+            }
+        } else {
+            for (let i = 0; i < types.length; i++) {
+                size += this.repos.get(types[i])?.size ?? 0;
+            }
+        }
+
+        return size;
     }
 
     /**
@@ -80,10 +182,6 @@ export class KLNFacilityRepository {
         return KLNFacilityRepository.INSTANCE ??= new KLNFacilityRepository(bus);
     }
 
-    private static readonly treeKeyFunc = (fac: Facility, out: Float64Array): Float64Array => {
-        return GeoPoint.sphericalToCartesian(fac, out);
-    };
-
     /**
      * Retrieves a facility from this repository.
      * @param icao The ICAO of the facility to retrieve.
@@ -94,7 +192,7 @@ export class KLNFacilityRepository {
             return undefined;
         }
 
-        return this.repos[ICAO.getFacilityType(icao)]?.get(icao);
+        return this.repos.get(ICAO.getFacilityType(icao))?.get(icao);
     }
 
     /**
@@ -161,7 +259,7 @@ export class KLNFacilityRepository {
         }
 
         this.addToRepo(fac);
-        this.pubSyncEvent(FacilityRepositorySyncType.Add, [fac]);
+        this.pubSyncEvent({type: FacilityRepositorySyncType.Add, facs: [fac]});
     }
 
     /**
@@ -189,7 +287,7 @@ export class KLNFacilityRepository {
         }
 
         this.trees[facilityType].removeAndInsert([fac], [fac]);
-        this.pubSyncEvent(FacilityRepositorySyncType.Update, [fac]);
+        this.pubSyncEvent({type: FacilityRepositorySyncType.Update, facs: [fac]});
     }
 
     /**
@@ -197,26 +295,31 @@ export class KLNFacilityRepository {
      * @param fac The facility to remove.
      * @throws Error if the facility has an invalid ICAO.
      */
-    public remove(fac: Facility): void {
-        if (!ICAO.isFacility(fac.icao)) {
-            throw new Error(`KLNFacilityRepository: invalid facility ICAO ${fac.icao}`);
+    public remove(fac: Facility | string): void {
+        const icao = typeof fac === 'string' ? fac : fac.icao;
+        if (!ICAO.isFacility(icao)) {
+            throw new Error(`KLNFacilityRepository: invalid facility ICAO ${icao}`);
         }
 
-        this.removeFromRepo(fac);
-        this.pubSyncEvent(FacilityRepositorySyncType.Remove, [fac]);
+        this.removeFromRepo(icao);
+        this.pubSyncEvent({type: FacilityRepositorySyncType.Remove, facs: [icao]});
     }
+
 
     /**
      * Iterates over every facility in this respository with a visitor function.
      * @param fn A visitor function.
      * @param types The types of facilities over which to iterate. Defaults to all facility types.
      */
-    public forEach(fn: (fac: Facility) => void, types?: FacilityType[]): void {
-        const keys = types ?? Object.keys(this.repos);
-
-        const len = keys.length;
-        for (let i = 0; i < len; i++) {
-            this.repos[keys[i] as FacilityType]?.forEach(fn);
+    public forEach(fn: (fac: Facility) => void, types?: readonly FacilityType[]): void {
+        if (types === undefined) {
+            for (const repo of this.repos.values()) {
+                repo.forEach(fn);
+            }
+        } else {
+            for (let i = 0; i < types.length; i++) {
+                this.repos.get(types[i])?.forEach(fn);
+            }
         }
     }
 
@@ -231,7 +334,10 @@ export class KLNFacilityRepository {
 
         const facilityType = ICAO.getFacilityType(fac.icao);
 
-        const repo = this.repos[facilityType] ??= new Map<string, Facility>();
+        let repo = this.repos.get(facilityType);
+        if (repo === undefined) {
+            this.repos.set(facilityType, repo = new Map<string, Facility>());
+        }
 
         const existing = repo.get(fac.icao);
 
@@ -249,29 +355,33 @@ export class KLNFacilityRepository {
             }
         }
 
-        if (existing !== undefined) {
-            this.bus.pub(`facility_changed_${fac.icao}`, fac, false, false);
+        if (existing === undefined) {
+            this.publisher.pub('facility_added', fac, false, false);
+        } else {
+            this.publisher.pub(`facility_changed_${fac.icao}`, fac, false, false);
+            this.publisher.pub('facility_changed', fac, false, false);
         }
     }
-
-    private size(): number {
-        let count = 0;
-        const keys = Object.keys(this.repos);
-
-        const len = keys.length;
-        for (let i = 0; i < len; i++) {
-            count += this.repos[keys[i] as FacilityType]?.size ?? 0;
-        }
-        return count;
-    }
-
     /**
      * Removes a facility from this repository.
-     * @param fac The facility to remove.
+     * @param fac The facility to remove, or the ICAO of the facility to remove.
      */
-    private removeFromRepo(fac: Facility): void {
-        const facilityType = ICAO.getFacilityType(fac.icao);
-        this.repos[ICAO.getFacilityType(fac.icao)]?.delete(fac.icao);
+    private removeFromRepo(fac: Facility | string): void {
+        const icao = typeof fac === 'string' ? fac : fac.icao;
+        const facilityType = ICAO.getFacilityType(icao);
+        const repo = this.repos.get(ICAO.getFacilityType(icao));
+
+        if (repo === undefined) {
+            return;
+        }
+
+        const facilityInRepo = repo.get(icao);
+
+        if (facilityInRepo === undefined) {
+            return;
+        }
+
+        repo.delete(icao);
 
         if (facilityType !== FacilityType.USR &&
             facilityType !== FacilityType.Airport &&
@@ -281,43 +391,66 @@ export class KLNFacilityRepository {
             return;
         }
 
-        this.trees[facilityType].remove(fac);
+        if (facilityType === FacilityType.USR ||
+            facilityType === FacilityType.Airport ||
+            facilityType === FacilityType.Intersection ||
+            facilityType === FacilityType.VOR ||
+            facilityType === FacilityType.NDB) {
+            this.trees[facilityType].remove(facilityInRepo);
+        }
+
+        this.publisher.pub(`facility_removed_${icao}`, facilityInRepo, false, false);
+        this.publisher.pub('facility_removed', facilityInRepo, false, false);
     }
 
     /**
-     * Publishes a sync event over the event bus.
-     * @param type The type of sync event.
-     * @param facs The event's user facilities.
+     * Publishes a facility added or removed sync event over the event bus.
+     * @param data The event data.
      */
-    private pubSyncEvent(type: FacilityRepositorySyncType, facs?: Facility[]): void {
+    private pubSyncEvent(data: FacilityRepositorySyncData): void {
         this.ignoreSync = true;
-        this.bus.pub(KLNFacilityRepository.SYNC_TOPIC, {type, facs}, true, false);
+        this.publisher.pub(KLNFacilityRepository.SYNC_TOPIC, data, true, false);
         this.ignoreSync = false;
     }
-
     /**
      * A callback which is called when a sync event occurs.
      * @param data The event data.
      */
-    private onSyncEvent(data: FacilityRepositoryCacheSyncData): void {
+    private onSyncEvent(data: FacilityRepositorySyncData): void {
         if (this.ignoreSync) {
             return;
         }
 
         switch (data.type) {
-            case FacilityRepositorySyncType.Add:
             case FacilityRepositorySyncType.DumpResponse:
-                data.facs!.forEach(fac => this.addToRepo(fac));
+                // Only accept responses to your own dump requests.
+                if (data.uid !== this.lastDumpRequestUid) {
+                    break;
+                } else {
+                    this.lastDumpRequestUid = undefined;
+                }
+            // eslint-disable-next-line no-fallthrough
+            case FacilityRepositorySyncType.Add:
+                if (data.facs.length === 1) {
+                    this.addToRepo(data.facs[0]);
+                } else {
+                    throw new Error("addMultipleToRepo is not implemented");
+                }
                 break;
             case FacilityRepositorySyncType.Remove:
-                data.facs!.forEach(fac => this.removeFromRepo(fac));
+                if (data.facs.length === 1) {
+                    this.removeFromRepo(data.facs[0]);
+                } else {
+                    throw new Error("removeMultipleFromRepo is not implemented");
+                }
                 break;
             case FacilityRepositorySyncType.DumpRequest:
-                const facs: Facility[] = [];
-                this.forEach(fac => facs.push(fac));
-                this.pubSyncEvent(FacilityRepositorySyncType.DumpResponse, facs);
-                break;
-            default:
+                // Don't respond to your own dump requests.
+                if (data.uid !== this.lastDumpRequestUid) {
+                    const facs: Facility[] = [];
+                    this.forEach(fac => facs.push(fac));
+                    this.pubSyncEvent({type: FacilityRepositorySyncType.DumpResponse, uid: data.uid, facs});
+                }
                 break;
         }
     }

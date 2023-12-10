@@ -43,7 +43,9 @@ export class Set10Page extends SixLineHalfPage {
 
     private saveFastGpsAcquisition(fastGpsAcquisition: number): void {
         this.props.userSettings.getSetting("fastGpsAcquisition").set(fastGpsAcquisition === 1);
-        this.props.sensors.in.gps.recalcTTF();
+        if (fastGpsAcquisition === 1) {
+            this.props.sensors.in.gps.gpsSatComputer.acquireAndUseSatellites();
+        }
     }
 
 }

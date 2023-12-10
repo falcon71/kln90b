@@ -2,7 +2,6 @@ import {FSComponent, NdbFacility, NdbType, VNode} from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {LatitudeEditor} from "../../controls/editors/LatitudeEditor";
 import {NdbSelector} from "../../controls/selects/NdbSelector";
 import {isNearestWpt, isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
@@ -67,7 +66,6 @@ export class NdbPage extends WaypointPage<NdbFacility> {
             nearestSelector: new NearestSelector(isNearestWpt(this.facility) ? this.facility.index : -1),
             name: new TextDisplay(this.formatName(facility)),
             freq: new NdbFreqEditor(this.props.bus, this.formatFreq(facility), this.setNdbFrequency.bind(this)),
-            lat: new LatitudeEditor(this.props.bus, facility ? facility.lat : null, this.setLatitude.bind(this)),
             coordOrNearestView: new CoordOrNearestView(this.props.bus, this.facility, this.props.magvar, this.setLatitude.bind(this), this.setLongitude.bind(this)),
         });
 

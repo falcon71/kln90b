@@ -1,7 +1,8 @@
 import {shortYearToLongYear, TimeStamp} from "../Time";
 import {EventBus, SimVarValueType} from "@microsoft/msfs-sdk";
-import {GPSEvents, Sensors} from "../../Sensors";
+import {Sensors} from "../../Sensors";
 import {MessageHandler, OneTimeMessage} from "../MessageHandler";
+import {GPSEvents} from "../../Gps";
 
 const AIRAC_MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEC"];
 
