@@ -3,13 +3,10 @@ import {
     EventBus,
     GeoPoint,
     GNSSEvents,
-    GPSEphemeris,
     GPSSatComputer,
     GPSSatComputerEvents,
     GPSSatComputerOptions,
     GPSSatellite,
-    GPSSatelliteState,
-    GPSSatelliteTimingOptions,
     GPSSystemState,
     Publisher,
     SimVarValueType,
@@ -67,105 +64,8 @@ class KLNGPSSatComputer extends GPSSatComputer {
     public getChannels(): (GPSSatellite | null)[] {
         return (this as any).channels;
     }
-
-    /**
-     * Loads the GPS ephemeris data file.
-     * Overwritte to instantiate our own KLNSatellite
-     */
-    private loadEphemerisData(): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
-            const request = new XMLHttpRequest();
-            const anythis = (this as any); //Yeah, we're cheating
-            request.onreadystatechange = () => {
-                if (request.readyState === XMLHttpRequest.DONE) {
-                    if (request.status === 200) {
-                        anythis.ephemerisData = JSON.parse(request.responseText);
-                        for (const prn in anythis.ephemerisData) {
-                            anythis.satellites.push(new KLNSatellite(parseInt(prn), undefined, anythis.ephemerisData[prn], anythis.satelliteTimingOptions, this));
-                        }
-
-                        resolve();
-                    } else {
-                        reject(`Could not initialize sat computer system with ephemeris data: ${request.responseText}`);
-                    }
-                }
-            };
-
-            request.open('GET', anythis.ephemerisFile);
-            request.send();
-        });
-    }
 }
 
-// @ts-ignore
-class KLNSatellite extends GPSSatellite {
-
-    /**
-     *
-     * @param prn
-     * @param sbasGroup
-     * @param ephemeris
-     * @param timingOptions
-     * @param computer added, because we need to check if the almanac is valid
-     */
-    constructor(prn: number, sbasGroup: string | undefined, ephemeris: GPSEphemeris | undefined, timingOptions: Readonly<Required<GPSSatelliteTimingOptions>>, private readonly computer: KLNGPSSatComputer) {
-        super(prn, sbasGroup, ephemeris, timingOptions);
-    }
-
-    /**
-     * We override this method to simulate a long acquisition time if the almanac is not valid
-     * @param simTime
-     * @param deltaTime
-     * @param distanceFromLastKnownPos
-     * @param forceAcquireAndUse
-     * @private
-     */
-    private updateStateTracked(simTime: number, deltaTime: number, distanceFromLastKnownPos: number, forceAcquireAndUse: boolean): boolean {
-        const reachable = this.signalStrength.get() > 0.05;
-        const anythis = (this as any); //Yeah, we're cheating
-
-        if (!forceAcquireAndUse && this.state.get() === GPSSatelliteState.None && reachable) {
-            if (anythis.timeToAcquire === undefined) {
-                if (this.computer.isAlmanacValid()) {
-                    //This part is taken from the original GPSSatellite
-                    const isEphemerisValid = distanceFromLastKnownPos < 5.80734e-4 /* 2 nautical miles */ && this.isCachedEphemerisValid(simTime);
-                    if (isEphemerisValid) {
-                        anythis.timeToAcquire = anythis.timingOptions.acquisitionTimeWithEphemeris + (Math.random() - 0.5) * anythis.timingOptions.acquisitionTimeRangeWithEphemeris;
-                        console.log("timeToAcquire with Ephemeris", anythis.timeToAcquire);
-                    } else {
-                        anythis.timeToAcquire = anythis.timingOptions.acquisitionTime + (Math.random() - 0.5) * anythis.timingOptions.acquisitionTimeRange;
-                        console.log("timeToAcquire without Ephemeris", anythis.timeToAcquire);
-                    }
-                } else {
-                    //We added this branch to simulate a long acquisition time without almanac
-                    anythis.timeToAcquire = anythis.timingOptions.acquisitionTimeWithoutAlmanac + (Math.random() - 0.5) * anythis.timingOptions.acquisitionTimeRangeWithoutAlmanac;
-                    console.log("timeToAcquire without Almanac", anythis.timeToAcquire);
-                }
-            } else {
-                if (this.computer.isAlmanacValid()) {
-                    //The user might have corrected the location or the date, then we need to reduce the timeToAcquire
-                    const isEphemerisValid = distanceFromLastKnownPos < 5.80734e-4 /* 2 nautical miles */ && this.isCachedEphemerisValid(simTime);
-                    if (isEphemerisValid) {
-                        if (anythis.timeToAcquire > anythis.timingOptions.acquisitionTimeWithEphemeris + 0.5 * anythis.timingOptions.acquisitionTimeRangeWithEphemeris) {
-                            anythis.timeToAcquire = anythis.timingOptions.acquisitionTimeWithEphemeris + (Math.random() - 0.5) * anythis.timingOptions.acquisitionTimeRangeWithEphemeris;
-                            console.log("Reduced timeToAcquire with Ephemeris", anythis.timeToAcquire);
-                        }
-                    } else {
-                        if (anythis.timeToAcquire > anythis.timingOptions.acquisitionTime + 0.5 * anythis.timingOptions.acquisitionTimeRange) {
-                            anythis.timeToAcquire = anythis.timingOptions.acquisitionTime + (Math.random() - 0.5) * anythis.timingOptions.acquisitionTimeRange;
-                            console.log("Reduced timeToAcquire without Ephemeris", anythis.timeToAcquire);
-                        }
-                    }
-
-                }
-
-            }
-        }
-
-        // @ts-ignore
-        return super.updateStateTracked(simTime, deltaTime, distanceFromLastKnownPos, forceAcquireAndUse);
-    }
-}
 
 export class GPS {
     public coords: GeoPoint;
@@ -187,13 +87,11 @@ export class GPS {
             channelCount: 8,
             timingOptions: { //3-17
                 almanacExpireTime: 90 * 24 * 60 * 60 * 1000, //Manual says 6 months, but it's 90 days
-                // @ts-ignore We added this two timings without almanac in our own KLNSatellite
-                acquisitionTimeWithoutAlmanac: fastGPS ? 10 * 1000 : 6 * 60 * 1000, //6 to 12 minutes -> 6 +- 4 minutes
-                acquisitionTimeRangeWithoutAlmanac: fastGPS ? 1000 : 8 * 60 * 1000,
-                acquisitionTime: fastGPS ? 10 * 1000 : 1.5 * 60 * 1000, //Up to two minutes -> 90 +- 30 seconds
+                acquisitionTime: fastGPS ? 10 * 1000 : 1.5 * 60 * 1000, //Up to two minutes -> 90 +- 30 seconds -> + 30 seconds to download ephemeris
                 acquisitionTimeRange: fastGPS ? 1000 : 60 * 1000,
-                acquisitionTimeWithEphemeris: fastGPS ? 10 * 1000 : 60 * 1000, //The ephemeris does not make much of a difference, only a missing almanac is slow
+                acquisitionTimeWithEphemeris: fastGPS ? 10 * 1000 : 60 * 1000,
                 acquisitionTimeRangeWithEphemeris: fastGPS ? 1000 : 60 * 1000,
+                acquisitionTimeout: fastGPS ? 1000 : 4 * 60 * 1000, //4 + 2 -> this puts us close to the 6 minutes the manual mentions. With a second miss, we are at 8+2, that's the value from the manual
                 ephemerisDownloadTime: fastGPS ? 1000 : 30000, //30 Seconds
                 almanacDownloadTime: fastGPS ? 1000 : 750000, //12.5 minutes
 
