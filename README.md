@@ -66,4 +66,5 @@ the [manual](https://www.bendixking.com/content/dam/bendixking/en/documents/docu
 that contains further information and reference.
 
 ## License
-This project is licensed under The GNU General Public License v3.0.
+
+This project is licensed under The GNU Lesser General Public License v3.0.
