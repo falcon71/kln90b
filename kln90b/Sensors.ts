@@ -18,7 +18,7 @@ import {CalcTickable} from "./TickController";
 import {AudioGenerator} from "./services/AudioGenerator";
 import {MessageHandler} from "./data/MessageHandler";
 import {NavMode} from "./data/VolatileMemory";
-import {LVAR_MSG_LIGHT, LVAR_WPT_LIGHT} from "./LVars";
+import {LVAR_ANNUN_TEST, LVAR_MSG_LIGHT, LVAR_WPT_LIGHT} from "./LVars";
 import {GPS} from "./Gps";
 
 
@@ -404,6 +404,10 @@ export class SensorsOut {
 
     public setWptAlertLight(lightOn: boolean) {
         SimVar.SetSimVarValue(LVAR_WPT_LIGHT, SimVarValueType.Bool, lightOn);
+    }
+
+    public setAnnunTest(lightOn: boolean) {
+        SimVar.SetSimVarValue(LVAR_ANNUN_TEST, SimVarValueType.Bool, lightOn);
     }
 
     /**

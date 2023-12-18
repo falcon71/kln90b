@@ -9,4 +9,5 @@ export const LVAR_GPS_SIMVARS = "L:KLN90B_WriteGpsSimvars"; // Changes Output.Wr
 
 export const LVAR_MSG_LIGHT = "L:KLN90B_MsgLight"; //Boolean. true whenever the MSG light flashes
 export const LVAR_WPT_LIGHT = "L:KLN90B_WptLight"; //Boolean. true if the waypoint alert is active
+export const LVAR_ANNUN_TEST = "L:KLN90B_AnnunTest"; //Boolean. true if the self-test is shown and all external annunciator lights should light up
 
