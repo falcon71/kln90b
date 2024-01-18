@@ -165,16 +165,16 @@ export class NavCalculator implements CalcTickable {
         const nav = this.memory.navPage;
         const obsOut = this.modeController.getDtkOrObsMagnetic();
         const magvar = this.magvar.getCurrentMagvar();
+        const track = this.sensors.in.gps.getTrackTrueRespectingGroundspeed();
 
         this.sensors.out.setXTK(nav.xtkToActive, nav.xtkScale);
         this.sensors.out.setObs(obsOut);
-        this.sensors.out.setMagvar(magvar);
-        this.sensors.out.setDesiredTrack(obsOut);
+        this.sensors.out.setDesiredTrack(obsOut, track, magvar);
         this.sensors.out.setWpBearing(this.magvar.trueToMag(nav.bearingToActive, magvar), nav.bearingToActive);
         this.sensors.out.setDistance(nav.distToActive);
         this.sensors.out.setWPTETE(nav.eteToActive, this.eteToEta(nav.eteToActive));
         this.sensors.out.setDestETE(nav.eteToDest, this.eteToEta(nav.eteToDest));
-        this.sensors.out.setPos(this.sensors.in.gps.coords, this.sensors.in.gps.groundspeed, this.sensors.in.gps.getTrackTrueRespectingGroundspeed());
+        this.sensors.out.setPos(this.sensors.in.gps.coords, this.sensors.in.gps.groundspeed, track, magvar);
 
         this.sensors.out.setWPIndex(nav.activeWaypoint.getActiveFplIdx(), nav.activeWaypoint.fpl0.getLegs().length);
 

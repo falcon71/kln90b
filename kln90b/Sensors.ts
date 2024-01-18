@@ -4,6 +4,8 @@ import {
     Facility,
     ICAO,
     LatLonInterface,
+    MagVar,
+    NavMath,
     SimVarValueType,
     Unit,
     UnitFamily,
@@ -233,13 +235,6 @@ export class SensorsOut {
 
     }
 
-    public setMagvar(magvar: number) {
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
-        SimVar.SetSimVarValue('GPS MAGVAR', SimVarValueType.Radians, magvar);
-    }
-
     public setXTK(xtk: number | null, scaling: number) {
         if (!this.options.output.writeGPSSimVars) {
             return;
@@ -263,16 +258,22 @@ export class SensorsOut {
         SimVar.SetSimVarValue('GPS HAS GLIDEPATH', SimVarValueType.Bool, false);
     }
 
-    public setDesiredTrack(dtkMag: number | null) {
+    public setDesiredTrack(dtkMag: number | null, actualTrack: number | null, magvar: number) {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
         if (dtkMag === null) {
             SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, 0);
             SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Radians, 0);
+            SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
         } else {
             SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(dtkMag, UnitType.RADIAN));
             SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Radians, UnitType.DEGREE.convertTo(dtkMag, UnitType.RADIAN));
+            if (actualTrack === null) {
+                SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
+            } else {
+                SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, UnitType.DEGREE.convertTo(NavMath.diffAngle(dtkMag, MagVar.trueToMagnetic(actualTrack, magvar)), UnitType.RADIAN));
+            }
         }
     }
 
@@ -283,6 +284,7 @@ export class SensorsOut {
         if (bearingMag === null) {
             SimVar.SetSimVarValue('GPS WP BEARING', SimVarValueType.Radians, 0);
         } else {
+            //This SimVar appears to be readonly??
             SimVar.SetSimVarValue('GPS WP BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(bearingMag, UnitType.RADIAN));
         }
         if (bearingTrue === null) {
@@ -303,10 +305,12 @@ export class SensorsOut {
         }
     }
 
-    public setPos(pos: LatLonInterface | null, speed: Knots | null, track: Degrees | null) {
+    public setPos(pos: LatLonInterface | null, speed: Knots | null, track: Degrees | null, magvar: number) {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
+        SimVar.SetSimVarValue('GPS MAGVAR', SimVarValueType.Radians, UnitType.DEGREE.convertTo(magvar, UnitType.RADIAN));
+
         if (pos === null) {
             SimVar.SetSimVarValue('GPS POSITION LAT', SimVarValueType.Degree, 0);
             SimVar.SetSimVarValue('GPS POSITION LON', SimVarValueType.Degree, 0);
@@ -321,8 +325,10 @@ export class SensorsOut {
         }
         if (track === null) {
             SimVar.SetSimVarValue('GPS GROUND TRUE TRACK', SimVarValueType.Radians, 0);
+            SimVar.SetSimVarValue('GPS GROUND MAGNETIC TRACK', SimVarValueType.Radians, 0);
         } else {
             SimVar.SetSimVarValue('GPS GROUND TRUE TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(track, UnitType.RADIAN));
+            SimVar.SetSimVarValue('GPS GROUND MAGNETIC TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(track, magvar), UnitType.RADIAN));
         }
     }
 
@@ -477,13 +483,12 @@ export class SensorsOut {
 
         this.setXTK(null, 5);
         this.setObs(null);
-        this.setMagvar(0);
-        this.setDesiredTrack(null);
+        this.setDesiredTrack(null, null, 0);
         this.setWpBearing(null, null);
         this.setDistance(null);
         this.setWPTETE(null, null);
         this.setDestETE(null, null);
-        this.setPos(null, null, null);
+        this.setPos(null, null, null, 0);
         this.setWPIndex(0, 0);
         this.setPrevWpt(null);
         this.setNextWpt(null);
