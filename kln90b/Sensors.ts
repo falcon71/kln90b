@@ -272,7 +272,7 @@ export class SensorsOut {
             if (actualTrack === null) {
                 SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
             } else {
-                SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, UnitType.DEGREE.convertTo(NavMath.diffAngle(dtkMag, MagVar.trueToMagnetic(actualTrack, magvar)), UnitType.RADIAN));
+                SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, UnitType.DEGREE.convertTo(NavMath.diffAngle(MagVar.trueToMagnetic(actualTrack, magvar), dtkMag), UnitType.RADIAN));
             }
         }
     }
