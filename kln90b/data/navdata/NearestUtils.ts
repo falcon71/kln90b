@@ -12,6 +12,7 @@ import {
 } from "@microsoft/msfs-sdk";
 import {Latitude, Longitude} from "../Units";
 import {KLNFacilityLoader, KLNNearestVorSearchSession} from "./KLNFacilityLoader";
+import {BoundaryUtils} from "./BoundaryUtils";
 
 export class NearestUtils {
     private vorSession: KLNNearestVorSearchSession | undefined;
@@ -72,7 +73,9 @@ export class NearestUtils {
         this.airspaceSession!.setFilter(filter);
         const result = await this.airspaceSession!.searchNearest(lat, lon, radius, maxItems);
         for (const airspace of result.added) {
-            this.nearestAirspaces.set(airspace.facility.id, airspace);
+            if (BoundaryUtils.isInside(airspace, lat, lon)) { //We need to check this. searchNearest seems to only check the bounding box, which can be huge like CANADA RVSM
+                this.nearestAirspaces.set(airspace.facility.id, airspace);
+            }
         }
         for (const id of result.removed) {
             this.nearestAirspaces.delete(id);
