@@ -54,6 +54,7 @@ export abstract class Editor<T> implements Field {
             this.applyValueToFields(this.convertedValue);
         }
         this.isFocused = focused;
+        this.children.walk((child) => (child as EditorField).isParentFocused = focused);
     }
 
     public setValue(value: T | null) {
@@ -135,12 +136,6 @@ export abstract class Editor<T> implements Field {
     tick(blink: boolean): void {
         if (!TickController.checkRef(this.containerRef)) {
             return;
-        }
-
-        if (this.isFocused) {
-            this.containerRef!.instance.classList.add("inverted");
-        } else {
-            this.containerRef!.instance.classList.remove("inverted");
         }
     }
 

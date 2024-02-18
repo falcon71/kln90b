@@ -9,6 +9,7 @@ export abstract class EditorField implements UiElement {
     readonly children = NO_CHILDREN;
     public value: EditorFieldValue = null;
     public isFocused = false;
+    public isParentFocused = false;
     private ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
 
@@ -43,6 +44,11 @@ export abstract class EditorField implements UiElement {
             this.ref.instance.classList.add("inverted-blink");
         } else {
             this.ref.instance.classList.remove("inverted-blink");
+            if (this.isParentFocused) {
+                this.ref.instance.classList.add("inverted");
+            } else {
+                this.ref.instance.classList.remove("inverted");
+            }
         }
 
         this.ref.instance.textContent = this.toString();
