@@ -28,7 +28,7 @@ export class AltPage extends SixLineHalfPage {
 
 
         this.children = new UIElementChildren<AltPageTypes>({
-            baro: BaroFieldsetFactory.createBaroFieldSet(this.props.sensors.in.airdata.barometer, this.props.userSettings, this.saveBaro),
+            baro: BaroFieldsetFactory.createBaroFieldSet(this.props.sensors.in.airdata.barometer, this.props.userSettings, this.saveBaro.bind(this)),
             alert: new SelectField([" OFF", "ON ›"], this.props.memory.altPage.alertEnabled ? 1 : 0, this.setAlertEnabled.bind(this)),
             warn: new SelectField(["2", "3", "4", "5", "6", "7", "8", "9"], this.props.memory.altPage.alertWarn / 100 - 2, this.setAlertWarn.bind(this)),
         });

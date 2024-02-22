@@ -55,7 +55,7 @@ export class SelfTestRightPage extends SixLineHalfPage {
             time: new TimeEditor(this.props.bus, now, this.saveTime.bind(this)),
             seconds: new TextDisplay(this.formatSeconds(now)),
             timezone: new SelectField(TIMEZONES.map(t => t.code), timezone, this.saveTimezone.bind(this)),
-            barometer: BaroFieldsetFactory.createBaroFieldSet(this.props.sensors.in.airdata.barometer, this.props.userSettings, this.saveBaro),
+            barometer: BaroFieldsetFactory.createBaroFieldSet(this.props.sensors.in.airdata.barometer, this.props.userSettings, this.saveBaro.bind(this)),
             approve: new Button("APPROVE?", this.approve.bind(this)),
             altitude: new TextDisplay(this.formatAlt()),
         });
