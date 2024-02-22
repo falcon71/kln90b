@@ -1,9 +1,12 @@
 import {Editor, Rawvalue} from "./Editor";
-import {EventBus, FSComponent, VNode} from "@microsoft/msfs-sdk";
+import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {EastWestEditorField, NumberEditorField} from "./EditorField";
 import {format} from "numerable";
+import {TickController} from "../../TickController";
 
 export class MagvarEditor extends Editor<number> {
+
+    private degreeRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
     constructor(bus: EventBus, value: number | null, enterCallback: (text: number) => void) {
         super(bus, [
@@ -15,7 +18,8 @@ export class MagvarEditor extends Editor<number> {
 
     public render(): VNode {
         return (<span ref={this.containerRef}>
-            {this.editorFields[0].render()}{this.editorFields[1].render()}°{this.editorFields[2].render()}
+            {this.editorFields[0].render()}{this.editorFields[1].render()}<span
+            ref={this.degreeRef}>°</span>{this.editorFields[2].render()}
         </span>);
     }
 
@@ -46,5 +50,17 @@ export class MagvarEditor extends Editor<number> {
         const newValue = Number(String(rawValue[0]) + String(rawValue[1])) * eastWestFactor;
 
         return Promise.resolve(newValue);
+    }
+
+    tick(blink: boolean): void {
+        super.tick(blink);
+        if (!TickController.checkRef(this.degreeRef)) {
+            return;
+        }
+        if (this.isFocused) {
+            this.degreeRef!.instance.classList.add("inverted");
+        } else {
+            this.degreeRef!.instance.classList.remove("inverted");
+        }
     }
 }

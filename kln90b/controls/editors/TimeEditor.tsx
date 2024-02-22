@@ -1,11 +1,13 @@
 import {Editor, Rawvalue} from "./Editor";
-import {EventBus, FSComponent, VNode} from "@microsoft/msfs-sdk";
+import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NumberEditorField} from "./EditorField";
 import {TimeStamp} from "../../data/Time";
 import {format} from "numerable";
+import {TickController} from "../../TickController";
 
 export class TimeEditor extends Editor<TimeStamp> {
 
+    private colonRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     constructor(bus: EventBus, value: TimeStamp | null, enterCallback: (text: TimeStamp) => void) {
         super(bus, [
             NumberEditorField.createWithMinMax(0, 23),
@@ -16,7 +18,8 @@ export class TimeEditor extends Editor<TimeStamp> {
 
     public render(): VNode {
         return (<span ref={this.containerRef}>
-            {this.editorFields[0].render()}:{this.editorFields[1].render()}{this.editorFields[2].render()}
+            {this.editorFields[0].render()}<span
+            ref={this.colonRef}>:</span>{this.editorFields[1].render()}{this.editorFields[2].render()}
         </span>);
     }
 
@@ -40,4 +43,16 @@ export class TimeEditor extends Editor<TimeStamp> {
 
     }
 
+
+    tick(blink: boolean): void {
+        super.tick(blink);
+        if (!TickController.checkRef(this.colonRef)) {
+            return;
+        }
+        if (this.isFocused) {
+            this.colonRef!.instance.classList.add("inverted");
+        } else {
+            this.colonRef!.instance.classList.remove("inverted");
+        }
+    }
 }

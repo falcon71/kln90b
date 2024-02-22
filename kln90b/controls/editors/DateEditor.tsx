@@ -1,9 +1,13 @@
 import {Editor, Rawvalue} from "./Editor";
-import {EventBus, FSComponent, VNode} from "@microsoft/msfs-sdk";
+import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {MonthEditorField, NumberEditorField} from "./EditorField";
 import {shortYearToLongYear, TimeStamp} from "../../data/Time";
+import {TickController} from "../../TickController";
 
 export class DateEditor extends Editor<TimeStamp> {
+
+    private space1Ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
+    private space2Ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
     constructor(bus: EventBus, value: TimeStamp, enterCallback: (text: TimeStamp) => void) {
         super(bus, [
@@ -16,7 +20,8 @@ export class DateEditor extends Editor<TimeStamp> {
 
     public render(): VNode {
         return (<span ref={this.containerRef}>
-            {this.editorFields[0].render()} {this.editorFields[1].render()} {this.editorFields[2].render()}{this.editorFields[3].render()}
+            {this.editorFields[0].render()}<span ref={this.space1Ref}> </span>{this.editorFields[1].render()}<span
+            ref={this.space2Ref}> </span>{this.editorFields[2].render()}{this.editorFields[3].render()}
         </span>);
     }
 
@@ -39,5 +44,19 @@ export class DateEditor extends Editor<TimeStamp> {
             return Promise.resolve(null);
         }
         return Promise.resolve(newDate);
+    }
+
+    tick(blink: boolean): void {
+        super.tick(blink);
+        if (!TickController.checkRef(this.space1Ref, this.space2Ref)) {
+            return;
+        }
+        if (this.isFocused) {
+            this.space1Ref!.instance.classList.add("inverted");
+            this.space2Ref!.instance.classList.add("inverted");
+        } else {
+            this.space1Ref!.instance.classList.remove("inverted");
+            this.space2Ref!.instance.classList.remove("inverted");
+        }
     }
 }

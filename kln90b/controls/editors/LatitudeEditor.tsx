@@ -1,10 +1,16 @@
 import {Editor, Rawvalue} from "./Editor";
-import {EventBus, FSComponent, VNode} from "@microsoft/msfs-sdk";
+import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NorthSouthEditorField, NumberEditorField} from "./EditorField";
 import {Latitude} from "../../data/Units";
 import {format} from "numerable";
+import {TickController} from "../../TickController";
 
 export class LatitudeEditor extends Editor<Latitude> {
+
+
+    private spaceRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
+    private degreeRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
+    private dotRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
     constructor(bus: EventBus, value: Latitude | null, enterCallback: (text: Latitude) => void) {
         super(bus, [
@@ -20,7 +26,10 @@ export class LatitudeEditor extends Editor<Latitude> {
 
     public render(): VNode {
         return (<span ref={this.containerRef}>
-            {this.editorFields[0].render()} {this.editorFields[1].render()}{this.editorFields[2].render()}°{this.editorFields[3].render()}{this.editorFields[4].render()}.{this.editorFields[5].render()}{this.editorFields[6].render()}
+            {this.editorFields[0].render()}<span
+            ref={this.spaceRef}> </span>{this.editorFields[1].render()}{this.editorFields[2].render()}<span
+            ref={this.degreeRef}>°</span>{this.editorFields[3].render()}{this.editorFields[4].render()}<span
+            ref={this.dotRef}>.</span>{this.editorFields[5].render()}{this.editorFields[6].render()}
         </span>);
     }
 
@@ -54,6 +63,22 @@ export class LatitudeEditor extends Editor<Latitude> {
 
 
         return Promise.resolve(northSouth * (degrees + minutes / 60));
+    }
+
+    tick(blink: boolean): void {
+        super.tick(blink);
+        if (!TickController.checkRef(this.spaceRef, this.degreeRef, this.dotRef)) {
+            return;
+        }
+        if (this.isFocused) {
+            this.spaceRef!.instance.classList.add("inverted");
+            this.degreeRef!.instance.classList.add("inverted");
+            this.dotRef!.instance.classList.add("inverted");
+        } else {
+            this.spaceRef!.instance.classList.remove("inverted");
+            this.degreeRef!.instance.classList.remove("inverted");
+            this.dotRef!.instance.classList.remove("inverted");
+        }
     }
 
 

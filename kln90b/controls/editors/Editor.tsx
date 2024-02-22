@@ -1,7 +1,6 @@
 import {EventBus, FSComponent, NodeReference, Publisher, VNode} from '@microsoft/msfs-sdk';
 import {EnterResult, Field} from "../../pages/CursorController";
 import {UIElementChildren} from '../../pages/Page';
-import {TickController} from "../../TickController";
 import {EditorField, EditorFieldValue} from "./EditorField";
 import {StatusLineMessageEvents} from "../StatusLine";
 
@@ -134,9 +133,7 @@ export abstract class Editor<T> implements Field {
     }
 
     tick(blink: boolean): void {
-        if (!TickController.checkRef(this.containerRef)) {
-            return;
-        }
+
     }
 
     clear(): boolean {
