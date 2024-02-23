@@ -112,7 +112,7 @@ export class NavCalculator implements CalcTickable {
                 if(toLeg.arcData === undefined){
                     nextDtk = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon).bearingTo(followingLeg.wpt);
                 } else {
-                    nextDtk = toLeg.arcData.circle.bearingAt(toLeg.wpt);
+                    nextDtk = toLeg.arcData.circle.bearingAt(toLeg.wpt); //Todo: In which direction does this point? I'm fairly certain, we need to consider turnDirection
                 }
                 const turnAngle  = Math.abs(NavMath.diffAngle(dtk, nextDtk));
                 const turnAnticipationDistance = turnRadius * Math.tan((turnAngle / 2) * Avionics.Utils.DEG2RAD);

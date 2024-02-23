@@ -8,6 +8,7 @@ import {
     GeoPoint,
     GeoPointInterface,
     LatLonInterface,
+    LegTurnDirection,
     MapProjection,
     NodeReference,
     ReadonlyFloat64Array,
@@ -51,9 +52,8 @@ export class CoordinateCanvasDrawContext {
     }
 
 
-    public drawArc(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, dashed: boolean = false) {
+    public drawArc(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, direction: LegTurnDirection, dashed: boolean = false) {
         const lines: ReadonlyFloat64Array[] = [];
-
 
         const handler = (vector: Readonly<GeoCircleResamplerVector>) => {
             const copy = new Float64Array(2);
@@ -62,7 +62,10 @@ export class CoordinateCanvasDrawContext {
             lines.push(copy);
         };
 
-        this.resampler.resample(this.projection.getGeoProjection(), circle, from, to, handler);
+        const point1 = direction == LegTurnDirection.Left ? from : to;
+        const point2 = direction == LegTurnDirection.Left ? to : from;
+
+        this.resampler.resample(this.projection.getGeoProjection(), circle, point1, point2, handler);
 
         for (let i = 1; i < lines.length; i++) {
             const from = lines[i - 1];
@@ -72,7 +75,7 @@ export class CoordinateCanvasDrawContext {
 
     }
 
-    public drawArcWithArrow(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface) {
+    public drawArcWithArrow(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, direction: LegTurnDirection) {
         const lines: ReadonlyFloat64Array[] = [];
 
         const handler = (vector: Readonly<GeoCircleResamplerVector>) => {
@@ -82,7 +85,10 @@ export class CoordinateCanvasDrawContext {
             lines.push(copy);
         };
 
-        this.resampler.resample(this.projection.getGeoProjection(), circle, from, to, handler);
+        const point1 = direction == LegTurnDirection.Left ? from : to;
+        const point2 = direction == LegTurnDirection.Left ? to : from;
+
+        this.resampler.resample(this.projection.getGeoProjection(), circle, point1, point2, handler);
 
         for (let i = 1; i < lines.length; i++) {
             const from = lines[i - 1];

@@ -2,14 +2,19 @@ import {
     AirportFacility,
     ApproachProcedure,
     ApproachTransition,
-    BitFlags, EnrouteTransition,
+    BitFlags,
+    EnrouteTransition,
     Facility,
-    FacilityType, FixTypeFlags,
+    FacilityType,
+    FixTypeFlags,
     FlightPlanLeg,
     GeoCircle,
     GeoPoint,
-    ICAO, LatLonInterface,
+    ICAO,
+    LatLonInterface,
+    LegTurnDirection,
     LegType,
+    NavMath,
     Procedure,
     RunwayTransition,
     RunwayUtils,
@@ -27,11 +32,14 @@ import {NavPageState} from "../VolatileMemory";
 
 export interface ArcData {
     beginRadial: Degrees, //The published beginning radial
-    beginPoint: LatLonInterface, //Coordinates of the beginning
+    beginPoint: LatLonInterface, //Published Coordinates of the beginning
     entryFacility: Facility, //The point where the aircraft will enter the arc. Somewhere between begin and end
 
     endRadial: Degrees,
     endFacility: Facility, //The end waypoint of the arc
+    endPoint: LatLonInterface,
+
+    turnDirection: LegTurnDirection,
 
     vor: VorFacility, //The VOR
 
@@ -138,7 +146,7 @@ export class SidStar {
             const dist = UnitType.GA_RADIAN.convertTo(arcData.circle.radius, UnitType.NMILE);
 
 
-            if (this.isRadialInArc(radial, arcData.beginRadial, arcData.endRadial)) {
+            if (NavMath.bearingIsBetween(radial, arcData.beginRadial, arcData.endRadial)) {
                 const entryFacility: UserFacility = {
                     icao: `UXY    ${this.getArcEntryName(radial, dist)}`, //XY marks this as temporyry
                     name: "",
@@ -169,6 +177,8 @@ export class SidStar {
                     entryFacility: entryFacility,
                     endRadial: arcData.endRadial,
                     endFacility: arcData.endFacility,
+                    endPoint: arcData.endPoint,
+                    turnDirection: arcData.turnDirection,
                     vor: arcData.vor,
                     circle: arcData.circle,
                 }
@@ -239,17 +249,6 @@ export class SidStar {
         }
 
         return null;
-    }
-
-    private static isRadialInArc(radial: Degrees, arcFrom: Degrees, arcTo: Degrees): boolean {
-        const from = arcFrom < arcTo ? arcFrom : arcTo; //Smaller value
-        const to = arcTo > arcFrom ? arcTo : arcFrom; //Bigger value
-
-        if (to - from >= 180) {
-            return radial <= from || radial >= to;
-        } else {
-            return radial >= from && radial <= to;
-        }
     }
 
     /**
@@ -360,8 +359,12 @@ export class SidStar {
         for (let i = 0; i < legs.length; i++) {
             const leg = legs[i];
             if (i === legs.length - 1 || BitFlags.isAny(leg.fixTypeFlags, BitFlags.union(FixTypeFlags.IAF, FixTypeFlags.FAF, FixTypeFlags.MAP, FixTypeFlags.MAHP))) { //We always keep IAF, FAF, MAP!
-                this.mergeAFsIfNecessary(leg, legs, i);
-                filtered.push(leg);
+                let modifiedLeg = leg;
+                if (i > 0) {
+                    modifiedLeg = this.addArcInfoIfPrevIsSame(legs[i - 1], leg);
+                }
+                this.mergeAFsIfNecessary(modifiedLeg, legs, i);
+                filtered.push(modifiedLeg);
             } else {
                 const next = legs[i + 1];
                 const bothAreAF = leg.type === LegType.AF && next.type === LegType.AF; //The KLN does not support step down fixes. We merge multiple arcs
@@ -369,8 +372,12 @@ export class SidStar {
                 const nextIsSameWpt = next.fixIcao === leg.fixIcao;
                 const isAlreadyLastInList = filtered.length > 0 && filtered[filtered.length - 1].fixIcao === leg.fixIcao;
                 if (!bothAreAF && !nextIsSameWpt && !isAlreadyLastInList) { //We prefer the following WPT, because those might be holds
-                    this.mergeAFsIfNecessary(leg, legs, i);
-                    filtered.push(leg);
+                    let modifiedLeg = leg;
+                    if (i > 0) {
+                        modifiedLeg = this.addArcInfoIfPrevIsSame(legs[i - 1], leg);
+                    }
+                    this.mergeAFsIfNecessary(modifiedLeg, legs, i);
+                    filtered.push(modifiedLeg);
                 }
             }
         }
@@ -388,6 +395,24 @@ export class SidStar {
                 iPrev--;
             }
         }
+    }
+
+    /**
+     * Example PHNY: TEWVU is the last waypoint of the transition, as well as the IF.
+     * In that case, we would use the IF, but the arc information from the previous wpt would be lost.
+     * We merge the arc information back from the previous waypoint
+     * @param prevLeg
+     * @param currentLeg
+     * @private
+     */
+    private addArcInfoIfPrevIsSame(prevLeg: FlightPlanLeg, currentLeg: FlightPlanLeg): FlightPlanLeg {
+        if (prevLeg.fixIcao !== currentLeg.fixIcao || prevLeg.type !== LegType.AF) {
+            return currentLeg;
+        }
+
+        //Yes, merging is as easy as that...
+        prevLeg.fixTypeFlags = currentLeg.fixTypeFlags;
+        return prevLeg;
     }
 
     /**
@@ -508,7 +533,7 @@ export class SidStar {
         const dist = UnitType.METER.convertTo(convertedLeg.leg.rho, UnitType.NMILE);
 
 
-        if (!SidStar.isRadialInArc(radial, convertedLeg.leg.course, convertedLeg.leg.theta)) {
+        if (!NavMath.bearingIsBetween(radial, convertedLeg.leg.course, convertedLeg.leg.theta)) {
             //Outside of arc, then it defaults to the beginning of the arc
             entryPoint.set(beginPoint);
             radial = convertedLeg.leg.course;
@@ -529,6 +554,10 @@ export class SidStar {
             reference1Distance: dist,
         };
 
+        //End point. The precision of the facility coordinates may not be precise enough and cause errors in the resample of the NAV 5 page
+        const endPoint = new GeoPoint(0, 0);
+        circle.closest(convertedLeg.facility, endPoint);
+
         try {
             //Not sure, but I would expect this to behave like the REF page
             this.facilityLoader.facilityRepo.add(entryFacility);
@@ -542,7 +571,8 @@ export class SidStar {
             entryFacility: entryFacility,
             endRadial: convertedLeg.leg.theta,
             endFacility: convertedLeg.facility,
-
+            endPoint: endPoint,
+            turnDirection: convertedLeg.leg.turnDirection,
 
             vor: vor,
             circle: circle,

@@ -213,8 +213,11 @@ export class SuperNav5Page extends SevenLinePage {
                     if (prevleg.arcData === undefined) {
                         ctx.drawFlightplanLine(prevleg.wpt, leg.wpt);
                     } else {
-                        ctx.drawArc(prevleg.arcData.circle, prevleg.arcData.beginPoint, prevleg.arcData.entryFacility, true);
-                        ctx.drawArc(prevleg.arcData.circle, prevleg.arcData.entryFacility, prevleg.arcData.endFacility);
+                        const point = new GeoPoint(prevleg.arcData.beginPoint.lat, prevleg.arcData.beginPoint.lon);
+                        if (!point.equals(prevleg.arcData.entryFacility)) {
+                            ctx.drawArc(prevleg.arcData.circle, prevleg.arcData.beginPoint, prevleg.arcData.entryFacility, prevleg.arcData.turnDirection, true);
+                        }
+                        ctx.drawArc(prevleg.arcData.circle, prevleg.arcData.entryFacility, prevleg.arcData.endPoint, prevleg.arcData.turnDirection);
                     }
                 }
             } else {
@@ -225,11 +228,14 @@ export class SuperNav5Page extends SevenLinePage {
                         ctx.drawFlightplanLine(prevleg.wpt, leg.wpt);
                     }
                 } else {
-                    ctx.drawArc(prevleg.arcData.circle, prevleg.arcData.beginPoint, prevleg.arcData.entryFacility, true);
+                    const point = new GeoPoint(prevleg.arcData.beginPoint.lat, prevleg.arcData.beginPoint.lon);
+                    if (!point.equals(prevleg.arcData.entryFacility)) {
+                        ctx.drawArc(prevleg.arcData.circle, prevleg.arcData.beginPoint, prevleg.arcData.entryFacility, prevleg.arcData.turnDirection, true);
+                    }
                     if (actIdx === i) {
-                        ctx.drawArcWithArrow(prevleg.arcData.circle, prevleg.arcData.entryFacility, prevleg.arcData.endFacility);
+                        ctx.drawArcWithArrow(prevleg.arcData.circle, prevleg.arcData.entryFacility, prevleg.arcData.endPoint, prevleg.arcData.turnDirection);
                     } else {
-                        ctx.drawArc(prevleg.arcData.circle, prevleg.arcData.entryFacility, prevleg.arcData.endFacility);
+                        ctx.drawArc(prevleg.arcData.circle, prevleg.arcData.entryFacility, prevleg.arcData.endPoint, prevleg.arcData.turnDirection);
                     }
                 }
             }
