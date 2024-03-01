@@ -183,9 +183,6 @@ export class GPS {
                     this.trackTrue = this.lastCoords.bearingTo(this.coords);
                 }
 
-                SimVar.SetSimVarValue('GPS POSITION LAT', SimVarValueType.Degree, this.coords.lat);
-                SimVar.SetSimVarValue('GPS POSITION LON', SimVarValueType.Degree, this.coords.lon);
-
                 this.intSaveCount += TICK_TIME_CALC;
                 if (this.intSaveCount >= SAVE_INTERVALL) {
                     this.savePosition();
