@@ -481,6 +481,16 @@ export class SensorsOut {
 
         SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, true);
 
+        //Code disabled for now.
+        //A CTD has been observed in the following conditions:
+        //Starting a flight on the runway and setting L:KLN90B_Disabled to true right away
+        //The sim crashes once hot swapping of other GPS units occur
+        //The crash can be prevented by the following:
+        //- Not setting GPS OVERRIDDEN to false when disabling the KLN (SimVarSync.setDisabled)
+        //- Running TickController.tickCalc at least once before setting GPS OVERRIDDEN to false when disabling the KLN
+        //- Or by not setting these GPS SimVars to 0
+        //- The exact offending SimVar is unknown at this time
+        /*
         this.setXTK(null, 5);
         this.setObs(null);
         this.setDesiredTrack(null, null, 0);
@@ -493,6 +503,7 @@ export class SensorsOut {
         this.setPrevWpt(null);
         this.setNextWpt(null);
         this.setMode(NavMode.ENR_LEG, false, !this.options.input.externalSwitches.legObsSwitchInstalled);
+         */
     }
 }
 
