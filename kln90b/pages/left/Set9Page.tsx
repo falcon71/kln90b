@@ -17,7 +17,7 @@ export class Set9Page extends SixLineHalfPage {
     public readonly cursorController;
     readonly children: UIElementChildren<Set9PageTypes>;
 
-    readonly name: string = "SET 7";
+    readonly name: string = "SET 9";
 
     protected readonly ref: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
 
