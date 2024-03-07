@@ -20,7 +20,7 @@ export class Set7Page extends SixLineHalfPage {
     public readonly cursorController;
     readonly children: UIElementChildren<Set7PageTypes>;
 
-    readonly name: string = "SET 8";
+    readonly name: string = "SET 7";
 
     constructor(props: PageProps) {
         super(props);
