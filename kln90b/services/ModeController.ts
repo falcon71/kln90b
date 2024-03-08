@@ -355,7 +355,7 @@ export class ModeController implements CalcTickable {
         const fafPoint = new GeoPoint(faf.wpt.lat, faf.wpt.lon);
         const appDtk = fafPoint.bearingTo(map.wpt);
 
-        if (Math.abs(NavMath.diffAngle(appDtk, this.sensors.in.gps.trackTrue)) > 70) {
+        if (Math.abs(NavMath.diffAngle(appDtk, this.sensors.in.gps.trackTrue)) > 110) {
             return; //Heading towards FAF
         }
 
