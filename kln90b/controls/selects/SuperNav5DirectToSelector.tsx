@@ -104,6 +104,7 @@ export class SuperNav5DirectToSelector implements UiElement {
                 this.activeWpt.recalculatePath();
             }
         }
+        this.isMovingArc = false;
 
         return true;
     }

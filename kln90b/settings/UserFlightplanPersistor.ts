@@ -28,25 +28,34 @@ export class UserFlightplanPersistor {
 
     public async restoreFlightplan(idx: number): Promise<Flightplan> {
         if (idx === 0) {
-            return new AsoboFlightplanLoader(this.bus, this.facilityLoader, this.messageHandler).loadAsoboFlightplan();
+            try {
+                return new AsoboFlightplanLoader(this.bus, this.facilityLoader, this.messageHandler).loadAsoboFlightplan();
+            } catch (e) {
+                console.log("Error restoring fpl 0", e);
+                throw e;
+            }
         }
+        try {
+            const setting = this.manager.getSetting(`fpl${idx - 1}`);
 
-        const setting = this.manager.getSetting(`fpl${idx - 1}`);
+            const serialized = setting.get();
+            console.log(`restoring flightplan ${idx}`, serialized);
 
-        const serialized = setting.get();
-        console.log(`restoring flightplan ${idx}`, serialized);
+            if (serialized === "") {
+                return new Flightplan(idx, [], this.bus);
+            }
 
-        if (serialized === "") {
-            return new Flightplan(idx, [], this.bus);
+            const serializedLegs = serialized.match(/.{1,12}/g)!;
+            const promises = serializedLegs.map(this.deserializeLeg.bind(this));
+            const legs = await Promise.all(promises);
+
+            const fpl = new Flightplan(idx, legs.filter(l => l !== null) as any, this.bus);
+            console.log(`flightplan ${idx} restored`, fpl);
+            return fpl;
+        } catch (e) {
+            console.log(`Error restoring fpl ${idx}`, e);
+            throw e;
         }
-
-        const serializedLegs = serialized.match(/.{1,12}/g)!;
-        const promises = serializedLegs.map(this.deserializeLeg.bind(this));
-        const legs = await Promise.all(promises);
-
-        const fpl = new Flightplan(idx, legs.filter(l => l !== null) as any, this.bus);
-        console.log(`flightplan ${idx} restored`, fpl);
-        return fpl;
     }
 
     private persistFlightplan(fpl: Flightplan) {

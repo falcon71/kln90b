@@ -228,7 +228,6 @@ class KLN90B extends BaseInstrument {
             this.userWaypointPersistor.restoreWaypoints();
         } catch (e) {
             restoreSuccessFull = false;
-            console.error(e);
         }
 
         this.userFlightplanPersistor = new UserFlightplanPersistor(this.bus, facilityLoader, this.messageHandler, this.planeSettings);

@@ -145,10 +145,21 @@ export class SidStar {
             const radial = vorPoint.bearingTo(entryPoint);
             const dist = UnitType.GA_RADIAN.convertTo(arcData.circle.radius, UnitType.NMILE);
 
+            let start;
+            let end;
 
-            if (NavMath.bearingIsBetween(radial, arcData.beginRadial, arcData.endRadial)) {
+            if (arcData.turnDirection == LegTurnDirection.Left) {
+                start = arcData.endRadial;
+                end = arcData.beginRadial;
+            } else {
+                start = arcData.beginRadial;
+                end = arcData.endRadial;
+            }
+
+
+            if (NavMath.bearingIsBetween(radial, start, end)) {
                 const entryFacility: UserFacility = {
-                    icao: `UXY    ${this.getArcEntryName(radial, dist)}`, //XY marks this as temporyry
+                    icao: `UXY    ${this.getArcEntryName(radial, dist)}`, //XY marks this as temporary
                     name: "",
                     lat: entryPoint.lat,
                     lon: entryPoint.lon,
@@ -532,15 +543,24 @@ export class SidStar {
         let radial = vorPoint.bearingTo(entryPoint);
         const dist = UnitType.METER.convertTo(convertedLeg.leg.rho, UnitType.NMILE);
 
+        let start;
+        let end;
+        if (convertedLeg.leg.turnDirection == LegTurnDirection.Left) {
+            start = convertedLeg.leg.theta;
+            end = convertedLeg.leg.course;
+        } else {
+            start = convertedLeg.leg.course;
+            end = convertedLeg.leg.theta;
+        }
 
-        if (!NavMath.bearingIsBetween(radial, convertedLeg.leg.course, convertedLeg.leg.theta)) {
+        if (!NavMath.bearingIsBetween(radial, start, end)) {
             //Outside of arc, then it defaults to the beginning of the arc
             entryPoint.set(beginPoint);
             radial = convertedLeg.leg.course;
         }
 
         const entryFacility: UserFacility = {
-            icao: `UXY    ${SidStar.getArcEntryName(radial, dist)}`, //XY marks this as temporyry
+            icao: `UXY    ${SidStar.getArcEntryName(radial, dist)}`, //XY marks this as temporary
             name: "",
             lat: entryPoint.lat,
             lon: entryPoint.lon,
