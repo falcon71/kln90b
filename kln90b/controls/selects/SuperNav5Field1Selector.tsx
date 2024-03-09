@@ -1,4 +1,4 @@
-import {FSComponent, UserSetting} from "@microsoft/msfs-sdk";
+import {UserSetting} from "@microsoft/msfs-sdk";
 import {SelectField} from "./SelectField";
 import {NavPageState} from "../../data/VolatileMemory";
 import {TickController} from "../../TickController";
@@ -99,7 +99,7 @@ export class SuperNav5Field1Selector extends SelectField {
      */
     private formatXtk(xtk: number | null): string {
         if (xtk === null) {
-            return "--.-NM-";
+            return "-.-NM-";
         }
         const xtkDist = Math.abs(xtk);
         let xtkString;
