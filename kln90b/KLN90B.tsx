@@ -124,6 +124,12 @@ class KLN90B extends BaseInstrument {
         return 'KLN90B';
     }
 
+
+    get isInteractive(): boolean {
+        return true;
+    }
+
+
     Init() {
         super.Init();
 

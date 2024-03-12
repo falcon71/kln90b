@@ -194,3 +194,25 @@ pre {
 .offset-left-cursor {
     margin-left: $charWidth * $zoom-factor;
 }
+
+.left-keyboard {
+    position: fixed;
+    top: $yMarginPx + 6 * $charHeight * $zoom-factor;
+    left: $xMarginPx + 1 * $charWidth * $zoom-factor;
+    width: 4 * $charWidth * $zoom-factor;
+    height: 1 * $charHeight * $zoom-factor;
+    color: transparent;
+    background-color: transparent;
+    border: none;
+}
+
+.right-keyboard {
+    position: fixed;
+    top: $yMarginPx + 6 * $charHeight * $zoom-factor;
+    left: $xMarginPx + 18 * $charWidth * $zoom-factor;
+    width: 4 * $charWidth * $zoom-factor;
+    height: 1 * $charHeight * $zoom-factor;
+    color: transparent;
+    background-color: transparent;
+    border: none;
+}
