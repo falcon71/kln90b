@@ -1,6 +1,5 @@
 import {NO_CHILDREN, UiElement, UIElementChildren} from "./Page";
 
-
 export interface CursorHandler {
     outerLeft(): boolean;
 
@@ -13,6 +12,8 @@ export interface CursorHandler {
     enter(): Promise<EnterResult>;
 
     clear(): boolean;
+
+    keyboard(key: string): boolean; //Keyboard presses
 }
 
 /**
@@ -208,6 +209,13 @@ export class CursorController implements CursorHandler {
     private getFields(): Field[] {
         // @ts-ignore
         return this.children.getallFlat().filter(c => isField(c) && !(c as Field).isReadonly);
+    }
+
+    public keyboard(key: string): boolean {
+        if (!this.cursorActive) {
+            return false;
+        }
+        return this.getCurrentFocusedField()!.keyboard(key);
     }
 }
 

@@ -1,4 +1,4 @@
-import {DisplayComponent, FSComponent, NodeReference, Subscription, VNode} from "@microsoft/msfs-sdk";
+import {DisplayComponent, FSComponent, NodeReference, Publisher, Subscription, VNode} from "@microsoft/msfs-sdk";
 import {TICK_TIME_DISPLAY, TickController} from "../TickController";
 import {NO_CHILDREN, Page, PageProps, UiElement} from "../pages/Page";
 import {NavMode} from "../data/VolatileMemory";
@@ -40,6 +40,16 @@ export interface StatusLineMessageEvents {
     statusLineMessage: KLNErrorMessage;
 }
 
+export interface KeyboardEventData {
+    side: 'LEFT' | 'RIGHT';
+    keyCode: number;
+}
+
+export interface KeyboardEvent {
+    keyboardevent: KeyboardEventData;
+}
+
+
 export class StatusLine extends DisplayComponent<StatusLineProps> implements UiElement {
 
     readonly children = NO_CHILDREN;
@@ -58,6 +68,7 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
     private statusLineMessage: KLNErrorMessage | null = null;
     private statusLineMessageTimer: number = 0;
     private sub: Subscription;
+    private readonly keyboardPublisher: Publisher<KeyboardEvent>;
 
     private keyBoardInitialized = false;
     private isLeftKeyboardActive = false;
@@ -69,6 +80,8 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
         super(props);
 
         this.sub = props.bus.getSubscriber<StatusLineMessageEvents>().on("statusLineMessage").handle(this.showMessage.bind(this), true);
+
+        this.keyboardPublisher = props.bus.getPublisher<KeyboardEvent>();
         this.sub.resume(false); //We don't care about old notifications from ages ago
     }
 
@@ -216,7 +229,15 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
 
         this.leftKeyboardRef.instance.onkeydown = (event) => {
             console.log(event);
+            this.keyboardPublisher.pub("keyboardevent", {side: 'LEFT', keyCode: event.keyCode});
             event.preventDefault();
+        };
+        this.leftKeyboardRef.instance.onkeypress = (event) => {
+            //console.log(event);
+            if (event.keyCode == 13) { //Enter somehow does not trigger onkeydown
+                this.keyboardPublisher.pub("keyboardevent", {side: 'LEFT', keyCode: event.keyCode});
+                event.preventDefault();
+            }
         };
         this.leftKeyboardRef.instance.onblur = (event) => {
             this.isLeftKeyboardActive = false;
@@ -239,8 +260,16 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
         };
 
         this.rightKeyboardRef.instance.onkeydown = (event) => {
-            console.log(event);
+            //console.log(event);
+            this.keyboardPublisher.pub("keyboardevent", {side: 'RIGHT', keyCode: event.keyCode});
             event.preventDefault();
+        };
+        this.rightKeyboardRef.instance.onkeypress = (event) => {
+            //console.log(event);
+            if (event.keyCode == 13) { //Enter somehow does not trigger onkeydown
+                this.keyboardPublisher.pub("keyboardevent", {side: 'RIGHT', keyCode: event.keyCode});
+                event.preventDefault();
+            }
         };
         this.rightKeyboardRef.instance.onblur = (event) => {
             this.isRightKeyboardActive = false;

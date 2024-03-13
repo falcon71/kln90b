@@ -247,4 +247,8 @@ export class FlightplanListItem implements Field, ListItem {
         this.wpt = facility;
         this.props.onInsertDone(this.props.wptIdx, facility, this.props.leg);
     }
+
+    public keyboard(key: string): boolean {
+        return this.waypointEditor.keyboard(key);
+    }
 }

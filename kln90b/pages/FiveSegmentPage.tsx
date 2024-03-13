@@ -18,6 +18,7 @@ import {
 import {StatusLine} from "../controls/StatusLine";
 import {CursorController, EnterResult} from "./CursorController";
 import {Page, PageProps, UiElement, UIElementChildren} from "./Page";
+import {KeyboardService} from "../services/KeyboardService";
 
 export interface FivePageProps extends PageProps {
     lPage: SixLineHalfPage;
@@ -117,6 +118,8 @@ export class FiveSegmentPage extends DisplayComponent<FivePageProps> implements 
     }
 
     onInteractionEvent(evt: string): boolean {
+        KeyboardService.routeKeyboardEvent(evt, this.props.lPage.getCursorController(), this.props.rPage.getCursorController());
+
         switch (evt) {
             case EVT_L_CURSOR:
                 return this.props.lPage.getCursorController().toggleCursor();

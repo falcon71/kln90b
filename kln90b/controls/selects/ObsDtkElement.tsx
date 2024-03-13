@@ -116,5 +116,7 @@ export class ObsDtkElement implements Field {
         return this.sensors.in.obsMag !== null && dtk !== null && Math.abs(NavMath.diffAngle(this.sensors.in.obsMag, dtk)) > 10;
     }
 
-
+    public keyboard(key: string): boolean {
+        return false;
+    }
 }

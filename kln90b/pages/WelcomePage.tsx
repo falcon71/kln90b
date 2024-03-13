@@ -20,6 +20,7 @@ import {
 import {PropsReadyEvent} from "../KLN90B";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {PageManager} from "./PageManager";
+import {KeyboardService} from "../services/KeyboardService";
 
 
 type WelcomePageChildTypes = {
@@ -80,6 +81,8 @@ export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> 
     }
 
     onInteractionEvent(evt: string): boolean {
+        KeyboardService.routeKeyboardEvent(evt, this.lCursorController, this.lCursorController);
+
         switch (evt) {
             case EVT_L_CURSOR:
                 return this.lCursorController.toggleCursor();
@@ -95,6 +98,7 @@ export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> 
                 this.lCursorController.enter();
                 return true;
         }
+
         return false;
     }
 

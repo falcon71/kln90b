@@ -178,6 +178,10 @@ class ModObsElement implements Field {
         return false;
     }
 
+    public keyboard(key: string): boolean {
+        return false;
+    }
+
     public render(): VNode {
         return (
             <span ref={this.ref}>{this.getDisplayValue()}</span>);

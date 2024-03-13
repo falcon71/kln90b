@@ -144,6 +144,10 @@ export class SimpleListItem<T> implements Field, ListItem {
         return true;
     }
 
+    public keyboard(key: string): boolean {
+        return false;
+    }
+
     public isItemFocused(): Boolean {
         return this.isFocused;
     }

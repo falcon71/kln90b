@@ -29,6 +29,7 @@ import {
     ICAO,
     NodeReference,
     SimVarValueType,
+    Subscription,
 } from '@microsoft/msfs-sdk';
 
 import '../KLN90B.scss';
@@ -47,7 +48,22 @@ import {KLNFacilityLoader} from "./data/navdata/KLNFacilityLoader";
 import {KLNFacilityRepository} from "./data/navdata/KLNFacilityRepository";
 import {UserWaypointPersistor} from "./settings/UserWaypointPersistor";
 import {Scanlists} from "./data/navdata/Scanlist";
-import {EVT_R_INNER_LEFT, EVT_R_INNER_RIGHT, EVT_R_SCAN, EVT_R_SCAN_LEFT, EVT_R_SCAN_RIGHT} from "./HEvents";
+import {
+    EVT_CLR,
+    EVT_ENT,
+    EVT_KEY,
+    EVT_L_INNER_LEFT,
+    EVT_L_INNER_RIGHT,
+    EVT_L_OUTER_LEFT,
+    EVT_L_OUTER_RIGHT,
+    EVT_R_INNER_LEFT,
+    EVT_R_INNER_RIGHT,
+    EVT_R_OUTER_LEFT,
+    EVT_R_OUTER_RIGHT,
+    EVT_R_SCAN,
+    EVT_R_SCAN_LEFT,
+    EVT_R_SCAN_RIGHT,
+} from "./HEvents";
 import {MessageHandler, OneTimeMessage} from "./data/MessageHandler";
 import {NavCalculator} from "./data/navdata/NavCalculator";
 import {AirspaceAlert} from "./data/navdata/AirspaceAlert";
@@ -68,6 +84,7 @@ import {buildPersistentMessages} from "./data/PersistentMessages";
 import {Flightplan} from "./data/flightplan/Flightplan";
 import {SidStar} from "./data/navdata/SidStar";
 import {SimVarSync} from "./SimVarSync";
+import {KeyboardEvent, KeyboardEventData} from "./controls/StatusLine";
 
 export interface PropsReadyEvent {
     propsReady: PageProps;
@@ -81,6 +98,7 @@ export interface PropsReadyEvent {
  */
 class KLN90B extends BaseInstrument {
     private readonly bus = new EventBus();
+    private keyboardEventSub: Subscription;
 
     private powerButton: PowerButton | undefined;
     private readonly hEventPublisher: HEventPublisher;
@@ -115,6 +133,8 @@ class KLN90B extends BaseInstrument {
         this.settingSaveManager.startAutoSave(saveKey);
 
         this.hEventPublisher = new HEventPublisher(this.bus);
+
+        this.keyboardEventSub = this.bus.getSubscriber<KeyboardEvent>().on("keyboardevent").handle(this.handleKeyboardEvent.bind(this));
 
         this.pageManager = new PageManager();
 
@@ -335,6 +355,66 @@ class KLN90B extends BaseInstrument {
             //this.bus.onAll(console.log);
 
         });
+    }
+
+    private handleKeyboardEvent(data: KeyboardEventData) {
+        switch (data.keyCode) {
+            case 13: //Enter
+                this.onInteractionEvent([EVT_ENT]);
+                break;
+            case 8: // Backspace
+                this.onInteractionEvent([EVT_CLR]);
+                break;
+            case 33: // Page up
+                switch (data.side) {
+                    case "LEFT":
+                        this.onInteractionEvent([EVT_L_INNER_LEFT]);
+                        break;
+                    case "RIGHT":
+                        this.onInteractionEvent([EVT_R_INNER_LEFT]);
+                        break;
+                }
+                break;
+            case 34: // Page Down
+                switch (data.side) {
+                    case "LEFT":
+                        this.onInteractionEvent([EVT_L_INNER_RIGHT]);
+                        break;
+                    case "RIGHT":
+                        this.onInteractionEvent([EVT_R_INNER_RIGHT]);
+                        break;
+                }
+                break;
+            case 35: // End
+                switch (data.side) {
+                    case "LEFT":
+                        this.onInteractionEvent([EVT_L_OUTER_RIGHT]);
+                        break;
+                    case "RIGHT":
+                        this.onInteractionEvent([EVT_R_OUTER_RIGHT]);
+                        break;
+                }
+                break;
+            case 36: // Home
+                switch (data.side) {
+                    case "LEFT":
+                        this.onInteractionEvent([EVT_L_OUTER_LEFT]);
+                        break;
+                    case "RIGHT":
+                        this.onInteractionEvent([EVT_R_OUTER_LEFT]);
+                        break;
+                }
+                break;
+            default:
+                if (data.keyCode >= 48 && data.keyCode <= 57 || //Number row
+                    data.keyCode >= 65 && data.keyCode <= 90) { //Letters
+                    const key = String.fromCharCode(data.keyCode).toUpperCase();
+                    this.onInteractionEvent([EVT_KEY + data.side + ":" + key]);
+                } else if (data.keyCode >= 96 && data.keyCode <= 105) { //Numpad
+                    const key = String(data.keyCode - 96);
+                    this.onInteractionEvent([EVT_KEY + data.side + ":" + key]);
+                }
+        }
     }
 
     /**

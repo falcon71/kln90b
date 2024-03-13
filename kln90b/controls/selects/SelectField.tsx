@@ -84,4 +84,14 @@ export class SelectField implements Field {
         return false;
     }
 
+    public keyboard(key: string): boolean {
+        const idx = this.valueSet.indexOf(key);
+        if (idx == -1) {
+            return false;
+        }
+
+        this.value = idx;
+        this.changedCallback(this.value);
+        return true;
+    }
 }

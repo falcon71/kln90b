@@ -35,6 +35,7 @@ import {SevenLinePage} from "./OneSegmentPage";
 import {isCustomPageTreeController, LEFT_PAGE_TREE, PageTreeController, RIGHT_PAGE_TREE} from "./PageTreeController";
 import {Nav4RightPage} from "./left/Nav4Page";
 import {Set0DummyPage, Set0Page} from "./left/Set0Page";
+import {KeyboardService} from "../services/KeyboardService";
 
 
 class PageStack {
@@ -295,6 +296,11 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         let leftPage: SixLineHalfPage;
         let rightPage: SixLineHalfPage;
 
+        if (this.overlayPageStack.isShown()) {
+            KeyboardService.routeKeyboardEvent(evt, this.getOverlayPage()!.lCursorController, this.getOverlayPage()!.rCursorController);
+        } else {
+            KeyboardService.routeKeyboardEvent(evt, this.getLeftPage().getCursorController(), this.getRightPage().getCursorController());
+        }
         switch (evt) {
             case EVT_L_CURSOR:
                 if (this.overlayPageStack.isShown()) {

@@ -94,4 +94,7 @@ export class NearestSelector implements Field {
         return `nr ${this.nearestIndex + 1}`; //The KLN is 1 based
     }
 
+    public keyboard(key: string): boolean {
+        return false;
+    }
 }

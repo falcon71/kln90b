@@ -182,4 +182,8 @@ export abstract class Editor<T> implements Field {
     private decrementCurrentChar() {
         this.editorFields[this.cursorIndex].decrementChar();
     }
+
+    public keyboard(key: string): boolean {
+        return false;
+    }
 }

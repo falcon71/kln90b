@@ -91,5 +91,8 @@ export class Button implements Field {
         return this.clearCallback !== undefined;
     }
 
+    public keyboard(key: string): boolean {
+        return false;
+    }
 
 }
