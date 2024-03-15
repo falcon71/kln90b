@@ -19,7 +19,7 @@ export interface FlightplanListItemProps extends PageProps {
     leg: KLNFlightplanLeg | null,
     wptIdx: number, //The index to display to the user
     wpt: Facility | null,
-    onCreate: (idx: number, mode: FplWptEnterMode) => void,
+    onCreate: (idx: number, mode: FplWptEnterMode, keyboardKey?: string) => void,
     onDelete: (idx: number) => void,
     onInsertDone: (idx: number, value: Facility | null, leg: KLNFlightplanLeg | null) => void,
     onBeforeDelete: (idx: number) => KLNErrorMessage | null,
@@ -129,7 +129,7 @@ export class FlightplanListItem implements Field, ListItem {
         }
 
         if (!this.waypointEditor.isEntered && this.wpt !== null) {
-
+            //We trigger creation of a new leg, we don't enter this waypoint
             this.props.onCreate(this.props.wptIdx, FplWptEnterMode.ROTATE_LEFT);
             return true;
         }
@@ -145,6 +145,7 @@ export class FlightplanListItem implements Field, ListItem {
         }
 
         if (!this.waypointEditor.isEntered && this.wpt !== null) {
+            //We trigger creation of a new leg, we don't enter this waypoint
             this.props.onCreate(this.props.wptIdx, FplWptEnterMode.ROTATE_RIGHT);
             return true;
         }
@@ -249,6 +250,24 @@ export class FlightplanListItem implements Field, ListItem {
     }
 
     public keyboard(key: string): boolean {
+        if (!this.isEntered) {
+            //We need the normal logic to check if we can actually enter
+            if (this.type === KLNLegType.APP) {
+                this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID ADD");
+                return true;
+            }
+
+            if (!this.waypointEditor.isEntered && this.wpt !== null) {
+                //We trigger creation of a new leg, we don't enter this waypoint
+                this.props.onCreate(this.props.wptIdx, FplWptEnterMode.KEYBOARD, key);
+                return true;
+            }
+            const enterHandled = this.waypointEditor.innerRight();
+            this.isEntered = this.waypointEditor.isEntered;
+            if (!enterHandled) {
+                return false;
+            }
+        }
         return this.waypointEditor.keyboard(key);
     }
 }

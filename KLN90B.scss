@@ -216,3 +216,7 @@ pre {
     background-color: transparent;
     border: none;
 }
+
+::selection {
+    background: transparent;
+}

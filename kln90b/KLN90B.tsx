@@ -362,20 +362,7 @@ class KLN90B extends BaseInstrument {
             case 13: //Enter
                 this.onInteractionEvent([EVT_ENT]);
                 break;
-            case 8: // Backspace
-                this.onInteractionEvent([EVT_CLR]);
-                break;
             case 33: // Page up
-                switch (data.side) {
-                    case "LEFT":
-                        this.onInteractionEvent([EVT_L_INNER_LEFT]);
-                        break;
-                    case "RIGHT":
-                        this.onInteractionEvent([EVT_R_INNER_LEFT]);
-                        break;
-                }
-                break;
-            case 34: // Page Down
                 switch (data.side) {
                     case "LEFT":
                         this.onInteractionEvent([EVT_L_INNER_RIGHT]);
@@ -385,7 +372,28 @@ class KLN90B extends BaseInstrument {
                         break;
                 }
                 break;
+            case 34: // Page Down
+                switch (data.side) {
+                    case "LEFT":
+                        this.onInteractionEvent([EVT_L_INNER_LEFT]);
+                        break;
+                    case "RIGHT":
+                        this.onInteractionEvent([EVT_R_INNER_LEFT]);
+                        break;
+                }
+                break;
+            case 8: // Backspace
             case 35: // End
+                switch (data.side) {
+                    case "LEFT":
+                        this.onInteractionEvent([EVT_L_OUTER_LEFT]);
+                        break;
+                    case "RIGHT":
+                        this.onInteractionEvent([EVT_R_OUTER_LEFT]);
+                        break;
+                }
+                break;
+            case 36: // Home
                 switch (data.side) {
                     case "LEFT":
                         this.onInteractionEvent([EVT_L_OUTER_RIGHT]);
@@ -395,15 +403,8 @@ class KLN90B extends BaseInstrument {
                         break;
                 }
                 break;
-            case 36: // Home
-                switch (data.side) {
-                    case "LEFT":
-                        this.onInteractionEvent([EVT_L_OUTER_LEFT]);
-                        break;
-                    case "RIGHT":
-                        this.onInteractionEvent([EVT_R_OUTER_LEFT]);
-                        break;
-                }
+            case 46: // Delete
+                this.onInteractionEvent([EVT_CLR]);
                 break;
             default:
                 if (data.keyCode >= 48 && data.keyCode <= 57 || //Number row

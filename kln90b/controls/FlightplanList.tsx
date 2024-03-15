@@ -23,13 +23,15 @@ export const enum FplWptEnterMode {
     ROTATE_RIGHT, //Rotate inner cursor
     ENTER, //Press enter (inserts WPT)
     CONFIRM, //ref page. Value is entered, must be confirmed
+    KEYBOARD, //The user pressed a keyboard key
 }
 
 interface EditableFlightplanLeg {
     wpt: Facility | null,
     leg?: KLNFlightplanLeg,
     origIdx: number, //The actual index of this leg in the flightplan. -1 when it is a new waypoint not yet in the fpl
-    enterMe?: FplWptEnterMode,
+    enterMe?: FplWptEnterMode, //Causes the leg to be entered after creation
+    enterKeyboardKey?: string,
     focusMe?: boolean,
 }
 
@@ -356,7 +358,7 @@ class EditableFlightplan {
         }
     }
 
-    public createLeg(idx: number, enter: FplWptEnterMode, wpt: Facility | null = null): void {
+    public createLeg(idx: number, enter: FplWptEnterMode, keyboardKey: string | undefined, wpt: Facility | null = null): void {
         const prev = this.legs[idx];
         let leg: KLNFlightplanLeg | undefined;
         if (prev?.leg) { //Happens when a SID or STAR is edited. We need to copy this metadata
@@ -368,7 +370,7 @@ class EditableFlightplan {
             }
         }
 
-        this.legs.splice(idx, 0, {wpt: wpt, leg: leg, origIdx: -1, enterMe: enter});
+        this.legs.splice(idx, 0, {wpt: wpt, leg: leg, origIdx: -1, enterMe: enter, enterKeyboardKey: keyboardKey});
         this.buildList();
     }
 
@@ -456,13 +458,18 @@ class EditableFlightplan {
                                 },
                             );
                             break;
+                        case FplWptEnterMode.KEYBOARD:
+                            listItem.innerRight();
+                            listItem.keyboard(leg.enterKeyboardKey!);
+                            break;
                         case FplWptEnterMode.CONFIRM:
                             listItem.confirmCurrentValue().then(_ => this.cursorController.setCursorActive(false));
                             break;
                     }
-                }
+                };
             } else if (leg.focusMe) {
                 focusIdx = numActiveFields - 1;
+                leg.focusMe = false;
             }
 
             if (leg.leg?.fixType === KLNFixType.MAP) {
@@ -599,7 +606,7 @@ export class FlightplanList extends List {
 
     public insertRefWpt(wpt: Facility, idx: number) {
         this.cursorController.setCursorActive(true);
-        this.editPlan.createLeg(idx, FplWptEnterMode.CONFIRM, wpt);
+        this.editPlan.createLeg(idx, FplWptEnterMode.CONFIRM, undefined, wpt);
     }
 
     public refreshFpl() {
