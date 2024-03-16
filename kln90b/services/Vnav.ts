@@ -101,8 +101,8 @@ export class Vnav implements CalcTickable {
         if (active === null) {
             return false;
         }
-        if (fplIdx === -1 && wpt.icao !== active.icao) {
-            return false;
+        if (fplIdx === -1) { //Direct to, wpt must be the active waypoint
+            return wpt.icao === active.icao;
         } else {
             const isFutureWpt = this.fpl0.getLegs().filter((_, idx) => idx >= fplIdx).some(l => l.wpt.icao === wpt.icao);
             if (!isFutureWpt) {
