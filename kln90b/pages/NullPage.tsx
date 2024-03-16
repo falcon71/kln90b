@@ -45,4 +45,8 @@ export class NullPage extends DisplayComponent<any> implements Page {
     public isMessagePageShown(): boolean {
         return false;
     }
+
+    public hasStatusline(): boolean {
+        return false;
+    }
 }

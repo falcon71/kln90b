@@ -11,6 +11,20 @@ https://www.bendixking.com/content/dam/bendixking/en/documents/document-lists/do
 
 https://www.bendixking.com/content/dam/bendixking/en/documents/document-lists/downloads-and-manuals/006-08773-0000-KLN-90B-Pilots-Guide.pdf
 
+### Keyboard Mode
+
+When a cursor is active, left click on the CRSR indication to switch to keyboard mode. While KYBD is flashing, the
+simulator will disable all inputs, including joystick inputs. To leave keyboard mode, right click anywhere on the
+screen.
+
+Mapping:
+
+* Home, End: Outer knob
+* Page up, Page down: Inner knob
+* Enter: ENT
+* Delete: CLR
+* A-Z, 0-9 and backspace work in certain text and number fields
+
 ## FAQ
 
 ### I press the power button and the device stays off

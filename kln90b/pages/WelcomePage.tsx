@@ -187,4 +187,8 @@ export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> 
     private saveWelcome4(welcome4: string): void {
         this.props.userSettings.getSetting("welcome4").set(welcome4);
     }
+
+    public hasStatusline(): boolean {
+        return false;
+    }
 }

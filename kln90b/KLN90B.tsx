@@ -217,7 +217,7 @@ class KLN90B extends BaseInstrument {
 
         console.log("forceReadyToUse", forceReadyToUse);
 
-        this.pageManager.Init();
+        this.pageManager.Init(this.bus);
         this.powerButton = new PowerButton({
             bus: this.bus,
             userSettings: this.userSettings,
@@ -312,7 +312,7 @@ class KLN90B extends BaseInstrument {
                 this.messageHandler,
             ], this.messageHandler, this.planeSettings);
 
-        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController);
+        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager);
 
         const msa = new MSA();
 
@@ -321,7 +321,6 @@ class KLN90B extends BaseInstrument {
         if (!restoreSuccessFull) {
             this.messageHandler.addMessage(new OneTimeMessage(["USER DATA LOST"]));
         }
-
 
         Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), msa.init()]).then(() => {
             const props: PageProps = {

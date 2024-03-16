@@ -177,4 +177,8 @@ export class FourSegmentPage extends DisplayComponent<FourPageProps> implements 
         //Lastly the page itself
         return this.props.page.enter();
     }
+
+    public hasStatusline(): boolean {
+        return true;
+    }
 }

@@ -4,6 +4,7 @@ import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {LVAR_DISABLE, LVAR_ELECTRICITY_INDEX, LVAR_GPS_SIMVARS, LVAR_OBS_SOURCE, LVAR_OBS_TARGET} from "./LVars";
 import {TickController} from "./TickController";
 import {ModeController} from "./services/ModeController";
+import {PageManager} from "./pages/PageManager";
 
 const SYNC_TICK = 100;
 
@@ -14,7 +15,7 @@ export class SimVarSync {
 
     private disabled: boolean = false;
 
-    constructor(private readonly powerButton: PowerButton, private readonly settings: KLN90PlaneSettings, private readonly tickController: TickController, private readonly modeController: ModeController) {
+    constructor(private readonly powerButton: PowerButton, private readonly settings: KLN90PlaneSettings, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager) {
         window.setInterval(this.tick.bind(this), SYNC_TICK);
     }
 
@@ -55,6 +56,7 @@ export class SimVarSync {
         this.disabled = disabled;
 
         this.tickController.setEnabled(!disabled);
+        this.pageManager.resetKeyboard();
 
         if (this.settings.output.writeGPSSimVars) {
             SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, !disabled); //Allows other devices to write GPS vars

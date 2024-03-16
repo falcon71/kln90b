@@ -2,7 +2,8 @@ import {Page, PageProps} from "./Page";
 import {
     AirportFacility,
     ComponentProps,
-    DisplayComponent, DisplayComponentFactory,
+    DisplayComponentFactory,
+    EventBus,
     Facility,
     FacilityType,
     FSComponent,
@@ -24,35 +25,33 @@ import {NdbPage} from "./right/NdbPage";
 import {IntPage} from "./right/IntPage";
 import {DisplayTickable} from "../TickController";
 import {OneTimeMessage} from "../data/MessageHandler";
+import {PageContainer} from "../controls/PageContainer";
 
 export class PageManager implements DisplayTickable {
 
-    private currentPage: DisplayComponent<PageProps> & Page | undefined;
-    private container: HTMLElement | null = null;
+    private container: PageContainer | null = null;
 
 
     constructor() {
     }
 
     onInteractionEvent(evt: string): void {
-        this.currentPage!.onInteractionEvent(evt);
+        this.container!.onInteractionEvent(evt);
     }
 
 
-    Init(): void {
+    Init(bus: EventBus): void {
         console.log("PageManager ready");
-        this.container = document.getElementById('InstrumentsContainer');
+        this.setupContainer(PageContainer, {bus: bus});
         this.setCurrentPage(NullPage, {})
     }
 
     public setCurrentPage<T extends ComponentProps>(type: DisplayComponentFactory<T>, props: T) {
-        //todo this is too fast, we must move the rerendering to the next tick!
-        this.currentPage?.destroy();
+        this.container!.setCurrentPage(type, props);
+    }
 
-        const page = FSComponent.buildComponent(type, props);
-        this.currentPage = page?.instance as unknown as DisplayComponent<PageProps> & Page;
-
-        this.rerenderCurrentPage();
+    public isLeftKeyboardActive(): boolean {
+        return this.container!.isLeftKeyboardActive;
     }
 
     public startMainPage(props: PageProps) {
@@ -105,22 +104,28 @@ export class PageManager implements DisplayTickable {
         if (props.planeSettings.input.fuelComputer.isInterfaced && !props.planeSettings.input.fuelComputer.fobTransmitted) {
             props.messageHandler.addMessage(new OneTimeMessage(["SET FUEL ON BOARD", "ON OTH 5 IF NECESSARY"]));
         }
-
     }
 
-
-    public rerenderCurrentPage() {
-        this.container!.innerHTML = "";
-
-        FSComponent.render(this.currentPage!.render()!, this.container);
+    public isRightKeyboardActive(): boolean {
+        return this.container!.isRightKeyboardActive;
     }
 
     public getCurrentPage(): Page {
-        return this.currentPage!;
+        return this.container!.getCurrentPage();
+    }
+
+    public resetKeyboard() {
+        this.container!.resetKeyboard();
     }
 
     tick(blink: boolean): void {
-        this.getCurrentPage().tick(blink);
-        this.getCurrentPage().children.walk((el) => el.tick(blink));
+        this.container!.tick(blink);
+    }
+
+    private setupContainer<T extends ComponentProps>(type: DisplayComponentFactory<T>, props: T) {
+        const container = FSComponent.buildComponent(type, props);
+        this.container = container?.instance as unknown as PageContainer;
+        const containerParent = document.getElementById('InstrumentsContainer');
+        FSComponent.render(this.container!.render()!, containerParent);
     }
 }

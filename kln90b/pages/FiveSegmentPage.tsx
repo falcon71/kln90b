@@ -223,4 +223,8 @@ export class FiveSegmentPage extends DisplayComponent<FivePageProps> implements 
         //Next right
         return await this.props.rPage.enter() != EnterResult.Not_Handled;
     }
+
+    public hasStatusline(): boolean {
+        return true;
+    }
 }

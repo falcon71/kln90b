@@ -1,4 +1,4 @@
-import {ComponentProps, DisplayComponent, EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
+import {ComponentProps, DisplayComponent, EventBus, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {PageManager} from "./PageManager";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {Sensors} from "../Sensors";
@@ -67,7 +67,7 @@ export interface Page extends UiElement {
 
     isMessagePageShown(): boolean;
 
-
+    hasStatusline(): boolean;
 }
 
 export declare type UiElementRecord = Record<any, UiElement>;

@@ -649,4 +649,9 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         this.statusLine.destroy();
         super.destroy();
     }
+
+    public hasStatusline(): boolean {
+        const overlayPage = this.getOverlayPage();
+        return !(overlayPage instanceof SuperNav5Page);
+    }
 }
