@@ -90,7 +90,7 @@ export class KLN90BPlaneSettingsParser {
         SimVar.SetSimVarValue(LVAR_OBS_TARGET, SimVarValueType.Number, options.output.obsTarget);
         SimVar.SetSimVarValue(LVAR_GPS_SIMVARS, SimVarValueType.Bool, options.output.writeGPSSimVars);
         if (options.input.electricitySimVar.includes(":")) {
-            SimVar.SetSimVarValue(LVAR_ELECTRICITY_INDEX, SimVarValueType.Number, options.input.electricitySimVar.split(":")[1]);
+            SimVar.SetSimVarValue(LVAR_ELECTRICITY_INDEX, SimVarValueType.Number, Number(options.input.electricitySimVar.split(":")[1]));
         }
 
         return options;
