@@ -195,23 +195,13 @@ pre {
     margin-left: $charWidth * $zoom-factor;
 }
 
-.left-keyboard {
+.keyboard {
     position: fixed;
-    top: $yMarginPx + 6 * $charHeight * $zoom-factor;
-    left: $xMarginPx + 1 * $charWidth * $zoom-factor;
-    width: 4 * $charWidth * $zoom-factor;
-    height: 1 * $charHeight * $zoom-factor;
-    color: transparent;
-    background-color: transparent;
-    border: none;
-}
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
 
-.right-keyboard {
-    position: fixed;
-    top: $yMarginPx + 6 * $charHeight * $zoom-factor;
-    left: $xMarginPx + 18 * $charWidth * $zoom-factor;
-    width: 4 * $charWidth * $zoom-factor;
-    height: 1 * $charHeight * $zoom-factor;
     color: transparent;
     background-color: transparent;
     border: none;

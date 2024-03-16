@@ -152,6 +152,12 @@ export class FourSegmentPage extends DisplayComponent<FourPageProps> implements 
         return false;
     }
 
+    public destroy(): void {
+        this.children.get("page").destroy();
+        this.children.get("statusLine").destroy();
+        super.destroy();
+    }
+
     private async handleEnter(): Promise<boolean> {
         if (this.props.page.lCursorController.isEnterAccepted()) { //If right requires confirmation, then it has priority
             return await this.props.page.lCursorController.enter() != EnterResult.Not_Handled;

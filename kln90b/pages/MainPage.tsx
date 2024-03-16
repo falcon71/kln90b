@@ -645,4 +645,8 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         return await this.getRightPage().enter() != EnterResult.Not_Handled;
     }
 
+    public destroy(): void {
+        this.statusLine.destroy();
+        super.destroy();
+    }
 }

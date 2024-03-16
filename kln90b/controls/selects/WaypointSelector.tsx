@@ -1,5 +1,14 @@
 import {SelectField} from "./SelectField";
-import {EventBus, Facility, FacilitySearchType, FacilityType, FSComponent, ICAO, Publisher, VNode} from "@microsoft/msfs-sdk";
+import {
+    EventBus,
+    Facility,
+    FacilitySearchType,
+    FacilityType,
+    FSComponent,
+    ICAO,
+    Publisher,
+    VNode,
+} from "@microsoft/msfs-sdk";
 import {UiElement, UIElementChildren} from "../../pages/Page";
 import {StatusLineMessageEvents} from "../StatusLine";
 import {KLNFacilityLoader} from "../../data/navdata/KLNFacilityLoader";
@@ -87,16 +96,28 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
     }
 
     private saveChar(charIdx: number, idx: number): void {
-        const enteredIdent = this.ident.substring(0, idx) + CHARSET[charIdx];
+        let enteredIdent = this.ident.substring(0, idx) + CHARSET[charIdx];
+        this.ident = enteredIdent;
 
-
+        //console.log("searching for", enteredIdent);
         this.facilityLoader.searchByIdent(this.facilitySearchType, enteredIdent, 100).then(async icaos => {
+            if (this.ident !== enteredIdent) {
+                console.log("cancelled searchByIdent", this.ident, enteredIdent); //The user changed the value quicker than we could search for facilities. Another search will already be underway
+                return;
+            }
+
             let resultFound = 0;
             for (const icao of icaos) {
                 const facility = await this.facilityLoader.getFacility(this.facilityType, icao) as unknown as T;
+                if (this.ident !== enteredIdent) {
+                    console.log("cancelled getFacility", this.ident, enteredIdent); //The user changed the value quicker than we could search for facilities. Another search will already be underway
+                    return;
+                }
                 if (this.isValidResult(facility)) {
                     if (resultFound == 0) {
+                        //console.log("set ident for unique entry", facility.icao, this.ident, enteredIdent);
                         this.ident = ICAO.getIdent(facility.icao);
+                        enteredIdent = this.ident;
                         this.changedCallback(facility);
                     } else if (resultFound == 1) {
                         if (this.ident === ICAO.getIdent(facility.icao)) {
@@ -108,7 +129,7 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
                 }
             }
             if (resultFound === 0) {
-                this.ident = enteredIdent;
+                //console.log("set ident nothing found", enteredIdent);
                 this.changedCallback(enteredIdent);
             }
 

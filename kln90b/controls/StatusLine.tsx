@@ -3,6 +3,7 @@ import {TICK_TIME_DISPLAY, TickController} from "../TickController";
 import {NO_CHILDREN, Page, PageProps, UiElement} from "../pages/Page";
 import {NavMode} from "../data/VolatileMemory";
 import {format} from "numerable";
+import {CHAR_HEIGHT, CHAR_WIDTH, MARGIN_X, MARGIN_Y, ZOOM_FACTOR} from "../data/Constants";
 
 
 export interface StatusLineProps extends PageProps {
@@ -62,8 +63,7 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
     private readonly msgEntRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     private readonly statusLineMessageRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
-    private leftKeyboardRef: NodeReference<HTMLInputElement> = FSComponent.createRef<HTMLInputElement>();
-    private rightKeyboardRef: NodeReference<HTMLInputElement> = FSComponent.createRef<HTMLInputElement>();
+    private keyboardRef: NodeReference<HTMLInputElement> = FSComponent.createRef<HTMLInputElement>();
 
     private statusLineMessage: KLNErrorMessage | null = null;
     private statusLineMessageTimer: number = 0;
@@ -72,9 +72,8 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
 
     private keyBoardInitialized = false;
     private isLeftKeyboardActive = false;
-    private readonly leftKeyboardId = this.genGuid();
     private isRightKeyboardActive = false;
-    private readonly rightKeyboardId = this.genGuid();
+    private readonly keyboardId = this.genGuid();
 
     constructor(props: StatusLineProps) {
         super(props);
@@ -94,18 +93,17 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
             <span ref={this.rightPageRef}>{this.props.screen.rightPageName()}</span>
              <br/>
             </span>
-            <input class="left-keyboard" ref={this.leftKeyboardRef}></input>
-            <input class="right-keyboard" ref={this.rightKeyboardRef}></input>
+            <input class="keyboard" ref={this.keyboardRef}></input>
         </pre>);
     }
 
     tick(blink: boolean): void {
-        if (!TickController.checkRef(this.leftPageRef, this.modeRef, this.msgEntRef, this.rightPageRef, this.statusRef, this.rightKeyboardRef)) {
+        if (!TickController.checkRef(this.leftPageRef, this.modeRef, this.msgEntRef, this.rightPageRef, this.statusRef, this.keyboardRef)) {
             return;
         }
 
         if (!this.keyBoardInitialized) {
-            this.setupKeyboards();
+            this.setupKeyboard();
         }
 
         if (this.isVisible) {
@@ -168,7 +166,6 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
 
 
         if (this.props.screen.isLeftCursorActive()) {
-            this.leftKeyboardRef.instance.classList.remove("d-none");
             this.leftPageRef.instance.classList.add("inverted", "offset-left-cursor");
             if (this.isLeftKeyboardActive) {
                 this.leftPageRef.instance.textContent = "KYBD";
@@ -182,8 +179,9 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
                 this.leftPageRef.instance.classList.remove("inverted-blink");
             }
         } else {
-            this.leftKeyboardRef.instance.blur();
-            this.leftKeyboardRef.instance.classList.add("d-none");
+            if (this.isLeftKeyboardActive) {
+                this.keyboardRef.instance.blur();
+            }
 
             this.leftPageRef.instance.textContent = this.props.screen.leftPageName().padEnd(5, " ");
             this.leftPageRef.instance.classList.remove("inverted", "inverted-blink", "offset-left-cursor");
@@ -191,7 +189,6 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
 
 
         if (this.props.screen.isRightCursorActive()) {
-            this.rightKeyboardRef.instance.classList.remove("d-none");
             this.rightPageRef.instance.classList.add("inverted");
             if (this.isRightKeyboardActive) {
                 this.rightPageRef.instance.textContent = "KYBD";
@@ -205,8 +202,9 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
                 this.rightPageRef.instance.classList.remove("inverted-blink");
             }
         } else {
-            this.rightKeyboardRef.instance.blur();
-            this.rightKeyboardRef.instance.classList.add("d-none");
+            if (this.isRightKeyboardActive) {
+                this.keyboardRef.instance.blur();
+            }
 
             if (this.props.screen.leftPageName() === "SET 0") {
                 this.rightPageRef.instance.textContent = "     ";  //3-7, this page is a bit special
@@ -230,82 +228,86 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
         }
     }
 
-    private setupKeyboards() {
+    destroy() {
+        console.log("destroy StatusLine");
+        this.sub.destroy();
+        if (this.isLeftKeyboardActive || this.isRightKeyboardActive) { //Very important that we clean up, otherwise the user cannot click anything
+            this.keyboardRef.instance.blur();
+        }
+        super.destroy();
+    }
+
+    private setupKeyboard() {
         console.log("Setting up keyboards");
 
         this.keyBoardInitialized = true;
 
-        this.leftKeyboardRef.instance.onkeydown = (event) => {
+        this.keyboardRef.instance.onkeydown = (event) => {
             //console.log(event);
-            this.keyboardPublisher.pub("keyboardevent", {side: 'LEFT', keyCode: event.keyCode});
+            const side = this.isLeftKeyboardActive ? 'LEFT' : 'RIGHT';
+            this.keyboardPublisher.pub("keyboardevent", {side: side, keyCode: event.keyCode});
             event.preventDefault();
         };
-        this.leftKeyboardRef.instance.onkeypress = (event) => {
+        this.keyboardRef.instance.onkeypress = (event) => {
             //console.log(event);
             if (event.keyCode == 13) { //Enter somehow does not trigger onkeydown
-                this.keyboardPublisher.pub("keyboardevent", {side: 'LEFT', keyCode: event.keyCode});
+                const side = this.isLeftKeyboardActive ? 'LEFT' : 'RIGHT';
+                this.keyboardPublisher.pub("keyboardevent", {side: side, keyCode: event.keyCode});
                 event.preventDefault();
-                this.leftKeyboardRef.instance.value = "";
+                this.keyboardRef.instance.value = "";
             }
         };
-        this.leftKeyboardRef.instance.onblur = (event) => {
+        this.keyboardRef.instance.onblur = (event) => {
             console.log(event);
             this.isLeftKeyboardActive = false;
-
-            Coherent.trigger('UNFOCUS_INPUT_FIELD', '');
-            Coherent.off('mousePressOutsideView');
-        };
-        this.leftKeyboardRef.instance.onfocus = (event) => {
-            if (!this.props.screen.isLeftCursorActive()) {
-                this.leftKeyboardRef.instance.blur(); //Nope
-                return;
-            }
-
-            this.isLeftKeyboardActive = true;
-            this.leftKeyboardRef.instance.value = "";
-
-            Coherent.trigger('FOCUS_INPUT_FIELD', this.leftKeyboardId, '', '', '', false);
-            Coherent.on('mousePressOutsideView', () => {
-                console.log('mousePressOutsideView');
-                this.leftKeyboardRef.instance.blur();
-            });
-        };
-
-        this.rightKeyboardRef.instance.onkeydown = (event) => {
-            //console.log(event);
-            this.keyboardPublisher.pub("keyboardevent", {side: 'RIGHT', keyCode: event.keyCode});
-            event.preventDefault();
-        };
-        this.rightKeyboardRef.instance.onkeypress = (event) => {
-            //console.log(event);
-            if (event.keyCode == 13) { //Enter somehow does not trigger onkeydown
-                this.keyboardPublisher.pub("keyboardevent", {side: 'RIGHT', keyCode: event.keyCode});
-                event.preventDefault();
-                this.leftKeyboardRef.instance.value = "";
-            }
-        };
-        this.rightKeyboardRef.instance.onblur = (event) => {
-            console.log(event);
             this.isRightKeyboardActive = false;
 
             Coherent.trigger('UNFOCUS_INPUT_FIELD', '');
             Coherent.off('mousePressOutsideView');
         };
-        this.rightKeyboardRef.instance.onfocus = (event) => {
-            if (!this.props.screen.isRightCursorActive()) {
-                this.rightKeyboardRef.instance.blur(); //Nope
-                return;
+        this.keyboardRef.instance.onmousedown = (event) => {
+            console.log(event);
+            if (event.button == 0) { //Left Click
+                if (this.props.screen.isLeftCursorActive() && !this.isLeftKeyboardActive && this.isWithinX(event.screenX, 1, 5) && this.isWithinY(event.screenY, 6)) {
+                    this.keyboardRef.instance.value = "";
+
+                    if (this.isRightKeyboardActive) {
+                        this.keyboardRef.instance.blur();
+                    }
+
+                    this.isLeftKeyboardActive = true;
+                    Coherent.trigger('FOCUS_INPUT_FIELD', this.keyboardId, '', '', '', false);
+                    Coherent.on('mousePressOutsideView', () => {
+                        console.log('mousePressOutsideView');
+                        this.keyboardRef.instance.blur();
+                    });
+                }
+
+                if (this.props.screen.isRightCursorActive() && !this.isRightKeyboardActive && this.isWithinX(event.screenX, 18, 22) && this.isWithinY(event.screenY, 6)) {
+                    this.keyboardRef.instance.value = "";
+
+                    if (this.isLeftKeyboardActive) {
+                        this.keyboardRef.instance.blur();
+                    }
+
+                    this.isRightKeyboardActive = true;
+                    Coherent.trigger('FOCUS_INPUT_FIELD', this.keyboardId, '', '', '', false);
+                    Coherent.on('mousePressOutsideView', () => {
+                        console.log('mousePressOutsideView');
+                        this.keyboardRef.instance.blur();
+                    });
+                }
+            } else if (event.button == 2) {  //Right click
+                if ((this.isLeftKeyboardActive || this.isRightKeyboardActive)) {
+                    this.keyboardRef.instance.blur();
+                }
             }
 
-            this.isRightKeyboardActive = true;
-            this.rightKeyboardRef.instance.value = "";
-
-            Coherent.trigger('FOCUS_INPUT_FIELD', this.rightKeyboardId, '', '', '', false);
-            Coherent.on('mousePressOutsideView', () => {
-                console.log('mousePressOutsideView');
-                this.rightKeyboardRef.instance.blur();
-            });
         };
+    }
+
+    private isWithinX(screenX: number, charLeft: number, charRight: number) {
+        return screenX >= (MARGIN_X + charLeft * CHAR_WIDTH) * ZOOM_FACTOR && screenX <= (MARGIN_X + (charRight) * CHAR_WIDTH) * ZOOM_FACTOR;
     }
 
     /**
@@ -318,9 +320,8 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
 
     }
 
-    destroy() {
-        super.destroy();
-        this.sub.destroy();
+    private isWithinY(screenY: number, row: number) {
+        return screenY >= (MARGIN_Y + row * CHAR_HEIGHT) * ZOOM_FACTOR && screenY <= (MARGIN_Y + (row + 1) * CHAR_HEIGHT) * ZOOM_FACTOR;
     }
 
     private getModeString(): string {

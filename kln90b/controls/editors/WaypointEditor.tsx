@@ -274,6 +274,10 @@ export class WaypointEditor extends Editor<Facility | null> {
             this.cancelAwaitingConfirmation();
         }
 
+        if (!this.isEntered) {
+            this.setEntered(true);
+        }
+
         const idx = this.editorFields[this.cursorIndex].charset.indexOf(key);
         if (idx == -1) {
             return false;

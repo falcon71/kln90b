@@ -194,6 +194,14 @@ export class FiveSegmentPage extends DisplayComponent<FivePageProps> implements 
         }
     }
 
+
+    public destroy(): void {
+        this.children.get("lPage").destroy();
+        this.children.get("rPage").destroy();
+        this.children.get("statusLine").destroy();
+        super.destroy();
+    }
+
     public isMessagePageShown(): boolean {
         return false;
     }

@@ -6,3 +6,7 @@ export const CHAR_HEIGHT = 13;
 
 export const CHAR_WIDTH_MAP = 6;
 export const CHAR_HEIGHT_MAP = 7;
+
+
+export const MARGIN_X = 4;
+export const MARGIN_Y = 3;
