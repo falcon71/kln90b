@@ -62,9 +62,6 @@ Aircraft should only interact with the KLN 90B via H Events. The events are list
 in [HEvents.ts](https://github.com/falcon71/kln90b/blob/main/kln90b/HEvents.ts). A
 few [LVars](https://github.com/falcon71/kln90b/blob/main/kln90b/LVars.ts) are available for animations.
 
-Please kep in mind, that the KLN 90B is currently in beta and a few details are subject to change until the first
-release.
-
 You are free to include the KLN 90B into your aircraft. If you do, write me a message. so I can include it in the list of aircraft that use the KLN 90B. If your aircraft is a payware aircraft, I would be happy to receive a copy.
 
 ## Contributors
