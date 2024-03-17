@@ -52,6 +52,11 @@ export class SuperNav5Page extends SevenLinePage {
 
     private isDecluttered: boolean = false;
 
+    /*
+    private timeMeasuresCount = 0;
+    private timeCumulated = 0;
+    */
+
     constructor(props: PageProps) {
         super(props);
 
@@ -120,6 +125,8 @@ export class SuperNav5Page extends SevenLinePage {
             return;
         }
 
+        //const start = performance.now();
+
         let range = this.rangeSetting.get();
         if (range === 0) {
             //3-36 Auto zoom
@@ -184,6 +191,17 @@ export class SuperNav5Page extends SevenLinePage {
         this.drawPlaneIcon(ctx);
 
         ctx.fill();
+        //Enable this to log the drawing performance
+        /*
+        this.timeMeasuresCount++;
+        this.timeCumulated += performance.now() - start;
+
+        if(this.timeMeasuresCount >= 20){
+            console.log(`Drawtime: ${this.timeCumulated / this.timeMeasuresCount} ms`);
+            this.timeMeasuresCount = 0;
+            this.timeCumulated = 0;
+        }
+         */
     }
 
     /**

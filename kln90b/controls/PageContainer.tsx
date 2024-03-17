@@ -135,12 +135,18 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
 
         this.keyboardRef.instance.onkeydown = (event) => {
             //console.log(event);
+            if (!this._isLeftKeyboardActive && !this._isRightKeyboardActive) {
+                return;
+            }
             const side = this._isLeftKeyboardActive ? 'LEFT' : 'RIGHT';
             this.keyboardPublisher.pub("keyboardevent", {side: side, keyCode: event.keyCode});
             event.preventDefault();
         };
         this.keyboardRef.instance.onkeypress = (event) => {
             //console.log(event);
+            if (!this._isLeftKeyboardActive && !this._isRightKeyboardActive) {
+                return;
+            }
             if (event.keyCode == 13) { //Enter somehow does not trigger onkeydown
                 const side = this._isLeftKeyboardActive ? 'LEFT' : 'RIGHT';
                 this.keyboardPublisher.pub("keyboardevent", {side: side, keyCode: event.keyCode});

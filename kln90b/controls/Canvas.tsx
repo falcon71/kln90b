@@ -11,32 +11,54 @@ import {
     LegTurnDirection,
     MapProjection,
     NodeReference,
-    ReadonlyFloat64Array,
     UnitType,
     VNode,
 } from "@microsoft/msfs-sdk";
 import {Degrees, Latitude, Longitude, NauticalMiles} from "../data/Units";
+
+
+const ARROWLENGTH = 5; //The length of the arms of the arrow in pixels
+const DASH_LENGTH = 3;
+const SHORTEN_LENGTH = 4; //Gap between flightplan lines and the icons
 
 /**
  * The canvas works with x and y coordinates in pixels, but we use it in a map drawing context, where the coordinate
  * systems uses latitude and longitude and maybe even rotation. This wrapper class takes care of the conversion between both systems.
  */
 export class CoordinateCanvasDrawContext {
-    private out1 = new Float64Array(2);
-    private out2 = new Float64Array(2);
-    private resampler: GeoCircleResampler;
+    private start = new Float64Array(2);
+    private end = new Float64Array(2);
+    private readonly circle = GeoCircle.createGreatCircle(this.start, this.end);
+
+    private readonly lineResampler: GeoCircleResampler = new GeoCircleResampler(UnitType.NMILE.convertTo(10, UnitType.GA_RADIAN), 0.25, 8); //Only great circles here, does not need to be that accurate
+    private readonly arcResampler: GeoCircleResampler;
+
+    private readonly resamplerHandler: ResamplerHandler;
+
 
     public constructor(private readonly ctx: CanvasDrawContext, private readonly projection: MapProjection) {
-        const resampleDistance = projection.getRange() / 20; //Eyeballed this until it looked "nice"
+        this.resamplerHandler = new ResamplerHandler(ctx);
 
-        this.resampler = new GeoCircleResampler(resampleDistance, 0.25, 8);
+        const arcResampleDistance = projection.getRange() / 20; //Eyeballed this until it looked "nice"
+        this.arcResampler = new GeoCircleResampler(arcResampleDistance, 0.25, 8);
     }
 
-    public drawLine(from: LatLonInterface, to: LatLonInterface) {
-        this.projection.project(from, this.out1);
-        this.projection.project(to, this.out2);
 
-        this.ctx.drawLine(Math.round(this.out1[0]), Math.round(this.out1[1]), Math.round(this.out2[0]), Math.round(this.out2[1]));
+    /**
+     * Draws a simple line
+     * @param from
+     * @param to
+     */
+    public drawLine(from: LatLonInterface, to: LatLonInterface) {
+        this.projection.project(from, this.start);
+        this.projection.project(to, this.end);
+        if (!this.resamplerHandler.isLineVisible(Math.round(this.start[0]), Math.round(this.start[1]), Math.round(this.end[0]), Math.round(this.end[1]))) {
+            return;
+        }
+
+        this.circle.setAsGreatCircle(from, to);
+        this.resamplerHandler.initDraw(this.start, this.end, false, 0);
+        this.lineResampler.resample(this.projection.getGeoProjection(), this.circle, from, to, this.resamplerHandler.handle.bind(this.resamplerHandler));
     }
 
     /**
@@ -45,74 +67,59 @@ export class CoordinateCanvasDrawContext {
      * @param to
      */
     public drawFlightplanLine(from: LatLonInterface, to: LatLonInterface) {
-        this.projection.project(from, this.out1);
-        this.projection.project(to, this.out2);
-
-        this.ctx.drawLine(...this.shortenLine(Math.round(this.out1[0]), Math.round(this.out1[1]), Math.round(this.out2[0]), Math.round(this.out2[1]), 4));
-    }
-
-
-    public drawArc(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, direction: LegTurnDirection, dashed: boolean = false) {
-        const lines: ReadonlyFloat64Array[] = [];
-
-        const handler = (vector: Readonly<GeoCircleResamplerVector>) => {
-            const copy = new Float64Array(2);
-            copy[0] = vector.projected[0];
-            copy[1] = vector.projected[1];
-            lines.push(copy);
-        };
-
-        const point1 = direction == LegTurnDirection.Left ? from : to;
-        const point2 = direction == LegTurnDirection.Left ? to : from;
-
-        this.resampler.resample(this.projection.getGeoProjection(), circle, point1, point2, handler);
-
-        for (let i = 1; i < lines.length; i++) {
-            const from = lines[i - 1];
-            const to = lines[i];
-            this.ctx.drawLine(Math.round(from[0]), Math.round(from[1]), Math.round(to[0]), Math.round(to[1]), dashed);
+        this.projection.project(from, this.start);
+        this.projection.project(to, this.end);
+        if (!this.resamplerHandler.isLineVisible(Math.round(this.start[0]), Math.round(this.start[1]), Math.round(this.end[0]), Math.round(this.end[1]))) {
+            return;
         }
 
-    }
+        this.circle.setAsGreatCircle(from, to);
 
-    public drawArcWithArrow(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, direction: LegTurnDirection) {
-        const lines: ReadonlyFloat64Array[] = [];
-
-        const handler = (vector: Readonly<GeoCircleResamplerVector>) => {
-            const copy = new Float64Array(2);
-            copy[0] = vector.projected[0];
-            copy[1] = vector.projected[1];
-            lines.push(copy);
-        };
-
-        const point1 = direction == LegTurnDirection.Left ? from : to;
-        const point2 = direction == LegTurnDirection.Left ? to : from;
-
-        this.resampler.resample(this.projection.getGeoProjection(), circle, point1, point2, handler);
-
-        for (let i = 1; i < lines.length; i++) {
-            const from = lines[i - 1];
-            const to = lines[i];
-            if (i === lines.length - 1) {
-                this.ctx.drawArrow(Math.round(from[0]), Math.round(from[1]), Math.round(to[0]), Math.round(to[1]));
-            } else {
-                this.ctx.drawLine(Math.round(from[0]), Math.round(from[1]), Math.round(to[0]), Math.round(to[1]));
-            }
-        }
-
+        this.resamplerHandler.initDraw(this.start, this.end, false, SHORTEN_LENGTH);
+        this.lineResampler.resample(this.projection.getGeoProjection(), this.circle, from, to, this.resamplerHandler.handle.bind(this.resamplerHandler));
     }
 
     /**
-     * Draws an arrow a flightplanleg. The arrow will be shortened
+     * Draws an arrow for a flightplanleg. The arrow will be shortened
      * @param from
      * @param to
      */
     public drawFlightplanArrow(from: LatLonInterface, to: LatLonInterface) {
-        this.projection.project(from, this.out1);
-        this.projection.project(to, this.out2);
+        this.projection.project(from, this.start);
+        this.projection.project(to, this.end);
+        if (!this.resamplerHandler.isLineVisible(Math.round(this.start[0]), Math.round(this.start[1]), Math.round(this.end[0]), Math.round(this.end[1]))) {
+            return;
+        }
 
+        this.circle.setAsGreatCircle(from, to);
 
-        this.ctx.drawArrow(...this.shortenLine(Math.round(this.out1[0]), Math.round(this.out1[1]), Math.round(this.out2[0]), Math.round(this.out2[1]), 4));
+        this.resamplerHandler.initDraw(this.start, this.end, false, SHORTEN_LENGTH);
+        this.lineResampler.resample(this.projection.getGeoProjection(), this.circle, from, to, this.resamplerHandler.handle.bind(this.resamplerHandler));
+        this.resamplerHandler.drawArrow();
+    }
+
+    public drawArc(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, direction: LegTurnDirection, dashed: boolean = false) {
+        const point1 = direction == LegTurnDirection.Left ? from : to;
+        const point2 = direction == LegTurnDirection.Left ? to : from;
+
+        this.projection.project(point1, this.start);
+        this.projection.project(point2, this.end);
+
+        this.resamplerHandler.initDraw(this.start, this.end, dashed, SHORTEN_LENGTH);
+        this.arcResampler.resample(this.projection.getGeoProjection(), circle, point1, point2, this.resamplerHandler.handle.bind(this.resamplerHandler));
+
+    }
+
+    public drawArcWithArrow(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, direction: LegTurnDirection) {
+        const point1 = direction == LegTurnDirection.Left ? from : to;
+        const point2 = direction == LegTurnDirection.Left ? to : from;
+
+        this.projection.project(point1, this.start);
+        this.projection.project(point2, this.end);
+
+        this.resamplerHandler.initDraw(this.start, this.end, false, SHORTEN_LENGTH);
+        this.arcResampler.resample(this.projection.getGeoProjection(), circle, point1, point2, this.resamplerHandler.handle.bind(this.resamplerHandler));
+        this.resamplerHandler.drawArrow();
     }
 
     /**
@@ -121,8 +128,8 @@ export class CoordinateCanvasDrawContext {
      * @param text
      */
     public drawLabel(coord: LatLonInterface, text: string) {
-        this.projection.project(coord, this.out1);
-        this.ctx.drawLabel(Math.round(this.out1[0]), Math.round(this.out1[1]), text);
+        this.projection.project(coord, this.start);
+        this.ctx.drawLabel(Math.round(this.start[0]), Math.round(this.start[1]), text);
     }
 
     /**
@@ -131,35 +138,162 @@ export class CoordinateCanvasDrawContext {
      * @param text
      */
     public drawIcon(coord: LatLonInterface, text: string) {
-        this.projection.project(coord, this.out1);
-        this.ctx.drawIcon(Math.round(this.out1[0]), Math.round(this.out1[1]), text);
+        this.projection.project(coord, this.start);
+        this.ctx.drawIcon(Math.round(this.start[0]), Math.round(this.start[1]), text);
     }
 
     public fill() {
         this.ctx.fill();
     }
+}
 
-    /**
-     * In the KLN, the lines don't got all the way to the label, instead leaving small gaps
-     * @param x0
-     * @param y0
-     * @param x1
-     * @param y1
-     * @param distance
-     * @private
-     */
-    private shortenLine(x0: number, y0: number, x1: number, y1: number, distance: number): [number, number, number, number] {
-        let dx = x1 - x0;
-        let dy = y1 - y0;
-        const length = Math.sqrt(dx * dx + dy * dy);
-        if (length > 0) {
-            dx /= length;
-            dy /= length;
-        }
-        dx *= length - distance;
-        dy *= length - distance;
-        return [Math.round(x1 - dx), Math.round(y1 - dy), Math.round(x0 + dx), Math.round(y0 + dy)];
+/**
+ * Draws a GC line after being process by the GeoCircleResampler
+ */
+class ResamplerHandler {
+
+    private start: Int32Array = new Int32Array(2); //Start point of the whole GC line. Used when the line is shortened at the start and end
+    private end: Int32Array = new Int32Array(2); //End point of the whole GC line. Used when the line is shortened at the start and end
+    private dashed: boolean = false;
+    private shorten: number = 0; //The KLN does not draw the flight plan lines right up to the waypoints, but leaves a few pixels of space
+
+    private from: Int32Array | null = null; //The waypoint from the last section
+
+    //Points that were last drawn, used to draw the arrow
+    private lastDrawnFrom: Int32Array | null = null;
+    private lastDrawnTo: Int32Array | null = null;
+
+    constructor(private readonly ctx: CanvasDrawContext) {
     }
+
+    public initDraw(start: Float64Array, end: Float64Array, dashed: boolean = false, shorten: number = 0): void {
+        this.start.set([Math.round(start[0]), Math.round(start[1])]);
+        this.end.set([Math.round(end[0]), Math.round(end[1])]);
+        this.dashed = dashed;
+        this.shorten = shorten;
+        this.from = null;
+        this.lastDrawnFrom = null;
+        this.lastDrawnTo = null;
+    }
+
+    public handle(vector: Readonly<GeoCircleResamplerVector>): void {
+        const from = this.from;
+        const to = new Int32Array([Math.round(vector.projected[0]), Math.round(vector.projected[1])]);
+        if (from === null || from == to) {
+            this.from = to;
+            return;
+        }
+
+        if (!this.isLineVisible(from[0], from[1], to[0], to[1])) {
+            this.lastDrawnFrom = from; //We pretend we have drawn it, because the arrow would otherwise always be at the edge of the screen
+            this.lastDrawnTo = to;
+            this.from = to;
+            return;
+        }
+
+        if (this.shorten == 0) {
+            //The easy part, draw the line as it is
+            this.drawLine(from, to);
+            this.from = to;
+            return;
+        }
+
+        //Now it gets hairy, we need to check if we need to shorten this line
+
+        if (Math.abs(this.end[0] - this.start[0]) <= 2 * this.shorten && Math.abs(this.end[1] - this.start[1]) <= 2 * this.shorten) {
+            this.from = to;
+            return; //Line too short, we can't see anything. Also sanity check
+        }
+
+        const dx = to[0] - from[0];
+        const dy = to[1] - from[1];
+
+        //We only need to check one direction since we know dx and dy
+        const startFromXDiff = (from[0] - this.start[0]) * Math.sign(dx);
+        const startToXDiff = (to[0] - this.start[0]) * Math.sign(dx);
+
+        const startFromYDiff = (from[1] - this.start[1]) * Math.sign(dy);
+        const startToYDiff = (to[1] - this.start[1]) * Math.sign(dy);
+
+        const endFromXDiff = (this.end[0] - from[0]) * Math.sign(dx);
+        const endToXDiff = (this.end[0] - to[0]) * Math.sign(dx);
+
+        const endFromYDiff = (this.end[1] - from[1]) * Math.sign(dy);
+        const endToYDiff = (this.end[1] - to[1]) * Math.sign(dy);
+
+        let shortenedFrom = from;
+        let shortenedTo = to;
+
+        if ((startToXDiff <= this.shorten && startToYDiff <= this.shorten) || (endFromXDiff <= this.shorten && endFromYDiff <= this.shorten)) {
+            //Do nothing, whole segment in the no fly zone
+            this.from = to;
+            return;
+        } else {
+            //check start
+            if (startFromXDiff > this.shorten || startFromYDiff > this.shorten) {
+                //ok, draw like this
+            } else {
+                //Shorten start
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    //X is more critical
+                    const newX = this.start[0] + this.shorten * Math.sign(dx);
+                    const newY = from[1] + dy * (newX - from[0]) / dx;
+
+                    shortenedFrom = new Int32Array([newX, newY]);
+                } else {
+                    //Y is more critical
+                    const newY = this.start[1] + this.shorten * Math.sign(dy);
+                    const newX = from[0] + dx * (newY - from[1]) / dy;
+
+                    shortenedFrom = new Int32Array([newX, newY]);
+                }
+            }
+
+            //check end
+            if (endToXDiff > this.shorten || endToYDiff > this.shorten) {
+                //ok, draw like this
+            } else {
+                //We are near the end, shorten the end point and add it
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    //X is more critical
+                    const newX = this.end[0] - this.shorten * Math.sign(dx);
+                    const newY = from[1] + dy * (newX - from[0]) / dx;
+
+                    shortenedTo = new Int32Array([newX, newY]);
+                } else {
+                    //Y is more critical
+                    const newY = this.end[1] - this.shorten * Math.sign(dy);
+                    const newX = from[0] + dx * (newY - from[1]) / dy;
+
+                    shortenedTo = new Int32Array([newX, newY]);
+                }
+            }
+        }
+
+        this.drawLine(shortenedFrom, shortenedTo);
+        this.from = to;
+    };
+
+    public drawArrow() {
+        if (this.lastDrawnFrom === null || this.lastDrawnTo === null) {
+            return;
+        }
+        this.ctx.drawArrow(this.lastDrawnFrom[0], this.lastDrawnFrom[1], this.lastDrawnTo[0], this.lastDrawnTo[1]);
+    }
+
+    public isLineVisible(x0: number, y0: number, x1: number, y1: number): boolean {
+        return (x0 >= 0 || x1 >= 0) &&
+            (x0 <= this.ctx.width || x1 <= this.ctx.width) &&
+            (y0 >= 0 || y1 >= 0) &&
+            (y0 <= this.ctx.height || y1 <= this.ctx.height);
+    }
+
+    private drawLine(from: Int32Array, to: Int32Array) {
+        this.ctx.drawLine(from[0], from[1], to[0], to[1], this.dashed);
+        this.lastDrawnFrom = from;
+        this.lastDrawnTo = to;
+    }
+
 }
 
 const WORDSIZE = 32;
@@ -232,9 +366,6 @@ class Bitset {
 
 }
 
-const ARROWLENGTH = 5; //The length of the arms of the arrow in pixels
-const DASH_LENGTH = 3;
-
 /**
  * Abstraction over the CanvasRenderingContext2D. This mainly converts between the kln pixel coordinates and the
  * actual pixel size of the HTML instrument. It draws pixelated lines and places smart labels.
@@ -281,9 +412,14 @@ export class CanvasDrawContext {
         }
     }
 
+    /**
+     * Draws only the arrow head, you will still need to call drawLine
+     * @param x0
+     * @param y0
+     * @param x1
+     * @param y1
+     */
     public drawArrow(x0: number, y0: number, x1: number, y1: number) {
-        this.drawLine(x0, y0, x1, y1);
-
         //Calculate the angle of the line when viewed as a right triangle
         const a = x0 - x1;
         const b = y0 - y1;
