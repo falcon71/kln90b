@@ -215,10 +215,10 @@ export class SensorsOut {
         if (obsMag !== null) {
             switch (this.options.output.obsTarget) {
                 case 1:
-                    SimVar.SetSimVarValue('VOR1_SET', SimVarValueType.Number, obsMag);
+                    SimVar.SetSimVarValue('K:VOR1_SET', SimVarValueType.Number, obsMag);
                     break;
                 case 2:
-                    SimVar.SetSimVarValue('VOR2_SET', SimVarValueType.Number, obsMag);
+                    SimVar.SetSimVarValue('K:VOR2_SET', SimVarValueType.Number, obsMag);
                     break;
             }
         }
