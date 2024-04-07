@@ -37,7 +37,7 @@ export class NavCalculator implements CalcTickable {
         if (nav.isSelfTestActive) {
             nav.xtkToActive = -2.5;
             nav.distToActive = 34.5;
-            nav.desiredTrack = 130;
+            nav.desiredTrack = this.magvar.magToTrue(315);
             nav.eteToActive = null;
             nav.distToDest = null;
             nav.eteToDest = null;
