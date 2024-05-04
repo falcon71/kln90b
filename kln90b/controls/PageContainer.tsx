@@ -6,6 +6,7 @@ import {
     FSComponent,
     NodeReference,
     Publisher,
+    UserSetting,
     VNode,
 } from "@microsoft/msfs-sdk";
 import {DisplayTickable, TickController} from "../TickController";
@@ -13,10 +14,12 @@ import {Page, PageProps} from "../pages/Page";
 import {CHAR_HEIGHT, CHAR_WIDTH, MARGIN_X, MARGIN_Y, ZOOM_FACTOR} from "../data/Constants";
 import {KeyboardEvent} from "./StatusLine";
 import {PowerEvent} from "../PowerButton";
+import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 
 
 export interface PageContainerProps extends ComponentProps {
     bus: EventBus;
+    userSettings: KLN90BUserSettings,
 }
 
 /**
@@ -32,10 +35,12 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
     private keyBoardInitialized = false;
     private readonly keyboardId = this.genGuid();
     private currentPage: DisplayComponent<PageProps> & Page | undefined;
+    private readonly glowSetting: UserSetting<boolean>;
 
     constructor(props: PageContainerProps) {
         super(props);
 
+        this.glowSetting = this.props.userSettings.getSetting("enableGlow");
         this.keyboardPublisher = props.bus.getPublisher<KeyboardEvent>();
         props.bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.resetKeyboard.bind(this));
     }
@@ -62,6 +67,12 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
     tick(blink: boolean): void {
         if (!TickController.checkRef(this.keyboardRef)) {
             return;
+        }
+
+        if (this.glowSetting.get()) {
+            this.containerRef.instance.classList.add("glow");
+        } else {
+            this.containerRef.instance.classList.remove("glow");
         }
 
         if (!this.keyBoardInitialized) {
@@ -216,7 +227,7 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
      * @returns A unique ID string.
      */
     private genGuid(): string {
-        return 'INPT-xxxyxxyy'.replace(/[xy]/g, function (c) {
+        return 'INPT-xxxyxxyy'.replace(/[xy]/g, c => {
             const r = Math.random() * 16 | 0,
                 v = c == 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);

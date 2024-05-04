@@ -217,7 +217,7 @@ class KLN90B extends BaseInstrument {
 
         console.log("forceReadyToUse", forceReadyToUse);
 
-        this.pageManager.Init(this.bus);
+        this.pageManager.Init(this.bus, this.userSettings);
         this.powerButton = new PowerButton({
             bus: this.bus,
             userSettings: this.userSettings,

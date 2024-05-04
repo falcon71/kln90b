@@ -81,6 +81,7 @@ export type KLN90BUserSettingsTypes = {
     superNav5Apt: boolean,
     flightTimer: boolean,
     fastGpsAcquisition: boolean,
+    enableGlow: boolean,
 }
 
 export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSettingsTypes> {
@@ -219,6 +220,10 @@ export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSett
             {
                 name: "fastGpsAcquisition",
                 defaultValue: GPS_ACQUISITION_REAL,
+            },
+            {
+                name: "enableGlow",
+                defaultValue: true,
             },
         ]);
     }

@@ -18,11 +18,14 @@ type SuperNav5RightTypes = {
 export class SuperNav5Right implements UiElement {
     public readonly children: UIElementChildren<SuperNav5RightTypes>;
     protected readonly ref: NodeReference<HTMLPreElement> = FSComponent.createRef<HTMLPreElement>();
-    private orientationSetting: UserSetting<Nav5Orientation>;
+    protected readonly glowRef: NodeReference<HTMLPreElement> = FSComponent.createRef<HTMLPreElement>();
+    private readonly orientationSetting: UserSetting<Nav5Orientation>;
+    private readonly glowSetting: UserSetting<boolean>;
 
     constructor(private props: PageProps, private cursorController: CursorController) {
 
         this.orientationSetting = this.props.userSettings.getSetting("superNav5MapOrientation");
+        this.glowSetting = this.props.userSettings.getSetting("enableGlow");
         this.children = new UIElementChildren<SuperNav5RightTypes>({
             vor: new SelectField(["OFF", "  H", " LH", "TLH"], this.props.userSettings.getSetting("superNav5Vor").get(), this.saveVor.bind(this)),
             ndb: new SelectField(["OFF", " ON"], this.props.userSettings.getSetting("superNav5Ndb").get() ? 1 : 0, this.saveNdb.bind(this)),
@@ -35,7 +38,7 @@ export class SuperNav5Right implements UiElement {
 
     public render(): VNode {
         return (<div ref={this.ref} class="super-nav5-right-controls d-none">
-            <pre class="super-nav5-right-controls-inner">
+            <pre ref={this.glowRef}>
                 ÜVOR:{this.children.get("vor").render()}<br/>
                 ÝNDB:{this.children.get("ndb").render()}<br/>
                 ŸAPT:{this.children.get("apt").render()}<br/>
@@ -46,6 +49,14 @@ export class SuperNav5Right implements UiElement {
 
     public tick(blink: boolean): void {
         this.children.get("orientationValue").bearing = this.getOrientationValue();
+        if (this.glowSetting.get()) {
+            this.glowRef.instance.classList.add("glow");
+            this.ref.instance.classList.add("noGlow");
+        } else {
+            this.glowRef.instance.classList.remove("glow");
+            this.ref.instance.classList.remove("noGlow");
+        }
+
         if (this.cursorController.cursorActive) {
             this.ref.instance.classList.remove("d-none");
         } else {

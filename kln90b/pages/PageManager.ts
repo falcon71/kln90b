@@ -26,6 +26,7 @@ import {IntPage} from "./right/IntPage";
 import {DisplayTickable} from "../TickController";
 import {OneTimeMessage} from "../data/MessageHandler";
 import {PageContainer} from "../controls/PageContainer";
+import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 
 export class PageManager implements DisplayTickable {
 
@@ -40,9 +41,9 @@ export class PageManager implements DisplayTickable {
     }
 
 
-    Init(bus: EventBus): void {
+    Init(bus: EventBus, userSettings: KLN90BUserSettings): void {
         console.log("PageManager ready");
-        this.setupContainer(PageContainer, {bus: bus});
+        this.setupContainer(PageContainer, {bus, userSettings});
         this.setCurrentPage(NullPage, {})
     }
 
