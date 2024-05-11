@@ -25,7 +25,7 @@ export class Vnav implements CalcTickable {
     public tick(): void {
         this.advisoryAltitude = null;
         this.timeToVnav = null;
-        if (this.navState.nav4VnavWpt !== null && !this.isValidVnavWpt(this.navState.nav4VnavWpt)) {
+        if (this.navState.nav4VnavWpt === null || !this.isValidVnavWpt(this.navState.nav4VnavWpt)) {
             this.navState.nav4VnavWpt = null;
             this.state = VnavState.Inactive;
             return;
