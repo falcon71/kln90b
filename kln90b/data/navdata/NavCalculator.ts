@@ -121,7 +121,9 @@ export class NavCalculator implements CalcTickable {
 
                 nav.waypointAlert = timeToTurn <= WPT_ALERT_WITH_TURN_ANTI;
                 //console.log(nav.distToActive, turnAnticipationDistance, nav.waypointAlert, timeToTurn, toWpt);
-                if (toLeg.fixType !== KLNFixType.MAP && (distanceToTurn <= 0 || (nav.waypointAlert && distanceToTurn > this.lastDistance))) {
+                if (toLeg.fixType !== KLNFixType.MAP &&
+                    (distanceToTurn <= this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS //Distance is within the next tick, we rather start the turn a little too early than too late
+                        || (nav.waypointAlert && distanceToTurn > this.lastDistance))) {
                     //don't move missed approach waypoint!
                     nav.activeWaypoint.sequenceToNextWaypoint();
                     console.log("turn: moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt(), distanceToTurn, this.lastDistance);
