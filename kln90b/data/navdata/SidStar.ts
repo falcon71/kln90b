@@ -215,6 +215,7 @@ export class SidStar {
             case ApproachType.APPROACH_TYPE_NDB:
             case ApproachType.APPROACH_TYPE_VORDME:
             case ApproachType.APPROACH_TYPE_NDBDME:
+                return SidStar.appHasNoRFLegs(app);
             default:
                 return false;
         }
