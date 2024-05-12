@@ -13,7 +13,7 @@ export class TextDisplay implements UiElement {
     }
 
     render(): VNode {
-        return (<span ref={this.ref}>    </span>);
+        return (<span ref={this.ref}>{this.text}</span>);
     }
 
     public tick(blnk: boolean): void {

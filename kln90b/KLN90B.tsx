@@ -85,6 +85,7 @@ import {Flightplan} from "./data/flightplan/Flightplan";
 import {SidStar} from "./data/navdata/SidStar";
 import {SimVarSync} from "./SimVarSync";
 import {KeyboardEvent, KeyboardEventData} from "./controls/StatusLine";
+import {ErrorEvent} from "./controls/ErrorPage";
 
 export interface PropsReadyEvent {
     propsReady: PageProps;
@@ -202,8 +203,8 @@ class KLN90B extends BaseInstrument {
             this.pageManager.onInteractionEvent(evt);
         } catch (e) {
             console.error(e);
-            if(this.planeSettings?.showErrorsAsMessage && e instanceof Error){
-                this.messageHandler.addError(e);
+            if (e instanceof Error) {
+                this.bus.getPublisher<ErrorEvent>().pub("error", e);
             }
         }
 
@@ -310,7 +311,7 @@ class KLN90B extends BaseInstrument {
                 vnav,
                 modeController,
                 this.messageHandler,
-            ], this.messageHandler, this.planeSettings);
+            ]);
 
         this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager);
 

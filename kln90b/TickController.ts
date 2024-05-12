@@ -1,7 +1,6 @@
 import {EventBus, NodeReference} from "@microsoft/msfs-sdk";
 import {PowerEvent, PowerEventData} from "./PowerButton";
-import {MessageHandler} from "./data/MessageHandler";
-import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
+import {ErrorEvent} from "./controls/ErrorPage";
 
 export const TICK_TIME_DISPLAY = 250;
 export const TICK_TIME_CALC = 1000;
@@ -39,10 +38,8 @@ export class TickController {
      * @param bus
      * @param displayTickables The display runs at 4hz
      * @param calcTickables Sensonrs and calculations run at 1hz
-     * @param messageHandler
-     * @param planeSettings
      */
-    constructor(private readonly bus: EventBus, private readonly displayTickables: DisplayTickable[], private readonly calcTickables: CalcTickable[], private readonly messageHandler: MessageHandler, private readonly planeSettings: KLN90PlaneSettings) {
+    constructor(private readonly bus: EventBus, private readonly displayTickables: DisplayTickable[], private readonly calcTickables: CalcTickable[]) {
 
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.handlePowerChange.bind(this));
     }
@@ -59,8 +56,8 @@ export class TickController {
                 tickable.tick(blink);
             } catch (e) {
                 console.error(e);
-                if (this.planeSettings?.showErrorsAsMessage && e instanceof Error) {
-                    this.messageHandler.addError(e);
+                if (e instanceof Error) {
+                    this.bus.getPublisher<ErrorEvent>().pub("error", e);
                 }
             }
         }
@@ -72,8 +69,8 @@ export class TickController {
                 tickable.tick();
             } catch (e) {
                 console.error(e);
-                if (this.planeSettings?.showErrorsAsMessage && e instanceof Error) {
-                    this.messageHandler.addError(e);
+                if (e instanceof Error) {
+                    this.bus.getPublisher<ErrorEvent>().pub("error", e);
                 }
             }
         }

@@ -1,7 +1,6 @@
 import {CalcTickable} from "../TickController";
 import {Sensors} from "../Sensors";
 import {BoundaryUtils} from "./navdata/BoundaryUtils";
-import {convertTextToKLNCharset} from "./Text";
 import {LodBoundary} from "@microsoft/msfs-sdk";
 
 export interface Message {
@@ -46,43 +45,6 @@ export class MessageHandler implements CalcTickable {
 
     public addMessage(message: Message): void {
         this.activeMessages.push(message);
-    }
-
-    /**
-     * Displays an error as a KLN message. The message is formatted to fit in the small screen.
-     * Only the line numbers in the kln90b.js are shown.
-     * @param error
-     */
-    public addError(error: Error): void {
-        const rawStack = error.stack!;
-        const text = (`ERR:${convertTextToKLNCharset(error.message)}`).match(/.{1,22}/g)!;
-
-        const formattedStack = rawStack.split("\n").map(this.formatStack).filter(s => s !== "");
-        for (const stackLine of formattedStack) { //Each stack entry plus space is 9 chars long
-            if (text[text.length - 1].length + 9 > 21) {
-                if (text.length >= 6) {
-                    //We can't display more than six lines
-                    break;
-                }
-                text.push(stackLine);
-            } else {
-                text[text.length - 1] += ` ${stackLine}`;
-            }
-        }
-
-        this.activeMessages.push(new OneTimeMessage(text));
-    }
-
-    /**
-     * The display is way to0 small, we only take the line numbers
-     * @private
-     */
-    private formatStack(line: string): string {
-        const match = line.match(/kln90b.js:(\d+:\d+)/);
-        if (match === null) {
-            return "";
-        }
-        return match[1];
     }
 
     public tick() {

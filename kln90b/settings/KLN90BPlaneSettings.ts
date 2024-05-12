@@ -13,7 +13,6 @@ export const enum FuelUnit {
 export interface KLN90PlaneSettings {
     takeHomeMode: boolean;
     debugMode: boolean; //Skips test pages, GPS available immediately
-    showErrorsAsMessage: boolean, //Displays JS errors as a message
     vfrOnly: boolean;
     input: {
         altimeterInterfaced: boolean; //example for no input: https://youtu.be/S1lt2W95bLA?t=176
@@ -40,8 +39,6 @@ export interface KLN90PlaneSettings {
         altitudeAlertEnabled: boolean;
         writeGPSSimVars: boolean;
     }
-
-
 }
 
 
@@ -81,7 +78,6 @@ export class KLN90BPlaneSettingsParser {
                 writeGPSSimVars: this.getOption(instrumentsTag, "Output.WriteGPSSimVars", true),
             },
             debugMode: false,
-            showErrorsAsMessage: this.getOption(instrumentsTag, "ShowErrorsAsMessage", true),
         };
 
         console.log("Plane Settings", options, xmlConfig);

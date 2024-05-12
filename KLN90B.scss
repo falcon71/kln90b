@@ -17,196 +17,238 @@ drop-shadow(0 0 10px $green); //This larger shadow creates the distinct glow on 
 
 
 @font-face {
-    font-family: "KLN90B";
-    src: url("/Fonts/kln90b.ttf") format("truetype");
-    font-weight: normal;
-    font-style: normal;
+  font-family: "KLN90B";
+  src: url("/Fonts/kln90b.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
 }
 
 @font-face {
-    font-family: "KLN90BMap";
-    src: url("/Fonts/kln90b-map.ttf") format("truetype");
-    font-weight: normal;
-    font-style: normal;
+  font-family: "KLN90BMap";
+  src: url("/Fonts/kln90b-map.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
 }
 
 kln-90b {
-    width: 100%;
-    height: 100%;
+  width: 100%;
+  height: 100%;
 }
 
 //It appears, that without this, the font ist not loaded and can't be used in the canvas
-.dummy{
-    font-family: KLN90BMap, monospace;
+.dummy {
+  font-family: KLN90BMap, monospace;
 }
 
+.errorpage {
+  background-color: black;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 12px;
+
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+
+  padding: 5px;
+
+  display: flex;
+  flex-direction: column;
+
+  h1 {
+    margin-bottom: 10px;
+  }
+
+  .errormessage {
+    flex-grow: 1;
+    border: 1px solid $green;
+    border-radius: 5px;
+
+    padding: 5px;
+  }
+
+  button {
+    border: 0;
+    background-color: $green;
+    color: black;
+    padding: 5px;
+    margin: 5px;
+    font-size: 20px;
+  }
+
+  .surpressButton {
+    float: right;
+  }
+}
 
 kln-90b #Mainframe #InstrumentsContainer {
-    font-family: KLN90B, monospace;
-    font-size: 11px * $zoom-factor;
-    background-color: black;
-    color: $green;
-    line-height: $charHeight * $zoom-factor;
+  font-family: KLN90B, monospace;
+  font-size: 11px * $zoom-factor;
+  background-color: black;
+  color: $green;
+  line-height: $charHeight * $zoom-factor;
 
-    position: absolute;
-    top: 0;
-    left: 0;
-    //width: ($charWidth * $xChars + $xMargin*2) * $zoom-factor;
-    //height: ($charHeight * $yChars + $yMargin*2 + 1) * $zoom-factor;
+  position: absolute;
+  top: 0;
+  left: 0;
+  //width: ($charWidth * $xChars + $xMargin*2) * $zoom-factor;
+  //height: ($charHeight * $yChars + $yMargin*2 + 1) * $zoom-factor;
 
-    z-index: 0;
-    margin: $yMarginPx $xMarginPx;
+  z-index: 0;
+  margin: $yMarginPx $xMarginPx;
 }
 
 .glow {
-    filter: $glow;
+  filter: $glow;
 }
 
 
 .noGlow {
-    filter: drop-shadow(0 0 0); //Otherwise there will be a glow effect on the top and right around the black background of the super NAV 5 right cursor window
+  filter: drop-shadow(0 0 0); //Otherwise there will be a glow effect on the top and right around the black background of the super NAV 5 right cursor window
 }
 
-.statusline{
-    position: fixed;
-    left: $xMarginPx;
-    top: $yMarginPx + 6 * $charHeight * $zoom-factor;
-    width: $xChars * $charWidth * $zoom-factor;
-    border-top: 1px*$zoom-factor solid $green ;
-    padding-top: 1px*$zoom-factor;
+.statusline {
+  position: fixed;
+  left: $xMarginPx;
+  top: $yMarginPx + 6 * $charHeight * $zoom-factor;
+  width: $xChars * $charWidth * $zoom-factor;
+  border-top: 1px*$zoom-factor solid $green;
+  padding-top: 1px*$zoom-factor;
 }
 
 pre {
-    font-family: KLN90B, monospace;
+  font-family: KLN90B, monospace;
 }
 
-.inverted{
-    background-color: $green;
-    color: black;
+.inverted {
+  background-color: $green;
+  color: black;
 }
 
 .inverted-blink {
-    color: $green;
-    background-color: unset;
+  color: $green;
+  background-color: unset;
 }
 
 .blink {
-    color: transparent;
-    background-color: unset;
+  color: transparent;
+  background-color: unset;
 }
 
-.d-none{
-    display: none;
+.d-none {
+  display: none;
 }
 
-.left-page{
-    position: fixed;
-    top: $yMarginPx;
-    left: $xMarginPx;
-    height: 6 * $charHeight * $zoom-factor;
+.left-page {
+  position: fixed;
+  top: $yMarginPx;
+  left: $xMarginPx;
+  height: 6 * $charHeight * $zoom-factor;
 }
 
-.right-page{
-    border-left: 1px*$zoom-factor solid $green ;
-    padding-left: $charWidth * $zoom-factor * 0.5;
-    position: fixed;
-    top: $yMarginPx;
-    left: $xMarginPx + 11.5 * $charWidth * $zoom-factor;
-    height: 6 * $charHeight * $zoom-factor;
+.right-page {
+  border-left: 1px*$zoom-factor solid $green;
+  padding-left: $charWidth * $zoom-factor * 0.5;
+  position: fixed;
+  top: $yMarginPx;
+  left: $xMarginPx + 11.5 * $charWidth * $zoom-factor;
+  height: 6 * $charHeight * $zoom-factor;
 }
 
 
-.full-page{
-    position: fixed;
-    top: $yMarginPx;
-    left: $xMarginPx;
+.full-page {
+  position: fixed;
+  top: $yMarginPx;
+  left: $xMarginPx;
 }
 
-.canvas-halfpage{
-    width: 11 * $charWidth * $zoom-factor;
-    height: 6 * $charHeight * $zoom-factor;
-    image-rendering: pixelated;
+.canvas-halfpage {
+  width: 11 * $charWidth * $zoom-factor;
+  height: 6 * $charHeight * $zoom-factor;
+  image-rendering: pixelated;
 }
 
-.canvas-fullpage{
-    position: fixed;
-    top: $yMarginPx;
-    left: $xMarginPx + (6 * $charWidth + 5) * $zoom-factor;
-    width: (17 * $charWidth - 5) * $zoom-factor;
-    height: 7 * $charHeight * $zoom-factor;
-    image-rendering: pixelated;
+.canvas-fullpage {
+  position: fixed;
+  top: $yMarginPx;
+  left: $xMarginPx + (6 * $charWidth + 5) * $zoom-factor;
+  width: (17 * $charWidth - 5) * $zoom-factor;
+  height: 7 * $charHeight * $zoom-factor;
+  image-rendering: pixelated;
 }
 
 .super-deviation-bar {
-    line-height: $charHeight * 2 * $zoom-factor;
+  line-height: $charHeight * 2 * $zoom-factor;
 }
 
 .use-invert {
-    margin-left: - $charWidth * 11 * $zoom-factor;
+  margin-left: - $charWidth * 11 * $zoom-factor;
 }
 
 .nav-5-bottom-controls {
-    position: absolute;
-    top: 5 * $charHeight * $zoom-factor;
-    left: 0;
+  position: absolute;
+  top: 5 * $charHeight * $zoom-factor;
+  left: 0;
 }
 
 .super-nav5-left-controls {
-    position: fixed;
-    top: $yMarginPx;
-    left: $xMarginPx;
-    height: 7 * $charHeight * $zoom-factor;
-    width: (6 * $charWidth + 5) * $zoom-factor;
-    border-right: 1px*$zoom-factor solid $green ;
+  position: fixed;
+  top: $yMarginPx;
+  left: $xMarginPx;
+  height: 7 * $charHeight * $zoom-factor;
+  width: (6 * $charWidth + 5) * $zoom-factor;
+  border-right: 1px*$zoom-factor solid $green;
 }
 
 .super-nav5-mgs-range {
-    position: fixed;
-    top: $yMarginPx + 5 * $charHeight * $zoom-factor;
-    left: $xMarginPx + (6 * $charWidth + 6) * $zoom-factor;
+  position: fixed;
+  top: $yMarginPx + 5 * $charHeight * $zoom-factor;
+  left: $xMarginPx + (6 * $charWidth + 6) * $zoom-factor;
 }
 
 .super-nav5-right-controls {
-    position: fixed;
-    top: $yMarginPx;
-    left: $xMarginPx + (($xChars * $charWidth) - (8 * $charWidth)) * $zoom-factor;
-    height: 4 * $charHeight * $zoom-factor;
-    width: 8 * $charWidth * $zoom-factor;
-    background-color: black;
-    border-left: 1px*$zoom-factor solid $green;
-    border-bottom: 1px*$zoom-factor solid $green;
+  position: fixed;
+  top: $yMarginPx;
+  left: $xMarginPx + (($xChars * $charWidth) - (8 * $charWidth)) * $zoom-factor;
+  height: 4 * $charHeight * $zoom-factor;
+  width: 8 * $charWidth * $zoom-factor;
+  background-color: black;
+  border-left: 1px*$zoom-factor solid $green;
+  border-bottom: 1px*$zoom-factor solid $green;
 }
 
 .super-nav5-directto-window {
-    position: fixed;
-    top: $yMarginPx + 6 * $charHeight * $zoom-factor;
-    left: $xMarginPx + (($xChars * $charWidth) - (6 * $charWidth)) * $zoom-factor;
-    height: $charHeight * $zoom-factor;
-    width: 6 * $charWidth * $zoom-factor;
+  position: fixed;
+  top: $yMarginPx + 6 * $charHeight * $zoom-factor;
+  left: $xMarginPx + (($xChars * $charWidth) - (6 * $charWidth)) * $zoom-factor;
+  height: $charHeight * $zoom-factor;
+  width: 6 * $charWidth * $zoom-factor;
 }
 
 .apt-8-iaf-list {
-    position: fixed;
-    top: $yMarginPx + 1 * $charHeight * $zoom-factor;
-    left: $xMarginPx + 16 * $charWidth * $zoom-factor;
+  position: fixed;
+  top: $yMarginPx + 1 * $charHeight * $zoom-factor;
+  left: $xMarginPx + 16 * $charWidth * $zoom-factor;
 }
 
 .offset-left-cursor {
-    margin-left: $charWidth * $zoom-factor;
+  margin-left: $charWidth * $zoom-factor;
 }
 
 .keyboard {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
 
-    color: transparent;
-    background-color: transparent;
-    border: none;
+  color: transparent;
+  background-color: transparent;
+  border: none;
 }
 
 ::selection {
-    background: transparent;
+  background: transparent;
 }

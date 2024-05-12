@@ -15,6 +15,7 @@ import {CHAR_HEIGHT, CHAR_WIDTH, MARGIN_X, MARGIN_Y, ZOOM_FACTOR} from "../data/
 import {KeyboardEvent} from "./StatusLine";
 import {PowerEvent} from "../PowerButton";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
+import {ErrorPage} from "./ErrorPage";
 
 
 export interface PageContainerProps extends ComponentProps {
@@ -61,6 +62,7 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
         return (<div>
             <div id="pageContainer" ref={this.containerRef}></div>
             <input class="keyboard" ref={this.keyboardRef}></input>
+            <ErrorPage bus={this.props.bus}></ErrorPage>
         </div>);
     }
 
