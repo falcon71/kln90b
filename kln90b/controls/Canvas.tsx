@@ -50,6 +50,10 @@ export class CoordinateCanvasDrawContext {
      * @param to
      */
     public drawLine(from: LatLonInterface, to: LatLonInterface) {
+        if (GeoPoint.equals(from, to)) {
+            return;
+        }
+
         this.projection.project(from, this.start);
         this.projection.project(to, this.end);
         if (!this.resamplerHandler.isLineVisible(Math.round(this.start[0]), Math.round(this.start[1]), Math.round(this.end[0]), Math.round(this.end[1]))) {
@@ -67,6 +71,10 @@ export class CoordinateCanvasDrawContext {
      * @param to
      */
     public drawFlightplanLine(from: LatLonInterface, to: LatLonInterface) {
+        if (GeoPoint.equals(from, to)) {
+            return;
+        }
+
         this.projection.project(from, this.start);
         this.projection.project(to, this.end);
         if (!this.resamplerHandler.isLineVisible(Math.round(this.start[0]), Math.round(this.start[1]), Math.round(this.end[0]), Math.round(this.end[1]))) {
@@ -85,6 +93,10 @@ export class CoordinateCanvasDrawContext {
      * @param to
      */
     public drawFlightplanArrow(from: LatLonInterface, to: LatLonInterface) {
+        if (GeoPoint.equals(from, to)) {
+            return;
+        }
+
         this.projection.project(from, this.start);
         this.projection.project(to, this.end);
         if (!this.resamplerHandler.isLineVisible(Math.round(this.start[0]), Math.round(this.start[1]), Math.round(this.end[0]), Math.round(this.end[1]))) {
@@ -99,6 +111,10 @@ export class CoordinateCanvasDrawContext {
     }
 
     public drawArc(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, direction: LegTurnDirection, dashed: boolean = false) {
+        if (GeoPoint.equals(from, to)) {
+            return;
+        }
+
         const point1 = direction == LegTurnDirection.Left ? from : to;
         const point2 = direction == LegTurnDirection.Left ? to : from;
 
@@ -111,6 +127,10 @@ export class CoordinateCanvasDrawContext {
     }
 
     public drawArcWithArrow(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, direction: LegTurnDirection) {
+        if (GeoPoint.equals(from, to)) {
+            return;
+        }
+
         const point1 = direction == LegTurnDirection.Left ? from : to;
         const point2 = direction == LegTurnDirection.Left ? to : from;
 
