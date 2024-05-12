@@ -16,6 +16,7 @@ import {
     LegType,
     NavMath,
     Procedure,
+    RnavTypeFlags,
     RunwayTransition,
     RunwayUtils,
     UnitType,
@@ -202,13 +203,18 @@ export class SidStar {
 
     public static isApproachRecognized(app: ApproachProcedure): boolean {
         switch (app.approachType) {
-            case ApproachType.APPROACH_TYPE_GPS:
             case ApproachType.APPROACH_TYPE_RNAV:
+                //Only if LNAV without VNAV is allowed
+                if (BitFlags.isAny(app.rnavTypeFlags, RnavTypeFlags.LNAV)) {
+                    return SidStar.appHasNoRFLegs(app);
+                } else {
+                    return false;
+                }
+            case ApproachType.APPROACH_TYPE_GPS:
             case ApproachType.APPROACH_TYPE_VOR:
             case ApproachType.APPROACH_TYPE_NDB:
             case ApproachType.APPROACH_TYPE_VORDME:
             case ApproachType.APPROACH_TYPE_NDBDME:
-                return SidStar.appHasNoRFLegs(app);
             default:
                 return false;
         }
