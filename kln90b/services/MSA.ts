@@ -21,6 +21,10 @@ export class MSA {
     }
 
     public getMSAFromTo(coord0: LatLonInterface, coord1: LatLonInterface): Feet | null {
+        if (GeoPoint.equals(coord0, coord1)) {
+            return this.getMSA(coord0);
+        }
+
         let msa: number | null = 0;
         let f = 0;
         this.GEOPOINTCACHE.set(coord0);
