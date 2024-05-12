@@ -365,6 +365,7 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
 
         switch (app.approachType) {
             case ApproachType.APPROACH_TYPE_GPS:
+            case ApproachType.APPROACH_TYPE_RNAV:
                 prefix = "RNAV";
                 break;
             case ApproachType.APPROACH_TYPE_VOR:

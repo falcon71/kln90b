@@ -89,6 +89,7 @@ export class SidStar {
 
         switch (app.approachType) {
             case ApproachType.APPROACH_TYPE_GPS:
+            case ApproachType.APPROACH_TYPE_RNAV:
                 prefix = "R";
                 break;
             case ApproachType.APPROACH_TYPE_VOR:
@@ -202,6 +203,7 @@ export class SidStar {
     public static isApproachRecognized(app: ApproachProcedure): boolean {
         switch (app.approachType) {
             case ApproachType.APPROACH_TYPE_GPS:
+            case ApproachType.APPROACH_TYPE_RNAV:
             case ApproachType.APPROACH_TYPE_VOR:
             case ApproachType.APPROACH_TYPE_NDB:
             case ApproachType.APPROACH_TYPE_VORDME:

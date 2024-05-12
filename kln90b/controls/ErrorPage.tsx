@@ -31,7 +31,7 @@ export class ErrorPage extends DisplayComponent<ErrorPageProps> {
 
     render(): VNode {
         return (<div ref={this.containerRef} class="errorpage d-none">
-            <h1>An Error occured. Please report at https://github.com/falcon71/kln90b or on Discord:</h1>
+            <h1>An error occured. Please report at https://github.com/falcon71/kln90b or on Discord:</h1>
             <div class="errormessage" ref={this.errorRef}></div>
             <div>
                 <button ref={this.okRef} type="button">OK</button>
