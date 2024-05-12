@@ -17,7 +17,7 @@ export class ErrorPage extends DisplayComponent<ErrorPageProps> {
     private containerRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
     private errorRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
     private okRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
-    private okSurpressRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
+    private okSuppressRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
 
     private showErrors: boolean = true;
 
@@ -35,7 +35,7 @@ export class ErrorPage extends DisplayComponent<ErrorPageProps> {
             <div class="errormessage" ref={this.errorRef}></div>
             <div>
                 <button ref={this.okRef} type="button">OK</button>
-                <button ref={this.okSurpressRef} type="button" class="surpressButton">OK and surpress further errors
+                <button ref={this.okSuppressRef} type="button" class="suppressButton">OK and suppress further errors
                 </button>
             </div>
         </div>);
@@ -50,7 +50,7 @@ export class ErrorPage extends DisplayComponent<ErrorPageProps> {
 
     public onAfterRender(thisNode: VNode): void {
         this.okRef.instance.onclick = this.ok.bind(this);
-        this.okSurpressRef.instance.onclick = this.okAndSurpress.bind(this);
+        this.okSuppressRef.instance.onclick = this.okAndSurpress.bind(this);
     }
 
     public ok() {
