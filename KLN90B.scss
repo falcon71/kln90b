@@ -43,8 +43,8 @@ kln-90b {
 .errorpage {
   background-color: black;
   font-family: monospace;
-  font-size: 11px;
-  line-height: 12px;
+  font-size: 20px;
+  line-height: 21px;
 
   position: fixed;
   left: 0;
@@ -57,16 +57,17 @@ kln-90b {
   display: flex;
   flex-direction: column;
 
-  h1 {
-    margin-bottom: 10px;
+  .errorheader {
+    font-size: 23px;
   }
 
   .errormessage {
     flex-grow: 1;
     border: 1px solid $green;
     border-radius: 5px;
-
     padding: 5px;
+
+    word-wrap: break-word;
   }
 
   button {
@@ -75,7 +76,6 @@ kln-90b {
     color: black;
     padding: 5px;
     margin: 5px;
-    font-size: 20px;
   }
 
   .suppressButton {
