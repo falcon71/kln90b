@@ -1,0 +1,16 @@
+{
+  "dependencies": [],
+  "content_type": "INSTRUMENTS",
+  "title": "KLN 90B",
+  "manufacturer": "",
+  "creator": "falcon71",
+  "package_version": "[VI]{version}[/VI]",
+  "minimum_game_version": "1.30.12.0",
+  "release_notes": {
+    "neutral": {
+      "LastUpdate": "",
+      "OlderHistory": ""
+    }
+  },
+  "total_package_size": "00000000000006350497"
+}
