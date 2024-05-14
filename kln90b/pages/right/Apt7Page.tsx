@@ -75,6 +75,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             ...props,
             selectProcedure: this.selectProcedure.bind(this),
             type: this.getProcedureType(),
+            changeFacility: this.changeFacility.bind(this),
         });
 
 
@@ -97,6 +98,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             ...this.props,
             selectProcedure: this.selectProcedure.bind(this),
             type: this.getProcedureType(),
+            changeFacility: this.changeFacility.bind(this),
         });
         this.requiresRedraw = true;
     }
@@ -105,14 +107,19 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         return this.props.scanLists.aptScanlist;
     }
 
-    protected changeFacility(fac: string | AirportFacility) {
+    public changeFacility(fac: string | AirportFacility) {
         super.changeFacility(fac);
         this.refreshPageInformation();
-        this.currentApt7Page = new Apt7ProcedurePage({
-            ...this.props,
-            selectProcedure: this.selectProcedure.bind(this),
-            type: this.getProcedureType(),
-        });
+        if (this.currentApt7Page instanceof Apt7ProcedurePage) {
+            this.currentApt7Page.setProcedureType(this.getProcedureType());
+        } else {
+            this.currentApt7Page = new Apt7ProcedurePage({
+                ...this.props,
+                selectProcedure: this.selectProcedure.bind(this),
+                type: this.getProcedureType(),
+                changeFacility: this.changeFacility.bind(this),
+            });
+        }
         this.requiresRedraw = true;
     }
 
@@ -191,6 +198,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
                     ...this.props,
                     selectProcedure: this.selectProcedure.bind(this),
                     type: type,
+                    changeFacility: this.changeFacility.bind(this),
                 });
                 break;
             case 1:
@@ -273,8 +281,8 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             this.hasSid = false;
             this.hasStar = false;
         } else {
-            this.hasSid = facility.departures.length > 0;
-            this.hasStar = facility.arrivals.length > 0;
+            this.hasSid = facility.departures.some(proc => SidStar.isProcedureRecognized(proc));
+            this.hasStar = facility.arrivals.some(proc => SidStar.isProcedureRecognized(proc));
             this.numPages = this.hasSid && this.hasStar ? 2 : 1;
         }
         this.currentPage = 0;
@@ -457,6 +465,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             ...this.props,
             selectProcedure: this.selectProcedure.bind(this),
             type: this.getProcedureType(),
+            changeFacility: this.changeFacility.bind(this),
         });
         this.requiresRedraw = true;
 
@@ -469,6 +478,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
 interface Apt7ProcedurePageProps extends PageProps {
     selectProcedure: (proc: ArrivalProcedure | DepartureProcedure) => void,
     type: KLNLegType,
+    changeFacility: (fac: string | AirportFacility) => void,
 }
 
 type Apt7ProcedurePageTypes = {
@@ -497,7 +507,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
     protected readonly emptyRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
     protected readonly listRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
     private readonly selectProcedure: (proc: ArrivalProcedure | DepartureProcedure) => void;
-    private readonly procedureType: KLNLegType;
+    private procedureType: KLNLegType;
 
     constructor(props: Apt7ProcedurePageProps) {
         super(props);
@@ -510,7 +520,10 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
         this.children = new UIElementChildren<Apt7ProcedurePageTypes>({
             activeArrow: new ActiveArrow(facility?.icao ?? null, this.props.memory.navPage),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
-            apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
+            apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, (fac) => {
+                props.changeFacility(fac); //Normally, only this.changeFacility would be called. But we also need to inform the parent, so it can calculate the number of pages correctly and set the correct procedure type
+                this.changeFacility(fac);
+            }),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "A"),
             nearestSelector: new NearestSelector(isNearestWpt(this.facility) ? this.facility.index : -1),
             list: new LastItemAlwaysVisibleList(UIElementChildren.forList([]), 4),
@@ -549,6 +562,18 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
         return this.props.scanLists.aptScanlist;
     }
 
+    public setProcedureType(procedureType: KLNLegType) {
+        this.procedureType = procedureType;
+    }
+
+    protected getMemory(): WaypointPageState<AirportFacility> {
+        return this.props.memory.aptPage;
+    }
+
+    protected getNearestList(): AirportNearestList {
+        return this.props.nearestLists.aptNearestList;
+    }
+
     protected redraw(): void {
         const facility = unpackFacility(this.facility);
         this.children.get("nearestSelector").setValue(isNearestWpt(this.facility) ? this.facility.index : -1);
@@ -559,7 +584,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
             this.mainRef.instance.classList.remove("d-none");
             this.children.get("createWpt").setVisible(false);
             const procedures: readonly Procedure[] = this.procedureType === KLNLegType.SID ? facility.departures : facility.arrivals;
-            const procs = procedures.filter(SidStar.isProcedureRecognized).map((proc, idx) => new SimpleListItem<Procedure>({
+            const procs = procedures.filter(proc => SidStar.isProcedureRecognized(proc)).map((proc, idx) => new SimpleListItem<Procedure>({
                 bus: this.props.bus,
                 value: proc,
                 fulltext: (idx + 1).toString().padStart(2, " ") + " " + proc.name.padEnd(7, " "),
@@ -576,14 +601,6 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
         }
 
         this.cursorController.refreshChildren(this.children);
-    }
-
-    protected getMemory(): WaypointPageState<AirportFacility> {
-        return this.props.memory.aptPage;
-    }
-
-    protected getNearestList(): AirportNearestList {
-        return this.props.nearestLists.aptNearestList;
     }
 }
 
@@ -659,7 +676,7 @@ class Apt7RunwayPage extends Apt7SelectorPage {
     }
 
     private buildList(): UIElementChildren<any> {
-        const rwys = this.proc.runwayTransitions.map((rwy, idx) => new SimpleListItem<RunwayTransition>({
+        const rwys = this.proc.runwayTransitions.filter(runwayTransition => SidStar.isProcedureRecognized(this.proc, runwayTransition, this.trans)).map((rwy, idx) => new SimpleListItem<RunwayTransition>({
             bus: this.props.bus,
             value: rwy,
             fulltext: (idx + 1).toString().padStart(2, " ") + " " + RunwayUtils.getRunwayNameString(rwy.runwayNumber, rwy.runwayDesignation, true).padEnd(5, " "),
@@ -717,7 +734,7 @@ class Apt7TransitionPage extends Apt7SelectorPage {
     }
 
     private buildList(): UIElementChildren<any> {
-        const iafs = this.proc.enRouteTransitions.map((trans, idx) => new SimpleListItem<ApproachTransition>({
+        const iafs = this.proc.enRouteTransitions.filter(enrouteTransition => SidStar.isProcedureRecognized(this.proc, this.rwy, enrouteTransition)).map((trans, idx) => new SimpleListItem<ApproachTransition>({
             bus: this.props.bus,
             value: trans,
             fulltext: (idx + 1).toString().padStart(2, " ") + " " + trans.name.padEnd(5, " "),

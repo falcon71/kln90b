@@ -221,10 +221,10 @@ export class SidStar {
         }
     }
 
-    public static isProcedureRecognized(proc: Procedure): boolean {
+    public static isProcedureRecognized(proc: Procedure, runwayTransition: RunwayTransition | null = null, enrouteTransition: EnrouteTransition | null = null): boolean {
         //The real device does not include RNAV procedures: https://www.euroga.org/forums/maintenance-avionics/5573-rnav-retrofit
         //It seems, that we can't recognize those here
-        return SidStar.procHasNoRFLegs(proc);
+        return SidStar.procHasNoRFLegs(proc) && SidStar.hasAtLeastOneRecognizedLeg(proc, runwayTransition, enrouteTransition);
     }
 
     /**
@@ -245,14 +245,13 @@ export class SidStar {
         }
 
 
-
         const futureLegs = navState.activeWaypoint.getFutureLegs();
         let dist = navState.distToActive!;
 
 
         for (let i = 0; i < futureLegs.length; i++) {
             const next = futureLegs[i];
-            if(i > 0) {
+            if (i > 0) {
                 const prev = futureLegs[i - 1];
                 //The manual states, distance is to the arc, not the VOR:
                 dist += UnitType.GA_RADIAN.convertTo(new GeoPoint(prev.wpt.lat, prev.wpt.lon).distance(next.wpt), UnitType.NMILE);
@@ -308,6 +307,43 @@ export class SidStar {
     }
 
     /**
+     * For example KGEG GEG7 only has CA and VM, which are not recognized by the KLN,
+     * which would result in an empty procedure with no legs.
+     * Another interesting example is KJFK JFK 5. Only RWY 31 has a leg to CRI, the others would be empty
+     * @param proc
+     * @param runwayTransition If given, then only this runwaytransition will be checked, otherwise all
+     * @param enrouteTransition If given, then only this enrouteTransition will be checked, otherwise all
+     * @private
+     */
+    private static hasAtLeastOneRecognizedLeg(proc: Procedure, runwayTransition: RunwayTransition | null = null, enrouteTransition: EnrouteTransition | null = null): boolean {
+        if (enrouteTransition === null) {
+            for (const transition of proc.enRouteTransitions) {
+                if (transition.legs.some(leg => SidStar.isLegSupported(leg))) {
+                    return true;
+                }
+            }
+        } else if (enrouteTransition.legs.some(leg => SidStar.isLegSupported(leg))) {
+            return true;
+        }
+
+        if (runwayTransition === null) {
+            for (const transition of proc.runwayTransitions) {
+                if (transition.legs.some(leg => SidStar.isLegSupported(leg))) {
+                    return true;
+                }
+            }
+        } else if (runwayTransition.legs.some(leg => SidStar.isLegSupported(leg))) {
+            return true;
+        }
+
+        return proc.commonLegs.some(leg => SidStar.isLegSupported(leg));
+    }
+
+    private static isLegSupported(leg: FlightPlanLeg): boolean {
+        return leg.fixIcao.trim() !== "" && leg.type != LegType.RF;
+    }
+
+    /**
      * Builds the list of legs.
      * Filters out duplicates and legs that are not supported by the KLN
      * Async, because we may need the facilities for DME arcs.
@@ -325,52 +361,9 @@ export class SidStar {
 
         legs.push(...app.finalLegs, ...app.missedLegs);
 
-        const cleaned = this.filterOutDuplicates(legs.filter(leg => this.isLegSupported(leg)));
+        const cleaned = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
         const approachName = SidStar.formatApproachName(app, facility);
         return await this.convertToKLN(facility, approachName, KLNLegType.APP, cleaned);
-    }
-
-    /**
-     * Builds the list of legs.
-     * Filters out duplicates and legs that are not supported by the KLN.
-     * Async, because we may need the facilities for DME arcs.
-     * @param facility
-     * @param type
-     * @param proc
-     * @param rwy
-     * @param trans
-     */
-
-    public async getKLNProcedureLegList(facility: AirportFacility, proc: Procedure, type: KLNLegType, rwy: RunwayTransition | null, trans: EnrouteTransition | null): Promise<KLNFlightplanLeg[]> {
-        const legs: FlightPlanLeg[] = [];
-
-        if (type === KLNLegType.SID) {
-            if (rwy != null) {
-                legs.push(...rwy.legs);
-            }
-
-            legs.push(...proc.commonLegs);
-
-            if (trans != null) {
-                legs.push(...trans.legs);
-            }
-        } else {
-
-            if (trans != null) {
-                legs.push(...trans.legs);
-            }
-
-            legs.push(...proc.commonLegs);
-
-            if (rwy != null) {
-                legs.push(...rwy.legs);
-            }
-        }
-
-        const cleaned = this.filterOutDuplicates(legs.filter(leg => this.isLegSupported(leg)));
-        const procedureName = `${proc.name}-${type === KLNLegType.SID ? "SID" : "Æ"}`;
-        return await this.convertToKLN(facility, procedureName, type, cleaned);
-
     }
 
     private filterOutDuplicates(legs: FlightPlanLeg[]): FlightPlanLeg[] {
@@ -492,8 +485,47 @@ export class SidStar {
 
     }
 
-    private isLegSupported(leg: FlightPlanLeg): boolean {
-        return leg.fixIcao.trim() !== "" && leg.type != LegType.RF;
+    /**
+     * Builds the list of legs.
+     * Filters out duplicates and legs that are not supported by the KLN.
+     * Async, because we may need the facilities for DME arcs.
+     * @param facility
+     * @param type
+     * @param proc
+     * @param rwy
+     * @param trans
+     */
+
+    public async getKLNProcedureLegList(facility: AirportFacility, proc: Procedure, type: KLNLegType, rwy: RunwayTransition | null, trans: EnrouteTransition | null): Promise<KLNFlightplanLeg[]> {
+        const legs: FlightPlanLeg[] = [];
+
+        if (type === KLNLegType.SID) {
+            if (rwy != null) {
+                legs.push(...rwy.legs);
+            }
+
+            legs.push(...proc.commonLegs);
+
+            if (trans != null) {
+                legs.push(...trans.legs);
+            }
+        } else {
+
+            if (trans != null) {
+                legs.push(...trans.legs);
+            }
+
+            legs.push(...proc.commonLegs);
+
+            if (rwy != null) {
+                legs.push(...rwy.legs);
+            }
+        }
+
+        const cleaned = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
+        const procedureName = `${proc.name}-${type === KLNLegType.SID ? "SID" : "Æ"}`;
+        return await this.convertToKLN(facility, procedureName, type, cleaned);
+
     }
 
     private getKLNFixType(leg: FlightPlanLeg): KLNFixType | undefined {
