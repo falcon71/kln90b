@@ -22,7 +22,7 @@ export class Database {
         const month = AIRAC_MONTHS.indexOf(monthStr);
         const date = Number(dateStr);
 
-        this.expirationTimestamp = TimeStamp.createDate(year, month, date);
+        this.expirationTimestamp = TimeStamp.createDate(year, month, date).withTime(23, 59);
         this.expirationDateString = `${dateStr} ${monthStr} ${yearStr}`;
 
         console.log("airacRange", airacRange, this.expirationTimestamp);
