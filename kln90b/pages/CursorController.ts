@@ -189,7 +189,7 @@ export class CursorController implements CursorHandler {
         }
         const result = await this.getCurrentFocusedField()!.enter();
 
-        if (result === EnterResult.Handled_Move_Focus) {
+        if (result !== EnterResult.Handled_Keep_Focus) {
             this.outerRight(); //Enter always moves to the next field, see https://www.youtube.com/shorts/9We5fcd2-VE
         }
         return result;
