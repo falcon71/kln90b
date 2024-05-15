@@ -1,10 +1,9 @@
-import {shortYearToLongYear, TimeStamp} from "../Time";
-import {EventBus, SimVarValueType} from "@microsoft/msfs-sdk";
+import {TimeStamp} from "../Time";
+import {AiracCycleFormatter, EventBus, FacilityLoader} from "@microsoft/msfs-sdk";
 import {Sensors} from "../../Sensors";
 import {MessageHandler, OneTimeMessage} from "../MessageHandler";
 import {GPSEvents} from "../../Gps";
 
-const AIRAC_MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEC"];
 
 export class Database {
 
@@ -13,19 +12,12 @@ export class Database {
     private readonly expirationTimestamp: TimeStamp;
 
     constructor(bus: EventBus, private sensors: Sensors, private messageHandler: MessageHandler) {
+        const airac = FacilityLoader.getDatabaseCycles().current;
 
-        const airacRange: string = SimVar.GetGameVarValue('FLIGHT NAVDATA DATE RANGE', SimVarValueType.String);
-        const yearStr = airacRange.substring(11, 13);
-        const monthStr = airacRange.substring(5, 8);
-        const dateStr = airacRange.substring(8, 10);
-        const year = shortYearToLongYear(Number(yearStr));
-        const month = AIRAC_MONTHS.indexOf(monthStr);
-        const date = Number(dateStr);
+        this.expirationTimestamp = TimeStamp.create(airac.expirationTimestamp);
+        this.expirationDateString = AiracCycleFormatter.create('{expMinus({dd} {MON} {YYYY})}')(airac);
 
-        this.expirationTimestamp = TimeStamp.createDate(year, month, date).withTime(23, 59);
-        this.expirationDateString = `${dateStr} ${monthStr} ${yearStr}`;
-
-        console.log("airacRange", airacRange, this.expirationTimestamp);
+        console.log("airac", airac, this.expirationTimestamp);
         bus.getSubscriber<GPSEvents>().on("timeUpdatedEvent").handle(this.onGPSAcquired.bind(this));
     }
 
