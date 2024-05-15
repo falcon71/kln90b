@@ -219,7 +219,7 @@ export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSett
             },
             {
                 name: "fastGpsAcquisition",
-                defaultValue: GPS_ACQUISITION_REAL,
+                defaultValue: GPS_ACQUISITION_FAST,
             },
             {
                 name: "enableGlow",
