@@ -42,6 +42,7 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
         super(props);
 
         this.glowSetting = this.props.userSettings.getSetting("enableGlow");
+        this.glowSetting.sub(this.glowChanged.bind(this));
         this.keyboardPublisher = props.bus.getPublisher<KeyboardEvent>();
         props.bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.resetKeyboard.bind(this));
     }
@@ -60,7 +61,7 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
 
     render(): VNode {
         return (<div>
-            <div id="pageContainer" ref={this.containerRef}></div>
+            <div id="pageContainer" ref={this.containerRef} class={this.glowSetting.get() ? "glow" : ""}></div>
             <input class="keyboard" ref={this.keyboardRef}></input>
             <ErrorPage bus={this.props.bus}></ErrorPage>
         </div>);
@@ -71,11 +72,6 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
             return;
         }
 
-        if (this.glowSetting.get()) {
-            this.containerRef.instance.classList.add("glow");
-        } else {
-            this.containerRef.instance.classList.remove("glow");
-        }
 
         if (!this.keyBoardInitialized) {
             this.setupKeyboard();
@@ -91,6 +87,17 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
 
         this.getCurrentPage().tick(blink);
         this.getCurrentPage().children.walk((el) => el.tick(blink));
+    }
+
+    private glowChanged(glow: boolean) {
+        if (!TickController.checkRef(this.containerRef)) {
+            return;
+        }
+        if (glow) {
+            this.containerRef.instance.classList.add("glow");
+        } else {
+            this.containerRef.instance.classList.remove("glow");
+        }
     }
 
     public setCurrentPage<T extends ComponentProps>(type: DisplayComponentFactory<T>, props: T) {
