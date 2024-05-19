@@ -1,22 +1,24 @@
-import {DefaultUserSettingManager, EventBus, ICAO} from "@microsoft/msfs-sdk";
+import {DefaultUserSettingManager, EventBus} from "@microsoft/msfs-sdk";
 import {KLN90BUserFlightplansSettings, KLN90BUserFlightplansTypes} from "./KLN90BUserFlightplans";
-import {Flightplan, FlightplanEvents, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
+import {Flightplan, FlightplanEvents, KLNFlightplanLeg} from "../data/flightplan/Flightplan";
 import {KLNFacilityLoader} from "../data/navdata/KLNFacilityLoader";
 import {AsoboFlightplanLoader} from "./AsoboFlightplanLoader";
-import {MessageHandler, OneTimeMessage} from "../data/MessageHandler";
+import {MessageHandler} from "../data/MessageHandler";
 import {AsoboFlightplanSaver} from "./AsoboFlightplanSaver";
 import {KLN90PlaneSettings} from "./KLN90BPlaneSettings";
+import {Flightplanloader} from "../services/Flightplanloader";
 
 /**
  * In the real unit, FPL 0 is also persisted: https://youtu.be/S1lt2W95bLA?t=181
  * We however load it from the simulator flightplan
  */
-export class UserFlightplanPersistor {
+export class UserFlightplanPersistor extends Flightplanloader {
     private manager: DefaultUserSettingManager<KLN90BUserFlightplansTypes>;
     private asoboFlightplanSaver: AsoboFlightplanSaver = new AsoboFlightplanSaver();
 
 
-    constructor(private readonly bus: EventBus, private readonly facilityLoader: KLNFacilityLoader, private readonly messageHandler: MessageHandler, private readonly planeSettings: KLN90PlaneSettings) {
+    constructor(bus: EventBus, facilityLoader: KLNFacilityLoader, messageHandler: MessageHandler, private readonly planeSettings: KLN90PlaneSettings) {
+        super(bus, facilityLoader, messageHandler);
         bus.getSubscriber<FlightplanEvents>().on("flightplanChanged").handle(this.persistFlightplan.bind(this));
         this.manager = KLN90BUserFlightplansSettings.getManager(bus);
     }
@@ -46,12 +48,7 @@ export class UserFlightplanPersistor {
             }
 
             const serializedLegs = serialized.match(/.{1,12}/g)!;
-            const promises = serializedLegs.map(this.deserializeLeg.bind(this));
-            const legs = await Promise.all(promises);
-
-            const fpl = new Flightplan(idx, legs.filter(l => l !== null) as any, this.bus);
-            console.log(`flightplan ${idx} restored`, fpl);
-            return fpl;
+            return await this.loadIcaos(serializedLegs, idx);
         } catch (e) {
             console.log(`Error restoring fpl ${idx}`, e);
             throw e;
@@ -78,15 +75,5 @@ export class UserFlightplanPersistor {
         return leg.wpt.icao;
     }
 
-    private async deserializeLeg(serialized: string): Promise<KLNFlightplanLeg | null> {
-        try {
-            const facility = await this.facilityLoader.getFacility(ICAO.getFacilityType(serialized), serialized);
-            return {wpt: facility, type: KLNLegType.USER};
-        } catch (e) {
-            this.messageHandler.addMessage(new OneTimeMessage([`WAYPOINT ${ICAO.getIdent(serialized)} DELETED`]));
-            //todo OTHER WAYPOINTS DELETED?
-        }
-        return null;
-    }
 
 }

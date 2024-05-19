@@ -1,7 +1,6 @@
-import {Flightplan, KLNLegType} from "../data/flightplan/Flightplan";
-import {EventBus, Facility, ICAO, Wait} from "@microsoft/msfs-sdk";
-import {KLNFacilityLoader} from "../data/navdata/KLNFacilityLoader";
-import {Message, MessageHandler, OneTimeMessage} from "../data/MessageHandler";
+import {Flightplan} from "../data/flightplan/Flightplan";
+import {Wait} from "@microsoft/msfs-sdk";
+import {Flightplanloader} from "../services/Flightplanloader";
 
 interface AsoboFlightplan {
     arrivalWaypointsSize: number,
@@ -14,12 +13,9 @@ interface AsoboFlightplanLeg {
     icao: string,
 }
 
-export class AsoboFlightplanLoader {
+export class AsoboFlightplanLoader extends Flightplanloader {
     static fpListenerInitialized = false;
 
-
-    constructor(private readonly bus: EventBus, private readonly facilityLoader: KLNFacilityLoader, private messageHandler: MessageHandler) {
-    }
 
     /**
      * Inits flight plan asobo sync
@@ -49,28 +45,9 @@ export class AsoboFlightplanLoader {
 
         console.log("asobo flightplan", data);
 
-        const waypoints = this.filterProcedures(data);
+        const icaos = this.filterProcedures(data).map(leg => leg.icao);
 
-        let messages: Message[] = [];
-
-        for (let i = 30; i < waypoints.length; i++) { //I'm terribly sorry, but the KLN90B flightplans can only have a maximum of 30 legs
-            messages.push(new OneTimeMessage([`WAYPOINT ${ICAO.getIdent(waypoints[i].icao)} DELETED`]));
-        }
-
-        if (messages.length > 10) {
-            messages = messages.slice(0, 10);
-            messages.push(new OneTimeMessage(["OTHER WAYPOINTS DELETED"]));
-        }
-
-        messages.forEach(this.messageHandler.addMessage);
-
-        const promises: Promise<Facility>[] = waypoints.slice(0, 30).map(wpt => this.facilityLoader.getFacility(ICAO.getFacilityType(wpt.icao), wpt.icao));
-
-        const legs = await Promise.all(promises);
-
-        const fpl = new Flightplan(0, legs.map(f => ({wpt: f, type: KLNLegType.USER})), this.bus);
-        console.log("flightplan 0 restored", fpl);
-        return fpl;
+        return this.loadIcaos(icaos);
     }
 
     /**
@@ -100,5 +77,4 @@ export class AsoboFlightplanLoader {
             : -(plan.arrivalWaypointsSize + 1);
         return [plan.waypoints[0], ...plan.waypoints.slice(enrouteStart, enrouteEnd), plan.waypoints[plan.waypoints.length - 1]];
     }
-
 }

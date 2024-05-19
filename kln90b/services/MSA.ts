@@ -63,7 +63,7 @@ export class MSA {
                         this.msaTable = JSON.parse(request.responseText);
                         resolve();
                     } else {
-                        reject(`Could not initialize msa table: ${request.responseText}`);
+                        reject(`Could not initialize msa table: ${request.status}`);
                     }
                 }
             };
