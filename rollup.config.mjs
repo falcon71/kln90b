@@ -1,6 +1,5 @@
 import typescript from '@rollup/plugin-typescript';
 import resolve from '@rollup/plugin-node-resolve';
-import terser from "@rollup/plugin-terser";
 import scss from "rollup-plugin-scss";
 import versionInjector from "rollup-plugin-version-injector";
 import fs from "fs";
@@ -42,6 +41,6 @@ export default {
 		}),
 		versionInjector(),
 		typescript(),
-		(production && terser()),
+		//(production && terser()), //Terser causes side effects? Canvas size was undefined, even though it has a default value in the constructor
 	]
 }
