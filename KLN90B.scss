@@ -68,6 +68,7 @@ kln-90b {
     padding: 5px;
 
     word-wrap: break-word;
+    overflow: auto;
   }
 
   button {
@@ -81,6 +82,19 @@ kln-90b {
   .suppressButton {
     float: right;
   }
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  background: black;
+}
+
+::-webkit-scrollbar-thumb {
+  background: $green;
+}
+
+::-webkit-scrollbar-corner {
+  background: black;
 }
 
 kln-90b #Mainframe #InstrumentsContainer {
