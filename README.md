@@ -34,7 +34,7 @@ Mapping:
 
 ## FAQ
 
-Please see the [Wiki](https://github.com/falcon71/kln90b/wiki/FAQ) for answers to commong questions.
+Please see the [Wiki](https://github.com/falcon71/kln90b/wiki/FAQ) for answers to common questions.
 
 ## Aircraft developers
 
