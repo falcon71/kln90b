@@ -71,16 +71,19 @@ kln-90b {
     overflow: auto;
   }
 
+  .errorButtons {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
   button {
     border: 0;
     background-color: $green;
     color: black;
     padding: 5px;
     margin: 5px;
-  }
-
-  .suppressButton {
-    float: right;
+    min-width: 100px;
   }
 }
 

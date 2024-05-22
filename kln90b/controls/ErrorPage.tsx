@@ -1,4 +1,5 @@
 import {ComponentProps, DisplayComponent, EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
+import {VERSION} from "../Version";
 
 
 export interface ErrorEvent {
@@ -35,9 +36,10 @@ export class ErrorPage extends DisplayComponent<ErrorPageProps> {
                 Discord:
             </div>
             <div class="errormessage" ref={this.errorRef}></div>
-            <div>
+            <div class="errorButtons">
                 <button ref={this.okRef} type="button">OK</button>
-                <button ref={this.okSuppressRef} type="button" class="suppressButton">OK and suppress further errors
+                <div>{VERSION}</div>
+                <button ref={this.okSuppressRef} type="button">OK and suppress further errors
                 </button>
             </div>
         </div>);
