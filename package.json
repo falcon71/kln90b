@@ -1,8 +1,7 @@
 {
   "name": "kln90b",
   "//": "6 chars maximum for the version!",
-  "version": "1.2B1",
-
+  "version": "1.2B2",
   "description": "",
   "main": "index.ts",
   "scripts": {
@@ -13,7 +12,6 @@
   "license": "GPL-3.0-or-later",
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^15.2.3",
-    "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^11.1.6",
     "@types/node": "^20.12.12",
     "rollup": "^4.17.2",

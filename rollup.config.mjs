@@ -6,8 +6,6 @@ import fs from "fs";
 
 const buildTargetDir = process.env.buildTargetDir ?? 'build';
 
-const production = process.env.NODE_ENV === 'production';
-
 /**
  * Copies the manifest.json file over and inserts the version number from the package.json
  * @param userConfig
@@ -41,6 +39,5 @@ export default {
 		}),
 		versionInjector(),
 		typescript(),
-		//(production && terser()), //Terser causes side effects? Canvas size was undefined, even though it has a default value in the constructor
 	]
 }
