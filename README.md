@@ -2,7 +2,7 @@
 
 This is a simulation of the Bendix/King KLN 90B GPS for the Microsoft Flight Simulator.
 
-## Users
+## Pilots
 
 Download the current version on the [releases page](https://github.com/falcon71/kln90b/releases/latest). This package
 only contains the GPS device. To use the KLN 90B, you will need
@@ -34,21 +34,7 @@ Mapping:
 
 ## FAQ
 
-### I press the power button and the device stays off
-
-Make sure your aircraft is powered. It will also take a few seconds for the screen to warm up, before the welcome page
-will be shown. Also check that the aircraft has electricity and no circuit brakers are pulled.
-
-### It takes a long time until a GPS signal is acquired
-
-If you have not used the KLN in the past three months (or ever), it will need to search the entire sky for valid GPS
-satelites . Afterwards, this catalogue will be saved, so the next time will be faster.
-The KLN 90B also remembers your last position. If this differs from you actual position, GPS acquisition will take
-longer.
-In this case, enter your position on the SET 1 page.
-
-Alternativly, you can set the GPS acquisition time to fast on the SET 10 page. GPS acquisition will then take less than
-30 seconds.
+Please see the [Wiki](https://github.com/falcon71/kln90b/wiki/FAQ) for answers to commong questions.
 
 ## Aircraft developers
 
