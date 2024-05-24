@@ -165,7 +165,7 @@ export class Nav5Page extends SixLineHalfPage {
                         ctx.drawArc(prevleg.arcData.circle, prevleg.arcData.beginPoint, prevleg.arcData.entryFacility, prevleg.arcData.turnDirection, true);
                     }
                     if (actIdx === i) {
-                        ctx.drawArcWithArrow(prevleg.arcData.circle, prevleg.arcData.entryFacility, prevleg.arcData.endFacility, prevleg.arcData.turnDirection);
+                        ctx.drawArcWithArrow(prevleg.arcData.circle, prevleg.arcData.entryFacility, prevleg.arcData.endPoint, prevleg.arcData.turnDirection);
                     } else {
                         ctx.drawArc(prevleg.arcData.circle, prevleg.arcData.entryFacility, prevleg.arcData.endPoint, prevleg.arcData.turnDirection);
                     }
