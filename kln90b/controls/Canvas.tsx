@@ -8,7 +8,6 @@ import {
     GeoPoint,
     GeoPointInterface,
     LatLonInterface,
-    LegTurnDirection,
     MapProjection,
     NodeReference,
     UnitType,
@@ -110,35 +109,29 @@ export class CoordinateCanvasDrawContext {
         this.resamplerHandler.drawArrow();
     }
 
-    public drawArc(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, direction: LegTurnDirection, dashed: boolean = false) {
+    public drawArc(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, dashed: boolean = false) {
         if (GeoPoint.equals(from, to)) {
             return;
         }
 
-        const point1 = direction == LegTurnDirection.Left ? from : to;
-        const point2 = direction == LegTurnDirection.Left ? to : from;
-
-        this.projection.project(point1, this.start);
-        this.projection.project(point2, this.end);
+        this.projection.project(from, this.start);
+        this.projection.project(to, this.end);
 
         this.resamplerHandler.initDraw(this.start, this.end, dashed, SHORTEN_LENGTH);
-        this.arcResampler.resample(this.projection.getGeoProjection(), circle, point1, point2, this.resamplerHandler.handle.bind(this.resamplerHandler));
+        this.arcResampler.resample(this.projection.getGeoProjection(), circle, from, to, this.resamplerHandler.handle.bind(this.resamplerHandler));
 
     }
 
-    public drawArcWithArrow(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, direction: LegTurnDirection) {
+    public drawArcWithArrow(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface) {
         if (GeoPoint.equals(from, to)) {
             return;
         }
 
-        const point1 = direction == LegTurnDirection.Left ? from : to;
-        const point2 = direction == LegTurnDirection.Left ? to : from;
-
-        this.projection.project(point1, this.start);
-        this.projection.project(point2, this.end);
+        this.projection.project(from, this.start);
+        this.projection.project(to, this.end);
 
         this.resamplerHandler.initDraw(this.start, this.end, false, SHORTEN_LENGTH);
-        this.arcResampler.resample(this.projection.getGeoProjection(), circle, point1, point2, this.resamplerHandler.handle.bind(this.resamplerHandler));
+        this.arcResampler.resample(this.projection.getGeoProjection(), circle, from, to, this.resamplerHandler.handle.bind(this.resamplerHandler));
         this.resamplerHandler.drawArrow();
     }
 

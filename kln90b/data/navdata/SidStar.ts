@@ -592,6 +592,8 @@ export class SidStar {
         } else {
             start = convertedLeg.leg.course;
             end = convertedLeg.leg.theta;
+            //Not sure if it is *always* correct to reverse it for right hand turns, but it seemed to work fine for all procedures as LGKO
+            circle.reverse();
         }
 
         if (!NavMath.bearingIsBetween(radial, start, end)) {
