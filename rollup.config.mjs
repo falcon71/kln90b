@@ -37,7 +37,9 @@ export default {
 		copyManifest({
 			outputPath: buildTargetDir,
 		}),
-		versionInjector(),
+		versionInjector({
+			injectInComments: false,
+		}),
 		typescript(),
 	]
 }
