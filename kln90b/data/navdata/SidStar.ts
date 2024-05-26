@@ -465,6 +465,7 @@ export class SidStar {
                     procedureName: procedureName,
                     arcData: arcData,
                     fixType: originalEntry.fixType,
+                    flyOver: enrichedLeg.leg.flyOver,
                 });
             }
 

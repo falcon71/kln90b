@@ -108,13 +108,15 @@ export class NavCalculator implements CalcTickable {
 
             if (this.turnAnticipation.get() && followingLeg !== null && toLeg.flyOver !== true) {
                 const turnRadius = UnitType.METER.convertTo(NavMath.turnRadius(this.sensors.in.gps.groundspeed, this.bankeAngleForStandardTurn(this.sensors.in.gps.groundspeed)), UnitType.NMILE);
+                const fromDtk = fromLeg.path.bearingAt(fromLeg.path.closest(toLeg.wpt, VEC3_CACHE)); //Important for DME arcs, we need the DTK at the end of the arc, not the current one. Also helps for very long GC legs
+
                 let nextDtk: number;
-                if(toLeg.arcData === undefined){
+                if (toLeg.arcData === undefined) {
                     nextDtk = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon).bearingTo(followingLeg.wpt);
                 } else {
                     nextDtk = toLeg.arcData.circle.bearingAt(toLeg.arcData.entryFacility);
                 }
-                const turnAngle  = Math.abs(NavMath.diffAngle(dtk, nextDtk));
+                const turnAngle = Math.abs(NavMath.diffAngle(fromDtk, nextDtk));
                 const turnAnticipationDistance = turnRadius * Math.tan((turnAngle / 2) * Avionics.Utils.DEG2RAD);
                 const distanceToTurn = nav.distToActive - turnAnticipationDistance;
                 const timeToTurn = distanceToTurn / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
