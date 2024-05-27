@@ -1,4 +1,4 @@
-import {CalcTickable} from "../../TickController";
+import {CalcTickable, TICK_TIME_CALC} from "../../TickController";
 import {Sensors} from "../../Sensors";
 import {FROM, TO, VolatileMemory} from "../VolatileMemory";
 import {GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
@@ -124,7 +124,7 @@ export class NavCalculator implements CalcTickable {
                 nav.waypointAlert = timeToTurn <= WPT_ALERT_WITH_TURN_ANTI;
                 //console.log(nav.distToActive, turnAnticipationDistance, nav.waypointAlert, timeToTurn, toWpt);
                 if (toLeg.fixType !== KLNFixType.MAP &&
-                    (distanceToTurn <= this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS //Distance is within the next tick, we rather start the turn a little too early than too late
+                    (distanceToTurn <= this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC //Distance is within the next tick, we rather start the turn a little too early than too late
                         || (nav.waypointAlert && distanceToTurn > this.lastDistance))) {
                     //don't move missed approach waypoint!
                     nav.activeWaypoint.sequenceToNextWaypoint();
