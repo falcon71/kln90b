@@ -22,6 +22,7 @@ import {MessageHandler} from "./data/MessageHandler";
 import {NavMode} from "./data/VolatileMemory";
 import {LVAR_ANNUN_TEST, LVAR_MSG_LIGHT, LVAR_WPT_LIGHT} from "./LVars";
 import {GPS} from "./Gps";
+import {SignalOutputFilter} from "./services/SignalOutputFilter";
 
 
 export class FuelComputer implements CalcTickable {
@@ -206,6 +207,8 @@ export class SensorsOut {
 
     public obsOut: number | null = null;
 
+    private xtkFilter = new SignalOutputFilter();
+
     constructor(private readonly options: KLN90PlaneSettings, public readonly audioGenerator: AudioGenerator) {
         this.reset();
     }
@@ -241,13 +244,13 @@ export class SensorsOut {
         }
         SimVar.SetSimVarValue('GPS CDI SCALING', SimVarValueType.Meters, UnitType.NMILE.convertTo(scaling, UnitType.METER));
         if (xtk === null) {
+            this.xtkFilter.setValue(0);
             SimVar.SetSimVarValue('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, false);
             SimVar.SetSimVarValue('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, false);
-            SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, 0);
         } else {
+            this.xtkFilter.setValue(UnitType.NMILE.convertTo(-xtk, UnitType.METER));
             SimVar.SetSimVarValue('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, true);
             SimVar.SetSimVarValue('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, true);
-            SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, UnitType.NMILE.convertTo(-xtk, UnitType.METER));
         }
 
         //The KLN does not output vertical information
@@ -256,6 +259,13 @@ export class SensorsOut {
         SimVar.SetSimVarValue('GPS VERTICAL ANGLE ERROR', SimVarValueType.Degree, 0);
         SimVar.SetSimVarValue('GPS VERTICAL ERROR', SimVarValueType.Meters, 0);
         SimVar.SetSimVarValue('GPS HAS GLIDEPATH', SimVarValueType.Bool, false);
+    }
+
+    /**
+     * The deviation bar signal is filtered by analog circuitry, so we set this more often
+     */
+    public setFilteredOutputs() {
+        SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, this.xtkFilter.getCurrentValue());
     }
 
     public setDesiredTrack(dtkMag: number | null, actualTrack: number | null, magvar: number) {

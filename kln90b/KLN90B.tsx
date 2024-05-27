@@ -86,6 +86,7 @@ import {SidStar} from "./data/navdata/SidStar";
 import {SimVarSync} from "./SimVarSync";
 import {KeyboardEvent, KeyboardEventData} from "./controls/StatusLine";
 import {ErrorEvent} from "./controls/ErrorPage";
+import {SignalOutputFillterTick} from "./services/SignalOutputFillterTick";
 
 export interface PropsReadyEvent {
     propsReady: PageProps;
@@ -311,6 +312,8 @@ class KLN90B extends BaseInstrument {
                 vnav,
                 modeController,
                 this.messageHandler,
+            ], [
+                new SignalOutputFillterTick(sensors),
             ]);
 
         this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager);

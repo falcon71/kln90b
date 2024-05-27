@@ -4,6 +4,7 @@ import {ErrorEvent} from "./controls/ErrorPage";
 
 export const TICK_TIME_DISPLAY = 250;
 export const TICK_TIME_CALC = 1000;
+export const TICK_TIME_SIGNALS = 1000 / 16;
 
 
 export interface DisplayTickable {
@@ -29,6 +30,7 @@ export class TickController {
     private blink = 0;
     private displayIntervallID: number = 0;
     private calcIntervallID: number = 0;
+    private signalsIntervallID: number = 0;
 
     private isEnabled = true;
     private isPowered = false;
@@ -38,8 +40,9 @@ export class TickController {
      * @param bus
      * @param displayTickables The display runs at 4hz
      * @param calcTickables Sensonrs and calculations run at 1hz
+     * @param signalTickables Analog filtered signals by circuitry, like the deviation bar signal (Page 186 in the maintenance manual)
      */
-    constructor(private readonly bus: EventBus, private readonly displayTickables: DisplayTickable[], private readonly calcTickables: CalcTickable[]) {
+    constructor(private readonly bus: EventBus, private readonly displayTickables: DisplayTickable[], private readonly calcTickables: CalcTickable[], private readonly signalTickables: CalcTickable[]) {
 
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.handlePowerChange.bind(this));
     }
@@ -76,6 +79,20 @@ export class TickController {
         }
     }
 
+    public tickSignals(): void {
+        for (const tickable of this.signalTickables) {
+            try {
+                tickable.tick();
+            } catch (e) {
+                console.error(e);
+                if (e instanceof Error) {
+                    this.bus.getPublisher<ErrorEvent>().pub("error", e);
+                }
+            }
+        }
+    }
+
+
     public setEnabled(enabled: boolean): void {
         if (this.isEnabled === enabled) {
             return;
@@ -95,10 +112,12 @@ export class TickController {
             console.log("starting ticks");
             this.displayIntervallID = window.setInterval(this.tickDisplay.bind(this), TICK_TIME_DISPLAY);
             this.calcIntervallID = window.setInterval(this.tickCalc.bind(this), TICK_TIME_CALC);
+            this.signalsIntervallID = window.setInterval(this.tickSignals.bind(this), TICK_TIME_SIGNALS);
         } else {
             console.log("ending ticks");
             window.clearInterval(this.displayIntervallID);
             window.clearInterval(this.calcIntervallID);
+            window.clearInterval(this.signalsIntervallID);
         }
     }
 
