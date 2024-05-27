@@ -83,6 +83,12 @@ export class NavCalculator implements CalcTickable {
             nav.desiredTrack = null;
             dtk = this.modeController.getObsTrue();
         } else {
+            if (isNaN(fromLeg.path.center[0])) { //Happens when FROM and TO are the same waypoint
+                console.warn("invalid path, sequencing to the next waypoint", fromLeg);
+                nav.activeWaypoint.sequenceToNextWaypoint();
+                return;
+            }
+
             dtk = fromLeg.path.bearingAt(fromLeg.path.closest(this.sensors.in.gps.coords, VEC3_CACHE));
             nav.desiredTrack = dtk;
         }
