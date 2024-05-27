@@ -1,9 +1,8 @@
 import {Editor, Rawvalue} from "./Editor";
 import {Facility, FacilitySearchType, FSComponent, ICAO, VNode} from "@microsoft/msfs-sdk";
-import {AlphabetEditorField, EditorFieldValue} from "./EditorField";
+import {AlphabetEditorField, EditorField, EditorFieldValue} from "./EditorField";
 import {PageProps, PageSide} from "../../pages/Page";
 import {MainPage} from "../../pages/MainPage";
-import {TickController} from "../../TickController";
 import {EnterResult} from "../../pages/CursorController";
 import {DuplicateWaypointPage} from "../../pages/left/DuplicateWaypointPage";
 import {WaypointConfirmPage} from "../../pages/right/WaypointConfirmPage";
@@ -108,15 +107,9 @@ export class WaypointEditor extends Editor<Facility | null> {
     }
 
     tick(blink: boolean) {
+        this.children.walk((child) => (child as EditorField).isParentBlink = this.isAwaitingConfirmation);
+
         super.tick(blink);
-        if (!TickController.checkRef(this.containerRef)) {
-            return;
-        }
-        if (this.isAwaitingConfirmation && blink) {
-            this.containerRef!.instance.classList.add("inverted-blink");
-        } else {
-            this.containerRef!.instance.classList.remove("inverted-blink");
-        }
 
     }
 
