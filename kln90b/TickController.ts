@@ -24,6 +24,12 @@ export interface CalcTickable {
  * rate of 4 hz. See maintenance manual page 43 for details (Figure 9, CRT Controller Timine Characteristics).
  * This imposes the rule, that DOM manipulationss are only ever allowed within a tick, not when
  * a state changes are the user interacts with the device!
+ *
+ * The calculation rate seems to be one second. Observe the DIS field at 35:15:
+ * https://youtu.be/zWsMxpqo5v4?si=nlakArKashayZBhh&t=2115
+ * The aircraft takes 0.78sec for 0.1NM and the display skips a digit every now and then. Since the refresh rate of the
+ * screen is higher, it appears that the calculations are done once per second. Page 189 in the maintenance manual
+ * mentions peaks in their circuitry with a 1HZ repetition, further strengthening this theory.
  */
 export class TickController {
 
