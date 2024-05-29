@@ -142,7 +142,7 @@ export class SidStar {
             return p.setFromCartesian(int);
             })
                 .sort((a, b) => a.distance(sensors.in.gps.coords) - b.distance(sensors.in.gps.coords)) //Max two, we want the closest one in front of the plane
-                .filter(p => NavMath.diffAngle(sensors.in.gps.coords.bearingTo(p), track) <= 90) //We look at the intersections of two great circles. The closest intersection may actually be behind the plane
+            .filter(p => Math.abs(NavMath.diffAngle(sensors.in.gps.coords.bearingTo(p), track)) <= 90) //We look at the intersections of two great circles. The closest intersection may actually be behind the plane
         ;
 
         for (const entryPoint of entryPoints) {
