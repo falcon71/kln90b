@@ -65,7 +65,8 @@ export class NavPageState {
     public eteToActive: Seconds | null = null;
     public distToDest: NauticalMiles | null = null;
     public eteToDest: Seconds | null = null;
-    public bearingToActive: Degrees | null = null; //true
+    public bearingToActive: Degrees | null = null; //true, based on appendix A of the manual
+    public bearingForAP: Degrees | null = null; //true. Will be set to desiredTrack in DME arcs to improve autopilot tracking
     public desiredTrack: Degrees | null = null;  //true
     public obsMag: Degrees = 0; //Magnetic!!
     public toFrom: ToFrom = TO;

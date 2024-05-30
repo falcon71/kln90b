@@ -42,6 +42,7 @@ export class NavCalculator implements CalcTickable {
             nav.distToDest = null;
             nav.eteToDest = null;
             nav.bearingToActive = 130;
+            nav.bearingForAP = 130;
             nav.toFrom = FROM;
             nav.waypointAlert = true;
             nav.xtkScale = 5;
@@ -81,6 +82,7 @@ export class NavCalculator implements CalcTickable {
 
         if (this.modeController.isObsModeActive()) {
             nav.desiredTrack = null;
+            nav.bearingForAP = nav.bearingToActive;
             dtk = this.modeController.getObsTrue();
         } else {
             if (isNaN(fromLeg.path.center[0])) { //Happens when FROM and TO are the same waypoint
@@ -88,9 +90,16 @@ export class NavCalculator implements CalcTickable {
                 nav.activeWaypoint.sequenceToNextWaypoint();
                 return;
             }
-
             dtk = fromLeg.path.bearingAt(fromLeg.path.closest(this.sensors.in.gps.coords, VEC3_CACHE));
             nav.desiredTrack = dtk;
+
+            if (fromLeg.path.isGreatCircle()) {
+                nav.bearingForAP = nav.bearingToActive;
+            } else {
+                //The autopilot does not play well with DME arcs, when DTK and bearing to does not match.
+                nav.bearingForAP = dtk;
+            }
+
         }
 
         if (this.sensors.in.gps.groundspeed > 2) {
@@ -165,6 +174,7 @@ export class NavCalculator implements CalcTickable {
         nav.eteToActive = null;
         nav.eteToDest = null;
         nav.bearingToActive = null;
+        nav.bearingForAP = null;
         nav.toFrom = TO;
         nav.waypointAlert = false;
         nav.xtkScale = 5;
@@ -180,7 +190,7 @@ export class NavCalculator implements CalcTickable {
         this.sensors.out.setXTK(nav.xtkToActive, nav.xtkScale);
         this.sensors.out.setObs(obsOut);
         this.sensors.out.setDesiredTrack(obsOut, track, magvar);
-        this.sensors.out.setWpBearing(this.magvar.trueToMag(nav.bearingToActive, magvar), nav.bearingToActive);
+        this.sensors.out.setWpBearing(nav.bearingForAP, nav.bearingToActive, magvar);
         this.sensors.out.setDistance(nav.distToActive);
         this.sensors.out.setWPTETE(nav.eteToActive, this.eteToEta(nav.eteToActive));
         this.sensors.out.setDestETE(nav.eteToDest, this.eteToEta(nav.eteToDest));

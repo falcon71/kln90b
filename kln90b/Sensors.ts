@@ -20,7 +20,7 @@ import {CalcTickable} from "./TickController";
 import {AudioGenerator} from "./services/AudioGenerator";
 import {MessageHandler} from "./data/MessageHandler";
 import {NavMode} from "./data/VolatileMemory";
-import {LVAR_ANNUN_TEST, LVAR_MSG_LIGHT, LVAR_WPT_LIGHT} from "./LVars";
+import {LVAR_ANNUN_TEST, LVAR_GPS_WP_BEARING, LVAR_MSG_LIGHT, LVAR_WPT_LIGHT} from "./LVars";
 import {GPS} from "./Gps";
 import {SignalOutputFilter} from "./services/SignalOutputFilter";
 
@@ -287,20 +287,21 @@ export class SensorsOut {
         }
     }
 
-    public setWpBearing(bearingMag: number | null, bearingTrue: number | null) {
+    public setWpBearing(bearingForAP: number | null, bearingToActive: number | null, magvar: number) {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
-        if (bearingMag === null) {
-            SimVar.SetSimVarValue('GPS WP BEARING', SimVarValueType.Radians, 0);
-        } else {
-            //This SimVar appears to be readonly??
-            SimVar.SetSimVarValue('GPS WP BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(bearingMag, UnitType.RADIAN));
-        }
-        if (bearingTrue === null) {
+        if (bearingForAP === null) {
+            SimVar.SetSimVarValue('GPS WP BEARING', SimVarValueType.Radians, 0);  //This SimVar appears to be readonly??
             SimVar.SetSimVarValue('GPS WP TRUE BEARING', SimVarValueType.Radians, 0);
         } else {
-            SimVar.SetSimVarValue('GPS WP TRUE BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(bearingTrue, UnitType.RADIAN));
+            SimVar.SetSimVarValue('GPS WP BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingForAP, magvar), UnitType.RADIAN));  //This SimVar appears to be readonly??
+            SimVar.SetSimVarValue('GPS WP TRUE BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(bearingForAP, UnitType.RADIAN));
+        }
+        if (bearingToActive === null) {
+            SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
+        } else {
+            SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingToActive, magvar), UnitType.RADIAN));
         }
     }
 
