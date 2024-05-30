@@ -187,6 +187,7 @@ export class NavCalculator implements CalcTickable {
         const magvar = this.magvar.getCurrentMagvar();
         const track = this.sensors.in.gps.getTrackTrueRespectingGroundspeed();
 
+        this.sensors.out.setGpsOverriden();
         this.sensors.out.setXTK(nav.xtkToActive, nav.xtkScale);
         this.sensors.out.setObs(obsOut);
         this.sensors.out.setDesiredTrack(obsOut, track, magvar);

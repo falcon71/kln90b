@@ -1,7 +1,7 @@
 {
   "name": "kln90b",
   "//": "6 chars maximum for the version!",
-  "version": "1.3B3",
+  "version": "1.3",
   "description": "",
   "main": "index.ts",
   "scripts": {

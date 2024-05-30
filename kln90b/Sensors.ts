@@ -485,12 +485,20 @@ export class SensorsOut {
         }
     }
 
-    public reset() {
+    public setGpsOverriden(): void {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
 
         SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, true);
+    }
+
+    public reset() {
+        if (!this.options.output.writeGPSSimVars) {
+            return;
+        }
+
+        this.setGpsOverriden();
 
         //Code disabled for now.
         //A CTD has been observed in the following conditions:
