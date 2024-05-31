@@ -217,21 +217,7 @@ export class WaypointEditor extends Editor<Facility | null> {
         if (this.isAwaitingConfirmation) { //3-28 Note: If an incorrect identifier has been entered, you may immediately start using the left inner knob to re-enter the correct identifier
             this.cancelAwaitingConfirmation();
         }
-
-        if (!this.isEntered) {
-            this.setEntered(true);
-        }
-
-        const idx = this.editorFields[this.cursorIndex].charset.indexOf(key);
-        if (idx == -1) {
-            return false;
-        }
-
-        this.editorFields[this.cursorIndex].value = idx;
-
-        this.onCharChanged();
-
-        return true;
+        return super.keyboard(key);
     }
 
     private async selectDuplicateWaypoint(ident: string, waypoints: Facility[]): Promise<Facility> {

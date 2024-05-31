@@ -76,6 +76,17 @@ export abstract class EditorField implements UiElement {
         return this.value == null ? "_".repeat(this.fieldLength()) : this.charset[this.value];
     }
 
+    public keyboard(key: string): boolean {
+        const idx = this.charset.indexOf(key);
+        if (idx == -1) {
+            return false;
+        }
+
+        this.value = idx;
+
+        return true;
+    }
+
 }
 
 export class AlphabetEditorField extends EditorField {

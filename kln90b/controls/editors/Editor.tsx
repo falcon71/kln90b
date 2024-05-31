@@ -184,6 +184,16 @@ export abstract class Editor<T> implements Field {
     }
 
     public keyboard(key: string): boolean {
-        return false;
+        if (!this.isEntered) {
+            this.setEntered(true);
+        }
+
+        const field = this.editorFields[this.cursorIndex];
+        if (field.keyboard(key)) {
+            this.onCharChanged();
+            return true;
+        } else {
+            return false;
+        }
     }
 }
