@@ -24,6 +24,7 @@ import {AirportNearestList} from "../../data/navdata/NearestList";
 import {AirportCoordOrNearestView} from "../../controls/AirportCoordOrNearestView";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {convertTextToKLNCharset} from "../../data/Text";
+import {buildIcao, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 
 type Apt1PageTypes = {
@@ -263,11 +264,11 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
 
     private buildAirportFacility(lat: number, lon: number): AirportFacility {
         return {
-            icao: `AXX    ${this.ident.padEnd(5, " ")}`,
+            icao: buildIcao('A', USER_WAYPOINT, this.ident),
             name: "",
             lat: lat,
             lon: lon,
-            region: "XX",
+            region: USER_WAYPOINT,
             city: "",
             magvar: 0,
             airportPrivateType: AirportPrivateType.Uknown,

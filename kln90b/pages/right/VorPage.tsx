@@ -14,6 +14,7 @@ import {NearestSelector} from "../../controls/selects/NearestSelector";
 import {CoordOrNearestView} from "../../controls/CoordOrNearestView";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {convertTextToKLNCharset} from "../../data/Text";
+import {buildIcao, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 
 type VorPageTypes = {
@@ -209,11 +210,11 @@ export class VorPage extends WaypointPage<VorFacility> {
         const magvar = this.userVor.magvar === null ? MagVar.get(this.userVor.lat, this.userVor.lon) : this.userVor.magvar;
 
         this.facility = {
-            icao: `VXX    ${this.ident.padEnd(5, " ")}`,
+            icao: buildIcao('V', USER_WAYPOINT, this.ident),
             name: "",
             lat: this.userVor.lat,
             lon: this.userVor.lon,
-            region: "XX",
+            region: USER_WAYPOINT,
             city: "",
             magvar: 0,
             freqMHz: this.userVor.freq ?? -1,

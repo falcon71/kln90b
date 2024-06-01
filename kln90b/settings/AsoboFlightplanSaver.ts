@@ -32,7 +32,7 @@ export class AsoboFlightplanSaver {
                     if (!(facType === FacilityType.Airport && (i === 0 || i === legs.length - 1))) {
                         if (facType === FacilityType.USR) {
                             console.log("ADD_CUSTOM_WAYPOINT", leg.wpt.icao, globalIndex);
-                            await Coherent.call('ADD_CUSTOM_WAYPOINT', leg.wpt.icao, globalIndex, leg.wpt.lat, leg.wpt.lon, false);
+                            await Coherent.call('ADD_CUSTOM_WAYPOINT', ICAO.getIdent(leg.wpt.icao), globalIndex, leg.wpt.lat, leg.wpt.lon, false);
                         } else {
                             console.log("ADD_WAYPOINT", leg.wpt.icao, globalIndex);
                             await Coherent.call('ADD_WAYPOINT', leg.wpt.icao, globalIndex, false);

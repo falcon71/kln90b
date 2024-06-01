@@ -7,6 +7,7 @@ import {Button} from "../../controls/Button";
 import {FplFileimporter} from "../../services/FplFileimporter";
 import {Fpl0Page} from "./FplPage";
 import {MainPage} from "../MainPage";
+import {TextDisplay} from "../../controls/displays/TextDisplay";
 
 
 /**
@@ -118,6 +119,7 @@ class Set10BasicPage extends SixLineHalfPage {
 
 type Set10ImportFplFilePageTypes = {
     importFlightplan: Button;
+    loading: TextDisplay,
 }
 
 class Set10ImportFplFilePage extends SixLineHalfPage {
@@ -134,6 +136,7 @@ class Set10ImportFplFilePage extends SixLineHalfPage {
 
         this.children = new UIElementChildren<Set10ImportFplFilePageTypes>({
             importFlightplan: new Button("IMPORT FPLN", this.importFlightplan.bind(this)),
+            loading: new TextDisplay(''),
         });
 
         this.cursorController = new CursorController(this.children);
@@ -147,11 +150,14 @@ class Set10ImportFplFilePage extends SixLineHalfPage {
                 &nbsp&nbspKLN.PLN<br/>
                 INTO FPL 0?<br/>
             <br/>
-            {this.children.get("importFlightplan").render()}
+            {this.children.get("importFlightplan").render()}{this.children.get("loading").render()}
             </pre>);
     }
 
     private importFlightplan(): void {
+        this.cursorController.setCursorActive(false);
+        this.children.get("importFlightplan").setVisible(false);
+        this.children.get("loading").text = "LOADING...";
         this.fplImporter.importFpl().then(fpl => {
             this.props.memory.fplPage.flightplans[0].load(fpl);
             const mainPage = this.props.pageManager.getCurrentPage() as MainPage;

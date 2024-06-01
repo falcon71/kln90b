@@ -95,7 +95,7 @@ export class Oth3Page extends SixLineHalfPage {
         }
 
         const fpl = TemporaryWaypointDeleter.findUsageInFlightplans(fac.icao, this.props.memory.fplPage.flightplans);
-        const fplString = fpl === null ? "  " : (fpl + 1).toString().padStart(2, " ");
+        const fplString = fpl === null ? "  " : fpl.toString().padStart(2, " ");
 
         return `${IcaoFixedLength.getIdentFromFacility(fac)} ${type}  ${fplString}`;
     }

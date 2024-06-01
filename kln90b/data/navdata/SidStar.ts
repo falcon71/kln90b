@@ -30,6 +30,7 @@ import {Degrees, NauticalMiles} from "../Units";
 import {format} from "numerable";
 import {Sensors} from "../../Sensors";
 import {NavPageState} from "../VolatileMemory";
+import {buildIcao, TEMPORARY_WAYPOINT} from "./IcaoBuilder";
 
 export interface ArcData {
     beginRadial: Degrees, //The published beginning radial
@@ -164,11 +165,11 @@ export class SidStar {
 
             if (NavMath.bearingIsBetween(radial, start, end)) {
                 const entryFacility: UserFacility = {
-                    icao: `UXY    ${this.getArcEntryName(radial, dist)}`, //XY marks this as temporary
+                    icao: buildIcao('U', TEMPORARY_WAYPOINT, this.getArcEntryName(radial, dist)),
                     name: "",
                     lat: entryPoint.lat,
                     lon: entryPoint.lon,
-                    region: "XX",
+                    region: TEMPORARY_WAYPOINT,
                     city: "",
                     magvar: 0,
                     isTemporary: false, //irrelevant, because this flag is not persisted
@@ -607,11 +608,11 @@ export class SidStar {
         }
 
         const entryFacility: UserFacility = {
-            icao: `UXY    ${SidStar.getArcEntryName(radial, dist)}`, //XY marks this as temporary
+            icao: buildIcao('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(radial, dist)),
             name: "",
             lat: entryPoint.lat,
             lon: entryPoint.lon,
-            region: "XX",
+            region: TEMPORARY_WAYPOINT,
             city: "",
             magvar: 0,
             isTemporary: false, //irrelevant, because this flag is not persisted

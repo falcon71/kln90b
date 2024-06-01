@@ -1,4 +1,4 @@
-import {EventBus, SimVarValueType} from "@microsoft/msfs-sdk";
+import {EventBus, SimVarValueType, Wait} from "@microsoft/msfs-sdk";
 import {PowerEvent, PowerEventData} from "./PowerButton";
 import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {LVAR_BRIGHTNESS} from "./LVars";
@@ -72,17 +72,13 @@ export class BrightnessManager {
 
     private async powerUp(timePoweredOff: number) {
         const warmUpTime = Math.min(timePoweredOff / TIME_UNTIL_COLD * TIME_TO_WARM, TIME_TO_WARM);
-        await this.sleep(warmUpTime);
+        await Wait.awaitDelay(warmUpTime);
         const brightnessIncrease = 1 / TIME_TO_REACH_FULL_BRIGHTNESS * BRIGHTNESS_TICKRATE;
         while (this.possibleBrightness < 1) {
-            await this.sleep(BRIGHTNESS_TICKRATE);
+            await Wait.awaitDelay(BRIGHTNESS_TICKRATE);
 
             this.possibleBrightness = Math.min(this.possibleBrightness + brightnessIncrease, 1);
             this.refreshElement();
         }
-    }
-
-    private sleep(ms: number) {
-        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }

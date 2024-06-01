@@ -13,6 +13,7 @@ import {NearestSelector} from "../../controls/selects/NearestSelector";
 import {CoordOrNearestView} from "../../controls/CoordOrNearestView";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {convertTextToKLNCharset} from "../../data/Text";
+import {buildIcao, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 interface UserNdb {
     freq: number | null,
@@ -173,11 +174,11 @@ export class NdbPage extends WaypointPage<NdbFacility> {
         }
 
         this.facility = {
-            icao: `NXX    ${this.ident.padEnd(5, " ")}`,
+            icao: buildIcao('N', USER_WAYPOINT, this.ident),
             name: "",
             lat: this.userNdb.lat,
             lon: this.userNdb.lon,
-            region: "XX",
+            region: USER_WAYPOINT,
             city: "",
             magvar: 0,
             freqMHz: this.userNdb.freq ?? -1,

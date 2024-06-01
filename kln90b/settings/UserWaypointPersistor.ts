@@ -185,12 +185,13 @@ export class UserWaypointPersistor {
 
 
     private deserializeAirport(str: string): AirportFacility {
+        const icao = this.deserializeIcao(str);
         return {
-            icao: this.deserializeIceo(str),
+            icao: icao,
             name: "",
             lat: this.deserializeLat(str),
             lon: this.deserializeLon(str),
-            region: "XX",
+            region: ICAO.getRegionCode(icao),
             city: "",
             magvar: 0,
             airportPrivateType: AirportPrivateType.Uknown,
@@ -254,12 +255,13 @@ export class UserWaypointPersistor {
     }
 
     private deserializeVor(str: string): VorFacility {
+        const icao = this.deserializeIcao(str);
         return {
-            icao: this.deserializeIceo(str),
+            icao: icao,
             name: "",
             lat: this.deserializeLat(str),
             lon: this.deserializeLon(str),
-            region: "XX",
+            region: ICAO.getRegionCode(icao),
             city: "",
             magvar: 0,
             freqMHz: this.deserializeFrequency(str),
@@ -271,12 +273,13 @@ export class UserWaypointPersistor {
     }
 
     private deserializeNdb(str: string): NdbFacility {
+        const icao = this.deserializeIcao(str);
         return {
-            icao: this.deserializeIceo(str),
+            icao: icao,
             name: "",
             lat: this.deserializeLat(str),
             lon: this.deserializeLon(str),
-            region: "XX",
+            region: ICAO.getRegionCode(icao),
             city: "",
             magvar: 0,
             freqMHz: this.deserializeFrequency(str),
@@ -285,12 +288,13 @@ export class UserWaypointPersistor {
     }
 
     private deserializeIntersection(str: string): IntersectionFacility {
+        const icao = this.deserializeIcao(str);
         return {
-            icao: this.deserializeIceo(str),
+            icao: icao,
             name: "",
             lat: this.deserializeLat(str),
             lon: this.deserializeLon(str),
-            region: "XX",
+            region: ICAO.getRegionCode(icao),
             city: "",
             magvar: 0,
             routes: [],
@@ -305,12 +309,13 @@ export class UserWaypointPersistor {
     }
 
     private deserializeSupplementary(str: string): UserFacility {
+        const icao = this.deserializeIcao(str);
         return {
-            icao: this.deserializeIceo(str),
+            icao: icao,
             name: "",
             lat: this.deserializeLat(str),
             lon: this.deserializeLon(str),
-            region: "XX",
+            region: ICAO.getRegionCode(icao),
             city: "",
             magvar: 0,
             isTemporary: false,
@@ -318,7 +323,7 @@ export class UserWaypointPersistor {
         };
     }
 
-    private deserializeIceo(str: string): string {
+    private deserializeIcao(str: string): string {
         return str.substring(0, 12);
     }
 

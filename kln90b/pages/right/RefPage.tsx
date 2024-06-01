@@ -1,6 +1,5 @@
 import {
     Facility,
-    FacilitySearchType,
     FSComponent,
     GeoCircle,
     GeoPoint,
@@ -19,6 +18,8 @@ import {FplPage} from "../left/FplPage";
 import {WaypointEditor} from "../../controls/editors/WaypointEditor";
 import {Flightplan} from "../../data/flightplan/Flightplan";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
+import {getUniqueIdent} from "../../data/navdata/UniqueIdentGenerator";
+import {buildIcao, TEMPORARY_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 type RefPageTypes = {
     wpt: WaypointEditor;
@@ -93,7 +94,7 @@ export class RefPage extends SixLineHalfPage {
         if (wpt === null) {
             return;
         }
-        const ident = await this.getUniqueIdent(wpt);
+        const ident = await getUniqueIdent(ICAO.getIdent(wpt.icao), this.props.facilityLoader);
         if (ident === null) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID REF");
             return;
@@ -109,11 +110,11 @@ export class RefPage extends SixLineHalfPage {
         }
 
         const facility: UserFacility = {
-            icao: `UXY    ${ident.padEnd(5, " ")}`, //XY marks this as temporyry
+            icao: buildIcao('U', TEMPORARY_WAYPOINT, ident),
             name: "",
             lat: closest.point.lat,
             lon: closest.point.lon,
-            region: "XX",
+            region: TEMPORARY_WAYPOINT,
             city: "",
             magvar: 0,
             isTemporary: false, //irrelevant, because this flag is not persisted
@@ -134,18 +135,6 @@ export class RefPage extends SixLineHalfPage {
         this.children.get("wpt").setValue(null);
     }
 
-    private async getUniqueIdent(wpt: Facility): Promise<string | null> {
-        const start = ICAO.getIdent(wpt.icao).substring(0, 4);
-        const existing = await this.props.facilityLoader.searchByIdent(FacilitySearchType.All, start, 100);
-        const SUFFIXES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
-        const existingIdents = existing.map(ICAO.getIdent);
-        for (const suffix of SUFFIXES) {
-            if (!existingIdents.includes(start + suffix)) {
-                return start + suffix;
-            }
-        }
-        return null;
-    }
 
     private findClosestPoint(fpl: Flightplan, wpt: Facility): { point: GeoPoint, legIdx: number } | null {
         const legs = fpl.getLegs();

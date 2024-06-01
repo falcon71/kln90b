@@ -1,4 +1,4 @@
-import {Facility, FSComponent, ICAO} from "@microsoft/msfs-sdk";
+import {Facility, ICAO} from "@microsoft/msfs-sdk";
 import {PageProps} from "../Page";
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
@@ -6,6 +6,7 @@ import {MAX_SCROLL_SPEED, Scanlist} from "../../data/navdata/Scanlist";
 import {KLNFacilityLoader} from "../../data/navdata/KLNFacilityLoader";
 import {AirportNearestList, NdbNearestList, NearestWpt, VorNearestList} from "../../data/navdata/NearestList";
 import {NearestSelector} from "../../controls/selects/NearestSelector";
+import {TEMPORARY_WAYPOINT, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 type ScrollDirection = -1 | 1;
 
@@ -241,7 +242,7 @@ export function isActiveWaypointPageProps<T extends Facility>(props: PageProps):
 
 export function isUserWaypoint(fac: Facility): boolean {
     const region = ICAO.getRegionCode(fac.icao);
-    return region === "XX" || region === "XY";
+    return region === USER_WAYPOINT || region === TEMPORARY_WAYPOINT;
 }
 
 /**

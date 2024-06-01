@@ -26,6 +26,7 @@ import {DistanceEditor} from "../../controls/editors/DistanceEditor";
 import {Scanlist} from "../../data/navdata/Scanlist";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
+import {buildIcao, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 
 type IntPageTypes = {
@@ -335,11 +336,11 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
         }
 
         this.facility = {
-            icao: `WXX    ${this.ident.padEnd(5, " ")}`,
+            icao: buildIcao('W', USER_WAYPOINT, this.ident),
             name: "",
             lat: lat,
             lon: lon,
-            region: "XX",
+            region: USER_WAYPOINT,
             city: "",
             magvar: 0,
             routes: [],
@@ -367,11 +368,11 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
 
     private createAtPresentPosition(): void {
         this.facility = {
-            icao: `WXX    ${this.ident.padEnd(5, " ")}`,
+            icao: buildIcao('W', USER_WAYPOINT, this.ident),
             name: "",
             lat: this.props.sensors.in.gps.coords.lat,
             lon: this.props.sensors.in.gps.coords.lon,
-            region: "XX",
+            region: USER_WAYPOINT,
             city: "",
             magvar: 0,
             routes: [],

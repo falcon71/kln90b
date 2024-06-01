@@ -26,6 +26,7 @@ import {Scanlist} from "../../data/navdata/Scanlist";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {TickController} from "../../TickController";
+import {buildIcao, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 
 type SupPageTypes = {
@@ -340,11 +341,11 @@ export class SupPage extends WaypointPage<UserFacility> {
         }
 
         this.facility = {
-            icao: `UXX    ${this.ident.padEnd(5, " ")}`,
+            icao: buildIcao('U', USER_WAYPOINT, this.ident),
             name: "",
             lat: lat,
             lon: lon,
-            region: "XX",
+            region: USER_WAYPOINT,
             city: "",
             magvar: 0,
             isTemporary: false,
@@ -366,11 +367,11 @@ export class SupPage extends WaypointPage<UserFacility> {
 
     private createAtPresentPosition(): void {
         this.facility = {
-            icao: `UXX    ${this.ident.padEnd(5, " ")}`,
+            icao: buildIcao('U', USER_WAYPOINT, this.ident),
             name: "",
             lat: this.props.sensors.in.gps.coords.lat,
             lon: this.props.sensors.in.gps.coords.lon,
-            region: "XX",
+            region: USER_WAYPOINT,
             city: "",
             magvar: 0,
             isTemporary: false,

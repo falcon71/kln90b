@@ -25,6 +25,7 @@ import {CtrState} from "../../data/VolatileMemory";
 import {KLNLegType} from "../../data/flightplan/Flightplan";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
 import {insertLegIntoFpl} from "../../services/FlightplanUtils";
+import {buildIcao, TEMPORARY_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 type Ctr1PageTypes = {
     newWpts: TextDisplay;
@@ -271,11 +272,11 @@ export class Ctr1Page extends SixLineHalfPage {
         }
 
         const facility: UserFacility = {
-            icao: `UXY    ${ident.padEnd(5, " ")}`, //XY marks this as temporyry
+            icao: buildIcao('U', TEMPORARY_WAYPOINT, ident),
             name: "",
             lat: intersection.intersection.lat,
             lon: intersection.intersection.lon,
-            region: "XX",
+            region: TEMPORARY_WAYPOINT,
             city: "",
             magvar: 0,
             isTemporary: false, //irrelevant, because this flag is not persisted
