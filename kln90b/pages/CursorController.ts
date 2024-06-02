@@ -84,7 +84,18 @@ export class CursorController implements CursorHandler {
                 this.focusIndex(fields.length - 1);
             }
         }
+    }
 
+    /**
+     * Sets the default field that will be selected the next time the cursor is activated.
+     * Has no effect if the cursor is already active.
+     * @param defaultField
+     */
+    public setDefaultCursorField(defaultField: number): void {
+        if (this.cursorActive) {
+            return;
+        }
+        this.cursorField = defaultField;
     }
 
     public toggleCursor(): boolean {

@@ -580,6 +580,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
         if (facility === null) {
             this.mainRef.instance.classList.add("d-none");
             this.children.get("createWpt").setVisible(true);
+            this.cursorController.setDefaultCursorField(0);
         } else {
             this.mainRef.instance.classList.remove("d-none");
             this.children.get("createWpt").setVisible(false);
@@ -591,9 +592,11 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
                 onEnter: this.selectProcedure,
             }));
             if (procs.length === 0) {
+                this.cursorController.setDefaultCursorField(0);
                 this.emptyRef.instance.classList.remove("d-none");
                 this.listRef.instance.classList.add("d-none");
             } else {
+                this.cursorController.setDefaultCursorField(4); //6-4 is proof that this is done on the APT 8 page. The APT 7 page is likely the same
                 this.emptyRef.instance.classList.add("d-none");
                 this.listRef.instance.classList.remove("d-none");
                 this.children.get("list").refresh(UIElementChildren.forList(procs));
@@ -786,6 +789,7 @@ class Apt7PreviewPage extends Apt7SelectorPage {
 
         this.cursorController = new CursorController(this.children);
         this.cursorController.setCursorActive(true);
+        this.cursorController.focusIndex(props.legs.length); //LOAD IN FPL is preselected: https://youtu.be/idv2Hh6PQnw?t=487
     }
 
 

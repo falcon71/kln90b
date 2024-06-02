@@ -328,6 +328,7 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
         if (facility === null) {
             this.mainRef.instance.classList.add("d-none");
             this.children.get("createWpt").setVisible(true);
+            this.cursorController.setDefaultCursorField(0);
         } else {
             this.mainRef.instance.classList.remove("d-none");
             this.children.get("createWpt").setVisible(false);
@@ -342,7 +343,9 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
             if (approaches.length === 0) {
                 this.emptyRef.instance.classList.remove("d-none");
                 this.listRef.instance.classList.add("d-none");
+                this.cursorController.setDefaultCursorField(0);
             } else {
+                this.cursorController.setDefaultCursorField(4); //6-4: "The cursor comes up on the first approach in the list of approaches.", also https://youtu.be/idv2Hh6PQnw?t=476
                 this.emptyRef.instance.classList.add("d-none");
                 this.listRef.instance.classList.remove("d-none");
                 this.children.get("list").refresh(UIElementChildren.forList(approaches));
@@ -503,6 +506,7 @@ class Apt8PreviewPage extends Apt8SelectorPage {
 
         this.cursorController = new CursorController(this.children);
         this.cursorController.setCursorActive(true);
+        this.cursorController.focusIndex(props.legs.length); //LOAD IN FPL is preselected: https://youtu.be/idv2Hh6PQnw?t=487
     }
 
 
