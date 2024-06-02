@@ -77,7 +77,7 @@ export class SimpleListItem<T> implements Field, ListItem {
         if (this.isEntered) {
             this.props.onDelete!(this.props.value);
             this.isEntered = false;
-            return Promise.resolve(EnterResult.Handled_Move_Focus);
+            return Promise.resolve(EnterResult.Handled_Keep_Focus);
         } else {
             if (this.props.onEnter === undefined) {
                 return Promise.resolve(EnterResult.Not_Handled);

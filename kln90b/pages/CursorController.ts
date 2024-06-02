@@ -189,7 +189,14 @@ export class CursorController implements CursorHandler {
         }
         const result = await this.getCurrentFocusedField()!.enter();
 
-        if (result !== EnterResult.Handled_Keep_Focus) {
+        if (result == EnterResult.Handled_Keep_Focus) {
+            const focused = this.getCurrentFocusedField();
+            if (this.cursorActive && focused && !focused.isFocused) {
+                //Happens when enter was pressed to delete an item (e.g. OTH 3 page)
+                //This item no longer exists, but we still want to focus the item on the current index
+                focused.setFocused(true);
+            }
+        } else {
             this.outerRight(); //Enter always moves to the next field, see https://www.youtube.com/shorts/9We5fcd2-VE
         }
         return result;
