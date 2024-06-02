@@ -59,7 +59,7 @@ export class List implements UiElement {
             requiredScrollIdx = focusedIdx;
         }
         if (focusedIdx >= requiredScrollIdx + this.height) {
-            requiredScrollIdx = focusedIdx - this.height;
+            requiredScrollIdx = focusedIdx - this.height + 1;
         }
         return requiredScrollIdx;
     }
