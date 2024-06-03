@@ -55,8 +55,10 @@ export class CursorController implements CursorHandler {
     /**
      *
      * @param children
+     * @param onCursorActiveChangedListener Will be called each time the cursorActive state is changed
      */
-    constructor(private children: UIElementChildren<any>) {
+    constructor(private children: UIElementChildren<any>, private onCursorActiveChangedListener: (isActive: boolean) => void = () => {
+    }) {
         // @ts-ignore
         this.fields = children.getallFlat().filter(c => isField(c) && !(c as Field).isReadonly);
     }
@@ -125,6 +127,7 @@ export class CursorController implements CursorHandler {
             this.getCurrentFocusedField()?.setFocused(false);
             this.cursorActive = active;
         }
+        this.onCursorActiveChangedListener(active);
     }
 
     public outerRight(): boolean {

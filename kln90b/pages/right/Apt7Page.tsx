@@ -534,11 +534,9 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
             this.children.get("apt").setReadonly(true);
         }
 
-        this.cursorController = new CursorController(this.children);
+        this.cursorController = new CursorController(this.children, this.warnIfDBOutdated.bind(this));
 
     }
-
-
     public render(): VNode {
         return (<pre>
              {this.children.get("activeArrow").render()}{this.children.get("activeIdx").render()}{this.children.get("apt").render()}&nbsp&nbsp{this.children.get("waypointType").render()}{this.children.get("nearestSelector").render()}<br/>
@@ -556,6 +554,15 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
             </div>
             {this.children.get("createWpt").render()}
         </pre>);
+    }
+
+    private warnIfDBOutdated(cursorActive: boolean) {
+        // Based on the KLN 89 trainer, this message is also shown on the APT 7 pages
+        // It is shown every time the cursor is activated (even for airports without procedures),
+        // but procedures can still be selected
+        if (cursorActive && !this.props.database.isAiracCurrent()) {
+            this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "OUTDATED DB");
+        }
     }
 
     public getScanlist(): Scanlist {

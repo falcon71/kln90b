@@ -143,11 +143,6 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
 
     private selectApproach(app: ApproachProcedure): void {
         console.log("selectApproach", app);
-        if (!this.props.database.isAiracCurrent() && !this.props.planeSettings.debugMode) {
-            this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "OUTDATED DB");
-            return;
-        }
-
         if (app.transitions.length <= 1) {
             this.selectIaf(app, app.transitions.length === 1 ? app.transitions[0] : null);
         } else {
@@ -295,8 +290,7 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
             this.children.get("apt").setReadonly(true);
         }
 
-        this.cursorController = new CursorController(this.children);
-
+        this.cursorController = new CursorController(this.children, this.warnIfDBOutdated.bind(this));
     }
 
 
@@ -317,6 +311,15 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
             </div>
             {this.children.get("createWpt").render()}
         </pre>);
+    }
+
+    private warnIfDBOutdated(cursorActive: boolean) {
+        // Based on the KLN 89 trainer
+        // It is shown every time the cursor is activated (even for airports without procedures),
+        // but procedures can still be selected
+        if (cursorActive && !this.props.database.isAiracCurrent()) {
+            this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "OUTDATED DB");
+        }
     }
 
     public getScanlist(): Scanlist {
