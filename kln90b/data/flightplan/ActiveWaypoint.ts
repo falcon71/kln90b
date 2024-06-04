@@ -59,12 +59,11 @@ export class ActiveWaypoint {
             this.fplIdx = this.findClosestLegIdx(legs);
             if (this.fplIdx === -1) {
                 //Two legs, but both are the same waypoint...
-                return null;
+                return this.flag();
             }
-            this.setFplData(this.fplIdx);
-            return this.to;
+            return this.setFplData(this.fplIdx);
         } else {
-            return null;
+            return this.flag();
         }
     }
 
@@ -167,11 +166,23 @@ export class ActiveWaypoint {
      * When moving the intercept point of an arc, the pilot may change the current leg. In this case, the path must
      * be recalculated
      */
-    public recalculatePath(){
+    public recalculatePath() {
         this.from!.path = CACHED_CIRCLE.setAsGreatCircle(this.from!.wpt, this.to!.wpt);
     }
 
-    private setFplData(idx: number) {
+    /**
+     * Deativates (flags) navigation
+     * @private
+     */
+    private flag(): null {
+        this.fplIdx = -1;
+        this.to = null;
+        this.isDirectTo = false;
+        this.saveLastActiveWaypoint();
+        return null;
+    }
+
+    private setFplData(idx: number): KLNFlightplanLeg {
         const legs = this.fpl0.getLegs();
         const from = legs[idx - 1];
         const to = legs[idx];
@@ -190,6 +201,7 @@ export class ActiveWaypoint {
         this.to = legs[idx];
         this.isDirectTo = false;
         this.saveLastActiveWaypoint();
+        return this.to;
     }
 
     private saveLastActiveWaypoint() {
