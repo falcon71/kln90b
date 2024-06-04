@@ -348,7 +348,7 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
                 this.listRef.instance.classList.add("d-none");
                 this.cursorController.setDefaultCursorField(0);
             } else {
-                this.cursorController.setDefaultCursorField(4); //6-4: "The cursor comes up on the first approach in the list of approaches.", also https://youtu.be/idv2Hh6PQnw?t=476
+                this.cursorController.setDefaultCursorField(this.activeIdx === -1 ? 4 : 0); //6-4: "The cursor comes up on the first approach in the list of approaches.", also https://youtu.be/idv2Hh6PQnw?t=476
                 this.emptyRef.instance.classList.add("d-none");
                 this.listRef.instance.classList.remove("d-none");
                 this.children.get("list").refresh(UIElementChildren.forList(approaches));

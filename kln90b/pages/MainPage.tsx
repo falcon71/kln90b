@@ -283,15 +283,6 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         return oldPage;
     }
 
-
-    public getPage(side: PageSide): SixLineHalfPage {
-        if (side == PageSide.RightPage) {
-            return this.getRightPage();
-        } else {
-            return this.getLeftPage();
-        }
-    }
-
     onInteractionEvent(evt: string): boolean {
         let leftPage: SixLineHalfPage;
         let rightPage: SixLineHalfPage;
@@ -301,6 +292,7 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         } else {
             KeyboardService.routeKeyboardEvent(evt, this.getLeftPage().getCursorController(), this.getRightPage().getCursorController());
         }
+        // noinspection FallThroughInSwitchStatementJS
         switch (evt) {
             case EVT_L_CURSOR:
                 if (this.overlayPageStack.isShown()) {
@@ -408,6 +400,14 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     this.leftTreeController.moveSubpage(1);
                 }
                 return true;
+            case EVT_R_SCAN_LEFT:
+                if (!this.getRightPage().getCursorController().cursorActive) {
+                    if (this.overlayPageStack.isShown()) {
+                        return this.getOverlayPage()!.scanLeft();
+                    }
+                    return this.getRightPage().scanLeft();
+                }
+            //Falltrough! Based on the KLN 89 trainer it behaves like EVT_R_INNER_LEFT when the cursor is active
             case EVT_R_INNER_LEFT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.rCursorController.cursorActive) {
@@ -426,6 +426,14 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     this.rightTreeController.moveSubpage(-1);
                 }
                 return true;
+            case EVT_R_SCAN_RIGHT:
+                if (!this.getRightPage().getCursorController().cursorActive) {
+                    if (this.overlayPageStack.isShown()) {
+                        return this.getOverlayPage()!.scanRight();
+                    }
+                    return this.getRightPage().scanRight();
+                }
+            //Falltrough! Based on the KLN 89 trainer it behaves like EVT_R_INNER_LEFT when the cursor is active
             case EVT_R_INNER_RIGHT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.rCursorController.cursorActive) {
@@ -444,16 +452,6 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     this.rightTreeController.moveSubpage(1);
                 }
                 return true;
-            case EVT_R_SCAN_LEFT:
-                if (this.overlayPageStack.isShown()) {
-                    return this.getOverlayPage()!.scanLeft();
-                }
-                return this.getRightPage().scanLeft();
-            case EVT_R_SCAN_RIGHT:
-                if (this.overlayPageStack.isShown()) {
-                    return this.getOverlayPage()!.scanRight();
-                }
-                return this.getRightPage().scanRight();
             case EVT_ENT:
                 if (this.overlayPageStack.isShown()) {
                     return this.getOverlayPage()!.enter();

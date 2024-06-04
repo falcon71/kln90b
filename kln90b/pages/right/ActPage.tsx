@@ -99,7 +99,7 @@ export class ActPagePage extends WaypointPage<Facility> {
         }
         this.actIdx = Utils.Clamp(this.actIdx + 1, 0, this.props.memory.fplPage.flightplans[0].getLegs().length - 1);
         this.rebuildPage();
-        return false;
+        return true;
     }
 
     public isEnterAccepted(): boolean {

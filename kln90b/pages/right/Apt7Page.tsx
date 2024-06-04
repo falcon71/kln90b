@@ -603,7 +603,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
                 this.emptyRef.instance.classList.remove("d-none");
                 this.listRef.instance.classList.add("d-none");
             } else {
-                this.cursorController.setDefaultCursorField(4); //6-4 is proof that this is done on the APT 8 page. The APT 7 page is likely the same
+                this.cursorController.setDefaultCursorField(this.activeIdx === -1 ? 4 : 0); //6-4 is proof that this is done on the APT 8 page. The APT 7 page is likely the same
                 this.emptyRef.instance.classList.add("d-none");
                 this.listRef.instance.classList.remove("d-none");
                 this.children.get("list").refresh(UIElementChildren.forList(procs));

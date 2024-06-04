@@ -120,6 +120,7 @@ export class FiveSegmentPage extends DisplayComponent<FivePageProps> implements 
     onInteractionEvent(evt: string): boolean {
         KeyboardService.routeKeyboardEvent(evt, this.props.lPage.getCursorController(), this.props.rPage.getCursorController());
 
+        // noinspection FallThroughInSwitchStatementJS
         switch (evt) {
             case EVT_L_CURSOR:
                 return this.props.lPage.getCursorController().toggleCursor();
@@ -137,14 +138,20 @@ export class FiveSegmentPage extends DisplayComponent<FivePageProps> implements 
                 return this.props.lPage.getCursorController().innerLeft();
             case EVT_L_INNER_RIGHT:
                 return this.props.lPage.getCursorController().innerRight();
+            case EVT_R_SCAN_LEFT:
+                if (!this.props.rPage.getCursorController().cursorActive) {
+                    return this.props.rPage.scanLeft();
+                }
+            //Falltrough! Based on the KLN 89 trainer it behaves like EVT_R_INNER_LEFT when the cursor is active
             case EVT_R_INNER_LEFT:
                 return this.props.rPage.getCursorController().innerLeft();
+            case EVT_R_SCAN_RIGHT:
+                if (!this.props.rPage.getCursorController().cursorActive) {
+                    return this.props.rPage.scanRight();
+                }
+            //Falltrough! Based on the KLN 89 trainer it behaves like EVT_R_INNER_RIGHT when the cursor is active
             case EVT_R_INNER_RIGHT:
                 return this.props.rPage.getCursorController().innerRight();
-            case EVT_R_SCAN_LEFT:
-                return this.props.rPage.scanLeft();
-            case EVT_R_SCAN_RIGHT:
-                return this.props.rPage.scanRight();
             case EVT_ENT:
                 this.handleEnter();
                 return true;
