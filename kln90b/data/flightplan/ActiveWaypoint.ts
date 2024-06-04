@@ -176,6 +176,7 @@ export class ActiveWaypoint {
      */
     private flag(): null {
         this.fplIdx = -1;
+        this.from = null;
         this.to = null;
         this.isDirectTo = false;
         this.saveLastActiveWaypoint();
