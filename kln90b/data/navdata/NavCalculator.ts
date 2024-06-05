@@ -18,6 +18,7 @@ const WPT_ALERT_WITHOUT_TURN_ANTI = 36;
 export const HOURS_TO_SECONDS = 3600;
 
 const VEC3_CACHE = new Float64Array(3);
+const TO_GEOPOINT_CACHE = new GeoPoint(0, 0);
 
 /**
  * This class updates all navigation variables
@@ -119,15 +120,20 @@ export class NavCalculator implements CalcTickable {
         //waypoint sequencing
         const waypointSequencingAllowed = !this.modeController.isObsModeActive();
         if (waypointSequencingAllowed && this.sensors.in.gps.groundspeed > 2) {
+            TO_GEOPOINT_CACHE.set(toLeg.wpt);
             const followingLeg = nav.activeWaypoint.getFollowingLeg();
 
-            if (this.turnAnticipation.get() && followingLeg !== null && toLeg.flyOver !== true) {
+            if (this.turnAnticipation.get()
+                && followingLeg !== null
+                && toLeg.flyOver !== true
+                && !TO_GEOPOINT_CACHE.equals(followingLeg.wpt))  //Based on the KLN 89 trainer, it will overfly the waypoint, if it is duplicated
+            {
                 const turnRadius = UnitType.METER.convertTo(NavMath.turnRadius(this.sensors.in.gps.groundspeed, this.bankeAngleForStandardTurn(this.sensors.in.gps.groundspeed)), UnitType.NMILE);
                 const fromDtk = fromLeg.path.bearingAt(fromLeg.path.closest(toLeg.wpt, VEC3_CACHE)); //Important for DME arcs, we need the DTK at the end of the arc, not the current one. Also helps for very long GC legs
 
                 let nextDtk: number;
                 if (toLeg.arcData === undefined) {
-                    nextDtk = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon).bearingTo(followingLeg.wpt);
+                    nextDtk = TO_GEOPOINT_CACHE.bearingTo(followingLeg.wpt);
                 } else {
                     nextDtk = toLeg.arcData.circle.bearingAt(toLeg.arcData.entryFacility);
                 }

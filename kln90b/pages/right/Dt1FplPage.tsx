@@ -116,6 +116,7 @@ export class Dt1FplPage extends SixLineHalfPage {
     private calculateDisEte(fpl: Flightplan): DisEte[] {
         const legs = fpl.getLegs();
         const disEte: DisEte[] = [];
+        const CACHED_POINT = new GeoPoint(0, 0);
         if (fpl.idx === 0) {
             const navState = this.props.memory.navPage;
             const actIdx = navState.activeWaypoint.getActiveFplIdx();
@@ -130,7 +131,8 @@ export class Dt1FplPage extends SixLineHalfPage {
                 } else {
                     const prev = legs[i - 1];
                     const next = legs[i];
-                    distanceTotal += UnitType.GA_RADIAN.convertTo(new GeoPoint(prev.wpt.lat, prev.wpt.lon).distance(next.wpt), UnitType.NMILE);
+                    CACHED_POINT.set(prev.wpt.lat, prev.wpt.lon);
+                    distanceTotal += UnitType.GA_RADIAN.convertTo(CACHED_POINT.distance(next.wpt), UnitType.NMILE);
                     disEte.push({
                         dis: distanceTotal,
                         ete: eteAvail ? distanceTotal / this.props.sensors.in.gps.groundspeed * 60 * 60 : null,
@@ -144,7 +146,8 @@ export class Dt1FplPage extends SixLineHalfPage {
             for (let i = 1; i < legs.length; i++) {
                 const prev = legs[i - 1];
                 const next = legs[i];
-                distanceTotal += UnitType.GA_RADIAN.convertTo(new GeoPoint(prev.wpt.lat, prev.wpt.lon).distance(next.wpt), UnitType.NMILE);
+                CACHED_POINT.set(prev.wpt.lat, prev.wpt.lon);
+                distanceTotal += UnitType.GA_RADIAN.convertTo(CACHED_POINT.distance(next.wpt), UnitType.NMILE);
                 disEte.push({dis: distanceTotal, ete: null})
             }
         }

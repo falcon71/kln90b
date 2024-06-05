@@ -212,7 +212,11 @@ export class Nav5Page extends SixLineHalfPage {
     private drawFlightplanLabels(ctx: CoordinateCanvasDrawContext, legs: KLNFlightplanLeg[]) {
         for (let i = 0; i < legs.length; i++) {
             const leg = legs[i];
-            ctx.drawIcon(leg.wpt, (i + 1).toString());
+            const nextLeg = legs[i + 1];
+
+            if (nextLeg === undefined || leg.wpt.icao !== nextLeg.wpt.icao) { //Don't draw the same waypoint twice
+                ctx.drawIcon(leg.wpt, (i + 1).toString());
+            }
         }
     }
 

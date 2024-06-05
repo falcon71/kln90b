@@ -114,40 +114,52 @@ export class Dt3FplPage extends SixLineHalfPage {
     }
     private calculateDisEte(fpl: Flightplan): DisDtk[] {
         const legs = fpl.getLegs();
-        const disEte: DisDtk[] = [];
+        const disDtk: DisDtk[] = [];
+        const CACHED_POINT = new GeoPoint(0, 0);
         if (fpl.idx === 0) {
             const navState = this.props.memory.navPage;
             const actIdx = navState.activeWaypoint.getActiveFplIdx();
             let distanceTotal = 0;
             for (let i = 0; i < legs.length; i++) {
                 if (actIdx > i || actIdx === -1) {
-                    disEte.push({dis: null, dtkMag: null});
+                    disDtk.push({dis: null, dtkMag: null});
                 } else if (actIdx === i) {
                     distanceTotal += navState.distToActive!;
-                    disEte.push({dis: distanceTotal, dtkMag: this.props.magvar.trueToMag(navState.bearingToActive)});
+                    disDtk.push({dis: distanceTotal, dtkMag: this.props.magvar.trueToMag(navState.bearingToActive)});
                 } else {
                     const prev = legs[i - 1];
                     const next = legs[i];
-                    distanceTotal += UnitType.GA_RADIAN.convertTo(new GeoPoint(prev.wpt.lat, prev.wpt.lon).distance(next.wpt), UnitType.NMILE);
-                    const dtkTrue = new GeoPoint(prev.wpt.lat, prev.wpt.lon).bearingTo(next.wpt);
-                    const magvar = this.props.magvar.getMagvarForCoordinates(prev.wpt);
-                    disEte.push({dis: distanceTotal, dtkMag: this.props.magvar.trueToMag(dtkTrue, magvar)});
+                    CACHED_POINT.set(prev.wpt.lat, prev.wpt.lon);
+                    if (CACHED_POINT.equals(next.wpt)) {
+                        disDtk.push(disDtk[disDtk.length - 1]); //The KLN 89 trainer displays the same DTK
+                    } else {
+                        distanceTotal += UnitType.GA_RADIAN.convertTo(CACHED_POINT.distance(next.wpt), UnitType.NMILE);
+                        const dtkTrue = CACHED_POINT.bearingTo(next.wpt);
+                        const magvar = this.props.magvar.getMagvarForCoordinates(prev.wpt);
+                        disDtk.push({dis: distanceTotal, dtkMag: this.props.magvar.trueToMag(dtkTrue, magvar)});
+                    }
+
                 }
             }
 
         } else {
             let distanceTotal = 0;
-            disEte.push({dis: null, dtkMag: null});
+            disDtk.push({dis: null, dtkMag: null});
             for (let i = 1; i < legs.length; i++) {
                 const prev = legs[i - 1];
                 const next = legs[i];
-                distanceTotal += UnitType.GA_RADIAN.convertTo(new GeoPoint(prev.wpt.lat, prev.wpt.lon).distance(next.wpt), UnitType.NMILE);
-                const dtkTrue = new GeoPoint(prev.wpt.lat, prev.wpt.lon).bearingTo(next.wpt);
-                const magvar = this.props.magvar.getMagvarForCoordinates(prev.wpt);
-                disEte.push({dis: distanceTotal, dtkMag: this.props.magvar.trueToMag(dtkTrue, magvar)});
+                CACHED_POINT.set(prev.wpt.lat, prev.wpt.lon);
+                if (CACHED_POINT.equals(next.wpt)) {
+                    disDtk.push(disDtk[disDtk.length - 1]); //The KLN 89 trainer displays the same DTK
+                } else {
+                    distanceTotal += UnitType.GA_RADIAN.convertTo(CACHED_POINT.distance(next.wpt), UnitType.NMILE);
+                    const dtkTrue = CACHED_POINT.bearingTo(next.wpt);
+                    const magvar = this.props.magvar.getMagvarForCoordinates(prev.wpt);
+                    disDtk.push({dis: distanceTotal, dtkMag: this.props.magvar.trueToMag(dtkTrue, magvar)});
+                }
             }
         }
-        return disEte;
+        return disDtk;
     }
 
     private getDistanceLine(row: number, fplIndices: [number, number, number, number, number, number], data: DisDtk[]): number | null {

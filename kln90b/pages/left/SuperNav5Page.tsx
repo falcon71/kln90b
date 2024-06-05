@@ -267,13 +267,16 @@ export class SuperNav5Page extends SevenLinePage {
     private drawFlightplanLabels(ctx: CoordinateCanvasDrawContext, legs: KLNFlightplanLeg[], range: NauticalMiles) {
         for (let i = 0; i < legs.length; i++) {
             const leg = legs[i];
+            const nextLeg = legs[i + 1];
 
-            if (range <= 2 && ICAO.getFacilityType(leg.wpt.icao) === FacilityType.Airport && !isUserWaypoint(leg.wpt)) {
-                this.drawRunways(ctx, leg.wpt as AirportFacility, range);
+            if (nextLeg === undefined || leg.wpt.icao !== nextLeg.wpt.icao) { //Don't draw the same waypoint twice
+                if (range <= 2 && ICAO.getFacilityType(leg.wpt.icao) === FacilityType.Airport && !isUserWaypoint(leg.wpt)) {
+                    this.drawRunways(ctx, leg.wpt as AirportFacility, range);
+                }
+
+                ctx.drawIcon(leg.wpt, "@");
+                ctx.drawLabel(leg.wpt, ICAO.getIdent(leg.wpt.icao));
             }
-
-            ctx.drawIcon(leg.wpt, "@");
-            ctx.drawLabel(leg.wpt, ICAO.getIdent(leg.wpt.icao));
         }
     }
 

@@ -127,10 +127,15 @@ export class Dt3OtherPage extends SixLineHalfPage {
         }
 
         const active = navState.activeWaypoint.getActiveWpt()!;
-
-        const dtkTrue = new GeoPoint(active.lat, active.lon).bearingTo(following);
+        const activePoint = new GeoPoint(active.lat, active.lon);
         const magvar = this.props.magvar.getMagvarForCoordinates(active);
-        return this.props.magvar.trueToMag(dtkTrue, magvar);
+        if (activePoint.equals(following)) {
+            return this.props.magvar.trueToMag(navState.desiredTrack, magvar); //The KLN 89 trainer displays the same DTK
+        } else {
+            const dtkTrue = activePoint.bearingTo(following);
+            return this.props.magvar.trueToMag(dtkTrue, magvar);
+        }
+
     }
 
 }
