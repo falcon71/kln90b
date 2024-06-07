@@ -216,13 +216,16 @@ export class SensorsOut {
     public setObs(obsMag: number | null) {
         this.obsOut = obsMag;
         if (obsMag !== null) {
-            switch (this.options.output.obsTarget) {
-                case 1:
-                    SimVar.SetSimVarValue('K:VOR1_SET', SimVarValueType.Number, obsMag);
-                    break;
-                case 2:
-                    SimVar.SetSimVarValue('K:VOR2_SET', SimVarValueType.Number, obsMag);
-                    break;
+            const gpsIsNavSource = SimVar.GetSimVarValue('GPS DRIVES NAV1', SimVarValueType.Bool);
+            if (gpsIsNavSource) {
+                switch (this.options.output.obsTarget) {
+                    case 1:
+                        SimVar.SetSimVarValue('K:VOR1_SET', SimVarValueType.Number, obsMag);
+                        break;
+                    case 2:
+                        SimVar.SetSimVarValue('K:VOR2_SET', SimVarValueType.Number, obsMag);
+                        break;
+                }
             }
         }
 
