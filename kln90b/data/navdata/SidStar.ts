@@ -165,7 +165,7 @@ export class SidStar {
 
             if (NavMath.bearingIsBetween(radial, start, end)) {
                 const entryFacility: UserFacility = {
-                    icao: buildIcao('U', TEMPORARY_WAYPOINT, this.getArcEntryName(radial, dist)),
+                    icao: buildIcao('U', TEMPORARY_WAYPOINT, this.getArcEntryName(ICAO.getIdent(arcData.vor.icao), radial, dist)),
                     name: "",
                     lat: entryPoint.lat,
                     lon: entryPoint.lon,
@@ -276,13 +276,22 @@ export class SidStar {
 
     /**
      * 6-16
+     * @param navaid
      * @param radial
      * @param dist
      */
-    private static getArcEntryName(radial: Degrees, dist: NauticalMiles): string {
-        const ALPHABET = [' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+    private static getArcEntryName(navaid: String, radial: Degrees, dist: NauticalMiles): string {
+        const rounded = Math.round(dist);
+        if (rounded <= 26) {
+            const ALPHABET = [' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
-        return `D${format(radial, "000")}${ALPHABET[Math.round(dist)]}`;
+            return `D${format(radial, "000")}${ALPHABET[rounded]}`;
+        } else if (rounded <= 99) { // https://www.jeppesen.com/download/navdata/navdata_info1.pdf
+            return `${navaid}${format(rounded, "00")}`;
+        } else {
+            return `${format(rounded - 100, "00")}${navaid}`;
+        }
+
     }
 
     private static appHasNoRFLegs(app: ApproachProcedure): boolean {
@@ -608,7 +617,7 @@ export class SidStar {
         }
 
         const entryFacility: UserFacility = {
-            icao: buildIcao('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(radial, dist)),
+            icao: buildIcao('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(ICAO.getIdent(vor.icao), radial, dist)),
             name: "",
             lat: entryPoint.lat,
             lon: entryPoint.lon,
