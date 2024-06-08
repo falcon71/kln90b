@@ -1,6 +1,6 @@
 import {CalcTickable, TICK_TIME_CALC} from "../../TickController";
 import {Sensors} from "../../Sensors";
-import {FROM, TO, VolatileMemory} from "../VolatileMemory";
+import {FROM, VolatileMemory} from "../VolatileMemory";
 import {GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Degrees, Knots, Seconds} from "../Units";
@@ -181,7 +181,7 @@ export class NavCalculator implements CalcTickable {
         nav.eteToDest = null;
         nav.bearingToActive = null;
         nav.bearingForAP = null;
-        nav.toFrom = TO;
+        nav.toFrom = null;
         nav.waypointAlert = false;
         nav.xtkScale = 5;
         this.lastDistance = 9999;
@@ -195,6 +195,7 @@ export class NavCalculator implements CalcTickable {
 
         this.sensors.out.setGpsOverriden();
         this.sensors.out.setXTK(nav.xtkToActive, nav.xtkScale);
+        this.sensors.out.setToFrom(nav.toFrom);
         this.sensors.out.setObs(obsOut);
         this.sensors.out.setDesiredTrack(obsOut, track, magvar);
         this.sensors.out.setWpBearing(nav.bearingForAP, nav.bearingToActive, magvar);

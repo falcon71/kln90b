@@ -17,7 +17,7 @@ export class DeviationBar implements UiElement {
     protected ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     protected flagRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
-    constructor(public deviation: number | null, public to: ToFrom, public xtkScale: number = 5) {
+    constructor(public deviation: number | null, public to: ToFrom | null, public xtkScale: number = 5) {
     }
 
     render(): VNode {

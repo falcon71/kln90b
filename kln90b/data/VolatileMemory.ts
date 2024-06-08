@@ -69,7 +69,7 @@ export class NavPageState {
     public bearingForAP: Degrees | null = null; //true. Will be set to desiredTrack in DME arcs to improve autopilot tracking
     public desiredTrack: Degrees | null = null;  //true
     public obsMag: Degrees = 0; //Magnetic!!
-    public toFrom: ToFrom = TO;
+    public toFrom: ToFrom | null = null;
     public xtkScale: number = 5;
 
     public waypointAlert = false;

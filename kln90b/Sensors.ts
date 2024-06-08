@@ -19,8 +19,8 @@ import {KLN90BUserSettings} from "./settings/KLN90BUserSettings";
 import {CalcTickable} from "./TickController";
 import {AudioGenerator} from "./services/AudioGenerator";
 import {MessageHandler} from "./data/MessageHandler";
-import {NavMode} from "./data/VolatileMemory";
-import {LVAR_ANNUN_TEST, LVAR_GPS_WP_BEARING, LVAR_MSG_LIGHT, LVAR_WPT_LIGHT} from "./LVars";
+import {NavMode, TO} from "./data/VolatileMemory";
+import {LVAR_ANNUN_TEST, LVAR_GPS_WP_BEARING, LVAR_HSI_TF_FLAGS, LVAR_MSG_LIGHT, LVAR_WPT_LIGHT} from "./LVars";
 import {GPS} from "./Gps";
 import {SignalOutputFilter} from "./services/SignalOutputFilter";
 
@@ -237,8 +237,6 @@ export class SensorsOut {
         } else {
             SimVar.SetSimVarValue('GPS OBS VALUE', SimVarValueType.Degree, obsMag);
         }
-
-
     }
 
     public setXTK(xtk: number | null, scaling: number) {
@@ -262,6 +260,14 @@ export class SensorsOut {
         SimVar.SetSimVarValue('GPS VERTICAL ANGLE ERROR', SimVarValueType.Degree, 0);
         SimVar.SetSimVarValue('GPS VERTICAL ERROR', SimVarValueType.Meters, 0);
         SimVar.SetSimVarValue('GPS HAS GLIDEPATH', SimVarValueType.Bool, false);
+    }
+
+    public setToFrom(toFrom: boolean | null) {
+        if (toFrom === null) {
+            SimVar.SetSimVarValue(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, 0);
+        } else {
+            SimVar.SetSimVarValue(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, toFrom === TO ? 1 : 2);
+        }
     }
 
     /**
