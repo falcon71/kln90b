@@ -103,13 +103,11 @@ export interface TriPageState {
 }
 
 export interface CalPageState {
-    cal1IndicatedAltitude: Feet;
-    cal1Barometer: Inhg;
+    cal12IndicatedAltitude: Feet;
+    cal12Barometer: Inhg;
     cal1SAT: Celsius;
 
     cal2Cas: Knots,
-    cal2IndicatedAltitude: Feet;
-    cal2Barometer: Inhg;
     cal2TAT: Celsius;
 
     cal3Tas: Knots,
@@ -206,13 +204,11 @@ export class VolatileMemory {
     };
 
     public readonly calPage: CalPageState = {
-        cal1IndicatedAltitude: 0,
-        cal1Barometer: 0, //https://youtu.be/gjmVrkHTdP0?t=27
+        cal12IndicatedAltitude: 0,
+        cal12Barometer: 0, //https://youtu.be/gjmVrkHTdP0?t=27
         cal1SAT: 0,
 
         cal2Cas: 0,
-        cal2IndicatedAltitude: 0,
-        cal2Barometer: 0,
         cal2TAT: 0,
 
         cal3Tas: 0,
@@ -288,13 +284,11 @@ export class VolatileMemory {
         this.navPage.navmode = NavMode.ENR_LEG;
         this.navPage.userMagvar = 0;
 
-        this.calPage.cal1IndicatedAltitude = 0;
-        this.calPage.cal1Barometer = 0; //https://youtu.be/gjmVrkHTdP0?t=27
+        this.calPage.cal12IndicatedAltitude = 0;
+        this.calPage.cal12Barometer = 0; //https://youtu.be/gjmVrkHTdP0?t=27
         this.calPage.cal1SAT = 0;
 
         this.calPage.cal2Cas = 0;
-        this.calPage.cal2IndicatedAltitude = 0;
-        this.calPage.cal2Barometer = 0;
 
         this.calPage.cal2TAT = 0;
         this.calPage.cal3Tas = 0;
