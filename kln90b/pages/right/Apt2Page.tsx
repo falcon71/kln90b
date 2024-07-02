@@ -1,4 +1,4 @@
-import {AirportFacility, FSComponent, GpsBoolean, NodeReference, VNode} from '@microsoft/msfs-sdk';
+import {AirportFacility, FSComponent, GpsBoolean, NodeReference, UnitType, VNode} from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
@@ -9,13 +9,13 @@ import {WaypointPageState} from "../../data/VolatileMemory";
 import {CreateWaypointMessage} from "../../controls/selects/CreateWaypointMessage";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
 import {Apt1Page} from "./Apt1Page";
-import {AltitudeEditor} from "../../controls/editors/AltitudeEditor";
+import {ElevationEditor} from "../../controls/editors/ElevationEditor";
 import {Scanlist} from "../../data/navdata/Scanlist";
 import {NearestSelector} from "../../controls/selects/NearestSelector";
 import {AirportNearestList, NearestWpt} from "../../data/navdata/NearestList";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {convertTextToKLNCharset} from "../../data/Text";
-import {AltitudeDisplay} from "../../controls/displays/AltitudeDisplay";
+import {ElevationDisplay} from "../../controls/displays/AltitudeDisplay";
 
 
 type Apt2PageTypes = {
@@ -117,7 +117,7 @@ export class Apt2Page extends WaypointPage<AirportFacility> {
 type Apt2DBPageTypes = {
     city1: TextDisplay,
     city2: TextDisplay,
-    elevation: AltitudeDisplay,
+    elevation: ElevationDisplay,
     approach: TextDisplay,
     radar: TextDisplay,
 }
@@ -150,7 +150,7 @@ export class Apt2DBPage extends WaypointPage<AirportFacility> {
         this.children = new UIElementChildren<Apt2DBPageTypes>({
             city1: new TextDisplay(this.multiline(city, state)[0]),
             city2: new TextDisplay(this.multiline(city, state)[1]),
-            elevation: new AltitudeDisplay(this.formatElevation(facility)),
+            elevation: new ElevationDisplay(this.formatElevation(facility)),
             approach: new TextDisplay(this.formatApproach(facility)),
             radar: new TextDisplay(this.formatRadar(facility)),
         });
@@ -212,7 +212,7 @@ export class Apt2DBPage extends WaypointPage<AirportFacility> {
         }
 
         // @ts-ignore
-        return Math.round(apt.altitude / 10) * 10;
+        return Math.round(UnitType.METER.convertTo(apt.altitude, UnitType.FOOT) / 10) * 10;
     }
 
     private formatCity(apt: AirportFacility): string {
@@ -285,7 +285,7 @@ export class Apt2DBPage extends WaypointPage<AirportFacility> {
 
 
 type Apt2UserPageTypes = {
-    elevation: AltitudeEditor,
+    elevation: ElevationEditor,
 }
 
 
@@ -307,7 +307,7 @@ export class Apt2UserPage extends WaypointPage<AirportFacility> {
         const facility = unpackFacility(this.facility);
 
         this.children = new UIElementChildren<Apt2UserPageTypes>({
-            elevation: new AltitudeEditor(this.props.bus, this.formatElevation(facility), this.setElevation.bind(this)),
+            elevation: new ElevationEditor(this.props.bus, this.formatElevation(facility), this.setElevation.bind(this)),
         });
 
         this.cursorController = new CursorController(this.children);
@@ -357,7 +357,7 @@ export class Apt2UserPage extends WaypointPage<AirportFacility> {
         if (facility) {
             this.props.facilityLoader.facilityRepo.update(facility!,
                 // @ts-ignore
-                fac => fac.altitude = elevation,
+                fac => fac.altitude = UnitType.FOOT.convertTo(elevation, UnitType.METER),
             );
         }
     }
@@ -369,6 +369,6 @@ export class Apt2UserPage extends WaypointPage<AirportFacility> {
         }
 
         // @ts-ignore
-        return Math.round(apt.altitude / 10) * 10;
+        return Math.round(UnitType.METER.convertTo(apt.altitude, UnitType.FOOT) / 10) * 10;
     }
 }

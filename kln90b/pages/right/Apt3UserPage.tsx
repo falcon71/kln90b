@@ -11,7 +11,7 @@ import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
-import {RunwayLengthEditor} from "../../controls/editors/AltitudeEditor";
+import {RunwayLengthEditor} from "../../controls/editors/ElevationEditor";
 import {RunwaySurfaceEditor} from "../../controls/editors/RunwaySurfaceEditor";
 import {Scanlist} from "../../data/navdata/Scanlist";
 import {AirportNearestList} from "../../data/navdata/NearestList";

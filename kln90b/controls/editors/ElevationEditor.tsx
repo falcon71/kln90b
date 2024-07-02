@@ -3,7 +3,7 @@ import {EventBus, FSComponent, VNode} from "@microsoft/msfs-sdk";
 import {NumberEditorField} from "./EditorField";
 import {format} from "numerable";
 
-export class AltitudeEditor extends Editor<number> {
+export class ElevationEditor extends Editor<number> {
 
     constructor(bus: EventBus, value: number | null, enterCallback: (text: number) => void) {
         super(bus, [
@@ -38,6 +38,6 @@ export class AltitudeEditor extends Editor<number> {
     }
 }
 
-export class RunwayLengthEditor extends AltitudeEditor { //They are both the same
+export class RunwayLengthEditor extends ElevationEditor { //They are both the same
 
 }
