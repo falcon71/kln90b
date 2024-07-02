@@ -214,7 +214,8 @@ export class ActiveWaypoint {
     }
 
     /**
-     * Returns the leg, that is closest to the current plane location
+     * Returns the leg, that is closest to the current plane location.
+     * If the flightplan contains at least two waypoints, then a solution will always be found (checked in the KLN 89 trainer)
      * @param legs
      * @private
      */
@@ -229,6 +230,7 @@ export class ActiveWaypoint {
             const to = legs[i].wpt;
             tempGeoPoint.set(from.wpt);
             const distFromTo = tempGeoPoint.distance(to);
+            const distGpsFrom = tempGeoPoint.distance(this.sensors.in.gps.coords);
             let circle: GeoCircle;
             if (from.arcData === undefined) {
                 CACHED_CIRCLE.setAsGreatCircle(from.wpt, to);
@@ -238,10 +240,16 @@ export class ActiveWaypoint {
             }
             circle.closest(this.sensors.in.gps.coords, tempGeoPoint);
             const distFromClosest = tempGeoPoint.distance(from.wpt); //We use this to check, if closest is between from and to
-            const distClosestWpt = tempGeoPoint.distance(this.sensors.in.gps.coords);
-            if (distFromClosest <= distFromTo && distClosestWpt < distMin) {
+            let distGPSClosestWpt: number;
+            if (distFromClosest <= distFromTo) { //The closest point is not between from and to, so lets use the distance between GPS and from instead
+                distGPSClosestWpt = distGpsFrom;
+            } else {
+                distGPSClosestWpt = tempGeoPoint.distance(this.sensors.in.gps.coords)
+            }
+
+            if (distGPSClosestWpt < distMin) {
                 closestWpt.set(tempGeoPoint);
-                distMin = distClosestWpt;
+                distMin = distGPSClosestWpt;
                 closestIdx = i;
             }
         }
