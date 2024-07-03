@@ -28,9 +28,9 @@ export class Cal4Page extends SixLineHalfPage {
         super(props);
 
         this.children = new UIElementChildren<Cal4PageTypes>({
-            gs: new SpeedFieldset(this.props.memory.calPage.cal4GS, this.setGS.bind(this)),
-            fpm: new FpmFieldset(this.props.memory.calPage.cal4Fpm, this.setFpm.bind(this)),
-            angle: new VnavAngleFieldset(this.props.memory.calPage.cal4Angle, this.setAngle.bind(this)),
+            gs: new SpeedFieldset(this.props.userSettings.getSetting('cal4GS').get(), this.setGS.bind(this)),
+            fpm: new FpmFieldset(this.props.userSettings.getSetting('cal4Fpm').get(), this.setFpm.bind(this)),
+            angle: new VnavAngleFieldset(this.props.userSettings.getSetting('cal4Angle').get(), this.setAngle.bind(this)),
         });
 
         this.cursorController = new CursorController(this.children);
@@ -50,30 +50,30 @@ export class Cal4Page extends SixLineHalfPage {
     }
 
     private setGS(gs: Knots): void {
-        this.props.memory.calPage.cal4GS = gs;
+        this.props.userSettings.getSetting('cal4GS').set(gs);
         let angle = 0;
         if (gs > 0) {
-            angle = Math.atan(this.props.memory.calPage.cal4Fpm / UnitType.KNOT.convertTo(gs, UnitType.FPM)) * Avionics.Utils.RAD2DEG;
+            angle = Math.atan(this.props.userSettings.getSetting('cal4Fpm').get() / UnitType.KNOT.convertTo(gs, UnitType.FPM)) * Avionics.Utils.RAD2DEG;
         }
-        this.props.memory.calPage.cal4Angle = angle;
+        this.props.userSettings.getSetting('cal4Angle').set(angle);
         this.children.get("angle").setValue(angle);
     }
 
     private setFpm(fpm: number): void {
-        this.props.memory.calPage.cal4Fpm = fpm;
+        this.props.userSettings.getSetting('cal4Fpm').set(fpm);
         let angle = 0;
-        if (this.props.memory.calPage.cal4GS > 0) {
-            angle = Math.atan(fpm / UnitType.KNOT.convertTo(this.props.memory.calPage.cal4GS, UnitType.FPM)) * Avionics.Utils.RAD2DEG;
+        if (this.props.userSettings.getSetting('cal4GS').get() > 0) {
+            angle = Math.atan(fpm / UnitType.KNOT.convertTo(this.props.userSettings.getSetting('cal4GS').get(), UnitType.FPM)) * Avionics.Utils.RAD2DEG;
         }
-        this.props.memory.calPage.cal4Angle = angle;
+        this.props.userSettings.getSetting('cal4Angle').set(angle);
         this.children.get("angle").setValue(angle);
     }
 
     private setAngle(angle: number): void {
-        this.props.memory.calPage.cal4Angle = angle;
-        const fpm = Math.round(UnitType.KNOT.convertTo(this.props.memory.calPage.cal4GS, UnitType.FPM) * Math.tan(angle * Avionics.Utils.DEG2RAD) / 100) * 100;
+        this.props.userSettings.getSetting('cal4Angle').set(angle);
+        const fpm = Math.round(UnitType.KNOT.convertTo(this.props.userSettings.getSetting('cal4GS').get(), UnitType.FPM) * Math.tan(angle * Avionics.Utils.DEG2RAD) / 100) * 100;
 
-        this.props.memory.calPage.cal4Fpm = fpm;
+        this.props.userSettings.getSetting('cal4Fpm').set(fpm);
         this.children.get("fpm").setFpm(fpm);
 
     }

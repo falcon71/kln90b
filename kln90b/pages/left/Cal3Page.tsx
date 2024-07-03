@@ -34,8 +34,8 @@ export class Cal3Page extends SixLineHalfPage {
         super(props);
 
         this.children = new UIElementChildren<Cal3PageTypes>({
-            tas: new SpeedFieldset(this.props.memory.calPage.cal3Tas, this.setTas.bind(this)),
-            hdg: new BearingFieldset(this.props.memory.calPage.cal3HeadingMag, this.setHeading.bind(this)),
+            tas: new SpeedFieldset(this.props.userSettings.getSetting('cal3Tas').get(), this.setTas.bind(this)),
+            hdg: new BearingFieldset(this.props.userSettings.getSetting('cal3HeadingMag').get(), this.setHeading.bind(this)),
             windLabel: new TextDisplay("HDWND"),
             windComponent: new SpeedDisplay(null),
             windDir: new BearingDisplay(null),
@@ -81,11 +81,11 @@ export class Cal3Page extends SixLineHalfPage {
         if (this.props.planeSettings.input.headingInput) {
             hdgTrue = this.props.magvar.magToTrue(this.props.sensors.in.headingGyro!);
         } else {
-            hdgTrue = this.props.magvar.magToTrue(this.props.memory.calPage.cal3HeadingMag);
+            hdgTrue = this.props.magvar.magToTrue(this.props.userSettings.getSetting('cal3HeadingMag').get());
         }
 
-        const windSpeed = calculateWindspeed(this.props.memory.calPage.cal3Tas, this.props.sensors.in.gps.groundspeed, hdgTrue, this.props.sensors.in.gps.trackTrue);
-        const windDir = calculateWindDirection(this.props.memory.calPage.cal3Tas, this.props.sensors.in.gps.groundspeed, hdgTrue, this.props.sensors.in.gps.trackTrue);
+        const windSpeed = calculateWindspeed(this.props.userSettings.getSetting('cal3Tas').get(), this.props.sensors.in.gps.groundspeed, hdgTrue, this.props.sensors.in.gps.trackTrue);
+        const windDir = calculateWindDirection(this.props.userSettings.getSetting('cal3Tas').get(), this.props.sensors.in.gps.groundspeed, hdgTrue, this.props.sensors.in.gps.trackTrue);
         const headWind = calculateHeadwind(windSpeed, windDir, hdgTrue);
 
         this.children.get("windLabel").text = headWind >= 0 ? "HDWND" : "TLWND";
@@ -95,12 +95,12 @@ export class Cal3Page extends SixLineHalfPage {
     }
 
     private setTas(tas: Knots): void {
-        this.props.memory.calPage.cal3Tas = tas;
+        this.props.userSettings.getSetting('cal3Tas').set(tas);
         this.requiresRedraw = true;
     }
 
     private setHeading(heading: Degrees): void {
-        this.props.memory.calPage.cal3HeadingMag = heading;
+        this.props.userSettings.getSetting('cal3HeadingMag').set(heading);
         this.requiresRedraw = true;
     }
 

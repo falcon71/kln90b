@@ -32,10 +32,10 @@ export class Cal1Page extends SixLineHalfPage {
         super(props);
 
         this.children = new UIElementChildren<Cal1PageTypes>({
-            indicated: new AltitudeFieldset(this.props.memory.calPage.cal12IndicatedAltitude, this.setIndicatedAltitude.bind(this)),
-            baro: BaroFieldsetFactory.createBaroFieldSet(this.props.memory.calPage.cal12Barometer, this.props.userSettings, this.setBarometer.bind(this)),
+            indicated: new AltitudeFieldset(this.props.userSettings.getSetting('cal12IndicatedAltitude').get(), this.setIndicatedAltitude.bind(this)),
+            baro: BaroFieldsetFactory.createBaroFieldSet(this.props.userSettings.getSetting('cal12Barometer').get(), this.props.userSettings, this.setBarometer.bind(this)),
             pressure: new AltitudeDisplay(null),
-            sat: new TempFieldset(this.props.memory.calPage.cal1SAT, this.setTemp.bind(this)),
+            sat: new TempFieldset(this.props.userSettings.getSetting('cal1SAT').get(), this.setTemp.bind(this)),
             density: new AltitudeDisplay(null),
         });
         this.cursorController = new CursorController(this.children);
@@ -54,24 +54,24 @@ export class Cal1Page extends SixLineHalfPage {
     }
 
     protected redraw() {
-        const pressureAlt = indicatedAlt2PressureAlt(this.props.memory.calPage.cal12IndicatedAltitude, this.props.memory.calPage.cal12Barometer);
+        const pressureAlt = indicatedAlt2PressureAlt(this.props.userSettings.getSetting('cal12IndicatedAltitude').get(), this.props.userSettings.getSetting('cal12Barometer').get());
         this.children.get("pressure").altitude = pressureAlt;
-        this.children.get("density").altitude = pressureAlt2DensityAlt(pressureAlt, this.props.memory.calPage.cal1SAT);
+        this.children.get("density").altitude = pressureAlt2DensityAlt(pressureAlt, this.props.userSettings.getSetting('cal1SAT').get());
 
     }
 
     private setIndicatedAltitude(alt: Feet): void {
-        this.props.memory.calPage.cal12IndicatedAltitude = alt;
+        this.props.userSettings.getSetting('cal12IndicatedAltitude').set(alt);
         this.requiresRedraw = true;
     }
 
     private setBarometer(baro: Inhg): void {
-        this.props.memory.calPage.cal12Barometer = baro;
+        this.props.userSettings.getSetting('cal12Barometer').set(baro);
         this.requiresRedraw = true;
     }
 
     private setTemp(temp: Celsius): void {
-        this.props.memory.calPage.cal1SAT = temp;
+        this.props.userSettings.getSetting('cal1SAT').set(temp);
         this.requiresRedraw = true;
     }
 }

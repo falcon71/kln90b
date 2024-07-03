@@ -28,10 +28,10 @@ export class Cal5Page extends SixLineHalfPage {
         super(props);
 
         this.children = new UIElementChildren<Cal5PageTypes>({
-            tempC: new TempFieldset(this.props.memory.calPage.cal5TempC, this.setTempC.bind(this)),
-            tempF: new TempFieldset(this.props.memory.calPage.cal5TempF, this.setTempF.bind(this)),
-            speedKt: new SpeedFieldset(this.props.memory.calPage.cal5SpeedKt, this.setSpeedKt.bind(this)),
-            speedMph: new SpeedFieldset(this.props.memory.calPage.cal5SpeedMph, this.setSpeedMph.bind(this)),
+            tempC: new TempFieldset(this.props.userSettings.getSetting('cal5TempC').get(), this.setTempC.bind(this)),
+            tempF: new TempFieldset(this.props.userSettings.getSetting('cal5TempF').get(), this.setTempF.bind(this)),
+            speedKt: new SpeedFieldset(this.props.userSettings.getSetting('cal5SpeedKt').get(), this.setSpeedKt.bind(this)),
+            speedMph: new SpeedFieldset(this.props.userSettings.getSetting('cal5SpeedMph').get(), this.setSpeedMph.bind(this)),
         });
 
         this.cursorController = new CursorController(this.children);
@@ -52,30 +52,30 @@ export class Cal5Page extends SixLineHalfPage {
     }
 
     private setTempC(tempC: Celsius): void {
-        this.props.memory.calPage.cal5TempC = tempC;
+        this.props.userSettings.getSetting('cal5TempC').set(tempC);
         const tempF = UnitType.CELSIUS.convertTo(tempC, UnitType.FAHRENHEIT);
-        this.props.memory.calPage.cal5TempF = tempF;
+        this.props.userSettings.getSetting('cal5TempF').set(tempF);
         this.children.get("tempF").setTemp(tempF);
     }
 
     private setTempF(tempF: Celsius): void {
-        this.props.memory.calPage.cal5TempF = tempF;
+        this.props.userSettings.getSetting('cal5TempF').set(tempF);
         const tempC = UnitType.FAHRENHEIT.convertTo(tempF, UnitType.CELSIUS);
-        this.props.memory.calPage.cal5TempC = tempC;
+        this.props.userSettings.getSetting('cal5TempC').set(tempC);
         this.children.get("tempC").setTemp(tempC);
     }
 
     private setSpeedKt(speedKt: Knots): void {
-        this.props.memory.calPage.cal5SpeedKt = speedKt;
+        this.props.userSettings.getSetting('cal5SpeedKt').set(speedKt);
         const speedMph = UnitType.KNOT.convertTo(speedKt, UnitType.MPH);
-        this.props.memory.calPage.cal5SpeedMph = speedMph;
+        this.props.userSettings.getSetting('cal5SpeedMph').set(speedMph);
         this.children.get("speedMph").setSpeed(speedMph);
     }
 
     private setSpeedMph(speedMph: Mph): void {
-        this.props.memory.calPage.cal5SpeedMph = speedMph;
+        this.props.userSettings.getSetting('cal5SpeedMph').set(speedMph);
         const speedKt = UnitType.MPH.convertTo(speedMph, UnitType.KNOT);
-        this.props.memory.calPage.cal5SpeedKt = speedKt;
+        this.props.userSettings.getSetting('cal5SpeedKt').set(speedKt);
         this.children.get("speedKt").setSpeed(speedKt);
     }
 }

@@ -33,10 +33,10 @@ export class Cal2Page extends SixLineHalfPage {
         super(props);
 
         this.children = new UIElementChildren<Cal2PageTypes>({
-            cas: new SpeedFieldset(this.props.memory.calPage.cal2Cas, this.setCas.bind(this)),
-            indicated: new AltitudeFieldset(this.props.memory.calPage.cal12IndicatedAltitude, this.setIndicatedAltitude.bind(this)),
-            baro: BaroFieldsetFactory.createBaroFieldSet(this.props.memory.calPage.cal12Barometer, this.props.userSettings, this.setBarometer.bind(this)),
-            tat: new TempFieldset(this.props.memory.calPage.cal2TAT, this.setTemp.bind(this)),
+            cas: new SpeedFieldset(this.props.userSettings.getSetting('cal2Cas').get(), this.setCas.bind(this)),
+            indicated: new AltitudeFieldset(this.props.userSettings.getSetting('cal12IndicatedAltitude').get(), this.setIndicatedAltitude.bind(this)),
+            baro: BaroFieldsetFactory.createBaroFieldSet(this.props.userSettings.getSetting('cal12Barometer').get(), this.props.userSettings, this.setBarometer.bind(this)),
+            tat: new TempFieldset(this.props.userSettings.getSetting('cal2TAT').get(), this.setTemp.bind(this)),
             tas: new SpeedDisplay(null),
         });
         this.cursorController = new CursorController(this.children);
@@ -57,36 +57,36 @@ export class Cal2Page extends SixLineHalfPage {
     protected redraw(): void {
         //we do actually want set the CAL 3 page, when the page is only viewed and no values are changed. This is based on the KLN-89 trainer
         const tas = this.calculateTas();
-        this.props.memory.calPage.cal3Tas = tas;
+        this.props.userSettings.getSetting('cal3Tas').set(tas);
         this.children.get("tas").speed = tas;
     }
 
     private setCas(cas: Knots): void {
-        this.props.memory.calPage.cal2Cas = cas;
+        this.props.userSettings.getSetting('cal2Cas').set(cas);
         this.requiresRedraw = true;
     }
 
     private setIndicatedAltitude(alt: Feet): void {
-        this.props.memory.calPage.cal12IndicatedAltitude = alt;
+        this.props.userSettings.getSetting('cal12IndicatedAltitude').set(alt);
         this.requiresRedraw = true;
     }
 
     private setBarometer(baro: Inhg): void {
-        this.props.memory.calPage.cal12Barometer = baro;
+        this.props.userSettings.getSetting('cal12Barometer').set(baro);
         this.requiresRedraw = true;
     }
 
     private setTemp(temp: Celsius): void {
-        this.props.memory.calPage.cal2TAT = temp;
+        this.props.userSettings.getSetting('cal2TAT').set(temp);
         this.requiresRedraw = true;
     }
 
     private calculateTas(): Knots {
-        const pressureAlt = indicatedAlt2PressureAlt(this.props.memory.calPage.cal12IndicatedAltitude, this.props.memory.calPage.cal12Barometer);
-        const mach = cas2Mach(this.props.memory.calPage.cal2Cas, pressureAlt);
+        const pressureAlt = indicatedAlt2PressureAlt(this.props.userSettings.getSetting('cal12IndicatedAltitude').get(), this.props.userSettings.getSetting('cal12Barometer').get());
+        const mach = cas2Mach(this.props.userSettings.getSetting('cal2Cas').get(), pressureAlt);
         let tas = 0;
         if (!isNaN(mach)) {
-            tas = mach2Tas(mach, this.props.memory.calPage.cal2TAT);
+            tas = mach2Tas(mach, this.props.userSettings.getSetting('cal2TAT').get());
         }
         return tas;
     }

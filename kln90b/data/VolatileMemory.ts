@@ -14,7 +14,7 @@ import {KLNFacilityLoader} from "./navdata/KLNFacilityLoader";
 import {Scanlists} from "./navdata/Scanlist";
 import {NearestWpt} from "./navdata/NearestList";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
-import {Celsius, Degrees, Fahrenheit, Feet, Inhg, Knots, Mph, NauticalMiles, Seconds} from "./Units";
+import {Degrees, Feet, Knots, NauticalMiles, Seconds} from "./Units";
 import {Flightplan} from "./flightplan/Flightplan";
 import {ActiveWaypoint} from "./flightplan/ActiveWaypoint";
 import {TimeStamp} from "./Time";
@@ -103,24 +103,7 @@ export interface TriPageState {
 }
 
 export interface CalPageState {
-    cal12IndicatedAltitude: Feet;
-    cal12Barometer: Inhg;
-    cal1SAT: Celsius;
 
-    cal2Cas: Knots,
-    cal2TAT: Celsius;
-
-    cal3Tas: Knots,
-    cal3HeadingMag: Degrees,
-
-    cal4GS: Knots,
-    cal4Fpm: number,
-    cal4Angle: number,
-
-    cal5TempC: Celsius,
-    cal5TempF: Fahrenheit,
-    cal5SpeedKt: Knots,
-    cal5SpeedMph: Mph,
 
     cal6TimeZ: TimeStamp | null,
     cal6FromTimezone: number | null,
@@ -204,25 +187,6 @@ export class VolatileMemory {
     };
 
     public readonly calPage: CalPageState = {
-        cal12IndicatedAltitude: 0,
-        cal12Barometer: 0, //https://youtu.be/gjmVrkHTdP0?t=27
-        cal1SAT: 0,
-
-        cal2Cas: 0,
-        cal2TAT: 0,
-
-        cal3Tas: 0,
-        cal3HeadingMag: 0,
-
-        cal4GS: 0,
-        cal4Fpm: 0,
-        cal4Angle: 0,
-
-        cal5TempC: 0,
-        cal5TempF: 32,
-        cal5SpeedKt: 0,
-        cal5SpeedMph: 0,
-
         cal6TimeZ: null,
         cal6FromTimezone: null,
         cal6ToTimezone: null,
@@ -283,25 +247,6 @@ export class VolatileMemory {
         this.navPage.nav4VnavDist = 0;
         this.navPage.navmode = NavMode.ENR_LEG;
         this.navPage.userMagvar = 0;
-
-        this.calPage.cal12IndicatedAltitude = 0;
-        this.calPage.cal12Barometer = 0; //https://youtu.be/gjmVrkHTdP0?t=27
-        this.calPage.cal1SAT = 0;
-
-        this.calPage.cal2Cas = 0;
-
-        this.calPage.cal2TAT = 0;
-        this.calPage.cal3Tas = 0;
-        this.calPage.cal3HeadingMag = 0;
-
-        this.calPage.cal4GS = 0;
-        this.calPage.cal4Fpm = 0;
-        this.calPage.cal4Angle = 0;
-
-        this.calPage.cal5TempC = 0;
-        this.calPage.cal5TempF = 32;
-        this.calPage.cal5SpeedKt = 0;
-        this.calPage.cal5SpeedMph = 0;
 
         this.calPage.cal6TimeZ = null;
         this.calPage.cal6FromTimezone = null;

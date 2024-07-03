@@ -1,4 +1,5 @@
 import {DefaultUserSettingManager, EventBus} from '@microsoft/msfs-sdk';
+import {Celsius, Degrees, Fahrenheit, Feet, Inhg, Knots, Mph} from "../data/Units";
 
 
 export const BARO_UNIT_INHG = true;
@@ -82,6 +83,25 @@ export type KLN90BUserSettingsTypes = {
     flightTimer: boolean,
     fastGpsAcquisition: boolean,
     enableGlow: boolean,
+
+    cal12IndicatedAltitude: Feet;
+    cal12Barometer: Inhg;
+    cal1SAT: Celsius;
+
+    cal2Cas: Knots,
+    cal2TAT: Celsius;
+
+    cal3Tas: Knots,
+    cal3HeadingMag: Degrees,
+
+    cal4GS: Knots,
+    cal4Fpm: number,
+    cal4Angle: number,
+
+    cal5TempC: Celsius,
+    cal5TempF: Fahrenheit,
+    cal5SpeedKt: Knots,
+    cal5SpeedMph: Mph,
 }
 
 export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSettingsTypes> {
@@ -224,6 +244,62 @@ export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSett
             {
                 name: "enableGlow",
                 defaultValue: true,
+            },
+            {
+                name: "cal12IndicatedAltitude",
+                defaultValue: 0,
+            },
+            {
+                name: "cal12Barometer",
+                defaultValue: 0,  //https://youtu.be/gjmVrkHTdP0?t=27
+            },
+            {
+                name: "cal1SAT",
+                defaultValue: 0,
+            },
+            {
+                name: "cal2Cas",
+                defaultValue: 0,
+            },
+            {
+                name: "cal2TAT",
+                defaultValue: 0,
+            },
+            {
+                name: "cal3Tas",
+                defaultValue: 0,
+            },
+            {
+                name: "cal3HeadingMag",
+                defaultValue: 0,
+            },
+            {
+                name: "cal4GS",
+                defaultValue: 0,
+            },
+            {
+                name: "cal4Fpm",
+                defaultValue: 0,
+            },
+            {
+                name: "cal4Angle",
+                defaultValue: 0,
+            },
+            {
+                name: "cal5TempC",
+                defaultValue: 0,
+            },
+            {
+                name: "cal5TempF",
+                defaultValue: 32,
+            },
+            {
+                name: "cal5SpeedKt",
+                defaultValue: 0,
+            },
+            {
+                name: "cal5SpeedMph",
+                defaultValue: 0,
             },
         ]);
     }
