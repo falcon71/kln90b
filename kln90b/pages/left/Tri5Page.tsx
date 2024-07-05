@@ -35,7 +35,7 @@ export class Tri5Page extends SixLineHalfPage {
     public readonly cursorController;
     readonly children: UIElementChildren<Tri5PageTypes>;
 
-    readonly name: string = "TRI 3";
+    readonly name: string = "TRI 5";
 
     private from: string = "     ";
     private to: string = "     ";
