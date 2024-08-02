@@ -32,6 +32,8 @@ import {format} from "numerable";
 export class UserWaypointPersistor {
     private manager: DefaultUserSettingManager<KLN90BUserWaypointsTypes>;
 
+    private ignoreSync = false;
+
 
     constructor(private bus: EventBus, private repo: KLNFacilityRepository) {
         bus.getSubscriber<any>().on(KLNFacilityRepository.SYNC_TOPIC).handle(this.persistWaypoints.bind(this));
@@ -40,12 +42,17 @@ export class UserWaypointPersistor {
 
     public restoreWaypoints() {
         const wpts = this.deserializeAllWpts();
+        this.ignoreSync = true;
         for (const wpt of wpts) {
             this.repo.add(wpt);
         }
+        this.ignoreSync = false;
     }
 
     private persistWaypoints(data: FacilityRepositorySyncData) {
+        if (this.ignoreSync) {
+            return;
+        }
         if (data.type !== FacilityRepositorySyncType.Add && data.type !== FacilityRepositorySyncType.Remove && data.type !== FacilityRepositorySyncType.Update) {
             return;
         }
