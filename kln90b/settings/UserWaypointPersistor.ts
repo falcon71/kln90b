@@ -138,7 +138,7 @@ export class UserWaypointPersistor {
      * @private
      */
     private serializetLat(lat: number): string {
-        const degreesString = format(lat, "+00", {rounding: "truncate", zeroFormat: "+00"});
+        const degreesString = format(lat, "+00", {rounding: "truncate", zeroFormat: "+00", signedZero: true});
 
         const minutes = (Math.abs(lat) % 1) * 60;
         const minutesString = format(minutes, "00.00");
@@ -151,7 +151,7 @@ export class UserWaypointPersistor {
      * @private
      */
     private serializetLon(lon: number): string {
-        const degreesString = format(lon, "+000", {rounding: "truncate", zeroFormat: "+000"});
+        const degreesString = format(lon, "+000", {rounding: "truncate", zeroFormat: "+000", signedZero: true});
 
         const minutes = (Math.abs(lon) % 1) * 60;
         const minutesString = format(minutes, "00.00");
@@ -335,17 +335,19 @@ export class UserWaypointPersistor {
     }
 
     private deserializeLat(str: string): number {
-        const degrees = Number(str.substring(12, 15));
+        const sign = str.substring(12, 13) == '-' ? -1 : 1;
+        const degrees = Number(str.substring(13, 15));
         const minutes = Number(str.substring(15, 20)) / 60;
 
-        return degrees + (degrees >= 0 ? minutes : -minutes);
+        return sign * (degrees + (degrees >= 0 ? minutes : -minutes));
     }
 
     private deserializeLon(str: string): number {
-        const degrees = Number(str.substring(20, 24));
+        const sign = str.substring(20, 21) == '-' ? -1 : 1;
+        const degrees = Number(str.substring(21, 24));
         const minutes = Number(str.substring(24, 29)) / 60;
 
-        return degrees + (degrees >= 0 ? minutes : -minutes);
+        return sign * (degrees + (degrees >= 0 ? minutes : -minutes));
     }
 
     private deserializeFrequency(str: string): number {
