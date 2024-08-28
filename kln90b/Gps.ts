@@ -101,8 +101,8 @@ export class GPS {
         this.gpsSatComputer = new KLNGPSSatComputer(
             1,
             bus,
-            'coui://html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B/Assets/gps_ephemeris.json',
-            'coui://html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B/Assets/gps_sbas.json',
+            `${options.basePath}/Assets/gps_ephemeris.json`,
+            `${options.basePath}/Assets/gps_sbas.json`,
             5000,
             [],
             'none',

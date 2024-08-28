@@ -122,8 +122,8 @@ export class Sta5Page extends SixLineHalfPage {
         const gps = new GPSSatComputer(
             1,
             tempBus,
-            'coui://html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B/Assets/gps_ephemeris.json',
-            'coui://html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B/Assets/gps_sbas.json',
+            `${this.props.planeSettings.basePath}/Assets/gps_ephemeris.json`,
+            `${this.props.planeSettings.basePath}/Assets/gps_sbas.json`,
             5000,
             [],
             'primary',

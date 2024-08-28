@@ -326,7 +326,7 @@ class KLN90B extends BaseInstrument {
             this.messageHandler.addMessage(new OneTimeMessage(["USER DATA LOST"]));
         }
 
-        Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), msa.init()]).then(() => {
+        Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), msa.init(this.planeSettings.basePath)]).then(() => {
             const props: PageProps = {
                 ref: this.mainScreen,
                 bus: this.bus,

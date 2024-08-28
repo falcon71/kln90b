@@ -54,7 +54,7 @@ export class MSA {
         return esa;
     }
 
-    public async init(): Promise<void> {
+    public async init(basePath: string): Promise<void> {
         return new Promise((resolve, reject) => {
             const request = new XMLHttpRequest();
             request.onreadystatechange = () => {
@@ -67,7 +67,7 @@ export class MSA {
                     }
                 }
             };
-            request.open('GET', "coui://html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B/Assets/msa.json");
+            request.open('GET', `${basePath}/Assets/msa.json`);
             request.send();
         });
     }

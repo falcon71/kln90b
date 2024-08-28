@@ -18,14 +18,14 @@ drop-shadow(0 0 10px $green); //This larger shadow creates the distinct glow on 
 
 @font-face {
   font-family: "KLN90B";
-  src: url("/Fonts/kln90b.ttf") format("truetype");
+  src: url("./Assets/kln90b.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
 }
 
 @font-face {
   font-family: "KLN90BMap";
-  src: url("/Fonts/kln90b-map.ttf") format("truetype");
+  src: url("./Assets/kln90b-map.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
 }
