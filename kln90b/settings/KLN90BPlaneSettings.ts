@@ -52,7 +52,7 @@ export class KLN90BPlaneSettingsParser {
 
         const options: KLN90PlaneSettings = {
             takeHomeMode: this.getOption(instrumentsTag, "TakeHomeMode", false),
-            basePath: this.getOption(instrumentsTag, "BasePath", 'coui://html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B'),
+            basePath: this.getOption(instrumentsTag, "BasePath", 'html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B'),
             vfrOnly: this.getOption(instrumentsTag, "VFROnly", false),
             input: {
                 altimeterInterfaced: this.getOption(instrumentsTag, "Input.AltimeterInterfaced", true),

@@ -67,7 +67,7 @@ export class MSA {
                     }
                 }
             };
-            request.open('GET', `${basePath}/Assets/msa.json`);
+            request.open('GET', `coui://${basePath}/Assets/msa.json`);
             request.send();
         });
     }

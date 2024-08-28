@@ -101,8 +101,8 @@ export class GPS {
         this.gpsSatComputer = new KLNGPSSatComputer(
             1,
             bus,
-            `${options.basePath}/Assets/gps_ephemeris.json`,
-            `${options.basePath}/Assets/gps_sbas.json`,
+            `coui://${options.basePath}/Assets/gps_ephemeris.json`,
+            `coui://${options.basePath}/Assets/gps_sbas.json`,
             5000,
             [],
             'none',
