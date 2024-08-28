@@ -75,6 +75,8 @@ class Set10BasicPage extends SixLineHalfPage {
 
     readonly name: string = "SET10";
 
+    private readonly fplImporter = new FplFileimporter(this.props.bus, this.props.facilityLoader, this.props.messageHandler);
+
     constructor(props: PageProps, setPage: (page: SixLineHalfPage) => void) {
         super(props);
 
@@ -82,14 +84,18 @@ class Set10BasicPage extends SixLineHalfPage {
         const fastGpsAcquisition = this.props.userSettings.getSetting("fastGpsAcquisition").get();
         const glow = this.props.userSettings.getSetting("enableGlow").get();
 
+        const importFlightplanButton = new Button("IMPORT FPL?", () => setPage(new Set10ImportFplFilePage(this.props, setPage)));
+
         this.children = new UIElementChildren<Set10BasicPageTypes>({
             fastGps: new SelectField(['REAL', 'FAST'], fastGpsAcquisition ? 1 : 0, this.saveFastGpsAcquisition.bind(this)),
             enableGlow: new SelectField(['OFF', ' ON'], glow ? 1 : 0, this.saveGlow.bind(this)),
-            importFlightplan: new Button("IMPORT FPL?", () => setPage(new Set10ImportFplFilePage(this.props, setPage))),
+            importFlightplan: importFlightplanButton,
         });
+        importFlightplanButton.setVisible(false);
 
         this.cursorController = new CursorController(this.children);
 
+        this.fplImporter.klnPlnFileExists().then(exists => importFlightplanButton.setVisible(exists));
     }
 
     public render(): VNode {

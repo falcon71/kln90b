@@ -30,6 +30,23 @@ export class FplFileimporter extends Flightplanloader {
         });
     }
 
+    public async klnPlnFileExists(): Promise<boolean> {
+        return new Promise((resolve, reject) => {
+            const request = new XMLHttpRequest();
+            request.onreadystatechange = () => {
+                if (request.readyState === XMLHttpRequest.DONE) {
+                    if (request.status === 200 && request.responseXML !== null) {
+                        resolve(true);
+                    } else {
+                        resolve(false);
+                    }
+                }
+            };
+            request.open('GET', "/VFS/flightplan/kln/kln.pln");
+            request.send();
+        });
+    }
+
     private async loadFromXml(xml: Document): Promise<Flightplan> {
         const flightPlan = xml.getElementsByTagName("FlightPlan.FlightPlan")[0];
 
