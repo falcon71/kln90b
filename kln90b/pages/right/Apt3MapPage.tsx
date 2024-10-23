@@ -1,4 +1,4 @@
-import {AirportFacility, FSComponent, GeoPoint, RunwayUtils, VNode} from '@microsoft/msfs-sdk';
+import {AirportFacility, GeoPoint, RunwayUtils, VNode} from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {Canvas} from "../../controls/Canvas";
@@ -23,7 +23,7 @@ export class Apt3MapPage extends WaypointPage<AirportFacility> {
         super(props);
 
         const facility = unpackFacility(this.facility);
-        if (!facility || isUserWaypoint(facility)) {
+        if (!facility || isUserWaypoint(facility) || facility.runways.length == 0) {
             this.numPages = 0;
         }
 
@@ -43,7 +43,7 @@ export class Apt3MapPage extends WaypointPage<AirportFacility> {
     public changeFacility(fac: string | AirportFacility) {
         super.changeFacility(fac);
         const facility = unpackFacility(this.facility);
-        this.numPages = facility && !isUserWaypoint(facility) ? 1 : 0;
+        this.numPages = facility && !isUserWaypoint(facility) && facility.runways.length > 0 ? 1 : 0;
     }
 
     public getScanlist(): Scanlist {

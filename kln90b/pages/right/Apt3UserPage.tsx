@@ -38,21 +38,18 @@ export class Apt3UserPage extends WaypointPage<AirportFacility> {
     private ref: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
     private isVisible: boolean = false;
 
-
     constructor(props: PageProps) {
         super(props);
 
-
         const facility = unpackFacility(this.facility);
+        const runway = this.getRunway(facility);
 
         this.children = new UIElementChildren<Apt3UserPageTypes>({
-            length: new RunwayLengthEditor(this.props.bus, facility ? this.getRunwayLength(this.getRunway(facility)) : null, this.setRunwayLength.bind(this)),
-            surface: new RunwaySurfaceEditor(this.props.bus, facility ? this.getRunwaySurface(this.getRunway(facility)) : null, this.setRunwaySurface.bind(this)),
+            length: new RunwayLengthEditor(this.props.bus, this.getRunwayLength(runway), this.setRunwayLength.bind(this)),
+            surface: new RunwaySurfaceEditor(this.props.bus, this.getRunwaySurface(runway), this.setRunwaySurface.bind(this)),
         });
 
-
         this.setVisible(facility !== null && isUserWaypoint(facility));
-
     }
 
     public render(): VNode {
@@ -107,19 +104,22 @@ export class Apt3UserPage extends WaypointPage<AirportFacility> {
         return this.props.nearestLists.aptNearestList;
     }
 
-    private getRunway(facility: AirportFacility): AirportRunway {
+    private getRunway(facility: AirportFacility | null): AirportRunway | null {
+        if (facility == null || facility.runways.length === 0) { //For example HEGH has no runways
+            return null;
+        }
         return facility.runways[0];
     }
 
-    private getRunwayLength(rwy: AirportRunway): number | null {
-        if (rwy.length < 0) {
+    private getRunwayLength(rwy: AirportRunway | null): number | null {
+        if (rwy == null || rwy.length < 0) {
             return null;
         }
         return UnitType.METER.convertTo(rwy.length, UnitType.FOOT);
     }
 
-    private getRunwaySurface(rwy: AirportRunway): RunwaySurfaceType | null {
-        if (rwy.surface === RunwaySurfaceType.WrightFlyerTrack) {
+    private getRunwaySurface(rwy: AirportRunway | null): RunwaySurfaceType | null {
+        if (rwy == null || rwy.surface === RunwaySurfaceType.WrightFlyerTrack) {
             return null;
         }
         return rwy.surface;
