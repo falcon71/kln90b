@@ -226,7 +226,7 @@ export class UserWaypointPersistor {
             elevation: 0,
             direction: 0,
             designation: "18-36",
-            length: Math.round(UnitType.FOOT.convertTo(Number(str.substring(35, 41)), UnitType.METER)),
+            length: UnitType.FOOT.convertTo(Number(str.substring(35, 41)), UnitType.METER),
             width: 0,
             surface: this.deserializeSurface(str),
             lighting: RunwayLightingType.Unknown,

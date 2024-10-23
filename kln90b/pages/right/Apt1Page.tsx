@@ -286,7 +286,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
                 elevation: 0,
                 direction: 0,
                 designation: "18-36",
-                length: -1,
+                length: -10,
                 width: 0,
                 surface: RunwaySurfaceType.WrightFlyerTrack,
                 lighting: RunwayLightingType.Unknown,

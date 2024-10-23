@@ -112,7 +112,7 @@ export class Apt3UserPage extends WaypointPage<AirportFacility> {
     }
 
     private getRunwayLength(rwy: AirportRunway): number | null {
-        if (rwy.length === -1) {
+        if (rwy.length < 0) {
             return null;
         }
         return UnitType.METER.convertTo(rwy.length, UnitType.FOOT);
