@@ -1,4 +1,4 @@
-import {Facility, GeoCircle, GeoPoint, UserSetting} from "@microsoft/msfs-sdk";
+import {Facility, GeoCircle, GeoPoint, LatLonInterface, UserSetting} from "@microsoft/msfs-sdk";
 import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "./Flightplan";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Sensors} from "../../Sensors";
@@ -221,16 +221,14 @@ export class ActiveWaypoint {
      */
     private findClosestLegIdx(legs: KLNFlightplanLeg[]): number {
         const CACHED_CIRCLE = new GeoCircle(new Float64Array(3), 0);
-        const tempGeoPoint = new GeoPoint(0, 0);
+        const tempFromGeoPoint = new GeoPoint(0, 0);
+        const tempClosestGeoPoint = new GeoPoint(0, 0);
         let distMin = 99999; //This is GA Radians!
-        const closestWpt = new GeoPoint(0, 0);
         let closestIdx = -1;
         for (let i = 1; i < legs.length; i++) {
             const from = legs[i - 1];
             const to = legs[i].wpt;
-            tempGeoPoint.set(from.wpt);
-            const distFromTo = tempGeoPoint.distance(to);
-            const distGpsFrom = tempGeoPoint.distance(this.sensors.in.gps.coords);
+            tempFromGeoPoint.set(from.wpt);
             let circle: GeoCircle;
             if (from.arcData === undefined) {
                 CACHED_CIRCLE.setAsGreatCircle(from.wpt, to);
@@ -238,23 +236,38 @@ export class ActiveWaypoint {
             } else {
                 circle = from.arcData.circle;
             }
-            circle.closest(this.sensors.in.gps.coords, tempGeoPoint);
-            const distFromClosest = tempGeoPoint.distance(from.wpt); //We use this to check, if closest is between from and to
+            circle.closest(this.sensors.in.gps.coords, tempClosestGeoPoint);
+
             let distGPSClosestWpt: number;
-            if (distFromClosest <= distFromTo) { //The closest point is not between from and to, so lets use the distance between GPS and from instead
-                distGPSClosestWpt = distGpsFrom;
+            if (this.isPointOnCircleBetween(tempFromGeoPoint, to, tempClosestGeoPoint)) {
+                distGPSClosestWpt = tempClosestGeoPoint.distance(this.sensors.in.gps.coords)
             } else {
-                distGPSClosestWpt = tempGeoPoint.distance(this.sensors.in.gps.coords)
+                //The closest point is not between from and to, so lets use the distance between GPS and from instead
+                distGPSClosestWpt = tempFromGeoPoint.distance(this.sensors.in.gps.coords);
             }
 
             if (distGPSClosestWpt < distMin) {
-                closestWpt.set(tempGeoPoint);
                 distMin = distGPSClosestWpt;
                 closestIdx = i;
             }
         }
 
         return closestIdx;
+    }
+
+    /**
+     * Checks if the point is located between from and to. All points must be located on the same great circle
+     * @param from
+     * @param to
+     * @param pointToCheck
+     * @private
+     */
+    private isPointOnCircleBetween(from: GeoPoint, to: LatLonInterface, pointToCheck: GeoPoint): boolean {
+        const distFromTo = from.distance(to);
+        const distPointFrom = pointToCheck.distance(from);
+        const distPointTo = pointToCheck.distance(to);
+        //If the distance between A & C and B & C is the same as A & B, then C lies between A & B, otherwise it is outside
+        return distPointFrom + distPointTo <= distFromTo + GeoCircle.ANGULAR_TOLERANCE;
     }
 
     private assertToMatchesFplIdx(): void {
