@@ -59,7 +59,7 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
 
     public async init() {
         this.session = await this.facilityLoader.startNearestSearchSession(this.searchType) as KLNSessionTypeMap[SearchType];
-        await this.initFilters(this.session);
+        this.initFilters(this.session);
     }
 
     public async tick() {
@@ -87,16 +87,18 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
             }
         }
 
-        for (const addedIcao of diff.added) {
+        const addedFacilities = await Promise.all(diff.added.map(addedIcao => this.facilityLoader.getFacility(this.facilityType, addedIcao)));
+
+        for (const addedFacility of addedFacilities) {
             this.nearestList.push({
-                facility: await this.facilityLoader.getFacility(this.facilityType, addedIcao) as any,
+                facility: addedFacility as any,
                 //Those values will be calculated in updateBearingDistance
                 bearingToTrue: 0,
                 distance: 0,
                 index: 0,
             });
-        }
 
+        }
         this.updateBearingDistance();
         this.isCalculating = false;
     }
@@ -109,7 +111,7 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
         return this.nearestList.slice(0, 9);
     }
 
-    protected abstract initFilters(session: KLNSessionTypeMap[SearchType]): Promise<void>;
+    protected abstract initFilters(session: KLNSessionTypeMap[SearchType]): void;
 
     private updateBearingDistance() {
         for (const wpt of this.nearestList) {
@@ -132,22 +134,22 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
 
 export class AirportNearestList extends NearestList<FacilitySearchType.Airport, AirportFacility> {
 
-    public async updateFilters() {
-        await this.session!.setAirportFilters(
+    public updateFilters(): void {
+        this.session!.setAirportFilters(
             this.userSettings.getSetting("nearestAptSurface").get(),
             this.userSettings.getSetting("nearestAptMinRunwayLength").get(),
         );
     }
 
-    protected async initFilters(session: KLNSessionTypeMap[FacilitySearchType.Airport]): Promise<void> {
-        return this.updateFilters();
+    protected initFilters(session: KLNSessionTypeMap[FacilitySearchType.Airport]): void {
+        this.updateFilters();
     }
 
 }
 
 export class VorNearestList extends NearestList<FacilitySearchType.Vor, VorFacility> {
-    protected async initFilters(session: KLNSessionTypeMap[FacilitySearchType.Vor]): Promise<void> {
-        await session.setVorFilter(
+    protected initFilters(session: KLNSessionTypeMap[FacilitySearchType.Vor]): void {
+        session.setVorFilter(
             BitFlags.union(BitFlags.createFlag(VorClass.HighAlt), BitFlags.createFlag(VorClass.LowAlt)),
             BitFlags.union(BitFlags.createFlag(VorType.VOR), BitFlags.createFlag(VorType.VORDME), BitFlags.createFlag(VorType.VORTAC)),
         );
@@ -156,7 +158,6 @@ export class VorNearestList extends NearestList<FacilitySearchType.Vor, VorFacil
 
 
 export class NdbNearestList extends NearestList<FacilitySearchType.Ndb, NdbFacility> {
-    protected initFilters(session: KLNSessionTypeMap[FacilitySearchType.Ndb]): Promise<void> {
-        return Promise.resolve();
+    protected initFilters(session: KLNSessionTypeMap[FacilitySearchType.Ndb]): void {
     }
 }
