@@ -4,7 +4,7 @@ import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {AirportSelector} from "../../controls/selects/AirportSelector";
 import {getRegionOrCountry} from "../../data/CountryMap";
-import {isNearestWpt, isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
+import {isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {CreateWaypointMessage} from "../../controls/selects/CreateWaypointMessage";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
@@ -56,7 +56,7 @@ export class Apt2Page extends WaypointPage<AirportFacility> {
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "A"),
-            nearestSelector: new NearestSelector(isNearestWpt(this.facility) ? this.facility.index : -1),
+            nearestSelector: new NearestSelector(this.facility),
             dbPage: new Apt2DBPage(props),
             userPage: new Apt2UserPage(props),
             createWpt: new CreateWaypointMessage(() => Apt1Page.createAtUserPosition(props), () => Apt1Page.createAtPresentPosition(props)),
@@ -88,7 +88,7 @@ export class Apt2Page extends WaypointPage<AirportFacility> {
 
     protected redraw() {
         const facility = unpackFacility(this.facility);
-        this.children.get("nearestSelector").setValue(isNearestWpt(this.facility) ? this.facility.index : -1);
+        this.children.get("nearestSelector").setFacility(this.facility);
         if (facility === null) {
             this.children.get("createWpt").setVisible(true);
         } else {

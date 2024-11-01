@@ -3,7 +3,7 @@ import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {AirportSelector} from "../../controls/selects/AirportSelector";
-import {isNearestWpt, unpackFacility, WaypointPage} from "./WaypointPage";
+import {unpackFacility, WaypointPage} from "./WaypointPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {CreateWaypointMessage} from "../../controls/selects/CreateWaypointMessage";
 import {Apt1Page} from "./Apt1Page";
@@ -53,7 +53,7 @@ export class Apt6Page extends WaypointPage<AirportFacility> {
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "A"),
-            nearestSelector: new NearestSelector(isNearestWpt(this.facility) ? this.facility.index : -1),
+            nearestSelector: new NearestSelector(this.facility),
             fuel: new TextDisplay(this.formatFuel(facility)),
             createWpt: new CreateWaypointMessage(() => Apt1Page.createAtUserPosition(props), () => Apt1Page.createAtPresentPosition(props)),
         });
@@ -89,7 +89,7 @@ export class Apt6Page extends WaypointPage<AirportFacility> {
 
     protected redraw() {
         const facility = unpackFacility(this.facility);
-        this.children.get("nearestSelector").setValue(isNearestWpt(this.facility) ? this.facility.index : -1);
+        this.children.get("nearestSelector").setFacility(this.facility);
         if (facility === null) {
             this.mainRef.instance.classList.add("d-none");
             this.children.get("createWpt").setVisible(true);

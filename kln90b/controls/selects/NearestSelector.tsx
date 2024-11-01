@@ -1,7 +1,9 @@
-import {FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
+import {Facility, FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {EnterResult, Field} from "../../pages/CursorController";
 import {NO_CHILDREN} from '../../pages/Page';
 import {TickController} from "../../TickController";
+import {NearestWpt} from "../../data/navdata/NearestList";
+import {isNearestWpt} from "../../pages/right/WaypointPage";
 
 
 export class NearestSelector implements Field {
@@ -14,15 +16,14 @@ export class NearestSelector implements Field {
 
     /**
      * The nearestIndex is 0 based
-     * @param nearestIndex
+     * @param facility
      */
-    public constructor(private nearestIndex: number = -1) {
-        this.isReadonly = nearestIndex === -1;
+    public constructor(private facility: Facility | NearestWpt<Facility> | null) {
     }
 
     public render(): VNode {
         return (
-            <span ref={this.ref}>{this.formatValue()}</span>);
+            <span ref={this.ref}>{this.formatValue(this.getIndex())}</span>);
     }
 
     outerLeft(): boolean {
@@ -41,9 +42,8 @@ export class NearestSelector implements Field {
         return false;
     }
 
-    public setValue(value: number): void {
-        this.nearestIndex = value;
-        this.isReadonly = value === -1;
+    public setFacility(facility: Facility | NearestWpt<Facility> | null): void {
+        this.facility = facility;
     }
 
     public setFocused(focused: boolean) {
@@ -54,20 +54,26 @@ export class NearestSelector implements Field {
         if (!TickController.checkRef(this.ref)) {
             return;
         }
+        const nearestIndex = this.getIndex();
+        this.isReadonly = nearestIndex === -1;
 
-        this.ref.instance.textContent = this.formatValue();
+        this.ref.instance.textContent = this.formatValue(nearestIndex);
 
         if (this.isFocused) {
             this.ref!.instance.classList.add("inverted");
             this.ref!.instance.classList.remove("blink");
         } else {
             this.ref!.instance.classList.remove("inverted");
-            if (blink && this.nearestIndex !== -1) {
+            if (blink && nearestIndex !== -1) {
                 this.ref!.instance.classList.add("blink");
             } else {
                 this.ref!.instance.classList.remove("blink");
             }
         }
+    }
+
+    private getIndex(): number {
+        return isNearestWpt(this.facility) ? this.facility.index : -1;
     }
 
     isEnterAccepted(): boolean {
@@ -86,12 +92,12 @@ export class NearestSelector implements Field {
         return false;
     }
 
-    private formatValue() {
-        if (this.nearestIndex === -1) {
+    private formatValue(nearestIndex: number) {
+        if (nearestIndex === -1) {
             return "    ";
         }
 
-        return `nr ${this.nearestIndex + 1}`; //The KLN is 1 based
+        return `nr ${nearestIndex + 1}`; //The KLN is 1 based
     }
 
     public keyboard(key: string): boolean {

@@ -207,6 +207,11 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
     }
 
     protected changeFacility(fac: T | NearestWpt<T> | string) {
+        if (fac === undefined) {
+            console.error("Somehow the facility got undefined, ignoring...");
+            return;
+        }
+
         if (typeof fac === "string") {
             this.facility = null;
             this.ident = fac;
