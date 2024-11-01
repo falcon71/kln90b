@@ -20,6 +20,8 @@ export const HOURS_TO_SECONDS = 3600;
 const VEC3_CACHE = new Float64Array(3);
 const TO_GEOPOINT_CACHE = new GeoPoint(0, 0);
 
+export const MAX_BANK_ANGLE = 25;
+
 /**
  * This class updates all navigation variables
  */
@@ -229,7 +231,7 @@ export class NavCalculator implements CalcTickable {
      * @private
      */
     private bankeAngleForStandardTurn(speed: Knots) {
-        return Math.min(57.3 * Math.atan(speed / 362.1), 25);
+        return Math.min(57.3 * Math.atan(speed / 362.1), MAX_BANK_ANGLE);
     }
 
 

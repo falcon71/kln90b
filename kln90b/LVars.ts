@@ -14,6 +14,8 @@ export const LVAR_GPS_WP_BEARING = "L:KLN90B_GPS_WP_BEARING";
 
 export const LVAR_HSI_TF_FLAGS = "L:KLN90B_HSI_TF_FLAGS"; //To from to animate the HSI. Please see https://github.com/falcon71/kln90b/wiki/CDI--HSI for details
 
+export const LVAR_ROLL_COMMAND = "L:KLN90B_RollCommand"; //Roll steering command for the autopilot. Please see https://github.com/falcon71/kln90b/wiki/Autopilot for details
+
 
 export const LVAR_MSG_LIGHT = "L:KLN90B_MsgLight"; //Boolean. true whenever the MSG light flashes
 export const LVAR_WPT_LIGHT = "L:KLN90B_WptLight"; //Boolean. true if the waypoint alert is active

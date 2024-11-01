@@ -20,7 +20,14 @@ import {CalcTickable} from "./TickController";
 import {AudioGenerator} from "./services/AudioGenerator";
 import {MessageHandler} from "./data/MessageHandler";
 import {NavMode, TO} from "./data/VolatileMemory";
-import {LVAR_ANNUN_TEST, LVAR_GPS_WP_BEARING, LVAR_HSI_TF_FLAGS, LVAR_MSG_LIGHT, LVAR_WPT_LIGHT} from "./LVars";
+import {
+    LVAR_ANNUN_TEST,
+    LVAR_GPS_WP_BEARING,
+    LVAR_HSI_TF_FLAGS,
+    LVAR_MSG_LIGHT,
+    LVAR_ROLL_COMMAND,
+    LVAR_WPT_LIGHT,
+} from "./LVars";
 import {GPS} from "./Gps";
 import {SignalOutputFilter} from "./services/SignalOutputFilter";
 
@@ -491,6 +498,14 @@ export class SensorsOut {
                 SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 2);
                 break
 
+        }
+    }
+
+    public setRollCommand(bankAngle: Number | null) {
+        if (bankAngle === null) {
+            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
+        } else {
+            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, bankAngle);
         }
     }
 

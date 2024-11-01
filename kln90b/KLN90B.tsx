@@ -87,6 +87,7 @@ import {SimVarSync} from "./SimVarSync";
 import {KeyboardEvent, KeyboardEventData} from "./controls/StatusLine";
 import {ErrorEvent} from "./controls/ErrorPage";
 import {SignalOutputFillterTick} from "./services/SignalOutputFillterTick";
+import {RollSteeringController} from "./services/RollSteeringController";
 
 export interface PropsReadyEvent {
     propsReady: PageProps;
@@ -312,6 +313,7 @@ class KLN90B extends BaseInstrument {
                 new Timers(sensors, this.userSettings, memory.dtPage),
                 vnav,
                 this.messageHandler,
+                new RollSteeringController(sensors, memory),
             ], [
                 new SignalOutputFillterTick(sensors),
             ]);
