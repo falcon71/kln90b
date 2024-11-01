@@ -134,7 +134,7 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
         if (this.scanHandler.isSearchRunning) {
             return true;
         }
-        if (isNearestWpt(this.facility)) {
+        if (isNearestWpt(this.facility) && this.facility.index > -1) {
             if (this.facility.index === 0) {
                 return true; //left end, nothing to do
             }
@@ -145,7 +145,8 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
                 this.changeFacility(nearestlist[newIndex] as any);
             }
         } else {
-            this.scanHandler.scanLeft(this.facility ? this.facility.icao : `       ${this.ident.padEnd(5, " ")}`).then(nextFacility => {
+            const fac = unpackFacility(this.facility);
+            this.scanHandler.scanLeft(fac ? fac.icao : `       ${this.ident.padEnd(5, " ")}`).then(nextFacility => {
                 if (nextFacility === null) { //End of waypointlist, move to the nearestlist if avaiable
                     const nearestListGenerator = this.getNearestList();
                     if (nearestListGenerator !== null) {
@@ -166,7 +167,7 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
         if (this.scanHandler.isSearchRunning) {
             return true;
         }
-        if (isNearestWpt(this.facility)) {
+        if (isNearestWpt(this.facility) && this.facility.index > -1) {
             const nearestListGenerator = this.getNearestList()!;
             const nearestlist = nearestListGenerator.getNearestList();
             const newIndex = this.facility.index + 1;
@@ -183,7 +184,8 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
                 this.changeFacility(nearestlist[newIndex] as any);
             }
         } else {
-            this.scanHandler.scanRight(this.facility ? this.facility.icao : `       ${this.ident.padEnd(5, " ")}`).then(nextFacility => {
+            const fac = unpackFacility(this.facility);
+            this.scanHandler.scanRight(fac ? fac.icao : `       ${this.ident.padEnd(5, " ")}`).then(nextFacility => {
                 if (nextFacility !== null) {
                     this.changeFacility(nextFacility as any);
                 }

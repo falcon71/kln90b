@@ -162,7 +162,7 @@ export class AirportCoordOrNearestView implements UiElement {
     }
 
     tick(blink: boolean): void {
-        if (isNearestWpt(this.facility)) {
+        if (isNearestWpt(this.facility) && this.facility.index > -1) {
             this.nearestRef.instance.classList.remove("d-none");
             this.coordRef.instance.classList.add("d-none");
             this.children.get("bearing").bearing = this.magvar.trueToMag(this.facility.bearingToTrue);
