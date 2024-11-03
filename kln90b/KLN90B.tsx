@@ -24,6 +24,9 @@ import {
     Facility,
     FacilityLoader,
     FacilityRepository,
+    FlightPathAirplaneSpeedMode,
+    FlightPathCalculator,
+    FlightPlanner,
     FSComponent,
     HEventPublisher,
     ICAO,
@@ -81,7 +84,6 @@ import {ModeController} from "./services/ModeController";
 import {Database} from "./data/navdata/Database";
 import {KLNMagvar} from "./data/navdata/KLNMagvar";
 import {buildPersistentMessages} from "./data/PersistentMessages";
-import {Flightplan} from "./data/flightplan/Flightplan";
 import {SidStar} from "./data/navdata/SidStar";
 import {SimVarSync} from "./SimVarSync";
 import {KeyboardEvent, KeyboardEventData} from "./controls/StatusLine";
@@ -252,14 +254,24 @@ class KLN90B extends BaseInstrument {
 
         const scanlists = new Scanlists(facilityLoader);
 
-        this.userWaypointPersistor = new UserWaypointPersistor(this.bus, facilityLoader.facilityRepo);
+        this.userWaypointPersistor = new UserWaypointPersistor(this.bus, facilityLoader.getFacilityRepo());
         try {
             this.userWaypointPersistor.restoreWaypoints();
         } catch (e) {
             restoreSuccessFull = false;
         }
+        const flightplanner = FlightPlanner.getPlanner(this.bus, new FlightPathCalculator(facilityLoader, {
+            defaultClimbRate: 100,
+            defaultSpeed: 100,
+            bankAngle: 25,
+            holdBankAngle: null,
+            courseReversalBankAngle: null,
+            turnAnticipationBankAngle: null,
+            maxBankAngle: 25,
+            airplaneSpeedMode: FlightPathAirplaneSpeedMode.GroundSpeed,
+        }, this.bus));
 
-        this.userFlightplanPersistor = new UserFlightplanPersistor(this.bus, facilityLoader, this.messageHandler, this.planeSettings);
+        this.userFlightplanPersistor = new UserFlightplanPersistor(this.bus, flightplanner, facilityLoader, this.messageHandler, this.planeSettings);
 
         const nearestLists = new Nearestlists(facilityLoader, sensors, this.userSettings);
         const nearestUtils = new NearestUtils(facilityLoader);
@@ -274,20 +286,22 @@ class KLN90B extends BaseInstrument {
             }
         }
 
-        let flightplans: Flightplan[];
+
+        let flightplans: FlightPlan[];
         if (restoreSuccessFull) {
             try {
                 flightplans = await this.userFlightplanPersistor.restoreAllFlightplan();
             } catch (e) {
-                flightplans = Array(26).fill(null).map((_, idx) => new Flightplan(idx, [], this.bus));
+                flightplans = Array(26).fill(null).map((_, idx) => new FlightPlan(idx, [], this.bus));
                 restoreSuccessFull = false;
                 console.error(e);
             }
         } else {
-            flightplans = Array(26).fill(null).map((_, idx) => new Flightplan(idx, [], this.bus));
+            flightplans = Array(26).fill(null).map((_, idx) => new FlightPlan(idx, [], this.bus));
         }
 
-        const memory = new VolatileMemory(this.bus, this.userSettings, facilityLoader, sensors, scanlists, flightplans, lastActiveWaypoint);
+
+        const memory = new VolatileMemory(this.bus, this.userSettings, facilityLoader, sensors, scanlists, flightplanner, lastActiveWaypoint);
 
 
         const airspaceAlert = new AirspaceAlert(this.userSettings, sensors, this.messageHandler, facilityLoader, memory.navPage);
@@ -296,7 +310,6 @@ class KLN90B extends BaseInstrument {
         const magvar = new KLNMagvar(sensors, memory.navPage);
 
         const modeController = new ModeController(this.bus, memory.navPage, flightplans[0], this.planeSettings, sensors, magvar);
-
 
         this.tickManager = new TickController(this.bus, [this.pageManager],
             [
@@ -313,7 +326,7 @@ class KLN90B extends BaseInstrument {
                 new Timers(sensors, this.userSettings, memory.dtPage),
                 vnav,
                 this.messageHandler,
-                new RollSteeringController(sensors, memory),
+                new RollSteeringController(sensors, memory, this.bus),
             ], [
                 new SignalOutputFillterTick(sensors),
             ]);
@@ -322,7 +335,7 @@ class KLN90B extends BaseInstrument {
 
         const msa = new MSA();
 
-        this.temporaryWaypointDeleter = new TemporaryWaypointDeleter(facilityLoader.facilityRepo, this.bus, flightplans);
+        this.temporaryWaypointDeleter = new TemporaryWaypointDeleter(facilityLoader.getFacilityRepo(), this.bus, flightplans);
 
         if (!restoreSuccessFull) {
             this.messageHandler.addMessage(new OneTimeMessage(["USER DATA LOST"]));

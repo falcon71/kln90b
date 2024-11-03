@@ -4,7 +4,7 @@ import {ModeController} from "../services/ModeController";
 import {format} from "numerable";
 import {NavMath} from "@microsoft/msfs-sdk";
 import {NavMode, NavPageState} from "./VolatileMemory";
-import {KLNFixType} from "./flightplan/Flightplan";
+import {KLNFixType} from "./flightplan/FlightPlan";
 import {Database} from "./navdata/Database";
 import {KLNMagvar} from "./navdata/KLNMagvar";
 import {PageManager} from "../pages/PageManager";

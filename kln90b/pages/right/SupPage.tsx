@@ -246,7 +246,7 @@ export class SupPage extends WaypointPage<UserFacility> {
         if (facility) {
             this.rad = radial;
 
-            this.props.facilityLoader.facilityRepo.update(facility, fac => {
+            this.props.facilityLoader.getFacilityRepo().update(facility, fac => {
                 const refCoords = new GeoPoint(this.ref!.lat, this.ref!.lon);
                 const newCoords = refCoords.offset(radial, UnitType.NMILE.convertTo(this.dis!, UnitType.GA_RADIAN), new GeoPoint(0, 0));
                 fac.lat = newCoords.lat;
@@ -262,7 +262,7 @@ export class SupPage extends WaypointPage<UserFacility> {
         const facility = unpackFacility(this.facility);
         if (facility) {
             this.dis = dist;
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => {
+            this.props.facilityLoader.getFacilityRepo().update(facility!, fac => {
                 const refCoords = new GeoPoint(this.ref!.lat, this.ref!.lon);
                 const newCoords = refCoords.offset(this.rad!, UnitType.NMILE.convertTo(dist, UnitType.GA_RADIAN), new GeoPoint(0, 0));
                 fac.lat = newCoords.lat;
@@ -277,7 +277,7 @@ export class SupPage extends WaypointPage<UserFacility> {
     private setLatitude(latitude: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.lat = latitude);
+            this.props.facilityLoader.getFacilityRepo().update(facility!, fac => fac.lat = latitude);
         } else {
             this.userSupplementary!.lat = latitude;
             this.createIfReady();
@@ -287,7 +287,7 @@ export class SupPage extends WaypointPage<UserFacility> {
     private setLongitude(longitude: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.lon = longitude);
+            this.props.facilityLoader.getFacilityRepo().update(facility!, fac => fac.lon = longitude);
         } else {
             this.userSupplementary!.lon = longitude;
             this.createIfReady();
@@ -352,7 +352,7 @@ export class SupPage extends WaypointPage<UserFacility> {
             userFacilityType: UserFacilityType.LAT_LONG,
         };
         try {
-            this.props.facilityLoader.facilityRepo.add(this.facility);
+            this.props.facilityLoader.getFacilityRepo().add(this.facility);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
@@ -378,7 +378,7 @@ export class SupPage extends WaypointPage<UserFacility> {
             userFacilityType: UserFacilityType.LAT_LONG,
         };
         try {
-            this.props.facilityLoader.facilityRepo.add(this.facility);
+            this.props.facilityLoader.getFacilityRepo().add(this.facility);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);

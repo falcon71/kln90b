@@ -1,16 +1,16 @@
 import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
 import {EventBus, FacilityType, ICAO, UserFacility} from "@microsoft/msfs-sdk";
 import {PowerEvent} from "../PowerButton";
-import {Flightplan} from "../data/flightplan/Flightplan";
+import {FlightPlan} from "../data/flightplan/FlightPlan";
 import {TEMPORARY_WAYPOINT} from "../data/navdata/IcaoBuilder";
 
 export class TemporaryWaypointDeleter {
 
-    constructor(private readonly repo: KLNFacilityRepository, bus: EventBus, private readonly flightplans: Flightplan[]) {
+    constructor(private readonly repo: KLNFacilityRepository, bus: EventBus, private readonly flightplans: FlightPlan[]) {
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.deleteUnusedTemporaryWaypoints.bind(this));
     }
 
-    public static findUsageInFlightplans(icao: string, flightplans: Flightplan[]): number | null {
+    public static findUsageInFlightplans(icao: string, flightplans: FlightPlan[]): number | null {
         for (const flightplan of flightplans) {
             if (flightplan.getLegs().some(leg => leg.wpt.icao === icao)) {
                 return flightplan.idx;

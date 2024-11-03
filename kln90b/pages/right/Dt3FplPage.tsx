@@ -5,7 +5,7 @@ import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {MainPage} from "../MainPage";
 import {FplPage} from "../left/FplPage";
 import {Alignment, RoundedDistanceDisplay} from "../../controls/displays/RoundedDistanceDisplay";
-import {Flightplan} from "../../data/flightplan/Flightplan";
+import {FlightPlan} from "../../data/flightplan/FlightPlan";
 import {Degrees} from "../../data/Units";
 import {BearingDisplay} from "../../controls/displays/BearingDisplay";
 
@@ -112,7 +112,8 @@ export class Dt3FplPage extends SixLineHalfPage {
 
         }
     }
-    private calculateDisEte(fpl: Flightplan): DisDtk[] {
+
+    private calculateDisEte(fpl: FlightPlan): DisDtk[] {
         const legs = fpl.getLegs();
         const disDtk: DisDtk[] = [];
         const CACHED_POINT = new GeoPoint(0, 0);

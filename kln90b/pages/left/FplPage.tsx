@@ -4,7 +4,7 @@ import {NO_CHILDREN, PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {MainPage} from "../MainPage";
 import {FlightplanList} from "../../controls/FlightplanList";
-import {Flightplan} from "../../data/flightplan/Flightplan";
+import {FlightPlan} from "../../data/flightplan/FlightPlan";
 
 
 type FplPageTypes = {
@@ -24,7 +24,7 @@ export abstract class FplPage extends SixLineHalfPage {
     readonly children: UIElementChildren<FplPageTypes>;
     public readonly fplIdx: number;
     readonly name: string;
-    private readonly flightplan: Flightplan;
+    private readonly flightplan: FlightPlan;
 
     protected constructor(props: FplPageProps) {
         super(props);

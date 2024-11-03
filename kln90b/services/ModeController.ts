@@ -1,13 +1,17 @@
 import {FROM, NavMode, NavPageState} from "../data/VolatileMemory";
 import {
     AirportFacility,
+    BitFlags,
     EventBus,
     Facility,
     FacilityType,
-    GeoCircle,
+    FixTypeFlags,
+    FlightPlan,
+    FlightPlanSegmentType,
     GeoPoint,
     ICAO,
     LatLonInterface,
+    LegDefinition,
     NavMath,
     UnitType,
     UserFacilityUtils,
@@ -15,11 +19,12 @@ import {
 } from "@microsoft/msfs-sdk";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {Sensors} from "../Sensors";
-import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
 import {Degrees} from "../data/Units";
 import {StatusLineMessageEvents} from "../controls/StatusLine";
 import {CalcTickable, TICK_TIME_CALC} from "../TickController";
 import {KLNMagvar} from "../data/navdata/KLNMagvar";
+import {getSegment} from "./FlightplanUtils";
+import {AccessUserData} from "../data/flightplan/AccesUserData";
 
 /**
  * 5-36
@@ -27,7 +32,7 @@ import {KLNMagvar} from "../data/navdata/KLNMagvar";
 export class ModeController implements CalcTickable {
 
 
-    constructor(private readonly bus: EventBus, private readonly navState: NavPageState, private readonly fpl0: Flightplan, private readonly planeSettings: KLN90PlaneSettings, private readonly sensors: Sensors, private readonly magvar: KLNMagvar) {
+    constructor(private readonly bus: EventBus, private readonly navState: NavPageState, private readonly fpl0: FlightPlan, private readonly planeSettings: KLN90PlaneSettings, private readonly sensors: Sensors, private readonly magvar: KLNMagvar) {
     }
 
 
@@ -92,13 +97,14 @@ export class ModeController implements CalcTickable {
 
         const active = this.navState.activeWaypoint.getActiveWpt();
         if (active !== null) {
-            if (this.navState.toFrom === FROM && this.navState.activeWaypoint.getActiveFplIdx() !== -1) {
-                this.navState.activeWaypoint.activateFpl0();
+            if (this.navState.toFrom === FROM) {
                 const from = UserFacilityUtils.createFromLatLon("UXX        d", this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, true);
-                const to = this.reorientFlightplanLeg(this.sensors.in.gps.coords) ?? active;
-
-                this.navState.activeWaypoint.directTo(from, to);
+                const to = this.navState.activeWaypoint.activateFpl0();
+                if (to !== null) {
+                    this.navState.activeWaypoint.directTo(from, to);
+                }
             } else {
+                //todo not sure this is right. We need rule 2, the OBS bekoes the DTK
                 const fromCoords: LatLonInterface = this.navState.activeWaypoint.getFromWpt()!;
                 const from = UserFacilityUtils.createFromLatLon("UXX        d", fromCoords.lat, fromCoords.lon, true);
                 this.navState.activeWaypoint.directTo(from, active);
@@ -269,33 +275,6 @@ export class ModeController implements CalcTickable {
         }
     }
 
-    private reorientFlightplanLeg(pos: LatLonInterface): Facility | null {
-        const legs = this.fpl0.getLegs();
-        if (legs.length < 2) {
-            return null;
-        }
-
-        const circle = new GeoCircle(new Float64Array(3), 0);
-        const tempGeoPoint = new GeoPoint(0, 0);
-        let distMin = 99999; //This is GA Radians!
-        let closestLeg: Facility | null = null;
-        for (let i = 1; i < legs.length; i++) {
-            const from = legs[i - 1].wpt;
-            const to = legs[i].wpt;
-            tempGeoPoint.set(from);
-            const distFromTo = tempGeoPoint.distance(to);
-            const path = circle.setAsGreatCircle(from, to);
-            path.closest(pos, tempGeoPoint);
-            const distFromClosest = tempGeoPoint.distance(from); //We use this to check, if closest is between from and to
-            const distClosestWpt = tempGeoPoint.distance(pos);
-            if (distFromClosest <= distFromTo && distClosestWpt < distMin) {
-                closestLeg = to;
-                distMin = distClosestWpt;
-            }
-        }
-        return closestLeg;
-    }
-
     private checkSwitchEnrToArmMode(apt: AirportFacility | null): void {
         if (apt !== null && UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(apt), UnitType.NMILE) <= 30) {
             console.log("Moving to Arm mode");
@@ -308,6 +287,8 @@ export class ModeController implements CalcTickable {
             return;
         }
 
+        this.fpl0.directToData
+
         //Scale moves to 1 in 30 seconds
         const scaleStep = 4 / 30 / 1000 * TICK_TIME_CALC;
 
@@ -315,18 +296,17 @@ export class ModeController implements CalcTickable {
     }
 
     private adjustXtkScaleActive(): void {
-
         if (this.navState.xtkScale == 0.3) {
             return;
         }
 
         const faf = this.navState.activeWaypoint.getActiveLeg();
-        if (faf?.fixType !== KLNFixType.FAF) {
+        if (BitFlags.isAll(faf?.leg.fixTypeFlags ?? 0, FixTypeFlags.FAF)) {
             this.navState.xtkScale = 0.3;
             return; //We moved on the MAP already
         }
 
-        const dist = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(faf.wpt), UnitType.NMILE);
+        const dist = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(AccessUserData.getFacility(faf!)), UnitType.NMILE);
         this.navState.xtkScale = dist * 0.35 + 0.3;  //Scale reaches 0.3 at 0 distance
     }
 
@@ -336,11 +316,10 @@ export class ModeController implements CalcTickable {
         }
 
         const faf = this.navState.activeWaypoint.getActiveLeg();
-        if (faf?.fixType !== KLNFixType.FAF) {
+        if (BitFlags.isAll(faf?.leg.fixTypeFlags ?? 0, FixTypeFlags.FAF)) {
             return; //Only when FAF is active
         }
-
-        if (UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(faf.wpt), UnitType.NMILE) > 2) {
+        if (UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(faf!.leg.lat!, faf!.leg.lon!), UnitType.NMILE) > 2) {
             return; //Within 2 NM
         }
 
@@ -352,8 +331,8 @@ export class ModeController implements CalcTickable {
             return;
         }
 
-        const fafPoint = new GeoPoint(faf.wpt.lat, faf.wpt.lon);
-        const appDtk = fafPoint.bearingTo(map.wpt);
+        const fafPoint = new GeoPoint(faf!.leg.lat!, faf!.leg.lon!);
+        const appDtk = fafPoint.bearingTo(AccessUserData.getFacility(map));
 
         if (Math.abs(NavMath.diffAngle(appDtk, this.sensors.in.gps.trackTrue)) > 110) {
             return; //Heading towards FAF
@@ -369,14 +348,19 @@ export class ModeController implements CalcTickable {
      * If there is an approach in the Flightplan, then this will return the corresponding airport. Null otherwise
      */
     private getApproachApt(): AirportFacility | null {
-        return this.fpl0.getLegs().find(leg => leg.type === KLNLegType.APP)?.parentFacility ?? null;
+        const appSegment = getSegment(this.fpl0, FlightPlanSegmentType.Approach);
+        if (appSegment === null) {
+            return null;
+        }
+
+        return AccessUserData.getParentFacility(appSegment.legs[0]);
     }
 
     /**
      * Returns the MAP, but only if it is still ahead of the plane
      * @private
      */
-    private getApproachMapIfAhead(): KLNFlightplanLeg | null {
-        return this.fpl0.getLegs().slice(this.navState.activeWaypoint.getActiveFplIdx()).find(leg => leg.fixType === KLNFixType.MAP) ?? null;
+    private getApproachMapIfAhead(): LegDefinition | null {
+        return this.fpl0.findLeg(leg => BitFlags.isAll(leg.leg.fixTypeFlags, FixTypeFlags.MAP), false, this.navState.activeWaypoint.getActiveFplIdx());
     }
 }

@@ -6,7 +6,7 @@ import {MainPage} from "../MainPage";
 import {FplPage} from "../left/FplPage";
 import {Alignment, RoundedDistanceDisplay} from "../../controls/displays/RoundedDistanceDisplay";
 import {TimeDisplay} from "../../controls/displays/TimeDisplay";
-import {Flightplan} from "../../data/flightplan/Flightplan";
+import {FlightPlan} from "../../data/flightplan/FlightPlan";
 import {TimeStamp, TIMEZONES} from "../../data/Time";
 import {SelectField} from "../../controls/selects/SelectField";
 
@@ -131,7 +131,7 @@ export class Dt2FplPage extends SixLineHalfPage {
         this.props.userSettings.getSetting("timezone").set(tzIndex);
     }
 
-    private calculateDisEte(fpl: Flightplan): DisEte[] {
+    private calculateDisEte(fpl: FlightPlan): DisEte[] {
         const legs = fpl.getLegs();
         const disEte: DisEte[] = [];
         const CACHED_POINT = new GeoPoint(0, 0);

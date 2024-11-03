@@ -24,10 +24,11 @@ import {SimpleListItem} from "../../controls/ListItem";
 import {Button} from "../../controls/Button";
 import {MainPage} from "../MainPage";
 import {Fpl0Page} from "../left/FplPage";
-import {KLNFlightplanLeg, KLNLegType} from "../../data/flightplan/Flightplan";
+import {FlightPlanSegmentType, LegDefinition} from "../../data/flightplan/FlightPlan";
 import {OneTimeMessage} from "../../data/MessageHandler";
 import {SidStar} from "../../data/navdata/SidStar";
 import {insertLegIntoFpl} from "../../services/FlightplanUtils";
+import {AccessUserData} from "../../data/flightplan/AccesUserData";
 
 
 type Apt8PageTypes = {
@@ -172,12 +173,11 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
         this.requiresRedraw = true;
     }
 
-    private loadIfFplContainsApt(app: ApproachProcedure, iaf: ApproachTransition | null, legs: KLNFlightplanLeg[]): void {
+    private loadIfFplContainsApt(app: ApproachProcedure, iaf: ApproachTransition | null, legs: LegDefinition[]): void {
         console.log("loadIfFplContainsApt", app, iaf, legs);
-        const fpl0Legs = this.props.memory.fplPage.flightplans[0].getLegs();
         const facility = unpackFacility(this.facility)!;
 
-        if (fpl0Legs.some(wpt => wpt.wpt.icao === facility.icao)) {
+        if (this.props.memory.fplPage.flighplanner.getFlightPlan(0).findLeg((leg) => AccessUserData.getFacility(leg).icao === facility.icao)) {
             this.load(app, iaf, legs);
             return;
         }
@@ -193,29 +193,41 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
 
     }
 
-    private load(app: ApproachProcedure, iaf: ApproachTransition | null, legs: KLNFlightplanLeg[]): void {
+    private load(app: ApproachProcedure, iaf: ApproachTransition | null, legs: LegDefinition[]): void {
         console.log("load", app, iaf, legs);
 
-        const fpl0 = this.props.memory.fplPage.flightplans[0];
-        fpl0.startBatchInsert();
-        fpl0.removeProcedure(KLNLegType.APP); //I don't think you can have two approaches at the same time
-        const fpl0Legs = fpl0.getLegs();
-        const facility = unpackFacility(this.facility)!;
-        let idx = fpl0Legs.findIndex(wpt => wpt.wpt.icao === facility.icao);
-        if (idx === -1) {
-            //Airport not in FPL?
-            idx = fpl0Legs.length;
-            try {
-                insertLegIntoFpl(fpl0, this.props.memory.navPage, fpl0Legs.length, {wpt: facility, type: KLNLegType.USER});
-            } catch (e) {
-                this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
-                console.error(e);
-                fpl0.finishBatchInsert();
-                return;
+        const fpl0 = this.props.memory.fplPage.flighplanner.getFlightPlan(0);
+        const batchId = fpl0.openBatch();
+
+        //The KLN-89 will ask for confirmation, if the user really wants to replace the existing approach. I'm sure you can only have one for the KLN 90B as well
+        for (const segment of fpl0.segments()) {
+            if (segment.segmentType === FlightPlanSegmentType.APP) {
+                fpl0.removeSegment(segment.segmentIndex);
             }
         }
 
-        if (SidStar.hasDuplicates(fpl0Legs, legs)) {
+        const facility = unpackFacility(this.facility)!;
+        const airport = fpl0.findLeg((leg) => AccessUserData.getFacility(leg).icao === facility.icao);
+        let idx: number;
+        if (airport === null) {
+            //Airport not in FPL?
+            idx = fpl0.length;
+            try {
+                insertLegIntoFpl(fpl0, this.props.memory.navPage, idx, {
+                    wpt: facility,
+                    type: FlightPlanSegmentType.USER,
+                });
+            } catch (e) {
+                this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
+                console.error(e);
+                fpl0.closeBatch(batchId);
+                return;
+            }
+        } else {
+            idx = fpl0.getLegIndexFromLeg(airport);
+        }
+
+        if (SidStar.hasDuplicates(fpl0, legs)) {
             this.props.messageHandler.addMessage(new OneTimeMessage(["REDUNDANT WPTS IN FPL", "EDIT ENROUTE WPTS", "AS NECESSARY"]));
         }
 
@@ -226,11 +238,11 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
             } catch (e) {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
                 console.error(e);
-                fpl0.finishBatchInsert();
+                fpl0.closeBatch(batchId);
                 break;
             }
         }
-        fpl0.finishBatchInsert();
+        fpl0.closeBatch(batchId);
 
         this.currentApt8Page = new Apt8IAPPage({
             ...this.props,
@@ -479,8 +491,8 @@ class Apt8IAFPage extends Apt8SelectorPage {
 interface Apt8PreviewPageProps extends PageProps {
     app: ApproachProcedure,
     iaf: ApproachTransition | null,
-    legs: KLNFlightplanLeg[],
-    load: (app: ApproachProcedure, iaf: ApproachTransition | null, legs: KLNFlightplanLeg[]) => void,
+    legs: LegDefinition[],
+    load: (app: ApproachProcedure, iaf: ApproachTransition | null, legs: LegDefinition[]) => void,
 }
 
 
@@ -521,8 +533,8 @@ class Apt8PreviewPage extends Apt8SelectorPage {
         </pre>);
     }
 
-    private buildList(legs: KLNFlightplanLeg[]): UIElementChildren<any> {
-        const waypoints = legs.map((leg, idx) => new SimpleListItem<KLNFlightplanLeg>({
+    private buildList(legs: LegDefinition[]): UIElementChildren<any> {
+        const waypoints = legs.map((leg, idx) => new SimpleListItem<LegDefinition>({
             bus: this.props.bus,
             value: leg,
             fulltext: `${(idx + 1).toString().padStart(2, " ")} ${ICAO.getIdent(leg.wpt.icao)}${SidStar.getWptSuffix(leg.fixType)}`.padEnd(11, " "), //6-10 the prefix is right after short identifiers
@@ -538,8 +550,8 @@ class Apt8PreviewPage extends Apt8SelectorPage {
 interface Apt8AddPageProps extends PageProps {
     app: ApproachProcedure,
     iaf: ApproachTransition | null,
-    legs: KLNFlightplanLeg[],
-    load: (app: ApproachProcedure, iaf: ApproachTransition | null, legs: KLNFlightplanLeg[]) => void,
+    legs: LegDefinition[],
+    load: (app: ApproachProcedure, iaf: ApproachTransition | null, legs: LegDefinition[]) => void,
 }
 
 
@@ -555,7 +567,7 @@ class Apt8AddPage extends Apt8SelectorPage {
 
     public readonly app: ApproachProcedure;
     public readonly iaf: ApproachTransition | null;
-    public readonly legs: KLNFlightplanLeg[];
+    public readonly legs: LegDefinition[];
 
     constructor(props: Apt8AddPageProps) {
         super(props);

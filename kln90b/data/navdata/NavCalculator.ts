@@ -5,7 +5,7 @@ import {GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Degrees, Knots, Seconds} from "../Units";
 import {ModeController} from "../../services/ModeController";
-import {KLNFixType} from "../flightplan/Flightplan";
+import {KLNFixType} from "../flightplan/FlightPlan";
 import {KLNMagvar} from "./KLNMagvar";
 import {calcDistToDestination} from "../../services/FlightplanUtils";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";

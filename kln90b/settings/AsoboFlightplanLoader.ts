@@ -1,4 +1,4 @@
-import {Flightplan} from "../data/flightplan/Flightplan";
+import {FlightPlan} from "../data/flightplan/FlightPlan";
 import {UserFacility, UserFacilityType, Wait} from "@microsoft/msfs-sdk";
 import {Flightplanloader} from "../services/Flightplanloader";
 import {StatusLineMessageEvents} from "../controls/StatusLine";
@@ -40,7 +40,7 @@ export class AsoboFlightplanLoader extends Flightplanloader {
     }
 
 
-    public async loadAsoboFlightplan(): Promise<Flightplan> {
+    public async loadAsoboFlightplan(): Promise<FlightPlan> {
         console.log("loading asobo flightplan");
         await AsoboFlightplanLoader.init();
         Coherent.call('LOAD_CURRENT_ATC_FLIGHTPLAN');
@@ -89,7 +89,7 @@ export class AsoboFlightplanLoader extends Flightplanloader {
         console.log("Adding temporary user waypoint", facility);
 
         try {
-            this.facilityLoader.facilityRepo.add(facility);
+            this.facilityLoader.getFacilityRepo().add(facility);
             return facility.icao;
         } catch (e) {
             this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");

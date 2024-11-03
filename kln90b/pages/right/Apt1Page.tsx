@@ -196,7 +196,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
     private setLatitude(latitude: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility, fac => fac.lat = latitude);
+            this.props.facilityLoader.getFacilityRepo().update(facility, fac => fac.lat = latitude);
         } else {
             this.userAirport!.lat = latitude;
             this.createIfReady();
@@ -206,7 +206,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
     private setLongitude(longitude: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility, fac => fac.lon = longitude);
+            this.props.facilityLoader.getFacilityRepo().update(facility, fac => fac.lon = longitude);
         } else {
             this.userAirport!.lon = longitude;
             this.createIfReady();
@@ -239,7 +239,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
 
         this.facility = this.buildAirportFacility(this.userAirport!.lat, this.userAirport!.lon);
         try {
-            this.props.facilityLoader.facilityRepo.add(this.facility!);
+            this.props.facilityLoader.getFacilityRepo().add(this.facility!);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
@@ -252,7 +252,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
         this.facility = this.buildAirportFacility(this.props.sensors.in.gps.coords.lat, this.props.sensors.in.gps.coords.lon);
 
         try {
-            this.props.facilityLoader.facilityRepo.add(this.facility!);
+            this.props.facilityLoader.getFacilityRepo().add(this.facility!);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);

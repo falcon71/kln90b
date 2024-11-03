@@ -29,14 +29,14 @@ export class NearestUtils {
     }
 
     public async init() {
-        this.vorSession = await this.facilityLoader.startNearestSearchSession(FacilitySearchType.Vor);
+        this.vorSession = await this.facilityLoader.startNearestKLNSearchSession(FacilitySearchType.Vor);
         await this.vorSession!.setVorFilter(
             BitFlags.union(BitFlags.createFlag(VorClass.HighAlt), BitFlags.createFlag(VorClass.LowAlt), BitFlags.createFlag(VorClass.Terminal)),
             BitFlags.union(BitFlags.createFlag(VorType.VOR), BitFlags.createFlag(VorType.VORDME), BitFlags.createFlag(VorType.VORTAC)),
         );
 
-        const settion = await this.facilityLoader.startNearestSearchSession(FacilitySearchType.Boundary);
-        this.airspaceSession = new NearestLodBoundarySearchSession(DefaultLodBoundaryCache.getCache(), settion, 0.5);
+        const session = await this.facilityLoader.startNearestKLNSearchSession(FacilitySearchType.Boundary);
+        this.airspaceSession = new NearestLodBoundarySearchSession(DefaultLodBoundaryCache.getCache(), session, 0.5);
 
     }
 

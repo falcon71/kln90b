@@ -1,9 +1,9 @@
-import {Flightplan} from "../data/flightplan/Flightplan";
+import {FlightPlan} from "../data/flightplan/FlightPlan";
 import {FacilityType, ICAO} from "@microsoft/msfs-sdk";
 
 export class AsoboFlightplanSaver {
 
-    public async saveToAsoboFlightplan(plan: Flightplan): Promise<void> {
+    public async saveToAsoboFlightplan(plan: FlightPlan): Promise<void> {
         try {
             console.log("saving asobo flightplan");
             await Coherent.call('SET_CURRENT_FLIGHTPLAN_INDEX', 0, true).catch((e: any) => console.warn("Error SET_CURRENT_FLIGHTPLAN_INDEX", e));

@@ -16,7 +16,7 @@ import {CursorController} from "../CursorController";
 import {MainPage} from "../MainPage";
 import {FplPage} from "../left/FplPage";
 import {WaypointEditor} from "../../controls/editors/WaypointEditor";
-import {Flightplan} from "../../data/flightplan/Flightplan";
+import {FlightPlan} from "../../data/flightplan/FlightPlan";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
 import {getUniqueIdent} from "../../data/navdata/UniqueIdentGenerator";
 import {buildIcao, TEMPORARY_WAYPOINT} from "../../data/navdata/IcaoBuilder";
@@ -125,7 +125,7 @@ export class RefPage extends SixLineHalfPage {
         };
 
         try {
-            this.props.facilityLoader.facilityRepo.add(facility);
+            this.props.facilityLoader.getFacilityRepo().add(facility);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
@@ -136,7 +136,7 @@ export class RefPage extends SixLineHalfPage {
     }
 
 
-    private findClosestPoint(fpl: Flightplan, wpt: Facility): { point: GeoPoint, legIdx: number } | null {
+    private findClosestPoint(fpl: FlightPlan, wpt: Facility): { point: GeoPoint, legIdx: number } | null {
         const legs = fpl.getLegs();
         if (legs.length < 2) {
             return null;

@@ -10,18 +10,18 @@ import {IcaoFixedLength} from "../data/navdata/IcaoFixedLength";
 import {TextDisplay} from "./displays/TextDisplay";
 import {SixLineHalfPage} from "../pages/FiveSegmentPage";
 import {FplWptEnterMode} from "./FlightplanList";
-import {KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
+import {FlightPlanSegmentType, LegDefinition} from "../data/flightplan/FlightPlan";
 import {SidStar} from "../data/navdata/SidStar";
 
 export interface FlightplanListItemProps extends PageProps {
     fplIdx: number,
     origWptIdx: number, //The actual index of this leg in the flightplan. -1 when it is a new waypoint not yet in the fpl
-    leg: KLNFlightplanLeg | null,
+    leg: LegDefinition | null,
     wptIdx: number, //The index to display to the user
     wpt: Facility | null,
     onCreate: (idx: number, mode: FplWptEnterMode, keyboardKey?: string) => void,
     onDelete: (idx: number) => void,
-    onInsertDone: (idx: number, value: Facility | null, leg: KLNFlightplanLeg | null) => void,
+    onInsertDone: (idx: number, value: Facility | null, leg: LegDefinition | null) => void,
     onBeforeDelete: (idx: number) => KLNErrorMessage | null,
     parent: SixLineHalfPage,
     cursorController: CursorController,
@@ -43,7 +43,7 @@ export class FlightplanListItem implements Field, ListItem {
     protected readonly readonlyRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     protected readonly delRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     private waypointEditor: WaypointEditor;
-    private readonly type: KLNLegType;
+    private readonly type: FlightPlanSegmentType;
     private readonly wptIdent: string;
 
     public constructor(protected props: FlightplanListItemProps) {
@@ -60,9 +60,9 @@ export class FlightplanListItem implements Field, ListItem {
             enterCallback: this.setFacility.bind(this),
         });
 
-        this.type = this.props.leg?.type ?? KLNLegType.USER;
+        this.type = this.props.leg?.type ?? FlightPlanSegmentType.USER;
 
-        if (this.type === KLNLegType.APP) {
+        if (this.type === FlightPlanSegmentType.APP) {
             const suffix = SidStar.getWptSuffix(this.props.leg?.fixType);
             this.wptIdent = (ICAO.getIdent(this.wpt!.icao) + suffix).padEnd(6, " ");
         } else {
@@ -74,18 +74,18 @@ export class FlightplanListItem implements Field, ListItem {
     public render(): VNode {
         let colon: string;
         switch (this.type) {
-            case KLNLegType.APP:
+            case FlightPlanSegmentType.APP:
                 colon = " ";
                 break;
-            case KLNLegType.SID:
-            case KLNLegType.STAR:
+            case FlightPlanSegmentType.SID:
+            case FlightPlanSegmentType.STAR:
                 colon = ".";
                 break;
-            case KLNLegType.USER:
+            case FlightPlanSegmentType.USER:
                 colon = ":";
                 break;
         }
-        const wptEditor = this.type === KLNLegType.APP ? (
+        const wptEditor = this.type === FlightPlanSegmentType.APP ? (
             <span ref={this.readonlyRef}>{this.wptIdent}</span>) : this.waypointEditor.render();
 
 
@@ -109,7 +109,7 @@ export class FlightplanListItem implements Field, ListItem {
             //The user aborted the insert by turning the cursor off
             this.props.onInsertDone(this.props.wptIdx, null, null);
         }
-        if (this.type !== KLNLegType.APP) {
+        if (this.type !== FlightPlanSegmentType.APP) {
             this.waypointEditor.setFocused(focused);
         }
     }
@@ -123,7 +123,7 @@ export class FlightplanListItem implements Field, ListItem {
     }
 
     innerLeft(): boolean {
-        if (this.type === KLNLegType.APP) {
+        if (this.type === FlightPlanSegmentType.APP) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID ADD");
             return true;
         }
@@ -139,7 +139,7 @@ export class FlightplanListItem implements Field, ListItem {
     }
 
     innerRight(): boolean {
-        if (this.type === KLNLegType.APP) {
+        if (this.type === FlightPlanSegmentType.APP) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID ADD");
             return true;
         }
@@ -188,7 +188,7 @@ export class FlightplanListItem implements Field, ListItem {
             return;
         }
 
-        if (this.type === KLNLegType.APP) {
+        if (this.type === FlightPlanSegmentType.APP) {
             if (this.isFocused) {
                 this.readonlyRef.instance.classList.add("inverted");
             } else {
@@ -218,7 +218,7 @@ export class FlightplanListItem implements Field, ListItem {
         if (this.wpt === null) {
             return false;
         }
-        if (this.type === KLNLegType.APP) {
+        if (this.type === FlightPlanSegmentType.APP) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID DEL");
             return true;
         }
@@ -252,7 +252,7 @@ export class FlightplanListItem implements Field, ListItem {
     public keyboard(key: string): boolean {
         if (!this.isEntered) {
             //We need the normal logic to check if we can actually enter
-            if (this.type === KLNLegType.APP) {
+            if (this.type === FlightPlanSegmentType.APP) {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID ADD");
                 return true;
             }

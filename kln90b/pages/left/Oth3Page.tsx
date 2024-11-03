@@ -45,7 +45,7 @@ export class Oth3Page extends SixLineHalfPage {
 
     private buildList(): WaypointDeleteListItem[] {
         const list: Facility[] = [];
-        this.props.facilityLoader.facilityRepo.forEach(f => list.push(f));
+        this.props.facilityLoader.getFacilityRepo().forEach(f => list.push(f));
         return list.sort(this.compareUserFacilities.bind(this)).map(f => new WaypointDeleteListItem({
             ...this.props,
             value: f,
@@ -125,7 +125,7 @@ export class Oth3Page extends SixLineHalfPage {
     }
 
     private deleteFacility(facility: Facility) {
-        this.props.facilityLoader.facilityRepo.remove(facility);
+        this.props.facilityLoader.getFacilityRepo().remove(facility);
     }
 
     private beforeDeleteFacility(facility: Facility): KLNErrorMessage | null {

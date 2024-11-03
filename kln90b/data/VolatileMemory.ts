@@ -3,6 +3,9 @@ import {
     EventBus,
     Facility,
     FacilityType,
+    FlightPlan,
+    FlightPlanner,
+    FlightPlanSegmentType,
     ICAO,
     IntersectionFacility,
     NdbFacility,
@@ -15,7 +18,6 @@ import {Scanlists} from "./navdata/Scanlist";
 import {NearestWpt} from "./navdata/NearestList";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 import {Degrees, Feet, Knots, NauticalMiles, Seconds} from "./Units";
-import {Flightplan} from "./flightplan/Flightplan";
 import {ActiveWaypoint} from "./flightplan/ActiveWaypoint";
 import {TimeStamp} from "./Time";
 import {CenterWaypoint} from "../pages/right/Ctr1Page";
@@ -33,7 +35,7 @@ export interface AltPageState {
 }
 
 export interface FplPageState {
-    flightplans: Flightplan[];
+    flighplanner: FlightPlanner,
 }
 
 export interface DtPageState {
@@ -84,7 +86,7 @@ export class NavPageState {
     //When operating outside the database coverage
     public userMagvar: Degrees = 0;
 
-    constructor(userSettings: KLN90BUserSettings, sensors: Sensors, fpl0: Flightplan, lastactiveWaypoint: Facility | null) {
+    constructor(userSettings: KLN90BUserSettings, sensors: Sensors, fpl0: FlightPlan, lastactiveWaypoint: Facility | null) {
         this.activeWaypoint = new ActiveWaypoint(userSettings, sensors, fpl0, lastactiveWaypoint);
     }
 
@@ -126,7 +128,7 @@ export const enum CtrState {
 
 export interface CtrPageState {
     state: CtrState,
-    lastFpl: Flightplan | null;
+    lastFpl: FlightPlan | null;
     waypoints: CenterWaypoint[];
 }
 
@@ -210,10 +212,10 @@ export class VolatileMemory {
 
     public isReady = false;
 
-    public constructor(bus: EventBus, userSettings: KLN90BUserSettings, private facilityLoader: KLNFacilityLoader, sensors: Sensors, private scanlists: Scanlists, flightplans: Flightplan[], lastactiveWaypoint: Facility | null) {
-        this.navPage = new NavPageState(userSettings, sensors, flightplans[0], lastactiveWaypoint);
+    public constructor(bus: EventBus, userSettings: KLN90BUserSettings, private facilityLoader: KLNFacilityLoader, sensors: Sensors, private scanlists: Scanlists, flighplanner: FlightPlanner, lastactiveWaypoint: Facility | null) {
+        this.navPage = new NavPageState(userSettings, sensors, flighplanner.getFlightPlan(0), lastactiveWaypoint);
         this.fplPage = {
-            flightplans,
+            flighplanner,
         };
 
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.reset.bind(this));
@@ -228,7 +230,15 @@ export class VolatileMemory {
         this.altPage.alertEnabled = false;
         this.altPage.alertWarn = 300;
 
-        this.fplPage.flightplans[0].removeProcedures();
+        const segments = this.fplPage.flighplanner.getFlightPlan(0).segments();
+        for (const segment of segments) {
+            if (segment.segmentType == FlightPlanSegmentType.Departure ||
+                segment.segmentType == FlightPlanSegmentType.Arrival ||
+                segment.segmentType == FlightPlanSegmentType.Approach ||
+                segment.segmentType == FlightPlanSegmentType.MissedApproach) {
+                this.fplPage.flighplanner.getFlightPlan(0).removeSegment(segment.segmentIndex);
+            }
+        }
 
         this.dtPage.departureTime = null;
         this.dtPage.flightTimer = 0;

@@ -22,7 +22,7 @@ import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {AirspaceIntersection, airspaceIntersectionsAlongRoute} from "../../services/AirspacesAlongRoute";
 import {format} from "numerable";
 import {CtrState} from "../../data/VolatileMemory";
-import {KLNLegType} from "../../data/flightplan/Flightplan";
+import {FlightPlanSegmentType} from "../../data/flightplan/FlightPlan";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
 import {insertLegIntoFpl} from "../../services/FlightplanUtils";
 import {buildIcao, TEMPORARY_WAYPOINT} from "../../data/navdata/IcaoBuilder";
@@ -227,7 +227,10 @@ export class Ctr1Page extends SixLineHalfPage {
         const fpl = this.props.memory.ctrPage.lastFpl!;
         let inserted = 0;
         for (const wpt of this.props.memory.ctrPage.waypoints.filter(wpt => wpt.isNew)) {
-            insertLegIntoFpl(fpl, this.props.memory.navPage, wpt.idx + inserted, {wpt: wpt.wpt, type: KLNLegType.USER});
+            insertLegIntoFpl(fpl, this.props.memory.navPage, wpt.idx + inserted, {
+                wpt: wpt.wpt,
+                type: FlightPlanSegmentType.USER,
+            });
             inserted++;
         }
 
@@ -287,7 +290,7 @@ export class Ctr1Page extends SixLineHalfPage {
         };
 
         try {
-            this.props.facilityLoader.facilityRepo.add(facility);
+            this.props.facilityLoader.getFacilityRepo().add(facility);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);

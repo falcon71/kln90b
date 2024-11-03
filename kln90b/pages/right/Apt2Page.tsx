@@ -355,7 +355,7 @@ export class Apt2UserPage extends WaypointPage<AirportFacility> {
     private setElevation(elevation: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility!,
+            this.props.facilityLoader.getFacilityRepo().update(facility!,
                 // @ts-ignore
                 fac => fac.altitude = UnitType.FOOT.convertTo(elevation, UnitType.METER),
             );

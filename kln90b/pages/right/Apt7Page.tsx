@@ -4,8 +4,12 @@ import {
     ArrivalProcedure,
     DepartureProcedure,
     EnrouteTransition,
+    FlightPlan,
+    FlightPlanSegmentType,
     FSComponent,
     ICAO,
+    LegDefinition,
+    LegType,
     NodeReference,
     Procedure,
     RunwayTransition,
@@ -28,16 +32,16 @@ import {SimpleListItem} from "../../controls/ListItem";
 import {Button} from "../../controls/Button";
 import {MainPage} from "../MainPage";
 import {Fpl0Page} from "../left/FplPage";
-import {KLNFlightplanLeg, KLNLegType} from "../../data/flightplan/Flightplan";
 import {OneTimeMessage} from "../../data/MessageHandler";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {NearestSelector} from "../../controls/selects/NearestSelector";
 import {SidStar} from "../../data/navdata/SidStar";
 import {insertLegIntoFpl} from "../../services/FlightplanUtils";
+import {AccessUserData} from "../../data/flightplan/AccesUserData";
 
 
 export interface Apt7PageProps extends PageProps {
-    type: KLNLegType,
+    type: FlightPlanSegmentType,
 }
 
 
@@ -130,7 +134,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         let proc: Procedure;
         let rwy: RunwayTransition | null;
         let trans: EnrouteTransition | null;
-        let legs: KLNFlightplanLeg[];
+        let legs: LegDefinition[];
         //The order RWY/TRANS is different for SID & STAR
         if (this.currentApt7Page instanceof Apt7ProcedurePage) {
             return false;
@@ -138,7 +142,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             proc = this.currentApt7Page.proc;
             rwy = null;
             trans = this.currentApt7Page.trans;
-            if (type === KLNLegType.SID) {
+            if (type === FlightPlanSegmentType.Departure) {
                 step = 1;
             } else {
                 step = 2;
@@ -147,7 +151,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             proc = this.currentApt7Page.proc;
             rwy = this.currentApt7Page.rwy;
             trans = null;
-            if (type === KLNLegType.SID) {
+            if (type === FlightPlanSegmentType.Departure) {
                 step = 2;
             } else {
                 step = 1;
@@ -169,7 +173,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
 
         step--;
         if (step === 2) {
-            if (type === KLNLegType.SID) {
+            if (type === FlightPlanSegmentType.Departure) {
                 if (proc.enRouteTransitions.length <= 1) {
                     step--;
                 }
@@ -181,7 +185,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         }
 
         if (step === 1) {
-            if (type === KLNLegType.SID) {
+            if (type === FlightPlanSegmentType.Departure) {
                 if (proc.runwayTransitions.length <= 1) {
                     step--;
                 }
@@ -202,7 +206,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
                 });
                 break;
             case 1:
-                if (type === KLNLegType.SID) {
+                if (type === FlightPlanSegmentType.Departure) {
                     this.currentApt7Page = new Apt7RunwayPage({
                         ...this.props,
                         proc: proc,
@@ -221,7 +225,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
                 }
                 break;
             case 2:
-                if (type === KLNLegType.SID) {
+                if (type === FlightPlanSegmentType.Departure) {
                     this.currentApt7Page = new Apt7TransitionPage({
                         ...this.props,
                         proc: proc,
@@ -288,18 +292,18 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         this.currentPage = 0;
     }
 
-    private getProcedureType(): KLNLegType {
+    private getProcedureType(): FlightPlanSegmentType {
         if (this.hasStar && (this.currentPage === 1 || !this.hasSid)) {
-            return KLNLegType.STAR;
+            return FlightPlanSegmentType.Arrival;
         } else {
-            return KLNLegType.SID;
+            return FlightPlanSegmentType.Departure;
         }
     }
 
     private selectProcedure(proc: Procedure): void {
         console.log("selectProcedure", proc);
 
-        if (this.getProcedureType() === KLNLegType.SID) {
+        if (this.getProcedureType() === FlightPlanSegmentType.Departure) {
             if (proc.runwayTransitions.length <= 1) {
                 this.selectRunway(proc, proc.runwayTransitions.length === 1 ? proc.runwayTransitions[0] : null, null)
             } else {
@@ -330,7 +334,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
     private async selectRunway(proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null): Promise<void> {
         console.log("selectRunway", proc, rwy);
 
-        if (this.getProcedureType() === KLNLegType.SID) {
+        if (this.getProcedureType() === FlightPlanSegmentType.Departure) {
             if (proc.enRouteTransitions.length <= 1) {
                 return this.selectTransition(proc, rwy, proc.enRouteTransitions.length === 1 ? proc.enRouteTransitions[0] : null)
             } else {
@@ -360,7 +364,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
     private async selectTransition(proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null): Promise<void> {
         console.log("selectTransition", proc, rwy, trans);
 
-        if (this.getProcedureType() === KLNLegType.SID) {
+        if (this.getProcedureType() === FlightPlanSegmentType.Departure) {
             const legs = await this.props.sidstar.getKLNProcedureLegList(unpackFacility(this.facility)!, proc, this.getProcedureType(), rwy, trans);
             this.currentApt7Page = new Apt7PreviewPage({
                 ...this.props,
@@ -387,12 +391,11 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         this.requiresRedraw = true;
     }
 
-    private loadIfFplContainsApt(proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null, legs: KLNFlightplanLeg[]): void {
+    private loadIfFplContainsApt(proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null, legs: LegDefinition[]): void {
         console.log("loadIfFplContainsApt", proc, rwy, trans, legs);
-        const fpl0Legs = this.props.memory.fplPage.flightplans[0].getLegs();
         const facility = unpackFacility(this.facility)!;
 
-        if (fpl0Legs.some(wpt => wpt.wpt.icao === facility.icao)) {
+        if (this.props.memory.fplPage.flighplanner.getFlightPlan(0).findLeg((leg) => AccessUserData.getFacility(leg).icao === facility.icao)) {
             this.load(proc, rwy, trans, legs);
             return;
         }
@@ -410,56 +413,72 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
 
     }
 
-    private load(proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null, legs: KLNFlightplanLeg[]): void {
+    private load(proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null, legs: LegDefinition[]): void {
         console.log("load", proc, rwy, trans, legs);
 
         const type = this.getProcedureType();
 
-        const fpl0 = this.props.memory.fplPage.flightplans[0];
-        fpl0.startBatchInsert();
-        fpl0.removeProcedure(type); //I don't think you can have two approaches at the same time
-        const fpl0Legs = fpl0.getLegs();
+        const fpl0 = this.props.memory.fplPage.flighplanner.getFlightPlan(0);
+        const batchId = fpl0.openBatch();
+        //The KLN-89 will ask for confirmation, if the user really wants to replace the existing approach. I'm sure you can only have one for the KLN 90B as well
+        for (const segment of fpl0.segments()) {
+            if (segment.segmentType === type) {
+                fpl0.removeSegment(segment.segmentIndex);
+            }
+        }
         const facility = unpackFacility(this.facility)!;
-        let idx = fpl0Legs.findIndex(wpt => wpt.wpt.icao === facility.icao);
-        if (idx === -1) {
+        const airport = fpl0.findLeg((leg) => AccessUserData.getFacility(leg).icao === facility.icao);
+        let idx: number;
+        if (airport === null) {
             //Airport not in FPL?
-            idx = type === KLNLegType.SID ? 0 : fpl0Legs.length;
+            idx = type === FlightPlanSegmentType.Departure ? 0 : fpl0.length;
 
             try {
-                insertLegIntoFpl(fpl0, this.props.memory.navPage, idx, {wpt: facility, type: KLNLegType.USER});
+                insertLegIntoFpl(fpl0, FlightPlanSegmentType.Enroute, this.props.memory.navPage, idx, FlightPlan.createLeg({
+                    type: LegType.DF,
+                    fixIcao: facility.icao,
+                    lat: facility.lat,
+                    lon: facility.lon,
+                }), {
+                    facility: facility,
+                });
             } catch (e) {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
                 console.error(e);
-                fpl0.finishBatchInsert();
+                fpl0.closeBatch(batchId);
                 return;
             }
+        } else {
+            idx = fpl0.getLegIndexFromLeg(airport);
         }
-        if (type === KLNLegType.SID) {
+        if (type === FlightPlanSegmentType.Departure) {
             //After the airport
             idx++;
         } else {
             //We want to insert the STAR before the APP
-            while (idx > 0 && fpl0Legs[idx - 1].type === KLNLegType.APP) {
-                idx--;
+            for (const segment of fpl0.segments()) {
+                if (segment.segmentType === FlightPlanSegmentType.Approach) {
+                    idx = fpl0.getLegIndexFromLeg(segment.legs[0]) - 1;
+                }
             }
         }
 
-        if (SidStar.hasDuplicates(fpl0Legs, legs)) {
+        if (SidStar.hasDuplicates(fpl0, legs)) {
             this.props.messageHandler.addMessage(new OneTimeMessage(["REDUNDANT WPTS IN FPL", "EDIT ENROUTE WPTS", "AS NECESSARY"]));
         }
 
         for (const leg of legs) {
             try {
-                insertLegIntoFpl(fpl0, this.props.memory.navPage, idx, leg);
+                insertLegIntoFpl(fpl0, type, this.props.memory.navPage, idx, leg, {});
                 idx++;
             } catch (e) {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
                 console.error(e);
-                fpl0.finishBatchInsert();
+                fpl0.closeBatch(batchId);
                 return;
             }
         }
-        fpl0.finishBatchInsert();
+        fpl0.closeBatch(batchId);
 
         this.currentApt7Page = new Apt7ProcedurePage({
             ...this.props,
@@ -477,7 +496,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
 
 interface Apt7ProcedurePageProps extends PageProps {
     selectProcedure: (proc: ArrivalProcedure | DepartureProcedure) => void,
-    type: KLNLegType,
+    type: FlightPlanSegmentType,
     changeFacility: (fac: string | AirportFacility) => void,
 }
 
@@ -507,7 +526,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
     protected readonly emptyRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
     protected readonly listRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
     private readonly selectProcedure: (proc: ArrivalProcedure | DepartureProcedure) => void;
-    private procedureType: KLNLegType;
+    private procedureType: FlightPlanSegmentType;
 
     constructor(props: Apt7ProcedurePageProps) {
         super(props);
@@ -537,6 +556,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
         this.cursorController = new CursorController(this.children, this.warnIfDBOutdated.bind(this));
 
     }
+
     public render(): VNode {
         return (<pre>
              {this.children.get("activeArrow").render()}{this.children.get("activeIdx").render()}{this.children.get("apt").render()}&nbsp&nbsp{this.children.get("waypointType").render()}{this.children.get("nearestSelector").render()}<br/>
@@ -548,7 +568,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
                     IN DATABASE
                 </div>
                 <div ref={this.listRef} class="d-none">
-                    SELECT {this.procedureType === KLNLegType.SID ? "SID" : "STAR"}<br/>
+                    SELECT {this.procedureType === FlightPlanSegmentType.Departure ? "SID" : "STAR"}<br/>
                     {this.children.get("list").render()}
                 </div>
             </div>
@@ -569,7 +589,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
         return this.props.scanLists.aptScanlist;
     }
 
-    public setProcedureType(procedureType: KLNLegType) {
+    public setProcedureType(procedureType: FlightPlanSegmentType) {
         this.procedureType = procedureType;
     }
 
@@ -591,7 +611,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
         } else {
             this.mainRef.instance.classList.remove("d-none");
             this.children.get("createWpt").setVisible(false);
-            const procedures: readonly Procedure[] = this.procedureType === KLNLegType.SID ? facility.departures : facility.arrivals;
+            const procedures: readonly Procedure[] = this.procedureType === FlightPlanSegmentType.Departure ? facility.departures : facility.arrivals;
             const procs = procedures.filter(proc => SidStar.isProcedureRecognized(proc)).map((proc, idx) => new SimpleListItem<Procedure>({
                 bus: this.props.bus,
                 value: proc,
@@ -619,14 +639,14 @@ abstract class Apt7SelectorPage extends WaypointPage<AirportFacility> {
 
     readonly name: string = "APT 7";
     public abstract readonly proc: Procedure;
-    protected abstract readonly procedureType: KLNLegType;
+    protected abstract readonly procedureType: FlightPlanSegmentType;
 
     public getScanlist(): Scanlist {
         return this.props.scanLists.aptScanlist;
     }
 
     protected formatTitle(): string {
-        return `${this.proc.name}-${this.procedureType === KLNLegType.SID ? "SID" : "Æ"}`;
+        return `${this.proc.name}-${this.procedureType === FlightPlanSegmentType.Departure ? "SID" : "Æ"}`;
     }
 
     protected getMemory(): WaypointPageState<AirportFacility> {
@@ -644,7 +664,7 @@ interface Apt7RunwayPageProps extends PageProps {
     proc: Procedure,
     trans: EnrouteTransition | null,
     selectRunway: (proc: Procedure, rwy: RunwayTransition, trans: EnrouteTransition | null) => void,
-    type: KLNLegType,
+    type: FlightPlanSegmentType,
 }
 
 
@@ -659,7 +679,7 @@ class Apt7RunwayPage extends Apt7SelectorPage {
 
     public readonly proc: Procedure;
     public readonly trans: EnrouteTransition | null;
-    protected readonly procedureType: KLNLegType;
+    protected readonly procedureType: FlightPlanSegmentType;
     private readonly selectRunway: (proc: Procedure, rwy: RunwayTransition, trans: (EnrouteTransition | null)) => void;
 
     constructor(props: Apt7RunwayPageProps) {
@@ -702,7 +722,7 @@ interface Apt7TransitionPageProps extends PageProps {
     proc: Procedure,
     rwy: RunwayTransition | null,
     selectTransition: (proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null) => void,
-    type: KLNLegType,
+    type: FlightPlanSegmentType,
 }
 
 
@@ -717,7 +737,7 @@ class Apt7TransitionPage extends Apt7SelectorPage {
 
     public readonly proc: Procedure;
     public readonly rwy: RunwayTransition | null;
-    protected readonly procedureType: KLNLegType;
+    protected readonly procedureType: FlightPlanSegmentType;
     private readonly selectTransition: (proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null) => void;
 
     constructor(props: Apt7TransitionPageProps) {
@@ -761,9 +781,9 @@ interface Apt7PreviewPageProps extends PageProps {
     proc: Procedure,
     rwy: RunwayTransition | null,
     trans: EnrouteTransition | null,
-    legs: KLNFlightplanLeg[],
-    load: (proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null, legs: KLNFlightplanLeg[]) => void,
-    type: KLNLegType,
+    legs: LegDefinition[],
+    load: (proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null, legs: LegDefinition[]) => void,
+    type: FlightPlanSegmentType,
 }
 
 
@@ -780,7 +800,7 @@ class Apt7PreviewPage extends Apt7SelectorPage {
     public readonly proc: Procedure;
     public readonly rwy: RunwayTransition | null;
     public readonly trans: EnrouteTransition | null;
-    protected readonly procedureType: KLNLegType;
+    protected readonly procedureType: FlightPlanSegmentType;
 
     constructor(props: Apt7PreviewPageProps) {
         super(props);
@@ -808,8 +828,8 @@ class Apt7PreviewPage extends Apt7SelectorPage {
         </pre>);
     }
 
-    private buildList(legs: KLNFlightplanLeg[]): UIElementChildren<any> {
-        const waypoints = legs.map((leg, idx) => new SimpleListItem<KLNFlightplanLeg>({
+    private buildList(legs: LegDefinition[]): UIElementChildren<any> {
+        const waypoints = legs.map((leg, idx) => new SimpleListItem<LegDefinition>({
             bus: this.props.bus,
             value: leg,
             fulltext: `${(idx + 1).toString().padStart(2, " ")} ${ICAO.getIdent(leg.wpt.icao)}${SidStar.getWptSuffix(leg.fixType)}`.padEnd(11, " "), //6-10 the prefix is right after short identifiers
@@ -826,9 +846,9 @@ interface Apt7AddPageProps extends PageProps {
     proc: Procedure,
     rwy: RunwayTransition | null,
     trans: EnrouteTransition | null,
-    legs: KLNFlightplanLeg[],
-    load: (proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null, legs: KLNFlightplanLeg[]) => void,
-    type: KLNLegType,
+    legs: LegDefinition[],
+    load: (proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null, legs: LegDefinition[]) => void,
+    type: FlightPlanSegmentType,
 }
 
 
@@ -845,8 +865,8 @@ class Apt7AddPage extends Apt7SelectorPage {
     public readonly proc: Procedure;
     public readonly rwy: RunwayTransition | null;
     public readonly trans: EnrouteTransition | null;
-    public readonly legs: KLNFlightplanLeg[];
-    protected readonly procedureType: KLNLegType;
+    public readonly legs: LegDefinition[];
+    protected readonly procedureType: FlightPlanSegmentType;
 
     constructor(props: Apt7AddPageProps) {
         super(props);
@@ -870,7 +890,7 @@ class Apt7AddPage extends Apt7SelectorPage {
             {this.formatTitle()}<br/>
             PRESS ENT<br/>
             TO ADD {ICAO.getIdent(unpackFacility(this.facility)!.icao)}<br/>
-            AND {this.procedureType === KLNLegType.SID ? "SID" : "STAR"} TO<br/>
+            AND {this.procedureType === FlightPlanSegmentType.Departure ? "SID" : "STAR"} TO<br/>
             FPL 0<br/>
             {this.children.get("approve").render()}
         </pre>);

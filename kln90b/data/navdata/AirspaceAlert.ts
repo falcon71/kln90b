@@ -9,7 +9,8 @@ import {
     GeoPoint,
     LodBoundary,
     NearestLodBoundarySearchSession,
-    UnitType, UserSetting,
+    UnitType,
+    UserSetting,
 } from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Sensors} from "../../Sensors";
@@ -58,7 +59,7 @@ export class AirspaceAlert implements CalcTickable {
     }
 
     public async init() {
-        const session = await this.facilityLoader.startNearestSearchSession(FacilitySearchType.Boundary);
+        const session = await this.facilityLoader.startNearestKLNSearchSession(FacilitySearchType.Boundary);
 
 
         this.airspaceSession = new NearestLodBoundarySearchSession(DefaultLodBoundaryCache.getCache(), session, 0.5);

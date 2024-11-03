@@ -1,4 +1,4 @@
-import {FSComponent, UserSetting} from "@microsoft/msfs-sdk";
+import {UserSetting} from "@microsoft/msfs-sdk";
 import {SelectField} from "./SelectField";
 import {NavPageState} from "../../data/VolatileMemory";
 import {TickController} from "../../TickController";
@@ -7,17 +7,17 @@ import {Sensors} from "../../Sensors";
 import {SuperNav5Field3} from "../../settings/KLN90BUserSettings";
 import {KLNMagvar} from "../../data/navdata/KLNMagvar";
 import {SidStar} from "../../data/navdata/SidStar";
-import {Flightplan} from "../../data/flightplan/Flightplan";
+import {FlightPlan} from "../../data/flightplan/FlightPlan";
 
 
 export class SuperNav5Field3Selector extends SelectField {
 
 
-    private constructor(valueSet: string[], private setting: UserSetting<SuperNav5Field3>, private state: NavPageState, private sensors: Sensors, private readonly magvar: KLNMagvar, private readonly fpl0: Flightplan, changedCallback: (value: number) => void) {
+    private constructor(valueSet: string[], private setting: UserSetting<SuperNav5Field3>, private state: NavPageState, private sensors: Sensors, private readonly magvar: KLNMagvar, private readonly fpl0: FlightPlan, changedCallback: (value: number) => void) {
         super(valueSet, setting.get(), changedCallback);
     }
 
-    public static build(setting: UserSetting<SuperNav5Field3>, state: NavPageState, sensors: Sensors, magvar: KLNMagvar, fpl0: Flightplan): SuperNav5Field3Selector {
+    public static build(setting: UserSetting<SuperNav5Field3>, state: NavPageState, sensors: Sensors, magvar: KLNMagvar, fpl0: FlightPlan): SuperNav5Field3Selector {
         return new SuperNav5Field3Selector([" TK   ", "BRG   ", "RAD   "], setting, state, sensors, magvar, fpl0, (field) => this.saveSetting(setting, field));
     }
 

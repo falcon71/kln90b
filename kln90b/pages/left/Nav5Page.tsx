@@ -8,7 +8,7 @@ import {MainPage} from "../MainPage";
 import {unpackFacility, WaypointPage} from "../right/WaypointPage";
 import {MapOrientationSelector} from "../../controls/selects/MapOrientationSelector";
 import {Nav5Orientation} from "../../settings/KLN90BUserSettings";
-import {KLNFixType, KLNFlightplanLeg} from "../../data/flightplan/Flightplan";
+import {KLNFixType, LegDefinition} from "../../data/flightplan/FlightPlan";
 import {ActiveWaypoint} from "../../data/flightplan/ActiveWaypoint";
 import {NauticalMiles} from "../../data/Units";
 
@@ -132,7 +132,7 @@ export class Nav5Page extends SixLineHalfPage {
         }
     }
 
-    private drawFlightplan(ctx: CoordinateCanvasDrawContext, legs: KLNFlightplanLeg[], activeWaypoint: ActiveWaypoint) {
+    private drawFlightplan(ctx: CoordinateCanvasDrawContext, legs: LegDefinition[], activeWaypoint: ActiveWaypoint) {
         const actIdx = activeWaypoint.getActiveFplIdx();
         for (let i = 1; i < legs.length; i++) {
             const prevleg = legs[i - 1];
@@ -209,7 +209,7 @@ export class Nav5Page extends SixLineHalfPage {
         }
     }
 
-    private drawFlightplanLabels(ctx: CoordinateCanvasDrawContext, legs: KLNFlightplanLeg[]) {
+    private drawFlightplanLabels(ctx: CoordinateCanvasDrawContext, legs: LegDefinition[]) {
         for (let i = 0; i < legs.length; i++) {
             const leg = legs[i];
             const nextLeg = legs[i + 1];

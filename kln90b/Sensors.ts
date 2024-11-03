@@ -503,9 +503,9 @@ export class SensorsOut {
 
     public setRollCommand(bankAngle: Number | null) {
         if (bankAngle === null) {
-            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
+            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Number, 0);
         } else {
-            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, bankAngle);
+            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Number, bankAngle);
         }
     }
 

@@ -12,9 +12,13 @@ import {
     GeoPoint,
     ICAO,
     IntersectionFacility,
-    NdbFacility, NearestAirportSearchSession, NearestBoundarySearchSession, NearestIntersectionSearchSession,
+    NdbFacility,
+    NearestAirportSearchSession,
+    NearestBoundarySearchSession,
+    NearestIntersectionSearchSession,
     NearestSearchResults,
-    NearestSearchSession, NearestVorSearchSession,
+    NearestSearchSession,
+    NearestVorSearchSession,
     RunwaySurfaceCategory,
     RunwaySurfaceType,
     SearchTypeMap,
@@ -247,12 +251,17 @@ export class KLNNearestVorSearchSession extends KLNCoherentNearestSearchSession<
  * In addition to those (known as Supplementary Waypoints in the KLN), the KLN allows user to define any waypoint as a
  * user waypoint. This FacilityLoader searches in the local Repo for any type.
  */
-export class KLNFacilityLoader {
+export class KLNFacilityLoader extends FacilityLoader { //Extends FacilityLoader just so we can pass this class to WorkingTitle classes. We don't actually use the super calls
 
-    private static repoSearchSessionId = -1;
+    private static klnRepoSearchSessionId = -1;
 
     constructor(private readonly actualFacilityLoader: FacilityLoader,
-                public readonly facilityRepo: KLNFacilityRepository) {
+                private readonly klnFacilityRepo: KLNFacilityRepository) {
+        super(null as any);
+    }
+
+    public getFacilityRepo(): KLNFacilityRepository {
+        return this.klnFacilityRepo;
     }
 
 
@@ -264,7 +273,7 @@ export class KLNFacilityLoader {
      * retrieved.
      */
     public getFacility<T extends FacilityType>(type: T, icao: string): Promise<FacilityTypeMap[T]> {
-        const repo = this.getFacilityFromRepo(type, icao);
+        const repo = this.getKlnFacilityFromRepo(type, icao);
         if (repo) {
             return Promise.resolve(repo);
         }
@@ -276,14 +285,14 @@ export class KLNFacilityLoader {
      * @param type The type of facilities for which to search.
      * @returns A Promise which will be fulfilled with the new nearest search session.
      */
-    public async startNearestSearchSession<T extends FacilitySearchType>(type: T): Promise<KLNSessionTypeMap[T]> {
+    public async startNearestKLNSearchSession<T extends FacilitySearchType>(type: T): Promise<KLNSessionTypeMap[T]> {
         if (type === FacilitySearchType.Boundary) {
             // noinspection ES6MissingAwait
             return this.actualFacilityLoader.startNearestSearchSession(type) as unknown as Promise<KLNSessionTypeMap[T]>;
         }
 
         // noinspection ES6MissingAwait
-        return this.startRepoNearestSearchSession(type) as unknown as Promise<KLNSessionTypeMap[T]>;
+        return this.startKlnRepoNearestSearchSession(type) as unknown as Promise<KLNSessionTypeMap[T]>;
 
     }
 
@@ -321,7 +330,7 @@ export class KLNFacilityLoader {
                 throw new Error(`Unsupported SearchType:${filter}`);
         }
 
-        this.facilityRepo.forEach(fac => {
+        this.getFacilityRepo().forEach(fac => {
             const facIdent = ICAO.getIdent(fac.icao);
 
             if (facIdent === ident) {
@@ -380,8 +389,8 @@ export class KLNFacilityLoader {
      * @returns A Promise which will be fulfilled with the requested facility, or rejected if the facility could not be
      * retrieved.
      */
-    private getFacilityFromRepo<T extends FacilityType>(type: T, icao: string): FacilityTypeMap[T] {
-        return this.facilityRepo.get(icao) as FacilityTypeMap[T];
+    private getKlnFacilityFromRepo<T extends FacilityType>(type: T, icao: string): FacilityTypeMap[T] {
+        return this.getFacilityRepo().get(icao) as FacilityTypeMap[T];
     }
 
     /**
@@ -390,10 +399,10 @@ export class KLNFacilityLoader {
      * @returns A Promise which will be fulfilled with the new nearest search session.
      * @throws Error if the search type is not supported.
      */
-    private async startRepoNearestSearchSession<T extends FacilitySearchType>(type: T): Promise<KLNSessionTypeMap[T]> {
+    private async startKlnRepoNearestSearchSession<T extends FacilitySearchType>(type: T): Promise<KLNSessionTypeMap[T]> {
         // Session ID doesn't really matter for these, so in order to not conflict with IDs from Coherent, we will set
         // them all to negative numbers
-        const repoSessionId = KLNFacilityLoader.repoSearchSessionId--;
+        const repoSessionId = KLNFacilityLoader.klnRepoSearchSessionId--;
 
         let typ: KLNRepoSearchableFacilityTypes;
         switch (type) {
@@ -410,7 +419,7 @@ export class KLNFacilityLoader {
                 throw Error(`Unsupported searchtype: ${type}`);
         }
 
-        const repoSession = new KLNNearestRepoFacilitySearchSession<any>(this.facilityRepo, repoSessionId, typ);
+        const repoSession = new KLNNearestRepoFacilitySearchSession<any>(this.getFacilityRepo(), repoSessionId, typ);
         const coherentSession: any = await this.actualFacilityLoader.startNearestSearchSession(type);
 
 

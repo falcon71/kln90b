@@ -1,4 +1,4 @@
-import {Flightplan} from "../data/flightplan/Flightplan";
+import {FlightPlan} from "../data/flightplan/FlightPlan";
 import {Flightplanloader} from "./Flightplanloader";
 import {getUniqueIdent} from "../data/navdata/UniqueIdentGenerator";
 import {UserFacility, UserFacilityType} from "@microsoft/msfs-sdk";
@@ -8,7 +8,7 @@ import {StatusLineMessageEvents} from "../controls/StatusLine";
 export class FplFileimporter extends Flightplanloader {
 
 
-    public async importFpl(): Promise<Flightplan> {
+    public async importFpl(): Promise<FlightPlan> {
         return new Promise((resolve, reject) => {
             const request = new XMLHttpRequest();
             request.onreadystatechange = () => {
@@ -47,7 +47,7 @@ export class FplFileimporter extends Flightplanloader {
         });
     }
 
-    private async loadFromXml(xml: Document): Promise<Flightplan> {
+    private async loadFromXml(xml: Document): Promise<FlightPlan> {
         const flightPlan = xml.getElementsByTagName("FlightPlan.FlightPlan")[0];
 
         // Get all ATCWaypoint nodes
@@ -128,7 +128,7 @@ export class FplFileimporter extends Flightplanloader {
             console.log("Adding temporary user waypoint", facility);
 
             try {
-                this.facilityLoader.facilityRepo.add(facility);
+                this.facilityLoader.getFacilityRepo().add(facility);
                 return facility.icao;
             } catch (e) {
                 this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");

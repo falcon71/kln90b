@@ -21,7 +21,7 @@ import {isUserWaypoint} from "../right/WaypointPage";
 import {Nav5Orientation, SuperNav5VOR} from "../../settings/KLN90BUserSettings";
 import {SuperNav5Left} from "../../controls/SuperNav5Left";
 import {SevenLinePage} from "../OneSegmentPage";
-import {KLNFixType, KLNFlightplanLeg} from "../../data/flightplan/Flightplan";
+import {KLNFixType, LegDefinition} from "../../data/flightplan/FlightPlan";
 import {ActiveWaypoint} from "../../data/flightplan/ActiveWaypoint";
 import {SuperNav5Right} from "../../controls/SuperNav5Right";
 import {NearestWpt} from '../../data/navdata/NearestList';
@@ -218,7 +218,7 @@ export class SuperNav5Page extends SevenLinePage {
         return RANGES.find((r) => r >= distance) ?? 1000;
     }
 
-    private drawFlightplan(ctx: CoordinateCanvasDrawContext, legs: KLNFlightplanLeg[], activeWaypoint: ActiveWaypoint) {
+    private drawFlightplan(ctx: CoordinateCanvasDrawContext, legs: LegDefinition[], activeWaypoint: ActiveWaypoint) {
         const actIdx = activeWaypoint.getActiveFplIdx();
         for (let i = 1; i < legs.length; i++) {
             const prevleg = legs[i - 1];
@@ -264,7 +264,7 @@ export class SuperNav5Page extends SevenLinePage {
         }
     }
 
-    private drawFlightplanLabels(ctx: CoordinateCanvasDrawContext, legs: KLNFlightplanLeg[], range: NauticalMiles) {
+    private drawFlightplanLabels(ctx: CoordinateCanvasDrawContext, legs: LegDefinition[], range: NauticalMiles) {
         for (let i = 0; i < legs.length; i++) {
             const leg = legs[i];
             const nextLeg = legs[i + 1];
@@ -311,7 +311,7 @@ export class SuperNav5Page extends SevenLinePage {
         }
     }
 
-    private drawAirports(ctx: CoordinateCanvasDrawContext, legs: KLNFlightplanLeg[], range: NauticalMiles) {
+    private drawAirports(ctx: CoordinateCanvasDrawContext, legs: LegDefinition[], range: NauticalMiles) {
         const airports = this.props.nearestLists.aptNearestList.getNearestList();
         for (const airport of airports) {
             if (!legs.some(leg => leg.wpt.icao === airport.facility.icao)) { //Don't draw it, if it is already drawn by the flightplan

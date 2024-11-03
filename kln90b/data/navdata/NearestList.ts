@@ -58,7 +58,7 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
     }
 
     public async init() {
-        this.session = await this.facilityLoader.startNearestSearchSession(this.searchType) as KLNSessionTypeMap[SearchType];
+        this.session = await this.facilityLoader.startNearestKLNSearchSession(this.searchType) as KLNSessionTypeMap[SearchType];
         this.initFilters(this.session);
     }
 

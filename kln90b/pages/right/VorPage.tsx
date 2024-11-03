@@ -155,7 +155,7 @@ export class VorPage extends WaypointPage<VorFacility> {
     private setVorFrequency(freq: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.freqMHz = freq);
+            this.props.facilityLoader.getFacilityRepo().update(facility!, fac => fac.freqMHz = freq);
         } else {
             this.userVor.freq = freq;
             this.createIfReady();
@@ -170,7 +170,7 @@ export class VorPage extends WaypointPage<VorFacility> {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "IN ACT LIST");
                 return;
             }
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.magneticVariation = -magvar);
+            this.props.facilityLoader.getFacilityRepo().update(facility!, fac => fac.magneticVariation = -magvar);
         } else {
             this.userVor.magvar = magvar;
             this.createIfReady();
@@ -180,7 +180,7 @@ export class VorPage extends WaypointPage<VorFacility> {
     private setLatitude(latitude: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.lat = latitude);
+            this.props.facilityLoader.getFacilityRepo().update(facility!, fac => fac.lat = latitude);
         } else {
             this.userVor.lat = latitude;
             this.createIfReady();
@@ -190,7 +190,7 @@ export class VorPage extends WaypointPage<VorFacility> {
     private setLongitude(longitude: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.lon = longitude);
+            this.props.facilityLoader.getFacilityRepo().update(facility!, fac => fac.lon = longitude);
         } else {
             this.userVor.lon = longitude;
             this.createIfReady();
@@ -224,7 +224,7 @@ export class VorPage extends WaypointPage<VorFacility> {
             vorClass: VorClass.Unknown,
         };
         try {
-            this.props.facilityLoader.facilityRepo.add(this.facility);
+            this.props.facilityLoader.getFacilityRepo().add(this.facility);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);

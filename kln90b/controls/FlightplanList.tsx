@@ -1,6 +1,13 @@
-import {AirportFacility, Facility, FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
+import {
+    AirportFacility,
+    Facility,
+    FlightPlanSegmentType,
+    FSComponent,
+    LegDefinition,
+    NodeReference,
+    VNode,
+} from '@microsoft/msfs-sdk';
 import {PageProps, UiElement, UIElementChildren} from '../pages/Page';
-import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
 import {List} from "./List";
 import {FlightplanListItem} from "./FlightplanListItem";
 import {Button} from "./Button";
@@ -28,7 +35,7 @@ export const enum FplWptEnterMode {
 
 interface EditableFlightplanLeg {
     wpt: Facility | null,
-    leg?: KLNFlightplanLeg,
+    leg?: LegDefinition,
     origIdx: number, //The actual index of this leg in the flightplan. -1 when it is a new waypoint not yet in the fpl
     enterMe?: FplWptEnterMode, //Causes the leg to be entered after creation
     enterKeyboardKey?: string,
@@ -95,7 +102,7 @@ class FPLFirstLine implements ListItem {
     public readonly children: UIElementChildren<FPLFirstLineTypes>;
 
     constructor(private cursorController: CursorController,
-                private flightplan: Flightplan,
+                private flightplan: FlightPlan,
                 loadFpl0: () => void,
                 useFpl: () => void,
                 useInvertedFpl: () => void,
@@ -176,11 +183,11 @@ class ChangeProcedureListItem implements ListItem {
     constructor(private cursorController: CursorController,
                 wptIdx: number,
                 private readonly facility: AirportFacility,
-                private readonly type: KLNLegType,
+                private readonly type: FlightPlanSegmentType,
                 navState: NavPageState,
                 private readonly procedureName: string,
-                private readonly removeProcedure: (type: KLNLegType) => void,
-                private readonly changeProcedure: (facility: AirportFacility, type: KLNLegType) => void,
+                private readonly removeProcedure: (type: FlightPlanSegmentType) => void,
+                private readonly changeProcedure: (facility: AirportFacility, type: FlightPlanSegmentType) => void,
     ) {
         this.children = new UIElementChildren<ChangeProcedureListItemTypes>({
             arrow: new FlightplanArrow(wptIdx, navState, cursorController),
@@ -285,11 +292,11 @@ class ChangeProcedureListItem implements ListItem {
 
     private getTypeString(): String {
         switch (this.type) {
-            case KLNLegType.APP:
+            case FlightPlanSegmentType.APP:
                 return "APR";
-            case KLNLegType.SID:
+            case FlightPlanSegmentType.SID:
                 return "SID";
-            case KLNLegType.STAR:
+            case FlightPlanSegmentType.STAR:
                 return "Æ";
             default:
                 throw Error(`Unexpected type:${this.type}`);
@@ -307,7 +314,7 @@ class EditableFlightplan {
 
 
     constructor(private cursorController: CursorController,
-                public flightplan: Flightplan,
+                public flightplan: FlightPlan,
                 private props: PageProps,
                 private parent: SixLineHalfPage,
                 loadFpl0: () => void,
@@ -325,7 +332,7 @@ class EditableFlightplan {
         this.buildList();
     }
 
-    public insertLeg(idx: number, wpt: Facility | null, leg: KLNFlightplanLeg | null) {
+    public insertLeg(idx: number, wpt: Facility | null, leg: LegDefinition | null) {
         if (wpt === null) {
             //The user aborted the insert by turning the cursor off
             this.syncLegsFromFlightplan();
@@ -336,7 +343,7 @@ class EditableFlightplan {
         try {
             const moveCursorIndex = this.flightplan.idx > 0 && this.flightplan.getLegs().length == 0;
             if (leg === null) {
-                leg = {wpt: wpt, type: KLNLegType.USER}
+                leg = {wpt: wpt, type: FlightPlanSegmentType.USER}
             } else {
                 leg = {
                     ...leg,
@@ -360,7 +367,7 @@ class EditableFlightplan {
 
     public createLeg(idx: number, enter: FplWptEnterMode, keyboardKey: string | undefined, wpt: Facility | null = null): void {
         const prev = this.legs[idx];
-        let leg: KLNFlightplanLeg | undefined;
+        let leg: LegDefinition | undefined;
         if (prev?.leg) { //Happens when a SID or STAR is edited. We need to copy this metadata
             leg = {
                 wpt: wpt as any, //We will fill leg once we are done in insertLeg
@@ -380,7 +387,7 @@ class EditableFlightplan {
         this.cursorController.focusIndex(0);
     }
 
-    public load(fpl: Flightplan): void {
+    public load(fpl: FlightPlan): void {
         this.flightplan.load(fpl);
         this.refreshFpl();
         this.cursorController.setCursorActive(false);
@@ -503,29 +510,29 @@ class EditableFlightplan {
         this.cursorController.setCursorActive(false);
     }
 
-    private removeProcedure(type: KLNLegType): void {
+    private removeProcedure(type: FlightPlanSegmentType): void {
         this.flightplan.removeProcedure(type);
         this.refreshFpl();
     }
 
-    private changeProcedure(facility: AirportFacility, type: KLNLegType): void {
+    private changeProcedure(facility: AirportFacility, type: FlightPlanSegmentType): void {
         const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
         this.cursorController.setCursorActive(false);
         let page;
         //Should this be push?
         this.props.memory.aptPage.facility = facility;
         switch (type) {
-            case KLNLegType.SID:
+            case FlightPlanSegmentType.SID:
                 page = new Apt7Page(this.props);
                 page.setCurrentPage(0);
                 mainPage.setRightPage(page);
                 break;
-            case KLNLegType.STAR:
+            case FlightPlanSegmentType.STAR:
                 page = new Apt7Page(this.props);
                 page.setCurrentPage(1); //Will be clamped if too large
                 mainPage.setRightPage(page);
                 break;
-            case KLNLegType.APP:
+            case FlightPlanSegmentType.APP:
                 mainPage.setRightPage(new Apt8Page(this.props));
                 break;
             default:
@@ -546,7 +553,7 @@ export class FlightplanList extends List {
 
     public static build(cursorController: CursorController,
                         parent: SixLineHalfPage,
-                        flightplan: Flightplan,
+                        flightplan: FlightPlan,
                         props: PageProps,
                         loadFpl0: () => void,
                         useFpl: () => void,
@@ -561,7 +568,7 @@ export class FlightplanList extends List {
         this.editPlan.askDeleteAll();
     }
 
-    public load(fpl: Flightplan) {
+    public load(fpl: FlightPlan) {
         this.editPlan.load(fpl);
     }
 

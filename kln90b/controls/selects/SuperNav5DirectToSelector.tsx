@@ -1,7 +1,7 @@
 import {EventBus, Facility, FSComponent, ICAO, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {Hardware} from "../../Hardware";
-import {Flightplan, KLNFlightplanLeg} from "../../data/flightplan/Flightplan";
+import {FlightPlan, LegDefinition} from "../../data/flightplan/FlightPlan";
 import {ActiveWaypoint} from "../../data/flightplan/ActiveWaypoint";
 import {SidStar} from "../../data/navdata/SidStar";
 import {Sensors} from "../../Sensors";
@@ -11,14 +11,14 @@ export class SuperNav5DirectToSelector implements UiElement {
 
     public readonly children = NO_CHILDREN;
     protected readonly ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
-    private legs: KLNFlightplanLeg[];
+    private legs: LegDefinition[];
     private isInitialized: boolean = false;
     private idx: number = 0;
 
     private isMovingArc = false;
 
 
-    constructor(private readonly bus: EventBus, private readonly hardware: Hardware, private readonly flightplan: Flightplan, private readonly activeWpt: ActiveWaypoint, private readonly sensors: Sensors) {
+    constructor(private readonly bus: EventBus, private readonly hardware: Hardware, private readonly flightplan: FlightPlan, private readonly activeWpt: ActiveWaypoint, private readonly sensors: Sensors) {
         this.legs = flightplan.getLegs();
     }
 

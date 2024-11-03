@@ -1,20 +1,19 @@
-import {Flightplan, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
 import {Message, MessageHandler, OneTimeMessage} from "../data/MessageHandler";
-import {EventBus, ICAO} from "@microsoft/msfs-sdk";
+import {FlightPlan, FlightPlanSegmentType, ICAO, LegDefinition} from "@microsoft/msfs-sdk";
 import {KLNFacilityLoader} from "../data/navdata/KLNFacilityLoader";
 
 export abstract class Flightplanloader {
-    public constructor(protected readonly bus: EventBus, protected readonly facilityLoader: KLNFacilityLoader, protected messageHandler: MessageHandler) {
+    public constructor(protected readonly facilityLoader: KLNFacilityLoader, protected messageHandler: MessageHandler) {
     }
 
     /**
      * Converts the list of icaos into a KLN flightplan. It will keep the number of legs below 30 and it will ignore
      * wapoints that can no longer be found. Messages will be generated for each deleted waypoint
+     * @param flightplan
      * @param icaos
-     * @param fplIdx
      * @protected
      */
-    protected async loadIcaos(icaos: string[], fplIdx: number = 0): Promise<Flightplan> {
+    protected async loadIcaos(flightplan: FlightPlan, icaos: string[]): Promise<FlightPlan> {
         let messages: Message[] = [];
 
         for (let i = 30; i < icaos.length; i++) { //I'm terribly sorry, but the KLN90B flightplans can only have a maximum of 30 legs
@@ -30,16 +29,27 @@ export abstract class Flightplanloader {
             messages.push(new OneTimeMessage(["OTHER WAYPOINTS DELETED"]));
         }
         messages.forEach(this.messageHandler.addMessage.bind(this.messageHandler));
+        flightplan.insertSegment(0, FlightPlanSegmentType.Enroute);
 
-        const fpl = new Flightplan(fplIdx, legs.filter(l => !(l instanceof OneTimeMessage)) as KLNFlightplanLeg[], this.bus);
-        console.log("loaded flightplan", fpl);
-        return fpl;
+        for (const leg of legs) {
+            if (!(leg instanceof OneTimeMessage)) {
+                const newleg = flightplan.addLeg(0, leg.leg);
+                newleg.userData = leg.userData;
+            }
+        }
+
+        console.log("loaded flightplan", flightplan);
+        return flightplan;
     }
 
-    private async convertToKLNLeg(icao: string): Promise<KLNFlightplanLeg | OneTimeMessage> {
+    private async convertToKLNLeg(icao: string): Promise<LegDefinition | OneTimeMessage> {
         try {
             const facility = await this.facilityLoader.getFacility(ICAO.getFacilityType(icao), icao);
-            return {wpt: facility, type: KLNLegType.USER};
+            return FlightPlan.createLeg({
+                fixIcao: facility.icao,
+                lat: facility.lat,
+                lon: facility.lon,
+            });
         } catch (e) {
             console.error(`Error converting ${icao}`, e);
             return new OneTimeMessage([`WAYPOINT ${ICAO.getIdent(icao)} DELETED`]);

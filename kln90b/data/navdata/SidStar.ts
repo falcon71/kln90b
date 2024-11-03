@@ -7,6 +7,7 @@ import {
     Facility,
     FacilityType,
     FixTypeFlags,
+    FlightPlan,
     FlightPlanLeg,
     GeoCircle,
     GeoPoint,
@@ -24,7 +25,7 @@ import {
     UserFacilityType,
     VorFacility,
 } from "@microsoft/msfs-sdk";
-import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "../flightplan/Flightplan";
+import {FlightPlan, FlightPlanSegmentType, KLNFixType, LegDefinition} from "../flightplan/FlightPlan";
 import {KLNFacilityLoader} from "./KLNFacilityLoader";
 import {Degrees, NauticalMiles} from "../Units";
 import {format} from "numerable";
@@ -60,7 +61,7 @@ export class SidStar {
      * @param procedureLegs
      */
 
-    public static hasDuplicates(fplLegs: KLNFlightplanLeg[], procedureLegs: KLNFlightplanLeg[]): boolean {
+    public static hasDuplicates(fpl: FlightPlan, procedureLegs: LegDefinition[]): boolean {
         const procedureIcaos = procedureLegs.map(leg => leg.wpt.icao);
 
         for (const fplLeg of fplLegs) {
@@ -120,7 +121,7 @@ export class SidStar {
     /**
      * 6-17. Scan was pulled from the Super NAV 5 page to recalculate the arc entry based on the current track
      */
-    public static recalculateArcEntryData(leg: KLNFlightplanLeg, sensors: Sensors): ArcData | null {
+    public static recalculateArcEntryData(leg: LegDefinition, sensors: Sensors): ArcData | null {
         const arcData = leg.arcData!;
 
         const track = sensors.in.gps.getTrackTrueRespectingGroundspeed();
@@ -234,7 +235,7 @@ export class SidStar {
     /**
      * 3-32, 6-18
      */
-    public static getVorIfWithin30NMOfArc(navState: NavPageState, fpl0: Flightplan): VorFacility | null {
+    public static getVorIfWithin30NMOfArc(navState: NavPageState, fpl0: FlightPlan): VorFacility | null {
         const fplIdx = navState.activeWaypoint.getActiveFplIdx();
         if (fplIdx === -1) {
             return null;
@@ -365,7 +366,7 @@ export class SidStar {
      * @param iaf
      */
 
-    public async getKLNApproachLegList(facility: AirportFacility, app: ApproachProcedure, iaf: ApproachTransition | null): Promise<KLNFlightplanLeg[]> {
+    public async getKLNApproachLegList(facility: AirportFacility, app: ApproachProcedure, iaf: ApproachTransition | null): Promise<LegDefinition[]> {
         const legs: FlightPlanLeg[] = [];
 
         if (iaf != null) {
@@ -376,7 +377,7 @@ export class SidStar {
 
         const cleaned = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
         const approachName = SidStar.formatApproachName(app, facility);
-        return await this.convertToKLN(facility, approachName, KLNLegType.APP, cleaned);
+        return await this.convertToKLN(facility, approachName, FlightPlanSegmentType.APP, cleaned);
     }
 
     private filterOutDuplicates(legs: FlightPlanLeg[]): FlightPlanLeg[] {
@@ -442,7 +443,50 @@ export class SidStar {
     }
 
     /**
-     * Converts the FlightPlanLegs to KLNFlightplanLegs.
+     * Builds the list of legs.
+     * Filters out duplicates and legs that are not supported by the KLN.
+     * Async, because we may need the facilities for DME arcs.
+     * @param facility
+     * @param type
+     * @param proc
+     * @param rwy
+     * @param trans
+     */
+
+    public async getKLNProcedureLegList(facility: AirportFacility, proc: Procedure, type: FlightPlanSegmentType, rwy: RunwayTransition | null, trans: EnrouteTransition | null): Promise<LegDefinition[]> {
+        const legs: FlightPlanLeg[] = [];
+
+        if (type === FlightPlanSegmentType.SID) {
+            if (rwy != null) {
+                legs.push(...rwy.legs);
+            }
+
+            legs.push(...proc.commonLegs);
+
+            if (trans != null) {
+                legs.push(...trans.legs);
+            }
+        } else {
+
+            if (trans != null) {
+                legs.push(...trans.legs);
+            }
+
+            legs.push(...proc.commonLegs);
+
+            if (rwy != null) {
+                legs.push(...rwy.legs);
+            }
+        }
+
+        const cleaned = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
+        const procedureName = `${proc.name}-${type === FlightPlanSegmentType.SID ? "SID" : "Æ"}`;
+        return await this.convertToKLN(facility, procedureName, type, cleaned);
+
+    }
+
+    /**
+     * Converts the FlightPlanLegs to LegDefinitions.
      * Also resolves DME Arc entries.
      * @param facility
      * @param procedureName
@@ -450,7 +494,7 @@ export class SidStar {
      * @param legs
      * @private
      */
-    private async convertToKLN(facility: AirportFacility, procedureName: string, legType: KLNLegType, legs: FlightPlanLeg[]): Promise<KLNFlightplanLeg[]> {
+    private async convertToKLN(facility: AirportFacility, procedureName: string, legType: FlightPlanSegmentType, legs: FlightPlanLeg[]): Promise<LegDefinition[]> {
         const promises = legs.map(leg =>
             this.facilityLoader.getFacility(ICAO.getFacilityType(leg.fixIcao), leg.fixIcao).then(fac => ({
                     leg: leg,
@@ -460,7 +504,7 @@ export class SidStar {
 
 
         const enriched = await Promise.all(promises);
-        const klnLegs: KLNFlightplanLeg[] = [];
+        const klnLegs: LegDefinition[] = [];
 
         for (const enrichedLeg of enriched) {
             if (enrichedLeg.leg.type === LegType.AF) {
@@ -496,49 +540,6 @@ export class SidStar {
 
         }
         return klnLegs;
-
-    }
-
-    /**
-     * Builds the list of legs.
-     * Filters out duplicates and legs that are not supported by the KLN.
-     * Async, because we may need the facilities for DME arcs.
-     * @param facility
-     * @param type
-     * @param proc
-     * @param rwy
-     * @param trans
-     */
-
-    public async getKLNProcedureLegList(facility: AirportFacility, proc: Procedure, type: KLNLegType, rwy: RunwayTransition | null, trans: EnrouteTransition | null): Promise<KLNFlightplanLeg[]> {
-        const legs: FlightPlanLeg[] = [];
-
-        if (type === KLNLegType.SID) {
-            if (rwy != null) {
-                legs.push(...rwy.legs);
-            }
-
-            legs.push(...proc.commonLegs);
-
-            if (trans != null) {
-                legs.push(...trans.legs);
-            }
-        } else {
-
-            if (trans != null) {
-                legs.push(...trans.legs);
-            }
-
-            legs.push(...proc.commonLegs);
-
-            if (rwy != null) {
-                legs.push(...rwy.legs);
-            }
-        }
-
-        const cleaned = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
-        const procedureName = `${proc.name}-${type === KLNLegType.SID ? "SID" : "Æ"}`;
-        return await this.convertToKLN(facility, procedureName, type, cleaned);
 
     }
 
@@ -637,7 +638,7 @@ export class SidStar {
 
         try {
             //Not sure, but I would expect this to behave like the REF page
-            this.facilityLoader.facilityRepo.add(entryFacility);
+            this.facilityLoader.getFacilityRepo().add(entryFacility);
         } catch (e) {
             //DB full. Oh well, what's the worst that could possibly happen?
         }

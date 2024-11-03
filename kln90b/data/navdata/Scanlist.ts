@@ -21,7 +21,7 @@ export class Scanlists {
         this.vorScanlist = new FacilityLoaderScanlist(FacilitySearchType.Vor, facilityLoader);
         this.ndbScanlist = new FacilityLoaderScanlist(FacilitySearchType.Ndb, facilityLoader);
         this.intScanlist = new FacilityLoaderScanlist(FacilitySearchType.Intersection, facilityLoader);
-        this.supScanlist = new SupScanlist(FacilitySearchType.User, facilityLoader.facilityRepo);
+        this.supScanlist = new SupScanlist(FacilitySearchType.User, facilityLoader.getFacilityRepo());
     }
 
 }

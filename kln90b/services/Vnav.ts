@@ -1,9 +1,8 @@
 import {NavPageState} from "../data/VolatileMemory";
 import {Sensors} from "../Sensors";
 import {CalcTickable} from "../TickController";
-import {Flightplan} from "../data/flightplan/Flightplan";
 import {Degrees, Feet, NauticalMiles, Seconds} from "../data/Units";
-import {Facility, GeoPoint, UnitType} from "@microsoft/msfs-sdk";
+import {Facility, FlightPlan, GeoPoint, UnitType} from "@microsoft/msfs-sdk";
 import {HOURS_TO_SECONDS} from "../data/navdata/NavCalculator";
 import {format} from "numerable";
 
@@ -19,7 +18,7 @@ export class Vnav implements CalcTickable {
     public timeToVnav: Seconds | null = null;
     public advisoryAltitude: Feet | null = null;
 
-    constructor(private readonly navState: NavPageState, private readonly sensors: Sensors, private readonly fpl0: Flightplan) {
+    constructor(private readonly navState: NavPageState, private readonly sensors: Sensors, private readonly fpl0: FlightPlan) {
     }
 
     public tick(): void {
@@ -104,8 +103,8 @@ export class Vnav implements CalcTickable {
         if (fplIdx === -1) { //Direct to, wpt must be the active waypoint
             return wpt.icao === active.icao;
         } else {
-            const isFutureWpt = this.fpl0.getLegs().filter((_, idx) => idx >= fplIdx).some(l => l.wpt.icao === wpt.icao);
-            if (!isFutureWpt) {
+            const futureWpt = this.fpl0.findLeg((l) => l.leg.fixIcao === wpt.icao, false, fplIdx);
+            if (futureWpt !== null) {
                 return false;
             }
         }
@@ -171,15 +170,16 @@ export class Vnav implements CalcTickable {
             return this.navState.distToActive! - this.navState.nav4VnavDist;
         } else {
             let dist = this.navState.distToActive! - this.navState.nav4VnavDist;
-            const legs = this.fpl0.getLegs();
             const fplIdx = this.navState.activeWaypoint.getActiveFplIdx();
-            for (let i = fplIdx + 1; i < legs.length; i++) {
-                const prev = legs[i - 1];
-                const next = legs[i];
-                dist += UnitType.GA_RADIAN.convertTo(new GeoPoint(prev.wpt.lat, prev.wpt.lon).distance(next.wpt), UnitType.NMILE);
-                if (next.wpt.icao === target.icao) {
-                    return dist;
+            let prev = null;
+            for (const next of this.fpl0.legs(, false, fplIdx)) {
+                if (prev !== null) {
+                    dist += UnitType.GA_RADIAN.convertTo(new GeoPoint(prev.leg.lat!, prev.leg.lon!).distance(next.leg.lat!, next.leg.lon!), UnitType.NMILE);
+                    if (next.wpt.icao === target.icao) {
+                        return dist;
+                    }
                 }
+                prev = next;
             }
             throw new Error(`VNAV Wpt is not valid${target.icao}`);
         }

@@ -1,6 +1,19 @@
-import {Facility, GeoCircle, GeoPoint, LatLonInterface, UserSetting} from "@microsoft/msfs-sdk";
-import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "./Flightplan";
+import {
+    BitFlags,
+    Facility,
+    FixTypeFlags,
+    FlightPlan,
+    FlightPlanner,
+    FlightPlanSegmentType,
+    GeoCircle,
+    GeoPoint,
+    LatLonInterface,
+    LegDefinition,
+    LegType,
+    UserSetting,
+} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
+import {AccessUserData} from "./AccesUserData";
 import {Sensors} from "../../Sensors";
 
 
@@ -11,17 +24,19 @@ export interface FromLeg {
 
 const CACHED_CIRCLE = new GeoCircle(new Float64Array(3), 0);
 
+export const DIRECT_TO_FPL_IDX = 99;
+
 export class ActiveWaypoint {
 
     private setting: UserSetting<string>;
 
     private from: FromLeg | null = null;
-    private to: KLNFlightplanLeg | null = null;
+    private to: LegDefinition | null = null;
     private isDirectTo: boolean = false;
 
     private fplIdx: number = -1; //The index of the active waypoint (to) in the flightplan
 
-    constructor(userSettings: KLN90BUserSettings, private readonly sensors: Sensors, public readonly fpl0: Flightplan, public lastactiveWaypoint: Facility | null) {
+    constructor(userSettings: KLN90BUserSettings, private readonly sensors: Sensors, public readonly flightPlanner: FlightPlanner, public lastactiveWaypoint: Facility | null) {
         this.setting = userSettings.getSetting("activeWaypoint");
     }
 
@@ -31,16 +46,46 @@ export class ActiveWaypoint {
             wpt: from,
             path: CACHED_CIRCLE,
         };
-        const legs = this.fpl0.getLegs();
-        this.fplIdx = legs.findIndex(leg => leg.wpt.icao === to.icao);
-        if (this.fplIdx > -1) {
-            this.to = legs[this.fplIdx]; //We need to keep the meta information like the suffix
+        const leg = this.fpl0.findLeg((leg) => leg.leg.fixIcao == to.icao);
+
+        if (leg == null) {
+            this.setFplIdx(-1);
+            const randomDtoFpl = this.flightPlanner.createFlightPlan(DIRECT_TO_FPL_IDX);
+
+            const segment = randomDtoFpl.insertSegment(0, FlightPlanSegmentType.RandomDirectTo, undefined, true);
+
+            this.to = randomDtoFpl.addLeg(segment.segmentIndex, FlightPlan.createLeg({
+                type: LegType.DF,
+                fixIcao: to.icao,
+                lat: to.lat,
+                lon: to.lon,
+            }));
+            this.to.userData['facility'] = to;
         } else {
-            this.to = {wpt: to, type: KLNLegType.USER};
+            this.setFplIdx(this.fpl0.getLegIndexFromLeg(leg));
+            this.to = this.fpl0.getLeg(this.fplIdx); //We need to keep the meta information like the suffix
         }
 
         this.isDirectTo = true;
         this.saveLastActiveWaypoint();
+    }
+
+    /**
+     * If FPL 0 is valid, then this activates the closest leg
+     */
+    public activateFpl0(): LegDefinition | null {
+        const legs = this.fpl0.legs();
+        if (this.fpl0.length >= 2) {
+            const closestLeg = this.findClosestLeg(legs);
+            if (closestLeg == null) {
+                //Two legs, but both are the same waypoint...
+                return this.flag();
+            }
+            this.setFplIdx(this.fpl0.getLegIndexFromLeg(closestLeg));
+            return this.setFplData(this.fplIdx);
+        } else {
+            return this.flag();
+        }
     }
 
     public cancelDirectTo() {
@@ -50,21 +95,13 @@ export class ActiveWaypoint {
         this.saveLastActiveWaypoint();
     }
 
-    /**
-     * If FPL 0 is valid, then this activates the closest leg
-     */
-    public activateFpl0(): KLNFlightplanLeg | null {
-        const legs = this.fpl0.getLegs();
-        if (legs.length >= 2) {
-            this.fplIdx = this.findClosestLegIdx(legs);
-            if (this.fplIdx === -1) {
-                //Two legs, but both are the same waypoint...
-                return this.flag();
-            }
-            return this.setFplData(this.fplIdx);
-        } else {
-            return this.flag();
+    public getActiveWpt(): Facility | null {
+        this.assertToMatchesFplIdx();
+        if (this.to === null) {
+            return null;
         }
+
+        return this.to.userData['facility'];
     }
 
     public getFromWpt(): Facility | null {
@@ -75,29 +112,21 @@ export class ActiveWaypoint {
         return this.from;
     }
 
-    public getActiveWpt(): Facility | null {
-        this.assertToMatchesFplIdx();
-        if (this.to === null) {
-            return null;
-        }
-
-        return this.to.wpt;
-    }
-
     /**
      * 6-20, returns all future legs including the current active waypoint up to the MAP or the destination
      */
-    public getFutureLegs(): KLNFlightplanLeg[] {
+    public getFutureLegs(): LegDefinition[] {
         if (this.fplIdx === -1) {
             const active = this.getActiveLeg();
             return active === null ? [] : [active];
         }
-        const wpts: KLNFlightplanLeg[] = [];
+        const wpts: LegDefinition[] = [];
 
-        const futureLegs = this.fpl0.getLegs().slice(this.fplIdx);
+        const futureLegs = this.fpl0.legs(false, this.fplIdx);
+
         for (const leg of futureLegs) {
             wpts.push(leg);
-            if (leg.fixType === KLNFixType.MAP) {
+            if (BitFlags.isAll(leg.leg.fixTypeFlags, FixTypeFlags.MAP)) {
                 return wpts;
             }
         }
@@ -112,16 +141,16 @@ export class ActiveWaypoint {
         if (futureWpts.length === 0) {
             return null
         }
-        return futureWpts[futureWpts.length - 1].wpt;
+        return AccessUserData.getFacility(futureWpts[futureWpts.length - 1]);
     }
 
     public sequenceToNextWaypoint() {
         if (this.fplIdx === -1) {
             return;
         }
-        const legs = this.fpl0.getLegs();
-        if (this.fplIdx + 1 < legs.length) {
-            this.fplIdx++;
+
+        if (this.fplIdx + 1 < this.fpl0.length) {
+            this.setFplIdx(this.fplIdx + 1);
             this.setFplData(this.fplIdx);
         }
     }
@@ -129,16 +158,20 @@ export class ActiveWaypoint {
     /**
      * Gets the leg after the active waypoint
      */
-    public getFollowingLeg(): KLNFlightplanLeg | null {
-        const legs = this.fpl0.getLegs();
+    public getFollowingLeg(): LegDefinition | null {
         if (this.fplIdx === -1) {
             return null;
         }
-        if (this.fplIdx + 1 < legs.length) {
-            return legs[this.fplIdx + 1];
+        if (this.fplIdx + 1 < this.fpl0.length) {
+            return this.fpl0.getLeg(this.fplIdx + 1);
         } else {
             return null;
         }
+    }
+
+    public getActiveLeg(): LegDefinition | null {
+        this.assertToMatchesFplIdx();
+        return this.to;
     }
 
     /**
@@ -148,9 +181,12 @@ export class ActiveWaypoint {
         return this.isDirectTo;
     }
 
-    public getActiveLeg(): KLNFlightplanLeg | null {
-        this.assertToMatchesFplIdx();
-        return this.to;
+    /**
+     * When moving the intercept point of an arc, the pilot may change the current leg. In this case, the path must
+     * be recalculated
+     */
+    public recalculatePath() {
+        this.from!.path = CACHED_CIRCLE.setAsGreatCircle(this.from!.wpt, AccessUserData.getFacility(this.to!));
     }
 
     /**
@@ -162,12 +198,9 @@ export class ActiveWaypoint {
         return this.fplIdx;
     }
 
-    /**
-     * When moving the intercept point of an arc, the pilot may change the current leg. In this case, the path must
-     * be recalculated
-     */
-    public recalculatePath() {
-        this.from!.path = CACHED_CIRCLE.setAsGreatCircle(this.from!.wpt, this.to!.wpt);
+    private setFplIdx(fplIdx: number) {
+        this.fplIdx = fplIdx;
+        this.fpl0.setLateralLeg(fplIdx); //-1 will get clamped to 0
     }
 
     /**
@@ -175,7 +208,7 @@ export class ActiveWaypoint {
      * @private
      */
     private flag(): null {
-        this.fplIdx = -1;
+        this.setFplIdx(-1);
         this.from = null;
         this.to = null;
         this.isDirectTo = false;
@@ -183,23 +216,22 @@ export class ActiveWaypoint {
         return null;
     }
 
-    private setFplData(idx: number): KLNFlightplanLeg {
-        const legs = this.fpl0.getLegs();
-        const from = legs[idx - 1];
-        const to = legs[idx];
-        if (from.arcData === undefined) {
-            CACHED_CIRCLE.setAsGreatCircle(from.wpt, to.wpt);
+    private setFplData(idx: number): LegDefinition {
+        const from = this.fpl0.getLeg(idx - 1);
+        const to = this.fpl0.getLeg(idx);
+        if (AccessUserData.getArcData(from) === undefined) {
+            CACHED_CIRCLE.setAsGreatCircle(AccessUserData.getFacility(from), AccessUserData.getFacility(to));
             this.from = {
-                wpt: from.wpt,
+                wpt: AccessUserData.getFacility(from),
                 path: CACHED_CIRCLE,
             };
         } else {
             this.from = {
-                wpt: from.wpt,
-                path: from.arcData.circle,
+                wpt: AccessUserData.getFacility(from),
+                path: AccessUserData.getArcData(from).circle,
             }
         }
-        this.to = legs[idx];
+        this.to = this.fpl0.getLeg(idx);
         this.isDirectTo = false;
         this.saveLastActiveWaypoint();
         return this.to;
@@ -219,40 +251,45 @@ export class ActiveWaypoint {
      * @param legs
      * @private
      */
-    private findClosestLegIdx(legs: KLNFlightplanLeg[]): number {
+    private findClosestLeg(legs: Generator<LegDefinition, void>): LegDefinition | null {
         const CACHED_CIRCLE = new GeoCircle(new Float64Array(3), 0);
         const tempFromGeoPoint = new GeoPoint(0, 0);
         const tempClosestGeoPoint = new GeoPoint(0, 0);
         let distMin = 99999; //This is GA Radians!
-        let closestIdx = -1;
-        for (let i = 1; i < legs.length; i++) {
-            const from = legs[i - 1];
-            const to = legs[i].wpt;
-            tempFromGeoPoint.set(from.wpt);
-            let circle: GeoCircle;
-            if (from.arcData === undefined) {
-                CACHED_CIRCLE.setAsGreatCircle(from.wpt, to);
-                circle = CACHED_CIRCLE;
-            } else {
-                circle = from.arcData.circle;
-            }
-            circle.closest(this.sensors.in.gps.coords, tempClosestGeoPoint);
+        let closestLeg = null;
 
-            let distGPSClosestWpt: number;
-            if (this.isPointOnCircleBetween(tempFromGeoPoint, to, tempClosestGeoPoint)) {
-                distGPSClosestWpt = tempClosestGeoPoint.distance(this.sensors.in.gps.coords)
-            } else {
-                //The closest point is not between from and to, so lets use the distance between GPS and from instead
-                distGPSClosestWpt = tempFromGeoPoint.distance(this.sensors.in.gps.coords);
-            }
+        let from = null;
 
-            if (distGPSClosestWpt < distMin) {
-                distMin = distGPSClosestWpt;
-                closestIdx = i;
+
+        for (const to of legs) {
+            if (from !== null) {
+                tempFromGeoPoint.set(AccessUserData.getFacility(from));
+                let circle: GeoCircle;
+                if (AccessUserData.getArcData(from) === undefined) {
+                    CACHED_CIRCLE.setAsGreatCircle(tempFromGeoPoint, AccessUserData.getFacility(to));
+                    circle = CACHED_CIRCLE;
+                } else {
+                    circle = AccessUserData.getArcData(from).circle;
+                }
+                circle.closest(this.sensors.in.gps.coords, tempClosestGeoPoint);
+
+                let distGPSClosestWpt: number;
+                if (this.isPointOnCircleBetween(tempFromGeoPoint, AccessUserData.getFacility(to), tempClosestGeoPoint)) {
+                    distGPSClosestWpt = tempClosestGeoPoint.distance(this.sensors.in.gps.coords)
+                } else {
+                    //The closest point is not between from and to, so lets use the distance between GPS and from instead
+                    distGPSClosestWpt = tempFromGeoPoint.distance(this.sensors.in.gps.coords);
+                }
+
+                if (distGPSClosestWpt < distMin) {
+                    distMin = distGPSClosestWpt;
+                    closestLeg = to;
+                }
             }
+            from = to;
         }
 
-        return closestIdx;
+        return closestLeg;
     }
 
     /**
@@ -275,12 +312,19 @@ export class ActiveWaypoint {
             return;
         }
 
-        const legs = this.fpl0.getLegs();
-        if (this.fplIdx < legs.length && this.to === legs[this.fplIdx]) { //Yes, we really need to check the instance here. For example the user may remove the enroute waypoint with the same icao as the IAF
-            return;
+        try {
+            const leg = this.fpl0.getLeg(this.fplIdx);
+            if (this.to !== leg) { //Yes, we really need to check the instance here. For example the user may remove the enroute waypoint with the same icao as the IAF
+                //The user must have modified the flightplan if to does not match the index anymore
+                this.activateFpl0();
+            }
+
+
+        } catch (e) {
+
+            //The user must have modified the flightplan if to does not match the index anymore
+            this.activateFpl0();
         }
-        //The user must have modified the flightplan if to does not match the index anymore
-        this.activateFpl0();
     }
 
 }

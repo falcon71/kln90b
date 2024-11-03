@@ -11,7 +11,7 @@ import {SuperNav5Page} from "./SuperNav5Page";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
 import {format} from "numerable";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {KLNFixType} from "../../data/flightplan/Flightplan";
+import {KLNFixType} from "../../data/flightplan/FlightPlan";
 import {FROM} from "../../data/VolatileMemory";
 
 
