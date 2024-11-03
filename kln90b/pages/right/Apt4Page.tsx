@@ -4,7 +4,7 @@ import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {format} from "numerable";
 import {AirportSelector} from "../../controls/selects/AirportSelector";
-import {isNearestWpt, unpackFacility, WaypointPage} from "./WaypointPage";
+import {unpackFacility, WaypointPage} from "./WaypointPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {CreateWaypointMessage} from "../../controls/selects/CreateWaypointMessage";
 import {Apt1Page} from "./Apt1Page";
@@ -60,7 +60,7 @@ export class Apt4Page extends WaypointPage<AirportFacility> {
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "A"),
-            nearestSelector: new NearestSelector(isNearestWpt(this.facility) ? this.facility.index : -1),
+            nearestSelector: new NearestSelector(this.facility),
             freq0: new TextDisplay(""),
             freq1: new TextDisplay(" COMM FREQ"),
             freq2: new TextDisplay(" DATA NOT"),
@@ -96,7 +96,7 @@ export class Apt4Page extends WaypointPage<AirportFacility> {
     }
 
     protected redraw(): void {
-        this.children.get("nearestSelector").setValue(isNearestWpt(this.facility) ? this.facility.index : -1);
+        this.children.get("nearestSelector").setFacility(this.facility);
         if (this.facility === null) {
             this.mainRef.instance.classList.add("d-none");
             this.children.get("createWpt").setVisible(true);

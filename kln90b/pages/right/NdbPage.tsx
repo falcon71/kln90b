@@ -3,7 +3,7 @@ import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {NdbSelector} from "../../controls/selects/NdbSelector";
-import {isNearestWpt, isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
+import {isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {NdbFreqEditor} from "../../controls/editors/NdbFreqEditor";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
@@ -64,7 +64,7 @@ export class NdbPage extends WaypointPage<NdbFacility> {
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             ndb: new NdbSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "N"),
-            nearestSelector: new NearestSelector(isNearestWpt(this.facility) ? this.facility.index : -1),
+            nearestSelector: new NearestSelector(this.facility),
             name: new TextDisplay(this.formatName(facility)),
             freq: new NdbFreqEditor(this.props.bus, this.formatFreq(facility), this.setNdbFrequency.bind(this)),
             coordOrNearestView: new CoordOrNearestView(this.props.bus, this.facility, this.props.magvar, this.setLatitude.bind(this), this.setLongitude.bind(this)),
@@ -107,7 +107,7 @@ export class NdbPage extends WaypointPage<NdbFacility> {
 
     protected redraw() {
         const facility = unpackFacility(this.facility);
-        this.children.get("nearestSelector").setValue(isNearestWpt(this.facility) ? this.facility.index : -1);
+        this.children.get("nearestSelector").setFacility(this.facility);
         this.children.get("coordOrNearestView").setFacility(this.facility);
         if (facility === null) {
             this.children.get("name").text = "";

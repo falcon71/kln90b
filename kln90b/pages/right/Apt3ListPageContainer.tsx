@@ -2,7 +2,7 @@ import {AirportFacility, FSComponent, VNode} from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {AirportSelector} from "../../controls/selects/AirportSelector";
-import {isNearestWpt, isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
+import {isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {CreateWaypointMessage} from "../../controls/selects/CreateWaypointMessage";
 import {Apt1Page} from "./Apt1Page";
@@ -61,7 +61,7 @@ export class Apt3ListPageContainer extends WaypointPage<AirportFacility> {
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, changeFacilityCallback),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "A"),
-            nearestSelector: new NearestSelector(isNearestWpt(this.facility) ? this.facility.index : -1),
+            nearestSelector: new NearestSelector(this.facility),
             createWpt: new CreateWaypointMessage(() => Apt1Page.createAtUserPosition(props), () => Apt1Page.createAtPresentPosition(props)),
             userPage: this.userPage,
             listPage: this.listPage,
@@ -120,7 +120,7 @@ export class Apt3ListPageContainer extends WaypointPage<AirportFacility> {
     }
 
     protected redraw() {
-        this.children.get("nearestSelector").setValue(isNearestWpt(this.facility) ? this.facility.index : -1);
+        this.children.get("nearestSelector").setFacility(this.facility);
     }
 
     protected getMemory(): WaypointPageState<AirportFacility> {

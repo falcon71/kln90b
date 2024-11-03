@@ -3,7 +3,7 @@ import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {VorSelector} from "../../controls/selects/VorSelector";
-import {isNearestWpt, isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
+import {isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
 import {VorFreqEditor} from "../../controls/editors/VorFreqEditor";
 import {MagvarEditor} from "../../controls/editors/MagvarEditor";
 import {WaypointPageState} from '../../data/VolatileMemory';
@@ -69,7 +69,7 @@ export class VorPage extends WaypointPage<VorFacility> {
             vor: new VorSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             dme: new TextDisplay(facility?.type == VorType.DME || facility?.type == VorType.VORDME ? "D" : " "),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "V"),
-            nearestSelector: new NearestSelector(isNearestWpt(this.facility) ? this.facility.index : -1),
+            nearestSelector: new NearestSelector(this.facility),
             name: new TextDisplay(this.formatName(facility)),
             class: new TextDisplay(this.formatClass(facility?.vorClass)),
             freq: new VorFreqEditor(this.props.bus, this.formatFreq(facility), this.setVorFrequency.bind(this)),
@@ -119,7 +119,7 @@ export class VorPage extends WaypointPage<VorFacility> {
 
     protected redraw() {
         const facility = unpackFacility(this.facility);
-        this.children.get("nearestSelector").setValue(isNearestWpt(this.facility) ? this.facility.index : -1);
+        this.children.get("nearestSelector").setFacility(this.facility);
         this.children.get("coordOrNearestView").setFacility(this.facility);
         if (facility === null) {
             this.children.get("dme").text = " ";
