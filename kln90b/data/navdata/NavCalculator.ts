@@ -1,7 +1,7 @@
 import {CalcTickable, TICK_TIME_CALC} from "../../TickController";
 import {Sensors} from "../../Sensors";
 import {FROM, VolatileMemory} from "../VolatileMemory";
-import {GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
+import {GeoCircle, GeoPoint, LatLonInterface, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Degrees, Knots, Seconds} from "../Units";
 import {ModeController} from "../../services/ModeController";
@@ -144,6 +144,7 @@ export class NavCalculator implements CalcTickable {
                 const distanceToTurn = nav.distToActive - turnAnticipationDistance;
                 const timeToTurn = distanceToTurn / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
 
+
                 nav.waypointAlert = timeToTurn <= WPT_ALERT_WITH_TURN_ANTI;
                 //console.log(nav.distToActive, turnAnticipationDistance, nav.waypointAlert, timeToTurn, toWpt);
                 if (toLeg.fixType !== KLNFixType.MAP &&
@@ -151,6 +152,9 @@ export class NavCalculator implements CalcTickable {
                         || (nav.waypointAlert && distanceToTurn > this.lastDistance))) {
                     //don't move missed approach waypoint!
                     nav.activeWaypoint.sequenceToNextWaypoint();
+
+                    //TODO use this turn for XTK until turn is completed
+                    const turnCircle = this.calculateTurnCircle(turnRadius, turnAngle, toLeg.wpt, fromDtk, NavMath.getTurnDirection(fromDtk, nextDtk));
                     console.log("turn: moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt(), distanceToTurn, this.lastDistance);
                 }
                 this.lastDistance = distanceToTurn;
@@ -167,6 +171,26 @@ export class NavCalculator implements CalcTickable {
 
         this.setOutput();
 
+    }
+
+    private calculateTurnCircle(turnRadius: number, turnAngle: number, waypoint: LatLonInterface, fromDtk: number, turnDir: "left" | "right"): GeoCircle {
+        const turnAnticipationDistance = turnRadius * Math.tan((turnAngle / 2) * Avionics.Utils.DEG2RAD);
+
+        //This is the point, where we ideally want to start the turn
+        const geoWaypoint = new GeoPoint(0, 0);
+        geoWaypoint.set(waypoint);
+        const startOfTurn = geoWaypoint.offset(NavMath.reciprocateHeading(fromDtk), UnitType.NMILE.convertTo(turnAnticipationDistance, UnitType.GA_RADIAN));
+
+        //This is the center point of the turn
+        const centerOfTurn = startOfTurn.offset(NavMath.normalizeHeading(fromDtk + 90 * (turnDir === "right" ? 1 : -1)), UnitType.NMILE.convertTo(turnRadius, UnitType.GA_RADIAN));
+
+        //This circle describes the entire turn
+        const circleDesribingTurnTowardsLeg = GeoCircle.createFromPoint(centerOfTurn, UnitType.NMILE.convertTo(turnRadius, UnitType.GA_RADIAN));
+        if (turnDir == "right") {
+            circleDesribingTurnTowardsLeg.reverse();
+        }
+
+        return circleDesribingTurnTowardsLeg;
     }
 
     /**

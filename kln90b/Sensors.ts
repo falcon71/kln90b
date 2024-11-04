@@ -290,11 +290,9 @@ export class SensorsOut {
         }
         if (dtkMag === null) {
             SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, 0);
-            SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Radians, 0);
             SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
         } else {
             SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(dtkMag, UnitType.RADIAN));
-            SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Radians, UnitType.DEGREE.convertTo(dtkMag, UnitType.RADIAN));
             if (actualTrack === null) {
                 SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
             } else {
@@ -501,11 +499,18 @@ export class SensorsOut {
         }
     }
 
-    public setRollCommand(bankAngle: Number | null) {
+    public setRollCommand(bankAngle: number | null, desiredHeading: number | null) {
         if (bankAngle === null) {
-            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
+            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Number, 0);
         } else {
-            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, bankAngle);
+            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Number, bankAngle);
+        }
+
+        //The real KLN does not have this, but we do and there is a SimVar for this...
+        if (desiredHeading === null) {
+            SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Number, 0);
+        } else {
+            SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Number, UnitType.DEGREE.convertTo(desiredHeading, UnitType.RADIAN));
         }
     }
 
