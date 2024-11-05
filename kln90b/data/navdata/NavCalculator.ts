@@ -3,7 +3,7 @@ import {Sensors} from "../../Sensors";
 import {FROM, VolatileMemory} from "../VolatileMemory";
 import {GeoCircle, GeoPoint, LatLonInterface, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
-import {Degrees, Knots, Seconds} from "../Units";
+import {Degrees, Knots, NauticalMiles, Seconds} from "../Units";
 import {ModeController} from "../../services/ModeController";
 import {KLNFixType} from "../flightplan/Flightplan";
 import {KLNMagvar} from "./KLNMagvar";
@@ -28,6 +28,9 @@ export const MAX_BANK_ANGLE = 25;
 export class NavCalculator implements CalcTickable {
     private readonly turnAnticipation: UserSetting<boolean>;
     private lastDistance = 9999;
+
+    private turnCircle: GeoCircle | null = null;
+    private turnAnticipationDistance: NauticalMiles | null = null;
 
 
     constructor(private readonly sensors: Sensors, private readonly memory: VolatileMemory, private readonly magvar: KLNMagvar, userSettings: KLN90BUserSettings, private readonly modeController: ModeController, private readonly planeSettings: KLN90PlaneSettings) {
@@ -115,7 +118,22 @@ export class NavCalculator implements CalcTickable {
             nav.waypointAlert = false;
         }
 
-        nav.xtkToActive = UnitType.GA_RADIAN.convertTo(fromLeg.path.distance(this.sensors.in.gps.coords), UnitType.NMILE);
+        if (this.turnAnticipationDistance !== null) {
+            const distFromCurrent = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(fromLeg.wpt), UnitType.NMILE);
+            if (distFromCurrent >= this.turnAnticipationDistance) {
+                //We have reached the end of the turn, XTK will now use the normal leg again
+                console.debug("Reached end of turn", distFromCurrent, this.turnAnticipationDistance);
+                this.turnAnticipationDistance = null;
+                this.turnCircle = null;
+            }
+        }
+
+        if (this.turnCircle === null) {
+            nav.xtkToActive = UnitType.GA_RADIAN.convertTo(fromLeg.path.distance(this.sensors.in.gps.coords), UnitType.NMILE);
+        } else {
+            //4-8 XTK will be based on a smooth turn
+            nav.xtkToActive = UnitType.GA_RADIAN.convertTo(this.turnCircle.distance(this.sensors.in.gps.coords), UnitType.NMILE);
+        }
 
         nav.toFrom = Math.abs(NavMath.diffAngle(nav.bearingToActive, dtk)) <= 90;
 
@@ -153,8 +171,9 @@ export class NavCalculator implements CalcTickable {
                     //don't move missed approach waypoint!
                     nav.activeWaypoint.sequenceToNextWaypoint();
 
-                    //TODO use this turn for XTK until turn is completed
-                    const turnCircle = this.calculateTurnCircle(turnRadius, turnAngle, toLeg.wpt, fromDtk, NavMath.getTurnDirection(fromDtk, nextDtk));
+                    //4-8 We save information on how this turn was calculated
+                    this.turnCircle = this.calculateTurnCircle(turnRadius, turnAnticipationDistance, toLeg.wpt, fromDtk, NavMath.getTurnDirection(fromDtk, nextDtk));
+                    this.turnAnticipationDistance = turnAnticipationDistance;
                     console.log("turn: moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt(), distanceToTurn, this.lastDistance);
                 }
                 this.lastDistance = distanceToTurn;
@@ -173,24 +192,30 @@ export class NavCalculator implements CalcTickable {
 
     }
 
-    private calculateTurnCircle(turnRadius: number, turnAngle: number, waypoint: LatLonInterface, fromDtk: number, turnDir: "left" | "right"): GeoCircle {
-        const turnAnticipationDistance = turnRadius * Math.tan((turnAngle / 2) * Avionics.Utils.DEG2RAD);
-
+    /**
+     * 4-8 XTK calculations use a smooth path during turns. Here we calculate this path once we start the turn
+     * @param turnRadius
+     * @param turnAnticipationDistance
+     * @param waypoint
+     * @param fromDtk
+     * @param turnDir
+     * @private
+     */
+    private calculateTurnCircle(turnRadius: number, turnAnticipationDistance: number, waypoint: LatLonInterface, fromDtk: number, turnDir: "left" | "right"): GeoCircle {
         //This is the point, where we ideally want to start the turn
-        const geoWaypoint = new GeoPoint(0, 0);
-        geoWaypoint.set(waypoint);
-        const startOfTurn = geoWaypoint.offset(NavMath.reciprocateHeading(fromDtk), UnitType.NMILE.convertTo(turnAnticipationDistance, UnitType.GA_RADIAN));
+        TO_GEOPOINT_CACHE.set(waypoint);
+        const startOfTurn = TO_GEOPOINT_CACHE.offset(NavMath.reciprocateHeading(fromDtk), UnitType.NMILE.convertTo(turnAnticipationDistance, UnitType.GA_RADIAN));
 
         //This is the center point of the turn
         const centerOfTurn = startOfTurn.offset(NavMath.normalizeHeading(fromDtk + 90 * (turnDir === "right" ? 1 : -1)), UnitType.NMILE.convertTo(turnRadius, UnitType.GA_RADIAN));
 
         //This circle describes the entire turn
-        const circleDesribingTurnTowardsLeg = GeoCircle.createFromPoint(centerOfTurn, UnitType.NMILE.convertTo(turnRadius, UnitType.GA_RADIAN));
+        const circleDescribingTurnTowardsLeg = GeoCircle.createFromPoint(centerOfTurn, UnitType.NMILE.convertTo(turnRadius, UnitType.GA_RADIAN));
         if (turnDir == "right") {
-            circleDesribingTurnTowardsLeg.reverse();
+            circleDescribingTurnTowardsLeg.reverse();
         }
 
-        return circleDesribingTurnTowardsLeg;
+        return circleDescribingTurnTowardsLeg;
     }
 
     /**
