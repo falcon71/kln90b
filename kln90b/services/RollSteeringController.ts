@@ -97,53 +97,24 @@ export class RollSteeringController implements CalcTickable {
         //Bank angle: Right negative, left positive
 
         const track = this.sensors.in.gps.getTrackTrueRespectingGroundspeed()!;
-        const trackDiff = NavMath.diffAngle(dtk, track);
-
+        const absTrackDiff = Math.abs(NavMath.diffAngle(track, dtk));
 
         //Case 1, we are on track, only minimal corrections needed
-        if (xtk < 0.1 && Math.abs(trackDiff) < 2) {
-            const desiredTrack = dtk + xtk * 20;
-            const desiredBankAngle = this.desiredBank(desiredTrack);
-            console.debug("On track", desiredTrack, desiredBankAngle);
+        if (xtk < 0.1 && absTrackDiff < 10) {
+            //It currently does overshoot a little, might need some small adjustments
+            const desiredTrack = dtk - xtk * 50;
+            const desiredBankAngle = this.desiredBank(track, desiredTrack, NavMath.getTurnDirection(track, desiredTrack));
+            console.debug(`On track, XKT:${xtk} DTK:${dtk} bank:${desiredBankAngle} courseToSteer:${desiredTrack}`);
             this.sensors.out.setRollCommand(desiredBankAngle, desiredTrack);
             return desiredBankAngle;
         }
 
-        //We are not on track and need to intercept the track in a 45° angle with a 25° bank
-        const interceptSign = xtk < 0 ? 1 : -1;
-        const interceptAngle = 45 * interceptSign;
+        //This is a 45° intercept track towards the leg
+        const interceptAngle = 45 * (xtk < 0 ? 1 : -1);
         const interceptTrack = NavMath.normalizeHeading(dtk + interceptAngle);
 
-        //Create a circle describing a 45 Degree path towards the leg
-        this.CACHED_POINT.set(this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon);
-        this.CACHED_POINT.offset(interceptTrack, UnitType.NMILE.convertTo(1000, UnitType.GA_RADIAN));
-        this.CACHED_CIRCLE.setAsGreatCircle(this.sensors.in.gps.coords, this.CACHED_POINT);
 
-        //Interception between theoretical 45° path and the leg
-        const intersections45Leg: Float64Array[] = [];
-        leg.intersection(this.CACHED_CIRCLE, intersections45Leg);
-        const intersection45LegPoints = intersections45Leg.map(int => {
-            const p = new GeoPoint(0, 0);
-            return p.setFromCartesian(int);
-        })
-            .filter(p => Math.abs(NavMath.diffAngle(this.sensors.in.gps.coords.bearingTo(p), interceptTrack)) <= 90) //We look at the intersections of two great circles. The closest intersection may actually be behind the plane
-            .sort((a, b) => a.distance(this.sensors.in.gps.coords) - b.distance(this.sensors.in.gps.coords)); //Max two, we want the closest one in front of the plane
-
-
-        const standardTurnRadiusAtCurrentSpeed = UnitType.METER.convertTo(NavMath.turnRadius(this.sensors.in.gps.groundspeed, this.bankeAngleForStandardTurn(this.sensors.in.gps.groundspeed)), UnitType.NMILE);
-        const distanceFor45DegreeTurn = standardTurnRadiusAtCurrentSpeed * Math.tan((45 / 2) * Avionics.Utils.DEG2RAD);
-
-        const distToIntersection = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(intersection45LegPoints[0]), UnitType.NMILE);
-
-        //Case 2, we are still too far away to intercept the leg. We simply fly with 45° towards it
-        if (distToIntersection > distanceFor45DegreeTurn) {
-            const desiredBankAngle = this.desiredBank(interceptTrack);
-            console.debug("Far away, intercept with 45 degrees", interceptTrack, desiredBankAngle);
-            this.sensors.out.setRollCommand(desiredBankAngle, interceptTrack);
-            return desiredBankAngle;
-        }
-
-        //We have passed the point, where we need to turn towards the leg
+        //We are not on track and need to calculate our turn to the track
         //First we calcuate the interception point between the aircraft and the leg
         this.CACHED_POINT.set(this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon);
         this.CACHED_POINT.offset(track, UnitType.NMILE.convertTo(1000, UnitType.GA_RADIAN));
@@ -156,35 +127,48 @@ export class RollSteeringController implements CalcTickable {
             return p.setFromCartesian(int);
         })
             .filter(p => Math.abs(NavMath.diffAngle(this.sensors.in.gps.coords.bearingTo(p), track)) <= 90) //We look at the intersections of two great circles. The closest intersection may actually be behind the plane
-            .filter(p => UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(p), UnitType.NMILE) <= distanceFor45DegreeTurn * 2) //Let's ignore the interception on the other side of the planet
+            .filter(p => UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(p), UnitType.NMILE) <= 100) //Let's ignore the interception on the other side of the planet
             .sort((a, b) => a.distance(this.sensors.in.gps.coords) - b.distance(this.sensors.in.gps.coords)); //Max two, we want the closest one in front of the plane
 
 
-        //Case 3 we are within the point where we should intercept the leg, but we don't.
-        // This means, we need to turn back to the leg, similiar to case 2
+        //Case 2 We don't intercept the leg, lets turn 45° towards it
         if (intersectionsCurrentTrackLegPoints.length === 0) {
-            const desiredBankAngle = this.desiredBank(interceptTrack);
-            console.debug("Track does not intercept leg, intercept with 45 degrees", interceptTrack, desiredBankAngle);
+            const desiredBankAngle = this.desiredBank(track, interceptTrack, NavMath.getTurnDirection(track, interceptTrack));
+            console.debug(`Track does not intercept leg, intercept with 45 degrees: bank:${desiredBankAngle} courseToSteer:${interceptTrack}`);
             this.sensors.out.setRollCommand(desiredBankAngle, interceptTrack);
             return desiredBankAngle;
         }
 
-        const distToIntersection2 = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(intersectionsCurrentTrackLegPoints[0]), UnitType.NMILE);
+        const distToIntersection = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(intersectionsCurrentTrackLegPoints[0]), UnitType.NMILE);
+        console.debug(`Inteception bearing:${NavMath.diffAngle(this.sensors.in.gps.coords.bearingTo(intersectionsCurrentTrackLegPoints[0]), track)} distance:${distToIntersection}`);
 
-        //Case 4, we are close enough to intercept the leg
-        //It was previously assumed to be a standard bank angle, but we calculate the optimal bank angle here going up to 30
-        const diffAngle = Math.abs(NavMath.diffAngle(track, dtk));
-
+        //Case 4, We calculate the optimal bank angle required for a smooth turn towards the leg
+        //This function allows up to 30° to correct for lag when turning
         //We are calculating the distance between the GPS position and the position where we intend to acutally intercept the leg
         //This is an isosceles triangle. The distance to the interception is the length of the sides and here we calculate the base
-        const distCurrentPosActualInterception = 2 * distToIntersection2 * Math.cos(diffAngle / 2 * Avionics.Utils.DEG2RAD);
+        const distCurrentPosActualInterception = 2 * distToIntersection * Math.cos(absTrackDiff / 2 * Avionics.Utils.DEG2RAD);
         //Another isosceles triangle. Knowing the base, we can calculate the sides again, those are turn radius
-        const requiredTurnRadius = distCurrentPosActualInterception / (2 * Math.cos((90 - (diffAngle / 2)) * Avionics.Utils.DEG2RAD));
+        const requiredTurnRadius = distCurrentPosActualInterception / (2 * Math.cos((90 - (absTrackDiff / 2)) * Avionics.Utils.DEG2RAD));
 
-        const desiredBankAngle = Math.min(NavMath.bankAngle(this.sensors.in.gps.groundspeed, UnitType.NMILE.convertTo(requiredTurnRadius, UnitType.METER)), 30) * interceptSign;
+        const absDesiredBankAngle = Math.min(NavMath.bankAngle(this.sensors.in.gps.groundspeed, UnitType.NMILE.convertTo(requiredTurnRadius, UnitType.METER)), 30);
 
+        const desiredTurnRadius = UnitType.METER.convertTo(NavMath.turnRadius(this.sensors.in.gps.groundspeed, this.bankeAngleForStandardTurn(this.sensors.in.gps.groundspeed)), UnitType.NMILE);
+        //This is the distance on the 45° edge on the circle to the leg. If we are farther away then the 45° degree intercept point, then we want to fly with 45° towards the leg, unless we require a stronger bank angle already
+        const maxXtkForTracking = desiredTurnRadius * (1 - Math.sqrt(2) / 2);
 
-        console.debug("RollSteering", desiredBankAngle, dtk);
+        //Less than 25° of bank angle is required and we are still far away from the leg, let's continue closing in on an intercept track
+        if (absDesiredBankAngle < 25 //If we need more than 25° bank, then this has priority
+            && xtk > maxXtkForTracking) {
+            const desiredBankAngle = this.desiredBank(track, interceptTrack, NavMath.getTurnDirection(track, interceptTrack));
+            console.debug(`Too far away, XTK ${xtk}>${maxXtkForTracking}, intercept with 45 degrees: bank:${desiredBankAngle} courseToSteer:${interceptTrack}`);
+            this.sensors.out.setRollCommand(desiredBankAngle, interceptTrack);
+            return desiredBankAngle;
+        }
+
+        //We are now ready to intercept the leg with the optimal bank angle
+        const desiredBankAngle = absDesiredBankAngle * (NavMath.getTurnDirection(track, dtk) == 'left' ? 1 : -1);
+
+        console.debug(`Intercepting leg: radius:${requiredTurnRadius} bank:${desiredBankAngle} courseToSteer:${dtk}`);
 
         this.sensors.out.setRollCommand(desiredBankAngle, dtk);
         return desiredBankAngle;
@@ -193,11 +177,11 @@ export class RollSteeringController implements CalcTickable {
     /**
      * Calculates a desired bank angle from a desired track.
      * @param desiredTrack The desired track, in degrees true.
+     * @param turnDirection
      * @returns The desired bank angle, in degrees. Positive values indicate left bank.
      */
-    private desiredBank(desiredTrack: number): number {
-        const turnDirection = NavMath.getTurnDirection(this.sensors.in.gps.getTrackTrueRespectingGroundspeed() ?? 0, desiredTrack);
-        const headingDiff = Math.abs(NavMath.diffAngle(this.sensors.in.gps.getTrackTrueRespectingGroundspeed() ?? 0, desiredTrack));
+    private desiredBank(track: number, desiredTrack: number, turnDirection: "left" | "right"): number {
+        const headingDiff = Math.abs(NavMath.diffAngle(track, desiredTrack));
         let baseBank = Math.min(1.25 * headingDiff, MAX_BANK_ANGLE);
         // baseBank = 25;
         baseBank *= (turnDirection === 'left' ? 1 : -1);
