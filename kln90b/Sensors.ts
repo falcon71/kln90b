@@ -501,9 +501,9 @@ export class SensorsOut {
 
     public setRollCommand(bankAngle: number | null, desiredHeading: number | null) {
         if (bankAngle === null) {
-            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Number, 0);
+            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
         } else {
-            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Number, bankAngle);
+            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, bankAngle);
         }
 
         //The real KLN does not have this, but we do and there is a SimVar for this...

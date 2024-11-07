@@ -23,6 +23,9 @@ const SELF_TEST_TIME_SEC = 5;
 const SELF_TEST_DIR_RIGHT = -1;
 const SELF_TEST_DIR_LEFT = 1;
 
+//Saves some calculations. This factor is the distance between the leg and the point 45° offset on the circle
+const MAX_XTK_INTECEPT_FACTOR = 1 - Math.sqrt(2) / 2;
+
 /**
  * Calculates the roll command for the autopilot
  * Code was adapted from Working Titles LNavComputer
@@ -154,7 +157,7 @@ export class RollSteeringController implements CalcTickable {
 
         const desiredTurnRadius = UnitType.METER.convertTo(NavMath.turnRadius(this.sensors.in.gps.groundspeed, this.bankeAngleForStandardTurn(this.sensors.in.gps.groundspeed)), UnitType.NMILE);
         //This is the distance on the 45° edge on the circle to the leg. If we are farther away then the 45° degree intercept point, then we want to fly with 45° towards the leg, unless we require a stronger bank angle already
-        const maxXtkForTracking = desiredTurnRadius * (1 - Math.sqrt(2) / 2);
+        const maxXtkForTracking = desiredTurnRadius * MAX_XTK_INTECEPT_FACTOR;
 
         //Less than 25° of bank angle is required and we are still far away from the leg, let's continue closing in on an intercept track
         if (absDesiredBankAngle < 25 //If we need more than 25° bank, then this has priority
