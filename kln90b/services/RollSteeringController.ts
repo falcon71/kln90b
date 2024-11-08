@@ -7,8 +7,6 @@ import {
     FlightPathUtils,
     GeoCircle,
     GeoPoint,
-    LNavState,
-    LNavTransitionMode,
     MathUtils,
     NavMath,
     UnitType,
@@ -38,15 +36,8 @@ export class RollSteeringController implements CalcTickable {
     private readonly CACHED_POINT = new GeoPoint(0, 0);
     private readonly CACHED_CIRCLE = new GeoCircle(new Float64Array(3), 0);
 
-    private readonly anticipationState: LNavState = {
-        globalLegIndex: 0,
-        transitionMode: LNavTransitionMode.None,
-        vectorIndex: 0,
-        isSuspended: false,
-        inhibitedSuspendLegIndex: -1,
-        resetVectorsOnSuspendEnd: false,
-        isMissedApproachActive: false,
-    };
+
+    private readonly loggingEnabled: boolean = false;
 
 
     constructor(private readonly sensors: Sensors, private readonly memory: VolatileMemory) {
@@ -107,7 +98,7 @@ export class RollSteeringController implements CalcTickable {
             //It currently does overshoot a little, might need some small adjustments
             const desiredTrack = dtk - xtk * 50;
             const desiredBankAngle = this.desiredBank(track, desiredTrack, NavMath.getTurnDirection(track, desiredTrack));
-            console.debug(`On track, XKT:${xtk} DTK:${dtk} bank:${desiredBankAngle} courseToSteer:${desiredTrack}`);
+            this.log(`On track, XKT:${xtk} DTK:${dtk} bank:${desiredBankAngle} courseToSteer:${desiredTrack}`);
             this.sensors.out.setRollCommand(desiredBankAngle, desiredTrack);
             return desiredBankAngle;
         }
@@ -137,13 +128,13 @@ export class RollSteeringController implements CalcTickable {
         //Case 2 We don't intercept the leg, lets turn 45° towards it
         if (intersectionsCurrentTrackLegPoints.length === 0) {
             const desiredBankAngle = this.desiredBank(track, interceptTrack, NavMath.getTurnDirection(track, interceptTrack));
-            console.debug(`Track does not intercept leg, intercept with 45 degrees: bank:${desiredBankAngle} courseToSteer:${interceptTrack}`);
+            this.log(`Track does not intercept leg, intercept with 45 degrees: bank:${desiredBankAngle} courseToSteer:${interceptTrack}`);
             this.sensors.out.setRollCommand(desiredBankAngle, interceptTrack);
             return desiredBankAngle;
         }
 
         const distToIntersection = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(intersectionsCurrentTrackLegPoints[0]), UnitType.NMILE);
-        console.debug(`Inteception bearing:${NavMath.diffAngle(this.sensors.in.gps.coords.bearingTo(intersectionsCurrentTrackLegPoints[0]), track)} distance:${distToIntersection}`);
+        this.log(`Inteception bearing:${NavMath.diffAngle(this.sensors.in.gps.coords.bearingTo(intersectionsCurrentTrackLegPoints[0]), track)} distance:${distToIntersection}`);
 
         //Case 4, We calculate the optimal bank angle required for a smooth turn towards the leg
         //This function allows up to 30° to correct for lag when turning
@@ -163,7 +154,7 @@ export class RollSteeringController implements CalcTickable {
         if (absDesiredBankAngle < 25 //If we need more than 25° bank, then this has priority
             && xtk > maxXtkForTracking) {
             const desiredBankAngle = this.desiredBank(track, interceptTrack, NavMath.getTurnDirection(track, interceptTrack));
-            console.debug(`Too far away, XTK ${xtk}>${maxXtkForTracking}, intercept with 45 degrees: bank:${desiredBankAngle} courseToSteer:${interceptTrack}`);
+            this.log(`Too far away, XTK ${xtk}>${maxXtkForTracking}, intercept with 45 degrees: bank:${desiredBankAngle} courseToSteer:${interceptTrack}`);
             this.sensors.out.setRollCommand(desiredBankAngle, interceptTrack);
             return desiredBankAngle;
         }
@@ -171,7 +162,7 @@ export class RollSteeringController implements CalcTickable {
         //We are now ready to intercept the leg with the optimal bank angle
         const desiredBankAngle = absDesiredBankAngle * (NavMath.getTurnDirection(track, dtk) == 'left' ? 1 : -1);
 
-        console.debug(`Intercepting leg: radius:${requiredTurnRadius} bank:${desiredBankAngle} courseToSteer:${dtk}`);
+        this.log(`Intercepting leg: radius:${requiredTurnRadius} bank:${desiredBankAngle} courseToSteer:${dtk}`);
 
         this.sensors.out.setRollCommand(desiredBankAngle, dtk);
         return desiredBankAngle;
@@ -230,4 +221,9 @@ export class RollSteeringController implements CalcTickable {
         return Math.min(57.3 * Math.atan(speed / 362.1), MAX_BANK_ANGLE);
     }
 
+    private log(message?: any, ...optionalParams: any[]): void {
+        if (this.loggingEnabled) {
+            console.debug(message, optionalParams);
+        }
+    }
 }

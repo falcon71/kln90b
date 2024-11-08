@@ -250,7 +250,7 @@ class KLN90B extends BaseInstrument {
             KLNFacilityRepository.getRepository(this.bus),
         );
 
-        const scanlists = new Scanlists(facilityLoader);
+        const scanlists = new Scanlists(facilityLoader, this.bus);
 
         this.userWaypointPersistor = new UserWaypointPersistor(this.bus, facilityLoader.facilityRepo);
         try {

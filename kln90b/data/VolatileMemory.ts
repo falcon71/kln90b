@@ -274,7 +274,7 @@ export class VolatileMemory {
     }
 
     private async setFirstSupplementary() {
-        const icao = await this.scanlists.supScanlist.start();
+        const icao = await this.scanlists.supScanlist.init();
         if (icao === null) {
             this.supPage.ident = "0   ";
             this.supPage.facility = null;
@@ -292,7 +292,7 @@ export class VolatileMemory {
     }
 
     private async setFirstIntersection() {
-        const icao = await this.scanlists.intScanlist.start();
+        const icao = await this.scanlists.intScanlist.init();
         if (icao === null) {
             this.intPage.ident = "0   ";
             this.intPage.facility = null;
@@ -303,7 +303,7 @@ export class VolatileMemory {
     }
 
     private async setFirstNdb() {
-        const icao = await this.scanlists.ndbScanlist.start();
+        const icao = await this.scanlists.ndbScanlist.init();
         if (icao === null) {
             this.ndbPage.ident = "0   ";
             this.ndbPage.facility = null;
@@ -314,7 +314,7 @@ export class VolatileMemory {
     }
 
     private async setFirstVor() {
-        const icao = await this.scanlists.vorScanlist.start();
+        const icao = await this.scanlists.vorScanlist.init();
         if (icao === null) {
             this.vorPage.ident = "0  ";
             this.vorPage.facility = null;
@@ -325,7 +325,7 @@ export class VolatileMemory {
     }
 
     private async setFirstApt() {
-        const icao = await this.scanlists.aptScanlist.start();
+        const icao = await this.scanlists.aptScanlist.init();
         if (icao === null) {
             this.aptPage.ident = "0   ";
             this.aptPage.facility = null;

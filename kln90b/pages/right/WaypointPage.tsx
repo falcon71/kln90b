@@ -10,13 +10,13 @@ import {TEMPORARY_WAYPOINT, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder"
 
 type ScrollDirection = -1 | 1;
 
-const SPEEDSTEP = 250;
+const SPEEDSTEP = 350;
 const SPEEDSTEP_SIZE = 1.5;
 
 /**
  * 3-21
  * The faster the know is rotated, the faster the rate of scanning. We only receive single events, so we base the speed
- * on the rate of events in a timefrage. In other words, the speed increases, the longer the knob is held.
+ * on the rate of events in a timeframe. In other words, the speed increases, the longer the knob is held.
  */
 class ScanHandler {
 
@@ -88,6 +88,7 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
                 const facility = unpackFacility(this.facility);
                 this.ident = ICAO.getIdent(facility.icao);
                 this.getMemory().ident = this.ident;
+                this.getScanlist().sync(facility.icao);
             } else { //This branch occurs, when the page is shown temporarily for confirmation or in the ACT page. We do not want to set the memory location
                 this.facility = props.facility;
                 if (this.facility === null) {
@@ -104,7 +105,13 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
         } else {
             this.facility = this.getMemory().facility;
             const facility = unpackFacility(this.facility);
-            this.ident = facility ? ICAO.getIdent(facility.icao) : this.getMemory().ident;
+            if (facility) {
+                this.ident = ICAO.getIdent(facility.icao);
+                this.getScanlist().sync(facility.icao);
+            } else {
+                this.ident = this.getMemory().ident;
+            }
+
             this.activeIdx = -1;
         }
         this.scanHandler = new ScanHandler(this.getScanlist(), this.props.facilityLoader);
@@ -172,14 +179,13 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
             const nearestlist = nearestListGenerator.getNearestList();
             const newIndex = this.facility.index + 1;
             if (newIndex >= nearestlist.length) { //End of nearest list, move to the beginning of the scanlist
-                this.getScanlist().start().then(async startIcao => {
-                    if (startIcao === null) {
-                        this.changeFacility("0    "); //No database??
-                    } else {
-                        const nextFacility = await this.props.facilityLoader.getFacility(ICAO.getFacilityType(startIcao), startIcao);
-                        this.changeFacility(nextFacility as any);
-                    }
-                });
+                const startIcao = this.getScanlist().start();
+                if (startIcao === null) {
+                    this.changeFacility("0    "); //No database??
+                } else {
+                    this.props.facilityLoader.getFacility(ICAO.getFacilityType(startIcao), startIcao)
+                        .then((nextFacility) => this.changeFacility(nextFacility as any));
+                }
             } else {
                 this.changeFacility(nearestlist[newIndex] as any);
             }
