@@ -11,7 +11,7 @@ import {
     NavMath,
     UnitType,
 } from "@microsoft/msfs-sdk";
-import {Knots} from "../data/Units";
+import {bankeAngleForStandardTurn, distanceToAchieveBankAngleChange} from "./KLNNavmath";
 
 /**
  * How long it takes for the bank to switch between 0 and 5° on the selft test page.
@@ -21,8 +21,9 @@ const SELF_TEST_TIME_SEC = 5;
 const SELF_TEST_DIR_RIGHT = -1;
 const SELF_TEST_DIR_LEFT = 1;
 
+const HYPOTENUSE_TO_SIDE = Math.SQRT1_2;
 //Saves some calculations. This factor is the distance between the leg and the point 45° offset on the circle
-const MAX_XTK_INTECEPT_FACTOR = 1 - Math.sqrt(2) / 2;
+const MAX_XTK_INTECEPT_FACTOR = 1 - HYPOTENUSE_TO_SIDE;
 
 /**
  * Calculates the roll command for the autopilot
@@ -146,9 +147,10 @@ export class RollSteeringController implements CalcTickable {
 
         const absDesiredBankAngle = Math.min(NavMath.bankAngle(this.sensors.in.gps.groundspeed, UnitType.NMILE.convertTo(requiredTurnRadius, UnitType.METER)), 30);
 
-        const desiredTurnRadius = UnitType.METER.convertTo(NavMath.turnRadius(this.sensors.in.gps.groundspeed, this.bankeAngleForStandardTurn(this.sensors.in.gps.groundspeed)), UnitType.NMILE);
+        const desiredTurnRadius = UnitType.METER.convertTo(NavMath.turnRadius(this.sensors.in.gps.groundspeed, bankeAngleForStandardTurn(this.sensors.in.gps.groundspeed)), UnitType.NMILE);
+        const distForBankAngleChange = distanceToAchieveBankAngleChange(25, this.sensors.in.gps.groundspeed);
         //This is the distance on the 45° edge on the circle to the leg. If we are farther away then the 45° degree intercept point, then we want to fly with 45° towards the leg, unless we require a stronger bank angle already
-        const maxXtkForTracking = desiredTurnRadius * MAX_XTK_INTECEPT_FACTOR;
+        const maxXtkForTracking = desiredTurnRadius * MAX_XTK_INTECEPT_FACTOR + distForBankAngleChange * HYPOTENUSE_TO_SIDE;
 
         //Less than 25° of bank angle is required and we are still far away from the leg, let's continue closing in on an intercept track
         if (absDesiredBankAngle < 25 //If we need more than 25° bank, then this has priority
@@ -209,16 +211,6 @@ export class RollSteeringController implements CalcTickable {
         );
 
         return desiredBankAngle;
-    }
-
-
-    /**
-     * https://edwilliams.org/avform147.htm#Turns
-     * @param speed
-     * @private
-     */
-    private bankeAngleForStandardTurn(speed: Knots) {
-        return Math.min(57.3 * Math.atan(speed / 362.1), MAX_BANK_ANGLE);
     }
 
     private log(message?: any, ...optionalParams: any[]): void {
