@@ -338,11 +338,13 @@ export class FacilityLoaderScanlist implements Scanlist {
         }
 
         //Now we just need to find the very last navaid
-        const lastResult = this.index[this.index.length - 1];
-        const res = await this.facilityLoader.searchByIdent(this.facilitySearchType, ICAO.getIdent(lastResult).substring(0, 1), 1000);
-        const lastEntry = res[res.length - 1];
-        if (lastEntry !== lastResult) {
-            this.index.push(lastEntry);
+        if (this.index.length > 0) {
+            const lastResult = this.index[this.index.length - 1];
+            const res = await this.facilityLoader.searchByIdent(this.facilitySearchType, ICAO.getIdent(lastResult).substring(0, 1), 1000);
+            const lastEntry = res[res.length - 1];
+            if (lastEntry !== lastResult) {
+                this.index.push(lastEntry);
+            }
         }
 
         this.log("index", this.index);
