@@ -14,6 +14,7 @@
             <FuelComputer>
                 <IsInterfaced>false</IsInterfaced>
                 <Unit>GAL</Unit> <!-- GAL,IMP,L,KG or LB -->
+                <Type>Avgas</Type> <!-- Avgas, JetA1 or JetB -->
                 <FOBTransmitted>true</FOBTransmitted> <!-- false if Fuel On Board must be entered by the pilot manually -->
                 <FuelUsedTransmitted>true</FuelUsedTransmitted> <!-- false if this fuel computer does not transmit Fuel Used -->
             </FuelComputer>

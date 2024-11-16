@@ -1,4 +1,4 @@
-import {FuelUnit, KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
+import {FuelType, FuelUnit, KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {
     EventBus,
     Facility,
@@ -6,6 +6,7 @@ import {
     LatLonInterface,
     MagVar,
     NavMath,
+    SimpleUnit,
     SimVarValueType,
     Unit,
     UnitFamily,
@@ -42,6 +43,14 @@ export class FuelComputer implements CalcTickable {
     public fuelUsed2: number | null = null;
     private readonly realNumberOfEngines: number = 0;
 
+
+    public static readonly GALLON_FUEL_AVGAS = new SimpleUnit(UnitFamily.Weight, 'gallon', 2.7216);
+    public static readonly IMP_GALLON_FUEL_AVGAS = new SimpleUnit(UnitFamily.Weight, 'imperial gallon', 3.2685);
+    public static readonly GALLON_FUEL_JETB = new SimpleUnit(UnitFamily.Weight, 'gallon', 2.9484);
+    public static readonly IMP_GALLON_FUEL_JETB = new SimpleUnit(UnitFamily.Weight, 'imperial gallon', 3.5408);
+    private static readonly LITER_FUEL_AVGAS = new SimpleUnit(UnitFamily.Weight, 'liter', 0.719);
+    private static readonly LITER_FUEL_JETB = new SimpleUnit(UnitFamily.Weight, 'liter', 0.7789);
+
     constructor(private readonly options: KLN90PlaneSettings) {
         if (this.options.input.fuelComputer.isInterfaced) {
             this.realNumberOfEngines = SimVar.GetSimVarValue('NUMBER OF ENGINES', SimVarValueType.Number);
@@ -58,16 +67,47 @@ export class FuelComputer implements CalcTickable {
 
         switch (this.options.input.fuelComputer.unit) {
             case FuelUnit.GAL:
-                targetUnit = UnitType.GALLON_FUEL;
+                switch (this.options.input.fuelComputer.type) {
+                    case FuelType.AVGAS:
+                        targetUnit = FuelComputer.GALLON_FUEL_AVGAS;
+                        break;
+                    case FuelType.JET_A1:
+                        targetUnit = UnitType.GALLON_FUEL;
+                        break;
+                    case FuelType.JET_B:
+                        targetUnit = FuelComputer.GALLON_FUEL_JETB;
+                        break;
+                }
                 break;
             case FuelUnit.IMP:
+                switch (this.options.input.fuelComputer.type) {
+                    case FuelType.AVGAS:
+                        targetUnit = FuelComputer.IMP_GALLON_FUEL_AVGAS;
+                        break;
+                    case FuelType.JET_A1:
+                        targetUnit = UnitType.IMP_GALLON_FUEL;
+                        break;
+                    case FuelType.JET_B:
+                        targetUnit = FuelComputer.IMP_GALLON_FUEL_JETB;
+                        break;
+                }
                 targetUnit = UnitType.IMP_GALLON_FUEL;
                 break;
             case FuelUnit.KG:
                 targetUnit = UnitType.KILOGRAM;
                 break;
             case FuelUnit.L:
-                targetUnit = UnitType.LITER_FUEL;
+                switch (this.options.input.fuelComputer.type) {
+                    case FuelType.AVGAS:
+                        targetUnit = FuelComputer.LITER_FUEL_AVGAS;
+                        break;
+                    case FuelType.JET_A1:
+                        targetUnit = UnitType.LITER_FUEL;
+                        break;
+                    case FuelType.JET_B:
+                        targetUnit = FuelComputer.LITER_FUEL_JETB;
+                        break;
+                }
                 break;
             case FuelUnit.LB:
                 targetUnit = UnitType.POUND;

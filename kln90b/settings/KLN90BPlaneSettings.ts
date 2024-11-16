@@ -9,6 +9,11 @@ export const enum FuelUnit {
     LB = "LB",
 }
 
+export const enum FuelType {
+    AVGAS = "Avgas",
+    JET_A1 = "JetA1",
+    JET_B = "JetB",
+}
 
 export interface KLN90PlaneSettings {
     takeHomeMode: boolean;
@@ -27,6 +32,7 @@ export interface KLN90PlaneSettings {
         fuelComputer: {
             isInterfaced: boolean,
             unit: FuelUnit,
+            type: FuelType,
             fobTransmitted: boolean,
             fuelUsedTransmitted: boolean,
         }
@@ -66,6 +72,7 @@ export class KLN90BPlaneSettingsParser {
                 fuelComputer: {
                     isInterfaced: this.getOption(instrumentsTag, "Input.FuelComputer.IsInterfaced", false),
                     unit: this.getOption(instrumentsTag, "Input.FuelComputer.Unit", FuelUnit.GAL),
+                    type: this.getOption(instrumentsTag, "Input.FuelComputer.Type", FuelType.AVGAS),
                     fobTransmitted: this.getOption(instrumentsTag, "Input.FuelComputer.FOBTransmitted", true),
                     fuelUsedTransmitted: this.getOption(instrumentsTag, "Input.FuelComputer.FuelUsedTransmitted", true),
                 },
