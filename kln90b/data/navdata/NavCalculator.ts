@@ -10,6 +10,7 @@ import {KLNMagvar} from "./KLNMagvar";
 import {calcDistToDestination} from "../../services/FlightplanUtils";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {bankeAngleForStandardTurn, distanceToAchieveBankAngleChange} from "../../services/KLNNavmath";
+import {TurnStackEntry} from "../flightplan/ActiveWaypoint";
 
 
 //4-8
@@ -23,20 +24,15 @@ const TO_GEOPOINT_CACHE = new GeoPoint(0, 0);
 
 export const MAX_BANK_ANGLE = 25;
 
-class TurnStackEntry {
-
-    constructor(public path: GeoCircle, public switchPoint: GeoPoint) {
-    }
-}
 
 /**
  * This class updates all navigation variables
  */
 export class NavCalculator implements CalcTickable {
     private readonly turnAnticipation: UserSetting<boolean>;
-    private lastDistance = 9999;
+    private lastDistanceToTurn = 9999;
+    private lastDistanceToActive = 9999;
 
-    private turnStack: TurnStackEntry[] = [];
     private lastTurnStackDistance: NauticalMiles | null = null;
 
 
@@ -59,7 +55,9 @@ export class NavCalculator implements CalcTickable {
             nav.toFrom = FROM;
             nav.waypointAlert = true;
             nav.xtkScale = 5;
-            this.lastDistance = 9999;
+            nav.activeWaypoint.clearTurnStack();
+            this.lastDistanceToTurn = 9999;
+            this.lastDistanceToActive = 9999;
             this.setOutput();
             return;
         } else if (!this.sensors.in.gps.isValid()) {
@@ -93,17 +91,62 @@ export class NavCalculator implements CalcTickable {
 
         let dtk: Degrees;
 
+        if (!this.modeController.isObsModeActive() && isNaN(fromLeg.path.center[0])) { //Happens when FROM and TO are the same waypoint
+            console.warn("invalid path, sequencing to the next waypoint", fromLeg);
+            nav.activeWaypoint.sequenceToNextWaypoint();
+            return;
+        }
+
+        //ETE
+        if (this.sensors.in.gps.groundspeed > 2) {
+            nav.eteToActive = nav.distToActive / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
+            nav.eteToDest = nav.distToDest ? nav.distToDest / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS : null;
+        } else {
+            nav.eteToActive = null;
+            nav.eteToDest = null;
+            nav.waypointAlert = false;
+        }
+
+        //Special handling for turns
+        if (nav.activeWaypoint.turnStack.length > 0) {
+            const turnStackEntry = nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1];
+            const distFromCurrent = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(turnStackEntry.switchPoint), UnitType.NMILE);
+            if (distFromCurrent <= this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC
+                || distFromCurrent > this.lastTurnStackDistance!) {
+                console.debug("Reached end of turn", distFromCurrent, this.lastTurnStackDistance, nav.activeWaypoint.turnStack);
+                //We have reached the end of the turn, XTK will now use the normal leg again
+                nav.activeWaypoint.turnStack.pop();
+                const nextEntry = nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1];
+                if (nextEntry) {
+                    this.lastTurnStackDistance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(nextEntry.switchPoint), UnitType.NMILE);
+                } else {
+                    this.lastTurnStackDistance = null;
+                }
+            } else {
+                this.lastTurnStackDistance = distFromCurrent;
+            }
+        }
+
+        //XTK
+        if (nav.activeWaypoint.turnStack.length > 0) {
+            //4-8 XTK will be based on a smooth turn
+            const turnStackEntry = nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1];
+            nav.xtkToActive = UnitType.GA_RADIAN.convertTo(turnStackEntry.path.distance(this.sensors.in.gps.coords), UnitType.NMILE);
+        } else {
+            nav.xtkToActive = UnitType.GA_RADIAN.convertTo(fromLeg.path.distance(this.sensors.in.gps.coords), UnitType.NMILE);
+        }
+
+
+        //DTK
         if (this.modeController.isObsModeActive()) {
             nav.desiredTrack = null;
             nav.bearingForAP = nav.bearingToActive;
             dtk = this.modeController.getObsTrue();
         } else {
-            if (isNaN(fromLeg.path.center[0])) { //Happens when FROM and TO are the same waypoint
-                console.warn("invalid path, sequencing to the next waypoint", fromLeg);
-                nav.activeWaypoint.sequenceToNextWaypoint();
-                return;
-            }
-            dtk = fromLeg.path.bearingAt(fromLeg.path.closest(this.sensors.in.gps.coords, VEC3_CACHE));
+            //XTK will be switched to the next XTK right at the start of the turn, even if the active waypoint has not been switched yet
+            const pathForDtk = nav.activeWaypoint.turnStack.length > 0 ? nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1].pathForDtk : fromLeg.path;
+
+            dtk = pathForDtk.bearingAt(pathForDtk.closest(this.sensors.in.gps.coords, VEC3_CACHE));
             nav.desiredTrack = dtk;
 
             if (fromLeg.path.isGreatCircle()) {
@@ -115,41 +158,6 @@ export class NavCalculator implements CalcTickable {
 
         }
 
-        if (this.sensors.in.gps.groundspeed > 2) {
-            nav.eteToActive = nav.distToActive / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
-            nav.eteToDest = nav.distToDest ? nav.distToDest / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS : null;
-        } else {
-            nav.eteToActive = null;
-            nav.eteToDest = null;
-            nav.waypointAlert = false;
-        }
-
-        if (this.turnStack.length > 0) {
-            const turnStackEntry = this.turnStack[this.turnStack.length - 1];
-            const distFromCurrent = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(turnStackEntry.switchPoint), UnitType.NMILE);
-            if (distFromCurrent <= this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC
-                || distFromCurrent > this.lastTurnStackDistance!) {
-                console.debug("Reached end of turn", distFromCurrent, this.lastTurnStackDistance, this.turnStack);
-                //We have reached the end of the turn, XTK will now use the normal leg again
-                this.turnStack.pop();
-                const nextEntry = this.turnStack[this.turnStack.length - 1];
-                if (nextEntry) {
-                    this.lastTurnStackDistance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(nextEntry.switchPoint), UnitType.NMILE);
-                } else {
-                    this.lastTurnStackDistance = null;
-                }
-            } else {
-                this.lastTurnStackDistance = distFromCurrent;
-            }
-        }
-
-        if (this.turnStack.length > 0) {
-            //4-8 XTK will be based on a smooth turn
-            const turnStackEntry = this.turnStack[this.turnStack.length - 1];
-            nav.xtkToActive = UnitType.GA_RADIAN.convertTo(turnStackEntry.path.distance(this.sensors.in.gps.coords), UnitType.NMILE);
-        } else {
-            nav.xtkToActive = UnitType.GA_RADIAN.convertTo(fromLeg.path.distance(this.sensors.in.gps.coords), UnitType.NMILE);
-        }
 
         nav.toFrom = Math.abs(NavMath.diffAngle(nav.bearingToActive, dtk)) <= 90;
 
@@ -169,9 +177,12 @@ export class NavCalculator implements CalcTickable {
                 const fromDtk = fromLeg.path.bearingAt(fromLeg.path.closest(toLeg.wpt, VEC3_CACHE)); //Important for DME arcs, we need the DTK at the end of the arc, not the current one. Also helps for very long GC legs
 
                 let nextDtk: number;
+                let nextPath: GeoCircle;
                 if (toLeg.arcData === undefined) {
-                    nextDtk = TO_GEOPOINT_CACHE.bearingTo(followingLeg.wpt);
+                    nextPath = GeoCircle.createGreatCircle(toLeg.wpt, followingLeg.wpt);
+                    nextDtk = nextPath.bearingAt(toLeg.wpt);
                 } else {
+                    nextPath = toLeg.arcData.circle;
                     nextDtk = toLeg.arcData.circle.bearingAt(toLeg.arcData.entryFacility);
                 }
                 const turnAngle = Math.abs(NavMath.diffAngle(fromDtk, nextDtk));
@@ -179,15 +190,14 @@ export class NavCalculator implements CalcTickable {
                 const distanceToTurn = nav.distToActive - turnAnticipationDistance - distanceToAchieveBankAngleChange(desiredBankAngle, this.sensors.in.gps.groundspeed);
                 const timeToTurn = distanceToTurn / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
 
-
-                nav.waypointAlert = timeToTurn <= WPT_ALERT_WITH_TURN_ANTI;
+                nav.waypointAlert = timeToTurn <= WPT_ALERT_WITH_TURN_ANTI || nav.activeWaypoint.turnStack.length > 0; //Arrow flashes until end of turn and the light remains on until end of turn: https://youtu.be/S1lt2W95bLA?si=C45kt8pik15Iodoy&t=2245
                 //console.log(nav.distToActive, turnAnticipationDistance, nav.waypointAlert, timeToTurn, toWpt);
-                if (toLeg.fixType !== KLNFixType.MAP &&
+
+                //We have reached the start of the turn but not the waypoint yet. XTK will now follow a curved path and DTK will indicate the next path
+                if (toLeg.fixType !== KLNFixType.MAP && nav.activeWaypoint.turnStack.length === 0 &&
                     (distanceToTurn <= this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC //Distance is within the next tick, we rather start the turn a little too early than too late
-                        || (nav.waypointAlert && distanceToTurn > this.lastDistance))) {
+                        || (nav.waypointAlert && distanceToTurn >= this.lastDistanceToTurn))) {
                     const fromPath = new GeoCircle(fromLeg.path.center, fromLeg.path.radius);
-                    //don't move missed approach waypoint!
-                    nav.activeWaypoint.sequenceToNextWaypoint();
 
                     //4-8 We save information on how this turn was calculated
                     const startOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
@@ -196,14 +206,29 @@ export class NavCalculator implements CalcTickable {
                     const turnCircle = this.calculateTurnCircle(turnRadius, startOfTurn, fromDtk, NavMath.getTurnDirection(fromDtk, nextDtk));
                     const endOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
                     endOfTurn.offset(nextDtk, UnitType.NMILE.convertTo(turnAnticipationDistance, UnitType.GA_RADIAN));
-                    this.turnStack.push(new TurnStackEntry(turnCircle, endOfTurn));
-                    console.log("turn: moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt(), distanceToTurn, this.lastDistance);
+                    nav.activeWaypoint.turnStack.push(new TurnStackEntry(turnCircle, endOfTurn, nextPath));
+                    console.log("turn: moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt(), distanceToTurn, this.lastDistanceToTurn);
 
                     //Since we add a few seconds before the turn to reach the desired bank angle, we need to keep the old path for a short moment
                     this.lastTurnStackDistance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(startOfTurn), UnitType.NMILE);
-                    this.turnStack.push(new TurnStackEntry(fromPath, startOfTurn));
+                    nav.activeWaypoint.turnStack.push(new TurnStackEntry(fromPath, startOfTurn, nextPath));
                 }
-                this.lastDistance = distanceToTurn;
+
+                //We are now abeam the waypoint
+                if (toLeg.fixType !== KLNFixType.MAP &&
+                    (nav.waypointAlert && nav.distToActive >= this.lastDistanceToActive)) {
+
+                    //don't move missed approach waypoint!
+                    nav.activeWaypoint.sequenceToNextWaypoint();
+                    console.log("moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt());
+                    this.lastDistanceToTurn = 9999;
+                    this.lastDistanceToActive = 9999;
+                } else {
+                    this.lastDistanceToTurn = distanceToTurn;
+                    this.lastDistanceToActive = nav.distToActive;
+                }
+
+
             } else {
                 nav.waypointAlert = nav.eteToActive! <= WPT_ALERT_WITHOUT_TURN_ANTI;
                 if (toLeg.fixType !== KLNFixType.MAP && nav.toFrom === FROM) {
@@ -259,7 +284,7 @@ export class NavCalculator implements CalcTickable {
         nav.toFrom = null;
         nav.waypointAlert = false;
         nav.xtkScale = 5;
-        this.lastDistance = 9999;
+        this.lastDistanceToTurn = 9999;
     }
 
     private setOutput() {
@@ -296,8 +321,4 @@ export class NavCalculator implements CalcTickable {
 
         return this.sensors.in.gps.timeZulu.getSecondsSinceMidnight() + ete;
     }
-
-
-
-
 }

@@ -146,6 +146,8 @@ export class ModeController implements CalcTickable {
     private forceSwitchToEnrObsMode() {
         const active = this.navState.activeWaypoint.getActiveWpt();
 
+        this.navState.activeWaypoint.clearTurnStack();
+
         if (this.navState.navmode === NavMode.APR_LEG) {
             //6-3 Switching to OBS cancels an active approach
             this.navState.navmode = NavMode.ARM_OBS;

@@ -11,6 +11,12 @@ export interface FromLeg {
 
 const CACHED_CIRCLE = new GeoCircle(new Float64Array(3), 0);
 
+export class TurnStackEntry {
+
+    constructor(public path: GeoCircle, public switchPoint: GeoPoint, public pathForDtk: GeoCircle) {
+    }
+}
+
 export class ActiveWaypoint {
 
     private setting: UserSetting<string>;
@@ -20,6 +26,8 @@ export class ActiveWaypoint {
     private isDirectTo: boolean = false;
 
     private fplIdx: number = -1; //The index of the active waypoint (to) in the flightplan
+
+    public turnStack: TurnStackEntry[] = [];
 
     constructor(userSettings: KLN90BUserSettings, private readonly sensors: Sensors, public readonly fpl0: Flightplan, public lastactiveWaypoint: Facility | null) {
         this.setting = userSettings.getSetting("activeWaypoint");
@@ -41,6 +49,7 @@ export class ActiveWaypoint {
 
         this.isDirectTo = true;
         this.saveLastActiveWaypoint();
+        this.clearTurnStack();
     }
 
     public cancelDirectTo() {
@@ -54,6 +63,7 @@ export class ActiveWaypoint {
      * If FPL 0 is valid, then this activates the closest leg
      */
     public activateFpl0(): KLNFlightplanLeg | null {
+        this.clearTurnStack();
         const legs = this.fpl0.getLegs();
         if (legs.length >= 2) {
             this.fplIdx = this.findClosestLegIdx(legs);
@@ -281,6 +291,14 @@ export class ActiveWaypoint {
         }
         //The user must have modified the flightplan if to does not match the index anymore
         this.activateFpl0();
+    }
+
+    /**
+     * Whenever we perform a direct to or modify the flight plan in a way that affects the active waypoint,
+     * then the saved turn information is no longer relevant
+     */
+    public clearTurnStack(): void {
+        this.turnStack = [];
     }
 
 }
