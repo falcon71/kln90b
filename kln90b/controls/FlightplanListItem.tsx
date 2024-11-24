@@ -1,4 +1,4 @@
-import {Facility, FSComponent, ICAO, NodeReference, VNode} from '@microsoft/msfs-sdk';
+import {Facility, FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {CursorController, EnterResult, Field} from "../pages/CursorController";
 import {PageProps, UIElementChildren} from '../pages/Page';
 import {TickController} from "../TickController";
@@ -64,7 +64,7 @@ export class FlightplanListItem implements Field, ListItem {
 
         if (this.type === KLNLegType.APP) {
             const suffix = SidStar.getWptSuffix(this.props.leg?.fixType);
-            this.wptIdent = (ICAO.getIdent(this.wpt!.icao) + suffix).padEnd(6, " ");
+            this.wptIdent = (this.wpt!.icaoStruct.ident + suffix).padEnd(6, " ");
         } else {
             this.wptIdent = IcaoFixedLength.getIdentFromFacility(this.wpt);
         }

@@ -194,7 +194,7 @@ export class ModeController implements CalcTickable {
     }
 
     public getMagvarForObs(wpt: Facility | null) {
-        if (wpt !== null && ICAO.getFacilityType(wpt.icao) === FacilityType.VOR) {
+        if (wpt !== null && ICAO.getFacilityTypeFromValue(wpt.icaoStruct) === FacilityType.VOR) {
             return -(wpt as VorFacility).magneticVariation; //Seems to be opposite to the magvar service
         }
         return this.magvar.getCurrentMagvar();

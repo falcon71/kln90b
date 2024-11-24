@@ -3,7 +3,6 @@ import {
     Facility,
     FSComponent,
     GeoPoint,
-    ICAO,
     IntersectionFacility,
     NodeReference,
     RunwayFacility,
@@ -26,7 +25,7 @@ import {DistanceEditor} from "../../controls/editors/DistanceEditor";
 import {Scanlist} from "../../data/navdata/Scanlist";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {buildIcao, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {buildIcao, buildIcaoStruct, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 
 type IntPageTypes = {
@@ -75,7 +74,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
             props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO INT WPTS");
         }
 
-        const isTerminalWpt = facility !== null && ICAO.getAssociatedAirportIdent(facility.icao).trim() != "";
+        const isTerminalWpt = facility !== null && facility.icaoStruct.airport.trim() != "";
 
         let wptType = "";
         if (this.activeIdx !== -1) {
@@ -83,7 +82,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
         }
 
         this.children = new UIElementChildren<IntPageTypes>({
-            activeArrow: new ActiveArrow(facility?.icao ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             int: new IntersectionSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(wptType),
@@ -135,7 +134,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
 
     protected changeFacility(fac: string | IntersectionFacility) {
         super.changeFacility(fac);
-        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icao ?? null;
+        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icaoStruct ?? null;
         this.children.get("int").setValue(this.ident);
         this.userIntersection = null;
 
@@ -335,16 +334,18 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
             return;
         }
 
+        // noinspection JSDeprecatedSymbols
         this.facility = {
             icao: buildIcao('W', USER_WAYPOINT, this.ident),
+            icaoStruct: buildIcaoStruct('W', USER_WAYPOINT, this.ident),
             name: "",
             lat: lat,
             lon: lon,
             region: USER_WAYPOINT,
             city: "",
-            magvar: 0,
             routes: [],
             nearestVorICAO: "",
+            nearestVorICAOStruct: {__Type: "JS_ICAO", type: "", ident: "", airport: "", region: ""},
             nearestVorType: VorType.Unknown,
             nearestVorFrequencyBCD16: 0,
             nearestVorFrequencyMHz: 0,
@@ -367,16 +368,18 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
     }
 
     private createAtPresentPosition(): void {
+        // noinspection JSDeprecatedSymbols
         this.facility = {
             icao: buildIcao('W', USER_WAYPOINT, this.ident),
+            icaoStruct: buildIcaoStruct('W', USER_WAYPOINT, this.ident),
             name: "",
             lat: this.props.sensors.in.gps.coords.lat,
             lon: this.props.sensors.in.gps.coords.lon,
             region: USER_WAYPOINT,
             city: "",
-            magvar: 0,
             routes: [],
             nearestVorICAO: "",
+            nearestVorICAOStruct: {__Type: "JS_ICAO", type: "", ident: "", airport: "", region: ""},
             nearestVorType: VorType.Unknown,
             nearestVorFrequencyBCD16: 0,
             nearestVorFrequencyMHz: 0,

@@ -11,10 +11,16 @@ import {
     GeoKdTreeSearchFilter,
     GeoPoint,
     ICAO,
+    IcaoValue,
     IntersectionFacility,
-    NdbFacility, NearestAirportSearchSession, NearestBoundarySearchSession, NearestIntersectionSearchSession,
+    NdbFacility,
+    NearestAirportSearchSession,
+    NearestBoundarySearchSession,
+    NearestIcaoSearchSessionDataType,
+    NearestIntersectionSearchSession,
     NearestSearchResults,
-    NearestSearchSession, NearestVorSearchSession,
+    NearestSearchSession,
+    NearestVorSearchSession,
     RunwaySurfaceCategory,
     RunwaySurfaceType,
     SearchTypeMap,
@@ -92,7 +98,7 @@ class KLNNearestRepoFacilitySearchSession<T extends Facility> implements Nearest
         const added = [];
 
         for (let i = 0; i < results.length; i++) {
-            const icao = results[i].icao;
+            const icao = results[i].icaoStruct;
             if (this.cachedResults.has(icao)) {
                 this.cachedResults.delete(icao);
             } else {
@@ -157,7 +163,7 @@ class KLNCoherentNearestSearchSession<TFacility extends Facility, TCoherent exte
 /**
  * A session for searching for nearest user facilities.
  */
-export class KLNNearestAirportFacilitySearchSession extends KLNCoherentNearestSearchSession<AirportFacility, NearestAirportSearchSession> {
+export class KLNNearestAirportFacilitySearchSession extends KLNCoherentNearestSearchSession<AirportFacility, NearestAirportSearchSession<NearestIcaoSearchSessionDataType.StringV1>> {
 
     public setAirportFilters(surfaceType: boolean, minRunwayLengthFeet: number): void {
         let surfaceTypeMask;
@@ -213,7 +219,7 @@ export class KLNNearestAirportFacilitySearchSession extends KLNCoherentNearestSe
 /**
  * A session for searching for nearest intersections.
  */
-export class KLNNearestIntersectionSearchSession extends KLNCoherentNearestSearchSession<IntersectionFacility, NearestIntersectionSearchSession> {
+export class KLNNearestIntersectionSearchSession extends KLNCoherentNearestSearchSession<IntersectionFacility, NearestIntersectionSearchSession<NearestIcaoSearchSessionDataType.StringV1>> {
 
     /**
      * Sets the filter for the intersection nearest search.
@@ -228,7 +234,7 @@ export class KLNNearestIntersectionSearchSession extends KLNCoherentNearestSearc
 /**
  * A session for searching for nearest VORs.
  */
-export class KLNNearestVorSearchSession extends KLNCoherentNearestSearchSession<VorFacility, NearestVorSearchSession> {
+export class KLNNearestVorSearchSession extends KLNCoherentNearestSearchSession<VorFacility, NearestVorSearchSession<NearestIcaoSearchSessionDataType.StringV1>> {
 
 
     /**
@@ -265,6 +271,21 @@ export class KLNFacilityLoader {
      */
     public getFacility<T extends FacilityType>(type: T, icao: string): Promise<FacilityTypeMap[T]> {
         const repo = this.getFacilityFromRepo(type, icao);
+        if (repo) {
+            return Promise.resolve(repo);
+        }
+        return this.actualFacilityLoader.getFacility(type, icao);
+    }
+
+    /**
+     * Retrieves a facility.
+     * @param type The type of facility to retrieve.
+     * @param icao The ICAO of the facility to retrieve.
+     * @returns A Promise which will be fulfilled with the requested facility, or rejected if the facility could not be
+     * retrieved.
+     */
+    public getFacility<T extends FacilityType>(type: T, icao: IcaoValue): Promise<FacilityTypeMap[T]> {
+        const repo = this.getFacilityFromRepo(type, ICAO.valueToStringV1(icao));
         if (repo) {
             return Promise.resolve(repo);
         }

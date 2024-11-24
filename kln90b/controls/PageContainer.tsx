@@ -162,6 +162,7 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
             this.keyboardPublisher.pub("keyboardevent", {side: side, keyCode: event.keyCode});
             event.preventDefault();
         };
+        // noinspection JSDeprecatedSymbols
         this.keyboardRef.instance.onkeypress = (event) => {
             //console.log(event);
             if (!this._isLeftKeyboardActive && !this._isRightKeyboardActive) {

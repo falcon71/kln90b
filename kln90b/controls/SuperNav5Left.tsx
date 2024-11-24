@@ -2,7 +2,7 @@ import {PageProps, UiElement, UIElementChildren} from "../pages/Page";
 import {DistanceDisplay} from "./displays/DistanceDisplay";
 import {TextDisplay} from "./displays/TextDisplay";
 import {SpeedDisplay} from "./displays/SpeedDisplay";
-import {FSComponent, ICAO, NodeReference, VNode} from "@microsoft/msfs-sdk";
+import {FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {SuperNav5Field1Selector} from "./selects/SuperNav5Field1Selector";
 import {SuperNav5Field2Selector} from "./selects/SuperNav5Field2Selector";
 import {SuperNav5Field3Selector} from "./selects/SuperNav5Field3Selector";
@@ -93,7 +93,7 @@ export class SuperNav5Left implements UiElement {
         if (leg === null) {
             return "";
         }
-        return ICAO.getIdent(leg.wpt.icao) + SidStar.getWptSuffix(leg.fixType);
+        return leg.wpt.icaoStruct.ident + SidStar.getWptSuffix(leg.fixType);
     }
 
     private getModeString(): string {

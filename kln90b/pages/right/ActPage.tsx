@@ -144,7 +144,7 @@ export class ActPagePage extends WaypointPage<Facility> {
             return new SupPage(props);
         }
 
-        switch (ICAO.getFacilityType(facility.icao)) {
+        switch (ICAO.getFacilityTypeFromValue(facility.icaoStruct)) {
             case FacilityType.Airport:
                 return new Apt1Page(props);
             case FacilityType.NDB:
@@ -157,7 +157,7 @@ export class ActPagePage extends WaypointPage<Facility> {
             case FacilityType.USR:
                 return new SupPage(props);
             default:
-                throw Error(`Unexpected facilityType: ${facility.icao}`);
+                throw Error(`Unexpected facilityType: ${facility.icaoStruct}`);
         }
     }
 
@@ -175,7 +175,7 @@ export class ActPagePage extends WaypointPage<Facility> {
     private rebuildPage() {
         const legs = this.props.memory.fplPage.flightplans[0].getLegs();
         this.facility = legs[this.actIdx].wpt;
-        this.ident = ICAO.getIdent(this.facility.icao);
+        this.ident = this.facility.icaoStruct.ident;
 
         const page = this.buildPage(this.facility, this.actIdx);
         this.pageTreeController.props = page.props;

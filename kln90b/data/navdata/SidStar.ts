@@ -30,7 +30,7 @@ import {Degrees, NauticalMiles} from "../Units";
 import {format} from "numerable";
 import {Sensors} from "../../Sensors";
 import {NavPageState} from "../VolatileMemory";
-import {buildIcao, TEMPORARY_WAYPOINT} from "./IcaoBuilder";
+import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "./IcaoBuilder";
 
 export interface ArcData {
     beginRadial: Degrees, //The published beginning radial
@@ -61,10 +61,10 @@ export class SidStar {
      */
 
     public static hasDuplicates(fplLegs: KLNFlightplanLeg[], procedureLegs: KLNFlightplanLeg[]): boolean {
-        const procedureIcaos = procedureLegs.map(leg => leg.wpt.icao);
+        const procedureIcaos = procedureLegs.map(leg => leg.wpt.icaoStruct);
 
         for (const fplLeg of fplLegs) {
-            if (procedureIcaos.includes(fplLeg.wpt.icao)) {
+            if (procedureIcaos.includes(fplLeg.wpt.icaoStruct)) {
                 return true;
             }
         }
@@ -114,7 +114,7 @@ export class SidStar {
             runway = RunwayUtils.getRunwayNameString(app.runwayNumber, app.runwayDesignator, true);
         }
 
-        return prefix + runway + app.approachSuffix + "-" + ICAO.getIdent(facility.icao);
+        return prefix + runway + app.approachSuffix + "-" + facility.icaoStruct.ident;
     }
 
     /**
@@ -164,17 +164,18 @@ export class SidStar {
 
 
             if (NavMath.bearingIsBetween(radial, start, end)) {
+                // noinspection JSDeprecatedSymbols
                 const entryFacility: UserFacility = {
-                    icao: buildIcao('U', TEMPORARY_WAYPOINT, this.getArcEntryName(ICAO.getIdent(arcData.vor.icao), radial, dist)),
+                    icao: buildIcao('U', TEMPORARY_WAYPOINT, this.getArcEntryName(arcData.vor.icaoStruct.ident, radial, dist)),
+                    icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, this.getArcEntryName(arcData.vor.icaoStruct.ident, radial, dist)),
                     name: "",
                     lat: entryPoint.lat,
                     lon: entryPoint.lon,
                     region: TEMPORARY_WAYPOINT,
                     city: "",
-                    magvar: 0,
                     isTemporary: false, //irrelevant, because this flag is not persisted
                     userFacilityType: UserFacilityType.LAT_LONG,
-                    reference1Icao: arcData.vor.icao,
+                    reference1IcaoStruct: arcData.vor.icaoStruct,
                     reference1Radial: radial,
                     reference1Distance: dist,
                 };
@@ -353,7 +354,7 @@ export class SidStar {
     }
 
     private static isLegSupported(leg: FlightPlanLeg): boolean {
-        return leg.fixIcao.trim() !== "" && leg.type != LegType.RF;
+        return leg.fixIcaoStruct.ident.trim() !== "" && leg.type != LegType.RF;
     }
 
     /**
@@ -395,8 +396,8 @@ export class SidStar {
                 const next = legs[i + 1];
                 const bothAreAF = leg.type === LegType.AF && next.type === LegType.AF; //The KLN does not support step down fixes. We merge multiple arcs
 
-                const nextIsSameWpt = next.fixIcao === leg.fixIcao;
-                const isAlreadyLastInList = filtered.length > 0 && filtered[filtered.length - 1].fixIcao === leg.fixIcao;
+                const nextIsSameWpt = ICAO.valueEquals(next.fixIcaoStruct, leg.fixIcaoStruct);
+                const isAlreadyLastInList = filtered.length > 0 && ICAO.valueEquals(filtered[filtered.length - 1].fixIcaoStruct, leg.fixIcaoStruct);
                 if (!bothAreAF && !nextIsSameWpt && !isAlreadyLastInList) { //We prefer the following WPT, because those might be holds
                     let modifiedLeg = leg;
                     if (i > 0) {
@@ -432,7 +433,7 @@ export class SidStar {
      * @private
      */
     private addArcInfoIfPrevIsSame(prevLeg: FlightPlanLeg, currentLeg: FlightPlanLeg): FlightPlanLeg {
-        if (prevLeg.fixIcao !== currentLeg.fixIcao || prevLeg.type !== LegType.AF) {
+        if (!ICAO.valueEquals(prevLeg.fixIcaoStruct, currentLeg.fixIcaoStruct) || prevLeg.type !== LegType.AF) {
             return currentLeg;
         }
 
@@ -452,7 +453,7 @@ export class SidStar {
      */
     private async convertToKLN(facility: AirportFacility, procedureName: string, legType: KLNLegType, legs: FlightPlanLeg[]): Promise<KLNFlightplanLeg[]> {
         const promises = legs.map(leg =>
-            this.facilityLoader.getFacility(ICAO.getFacilityType(leg.fixIcao), leg.fixIcao).then(fac => ({
+            this.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(leg.fixIcaoStruct), leg.fixIcaoStruct).then(fac => ({
                     leg: leg,
                     facility: fac,
                 }),
@@ -579,7 +580,7 @@ export class SidStar {
      * Therefore, it generates an artificialy entry waypoint based on the radial of the current position to the VOR.
      */
     private async getArcEntryData(convertedLeg: { facility: Facility; leg: FlightPlanLeg }): Promise<ArcData> {
-        const vor = await this.facilityLoader.getFacility(FacilityType.VOR, convertedLeg.leg.originIcao);
+        const vor = await this.facilityLoader.getFacility(FacilityType.VOR, convertedLeg.leg.originIcaoStruct);
         const vorPoint = new GeoPoint(vor.lat, vor.lon);
 
         const circleCenter = new Float64Array(3);
@@ -616,17 +617,18 @@ export class SidStar {
             radial = convertedLeg.leg.course;
         }
 
+        // noinspection JSDeprecatedSymbols
         const entryFacility: UserFacility = {
-            icao: buildIcao('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(ICAO.getIdent(vor.icao), radial, dist)),
+            icao: buildIcao('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(vor.icaoStruct.ident, radial, dist)),
+            icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(vor.icaoStruct.ident, radial, dist)),
             name: "",
             lat: entryPoint.lat,
             lon: entryPoint.lon,
             region: TEMPORARY_WAYPOINT,
             city: "",
-            magvar: 0,
             isTemporary: false, //irrelevant, because this flag is not persisted
             userFacilityType: UserFacilityType.LAT_LONG,
-            reference1Icao: vor.icao,
+            reference1IcaoStruct: vor.icaoStruct,
             reference1Radial: radial,
             reference1Distance: dist,
         };

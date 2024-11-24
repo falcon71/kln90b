@@ -47,7 +47,7 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
 
         let page: SixLineHalfPage;
 
-        switch (ICAO.getFacilityType(facility.icao)) {
+        switch (ICAO.getFacilityTypeFromValue(facility.icaoStruct)) {
             case FacilityType.Airport:
                 page = new Apt1Page(props);
                 break;
@@ -65,7 +65,7 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
                 page = new SupPage(props);
                 break;
             default:
-                throw Error(`Unexpected facilityType: ${facility.icao}`);
+                throw Error(`Unexpected facilityType: ${facility.icaoStruct}`);
         }
 
         this.pageTreeController = new PageTreeController(RIGHT_PAGE_TREE, page, this.props, this.pageChanged.bind(this));

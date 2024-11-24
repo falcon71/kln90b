@@ -5,7 +5,6 @@ import {
     FacilitySearchType,
     FacilityType,
     FSComponent,
-    ICAO,
     Publisher,
     VNode,
 } from "@microsoft/msfs-sdk";
@@ -116,11 +115,11 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
                 if (this.isValidResult(facility)) {
                     if (resultFound == 0) {
                         //console.log("set ident for unique entry", facility.icao, this.ident, enteredIdent);
-                        this.ident = ICAO.getIdent(facility.icao);
+                        this.ident = facility.icaoStruct.ident;
                         enteredIdent = this.ident;
                         this.changedCallback(facility);
                     } else if (resultFound == 1) {
-                        if (this.ident === ICAO.getIdent(facility.icao)) {
+                        if (this.ident === facility.icaoStruct.ident) {
                             this.statusLineMessagePublisher.pub("statusLineMessage", "DUP IDENT");
                         }
                         break;

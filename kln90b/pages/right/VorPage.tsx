@@ -1,4 +1,4 @@
-import {FSComponent, MagVar, VNode, VorClass, VorFacility, VorType} from '@microsoft/msfs-sdk';
+import {FSComponent, ICAO, MagVar, VNode, VorClass, VorFacility, VorType} from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
@@ -14,7 +14,7 @@ import {NearestSelector} from "../../controls/selects/NearestSelector";
 import {CoordOrNearestView} from "../../controls/CoordOrNearestView";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {convertTextToKLNCharset} from "../../data/Text";
-import {buildIcao, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {buildIcao, buildIcaoStruct, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 
 type VorPageTypes = {
@@ -166,7 +166,7 @@ export class VorPage extends WaypointPage<VorFacility> {
         const facility = unpackFacility(this.facility);
         if (facility) {
             const activeWpt = this.props.memory.navPage.activeWaypoint.getActiveWpt();
-            if (activeWpt?.icao === facility.icao) {
+            if (activeWpt !== null && ICAO.valueEquals(activeWpt.icaoStruct, facility.icaoStruct)) {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "IN ACT LIST");
                 return;
             }
@@ -209,8 +209,10 @@ export class VorPage extends WaypointPage<VorFacility> {
 
         const magvar = this.userVor.magvar === null ? MagVar.get(this.userVor.lat, this.userVor.lon) : this.userVor.magvar;
 
+        // noinspection JSDeprecatedSymbols
         this.facility = {
             icao: buildIcao('V', USER_WAYPOINT, this.ident),
+            icaoStruct: buildIcaoStruct('U', USER_WAYPOINT, this.ident),
             name: "",
             lat: this.userVor.lat,
             lon: this.userVor.lon,
@@ -222,6 +224,11 @@ export class VorPage extends WaypointPage<VorFacility> {
             magneticVariation: -magvar,
             type: VorType.Unknown,
             vorClass: VorClass.Unknown,
+            navRange: 0,
+            dme: null,
+            ils: null,
+            tacan: null,
+            trueReferenced: false,
         };
         try {
             this.props.facilityLoader.facilityRepo.add(this.facility);

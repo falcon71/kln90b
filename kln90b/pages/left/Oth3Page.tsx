@@ -63,10 +63,10 @@ export class Oth3Page extends SixLineHalfPage {
      * @private
      */
     private compareUserFacilities(a: Facility, b: Facility): number {
-        const aCat = this.getSortIndex(ICAO.getFacilityType(a.icao));
-        const bCat = this.getSortIndex(ICAO.getFacilityType(b.icao));
+        const aCat = this.getSortIndex(ICAO.getFacilityTypeFromValue(a.icaoStruct));
+        const bCat = this.getSortIndex(ICAO.getFacilityTypeFromValue(b.icaoStruct));
         if (aCat === bCat) {
-            return ICAO.getIdent(a.icao).localeCompare(ICAO.getIdent(b.icao));
+            return a.icaoStruct.ident.localeCompare(b.icaoStruct.ident);
         } else {
             return aCat - bCat;
         }
@@ -74,7 +74,7 @@ export class Oth3Page extends SixLineHalfPage {
 
     private getListitemText(fac: Facility): string {
         let type: string;
-        switch (ICAO.getFacilityType(fac.icao)) {
+        switch (ICAO.getFacilityTypeFromValue(fac.icaoStruct)) {
             case FacilityType.Airport:
                 type = "A";
                 break;
@@ -91,10 +91,10 @@ export class Oth3Page extends SixLineHalfPage {
                 type = "S";
                 break;
             default:
-                throw new Error(`Unsupported type: ${fac.icao}`);
+                throw new Error(`Unsupported type: ${fac.icaoStruct}`);
         }
 
-        const fpl = TemporaryWaypointDeleter.findUsageInFlightplans(fac.icao, this.props.memory.fplPage.flightplans);
+        const fpl = TemporaryWaypointDeleter.findUsageInFlightplans(fac.icaoStruct, this.props.memory.fplPage.flightplans);
         const fplString = fpl === null ? "  " : fpl.toString().padStart(2, " ");
 
         return `${IcaoFixedLength.getIdentFromFacility(fac)} ${type}  ${fplString}`;
@@ -130,9 +130,9 @@ export class Oth3Page extends SixLineHalfPage {
 
     private beforeDeleteFacility(facility: Facility): KLNErrorMessage | null {
         const activeWpt = this.props.memory.navPage.activeWaypoint.getActiveWpt();
-        if (activeWpt?.icao === facility.icao) {
+        if (activeWpt !== null && ICAO.valueEquals(activeWpt.icaoStruct, facility.icaoStruct)) {
             return "ACTIVE WPT";
-        } else if (TemporaryWaypointDeleter.findUsageInFlightplans(facility.icao, this.props.memory.fplPage.flightplans) !== null) {
+        } else if (TemporaryWaypointDeleter.findUsageInFlightplans(facility.icaoStruct, this.props.memory.fplPage.flightplans) !== null) {
             return "USED IN FPL";
         }
         return null;

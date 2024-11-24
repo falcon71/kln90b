@@ -3,7 +3,6 @@ import {
     FSComponent,
     GeoCircle,
     GeoPoint,
-    ICAO,
     NodeReference,
     UnitType,
     UserFacility,
@@ -19,7 +18,7 @@ import {WaypointEditor} from "../../controls/editors/WaypointEditor";
 import {Flightplan} from "../../data/flightplan/Flightplan";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
 import {getUniqueIdent} from "../../data/navdata/UniqueIdentGenerator";
-import {buildIcao, TEMPORARY_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 type RefPageTypes = {
     wpt: WaypointEditor;
@@ -94,7 +93,7 @@ export class RefPage extends SixLineHalfPage {
         if (wpt === null) {
             return;
         }
-        const ident = await getUniqueIdent(ICAO.getIdent(wpt.icao), this.props.facilityLoader);
+        const ident = await getUniqueIdent(wpt.icaoStruct.ident, this.props.facilityLoader);
         if (ident === null) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID REF");
             return;
@@ -109,17 +108,18 @@ export class RefPage extends SixLineHalfPage {
             return;
         }
 
+        // noinspection JSDeprecatedSymbols
         const facility: UserFacility = {
             icao: buildIcao('U', TEMPORARY_WAYPOINT, ident),
+            icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, ident),
             name: "",
             lat: closest.point.lat,
             lon: closest.point.lon,
             region: TEMPORARY_WAYPOINT,
             city: "",
-            magvar: 0,
             isTemporary: false, //irrelevant, because this flag is not persisted
             userFacilityType: UserFacilityType.LAT_LONG,
-            reference1Icao: wpt.icao,
+            reference1IcaoStruct: wpt.icaoStruct,
             reference1Radial: closest.point.bearingFrom(wpt),
             reference1Distance: UnitType.GA_RADIAN.convertTo(closest.point.distance(wpt), UnitType.NMILE),
         };

@@ -1,8 +1,8 @@
 import {Flightplan} from "../data/flightplan/Flightplan";
 import {Flightplanloader} from "./Flightplanloader";
 import {getUniqueIdent} from "../data/navdata/UniqueIdentGenerator";
-import {UserFacility, UserFacilityType} from "@microsoft/msfs-sdk";
-import {buildIcao, buildIcaoWithAirport, TEMPORARY_WAYPOINT} from "../data/navdata/IcaoBuilder";
+import {IcaoValue, UserFacility, UserFacilityType} from "@microsoft/msfs-sdk";
+import {buildIcao, buildIcaoStruct, buildIcaoStructWithAirport, TEMPORARY_WAYPOINT} from "../data/navdata/IcaoBuilder";
 import {StatusLineMessageEvents} from "../controls/StatusLine";
 
 export class FplFileimporter extends Flightplanloader {
@@ -53,7 +53,7 @@ export class FplFileimporter extends Flightplanloader {
         // Get all ATCWaypoint nodes
         const waypointTags = flightPlan.getElementsByTagName("ATCWaypoint");
 
-        const icaos: string[] = [];
+        const icaos: IcaoValue[] = [];
 
         // Iterate through each ATCWaypoint node
         for (let i = 0; i < waypointTags.length; i++) {
@@ -74,8 +74,8 @@ export class FplFileimporter extends Flightplanloader {
 
     }
 
-    private async convertLeg(waypoint: Element): Promise<string> {
-        let type: string;
+    private async convertLeg(waypoint: Element): Promise<IcaoValue> {
+        let type: 'A' | 'W' | 'V' | 'N' | 'U' | '';
         switch (waypoint.getElementsByTagName("ATCWaypointType")[0].textContent) {
             case "Airport":
                 type = "A";
@@ -93,7 +93,7 @@ export class FplFileimporter extends Flightplanloader {
                 type = "U";
                 break;
             default:
-                type = "X";
+                type = "";
                 break;
         }
         const regionTags = waypoint.getElementsByTagName("ICAORegion");
@@ -109,19 +109,20 @@ export class FplFileimporter extends Flightplanloader {
             const newIdent = await getUniqueIdent(ident, this.facilityLoader);
 
             if (newIdent === null) {
-                return `       ${ident}`; //This waypoint will not be found and cause a WAYPOINT DELETED message
+                return this.notFoundIcao(ident);
             }
 
             const worldPosition = waypoint.getElementsByTagName("WorldPosition")[0].textContent!.split(',');
 
+            // noinspection JSDeprecatedSymbols
             const facility: UserFacility = {
                 icao: buildIcao('U', TEMPORARY_WAYPOINT, newIdent),
+                icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, newIdent),
                 name: "",
                 lat: this.parseLatitude(worldPosition[0]),
                 lon: this.parseLongitude(worldPosition[1]),
                 region: TEMPORARY_WAYPOINT,
                 city: "",
-                magvar: 0,
                 isTemporary: false, //irrelevant, because this flag is not persisted
                 userFacilityType: UserFacilityType.LAT_LONG,
             };
@@ -129,15 +130,15 @@ export class FplFileimporter extends Flightplanloader {
 
             try {
                 this.facilityLoader.facilityRepo.add(facility);
-                return facility.icao;
+                return facility.icaoStruct;
             } catch (e) {
                 this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
                 console.error(e);
-                return `       ${ident}`; //This waypoint will not be found and cause a WAYPOINT DELETED message
+                return this.notFoundIcao(ident);
             }
 
         } else {
-            return buildIcaoWithAirport(type as any, region, airport, ident);
+            return buildIcaoStructWithAirport(type, region, airport, ident);
         }
     }
 

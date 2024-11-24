@@ -13,7 +13,7 @@ import {NearestSelector} from "../../controls/selects/NearestSelector";
 import {CoordOrNearestView} from "../../controls/CoordOrNearestView";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {convertTextToKLNCharset} from "../../data/Text";
-import {buildIcao, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {buildIcao, buildIcaoStruct, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 interface UserNdb {
     freq: number | null,
@@ -173,8 +173,10 @@ export class NdbPage extends WaypointPage<NdbFacility> {
             return;
         }
 
+        // noinspection JSDeprecatedSymbols
         this.facility = {
             icao: buildIcao('N', USER_WAYPOINT, this.ident),
+            icaoStruct: buildIcaoStruct('N', USER_WAYPOINT, this.ident),
             name: "",
             lat: this.userNdb.lat,
             lon: this.userNdb.lon,
@@ -183,6 +185,8 @@ export class NdbPage extends WaypointPage<NdbFacility> {
             magvar: 0,
             freqMHz: this.userNdb.freq ?? -1,
             type: NdbType.H,
+            range: 0,
+            bfoRequired: false,
         };
         try {
             this.props.facilityLoader.facilityRepo.add(this.facility);

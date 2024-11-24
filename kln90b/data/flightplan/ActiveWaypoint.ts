@@ -1,4 +1,4 @@
-import {Facility, GeoCircle, GeoPoint, LatLonInterface, UserSetting} from "@microsoft/msfs-sdk";
+import {Facility, GeoCircle, GeoPoint, ICAO, LatLonInterface, UserSetting} from "@microsoft/msfs-sdk";
 import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "./Flightplan";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Sensors} from "../../Sensors";
@@ -40,7 +40,7 @@ export class ActiveWaypoint {
             path: CACHED_CIRCLE,
         };
         const legs = this.fpl0.getLegs();
-        this.fplIdx = legs.findIndex(leg => leg.wpt.icao === to.icao);
+        this.fplIdx = legs.findIndex(leg => ICAO.valueEquals(leg.wpt.icaoStruct, to.icaoStruct));
         if (this.fplIdx > -1) {
             this.to = legs[this.fplIdx]; //We need to keep the meta information like the suffix
         } else {
@@ -219,7 +219,7 @@ export class ActiveWaypoint {
         const active = this.getActiveWpt();
         if (active !== null) {
             this.lastactiveWaypoint = active;
-            this.setting.set(active.icao);
+            this.setting.set(ICAO.valueToStringV1(active.icaoStruct));
         }
     }
 

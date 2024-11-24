@@ -65,35 +65,35 @@ export class PageManager implements DisplayTickable {
             }); //default when no last active waypoint
         } else {
             let page: WaypointPage<Facility>;
-            switch (ICAO.getFacilityType(lastActiveWaypoint.icao)) {
+            switch (ICAO.getFacilityTypeFromValue(lastActiveWaypoint.icaoStruct)) {
                 case FacilityType.Airport:
-                    props.memory.aptPage.ident = ICAO.getIdent(lastActiveWaypoint.icao);
+                    props.memory.aptPage.ident = lastActiveWaypoint.icaoStruct.ident;
                     props.memory.aptPage.facility = lastActiveWaypoint as AirportFacility;
                     page = new Apt4Page(props);
                     break;
                 case FacilityType.VOR:
-                    props.memory.vorPage.ident = ICAO.getIdent(lastActiveWaypoint.icao);
+                    props.memory.vorPage.ident = lastActiveWaypoint.icaoStruct.ident;
                     props.memory.vorPage.facility = lastActiveWaypoint as VorFacility;
                     page = new VorPage(props);
                     break;
                 case FacilityType.NDB:
-                    props.memory.ndbPage.ident = ICAO.getIdent(lastActiveWaypoint.icao);
+                    props.memory.ndbPage.ident = lastActiveWaypoint.icaoStruct.ident;
                     props.memory.ndbPage.facility = lastActiveWaypoint as NdbFacility;
                     page = new NdbPage(props);
                     break;
                 case FacilityType.Intersection:
                 case FacilityType.RWY:
-                    props.memory.intPage.ident = ICAO.getIdent(lastActiveWaypoint.icao);
+                    props.memory.intPage.ident = lastActiveWaypoint.icaoStruct.ident;
                     props.memory.intPage.facility = lastActiveWaypoint as IntersectionFacility | RunwayFacility;
                     page = new IntPage(props);
                     break;
                 case FacilityType.USR:
-                    props.memory.supPage.ident = ICAO.getIdent(lastActiveWaypoint.icao);
+                    props.memory.supPage.ident = lastActiveWaypoint.icaoStruct.ident;
                     props.memory.supPage.facility = lastActiveWaypoint as UserFacility;
                     page = new SupPage(props);
                     break;
                 default:
-                    throw new Error(`Unsupported waypoint: ${lastActiveWaypoint.icao}`);
+                    throw new Error(`Unsupported waypoint: ${lastActiveWaypoint.icaoStruct}`);
             }
             this.setCurrentPage(MainPage, {
                 ...props,

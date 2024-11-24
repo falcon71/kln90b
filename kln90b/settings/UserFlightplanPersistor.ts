@@ -1,4 +1,4 @@
-import {DefaultUserSettingManager, EventBus} from "@microsoft/msfs-sdk";
+import {DefaultUserSettingManager, EventBus, ICAO} from "@microsoft/msfs-sdk";
 import {KLN90BUserFlightplansSettings, KLN90BUserFlightplansTypes} from "./KLN90BUserFlightplans";
 import {Flightplan, FlightplanEvents, KLNFlightplanLeg} from "../data/flightplan/Flightplan";
 import {KLNFacilityLoader} from "../data/navdata/KLNFacilityLoader";
@@ -47,7 +47,7 @@ export class UserFlightplanPersistor extends Flightplanloader {
                 return new Flightplan(idx, [], this.bus);
             }
 
-            const serializedLegs = serialized.match(/.{1,12}/g)!;
+            const serializedLegs = serialized.match(/.{1,12}/g)!.map(ICAO.stringV2ToValue);
             return await this.loadIcaos(serializedLegs, idx);
         } catch (e) {
             console.log(`Error restoring fpl ${idx}`, e);
@@ -72,7 +72,7 @@ export class UserFlightplanPersistor extends Flightplanloader {
     }
 
     private serializeLeg(leg: KLNFlightplanLeg): string {
-        return leg.wpt.icao;
+        return ICAO.valueToStringV2(leg.wpt.icaoStruct);
     }
 
 

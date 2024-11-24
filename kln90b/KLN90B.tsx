@@ -268,7 +268,7 @@ class KLN90B extends BaseInstrument {
         let lastActiveWaypoint: Facility | null = null;
         if (lastActiveIcao !== "") {
             try {
-                lastActiveWaypoint = await facilityLoader.getFacility(ICAO.getFacilityType(lastActiveIcao), lastActiveIcao);
+                lastActiveWaypoint = await facilityLoader.getFacility(ICAO.getFacilityTypeFromStringV1(lastActiveIcao), lastActiveIcao);
             } catch (e) {
                 console.error(`Last active waypoint not found: ${lastActiveIcao}`, e);
             }

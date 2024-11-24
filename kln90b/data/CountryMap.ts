@@ -334,8 +334,8 @@ export function getRegionOrCountry(facility: Facility) {
 
 export function getCountry(facility: Facility) {
     let region = facility.region;
-    if (ICAO.getFacilityType(facility.icao) === FacilityType.Airport) {
-        region = ICAO.getIdent(facility.icao).substring(0, 2);
+    if (ICAO.getFacilityTypeFromValue(facility.icaoStruct) === FacilityType.Airport) {
+        region = facility.icaoStruct.ident.substring(0, 2);
     }
 
     return COUNTRYMAP.hasOwnProperty(region) ? COUNTRYMAP[region] : "   ";

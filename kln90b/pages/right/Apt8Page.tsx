@@ -177,7 +177,7 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
         const fpl0Legs = this.props.memory.fplPage.flightplans[0].getLegs();
         const facility = unpackFacility(this.facility)!;
 
-        if (fpl0Legs.some(wpt => wpt.wpt.icao === facility.icao)) {
+        if (fpl0Legs.some(wpt => ICAO.valueEquals(wpt.wpt.icaoStruct, facility.icaoStruct))) {
             this.load(app, iaf, legs);
             return;
         }
@@ -201,7 +201,7 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
         fpl0.removeProcedure(KLNLegType.APP); //I don't think you can have two approaches at the same time
         const fpl0Legs = fpl0.getLegs();
         const facility = unpackFacility(this.facility)!;
-        let idx = fpl0Legs.findIndex(wpt => wpt.wpt.icao === facility.icao);
+        let idx = fpl0Legs.findIndex(wpt => ICAO.valueEquals(wpt.wpt.icaoStruct, facility.icaoStruct));
         if (idx === -1) {
             //Airport not in FPL?
             idx = fpl0Legs.length;
@@ -280,7 +280,7 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
 
 
         this.children = new UIElementChildren<Apt8IAPPageTypes>({
-            activeArrow: new ActiveArrow(facility?.icao ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             list: new LastItemAlwaysVisibleList(UIElementChildren.forList([])),
             createWpt: new CreateWaypointMessage(() => Apt1Page.createAtUserPosition(props), () => Apt1Page.createAtPresentPosition(props)),
@@ -525,7 +525,7 @@ class Apt8PreviewPage extends Apt8SelectorPage {
         const waypoints = legs.map((leg, idx) => new SimpleListItem<KLNFlightplanLeg>({
             bus: this.props.bus,
             value: leg,
-            fulltext: `${(idx + 1).toString().padStart(2, " ")} ${ICAO.getIdent(leg.wpt.icao)}${SidStar.getWptSuffix(leg.fixType)}`.padEnd(11, " "), //6-10 the prefix is right after short identifiers
+            fulltext: `${(idx + 1).toString().padStart(2, " ")} ${leg.wpt.icaoStruct.ident}${SidStar.getWptSuffix(leg.fixType)}`.padEnd(11, " "), //6-10 the prefix is right after short identifiers
         }));
 
         return UIElementChildren.forList(waypoints);
@@ -576,7 +576,7 @@ class Apt8AddPage extends Apt8SelectorPage {
         return (<pre>
             {this.formatTitle()}<br/>
             PRESS ENT<br/>
-            TO ADD {ICAO.getIdent(unpackFacility(this.facility)!.icao)}<br/>
+            TO ADD {unpackFacility(this.facility)!.icaoStruct.ident}<br/>
             AND APPR TO<br/>
             FPL 0<br/>
             {this.children.get("approve").render()}

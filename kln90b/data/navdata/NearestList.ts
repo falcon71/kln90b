@@ -5,6 +5,7 @@ import {
     FacilitySearchType,
     FacilityType,
     GeoPoint,
+    ICAO,
     NdbFacility,
     UnitType,
     VorClass,
@@ -80,7 +81,7 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
 
         for (const removedIcao of diff.removed) {
             for (let i = 0; i < this.nearestList.length; i++) {
-                if (this.nearestList[i].facility.icao === removedIcao) {
+                if (ICAO.valueToStringV1(this.nearestList[i].facility.icaoStruct) === removedIcao) {
                     this.nearestList[i].index = -1;
                     this.nearestList.splice(i, 1);
                 }

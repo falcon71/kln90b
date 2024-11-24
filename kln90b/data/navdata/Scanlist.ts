@@ -1,4 +1,4 @@
-import {EventBus, FacilitySearchType, ICAO} from "@microsoft/msfs-sdk";
+import {EventBus, FacilitySearchType, ICAO, IcaoValue} from "@microsoft/msfs-sdk";
 import {KLNFacilityLoader} from "./KLNFacilityLoader";
 import {KLNFacilityRepository} from "./KLNFacilityRepository";
 
@@ -33,25 +33,25 @@ export interface Scanlist {
     /**
      * Initialized the cache and returns the first waypoint
      */
-    init(): Promise<string | null>;
+    init(): Promise<IcaoValue | null>;
 
     /**
      * Gets the first waypoint in the list. null if no waypoints exists (should only occur for SUP)
      */
-    start(): string | null;
+    start(): IcaoValue | null;
 
     /**
      * Gets the next waypoint from the list in the specified direction
      * @param icao
      * @param direction -1 or 1 for the previous or next waypoint. 10 would select the tenths next waypoint
      */
-    getNext(icao: string, direction: number): Promise<string | null>;
+    getNext(icao: IcaoValue, direction: number): Promise<IcaoValue | null>;
 
     /**
      * Makes sure that the backing cache is up to date for this icao
      * @param icao
      */
-    sync(icao: string): void;
+    sync(icao: IcaoValue): void;
 }
 
 /**
@@ -66,21 +66,27 @@ export interface Scanlist {
 export class FacilityLoaderScanlist implements Scanlist {
 
     //Contains the first waypoint for each letter of the alhpabet
-    private index: string[] = [];
+    private index: IcaoValue[] = [];
 
     //A moving window of continous ICAO codes that are chached
-    private icaoListCache: string[] = [];
+    private icaoListCache: IcaoValue[] = [];
 
     private listManangerJob: Promise<void> | null = null;
     private lastManangerJobId = 0;
 
     //The last icao the pilot viewed. This should be the center of the moving cache window
-    private lastIcao: string = "";
+    private lastIcao: IcaoValue = {
+        __Type: "JS_ICAO",
+        type: "",
+        ident: "",
+        region: "",
+        airport: "",
+    };
 
     //The first icao our cache currently encompasses. Might be smaller than the first value. We may have checked '0', but the first used icao can be '1'
-    private cacheValidFromIcao = "ZZZZ";
+    private cacheValidFromIdent = "ZZZZ";
     //The last icao our cache currently encompasses.
-    private cacheValidToIcao = "0";
+    private cacheValidToIdent = "0";
 
     private readonly loggingEnabled: boolean = false;
 
@@ -89,7 +95,7 @@ export class FacilityLoaderScanlist implements Scanlist {
         bus.getSubscriber<any>().on(KLNFacilityRepository.SYNC_TOPIC).handle(this.waypointsChanged.bind(this));
     }
 
-    public async init(): Promise<string | null> {
+    public async init(): Promise<IcaoValue | null> {
         await this.rebuildIndex();
         this.lastIcao = this.index[0];
         this.listManangerJob = this.startListManager();
@@ -99,7 +105,7 @@ export class FacilityLoaderScanlist implements Scanlist {
     /**
      * Gets the first waypoint in the list. null if no waypoints exists (should only occur for SUP)
      */
-    public start(): string | null {
+    public start(): IcaoValue | null {
         return this.index[0];
     }
 
@@ -108,7 +114,7 @@ export class FacilityLoaderScanlist implements Scanlist {
      * @param icao
      * @param direction -1 or 1 for the previous or next waypoint. 10 would select the tenths next waypoint
      */
-    public async getNext(icao: string, direction: number): Promise<string | null> {
+    public async getNext(icao: IcaoValue, direction: number): Promise<IcaoValue | null> {
         this.lastIcao = icao;
 
         if (direction === 0) {
@@ -156,7 +162,7 @@ export class FacilityLoaderScanlist implements Scanlist {
         return this.icaoListCache.length === 0;
     }
 
-    public sync(icao: string): void {
+    public sync(icao: IcaoValue): void {
         this.lastIcao = icao;
         this.listManangerJob = this.startListManager();
     }
@@ -176,7 +182,7 @@ export class FacilityLoaderScanlist implements Scanlist {
         let sizeAfterCurrent = 0;
 
         const listIndex = this.icaoListCache.indexOf(this.lastIcao);
-        this.log(`${this.facilitySearchType}: Cache size: ${this.icaoListCache.length} ${this.cacheValidFromIcao}-${this.cacheValidToIcao}, lastIcao: ${this.lastIcao}, index: ${listIndex}`);
+        this.log(`${this.facilitySearchType}: Cache size: ${this.icaoListCache.length} ${this.cacheValidFromIdent}-${this.cacheValidToIdent}, lastIcao: ${this.lastIcao}, index: ${listIndex}`);
 
         if (listIndex == -1) {
             //Happens with sync. We jumped to a random waypoint not in our list, now we need to throw everything away
@@ -191,13 +197,13 @@ export class FacilityLoaderScanlist implements Scanlist {
 
         if (sizeBeforeCurrent < TARGET_CACHE_SIZE / 2) {
             this.log(`${this.facilitySearchType}: Size towards beginning: ${sizeBeforeCurrent}, extending cache towards beginning`);
-            let ident: string | null = ICAO.getIdent(this.lastIcao);
+            let ident: string | null = this.lastIcao.ident;
             while (sizeBeforeCurrent < targetSizeForExtension) {
                 ident = this.getNextIdentForSearch(ident!, -1);
                 if (ident === null) { //End of the list
                     break;
                 }
-                if (this.cacheValidFromIcao.localeCompare(ident) <= 0) {
+                if (this.cacheValidFromIdent.localeCompare(ident) <= 0) {
                     continue;
                 }
                 this.log(`${this.facilitySearchType} : Searching for ${ident}`);
@@ -208,26 +214,26 @@ export class FacilityLoaderScanlist implements Scanlist {
                     this.log(`${this.facilitySearchType}: filling of list canceled`);
                     return;
                 }
-                this.cacheValidFromIcao = ident;
-                this.icaoListCache = this.addResultToCache(results);
+                this.cacheValidFromIdent = ident;
+                this.icaoListCache = this.addResultToCache(results.map(ICAO.stringV1ToValue));
                 sizeBeforeCurrent += this.icaoListCache.length - sizeBefore;
             }
 
         } else if (sizeBeforeCurrent > MAXIMUM_CACHE_SIZE / 2) {
             this.log(`${this.facilitySearchType}: Size towards beginning: ${sizeBeforeCurrent}, Pruning beginning of cache`);
             this.icaoListCache = this.icaoListCache.slice(sizeBeforeCurrent - MAXIMUM_CACHE_SIZE / 2, this.icaoListCache.length - 1);
-            this.cacheValidFromIcao = this.icaoListCache[0];
+            this.cacheValidFromIdent = this.icaoListCache[0].ident;
         }
 
         if (sizeAfterCurrent < TARGET_CACHE_SIZE / 2) {
             this.log(`${this.facilitySearchType}: Size towards end: ${sizeAfterCurrent}, extending cache towards end`);
-            let ident: string | null = ICAO.getIdent(this.lastIcao);
+            let ident: string | null = this.lastIcao.ident;
             while (sizeAfterCurrent < targetSizeForExtension) {
                 ident = this.getNextIdentForSearch(ident!, 1);
                 if (ident === null) { //End of the list
                     break;
                 }
-                if (this.cacheValidToIcao.localeCompare(ident) >= 0) {
+                if (this.cacheValidToIdent.localeCompare(ident) >= 0) {
                     continue;
                 }
                 this.log(`${this.facilitySearchType} : Searching for ${ident}`);
@@ -238,27 +244,27 @@ export class FacilityLoaderScanlist implements Scanlist {
                     this.log(`${this.facilitySearchType}: filling of list canceled`);
                     return;
                 }
-                this.cacheValidToIcao = ident;
-                this.icaoListCache = this.addResultToCache(results);
+                this.cacheValidToIdent = ident;
+                this.icaoListCache = this.addResultToCache(results.map(ICAO.stringV1ToValue));
                 sizeAfterCurrent += this.icaoListCache.length - sizeBefore;
                 if (this.icaoListCache.length > 0) {
-                    this.cacheValidToIcao = ICAO.getIdent(this.icaoListCache[this.icaoListCache.length - 1]);
+                    this.cacheValidToIdent = this.icaoListCache[this.icaoListCache.length - 1].ident;
                 }
             }
         } else if (sizeAfterCurrent > MAXIMUM_CACHE_SIZE / 2) {
             this.log(`${this.facilitySearchType}: Size towards end: ${sizeAfterCurrent}, pruning end of cache`);
             this.icaoListCache = this.icaoListCache.slice(0, listIndex + MAXIMUM_CACHE_SIZE / 2);
-            this.cacheValidToIcao = this.icaoListCache[this.icaoListCache.length - 1];
+            this.cacheValidToIdent = this.icaoListCache[this.icaoListCache.length - 1].ident;
         }
-        this.log(`${this.facilitySearchType}: "Listmanager done ${this.cacheValidFromIcao}-${this.cacheValidToIcao}`, this.icaoListCache);
+        this.log(`${this.facilitySearchType}: "Listmanager done ${this.cacheValidFromIdent}-${this.cacheValidToIdent}`, this.icaoListCache);
         this.listManangerJob = null;
     }
 
     private invalidateCache() {
         //Happens with sync. We jumped to a random waypoint not in our list, now we need to throw everything away
-        this.cacheValidFromIcao = "ZZZZ";
-        this.cacheValidToIcao = "0";
-        if (this.lastIcao == "") {
+        this.cacheValidFromIdent = "ZZZZ";
+        this.cacheValidToIdent = "0";
+        if (this.lastIcao.ident == "") {
             this.icaoListCache = [];
         } else {
             this.icaoListCache = [this.lastIcao];
@@ -272,13 +278,12 @@ export class FacilityLoaderScanlist implements Scanlist {
      * @param direction
      * @private
      */
-    private findClosest(icao: string, direction: number): number {
-        const targetIdent = ICAO.getIdent(icao);
+    private findClosest(icao: IcaoValue, direction: number): number {
         let sign = Math.sign(direction) * -1;
         if (sign === 0) {
             sign = -1;
         }
-        return this.icaoListCache.findIndex(testIcao => ICAO.getIdent(testIcao).localeCompare(targetIdent) == sign);
+        return this.icaoListCache.findIndex(testIcao => testIcao.ident.localeCompare(icao.ident) == sign);
     }
 
     /**
@@ -287,16 +292,15 @@ export class FacilityLoaderScanlist implements Scanlist {
      * @param direction
      * @private
      */
-    private getNextFromIndex(icao: string, direction: number): string | null {
+    private getNextFromIndex(icao: IcaoValue, direction: number): IcaoValue | null {
         const signOfDirection = Math.sign(direction);
-        const ident = ICAO.getIdent(icao);
         let index = this.index;
         if (direction < 0) {
             index = index.slice().reverse();
         }
 
         for (const indexElement of index) {
-            if (ICAO.getIdent(indexElement).localeCompare(ident) === signOfDirection) {
+            if (indexElement.ident.localeCompare(icao.ident) === signOfDirection) {
                 return indexElement;
             }
         }
@@ -308,41 +312,40 @@ export class FacilityLoaderScanlist implements Scanlist {
         this.invalidateCache();
         this.listManangerJob = this.startListManager();
     }
-    private addResultToCache(result: string[]): string[] {
+
+    private addResultToCache(result: IcaoValue[]): IcaoValue[] {
         const cache = this.icaoListCache.concat(result);
         return this.cleanupCache(cache);
     }
 
-    private cleanupCache(cache: string[]): string[] {
+    private cleanupCache(cache: IcaoValue[]): IcaoValue[] {
         cache = [...new Set(cache)];
         return cache.sort(this.listSortFunction);
     }
 
-    private listSortFunction(aIcao: string, bIcao: string): number {
-        const aIdent = ICAO.getIdent(aIcao);
-        const bIdent = ICAO.getIdent(bIcao);
-        if (aIdent === bIdent) {
-            return aIcao.localeCompare(bIcao);
+    private listSortFunction(aIcao: IcaoValue, bIcao: IcaoValue): number {
+        if (aIcao.ident === bIcao.ident) {
+            return ICAO.valueToStringV2(aIcao).localeCompare(ICAO.valueToStringV2(bIcao));
         }
 
-        return aIdent.localeCompare(bIdent);
+        return aIcao.ident.localeCompare(bIcao.ident);
     }
 
-    private async rebuildIndex(): Promise<string[]> {
+    private async rebuildIndex(): Promise<IcaoValue[]> {
         this.index = [];
         for (let i = 0; i < CHARSET.length; i++) {
             const res = await this.facilityLoader.searchByIdent(this.facilitySearchType, CHARSET[i], 1);
             if (res.length > 0) {
-                this.index.push(res[0]);
+                this.index.push(ICAO.stringV1ToValue(res[0]));
             }
         }
 
         //Now we just need to find the very last navaid
         if (this.index.length > 0) {
             const lastResult = this.index[this.index.length - 1];
-            const res = await this.facilityLoader.searchByIdent(this.facilitySearchType, ICAO.getIdent(lastResult).substring(0, 1), 1000);
-            const lastEntry = res[res.length - 1];
-            if (lastEntry !== lastResult) {
+            const res = await this.facilityLoader.searchByIdent(this.facilitySearchType, lastResult.ident.substring(0, 1), 1000);
+            const lastEntry = ICAO.stringV1ToValue(res[res.length - 1]);
+            if (!ICAO.valueEquals(lastEntry, lastResult)) {
                 this.index.push(lastEntry);
             }
         }

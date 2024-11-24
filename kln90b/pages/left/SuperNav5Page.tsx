@@ -269,13 +269,13 @@ export class SuperNav5Page extends SevenLinePage {
             const leg = legs[i];
             const nextLeg = legs[i + 1];
 
-            if (nextLeg === undefined || leg.wpt.icao !== nextLeg.wpt.icao) { //Don't draw the same waypoint twice
-                if (range <= 2 && ICAO.getFacilityType(leg.wpt.icao) === FacilityType.Airport && !isUserWaypoint(leg.wpt)) {
+            if (nextLeg === undefined || !ICAO.valueEquals(leg.wpt.icaoStruct, nextLeg.wpt.icaoStruct)) { //Don't draw the same waypoint twice
+                if (range <= 2 && ICAO.getFacilityTypeFromValue(leg.wpt.icaoStruct) === FacilityType.Airport && !isUserWaypoint(leg.wpt)) {
                     this.drawRunways(ctx, leg.wpt as AirportFacility, range);
                 }
 
                 ctx.drawIcon(leg.wpt, "@");
-                ctx.drawLabel(leg.wpt, ICAO.getIdent(leg.wpt.icao));
+                ctx.drawLabel(leg.wpt, leg.wpt.icaoStruct.ident);
             }
         }
     }
@@ -314,13 +314,13 @@ export class SuperNav5Page extends SevenLinePage {
     private drawAirports(ctx: CoordinateCanvasDrawContext, legs: KLNFlightplanLeg[], range: NauticalMiles) {
         const airports = this.props.nearestLists.aptNearestList.getNearestList();
         for (const airport of airports) {
-            if (!legs.some(leg => leg.wpt.icao === airport.facility.icao)) { //Don't draw it, if it is already drawn by the flightplan
+            if (!legs.some(leg => ICAO.valueEquals(leg.wpt.icaoStruct, airport.facility.icaoStruct))) { //Don't draw it, if it is already drawn by the flightplan
                 if (range <= 2 && !isUserWaypoint(airport.facility)) {
                     this.drawRunways(ctx, airport.facility, range);
                 } else {
                     ctx.drawIcon(airport.facility, "&");
                 }
-                ctx.drawLabel(airport.facility, ICAO.getIdent(airport.facility.icao));
+                ctx.drawLabel(airport.facility, airport.facility.icaoStruct.ident);
             }
         }
     }
@@ -370,7 +370,7 @@ export class SuperNav5Page extends SevenLinePage {
     private drawNearestList(ctx: CoordinateCanvasDrawContext, waypoints: NearestWpt<Facility>[], icon: string) {
         for (const wpt of waypoints) {
             ctx.drawIcon(wpt.facility, icon);
-            ctx.drawLabel(wpt.facility, ICAO.getIdent(wpt.facility.icao));
+            ctx.drawLabel(wpt.facility, wpt.facility.icaoStruct.ident);
         }
     }
 

@@ -1,4 +1,4 @@
-import {FSComponent, ICAO, VNode} from '@microsoft/msfs-sdk';
+import {FSComponent, VNode} from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
@@ -93,7 +93,7 @@ export class SuperNav1Page extends SixLinePage {
         if (leg === null) {
             return "";
         }
-        return ICAO.getIdent(leg.wpt.icao) + SidStar.getWptSuffix(leg.fixType);
+        return leg.wpt.icaoStruct.ident + SidStar.getWptSuffix(leg.fixType);
     }
 
 }

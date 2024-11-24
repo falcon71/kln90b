@@ -4,6 +4,7 @@ import {
     FacilityFrequencyType,
     FSComponent,
     GpsBoolean,
+    LandingSystemCategory,
     NodeReference,
     RunwayLightingType,
     RunwaySurfaceType,
@@ -24,7 +25,7 @@ import {AirportNearestList} from "../../data/navdata/NearestList";
 import {AirportCoordOrNearestView} from "../../controls/AirportCoordOrNearestView";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {convertTextToKLNCharset} from "../../data/Text";
-import {buildIcao, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {buildIcao, buildIcaoStruct, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 
 type Apt1PageTypes = {
@@ -263,8 +264,10 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
     }
 
     private buildAirportFacility(lat: number, lon: number): AirportFacility {
+        // noinspection JSDeprecatedSymbols
         return {
             icao: buildIcao('A', USER_WAYPOINT, this.ident),
+            icaoStruct: buildIcaoStruct('A', USER_WAYPOINT, this.ident),
             name: "",
             lat: lat,
             lon: lon,
@@ -292,8 +295,13 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
                 lighting: RunwayLightingType.Unknown,
                 designatorCharPrimary: RunwayDesignator.RUNWAY_DESIGNATOR_NONE,
                 designatorCharSecondary: RunwayDesignator.RUNWAY_DESIGNATOR_NONE,
+                primaryBlastpadLength: 0,
+                primaryOverrunLength: 0,
+                secondaryOverrunLength: 0,
+                secondaryBlastpadLength: 0,
                 primaryILSFrequency: {
                     icao: "",
+                    icaoStruct: {__Type: "JS_ICAO", type: "", ident: "", airport: "", region: ""},
                     name: "",
                     freqMHz: 0,
                     freqBCD16: 0,
@@ -302,9 +310,16 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
                     glideslopeAngle: 0,
                     localizerCourse: 0,
                     magvar: 0,
+                    hasBackcourse: false,
+                    glideslopeAlt: 0,
+                    glideslopeLat: 0,
+                    glideslopeLon: 0,
+                    lsCategory: LandingSystemCategory.None,
+                    localizerWidth: 0,
                 },
                 secondaryILSFrequency: {
                     icao: "",
+                    icaoStruct: {__Type: "JS_ICAO", type: "", ident: "", airport: "", region: ""},
                     name: "",
                     freqMHz: 0,
                     freqBCD16: 0,
@@ -313,6 +328,12 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
                     glideslopeAngle: 0,
                     localizerCourse: 0,
                     magvar: 0,
+                    hasBackcourse: false,
+                    glideslopeAlt: 0,
+                    glideslopeLat: 0,
+                    glideslopeLon: 0,
+                    lsCategory: LandingSystemCategory.None,
+                    localizerWidth: 0,
                 },
                 primaryElevation: 0,
                 primaryThresholdLength: 0,

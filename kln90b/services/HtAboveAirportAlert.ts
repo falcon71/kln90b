@@ -26,7 +26,7 @@ export class HtAboveAirportAlert implements CalcTickable {
 
         const enabled = this.userSettings.getSetting("htAboveAptEnabled").get();
 
-        if (!enabled || ICAO.getFacilityType(activeWpt.icao) !== FacilityType.Airport) {
+        if (!enabled || ICAO.getFacilityTypeFromValue(activeWpt.icaoStruct) !== FacilityType.Airport) {
             return;
         }
 

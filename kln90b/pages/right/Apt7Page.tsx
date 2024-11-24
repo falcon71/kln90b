@@ -392,7 +392,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         const fpl0Legs = this.props.memory.fplPage.flightplans[0].getLegs();
         const facility = unpackFacility(this.facility)!;
 
-        if (fpl0Legs.some(wpt => wpt.wpt.icao === facility.icao)) {
+        if (fpl0Legs.some(wpt => ICAO.valueEquals(wpt.wpt.icaoStruct, facility.icaoStruct))) {
             this.load(proc, rwy, trans, legs);
             return;
         }
@@ -420,7 +420,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         fpl0.removeProcedure(type); //I don't think you can have two approaches at the same time
         const fpl0Legs = fpl0.getLegs();
         const facility = unpackFacility(this.facility)!;
-        let idx = fpl0Legs.findIndex(wpt => wpt.wpt.icao === facility.icao);
+        let idx = fpl0Legs.findIndex(wpt => ICAO.valueEquals(wpt.wpt.icaoStruct, facility.icaoStruct));
         if (idx === -1) {
             //Airport not in FPL?
             idx = type === KLNLegType.SID ? 0 : fpl0Legs.length;
@@ -518,7 +518,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
 
 
         this.children = new UIElementChildren<Apt7ProcedurePageTypes>({
-            activeArrow: new ActiveArrow(facility?.icao ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, (fac) => {
                 props.changeFacility(fac); //Normally, only this.changeFacility would be called. But we also need to inform the parent, so it can calculate the number of pages correctly and set the correct procedure type
@@ -812,7 +812,7 @@ class Apt7PreviewPage extends Apt7SelectorPage {
         const waypoints = legs.map((leg, idx) => new SimpleListItem<KLNFlightplanLeg>({
             bus: this.props.bus,
             value: leg,
-            fulltext: `${(idx + 1).toString().padStart(2, " ")} ${ICAO.getIdent(leg.wpt.icao)}${SidStar.getWptSuffix(leg.fixType)}`.padEnd(11, " "), //6-10 the prefix is right after short identifiers
+            fulltext: `${(idx + 1).toString().padStart(2, " ")} ${leg.wpt.icaoStruct.ident}${SidStar.getWptSuffix(leg.fixType)}`.padEnd(11, " "), //6-10 the prefix is right after short identifiers
         }));
 
         return UIElementChildren.forList(waypoints);
@@ -869,7 +869,7 @@ class Apt7AddPage extends Apt7SelectorPage {
         return (<pre>
             {this.formatTitle()}<br/>
             PRESS ENT<br/>
-            TO ADD {ICAO.getIdent(unpackFacility(this.facility)!.icao)}<br/>
+            TO ADD {unpackFacility(this.facility)!.icaoStruct.ident}<br/>
             AND {this.procedureType === KLNLegType.SID ? "SID" : "STAR"} TO<br/>
             FPL 0<br/>
             {this.children.get("approve").render()}

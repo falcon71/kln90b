@@ -2,7 +2,6 @@ import {FuelType, FuelUnit, KLN90PlaneSettings} from "./settings/KLN90BPlaneSett
 import {
     EventBus,
     Facility,
-    ICAO,
     LatLonInterface,
     MagVar,
     NavMath,
@@ -446,7 +445,7 @@ export class SensorsOut {
             SimVar.SetSimVarValue('GPS WP NEXT LAT', SimVarValueType.Degree, 0);
             SimVar.SetSimVarValue('GPS WP NEXT LON', SimVarValueType.Degree, 0);
         } else {
-            SimVar.SetSimVarValue('GPS WP NEXT ID', SimVarValueType.String, ICAO.getIdent(wpt.icao));
+            SimVar.SetSimVarValue('GPS WP NEXT ID', SimVarValueType.String, wpt.icaoStruct.ident);
             SimVar.SetSimVarValue('GPS WP NEXT LAT', SimVarValueType.Degree, wpt.lat);
             SimVar.SetSimVarValue('GPS WP NEXT LON', SimVarValueType.Degree, wpt.lon);
         }
@@ -463,7 +462,7 @@ export class SensorsOut {
             SimVar.SetSimVarValue('GPS WP PREV LON', SimVarValueType.Degree, 0);
         } else {
             SimVar.SetSimVarValue('GPS WP PREV VALID', SimVarValueType.Bool, true);
-            SimVar.SetSimVarValue('GPS WP PREV ID', SimVarValueType.String, ICAO.getIdent(wpt.icao));
+            SimVar.SetSimVarValue('GPS WP PREV ID', SimVarValueType.String, wpt.icaoStruct.ident);
             SimVar.SetSimVarValue('GPS WP PREV LAT', SimVarValueType.Degree, wpt.lat);
             SimVar.SetSimVarValue('GPS WP PREV LON', SimVarValueType.Degree, wpt.lon);
         }

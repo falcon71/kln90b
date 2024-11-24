@@ -1,4 +1,4 @@
-import {EventBus, Facility, FSComponent, ICAO, NodeReference, VNode} from "@microsoft/msfs-sdk";
+import {EventBus, Facility, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {Hardware} from "../../Hardware";
 import {Flightplan, KLNFlightplanLeg} from "../../data/flightplan/Flightplan";
@@ -44,7 +44,7 @@ export class SuperNav5DirectToSelector implements UiElement {
                 this.ref.instance.textContent = "MOVE ?";
             } else {
                 const leg = this.legs[this.idx];
-                this.ref.instance.textContent = (ICAO.getIdent(leg.wpt.icao) + SidStar.getWptSuffix(leg.fixType)).padEnd(6, " ");
+                this.ref.instance.textContent = (leg.wpt.icaoStruct.ident + SidStar.getWptSuffix(leg.fixType)).padEnd(6, " ");
             }
 
         } else {

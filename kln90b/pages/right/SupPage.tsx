@@ -26,7 +26,7 @@ import {Scanlist} from "../../data/navdata/Scanlist";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {TickController} from "../../TickController";
-import {buildIcao, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {buildIcao, buildIcaoStruct, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 
 type SupPageTypes = {
@@ -215,8 +215,8 @@ export class SupPage extends WaypointPage<UserFacility> {
             return;
         }
         const facility = unpackFacility(this.facility);
-        if (facility.reference1Icao !== undefined) {
-            this.props.facilityLoader.getFacility(ICAO.getFacilityType(facility.reference1Icao), facility.reference1Icao).then(ref => {
+        if (facility.reference1IcaoStruct !== undefined) {
+            this.props.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(facility.reference1IcaoStruct), facility.reference1IcaoStruct).then(ref => {
                 this.ref = ref; //5-22 This is only set for REF Waypoints
                 this.dis = facility.reference1Distance!;
                 this.rad = facility.reference1Radial!;
@@ -340,14 +340,15 @@ export class SupPage extends WaypointPage<UserFacility> {
             return;
         }
 
+        // noinspection JSDeprecatedSymbols
         this.facility = {
             icao: buildIcao('U', USER_WAYPOINT, this.ident),
+            icaoStruct: buildIcaoStruct('U', USER_WAYPOINT, this.ident),
             name: "",
             lat: lat,
             lon: lon,
             region: USER_WAYPOINT,
             city: "",
-            magvar: 0,
             isTemporary: false,
             userFacilityType: UserFacilityType.LAT_LONG,
         };
@@ -366,14 +367,15 @@ export class SupPage extends WaypointPage<UserFacility> {
     }
 
     private createAtPresentPosition(): void {
+        // noinspection JSDeprecatedSymbols
         this.facility = {
             icao: buildIcao('U', USER_WAYPOINT, this.ident),
+            icaoStruct: buildIcaoStruct('U', USER_WAYPOINT, this.ident),
             name: "",
             lat: this.props.sensors.in.gps.coords.lat,
             lon: this.props.sensors.in.gps.coords.lon,
             region: USER_WAYPOINT,
             city: "",
-            magvar: 0,
             isTemporary: false,
             userFacilityType: UserFacilityType.LAT_LONG,
         };

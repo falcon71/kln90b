@@ -10,6 +10,7 @@ import {
     GpsBoolean,
     ICAO,
     IntersectionFacility,
+    LandingSystemCategory,
     NdbFacility,
     NdbType,
     RunwayLightingType,
@@ -76,7 +77,7 @@ export class UserWaypointPersistor {
     }
 
     private serializeWpt(wpt: Facility): string {
-        switch (ICAO.getFacilityType(wpt.icao)) {
+        switch (ICAO.getFacilityTypeFromValue(wpt.icaoStruct)) {
             case FacilityType.Airport:
                 return this.serializeApt(wpt as AirportFacility);
             case FacilityType.VOR:
@@ -93,7 +94,7 @@ export class UserWaypointPersistor {
     }
 
     private serializeApt(wpt: AirportFacility): string {
-        return wpt.icao + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon)
+        return ICAO.valueToStringV2(wpt.icaoStruct) + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon)
             // @ts-ignore
             + format(wpt.altitude, "+00000", {zeroFormat: "+00000"})
             + this.serializeRunway(wpt.runways[0]);
@@ -117,19 +118,19 @@ export class UserWaypointPersistor {
     }
 
     private serializeVor(wpt: VorFacility): string {
-        return wpt.icao + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon) + format(wpt.freqMHz, "+000.00") + format(wpt.magneticVariation, "+00");
+        return ICAO.valueToStringV2(wpt.icaoStruct) + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon) + format(wpt.freqMHz, "+000.00") + format(wpt.magneticVariation, "+00");
     }
 
     private serializeNdb(wpt: NdbFacility): string {
-        return wpt.icao + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon) + format(wpt.freqMHz, "+0000.0");
+        return ICAO.valueToStringV2(wpt.icaoStruct) + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon) + format(wpt.freqMHz, "+0000.0");
     }
 
     private serializeIntersection(wpt: IntersectionFacility): string {
-        return wpt.icao + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon);
+        return ICAO.valueToStringV2(wpt.icaoStruct) + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon);
     }
 
     private serializeSupplementary(wpt: UserFacility): string {
-        return wpt.icao + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon);
+        return ICAO.valueToStringV2(wpt.icaoStruct) + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon);
     }
 
     /**
@@ -174,7 +175,7 @@ export class UserWaypointPersistor {
 
     private deserializeFacility(str: string): Facility {
         console.log("restoring", str);
-        switch (ICAO.getFacilityType(str)) {
+        switch (ICAO.getFacilityTypeFromStringV2(str)) {
             case FacilityType.Airport:
                 return this.deserializeAirport(str);
             case FacilityType.VOR:
@@ -193,12 +194,15 @@ export class UserWaypointPersistor {
 
     private deserializeAirport(str: string): AirportFacility {
         const icao = this.deserializeIcao(str);
+        const icaoStruct = ICAO.stringV2ToValue(icao);
+        // noinspection JSDeprecatedSymbols
         return {
             icao: icao,
+            icaoStruct: icaoStruct,
             name: "",
             lat: this.deserializeLat(str),
             lon: this.deserializeLon(str),
-            region: ICAO.getRegionCode(icao),
+            region: icaoStruct.region,
             city: "",
             magvar: 0,
             airportPrivateType: AirportPrivateType.Uknown,
@@ -220,6 +224,7 @@ export class UserWaypointPersistor {
     }
 
     private deserializeRunway(str: string): AirportRunway {
+        // noinspection JSDeprecatedSymbols
         return {
             latitude: this.deserializeLat(str),
             longitude: this.deserializeLon(str),
@@ -232,8 +237,13 @@ export class UserWaypointPersistor {
             lighting: RunwayLightingType.Unknown,
             designatorCharPrimary: RunwayDesignator.RUNWAY_DESIGNATOR_NONE,
             designatorCharSecondary: RunwayDesignator.RUNWAY_DESIGNATOR_NONE,
+            primaryBlastpadLength: 0,
+            primaryOverrunLength: 0,
+            secondaryOverrunLength: 0,
+            secondaryBlastpadLength: 0,
             primaryILSFrequency: {
                 icao: "",
+                icaoStruct: {__Type: "JS_ICAO", type: "", ident: "", airport: "", region: ""},
                 name: "",
                 freqMHz: 0,
                 freqBCD16: 0,
@@ -242,9 +252,16 @@ export class UserWaypointPersistor {
                 glideslopeAngle: 0,
                 localizerCourse: 0,
                 magvar: 0,
+                hasBackcourse: false,
+                glideslopeAlt: 0,
+                glideslopeLat: 0,
+                glideslopeLon: 0,
+                lsCategory: LandingSystemCategory.None,
+                localizerWidth: 0,
             },
             secondaryILSFrequency: {
                 icao: "",
+                icaoStruct: {__Type: "JS_ICAO", type: "", ident: "", airport: "", region: ""},
                 name: "",
                 freqMHz: 0,
                 freqBCD16: 0,
@@ -253,6 +270,12 @@ export class UserWaypointPersistor {
                 glideslopeAngle: 0,
                 localizerCourse: 0,
                 magvar: 0,
+                hasBackcourse: false,
+                glideslopeAlt: 0,
+                glideslopeLat: 0,
+                glideslopeLon: 0,
+                lsCategory: LandingSystemCategory.None,
+                localizerWidth: 0,
             },
             primaryElevation: 0,
             primaryThresholdLength: 0,
@@ -263,12 +286,15 @@ export class UserWaypointPersistor {
 
     private deserializeVor(str: string): VorFacility {
         const icao = this.deserializeIcao(str);
+        const icaoStruct = ICAO.stringV2ToValue(icao);
+        // noinspection JSDeprecatedSymbols
         return {
             icao: icao,
+            icaoStruct: icaoStruct,
             name: "",
             lat: this.deserializeLat(str),
             lon: this.deserializeLon(str),
-            region: ICAO.getRegionCode(icao),
+            region: icaoStruct.region,
             city: "",
             magvar: 0,
             freqMHz: this.deserializeFrequency(str),
@@ -276,36 +302,49 @@ export class UserWaypointPersistor {
             magneticVariation: Number(str.substring(36, 39)),
             type: VorType.Unknown,
             vorClass: VorClass.Unknown,
+            navRange: 0,
+            dme: null,
+            ils: null,
+            tacan: null,
+            trueReferenced: false,
         };
     }
 
     private deserializeNdb(str: string): NdbFacility {
         const icao = this.deserializeIcao(str);
+        const icaoStruct = ICAO.stringV2ToValue(icao);
+        // noinspection JSDeprecatedSymbols
         return {
             icao: icao,
+            icaoStruct: icaoStruct,
             name: "",
             lat: this.deserializeLat(str),
             lon: this.deserializeLon(str),
-            region: ICAO.getRegionCode(icao),
+            region: icaoStruct.region,
             city: "",
             magvar: 0,
             freqMHz: this.deserializeFrequency(str),
             type: NdbType.H,
+            range: 0,
+            bfoRequired: false,
         };
     }
 
     private deserializeIntersection(str: string): IntersectionFacility {
         const icao = this.deserializeIcao(str);
+        const icaoStruct = ICAO.stringV2ToValue(icao);
+        // noinspection JSDeprecatedSymbols
         return {
             icao: icao,
+            icaoStruct: icaoStruct,
             name: "",
             lat: this.deserializeLat(str),
             lon: this.deserializeLon(str),
-            region: ICAO.getRegionCode(icao),
+            region: icaoStruct.region,
             city: "",
-            magvar: 0,
             routes: [],
             nearestVorICAO: "",
+            nearestVorICAOStruct: {__Type: "JS_ICAO", type: "", ident: "", airport: "", region: ""},
             nearestVorType: VorType.Unknown,
             nearestVorFrequencyBCD16: 0,
             nearestVorFrequencyMHz: 0,
@@ -317,14 +356,16 @@ export class UserWaypointPersistor {
 
     private deserializeSupplementary(str: string): UserFacility {
         const icao = this.deserializeIcao(str);
+        const icaoStruct = ICAO.stringV2ToValue(icao);
+        // noinspection JSDeprecatedSymbols
         return {
             icao: icao,
+            icaoStruct: icaoStruct,
             name: "",
             lat: this.deserializeLat(str),
             lon: this.deserializeLon(str),
-            region: ICAO.getRegionCode(icao),
+            region: icaoStruct.region,
             city: "",
-            magvar: 0,
             isTemporary: false,
             userFacilityType: UserFacilityType.LAT_LONG,
         };

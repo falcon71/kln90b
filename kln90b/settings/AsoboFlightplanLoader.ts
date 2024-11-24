@@ -1,9 +1,9 @@
 import {Flightplan} from "../data/flightplan/Flightplan";
-import {UserFacility, UserFacilityType, Wait} from "@microsoft/msfs-sdk";
+import {ICAO, IcaoValue, UserFacility, UserFacilityType, Wait} from "@microsoft/msfs-sdk";
 import {Flightplanloader} from "../services/Flightplanloader";
 import {StatusLineMessageEvents} from "../controls/StatusLine";
 import {getUniqueIdent} from "../data/navdata/UniqueIdentGenerator";
-import {buildIcao, TEMPORARY_WAYPOINT} from "../data/navdata/IcaoBuilder";
+import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "../data/navdata/IcaoBuilder";
 
 interface AsoboFlightplan {
     arrivalWaypointsSize: number,
@@ -50,7 +50,7 @@ export class AsoboFlightplanLoader extends Flightplanloader {
         const data = await Coherent.call('GET_FLIGHTPLAN') as AsoboFlightplan;
 
         console.log("asobo flightplan", data);
-        const icaos: string[] = [];
+        const icaos: IcaoValue[] = [];
 
         for (const leg of this.filterProcedures(data)) {
             //It is important, that this code is synchronized, so the waypoint gets added to the facility, before the next getUniqueIdent is called
@@ -63,26 +63,27 @@ export class AsoboFlightplanLoader extends Flightplanloader {
         return this.loadIcaos(icaos);
     }
 
-    private async mapLeg(leg: AsoboFlightplanLeg): Promise<string> {
+    private async mapLeg(leg: AsoboFlightplanLeg): Promise<IcaoValue> {
         if (leg.icao.length == 12) {
-            return leg.icao;
+            return ICAO.stringV1ToValue(leg.icao);
         }
 
         //Will be added as a temporary user waypoint
         const ident = await getUniqueIdent(leg.ident.toUpperCase(), this.facilityLoader);
 
         if (ident === null) {
-            return `       ${leg.ident.substring(0, 5).toUpperCase()}`; //This waypoint will not be found and cause a WAYPOINT DELETED message
+            return this.notFoundIcao(leg.ident.substring(0, 5).toUpperCase());
         }
 
+        // noinspection JSDeprecatedSymbols
         const facility: UserFacility = {
             icao: buildIcao('U', TEMPORARY_WAYPOINT, ident),
+            icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, ident),
             name: "",
             lat: leg.lla.lat,
             lon: leg.lla.long,
             region: TEMPORARY_WAYPOINT,
             city: "",
-            magvar: 0,
             isTemporary: false, //irrelevant, because this flag is not persisted
             userFacilityType: UserFacilityType.LAT_LONG,
         };
@@ -90,11 +91,11 @@ export class AsoboFlightplanLoader extends Flightplanloader {
 
         try {
             this.facilityLoader.facilityRepo.add(facility);
-            return facility.icao;
+            return facility.icaoStruct;
         } catch (e) {
             this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
-            return `       ${leg.ident.substring(0, 5).toUpperCase()}`; //This waypoint will not be found and cause a WAYPOINT DELETED message
+            return this.notFoundIcao(leg.ident.substring(0, 5).toUpperCase());
         }
 
     }
