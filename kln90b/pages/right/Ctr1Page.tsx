@@ -4,6 +4,7 @@ import {
     Facility,
     FacilitySearchType,
     FacilityType,
+    FacilityUtils,
     FSComponent,
     ICAO,
     LodBoundary,
@@ -246,7 +247,7 @@ export class Ctr1Page extends SixLineHalfPage {
         const legs = this.props.memory.ctrPage.lastFpl!.getLegs();
 
         for (const leg of legs) {
-            if (ICAO.getFacilityTypeFromValue(leg.wpt.icaoStruct) === FacilityType.USR && leg.wpt.lat === intersection.intersection.lat && leg.wpt.lon === intersection.intersection.lon) {
+            if (FacilityUtils.isFacilityType(leg.wpt, FacilityType.USR) && leg.wpt.lat === intersection.intersection.lat && leg.wpt.lon === intersection.intersection.lon) {
                 return {
                     isNew: false,
                     idx: -1, //Only relevant for inserting new waypoints
@@ -288,7 +289,7 @@ export class Ctr1Page extends SixLineHalfPage {
         };
 
         try {
-            this.props.facilityLoader.facilityRepo.add(facility);
+            this.props.facilityRepository.add(facility);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);

@@ -1,21 +1,24 @@
 import {
     BitFlags,
     DefaultLodBoundaryCache,
+    FacilityClient,
     FacilitySearchType,
     FacilityType,
     LodBoundary,
+    NearestBoundarySearchSession,
+    NearestIcaoSearchSessionDataType,
     NearestLodBoundarySearchSession,
+    NearestSearchSessionTypeMap,
     UnitType,
     VorClass,
     VorFacility,
     VorType,
 } from "@microsoft/msfs-sdk";
 import {Latitude, Longitude} from "../Units";
-import {KLNFacilityLoader, KLNNearestVorSearchSession} from "./KLNFacilityLoader";
 import {BoundaryUtils} from "./BoundaryUtils";
 
 export class NearestUtils {
-    private vorSession: KLNNearestVorSearchSession | undefined;
+    private vorSession: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[FacilitySearchType.Vor] | undefined;
 
     private nearestVor: VorFacility | null = null;
 
@@ -25,18 +28,18 @@ export class NearestUtils {
 
     private airspaceSession: NearestLodBoundarySearchSession | undefined;
 
-    public constructor(private readonly facilityLoader: KLNFacilityLoader) {
+    public constructor(private readonly facilityLoader: FacilityClient) {
     }
 
     public async init() {
-        this.vorSession = await this.facilityLoader.startNearestSearchSession(FacilitySearchType.Vor);
-        await this.vorSession!.setVorFilter(
+        this.vorSession = await this.facilityLoader.startNearestSearchSessionWithIcaoStructs(FacilitySearchType.Vor);
+        this.vorSession!.setVorFilter(
             BitFlags.union(BitFlags.createFlag(VorClass.HighAlt), BitFlags.createFlag(VorClass.LowAlt), BitFlags.createFlag(VorClass.Terminal)),
             BitFlags.union(BitFlags.createFlag(VorType.VOR), BitFlags.createFlag(VorType.VORDME), BitFlags.createFlag(VorType.VORTAC)),
         );
 
-        const settion = await this.facilityLoader.startNearestSearchSession(FacilitySearchType.Boundary);
-        this.airspaceSession = new NearestLodBoundarySearchSession(DefaultLodBoundaryCache.getCache(), settion, 0.5);
+        const session = await this.facilityLoader.startNearestSearchSessionWithIcaoStructs(FacilitySearchType.Boundary) as NearestBoundarySearchSession;
+        this.airspaceSession = new NearestLodBoundarySearchSession(DefaultLodBoundaryCache.getCache(), session, 0.5);
 
     }
 

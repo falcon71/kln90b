@@ -1,9 +1,11 @@
 import {Flightplan} from "../data/flightplan/Flightplan";
-import {ICAO, IcaoValue, UserFacility, UserFacilityType, Wait} from "@microsoft/msfs-sdk";
+import {EventBus, FacilityClient, ICAO, IcaoValue, UserFacility, UserFacilityType, Wait} from "@microsoft/msfs-sdk";
 import {Flightplanloader} from "../services/Flightplanloader";
 import {StatusLineMessageEvents} from "../controls/StatusLine";
 import {getUniqueIdent} from "../data/navdata/UniqueIdentGenerator";
 import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "../data/navdata/IcaoBuilder";
+import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
+import {MessageHandler} from "../data/MessageHandler";
 
 interface AsoboFlightplan {
     arrivalWaypointsSize: number,
@@ -22,6 +24,9 @@ interface AsoboFlightplanLeg {
 export class AsoboFlightplanLoader extends Flightplanloader {
     static fpListenerInitialized = false;
 
+    constructor(bus: EventBus, facilityLoader: FacilityClient, private readonly facilityRepository: KLNFacilityRepository, messageHandler: MessageHandler) {
+        super(bus, facilityLoader, messageHandler);
+    }
 
     /**
      * Inits flight plan asobo sync
@@ -90,7 +95,7 @@ export class AsoboFlightplanLoader extends Flightplanloader {
         console.log("Adding temporary user waypoint", facility);
 
         try {
-            this.facilityLoader.facilityRepo.add(facility);
+            this.facilityRepository.add(facility);
             return facility.icaoStruct;
         } catch (e) {
             this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");

@@ -8,6 +8,7 @@ import {
     GeoKdTreeSearchVisitor,
     GeoPoint,
     ICAO,
+    IcaoValue,
 } from "@microsoft/msfs-sdk";
 import {isUserWaypoint} from "../../pages/right/WaypointPage";
 import {MAX_USER_WAYPOINTS} from "../../settings/KLN90BUserWaypoints";
@@ -51,7 +52,7 @@ type FacilityRepositoryRemove = {
     type: FacilityRepositorySyncType.Remove;
 
     /** The ICAOs of the facilities that were removed. */
-    facs: string[];
+    facs: IcaoValue[];
 }
 
 /**
@@ -187,12 +188,12 @@ export class KLNFacilityRepository {
      * @param icao The ICAO of the facility to retrieve.
      * @returns The requested user facility, or undefined if it was not found in this repository.
      */
-    public get(icao: string): Facility | undefined {
-        if (!ICAO.isFacility(icao)) {
+    public get(icao: IcaoValue): Facility | undefined {
+        if (!ICAO.isValueFacility(icao)) {
             return undefined;
         }
 
-        return this.repos.get(ICAO.getFacilityType(icao))?.get(icao);
+        return this.repos.get(ICAO.getFacilityTypeFromValue(icao))?.get(ICAO.getUid(icao));
     }
 
     /**
@@ -254,8 +255,8 @@ export class KLNFacilityRepository {
      * @throws Error if the facility has an invalid ICAO.
      */
     public add(fac: Facility): void {
-        if (!ICAO.isFacility(fac.icao)) {
-            throw new Error(`KLNFacilityRepository: invalid facility ICAO ${fac.icao}`);
+        if (!ICAO.isValueFacility(fac.icaoStruct)) {
+            throw new Error(`FacilityRepository: invalid facility ICAO ${ICAO.tryValueToStringV2(fac.icaoStruct)}`);
         }
 
         this.addToRepo(fac);
@@ -295,16 +296,15 @@ export class KLNFacilityRepository {
      * @param fac The facility to remove.
      * @throws Error if the facility has an invalid ICAO.
      */
-    public remove(fac: Facility | string): void {
-        const icao = typeof fac === 'string' ? fac : fac.icao;
-        if (!ICAO.isFacility(icao)) {
-            throw new Error(`KLNFacilityRepository: invalid facility ICAO ${icao}`);
+    public remove(fac: Facility | IcaoValue): void {
+        const icao = ICAO.isValue(fac) ? fac : fac.icaoStruct;
+        if (!ICAO.isValueFacility(icao)) {
+            throw new Error(`FacilityRepository: invalid facility ICAO ${ICAO.tryValueToStringV2(icao)}`);
         }
 
         this.removeFromRepo(icao);
         this.pubSyncEvent({type: FacilityRepositorySyncType.Remove, facs: [icao]});
     }
-
 
     /**
      * Iterates over every facility in this respository with a visitor function.
@@ -332,16 +332,18 @@ export class KLNFacilityRepository {
             throw new Error("Repository is full");
         }
 
-        const facilityType = ICAO.getFacilityType(fac.icao);
+        const facilityType = ICAO.getFacilityTypeFromValue(fac.icaoStruct);
 
         let repo = this.repos.get(facilityType);
         if (repo === undefined) {
             this.repos.set(facilityType, repo = new Map<string, Facility>());
         }
 
-        const existing = repo.get(fac.icao);
+        const uid = ICAO.getUid(fac.icaoStruct);
 
-        repo.set(fac.icao, fac);
+        const existing = repo.get(uid);
+
+        repo.set(uid, fac);
 
         if (facilityType === FacilityType.USR ||
             facilityType === FacilityType.Airport ||
@@ -358,7 +360,7 @@ export class KLNFacilityRepository {
         if (existing === undefined) {
             this.publisher.pub('facility_added', fac, false, false);
         } else {
-            this.publisher.pub(`facility_changed_${fac.icao}`, fac, false, false);
+            this.publisher.pub(`facility_changed_${uid}`, fac, false, false);
             this.publisher.pub('facility_changed', fac, false, false);
         }
     }
@@ -366,22 +368,24 @@ export class KLNFacilityRepository {
      * Removes a facility from this repository.
      * @param fac The facility to remove, or the ICAO of the facility to remove.
      */
-    private removeFromRepo(fac: Facility | string): void {
-        const icao = typeof fac === 'string' ? fac : fac.icao;
-        const facilityType = ICAO.getFacilityType(icao);
-        const repo = this.repos.get(ICAO.getFacilityType(icao));
+    private removeFromRepo(fac: Facility | IcaoValue): void {
+        const icao = ICAO.isValue(fac) ? fac : fac.icaoStruct;
+        const facilityType = ICAO.getFacilityTypeFromValue(icao);
+        const repo = this.repos.get(facilityType);
 
         if (repo === undefined) {
             return;
         }
 
-        const facilityInRepo = repo.get(icao);
+        const uid = ICAO.getUid(icao);
+
+        const facilityInRepo = repo.get(uid);
 
         if (facilityInRepo === undefined) {
             return;
         }
 
-        repo.delete(icao);
+        repo.delete(uid);
 
         if (facilityType !== FacilityType.USR &&
             facilityType !== FacilityType.Airport &&
@@ -399,7 +403,7 @@ export class KLNFacilityRepository {
             this.trees[facilityType].remove(facilityInRepo);
         }
 
-        this.publisher.pub(`facility_removed_${icao}`, facilityInRepo, false, false);
+        this.publisher.pub(`facility_removed_${uid}`, facilityInRepo, false, false);
         this.publisher.pub('facility_removed', facilityInRepo, false, false);
     }
 

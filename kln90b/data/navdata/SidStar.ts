@@ -5,6 +5,7 @@ import {
     BitFlags,
     EnrouteTransition,
     Facility,
+    FacilityClient,
     FacilityType,
     FixTypeFlags,
     FlightPlanLeg,
@@ -25,12 +26,12 @@ import {
     VorFacility,
 } from "@microsoft/msfs-sdk";
 import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "../flightplan/Flightplan";
-import {KLNFacilityLoader} from "./KLNFacilityLoader";
 import {Degrees, NauticalMiles} from "../Units";
 import {format} from "numerable";
 import {Sensors} from "../../Sensors";
 import {NavPageState} from "../VolatileMemory";
 import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "./IcaoBuilder";
+import {KLNFacilityRepository} from "./KLNFacilityRepository";
 
 export interface ArcData {
     beginRadial: Degrees, //The published beginning radial
@@ -51,7 +52,7 @@ export interface ArcData {
 export class SidStar {
 
 
-    public constructor(private readonly facilityLoader: KLNFacilityLoader, private readonly sensors: Sensors) {
+    public constructor(private readonly facilityLoader: FacilityClient, private readonly facilityRepository: KLNFacilityRepository, private readonly sensors: Sensors) {
     }
 
     /**
@@ -207,20 +208,20 @@ export class SidStar {
     }
 
     public static isApproachRecognized(app: ApproachProcedure): boolean {
+        if (!SidStar.appIsBRnav(app) || !SidStar.appHasNoRFLegs(app)) {
+            return false;
+        }
+
         switch (app.approachType) {
             case ApproachType.APPROACH_TYPE_RNAV:
                 //Only if LNAV without VNAV is allowed
-                if (BitFlags.isAny(app.rnavTypeFlags, RnavTypeFlags.LNAV)) {
-                    return SidStar.appHasNoRFLegs(app);
-                } else {
-                    return false;
-                }
+                return BitFlags.isAny(app.rnavTypeFlags, RnavTypeFlags.LNAV);
             case ApproachType.APPROACH_TYPE_GPS:
             case ApproachType.APPROACH_TYPE_VOR:
             case ApproachType.APPROACH_TYPE_NDB:
             case ApproachType.APPROACH_TYPE_VORDME:
             case ApproachType.APPROACH_TYPE_NDBDME:
-                return SidStar.appHasNoRFLegs(app);
+                return true;
             default:
                 return false;
         }
@@ -229,7 +230,7 @@ export class SidStar {
     public static isProcedureRecognized(proc: Procedure, runwayTransition: RunwayTransition | null = null, enrouteTransition: EnrouteTransition | null = null): boolean {
         //The real device does not include RNAV procedures: https://www.euroga.org/forums/maintenance-avionics/5573-rnav-retrofit
         //It seems, that we can't recognize those here
-        return SidStar.procHasNoRFLegs(proc) && SidStar.hasAtLeastOneRecognizedLeg(proc, runwayTransition, enrouteTransition);
+        return SidStar.procIsBRnav(proc) && SidStar.procHasNoRFLegs(proc) && SidStar.hasAtLeastOneRecognizedLeg(proc, runwayTransition, enrouteTransition);
     }
 
     /**
@@ -321,6 +322,41 @@ export class SidStar {
     }
 
     /**
+     *  People are going to hate me, but the KLN is only capable of B-RNAV
+     * @param proc
+     * @private
+     */
+    private static appIsBRnav(app: ApproachProcedure): boolean {
+        for (const transition of app.transitions) {
+            if (transition.legs.some(leg => leg.rnp < 5)) {
+                return false;
+            }
+        }
+
+        return !app.finalLegs.concat(app.missedLegs).some(leg => leg.rnp < 5);
+    }
+
+    /**
+     *  People are going to hate me, but the KLN is only capable of B-RNAV
+     * @param proc
+     * @private
+     */
+    private static procIsBRnav(proc: Procedure): boolean {
+        for (const transition of proc.enRouteTransitions) {
+            if (transition.legs.some(leg => leg.rnp < 5)) {
+                return false;
+            }
+        }
+        for (const transition of proc.runwayTransitions) {
+            if (transition.legs.some(leg => leg.rnp < 5)) {
+                return false;
+            }
+        }
+
+        return !proc.commonLegs.some(leg => leg.rnp < 5);
+    }
+
+    /**
      * For example KGEG GEG7 only has CA and VM, which are not recognized by the KLN,
      * which would result in an empty procedure with no legs.
      * Another interesting example is KJFK JFK 5. Only RWY 31 has a leg to CRI, the others would be empty
@@ -354,7 +390,8 @@ export class SidStar {
     }
 
     private static isLegSupported(leg: FlightPlanLeg): boolean {
-        return leg.fixIcaoStruct.ident.trim() !== "" && leg.type != LegType.RF;
+        return leg.fixIcaoStruct.ident.trim() !== "" &&
+            leg.type != LegType.RF;
     }
 
     /**
@@ -639,7 +676,7 @@ export class SidStar {
 
         try {
             //Not sure, but I would expect this to behave like the REF page
-            this.facilityLoader.facilityRepo.add(entryFacility);
+            this.facilityRepository.add(entryFacility);
         } catch (e) {
             //DB full. Oh well, what's the worst that could possibly happen?
         }

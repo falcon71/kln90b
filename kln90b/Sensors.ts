@@ -43,11 +43,9 @@ export class FuelComputer implements CalcTickable {
     private readonly realNumberOfEngines: number = 0;
 
 
-    public static readonly GALLON_FUEL_AVGAS = new SimpleUnit(UnitFamily.Weight, 'gallon', 2.7216);
     public static readonly IMP_GALLON_FUEL_AVGAS = new SimpleUnit(UnitFamily.Weight, 'imperial gallon', 3.2685);
     public static readonly GALLON_FUEL_JETB = new SimpleUnit(UnitFamily.Weight, 'gallon', 2.9484);
     public static readonly IMP_GALLON_FUEL_JETB = new SimpleUnit(UnitFamily.Weight, 'imperial gallon', 3.5408);
-    private static readonly LITER_FUEL_AVGAS = new SimpleUnit(UnitFamily.Weight, 'liter', 0.719);
     private static readonly LITER_FUEL_JETB = new SimpleUnit(UnitFamily.Weight, 'liter', 0.7789);
 
     constructor(private readonly options: KLN90PlaneSettings) {
@@ -68,7 +66,7 @@ export class FuelComputer implements CalcTickable {
             case FuelUnit.GAL:
                 switch (this.options.input.fuelComputer.type) {
                     case FuelType.AVGAS:
-                        targetUnit = FuelComputer.GALLON_FUEL_AVGAS;
+                        targetUnit = UnitType.GALLON_AUTOGAS_FUEL;
                         break;
                     case FuelType.JET_A1:
                         targetUnit = UnitType.GALLON_FUEL;
@@ -98,7 +96,7 @@ export class FuelComputer implements CalcTickable {
             case FuelUnit.L:
                 switch (this.options.input.fuelComputer.type) {
                     case FuelType.AVGAS:
-                        targetUnit = FuelComputer.LITER_FUEL_AVGAS;
+                        targetUnit = UnitType.LITER_AUTOGAS_FUEL;
                         break;
                     case FuelType.JET_A1:
                         targetUnit = UnitType.LITER_FUEL;

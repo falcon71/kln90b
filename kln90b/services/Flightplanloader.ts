@@ -1,11 +1,10 @@
 import {Flightplan, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
 import {Message, MessageHandler, OneTimeMessage} from "../data/MessageHandler";
-import {EventBus, ICAO, IcaoValue} from "@microsoft/msfs-sdk";
-import {KLNFacilityLoader} from "../data/navdata/KLNFacilityLoader";
+import {EventBus, FacilityClient, ICAO, IcaoValue} from "@microsoft/msfs-sdk";
 import {buildIcaoStructIdentOnly} from "../data/navdata/IcaoBuilder";
 
 export abstract class Flightplanloader {
-    public constructor(protected readonly bus: EventBus, protected readonly facilityLoader: KLNFacilityLoader, protected messageHandler: MessageHandler) {
+    public constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler) {
     }
 
     /**

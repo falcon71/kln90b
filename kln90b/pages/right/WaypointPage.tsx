@@ -1,9 +1,8 @@
-import {Facility, ICAO, IcaoValue} from "@microsoft/msfs-sdk";
+import {Facility, FacilityClient, ICAO, IcaoValue} from "@microsoft/msfs-sdk";
 import {PageProps} from "../Page";
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {MAX_SCROLL_SPEED, Scanlist} from "../../data/navdata/Scanlist";
-import {KLNFacilityLoader} from "../../data/navdata/KLNFacilityLoader";
 import {AirportNearestList, NdbNearestList, NearestWpt, VorNearestList} from "../../data/navdata/NearestList";
 import {NearestSelector} from "../../controls/selects/NearestSelector";
 import {buildIcaoStructIdentOnly, TEMPORARY_WAYPOINT, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
@@ -21,11 +20,12 @@ const SPEEDSTEP_SIZE = 1.5;
 class ScanHandler {
 
     public isSearchRunning: boolean = false;
+    //todo we could use InputAcceleration from the sdk for this
     private lastScrollTime: number = 0;
     private lastScrollSpeed: number = 1;
     private lastScrollDirection: ScrollDirection = 1;
 
-    constructor(private scanList: Scanlist, private facilityLoader: KLNFacilityLoader) {
+    constructor(private scanList: Scanlist, private facilityLoader: FacilityClient) {
     }
 
     public async scanLeft(lastIcao: IcaoValue): Promise<Facility | null> {

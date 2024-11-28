@@ -127,7 +127,7 @@ export class Apt3UserPage extends WaypointPage<AirportFacility> {
 
     private setRunwayLength(runwayLength: number) {
         const facility = unpackFacility(this.facility);
-        this.props.facilityLoader.facilityRepo.update(facility!, fac => {
+        this.props.facilityRepository.update(facility!, fac => {
             const rwy = fac.runways[0] as UserAirportRunway;
             rwy.length = UnitType.FOOT.convertTo(runwayLength, UnitType.METER);
         });
@@ -135,7 +135,7 @@ export class Apt3UserPage extends WaypointPage<AirportFacility> {
 
     private setRunwaySurface(surface: RunwaySurfaceType) {
         const facility = unpackFacility(this.facility);
-        this.props.facilityLoader.facilityRepo.update(facility!, fac => {
+        this.props.facilityRepository.update(facility!, fac => {
             const rwy = fac.runways[0] as UserAirportRunway;
             rwy.surface = surface;
         });

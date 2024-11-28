@@ -125,7 +125,7 @@ export class RefPage extends SixLineHalfPage {
         };
 
         try {
-            this.props.facilityLoader.facilityRepo.add(facility);
+            this.props.facilityRepository.add(facility);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);

@@ -1,5 +1,4 @@
-import {EventBus, FacilitySearchType, ICAO, IcaoValue} from "@microsoft/msfs-sdk";
-import {KLNFacilityLoader} from "./KLNFacilityLoader";
+import {EventBus, FacilityClient, FacilitySearchType, ICAO, IcaoValue} from "@microsoft/msfs-sdk";
 import {KLNFacilityRepository} from "./KLNFacilityRepository";
 
 const TARGET_CACHE_SIZE = 1000;
@@ -17,7 +16,7 @@ export class Scanlists {
     public readonly supScanlist: Scanlist;
 
 
-    constructor(facilityLoader: KLNFacilityLoader, bus: EventBus) {
+    constructor(facilityLoader: FacilityClient, bus: EventBus) {
         this.aptScanlist = new FacilityLoaderScanlist(FacilitySearchType.Airport, facilityLoader, bus);
         this.vorScanlist = new FacilityLoaderScanlist(FacilitySearchType.Vor, facilityLoader, bus);
         this.ndbScanlist = new FacilityLoaderScanlist(FacilitySearchType.Ndb, facilityLoader, bus);
@@ -75,13 +74,7 @@ export class FacilityLoaderScanlist implements Scanlist {
     private lastManangerJobId = 0;
 
     //The last icao the pilot viewed. This should be the center of the moving cache window
-    private lastIcao: IcaoValue = {
-        __Type: "JS_ICAO",
-        type: "",
-        ident: "",
-        region: "",
-        airport: "",
-    };
+    private lastIcao: IcaoValue = ICAO.emptyValue();
 
     //The first icao our cache currently encompasses. Might be smaller than the first value. We may have checked '0', but the first used icao can be '1'
     private cacheValidFromIdent = "ZZZZ";
@@ -91,7 +84,7 @@ export class FacilityLoaderScanlist implements Scanlist {
     private readonly loggingEnabled: boolean = false;
 
 
-    constructor(private readonly facilitySearchType: FacilitySearchType, private readonly facilityLoader: KLNFacilityLoader, bus: EventBus) {
+    constructor(private readonly facilitySearchType: FacilitySearchType, private readonly facilityLoader: FacilityClient, bus: EventBus) {
         bus.getSubscriber<any>().on(KLNFacilityRepository.SYNC_TOPIC).handle(this.waypointsChanged.bind(this));
     }
 
@@ -264,7 +257,7 @@ export class FacilityLoaderScanlist implements Scanlist {
         //Happens with sync. We jumped to a random waypoint not in our list, now we need to throw everything away
         this.cacheValidFromIdent = "ZZZZ";
         this.cacheValidToIdent = "0";
-        if (this.lastIcao.ident == "") {
+        if (ICAO.isValueEmpty(this.lastIcao)) {
             this.icaoListCache = [];
         } else {
             this.icaoListCache = [this.lastIcao];

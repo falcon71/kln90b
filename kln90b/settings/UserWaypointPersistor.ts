@@ -219,7 +219,7 @@ export class UserWaypointPersistor {
             approaches: [],
             arrivals: [],
             // @ts-ignore
-            altitude: Number(str.substring(29, 35)),
+            altitude: Number(str.substring(36, 42)),
         };
     }
 
@@ -231,7 +231,7 @@ export class UserWaypointPersistor {
             elevation: 0,
             direction: 0,
             designation: "18-36",
-            length: UnitType.FOOT.convertTo(Number(str.substring(35, 41)), UnitType.METER),
+            length: UnitType.FOOT.convertTo(Number(str.substring(42, 48)), UnitType.METER),
             width: 0,
             surface: this.deserializeSurface(str),
             lighting: RunwayLightingType.Unknown,
@@ -299,7 +299,7 @@ export class UserWaypointPersistor {
             magvar: 0,
             freqMHz: this.deserializeFrequency(str),
             freqBCD16: 0,
-            magneticVariation: Number(str.substring(36, 39)),
+            magneticVariation: Number(str.substring(43, 46)),
             type: VorType.Unknown,
             vorClass: VorClass.Unknown,
             navRange: 0,
@@ -372,31 +372,31 @@ export class UserWaypointPersistor {
     }
 
     private deserializeIcao(str: string): string {
-        return str.substring(0, 12);
+        return str.substring(0, 19);
     }
 
     private deserializeLat(str: string): number {
-        const sign = str.substring(12, 13) == '-' ? -1 : 1;
-        const degrees = Number(str.substring(13, 15));
-        const minutes = Number(str.substring(15, 20)) / 60;
+        const sign = str.substring(19, 20) == '-' ? -1 : 1;
+        const degrees = Number(str.substring(19, 22));
+        const minutes = Number(str.substring(22, 27)) / 60;
 
         return sign * (degrees + (degrees >= 0 ? minutes : -minutes));
     }
 
     private deserializeLon(str: string): number {
-        const sign = str.substring(20, 21) == '-' ? -1 : 1;
-        const degrees = Number(str.substring(21, 24));
-        const minutes = Number(str.substring(24, 29)) / 60;
+        const sign = str.substring(27, 28) == '-' ? -1 : 1;
+        const degrees = Number(str.substring(27, 31));
+        const minutes = Number(str.substring(31, 36)) / 60;
 
         return sign * (degrees + (degrees >= 0 ? minutes : -minutes));
     }
 
     private deserializeFrequency(str: string): number {
-        return Number(str.substring(29, 36));
+        return Number(str.substring(36, 43));
     }
 
     private deserializeSurface(str: string): RunwaySurfaceType {
-        switch (str.substring(41, 42)) {
+        switch (str.substring(48, 49)) {
             case "-":
                 return RunwaySurfaceType.WrightFlyerTrack;
             case "H":

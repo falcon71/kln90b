@@ -5,16 +5,18 @@ import {
     BoundaryFacility,
     BoundaryType,
     DefaultLodBoundaryCache,
+    FacilityClient,
     FacilitySearchType,
     GeoPoint,
     LodBoundary,
+    NearestBoundarySearchSession,
     NearestLodBoundarySearchSession,
-    UnitType, UserSetting,
+    UnitType,
+    UserSetting,
 } from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Sensors} from "../../Sensors";
 import {AirspaceAlertMessage, InsideAirspaceMessage, MessageHandler} from "../MessageHandler";
-import {KLNFacilityLoader} from "./KLNFacilityLoader";
 import {BoundaryUtils} from "./BoundaryUtils";
 import {Feet} from "../Units";
 import {NavMode, NavPageState} from "../VolatileMemory";
@@ -52,13 +54,13 @@ export class AirspaceAlert implements CalcTickable {
 
     private tickTimer: number = 0;
 
-    constructor(userSettings: KLN90BUserSettings, private sensors: Sensors, private messageHandler: MessageHandler, private readonly facilityLoader: KLNFacilityLoader, private readonly navState: NavPageState) {
+    constructor(userSettings: KLN90BUserSettings, private sensors: Sensors, private messageHandler: MessageHandler, private readonly facilityLoader: FacilityClient, private readonly navState: NavPageState) {
         this.enabled = userSettings.getSetting("airspaceAlertEnabled");
         this.altBuffer = userSettings.getSetting("airspaceAlertBuffer");
     }
 
     public async init() {
-        const session = await this.facilityLoader.startNearestSearchSession(FacilitySearchType.Boundary);
+        const session = await this.facilityLoader.startNearestSearchSessionWithIcaoStructs(FacilitySearchType.Boundary) as NearestBoundarySearchSession;
 
 
         this.airspaceSession = new NearestLodBoundarySearchSession(DefaultLodBoundaryCache.getCache(), session, 0.5);

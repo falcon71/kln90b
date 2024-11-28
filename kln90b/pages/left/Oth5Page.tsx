@@ -42,7 +42,7 @@ export class Oth5Page extends SixLineHalfPage {
         const destination = this.props.memory.navPage.activeWaypoint.getDestination();
 
         this.children = new UIElementChildren<Oth5PageTypes>({
-            destArrow: new ActiveArrow(destination?.icao ?? null, this.props.memory.navPage),
+            destArrow: new ActiveArrow(destination?.icaoStruct ?? null, this.props.memory.navPage),
             dest: new TextDisplay(IcaoFixedLength.getIdentFromFacility(destination)),
             fuelUnit: new TextDisplay(this.props.planeSettings.input.fuelComputer.unit.padStart(3, " ")),
             fobLabel: new TextDisplay(this.props.planeSettings.input.fuelComputer.fobTransmitted ? " " : ":"),
@@ -77,7 +77,7 @@ export class Oth5Page extends SixLineHalfPage {
         const futureLegs = this.props.memory.navPage.activeWaypoint.getFutureLegs();
         const destLeg = futureLegs.length > 0 ? futureLegs[futureLegs.length - 1] : null;
 
-        this.children.get("destArrow").icao = destLeg?.wpt?.icao ?? null;
+        this.children.get("destArrow").icao = destLeg?.wpt?.icaoStruct ?? null;
         this.children.get("dest").text = IcaoFixedLength.getIdentFromFacility(destLeg?.wpt ?? null);
 
 

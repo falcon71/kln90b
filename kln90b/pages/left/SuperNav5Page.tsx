@@ -3,6 +3,7 @@ import {
     AirportRunway,
     Facility,
     FacilityType,
+    FacilityUtils,
     FSComponent,
     GeoPoint,
     ICAO,
@@ -270,7 +271,7 @@ export class SuperNav5Page extends SevenLinePage {
             const nextLeg = legs[i + 1];
 
             if (nextLeg === undefined || !ICAO.valueEquals(leg.wpt.icaoStruct, nextLeg.wpt.icaoStruct)) { //Don't draw the same waypoint twice
-                if (range <= 2 && ICAO.getFacilityTypeFromValue(leg.wpt.icaoStruct) === FacilityType.Airport && !isUserWaypoint(leg.wpt)) {
+                if (range <= 2 && FacilityUtils.isFacilityType(leg.wpt, FacilityType.Airport) && !isUserWaypoint(leg.wpt)) {
                     this.drawRunways(ctx, leg.wpt as AirportFacility, range);
                 }
 

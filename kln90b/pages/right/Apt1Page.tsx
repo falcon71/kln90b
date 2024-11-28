@@ -88,7 +88,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
         }
 
         this.children = new UIElementChildren<Apt1PageTypes>({
-            activeArrow: new ActiveArrow(facility?.icao ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "A"),
@@ -159,7 +159,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
     protected changeFacility(fac: string | AirportFacility) {
         super.changeFacility(fac);
         this.children.get("apt").setValue(this.ident);
-        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icao ?? null;
+        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icaoStruct ?? null;
         this.children.get("coordOrNearestView").setFacility(this.facility);
         this.userAirport = null;
     }
@@ -197,7 +197,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
     private setLatitude(latitude: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility, fac => fac.lat = latitude);
+            this.props.facilityRepository.update(facility, fac => fac.lat = latitude);
         } else {
             this.userAirport!.lat = latitude;
             this.createIfReady();
@@ -207,7 +207,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
     private setLongitude(longitude: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility, fac => fac.lon = longitude);
+            this.props.facilityRepository.update(facility, fac => fac.lon = longitude);
         } else {
             this.userAirport!.lon = longitude;
             this.createIfReady();
@@ -240,7 +240,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
 
         this.facility = this.buildAirportFacility(this.userAirport!.lat, this.userAirport!.lon);
         try {
-            this.props.facilityLoader.facilityRepo.add(this.facility!);
+            this.props.facilityRepository.add(this.facility!);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
@@ -253,7 +253,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
         this.facility = this.buildAirportFacility(this.props.sensors.in.gps.coords.lat, this.props.sensors.in.gps.coords.lon);
 
         try {
-            this.props.facilityLoader.facilityRepo.add(this.facility!);
+            this.props.facilityRepository.add(this.facility!);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);

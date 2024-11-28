@@ -1,12 +1,18 @@
 import {Flightplan} from "../data/flightplan/Flightplan";
 import {Flightplanloader} from "./Flightplanloader";
 import {getUniqueIdent} from "../data/navdata/UniqueIdentGenerator";
-import {IcaoValue, UserFacility, UserFacilityType} from "@microsoft/msfs-sdk";
+import {EventBus, FacilityClient, IcaoValue, UserFacility, UserFacilityType} from "@microsoft/msfs-sdk";
 import {buildIcao, buildIcaoStruct, buildIcaoStructWithAirport, TEMPORARY_WAYPOINT} from "../data/navdata/IcaoBuilder";
 import {StatusLineMessageEvents} from "../controls/StatusLine";
+import {MessageHandler} from "../data/MessageHandler";
+import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
 
 export class FplFileimporter extends Flightplanloader {
 
+
+    constructor(bus: EventBus, facilityLoader: FacilityClient, private readonly facilityRepository: KLNFacilityRepository, messageHandler: MessageHandler) {
+        super(bus, facilityLoader, messageHandler);
+    }
 
     public async importFpl(): Promise<Flightplan> {
         return new Promise((resolve, reject) => {
@@ -129,7 +135,7 @@ export class FplFileimporter extends Flightplanloader {
             console.log("Adding temporary user waypoint", facility);
 
             try {
-                this.facilityLoader.facilityRepo.add(facility);
+                this.facilityRepository.add(facility);
                 return facility.icaoStruct;
             } catch (e) {
                 this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");

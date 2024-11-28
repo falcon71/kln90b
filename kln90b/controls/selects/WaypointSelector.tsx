@@ -2,6 +2,7 @@ import {SelectField} from "./SelectField";
 import {
     EventBus,
     Facility,
+    FacilityClient,
     FacilitySearchType,
     FacilityType,
     FSComponent,
@@ -10,7 +11,6 @@ import {
 } from "@microsoft/msfs-sdk";
 import {UiElement, UIElementChildren} from "../../pages/Page";
 import {StatusLineMessageEvents} from "../StatusLine";
-import {KLNFacilityLoader} from "../../data/navdata/KLNFacilityLoader";
 
 
 export type WaypointFieldsetTypes = {
@@ -32,7 +32,7 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
 
     protected constructor(bus: EventBus,
                           private ident: string,
-                          private facilityLoader: KLNFacilityLoader,
+                          private facilityLoader: FacilityClient,
                           private readonly length: number,
                           private readonly facilitySearchType: FacilitySearchType,
                           private readonly changedCallback: (facility: T | string) => void) {

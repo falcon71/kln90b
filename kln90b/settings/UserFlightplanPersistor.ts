@@ -1,12 +1,12 @@
-import {DefaultUserSettingManager, EventBus, ICAO} from "@microsoft/msfs-sdk";
+import {DefaultUserSettingManager, EventBus, FacilityClient, ICAO} from "@microsoft/msfs-sdk";
 import {KLN90BUserFlightplansSettings, KLN90BUserFlightplansTypes} from "./KLN90BUserFlightplans";
 import {Flightplan, FlightplanEvents, KLNFlightplanLeg} from "../data/flightplan/Flightplan";
-import {KLNFacilityLoader} from "../data/navdata/KLNFacilityLoader";
 import {AsoboFlightplanLoader} from "./AsoboFlightplanLoader";
 import {MessageHandler} from "../data/MessageHandler";
 import {AsoboFlightplanSaver} from "./AsoboFlightplanSaver";
 import {KLN90PlaneSettings} from "./KLN90BPlaneSettings";
 import {Flightplanloader} from "../services/Flightplanloader";
+import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
 
 /**
  * In the real unit, FPL 0 is also persisted: https://youtu.be/S1lt2W95bLA?t=181
@@ -16,8 +16,7 @@ export class UserFlightplanPersistor extends Flightplanloader {
     private manager: DefaultUserSettingManager<KLN90BUserFlightplansTypes>;
     private asoboFlightplanSaver: AsoboFlightplanSaver = new AsoboFlightplanSaver();
 
-
-    constructor(bus: EventBus, facilityLoader: KLNFacilityLoader, messageHandler: MessageHandler, private readonly planeSettings: KLN90PlaneSettings) {
+    constructor(bus: EventBus, facilityLoader: FacilityClient, private readonly facilityRepository: KLNFacilityRepository, messageHandler: MessageHandler, private readonly planeSettings: KLN90PlaneSettings) {
         super(bus, facilityLoader, messageHandler);
         bus.getSubscriber<FlightplanEvents>().on("flightplanChanged").handle(this.persistFlightplan.bind(this));
         this.manager = KLN90BUserFlightplansSettings.getManager(bus);
@@ -31,7 +30,7 @@ export class UserFlightplanPersistor extends Flightplanloader {
     public async restoreFlightplan(idx: number): Promise<Flightplan> {
         if (idx === 0) {
             try {
-                return new AsoboFlightplanLoader(this.bus, this.facilityLoader, this.messageHandler).loadAsoboFlightplan();
+                return new AsoboFlightplanLoader(this.bus, this.facilityLoader, this.facilityRepository, this.messageHandler).loadAsoboFlightplan();
             } catch (e) {
                 console.log("Error restoring fpl 0", e);
                 throw e;
@@ -47,7 +46,7 @@ export class UserFlightplanPersistor extends Flightplanloader {
                 return new Flightplan(idx, [], this.bus);
             }
 
-            const serializedLegs = serialized.match(/.{1,12}/g)!.map(ICAO.stringV2ToValue);
+            const serializedLegs = serialized.match(/.{1,19}/g)!.map(ICAO.stringV2ToValue);
             return await this.loadIcaos(serializedLegs, idx);
         } catch (e) {
             console.log(`Error restoring fpl ${idx}`, e);

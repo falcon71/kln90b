@@ -1,4 +1,4 @@
-import {Facility, FacilityType, ICAO} from "@microsoft/msfs-sdk";
+import {Facility, FacilityType, FacilityUtils} from "@microsoft/msfs-sdk";
 
 export const STATEMAP: { [key: string]: string } = {
     Alaska: "AK",
@@ -334,7 +334,7 @@ export function getRegionOrCountry(facility: Facility) {
 
 export function getCountry(facility: Facility) {
     let region = facility.region;
-    if (ICAO.getFacilityTypeFromValue(facility.icaoStruct) === FacilityType.Airport) {
+    if (FacilityUtils.isFacilityType(facility, FacilityType.Airport)) {
         region = facility.icaoStruct.ident.substring(0, 2);
     }
 

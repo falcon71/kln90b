@@ -57,7 +57,7 @@ export class Apt3ListPageContainer extends WaypointPage<AirportFacility> {
         const facility = unpackFacility(this.facility);
 
         this.children = new UIElementChildren<Apt3ListPageTypes>({
-            activeArrow: new ActiveArrow(facility?.icao ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, changeFacilityCallback),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "A"),
@@ -95,7 +95,7 @@ export class Apt3ListPageContainer extends WaypointPage<AirportFacility> {
     public changeFacility(fac: string | AirportFacility) {
         super.changeFacility(fac);
         this.children.get("apt").setValue(this.ident);
-        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icao ?? null;
+        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icaoStruct ?? null;
         this.currentPage = 0;
         this.userPage.changeFacility(fac);
         this.listPage.changeFacility(fac);

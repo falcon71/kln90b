@@ -60,7 +60,7 @@ export class NdbPage extends WaypointPage<NdbFacility> {
         }
 
         this.children = new UIElementChildren<NdbPageTypes>({
-            activeArrow: new ActiveArrow(facility?.icao ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             ndb: new NdbSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "N"),
@@ -96,7 +96,7 @@ export class NdbPage extends WaypointPage<NdbFacility> {
     protected changeFacility(fac: string | NdbFacility) {
         super.changeFacility(fac);
         this.children.get("ndb").setValue(this.ident);
-        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icao ?? null;
+        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icaoStruct ?? null;
         this.children.get("coordOrNearestView").setFacility(this.facility);
         this.userNdb = {
             freq: null,
@@ -136,7 +136,7 @@ export class NdbPage extends WaypointPage<NdbFacility> {
     private setNdbFrequency(freq: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.freqMHz = freq);
+            this.props.facilityRepository.update(facility!, fac => fac.freqMHz = freq);
         } else {
             this.userNdb.freq = freq;
             this.createIfReady();
@@ -146,7 +146,7 @@ export class NdbPage extends WaypointPage<NdbFacility> {
     private setLatitude(latitude: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.lat = latitude);
+            this.props.facilityRepository.update(facility!, fac => fac.lat = latitude);
         } else {
             this.userNdb.lat = latitude;
             this.createIfReady();
@@ -156,7 +156,7 @@ export class NdbPage extends WaypointPage<NdbFacility> {
     private setLongitude(longitude: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.lon = longitude);
+            this.props.facilityRepository.update(facility!, fac => fac.lon = longitude);
         } else {
             this.userNdb.lon = longitude;
             this.createIfReady();
@@ -189,7 +189,7 @@ export class NdbPage extends WaypointPage<NdbFacility> {
             bfoRequired: false,
         };
         try {
-            this.props.facilityLoader.facilityRepo.add(this.facility);
+            this.props.facilityRepository.add(this.facility);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);

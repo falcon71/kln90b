@@ -1,5 +1,5 @@
 import {Flightplan} from "../data/flightplan/Flightplan";
-import {FacilityType, ICAO} from "@microsoft/msfs-sdk";
+import {FacilityType, FacilityUtils, ICAO} from "@microsoft/msfs-sdk";
 
 export class AsoboFlightplanSaver {
 
@@ -14,15 +14,15 @@ export class AsoboFlightplanSaver {
 
             //The order is important. SET_DESTINATION clears all waypoints
             if (legs.length >= 0) {
-                if (ICAO.getFacilityTypeFromValue(legs[0].wpt.icaoStruct) === FacilityType.Airport) {
+                if (FacilityUtils.isFacilityType(legs[0].wpt, FacilityType.Airport)) {
                     console.log("SET_ORIGIN", legs[0].wpt.icaoStruct);
                     await Coherent.call('SET_ORIGIN', legs[0].wpt.icaoStruct, false);
                 }
 
-                const lastWptIcao = legs[legs.length - 1].wpt.icaoStruct;
-                if (ICAO.getFacilityTypeFromValue(lastWptIcao) === FacilityType.Airport) {
-                    console.log("SET_DESTINATION", lastWptIcao);
-                    await Coherent.call('SET_DESTINATION', lastWptIcao, false);
+                const lastWpt = legs[legs.length - 1].wpt;
+                if (FacilityUtils.isFacilityType(lastWpt, FacilityType.Airport)) {
+                    console.log("SET_DESTINATION", lastWpt.icaoStruct);
+                    await Coherent.call('SET_DESTINATION', lastWpt.icaoStruct, false);
                 }
 
 

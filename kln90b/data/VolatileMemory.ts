@@ -2,6 +2,7 @@ import {
     AirportFacility,
     EventBus,
     Facility,
+    FacilityClient,
     FacilityType,
     IntersectionFacility,
     NdbFacility,
@@ -9,7 +10,6 @@ import {
     UserFacility,
     VorFacility,
 } from "@microsoft/msfs-sdk";
-import {KLNFacilityLoader} from "./navdata/KLNFacilityLoader";
 import {Scanlists} from "./navdata/Scanlist";
 import {NearestWpt} from "./navdata/NearestList";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
@@ -209,7 +209,7 @@ export class VolatileMemory {
 
     public isReady = false;
 
-    public constructor(bus: EventBus, userSettings: KLN90BUserSettings, private facilityLoader: KLNFacilityLoader, sensors: Sensors, private scanlists: Scanlists, flightplans: Flightplan[], lastactiveWaypoint: Facility | null) {
+    public constructor(bus: EventBus, userSettings: KLN90BUserSettings, private facilityLoader: FacilityClient, sensors: Sensors, private scanlists: Scanlists, flightplans: Flightplan[], lastactiveWaypoint: Facility | null) {
         this.navPage = new NavPageState(userSettings, sensors, flightplans[0], lastactiveWaypoint);
         this.fplPage = {
             flightplans,

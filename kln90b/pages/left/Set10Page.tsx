@@ -75,7 +75,7 @@ class Set10BasicPage extends SixLineHalfPage {
 
     readonly name: string = "SET10";
 
-    private readonly fplImporter = new FplFileimporter(this.props.bus, this.props.facilityLoader, this.props.messageHandler);
+    private readonly fplImporter = new FplFileimporter(this.props.bus, this.props.facilityLoader, this.props.facilityRepository, this.props.messageHandler);
 
     constructor(props: PageProps, setPage: (page: SixLineHalfPage) => void) {
         super(props);
@@ -135,7 +135,7 @@ class Set10ImportFplFilePage extends SixLineHalfPage {
 
     readonly name: string = "SET10";
 
-    private readonly fplImporter = new FplFileimporter(this.props.bus, this.props.facilityLoader, this.props.messageHandler);
+    private readonly fplImporter = new FplFileimporter(this.props.bus, this.props.facilityLoader, this.props.facilityRepository, this.props.messageHandler);
 
     constructor(props: PageProps, private readonly setPage: (page: SixLineHalfPage) => void) {
         super(props);
