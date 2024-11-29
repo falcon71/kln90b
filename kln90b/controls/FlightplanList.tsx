@@ -178,7 +178,7 @@ class ChangeProcedureListItem implements ListItem {
                 private readonly facility: AirportFacility,
                 private readonly type: KLNLegType,
                 navState: NavPageState,
-                private readonly procedureName: string,
+                private readonly procedureDisplayName: string,
                 private readonly removeProcedure: (type: KLNLegType) => void,
                 private readonly changeProcedure: (facility: AirportFacility, type: KLNLegType) => void,
     ) {
@@ -191,7 +191,7 @@ class ChangeProcedureListItem implements ListItem {
     public render(): VNode {
         return (
             <span ref={this.ref}>{this.children.get("arrow").render()}<span
-                ref={this.innerRef}>{this.procedureName}</span></span>);
+                ref={this.innerRef}>{this.procedureDisplayName}</span></span>);
     }
 
 
@@ -264,7 +264,7 @@ class ChangeProcedureListItem implements ListItem {
             }
         } else {
             this.children.get("arrow").isVisible = true;
-            this.innerRef.instance.textContent = this.procedureName;
+            this.innerRef.instance.textContent = this.procedureDisplayName;
             this.ref.instance.classList.remove("inverted", "inverted-blink");
         }
     }
@@ -365,7 +365,7 @@ class EditableFlightplan {
             leg = {
                 wpt: wpt as any, //We will fill leg once we are done in insertLeg
                 type: prev.leg.type,
-                procedureName: prev.leg.procedureName,
+                procedure: prev.leg.procedure,
                 parentFacility: prev.leg.parentFacility,
             }
         }
@@ -403,7 +403,7 @@ class EditableFlightplan {
 
         for (let i = 0; i < this.legs.length; i++) {
             const leg = this.legs[i];
-            if (leg.leg !== undefined && leg.leg.procedureName !== undefined && (i === 0 || leg.leg.procedureName !== this.legs[i - 1].leg?.procedureName)) {
+            if (leg.leg !== undefined && leg.leg.procedure?.displayName !== undefined && (i === 0 || leg.leg.procedure.displayName !== this.legs[i - 1].leg?.procedure?.displayName)) {
                 numActiveFields++;
                 listItems.push(new ChangeProcedureListItem(
                     this.cursorController,
@@ -411,7 +411,7 @@ class EditableFlightplan {
                     leg.leg.parentFacility!,
                     leg.leg.type,
                     this.props.memory.navPage,
-                    leg.leg.procedureName,
+                    leg.leg.procedure.displayName,
                     this.removeProcedure.bind(this),
                     this.changeProcedure.bind(this),
                 ));

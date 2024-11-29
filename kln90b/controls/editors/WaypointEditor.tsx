@@ -1,5 +1,5 @@
 import {Editor, Rawvalue} from "./Editor";
-import {Facility, FacilitySearchType, FSComponent, ICAO, VNode} from "@microsoft/msfs-sdk";
+import {Facility, FacilitySearchType, FSComponent, VNode} from "@microsoft/msfs-sdk";
 import {AlphabetEditorField, EditorField, EditorFieldValue} from "./EditorField";
 import {PageProps, PageSide} from "../../pages/Page";
 import {MainPage} from "../../pages/MainPage";
@@ -200,9 +200,9 @@ export class WaypointEditor extends Editor<Facility | null> {
             .map(f => f.charset[f.value!])
             .join("");
 
-        const values = await this.props.facilityLoader.searchByIdent(FacilitySearchType.All, ident, 1);
+        const values = await this.props.facilityLoader.searchByIdentWithIcaoStructs(FacilitySearchType.All, ident, 1);
         if (values.length > 0) {
-            ident = ICAO.getIdentFromStringV1(values[0]);
+            ident = values[0].ident;
         }
         ident = ident.padEnd(5, " ");
 

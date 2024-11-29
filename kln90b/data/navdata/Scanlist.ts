@@ -92,7 +92,7 @@ export class FacilityLoaderScanlist implements Scanlist {
         await this.rebuildIndex();
         this.lastIcao = this.index[0];
         this.listManangerJob = this.startListManager();
-        return this.index[0];
+        return this.index.length > 0 ? this.index[0] : null;
     }
 
     /**
@@ -201,14 +201,14 @@ export class FacilityLoaderScanlist implements Scanlist {
                 }
                 this.log(`${this.facilitySearchType} : Searching for ${ident}`);
                 const sizeBefore = this.icaoListCache.length;
-                const results = await this.facilityLoader.searchByIdent(this.facilitySearchType, ident, targetSizeForExtension - sizeBeforeCurrent);
+                const results = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, ident, targetSizeForExtension - sizeBeforeCurrent);
                 if (jobId !== this.lastManangerJobId) {
                     //Happens, when we use the index, that one does not wait for this job to finish
                     this.log(`${this.facilitySearchType}: filling of list canceled`);
                     return;
                 }
                 this.cacheValidFromIdent = ident;
-                this.icaoListCache = this.addResultToCache(results.map(ICAO.stringV1ToValue));
+                this.icaoListCache = this.addResultToCache(results);
                 sizeBeforeCurrent += this.icaoListCache.length - sizeBefore;
             }
 
@@ -231,14 +231,14 @@ export class FacilityLoaderScanlist implements Scanlist {
                 }
                 this.log(`${this.facilitySearchType} : Searching for ${ident}`);
                 const sizeBefore = this.icaoListCache.length;
-                const results = await this.facilityLoader.searchByIdent(this.facilitySearchType, ident, targetSizeForExtension - sizeAfterCurrent);
+                const results = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, ident, targetSizeForExtension - sizeAfterCurrent);
                 if (jobId !== this.lastManangerJobId) {
                     //Happens, when we use the index, that one does not wait for this job to finish
                     this.log(`${this.facilitySearchType}: filling of list canceled`);
                     return;
                 }
                 this.cacheValidToIdent = ident;
-                this.icaoListCache = this.addResultToCache(results.map(ICAO.stringV1ToValue));
+                this.icaoListCache = this.addResultToCache(results);
                 sizeAfterCurrent += this.icaoListCache.length - sizeBefore;
                 if (this.icaoListCache.length > 0) {
                     this.cacheValidToIdent = this.icaoListCache[this.icaoListCache.length - 1].ident;
@@ -327,17 +327,17 @@ export class FacilityLoaderScanlist implements Scanlist {
     private async rebuildIndex(): Promise<IcaoValue[]> {
         this.index = [];
         for (let i = 0; i < CHARSET.length; i++) {
-            const res = await this.facilityLoader.searchByIdent(this.facilitySearchType, CHARSET[i], 1);
+            const res = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, CHARSET[i], 1);
             if (res.length > 0) {
-                this.index.push(ICAO.stringV1ToValue(res[0]));
+                this.index.push(res[0]);
             }
         }
 
         //Now we just need to find the very last navaid
         if (this.index.length > 0) {
             const lastResult = this.index[this.index.length - 1];
-            const res = await this.facilityLoader.searchByIdent(this.facilitySearchType, lastResult.ident.substring(0, 1), 1000);
-            const lastEntry = ICAO.stringV1ToValue(res[res.length - 1]);
+            const res = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, lastResult.ident.substring(0, 1), 1000);
+            const lastEntry = res[res.length - 1];
             if (!ICAO.valueEquals(lastEntry, lastResult)) {
                 this.index.push(lastEntry);
             }

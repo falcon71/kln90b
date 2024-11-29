@@ -1,12 +1,9 @@
 import {
     BitFlags,
     BoundaryType,
-    Facility,
-    FacilitySearchType,
     FacilityType,
     FacilityUtils,
     FSComponent,
-    ICAO,
     LodBoundary,
     NodeReference,
     UnitType,
@@ -21,12 +18,12 @@ import {MainPage} from "../MainPage";
 import {FplPage} from "../left/FplPage";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {AirspaceIntersection, airspaceIntersectionsAlongRoute} from "../../services/AirspacesAlongRoute";
-import {format} from "numerable";
 import {CtrState} from "../../data/VolatileMemory";
 import {KLNLegType} from "../../data/flightplan/Flightplan";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
 import {insertLegIntoFpl} from "../../services/FlightplanUtils";
 import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {getUniqueIdentWithNumbers} from "../../data/navdata/UniqueIdentGenerator";
 
 type Ctr1PageTypes = {
     newWpts: TextDisplay;
@@ -267,7 +264,7 @@ export class Ctr1Page extends SixLineHalfPage {
             return null;
         }
 
-        const ident = await this.getUniqueIdent(closestVor);
+        const ident = await getUniqueIdentWithNumbers(closestVor.icaoStruct.ident, this.props.facilityLoader);
         if (ident === null) {
             return null;
         }
@@ -303,19 +300,6 @@ export class Ctr1Page extends SixLineHalfPage {
             airspaceTo: intersection.airspaceTo,
             wpt: facility,
         };
-    }
-
-    private async getUniqueIdent(wpt: Facility): Promise<string | null> {
-        const start = wpt.icaoStruct.ident;
-        const existing = await this.props.facilityLoader.searchByIdent(FacilitySearchType.All, start, 100);
-        const existingIdents = existing.map(ICAO.getIdentFromStringV1);
-        for (let i = 0; i < 100; i++) {
-            const checkIdent = start + format(i, "00");
-            if (!existingIdents.includes(checkIdent)) {
-                return checkIdent;
-            }
-        }
-        return null;
     }
 
 

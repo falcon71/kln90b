@@ -243,7 +243,7 @@ export class UserWaypointPersistor {
             secondaryBlastpadLength: 0,
             primaryILSFrequency: {
                 icao: "",
-                icaoStruct: {__Type: "JS_ICAO", type: "", ident: "", airport: "", region: ""},
+                icaoStruct: ICAO.emptyValue(),
                 name: "",
                 freqMHz: 0,
                 freqBCD16: 0,
@@ -261,7 +261,7 @@ export class UserWaypointPersistor {
             },
             secondaryILSFrequency: {
                 icao: "",
-                icaoStruct: {__Type: "JS_ICAO", type: "", ident: "", airport: "", region: ""},
+                icaoStruct: ICAO.emptyValue(),
                 name: "",
                 freqMHz: 0,
                 freqBCD16: 0,
@@ -344,7 +344,7 @@ export class UserWaypointPersistor {
             city: "",
             routes: [],
             nearestVorICAO: "",
-            nearestVorICAOStruct: {__Type: "JS_ICAO", type: "", ident: "", airport: "", region: ""},
+            nearestVorICAOStruct: ICAO.emptyValue(),
             nearestVorType: VorType.Unknown,
             nearestVorFrequencyBCD16: 0,
             nearestVorFrequencyMHz: 0,

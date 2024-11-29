@@ -4,6 +4,7 @@ import {
     FacilityFrequencyType,
     FSComponent,
     GpsBoolean,
+    ICAO,
     LandingSystemCategory,
     NodeReference,
     RunwayLightingType,
@@ -301,7 +302,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
                 secondaryBlastpadLength: 0,
                 primaryILSFrequency: {
                     icao: "",
-                    icaoStruct: {__Type: "JS_ICAO", type: "", ident: "", airport: "", region: ""},
+                    icaoStruct: ICAO.emptyValue(),
                     name: "",
                     freqMHz: 0,
                     freqBCD16: 0,
@@ -319,7 +320,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
                 },
                 secondaryILSFrequency: {
                     icao: "",
-                    icaoStruct: {__Type: "JS_ICAO", type: "", ident: "", airport: "", region: ""},
+                    icaoStruct: ICAO.emptyValue(),
                     name: "",
                     freqMHz: 0,
                     freqBCD16: 0,

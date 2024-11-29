@@ -11,7 +11,6 @@ import {
     NearestAirportSearchSession,
     NearestIcaoSearchSessionDataType,
     NearestSearchSessionTypeMap,
-    RunwaySurfaceCategory,
     RunwaySurfaceType,
     UnitType,
     VorClass,
@@ -155,7 +154,6 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
 
     private getSurfaceMask(surfaceType: boolean): number {
         let surfaceTypeMask;
-        let surfaceCategory: number;
         switch (surfaceType) {
             case SURFACE_HRD_SFT:
                 surfaceTypeMask = BitFlags.union(
@@ -179,10 +177,6 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
                     BitFlags.createFlag(RunwaySurfaceType.ShortGrass),
                     BitFlags.createFlag(RunwaySurfaceType.LongGrass),
                 );
-                surfaceCategory = BitFlags.union(
-                    RunwaySurfaceCategory.Hard,
-                    RunwaySurfaceCategory.Soft,
-                );
                 break;
             case SURFACE_HRD:
                 surfaceTypeMask = BitFlags.union(
@@ -192,7 +186,6 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
                     BitFlags.createFlag(RunwaySurfaceType.Brick),
                     BitFlags.createFlag(RunwaySurfaceType.Bituminous),
                 );
-                surfaceCategory = RunwaySurfaceCategory.Hard;
                 break;
         }
         return surfaceTypeMask;

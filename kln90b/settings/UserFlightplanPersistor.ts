@@ -1,9 +1,7 @@
 import {DefaultUserSettingManager, EventBus, FacilityClient, ICAO} from "@microsoft/msfs-sdk";
 import {KLN90BUserFlightplansSettings, KLN90BUserFlightplansTypes} from "./KLN90BUserFlightplans";
-import {Flightplan, FlightplanEvents, KLNFlightplanLeg} from "../data/flightplan/Flightplan";
-import {AsoboFlightplanLoader} from "./AsoboFlightplanLoader";
+import {Flightplan, FlightplanEvents, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
 import {MessageHandler} from "../data/MessageHandler";
-import {AsoboFlightplanSaver} from "./AsoboFlightplanSaver";
 import {KLN90PlaneSettings} from "./KLN90BPlaneSettings";
 import {Flightplanloader} from "../services/Flightplanloader";
 import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
@@ -14,7 +12,6 @@ import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
  */
 export class UserFlightplanPersistor extends Flightplanloader {
     private manager: DefaultUserSettingManager<KLN90BUserFlightplansTypes>;
-    private asoboFlightplanSaver: AsoboFlightplanSaver = new AsoboFlightplanSaver();
 
     constructor(bus: EventBus, facilityLoader: FacilityClient, private readonly facilityRepository: KLNFacilityRepository, messageHandler: MessageHandler, private readonly planeSettings: KLN90PlaneSettings) {
         super(bus, facilityLoader, messageHandler);
@@ -28,16 +25,8 @@ export class UserFlightplanPersistor extends Flightplanloader {
     }
 
     public async restoreFlightplan(idx: number): Promise<Flightplan> {
-        if (idx === 0) {
-            try {
-                return new AsoboFlightplanLoader(this.bus, this.facilityLoader, this.facilityRepository, this.messageHandler).loadAsoboFlightplan();
-            } catch (e) {
-                console.log("Error restoring fpl 0", e);
-                throw e;
-            }
-        }
         try {
-            const setting = this.manager.getSetting(`fpl${idx - 1}`);
+            const setting = this.manager.getSetting(`fpl${idx}`);
 
             const serialized = setting.get();
             console.log(`restoring flightplan ${idx}`, serialized);
@@ -55,16 +44,13 @@ export class UserFlightplanPersistor extends Flightplanloader {
     }
 
     private persistFlightplan(fpl: Flightplan) {
-        if (fpl.idx === 0 && this.planeSettings.output.writeGPSSimVars) {
-            this.asoboFlightplanSaver.saveToAsoboFlightplan(fpl);
-            return;
-        }
-
-        const setting = this.manager.getSetting(`fpl${fpl.idx - 1}`);
+        const setting = this.manager.getSetting(`fpl${fpl.idx}`);
 
         let serialized = "";
         for (const leg of fpl.getLegs()) {
-            serialized += this.serializeLeg(leg)
+            if (leg.type === KLNLegType.USER) {
+                serialized += this.serializeLeg(leg);
+            }
         }
         console.log("persisting flightplan", fpl, serialized);
         setting.set(serialized);

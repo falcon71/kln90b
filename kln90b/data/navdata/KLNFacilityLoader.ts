@@ -38,7 +38,10 @@ import {KLNFacilityRepository, KLNRepoSearchableFacilityTypes} from "./KLNFacili
  * This is an adaption the class NearestUserFacilitySearchSession from the SDK. That class can unfortunately only
  * search for USR waypoints, but we need to search for all waypoint types.
  */
-class KLNNearestRepoFacilitySearchSession<T extends Facility> implements NearestSearchSession<IcaoValue, IcaoValue> {
+class KLNNearestRepoFacilitySearchSession<T extends Facility> implements NearestIcaoSearchSession<NearestIcaoSearchSessionDataType.Struct> {
+
+    public readonly icaoDataType = NearestIcaoSearchSessionDataType.Struct;
+
     protected filter: GeoKdTreeSearchFilter<T> | undefined = undefined;
 
     private readonly cachedResults = new Set<IcaoValue>();
@@ -93,6 +96,7 @@ class KLNNearestRepoFacilitySearchSession<T extends Facility> implements Nearest
     public seFacilityFilter(filter?: GeoKdTreeSearchFilter<T>): void {
         this.filter = filter;
     }
+
 }
 
 
@@ -128,7 +132,7 @@ class KLNCoherentNearestSearchSession<TFacility extends Facility, TCoherent exte
 }
 
 /**
- * A session for searching for nearest user facilities.
+ * A session for searching for nearest Airports.
  */
 export class KLNNearestAirportFacilitySearchSession extends KLNCoherentNearestSearchSession<AirportFacility, NearestAirportSearchSession<NearestIcaoSearchSessionDataType.Struct>> implements NearestAirportFilteredSearchSession<NearestIcaoSearchSessionDataType.Struct> {
 
@@ -291,52 +295,22 @@ export class KLNFacilityLoader implements FacilityClient {
             }
         }, repoType);
 
+        results.sort((a, b) => a.ident.localeCompare(b.ident));
+
         return results;
     }
 
-    /** @inheritDoc */
-    public async searchByIdent(filter: FacilitySearchType, ident: string, maxItems = 40): Promise<string[]> {
-        const results = await this.actualFacilityLoader.searchByIdent(filter, ident, maxItems);
-
-        let repoType: FacilityType[] | undefined;
-        switch (filter) {
-            case FacilitySearchType.Airport:
-                repoType = [FacilityType.Airport];
-                break;
-            case FacilitySearchType.User:
-                repoType = [FacilityType.USR];
-                break;
-            case FacilitySearchType.Vor:
-                repoType = [FacilityType.VOR];
-                break;
-            case FacilitySearchType.Intersection:
-                repoType = [FacilityType.Intersection];
-                break;
-            case FacilitySearchType.Ndb:
-                repoType = [FacilityType.NDB];
-                break;
-            case FacilitySearchType.All:
-                repoType = undefined;
-                break;
-            default:
-                throw new Error(`Unsupported SearchType:${filter}`);
-        }
-
-        this.facilityRepo.forEach(fac => {
-            const facIdent = ICAO.getIdent(fac.icao);
-
-            if (facIdent === ident) {
-                results.unshift(fac.icao);
-            } else if (facIdent.startsWith(ident)) {
-                results.push(fac.icao);
-            }
-        }, repoType);
-        return results;
-    }
 
     /** @inheritDoc */
-    public async findNearestFacilitiesByIdent<T extends FacilitySearchTypeLatLon>(filter: T, ident: string, lat: number, lon: number, maxItems = 40): Promise<SearchTypeMap[T][]> {
-        const results = await this.searchByIdent(filter, ident, maxItems);
+    public async findNearestFacilitiesByIdent<T extends FacilitySearchTypeLatLon>(
+        filter: T,
+        ident: string,
+        lat: number,
+        lon: number,
+        maxItems = 40,
+    ): Promise<SearchTypeMap[T][]> {
+
+        const results = await this.searchByIdentWithIcaoStructs(filter, ident, maxItems);
 
         if (!results) {
             return [];
@@ -346,10 +320,8 @@ export class KLNFacilityLoader implements FacilityClient {
 
         for (let i = 0; i < results.length; i++) {
             const icao = results[i];
-            const facIdent = ICAO.getIdent(icao);
-            if (facIdent === ident) {
-                const facType = ICAO.getFacilityType(icao);
-                // noinspection ES6MissingAwait
+            if (icao.ident === ident) {
+                const facType = ICAO.getFacilityTypeFromValue(icao);
                 promises.push(this.getFacility(facType, icao) as Promise<SearchTypeMap[T]>);
             }
         }
@@ -370,6 +342,11 @@ export class KLNFacilityLoader implements FacilityClient {
         return this.actualFacilityLoader.awaitInitialization();
     }
 
+    /** @inheritDoc */
+    public async searchByIdent(filter: FacilitySearchType, ident: string, maxItems = 40): Promise<string[]> {
+        throw new Error("searchByIdent is not implemented");
+    }
+
     public getAirway(airwayName: string, airwayType: number, icao: IcaoValue): Promise<AirwayData>
 
     public getAirway(airwayName: string, airwayType: number, icao: string): Promise<AirwayData>;
@@ -383,7 +360,7 @@ export class KLNFacilityLoader implements FacilityClient {
     public getMetar(ident: string): Promise<Metar | undefined>;
 
     public getMetar(airport: AirportFacility | string): Promise<Metar | undefined> {
-        throw new Error("getAirway is not implemented");
+        throw new Error("getMetar is not implemented");
     }
 
     public getTaf(airport: AirportFacility): Promise<Taf | undefined>;
@@ -391,23 +368,23 @@ export class KLNFacilityLoader implements FacilityClient {
     public getTaf(ident: string): Promise<Taf | undefined>;
 
     public getTaf(airport: AirportFacility | string): Promise<Taf | undefined> {
-        throw new Error("getAirway is not implemented");
+        throw new Error("getTaf is not implemented");
     }
 
     public searchMetar(lat: number, lon: number): Promise<Metar | undefined> {
-        throw new Error("getAirway is not implemented");
+        throw new Error("searchMetar is not implemented");
     }
 
     public searchTaf(lat: number, lon: number): Promise<Taf | undefined> {
-        throw new Error("getAirway is not implemented");
+        throw new Error("searchTaf is not implemented");
     }
 
     public startNearestSearchSession<T extends FacilitySearchType>(type: T): Promise<NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.StringV1>[T]> {
-        throw new Error("getAirway is not implemented");
+        throw new Error("startNearestSearchSession is not implemented");
     }
 
     public tryGetAirway(airwayName: string, airwayType: number, icao: IcaoValue): Promise<AirwayData | null> {
-        throw new Error("getAirway is not implemented");
+        throw new Error("tryGetAirway is not implemented");
     }
 
     /**

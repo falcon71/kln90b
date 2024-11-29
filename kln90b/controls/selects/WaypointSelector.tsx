@@ -99,7 +99,7 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
         this.ident = enteredIdent;
 
         //console.log("searching for", enteredIdent);
-        this.facilityLoader.searchByIdent(this.facilitySearchType, enteredIdent, 100).then(async icaos => {
+        this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, enteredIdent, 100).then(async icaos => {
             if (this.ident !== enteredIdent) {
                 console.log("cancelled searchByIdent", this.ident, enteredIdent); //The user changed the value quicker than we could search for facilities. Another search will already be underway
                 return;

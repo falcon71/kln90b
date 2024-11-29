@@ -89,7 +89,8 @@ import {KeyboardEvent, KeyboardEventData} from "./controls/StatusLine";
 import {ErrorEvent} from "./controls/ErrorPage";
 import {SignalOutputFillterTick} from "./services/SignalOutputFillterTick";
 import {RollSteeringController} from "./services/RollSteeringController";
-import {KlnEfbManager} from "./services/KlnEfbManager";
+import {KlnEfbSaver} from "./services/KlnEfbSaver";
+import {KlnEfbLoader} from "./services/KlnEfbLoader";
 
 export interface PropsReadyEvent {
     propsReady: PageProps;
@@ -123,7 +124,8 @@ class KLN90B extends BaseInstrument {
     private temporaryWaypointDeleter: TemporaryWaypointDeleter | undefined;
     private readonly messageHandler: MessageHandler = new MessageHandler();
     private planeSettings: KLN90PlaneSettings | undefined;
-    private efbManager: KlnEfbManager | undefined;
+    private efbSaver: KlnEfbSaver | undefined;
+    private efbLoader: KlnEfbLoader | undefined;
 
 
     constructor() {
@@ -333,8 +335,11 @@ class KLN90B extends BaseInstrument {
             this.messageHandler.addMessage(new OneTimeMessage(["USER DATA LOST"]));
         }
 
+        const sidstar = new SidStar(facilityLoader, facilityRepository, sensors);
+
         FlightPlanRouteManager.getManager().then(manager => {
-            this.efbManager = new KlnEfbManager(this.planeSettings!, manager, flightplans[0]);
+            this.efbSaver = new KlnEfbSaver(this.planeSettings!, manager, flightplans[0]);
+            this.efbLoader = new KlnEfbLoader(manager, flightplans[0], facilityLoader, this.messageHandler, sidstar);
         });
 
         Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), msa.init(this.planeSettings.basePath)]).then(() => {
@@ -359,7 +364,7 @@ class KLN90B extends BaseInstrument {
                 modeController: modeController,
                 database: new Database(this.bus, sensors, this.messageHandler),
                 magvar: magvar,
-                sidstar: new SidStar(facilityLoader, facilityRepository, sensors),
+                sidstar: sidstar,
             };
 
             this.messageHandler.persistentMessages = buildPersistentMessages(props);

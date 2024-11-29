@@ -25,7 +25,7 @@ import {
     UserFacilityType,
     VorFacility,
 } from "@microsoft/msfs-sdk";
-import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "../flightplan/Flightplan";
+import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType, ProcedureInformation} from "../flightplan/Flightplan";
 import {Degrees, NauticalMiles} from "../Units";
 import {format} from "numerable";
 import {Sensors} from "../../Sensors";
@@ -49,7 +49,10 @@ export interface ArcData {
     circle: GeoCircle,
 }
 
+const B_RNAV = UnitType.NMILE.convertTo(5, UnitType.METER);
+
 export class SidStar {
+
 
 
     public constructor(private readonly facilityLoader: FacilityClient, private readonly facilityRepository: KLNFacilityRepository, private readonly sensors: Sensors) {
@@ -328,12 +331,12 @@ export class SidStar {
      */
     private static appIsBRnav(app: ApproachProcedure): boolean {
         for (const transition of app.transitions) {
-            if (transition.legs.some(leg => leg.rnp < 5)) {
+            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < B_RNAV)) {
                 return false;
             }
         }
 
-        return !app.finalLegs.concat(app.missedLegs).some(leg => leg.rnp < 5);
+        return !app.finalLegs.concat(app.missedLegs).some(leg => leg.rnp > 0 && leg.rnp < B_RNAV);
     }
 
     /**
@@ -343,17 +346,17 @@ export class SidStar {
      */
     private static procIsBRnav(proc: Procedure): boolean {
         for (const transition of proc.enRouteTransitions) {
-            if (transition.legs.some(leg => leg.rnp < 5)) {
+            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < B_RNAV)) {
                 return false;
             }
         }
         for (const transition of proc.runwayTransitions) {
-            if (transition.legs.some(leg => leg.rnp < 5)) {
+            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < B_RNAV)) {
                 return false;
             }
         }
 
-        return !proc.commonLegs.some(leg => leg.rnp < 5);
+        return !proc.commonLegs.some(leg => leg.rnp > 0 && leg.rnp < B_RNAV);
     }
 
     /**
@@ -414,7 +417,15 @@ export class SidStar {
 
         const cleaned = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
         const approachName = SidStar.formatApproachName(app, facility);
-        return await this.convertToKLN(facility, approachName, KLNLegType.APP, cleaned);
+        return await this.convertToKLN(facility, {
+            displayName: approachName,
+            procedureName: app.name,
+            approachSuffix: app.approachSuffix,
+            approachType: app.approachType,
+            transition: iaf?.name,
+            runwayNumber: app.runwayNumber,
+            runwayDesignator: app.runwayDesignator,
+        }, KLNLegType.APP, cleaned);
     }
 
     private filterOutDuplicates(legs: FlightPlanLeg[]): FlightPlanLeg[] {
@@ -480,64 +491,6 @@ export class SidStar {
     }
 
     /**
-     * Converts the FlightPlanLegs to KLNFlightplanLegs.
-     * Also resolves DME Arc entries.
-     * @param facility
-     * @param procedureName
-     * @param legType
-     * @param legs
-     * @private
-     */
-    private async convertToKLN(facility: AirportFacility, procedureName: string, legType: KLNLegType, legs: FlightPlanLeg[]): Promise<KLNFlightplanLeg[]> {
-        const promises = legs.map(leg =>
-            this.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(leg.fixIcaoStruct), leg.fixIcaoStruct).then(fac => ({
-                    leg: leg,
-                    facility: fac,
-                }),
-            ));
-
-
-        const enriched = await Promise.all(promises);
-        const klnLegs: KLNFlightplanLeg[] = [];
-
-        for (const enrichedLeg of enriched) {
-            if (enrichedLeg.leg.type === LegType.AF) {
-                //Entry here and exits below for arcs
-
-                //The KLN calculates its own entry
-                const originalEntry = klnLegs.pop()!;
-
-
-                const arcData = await this.getArcEntryData(enrichedLeg);
-                klnLegs.push({
-                    wpt: arcData.entryFacility,
-                    type: legType,
-                    parentFacility: facility,
-                    procedureName: procedureName,
-                    arcData: arcData,
-                    fixType: originalEntry.fixType,
-                    flyOver: enrichedLeg.leg.flyOver,
-                });
-            }
-
-
-            const askObs = this.shouldAskObs(enrichedLeg.leg.type);
-            klnLegs.push({
-                wpt: enrichedLeg.facility,
-                type: legType,
-                parentFacility: facility,
-                procedureName: procedureName,
-                flyOver: enrichedLeg.leg.flyOver || askObs,
-                askObs: askObs,
-                fixType: this.getKLNFixType(enrichedLeg.leg),
-            });
-
-        }
-        return klnLegs;
-
-    }
-
-    /**
      * Builds the list of legs.
      * Filters out duplicates and legs that are not supported by the KLN.
      * Async, because we may need the facilities for DME arcs.
@@ -576,7 +529,71 @@ export class SidStar {
 
         const cleaned = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
         const procedureName = `${proc.name}-${type === KLNLegType.SID ? "SID" : "Æ"}`;
-        return await this.convertToKLN(facility, procedureName, type, cleaned);
+        return await this.convertToKLN(facility, {
+            displayName: procedureName,
+            procedureName: proc.name,
+            transition: trans?.name,
+            runwayNumber: rwy?.runwayNumber,
+            runwayDesignator: rwy?.runwayDesignation as RunwayDesignator ?? null,
+        }, type, cleaned);
+
+    }
+
+    /**
+     * Converts the FlightPlanLegs to KLNFlightplanLegs.
+     * Also resolves DME Arc entries.
+     * @param facility
+     * @param procedureName
+     * @param legType
+     * @param legs
+     * @private
+     */
+    private async convertToKLN(facility: AirportFacility, procedureInformation: ProcedureInformation, legType: KLNLegType, legs: FlightPlanLeg[]): Promise<KLNFlightplanLeg[]> {
+        const promises = legs.map(leg =>
+            this.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(leg.fixIcaoStruct), leg.fixIcaoStruct).then(fac => ({
+                    leg: leg,
+                    facility: fac,
+                }),
+            ));
+
+
+        const enriched = await Promise.all(promises);
+        const klnLegs: KLNFlightplanLeg[] = [];
+
+        for (const enrichedLeg of enriched) {
+            if (enrichedLeg.leg.type === LegType.AF) {
+                //Entry here and exits below for arcs
+
+                //The KLN calculates its own entry
+                const originalEntry = klnLegs.pop()!;
+
+
+                const arcData = await this.getArcEntryData(enrichedLeg);
+                klnLegs.push({
+                    wpt: arcData.entryFacility,
+                    type: legType,
+                    parentFacility: facility,
+                    procedure: procedureInformation,
+                    arcData: arcData,
+                    fixType: originalEntry.fixType,
+                    flyOver: enrichedLeg.leg.flyOver,
+                });
+            }
+
+
+            const askObs = this.shouldAskObs(enrichedLeg.leg.type);
+            klnLegs.push({
+                wpt: enrichedLeg.facility,
+                type: legType,
+                parentFacility: facility,
+                procedure: procedureInformation,
+                flyOver: enrichedLeg.leg.flyOver || askObs,
+                askObs: askObs,
+                fixType: this.getKLNFixType(enrichedLeg.leg),
+            });
+
+        }
+        return klnLegs;
 
     }
 
