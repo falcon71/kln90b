@@ -12,9 +12,13 @@ import {
     GeoPoint,
     ICAO,
     IntersectionFacility,
-    NdbFacility, NearestAirportSearchSession, NearestBoundarySearchSession, NearestIntersectionSearchSession,
+    NdbFacility,
+    NearestAirportSearchSession,
+    NearestBoundarySearchSession,
+    NearestIntersectionSearchSession,
     NearestSearchResults,
-    NearestSearchSession, NearestVorSearchSession,
+    NearestSearchSession,
+    NearestVorSearchSession,
     RunwaySurfaceCategory,
     RunwaySurfaceType,
     SearchTypeMap,
@@ -330,6 +334,8 @@ export class KLNFacilityLoader {
                 results.push(fac.icao);
             }
         }, repoType);
+        results.sort((a, b) => ICAO.getIdent(a).localeCompare(ICAO.getIdent(b)));
+
         return results;
     }
 
