@@ -92,14 +92,14 @@ export class FacilityLoaderScanlist implements Scanlist {
         await this.rebuildIndex();
         this.lastIcao = this.index[0];
         this.listManangerJob = this.startListManager();
-        return this.index.length > 0 ? this.index[0] : null;
+        return this.start();
     }
 
     /**
      * Gets the first waypoint in the list. null if no waypoints exists (should only occur for SUP)
      */
     public start(): IcaoValue | null {
-        return this.index[0];
+        return this.index.length > 0 ? this.index[0] : null;
     }
 
     /**
