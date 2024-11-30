@@ -78,6 +78,10 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
 
     public static async showWaypointconfirmation(props: WaypointPageProps<any>, parent: SixLineHalfPage): Promise<Facility> {
         const mainPage = props.pageManager.getCurrentPage() as MainPage;
+        if ("idx" in props) {
+            delete props.idx; //Just to make sure, this does not get interpreted as ActiveWaypointPageProps
+        }
+
         return new Promise<Facility>((resolve) => {
             const fullprops = {
                 ...props,
