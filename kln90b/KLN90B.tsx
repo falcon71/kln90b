@@ -339,7 +339,7 @@ class KLN90B extends BaseInstrument {
 
         FlightPlanRouteManager.getManager().then(manager => {
             this.efbSaver = new KlnEfbSaver(this.planeSettings!, manager, flightplans[0]);
-            this.efbLoader = new KlnEfbLoader(manager, flightplans[0], facilityLoader, this.messageHandler, sidstar);
+            this.efbLoader = new KlnEfbLoader(this.bus, facilityLoader, this.messageHandler, manager, flightplans[0], this.pageManager, facilityRepository);
         });
 
         Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), msa.init(this.planeSettings.basePath)]).then(() => {

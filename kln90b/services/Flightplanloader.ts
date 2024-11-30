@@ -4,7 +4,7 @@ import {EventBus, FacilityClient, ICAO, IcaoValue} from "@microsoft/msfs-sdk";
 import {buildIcaoStructIdentOnly} from "../data/navdata/IcaoBuilder";
 
 export abstract class Flightplanloader {
-    public constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler) {
+    protected constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler) {
     }
 
     /**
