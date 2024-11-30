@@ -211,7 +211,7 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
         } else if (this.activeIdx === 0) { //Direct to
             return "   ";
         }
-        return (this.activeIdx + 1).toString().padStart(2, " ") + " ";
+        return (this.activeIdx).toString().padStart(2, " ") + " ";
     }
 
     protected changeFacility(fac: T | NearestWpt<T> | string) {

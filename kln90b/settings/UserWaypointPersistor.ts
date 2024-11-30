@@ -404,7 +404,7 @@ export class UserWaypointPersistor {
             case "S":
                 return RunwaySurfaceType.Grass;
             default:
-                throw Error(`Unexpoected runwaySurface:${str.substring(48, 49)}`);
+                throw new Error(`Unexpoected runwaySurface:${str.substring(48, 49)}`);
         }
 
     }

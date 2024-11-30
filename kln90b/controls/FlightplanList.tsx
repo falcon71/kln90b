@@ -297,7 +297,7 @@ class ChangeProcedureListItem implements ListItem {
             case KLNLegType.STAR:
                 return "Æ";
             default:
-                throw Error(`Unexpected type:${this.type}`);
+                throw new Error(`Unexpected type:${this.type}`);
 
         }
     }
@@ -541,7 +541,7 @@ class EditableFlightplan {
                 mainPage.setRightPage(new Apt8Page(this.props));
                 break;
             default:
-                throw Error(`Type ${type} not supported`)
+                throw new Error(`Type ${type} not supported`)
         }
 
     }

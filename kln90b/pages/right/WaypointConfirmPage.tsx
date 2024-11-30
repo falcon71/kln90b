@@ -65,7 +65,7 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
                 page = new SupPage(props);
                 break;
             default:
-                throw Error(`Unexpected facilityType: ${facility.icaoStruct}`);
+                throw new Error(`Unexpected facilityType: ${facility.icaoStruct}`);
         }
 
         this.pageTreeController = new PageTreeController(RIGHT_PAGE_TREE, page, this.props, this.pageChanged.bind(this));

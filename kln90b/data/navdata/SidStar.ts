@@ -107,7 +107,7 @@ export class SidStar {
                 prefix = "N";
                 break;
             default:
-                throw Error(`Unsupported approachtype: ${app}`);
+                throw new Error(`Unsupported approachtype: ${app}`);
         }
 
         let runway: string;

@@ -384,7 +384,7 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
                 prefix = "NDB";
                 break;
             default:
-                throw Error(`Unsupported approachtype: ${app}`);
+                throw new Error(`Unsupported approachtype: ${app}`);
         }
 
         let suffix = "";

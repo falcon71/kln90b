@@ -164,7 +164,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             legs = this.currentApt7Page.legs;
             step = 4;
         } else {
-            throw Error(`Unexpected page: ${this.currentApt7Page}`);
+            throw new Error(`Unexpected page: ${this.currentApt7Page}`);
         }
 
         step--;
