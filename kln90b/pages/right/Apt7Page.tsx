@@ -538,6 +538,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
 
     }
     public render(): VNode {
+        this.requiresRedraw = true;
         return (<pre>
              {this.children.get("activeArrow").render()}{this.children.get("activeIdx").render()}{this.children.get("apt").render()}&nbsp&nbsp{this.children.get("waypointType").render()}{this.children.get("nearestSelector").render()}<br/>
             <div ref={this.mainRef}>

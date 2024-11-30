@@ -295,6 +295,7 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
 
 
     public render(): VNode {
+        this.requiresRedraw = true;
         return (<pre>
             {this.children.get("activeArrow").render()}{this.children.get("apt").render()} IAP<br/>
             <div ref={this.mainRef}>
