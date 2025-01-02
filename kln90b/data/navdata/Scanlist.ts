@@ -192,11 +192,11 @@ export class FacilityLoaderScanlist implements Scanlist {
             this.log(`${this.facilitySearchType}: Size towards beginning: ${sizeBeforeCurrent}, extending cache towards beginning`);
             let ident: string | null = this.lastIcao.ident;
             while (sizeBeforeCurrent < targetSizeForExtension) {
-                ident = this.getNextIdentForSearch(ident!, -1);
-                if (ident === null) { //End of the list
+                if (ident === null || ident === "") { //End of the list
                     break;
                 }
                 if (this.cacheValidFromIdent.localeCompare(ident) <= 0) {
+                    ident = this.getNextIdentForSearch(ident!, -1);
                     continue;
                 }
                 this.log(`${this.facilitySearchType} : Searching for ${ident}`);
@@ -210,6 +210,7 @@ export class FacilityLoaderScanlist implements Scanlist {
                 this.cacheValidFromIdent = ident;
                 this.icaoListCache = this.addResultToCache(results);
                 sizeBeforeCurrent += this.icaoListCache.length - sizeBefore;
+                ident = this.getNextIdentForSearch(ident!, -1);
             }
 
         } else if (sizeBeforeCurrent > MAXIMUM_CACHE_SIZE / 2) {
@@ -257,11 +258,7 @@ export class FacilityLoaderScanlist implements Scanlist {
         //Happens with sync. We jumped to a random waypoint not in our list, now we need to throw everything away
         this.cacheValidFromIdent = "ZZZZ";
         this.cacheValidToIdent = "0";
-        if (ICAO.isValueEmpty(this.lastIcao)) {
-            this.icaoListCache = [];
-        } else {
-            this.icaoListCache = [this.lastIcao];
-        }
+        this.icaoListCache = [];
     }
 
     /**

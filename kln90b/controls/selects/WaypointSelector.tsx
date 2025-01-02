@@ -6,6 +6,8 @@ import {
     FacilitySearchType,
     FacilityType,
     FSComponent,
+    ICAO,
+    IcaoValue,
     Publisher,
     VNode,
 } from "@microsoft/msfs-sdk";
@@ -100,6 +102,8 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
 
         //console.log("searching for", enteredIdent);
         this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, enteredIdent, 100).then(async icaos => {
+            icaos = icaos.sort(this.listSortFunction);
+
             if (this.ident !== enteredIdent) {
                 console.log("cancelled searchByIdent", this.ident, enteredIdent); //The user changed the value quicker than we could search for facilities. Another search will already be underway
                 return;
@@ -134,6 +138,14 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
 
             this.applyIdentToFields();
         });
+    }
+
+    private listSortFunction(aIcao: IcaoValue, bIcao: IcaoValue): number {
+        if (aIcao.ident === bIcao.ident) {
+            return ICAO.valueToStringV2(aIcao).localeCompare(ICAO.valueToStringV2(bIcao));
+        }
+
+        return aIcao.ident.localeCompare(bIcao.ident);
     }
 
     private applyIdentToFields(): void {
