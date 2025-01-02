@@ -227,6 +227,7 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
             this.facility = fac;
             const facility = unpackFacility(this.facility);
             this.ident = ICAO.getIdent(facility.icao);
+            this.getScanlist().sync(facility.icao);
         }
 
         this.getMemory().facility = this.facility;

@@ -101,6 +101,8 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
 
         //console.log("searching for", enteredIdent);
         this.facilityLoader.searchByIdent(this.facilitySearchType, enteredIdent, 100).then(async icaos => {
+            icaos = icaos.sort(this.listSortFunction);
+
             if (this.ident !== enteredIdent) {
                 console.log("cancelled searchByIdent", this.ident, enteredIdent); //The user changed the value quicker than we could search for facilities. Another search will already be underway
                 return;
@@ -135,6 +137,16 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
 
             this.applyIdentToFields();
         });
+    }
+
+    private listSortFunction(aIcao: string, bIcao: string): number {
+        const aIdent = ICAO.getIdent(aIcao);
+        const bIdent = ICAO.getIdent(bIcao);
+        if (aIdent === bIdent) {
+            return aIcao.localeCompare(bIcao);
+        }
+
+        return aIdent.localeCompare(bIdent);
     }
 
     private applyIdentToFields(): void {
