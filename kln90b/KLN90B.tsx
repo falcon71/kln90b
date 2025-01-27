@@ -91,6 +91,7 @@ import {SignalOutputFillterTick} from "./services/SignalOutputFillterTick";
 import {RollSteeringController} from "./services/RollSteeringController";
 import {KlnEfbSaver} from "./services/KlnEfbSaver";
 import {KlnEfbLoader} from "./services/KlnEfbLoader";
+import {WTFlightplanSync} from "./services/WTFlightplanSync";
 
 export interface PropsReadyEvent {
     propsReady: PageProps;

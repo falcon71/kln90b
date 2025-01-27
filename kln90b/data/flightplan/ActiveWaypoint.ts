@@ -1,4 +1,13 @@
-import {EventBus, Facility, GeoCircle, GeoPoint, LatLonInterface, Publisher, UserSetting} from "@microsoft/msfs-sdk";
+import {
+    EventBus,
+    Facility,
+    GeoCircle,
+    GeoPoint,
+    ICAO,
+    LatLonInterface,
+    Publisher,
+    UserSetting,
+} from "@microsoft/msfs-sdk";
 import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "./Flightplan";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Sensors} from "../../Sensors";

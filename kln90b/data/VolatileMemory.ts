@@ -210,7 +210,7 @@ export class VolatileMemory {
     public isReady = false;
 
     public constructor(bus: EventBus, userSettings: KLN90BUserSettings, private facilityLoader: FacilityClient, sensors: Sensors, private scanlists: Scanlists, flightplans: Flightplan[], lastactiveWaypoint: Facility | null) {
-        this.navPage = new NavPageState(userSettings, sensors, flightplans[0], lastactiveWaypoint);
+        this.navPage = new NavPageState(bus, userSettings, sensors, flightplans[0], lastactiveWaypoint);
         this.fplPage = {
             flightplans,
         };
