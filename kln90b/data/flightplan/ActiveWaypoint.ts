@@ -1,4 +1,4 @@
-import {Facility, GeoCircle, GeoPoint, ICAO, LatLonInterface, UserSetting} from "@microsoft/msfs-sdk";
+import {EventBus, Facility, GeoCircle, GeoPoint, LatLonInterface, Publisher, UserSetting} from "@microsoft/msfs-sdk";
 import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "./Flightplan";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Sensors} from "../../Sensors";
@@ -17,6 +17,11 @@ export class TurnStackEntry {
     }
 }
 
+export interface ActiveWaypointChangedEvents {
+    activeWaypointChanged: number;
+}
+
+
 export class ActiveWaypoint {
 
     private setting: UserSetting<string>;
@@ -28,9 +33,11 @@ export class ActiveWaypoint {
     private fplIdx: number = -1; //The index of the active waypoint (to) in the flightplan
 
     public turnStack: TurnStackEntry[] = [];
+    private publisher: Publisher<ActiveWaypointChangedEvents>;
 
-    constructor(userSettings: KLN90BUserSettings, private readonly sensors: Sensors, public readonly fpl0: Flightplan, public lastactiveWaypoint: Facility | null) {
+    constructor(bus: EventBus, userSettings: KLN90BUserSettings, private readonly sensors: Sensors, public readonly fpl0: Flightplan, public lastactiveWaypoint: Facility | null) {
         this.setting = userSettings.getSetting("activeWaypoint");
+        this.publisher = bus.getPublisher<ActiveWaypointChangedEvents>();
     }
 
     public directTo(from: Facility, to: Facility) {
@@ -40,7 +47,7 @@ export class ActiveWaypoint {
             path: CACHED_CIRCLE,
         };
         const legs = this.fpl0.getLegs();
-        this.fplIdx = legs.findIndex(leg => ICAO.valueEquals(leg.wpt.icaoStruct, to.icaoStruct));
+        this.setActiveIdx(legs.findIndex(leg => ICAO.valueEquals(leg.wpt.icaoStruct, to.icaoStruct)));
         if (this.fplIdx > -1) {
             this.to = legs[this.fplIdx]; //We need to keep the meta information like the suffix
         } else {
@@ -66,7 +73,7 @@ export class ActiveWaypoint {
         this.clearTurnStack();
         const legs = this.fpl0.getLegs();
         if (legs.length >= 2) {
-            this.fplIdx = this.findClosestLegIdx(legs);
+            this.setActiveIdx(this.findClosestLegIdx(legs));
             if (this.fplIdx === -1) {
                 //Two legs, but both are the same waypoint...
                 return this.flag();
@@ -74,6 +81,17 @@ export class ActiveWaypoint {
             return this.setFplData(this.fplIdx);
         } else {
             return this.flag();
+        }
+    }
+
+    public sequenceToNextWaypoint() {
+        if (this.fplIdx === -1) {
+            return;
+        }
+        const legs = this.fpl0.getLegs();
+        if (this.fplIdx + 1 < legs.length) {
+            this.setActiveIdx(this.fplIdx + 1);
+            this.setFplData(this.fplIdx);
         }
     }
 
@@ -125,15 +143,12 @@ export class ActiveWaypoint {
         return futureWpts[futureWpts.length - 1].wpt;
     }
 
-    public sequenceToNextWaypoint() {
-        if (this.fplIdx === -1) {
+    private setActiveIdx(activeIdx: number) {
+        if (activeIdx === this.fplIdx) {
             return;
         }
-        const legs = this.fpl0.getLegs();
-        if (this.fplIdx + 1 < legs.length) {
-            this.fplIdx++;
-            this.setFplData(this.fplIdx);
-        }
+        this.fplIdx = activeIdx;
+        this.publisher.pub("activeWaypointChanged", this.fplIdx);
     }
 
     /**
@@ -185,7 +200,7 @@ export class ActiveWaypoint {
      * @private
      */
     private flag(): null {
-        this.fplIdx = -1;
+        this.setActiveIdx(-1);
         this.from = null;
         this.to = null;
         this.isDirectTo = false;

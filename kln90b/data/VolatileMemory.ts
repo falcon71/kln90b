@@ -83,8 +83,8 @@ export class NavPageState {
     //When operating outside the database coverage
     public userMagvar: Degrees = 0;
 
-    constructor(userSettings: KLN90BUserSettings, sensors: Sensors, fpl0: Flightplan, lastactiveWaypoint: Facility | null) {
-        this.activeWaypoint = new ActiveWaypoint(userSettings, sensors, fpl0, lastactiveWaypoint);
+    constructor(bus: EventBus, userSettings: KLN90BUserSettings, sensors: Sensors, fpl0: Flightplan, lastactiveWaypoint: Facility | null) {
+        this.activeWaypoint = new ActiveWaypoint(bus, userSettings, sensors, fpl0, lastactiveWaypoint);
     }
 
 }

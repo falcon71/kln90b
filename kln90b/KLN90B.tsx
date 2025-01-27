@@ -124,6 +124,7 @@ class KLN90B extends BaseInstrument {
     private temporaryWaypointDeleter: TemporaryWaypointDeleter | undefined;
     private readonly messageHandler: MessageHandler = new MessageHandler();
     private planeSettings: KLN90PlaneSettings | undefined;
+    private wtFlightplanSync: WTFlightplanSync | undefined;
     private efbSaver: KlnEfbSaver | undefined;
     private efbLoader: KlnEfbLoader | undefined;
 
@@ -296,6 +297,7 @@ class KLN90B extends BaseInstrument {
 
         const memory = new VolatileMemory(this.bus, this.userSettings, facilityLoader, sensors, scanlists, flightplans, lastActiveWaypoint);
 
+        this.wtFlightplanSync = new WTFlightplanSync(this.bus, facilityLoader, this.planeSettings, memory.navPage.activeWaypoint);
 
         const airspaceAlert = new AirspaceAlert(this.userSettings, sensors, this.messageHandler, facilityLoader, memory.navPage);
         const vnav = new Vnav(memory.navPage, sensors, flightplans[0]);
