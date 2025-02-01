@@ -325,9 +325,6 @@ export class ActiveWaypoint {
         }
 
         const legs = this.fpl0.getLegs();
-        const isEqual = this.to === legs[this.fplIdx];
-        console.log(isEqual);
-
         if (this.fplIdx < legs.length && this.to === legs[this.fplIdx]) { //Yes, we really need to check the instance here. For example the user may remove the enroute waypoint with the same icao as the IAF
             return;
         }
