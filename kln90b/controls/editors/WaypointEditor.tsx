@@ -1,5 +1,5 @@
 import {Editor, Rawvalue} from "./Editor";
-import {Facility, FacilitySearchType, FSComponent, ICAO, VNode} from "@microsoft/msfs-sdk";
+import {Facility, FacilitySearchType, FSComponent, VNode} from "@microsoft/msfs-sdk";
 import {AlphabetEditorField, EditorField, EditorFieldValue} from "./EditorField";
 import {PageProps, PageSide} from "../../pages/Page";
 import {MainPage} from "../../pages/MainPage";
@@ -7,7 +7,6 @@ import {EnterResult} from "../../pages/CursorController";
 import {DuplicateWaypointPage} from "../../pages/left/DuplicateWaypointPage";
 import {WaypointConfirmPage} from "../../pages/right/WaypointConfirmPage";
 import {isWapointPage, unpackFacility} from "../../pages/right/WaypointPage";
-import {IcaoFixedLength} from "../../data/navdata/IcaoFixedLength";
 import {SixLineHalfPage} from "../../pages/FiveSegmentPage";
 
 interface WaypointEditorProps extends PageProps {
@@ -159,7 +158,7 @@ export class WaypointEditor extends Editor<Facility | null> {
     }
 
     protected convertFromValue(value: Facility): Rawvalue {
-        const ident = IcaoFixedLength.getIdent(value.icao);
+        const ident = value.icaoStruct.ident.padEnd(5);
 
         return [
             this.editorFields[0].charset.indexOf(ident.substring(0, 1)),
@@ -177,7 +176,7 @@ export class WaypointEditor extends Editor<Facility | null> {
         }
         const ident = val.join("").trim();
         const results = (await this.props.facilityLoader.findNearestFacilitiesByIdent(FacilitySearchType.All, ident, this.props.sensors.in.gps.coords.lat, this.props.sensors.in.gps.coords.lon, 99))
-            .filter(wpt => ICAO.getIdent(wpt.icao) === ident); //We only want exact matches
+            .filter(wpt => wpt.icaoStruct.ident === ident); //We only want exact matches
         if (results.length === 0) {
             return null;
         } else if (results.length === 1) {
@@ -201,9 +200,9 @@ export class WaypointEditor extends Editor<Facility | null> {
             .map(f => f.charset[f.value!])
             .join("");
 
-        const values = await this.props.facilityLoader.searchByIdent(FacilitySearchType.All, ident, 1);
+        const values = await this.props.facilityLoader.searchByIdentWithIcaoStructs(FacilitySearchType.All, ident, 1);
         if (values.length > 0) {
-            ident = ICAO.getIdent(values[0]);
+            ident = values[0].ident;
         }
         ident = ident.padEnd(5, " ");
 

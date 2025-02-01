@@ -29,12 +29,13 @@ export class ActPagePage extends WaypointPage<Facility> {
 
     public name: string;
 
+    private requiresRebuild = false;
 
     public pageTreeController: PageTreeController;
 
-    private readonly ref: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
+    private readonly noActiveRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
+    private readonly innerRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
 
-    private actIdx = -1;
 
     constructor(public props: PageProps) {
         super(ActPagePage.buildProps(props));
@@ -43,8 +44,7 @@ export class ActPagePage extends WaypointPage<Facility> {
 
         const facility: Facility | null = unpackFacility(this.facility)!;
 
-        this.actIdx = props.memory.navPage.activeWaypoint.getActiveFplIdx();
-        const page = this.buildPage(facility, this.actIdx);
+        const page = this.buildPage(facility, this.activeIdx);
 
         this.pageTreeController = new PageTreeController(RIGHT_PAGE_TREE, page, page.props, this.pageChanged.bind(this));
         this.name = this.buildName(this.pageTreeController.currentPage.name);
@@ -58,26 +58,27 @@ export class ActPagePage extends WaypointPage<Facility> {
     private static buildProps(props: PageProps): ActiveWaypointPageProps<Facility> {
         const idx = props.memory.navPage.activeWaypoint.getActiveFplIdx();
 
-        const facility = props.memory.navPage.activeWaypoint.lastactiveWaypoint;
+        const facility = props.memory.navPage.activeWaypoint.getActiveWpt();
         return {
             ...props,
             facility: facility,
-            idx: facility === null ? -1 : idx + 1,
+            idx: idx,
         };
     }
 
     public render(): VNode {
-        if (this.facility === null) {
-            return (<div ref={this.ref}>
+        this.requiresRedraw = true;
+        return (<div>
+            <div ref={this.noActiveRef}>
                 <br/>
                 <br/>
                 NO ACTIVE<br/>
                 <br/>
                 WAYPOINT
-            </div>);
-        } else {
-            return (<div ref={this.ref}>{this.pageTreeController.currentPage.render()}</div>);
-        }
+            </div>
+            <div ref={this.innerRef} class="d-none">{this.pageTreeController.currentPage.render()}</div>
+        </div>);
+
     }
 
     public getScanlist(): Scanlist {
@@ -85,20 +86,28 @@ export class ActPagePage extends WaypointPage<Facility> {
     }
 
     scanLeft(): boolean {
-        if (this.actIdx === -1) {
+        if (this.activeIdx === -1) {
             return false;
         }
-        this.actIdx = Utils.Clamp(this.actIdx - 1, 0, this.props.memory.fplPage.flightplans[0].getLegs().length - 1);
-        this.rebuildPage();
+
+        const newIdx = Utils.Clamp(this.activeIdx - 1, 0, this.props.memory.fplPage.flightplans[0].getLegs().length - 1);
+        if (newIdx !== this.activeIdx) {
+            this.rebuildPage(newIdx);
+        }
+
         return true;
     }
 
     scanRight(): boolean {
-        if (this.actIdx === -1) {
+        if (this.activeIdx === -1) {
             return false;
         }
-        this.actIdx = Utils.Clamp(this.actIdx + 1, 0, this.props.memory.fplPage.flightplans[0].getLegs().length - 1);
-        this.rebuildPage();
+
+        const newIdx = Utils.Clamp(this.activeIdx + 1, 0, this.props.memory.fplPage.flightplans[0].getLegs().length - 1);
+        if (newIdx !== this.activeIdx) {
+            this.rebuildPage(newIdx);
+        }
+
         return true;
     }
 
@@ -126,10 +135,59 @@ export class ActPagePage extends WaypointPage<Facility> {
         throw new Error("No nearestLists either");
     }
 
+    public tick(blink: boolean): void {
+        super.tick(blink);
+
+        const expectedWaypoint = this.getExpectedActiveWaypoint();
+        if (expectedWaypoint === null) {
+            if (this.facility !== null) {
+                //We no longer have a new active waypoint
+                this.rebuildPage(-1);
+            }
+        } else {
+            if (this.facility === null //We now have a new active waypoint
+                || !ICAO.valueEquals(expectedWaypoint.icaoStruct, unpackFacility(this.facility)!.icaoStruct) //Or the current waypoint no longer matches the active waypoint
+            ) {
+                this.rebuildPage(this.props.memory.navPage.activeWaypoint.getActiveFplIdx());
+            }
+        }
+    }
+
     protected redraw(): void {
-        if (this.facility !== null) {
-            this.ref.instance.innerHTML = "";
-            FSComponent.render(this.pageTreeController.currentPage.render(), this.ref.instance);
+        if (this.facility === null) {
+            this.noActiveRef.instance.classList.remove("d-none");
+            this.innerRef.instance.classList.add("d-none");
+        } else {
+            this.noActiveRef.instance.classList.add("d-none");
+            this.innerRef.instance.classList.remove("d-none");
+            this.innerRef.instance.innerHTML = "";
+
+            if (this.requiresRebuild) {
+                const page = this.buildPage(unpackFacility(this.facility), this.activeIdx);
+                this.pageTreeController.props = page.props;
+                this.pageTreeController.setPage(page);
+                this.requiresRebuild = false;
+            }
+
+            FSComponent.render(this.pageTreeController.currentPage.render(), this.innerRef.instance);
+        }
+    }
+
+    /**
+     * The active waypoint can change all the time. Here we do a sanity check, if our currently displayed waypoint still makes sense
+     * @private
+     */
+    private getExpectedActiveWaypoint(): Facility | null {
+        const actualActiveIdx = this.props.memory.navPage.activeWaypoint.getActiveFplIdx();
+        if (actualActiveIdx === -1) {
+            return this.props.memory.navPage.activeWaypoint.getActiveWpt(); //Might be a random DTO
+        } else {
+            const wptAtIdx = this.props.memory.fplPage.flightplans[0].getLegs()[this.activeIdx];
+            if (wptAtIdx) {
+                return wptAtIdx.wpt;
+            } else {
+                return this.props.memory.navPage.activeWaypoint.getActiveWpt();
+            }
         }
     }
 
@@ -137,14 +195,14 @@ export class ActPagePage extends WaypointPage<Facility> {
         const props: ActiveWaypointPageProps<Facility> = {
             ...this.props,
             facility: facility,
-            idx: idx === -1 ? 0 : idx,
+            idx: idx === -1 ? 0 : idx + 1,
         };
 
         if (facility === null) {
             return new SupPage(props);
         }
 
-        switch (ICAO.getFacilityType(facility.icao)) {
+        switch (ICAO.getFacilityTypeFromValue(facility.icaoStruct)) {
             case FacilityType.Airport:
                 return new Apt1Page(props);
             case FacilityType.NDB:
@@ -157,7 +215,7 @@ export class ActPagePage extends WaypointPage<Facility> {
             case FacilityType.USR:
                 return new SupPage(props);
             default:
-                throw Error(`Unexpected facilityType: ${facility.icao}`);
+                throw new Error(`Unexpected facilityType: ${facility.icaoStruct}`);
         }
     }
 
@@ -172,13 +230,24 @@ export class ActPagePage extends WaypointPage<Facility> {
         this.requiresRedraw = true;
     }
 
-    private rebuildPage() {
-        const legs = this.props.memory.fplPage.flightplans[0].getLegs();
-        this.facility = legs[this.actIdx].wpt;
-        this.ident = ICAO.getIdent(this.facility.icao);
-
-        const page = this.buildPage(this.facility, this.actIdx);
-        this.pageTreeController.props = page.props;
-        this.pageTreeController.setPage(page);
+    private rebuildPage(newActiveIdx: number) {
+        this.activeIdx = newActiveIdx;
+        if (this.activeIdx === -1) {
+            const activeWpt = this.props.memory.navPage.activeWaypoint.getActiveWpt();
+            if (activeWpt) {
+                //Random DTO
+                this.facility = activeWpt;
+                this.ident = this.facility.icaoStruct.ident;
+            } else {
+                this.facility = null;
+                this.ident = "";
+            }
+        } else {
+            const legs = this.props.memory.fplPage.flightplans[0].getLegs();
+            this.facility = legs[this.activeIdx].wpt;
+            this.ident = this.facility.icaoStruct.ident;
+        }
+        this.requiresRedraw = true;
+        this.requiresRebuild = true;
     }
 }

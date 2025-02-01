@@ -2,16 +2,17 @@ import {SelectField} from "./SelectField";
 import {
     EventBus,
     Facility,
+    FacilityClient,
     FacilitySearchType,
     FacilityType,
     FSComponent,
     ICAO,
+    IcaoValue,
     Publisher,
     VNode,
 } from "@microsoft/msfs-sdk";
 import {UiElement, UIElementChildren} from "../../pages/Page";
 import {StatusLineMessageEvents} from "../StatusLine";
-import {KLNFacilityLoader} from "../../data/navdata/KLNFacilityLoader";
 
 
 export type WaypointFieldsetTypes = {
@@ -33,7 +34,7 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
 
     protected constructor(bus: EventBus,
                           private ident: string,
-                          private facilityLoader: KLNFacilityLoader,
+                          private facilityLoader: FacilityClient,
                           private readonly length: number,
                           private readonly facilitySearchType: FacilitySearchType,
                           private readonly changedCallback: (facility: T | string) => void) {
@@ -100,7 +101,7 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
         this.ident = enteredIdent;
 
         //console.log("searching for", enteredIdent);
-        this.facilityLoader.searchByIdent(this.facilitySearchType, enteredIdent, 100).then(async icaos => {
+        this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, enteredIdent, 100).then(async icaos => {
             icaos = icaos.sort(this.listSortFunction);
 
             if (this.ident !== enteredIdent) {
@@ -118,11 +119,11 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
                 if (this.isValidResult(facility)) {
                     if (resultFound == 0) {
                         //console.log("set ident for unique entry", facility.icao, this.ident, enteredIdent);
-                        this.ident = ICAO.getIdent(facility.icao);
+                        this.ident = facility.icaoStruct.ident;
                         enteredIdent = this.ident;
                         this.changedCallback(facility);
                     } else if (resultFound == 1) {
-                        if (this.ident === ICAO.getIdent(facility.icao)) {
+                        if (this.ident === facility.icaoStruct.ident) {
                             this.statusLineMessagePublisher.pub("statusLineMessage", "DUP IDENT");
                         }
                         break;
@@ -139,14 +140,12 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
         });
     }
 
-    private listSortFunction(aIcao: string, bIcao: string): number {
-        const aIdent = ICAO.getIdent(aIcao);
-        const bIdent = ICAO.getIdent(bIcao);
-        if (aIdent === bIdent) {
-            return aIcao.localeCompare(bIcao);
+    private listSortFunction(aIcao: IcaoValue, bIcao: IcaoValue): number {
+        if (aIcao.ident === bIcao.ident) {
+            return ICAO.valueToStringV2(aIcao).localeCompare(ICAO.valueToStringV2(bIcao));
         }
 
-        return aIdent.localeCompare(bIdent);
+        return aIcao.ident.localeCompare(bIcao.ident);
     }
 
     private applyIdentToFields(): void {

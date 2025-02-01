@@ -1,5 +1,5 @@
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
-import {FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
+import {FSComponent, ICAO, IcaoValue, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {TickController} from "../../TickController";
 import {NavPageState} from "../../data/VolatileMemory";
 
@@ -11,7 +11,7 @@ export class ActiveArrow implements UiElement {
     private ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
 
-    constructor(public icao: string | null, private navPageState: NavPageState) {
+    constructor(public icao: IcaoValue | null, private navPageState: NavPageState) {
     }
 
     render(): VNode {
@@ -27,7 +27,7 @@ export class ActiveArrow implements UiElement {
             this.ref.instance.innerText = " ";
             this.ref.instance.classList.remove("blink");
         } else {
-            if (this.icao == activeWpt.icao) {
+            if (this.icao !== null && ICAO.valueEquals(this.icao, activeWpt.icaoStruct)) {
                 this.ref.instance.innerText = "›";
                 //3-29 Waypoint alerting
                 if (this.navPageState.waypointAlert && blink) {

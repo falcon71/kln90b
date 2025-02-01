@@ -1,4 +1,4 @@
-import {FSComponent, MagVar, VNode, VorClass, VorFacility, VorType} from '@microsoft/msfs-sdk';
+import {FSComponent, ICAO, MagVar, VNode, VorClass, VorFacility, VorType} from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
@@ -14,7 +14,7 @@ import {NearestSelector} from "../../controls/selects/NearestSelector";
 import {CoordOrNearestView} from "../../controls/CoordOrNearestView";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {convertTextToKLNCharset} from "../../data/Text";
-import {buildIcao, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {buildIcao, buildIcaoStruct, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 
 type VorPageTypes = {
@@ -64,7 +64,7 @@ export class VorPage extends WaypointPage<VorFacility> {
         }
 
         this.children = new UIElementChildren<VorPageTypes>({
-            activeArrow: new ActiveArrow(facility?.icao ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             vor: new VorSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             dme: new TextDisplay(facility?.type == VorType.DME || facility?.type == VorType.VORDME ? "D" : " "),
@@ -107,7 +107,7 @@ export class VorPage extends WaypointPage<VorFacility> {
 
         this.children.get("vor").setValue(this.ident);
         this.children.get("dme").text = facility?.type == VorType.DME || facility?.type == VorType.VORDME ? "D" : " ";
-        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icao ?? null;
+        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icaoStruct ?? null;
         this.children.get("coordOrNearestView").setFacility(this.facility);
         this.userVor = {
             freq: null,
@@ -155,7 +155,7 @@ export class VorPage extends WaypointPage<VorFacility> {
     private setVorFrequency(freq: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.freqMHz = freq);
+            this.props.facilityRepository.update(facility!, fac => fac.freqMHz = freq);
         } else {
             this.userVor.freq = freq;
             this.createIfReady();
@@ -166,11 +166,11 @@ export class VorPage extends WaypointPage<VorFacility> {
         const facility = unpackFacility(this.facility);
         if (facility) {
             const activeWpt = this.props.memory.navPage.activeWaypoint.getActiveWpt();
-            if (activeWpt?.icao === facility.icao) {
+            if (activeWpt !== null && ICAO.valueEquals(activeWpt.icaoStruct, facility.icaoStruct)) {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "IN ACT LIST");
                 return;
             }
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.magneticVariation = -magvar);
+            this.props.facilityRepository.update(facility!, fac => fac.magneticVariation = -magvar);
         } else {
             this.userVor.magvar = magvar;
             this.createIfReady();
@@ -180,7 +180,7 @@ export class VorPage extends WaypointPage<VorFacility> {
     private setLatitude(latitude: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.lat = latitude);
+            this.props.facilityRepository.update(facility!, fac => fac.lat = latitude);
         } else {
             this.userVor.lat = latitude;
             this.createIfReady();
@@ -190,7 +190,7 @@ export class VorPage extends WaypointPage<VorFacility> {
     private setLongitude(longitude: number) {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.props.facilityLoader.facilityRepo.update(facility!, fac => fac.lon = longitude);
+            this.props.facilityRepository.update(facility!, fac => fac.lon = longitude);
         } else {
             this.userVor.lon = longitude;
             this.createIfReady();
@@ -209,8 +209,10 @@ export class VorPage extends WaypointPage<VorFacility> {
 
         const magvar = this.userVor.magvar === null ? MagVar.get(this.userVor.lat, this.userVor.lon) : this.userVor.magvar;
 
+        // noinspection JSDeprecatedSymbols
         this.facility = {
             icao: buildIcao('V', USER_WAYPOINT, this.ident),
+            icaoStruct: buildIcaoStruct('U', USER_WAYPOINT, this.ident),
             name: "",
             lat: this.userVor.lat,
             lon: this.userVor.lon,
@@ -222,9 +224,14 @@ export class VorPage extends WaypointPage<VorFacility> {
             magneticVariation: -magvar,
             type: VorType.Unknown,
             vorClass: VorClass.Unknown,
+            navRange: 0,
+            dme: null,
+            ils: null,
+            tacan: null,
+            trueReferenced: false,
         };
         try {
-            this.props.facilityLoader.facilityRepo.add(this.facility);
+            this.props.facilityRepository.add(this.facility);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);

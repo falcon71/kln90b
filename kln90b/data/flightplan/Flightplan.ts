@@ -1,4 +1,4 @@
-import {AirportFacility, EventBus, Facility, Publisher} from "@microsoft/msfs-sdk";
+import {AirportFacility, EventBus, ExtendedApproachType, Facility, Publisher} from "@microsoft/msfs-sdk";
 import {ArcData} from "../navdata/SidStar";
 
 export const enum KLNLegType {
@@ -15,11 +15,21 @@ export const enum KLNFixType {
     MAHP,
 }
 
+export interface ProcedureInformation {
+    readonly displayName: string,
+    readonly procedureName: string,
+    readonly approachSuffix?: string,
+    readonly approachType?: ExtendedApproachType,
+    readonly transition?: string,
+    readonly runwayNumber?: number,
+    readonly runwayDesignator?: RunwayDesignator,
+}
+
 export interface KLNFlightplanLeg {
     wpt: Facility,
     readonly type: KLNLegType,
     readonly parentFacility?: AirportFacility,
-    readonly procedureName?: string,
+    readonly procedure?: ProcedureInformation,
     readonly flyOver?: boolean,
     readonly fixType?: KLNFixType,
     readonly askObs?: boolean,

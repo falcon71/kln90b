@@ -48,7 +48,7 @@ class PageStack {
 
     public pop(): SixLineHalfPage {
         if (this.isBasePageShown()) {
-            throw Error("Cannot pop the base page");
+            throw new Error("Cannot pop the base page");
         }
         return this.stack.pop()!.page;
     }
@@ -93,7 +93,7 @@ class OverlayStack {
 
     public pop(): SixLinePage | SevenLinePage {
         if (this.stack.length === 0) {
-            throw Error("No pages left to pop");
+            throw new Error("No pages left to pop");
         }
         return this.stack.pop()!;
     }

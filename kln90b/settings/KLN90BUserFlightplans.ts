@@ -19,7 +19,7 @@ export class KLN90BUserFlightplansSettings {
 
     private static buildSettingsDefs(): Def[] {
         const defs: Def[] = [];
-        for (let i = 0; i < NUM_FLIGHTPLANS; i++) {
+        for (let i = 0; i <= NUM_FLIGHTPLANS; i++) {
             defs.push({
                 name: `fpl${i}`,
                 defaultValue: "",

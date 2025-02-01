@@ -131,7 +131,7 @@ export class Set0Page extends SixLinePage {
                     &nbsp&nbsp&nbspN O T&nbsp&nbsp&nbspR E A D Y
                 </pre>);
             default:
-                throw Error(`Unexpected step: ${this.step}`);
+                throw new Error(`Unexpected step: ${this.step}`);
         }
     }
 

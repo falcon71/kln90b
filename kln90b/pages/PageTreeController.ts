@@ -227,7 +227,7 @@ export class PageTreeController {
                 }
             }
         }
-        throw Error(`page ${page} not found in pagetree`);
+        throw new Error(`page ${page} not found in pagetree`);
     }
 
     private getPageSubIndex(): number {

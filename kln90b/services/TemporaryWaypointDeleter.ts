@@ -1,5 +1,5 @@
 import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
-import {EventBus, FacilityType, ICAO, UserFacility} from "@microsoft/msfs-sdk";
+import {EventBus, FacilityType, ICAO, IcaoValue, UserFacility} from "@microsoft/msfs-sdk";
 import {PowerEvent} from "../PowerButton";
 import {Flightplan} from "../data/flightplan/Flightplan";
 import {TEMPORARY_WAYPOINT} from "../data/navdata/IcaoBuilder";
@@ -10,9 +10,9 @@ export class TemporaryWaypointDeleter {
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.deleteUnusedTemporaryWaypoints.bind(this));
     }
 
-    public static findUsageInFlightplans(icao: string, flightplans: Flightplan[]): number | null {
+    public static findUsageInFlightplans(icao: IcaoValue, flightplans: Flightplan[]): number | null {
         for (const flightplan of flightplans) {
-            if (flightplan.getLegs().some(leg => leg.wpt.icao === icao)) {
+            if (flightplan.getLegs().some(leg => ICAO.valueEquals(leg.wpt.icaoStruct, icao))) {
                 return flightplan.idx;
             }
         }
@@ -28,7 +28,7 @@ export class TemporaryWaypointDeleter {
         this.repo.forEach(fac => {
             const userFac = fac as UserFacility;
             //Region XY marks this as temporary. isTemporary can't be used, because that is not persisted
-            if (ICAO.getRegionCode(userFac.icao) === TEMPORARY_WAYPOINT && TemporaryWaypointDeleter.findUsageInFlightplans(userFac.icao, this.flightplans) === null) {
+            if (userFac.icaoStruct.region === TEMPORARY_WAYPOINT && TemporaryWaypointDeleter.findUsageInFlightplans(userFac.icaoStruct, this.flightplans) === null) {
                 console.log("Deleting unused waypoint:", userFac);
                 this.repo.remove(userFac);
             }

@@ -1,4 +1,4 @@
-import {FSComponent, ICAO, UnitType, VNode} from '@microsoft/msfs-sdk';
+import {FSComponent, UnitType, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
@@ -74,7 +74,7 @@ export class Nav2Page extends SixLineHalfPage {
                 this.children.get("vorBearing").bearing = null;
                 this.children.get("vorDist").distance = null;
             } else {
-                this.children.get("vor").text = ICAO.getIdent(vor.icao);
+                this.children.get("vor").text = (vor.icaoStruct.ident);
                 const radialTrue = this.props.sensors.in.gps.coords.bearingFrom(vor.lat, vor.lon); //NearestWpt is to
                 this.children.get("vorBearing").bearing = this.props.magvar.trueToMag(radialTrue, -vor.magneticVariation);
                 this.children.get("vorDist").distance = UnitType.GA_RADIAN.convertTo(this.props.sensors.in.gps.coords.distance(vor), UnitType.NMILE);

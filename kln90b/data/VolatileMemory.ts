@@ -2,15 +2,14 @@ import {
     AirportFacility,
     EventBus,
     Facility,
+    FacilityClient,
     FacilityType,
-    ICAO,
     IntersectionFacility,
     NdbFacility,
     RunwayFacility,
     UserFacility,
     VorFacility,
 } from "@microsoft/msfs-sdk";
-import {KLNFacilityLoader} from "./navdata/KLNFacilityLoader";
 import {Scanlists} from "./navdata/Scanlist";
 import {NearestWpt} from "./navdata/NearestList";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
@@ -210,7 +209,7 @@ export class VolatileMemory {
 
     public isReady = false;
 
-    public constructor(bus: EventBus, userSettings: KLN90BUserSettings, private facilityLoader: KLNFacilityLoader, sensors: Sensors, private scanlists: Scanlists, flightplans: Flightplan[], lastactiveWaypoint: Facility | null) {
+    public constructor(bus: EventBus, userSettings: KLN90BUserSettings, private facilityLoader: FacilityClient, sensors: Sensors, private scanlists: Scanlists, flightplans: Flightplan[], lastactiveWaypoint: Facility | null) {
         this.navPage = new NavPageState(bus, userSettings, sensors, flightplans[0], lastactiveWaypoint);
         this.fplPage = {
             flightplans,
@@ -281,7 +280,7 @@ export class VolatileMemory {
         } else {
             try {
                 this.supPage.facility = await this.facilityLoader.getFacility(FacilityType.USR, icao);
-                this.supPage.ident = ICAO.getIdent(icao);
+                this.supPage.ident = icao.ident;
             } catch (e) {
                 console.warn(`Waypoint was deleted while accessing it: ${icao}`, e);
                 //There is an await above. Inbetween, TemporaryWaypointDeleter might run and delete this waypoint
@@ -298,7 +297,7 @@ export class VolatileMemory {
             this.intPage.facility = null;
         } else {
             this.intPage.facility = await this.facilityLoader.getFacility(FacilityType.Intersection, icao);
-            this.intPage.ident = ICAO.getIdent(icao);
+            this.intPage.ident = icao.ident;
         }
     }
 
@@ -309,7 +308,7 @@ export class VolatileMemory {
             this.ndbPage.facility = null;
         } else {
             this.ndbPage.facility = await this.facilityLoader.getFacility(FacilityType.NDB, icao);
-            this.ndbPage.ident = ICAO.getIdent(icao);
+            this.ndbPage.ident = icao.ident;
         }
     }
 
@@ -320,7 +319,7 @@ export class VolatileMemory {
             this.vorPage.facility = null;
         } else {
             this.vorPage.facility = await this.facilityLoader.getFacility(FacilityType.VOR, icao);
-            this.vorPage.ident = ICAO.getIdent(icao);
+            this.vorPage.ident = icao.ident;
         }
     }
 
@@ -331,7 +330,7 @@ export class VolatileMemory {
             this.aptPage.facility = null;
         } else {
             this.aptPage.facility = await this.facilityLoader.getFacility(FacilityType.Airport, icao);
-            this.aptPage.ident = ICAO.getIdent(icao);
+            this.aptPage.ident = icao.ident;
         }
     }
 }

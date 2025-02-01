@@ -49,7 +49,7 @@ export class Apt6Page extends WaypointPage<AirportFacility> {
         }
 
         this.children = new UIElementChildren<Apt6PageTypes>({
-            activeArrow: new ActiveArrow(facility?.icao ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "A"),
@@ -102,7 +102,7 @@ export class Apt6Page extends WaypointPage<AirportFacility> {
 
     protected changeFacility(fac: string | AirportFacility) {
         super.changeFacility(fac);
-        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icao ?? null;
+        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icaoStruct ?? null;
         this.children.get("apt").setValue(this.ident);
     }
 

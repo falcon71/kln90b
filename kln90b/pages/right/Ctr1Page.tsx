@@ -1,11 +1,9 @@
 import {
     BitFlags,
     BoundaryType,
-    Facility,
-    FacilitySearchType,
     FacilityType,
+    FacilityUtils,
     FSComponent,
-    ICAO,
     LodBoundary,
     NodeReference,
     UnitType,
@@ -20,12 +18,12 @@ import {MainPage} from "../MainPage";
 import {FplPage} from "../left/FplPage";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {AirspaceIntersection, airspaceIntersectionsAlongRoute} from "../../services/AirspacesAlongRoute";
-import {format} from "numerable";
 import {CtrState} from "../../data/VolatileMemory";
 import {KLNLegType} from "../../data/flightplan/Flightplan";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
 import {insertLegIntoFpl} from "../../services/FlightplanUtils";
-import {buildIcao, TEMPORARY_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {getUniqueIdentWithNumbers} from "../../data/navdata/UniqueIdentGenerator";
 
 type Ctr1PageTypes = {
     newWpts: TextDisplay;
@@ -246,7 +244,7 @@ export class Ctr1Page extends SixLineHalfPage {
         const legs = this.props.memory.ctrPage.lastFpl!.getLegs();
 
         for (const leg of legs) {
-            if (ICAO.getFacilityType(leg.wpt.icao) === FacilityType.USR && leg.wpt.lat === intersection.intersection.lat && leg.wpt.lon === intersection.intersection.lon) {
+            if (FacilityUtils.isFacilityType(leg.wpt, FacilityType.USR) && leg.wpt.lat === intersection.intersection.lat && leg.wpt.lon === intersection.intersection.lon) {
                 return {
                     isNew: false,
                     idx: -1, //Only relevant for inserting new waypoints
@@ -266,28 +264,29 @@ export class Ctr1Page extends SixLineHalfPage {
             return null;
         }
 
-        const ident = await this.getUniqueIdent(closestVor);
+        const ident = await getUniqueIdentWithNumbers(closestVor.icaoStruct.ident, this.props.facilityLoader);
         if (ident === null) {
             return null;
         }
 
+        // noinspection JSDeprecatedSymbols
         const facility: UserFacility = {
             icao: buildIcao('U', TEMPORARY_WAYPOINT, ident),
+            icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, ident),
             name: "",
             lat: intersection.intersection.lat,
             lon: intersection.intersection.lon,
             region: TEMPORARY_WAYPOINT,
             city: "",
-            magvar: 0,
             isTemporary: false, //irrelevant, because this flag is not persisted
             userFacilityType: UserFacilityType.LAT_LONG,
-            reference1Icao: closestVor.icao,
+            reference1IcaoStruct: closestVor.icaoStruct,
             reference1Radial: intersection.intersection.bearingFrom(closestVor),
             reference1Distance: UnitType.GA_RADIAN.convertTo(intersection.intersection.distance(closestVor), UnitType.NMILE),
         };
 
         try {
-            this.props.facilityLoader.facilityRepo.add(facility);
+            this.props.facilityRepository.add(facility);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
@@ -301,19 +300,6 @@ export class Ctr1Page extends SixLineHalfPage {
             airspaceTo: intersection.airspaceTo,
             wpt: facility,
         };
-    }
-
-    private async getUniqueIdent(wpt: Facility): Promise<string | null> {
-        const start = ICAO.getIdent(wpt.icao);
-        const existing = await this.props.facilityLoader.searchByIdent(FacilitySearchType.All, start, 100);
-        const existingIdents = existing.map(ICAO.getIdent);
-        for (let i = 0; i < 100; i++) {
-            const checkIdent = start + format(i, "00");
-            if (!existingIdents.includes(checkIdent)) {
-                return checkIdent;
-            }
-        }
-        return null;
     }
 
 

@@ -72,7 +72,7 @@ export class DuplicateWaypointPage extends SixLineHalfPage {
     }
 
     private formatWptText(wpt: Facility, idx: number): string {
-        return idx.toString().padStart(2, " ") + " " + this.formatType(ICAO.getFacilityType(wpt.icao)) + " " + getCountry(wpt) + "?";
+        return idx.toString().padStart(2, " ") + " " + this.formatType(ICAO.getFacilityTypeFromValue(wpt.icaoStruct)) + " " + getCountry(wpt) + "?";
     }
 
     private formatType(type: FacilityType): string {

@@ -44,7 +44,7 @@ export class Dt1OtherPage extends SixLineHalfPage {
 
 
         this.children = new UIElementChildren<Dt1OtherPageTypes>({
-            activeArrow: new ActiveArrow(to?.icao ?? null, navState),
+            activeArrow: new ActiveArrow(to?.icaoStruct ?? null, navState),
             activeIdx: new TextDisplay(activeIdx === -1 ? "  " : (activeIdx + 1).toString().padStart(2, " ")),
             activeIdent: new TextDisplay(IcaoFixedLength.getIdentFromFacility(to)),
             activeDis: new RoundedDistanceDisplay(Alignment.right, navState.distToActive),
@@ -85,7 +85,7 @@ export class Dt1OtherPage extends SixLineHalfPage {
         const futureLegs = this.props.memory.navPage.activeWaypoint.getFutureLegs();
         const destLeg = futureLegs.length > 1 ? futureLegs[futureLegs.length - 1] : null;
 
-        this.children.get("activeArrow").icao = to?.icao ?? null;
+        this.children.get("activeArrow").icao = to?.icaoStruct ?? null;
         this.children.get("activeIdx").text = activeIdx === -1 ? "  " : (activeIdx + 1).toString().padStart(2, " ");
         this.children.get("activeIdent").text = IcaoFixedLength.getIdentFromFacility(to);
         this.children.get("activeDis").distance = navState.distToActive;

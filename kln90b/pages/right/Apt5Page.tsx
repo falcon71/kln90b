@@ -1,4 +1,4 @@
-import {AirportFacility, FSComponent, ICAO, NodeReference, VNode} from '@microsoft/msfs-sdk';
+import {AirportFacility, FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {FreetextEditor} from "../../controls/editors/FreetextEditor";
@@ -50,7 +50,7 @@ export class Apt5Page extends WaypointPage<AirportFacility> {
         this.remarks = this.props.remarksManager.getRemarks(this.ident);
 
         this.children = new UIElementChildren<Apt5PageTypes>({
-            activeArrow: new ActiveArrow(facility?.icao ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "A"),
@@ -100,7 +100,7 @@ export class Apt5Page extends WaypointPage<AirportFacility> {
         } else {
             this.mainRef.instance.classList.remove("d-none");
             this.children.get("createWpt").setVisible(false);
-            this.remarks = this.props.remarksManager.getRemarks(ICAO.getIdent(facility.icao));
+            this.remarks = this.props.remarksManager.getRemarks(facility.icaoStruct.ident);
             this.children.get("rmk0").setValue(this.remarks[0]);
             this.children.get("rmk1").setValue(this.remarks[1]);
             this.children.get("rmk2").setValue(this.remarks[2]);
@@ -114,7 +114,7 @@ export class Apt5Page extends WaypointPage<AirportFacility> {
 
     protected changeFacility(fac: string | AirportFacility) {
         super.changeFacility(fac);
-        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icao ?? null;
+        this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icaoStruct ?? null;
         this.children.get("apt").setValue(this.ident);
     }
 

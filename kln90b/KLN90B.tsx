@@ -24,6 +24,7 @@ import {
     Facility,
     FacilityLoader,
     FacilityRepository,
+    FlightPlanRouteManager,
     FSComponent,
     HEventPublisher,
     ICAO,
@@ -88,6 +89,8 @@ import {KeyboardEvent, KeyboardEventData} from "./controls/StatusLine";
 import {ErrorEvent} from "./controls/ErrorPage";
 import {SignalOutputFillterTick} from "./services/SignalOutputFillterTick";
 import {RollSteeringController} from "./services/RollSteeringController";
+import {KlnEfbSaver} from "./services/KlnEfbSaver";
+import {KlnEfbLoader} from "./services/KlnEfbLoader";
 import {WTFlightplanSync} from "./services/WTFlightplanSync";
 
 export interface PropsReadyEvent {
@@ -123,6 +126,8 @@ class KLN90B extends BaseInstrument {
     private readonly messageHandler: MessageHandler = new MessageHandler();
     private planeSettings: KLN90PlaneSettings | undefined;
     private wtFlightplanSync: WTFlightplanSync | undefined;
+    private efbSaver: KlnEfbSaver | undefined;
+    private efbLoader: KlnEfbLoader | undefined;
 
 
     constructor() {
@@ -247,32 +252,32 @@ class KLN90B extends BaseInstrument {
 
         let restoreSuccessFull = true;
 
-        const facilityLoader = new FacilityLoader(FacilityRepository.getRepository(this.bus));
+        const facilityRepository = KLNFacilityRepository.getRepository(this.bus);
 
-        const klnFacilityLoader = new KLNFacilityLoader(
-            facilityLoader,
-            KLNFacilityRepository.getRepository(this.bus),
+        const facilityLoader = new KLNFacilityLoader(
+            new FacilityLoader(FacilityRepository.getRepository(this.bus)),
+            facilityRepository,
         );
 
-        const scanlists = new Scanlists(klnFacilityLoader, this.bus);
+        const scanlists = new Scanlists(facilityLoader, this.bus);
 
-        this.userWaypointPersistor = new UserWaypointPersistor(this.bus, klnFacilityLoader.facilityRepo);
+        this.userWaypointPersistor = new UserWaypointPersistor(this.bus, facilityRepository);
         try {
             this.userWaypointPersistor.restoreWaypoints();
         } catch (e) {
             restoreSuccessFull = false;
         }
 
-        this.userFlightplanPersistor = new UserFlightplanPersistor(this.bus, klnFacilityLoader, this.messageHandler, this.planeSettings);
+        this.userFlightplanPersistor = new UserFlightplanPersistor(this.bus, facilityLoader, facilityRepository, this.messageHandler, this.planeSettings);
 
-        const nearestLists = new Nearestlists(klnFacilityLoader, sensors, this.userSettings);
-        const nearestUtils = new NearestUtils(klnFacilityLoader);
+        const nearestLists = new Nearestlists(facilityLoader, sensors, this.userSettings);
+        const nearestUtils = new NearestUtils(facilityLoader);
 
         const lastActiveIcao: string | null = this.userSettings.getSetting("activeWaypoint").get();
         let lastActiveWaypoint: Facility | null = null;
         if (lastActiveIcao !== "") {
             try {
-                lastActiveWaypoint = await klnFacilityLoader.getFacility(ICAO.getFacilityType(lastActiveIcao), lastActiveIcao);
+                lastActiveWaypoint = await facilityLoader.getFacility(ICAO.getFacilityTypeFromStringV1(lastActiveIcao), lastActiveIcao);
             } catch (e) {
                 console.error(`Last active waypoint not found: ${lastActiveIcao}`, e);
             }
@@ -291,11 +296,11 @@ class KLN90B extends BaseInstrument {
             flightplans = Array(26).fill(null).map((_, idx) => new Flightplan(idx, [], this.bus));
         }
 
-        const memory = new VolatileMemory(this.bus, this.userSettings, klnFacilityLoader, sensors, scanlists, flightplans, lastActiveWaypoint);
+        const memory = new VolatileMemory(this.bus, this.userSettings, facilityLoader, sensors, scanlists, flightplans, lastActiveWaypoint);
 
         this.wtFlightplanSync = new WTFlightplanSync(this.bus, facilityLoader, this.planeSettings, memory.navPage.activeWaypoint);
 
-        const airspaceAlert = new AirspaceAlert(this.userSettings, sensors, this.messageHandler, klnFacilityLoader, memory.navPage);
+        const airspaceAlert = new AirspaceAlert(this.userSettings, sensors, this.messageHandler, facilityLoader, memory.navPage);
         const vnav = new Vnav(memory.navPage, sensors, flightplans[0]);
 
         const magvar = new KLNMagvar(sensors, memory.navPage);
@@ -327,11 +332,18 @@ class KLN90B extends BaseInstrument {
 
         const msa = new MSA();
 
-        this.temporaryWaypointDeleter = new TemporaryWaypointDeleter(klnFacilityLoader.facilityRepo, this.bus, flightplans);
+        this.temporaryWaypointDeleter = new TemporaryWaypointDeleter(facilityRepository, this.bus, flightplans);
 
         if (!restoreSuccessFull) {
             this.messageHandler.addMessage(new OneTimeMessage(["USER DATA LOST"]));
         }
+
+        const sidstar = new SidStar(facilityLoader, facilityRepository, sensors);
+
+        FlightPlanRouteManager.getManager().then(manager => {
+            this.efbSaver = new KlnEfbSaver(this.planeSettings!, manager, flightplans[0]);
+            this.efbLoader = new KlnEfbLoader(this.bus, facilityLoader, this.messageHandler, manager, flightplans[0], this.pageManager, facilityRepository);
+        });
 
         Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), msa.init(this.planeSettings.basePath)]).then(() => {
             const props: PageProps = {
@@ -344,7 +356,8 @@ class KLN90B extends BaseInstrument {
                 messageHandler: this.messageHandler,
                 hardware: this.hardware,
                 memory: memory,
-                facilityLoader: klnFacilityLoader,
+                facilityLoader: facilityLoader,
+                facilityRepository: facilityRepository,
                 nearestLists: nearestLists,
                 nearestUtils: nearestUtils,
                 remarksManager: new RemarksManager(this.bus, this.userSettings),
@@ -354,7 +367,7 @@ class KLN90B extends BaseInstrument {
                 modeController: modeController,
                 database: new Database(this.bus, sensors, this.messageHandler),
                 magvar: magvar,
-                sidstar: new SidStar(klnFacilityLoader, sensors),
+                sidstar: sidstar,
             };
 
             this.messageHandler.persistentMessages = buildPersistentMessages(props);

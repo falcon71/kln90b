@@ -1,4 +1,4 @@
-import {FSComponent, ICAO, VNode} from '@microsoft/msfs-sdk';
+import {FSComponent, VNode} from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
@@ -49,7 +49,7 @@ export class SuperNav1Page extends SixLinePage {
 
         this.children = new UIElementChildren<SuperNav1PageTypes>({
             from: new TextDisplay(IcaoFixedLength.getIdentFromFacility(from)),
-            activeArrow: new ActiveArrow(to?.icao ?? null, navState),
+            activeArrow: new ActiveArrow(to?.icaoStruct ?? null, navState),
             to: new TextDisplay(this.getIdent()),
             cdi: new SuperDeviationBar(navState.xtkToActive, navState.toFrom, navState.xtkScale),
             dist: new DistanceDisplay(4, navState.distToActive),
@@ -76,7 +76,7 @@ export class SuperNav1Page extends SixLinePage {
         const to = navState.activeWaypoint.getActiveWpt();
 
         this.children.get("from").text = IcaoFixedLength.getIdentFromFacility(from);
-        this.children.get("activeArrow").icao = to?.icao ?? null;
+        this.children.get("activeArrow").icao = to?.icaoStruct ?? null;
         this.children.get("to").text = this.getIdent();
 
         this.children.get("cdi").xtkScale = navState.xtkScale;
@@ -93,7 +93,7 @@ export class SuperNav1Page extends SixLinePage {
         if (leg === null) {
             return "";
         }
-        return ICAO.getIdent(leg.wpt.icao) + SidStar.getWptSuffix(leg.fixType);
+        return leg.wpt.icaoStruct.ident + SidStar.getWptSuffix(leg.fixType);
     }
 
 }

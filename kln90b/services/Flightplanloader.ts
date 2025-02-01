@@ -1,10 +1,10 @@
 import {Flightplan, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
 import {Message, MessageHandler, OneTimeMessage} from "../data/MessageHandler";
-import {EventBus, ICAO} from "@microsoft/msfs-sdk";
-import {KLNFacilityLoader} from "../data/navdata/KLNFacilityLoader";
+import {EventBus, FacilityClient, ICAO, IcaoValue} from "@microsoft/msfs-sdk";
+import {buildIcaoStructIdentOnly} from "../data/navdata/IcaoBuilder";
 
 export abstract class Flightplanloader {
-    public constructor(protected readonly bus: EventBus, protected readonly facilityLoader: KLNFacilityLoader, protected messageHandler: MessageHandler) {
+    protected constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler) {
     }
 
     /**
@@ -14,11 +14,11 @@ export abstract class Flightplanloader {
      * @param fplIdx
      * @protected
      */
-    protected async loadIcaos(icaos: string[], fplIdx: number = 0): Promise<Flightplan> {
+    protected async loadIcaos(icaos: IcaoValue[], fplIdx: number = 0): Promise<Flightplan> {
         let messages: Message[] = [];
 
         for (let i = 30; i < icaos.length; i++) { //I'm terribly sorry, but the KLN90B flightplans can only have a maximum of 30 legs
-            messages.push(new OneTimeMessage([`WAYPOINT ${ICAO.getIdent(icaos[i])} DELETED`]));
+            messages.push(new OneTimeMessage([`WAYPOINT ${icaos[i].ident} DELETED`]));
         }
 
         const promises = icaos.slice(0, 30).map(this.convertToKLNLeg.bind(this));
@@ -36,13 +36,22 @@ export abstract class Flightplanloader {
         return fpl;
     }
 
-    private async convertToKLNLeg(icao: string): Promise<KLNFlightplanLeg | OneTimeMessage> {
+    /**
+     * This waypoint will not be found and cause a WAYPOINT DELETED message
+     * @param ident
+     * @protected
+     */
+    protected notFoundIcao(ident: string): IcaoValue {
+        return buildIcaoStructIdentOnly(ident);
+    }
+
+    private async convertToKLNLeg(icao: IcaoValue): Promise<KLNFlightplanLeg | OneTimeMessage> {
         try {
-            const facility = await this.facilityLoader.getFacility(ICAO.getFacilityType(icao), icao);
+            const facility = await this.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(icao), icao);
             return {wpt: facility, type: KLNLegType.USER};
         } catch (e) {
             console.error(`Error converting ${icao}`, e);
-            return new OneTimeMessage([`WAYPOINT ${ICAO.getIdent(icao)} DELETED`]);
+            return new OneTimeMessage([`WAYPOINT ${icao.ident} DELETED`]);
         }
     }
 }

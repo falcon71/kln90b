@@ -173,14 +173,15 @@ class ChangeProcedureListItem implements ListItem {
     protected readonly ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     protected readonly innerRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
-    constructor(private cursorController: CursorController,
-                wptIdx: number,
+    constructor(cursorController: CursorController,
+                private readonly wptIdx: number,
                 private readonly facility: AirportFacility,
                 private readonly type: KLNLegType,
                 navState: NavPageState,
-                private readonly procedureName: string,
+                private readonly procedureDisplayName: string,
                 private readonly removeProcedure: (type: KLNLegType) => void,
                 private readonly changeProcedure: (facility: AirportFacility, type: KLNLegType) => void,
+                private readonly onCreate: (idx: number, mode: FplWptEnterMode, keyboardKey?: string) => void,
     ) {
         this.children = new UIElementChildren<ChangeProcedureListItemTypes>({
             arrow: new FlightplanArrow(wptIdx, navState, cursorController),
@@ -191,7 +192,7 @@ class ChangeProcedureListItem implements ListItem {
     public render(): VNode {
         return (
             <span ref={this.ref}>{this.children.get("arrow").render()}<span
-                ref={this.innerRef}>{this.procedureName}</span></span>);
+                ref={this.innerRef}>{this.procedureDisplayName}</span></span>);
     }
 
 
@@ -210,12 +211,16 @@ class ChangeProcedureListItem implements ListItem {
         return false;
     }
 
+    //confirmed in KLN-89 trainer, inserts a new waypoint before
     innerLeft(): boolean {
-        return false;
+        this.onCreate(this.wptIdx, FplWptEnterMode.ROTATE_LEFT);
+        return true;
     }
 
+    //confirmed in KLN-89 trainer, inserts a new waypoint before
     innerRight(): boolean {
-        return false;
+        this.onCreate(this.wptIdx, FplWptEnterMode.ROTATE_RIGHT);
+        return true;
     }
 
 
@@ -264,7 +269,7 @@ class ChangeProcedureListItem implements ListItem {
             }
         } else {
             this.children.get("arrow").isVisible = true;
-            this.innerRef.instance.textContent = this.procedureName;
+            this.innerRef.instance.textContent = this.procedureDisplayName;
             this.ref.instance.classList.remove("inverted", "inverted-blink");
         }
     }
@@ -292,7 +297,7 @@ class ChangeProcedureListItem implements ListItem {
             case KLNLegType.STAR:
                 return "Æ";
             default:
-                throw Error(`Unexpected type:${this.type}`);
+                throw new Error(`Unexpected type:${this.type}`);
 
         }
     }
@@ -359,16 +364,22 @@ class EditableFlightplan {
     }
 
     public createLeg(idx: number, enter: FplWptEnterMode, keyboardKey: string | undefined, wpt: Facility | null = null): void {
-        const prev = this.legs[idx];
         let leg: KLNFlightplanLeg | undefined;
-        if (prev?.leg) { //Happens when a SID or STAR is edited. We need to copy this metadata
-            leg = {
-                wpt: wpt as any, //We will fill leg once we are done in insertLeg
-                type: prev.leg.type,
-                procedureName: prev.leg.procedureName,
-                parentFacility: prev.leg.parentFacility,
+        if (Number.isInteger(idx)) {
+            const prev = this.legs[idx];
+            if (prev?.leg) { //Happens when a SID or STAR is edited. We need to copy this metadata
+                leg = {
+                    wpt: wpt as any, //We will fill leg once we are done in insertLeg
+                    type: prev.leg.type,
+                    procedure: prev.leg.procedure,
+                    parentFacility: prev.leg.parentFacility,
+                }
             }
+        } else {
+            //We are inserting a waypoint right before a procedure, we don't want to copy the procedure metadata
+            idx = idx + 0.5;
         }
+
 
         this.legs.splice(idx, 0, {wpt: wpt, leg: leg, origIdx: -1, enterMe: enter, enterKeyboardKey: keyboardKey});
         this.buildList();
@@ -403,7 +414,7 @@ class EditableFlightplan {
 
         for (let i = 0; i < this.legs.length; i++) {
             const leg = this.legs[i];
-            if (leg.leg !== undefined && leg.leg.procedureName !== undefined && (i === 0 || leg.leg.procedureName !== this.legs[i - 1].leg?.procedureName)) {
+            if (leg.leg !== undefined && leg.leg.procedure?.displayName !== undefined && (i === 0 || leg.leg.procedure.displayName !== this.legs[i - 1].leg?.procedure?.displayName)) {
                 numActiveFields++;
                 listItems.push(new ChangeProcedureListItem(
                     this.cursorController,
@@ -411,9 +422,10 @@ class EditableFlightplan {
                     leg.leg.parentFacility!,
                     leg.leg.type,
                     this.props.memory.navPage,
-                    leg.leg.procedureName,
+                    leg.leg.procedure.displayName,
                     this.removeProcedure.bind(this),
                     this.changeProcedure.bind(this),
+                    this.createLeg.bind(this),
                 ));
             }
 
@@ -529,7 +541,7 @@ class EditableFlightplan {
                 mainPage.setRightPage(new Apt8Page(this.props));
                 break;
             default:
-                throw Error(`Type ${type} not supported`)
+                throw new Error(`Type ${type} not supported`)
         }
 
     }

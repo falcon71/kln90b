@@ -46,7 +46,7 @@ export class Nav3Page extends SixLineHalfPage {
 
         this.children = new UIElementChildren<Nav3PageTypes>({
             from: new TextDisplay(IcaoFixedLength.getIdentFromFacility(from)),
-            activeArrow: new ActiveArrow(to?.icao ?? null, navState),
+            activeArrow: new ActiveArrow(to?.icaoStruct ?? null, navState),
             to: new TextDisplay(IcaoFixedLength.getIdentFromFacility(to)),
             dtkLabel: new TextDisplay(this.getDtkLabel()),
             dtk: new ObsDtkElement(this.props.planeSettings, this.props.sensors, navState, this.props.modeController),
@@ -87,7 +87,7 @@ export class Nav3Page extends SixLineHalfPage {
         const to = navState.activeWaypoint.getActiveWpt();
 
         this.children.get("from").text = IcaoFixedLength.getIdentFromFacility(from);
-        this.children.get("activeArrow").icao = to?.icao ?? null;
+        this.children.get("activeArrow").icao = to?.icaoStruct ?? null;
         this.children.get("to").text = IcaoFixedLength.getIdentFromFacility(to);
 
         this.children.get("track").bearing = gps.isValid() ? this.props.magvar.trueToMag(gps.getTrackTrueRespectingGroundspeed()) : null;

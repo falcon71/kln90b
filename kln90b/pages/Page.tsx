@@ -1,4 +1,4 @@
-import {ComponentProps, DisplayComponent, EventBus, NodeReference, VNode} from "@microsoft/msfs-sdk";
+import {ComponentProps, DisplayComponent, EventBus, FacilityClient, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {PageManager} from "./PageManager";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {Sensors} from "../Sensors";
@@ -6,7 +6,6 @@ import {VolatileMemory} from "../data/VolatileMemory";
 import {NearestUtils} from "../data/navdata/NearestUtils";
 import {RemarksManager} from "../settings/RemarksManager";
 import {Nearestlists} from "../data/navdata/NearestList";
-import {KLNFacilityLoader} from "../data/navdata/KLNFacilityLoader";
 import {Scanlists} from "../data/navdata/Scanlist";
 import {MessageHandler} from "../data/MessageHandler";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
@@ -17,6 +16,7 @@ import {ModeController} from "../services/ModeController";
 import {Database} from "../data/navdata/Database";
 import {KLNMagvar} from "../data/navdata/KLNMagvar";
 import {SidStar} from "../data/navdata/SidStar";
+import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
 
 export enum PageSide {
     LeftPage,
@@ -36,7 +36,8 @@ export interface PageProps extends ComponentProps {
     messageHandler: MessageHandler;
     hardware: Hardware;
     memory: VolatileMemory;
-    facilityLoader: KLNFacilityLoader;
+    facilityLoader: FacilityClient;
+    facilityRepository: KLNFacilityRepository;
     nearestLists: Nearestlists;
     nearestUtils: NearestUtils;
     scanLists: Scanlists;

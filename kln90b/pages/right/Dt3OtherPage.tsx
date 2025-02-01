@@ -47,7 +47,7 @@ export class Dt3OtherPage extends SixLineHalfPage {
         const following = followingIdx > -1 ? legs[followingIdx].wpt : null;
 
         this.children = new UIElementChildren<Dt3OtherPageTypes>({
-            activeArrow: new ActiveArrow(to?.icao ?? null, navState),
+            activeArrow: new ActiveArrow(to?.icaoStruct ?? null, navState),
             activeIdx: new TextDisplay(activeIdx === -1 ? "  " : (activeIdx + 1).toString().padStart(2, " ")),
             activeIdent: new TextDisplay(IcaoFixedLength.getIdentFromFacility(to)),
             activeDis: new RoundedDistanceDisplay(Alignment.right, navState.distToActive),
@@ -90,7 +90,7 @@ export class Dt3OtherPage extends SixLineHalfPage {
         const followingIdx = activeIdx !== -1 && activeIdx + 1 < legs.length ? activeIdx + 1 : -1;
         const following = followingIdx > -1 ? legs[followingIdx].wpt : null;
 
-        this.children.get("activeArrow").icao = to?.icao ?? null;
+        this.children.get("activeArrow").icao = to?.icaoStruct ?? null;
         this.children.get("activeIdx").text = activeIdx === -1 ? "  " : (activeIdx + 1).toString().padStart(2, " ");
         this.children.get("activeIdent").text = IcaoFixedLength.getIdentFromFacility(to);
         this.children.get("activeDis").distance = navState.distToActive;

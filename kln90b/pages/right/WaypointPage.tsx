@@ -1,12 +1,11 @@
-import {Facility, ICAO} from "@microsoft/msfs-sdk";
+import {Facility, FacilityClient, ICAO, IcaoValue} from "@microsoft/msfs-sdk";
 import {PageProps} from "../Page";
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {MAX_SCROLL_SPEED, Scanlist} from "../../data/navdata/Scanlist";
-import {KLNFacilityLoader} from "../../data/navdata/KLNFacilityLoader";
 import {AirportNearestList, NdbNearestList, NearestWpt, VorNearestList} from "../../data/navdata/NearestList";
 import {NearestSelector} from "../../controls/selects/NearestSelector";
-import {TEMPORARY_WAYPOINT, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {buildIcaoStructIdentOnly, TEMPORARY_WAYPOINT, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 type ScrollDirection = -1 | 1;
 
@@ -21,18 +20,19 @@ const SPEEDSTEP_SIZE = 1.5;
 class ScanHandler {
 
     public isSearchRunning: boolean = false;
+    //todo we could use InputAcceleration from the sdk for this
     private lastScrollTime: number = 0;
     private lastScrollSpeed: number = 1;
     private lastScrollDirection: ScrollDirection = 1;
 
-    constructor(private scanList: Scanlist, private facilityLoader: KLNFacilityLoader) {
+    constructor(private scanList: Scanlist, private facilityLoader: FacilityClient) {
     }
 
-    public async scanLeft(lastIcao: string): Promise<Facility | null> {
+    public async scanLeft(lastIcao: IcaoValue): Promise<Facility | null> {
         return this.scan(lastIcao, -1);
     }
 
-    public async scanRight(lastIcao: string): Promise<Facility | null> {
+    public async scanRight(lastIcao: IcaoValue): Promise<Facility | null> {
         return this.scan(lastIcao, 1);
     }
 
@@ -51,7 +51,7 @@ class ScanHandler {
         return Math.min(Math.floor(speed), MAX_SCROLL_SPEED) * direction;
     }
 
-    private async scan(lastIcao: string, direction: ScrollDirection): Promise<Facility | null> {
+    private async scan(lastIcao: IcaoValue, direction: ScrollDirection): Promise<Facility | null> {
         const scrollSpeed = this.getScrollSpeed(direction); //We always want to execute this, so we still have the correct speed
         if (this.isSearchRunning) {
             throw new Error("I'm already scanning, you are calling me too fast!");
@@ -63,7 +63,7 @@ class ScanHandler {
             this.isSearchRunning = false;
             return null
         }
-        const nextFacility = await this.facilityLoader.getFacility(ICAO.getFacilityType(nextIcao), nextIcao) as any;
+        const nextFacility = await this.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(nextIcao), nextIcao) as any;
 
         this.isSearchRunning = false;
         return nextFacility;
@@ -86,15 +86,15 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
                 this.facility = props.facility;
                 this.getMemory().facility = props.facility;
                 const facility = unpackFacility(this.facility);
-                this.ident = ICAO.getIdent(facility.icao);
+                this.ident = facility.icaoStruct.ident;
                 this.getMemory().ident = this.ident;
-                this.getScanlist().sync(facility.icao);
+                this.getScanlist().sync(facility.icaoStruct);
             } else { //This branch occurs, when the page is shown temporarily for confirmation or in the ACT page. We do not want to set the memory location
                 this.facility = props.facility;
                 if (this.facility === null) {
                     this.ident = "";
                 } else {
-                    this.ident = ICAO.getIdent(props.facility.icao);
+                    this.ident = props.facility.icaoStruct.ident;
                 }
             }
             if (isActiveWaypointPageProps(props)) {
@@ -106,8 +106,8 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
             this.facility = this.getMemory().facility;
             const facility = unpackFacility(this.facility);
             if (facility) {
-                this.ident = ICAO.getIdent(facility.icao);
-                this.getScanlist().sync(facility.icao);
+                this.ident = facility.icaoStruct.ident;
+                this.getScanlist().sync(facility.icaoStruct);
             } else {
                 this.ident = this.getMemory().ident;
             }
@@ -153,7 +153,7 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
             }
         } else {
             const fac = unpackFacility(this.facility);
-            this.scanHandler.scanLeft(fac ? fac.icao : `       ${this.ident.padEnd(5, " ")}`).then(nextFacility => {
+            this.scanHandler.scanLeft(fac ? fac.icaoStruct : buildIcaoStructIdentOnly(this.ident.padEnd(5, " "))).then(nextFacility => {
                 if (nextFacility === null) { //End of waypointlist, move to the nearestlist if avaiable
                     const nearestListGenerator = this.getNearestList();
                     if (nearestListGenerator !== null) {
@@ -183,7 +183,7 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
                 if (startIcao === null) {
                     this.changeFacility("0    "); //No database??
                 } else {
-                    this.props.facilityLoader.getFacility(ICAO.getFacilityType(startIcao), startIcao)
+                    this.props.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(startIcao), startIcao)
                         .then((nextFacility) => this.changeFacility(nextFacility as any));
                 }
             } else {
@@ -191,7 +191,7 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
             }
         } else {
             const fac = unpackFacility(this.facility);
-            this.scanHandler.scanRight(fac ? fac.icao : `       ${this.ident.padEnd(5, " ")}`).then(nextFacility => {
+            this.scanHandler.scanRight(fac ? fac.icaoStruct : buildIcaoStructIdentOnly(this.ident.padEnd(5, " "))).then(nextFacility => {
                 if (nextFacility !== null) {
                     this.changeFacility(nextFacility as any);
                 }
@@ -211,7 +211,7 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
         } else if (this.activeIdx === 0) { //Direct to
             return "   ";
         }
-        return (this.activeIdx + 1).toString().padStart(2, " ") + " ";
+        return (this.activeIdx).toString().padStart(2, " ") + " ";
     }
 
     protected changeFacility(fac: T | NearestWpt<T> | string) {
@@ -226,8 +226,8 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
         } else {
             this.facility = fac;
             const facility = unpackFacility(this.facility);
-            this.ident = ICAO.getIdent(facility.icao);
-            this.getScanlist().sync(facility.icao);
+            this.ident = facility.icaoStruct.ident;
+            this.getScanlist().sync(facility.icaoStruct);
         }
 
         this.getMemory().facility = this.facility;
@@ -255,8 +255,7 @@ export function isActiveWaypointPageProps<T extends Facility>(props: PageProps):
 }
 
 export function isUserWaypoint(fac: Facility): boolean {
-    const region = ICAO.getRegionCode(fac.icao);
-    return region === USER_WAYPOINT || region === TEMPORARY_WAYPOINT;
+    return fac.icaoStruct.region === USER_WAYPOINT || fac.icaoStruct.region === TEMPORARY_WAYPOINT;
 }
 
 /**

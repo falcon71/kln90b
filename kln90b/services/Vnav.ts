@@ -3,7 +3,7 @@ import {Sensors} from "../Sensors";
 import {CalcTickable} from "../TickController";
 import {Flightplan} from "../data/flightplan/Flightplan";
 import {Degrees, Feet, NauticalMiles, Seconds} from "../data/Units";
-import {Facility, GeoPoint, UnitType} from "@microsoft/msfs-sdk";
+import {Facility, GeoPoint, ICAO, UnitType} from "@microsoft/msfs-sdk";
 import {HOURS_TO_SECONDS} from "../data/navdata/NavCalculator";
 import {format} from "numerable";
 
@@ -102,9 +102,9 @@ export class Vnav implements CalcTickable {
             return false;
         }
         if (fplIdx === -1) { //Direct to, wpt must be the active waypoint
-            return wpt.icao === active.icao;
+            return ICAO.valueEquals(wpt.icaoStruct, active.icaoStruct)
         } else {
-            const isFutureWpt = this.fpl0.getLegs().filter((_, idx) => idx >= fplIdx).some(l => l.wpt.icao === wpt.icao);
+            const isFutureWpt = this.fpl0.getLegs().filter((_, idx) => idx >= fplIdx).some(l => ICAO.valueEquals(l.wpt.icaoStruct, wpt.icaoStruct));
             if (!isFutureWpt) {
                 return false;
             }
@@ -167,7 +167,7 @@ export class Vnav implements CalcTickable {
     private getDistanceToTarget(target: Facility): NauticalMiles {
         console.assert(this.isValidVnavWpt(target), "VNAV Wpt is not valid", target);
         const activeWpt = this.navState.activeWaypoint.getActiveWpt()!;
-        if (activeWpt.icao === target.icao) {
+        if (ICAO.valueEquals(activeWpt.icaoStruct, target.icaoStruct)) {
             return this.navState.distToActive! - this.navState.nav4VnavDist;
         } else {
             let dist = this.navState.distToActive! - this.navState.nav4VnavDist;
@@ -177,11 +177,11 @@ export class Vnav implements CalcTickable {
                 const prev = legs[i - 1];
                 const next = legs[i];
                 dist += UnitType.GA_RADIAN.convertTo(new GeoPoint(prev.wpt.lat, prev.wpt.lon).distance(next.wpt), UnitType.NMILE);
-                if (next.wpt.icao === target.icao) {
+                if (ICAO.valueEquals(next.wpt.icaoStruct, target.icaoStruct)) {
                     return dist;
                 }
             }
-            throw new Error(`VNAV Wpt is not valid${target.icao}`);
+            throw new Error(`VNAV Wpt is not valid${target.icaoStruct}`);
         }
     }
 }

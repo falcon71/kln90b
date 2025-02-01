@@ -2,18 +2,23 @@ import {
     AirportFacility,
     BitFlags,
     Facility,
+    FacilityClient,
     FacilitySearchType,
     FacilityType,
     GeoPoint,
+    ICAO,
     NdbFacility,
+    NearestAirportSearchSession,
+    NearestIcaoSearchSessionDataType,
+    NearestSearchSessionTypeMap,
+    RunwaySurfaceType,
     UnitType,
     VorClass,
     VorFacility,
     VorType,
 } from "@microsoft/msfs-sdk";
 import {Sensors} from "../../Sensors";
-import {KLNFacilityLoader, KLNSessionTypeMap} from "./KLNFacilityLoader";
-import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
+import {KLN90BUserSettings, SURFACE_HRD, SURFACE_HRD_SFT} from "../../settings/KLN90BUserSettings";
 import {CalcTickable, TICK_TIME_CALC} from "../../TickController";
 
 const NEAREST_TICK_TIME = 10000;
@@ -27,7 +32,7 @@ export class Nearestlists {
     public readonly ndbNearestList: NdbNearestList;
 
 
-    constructor(facilityLoader: KLNFacilityLoader, sensors: Sensors, userSettings: KLN90BUserSettings) {
+    constructor(facilityLoader: FacilityClient, sensors: Sensors, userSettings: KLN90BUserSettings) {
         this.aptNearestList = new AirportNearestList(facilityLoader, sensors, FacilitySearchType.Airport, FacilityType.Airport, userSettings);
         this.vorNearestList = new VorNearestList(facilityLoader, sensors, FacilitySearchType.Vor, FacilityType.VOR, userSettings);
         this.ndbNearestList = new NdbNearestList(facilityLoader, sensors, FacilitySearchType.Ndb, FacilityType.NDB, userSettings);
@@ -47,18 +52,18 @@ export interface NearestWpt<T extends Facility> {
 
 
 abstract class NearestList<SearchType extends NearestSearchType, FacType extends Facility> implements CalcTickable {
-    protected session: KLNSessionTypeMap[SearchType] | undefined;
+    protected session: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[SearchType] | undefined;
 
     private nearestList: NearestWpt<FacType>[] = [];
 
     private tickTimer: number = 0;
     private isCalculating: boolean = false;
 
-    public constructor(private readonly facilityLoader: KLNFacilityLoader, private readonly sensors: Sensors, private readonly searchType: SearchType, private readonly facilityType: FacilityType, protected userSettings: KLN90BUserSettings) {
+    public constructor(private readonly facilityLoader: FacilityClient, private readonly sensors: Sensors, private readonly searchType: SearchType, private readonly facilityType: FacilityType, protected userSettings: KLN90BUserSettings) {
     }
 
     public async init() {
-        this.session = await this.facilityLoader.startNearestSearchSession(this.searchType) as KLNSessionTypeMap[SearchType];
+        this.session = await this.facilityLoader.startNearestSearchSessionWithIcaoStructs(this.searchType);
         this.initFilters(this.session);
     }
 
@@ -80,7 +85,7 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
 
         for (const removedIcao of diff.removed) {
             for (let i = 0; i < this.nearestList.length; i++) {
-                if (this.nearestList[i].facility.icao === removedIcao) {
+                if (ICAO.valueEquals(this.nearestList[i].facility.icaoStruct, removedIcao)) {
                     this.nearestList[i].index = -1;
                     this.nearestList.splice(i, 1);
                 }
@@ -111,7 +116,7 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
         return this.nearestList.slice(0, 9);
     }
 
-    protected abstract initFilters(session: KLNSessionTypeMap[SearchType]): void;
+    protected abstract initFilters(session: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[SearchType]): void;
 
     private updateBearingDistance() {
         for (const wpt of this.nearestList) {
@@ -135,20 +140,61 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
 export class AirportNearestList extends NearestList<FacilitySearchType.Airport, AirportFacility> {
 
     public updateFilters(): void {
-        this.session!.setAirportFilters(
-            this.userSettings.getSetting("nearestAptSurface").get(),
-            this.userSettings.getSetting("nearestAptMinRunwayLength").get(),
+        this.session!.setExtendedAirportFilters(
+            this.getSurfaceMask(this.userSettings.getSetting("nearestAptSurface").get()),
+            NearestAirportSearchSession.Defaults.ApproachTypeMask,
+            NearestAirportSearchSession.Defaults.ToweredMask,
+            UnitType.FOOT.convertTo(this.userSettings.getSetting("nearestAptMinRunwayLength").get(), UnitType.METER),
         );
     }
 
-    protected initFilters(session: KLNSessionTypeMap[FacilitySearchType.Airport]): void {
+    protected initFilters(session: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[FacilitySearchType.Airport]): void {
         this.updateFilters();
+    }
+
+    private getSurfaceMask(surfaceType: boolean): number {
+        let surfaceTypeMask;
+        switch (surfaceType) {
+            case SURFACE_HRD_SFT:
+                surfaceTypeMask = BitFlags.union(
+                    //hard
+                    BitFlags.createFlag(RunwaySurfaceType.Concrete),
+                    BitFlags.createFlag(RunwaySurfaceType.Asphalt),
+                    BitFlags.createFlag(RunwaySurfaceType.Tarmac),
+                    BitFlags.createFlag(RunwaySurfaceType.Brick),
+                    BitFlags.createFlag(RunwaySurfaceType.Bituminous),
+                    //soft
+                    BitFlags.createFlag(RunwaySurfaceType.HardTurf),
+                    BitFlags.createFlag(RunwaySurfaceType.Gravel),
+                    BitFlags.createFlag(RunwaySurfaceType.Sand),
+                    BitFlags.createFlag(RunwaySurfaceType.Dirt),
+                    BitFlags.createFlag(RunwaySurfaceType.Ice),
+                    BitFlags.createFlag(RunwaySurfaceType.SteelMats),
+                    BitFlags.createFlag(RunwaySurfaceType.Shale),
+
+                    BitFlags.createFlag(RunwaySurfaceType.Grass),
+                    BitFlags.createFlag(RunwaySurfaceType.GrassBumpy),
+                    BitFlags.createFlag(RunwaySurfaceType.ShortGrass),
+                    BitFlags.createFlag(RunwaySurfaceType.LongGrass),
+                );
+                break;
+            case SURFACE_HRD:
+                surfaceTypeMask = BitFlags.union(
+                    BitFlags.createFlag(RunwaySurfaceType.Concrete),
+                    BitFlags.createFlag(RunwaySurfaceType.Asphalt),
+                    BitFlags.createFlag(RunwaySurfaceType.Tarmac),
+                    BitFlags.createFlag(RunwaySurfaceType.Brick),
+                    BitFlags.createFlag(RunwaySurfaceType.Bituminous),
+                );
+                break;
+        }
+        return surfaceTypeMask;
     }
 
 }
 
 export class VorNearestList extends NearestList<FacilitySearchType.Vor, VorFacility> {
-    protected initFilters(session: KLNSessionTypeMap[FacilitySearchType.Vor]): void {
+    protected initFilters(session: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[FacilitySearchType.Vor]): void {
         session.setVorFilter(
             BitFlags.union(BitFlags.createFlag(VorClass.HighAlt), BitFlags.createFlag(VorClass.LowAlt)),
             BitFlags.union(BitFlags.createFlag(VorType.VOR), BitFlags.createFlag(VorType.VORDME), BitFlags.createFlag(VorType.VORTAC)),
@@ -158,6 +204,6 @@ export class VorNearestList extends NearestList<FacilitySearchType.Vor, VorFacil
 
 
 export class NdbNearestList extends NearestList<FacilitySearchType.Ndb, NdbFacility> {
-    protected initFilters(session: KLNSessionTypeMap[FacilitySearchType.Ndb]): void {
+    protected initFilters(session: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[FacilitySearchType.Ndb]): void {
     }
 }

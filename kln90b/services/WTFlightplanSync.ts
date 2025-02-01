@@ -1,8 +1,9 @@
 import {Flightplan, FlightplanEvents, KLNFixType} from "../data/flightplan/Flightplan";
 import {
     EventBus,
-    FacilityLoader,
+    FacilityClient,
     FlightPathAirplaneSpeedMode,
+    FlightPathAirplaneWindMode,
     FlightPathCalculator,
     FlightPlan,
     FlightPlanner,
@@ -18,7 +19,7 @@ const FLIGHTPLANNER_ID = "kln90b";
 export class WTFlightplanSync {
     private readonly flightplanner: FlightPlanner;
 
-    constructor(bus: EventBus, facilityLoader: FacilityLoader, private readonly planeSettings: KLN90PlaneSettings, private readonly activeWaypoint: ActiveWaypoint) {
+    constructor(bus: EventBus, facilityLoader: FacilityClient, private readonly planeSettings: KLN90PlaneSettings, private readonly activeWaypoint: ActiveWaypoint) {
         bus.getSubscriber<FlightplanEvents>().on("flightplanChanged").handle(this.flightplanChanged.bind(this));
         bus.getSubscriber<ActiveWaypointChangedEvents>().on("activeWaypointChanged").handle(this.activeIdxChanged.bind(this));
 
@@ -35,6 +36,7 @@ export class WTFlightplanSync {
                 turnAnticipationBankAngle: [[10, 60], [15, 100]],
                 maxBankAngle: 25,
                 airplaneSpeedMode: FlightPathAirplaneSpeedMode.GroundSpeed,
+                airplaneWindMode: FlightPathAirplaneWindMode.None,
             },
             bus,
         );

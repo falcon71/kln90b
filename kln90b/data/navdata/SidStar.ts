@@ -5,6 +5,7 @@ import {
     BitFlags,
     EnrouteTransition,
     Facility,
+    FacilityClient,
     FacilityType,
     FixTypeFlags,
     FlightPlanLeg,
@@ -24,13 +25,13 @@ import {
     UserFacilityType,
     VorFacility,
 } from "@microsoft/msfs-sdk";
-import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "../flightplan/Flightplan";
-import {KLNFacilityLoader} from "./KLNFacilityLoader";
+import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType, ProcedureInformation} from "../flightplan/Flightplan";
 import {Degrees, NauticalMiles} from "../Units";
 import {format} from "numerable";
 import {Sensors} from "../../Sensors";
 import {NavPageState} from "../VolatileMemory";
-import {buildIcao, TEMPORARY_WAYPOINT} from "./IcaoBuilder";
+import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "./IcaoBuilder";
+import {KLNFacilityRepository} from "./KLNFacilityRepository";
 
 export interface ArcData {
     beginRadial: Degrees, //The published beginning radial
@@ -48,10 +49,13 @@ export interface ArcData {
     circle: GeoCircle,
 }
 
+const B_RNAV = UnitType.NMILE.convertTo(5, UnitType.METER);
+
 export class SidStar {
 
 
-    public constructor(private readonly facilityLoader: KLNFacilityLoader, private readonly sensors: Sensors) {
+
+    public constructor(private readonly facilityLoader: FacilityClient, private readonly facilityRepository: KLNFacilityRepository, private readonly sensors: Sensors) {
     }
 
     /**
@@ -61,10 +65,10 @@ export class SidStar {
      */
 
     public static hasDuplicates(fplLegs: KLNFlightplanLeg[], procedureLegs: KLNFlightplanLeg[]): boolean {
-        const procedureIcaos = procedureLegs.map(leg => leg.wpt.icao);
+        const procedureIcaos = procedureLegs.map(leg => leg.wpt.icaoStruct);
 
         for (const fplLeg of fplLegs) {
-            if (procedureIcaos.includes(fplLeg.wpt.icao)) {
+            if (procedureIcaos.includes(fplLeg.wpt.icaoStruct)) {
                 return true;
             }
         }
@@ -103,7 +107,7 @@ export class SidStar {
                 prefix = "N";
                 break;
             default:
-                throw Error(`Unsupported approachtype: ${app}`);
+                throw new Error(`Unsupported approachtype: ${app}`);
         }
 
         let runway: string;
@@ -114,7 +118,7 @@ export class SidStar {
             runway = RunwayUtils.getRunwayNameString(app.runwayNumber, app.runwayDesignator, true);
         }
 
-        return prefix + runway + app.approachSuffix + "-" + ICAO.getIdent(facility.icao);
+        return prefix + runway + app.approachSuffix + "-" + facility.icaoStruct.ident;
     }
 
     /**
@@ -164,17 +168,18 @@ export class SidStar {
 
 
             if (NavMath.bearingIsBetween(radial, start, end)) {
+                // noinspection JSDeprecatedSymbols
                 const entryFacility: UserFacility = {
-                    icao: buildIcao('U', TEMPORARY_WAYPOINT, this.getArcEntryName(ICAO.getIdent(arcData.vor.icao), radial, dist)),
+                    icao: buildIcao('U', TEMPORARY_WAYPOINT, this.getArcEntryName(arcData.vor.icaoStruct.ident, radial, dist)),
+                    icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, this.getArcEntryName(arcData.vor.icaoStruct.ident, radial, dist)),
                     name: "",
                     lat: entryPoint.lat,
                     lon: entryPoint.lon,
                     region: TEMPORARY_WAYPOINT,
                     city: "",
-                    magvar: 0,
                     isTemporary: false, //irrelevant, because this flag is not persisted
                     userFacilityType: UserFacilityType.LAT_LONG,
-                    reference1Icao: arcData.vor.icao,
+                    reference1IcaoStruct: arcData.vor.icaoStruct,
                     reference1Radial: radial,
                     reference1Distance: dist,
                 };
@@ -206,20 +211,20 @@ export class SidStar {
     }
 
     public static isApproachRecognized(app: ApproachProcedure): boolean {
+        if (!SidStar.appIsBRnav(app) || !SidStar.appHasNoRFLegs(app)) {
+            return false;
+        }
+
         switch (app.approachType) {
             case ApproachType.APPROACH_TYPE_RNAV:
                 //Only if LNAV without VNAV is allowed
-                if (BitFlags.isAny(app.rnavTypeFlags, RnavTypeFlags.LNAV)) {
-                    return SidStar.appHasNoRFLegs(app);
-                } else {
-                    return false;
-                }
+                return BitFlags.isAny(app.rnavTypeFlags, RnavTypeFlags.LNAV);
             case ApproachType.APPROACH_TYPE_GPS:
             case ApproachType.APPROACH_TYPE_VOR:
             case ApproachType.APPROACH_TYPE_NDB:
             case ApproachType.APPROACH_TYPE_VORDME:
             case ApproachType.APPROACH_TYPE_NDBDME:
-                return SidStar.appHasNoRFLegs(app);
+                return true;
             default:
                 return false;
         }
@@ -228,7 +233,7 @@ export class SidStar {
     public static isProcedureRecognized(proc: Procedure, runwayTransition: RunwayTransition | null = null, enrouteTransition: EnrouteTransition | null = null): boolean {
         //The real device does not include RNAV procedures: https://www.euroga.org/forums/maintenance-avionics/5573-rnav-retrofit
         //It seems, that we can't recognize those here
-        return SidStar.procHasNoRFLegs(proc) && SidStar.hasAtLeastOneRecognizedLeg(proc, runwayTransition, enrouteTransition);
+        return SidStar.procIsBRnav(proc) && SidStar.procHasNoRFLegs(proc) && SidStar.hasAtLeastOneRecognizedLeg(proc, runwayTransition, enrouteTransition);
     }
 
     /**
@@ -320,6 +325,41 @@ export class SidStar {
     }
 
     /**
+     *  People are going to hate me, but the KLN is only capable of B-RNAV
+     * @param proc
+     * @private
+     */
+    private static appIsBRnav(app: ApproachProcedure): boolean {
+        for (const transition of app.transitions) {
+            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < B_RNAV)) {
+                return false;
+            }
+        }
+
+        return !app.finalLegs.concat(app.missedLegs).some(leg => leg.rnp > 0 && leg.rnp < B_RNAV);
+    }
+
+    /**
+     *  People are going to hate me, but the KLN is only capable of B-RNAV
+     * @param proc
+     * @private
+     */
+    private static procIsBRnav(proc: Procedure): boolean {
+        for (const transition of proc.enRouteTransitions) {
+            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < B_RNAV)) {
+                return false;
+            }
+        }
+        for (const transition of proc.runwayTransitions) {
+            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < B_RNAV)) {
+                return false;
+            }
+        }
+
+        return !proc.commonLegs.some(leg => leg.rnp > 0 && leg.rnp < B_RNAV);
+    }
+
+    /**
      * For example KGEG GEG7 only has CA and VM, which are not recognized by the KLN,
      * which would result in an empty procedure with no legs.
      * Another interesting example is KJFK JFK 5. Only RWY 31 has a leg to CRI, the others would be empty
@@ -353,7 +393,8 @@ export class SidStar {
     }
 
     private static isLegSupported(leg: FlightPlanLeg): boolean {
-        return leg.fixIcao.trim() !== "" && leg.type != LegType.RF;
+        return leg.fixIcaoStruct.ident.trim() !== "" &&
+            leg.type != LegType.RF;
     }
 
     /**
@@ -376,7 +417,15 @@ export class SidStar {
 
         const cleaned = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
         const approachName = SidStar.formatApproachName(app, facility);
-        return await this.convertToKLN(facility, approachName, KLNLegType.APP, cleaned);
+        return await this.convertToKLN(facility, {
+            displayName: approachName,
+            procedureName: app.name,
+            approachSuffix: app.approachSuffix,
+            approachType: app.approachType,
+            transition: iaf?.name,
+            runwayNumber: app.runwayNumber,
+            runwayDesignator: app.runwayDesignator,
+        }, KLNLegType.APP, cleaned);
     }
 
     private filterOutDuplicates(legs: FlightPlanLeg[]): FlightPlanLeg[] {
@@ -395,8 +444,8 @@ export class SidStar {
                 const next = legs[i + 1];
                 const bothAreAF = leg.type === LegType.AF && next.type === LegType.AF; //The KLN does not support step down fixes. We merge multiple arcs
 
-                const nextIsSameWpt = next.fixIcao === leg.fixIcao;
-                const isAlreadyLastInList = filtered.length > 0 && filtered[filtered.length - 1].fixIcao === leg.fixIcao;
+                const nextIsSameWpt = ICAO.valueEquals(next.fixIcaoStruct, leg.fixIcaoStruct);
+                const isAlreadyLastInList = filtered.length > 0 && ICAO.valueEquals(filtered[filtered.length - 1].fixIcaoStruct, leg.fixIcaoStruct);
                 if (!bothAreAF && !nextIsSameWpt && !isAlreadyLastInList) { //We prefer the following WPT, because those might be holds
                     let modifiedLeg = leg;
                     if (i > 0) {
@@ -432,71 +481,13 @@ export class SidStar {
      * @private
      */
     private addArcInfoIfPrevIsSame(prevLeg: FlightPlanLeg, currentLeg: FlightPlanLeg): FlightPlanLeg {
-        if (prevLeg.fixIcao !== currentLeg.fixIcao || prevLeg.type !== LegType.AF) {
+        if (!ICAO.valueEquals(prevLeg.fixIcaoStruct, currentLeg.fixIcaoStruct) || prevLeg.type !== LegType.AF) {
             return currentLeg;
         }
 
         //Yes, merging is as easy as that...
         prevLeg.fixTypeFlags = currentLeg.fixTypeFlags;
         return prevLeg;
-    }
-
-    /**
-     * Converts the FlightPlanLegs to KLNFlightplanLegs.
-     * Also resolves DME Arc entries.
-     * @param facility
-     * @param procedureName
-     * @param legType
-     * @param legs
-     * @private
-     */
-    private async convertToKLN(facility: AirportFacility, procedureName: string, legType: KLNLegType, legs: FlightPlanLeg[]): Promise<KLNFlightplanLeg[]> {
-        const promises = legs.map(leg =>
-            this.facilityLoader.getFacility(ICAO.getFacilityType(leg.fixIcao), leg.fixIcao).then(fac => ({
-                    leg: leg,
-                    facility: fac,
-                }),
-            ));
-
-
-        const enriched = await Promise.all(promises);
-        const klnLegs: KLNFlightplanLeg[] = [];
-
-        for (const enrichedLeg of enriched) {
-            if (enrichedLeg.leg.type === LegType.AF) {
-                //Entry here and exits below for arcs
-
-                //The KLN calculates its own entry
-                const originalEntry = klnLegs.pop()!;
-
-
-                const arcData = await this.getArcEntryData(enrichedLeg);
-                klnLegs.push({
-                    wpt: arcData.entryFacility,
-                    type: legType,
-                    parentFacility: facility,
-                    procedureName: procedureName,
-                    arcData: arcData,
-                    fixType: originalEntry.fixType,
-                    flyOver: enrichedLeg.leg.flyOver,
-                });
-            }
-
-
-            const askObs = this.shouldAskObs(enrichedLeg.leg.type);
-            klnLegs.push({
-                wpt: enrichedLeg.facility,
-                type: legType,
-                parentFacility: facility,
-                procedureName: procedureName,
-                flyOver: enrichedLeg.leg.flyOver || askObs,
-                askObs: askObs,
-                fixType: this.getKLNFixType(enrichedLeg.leg),
-            });
-
-        }
-        return klnLegs;
-
     }
 
     /**
@@ -538,7 +529,71 @@ export class SidStar {
 
         const cleaned = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
         const procedureName = `${proc.name}-${type === KLNLegType.SID ? "SID" : "Æ"}`;
-        return await this.convertToKLN(facility, procedureName, type, cleaned);
+        return await this.convertToKLN(facility, {
+            displayName: procedureName,
+            procedureName: proc.name,
+            transition: trans?.name,
+            runwayNumber: rwy?.runwayNumber,
+            runwayDesignator: rwy?.runwayDesignation as RunwayDesignator ?? null,
+        }, type, cleaned);
+
+    }
+
+    /**
+     * Converts the FlightPlanLegs to KLNFlightplanLegs.
+     * Also resolves DME Arc entries.
+     * @param facility
+     * @param procedureName
+     * @param legType
+     * @param legs
+     * @private
+     */
+    private async convertToKLN(facility: AirportFacility, procedureInformation: ProcedureInformation, legType: KLNLegType, legs: FlightPlanLeg[]): Promise<KLNFlightplanLeg[]> {
+        const promises = legs.map(leg =>
+            this.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(leg.fixIcaoStruct), leg.fixIcaoStruct).then(fac => ({
+                    leg: leg,
+                    facility: fac,
+                }),
+            ));
+
+
+        const enriched = await Promise.all(promises);
+        const klnLegs: KLNFlightplanLeg[] = [];
+
+        for (const enrichedLeg of enriched) {
+            if (enrichedLeg.leg.type === LegType.AF) {
+                //Entry here and exits below for arcs
+
+                //The KLN calculates its own entry
+                const originalEntry = klnLegs.pop()!;
+
+
+                const arcData = await this.getArcEntryData(enrichedLeg);
+                klnLegs.push({
+                    wpt: arcData.entryFacility,
+                    type: legType,
+                    parentFacility: facility,
+                    procedure: procedureInformation,
+                    arcData: arcData,
+                    fixType: originalEntry.fixType,
+                    flyOver: enrichedLeg.leg.flyOver,
+                });
+            }
+
+
+            const askObs = this.shouldAskObs(enrichedLeg.leg.type);
+            klnLegs.push({
+                wpt: enrichedLeg.facility,
+                type: legType,
+                parentFacility: facility,
+                procedure: procedureInformation,
+                flyOver: enrichedLeg.leg.flyOver || askObs,
+                askObs: askObs,
+                fixType: this.getKLNFixType(enrichedLeg.leg),
+            });
+
+        }
+        return klnLegs;
 
     }
 
@@ -579,7 +634,7 @@ export class SidStar {
      * Therefore, it generates an artificialy entry waypoint based on the radial of the current position to the VOR.
      */
     private async getArcEntryData(convertedLeg: { facility: Facility; leg: FlightPlanLeg }): Promise<ArcData> {
-        const vor = await this.facilityLoader.getFacility(FacilityType.VOR, convertedLeg.leg.originIcao);
+        const vor = await this.facilityLoader.getFacility(FacilityType.VOR, convertedLeg.leg.originIcaoStruct);
         const vorPoint = new GeoPoint(vor.lat, vor.lon);
 
         const circleCenter = new Float64Array(3);
@@ -616,17 +671,18 @@ export class SidStar {
             radial = convertedLeg.leg.course;
         }
 
+        // noinspection JSDeprecatedSymbols
         const entryFacility: UserFacility = {
-            icao: buildIcao('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(ICAO.getIdent(vor.icao), radial, dist)),
+            icao: buildIcao('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(vor.icaoStruct.ident, radial, dist)),
+            icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(vor.icaoStruct.ident, radial, dist)),
             name: "",
             lat: entryPoint.lat,
             lon: entryPoint.lon,
             region: TEMPORARY_WAYPOINT,
             city: "",
-            magvar: 0,
             isTemporary: false, //irrelevant, because this flag is not persisted
             userFacilityType: UserFacilityType.LAT_LONG,
-            reference1Icao: vor.icao,
+            reference1IcaoStruct: vor.icaoStruct,
             reference1Radial: radial,
             reference1Distance: dist,
         };
@@ -637,7 +693,7 @@ export class SidStar {
 
         try {
             //Not sure, but I would expect this to behave like the REF page
-            this.facilityLoader.facilityRepo.add(entryFacility);
+            this.facilityRepository.add(entryFacility);
         } catch (e) {
             //DB full. Oh well, what's the worst that could possibly happen?
         }

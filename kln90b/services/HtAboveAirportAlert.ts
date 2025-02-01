@@ -1,7 +1,7 @@
 import {CalcTickable} from "../TickController";
 import {NavPageState} from "../data/VolatileMemory";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
-import {Facility, FacilityType, ICAO} from "@microsoft/msfs-sdk";
+import {Facility, FacilityType, FacilityUtils} from "@microsoft/msfs-sdk";
 import {Sensors} from "../Sensors";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 import {LONG_BEEP_ID, SHORT_BEEP_ID} from "./AudioGenerator";
@@ -26,7 +26,7 @@ export class HtAboveAirportAlert implements CalcTickable {
 
         const enabled = this.userSettings.getSetting("htAboveAptEnabled").get();
 
-        if (!enabled || ICAO.getFacilityType(activeWpt.icao) !== FacilityType.Airport) {
+        if (!enabled || !FacilityUtils.isFacilityType(activeWpt, FacilityType.Airport)) {
             return;
         }
 

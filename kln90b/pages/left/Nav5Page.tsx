@@ -1,4 +1,4 @@
-import {FSComponent, GeoPoint, UnitType, UserSetting, VNode} from '@microsoft/msfs-sdk';
+import {FSComponent, GeoPoint, ICAO, UnitType, UserSetting, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
@@ -214,7 +214,7 @@ export class Nav5Page extends SixLineHalfPage {
             const leg = legs[i];
             const nextLeg = legs[i + 1];
 
-            if (nextLeg === undefined || leg.wpt.icao !== nextLeg.wpt.icao) { //Don't draw the same waypoint twice
+            if (nextLeg === undefined || !ICAO.valueEquals(leg.wpt.icaoStruct, nextLeg.wpt.icaoStruct)) { //Don't draw the same waypoint twice
                 ctx.drawIcon(leg.wpt, (i + 1).toString());
             }
         }
