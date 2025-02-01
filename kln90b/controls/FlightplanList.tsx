@@ -40,6 +40,15 @@ type UseInvertButtonTypes = {
     useInverted: Button,
 }
 
+export interface FlightPlanWaypint {
+    wpt: Facility,
+    index: number,
+}
+
+export function isFlightPlanWaypint(wapoint: any): wapoint is FlightPlanWaypint {
+    return "wpt" in wapoint;
+}
+
 /**
  * This one is tricky, because use and invert are both marked, when the cursor is over invert.
  * We do this by drawing the use buton with negative margin on top of the useInvert button.
@@ -581,9 +590,15 @@ export class FlightplanList extends List {
         super.refresh(children);
     }
 
-    public getSelectedWaypoint(): Facility | null {
+    public getSelectedWaypoint(): FlightPlanWaypint | null {
         const focused: FlightplanListItem | null = this.children.getall().filter(c => c instanceof FlightplanListItem).find(x => (x as FlightplanListItem).isFocused) as any;
-        return focused?.wpt ?? null;
+        if (!focused || !focused.wpt) {
+            return null;
+        }
+        return {
+            wpt: focused.wpt,
+            index: focused.origWptIdx,
+        };
     }
 
     public tick(blink: boolean): void {

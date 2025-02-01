@@ -3,7 +3,7 @@ import {SixLineHalfPage} from "../FiveSegmentPage";
 import {NO_CHILDREN, PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {MainPage} from "../MainPage";
-import {FlightplanList} from "../../controls/FlightplanList";
+import {FlightplanList, FlightPlanWaypint} from "../../controls/FlightplanList";
 import {Flightplan} from "../../data/flightplan/Flightplan";
 
 
@@ -59,7 +59,7 @@ export abstract class FplPage extends SixLineHalfPage {
         return (<pre>{this.children.get("wptList").render()}</pre>);
     }
 
-    public getSelectedWaypoint(): Facility | null {
+    public getSelectedWaypoint(): FlightPlanWaypint | null {
         if (!this.cursorController.cursorActive) {
             return null;
         }
