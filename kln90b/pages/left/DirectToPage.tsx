@@ -1,4 +1,4 @@
-import {Facility, FSComponent, UserFacilityUtils, VNode} from '@microsoft/msfs-sdk';
+import {Facility, FSComponent, ICAO, UserFacilityUtils, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
@@ -13,6 +13,7 @@ import {format} from "numerable";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {KLNFixType} from "../../data/flightplan/Flightplan";
 import {FROM} from "../../data/VolatileMemory";
+import {FlightPlanWaypint, isFlightPlanWaypint} from "../../controls/FlightplanList";
 
 
 type DirectToPageTypes = {
@@ -31,18 +32,30 @@ export class DirectToPage extends SixLineHalfPage {
     readonly name: string = "     ";
 
     private activateMode: boolean = false;
+    //If the user performs a direct to by selecting a wpt from the fpl 0 page, then the KLN knows wheter you selected
+    //the first or any other occurence
+    private readonly flightPlanIndex: number | null = null;
 
     constructor(props: PageProps) {
         super(props);
 
         const directToAutoFill = this.getDirectToSuggestion();
+        let facility: Facility | null;
+        if (isFlightPlanWaypint(directToAutoFill)) {
+            facility = directToAutoFill.wpt;
+            this.flightPlanIndex = directToAutoFill.index;
+        } else {
+            facility = directToAutoFill;
+            this.flightPlanIndex = null;
+        }
+
 
         this.children = new UIElementChildren<DirectToPageTypes>({
             title: new TextDisplay("DIRECT TO:"),
             wpt: new WaypointEditor({
                 ...this.props,
                 enterCallback: this.performDirectTo.bind(this),
-                value: directToAutoFill,
+                value: facility,
                 parent: this,
             }),
         });
@@ -92,7 +105,12 @@ export class DirectToPage extends SixLineHalfPage {
             this.props.memory.navPage.activeWaypoint.cancelDirectTo();
         } else {
             const from = UserFacilityUtils.createFromLatLon("UXX        d", this.props.sensors.in.gps.coords.lat, this.props.sensors.in.gps.coords.lon, true);
-            this.props.memory.navPage.activeWaypoint.directTo(from, waypoint);
+            if (this.flightPlanIndex !== null && ICAO.valueEquals(this.props.memory.fplPage.flightplans[0].getLegs()[this.flightPlanIndex].wpt.icaoStruct, waypoint.icaoStruct)) {
+                this.props.memory.navPage.activeWaypoint.directToFlightplanIndex(from, this.flightPlanIndex);
+            } else {
+                this.props.memory.navPage.activeWaypoint.directTo(from, waypoint);
+            }
+
             this.props.modeController.deactivateApproach();
             if (this.props.modeController.isObsModeActive()) {
                 if (this.activateMode) {
@@ -115,7 +133,7 @@ export class DirectToPage extends SixLineHalfPage {
         }
     }
 
-    private getDirectToSuggestion(): Facility | null {
+    private getDirectToSuggestion(): Facility | FlightPlanWaypint | null {
         const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
         //1 flightplan 0 with cursor
         const leftPage = mainPage.getLeftPage();

@@ -40,6 +40,21 @@ export class ActiveWaypoint {
         this.publisher = bus.getPublisher<ActiveWaypointChangedEvents>();
     }
 
+    public directToFlightplanIndex(from: Facility, fplIdx: number) {
+        this.from = {
+            wpt: from,
+            path: CACHED_CIRCLE,
+        };
+        this.setActiveIdx(fplIdx);
+        const legs = this.fpl0.getLegs();
+        this.to = legs[this.fplIdx]; //We need to keep the meta information like the suffix
+        CACHED_CIRCLE.setAsGreatCircle(from, this.to.wpt);
+
+        this.isDirectTo = true;
+        this.saveLastActiveWaypoint();
+        this.clearTurnStack();
+    }
+
     public directTo(from: Facility, to: Facility) {
         CACHED_CIRCLE.setAsGreatCircle(from, to);
         this.from = {
@@ -301,6 +316,9 @@ export class ActiveWaypoint {
         }
 
         const legs = this.fpl0.getLegs();
+        const isEqual = this.to === legs[this.fplIdx];
+        console.log(isEqual);
+
         if (this.fplIdx < legs.length && this.to === legs[this.fplIdx]) { //Yes, we really need to check the instance here. For example the user may remove the enroute waypoint with the same icao as the IAF
             return;
         }
