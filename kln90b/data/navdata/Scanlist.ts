@@ -90,7 +90,9 @@ export class FacilityLoaderScanlist implements Scanlist {
 
     public async init(): Promise<IcaoValue | null> {
         await this.rebuildIndex();
-        this.lastIcao = this.index[0];
+        if (this.index.length > 0) {
+            this.lastIcao = this.index[0];
+        }
         this.listManangerJob = this.startListManager();
         return this.start();
     }
@@ -136,7 +138,7 @@ export class FacilityLoaderScanlist implements Scanlist {
             await this.listManangerJob;
         }
 
-        let listIndex = this.icaoListCache.indexOf(icao);
+        let listIndex = this.indexOfIcaoInCache(icao);
         if (listIndex === -1) {
             listIndex = this.findClosest(icao, direction);
         }
@@ -149,6 +151,36 @@ export class FacilityLoaderScanlist implements Scanlist {
         this.lastIcao = this.icaoListCache[nextIndex];
         this.listManangerJob = this.startListManager();
         return this.lastIcao;
+    }
+
+    /**
+     * We can't use the normal js indexOf function, because IcaoValues may change with a __cachedUid field and are no longer considered equal
+     * Since our array is already sorted, we can use a simple binary search which should actually be faster than indexOf
+     * @param icao
+     * @private
+     */
+    private indexOfIcaoInCache(icao: IcaoValue): number {
+        const uidToSearch = ICAO.getUid(icao);
+
+        let start = 0;
+        let end = this.icaoListCache.length - 1;
+
+        while (start <= end) {
+            const mid = Math.floor((start + end) / 2);
+            const midIcao = this.icaoListCache[mid];
+            const midUid = ICAO.getUid(midIcao);
+
+            if (midUid === uidToSearch) {
+                return mid;
+            }
+
+            if (this.listSortFunction(icao, midIcao) < 0) {
+                end = mid - 1;
+            } else {
+                start = mid + 1;
+            }
+        }
+        return -1;
     }
 
     public isEmpty(): boolean {
@@ -174,7 +206,7 @@ export class FacilityLoaderScanlist implements Scanlist {
         let sizeBeforeCurrent = 0;
         let sizeAfterCurrent = 0;
 
-        const listIndex = this.icaoListCache.indexOf(this.lastIcao);
+        const listIndex = this.indexOfIcaoInCache(this.lastIcao);
         this.log(`${this.facilitySearchType}: Cache size: ${this.icaoListCache.length} ${this.cacheValidFromIdent}-${this.cacheValidToIdent}, lastIcao: ${this.lastIcao}, index: ${listIndex}`);
 
         if (listIndex == -1) {
