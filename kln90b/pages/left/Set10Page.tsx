@@ -41,8 +41,7 @@ export class Set10Page extends SixLineHalfPage {
     public render(): VNode {
         return (<pre>
                 GPS:&nbsp&nbsp&nbsp{this.children.get("fastGps").render()}<br/>
-                GLOW:&nbsp&nbsp&nbsp{this.children.get("enableGlow").render()}<br/>
-            {this.children.get("importFlightplan").render()}
+                GLOW:&nbsp&nbsp&nbsp{this.children.get("enableGlow").render()}
             </pre>);
     }
 
