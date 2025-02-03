@@ -8,6 +8,10 @@ Download the current version on the [releases page](https://github.com/falcon71/
 only contains the GPS device. To use the KLN 90B, you will need
 an [aircraft that incorporates this project](https://github.com/falcon71/kln90b/wiki/Aircraft-using-the-KLN-90B).
 
+> [!NOTE]  
+> Version 2.x is only compatible with MSFS 2024.  
+> Version 1.x is only compatible with MSFS 2020.
+
 Documentation for the real device:
 
 https://www.bendixking.com/content/dam/bendixking/en/documents/document-lists/downloads-and-manuals/006-08774-0000-KLN-90B-Abbreviated-Operations-Manual.pdf
