@@ -40,7 +40,7 @@ export class Sta2Page extends SixLineHalfPage {
 
     protected redraw(): void {
         if (this.props.sensors.in.gps.isValid()) {
-            const posError = this.props.sensors.in.gps.gpsSatComputer.hdop * 4;
+            const posError = this.props.sensors.in.gps.anp * 100;
             this.children.get("posError").text = `.${format(posError, "00")}`;
         } else {
             this.children.get("posError").text = ".--";
