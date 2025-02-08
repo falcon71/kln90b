@@ -46,6 +46,7 @@ export class ErrorPage extends DisplayComponent<ErrorPageProps> {
     }
 
     public showError(error: Error) {
+        console.error(error);
         if (this.showErrors) {
             this.errorRef.instance.innerHTML = error.toString() + "<br>" + error.stack;
             this.containerRef.instance.classList.remove("d-none")

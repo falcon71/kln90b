@@ -37,7 +37,11 @@ export class PageManager implements DisplayTickable {
     }
 
     onInteractionEvent(evt: string): void {
-        this.container!.onInteractionEvent(evt);
+        if (this.container) {
+            this.container.onInteractionEvent(evt);
+        } else {
+            console.error(`Event ${evt} ignored, we are not yet initialized!`);
+        }
     }
 
 
