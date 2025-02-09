@@ -2,48 +2,45 @@ import {DefaultUserSettingManager, EventBus, FacilityClient, ICAO} from "@micros
 import {KLN90BUserFlightplansSettings, KLN90BUserFlightplansTypes} from "./KLN90BUserFlightplans";
 import {Flightplan, FlightplanEvents, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
 import {MessageHandler} from "../data/MessageHandler";
-import {KLN90PlaneSettings} from "./KLN90BPlaneSettings";
 import {Flightplanloader} from "../services/Flightplanloader";
-import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
+import {KLN90BUserSettings} from "./KLN90BUserSettings";
+import {UserFlightplanLoaderV2} from "./UserFlightplanLoaderV2";
+import {UserFlightplanLoaderV1} from "./UserFlightplanLoaderV1";
+
+
+export interface UserFlightplanLoader {
+    restoreAllFlightplan(): Promise<Flightplan[]>;
+}
 
 /**
  * In the real unit, FPL 0 is also persisted: https://youtu.be/S1lt2W95bLA?t=181
- * We however load it from the simulator flightplan
  */
 export class UserFlightplanPersistor extends Flightplanloader {
     private manager: DefaultUserSettingManager<KLN90BUserFlightplansTypes>;
 
-    constructor(bus: EventBus, facilityLoader: FacilityClient, private readonly facilityRepository: KLNFacilityRepository, messageHandler: MessageHandler, private readonly planeSettings: KLN90PlaneSettings) {
+    private v1Loader: UserFlightplanLoader;
+    private v2Loader: UserFlightplanLoader;
+
+
+    constructor(bus: EventBus, facilityLoader: FacilityClient, messageHandler: MessageHandler, private readonly userSettings: KLN90BUserSettings) {
         super(bus, facilityLoader, messageHandler);
         bus.getSubscriber<FlightplanEvents>().on("flightplanChanged").handle(this.persistFlightplan.bind(this));
         this.manager = KLN90BUserFlightplansSettings.getManager(bus);
+        this.v1Loader = new UserFlightplanLoaderV1(bus, facilityLoader, messageHandler);
+        this.v2Loader = new UserFlightplanLoaderV2(bus, facilityLoader, messageHandler);
     }
 
     public restoreAllFlightplan(): Promise<Flightplan[]> {
-        const promises = Array(26).fill(undefined).map((_, i) => this.restoreFlightplan.bind(this)(i));
-        return Promise.all(promises);
-    }
-
-    public async restoreFlightplan(idx: number): Promise<Flightplan> {
-        try {
-            const setting = this.manager.getSetting(`fpl${idx}`);
-
-            const serialized = setting.get();
-            console.log(`restoring flightplan ${idx}`, serialized);
-
-            if (serialized === "") {
-                return new Flightplan(idx, [], this.bus);
-            }
-
-            const serializedLegs = serialized.match(/.{1,19}/g)!.map(ICAO.stringV2ToValue);
-            return await this.loadIcaos(serializedLegs, idx);
-        } catch (e) {
-            console.log(`Error restoring fpl ${idx}`, e);
-            throw e;
+        if (this.userSettings.getSetting("userDataFormat").get() === 2) {
+            return this.v2Loader.restoreAllFlightplan();
+        } else {
+            return this.v1Loader.restoreAllFlightplan();
         }
+
+
     }
 
-    private persistFlightplan(fpl: Flightplan) {
+    public persistFlightplan(fpl: Flightplan) {
         const setting = this.manager.getSetting(`fpl${fpl.idx}`);
 
         let serialized = "";
