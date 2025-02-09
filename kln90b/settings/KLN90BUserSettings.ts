@@ -102,6 +102,7 @@ export type KLN90BUserSettingsTypes = {
     cal5TempF: Fahrenheit,
     cal5SpeedKt: Knots,
     cal5SpeedMph: Mph,
+    userDataFormat: number,
 }
 
 export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSettingsTypes> {
@@ -299,6 +300,10 @@ export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSett
             },
             {
                 name: "cal5SpeedMph",
+                defaultValue: 0,
+            },
+            {
+                name: "userDataFormat",
                 defaultValue: 0,
             },
         ]);

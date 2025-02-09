@@ -19,6 +19,7 @@
 // noinspection JSUnusedGlobalSymbols
 
 import {
+    DataStore,
     DisplayComponent,
     EventBus,
     Facility,
@@ -261,14 +262,14 @@ class KLN90B extends BaseInstrument {
 
         const scanlists = new Scanlists(facilityLoader, this.bus);
 
-        this.userWaypointPersistor = new UserWaypointPersistor(this.bus, facilityRepository);
+        this.userWaypointPersistor = new UserWaypointPersistor(this.bus, facilityRepository, this.userSettings);
         try {
             this.userWaypointPersistor.restoreWaypoints();
         } catch (e) {
             restoreSuccessFull = false;
         }
 
-        this.userFlightplanPersistor = new UserFlightplanPersistor(this.bus, facilityLoader, facilityRepository, this.messageHandler, this.planeSettings);
+        this.userFlightplanPersistor = new UserFlightplanPersistor(this.bus, facilityLoader, this.messageHandler, this.userSettings);
 
         const nearestLists = new Nearestlists(facilityLoader, sensors, this.userSettings);
         const nearestUtils = new NearestUtils(facilityLoader);
@@ -295,6 +296,17 @@ class KLN90B extends BaseInstrument {
         } else {
             flightplans = Array(26).fill(null).map((_, idx) => new Flightplan(idx, [], this.bus));
         }
+
+        const userDataFormat = this.userSettings.getSetting("userDataFormat");
+        if (userDataFormat.get() !== 2) {
+            //Convert to V2
+            this.userWaypointPersistor.persistAllWaypoints();
+            for (const plan of flightplans) {
+                this.userFlightplanPersistor.persistFlightplan(plan);
+            }
+            userDataFormat.set(2);
+        }
+
 
         const memory = new VolatileMemory(this.bus, this.userSettings, facilityLoader, sensors, scanlists, flightplans, lastActiveWaypoint);
 
