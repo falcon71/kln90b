@@ -9,8 +9,8 @@ only contains the GPS device. To use the KLN 90B, you will need
 an [aircraft that incorporates this project](https://github.com/falcon71/kln90b/wiki/Aircraft-using-the-KLN-90B).
 
 > [!NOTE]  
-> Version 2.x is only compatible with MSFS 2024.  
-> Version 1.x is only compatible with MSFS 2020.
+> Version [2.x](https://github.com/falcon71/kln90b/releases/latest) is only compatible with MSFS 2024.  
+> Version [1.x](https://github.com/falcon71/kln90b/releases?q=tag%3Av1) is only compatible with MSFS 2020.
 
 Documentation for the real device:
 
