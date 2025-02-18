@@ -14,9 +14,8 @@ an [aircraft that incorporates this project](https://github.com/falcon71/kln90b/
 
 Documentation for the real device:
 
-https://www.bendixking.com/content/dam/bendixking/en/documents/document-lists/downloads-and-manuals/006-08774-0000-KLN-90B-Abbreviated-Operations-Manual.pdf
-
-https://www.bendixking.com/content/dam/bendixking/en/documents/document-lists/downloads-and-manuals/006-08773-0000-KLN-90B-Pilots-Guide.pdf
+[KLN-90B Abbreviated Operation Manual](https://www.bendixking.com/content/dam/bendixking/en/documents/document-lists/downloads-and-manuals/006-08774-0000-KLN-90B-Abbreviated-Operations-Manual.pdf)  
+[KLN-90B Pilot's Guide](https://www.bendixking.com/content/dam/bendixking/en/documents/document-lists/downloads-and-manuals/006-08773-0000-KLN-90B-Pilots-Guide.pdf)
 
 You can join our Discord community here:
 
