@@ -19,7 +19,6 @@
 // noinspection JSUnusedGlobalSymbols
 
 import {
-    DataStore,
     DisplayComponent,
     EventBus,
     Facility,
@@ -165,7 +164,9 @@ class KLN90B extends BaseInstrument {
         super.Init();
 
         // noinspection JSIgnoredPromiseFromCall
-        this.asyncInit();
+        this.asyncInit().catch(e => {
+            this.bus.getPublisher<ErrorEvent>().pub("error", e);
+        });
 
     }
 
@@ -221,6 +222,7 @@ class KLN90B extends BaseInstrument {
     }
 
     private async asyncInit() {
+
         //The xml is not available before init!
         this.planeSettings = new KLN90BPlaneSettingsParser().parsePlaneSettings(this.xmlConfig);
 
@@ -236,6 +238,7 @@ class KLN90B extends BaseInstrument {
             pageManager: this.pageManager,
             forceReadyToUse: forceReadyToUse,
         });
+
 
         //From now on, the welcome page may be shown. This gives us time to initialize everything here.
         //Lots of coherent calls, might take a while
@@ -389,6 +392,8 @@ class KLN90B extends BaseInstrument {
 
             //this.bus.onAll(console.log);
 
+        }).catch(e => {
+            this.bus.getPublisher<ErrorEvent>().pub("error", e);
         });
     }
 
