@@ -46,7 +46,7 @@ export interface FlightPlanWaypint {
 }
 
 export function isFlightPlanWaypint(wapoint: any): wapoint is FlightPlanWaypint {
-    return "wpt" in wapoint;
+    return wapoint && "wpt" in wapoint;
 }
 
 /**
