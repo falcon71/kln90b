@@ -104,8 +104,12 @@ export class UserWaypointLoaderV2 implements UserWaypointLoader {
             departures: [],
             approaches: [],
             arrivals: [],
-            // @ts-ignore
             altitude: Number(str.substring(36, 42)),
+            loadedDataFlags: 0,
+            holdingPatterns: [],
+            transitionAlt: 0,
+            transitionLevel: 0,
+            iata: "",
         };
     }
 

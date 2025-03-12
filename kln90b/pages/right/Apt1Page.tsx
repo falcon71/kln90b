@@ -344,8 +344,12 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
             departures: [],
             approaches: [],
             arrivals: [],
-            // @ts-ignore
             altitude: -1,
+            loadedDataFlags: 0,
+            holdingPatterns: [],
+            transitionAlt: 0,
+            transitionLevel: 0,
+            iata: "",
         };
     }
 

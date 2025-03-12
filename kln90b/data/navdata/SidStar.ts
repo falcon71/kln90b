@@ -2,6 +2,7 @@ import {
     AirportFacility,
     ApproachProcedure,
     ApproachTransition,
+    ApproachUtils,
     BitFlags,
     EnrouteTransition,
     Facility,
@@ -211,7 +212,7 @@ export class SidStar {
     }
 
     public static isApproachRecognized(app: ApproachProcedure): boolean {
-        if (!SidStar.appIsBRnav(app) || !SidStar.appHasNoRFLegs(app)) {
+        if (!SidStar.appIsBRnav(app) || !SidStar.appHasNoRFLegs(app) || ApproachUtils.isRnpAr(app)) {
             return false;
         }
 
@@ -232,8 +233,7 @@ export class SidStar {
 
     public static isProcedureRecognized(proc: Procedure, runwayTransition: RunwayTransition | null = null, enrouteTransition: EnrouteTransition | null = null): boolean {
         //The real device does not include RNAV procedures: https://www.euroga.org/forums/maintenance-avionics/5573-rnav-retrofit
-        //It seems, that we can't recognize those here
-        return SidStar.procIsBRnav(proc) && SidStar.procHasNoRFLegs(proc) && SidStar.hasAtLeastOneRecognizedLeg(proc, runwayTransition, enrouteTransition);
+        return SidStar.procIsBRnav(proc) && SidStar.procHasNoRFLegs(proc) && SidStar.hasAtLeastOneRecognizedLeg(proc, runwayTransition, enrouteTransition) && !proc.rnpAr;
     }
 
     /**
