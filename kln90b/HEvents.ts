@@ -2,6 +2,8 @@
 export const EVT_BRT_INC = "KLN90B_Brt_Inc";
 export const EVT_BRT_DEC = "KLN90B_Brt_Dec";
 export const EVT_POWER = "KLN90B_Power_Toggle";
+export const EVT_POWER_ON = "KLN90B_Power_On"; //Intended for hardware
+export const EVT_POWER_OFF = "KLN90B_Power_Off"; //Intended for hardware
 
 //MENU
 export const EVT_MSG = "KLN90B_MSG_Push";

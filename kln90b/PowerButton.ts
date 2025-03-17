@@ -1,6 +1,6 @@
 import {HEvent, Publisher, SimVarValueType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettingsTypes} from "./settings/KLN90BUserSettings";
-import {EVT_BRT_DEC, EVT_BRT_INC, EVT_POWER} from "./HEvents";
+import {EVT_BRT_DEC, EVT_BRT_INC, EVT_POWER, EVT_POWER_OFF, EVT_POWER_ON} from "./HEvents";
 import {BrightnessManager} from "./BrightnessManager";
 import {WelcomePage, WelcomePageProps} from "./pages/WelcomePage";
 import {NullPage} from "./pages/NullPage";
@@ -38,12 +38,22 @@ export class PowerButton {
 
         const hEvent = this.props.bus.getSubscriber<HEvent>();
         hEvent.on('hEvent').handle((e: string) => {
-            if (e === EVT_BRT_INC) {
-                this.brightnessManager.incBrightness();
-            } else if (e === EVT_BRT_DEC) {
-                this.brightnessManager.decBrightness();
-            } else if (e === EVT_POWER) {
-                this.togglePowerSwitch();
+            switch (e) {
+                case EVT_BRT_INC:
+                    this.brightnessManager.incBrightness();
+                    break;
+                case EVT_BRT_DEC:
+                    this.brightnessManager.decBrightness();
+                    break;
+                case EVT_POWER:
+                    this.togglePowerSwitch();
+                    break;
+                case EVT_POWER_ON:
+                    this.setPowerOn();
+                    break;
+                case EVT_POWER_OFF:
+                    this.setPowerOff();
+                    break;
             }
         });
 
@@ -73,6 +83,14 @@ export class PowerButton {
 
     private togglePowerSwitch() {
         this.setPowerSwitch(!this.powerSwitchOn);
+    }
+
+    private setPowerOn() {
+        this.setPowerSwitch(true);
+    }
+
+    private setPowerOff() {
+        this.setPowerSwitch(false);
     }
 
     /**
