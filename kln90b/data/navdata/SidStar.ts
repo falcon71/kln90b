@@ -50,8 +50,6 @@ export interface ArcData {
     circle: GeoCircle,
 }
 
-const B_RNAV = UnitType.NMILE.convertTo(5, UnitType.METER);
-
 export class SidStar {
 
 
@@ -211,8 +209,8 @@ export class SidStar {
         return null;
     }
 
-    public static isApproachRecognized(app: ApproachProcedure): boolean {
-        if (!SidStar.appIsBRnav(app) || !SidStar.appHasNoRFLegs(app) || ApproachUtils.isRnpAr(app)) {
+    public static isApproachRecognized(rnavCertification: NauticalMiles, app: ApproachProcedure): boolean {
+        if (!SidStar.appIsBRnav(app, rnavCertification) || !SidStar.appHasNoRFLegs(app) || ApproachUtils.isRnpAr(app)) {
             return false;
         }
 
@@ -231,9 +229,9 @@ export class SidStar {
         }
     }
 
-    public static isProcedureRecognized(proc: Procedure, runwayTransition: RunwayTransition | null = null, enrouteTransition: EnrouteTransition | null = null): boolean {
+    public static isProcedureRecognized(rnavCertification: NauticalMiles, proc: Procedure, runwayTransition: RunwayTransition | null = null, enrouteTransition: EnrouteTransition | null = null): boolean {
         //The real device does not include RNAV procedures: https://www.euroga.org/forums/maintenance-avionics/5573-rnav-retrofit
-        return SidStar.procIsBRnav(proc) && SidStar.procHasNoRFLegs(proc) && SidStar.hasAtLeastOneRecognizedLeg(proc, runwayTransition, enrouteTransition) && !proc.rnpAr;
+        return SidStar.procIsBRnav(proc, rnavCertification) && SidStar.procHasNoRFLegs(proc) && SidStar.hasAtLeastOneRecognizedLeg(proc, runwayTransition, enrouteTransition) && !proc.rnpAr;
     }
 
     /**
@@ -326,37 +324,43 @@ export class SidStar {
 
     /**
      *  People are going to hate me, but the KLN is only capable of B-RNAV
-     * @param proc
      * @private
+     * @param app
+     * @param rnavCertification
      */
-    private static appIsBRnav(app: ApproachProcedure): boolean {
+    private static appIsBRnav(app: ApproachProcedure, rnavCertification: NauticalMiles): boolean {
+        const rnavCertificationMeters = UnitType.NMILE.convertTo(rnavCertification, UnitType.METER);
+
         for (const transition of app.transitions) {
-            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < B_RNAV)) {
+            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < rnavCertificationMeters)) {
                 return false;
             }
         }
 
-        return !app.finalLegs.concat(app.missedLegs).some(leg => leg.rnp > 0 && leg.rnp < B_RNAV);
+        return !app.finalLegs.concat(app.missedLegs).some(leg => leg.rnp > 0 && leg.rnp < rnavCertificationMeters);
     }
 
     /**
      *  People are going to hate me, but the KLN is only capable of B-RNAV
      * @param proc
+     * @param rnavCertification
      * @private
      */
-    private static procIsBRnav(proc: Procedure): boolean {
+    private static procIsBRnav(proc: Procedure, rnavCertification: NauticalMiles): boolean {
+        const rnavCertificationMeters = UnitType.NMILE.convertTo(rnavCertification, UnitType.METER);
+
         for (const transition of proc.enRouteTransitions) {
-            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < B_RNAV)) {
+            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < rnavCertificationMeters)) {
                 return false;
             }
         }
         for (const transition of proc.runwayTransitions) {
-            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < B_RNAV)) {
+            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < rnavCertificationMeters)) {
                 return false;
             }
         }
 
-        return !proc.commonLegs.some(leg => leg.rnp > 0 && leg.rnp < B_RNAV);
+        return !proc.commonLegs.some(leg => leg.rnp > 0 && leg.rnp < rnavCertificationMeters);
     }
 
     /**

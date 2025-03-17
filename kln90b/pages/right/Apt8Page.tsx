@@ -336,7 +336,8 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
         } else {
             this.mainRef.instance.classList.remove("d-none");
             this.children.get("createWpt").setVisible(false);
-            const approaches = facility.approaches.filter(SidStar.isApproachRecognized).map((app, idx) => new SimpleListItem<ApproachProcedure>({
+            const rnavCertification = this.props.userSettings.getSetting("rnavCertification").get();
+            const approaches = facility.approaches.filter(app => SidStar.isApproachRecognized(rnavCertification, app)).map((app, idx) => new SimpleListItem<ApproachProcedure>({
                 bus: this.props.bus,
                 value: app,
                 fulltext: (idx + 1).toString().padStart(2, " ") + " " + this.formatApproachName(app),

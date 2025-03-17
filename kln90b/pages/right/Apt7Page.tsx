@@ -281,8 +281,9 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             this.hasSid = false;
             this.hasStar = false;
         } else {
-            this.hasSid = facility.departures.some(proc => SidStar.isProcedureRecognized(proc));
-            this.hasStar = facility.arrivals.some(proc => SidStar.isProcedureRecognized(proc));
+            const rnavCertification = this.props.userSettings.getSetting("rnavCertification").get();
+            this.hasSid = facility.departures.some(proc => SidStar.isProcedureRecognized(rnavCertification, proc));
+            this.hasStar = facility.arrivals.some(proc => SidStar.isProcedureRecognized(rnavCertification, proc));
             this.numPages = this.hasSid && this.hasStar ? 2 : 1;
         }
         this.currentPage = 0;
@@ -593,7 +594,8 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
             this.mainRef.instance.classList.remove("d-none");
             this.children.get("createWpt").setVisible(false);
             const procedures: readonly Procedure[] = this.procedureType === KLNLegType.SID ? facility.departures : facility.arrivals;
-            const procs = procedures.filter(proc => SidStar.isProcedureRecognized(proc)).map((proc, idx) => new SimpleListItem<Procedure>({
+            const rnavCertification = this.props.userSettings.getSetting("rnavCertification").get();
+            const procs = procedures.filter(proc => SidStar.isProcedureRecognized(rnavCertification, proc)).map((proc, idx) => new SimpleListItem<Procedure>({
                 bus: this.props.bus,
                 value: proc,
                 fulltext: (idx + 1).toString().padStart(2, " ") + " " + proc.name.padEnd(7, " "),
@@ -687,7 +689,8 @@ class Apt7RunwayPage extends Apt7SelectorPage {
     }
 
     private buildList(): UIElementChildren<any> {
-        const rwys = this.proc.runwayTransitions.filter(runwayTransition => SidStar.isProcedureRecognized(this.proc, runwayTransition, this.trans)).map((rwy, idx) => new SimpleListItem<RunwayTransition>({
+        const rnavCertification = this.props.userSettings.getSetting("rnavCertification").get();
+        const rwys = this.proc.runwayTransitions.filter(runwayTransition => SidStar.isProcedureRecognized(rnavCertification, this.proc, runwayTransition, this.trans)).map((rwy, idx) => new SimpleListItem<RunwayTransition>({
             bus: this.props.bus,
             value: rwy,
             fulltext: (idx + 1).toString().padStart(2, " ") + " " + RunwayUtils.getRunwayNameString(rwy.runwayNumber, rwy.runwayDesignation, true).padEnd(5, " "),
@@ -745,7 +748,8 @@ class Apt7TransitionPage extends Apt7SelectorPage {
     }
 
     private buildList(): UIElementChildren<any> {
-        const iafs = this.proc.enRouteTransitions.filter(enrouteTransition => SidStar.isProcedureRecognized(this.proc, this.rwy, enrouteTransition)).map((trans, idx) => new SimpleListItem<ApproachTransition>({
+        const rnavCertification = this.props.userSettings.getSetting("rnavCertification").get();
+        const iafs = this.proc.enRouteTransitions.filter(enrouteTransition => SidStar.isProcedureRecognized(rnavCertification, this.proc, this.rwy, enrouteTransition)).map((trans, idx) => new SimpleListItem<ApproachTransition>({
             bus: this.props.bus,
             value: trans,
             fulltext: (idx + 1).toString().padStart(2, " ") + " " + trans.name.padEnd(5, " "),
