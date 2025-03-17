@@ -1,10 +1,18 @@
 import {SimVarValueType} from "@microsoft/msfs-sdk";
 import {PowerButton} from "./PowerButton";
 import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
-import {LVAR_DISABLE, LVAR_ELECTRICITY_INDEX, LVAR_GPS_SIMVARS, LVAR_OBS_SOURCE, LVAR_OBS_TARGET} from "./LVars";
+import {
+    LVAR_BRIGHTNESS,
+    LVAR_DISABLE,
+    LVAR_ELECTRICITY_INDEX,
+    LVAR_GPS_SIMVARS,
+    LVAR_OBS_SOURCE,
+    LVAR_OBS_TARGET,
+} from "./LVars";
 import {TickController} from "./TickController";
 import {ModeController} from "./services/ModeController";
 import {PageManager} from "./pages/PageManager";
+import {BrightnessManager} from "./BrightnessManager";
 
 const SYNC_TICK = 100;
 
@@ -15,7 +23,7 @@ export class SimVarSync {
 
     private disabled: boolean = false;
 
-    constructor(private readonly powerButton: PowerButton, private readonly settings: KLN90PlaneSettings, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager) {
+    constructor(private readonly powerButton: PowerButton, private readonly settings: KLN90PlaneSettings, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager, private readonly brightnessManager: BrightnessManager) {
         window.setInterval(this.tick.bind(this), SYNC_TICK);
     }
 
@@ -46,6 +54,8 @@ export class SimVarSync {
             this.settings.output.writeGPSSimVars = writeGpsSimvars;
             SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, writeGpsSimvars);
         }
+        this.brightnessManager.setBrightnessExternal(SimVar.GetSimVarValue(LVAR_BRIGHTNESS, SimVarValueType.Number));
+
     }
 
     private setDisabled(disabled: boolean): void {

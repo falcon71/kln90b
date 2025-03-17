@@ -92,6 +92,7 @@ import {RollSteeringController} from "./services/RollSteeringController";
 import {KlnEfbSaver} from "./services/KlnEfbSaver";
 import {KlnEfbLoader} from "./services/KlnEfbLoader";
 import {WTFlightplanSync} from "./services/WTFlightplanSync";
+import {BrightnessManager} from "./BrightnessManager";
 
 export interface PropsReadyEvent {
     propsReady: PageProps;
@@ -231,13 +232,15 @@ class KLN90B extends BaseInstrument {
         console.log("forceReadyToUse", forceReadyToUse);
 
         this.pageManager.Init(this.bus, this.userSettings);
+
+        const brightnessManager = new BrightnessManager(this.bus, this.planeSettings);
         this.powerButton = new PowerButton({
             bus: this.bus,
             userSettings: this.userSettings,
             planeSettings: this.planeSettings,
             pageManager: this.pageManager,
             forceReadyToUse: forceReadyToUse,
-        });
+        }, brightnessManager);
 
 
         //From now on, the welcome page may be shown. This gives us time to initialize everything here.
@@ -343,7 +346,7 @@ class KLN90B extends BaseInstrument {
                 new SignalOutputFillterTick(sensors),
             ]);
 
-        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager);
+        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager, brightnessManager);
 
         const msa = new MSA();
 

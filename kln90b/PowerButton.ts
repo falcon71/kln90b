@@ -22,8 +22,6 @@ export interface PowerEvent {
 export class PowerButton {
 
 
-    private readonly brightnessManager: BrightnessManager;
-
     private powerSwitchOn: boolean = false; //State of the knob
     private electricityAvailable: boolean = true; //State of the electrical system / circuit braker
     private isPowered: boolean = false; //If the device is actually on or off
@@ -33,8 +31,7 @@ export class PowerButton {
     private lastPowerChangeTime: number = Date.now() - HOURS_TO_SECONDS * 1000;
 
 
-    constructor(private props: WelcomePageProps | PageProps) {
-        this.brightnessManager = new BrightnessManager(props.bus, props.planeSettings);
+    constructor(private props: WelcomePageProps | PageProps, private readonly brightnessManager: BrightnessManager) {
 
         const hEvent = this.props.bus.getSubscriber<HEvent>();
         hEvent.on('hEvent').handle((e: string) => {

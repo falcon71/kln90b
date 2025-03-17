@@ -1,4 +1,4 @@
-import {EventBus, SimVarValueType, Wait} from "@microsoft/msfs-sdk";
+import {EventBus, MathUtils, SimVarValueType, Wait} from "@microsoft/msfs-sdk";
 import {PowerEvent, PowerEventData} from "./PowerButton";
 import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {LVAR_BRIGHTNESS} from "./LVars";
@@ -15,26 +15,41 @@ export class BrightnessManager {
     private brightnessSetting = 1; //Position of the knob
     private possibleBrightness = 0; //Depends on power
     private container: HTMLElement;
+    private simVarWritten: boolean = false;
 
     constructor(bus: EventBus, private readonly planeSetting: KLN90PlaneSettings) {
         this.container = document.getElementById('InstrumentsContainer')!;
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.powerChanged.bind(this));
 
-        this.brightnessSetting = SimVar.GetSimVarValue(LVAR_BRIGHTNESS, SimVarValueType.Percent);
+        this.brightnessSetting = SimVar.GetSimVarValue(LVAR_BRIGHTNESS, SimVarValueType.Number);
         if(this.brightnessSetting === 0){
             this.setBrightness(1); //Initialize with 1
         }
     }
 
     public incBrightness(): void {
-        this.setBrightness(Math.min(this.brightnessSetting + BRIGHTNESS_STEP, 1));
+        this.setBrightness(this.brightnessSetting + BRIGHTNESS_STEP);
     }
 
     public decBrightness(): void {
-        this.setBrightness(Math.max(this.brightnessSetting - BRIGHTNESS_STEP, 0));
+        this.setBrightness(this.brightnessSetting - BRIGHTNESS_STEP);
     }
 
-    public setBrightness(brightness: number): void{
+    public setBrightnessExternal(brightness: number): void {
+        if (!this.simVarWritten) {
+            if (this.brightnessSetting == brightness) {
+                this.simVarWritten = true; //During startup it does not seem to work well. If both values are the same, then the SimVar has been written
+                return;
+            }
+            //Happens when the users uses the events. We are about to write the simvar, but the read operation will still yield the old value, this resetting the user action
+            console.log(`Ignoring setBrightnessExternal, last Value is not yet written. Current: ${this.brightnessSetting} External: ${brightness}`);
+            return;
+        }
+        this.setBrightness(brightness);
+    }
+
+    private setBrightness(brightness: number): void {
+        brightness = MathUtils.clamp(brightness, 0, 1);
         if(this.brightnessSetting === brightness){
             return;
         }
@@ -45,7 +60,8 @@ export class BrightnessManager {
     }
 
     private updateLvar(): void{
-        SimVar.SetSimVarValue(LVAR_BRIGHTNESS, SimVarValueType.Percent, this.brightnessSetting);
+        this.simVarWritten = false;
+        SimVar.SetSimVarValue(LVAR_BRIGHTNESS, SimVarValueType.Number, this.brightnessSetting).then(() => this.simVarWritten = true);
     }
 
 
