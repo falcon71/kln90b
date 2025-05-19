@@ -73,13 +73,13 @@ export class AltitudeFieldset implements UiElement {
 
     private saveAlt100(newAlt100: number): void {
         const oldAlt = format(this.alt, "00000");
-        this.alt = Number(oldAlt.substring(1, 2) + newAlt100 + oldAlt.substring(3));
+        this.alt = Number(oldAlt.substring(0, 2) + newAlt100 + oldAlt.substring(3));
         this.callback(this.alt);
     }
 
     private saveAlt10(newAlt10: number): void {
         const oldAlt = format(this.alt, "00000");
-        this.alt = Number(oldAlt.substring(2, 3) + newAlt10 + oldAlt.substring(4));
+        this.alt = Number(oldAlt.substring(0, 3) + newAlt10 + oldAlt.substring(4));
         this.callback(this.alt);
     }
 
