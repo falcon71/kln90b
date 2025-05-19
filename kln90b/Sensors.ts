@@ -112,7 +112,7 @@ export class FuelComputer implements CalcTickable {
         }
 
         if (this.options.input.fuelComputer.fobTransmitted) {
-            this.fob = UnitType.POUND.convertTo(SimVar.GetSimVarValue('FUEL TOTAL QUANTITY WEIGHT', SimVarValueType.Pounds), targetUnit);
+            this.fob = UnitType.POUND.convertTo(SimVar.GetSimVarValue('FUEL TOTAL QUANTITY WEIGHT EX1', SimVarValueType.Pounds), targetUnit);
         }
 
         if (this.realNumberOfEngines === 2) {
