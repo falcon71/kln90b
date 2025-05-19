@@ -1,4 +1,4 @@
-import {Facility, FSComponent, ICAO, UserFacilityUtils, VNode} from '@microsoft/msfs-sdk';
+import {Facility, FSComponent, UserFacilityUtils, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
@@ -105,7 +105,7 @@ export class DirectToPage extends SixLineHalfPage {
             this.props.memory.navPage.activeWaypoint.cancelDirectTo();
         } else {
             const from = UserFacilityUtils.createFromLatLon("UXX        d", this.props.sensors.in.gps.coords.lat, this.props.sensors.in.gps.coords.lon, true);
-            if (this.flightPlanIndex !== null && ICAO.valueEquals(this.props.memory.fplPage.flightplans[0].getLegs()[this.flightPlanIndex].wpt.icaoStruct, waypoint.icaoStruct)) {
+            if (this.flightPlanIndex !== null && this.props.memory.fplPage.flightplans[0].getLegs()[this.flightPlanIndex].wpt.icao === waypoint.icao) {
                 this.props.memory.navPage.activeWaypoint.directToFlightplanIndex(from, this.flightPlanIndex);
             } else {
                 this.props.memory.navPage.activeWaypoint.directTo(from, waypoint);

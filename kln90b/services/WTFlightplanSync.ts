@@ -15,6 +15,7 @@ import {ActiveWaypoint, ActiveWaypointChangedEvents} from "../data/flightplan/Ac
 
 const FLIGHTPLANNER_ID = "kln90b";
 
+const DTO_PLAN_INDEX = 1;
 export class WTFlightplanSync {
     private readonly flightplanner: FlightPlanner;
 
@@ -57,14 +58,55 @@ export class WTFlightplanSync {
     }
 
     private syncToWTFlightplan(klnPlan: Flightplan, activeIdx: number) {
+        this.writeFpl0(klnPlan, activeIdx);
+        this.writeDtoPlan();
+
+        console.log("wtPlan", this.flightplanner);
+    }
+
+    private writeFpl0(klnPlan: Flightplan, activeIdx: number) {
         const wtPlan = this.flightplanner.getFlightPlan(0);
         const batchID = wtPlan.openBatch("KLN_sync");
 
         this.emptyFlightplan(wtPlan);
         this.setPlanLegs(wtPlan, klnPlan, activeIdx);
         wtPlan.closeBatch(batchID);
+    }
 
-        console.log("wtPlan", wtPlan);
+    private writeDtoPlan() {
+        //DTO is done on flightplan 1 like the Garmins
+        //Since the KLN always keeps the entire flightplan, we do all DTOs here, not just random DTOs
+        if (this.activeWaypoint.isDctNavigation()) {
+            const dtoPlan = this.flightplanner.createFlightPlan(DTO_PLAN_INDEX);
+            const batchID = dtoPlan.openBatch("KLN_sync");
+            this.emptyFlightplan(dtoPlan);
+            dtoPlan.addSegment(0, FlightPlanSegmentType.RandomDirectTo);
+            const from = this.activeWaypoint.getFromWpt()!;
+
+            const fromLeg = FlightPlan.createLeg({
+                type: LegType.IF,
+                lat: from.lat,
+                lon: from.lon,
+            });
+            dtoPlan.addLeg(0, fromLeg);
+
+            const to = this.activeWaypoint.getActiveWpt()!;
+
+            const toLeg = FlightPlan.createLeg({
+                type: LegType.DF,
+                fixIcao: to.icao,
+                lat: to.lat,
+                lon: to.lon,
+            });
+            dtoPlan.addLeg(0, toLeg);
+            dtoPlan.setLateralLeg(1);
+            dtoPlan.setDirectToData(1);
+            dtoPlan.closeBatch(batchID);
+            this.flightplanner.setActivePlanIndex(DTO_PLAN_INDEX);
+        } else {
+            this.flightplanner.deleteFlightPlan(DTO_PLAN_INDEX);
+            this.flightplanner.setActivePlanIndex(0);
+        }
     }
 
     private emptyFlightplan(wtPlan: FlightPlan) {
@@ -92,11 +134,13 @@ export class WTFlightplanSync {
             wtPlan.addLeg(0, leg);
             if (klnLeg.fixType === KLNFixType.MAP && currentIdx >= activeIdx) {
                 wtPlan.setLateralLeg(idxForWt);
+                wtPlan.setDirectToData(this.activeWaypoint.isDctNavigation() ? idxForWt : -1);
                 return; //Install manual: We do not return data after a fence
             }
             if (klnLeg.arcData) {
                 if (currentIdx >= activeIdx) {
                     wtPlan.setLateralLeg(idxForWt);
+                    wtPlan.setDirectToData(this.activeWaypoint.isDctNavigation() ? idxForWt : -1);
                     return; //Install manual: We do not return data after an arc
                 } else {
                     //Everything before the arc must be deleted again, we only transmit everything after the arc
@@ -110,6 +154,8 @@ export class WTFlightplanSync {
         }
 
         wtPlan.setLateralLeg(idxForWt);
+        wtPlan.setDirectToData(this.activeWaypoint.isDctNavigation() ? idxForWt : -1);
+
     }
 
 }
