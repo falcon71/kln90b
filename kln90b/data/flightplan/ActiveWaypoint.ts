@@ -54,12 +54,12 @@ export class ActiveWaypoint {
             wpt: from,
             path: CACHED_CIRCLE,
         };
-        this.setActiveIdx(fplIdx);
         const legs = this.fpl0.getLegs();
-        this.to = legs[this.fplIdx]; //We need to keep the meta information like the suffix
+        this.to = legs[fplIdx]; //We need to keep the meta information like the suffix
         CACHED_CIRCLE.setAsGreatCircle(from, this.to.wpt);
 
         this.isDirectTo = true;
+        this.setActiveIdx(fplIdx);
         this.saveLastActiveWaypoint();
         this.clearTurnStack();
     }
@@ -71,22 +71,22 @@ export class ActiveWaypoint {
             path: CACHED_CIRCLE,
         };
         const legs = this.fpl0.getLegs();
-        this.setActiveIdx(legs.findIndex(leg => ICAO.valueEquals(leg.wpt.icaoStruct, to.icaoStruct)));
-        if (this.fplIdx > -1) {
+        const fplIdx = legs.findIndex(leg => ICAO.valueEquals(leg.wpt.icaoStruct, to.icaoStruct));
+        if (fplIdx > -1) {
             this.to = legs[this.fplIdx]; //We need to keep the meta information like the suffix
         } else {
             this.to = {wpt: to, type: KLNLegType.USER};
         }
-
         this.isDirectTo = true;
+        this.setActiveIdx(fplIdx);
         this.saveLastActiveWaypoint();
         this.clearTurnStack();
     }
 
     public cancelDirectTo() {
         //Yes, it does not keep the last waypoint, but always recalculates the closest leg
-        this.activateFpl0();
         this.isDirectTo = false;
+        this.activateFpl0();
         this.saveLastActiveWaypoint();
     }
 
@@ -168,9 +168,6 @@ export class ActiveWaypoint {
     }
 
     private setActiveIdx(activeIdx: number) {
-        if (activeIdx === this.fplIdx) {
-            return;
-        }
         this.fplIdx = activeIdx;
         this.publisher.pub("activeWaypointChanged", this.fplIdx);
     }
