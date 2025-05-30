@@ -43,7 +43,6 @@ export class FuelComputer implements CalcTickable {
     private readonly realNumberOfEngines: number = 0;
 
 
-    public static readonly IMP_GALLON_FUEL_AVGAS = new SimpleUnit(UnitFamily.Weight, 'imperial gallon', 3.2685);
     public static readonly GALLON_FUEL_JETB = new SimpleUnit(UnitFamily.Weight, 'gallon', 2.9484);
     public static readonly IMP_GALLON_FUEL_JETB = new SimpleUnit(UnitFamily.Weight, 'imperial gallon', 3.5408);
     private static readonly LITER_FUEL_JETB = new SimpleUnit(UnitFamily.Weight, 'liter', 0.7789);
@@ -69,7 +68,7 @@ export class FuelComputer implements CalcTickable {
                         targetUnit = UnitType.GALLON_AUTOGAS_FUEL;
                         break;
                     case FuelType.JET_A1:
-                        targetUnit = UnitType.GALLON_FUEL;
+                        targetUnit = UnitType.GALLON_JET_A_FUEL;
                         break;
                     case FuelType.JET_B:
                         targetUnit = FuelComputer.GALLON_FUEL_JETB;
@@ -79,10 +78,10 @@ export class FuelComputer implements CalcTickable {
             case FuelUnit.IMP:
                 switch (this.options.input.fuelComputer.type) {
                     case FuelType.AVGAS:
-                        targetUnit = FuelComputer.IMP_GALLON_FUEL_AVGAS;
+                        targetUnit = UnitType.IMP_GALLON_AUTOGAS_FUEL;
                         break;
                     case FuelType.JET_A1:
-                        targetUnit = UnitType.IMP_GALLON_FUEL;
+                        targetUnit = UnitType.IMP_GALLON_JET_A_FUEL;
                         break;
                     case FuelType.JET_B:
                         targetUnit = FuelComputer.IMP_GALLON_FUEL_JETB;
@@ -99,7 +98,7 @@ export class FuelComputer implements CalcTickable {
                         targetUnit = UnitType.LITER_AUTOGAS_FUEL;
                         break;
                     case FuelType.JET_A1:
-                        targetUnit = UnitType.LITER_FUEL;
+                        targetUnit = UnitType.LITER_JET_A_FUEL;
                         break;
                     case FuelType.JET_B:
                         targetUnit = FuelComputer.LITER_FUEL_JETB;
