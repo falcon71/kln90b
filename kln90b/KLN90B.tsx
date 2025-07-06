@@ -211,7 +211,7 @@ class KLN90B extends BaseInstrument {
             }
             console.log(args[0], evt);
 
-            this.hEventPublisher.dispatchHEvent(evt);
+            this.hEventPublisher.dispatchHEvent([evt]);
             this.pageManager.onInteractionEvent(evt);
         } catch (e) {
             console.error(e);

@@ -29,7 +29,7 @@ export class DirectToPage extends SixLineHalfPage {
     public readonly cursorController;
     readonly children: UIElementChildren<DirectToPageTypes>;
 
-    readonly name: string = "     ";
+    readonly name: string = "DIR  "; //The KLN 89 and KLN 90B trainer display DIR
 
     private activateMode: boolean = false;
     //If the user performs a direct to by selecting a wpt from the fpl 0 page, then the KLN knows wheter you selected
@@ -82,12 +82,6 @@ export class DirectToPage extends SixLineHalfPage {
             this.activateMode = false;
             this.children.get("title").text = "DIRECT TO:";
         }
-
-        if (!this.cursorController.cursorActive) {
-            const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
-            mainPage.popLeftPage();
-        }
-
     }
 
     public render(): VNode {

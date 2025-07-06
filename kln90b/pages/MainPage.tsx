@@ -307,7 +307,13 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
             case EVT_L_OUTER_LEFT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.lCursorController.cursorActive) {
-                        return this.getOverlayPage()!.lCursorController.outerLeft();
+                        if (this.getOverlayPage()!.lCursorController.outerLeft()) {
+                            return true;
+                        } else {
+                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                            this.popOverlayPage();
+                            return this.onInteractionEvent(evt);
+                        }
                     } else if (this.isSuperPageShown()) {
                         this.leftTreeController.movePage(-1);
                     }
@@ -317,12 +323,22 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     return this.getLeftPage().getCursorController().outerLeft();
                 } else if (this.leftPageStack.isBasePageShown()) {
                     this.leftTreeController.movePage(-1);
+                } else {
+                    //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                    this.popLeftPage();
+                    return this.onInteractionEvent(evt);
                 }
                 return true;
             case EVT_L_OUTER_RIGHT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.lCursorController.cursorActive) {
-                        return this.getOverlayPage()!.lCursorController.outerRight();
+                        if (this.getOverlayPage()!.lCursorController.outerRight()) {
+                            return true;
+                        } else {
+                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                            this.popOverlayPage();
+                            return this.onInteractionEvent(evt);
+                        }
                     } else if (this.isSuperPageShown()) {
                         this.leftTreeController.movePage(1);
                     }
@@ -332,12 +348,22 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     return this.getLeftPage().getCursorController().outerRight();
                 } else if (this.leftPageStack.isBasePageShown()) {
                     this.leftTreeController.movePage(1);
+                } else {
+                    //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                    this.popLeftPage();
+                    return this.onInteractionEvent(evt);
                 }
                 return true;
             case EVT_R_OUTER_LEFT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.rCursorController.cursorActive) {
-                        return this.getOverlayPage()!.rCursorController.outerLeft();
+                        if (this.getOverlayPage()!.rCursorController.outerLeft()) {
+                            return true;
+                        } else {
+                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                            this.popOverlayPage();
+                            return this.onInteractionEvent(evt);
+                        }
                     } else if (this.isSuperPageShown()) {
                         this.rightTreeController.movePage(-1);
                     }
@@ -347,12 +373,22 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     return this.getRightPage().getCursorController().outerLeft();
                 } else if (this.rightPageStack.isBasePageShown()) {
                     this.rightTreeController.movePage(-1);
+                } else {
+                    //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                    this.popRightPage();
+                    return this.onInteractionEvent(evt);
                 }
                 return true;
             case EVT_R_OUTER_RIGHT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.rCursorController.cursorActive) {
-                        return this.getOverlayPage()!.rCursorController.outerRight();
+                        if (this.getOverlayPage()!.rCursorController.outerRight()) {
+                            return true;
+                        } else {
+                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                            this.popOverlayPage();
+                            return this.onInteractionEvent(evt);
+                        }
                     } else if (this.isSuperPageShown()) {
                         this.rightTreeController.movePage(1);
                     }
@@ -362,12 +398,22 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     return this.getRightPage().getCursorController().outerRight();
                 } else if (this.rightPageStack.isBasePageShown()) {
                     this.rightTreeController.movePage(1);
+                } else {
+                    //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                    this.popRightPage();
+                    return this.onInteractionEvent(evt);
                 }
                 return true;
             case EVT_L_INNER_LEFT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.lCursorController.cursorActive) {
-                        return this.getOverlayPage()!.lCursorController.innerLeft();
+                        if (this.getOverlayPage()!.lCursorController.innerLeft()) {
+                            return true;
+                        } else {
+                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                            this.popOverlayPage();
+                            return this.onInteractionEvent(evt);
+                        }
                     } else if (this.isSuperPageShown()) {
                         this.leftTreeController.moveSubpage(-1);
                     }
@@ -380,12 +426,22 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     leftPage.pageTreeController.moveSubpage(-1);
                 } else if (this.leftPageStack.isBasePageShown()) {
                     this.leftTreeController.moveSubpage(-1);
+                } else {
+                    //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                    this.popLeftPage();
+                    return this.onInteractionEvent(evt);
                 }
                 return true;
             case EVT_L_INNER_RIGHT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.lCursorController.cursorActive) {
-                        return this.getOverlayPage()!.lCursorController.innerRight();
+                        if (this.getOverlayPage()!.lCursorController.innerRight()) {
+                            return true;
+                        } else {
+                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                            this.popOverlayPage();
+                            return this.onInteractionEvent(evt);
+                        }
                     } else if (this.isSuperPageShown()) {
                         this.leftTreeController.moveSubpage(1);
                     }
@@ -398,6 +454,10 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     leftPage.pageTreeController.moveSubpage(1);
                 } else if (this.leftPageStack.isBasePageShown()) {
                     this.leftTreeController.moveSubpage(1);
+                } else {
+                    //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                    this.popLeftPage();
+                    return this.onInteractionEvent(evt);
                 }
                 return true;
             case EVT_R_SCAN_LEFT:
@@ -411,7 +471,13 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
             case EVT_R_INNER_LEFT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.rCursorController.cursorActive) {
-                        return this.getOverlayPage()!.rCursorController.innerLeft();
+                        if (this.getOverlayPage()!.rCursorController.innerLeft()) {
+                            return true;
+                        } else {
+                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                            this.popOverlayPage();
+                            return this.onInteractionEvent(evt);
+                        }
                     } else if (this.isSuperPageShown()) {
                         this.rightTreeController.moveSubpage(-1);
                     }
@@ -424,6 +490,10 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     rightPage.pageTreeController.moveSubpage(-1);
                 } else if (this.rightPageStack.isBasePageShown()) {
                     this.rightTreeController.moveSubpage(-1);
+                } else {
+                    //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                    this.popRightPage();
+                    return this.onInteractionEvent(evt);
                 }
                 return true;
             case EVT_R_SCAN_RIGHT:
@@ -437,7 +507,13 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
             case EVT_R_INNER_RIGHT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.rCursorController.cursorActive) {
-                        return this.getOverlayPage()!.rCursorController.innerRight();
+                        if (this.getOverlayPage()!.rCursorController.innerRight()) {
+                            return true;
+                        } else {
+                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                            this.popOverlayPage();
+                            return this.onInteractionEvent(evt);
+                        }
                     } else if (this.isSuperPageShown()) {
                         this.rightTreeController.moveSubpage(1);
                     }
@@ -450,6 +526,10 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     rightPage.pageTreeController.moveSubpage(1);
                 } else if (this.rightPageStack.isBasePageShown()) {
                     this.rightTreeController.moveSubpage(1);
+                } else {
+                    //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
+                    this.popRightPage();
+                    return this.onInteractionEvent(evt);
                 }
                 return true;
             case EVT_ENT:

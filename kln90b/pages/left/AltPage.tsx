@@ -18,7 +18,7 @@ export class AltPage extends SixLineHalfPage {
     public readonly cursorController;
     readonly children: UIElementChildren<AltPageTypes>;
 
-    readonly name: string = "     ";
+    readonly name: string = "ALT  "; //The KLN 89 and KLN 90B trainer display ALT
 
     protected readonly brRef: NodeReference<HTMLBRElement> = FSComponent.createRef<HTMLBRElement>();
     protected readonly warnRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
