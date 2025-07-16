@@ -1,4 +1,5 @@
 import {
+    AirportClassMask,
     AirportFacility,
     BitFlags,
     Facility,
@@ -140,8 +141,10 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
 export class AirportNearestList extends NearestList<FacilitySearchType.Airport, AirportFacility> {
 
     public updateFilters(): void {
+        const surfaceTypeSetting = this.userSettings.getSetting("nearestAptSurface").get();
+        this.session?.setAirportFilter(false, this.getAirportClassMask(surfaceTypeSetting)); //This filters out helipads
         this.session!.setExtendedAirportFilters(
-            this.getSurfaceMask(this.userSettings.getSetting("nearestAptSurface").get()),
+            this.getSurfaceMask(surfaceTypeSetting),
             NearestAirportSearchSession.Defaults.ApproachTypeMask,
             NearestAirportSearchSession.Defaults.ToweredMask,
             UnitType.FOOT.convertTo(this.userSettings.getSetting("nearestAptMinRunwayLength").get(), UnitType.METER),
@@ -152,11 +155,20 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
         this.updateFilters();
     }
 
-    private getSurfaceMask(surfaceType: boolean): number {
-        let surfaceTypeMask;
+    private getAirportClassMask(surfaceType: boolean): number {
         switch (surfaceType) {
             case SURFACE_HRD_SFT:
-                surfaceTypeMask = BitFlags.union(
+                return AirportClassMask.HardSurface | AirportClassMask.SoftSurface;
+            case SURFACE_HRD:
+                return AirportClassMask.HardSurface;
+        }
+    }
+
+
+    private getSurfaceMask(surfaceType: boolean): number {
+        switch (surfaceType) {
+            case SURFACE_HRD_SFT:
+                return BitFlags.union(
                     //hard
                     BitFlags.createFlag(RunwaySurfaceType.Concrete),
                     BitFlags.createFlag(RunwaySurfaceType.Asphalt),
@@ -177,18 +189,15 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
                     BitFlags.createFlag(RunwaySurfaceType.ShortGrass),
                     BitFlags.createFlag(RunwaySurfaceType.LongGrass),
                 );
-                break;
             case SURFACE_HRD:
-                surfaceTypeMask = BitFlags.union(
+                return BitFlags.union(
                     BitFlags.createFlag(RunwaySurfaceType.Concrete),
                     BitFlags.createFlag(RunwaySurfaceType.Asphalt),
                     BitFlags.createFlag(RunwaySurfaceType.Tarmac),
                     BitFlags.createFlag(RunwaySurfaceType.Brick),
                     BitFlags.createFlag(RunwaySurfaceType.Bituminous),
                 );
-                break;
         }
-        return surfaceTypeMask;
     }
 
 }
