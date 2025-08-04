@@ -210,7 +210,9 @@ export class SidStar {
     }
 
     public static isApproachRecognized(rnavCertification: NauticalMiles, app: ApproachProcedure): boolean {
-        if (!SidStar.appIsBRnav(app, rnavCertification) || !SidStar.appHasNoRFLegs(app) || ApproachUtils.isRnpAr(app)) {
+        //We don't filter based on RNP values. The real KLN lists all approaches at 2M2 and KMBT, even though they technically require an RNP of 0.3
+        //ApproachUtils.isRnpAr works fine for the KMEM 18L approaches
+        if (!SidStar.appHasNoRFLegs(app) || ApproachUtils.isRnpAr(app)) {
             return false;
         }
 
