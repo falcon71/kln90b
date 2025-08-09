@@ -1,5 +1,5 @@
 import {DefaultUserSettingManager, EventBus} from '@microsoft/msfs-sdk';
-import {Celsius, Degrees, Fahrenheit, Feet, Inhg, Knots, Mph, NauticalMiles} from "../data/Units";
+import {Celsius, Degrees, Fahrenheit, Feet, Inhg, Knots, Mph} from "../data/Units";
 
 
 export const BARO_UNIT_INHG = true;
@@ -103,7 +103,6 @@ export type KLN90BUserSettingsTypes = {
 
     fastGpsAcquisition: boolean,
     enableGlow: boolean,
-    rnavCertification: NauticalMiles,
 
     userDataFormat: number,
 }
@@ -304,10 +303,6 @@ export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSett
             {
                 name: "cal5SpeedMph",
                 defaultValue: 0,
-            },
-            {
-                name: "rnavCertification",
-                defaultValue: 5,
             },
             {
                 name: "userDataFormat",

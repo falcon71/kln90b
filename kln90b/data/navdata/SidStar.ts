@@ -209,7 +209,7 @@ export class SidStar {
         return null;
     }
 
-    public static isApproachRecognized(rnavCertification: NauticalMiles, app: ApproachProcedure): boolean {
+    public static isApproachRecognized(app: ApproachProcedure): boolean {
         //We don't filter based on RNP values. The real KLN lists all approaches at 2M2 and KMBT, even though they technically require an RNP of 0.3
         //ApproachUtils.isRnpAr works fine for the KMEM 18L approaches
         if (!SidStar.appHasNoRFLegs(app) || ApproachUtils.isRnpAr(app)) {
@@ -231,9 +231,9 @@ export class SidStar {
         }
     }
 
-    public static isProcedureRecognized(rnavCertification: NauticalMiles, proc: Procedure, runwayTransition: RunwayTransition | null = null, enrouteTransition: EnrouteTransition | null = null): boolean {
+    public static isProcedureRecognized(proc: Procedure, runwayTransition: RunwayTransition | null = null, enrouteTransition: EnrouteTransition | null = null): boolean {
         //The real device does not include RNAV procedures: https://www.euroga.org/forums/maintenance-avionics/5573-rnav-retrofit
-        return SidStar.procIsBRnav(proc, rnavCertification) && SidStar.procHasNoRFLegs(proc) && SidStar.hasAtLeastOneRecognizedLeg(proc, runwayTransition, enrouteTransition) && !proc.rnpAr;
+        return SidStar.procHasNoRFLegs(proc) && SidStar.hasAtLeastOneRecognizedLeg(proc, runwayTransition, enrouteTransition) && !proc.rnpAr;
     }
 
     /**
@@ -324,46 +324,6 @@ export class SidStar {
         return !proc.commonLegs.some(leg => leg.type === LegType.RF);
     }
 
-    /**
-     *  People are going to hate me, but the KLN is only capable of B-RNAV
-     * @private
-     * @param app
-     * @param rnavCertification
-     */
-    private static appIsBRnav(app: ApproachProcedure, rnavCertification: NauticalMiles): boolean {
-        const rnavCertificationMeters = UnitType.NMILE.convertTo(rnavCertification, UnitType.METER);
-
-        for (const transition of app.transitions) {
-            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < rnavCertificationMeters)) {
-                return false;
-            }
-        }
-
-        return !app.finalLegs.concat(app.missedLegs).some(leg => leg.rnp > 0 && leg.rnp < rnavCertificationMeters);
-    }
-
-    /**
-     *  People are going to hate me, but the KLN is only capable of B-RNAV
-     * @param proc
-     * @param rnavCertification
-     * @private
-     */
-    private static procIsBRnav(proc: Procedure, rnavCertification: NauticalMiles): boolean {
-        const rnavCertificationMeters = UnitType.NMILE.convertTo(rnavCertification, UnitType.METER);
-
-        for (const transition of proc.enRouteTransitions) {
-            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < rnavCertificationMeters)) {
-                return false;
-            }
-        }
-        for (const transition of proc.runwayTransitions) {
-            if (transition.legs.some(leg => leg.rnp > 0 && leg.rnp < rnavCertificationMeters)) {
-                return false;
-            }
-        }
-
-        return !proc.commonLegs.some(leg => leg.rnp > 0 && leg.rnp < rnavCertificationMeters);
-    }
 
     /**
      * For example KGEG GEG7 only has CA and VM, which are not recognized by the KLN,
@@ -549,7 +509,7 @@ export class SidStar {
      * Converts the FlightPlanLegs to KLNFlightplanLegs.
      * Also resolves DME Arc entries.
      * @param facility
-     * @param procedureName
+     * @param procedureInformation
      * @param legType
      * @param legs
      * @private
