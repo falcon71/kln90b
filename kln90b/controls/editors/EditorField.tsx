@@ -8,6 +8,7 @@ export abstract class EditorField implements UiElement {
     abstract readonly charset: string[];
     readonly children = NO_CHILDREN;
     public value: EditorFieldValue = null;
+    public defaultValue: number = 0;
     public isFocused = false;
     public isParentFocused = false;
     public isParentBlink = false;

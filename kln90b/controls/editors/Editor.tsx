@@ -113,7 +113,7 @@ export abstract class Editor<T> implements Field {
             return EnterResult.Not_Handled;
         }
 
-        const editedValue = this.editorFields.map(f => f.value ?? 0);
+        const editedValue = this.editorFields.map(f => f.value ?? f.defaultValue);
         const value = await this.convertToValue(editedValue);
         if (value === null) {
             this.statusLineMessagePublisher.pub("statusLineMessage", "INVALID ENT");

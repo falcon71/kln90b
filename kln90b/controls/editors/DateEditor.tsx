@@ -16,6 +16,11 @@ export class DateEditor extends Editor<TimeStamp> {
             new NumberEditorField(),
             new NumberEditorField(),
         ], value, enterCallback);
+
+        //The default date in the -89 is 2000, but it's 1988 in the -90B
+        //When entering a 0 in the third place and leaving the fourth place blank, it becomes 2008
+        this.editorFields[2].defaultValue = 8;
+        this.editorFields[3].defaultValue = 8;
     }
 
     public render(): VNode {
