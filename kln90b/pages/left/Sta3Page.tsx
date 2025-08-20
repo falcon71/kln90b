@@ -23,10 +23,12 @@ export class Sta3Page extends SixLineHalfPage {
         //From the installation manual 2.4.1: CAL 0 -10°, CAL 100: 0° (default), CAL 200: +10°
         //can be adjusted by holding the left CRS Button when turning the device on
         return (<pre>
-            HOST SW&nbsp&nbsp20<br/>
-            RCVR SW&nbsp&nbsp20<br/>
-            OBS CAL&nbsp100<br/>
-            MSFS {VERSION.padStart(6, " ")}
+            HOST SW<br/>
+            {VERSION.padStart(11, " ")}<br/>
+            RCVR SW<br/>
+            &nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp02<br/>
+            <br/>
+            OBS CAL&nbsp100
         </pre>);
     }
 
