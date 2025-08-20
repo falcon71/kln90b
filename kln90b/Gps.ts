@@ -76,7 +76,6 @@ export class GPS {
     private lastCoords: GeoPoint;
     private intSaveCount = 0;
     private readonly takeHomeMode: boolean;
-    private isStarted: boolean = false;
     private clockPublisher: Publisher<ClockEvents>;
     private gnssPublisher: Publisher<GNSSEvents>;
 
@@ -163,12 +162,9 @@ export class GPS {
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + TICK_TIME_CALC);
             this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp();
         } else {
-
-            if (this.isStarted) {
-                this.clockPublisher.pub('simTime', actualUnixTime);
-                this.gnssPublisher.pub('gps-position', new LatLongAlt(lat, lon, alt));
-                this.gpsSatComputer.onUpdate();
-            }
+            this.clockPublisher.pub('simTime', actualUnixTime);
+            this.gnssPublisher.pub('gps-position', new LatLongAlt(lat, lon, alt));
+            this.gpsSatComputer.onUpdate();
 
             if (this.isValid()) {
                 this.lastCoords = this.coords;
@@ -213,10 +209,6 @@ export class GPS {
         return this.groundspeed >= MIN_GROUND_SPEED_FOR_TRACK ? this.trackTrue : null;
     }
 
-    public startGPSSearch(): void {
-        this.isStarted = true;
-    }
-
     public isValid(): boolean {
         //todo this is not entirely correct. GPSSatComputer assumes navigation is only possible with 4 sats. 5-29 states that navigation may be possible with 3 sats when an altitude input is used in the solution
         return this.gpsSatComputer.state === GPSSystemState.SolutionAcquired || this.gpsSatComputer.state === GPSSystemState.DiffSolutionAcquired;
@@ -226,7 +218,6 @@ export class GPS {
     reset(): void {
         this.savePosition();
         this.gpsSatComputer.reset();
-        this.isStarted = false;
 
         //we still keep all old values
     }

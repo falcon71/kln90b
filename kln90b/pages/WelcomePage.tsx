@@ -142,7 +142,6 @@ export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> 
         if ((now - this.startTime > TEST_TIME || this.forceReadyToUse) && !this.lCursorController.cursorActive && this.arePropsReady(this.props)) {
             if (this.forceReadyToUse) {
                 //We got no time for that
-                this.props.sensors.in.gps.startGPSSearch();
                 this.props.sensors.in.gps.gpsSatComputer.acquireAndUseSatellites();
                 this.props.pageManager.startMainPage(this.props);
             } else if (this.props.planeSettings.takeHomeMode) {

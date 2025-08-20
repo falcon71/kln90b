@@ -142,7 +142,6 @@ export class SelfTestRightPage extends SixLineHalfPage {
         this.props.memory.navPage.isSelfTestActive = false;
 
         this.props.sensors.out.audioGenerator.shortBeeps(5);
-        this.props.sensors.in.gps.startGPSSearch();
         if (this.props.planeSettings.vfrOnly) {
             this.props.pageManager.setCurrentPage(FourSegmentPage, {
                 ...this.props,
