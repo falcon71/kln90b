@@ -24,6 +24,8 @@ import {TICK_TIME_CALC} from "./TickController";
 
 const SAVE_INTERVALL = 60000;
 const MIN_GROUND_SPEED_FOR_TRACK = 2; //3-35
+const GPS_EPOCH = 315964800000; //Jan 6 1980
+const GPS_ERA_DURATION = 1024 * 60 * 60 * 24 * 7 * 1000;
 export interface GPSEvents {
     timeUpdatedEvent: TimeStamp; //This is fired if either the time was manually updated by the other or when the time was changed by more than 10 minutes
 }
@@ -78,6 +80,7 @@ export class GPS {
     private readonly takeHomeMode: boolean;
     private clockPublisher: Publisher<ClockEvents>;
     private gnssPublisher: Publisher<GNSSEvents>;
+    private gpsStartTime: number = 0;
 
     constructor(private bus: EventBus, private userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, private readonly messageHandler: MessageHandler) {
         const fastGPS = this.userSettings.getSetting("fastGpsAcquisition").get();
@@ -93,7 +96,6 @@ export class GPS {
                 acquisitionTimeout: fastGPS ? 1000 : 4 * 60 * 1000, //4 + 2 -> this puts us close to the 6 minutes the manual mentions. With a second miss, we are at 8+2, that's the value from the manual
                 ephemerisDownloadTime: fastGPS ? 1000 : 30000, //30 Seconds
                 almanacDownloadTime: fastGPS ? 1000 : 750000, //12.5 minutes
-
             },
         };
 
@@ -184,7 +186,8 @@ export class GPS {
                     this.savePosition();
                     this.intSaveCount = 0;
                 }
-                this.timeZulu = this.unixToTimestamp(actualUnixTime);
+                const assumedTime = this.timeZulu.getTimestamp() + TICK_TIME_CALC; //We need to add a second, otherwise we would roll back right to the start of the GPS epcoh
+                this.timeZulu = this.calculateGPSTime(assumedTime, actualUnixTime);
                 this.gpsSatComputer.internalTime = actualUnixTime;
             } else {
                 this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + TICK_TIME_CALC);
@@ -237,8 +240,10 @@ export class GPS {
     }
 
     private gpsAcquired() {
-        const unixTime = this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds));
-        const time = this.unixToTimestamp(unixTime);
+        const timeNow = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
+        console.log(`gpsAcquired in ${timeNow - this.gpsStartTime} seconds`);
+        const actualUnixTime = this.absoluteTimeToUNIXTime(timeNow);
+        const calculatedTime = this.calculateGPSTime(this.timeZulu.getTimestamp(), actualUnixTime);
         const pos = new GeoPoint(
             SimVar.GetSimVarValue('PLANE LATITUDE', SimVarValueType.Degree),
             SimVar.GetSimVarValue('PLANE LONGITUDE', SimVarValueType.Degree),
@@ -248,13 +253,13 @@ export class GPS {
             this.messageHandler.addMessage(new OneTimeMessage(["POSITION DIFFERS FROM", "LAST POSITION BY >2NM"]));
         }
 
-        if (Math.abs(time.getTimestamp() - this.timeZulu.getTimestamp()) > 10 * 60 * 1000) {
+        if (Math.abs(calculatedTime.getTimestamp() - this.timeZulu.getTimestamp()) > 10 * 60 * 1000) {
             this.messageHandler.addMessage(new OneTimeMessage(["SYSTEM TIME UPDATED", "TO GPS TIME"]));
-            this.bus.getPublisher<GPSEvents>().pub("timeUpdatedEvent", time);
+            this.bus.getPublisher<GPSEvents>().pub("timeUpdatedEvent", calculatedTime);
         }
 
-        this.timeZulu = time;
-        this.gpsSatComputer.internalTime = time.getTimestamp();
+        this.timeZulu = calculatedTime;
+        this.gpsSatComputer.internalTime = actualUnixTime;
         this.coords = pos;
     }
 
@@ -262,6 +267,27 @@ export class GPS {
         if (evt.isPowered) {
             //Ticks are not running, when we are powered off
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + evt.timeSincePowerChange);
+            this.gpsStartTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
         }
     }
+
+    /**
+     * The GPS only transmites the date as week and as a timestamp since that week
+     * The week is a 10 bit value and as such rolls over every 1024 weeks (19.6 years)
+     * If it gets the epoch wrong, then the date will be of by about 20 years
+     * We simulate this here.
+     * See https://en.wikipedia.org/wiki/GPS_week_number_rollover
+     * @private
+     * @param assumedTime We use this time to calculate the GPS era we think we are in
+     * @param actualUnixTime
+     */
+    private calculateGPSTime(assumedTime: number, actualUnixTime: number): TimeStamp {
+        const assumedEra = Math.floor((assumedTime - GPS_EPOCH) / GPS_ERA_DURATION);
+        const actualEra = Math.floor((actualUnixTime - GPS_EPOCH) / GPS_ERA_DURATION);
+
+        return TimeStamp.create(actualUnixTime - (actualEra - assumedEra) * GPS_ERA_DURATION);
+    }
+
+
+
 }

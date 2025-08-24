@@ -30,6 +30,7 @@ type WelcomePageChildTypes = {
     welcome4: FreetextEditor;
 }
 
+//Maintenance manual says 15 seconds (page 84)
 const TEST_TIME = 17000; //https://youtube.com/shorts/9We5fcd2-VE?feature=share https://www.youtube.com/watch?v=8esFTk7Noj8
 
 export interface WelcomePageProps extends ComponentProps {

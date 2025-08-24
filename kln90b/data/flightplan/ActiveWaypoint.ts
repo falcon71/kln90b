@@ -168,8 +168,10 @@ export class ActiveWaypoint {
     }
 
     private setActiveIdx(activeIdx: number) {
-        this.fplIdx = activeIdx;
-        this.publisher.pub("activeWaypointChanged", this.fplIdx);
+        if (this.fplIdx !== activeIdx) {
+            this.fplIdx = activeIdx;
+            this.publisher.pub("activeWaypointChanged", this.fplIdx);
+        }
     }
 
     /**
