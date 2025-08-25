@@ -10,6 +10,7 @@ import {
     GpsBoolean,
     ICAO,
     IntersectionFacility,
+    IntersectionType,
     LandingSystemCategory,
     NdbFacility,
     NdbType,
@@ -235,6 +236,7 @@ export class UserWaypointLoaderV1 implements UserWaypointLoader {
             nearestVorTrueRadial: 0,
             nearestVorMagneticRadial: 0,
             nearestVorDistance: 0,
+            type: IntersectionType.Named,
         };
     }
 

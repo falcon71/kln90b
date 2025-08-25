@@ -5,6 +5,7 @@ import {
     GeoPoint,
     ICAO,
     IntersectionFacility,
+    IntersectionType,
     NodeReference,
     RunwayFacility,
     UnitType,
@@ -353,6 +354,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
             nearestVorTrueRadial: 0,
             nearestVorMagneticRadial: 0,
             nearestVorDistance: 0,
+            type: IntersectionType.Named,
         };
         try {
             this.props.facilityRepository.add(this.facility);
@@ -387,6 +389,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
             nearestVorTrueRadial: 0,
             nearestVorMagneticRadial: 0,
             nearestVorDistance: 0,
+            type: IntersectionType.Named,
         };
         try {
             this.props.facilityRepository.add(this.facility);
