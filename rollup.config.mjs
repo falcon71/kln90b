@@ -7,21 +7,19 @@ import fs from "fs";
 const buildTargetDir = process.env.buildTargetDir ?? 'build';
 
 /**
- * Copies the manifest.json file over and inserts the version number from the package.json
+ * Copies all resources to the build directory and inserts the version number from the package.json into the manifest
  * @param userConfig
  * @returns {{generateBundle(*, *): void}}
  */
-function copyManifest(userConfig) {
+function copyResourcesAndUpdateManifest(userConfig) {
 	return {
 		generateBundle(outputOptions, bundle) {
 			const packageFile = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 			const version = packageFile.version;
 
-			let content = fs.readFileSync('manifest.json', 'utf8');
+			fs.cpSync('resources', userConfig.outputPath, {recursive: true});
+			let content = fs.readFileSync('resources/manifest.json', 'utf8');
 			content = content.replace('[VI]{version}[/VI]', version);
-			if (!fs.existsSync(userConfig.outputPath)) {
-				fs.mkdirSync(userConfig.outputPath);
-			}
 			fs.writeFileSync(`${userConfig.outputPath}/manifest.json`, content);
 		}
 	}
@@ -37,7 +35,7 @@ export default {
 	plugins: [
 		scss({ fileName: 'KLN90B.css' }),
 		resolve(),
-		copyManifest({
+		copyResourcesAndUpdateManifest({
 			outputPath: buildTargetDir,
 		}),
 		versionInjector({
