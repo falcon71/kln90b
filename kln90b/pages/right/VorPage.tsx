@@ -229,6 +229,7 @@ export class VorPage extends WaypointPage<VorFacility> {
             ils: null,
             tacan: null,
             trueReferenced: false,
+            alt: 0,
         };
         try {
             this.props.facilityRepository.add(this.facility);

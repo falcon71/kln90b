@@ -187,6 +187,7 @@ export class NdbPage extends WaypointPage<NdbFacility> {
             type: NdbType.H,
             range: 0,
             bfoRequired: false,
+            alt: 0,
         };
         try {
             this.props.facilityRepository.add(this.facility);

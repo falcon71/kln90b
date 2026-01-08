@@ -198,6 +198,7 @@ export class UserWaypointLoaderV2 implements UserWaypointLoader {
             ils: null,
             tacan: null,
             trueReferenced: false,
+            alt: 0,
         };
     }
 
@@ -218,6 +219,7 @@ export class UserWaypointLoaderV2 implements UserWaypointLoader {
             type: NdbType.H,
             range: 0,
             bfoRequired: false,
+            alt: 0,
         };
     }
 
