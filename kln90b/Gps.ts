@@ -64,7 +64,7 @@ class KLNGPSSatComputer extends GPSSatComputer {
      * channels is private, but we display this in the STA 1 page, so we make it public here
      */
     public getChannels(): (GPSSatellite | null)[] {
-        return (this as any).channels;
+        return (this as any).activeSimulationContext.channels;
     }
 }
 
