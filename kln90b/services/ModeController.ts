@@ -7,6 +7,7 @@ import {
     FacilityUtils,
     GeoCircle,
     GeoPoint,
+    ICAO,
     LatLonInterface,
     NavMath,
     UnitType,
@@ -91,6 +92,7 @@ export class ModeController implements CalcTickable {
         this.navState.navmode = this.navState.navmode === NavMode.ARM_OBS ? NavMode.ARM_LEG : NavMode.ENR_LEG;
 
         const active = this.navState.activeWaypoint.getActiveWpt();
+        this.navState.obsMag = 0;
         if (active !== null) {
             if (this.navState.toFrom === FROM && this.navState.activeWaypoint.getActiveFplIdx() !== -1) {
                 this.navState.activeWaypoint.activateFpl0();
@@ -143,26 +145,28 @@ export class ModeController implements CalcTickable {
 
     }
 
-    private forceSwitchToEnrObsMode() {
+    public setObs(obsMag: Degrees): void {
+        if (obsMag === this.navState.obsMag) {
+            return;
+        }
+
+        this.navState.obsMag = obsMag;
         const active = this.navState.activeWaypoint.getActiveWpt();
+        if (active === null) {
+            return;
+        }
+        const toPoint = new GeoPoint(active.lat, active.lon);
+        const bearing = this.getObsTrue() - 180;
 
-        this.navState.activeWaypoint.clearTurnStack();
-
-        if (this.navState.navmode === NavMode.APR_LEG) {
-            //6-3 Switching to OBS cancels an active approach
-            this.navState.navmode = NavMode.ARM_OBS;
-            this.navState.xtkScale = 1;
+        toPoint.offset(bearing, UnitType.NMILE.convertTo(1000, UnitType.GA_RADIAN));
+        const from = UserFacilityUtils.createFromLatLon(ICAO.value("U", "XX", "", ""), toPoint.lat, toPoint.lon, true);
+        const activeIdx = this.navState.activeWaypoint.getActiveFplIdx();
+        if (activeIdx >= 0) {
+            this.navState.activeWaypoint.directToFlightplanIndex(from, activeIdx);
         } else {
-            this.navState.navmode = this.navState.navmode === NavMode.ARM_LEG ? NavMode.ARM_OBS : NavMode.ENR_OBS;
+            this.navState.activeWaypoint.directTo(from, active);
         }
 
-        if (this.sensors.in.obsMag !== null && this.planeSettings.output.obsTarget === 0) {
-            this.setObs(this.sensors.in.obsMag);
-        } else if (active !== null) {
-            const obsTrue = this.navState.desiredTrack!;
-            const magvar = this.getMagvarForObs(active);
-            this.setObs(this.magvar.trueToMag(obsTrue, magvar));
-        }
     }
 
     public isObsModeActive(): boolean {
@@ -200,22 +204,27 @@ export class ModeController implements CalcTickable {
         return this.magvar.getCurrentMagvar();
     }
 
-    public setObs(obsMag: Degrees): void {
-        if (obsMag === this.navState.obsMag) {
-            return;
-        }
-
-        this.navState.obsMag = obsMag;
+    private forceSwitchToEnrObsMode() {
         const active = this.navState.activeWaypoint.getActiveWpt();
-        if (active === null) {
-            return;
-        }
-        const toPoint = new GeoPoint(active.lat, active.lon);
-        const bearing = this.getObsTrue() - 180;
 
-        toPoint.offset(bearing, UnitType.NMILE.convertTo(1000, UnitType.GA_RADIAN));
-        const from = UserFacilityUtils.createFromLatLon("UXX         ", toPoint.lat, toPoint.lon, true);
-        this.navState.activeWaypoint.directTo(from, active);
+        this.navState.activeWaypoint.clearTurnStack();
+
+        if (this.navState.navmode === NavMode.APR_LEG) {
+            //6-3 Switching to OBS cancels an active approach
+            this.navState.navmode = NavMode.ARM_OBS;
+            this.navState.xtkScale = 1;
+        } else {
+            this.navState.navmode = this.navState.navmode === NavMode.ARM_LEG ? NavMode.ARM_OBS : NavMode.ENR_OBS;
+        }
+
+        if (this.sensors.in.obsMag !== null && this.planeSettings.output.obsTarget === 0) {
+            this.setObs(this.sensors.in.obsMag);
+        } else if (active !== null) {
+            const obsTrue = this.navState.desiredTrack ?? this.navState.bearingToActive!; //Null when TO and FROM are the same waypoint
+
+            const magvar = this.getMagvarForObs(active);
+            this.setObs(this.magvar.trueToMag(obsTrue, magvar));
+        }
     }
 
     public tick(): void {

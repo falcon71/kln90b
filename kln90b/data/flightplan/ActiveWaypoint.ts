@@ -323,10 +323,17 @@ export class ActiveWaypoint {
             return;
         }
 
+
         const legs = this.fpl0.getLegs();
         if (this.fplIdx < legs.length && this.to === legs[this.fplIdx]) { //Yes, we really need to check the instance here. For example the user may remove the enroute waypoint with the same icao as the IAF
             return;
         }
+        if (this.isDirectTo) {
+            //Becomes a random DTO when the waypoint is deleted from the plan
+            this.fplIdx = -1;
+            return;
+        }
+
         //The user must have modified the flightplan if to does not match the index anymore
         this.activateFpl0();
     }

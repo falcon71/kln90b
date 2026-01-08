@@ -98,7 +98,7 @@ export class DirectToPage extends SixLineHalfPage {
         if (waypoint === null) { //3-29 clear DCT
             this.props.memory.navPage.activeWaypoint.cancelDirectTo();
         } else {
-            const from = UserFacilityUtils.createFromLatLon("UXX        d", this.props.sensors.in.gps.coords.lat, this.props.sensors.in.gps.coords.lon, true);
+            const from = UserFacilityUtils.createFromLatLon(ICAO.value("U", "XX", "", "d"), this.props.sensors.in.gps.coords.lat, this.props.sensors.in.gps.coords.lon, true);
             if (this.flightPlanIndex !== null && ICAO.valueEquals(this.props.memory.fplPage.flightplans[0].getLegs()[this.flightPlanIndex].wpt.icaoStruct, waypoint.icaoStruct)) {
                 this.props.memory.navPage.activeWaypoint.directToFlightplanIndex(from, this.flightPlanIndex);
             } else {
