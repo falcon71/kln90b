@@ -96,13 +96,13 @@ export class ModeController implements CalcTickable {
         if (active !== null) {
             if (this.navState.toFrom === FROM && this.navState.activeWaypoint.getActiveFplIdx() !== -1) {
                 this.navState.activeWaypoint.activateFpl0();
-                const from = UserFacilityUtils.createFromLatLon("UXX        d", this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, true);
+                const from = UserFacilityUtils.createFromLatLon(ICAO.value("U", "XX", "", "d"), this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, true);
                 const to = this.reorientFlightplanLeg(this.sensors.in.gps.coords) ?? active;
 
                 this.navState.activeWaypoint.directTo(from, to);
             } else {
                 const fromCoords: LatLonInterface = this.navState.activeWaypoint.getFromWpt()!;
-                const from = UserFacilityUtils.createFromLatLon("UXX        d", fromCoords.lat, fromCoords.lon, true);
+                const from = UserFacilityUtils.createFromLatLon(ICAO.value("U", "XX", "", "d"), fromCoords.lat, fromCoords.lon, true);
                 this.navState.activeWaypoint.directTo(from, active);
             }
         }
