@@ -98,7 +98,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
             name2: new TextDisplay(this.multiline(name)[1]),
             type: new TextDisplay(""),
             coordOrNearestView: new AirportCoordOrNearestView(this.props.bus, this.facility, this.props.magvar, this.setLatitude.bind(this), this.setLongitude.bind(this), this.props.nearestUtils),
-            createWpt: new CreateWaypointMessage(this.createAtUserPosition.bind(this), this.createAtPresentPosition.bind(this)),
+            createWpt: new CreateWaypointMessage(() => Apt1Page.createAtUserPosition(props), () => Apt1Page.createAtPresentPosition(props)),
         });
 
         this.mainRef = FSComponent.createRef<HTMLDivElement>();
@@ -168,16 +168,17 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
     protected redraw() {
         const facility = unpackFacility(this.facility);
         this.children.get("nearestSelector").setFacility(this.facility);
-        this.children.get("coordOrNearestView").setFacility(this.facility);
         if (facility === null) {
             if (this.userAirport === null) {
                 this.mainRef.instance.classList.add("d-none");
                 this.children.get("createWpt").setVisible(true);
+                this.children.get("coordOrNearestView").setFacility(this.facility);
             } else {
                 this.mainRef.instance.classList.remove("d-none");
                 this.children.get("createWpt").setVisible(false);
             }
         } else {
+            this.children.get("coordOrNearestView").setFacility(this.facility);
             this.mainRef.instance.classList.remove("d-none");
             this.children.get("createWpt").setVisible(false);
 
@@ -224,6 +225,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
         //We need to position the cursor over the lat field. But we can't do so without setting the readonly state for all fields
         this.children.get("coordOrNearestView").enableLatLon(null, null);
         this.children.get("createWpt").setVisible(false);
+        this.children.get("nearestSelector").isReadonly = true;
         this.cursorController.focusIndex(4);
 
         this.requiresRedraw = true;
