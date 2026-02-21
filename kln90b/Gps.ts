@@ -178,7 +178,9 @@ export class GPS {
 
                 if (this.groundspeed >= MIN_GROUND_SPEED_FOR_TRACK) {
                     //3-34 The manual mentions, that this can lag a bit, so this works for me
-                    this.trackTrue = this.lastCoords.bearingTo(this.coords);
+                    if (!this.lastCoords.equals(this.coords)) { //Sim is paused
+                        this.trackTrue = this.lastCoords.bearingTo(this.coords);
+                    }
                 }
 
                 this.intSaveCount += TICK_TIME_CALC;

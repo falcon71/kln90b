@@ -73,7 +73,7 @@ export class ActiveWaypoint {
         const legs = this.fpl0.getLegs();
         const fplIdx = legs.findIndex(leg => ICAO.valueEquals(leg.wpt.icaoStruct, to.icaoStruct));
         if (fplIdx > -1) {
-            this.to = legs[this.fplIdx]; //We need to keep the meta information like the suffix
+            this.to = legs[fplIdx]; //We need to keep the meta information like the suffix
         } else {
             this.to = {wpt: to, type: KLNLegType.USER};
         }
