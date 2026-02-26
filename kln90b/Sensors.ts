@@ -325,15 +325,16 @@ export class SensorsOut {
             return;
         }
         if (dtkMag === null) {
-            SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, 0);
             SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
+            SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, 0);
         } else {
-            SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(dtkMag, UnitType.RADIAN));
             if (actualTrack === null) {
                 SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
             } else {
                 SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, UnitType.DEGREE.convertTo(NavMath.diffAngle(MagVar.trueToMagnetic(actualTrack, magvar), dtkMag), UnitType.RADIAN));
             }
+            SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(dtkMag, UnitType.RADIAN));
+
         }
     }
 
