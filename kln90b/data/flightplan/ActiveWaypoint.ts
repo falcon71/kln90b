@@ -62,6 +62,7 @@ export class ActiveWaypoint {
         this.setActiveIdx(fplIdx);
         this.saveLastActiveWaypoint();
         this.clearTurnStack();
+        this.publisher.pub("activeWaypointChanged", this.fplIdx);
     }
 
     public directTo(from: Facility, to: Facility) {
@@ -81,6 +82,7 @@ export class ActiveWaypoint {
         this.setActiveIdx(fplIdx);
         this.saveLastActiveWaypoint();
         this.clearTurnStack();
+        this.publisher.pub("activeWaypointChanged", this.fplIdx);
     }
 
     public cancelDirectTo() {
@@ -102,7 +104,9 @@ export class ActiveWaypoint {
                 //Two legs, but both are the same waypoint...
                 return this.flag();
             }
-            return this.setFplData(this.fplIdx);
+            const to = this.setFplData(this.fplIdx);
+            this.publisher.pub("activeWaypointChanged", this.fplIdx);
+            return to;
         } else {
             return this.flag();
         }
@@ -116,6 +120,7 @@ export class ActiveWaypoint {
         if (this.fplIdx + 1 < legs.length) {
             this.setActiveIdx(this.fplIdx + 1);
             this.setFplData(this.fplIdx);
+            this.publisher.pub("activeWaypointChanged", this.fplIdx);
         }
     }
 
@@ -170,7 +175,6 @@ export class ActiveWaypoint {
     private setActiveIdx(activeIdx: number) {
         if (this.fplIdx !== activeIdx) {
             this.fplIdx = activeIdx;
-            this.publisher.pub("activeWaypointChanged", this.fplIdx);
         }
     }
 
@@ -228,6 +232,7 @@ export class ActiveWaypoint {
         this.to = null;
         this.isDirectTo = false;
         this.saveLastActiveWaypoint();
+        this.publisher.pub("activeWaypointChanged", this.fplIdx);
         return null;
     }
 
