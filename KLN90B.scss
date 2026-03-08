@@ -33,6 +33,7 @@ drop-shadow(0 0 10px $green); //This larger shadow creates the distinct glow on 
 kln-90b {
   width: 100%;
   height: 100%;
+  background-color: black;
 }
 
 //It appears, that without this, the font ist not loaded and can't be used in the canvas
@@ -120,11 +121,6 @@ kln-90b #Mainframe #InstrumentsContainer {
 
 .glow {
   filter: $glow;
-}
-
-
-.noGlow {
-  filter: drop-shadow(0 0 0); //Otherwise there will be a glow effect on the top and right around the black background of the super NAV 5 right cursor window
 }
 
 .statusline {
@@ -226,13 +222,17 @@ pre {
   left: $xMarginPx + (6 * $charWidth + 6) * $zoom-factor;
 }
 
-.super-nav5-right-controls {
+.super-nav5-right-controls-parent {
   position: fixed;
   top: $yMarginPx;
   left: $xMarginPx + (($xChars * $charWidth) - (8 * $charWidth)) * $zoom-factor;
   height: 4 * $charHeight * $zoom-factor;
   width: 8 * $charWidth * $zoom-factor;
   background-color: black;
+  filter: drop-shadow(0 0 0); //Otherwise there will be a glow effect on the top and right around the black background of the super NAV 5 right cursor window
+}
+
+.super-nav5-right-controls {
   border-left: 1px*$zoom-factor solid $green;
   border-bottom: 1px*$zoom-factor solid $green;
 }

@@ -6,7 +6,6 @@ import {
     FSComponent,
     NodeReference,
     Publisher,
-    UserSetting,
     VNode,
 } from "@microsoft/msfs-sdk";
 import {DisplayTickable, TickController} from "../TickController";
@@ -36,13 +35,9 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
     private keyBoardInitialized = false;
     private readonly keyboardId = this.genGuid();
     private currentPage: DisplayComponent<PageProps> & Page | undefined;
-    private readonly glowSetting: UserSetting<boolean>;
 
     constructor(props: PageContainerProps) {
         super(props);
-
-        this.glowSetting = this.props.userSettings.getSetting("enableGlow");
-        this.glowSetting.sub(this.glowChanged.bind(this));
         this.keyboardPublisher = props.bus.getPublisher<KeyboardEvent>();
         props.bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.resetKeyboard.bind(this));
     }
@@ -61,7 +56,7 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
 
     render(): VNode {
         return (<div>
-            <div id="pageContainer" ref={this.containerRef} class={this.glowSetting.get() ? "glow" : ""}></div>
+            <div id="pageContainer" ref={this.containerRef} class="glow"></div>
             <input class="keyboard" ref={this.keyboardRef}></input>
             <ErrorPage bus={this.props.bus}></ErrorPage>
         </div>);
@@ -87,17 +82,6 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
 
         this.getCurrentPage().tick(blink);
         this.getCurrentPage().children.walk((el) => el.tick(blink));
-    }
-
-    private glowChanged(glow: boolean) {
-        if (!TickController.checkRef(this.containerRef)) {
-            return;
-        }
-        if (glow) {
-            this.containerRef.instance.classList.add("glow");
-        } else {
-            this.containerRef.instance.classList.remove("glow");
-        }
     }
 
     public setCurrentPage<T extends ComponentProps>(type: DisplayComponentFactory<T>, props: T) {

@@ -102,7 +102,6 @@ export type KLN90BUserSettingsTypes = {
     cal5SpeedMph: Mph,
 
     fastGpsAcquisition: boolean,
-    enableGlow: boolean,
 
     userDataFormat: number,
 }
@@ -243,10 +242,6 @@ export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSett
             {
                 name: "fastGpsAcquisition",
                 defaultValue: GPS_ACQUISITION_FAST,
-            },
-            {
-                name: "enableGlow",
-                defaultValue: true,
             },
             {
                 name: "cal12IndicatedAltitude",
