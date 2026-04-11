@@ -30,12 +30,8 @@ export class WaypointEditor extends Editor<Facility | null> {
      * @private
      */
     private isAwaitingConfirmation: boolean = false;
-    /**
-     * True if we are showing the waypoint page on the right.
-     * Might be different than isAwaitingConfirmation, if we confirm a CLR
-     * @private
-     */
-    private isShowingWaypointPage: boolean = false;
+    private valueToConfirm: Facility | null = null;
+
 
     constructor(private props: WaypointEditorProps) {
         super(props.bus, [
@@ -57,11 +53,15 @@ export class WaypointEditor extends Editor<Facility | null> {
 
     async enter(): Promise<EnterResult> {
         if (this.isAwaitingConfirmation) {
-            if (this.isShowingWaypointPage) {//The waypoint confirm Page is shown. Return will be handled there
-                return EnterResult.Not_Handled;
+            if (this.isShowingWaypointPage()) {//The waypoint confirm Page is shown. Return will be handled there
+                const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
+                mainPage.popRightPage();
+
+                this.valueConfirmed(this.valueToConfirm);
+                return EnterResult.Handled_Keep_Focus;
 
             } else { //This means, clear was pressed on the DCT page and no airport was actually shown
-                this.valueConfirmed(null);
+                this.valueConfirmed(this.valueToConfirm);
                 return EnterResult.Handled_Move_Focus;
             }
         } else if (!this.isEntered) {
@@ -90,6 +90,16 @@ export class WaypointEditor extends Editor<Facility | null> {
             await this.confirmValue(editedValue, value);
             return EnterResult.Handled_Move_Focus;
         }
+    }
+
+    /**
+     * True if we are showing the waypoint page on the right.
+     * Might be different than isAwaitingConfirmation, if we confirm a CLR
+     * @private
+     */
+    private isShowingWaypointPage(): boolean {
+        const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
+        return mainPage.getRightPage() instanceof WaypointConfirmPage;
     }
 
     /**
@@ -239,7 +249,7 @@ export class WaypointEditor extends Editor<Facility | null> {
     private async confirmValue(editedValue: Rawvalue | null, value: Facility | null): Promise<void> {
         this.isEntered = true; //We still want to steal the cursor
         this.isAwaitingConfirmation = true;
-        this.isShowingWaypointPage = value !== null;
+        this.valueToConfirm = value;
 
         this.applyValueToFields(editedValue);
 
@@ -250,12 +260,12 @@ export class WaypointEditor extends Editor<Facility | null> {
         return WaypointConfirmPage.showWaypointconfirmation({
             ...this.props,
             facility: value,
-        }, this.props.parent).then(this.valueConfirmed.bind(this));
+        }, this.props.parent);
     }
 
     private valueConfirmed(value: Facility | null): void {
         this.isAwaitingConfirmation = false;
-        this.isShowingWaypointPage = false;
+        this.valueToConfirm = null;
 
         if (value === null) {
             this.convertedValue = null;
@@ -270,11 +280,11 @@ export class WaypointEditor extends Editor<Facility | null> {
 
     private cancelAwaitingConfirmation() {
         const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
-        if (this.isShowingWaypointPage) {
+        if (this.isShowingWaypointPage()) {
             mainPage.popRightPage();
-            this.isShowingWaypointPage = false;
         }
         this.isAwaitingConfirmation = false;
+        this.valueToConfirm = null;
         this.isEntered = false;
         this.applyValueToFields(this.convertedValue);
     }

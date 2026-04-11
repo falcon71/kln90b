@@ -1,6 +1,6 @@
 import {Facility, FacilityType, FSComponent, ICAO, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
-import {EnterResult, NO_CURSOR_CONTROLLER} from "../CursorController";
+import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {Apt1Page} from "./Apt1Page";
 import {NdbPage} from "./NdbPage";
 import {VorPage} from "./VorPage";
@@ -13,10 +13,6 @@ import {Scanlist} from "../../data/navdata/Scanlist";
 import {UIElementChildren} from "../Page";
 import {PageTreeController, RIGHT_PAGE_TREE} from "../PageTreeController";
 
-
-interface FullWaypointPageProps extends WaypointPageProps<any> {
-    resolve: (value: Facility) => void,
-}
 
 type WaypointConfirmPageTypes = {
     page: WaypointPage<Facility>,
@@ -76,19 +72,13 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
         });
     }
 
-    public static async showWaypointconfirmation(props: WaypointPageProps<any>, parent: SixLineHalfPage): Promise<Facility> {
+    public static showWaypointconfirmation(props: WaypointPageProps<any>, parent: SixLineHalfPage): void {
         const mainPage = props.pageManager.getCurrentPage() as MainPage;
         if ("idx" in props) {
             delete props.idx; //Just to make sure, this does not get interpreted as ActiveWaypointPageProps
         }
 
-        return new Promise<Facility>((resolve) => {
-            const fullprops = {
-                ...props,
-                resolve: resolve,
-            };
-            mainPage.pushRightPage(new WaypointConfirmPage(fullprops), parent);
-        });
+        mainPage.pushRightPage(new WaypointConfirmPage(props), parent);
     }
 
     public render(): VNode {
@@ -96,16 +86,7 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
     }
 
     isEnterAccepted(): boolean {
-        return true;
-    }
-
-    enter(): Promise<EnterResult> {
-        const props = this.props as FullWaypointPageProps;
-
-        const mainPage = props.pageManager.getCurrentPage() as MainPage;
-        mainPage.popRightPage();
-        props.resolve(unpackFacility(this.facility)!);
-        return Promise.resolve(EnterResult.Handled_Keep_Focus);
+        return false;
     }
 
     public getScanlist(): Scanlist {
