@@ -1,4 +1,4 @@
-import {Facility, FSComponent} from '@microsoft/msfs-sdk';
+import {Facility} from '@microsoft/msfs-sdk';
 import {PageProps} from '../pages/Page';
 import {StatusLineMessageEvents} from "./StatusLine";
 import {ListItemProps, SimpleListItem} from "./ListItem";
@@ -41,6 +41,7 @@ export class WaypointDeleteListItem extends SimpleListItem<Facility> {
         WaypointConfirmPage.showWaypointconfirmation({
             ...this.getPageProps(),
             facility: this.props.value,
+            callingEditor: null,
         }, this.parent); //We are the left page, that means we get priority and we will see the enter from the list
 
 

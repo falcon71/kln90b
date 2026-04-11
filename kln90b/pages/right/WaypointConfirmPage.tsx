@@ -1,6 +1,6 @@
 import {Facility, FacilityType, FSComponent, ICAO, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
-import {NO_CURSOR_CONTROLLER} from "../CursorController";
+import {EnterResult, NO_CURSOR_CONTROLLER} from "../CursorController";
 import {Apt1Page} from "./Apt1Page";
 import {NdbPage} from "./NdbPage";
 import {VorPage} from "./VorPage";
@@ -12,7 +12,11 @@ import {WaypointPageState} from "../../data/VolatileMemory";
 import {Scanlist} from "../../data/navdata/Scanlist";
 import {UIElementChildren} from "../Page";
 import {PageTreeController, RIGHT_PAGE_TREE} from "../PageTreeController";
+import {WaypointEditor} from "../../controls/editors/WaypointEditor";
 
+interface WaypointConfirmProps extends WaypointPageProps<any> {
+    callingEditor: WaypointEditor | null,
+}
 
 type WaypointConfirmPageTypes = {
     page: WaypointPage<Facility>,
@@ -30,7 +34,7 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
 
     private readonly ref: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
 
-    private constructor(props: WaypointPageProps<Facility>) {
+    private constructor(props: WaypointConfirmProps) {
         super(props);
 
 
@@ -72,7 +76,7 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
         });
     }
 
-    public static showWaypointconfirmation(props: WaypointPageProps<any>, parent: SixLineHalfPage): void {
+    public static showWaypointconfirmation(props: WaypointConfirmProps, parent: SixLineHalfPage): void {
         const mainPage = props.pageManager.getCurrentPage() as MainPage;
         if ("idx" in props) {
             delete props.idx; //Just to make sure, this does not get interpreted as ActiveWaypointPageProps
@@ -86,7 +90,17 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
     }
 
     isEnterAccepted(): boolean {
-        return false;
+        return true;
+    }
+
+    enter(): Promise<EnterResult> {
+        //Normally, the calling edtor will handle the enter event. This does not work, when the editor is one the right page (like REF), so we delegate the event page to the parent manually
+        const props = this.props as WaypointConfirmProps;
+        if (props.callingEditor == null) {
+            return Promise.resolve(EnterResult.Not_Handled);
+        }
+
+        return Promise.resolve(props.callingEditor.currentValueConfirmed());
     }
 
     public getScanlist(): Scanlist {
