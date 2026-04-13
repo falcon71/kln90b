@@ -272,10 +272,10 @@ export class UserWaypointLoaderV1 implements UserWaypointLoader {
 
     private deserializeLon(str: string): number {
         const sign = str.substring(20, 21) == '-' ? -1 : 1;
-        const degrees = Number(str.substring(21, 24));
+        const degrees = Number(str.substring(22, 24));
         const minutes = Number(str.substring(24, 29)) / 60;
 
-        return sign * (degrees + (degrees >= 0 ? minutes : -minutes));
+        return sign * (degrees + minutes);
     }
 
     private deserializeFrequency(str: string): number {
