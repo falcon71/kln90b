@@ -15,6 +15,8 @@ import {KeyboardEvent} from "./StatusLine";
 import {PowerEvent} from "../PowerButton";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 import {ErrorPage} from "./ErrorPage";
+import KEY_ENTER = KeyCode.KEY_ENTER;
+import KEY_ESCAPE = KeyCode.KEY_ESCAPE;
 
 
 export interface PageContainerProps extends ComponentProps {
@@ -152,11 +154,18 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
             if (!this._isLeftKeyboardActive && !this._isRightKeyboardActive) {
                 return;
             }
-            if (event.keyCode == 13) { //Enter somehow does not trigger onkeydown
+            if (event.keyCode == KEY_ENTER) { //Enter somehow does not trigger onkeydown
                 const side = this._isLeftKeyboardActive ? 'LEFT' : 'RIGHT';
                 this.keyboardPublisher.pub("keyboardevent", {side: side, keyCode: event.keyCode});
                 event.preventDefault();
                 this.keyboardRef.instance.value = "";
+            } else if (event.keyCode == KEY_ESCAPE) { //Escape somehow does not trigger onkeydown
+                event.preventDefault();
+                setTimeout(() => {
+                    //The sim will display the pause menu when pressing escape without the timeout
+                    this.resetKeyboard();
+                    this.keyboardRef.instance.value = "";
+                }, 100);
             }
         };
         this.keyboardRef.instance.onblur = (event) => {

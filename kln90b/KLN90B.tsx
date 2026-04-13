@@ -93,6 +93,19 @@ import {KlnEfbSaver} from "./services/KlnEfbSaver";
 import {KlnEfbLoader} from "./services/KlnEfbLoader";
 import {WTFlightplanSync} from "./services/WTFlightplanSync";
 import {BrightnessManager} from "./BrightnessManager";
+import KEY_ENTER = KeyCode.KEY_ENTER;
+import KEY_PAGE_UP = KeyCode.KEY_PAGE_UP;
+import KEY_PAGE_DOWN = KeyCode.KEY_PAGE_DOWN;
+import KEY_BACK_SPACE = KeyCode.KEY_BACK_SPACE;
+import KEY_END = KeyCode.KEY_END;
+import KEY_HOME = KeyCode.KEY_HOME;
+import KEY_DELETE = KeyCode.KEY_DELETE;
+import KEY_A = KeyCode.KEY_A;
+import KEY_0 = KeyCode.KEY_0;
+import KEY_9 = KeyCode.KEY_9;
+import KEY_Z = KeyCode.KEY_Z;
+import KEY_NUMPAD0 = KeyCode.KEY_NUMPAD0;
+import KEY_NUMPAD9 = KeyCode.KEY_NUMPAD9;
 
 export interface PropsReadyEvent {
     propsReady: PageProps;
@@ -402,10 +415,10 @@ class KLN90B extends BaseInstrument {
 
     private handleKeyboardEvent(data: KeyboardEventData) {
         switch (data.keyCode) {
-            case 13: //Enter
+            case KEY_ENTER:
                 this.onInteractionEvent([EVT_ENT]);
                 break;
-            case 33: // Page up
+            case KEY_PAGE_UP:
                 switch (data.side) {
                     case "LEFT":
                         this.onInteractionEvent([EVT_L_INNER_RIGHT]);
@@ -415,7 +428,7 @@ class KLN90B extends BaseInstrument {
                         break;
                 }
                 break;
-            case 34: // Page Down
+            case KEY_PAGE_DOWN:
                 switch (data.side) {
                     case "LEFT":
                         this.onInteractionEvent([EVT_L_INNER_LEFT]);
@@ -425,8 +438,8 @@ class KLN90B extends BaseInstrument {
                         break;
                 }
                 break;
-            case 8: // Backspace
-            case 35: // End
+            case KEY_BACK_SPACE:
+            case KEY_END:
                 switch (data.side) {
                     case "LEFT":
                         this.onInteractionEvent([EVT_L_OUTER_LEFT]);
@@ -436,7 +449,7 @@ class KLN90B extends BaseInstrument {
                         break;
                 }
                 break;
-            case 36: // Home
+            case KEY_HOME:
                 switch (data.side) {
                     case "LEFT":
                         this.onInteractionEvent([EVT_L_OUTER_RIGHT]);
@@ -446,15 +459,15 @@ class KLN90B extends BaseInstrument {
                         break;
                 }
                 break;
-            case 46: // Delete
+            case KEY_DELETE:
                 this.onInteractionEvent([EVT_CLR]);
                 break;
             default:
-                if (data.keyCode >= 48 && data.keyCode <= 57 || //Number row
-                    data.keyCode >= 65 && data.keyCode <= 90) { //Letters
+                if (data.keyCode >= KEY_0 && data.keyCode <= KEY_9 || //Number row
+                    data.keyCode >= KEY_A && data.keyCode <= KEY_Z) { //Letters
                     const key = String.fromCharCode(data.keyCode).toUpperCase();
                     this.onInteractionEvent([EVT_KEY + data.side + ":" + key]);
-                } else if (data.keyCode >= 96 && data.keyCode <= 105) { //Numpad
+                } else if (data.keyCode >= KEY_NUMPAD0 && data.keyCode <= KEY_NUMPAD9) { //Numpad
                     const key = String(data.keyCode - 96);
                     this.onInteractionEvent([EVT_KEY + data.side + ":" + key]);
                 }
