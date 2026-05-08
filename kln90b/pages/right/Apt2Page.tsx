@@ -16,6 +16,9 @@ import {AirportNearestList, NearestWpt} from "../../data/navdata/NearestList";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {convertTextToKLNCharset} from "../../data/Text";
 import {ElevationDisplay} from "../../controls/displays/AltitudeDisplay";
+import {TimeZoneInfo, TimezoneService} from "../../services/TimezoneService";
+import {format} from "numerable";
+import {TimeStamp} from "../../data/Time";
 
 
 type Apt2PageTypes = {
@@ -118,6 +121,7 @@ type Apt2DBPageTypes = {
     city1: TextDisplay,
     city2: TextDisplay,
     elevation: ElevationDisplay,
+    timezone: TextDisplay,
     approach: TextDisplay,
     radar: TextDisplay,
 }
@@ -151,23 +155,24 @@ export class Apt2DBPage extends WaypointPage<AirportFacility> {
             city1: new TextDisplay(this.multiline(city, state)[0]),
             city2: new TextDisplay(this.multiline(city, state)[1]),
             elevation: new ElevationDisplay(this.formatElevation(facility)),
+            timezone: new TextDisplay(""),
             approach: new TextDisplay(this.formatApproach(facility)),
             radar: new TextDisplay(this.formatRadar(facility)),
         });
 
         this.cursorController = new CursorController(this.children);
+        this.loadTimezone();
 
     }
 
 
     public render(): VNode {
         this.requiresRedraw = true;
-        //todo we're supposed to show the timezone
         return (<div ref={this.mainRef}>
             {this.children.get("city1").render()}<br/>
             {this.children.get("city2").render()}<br/>
             ELV {this.children.get("elevation").render()}ft<br/>
-            <br/>
+            {this.children.get("timezone").render()}<br/>
             {this.children.get("approach").render()}&nbsp{this.children.get("radar").render()}
         </div>);
     }
@@ -195,6 +200,32 @@ export class Apt2DBPage extends WaypointPage<AirportFacility> {
             this.children.get("approach").text = this.formatApproach(facility);
             this.children.get("radar").text = this.formatRadar(facility);
         }
+        this.loadTimezone();
+    }
+
+
+    private loadTimezone() {
+        const facility = unpackFacility(this.facility);
+
+        this.children.get("timezone").text = "";
+
+        if (!facility || isUserWaypoint(facility)) {
+            return;
+        }
+
+        const longestDay = this.getLongestDay(this.props.sensors.in.gps.timeZulu, facility.lat);
+
+        Promise.all([TimezoneService.getTimezoneInfo(this.props.sensors.in.gps.timeZulu.getTimestamp(), facility.lat, facility.lon),
+            TimezoneService.getTimezoneInfo(longestDay.getTimestamp(), facility.lat, facility.lon)]).then(res => {
+            this.children.get("timezone").text = this.formatTimezone(res);
+        });
+    }
+
+    private getLongestDay(timeNow: TimeStamp, latitude: number): TimeStamp {
+        const month = latitude < 0 ? 11 : 5; // Dec : Jun (0-based)
+        const day = latitude < 0 ? 21 : 21;
+
+        return TimeStamp.createDate(timeNow.getYear(), month, day);
     }
 
     protected getMemory(): WaypointPageState<AirportFacility> {
@@ -219,6 +250,26 @@ export class Apt2DBPage extends WaypointPage<AirportFacility> {
         const rawParts = apt.city.split(", ");
 
         return convertTextToKLNCharset(Utils.Translate(rawParts[0]));
+    }
+
+
+    private formatTimezone(tz: TimeZoneInfo[]): string {
+        const tzNow = tz[0];
+        let base = tzNow.utcOffset / 3600000;
+        if (tzNow.dstActive) {
+            base -= 1;
+        }
+        const tzAtLongestDate = tz[1];
+        if (tzAtLongestDate.dstActive) {
+            //It seems like the KLN can only display full hours, so anything else will be truncated
+            return `Z${this.formatTimezoneOffset(base)}(${this.formatTimezoneOffset(base + 1)}DT)`;
+        } else {
+            return `Z${this.formatTimezoneOffset(base)}`;
+        }
+    }
+
+    private formatTimezoneOffset(tz: number): string {
+        return format(tz, "+00", {rounding: "truncate", zeroFormat: "+00", signedZero: true});
     }
 
     private formatApproach(apt: AirportFacility | null): string {
