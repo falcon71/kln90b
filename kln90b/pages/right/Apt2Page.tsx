@@ -223,9 +223,8 @@ export class Apt2DBPage extends WaypointPage<AirportFacility> {
 
     private getLongestDay(timeNow: TimeStamp, latitude: number): TimeStamp {
         const month = latitude < 0 ? 11 : 5; // Dec : Jun (0-based)
-        const day = latitude < 0 ? 21 : 21;
 
-        return TimeStamp.createDate(timeNow.getYear(), month, day);
+        return TimeStamp.createDate(timeNow.getYear(), month, 21);
     }
 
     protected getMemory(): WaypointPageState<AirportFacility> {
