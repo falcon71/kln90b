@@ -22,7 +22,9 @@ const CACHED_CIRCLE = new GeoCircle(new Float64Array(3), 0);
 
 export class TurnStackEntry {
 
-    constructor(public path: GeoCircle, public switchPoint: GeoPoint, public pathForDtk: GeoCircle) {
+    constructor(public path: GeoCircle, //The path of the turn itself
+                public switchPoint: GeoPoint, //The part when to switch to the next TurnStackEntry or the next leg if the stack is empty
+                public pathForDtk: GeoCircle) { //The DTK calculation does not follow a curved path, so we save the great circle of the normal legs for the DTK calculation
     }
 }
 
@@ -41,7 +43,7 @@ export class ActiveWaypoint {
 
     private fplIdx: number = -1; //The index of the active waypoint (to) in the flightplan
 
-    public turnStack: TurnStackEntry[] = [];
+    public turnStack: TurnStackEntry[] = []; //This is a stack, because for each turn, we keep two entries: One before the start of the turn (to account for the bank angle change) and the turn itself up to the end of the turn
     private publisher: Publisher<ActiveWaypointChangedEvents>;
 
     constructor(bus: EventBus, userSettings: KLN90BUserSettings, private readonly sensors: Sensors, public readonly fpl0: Flightplan, public lastactiveWaypoint: Facility | null) {

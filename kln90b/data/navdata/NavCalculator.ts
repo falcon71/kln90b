@@ -197,21 +197,31 @@ export class NavCalculator implements CalcTickable {
                 if (toLeg.fixType !== KLNFixType.MAP && nav.activeWaypoint.turnStack.length === 0 &&
                     (distanceToTurn <= this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC //Distance is within the next tick, we rather start the turn a little too early than too late
                         || (nav.waypointAlert && distanceToTurn >= this.lastDistanceToTurn))) {
-                    const fromPath = new GeoCircle(fromLeg.path.center, fromLeg.path.radius);
+                    if (turnAnticipationDistance > nav.distToActive) {
+                        //We already added some extra distance to account for the bank angle change. This can only happen for very tight turns where the distance to the next waypoint is already too short
+                        //The KLN 89 trainer skips these type of legs immediatly, so do we
 
-                    //4-8 We save information on how this turn was calculated
-                    const startOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
-                    startOfTurn.offset(NavMath.reciprocateHeading(fromDtk), UnitType.NMILE.convertTo(turnAnticipationDistance, UnitType.GA_RADIAN));
+                        nav.activeWaypoint.sequenceToNextWaypoint();
+                        console.log("already behind start of turn, skipping turn calculation, switching to next wpt", turnAnticipationDistance, nav.distToActive, toLeg.wpt, nav.activeWaypoint.getActiveWpt());
+                        this.lastDistanceToTurn = 9999;
+                        this.lastDistanceToActive = 9999;
+                    } else {
+                        const fromPath = new GeoCircle(fromLeg.path.center, fromLeg.path.radius);
 
-                    const turnCircle = this.calculateTurnCircle(turnRadius, startOfTurn, fromDtk, NavMath.getTurnDirection(fromDtk, nextDtk));
-                    const endOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
-                    endOfTurn.offset(nextDtk, UnitType.NMILE.convertTo(turnAnticipationDistance, UnitType.GA_RADIAN));
-                    nav.activeWaypoint.turnStack.push(new TurnStackEntry(turnCircle, endOfTurn, nextPath));
-                    console.log("turn: moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt(), distanceToTurn, this.lastDistanceToTurn);
+                        //4-8 We save information on how this turn was calculated
+                        const startOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
+                        startOfTurn.offset(NavMath.reciprocateHeading(fromDtk), UnitType.NMILE.convertTo(turnAnticipationDistance, UnitType.GA_RADIAN));
 
-                    //Since we add a few seconds before the turn to reach the desired bank angle, we need to keep the old path for a short moment
-                    this.lastTurnStackDistance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(startOfTurn), UnitType.NMILE);
-                    nav.activeWaypoint.turnStack.push(new TurnStackEntry(fromPath, startOfTurn, nextPath));
+                        const turnCircle = this.calculateTurnCircle(turnRadius, startOfTurn, fromDtk, NavMath.getTurnDirection(fromDtk, nextDtk));
+                        const endOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
+                        endOfTurn.offset(nextDtk, UnitType.NMILE.convertTo(turnAnticipationDistance, UnitType.GA_RADIAN));
+                        nav.activeWaypoint.turnStack.push(new TurnStackEntry(turnCircle, endOfTurn, nextPath));
+                        console.log("turn: moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt(), distanceToTurn, this.lastDistanceToTurn);
+
+                        //Since we add a few seconds before the turn to reach the desired bank angle, we need to keep the old path for a short moment
+                        this.lastTurnStackDistance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(startOfTurn), UnitType.NMILE);
+                        nav.activeWaypoint.turnStack.push(new TurnStackEntry(fromPath, startOfTurn, nextPath));
+                    }
                 }
 
                 //We are now abeam the waypoint
