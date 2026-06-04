@@ -216,7 +216,8 @@ export class GPS {
 
     public isValid(): boolean {
         //todo this is not entirely correct. GPSSatComputer assumes navigation is only possible with 4 sats. 5-29 states that navigation may be possible with 3 sats when an altitude input is used in the solution
-        return this.gpsSatComputer.state === GPSSystemState.SolutionAcquired || this.gpsSatComputer.state === GPSSystemState.DiffSolutionAcquired;
+        const state = this.gpsSatComputer.systemState.get();
+        return state === GPSSystemState.SolutionAcquired || state === GPSSystemState.DiffSolutionAcquired;
     }
 
 

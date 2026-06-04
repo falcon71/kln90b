@@ -12,6 +12,8 @@ export const LVAR_HSI_TF_FLAGS = "L:KLN90B_HSI_TF_FLAGS"; //To from to animate t
 
 export const LVAR_ROLL_COMMAND = "L:KLN90B_RollCommand"; //Roll steering command for the autopilot. Please see https://github.com/falcon71/kln90b/wiki/Autopilot for details
 
+export const LVAR_INTEGRITY_WARNING = "L:KLN90B_IntegrityWarn"; //Based on ARINC label 275 bit 22. True if GPS signal is not available
+
 //External annunciators, see https://github.com/falcon71/kln90b/wiki/External-Annunciators for details
 export const LVAR_MSG_LIGHT = "L:KLN90B_MsgLight"; //Boolean. true whenever the MSG light flashes
 export const LVAR_WPT_LIGHT = "L:KLN90B_WptLight"; //Boolean. true if the waypoint alert is active
