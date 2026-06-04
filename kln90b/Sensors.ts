@@ -25,6 +25,7 @@ import {
     LVAR_ANNUN_TEST,
     LVAR_GPS_WP_BEARING,
     LVAR_HSI_TF_FLAGS,
+    LVAR_INTEGRITY_WARNING,
     LVAR_MSG_LIGHT,
     LVAR_ROLL_COMMAND,
     LVAR_WPT_LIGHT,
@@ -370,7 +371,7 @@ export class SensorsOut {
         }
     }
 
-    public setPos(pos: LatLonInterface | null, speed: Knots | null, track: Degrees | null, magvar: number) {
+    public setPos(pos: LatLonInterface | null, speed: Knots | null, track: Degrees | null, magvar: number, integretyWarning: boolean) {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
@@ -395,6 +396,9 @@ export class SensorsOut {
             SimVar.SetSimVarValue('GPS GROUND TRUE TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(track, UnitType.RADIAN));
             SimVar.SetSimVarValue('GPS GROUND MAGNETIC TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(track, magvar), UnitType.RADIAN));
         }
+
+        SimVar.SetSimVarValue(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, integretyWarning);
+
     }
 
     public setWPTETE(ete: Seconds | null, eta: Seconds | null) {

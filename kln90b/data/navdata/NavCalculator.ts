@@ -312,7 +312,7 @@ export class NavCalculator implements CalcTickable {
         this.sensors.out.setDistance(nav.distToActive);
         this.sensors.out.setWPTETE(nav.eteToActive, this.eteToEta(nav.eteToActive));
         this.sensors.out.setDestETE(nav.eteToDest, this.eteToEta(nav.eteToDest));
-        this.sensors.out.setPos(this.sensors.in.gps.coords, this.sensors.in.gps.groundspeed, track, magvar);
+        this.sensors.out.setPos(this.sensors.in.gps.coords, this.sensors.in.gps.groundspeed, track, magvar, !this.sensors.in.gps.isValid());
 
         this.sensors.out.setWPIndex(nav.activeWaypoint.getActiveFplIdx(), nav.activeWaypoint.fpl0.getLegs().length);
 
