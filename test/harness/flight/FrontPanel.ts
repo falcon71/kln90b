@@ -8,8 +8,30 @@ import {Screen} from '../render/screen';
 
 export type Side = 'L' | 'R';
 
+/** AlphabetEditorField.charset in kln90b/controls/editors/EditorField.tsx */
+const ALPHABET = [' ', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
 /** One display tick, so the screen shows the result of each click (DOM changes only in display ticks) */
 const CLICK_MS = 250;
+
+interface Field {
+    row: number;
+    col: number;
+    text: string;
+}
+
+function sameName(shown: string, wanted: string): boolean {
+    // With more than one sub-page, the status line shows "APT+3" for "APT 3"
+    return shown === wanted || (shown[3] === '+' && shown.slice(0, 3) === wanted.slice(0, 3) && shown[4] === wanted[4]);
+}
+
+function steps(from: string, to: string): number {
+    const a = ALPHABET.indexOf(from);
+    const b = ALPHABET.indexOf(to);
+    if (b < 0) throw new Error(`FrontPanel: "${to}" cannot be entered with the knob`);
+    if (a < 0) return 1; // "_" (no value yet): one click enters or starts the field, then read again
+    const forward = (b - a + ALPHABET.length) % ALPHABET.length;
+    return forward <= ALPHABET.length / 2 ? forward : forward - ALPHABET.length;
+}
 
 /** The unit's controls, driven through the same H events as the sim and the aircraft's hardware. */
 export class FrontPanel {
@@ -65,5 +87,71 @@ export class FrontPanel {
 
     public power(): Promise<void> {
         return this.press(EVT_POWER);
+    }
+
+    /** Selects a page by its status-line name, e.g. 'FPL 0' or 'NAV 1'. The cursor on that side must be off. */
+    public async selectPage(side: Side, name: string): Promise<void> {
+        const shown = () => side === 'L' ? this.screen().leftName() : this.screen().rightName();
+        for (let i = 0; shown().slice(0, 3) !== name.slice(0, 3); i++) {
+            if (i > 12) throw new Error(`selectPage: no page group ${name.slice(0, 3)}\n${this.screen().dump()}`);
+            await this.outer(side, 1);
+        }
+        for (let i = 0; !sameName(shown(), name); i++) {
+            if (i > 30) throw new Error(`selectPage: no page ${name}\n${this.screen().dump()}`);
+            await this.inner(side, 1);
+        }
+    }
+
+    /** Types an ident into the focused editor with the inner and outer knobs. Does not press ENT. */
+    public async enterIdent(side: Side, ident: string): Promise<void> {
+        for (let i = 0; i < ident.length; i++) {
+            if (i > 0) await this.outer(side, 1);
+            for (let guard = 0; ; guard++) {
+                const current = this.focusedField(side).text[i] ?? ' ';
+                if (current === ident[i]) break;
+                if (guard > ALPHABET.length) throw new Error(`enterIdent: cannot reach "${ident[i]}" at ${i}\n${this.screen().dump()}`);
+                await this.inner(side, steps(current, ident[i]));
+            }
+        }
+    }
+
+    /** Appends waypoints to FPL 0 with waypoint confirmation (two ENTs each), then turns the cursor off. */
+    public async appendToFpl0(idents: string[]): Promise<void> {
+        await this.selectPage('L', 'FPL 0');
+        await this.cursor('L');
+        for (let i = 0; this.focusedField('L').text.replace(/[_ ]/g, '') !== ''; i++) {
+            if (i > 31) throw new Error(`appendToFpl0: no blank entry\n${this.screen().dump()}`);
+            await this.outer('L', 1);
+        }
+        for (const ident of idents) {
+            await this.enterIdent('L', ident);
+            await this.ent();
+            await this.ent();
+        }
+        await this.cursor('L');
+    }
+
+    /** The one run of inverted cells on a side, which is the focused field. */
+    private focusedField(side: Side): Field {
+        const s = this.screen();
+        const [c0, c1] = side === 'L' ? [0, 11] : [12, 23];
+        const runs: Field[] = [];
+        for (let r = 0; r < 6; r++) {
+            let c = c0;
+            while (c < c1) {
+                const highlighted = (col: number) => s.cell(r, col).attr === 'I' || s.cell(r, col).attr === 'F';
+                if (highlighted(c)) {
+                    const start = c;
+                    while (c < c1 && highlighted(c)) c++;
+                    runs.push({row: r, col: start, text: s.row(r).slice(start, c)});
+                } else {
+                    c++;
+                }
+            }
+        }
+        if (runs.length !== 1) {
+            throw new Error(`FrontPanel: expected one focused field on side ${side}, found ${runs.length}\n${s.dump()}`);
+        }
+        return runs[0];
     }
 }
