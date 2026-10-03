@@ -29,7 +29,7 @@ Comments such as `3-29` in the code are page numbers in the KLN 90B Pilot's Guid
 
 `KLN90B` (`kln90b/KLN90B.tsx`) is a thin adapter between the sim's `BaseInstrument` lifecycle and the instrument. It is
 registered with `registerInstrument('kln-90b', KLN90B)`, and it has `templateID` `'KLN90B'` and `isInteractive` true.
-It does four things: `Init()` calls `super.Init()` and then `core.init(xmlConfig)`; `onInteractionEvent` calls `super`
+It does the following: `Init()` calls `super.Init()` and then `core.init(xmlConfig)`; `onInteractionEvent` calls `super`
 and then `core.onInteractionEvent`; `onSoundEnd` forwards to the core; and the core's re-dispatch callback is the
 adapter's own `onInteractionEvent`.
 
@@ -52,8 +52,8 @@ sections below say `KLN90BCore` where the code moved and `KLN90B` where the adap
   event strings. It re-dispatches them through the callback it was given, so in the sim they pass through
   `KLN90B.onInteractionEvent` and `BaseInstrument.onInteractionEvent` as before.
 
-**Init()** (`KLN90B.Init`, then `KLN90BCore.init`) calls `asyncInit(xmlConfig)`. Errors are published as the `error` topic and rendered by `controls/ErrorPage` as a
-full-screen error page with a GitHub link.
+**Init()** (`KLN90B.Init`, then `KLN90BCore.init`) calls `asyncInit(xmlConfig)`. Errors are published as the `error`
+topic and rendered by `controls/ErrorPage` as a full-screen error page with a GitHub link.
 
 **asyncInit()** does the following, in order:
 
@@ -701,7 +701,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 
 ### Event flow
 
-1. MSFS H events → `KLN90B.onInteractionEvent(args)` → `KLN90BCore.onInteractionEvent(args)`. Event names are in `kln90b/HEvents.ts`, for example:
+1. MSFS H events → `KLN90B.onInteractionEvent(args)` → `KLN90BCore.onInteractionEvent(args)`. Event names are in
+   `kln90b/HEvents.ts`, for example:
     - `KLN90B_LeftLargeKnob_Left` = `EVT_L_OUTER_LEFT`
     - `..SmallKnob..` = INNER
     - `KLN90B_LeftCursor_Toggle` = `EVT_L_CURSOR`
@@ -772,8 +773,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   `hasStatusline()`.
 - The click focuses the invisible input (`Coherent.trigger('FOCUS_INPUT_FIELD')`), and the status line shows `KYBD`
   flashing. Right click, Esc, blur, or the cursor turning off leave keyboard mode (`resetKeyboard`).
-- Key codes are published as bus `keyboardevent` (`KeyboardEventData{side,keyCode}`). `KLN90B.handleKeyboardEvent` maps
-  them back to H events:
+- Key codes are published as bus `keyboardevent` (`KeyboardEventData{side,keyCode}`). `KLN90BCore.handleKeyboardEvent`
+  maps them back to H events:
     - Enter → ENT
     - PgUp/PgDn → inner knob right/left
     - Backspace/End → outer left

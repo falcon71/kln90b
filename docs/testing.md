@@ -31,7 +31,7 @@ npx vitest run --project unit              # one stage (unit | render | flight)
 npm run test:watch                         # Vitest watch mode
 npx vitest run test/render/pages/Nav2Page.test.ts   # one file
 npx vitest run --reporter=verbose          # also shows what passing tests print with console.warn
-KLN_TEST_LOG=1 npm test                    # shows the instrument's console.log/info output
+KLN_TEST_LOG=1 npx vitest run --reporter=verbose   # also shows the instrument's console.log/info output
 npx tsc --noEmit                           # the type check; Vitest does not type-check
 ```
 
@@ -220,8 +220,9 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
 - The unit switches DTK and XTK at the start of the turn but sequences at the closest approach to the waypoint (4-8), so
   sequencing is checked separately, below 0.1 NM.
 - The waypoint alert comes on about 20 s before the turn (`WPT_ALERT_WITH_TURN_ANTI`) and stays on through it.
-- After a `jump(nmBefore('KBBB', 10))`, DIS on the model, in the SimVar `GPS WP DISTANCE` and on the NAV 1 page agree
-  with an independent great-circle distance to within one calculation tick.
+- Right after `jump(nmBefore('KBBB', 10))`, the navigation model's DIS matches the independent great-circle distance to
+  KBBB. At 5 NM to go, both the model's DIS and the SimVar `GPS WP DISTANCE` match it. Both checks use 0.04 NM, one
+  calculation tick at 120 kt. The NAV 1 page's DIS row is then compared with the model's calculated distance.
 
 `turnDirection.test.ts` shows how to pin a bug that needs a flight: one test flies and records, a second `it.fails`
 judges the recording, so a broken flight cannot be mistaken for the bug.
@@ -262,7 +263,10 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   filter) also runs at that rate, which matters for any future test of filter timing.
 - **A booted engine-running unit starts with the MSG annunciator lit.** Empty storage means the last position is 0/0, so
   `POSITION DIFFERS FROM LAST POSITION BY >2NM` posts, and the GPS clock starts an hour behind, so
-  `SYSTEM TIME UPDATED TO GPS TIME` posts. The NAV 2 snapshot shows it. Seed `storage` with a last position to avoid it.
+  `SYSTEM TIME UPDATED TO GPS TIME` posts. The NAV 2 snapshot shows it. Seeding a last position in `storage`
+  (`lastLatitude`, `lastLongitude`) removes only the first message; the second still posts on an engine-running boot
+  (the hour is not added back when `forceReadyToUse` skips the power-on), so no `storage` setting gives an unlit MSG
+  annunciator.
 - **One unit per test file.**
 - **SDK upgrades may require updating the fakes.** `FakeSim` mirrors the native layer the SDK builds on, and
   `KLNGPSSatComputer` reaches into private SDK internals (docs/architecture.md, Core 3); recheck both, and run the whole

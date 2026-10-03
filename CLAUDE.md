@@ -69,9 +69,9 @@ change what they mean; add new ones instead:
 - **Boot:** `KLN90B.tsx` (a thin `BaseInstrument`) creates `KLN90BCore`, whose `init()` builds everything;
   `KLN90BPlatform` supplies navdata, the facility repository and the EFB route manager (tests pass fakes). `init()`
   parses panel.xml, builds the sensors, navdata and persistence, then `VolatileMemory` and the services. It then
-  publishes `propsReady` with **`PageProps`**
-  (`pages/Page.tsx`), the single services bag every page and control receives. One `EventBus` is shared by everything.
-  User settings are saved per aircraft model under the key `"<ATC MODEL>.profile_1"`.
+  publishes `propsReady` with **`PageProps`** (`pages/Page.tsx`), the single services bag every page and control
+  receives. One `EventBus` is shared by everything. User settings are saved per aircraft model under the key
+  `"<ATC MODEL>.profile_1"`.
 - **Ticks** (`TickController.ts`): the display runs at 4 Hz (blink = every 4th tick), the calculations at 1 Hz through
   an ordered list of tickables, and the XTK output filter at 16 Hz. They run only while powered and not
   hot-swap-disabled.
