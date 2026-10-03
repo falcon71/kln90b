@@ -1,3 +1,4 @@
+import {GlobalFonts} from '@napi-rs/canvas';
 import {describe, expect, it} from 'vitest';
 import {canvasToAscii} from '../../harness/render/canvas';
 
@@ -18,12 +19,33 @@ describe('canvas backing', () => {
     });
 
     it('renders the map font inside the text box only', () => {
-        const el = canvas(40, 12);
-        const ctx = el.getContext('2d')!;
-        ctx.fillStyle = '#00D109';
-        ctx.font = '7px KLN90BMap';
-        ctx.textBaseline = 'top';
-        ctx.fillText('KLN', 2, 2);
+        expect(GlobalFonts.has('KLN90BMap')).toBe(true);
+        const draw = (font: string): HTMLCanvasElement => {
+            const c = canvas(40, 12);
+            const g = c.getContext('2d')!;
+            g.fillStyle = '#00D109';
+            g.font = font;
+            g.textBaseline = 'top';
+            g.fillText('KLN', 2, 2);
+            return c;
+        };
+        const el = draw('7px KLN90BMap');
+        // A fallback font must not produce the same pixels, or the map font is not the one being used
+        expect(canvasToAscii(el)).not.toBe(canvasToAscii(draw('7px sans-serif')));
+        expect(canvasToAscii(el)).toMatchInlineSnapshot(`
+          "........................................
+          ........................................
+          ..#...#.#.....#...#.....................
+          ..#..#..#.....##..#.....................
+          ..#.#...#.....##..#.....................
+          ..##....#.....#.#.#.....................
+          ..#.#...#.....#..##.....................
+          ..#..#..#.....#..##.....................
+          ..#...#.#####.#...#.....................
+          ........................................
+          ........................................
+          ........................................"
+        `);
         const rows = canvasToAscii(el).split('\n');
         const lit = rows.flatMap((r, y) => [...r].map((c, x) => ({c, x, y}))).filter(p => p.c === '#');
         expect(lit.length).toBeGreaterThan(10);

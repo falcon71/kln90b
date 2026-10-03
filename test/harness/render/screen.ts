@@ -24,7 +24,7 @@ export function readRows(root: Element): Cell[][] {
     const walk = (node: Node, attr: CellAttr) => {
         if (node.nodeType === 3) {
             for (const ch of node.textContent ?? '') {
-                rows[rows.length - 1].push({ch: ch === ' ' ? ' ' : ch, attr});
+                rows[rows.length - 1].push({ch: ch === '\u00a0' ? ' ' : ch, attr});
             }
             return;
         }
@@ -81,6 +81,9 @@ export class Screen {
             const clone = full.cloneNode(true) as Element;
             clone.querySelectorAll('.statusline').forEach(s => s.closest('pre')?.remove());
             const f = readRows(clone);
+            if (f.length > ROWS) {
+                throw new Error(`Screen: full page has ${f.length} rows, more than ${ROWS} (SevenLinePage pages such as Super NAV 5 are not supported)`);
+            }
             for (let i = 0; i < ROWS; i++) grid.push(fit(f[i], FULL_WIDTH, `row ${i}`));
         } else {
             for (let i = 0; i < ROWS; i++) grid.push(fit([], FULL_WIDTH, 'blank row'));
