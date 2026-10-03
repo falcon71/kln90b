@@ -5,7 +5,7 @@ import {BrightnessManager} from "./BrightnessManager";
 import {WelcomePage, WelcomePageProps} from "./pages/WelcomePage";
 import {NullPage} from "./pages/NullPage";
 import {PageProps} from "./pages/Page";
-import {PropsReadyEvent} from "./KLN90B";
+import {PropsReadyEvent} from "./KLN90BCore";
 import {LVAR_POWER} from "./LVars";
 import {HOURS_TO_SECONDS} from "./data/navdata/NavCalculator";
 

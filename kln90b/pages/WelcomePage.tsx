@@ -17,7 +17,7 @@ import {
     EVT_L_OUTER_LEFT,
     EVT_L_OUTER_RIGHT,
 } from "../HEvents";
-import {PropsReadyEvent} from "../KLN90B";
+import {PropsReadyEvent} from "../KLN90BCore";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {PageManager} from "./PageManager";
 import {KeyboardService} from "../services/KeyboardService";

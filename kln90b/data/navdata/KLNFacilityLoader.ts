@@ -179,6 +179,12 @@ export class KLNNearestVorSearchSession extends KLNCoherentNearestSearchSession<
 }
 
 /**
+ * The part of the SDK FacilityLoader that KLNFacilityLoader uses. The sim passes the real FacilityLoader; tests pass
+ * an in-memory source.
+ */
+export type ActualFacilityClient = Pick<FacilityLoader, 'getFacility' | 'searchByIdentWithIcaoStructs' | 'startNearestSearchSessionWithIcaoStructs' | 'awaitInitialization'>;
+
+/**
  * We use our own FacilityLoader, because the one from the SDK only supports USR as user waypoints.
  * In addition to those (known as Supplementary Waypoints in the KLN), the KLN allows user to define any waypoint as a
  * user waypoint. This FacilityLoader searches in the local Repo for any type.
@@ -187,7 +193,7 @@ export class KLNFacilityLoader implements FacilityClient {
 
     private static repoSearchSessionId = -1;
 
-    constructor(private readonly actualFacilityLoader: FacilityLoader,
+    constructor(private readonly actualFacilityLoader: ActualFacilityClient,
                 private readonly facilityRepo: KLNFacilityRepository) {
     }
 
