@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {EventBus, FacilitySearchType, FacilityType, ICAO, UnitType} from '@microsoft/msfs-sdk';
-import {airport, vor} from '../../harness/navdata/builders';
+import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
 import {KLNFacilityLoader, ActualFacilityClient} from '../../../kln90b/data/navdata/KLNFacilityLoader';
 import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
@@ -34,11 +34,55 @@ describe('MemoryFacilityClient', () => {
         expect(second.removed.map((i: any) => i.ident)).toEqual(['ABC']);
     });
 
+    it('returns ident matches sorted, by prefix only, and capped at maxItems', async () => {
+        const unsorted = new MemoryFacilityClient([vor('ABE', 47, 8), vor('ABC', 47, 8), vor('XAB', 47, 8), vor('ABD', 47, 8)]);
+        const all = await unsorted.searchByIdentWithIcaoStructs(FacilitySearchType.Vor, 'AB');
+        expect(all.map(i => i.ident)).toEqual(['ABC', 'ABD', 'ABE']);
+        const capped = await unsorted.searchByIdentWithIcaoStructs(FacilitySearchType.Vor, 'AB', 2);
+        expect(capped.map(i => i.ident)).toEqual(['ABC', 'ABD']);
+    });
+
+    it('does not repeat facilities that stay in range or have already been removed', async () => {
+        const session = await client.startNearestSearchSessionWithIcaoStructs(FacilitySearchType.Vor);
+        const idents = (list: any[]) => list.map(i => i.ident);
+        const c1 = await session.searchNearest(47.3, 8.9, nm(20), 10);
+        expect([idents(c1.added), idents(c1.removed)]).toEqual([['ABC'], []]);
+        const c2 = await session.searchNearest(47.3, 8.9, nm(20), 10);
+        expect([idents(c2.added), idents(c2.removed)]).toEqual([[], []]);
+        const c3 = await session.searchNearest(48.3, 8.9, nm(20), 10);
+        expect([idents(c3.added), idents(c3.removed)]).toEqual([['ABD'], ['ABC']]);
+        const c4 = await session.searchNearest(48.3, 8.9, nm(20), 10);
+        expect([idents(c4.added), idents(c4.removed)]).toEqual([[], []]);
+    });
+
+    it('keeps a separate nearest search per facility type', async () => {
+        const session = await client.startNearestSearchSessionWithIcaoStructs(FacilitySearchType.Airport);
+        const result = await session.searchNearest(47.0, 8.0, nm(20), 10);
+        expect(result.added.map((i: any) => i.ident)).toEqual(['KAAA']);
+    });
+
+    it('adds facilities from JSON with a V2 ICAO string', async () => {
+        const jsn = vor('JSN', 46, 7);
+        const jsonClient = new MemoryFacilityClient();
+        jsonClient.addJson([{...jsn, icaoStruct: ICAO.valueToStringV2(jsn.icaoStruct)}]);
+        const found = await jsonClient.getFacility(FacilityType.VOR, ICAO.value('V', 'K1', '', 'JSN'));
+        expect(found.lat).toBe(46);
+    });
+
     it('serves KLNFacilityLoader', async () => {
         const loader = new KLNFacilityLoader(client as unknown as ActualFacilityClient, KLNFacilityRepository.getRepository(new EventBus()));
         await expect(loader.getFacility(FacilityType.VOR, abc.icaoStruct)).resolves.toBe(abc);
         const session = await loader.startNearestSearchSessionWithIcaoStructs(FacilitySearchType.Vor);
         const result = await session.searchNearest(47.3, 8.9, nm(20), 10);
         expect(result.added.map(i => i.ident)).toEqual(['ABC']);
+    });
+});
+
+describe('builders', () => {
+    it('never use the regions the instrument reserves for user and temporary waypoints', () => {
+        for (const fac of [airport('KBBB', 1, 2), vor('BBB', 1, 2), ndb('BBB', 1, 2), intersection('BBBBB', 1, 2)]) {
+            expect(['XX', 'XY']).not.toContain(fac.region);
+            expect(['XX', 'XY']).not.toContain(fac.icaoStruct.region);
+        }
     });
 });
