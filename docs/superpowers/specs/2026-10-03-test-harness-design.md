@@ -31,7 +31,7 @@ Out of scope: broad coverage, CI, fixing bugs found on the way, an in-sim navdat
 | DOM | **happy-dom** | FSComponent renders through plain `document.createElement`; happy-dom is fast and sufficient |
 | canvas | **@napi-rs/canvas** behind `HTMLCanvasElement.prototype.getContext` | happy-dom returns `null` for `getContext('2d')`; prebuilt Skia binaries need no build tools; verified with `kln90b-map.ttf` |
 | screen assertions | 23×7 text grid + attribute mask; canvas as ASCII pixel art | the display is a character grid; text diffs review well |
-| assembling the unit | **composition root** (`Kln90bCore`) + small `Kln90bPlatform`; `KLN90B` becomes a thin `BaseInstrument` adapter | tests and production run the same build code; no faking of the sim's undocumented `BaseInstrument` |
+| assembling the unit | **composition root** (`KLN90BCore`) + small `KLN90BPlatform`; `KLN90B` becomes a thin `BaseInstrument` adapter | tests and production run the same build code; no faking of the sim's undocumented `BaseInstrument` |
 | leaf sim access | stays global (`SimVar`, `Coherent`, timers) and is faked globally | small stable APIs; wrapping them would touch nav and UI code everywhere |
 | pilot | pluggable; default **coupled autopilot** flying `L:KLN90B_RollCommand` | closed loop tests the guidance, not only the math |
 | time | `fly()` = compressed, every tick; `jump()` = slew-style teleport plus clock jump, refuses to cross a waypoint | full fidelity where it matters, near-free cruise |
@@ -46,7 +46,7 @@ Out of scope: broad coverage, CI, fixing bugs found on the way, an in-sim navdat
 
 | project | files | environment | setup files |
 |---|---|---|---|
-| `unit` | `test/unit/**/*.test.ts` | node | load-time SDK globals (`SimVar`, `RunwayDesignator`, `Avionics`, `BaseInstrument`, `KeyCode`, others found while wiring) |
+| `unit` | `test/unit/**/*.test.ts` | node | the sim fakes (the SDK needs several of them at load time) |
 | `render` | `test/render/**/*.test.ts(x)` | happy-dom | sim fakes, canvas backing, map font |
 | `flight` | `test/flight/**/*.test.ts` | happy-dom | sim fakes, canvas backing, map font |
 
@@ -62,7 +62,7 @@ test/
     navdata/       facility builders, MemoryFacilityClient
     render/        screen reader, canvas backing, canvasToAscii
     flight/        Flight, World, Aircraft, pilots, FrontPanel, monitors, recorder
-    platform.ts    FakePlatform implementing Kln90bPlatform
+    platform.ts    FakePlatform implementing KLN90BPlatform
   unit/
   render/
   flight/
@@ -80,16 +80,20 @@ test/
 
 ## Composition root (production change)
 
-New file `kln90b/Kln90bCore.ts`:
+New file `kln90b/KLN90BCore.ts`:
 
-- `class Kln90bCore`:
-    - `constructor(platform: Kln90bPlatform)` does what the `KLN90B` constructor does today: bus, user settings, settings
+- `class KLN90BCore`:
+    - `constructor(platform: KLN90BPlatform, dispatchInteractionEvent: (args: string[]) => void)` does what the `KLN90B`
+      constructor does today: bus, user settings, settings
       load and auto-save under `"<ATC MODEL>.profile_1"`, `HEventPublisher`, keyboard subscription, `PageManager`.
-    - `init(xmlConfig: Element): Promise<void>` is today's `asyncInit` body, moved verbatim. Statement order is kept:
+    - `init(xmlConfig: Document): Promise<void>` is today's `asyncInit` body, moved verbatim. Statement order is kept:
       the welcome page can show before the navdata awaits, and the tick lists keep their order.
-    - `onInteractionEvent(evt: string)`, `onSoundEnd(id)` and the keyboard mapping move over unchanged.
-    - Exposes for tests: `bus`, `pageManager`, and a `propsReady: Promise<PageProps>`.
-- `interface Kln90bPlatform`:
+    - `onInteractionEvent(args: string[])`, `onSoundEnd(id)` and the keyboard mapping move over unchanged. Keyboard events
+      are re-dispatched through `dispatchInteractionEvent`, which the adapter points at its own `onInteractionEvent`, so
+      they still pass through `BaseInstrument.onInteractionEvent` as before.
+    - Exposes for tests: `bus` and `pageManager` as public readonly fields; tests wait for the existing `propsReady` bus
+      event instead of a new API.
+- `interface KLN90BPlatform`:
     - `createFacilityClient(bus)` returns the facility-client methods `KLNFacilityLoader` calls on its inner loader.
       Production: `new FacilityLoader(FacilityRepository.getRepository(bus))`.
     - `getFacilityRepository(bus)`. Production: `KLNFacilityRepository.getRepository(bus)`.
@@ -171,14 +175,14 @@ const flight = await Flight.start({
 });
 ```
 
-`Flight.start` installs the world into the fakes, builds `Kln90bCore` with the fake platform, calls `init()`, and
+`Flight.start` installs the world into the fakes, builds `KLN90BCore` with the fake platform, calls `init()`, and
 resolves once `propsReady` fired and the GPS solution is valid. (Coordinates above are illustrative.)
 
 ### Aircraft and pilots
 
 - Kinematic point mass stepped at 16 Hz on the fake clock. Bank follows the commanded bank at a configurable roll rate
   (default 5°/s) up to a configurable maximum (default 25°); turn rate is g·tan(bank)/v; ground speed constant or
-  scripted; optional wind.
+  scripted; no wind yet.
 - Each step writes what the unit reads: `PLANE LATITUDE/LONGITUDE`, `GROUND VELOCITY`, `PLANE HEADING DEGREES
   GYRO/TRUE`, `PLANE ALTITUDE`, `PRESSURE ALTITUDE`, `AIRSPEED TRUE`, `GPS DRIVES NAV1` and the others found while
   wiring.
@@ -241,7 +245,7 @@ resolves once `propsReady` fired and the GPS solution is valid. (Coordinates abo
     7. next steps, e.g. a power-cycle flight test for #90 (OTH pages pruned again on each `MainPage` construction).
 - `CLAUDE.md`: replace "There are no automated tests ..." with the commands and a pointer to `docs/testing.md`; ask for
   a test at the cheapest stage that can observe a behavior change.
-- `docs/architecture.md`: Core 1 describes `Kln90bCore`, `Kln90bPlatform` and the thin adapter; update the "as of"
+- `docs/architecture.md`: Core 1 describes `KLN90BCore`, `KLN90BPlatform` and the thin adapter; update the "as of"
   line.
 
 ## Build order
