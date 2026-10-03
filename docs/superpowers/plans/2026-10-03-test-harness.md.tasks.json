@@ -29,7 +29,7 @@
     {
       "id": 4,
       "subject": "Task 4: User sim check after core extraction",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         3
       ],
@@ -130,5 +130,5 @@
       "description": "**Goal:** Document the three test stages for humans and agents, and update `CLAUDE.md` and `docs/architecture.md`.\n\n**Files:**\n- Create: `docs/testing.md`\n- Modify: `CLAUDE.md`, `docs/architecture.md`\n\n**Acceptance Criteria:**\n- [ ] `docs/testing.md` covers the seven sections of Step 1 in this plan task, using the proof tests as worked examples and stating the measured flight speed from Task 13 as a dated measurement.\n- [ ] `CLAUDE.md` no longer says there are no tests; it lists the test commands and points to `docs/testing.md`.\n- [ ] `docs/architecture.md` Core 1 describes `KLN90BCore`, `KLN90BPlatform` and the adapter, and its \"as of\" line names the new commit.\n- [ ] No counts of growing things in prose; American English; no manual text.\n\n**Verify:** `grep -n \"no automated tests\" CLAUDE.md` → no match; `npm test` → green\n\n```json:metadata\n{\"files\": [\"docs/testing.md\", \"CLAUDE.md\", \"docs/architecture.md\"], \"verifyCommand\": \"npm test && npx tsc --noEmit\", \"acceptanceCriteria\": [\"docs/testing.md covers the seven listed sections with the proof tests as examples and the dated speed measurement\", \"CLAUDE.md lists test commands and points to docs/testing.md; 'no automated tests' removed\", \"architecture.md Core 1 describes KLN90BCore, KLN90BPlatform and the adapter; 'as of' line updated\", \"no counts of growing things; American English; no manual text\"], \"modelTier\": \"standard\"}\n```"
     }
   ],
-  "lastUpdated": "2026-10-03T14:31:43.113Z"
+  "lastUpdated": "2026-10-03T14:49:31.106Z"
 }
