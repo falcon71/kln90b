@@ -4,14 +4,14 @@
     {
       "id": 1,
       "subject": "Task 1: Vitest tooling and load-time globals",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [],
       "description": "**Goal:** `npm test` runs a Vitest unit project that loads the SDK and project modules under Node.\n\n**Files:**\n- Modify: `package.json`, `package-lock.json`, `.gitignore`\n- Create: `vitest.config.mts`, `test/harness/sim/staticGlobals.ts`, `test/harness/sim/install.ts`, `test/harness/setup/unit.ts`, `test/harness/setup/dom.ts`\n- Test: `test/unit/harness/sdk.test.ts`\n\n**Acceptance Criteria:**\n- [ ] `npm test` exits 0 and reports the `unit` project test passing.\n- [ ] `npx vitest run --project unit` runs only unit tests.\n- [ ] `npx tsc --noEmit` is clean.\n- [ ] `npm run build` succeeds (pre-existing warnings only).\n\n**Verify:** `npm test` → `Test Files  1 passed`\n\n```json:metadata\n{\"files\": [\"package.json\", \"package-lock.json\", \".gitignore\", \"vitest.config.mts\", \"test/harness/sim/staticGlobals.ts\", \"test/harness/sim/install.ts\", \"test/harness/setup/unit.ts\", \"test/harness/setup/dom.ts\", \"test/unit/harness/sdk.test.ts\"], \"verifyCommand\": \"npm test && npx tsc --noEmit && npm run build\", \"acceptanceCriteria\": [\"npm test exits 0 with the unit project test passing\", \"npx vitest run --project unit runs only unit tests\", \"npx tsc --noEmit is clean\", \"npm run build succeeds with only pre-existing warnings\"], \"modelTier\": \"mechanical\"}\n```"
     },
     {
       "id": 2,
       "subject": "Task 2: Unit proof tests (#97, #98 pins)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         1
       ],
@@ -20,7 +20,7 @@
     {
       "id": 3,
       "subject": "Task 3: Extract KLN90BCore composition root",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         1
       ],
@@ -38,7 +38,7 @@
     {
       "id": 5,
       "subject": "Task 5: Sim fakes",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         1
       ],
@@ -47,7 +47,7 @@
     {
       "id": 6,
       "subject": "Task 6: Fake navdata",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         5,
         3
@@ -57,7 +57,7 @@
     {
       "id": 7,
       "subject": "Task 7: Headless boot and smoke test",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         6
       ],
@@ -66,7 +66,7 @@
     {
       "id": 8,
       "subject": "Task 8: Screen reader and canvas backing",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         5
       ],
@@ -75,7 +75,7 @@
     {
       "id": 9,
       "subject": "Task 9: Render proof test (NAV 2)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         7,
         8
@@ -85,7 +85,7 @@
     {
       "id": 10,
       "subject": "Task 10: Aircraft model and pilots",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         5
       ],
@@ -94,7 +94,7 @@
     {
       "id": 11,
       "subject": "Task 11: Flight driver",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         7,
         8,
@@ -105,7 +105,7 @@
     {
       "id": 12,
       "subject": "Task 12: Front-panel driver",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         11
       ],
@@ -114,7 +114,7 @@
     {
       "id": 13,
       "subject": "Task 13: Proof flight",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         12
       ],
@@ -123,12 +123,12 @@
     {
       "id": 14,
       "subject": "Task 14: Documentation",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         13
       ],
       "description": "**Goal:** Document the three test stages for humans and agents, and update `CLAUDE.md` and `docs/architecture.md`.\n\n**Files:**\n- Create: `docs/testing.md`\n- Modify: `CLAUDE.md`, `docs/architecture.md`\n\n**Acceptance Criteria:**\n- [ ] `docs/testing.md` covers the seven sections of Step 1 in this plan task, using the proof tests as worked examples and stating the measured flight speed from Task 13 as a dated measurement.\n- [ ] `CLAUDE.md` no longer says there are no tests; it lists the test commands and points to `docs/testing.md`.\n- [ ] `docs/architecture.md` Core 1 describes `KLN90BCore`, `KLN90BPlatform` and the adapter, and its \"as of\" line names the new commit.\n- [ ] No counts of growing things in prose; American English; no manual text.\n\n**Verify:** `grep -n \"no automated tests\" CLAUDE.md` → no match; `npm test` → green\n\n```json:metadata\n{\"files\": [\"docs/testing.md\", \"CLAUDE.md\", \"docs/architecture.md\"], \"verifyCommand\": \"npm test && npx tsc --noEmit\", \"acceptanceCriteria\": [\"docs/testing.md covers the seven listed sections with the proof tests as examples and the dated speed measurement\", \"CLAUDE.md lists test commands and points to docs/testing.md; 'no automated tests' removed\", \"architecture.md Core 1 describes KLN90BCore, KLN90BPlatform and the adapter; 'as of' line updated\", \"no counts of growing things; American English; no manual text\"], \"modelTier\": \"standard\"}\n```"
     }
   ],
-  "lastUpdated": "2026-10-03T12:50:35.643Z"
+  "lastUpdated": "2026-10-03T14:31:43.113Z"
 }
