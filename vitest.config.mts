@@ -27,7 +27,7 @@ export default defineConfig({
             },
             {
                 extends: true,
-                test: {name: 'render', environment: 'happy-dom', include: ['test/render/**/*.test.ts'], setupFiles: ['test/harness/setup/dom.ts'], passWithNoTests: true},
+                test: {name: 'render', environment: 'happy-dom', include: ['test/render/**/*.test.ts'], setupFiles: ['test/harness/setup/dom.ts']},
             },
             {
                 extends: true,
