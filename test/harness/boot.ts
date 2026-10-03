@@ -21,6 +21,11 @@ export interface BootOptions {
     storage?: Record<string, unknown>;
     /** ENG COMBUSTION:1. True skips the welcome and self-test pages (KLN90BCore.isForceReadyToUse). Default true */
     engineRunning?: boolean;
+    /**
+     * The fake clock's start. The navdata cycle is fixed to DEFAULT_NAVDATA_RANGE (see sim/clock.ts), so a start outside
+     * that cycle boots with an expired database (DATA BASE OUT OF DATE message, MSG lit) unless the caller also sets
+     * the FLIGHT NAVDATA DATE RANGE game var.
+     */
     start?: Date;
     seed?: number;
     atcModel?: string;

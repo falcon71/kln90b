@@ -42,7 +42,6 @@ import {NearestUtils} from "./data/navdata/NearestUtils";
 import {RemarksManager} from "./settings/RemarksManager";
 import {Nearestlists} from "./data/navdata/NearestList";
 import {KLNFacilityLoader} from "./data/navdata/KLNFacilityLoader";
-import {KLNFacilityRepository} from "./data/navdata/KLNFacilityRepository";
 import {UserWaypointPersistor} from "./settings/UserWaypointPersistor";
 import {Scanlists} from "./data/navdata/Scanlist";
 import {

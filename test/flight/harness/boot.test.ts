@@ -7,7 +7,7 @@ describe('headless boot', () => {
         const unit = await bootUnit({facilities: [vor('ABC', 47.2, 8.0)], position: {lat: 47, lon: 8}});
         await vi.advanceTimersByTimeAsync(30_000);
 
-        const statusLine = document.querySelector('.statusline')!.textContent!.replace(/ /g, ' ');
+        const statusLine = document.querySelector('.statusline')!.textContent!.replace(/\u00a0/g, ' ');
         expect(statusLine.startsWith('NAV 2')).toBe(true);
         expect(unit.props.sensors.in.gps.isValid()).toBe(true);
         expect(unit.errors).toEqual([]);

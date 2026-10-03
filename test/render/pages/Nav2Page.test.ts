@@ -19,6 +19,7 @@ describe('NAV 2 page', () => {
             "E 08°00.00'",
         ]);
         expect(screen.leftName()).toBe('NAV 2');
+        // The snapshot also pins the SUP page and the lit MSG annunciator from the engine-running boot (docs/testing.md, limitations)
         expect(screen.dump()).toMatchInlineSnapshot(`
           "PRESENT POS| 0         
                      |           

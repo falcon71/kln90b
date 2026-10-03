@@ -272,7 +272,9 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   `KLNGPSSatComputer` reaches into private SDK internals (docs/architecture.md, Core 3); recheck both, and run the whole
   suite, after upgrading `@microsoft/msfs-sdk`.
 - **TypeScript 6 no longer includes `@types` automatically.** Harness files that use Node APIs carry
-  `/// <reference types="node" />`.
+  `/// <reference types="node" />`. The directive makes the Node types available to the whole `tsc` program, because the
+  root `tsconfig.json` has no `include`; it does not keep Node APIs out of the code in `kln90b/`, so `tsc` will not catch
+  an accidental Node call there.
 - **Display limits:** `Screen` cannot read Super NAV 5 and skips `<canvas>` content (section 4).
 - **There is no CI.** Run `npm test` and `npx tsc --noEmit` before committing.
 

@@ -68,12 +68,14 @@ export class Flight {
     private readonly monitors: { name: string; check: (f: Flight) => true | string }[] = [];
     private readonly failures: MonitorFailure[] = [];
     private readonly startMs: number;
-    private consoleErrors = 0;
+    /** Counts console.error calls, boot included; Flight.start installs the counter before the unit boots */
+    private readonly consoleErrors: { count: number };
     /** Clock time up to which the aircraft has been integrated */
     private lastPhysicsMs = 0;
 
-    private constructor(public readonly unit: HeadlessUnit, public readonly world: World, public readonly aircraft: Aircraft, pilot: Pilot) {
+    private constructor(public readonly unit: HeadlessUnit, public readonly world: World, public readonly aircraft: Aircraft, pilot: Pilot, consoleErrors: { count: number }) {
         this.pilot = pilot;
+        this.consoleErrors = consoleErrors;
         this.startMs = Date.now();
         this.panel = new FrontPanel(evt => unit.send(evt), () => this.screen);
     }
@@ -84,11 +86,18 @@ export class Flight {
      */
     public static async start(opts: FlightOptions): Promise<Flight> {
         const {world, aircraft, aircraftOptions, pilot, ...boot} = opts;
+        // Counted from before the boot, so an error logged while the unit starts up trips the monitor too
+        const consoleErrors = {count: 0};
+        const originalError = console.error;
+        console.error = (...args: unknown[]) => {
+            consoleErrors.count++;
+            originalError(...args);
+        };
         const unit = await bootUnit({
             ...boot, facilities: world.all(), position: {lat: aircraft.lat, lon: aircraft.lon}, altitudeFt: aircraft.altitudeFt,
             magvar: (lat, lon) => world.magvar(lat, lon),
         });
-        const flight = new Flight(unit, world, new Aircraft(aircraft, aircraftOptions), pilot ?? coupledAutopilot());
+        const flight = new Flight(unit, world, new Aircraft(aircraft, aircraftOptions), pilot ?? coupledAutopilot(), consoleErrors);
         flight.installBuiltInMonitors();
         flight.installLoops();
         onTestFailed(() => {
@@ -225,14 +234,9 @@ export class Flight {
     }
 
     private installBuiltInMonitors(): void {
-        const originalError = console.error;
-        console.error = (...args: unknown[]) => {
-            this.consoleErrors++;
-            originalError(...args);
-        };
         this.monitor('no error page', f => f.unit.errors.length === 0 || `error published: ${f.unit.errors.map(String).join('; ')}`);
         this.monitor('no SimVar unit errors', f => f.sim.errors.length === 0 || f.sim.errors.join('; '));
-        this.monitor('no console.error', () => this.consoleErrors === 0 || `${this.consoleErrors} console.error call(s)`);
+        this.monitor('no console.error', () => this.consoleErrors.count === 0 || `${this.consoleErrors.count} console.error call(s)`);
         this.monitor('GPS outputs finite', f => {
             for (const name of ['GPS WP DISTANCE', 'GPS WP DESIRED TRACK', 'GPS WP CROSS TRK', 'GPS GROUND SPEED']) {
                 const w = f.sim.lastWrite(name);
