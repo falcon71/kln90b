@@ -33,7 +33,7 @@ export default defineConfig({
                 extends: true,
                 test: {
                     name: 'flight', environment: 'happy-dom', include: ['test/flight/**/*.test.ts'],
-                    setupFiles: ['test/harness/setup/dom.ts'], testTimeout: 60_000, passWithNoTests: true,
+                    setupFiles: ['test/harness/setup/dom.ts'], testTimeout: 60_000,
                 },
             },
         ],
