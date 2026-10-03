@@ -33,57 +33,55 @@ them it is for the convenience of the session, and `testing.md` is the authority
 **Session mechanics**
 
 1. Start on a new git branch named after the session (`tests-session-N-<topic>`), before the first edit.
-2. Run `npm test` and `npx tsc --noEmit` first. Both must be clean before any new work starts. If they are not, stop and
+2. Treat each session as an architectoral path.
+3. Run `npm test` and `npx tsc --noEmit` first. Both must be clean before any new work starts. If they are not, stop and
    report; do not fix unrelated failures as part of the session.
-3. Run the coverage report (`npm run coverage`, added by session 1) and read it for the session's area before writing
+4. Run the coverage report (`npm run coverage`, added by session 1) and read it for the session's area before writing
    tests.
-4. Commit in small steps, one area or one regression test per commit, with the attribution lines the session is given.
-   Never merge; the maintainer merges after review.
 5. Finish by running `npm test` and `npx tsc --noEmit` again, ticking the session's checkbox in section 3, adding a
    session log entry in section 4 (date, branch, what was done, what was left and why) and committing this document.
-6. If the session runs out of context before its scope is done, it still does step 5. It leaves the checkbox unticked
-   and writes what remains into the log. The next run of the same session continues from the log.
 
 **What a test is allowed to assert**
 
-7. **Spec tests** assert the real unit's behavior with the Pilot's Guide page (or another source named in `CLAUDE.md`)
+6. **Spec tests** assert the real unit's behavior with the Pilot's Guide page (or another source named in `CLAUDE.md`)
    cited in a comment, and an expected value derived independently of the code under test. Prefer these.
-8. **Characterization tests** pin what the code does today, such as a page snapshot. They are allowed where no spec is
+7. **Characterization tests** pin what the code does today, such as a page snapshot. They are allowed where no spec is
    at hand, and they are labeled as `testing.md` section 5 describes. A characterization test never carries a manual
    citation, because it does not claim to match the manual.
-9. **When the code and the manual disagree, the test asserts the manual**, is written as `it.fails('… (#NN)')` and the
+8. **When the code and the manual disagree, the test asserts the manual**, is written as `it.fails('… (#NN)')` and the
    bug is filed per `CLAUDE.md`. Never assert a bug as correct, not even in a characterization test: if a snapshot
    contains a visible bug, exclude that row or pin the bug separately.
-10. **Use the cheapest stage** that can observe the behavior (`testing.md` section 1). One headless unit per test file.
+9. **Use the cheapest stage** that can observe the behavior (`testing.md` section 1). One headless unit per test file.
 
 **Proving a test holds**
 
-11. Every new test is verified by breaking its subject on purpose (`testing.md` section 5). For a regression test the
+10. Every new test is verified by breaking its subject on purpose (`testing.md` section 5). For a regression test the
     break is the original bug: reintroduce it in the working tree, by hand when the old commit's diff no longer applies,
     confirm the test fails, restore, and confirm `git diff` shows only the intended changes. Never commit the broken
     state. Record in the log any fix that could not be re-broken and why.
-12. A regression test that cannot fail for its bug is not done. Either make it bite or mark the item "not provable" in
+11. A regression test that cannot fail for its bug is not done. Either make it bite or mark the item "not provable" in
     the triage table with the reason.
 
 **What a session may change**
 
-13. **Do not change behavior.** Small changes for testability (a constructor parameter for a dependency, exposing a seam,
+12. **Do not change behavior.** Small changes for testability (a constructor parameter for a dependency, exposing a
+    seam,
     making a private helper reachable) are fine; the commit message says what changed and why.
-14. **Harness extensions are fine when they unblock several tests.** One test is not worth a large extension: list the
+13. **Harness extensions are fine when they unblock several tests.** One test is not worth a large extension: list the
     extension under `testing.md` section 7 instead. Session H exists for the large ones.
-15. Every bug spotted goes to GitHub per `CLAUDE.md`, with an `it.fails` pin where a test can observe it. Do not fix
+14. Every bug spotted goes to GitHub per `CLAUDE.md`, with an `it.fails` pin where a test can observe it. Do not fix
     bugs during a test session.
-16. Never commit manual text, tables or screens, and never commit navdata recorded from the sim. Facilities in tests are
+15. Never commit manual text, tables or screens, and never commit navdata recorded from the sim. Facilities in tests are
     invented (`testing.md` section 5).
 
 **Avoiding false security**
 
-17. Do not write a test whose only purpose is to raise the coverage number. A test must either state a spec, pin the
+16. Do not write a test whose only purpose is to raise the coverage number. A test must either state a spec, pin the
     current behavior of something that could plausibly break, or guard a past bug.
-18. Permissive assertions (`toBeDefined`, `length > 0`, `not.toThrow` alone) are not a test of anything but the absence
+17. Permissive assertions (`toBeDefined`, `length > 0`, `not.toThrow` alone) are not a test of anything but the absence
     of a crash. Use them only for the "every H event is accepted without an error" style of sweep, and say so in the
     test name.
-19. The session log says what was **not** covered in the session's area, so the final record in session 11 can be
+18. The session log says what was **not** covered in the session's area, so the final record in session 11 can be
     written from the logs.
 
 # 3. The sessions
