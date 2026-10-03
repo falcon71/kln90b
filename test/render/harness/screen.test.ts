@@ -39,6 +39,11 @@ describe('Screen', () => {
         expect(() => Screen.read()).toThrow(/left row 0 is 12 cells wide, more than 11: "TWELVE CHARS"/);
     });
 
+    it('skips the fallback text of a canvas', () => {
+        mount(`<div><div class="left-page"><canvas>ERROR</canvas><pre>N^&nbsp;&nbsp;&nbsp;40<br/></pre></div><div class="right-page"><pre></pre></div>${STATUS}</div>`);
+        expect(Screen.read().row(0)).toBe('N^   40    |           ');
+    });
+
     it('inherits the attribute of an enclosing span into nested spans', () => {
         mount(`<div><div class="left-page"><pre><span class="inverted">A<span>B</span></span><span class="blink">C<span>D</span></span>`
             + `<span class="inverted"><span class="inverted-blink">E</span>F</span><br/></pre></div><div class="right-page"><pre></pre></div>${STATUS}</div>`);

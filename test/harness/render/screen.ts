@@ -18,7 +18,11 @@ function attrOf(el: Element, inherited: CellAttr): CellAttr {
     return inherited;
 }
 
-/** Text rows of an element as the font renders them: <br> starts a row, d-none subtrees are skipped. */
+/**
+ * Text rows of an element as the font renders them: <br> starts a row, d-none subtrees are skipped, and so is the
+ * fallback text inside a <canvas> ("ERROR" in Canvas.tsx), which a browser that supports canvas never shows. The map
+ * itself is not read, and text positioned over it with CSS (the NAV 5 range) reads in DOM order, not at its row.
+ */
 export function readRows(root: Element): Cell[][] {
     const rows: Cell[][] = [[]];
     const walk = (node: Node, attr: CellAttr) => {
@@ -30,7 +34,7 @@ export function readRows(root: Element): Cell[][] {
         }
         if (node.nodeType !== 1) return;
         const el = node as Element;
-        if (el.classList.contains('d-none')) return;
+        if (el.classList.contains('d-none') || el.tagName === 'CANVAS') return;
         if (el.tagName === 'BR') {
             rows.push([]);
             return;
