@@ -1,5 +1,10 @@
-/** Earth radius in NM used for expectations; the SDK's great-circle math uses a sphere as well. */
-export const EARTH_RADIUS_NM = 3440.065;
+/**
+ * Earth radius in NM used for expectations. This is the sphere of the SDK's great-arc radian
+ * (UnitType.GA_RADIAN, defined as 6378100 m in msfssdk.js:4469). The instrument's own distances
+ * use this sphere, so expectations computed here model the same sphere. The formulas stay
+ * independent of the SDK.
+ */
+export const EARTH_RADIUS_NM = 6378100 / 1852;
 const RAD = Math.PI / 180;
 
 export interface LatLon {

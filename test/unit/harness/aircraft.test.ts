@@ -12,7 +12,7 @@ describe('Aircraft', () => {
     it('flies 120 NM in one hour at 120 kt', () => {
         const a = new Aircraft({lat: 0, lon: 0, altitudeFt: 3000, groundspeedKt: 120, trackTrue: 0});
         fly(a, 3600, 0);
-        expect(distanceNm({lat: 0, lon: 0}, a)).toBeCloseTo(120, 0);
+        expect(distanceNm({lat: 0, lon: 0}, a)).toBeCloseTo(120, 1);
         expect(a.lon).toBeCloseTo(0, 6);
     });
 
