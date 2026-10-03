@@ -72,8 +72,13 @@ describe('user waypoint V2 format', () => {
         expect(storedSlot(0)).toBe('NXX        XY      +4800.00+00900.00+0345.0');
     });
 
-    it.fails('restores a southern latitude (#98)', () => {
+    it('restores a southern waypoint without throwing', () => {
         expect(() => restoreFrom('WXX        SOUTH   -1230.00+01015.00')).not.toThrow();
+        expect(repo.get(ICAO.value('W', 'XX', '', 'SOUTH'))).toBeDefined();
+    });
+
+    it.fails('restores a southern latitude (#98)', () => {
+        restoreFrom('WXX        SOUTH   -1230.00+01015.00');
         const wpt = repo.get(ICAO.value('W', 'XX', '', 'SOUTH'))!;
         expect(wpt.lat).toBeCloseTo(-12.5, 6);
     });
