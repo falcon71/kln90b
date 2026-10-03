@@ -3,3 +3,4 @@ build
 .rollup.cache
 node_modules
 types
+test/flight/__output__/
