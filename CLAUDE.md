@@ -24,6 +24,8 @@ For the wiring that takes many files to see, read **[docs/architecture.md](docs/
 npm install
 npm run build          # rollup -c → build/ (a complete MSFS community package), ~7 s
 npx tsc --noEmit       # type check only; currently clean, ~3 s
+npm test               # all tests (Vitest: unit, render, flight)
+npx vitest run --project flight   # one stage
 ```
 
 - Set the env var `buildTargetDir` to build straight into the sim's community folder (e.g.
@@ -37,9 +39,10 @@ npx tsc --noEmit       # type check only; currently clean, ~3 s
 - `resources/layout.json` is static and is not regenerated. If you add or rename an asset file, update it by hand.
 - The version in `package.json` must be **at most 6 characters**, because it is shown on the unit's screen.
 
-**There are no automated tests, no linter and no CI.** The only checks are `tsc` and the build; behaviour has to be
-verified in the sim. If you add tests, the code has heavy sim globals (`SimVar`, `Coherent`, `BaseInstrument`), so
-start with pure logic such as `KLNNavmath`, the loaders/serializers and `NavCalculator` math.
+Tests live in `test/` and run with Vitest in three stages: unit (Node), render (happy-dom, reads the 23×7 screen) and
+flight (boots the whole unit headless and flies it on simulated time). See **[docs/testing.md](docs/testing.md)**. There
+is no linter and no CI; `tsc` and the build remain separate checks. Behavior changes should come with a test at the
+cheapest stage that can observe them.
 
 ## Public contract with aircraft — do not break
 
@@ -63,8 +66,10 @@ change what they mean; add new ones instead:
 
 ## Architecture in brief
 
-- **Boot:** `KLN90B.tsx` (a `BaseInstrument`) runs `asyncInit()`. It parses panel.xml, builds the sensors, navdata and
-  persistence, then `VolatileMemory` and the services. It then publishes `propsReady` with **`PageProps`**
+- **Boot:** `KLN90B.tsx` (a thin `BaseInstrument`) creates `KLN90BCore`, whose `init()` builds everything;
+  `KLN90BPlatform` supplies navdata, the facility repository and the EFB route manager (tests pass fakes). `init()`
+  parses panel.xml, builds the sensors, navdata and persistence, then `VolatileMemory` and the services. It then
+  publishes `propsReady` with **`PageProps`**
   (`pages/Page.tsx`), the single services bag every page and control receives. One `EventBus` is shared by everything.
   User settings are saved per aircraft model under the key `"<ATC MODEL>.profile_1"`.
 - **Ticks** (`TickController.ts`): the display runs at 4 Hz (blink = every 4th tick), the calculations at 1 Hz through

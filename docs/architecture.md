@@ -2,7 +2,8 @@
 
 Detailed companion to [CLAUDE.md](../CLAUDE.md). It covers the big-picture wiring that takes many files to see.
 All paths are relative to the repo root and the code lives under `kln90b/`. It describes the code as of v2.2.0
-(commit `d449d11`); check the code when this document and the code disagree, and update this document.
+(commit `456356d`); check the code when this document and the code disagree, and update this document.
+Automated tests are described in [testing.md](testing.md).
 
 - Part 1, **Core**: boot, tick loops, sensors/GPS, sim outputs, navigation, navdata, persistence, configuration,
   messages.
@@ -18,7 +19,7 @@ Comments such as `3-29` in the code are page numbers in the KLN 90B Pilot's Guid
     - `KLN90PlaneSettings.debugMode` is hard-coded to `false` in `KLN90BPlaneSettingsParser`; set it to true by hand. It
       skips the test pages, gives instant brightness and makes `AudioGenerator` show `BEEP: n` on the status line.
     - `loggingEnabled = false` flags exist in `Scanlist.ts` and `RollSteeringController.ts`.
-    - There is a commented-out `this.bus.onAll(console.log)` in `KLN90B.tsx`.
+    - There is a commented-out `this.bus.onAll(console.log)` in `KLN90BCore.ts`.
     - There is a lot of `console.log`.
     - The user setting `fastGpsAcquisition` (SET 10 page) **defaults to true** (`GPS_ACQUISITION_FAST`).
 - Other branches: `switch-to-wt-flightplan` (abandoned; see Core 5), `fuzzy-gps` (Kalman-filtered GPS noise, "not
@@ -26,10 +27,21 @@ Comments such as `3-29` in the code are page numbers in the KLN 90B Pilot's Guid
 
 ## Core 1. Startup and lifecycle
 
-`KLN90B extends BaseInstrument` (`kln90b/KLN90B.tsx`) and is registered with `registerInstrument('kln-90b', KLN90B)`.
-`templateID` is `'KLN90B'` and `isInteractive` is true.
+`KLN90B` (`kln90b/KLN90B.tsx`) is a thin adapter between the sim's `BaseInstrument` lifecycle and the instrument. It is
+registered with `registerInstrument('kln-90b', KLN90B)`, and it has `templateID` `'KLN90B'` and `isInteractive` true.
+It does four things: `Init()` calls `super.Init()` and then `core.init(xmlConfig)`; `onInteractionEvent` calls `super`
+and then `core.onInteractionEvent`; `onSoundEnd` forwards to the core; and the core's re-dispatch callback is the
+adapter's own `onInteractionEvent`.
 
-**constructor** (runs before the XML config is available):
+`KLN90BCore` (`kln90b/KLN90BCore.ts`) holds what used to be the instrument class: the bus, the services, the pages and
+the tick loops. Its constructor takes a `KLN90BPlatform` and the re-dispatch callback. `KLN90BPlatform`
+(`kln90b/KLN90BPlatform.ts`) is what the core needs from outside the sim's global APIs (`SimVar`, `Coherent` and
+`DataStore` stay global): `createFacilityClient(bus)`, `getFacilityRepository(bus)` and `getRouteManager()`. The sim
+passes `SIM_PLATFORM`, which wraps the SDK `FacilityLoader`, `KLNFacilityRepository` and `FlightPlanRouteManager`. The
+tests create `KLN90BCore` directly with a `FakePlatform` (testing.md), which is the reason the split exists. The
+sections below say `KLN90BCore` where the code moved and `KLN90B` where the adapter still acts.
+
+**constructor** of `KLN90BCore` (runs before the XML config is available):
 
 - Creates `new EventBus()`, which is the single bus for everything.
 - Creates `KLN90BUserSettings(bus)` and `KLN90BSettingSaveManager`, then calls `load(saveKey)` and
@@ -37,9 +49,10 @@ Comments such as `3-29` in the code are page numbers in the KLN 90B Pilot's Guid
   `saveKey = "${SimVar 'ATC MODEL'}.profile_1"`. **All persistent data is per aircraft model.**
 - Creates `HEventPublisher` and `PageManager`.
 - Subscribes to the `keyboardevent` topic (PC keyboard mode): `handleKeyboardEvent` maps keys to the knob and button
-  event strings.
+  event strings. It re-dispatches them through the callback it was given, so in the sim they pass through
+  `KLN90B.onInteractionEvent` and `BaseInstrument.onInteractionEvent` as before.
 
-**Init()** calls `asyncInit()`. Errors are published as the `error` topic and rendered by `controls/ErrorPage` as a
+**Init()** (`KLN90B.Init`, then `KLN90BCore.init`) calls `asyncInit(xmlConfig)`. Errors are published as the `error` topic and rendered by `controls/ErrorPage` as a
 full-screen error page with a GitHub link.
 
 **asyncInit()** does the following, in order:
@@ -53,8 +66,9 @@ full-screen error page with a GitHub link.
 4. Constructs `AudioGenerator`, then `Sensors` (which builds `GPS` and the `KLNGPSSatComputer`), then calls
    `hEventPublisher.startPublish()`.
    If `forceReadyToUse` is set, it calls `powerButton.forceReadyToUse()`.
-5. Navdata: it calls `KLNFacilityRepository.getRepository(bus)` (a singleton) and builds
-   `KLNFacilityLoader(new FacilityLoader(FacilityRepository.getRepository(bus)), klnRepo)`, then `Scanlists`.
+5. Navdata: it asks the platform for the facility repository (`KLNFacilityRepository.getRepository(bus)`, a singleton)
+   and the facility client (in the sim `new FacilityLoader(FacilityRepository.getRepository(bus))`), builds
+   `KLNFacilityLoader(client, klnRepo)` from them, then `Scanlists`.
 6. Persistence:
     - `UserWaypointPersistor.restoreWaypoints()`.
     - `UserFlightplanPersistor.restoreAllFlightplan()`, which returns 26 `Flightplan`s (index 0 to 25). On failure it
@@ -64,8 +78,8 @@ full-screen error page with a GitHub link.
     - If `userDataFormat !== 2`, it re-persists everything in the V2 format and sets `userDataFormat=2` (see Core 7).
 7. Constructs `VolatileMemory`, `WTFlightplanSync`, `AirspaceAlert`, `Vnav`, `KLNMagvar`, `ModeController`, then
    `TickController` (Core 2), then `SimVarSync`,
-   `MSA`, `TemporaryWaypointDeleter` and `SidStar`. `FlightPlanRouteManager.getManager()` then creates `KlnEfbSaver` and
-   `KlnEfbLoader` (EFB route sync).
+   `MSA`, `TemporaryWaypointDeleter` and `SidStar`. The platform's route manager (in the sim
+   `FlightPlanRouteManager.getManager()`) then creates `KlnEfbSaver` and `KlnEfbLoader` (EFB route sync).
 8. `Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), msa.init(basePath)])` then builds the *
    *`PageProps`**,
    sets `messageHandler.persistentMessages = buildPersistentMessages(props)` and publishes **`propsReady`** with the
@@ -113,7 +127,8 @@ arrives.
 
 **Input routing**: the sim delivers H events as `BaseInstrument.onInteractionEvent(args)`.
 
-- `KLN90B.onInteractionEvent` handles the SCAN pull state (`Hardware.isScanPulled`, mirrored to `L:KLN90B_RightScan`).
+- `KLN90B.onInteractionEvent` calls `super` and passes the event to `KLN90BCore.onInteractionEvent`, which handles the
+  SCAN pull state (`Hardware.isScanPulled`, mirrored to `L:KLN90B_RightScan`).
   While SCAN is pulled, it remaps right-inner turns to the internal `EVT_R_SCAN_LEFT/RIGHT`.
 - It then calls `hEventPublisher.dispatchHEvent([evt])`, which puts the event on the bus `hEvent` topic. `PowerButton`
   listens there for power and brightness events.
@@ -442,7 +457,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - The same layout but with the **19-char `ICAO.valueToStringV2`**, so all field offsets shift by 7.
     - `fpl{i}` stores FPL i for 0 to 25, **including FPL 0**. Only USER legs are stored.
     - Code: `UserWaypointLoaderV2`, `UserFlightplanLoaderV2`.
-- Migration in `KLN90B.asyncInit`: if the format is not 2, re-persist all waypoints and plans with the V2 writers, then
+- Migration in `KLN90BCore.asyncInit`: if the format is not 2, re-persist all waypoints and plans with the V2 writers, then
   set `userDataFormat=2`. Writers (`UserWaypointPersistor.serialize*`, `UserFlightplanPersistor.persistFlightplan`) only
   produce V2.
 - Restore errors cause empty plans and the `USER DATA LOST` message.
@@ -532,7 +547,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   failures, 3-satellite plus altitude solutions, circular airspaces, and CTA/TMA in the SUA filter (TODO).
 - **Event bus topics** are typed by interfaces declared next to their owner. There is no central file:
     - `PowerEvent.powerEvent` (`PowerButton.ts`)
-    - `PropsReadyEvent.propsReady` (`KLN90B.tsx`)
+    - `PropsReadyEvent.propsReady` (`KLN90BCore.ts`)
     - `FlightplanEvents.flightplanChanged` (`Flightplan.ts`)
     - `ActiveWaypointChangedEvents.activeWaypointChanged` (`ActiveWaypoint.ts`)
     - `GPSEvents.timeUpdatedEvent` (`Gps.ts`)
@@ -548,7 +563,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - **Allocation hygiene:** module-level caches like `VEC3_CACHE`, `TO_GEOPOINT_CACHE` and `CACHED_CIRCLE` are reused, in
   SDK style. Beware of aliasing.
 - **Global and singleton state:** `KLNFacilityRepository.INSTANCE`, the `KLN90BUser*Settings` managers (`INSTANCE ??=`),
-  `FlightPlanner` id `"kln90b"`, and the `SimVar`/`Coherent` globals from `@microsoft/msfs-types`. `global.d.ts` only
+  `FlightPlanner` id `"kln90b"`, and the `SimVar`/`Coherent` globals from `@microsoft/msfs-types`. Because of these
+  singletons the tests run one headless unit per test file (testing.md). `global.d.ts` only
   declares `*.scss`. `KeyCode.*` constants are ambient.
 - **Error handling:** a try/catch around every tick and interaction publishes `error`, which shows the on-screen error
   page with an "OK and suppress further errors" button. Async code mostly uses `.catch(e => bus.pub("error"))` or
@@ -584,7 +600,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - `PageProps` (`pages/Page.tsx`) is the single "services bag" passed to every page and many controls. It holds bus,
   userSettings, planeSettings, sensors, pageManager, messageHandler, hardware, memory (`VolatileMemory`),
   facilityLoader, facilityRepository, nearestLists, nearestUtils, scanLists, remarksManager, msa, vnav, modeController,
-  database, magvar and sidstar. It is assembled in `KLN90B.asyncInit` and published as `propsReady`.
+  database, magvar and sidstar. It is assembled in `KLN90BCore.asyncInit` and published as `propsReady`.
 
 ## UI 1. Page model
 
@@ -685,7 +701,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 
 ### Event flow
 
-1. MSFS H events → `KLN90B.onInteractionEvent(args)`. Event names are in `kln90b/HEvents.ts`, for example:
+1. MSFS H events → `KLN90B.onInteractionEvent(args)` → `KLN90BCore.onInteractionEvent(args)`. Event names are in `kln90b/HEvents.ts`, for example:
     - `KLN90B_LeftLargeKnob_Left` = `EVT_L_OUTER_LEFT`
     - `..SmallKnob..` = INNER
     - `KLN90B_LeftCursor_Toggle` = `EVT_L_CURSOR`
