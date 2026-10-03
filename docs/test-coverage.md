@@ -97,7 +97,7 @@ A session that was interrupted is rerun with the same number until its checkbox 
 
 ## Session 1: coverage tooling and regression triage
 
-- [ ] done
+- [x] done
 
 **Goal:** know what is untested and which past bugs can be turned into tests, before writing any.
 
@@ -165,6 +165,13 @@ section 7:
 3. Airspace boundaries in the navdata, for the SUA alert and `AirspacesAlongRoute`.
 4. A `FrontPanel.enterIdent` that blanks the positions past a short ident.
 5. A power-cycle helper (`engineRunning: false`, `FrontPanel.power()`), for #90 and the cold-and-dark pages.
+
+Found by the session 1 triage (section 5):
+
+6. A route manager in `FakePlatform` that can emit a synced EFB route, for #15 and `KlnEfbLoader` in Session 6.
+7. A boot-failure helper: a boot that awaits the `error` event instead of `propsReady`, for #50.
+8. A reader for the Super NAV 5 `<pre>` blocks, for `eef92e8`.
+9. A paused aircraft (position frozen, ground speed kept), for the pause half of `43d472b`.
 
 Each extension comes with its own harness test (`test/*/harness/`) and a paragraph in `testing.md` section 3. After
 this session, the *needs harness* rows it unblocked become *testable* and are picked up by a rerun of session 2 or 3.
@@ -342,7 +349,64 @@ One entry per session run, newest first. Format: date, session, branch, what was
 coverage summary for the session's area at start and end. This is a dated record and is never edited afterwards; a
 later run adds a new entry.
 
-(no entries yet)
+## 2026-10-03, session 1, branch `tests-session-1-triage`
+
+**Done**
+- **Coverage tooling:** `@vitest/coverage-v8` 5.0.3, `npm run coverage`, `coverage/` ignored, coverage limited to
+  `kln90b/**` with the text and HTML reporters. Documented in `testing.md` section 2.
+- **Triage:** the table in section 5 covers all 79 closed issues and every fix commit on `master` whose subject says
+  fix or references an issue. Duplicates share a row. Verdicts: 62 testable (16 unit, 29 render, 14 flight, 3 mixed),
+  13 needs harness, 4 superseded, 7 not testable, 5 no behavior (rows, not issues: the no-behavior rows bundle
+  several issues or commits each).
+- **Needs harness:** 7 rows wait for procedure builders. One row each waits for the nearest-search filters, airspace
+  boundaries, an EFB route manager, a boot-failure helper, a Super NAV 5 reader and a paused aircraft. The last four
+  were added to the Session H list.
+- **How the triage was done:** four parallel subagents drafted rows from the issues, their comments and the fix
+  diffs. The session then checked every verdict and stage against the harness. Key-driven page bugs were moved from
+  flight to render, because `FrontPanel` needs no flight.
+
+**Bugs found and filed** (no pins yet; session 2 pins them):
+- **#101:** the #78 fix (`6677fae`) narrowed the V1 longitude slice to two digits, so the V1-to-V2 conversion of #47
+  moves user waypoints at 100° or more by thousands of miles, and persists the result.
+- **#102:** the polygon filter of `133f4d8` in `NearestUtils.getAirspaces` drops airspaces that a TRI 2/4/6 route
+  crosses unless a search center lies inside them. The same issue records the shared search session and the shared
+  `fill([])` array in `AirspacesAlongRoute.ts`.
+
+**Observed but not filed.** These are unverified or deliberate; session 7 should look at them:
+- `BoundaryUtils` ignores circular airspaces (a TODO in the code). Since `133f4d8`, such an airspace can drop out of
+  the nearest airspaces entirely. Needs real boundary data to confirm.
+- `SidStar.getArcEntryName` can produce idents longer than five characters for navaid idents longer than three, or
+  arcs of 127 NM or more.
+- `ActiveWaypoint.assertToMatchesFplIdx` sets the FPL index to -1 without publishing `activeWaypointChanged`, so
+  `WTFlightplanSync` may keep a stale index.
+- `SensorsOut.reset` leaves the GPS SimVars at their last values while the unit is disabled (the `d3c5230`
+  workaround; deliberate).
+
+**Not covered in this session:** no tests were written (by design). Open issues were triaged only where a fix commit
+references them (#68). The 1.x line on `fs2020` was not triaged beyond noting its backports.
+
+**Coverage at the start of the session** (the first run; all tests green; the end is the same, since no tests were
+added):
+
+| directory                  | % stmts | % branch | % funcs | % lines |
+|----------------------------|--------:|---------:|--------:|--------:|
+| all files                  |   34.22 |    24.78 |   37.29 |   33.76 |
+| `kln90b`                   |   68.53 |    46.36 |   76.19 |   68.32 |
+| `kln90b/controls`          |   44.33 |    35.46 |   45.64 |   43.82 |
+| `kln90b/controls/displays` |   54.40 |    40.42 |   58.66 |   53.72 |
+| `kln90b/controls/editors`  |   53.99 |    37.01 |   57.93 |   52.90 |
+| `kln90b/controls/selects`  |   26.18 |    16.40 |   31.75 |   25.65 |
+| `kln90b/data`              |   65.21 |    39.28 |   65.06 |   64.40 |
+| `kln90b/data/flightplan`   |   68.64 |    61.11 |   65.85 |   68.53 |
+| `kln90b/data/navdata`      |   49.28 |    33.09 |   59.52 |   49.29 |
+| `kln90b/pages`             |   37.82 |    26.72 |   45.35 |   36.89 |
+| `kln90b/pages/left`        |   14.35 |    11.52 |   14.85 |   14.27 |
+| `kln90b/pages/right`       |    7.20 |     5.97 |    8.00 |    7.33 |
+| `kln90b/services`          |   36.09 |    22.04 |   57.01 |   34.83 |
+| `kln90b/settings`          |   73.63 |    48.97 |   76.19 |   72.83 |
+
+All 252 source files are in the report. 98 have code that no test runs, most of them pages: 39 in `pages/left` and 26
+in `pages/right`. Two contain no statements at all.
 
 # 5. Regression triage table
 
