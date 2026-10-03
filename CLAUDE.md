@@ -127,6 +127,20 @@ change what they mean; add new ones instead:
 - Commit messages are `fixes #NN <description>` or `references #NN <description>` for GitHub issues, and plain
   sentences otherwise.
 
+## Bugs go to GitHub issues
+
+Every time you spot a bug, whether in code you read, in a test or during a review, report it on GitHub
+(https://github.com/falcon71/kln90b/issues):
+
+- **Check first whether it is already known.** Search open *and* closed issues with a few different wordings. A closed
+  issue can be a partial fix: #98 was the unfixed half of the closed #78.
+- **If it is not known, create a new issue with the `bug` label.** State what is wrong, a concrete reproduction (input
+  and observed vs. expected values), the file and line, the impact on the user, and a suggested fix. If it continues a
+  closed issue, reference that issue instead of reopening it.
+- **Do not fix it on the side** of unrelated work. Pin it with an `it.fails('… (#NN)')` test where a test can observe it
+  (see [docs/testing.md](docs/testing.md)), so the pin turns red once the bug is fixed.
+- Cite manual pages in issues; never copy manual text into them (see below).
+
 ## Reference material (copyrighted — never commit)
 
 The maintainer has the Pilot's Guide, the Installation Manual, the Component Maintenance Manual and photos of real units
