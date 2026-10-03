@@ -1,10 +1,12 @@
 import {describe, expect, it} from 'vitest';
 import {GeoPoint, UnitType} from '@microsoft/msfs-sdk';
-import {Flight, nmBefore} from '../../harness/flight/Flight';
+import {Flight, minutes, nmBefore} from '../../harness/flight/Flight';
 import {World} from '../../harness/flight/World';
 import {airport, vor} from '../../harness/navdata/builders';
 import {savedFlightplan} from '../../harness/storage';
-import {courseDeg, distanceNm} from '../../harness/flight/geo';
+import {courseDeg, distanceNm, finalCourseDeg} from '../../harness/flight/geo';
+
+const angleDiff = (a: number, b: number) => ((a - b + 540) % 360) - 180;
 
 describe('jump', () => {
     it('moves to a point before the active waypoint and refuses to cross it', async () => {
@@ -24,10 +26,35 @@ describe('jump', () => {
         await expect(flight.jump(nmBefore('KBBB', 5))).rejects.toThrow(/not the active waypoint/);
         await expect(flight.jump(nmBefore('ABC', 1))).rejects.toThrow(/closer than 3 NM/);
 
+        // One minute at 120 kt is 2 NM, far from ABC. jump() flies one second after the jump.
+        let before = {t: flight.t, toAbc: distanceNm(flight.aircraft, abc)};
+        await flight.jump(minutes(1));
+        expect(flight.t - before.t).toBeCloseTo(61, 3);
+        expect(before.toAbc - distanceNm(flight.aircraft, abc)).toBeCloseTo(2 + 1 / 30, 1);
+
+        before = {t: flight.t, toAbc: distanceNm(flight.aircraft, abc)};
         await flight.jump(nmBefore('ABC', 10));
+        const jumpedSeconds = (before.toAbc - 10) / 120 * 3600 + 1;
+        expect(Math.abs(flight.t - before.t - jumpedSeconds)).toBeLessThan(2);
         // jump() flies one second after the jump: 0.03 NM at 120 kt
         expect(Math.abs(distanceNm(flight.aircraft, abc) - 10)).toBeLessThan(0.2);
         expect(flight.unit.props.sensors.in.gps.isValid()).toBe(true);
-        expect(Math.abs(flight.nav.distNm! - distanceNm(flight.aircraft, abc))).toBeLessThan(0.1);
+
+        // Fly on the leg with the coupled autopilot, then check what the unit navigates
+        await flight.fly(10);
+        const nav = flight.nav;
+        expect(Math.abs(nav.distNm! - distanceNm(flight.aircraft, abc))).toBeLessThan(0.1);
+        expect(nav.activeIdent).toBe('ABC');
+        expect(nav.toFrom).toBe('TO');
+        expect(nav.mode).toBe('ENR-LEG');
+        // 5-33, 5-37: the CDI scale defaults to ±5 NM
+        expect(nav.xtkScale).toBe(5);
+        expect(Math.abs(nav.xtkNm!)).toBeLessThan(0.3);
+        // About 9.6 NM out, far from the waypoint alert
+        expect(nav.waypointAlert).toBe(false);
+        expect(Math.abs(angleDiff(nav.dtkTrue!, finalCourseDeg(kaaa, abc)))).toBeLessThan(1);
+
+        // Ten minutes at 120 kt is 20 NM, past ABC
+        await expect(flight.jump(minutes(10))).rejects.toThrow(/would cross ABC/);
     });
 });

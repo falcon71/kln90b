@@ -57,6 +57,9 @@ interface MonitorFailure {
 
 /**
  * A simulated flight: the headless unit, an aircraft, a pilot and the world. Time only moves in fly, flyUntil and jump.
+ *
+ * Monitors and the recorder sample once per simulated second, so they can miss a transient shorter than a second, and
+ * they do not run across the span a jump skips.
  */
 export class Flight {
     public readonly recorder = new FlightRecorder();
@@ -75,6 +78,10 @@ export class Flight {
         this.panel = new FrontPanel(evt => unit.send(evt), () => this.screen);
     }
 
+    /**
+     * Boots the unit and flies until the GPS has a solution. Call it inside a test: it registers onTestFailed, which
+     * binds the recorder to that test, and the output is named after it.
+     */
     public static async start(opts: FlightOptions): Promise<Flight> {
         const {world, aircraft, aircraftOptions, pilot, ...boot} = opts;
         const unit = await bootUnit({
@@ -121,7 +128,8 @@ export class Flight {
     }
 
     /**
-     * Adds a check that runs once per simulated second. Return true when fine, otherwise a description.
+     * Adds a check that runs once per simulated second. Return true when fine, otherwise a description. A check sees
+     * the state at each whole second only, so a condition that comes and goes between two samples is not caught.
      */
     public monitor(name: string, check: (f: Flight) => true | string): void {
         this.monitors.push({name, check});
@@ -149,6 +157,7 @@ export class Flight {
     /**
      * Slew-style jump: moves the aircraft along its current great circle and the clock forward without running the
      * ticks in between, then runs one second normally. Integrated values (flight timer, fuel) miss the jumped time.
+     * Monitors do not run for the skipped span.
      * @throws Error if the jump would cross or come within 3 NM of the active waypoint
      */
     public async jump(target: JumpTarget): Promise<void> {
@@ -165,6 +174,9 @@ export class Flight {
             distance = this.aircraft.groundspeedKt * target.minutes / 60;
         }
         if (distance <= 0) throw new Error(`jump: nothing to jump (${distance.toFixed(2)} NM)`);
+        if (toActive - distance < 0) {
+            throw new Error(`jump: would cross ${active} (${(distance - toActive).toFixed(2)} NM past it)`);
+        }
         if (toActive - distance < MIN_REMAINING_NM) {
             throw new Error(`jump: would end ${(toActive - distance).toFixed(2)} NM from ${active}, closer than ${MIN_REMAINING_NM} NM`);
         }
