@@ -229,6 +229,13 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 
 # 5. Conventions
 
+- **Two kinds of tests, labeled differently.** A *spec test* states what the real unit does: it cites the manual page
+  and derives its expected value independently (the next two bullets). A *characterization test* pins what the code
+  does today, typically a page snapshot, and claims nothing about the real unit. Characterization tests are allowed
+  where no spec is at hand, but the word `characterization` must appear in the `describe` or `it` title
+  (`describe('NAV 3 page (characterization)', …)`), so that `grep characterization test/` lists every test that is not
+  evidence of correctness. A characterization test carries no manual citation. When the code and the manual disagree,
+  the test asserts the manual and is pinned as a known bug (below); a snapshot never freezes a visible bug as correct.
 - **Cite the manual page behind an expectation** in a comment (`// 4-8: ...`), the same as in the code. A test is a
   statement of the real unit's behavior, and the page is the evidence.
 - **Derive expected values independently.** Never compute the expectation with the function under test or with the
@@ -246,7 +253,12 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   Screen snapshots of your own render of the instrument are fine.
 - **A behavior change comes with a test** at the cheapest stage that can observe it. A bug fix starts with a test that
   fails for the bug.
-- Verify a new test by breaking its subject on purpose and confirming it fails, then restore the code.
+- **Verify a new test by breaking its subject on purpose** and confirming it fails, then restore the code and check
+  that `git diff` shows only the intended changes. For a regression test the break is the original bug: reintroduce it
+  in the working tree, by hand when the old commit's diff no longer applies. Never commit the broken state. A test
+  that stays green under the break is not a test of that behavior; fix the test, not the record. Permissive
+  assertions (`toBeDefined`, `length > 0`, a bare `not.toThrow`) survive almost any break, so use them only for a
+  deliberate "accepts every event without an error" sweep, and say so in the test name.
 
 # 6. Limitations
 
@@ -284,6 +296,9 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 
 # 7. Next steps
 
+- **The test baseline is being built session by session.** The plan, the rules for those sessions and the regression
+  triage table are in [test-coverage.md](test-coverage.md). That document is temporary and its last session retires it
+  into a coverage record here; until then, start a test session from it rather than from this list.
 - A power-cycle flight test for #90 (the OTH pages are pruned again on each `MainPage` construction). It needs the
   `FrontPanel.power()` helper and a boot with `engineRunning: false`.
 - Procedure builders for the navdata, so approach and SID/STAR tests can run, and nearest-search filters in
