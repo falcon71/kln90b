@@ -34,12 +34,12 @@ beforeEach(removeAll);
 describe('user waypoint V2 format', () => {
     it('serializes a user VOR', () => {
         const vor = {
-            icao: '', icaoStruct: ICAO.value('V', 'XX', '', 'ABC'), name: '', lat: 47.5, lon: 8.9, region: 'XX', city: '',
+            icao: '', icaoStruct: ICAO.value('V', 'XX', '', 'ABC'), name: '', lat: 47.5125, lon: 8.9125, region: 'XX', city: '',
             magvar: 0, freqMHz: 114.3, freqBCD16: 0, magneticVariation: 2, type: 0, vorClass: 0, navRange: 0,
             dme: null, ils: null, tacan: null, trueReferenced: false, alt: 0,
         } as unknown as VorFacility;
         repo.add(vor);
-        expect(storedSlot(0)).toBe('VXX        ABC     +4730.00+00854.00+114.30+02');
+        expect(storedSlot(0)).toBe('VXX        ABC     +4730.75+00854.75+114.30+02');
     });
 
     it('restores a user VOR', () => {
@@ -68,10 +68,12 @@ describe('user waypoint V2 format', () => {
         const ndb = repo.get(ICAO.value('N', 'XX', '', 'XY')) as NdbFacility;
         expect(ICAO.getFacilityTypeFromValue(ndb.icaoStruct)).toBe(FacilityType.NDB);
         expect(ndb.freqMHz).toBeCloseTo(345, 6);
+        // Restoring re-persists through the repository sync, so the slot must hold the identical string again
+        expect(storedSlot(0)).toBe('NXX        XY      +4800.00+00900.00+0345.0');
     });
 
     it.fails('restores a southern latitude (#98)', () => {
-        restoreFrom('WXX        SOUTH   -1230.00+01015.00');
+        expect(() => restoreFrom('WXX        SOUTH   -1230.00+01015.00')).not.toThrow();
         const wpt = repo.get(ICAO.value('W', 'XX', '', 'SOUTH'))!;
         expect(wpt.lat).toBeCloseTo(-12.5, 6);
     });

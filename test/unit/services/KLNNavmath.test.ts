@@ -10,6 +10,7 @@ describe('intermediatePoint', () => {
 
     it.fails('returns the great-circle midpoint and end point (#97)', () => {
         // Expected values from https://edwilliams.org/avform147.htm#Intermediate, computed independently
+        expect(() => intermediatePoint({lat: 50, lon: 8}, {lat: 51, lon: 10}, 0.5)).not.toThrow();
         const mid = intermediatePoint({lat: 50, lon: 8}, {lat: 51, lon: 10}, 0.5);
         expect(mid.lat).toBeCloseTo(50.5043, 3);
         expect(mid.lon).toBeCloseTo(8.9894, 3);
