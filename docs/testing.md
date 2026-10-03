@@ -33,11 +33,14 @@ npx vitest run test/render/pages/Nav2Page.test.ts   # one file
 npx vitest run --reporter=verbose          # also shows what passing tests print with console.warn
 KLN_TEST_LOG=1 npx vitest run --reporter=verbose   # also shows the instrument's console.log/info output
 npx tsc --noEmit                           # the type check; Vitest does not type-check
+npm run coverage                           # all tests with V8 coverage of kln90b/: table on stdout, HTML in coverage/
 ```
 
 - The instrument logs a great deal. By default `vitest.config.mts` drops all console output except stderr; set
   `KLN_TEST_LOG=1` when you need to see it. The default reporter also hides the output of passing tests.
 - `npx tsc --noEmit` and `npm run build` are separate checks. `vitest.config.mts` is excluded from `tsc`.
+- Coverage is a diagnostic: it shows code no test has run. It is not a target, because a snapshot of every page in its
+  default state raises it without proving anything about the real unit. `coverage/` is gitignored.
 - A failed flight test writes its recording to `test/flight/__output__/` (gitignored); see section 4.
 - There is no linter and no CI.
 

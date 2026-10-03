@@ -20,6 +20,8 @@ export default defineConfig({
     test: {
         // The instrument logs a lot. Set KLN_TEST_LOG=1 to see console.log/info output; stderr is always shown.
         onConsoleLog: (_log, type) => process.env.KLN_TEST_LOG === '1' || type === 'stderr' ? undefined : false,
+        // npm run coverage. Only the instrument counts; files no test loads are listed at 0 %, which is the point.
+        coverage: {provider: 'v8', include: ['kln90b/**'], reporter: ['text', 'html']},
         projects: [
             {
                 extends: true,
