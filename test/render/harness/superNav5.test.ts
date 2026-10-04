@@ -10,8 +10,8 @@ describe('SuperNav5.read (harness)', () => {
     // 3-36: NAV 5 on both sides makes Super NAV 5, with field 1 set to XTK. The -.-NM- text without an active waypoint is a characterization: the guide has no figure of it
     it('reads the left column, the message and range, and hides the right cursor windows', async () => {
         const unit = await bootUnit({storage: {superNav5Field1: SuperNav5Field1.XTK}});
+        await unit.panel.selectPage('R', 'NAV 4'); // the right side first: its shorter way passes NAV 5, which is Super NAV 5 once the left shows NAV 5
         await unit.panel.selectPage('L', 'NAV 5');
-        await unit.panel.selectPage('R', 'NAV 4');
         await unit.panel.inner('R', 1); // NAV 5 on both sides: the overlay hides the status line, so selectPage cannot end there
         await vi.advanceTimersByTimeAsync(250);
         expect((unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage()).toBeInstanceOf(SuperNav5Page);
@@ -31,8 +31,8 @@ describe('SuperNav5.read (harness)', () => {
 
     it('reads the right cursor window once the right cursor is on', async () => {
         const unit = await bootUnit();
+        await unit.panel.selectPage('R', 'NAV 4'); // the right side first: its shorter way passes NAV 5, which is Super NAV 5 once the left shows NAV 5
         await unit.panel.selectPage('L', 'NAV 5');
-        await unit.panel.selectPage('R', 'NAV 4');
         await unit.panel.inner('R', 1); // NAV 5 on both sides: the overlay hides the status line, so selectPage cannot end there
         await unit.panel.cursor('R');
         await vi.advanceTimersByTimeAsync(250);
@@ -44,8 +44,8 @@ describe('SuperNav5.read (harness)', () => {
 
     it('reads the direct-to window once the scan knob is pulled', async () => {
         const unit = await bootUnit();
+        await unit.panel.selectPage('R', 'NAV 4'); // the right side first: its shorter way passes NAV 5, which is Super NAV 5 once the left shows NAV 5
         await unit.panel.selectPage('L', 'NAV 5');
-        await unit.panel.selectPage('R', 'NAV 4');
         await unit.panel.inner('R', 1); // NAV 5 on both sides: the overlay hides the status line, so selectPage cannot end there
         await unit.panel.scan();
         await vi.advanceTimersByTimeAsync(250);
@@ -56,8 +56,8 @@ describe('SuperNav5.read (harness)', () => {
 
     it('is the page Screen refuses to read', async () => {
         const unit = await bootUnit();
+        await unit.panel.selectPage('R', 'NAV 4'); // the right side first: its shorter way passes NAV 5, which is Super NAV 5 once the left shows NAV 5
         await unit.panel.selectPage('L', 'NAV 5');
-        await unit.panel.selectPage('R', 'NAV 4');
         await unit.panel.inner('R', 1); // NAV 5 on both sides: the overlay hides the status line, so selectPage cannot end there
         await vi.advanceTimersByTimeAsync(250);
 

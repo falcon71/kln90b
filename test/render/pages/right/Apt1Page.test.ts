@@ -39,8 +39,6 @@ describe('APT 1 page on a nearest entry', () => {
     const kccc = airport('KCCC', 47.4, 8.0);
     const kzzz = airport('KZZZ', 57.1, 8.0);
 
-    const rightRow = (n: number) => Screen.read().rows('R')[n];
-
     /** The aircraft is 0.6 NM from KBBB; the emergency nearest function (3-23) shows the nearest airport on APT 1 */
     async function bootAtNearest(): Promise<HeadlessUnit> {
         const unit = await bootUnit({facilities: [kaaa, kbbb, kccc, kzzz], position: {lat: 47.19, lon: 8.0}});
@@ -49,7 +47,7 @@ describe('APT 1 page on a nearest entry', () => {
         await unit.panel.msg();
         await unit.panel.ent();
         // Precondition, not the claim
-        expect(rightRow(0)).toBe(' KBBB  nr 1');
+        expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 1');
         return unit;
     }
 
@@ -67,9 +65,9 @@ describe('APT 1 page on a nearest entry', () => {
         unit.env.sim.set('PLANE LATITUDE', 'degrees', 47.39);
         await vi.advanceTimersByTimeAsync(12000);
 
-        expect(rightRow(0)).toBe(' KBBB  nr 2');
-        expect(rightRow(4)).toBe('     180°to');
-        expect(rightRow(5)).toBe('     11.4nm');
+        expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 2');
+        expect(Screen.read().rows('R')[4]).toBe('     180°to');
+        expect(Screen.read().rows('R')[5]).toBe('     11.4nm');
     });
 
     describe('after the entry dropped off the list (characterization)', () => {
@@ -77,10 +75,10 @@ describe('APT 1 page on a nearest entry', () => {
             const unit = await bootAtNearest();
             await dropEntry(unit);
 
-            expect(rightRow(0)).toBe(' KBBB      ');
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB      ');
             // KBBB's coordinates, no longer bearing and distance
-            expect(rightRow(4)).toBe('N 47°12.00\'');
-            expect(rightRow(5)).toBe('E 08°00.00\'');
+            expect(Screen.read().rows('R')[4]).toBe('N 47°12.00\'');
+            expect(Screen.read().rows('R')[5]).toBe('E 08°00.00\'');
         });
 
         // The checks are independent: the ident, the coordinates and the error channels (unit.errors and
@@ -92,9 +90,9 @@ describe('APT 1 page on a nearest entry', () => {
             await unit.panel.scan();
             await unit.panel.inner('R', -1);
 
-            expect(rightRow(0)).toBe(' KAAA      ');
-            expect(rightRow(4)).toBe('N 47°00.00\'');
-            expect(rightRow(5)).toBe('E 08°00.00\'');
+            expect(Screen.read().rows('R')[0]).toBe(' KAAA      ');
+            expect(Screen.read().rows('R')[4]).toBe('N 47°00.00\'');
+            expect(Screen.read().rows('R')[5]).toBe('E 08°00.00\'');
             expect(unit.errors).toEqual([]);
             expect(unit.consoleErrors).toEqual([]);
         });
@@ -106,9 +104,9 @@ describe('APT 1 page on a nearest entry', () => {
             await unit.panel.scan();
             await unit.panel.inner('R', 1);
 
-            expect(rightRow(0)).toBe(' KCCC      ');
-            expect(rightRow(4)).toBe('N 47°24.00\'');
-            expect(rightRow(5)).toBe('E 08°00.00\'');
+            expect(Screen.read().rows('R')[0]).toBe(' KCCC      ');
+            expect(Screen.read().rows('R')[4]).toBe('N 47°24.00\'');
+            expect(Screen.read().rows('R')[5]).toBe('E 08°00.00\'');
             expect(unit.errors).toEqual([]);
             expect(unit.consoleErrors).toEqual([]);
         });

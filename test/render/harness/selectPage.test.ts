@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit} from '../../harness/boot';
-import {PAGE_GROUPS, Side} from '../../harness/flight/FrontPanel';
+import {PAGE_CYCLES, PAGE_GROUPS, Side} from '../../harness/flight/FrontPanel';
 import {Screen} from '../../harness/render/screen';
 
 // STA 3 shows the version, which the build injects into Version.ts; the source carries a placeholder 18 cells wide
@@ -60,6 +60,61 @@ describe('FrontPanel.selectPage (harness)', () => {
         await unit.panel.selectPage('L', 'SET 9');
         expect(inner.mock.calls).toEqual([['L', -1], ['L', -1]]);
         expect(Screen.read().status().left).toBe('SET 9');
+    });
+
+    // The inner knob wraps (PageTreeController.moveSubpage), and SET 0 is the last page of the SET group
+    it('turns the inner knob the shorter way around the group: SET 0 is one click back from SET 1', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'SET 1');
+        const inner = vi.spyOn(unit.panel, 'inner');
+
+        await unit.panel.selectPage('L', 'SET 0');
+        expect(inner.mock.calls).toEqual([['L', -1]]);
+        expect(Screen.read().status().left).toBe('SET 0');
+
+        inner.mockClear();
+        await unit.panel.selectPage('L', 'SET 1');
+        expect(inner.mock.calls).toEqual([['L', 1]]);
+
+        inner.mockClear();
+        await unit.panel.selectPage('L', 'SET10');
+        expect(inner.mock.calls).toEqual([['L', -1], ['L', -1]]);
+        expect(Screen.read().status().left).toBe('SET10');
+    });
+
+    it('wraps the inner knob in a group with a first page 0 too: FPL 25 is one click back from FPL 0', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'FPL 0');
+        const inner = vi.spyOn(unit.panel, 'inner');
+
+        await unit.panel.selectPage('L', 'FPL25');
+
+        expect(inner.mock.calls).toEqual([['L', -1]]);
+        expect(Screen.read().status().left).toBe('FPL25');
+    });
+
+    // The harness keeps the page numbers of each group itself, because it cannot read them from the unit. Walk the real
+    // trees with the inner knob and compare. A page with sub-pages shows the same name for several clicks.
+    describe('PAGE_CYCLES', () => {
+        const number = (name: string): number => Number(/^.{3}[ +]?(\d+)$/.exec(name)![1]);
+
+        it.each(Object.keys(PAGE_CYCLES).flatMap(group => (['L', 'R'] as Side[])
+            .filter(side => PAGE_GROUPS[side].includes(group)).map(side => [side, group])) as [Side, string][])(
+            'is the order of the inner knob on the %s side in the %s group', async (side, group) => {
+                const unit = await bootUnit();
+                const cycle = PAGE_CYCLES[group];
+                await unit.panel.selectPage(side, `${group} ${cycle[0]}`);
+                const seen = [cycle[0]];
+
+                for (let clicks = 0; clicks < 100; clicks++) {
+                    await unit.panel.inner(side, 1);
+                    const n = number(Screen.read().status()[side === 'L' ? 'left' : 'right']);
+                    if (n === cycle[0] && seen.length > 1) break;
+                    if (n !== seen[seen.length - 1]) seen.push(n);
+                }
+
+                expect(seen).toEqual(cycle);
+            });
     });
 
     // The booted pages are NAV 2 on the left and SUP on the right. Each page is reached from the one before it, forward
