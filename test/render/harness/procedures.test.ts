@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {Facility, FixTypeFlags, GeoPoint, LegTurnDirection, UnitType} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
@@ -58,7 +58,9 @@ describe('procedures through APT 8 (harness)', () => {
         ]);
         // The CA leg and the repeated fixes are gone: each fix appears once
         expect(fpl0(unit).map(l => l.wpt.icaoStruct.ident).sort()).toEqual(['FAFAA', 'IAFAA', 'IFAAA', 'KPRC', 'MAHAA', 'MAPAA']);
-        // The load switched the left side to FPL 0
+        // The load switched the left side to FPL 0. The page scrolls to the active leg (the MAP, where the unit sits) at
+        // the next calculation tick, which comes within one second; the screen right after ENT can still show the top
+        await vi.advanceTimersByTimeAsync(1000);
         expect(Screen.read().leftName()).toBe('FPL 0');
         const left = rows('L');
         expect(left).toContain('  3 FAFAAá');
