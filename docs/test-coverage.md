@@ -326,8 +326,8 @@ first), each at the cheapest stage and proven to bite.
 
 **Tasks** (rules 19 to 27): no harness task unless a gap appears. Batches by area:
 
-- navigation and procedures: #18, #20, #21, `326da1a`, `633fdad`, #23, the #41 missed approach, the DME-arc half of #19,
-  `7fd640e` with `1ef2a35`;
+- navigation and procedures: #18, #20, #21, `326da1a` (the DME-arc half of #19), `633fdad`, #23, the #41 missed
+  approach, `7fd640e` with `1ef2a35`;
 - nearest lists and airspaces: #57, `133f4d8` with #102 and the pin of the SUA alert (#127 is pinned already);
 - start-up and import: #15, #50, #90;
 - displays: #17, `80631c8`, `eef92e8` and the pause half of `43d472b`.
@@ -547,8 +547,8 @@ later run adds a new entry.
   root tests (task 6), render right pages, data and services (task 7), flight and unit (task 8). Local readers,
   fixed-count navigation, hand-built V2 strings, hand-rolled power-on and console spies became `rows`, `status`,
   `selectPage`, `savedUserWaypoints`, `powerOn`, `unit.consoleErrors` and the geometry helpers. The assertions keep
-  their meaning, the totals before and after each task were identical, and nothing under `kln90b/` changed. Task 6 also
-  fixed the harness opacity probe (an unset opacity read as NaN, not 0).
+  their meaning, each refactor commit kept the totals (task 6's fix round added one harness test, in `display.test.ts`),
+  and nothing under `kln90b/` changed. Task 6 also fixed the harness opacity probe (an unset opacity read as NaN, not 0).
 - **Task 8b (added by the controller before the close-out):** the refactor found three FrontPanel gaps. `selectPage`
   takes the shorter way round the inner knob with wrap (`PAGE_CYCLES`), `enterIdent` forces the search when the
   selector already shows the ident, and `cursorTo` steps over cursor positions that focus nothing. The tests that had
@@ -610,7 +610,7 @@ below).
   pin flips (older than this session).
 - #72 (`3977549`): the `WaypointEditor.isEnterAccepted` half of the fix is not held by any test; the nested-page pop
   holds the other half.
-- `Flight.syncDisplay`'s throw after more than four display ticks has no test. `allowObsWarning` is tested.
+- `Flight.syncDisplay`'s throw when DIS changed in every display tick has no test. `allowObsWarning` is tested.
 - The `Version` mock in `selectPage.test.ts` could become harness setup (minor).
 - The flight copies of `92fbba1` and #61, the `GPS DRIVES NAV1` option and a cold start in `Flight.start`: out of scope
   by the maintainer's decision (candidates 9, 10 and 11).
@@ -1069,8 +1069,8 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 | | `80631c8` | APT 7 and APT 8 were not redrawn after a waypoint confirmation page. | render | testable | APT 7 and APT 8 with a loaded procedure: the page is redrawn after a waypoint confirmation page. Extension: procedure builders (`withProcedures`). | |
 | | #57 `531b0f9` | Heliports and airports without runways are filtered from the nearest list and Super NAV 5. | render | testable | `airport(ident, lat, lon, {runways: []})` is a heliport; hard-surface, short-runway and runway-less airports in the world: the nearest list and Super NAV 5 hide what the filters hide, and a nearer hidden facility takes no slot. A runway-less airport passes the extended filter (the sim developers' rule, `testing.md` section 3). Extension: nearest-search filters in `MemoryFacilityClient`. | |
 | | `133f4d8` | Airspaces were selected by bounding box; now by polygon. | render | testable | The fix over-filters the route searches: #102 gets its pin here. `airspace()` and `BootOptions.airspaces` build the world; the fake selects by bounding box (inferred, `testing.md` section 3), so a test asserts what `NearestUtils` does with that result. Extension: airspaces. | |
-| | #50 `b4a4ff2` | Errors during startup are published instead of leaving the unit in the self-test. | render | testable | `bootUnitExpectingError({platform: {createFacilityClient}})` with a throwing client awaits the `error` event: the error is published and the error page shows it. Extension: the boot-failure helper. | |
-| | `eef92e8` | Super NAV 5 showed `--.-NM-` instead of `-.-NM-` without XTK. | render | testable | Super NAV 5 without XTK: `SuperNav5.read()` shows `-.-NM-`, not `--.-NM-`. Extension: the Super NAV 5 reader. | |
+| | #50 `b4a4ff2` | Errors during startup are published instead of leaving the unit in the self-test. | render | testable | `bootUnitExpectingError({platform: {createFacilityClient}})` with a throwing client awaits the `error` event: the error is published and the error page shows it. Extension: the boot-failure helper. `test/render/harness/bootFailure.test.ts` already shows the error page on a failing start (a harness test); Session 3b either proves it against the old bug and says so here, or writes the regression test in the mirrored folder, so that no duplicate proves nothing new. | |
+| | `eef92e8` | Super NAV 5 showed `--.-NM-` instead of `-.-NM-` without XTK. | render | testable | Super NAV 5 without XTK: `SuperNav5.read()` shows `-.-NM-`, not `--.-NM-`. Extension: the Super NAV 5 reader. `test/render/harness/superNav5.test.ts` already reads `-.-NM-` (labeled characterization); Session 3b either proves it against the old bug and says so here, or writes the regression test in the mirrored folder. | |
 | | `43d472b` (part) | The track is not recomputed while the sim is paused (identical positions). | render | testable | A render test sets ground speed above 2 kt, teleports once and holds; no harness needed. The track is not recomputed while the position stays identical. The paused aircraft of Session H was dropped. | |
 | | #7 `30f2216` | Import of `.fpl` files via SET 10. | — | superseded | `86a6d44` replaced it with the EFB route sync (`KlnEfbLoader`); see #15. | |
 | | `6ed57d9` | The AIRAC cycle was treated as expired on its last day. | — | superseded | `22b4532` moved to the SDK AIRAC utilities. A boundary test of today's code belongs in Session 7. | |

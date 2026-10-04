@@ -5,11 +5,8 @@ import {airspace} from '../../harness/navdata/airspaces';
 import {airport} from '../../harness/navdata/builders';
 import {Screen} from '../../harness/render/screen';
 
-/**
- * The text of the MSG page. MessagePage separates its lines with newline characters inside one <pre>, which Screen.read
- * does not split into rows (it follows <br>), so the test reads the text of the full page directly.
- */
-const messagePageText = () => document.querySelector('.full-page')!.textContent!.replace(/ /g, ' ');
+/** The text of the MSG page, read as the pilot sees it: one row per message line. */
+const messagePageText = () => Screen.read().text();
 
 const around = (lat: number, lon: number, d: number): [number, number][] => [[lat + d, lon - d], [lat + d, lon + d], [lat - d, lon + d], [lat - d, lon - d]];
 
