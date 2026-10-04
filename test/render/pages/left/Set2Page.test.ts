@@ -17,7 +17,7 @@ describe('SET 2 page', () => {
 
     // Appendix B (B-1, B-3) lists the message as RECYCLE POWER TO USE CORRECT DATA BASE DATA
     it.fails('spells the message about a changed database validity correctly (#111)', async () => {
-        const unit = await bootUnit({storage: {fastGpsAcquisition: false, timezone: 1}});
+        const unit = await bootUnit({storage: {fastGpsAcquisition: false}});
         // A booted unit has a fix at once, and the date is read-only with a fix
         unit.props.sensors.in.gps.reset();
         await unit.panel.outer('L', 3);

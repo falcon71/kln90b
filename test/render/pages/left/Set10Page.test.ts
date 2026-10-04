@@ -4,7 +4,7 @@ import {Screen} from '../../../harness/render/screen';
 
 describe('SET 10 page (characterization, the page is fictitious, #46)', () => {
     it('renders without an error', async () => {
-        const unit = await bootUnit({storage: {timezone: 1}});
+        const unit = await bootUnit();
         await unit.panel.outer('L', 3);
         await unit.panel.inner('L', -2);
 

@@ -338,8 +338,6 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   nearest selector. `FrontPanel.selectPage('R', …)` only turns the outer knob forward, so it throws when it has to
   pass such a page (from the boot page SUP, any page after NDB, and INT or VOR going the long way round). Navigate with
   fixed counts (`outer('R', -1)` from SUP reaches INT) or read the half page's DOM with `readRows`.
-- **SET 2 cannot be read with the default timezone** until #110 is fixed (the name of UTC is 12 characters). Boot with
-  `storage: {timezone: 1}`.
 - **A booted engine-running unit has a GPS fix at once**, in the slow acquisition mode too (the force-ready start calls
   `acquireAndUseSatellites()` in `WelcomePage`). A test that needs an invalid GPS, for example to enter the date on SET 2
   (read-only with a fix), calls `unit.props.sensors.in.gps.reset()` after the boot.

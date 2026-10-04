@@ -8,8 +8,7 @@ import {Screen} from '../../../harness/render/screen';
  */
 describe('left page names (fb671c0, 74134be, 9d1fe96)', () => {
     it('names the SET pages in order, from SET 1 to SET 10', async () => {
-        // The default timezone name overflows SET 2, which Screen cannot read
-        const unit = await bootUnit({storage: {timezone: 1}});
+        const unit = await bootUnit();
         await unit.panel.outer('L', 3);
         const names = [Screen.read().leftName()];
         for (let i = 0; i < 9; i++) {

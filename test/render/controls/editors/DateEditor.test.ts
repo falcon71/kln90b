@@ -3,12 +3,11 @@ import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 
 /**
- * SET 2 with the date editable. The default timezone name has 12 characters and overflows SET 2 (see the pin in
- * Set2Page.test.ts), so the boot picks timezone 1. A booted unit has a GPS fix at once, even with slow acquisition;
+ * SET 2 with the date editable. A booted unit has a GPS fix at once, even with slow acquisition;
  * the reset starts the slow search, which gives the date and time pages their editable state (3-53).
  */
 async function bootOnSet2(): Promise<HeadlessUnit> {
-    const unit = await bootUnit({storage: {fastGpsAcquisition: false, timezone: 1}});
+    const unit = await bootUnit({storage: {fastGpsAcquisition: false}});
     unit.props.sensors.in.gps.reset();
     await unit.panel.outer('L', 3);
     await unit.panel.inner('L', 1);
