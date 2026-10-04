@@ -13,9 +13,7 @@ describe('INT page', () => {
         await unit.panel.selectPage('R', 'INT  ');
         await vi.advanceTimersByTimeAsync(9000); // the REF calculation takes 8 s (REF_CALCULATION_TIME)
         await unit.panel.cursor('R');
-        // Four characters of the ident, one step without a field, then the REF field. Not cursorTo: it throws on the step
-        // with no focused field.
-        await unit.panel.outer('R', 5);
+        await unit.panel.cursorTo('R', 'ABC'); // the REF field, which shows the nearest VOR
         await unit.panel.enterIdent('R', 'XYZ');
 
         await unit.panel.ent();

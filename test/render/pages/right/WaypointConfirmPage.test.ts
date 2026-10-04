@@ -4,8 +4,6 @@ import {insertLeg} from '../../../harness/flightplan';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 
-const rightRows = () => Screen.read().rows('R');
-
 describe('waypoint confirmation page', () => {
     // 3-14: the confirmation page shows the waypoint as the waypoint page does (the ACT page is the one with a position
     // in the flight plan in front of the ident)
@@ -21,7 +19,7 @@ describe('waypoint confirmation page', () => {
         await unit.panel.selectPage('R', 'VOR  ');
         await unit.panel.cursor('R');
         await unit.panel.enterIdent('R', 'XYZ');
-        const plainRow0 = rightRows()[0];
+        const plainRow0 = Screen.read().rows('R')[0];
         expect(plainRow0).toBe(' XYZ D     ');
         await unit.panel.cursor('R');
 
@@ -30,15 +28,15 @@ describe('waypoint confirmation page', () => {
         insertLeg(unit, 0, kaaa);
         insertLeg(unit, 1, inta);
         await vi.advanceTimersByTimeAsync(3000);
-        expect(rightRows()[0]).toBe('› 2 INTA I ');
+        expect(Screen.read().rows('R')[0]).toBe('› 2 INTA I ');
         await unit.panel.cursor('R');
         await vi.advanceTimersByTimeAsync(9000);
         await unit.panel.enterIdent('R', 'XYZ');
         await unit.panel.ent();
 
         // The confirmation page is the VOR page of XYZ, without the position in the flight plan of the ACT page
-        expect(rightRows()[0]).toBe(plainRow0);
-        expect(rightRows()[0]).not.toContain(' 2 ');
+        expect(Screen.read().rows('R')[0]).toBe(plainRow0);
+        expect(Screen.read().rows('R')[0]).not.toContain(' 2 ');
         expect(unit.errors).toEqual([]);
     });
 });

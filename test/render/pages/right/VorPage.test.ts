@@ -23,9 +23,7 @@ describe('VOR page with duplicate idents (d3228dd)', () => {
         });
         await unit.panel.selectPage('R', 'VOR  ');
         await unit.panel.cursor('R');
-        // Not enterIdent: the fresh page shows ABC SOUTH, so its first character is an A already, the knobs would leave
-        // it alone, and no search would run. The keyboard sets every character, so it makes the unit search for ABC.
-        await unit.panel.type('R', 'ABC');
+        await unit.panel.enterIdent('R', 'ABC'); // the fresh page shows ABC SOUTH already, so the helper makes the unit search
         await unit.panel.cursor('R');
         expect(identAndName()).toEqual([' ABC D     ', 'ABC NORTH  ']);
 

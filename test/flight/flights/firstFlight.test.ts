@@ -50,7 +50,7 @@ describe('first flight', () => {
         expect(alertLead).toBeGreaterThan(10);
         expect(alertLead).toBeLessThan(30);
 
-        await flight.flyUntil(() => flight.nav.activeIdent === 'KBBB', {timeout: 60, description: 'sequencing to KBBB'});
+        await flight.flyUntilActive('KBBB', {timeout: 60});
         lastSequence = flight.t;
         // 4-8: the leg sequences after the midpoint of the turn, the point of the turn closest to ABC. A turn of radius
         // 0.63 NM through 35° passes R·(1/cos(35°/2) - 1) = 0.03 NM from ABC; one calc tick (0.033 NM) and the 250 ms
