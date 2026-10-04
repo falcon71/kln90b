@@ -34,7 +34,7 @@
     {
       "id": 6,
       "subject": "Task 6: refactor R1 (render left pages, controls, root render files)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         1,
         2,
@@ -47,7 +47,7 @@
     {
       "id": 7,
       "subject": "Task 7: refactor R2 (render right pages, data, services)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         1,
         2,
@@ -60,7 +60,7 @@
     {
       "id": 8,
       "subject": "Task 8: refactor R3 (flight and unit)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         1,
         2,
@@ -82,5 +82,5 @@
       "description": "**Goal:** File the bugs the session found, re-verdict the triage rows, insert Session 3b, reconcile `testing.md`, and\nwrite the session log.\n\n**Files:**\n- Modify: test files containing `#NEW-` placeholders\n- Modify: `docs/test-coverage.md` (Session H checkbox and text, new Session 3b, section 4 log, section 5 rows)\n- Modify: `docs/testing.md` sections 3, 4, 6 and 7\n\n**Acceptance Criteria:**\n- [ ] Every confirmed bug from the reports and reviews has a GitHub issue with the `bug` label, filed after a search of\n      open and closed issues; `grep -r \"#NEW-\" test/` finds nothing.\n- [ ] The *needs harness* rows say *testable* and name their extension; the pause half of `43d472b` is *testable* at\n      render stage with its reason; the flight-only versions of `92fbba1` and #61 stay uncovered with the maintainer's\n      ruling.\n- [ ] Section 3 has Session 3b between Session H and Session 4: goal, the rows it takes, done-when, run by rules 19 to 27;\n      the Session H text names Session 3b instead of a rerun.\n- [ ] `testing.md` section 6 drops the traps the session removed and records the inferred behaviors; section 7 drops what\n      was built and keeps what was not.\n- [ ] Session H is ticked; its log entry has done, decisions, bugs filed, not covered (rule 18), coverage at start and\n      end, the suite totals.\n- [ ] `npm test`, `npx tsc --noEmit` and `npm run coverage` clean.\n\n**Verify:** `npm test && npx tsc --noEmit && grep -r \"#NEW-\" test/` → tests pass, no type errors, grep prints nothing.\n\nPlan: docs/superpowers/plans/2026-10-04-session-H-harness.md (Steps for this task are there).\n\n```json:metadata\n{\"files\": [\"docs/test-coverage.md\", \"docs/testing.md\"], \"verifyCommand\": \"npm test && npx tsc --noEmit && grep -r \\\"#NEW-\\\" test/\", \"acceptanceCriteria\": [\"bugs filed with bug label after duplicate search\", \"no #NEW- placeholders\", \"needs-harness rows re-verdicted\", \"Session 3b inserted and Session H text updated\", \"testing.md sections 6 and 7 reconciled\", \"session log complete\", \"checks clean\"], \"modelTier\": \"standard\"}\n```"
     }
   ],
-  "lastUpdated": "2026-10-04T17:51:26.894Z"
+  "lastUpdated": "2026-10-04T18:19:18.885Z"
 }
