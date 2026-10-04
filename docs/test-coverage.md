@@ -51,7 +51,7 @@ them it is for the convenience of the session, and `testing.md` is the authority
 8. **When the code and the manual disagree, the test asserts the manual**, is written as `it.fails('… (#NN)')` and the
    bug is filed per `CLAUDE.md`. Never assert a bug as correct, not even in a characterization test: if a snapshot
    contains a visible bug, exclude that row or pin the bug separately.
-9. **Use the cheapest stage** that can observe the behavior (`testing.md` section 1). One headless unit per test file.
+9. **Use the cheapest stage** that can observe the behavior (`testing.md` section 1). One headless unit per test.
 
 **Proving a test holds**
 

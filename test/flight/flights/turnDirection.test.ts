@@ -10,7 +10,7 @@ import {courseDeg, finalCourseDeg, norm360} from '../../harness/flight/geo';
 const rollAfterTurnStart: number[] = [];
 
 /**
- * One flight per file (bootUnit), so the first test flies and records and the second only judges what was recorded.
+ * The first test flies and records and the second only judges what was recorded, so the flight is flown once.
  * The first test failing means the flight itself broke, which the second cannot tell apart from the bug.
  */
 describe('turn direction at ABC', () => {

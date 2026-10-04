@@ -18,6 +18,11 @@ export class FakeCoherent {
     constructor(private readonly sim: FakeSim) {
     }
 
+    public reset(): void {
+        this.calls.length = 0;
+        this.replies.clear();
+    }
+
     public install(g: any): void {
         const call = (name: string, ...args: unknown[]): Promise<unknown> => {
             if (SET_VALUE_REG.has(name)) {

@@ -1,6 +1,19 @@
-import {describe, expect, it, vi} from 'vitest';
+import {beforeAll, describe, expect, it, vi} from 'vitest';
 import {bootUnit} from '../../harness/boot';
 import {vor} from '../../harness/navdata/builders';
+
+describe('headless boot outside a test', () => {
+    let outcome: unknown;
+
+    beforeAll(async () => {
+        outcome = await bootUnit().then(() => 'booted', e => e);
+    });
+
+    it('says that bootUnit belongs inside a test', () => {
+        expect(outcome).toBeInstanceOf(Error);
+        expect((outcome as Error).message).toMatch(/call it inside a test/);
+    });
+});
 
 describe('headless boot', () => {
     it('boots to the main page with a GPS solution', async () => {
@@ -16,7 +29,8 @@ describe('headless boot', () => {
         expect(unit.env.sim.get('GPS POSITION LON', 'degrees')).toBeCloseTo(8, 6);
     });
 
-    it('allows only one unit per test file', async () => {
-        await expect(bootUnit()).rejects.toThrow(/one unit per test file/);
+    it('allows only one live unit per test', async () => {
+        await bootUnit();
+        await expect(bootUnit()).rejects.toThrow(/one unit per test/);
     });
 });

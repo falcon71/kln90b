@@ -564,7 +564,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   SDK style. Beware of aliasing.
 - **Global and singleton state:** `KLNFacilityRepository.INSTANCE`, the `KLN90BUser*Settings` managers (`INSTANCE ??=`),
   `FlightPlanner` id `"kln90b"`, and the `SimVar`/`Coherent` globals from `@microsoft/msfs-types`. Because of these
-  singletons the tests run one headless unit per test file (testing.md). `global.d.ts` only
+  singletons the tests run one headless unit per test (testing.md). `global.d.ts` only
   declares `*.scss`. `KeyCode.*` constants are ambient.
 - **Error handling:** a try/catch around every tick and interaction publishes `error`, which shows the on-screen error
   page with an "OK and suppress further errors" button. Async code mostly uses `.catch(e => bus.pub("error"))` or

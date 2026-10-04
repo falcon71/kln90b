@@ -61,7 +61,7 @@ manager. The sim uses `SIM_PLATFORM`; tests use `FakePlatform` (`test/harness/pl
 3. Builds a `KLN90BCore` with a `FakePlatform` around a `MemoryFacilityClient` and calls `init()` with a panel.xml
    document (`MINIMAL_PANEL_XML` unless `panelXml` is given).
 4. Advances simulated time until `propsReady` fires, and returns the `HeadlessUnit`: `core`, `props` (the `PageProps`
-   bag), `env` (the fakes), `navdata`, `errors` (everything published on the `error` topic) and `send(evt)`.
+   bag), `env` (the fakes), `navdata`, `errors` (everything published on the `error` topic), `send(evt)` and `panel` (the front panel).
 
 By default the engine is running, so the unit skips the welcome and self-test pages (`isForceReadyToUse`). Pass
 `engineRunning: false` to see the cold-and-dark start.
@@ -95,8 +95,15 @@ The sim globals are installed once per test file by the setup files `test/harnes
 
 ## Isolation and time
 
-- Vitest gives every test file fresh module state and its own globals. Within a file, `bootUnit` throws on a second
-  call: `KLNFacilityRepository` and the settings managers are singletons. **One headless unit per test file.**
+- Vitest gives every test file fresh module state and its own globals. Every test may boot its own unit with
+  `bootUnit`, and a file may hold several such tests. The unit is torn down when the test ends:
+    - its timers stop;
+    - the sim fakes are reset in place (`FakeSim` keeps its registration ids, because SDK objects cache them);
+    - the singletons listed in `test/harness/singletons.ts` are cleared;
+    - the DOM is emptied.
+
+  Only one unit is live at a time: `bootUnit` throws on a second call in the same test, and outside a test. A singleton
+  added to the instrument must be added to `singletons.ts`.
   Unit tests of a single service (see `UserWaypointV2.test.ts`) use the same singletons, so they build their own bus.
 - The clock is Vitest's fake timers (`sim/clock.ts`): `setTimeout`, `setInterval`, `Date` and `requestAnimationFrame`
   are faked, starting at `DEFAULT_START`. Advance it with `await vi.advanceTimersByTimeAsync(ms)`. All tick loops
@@ -197,6 +204,7 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
   `mode`, `waypointAlert`, `xtkScale`). `flight.sim` reads and writes SimVars, `flight.screen` reads the screen and
   `flight.t` is the simulated time in seconds.
 - **`flight.panel`** (`flight/FrontPanel.ts`) is the front panel driven through the same H events an aircraft sends.
+  A render test that boots with `bootUnit` gets the same panel as `unit.panel`.
     - Raw events: `press(evt)`, `outer(side, clicks)`, `inner(side, clicks)`, `cursor(side)`, `ent()`, `clr()`, `dct()`,
       `msg()`, `alt()`, `scan()`, `power()`. Each click advances one display tick so the screen shows its result.
     - Helpers: `selectPage(side, 'FPL 0')`, `enterIdent(side, ident)` and `appendToFpl0(idents)`.
@@ -282,7 +290,8 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   (`lastLatitude`, `lastLongitude`) removes only the first message; the second still posts on an engine-running boot
   (the hour is not added back when `forceReadyToUse` skips the power-on), so no `storage` setting gives an unlit MSG
   annunciator.
-- **One unit per test file.**
+- **One live unit per test.** `bootUnit` refuses a second boot in the same test, because the singletons allow one unit
+  at a time. A singleton the teardown does not know shows up as a test that passes alone and fails in its file.
 - **SDK upgrades may require updating the fakes.** `FakeSim` mirrors the native layer the SDK builds on, and
   `KLNGPSSatComputer` reaches into private SDK internals (docs/architecture.md, Core 3); recheck both, and run the whole
   suite, after upgrading `@microsoft/msfs-sdk`.
