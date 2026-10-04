@@ -127,6 +127,28 @@ The sim globals are installed once per test file by the setup files `test/harnes
 with `airport()`, `vor()`, `ndb()` and `intersection()` (`navdata/builders.ts`). The builders fill every field the
 instrument reads and nothing else. The data is synthetic; see the limitations in section 6.
 
+**Nearest filters.** A nearest session keeps its filters itself and applies them inside the search, before `maxItems`,
+as the sim does: a nearer facility that the filter hides takes no slot, and a facility hidden by a new filter is reported
+as `removed` at the next search. The airport filters are the class mask of `setAirportFilter` and the surface, length
+and towered filters of `setExtendedAirportFilters` (bit 1 of the towered mask is untowered, bit 2 towered); the VOR
+filters are the class and type masks of `setVorFilter`. An airport without runways passes the extended filter and is
+dropped only by the class mask. That rule is the sim developers' own, quoted to the maintainer from their code: "If
+there are no runways, the minimum runway size and surface types filters should not apply". `airport()` takes `runways`
+(an empty list is a heliport), `towered` and `airportClass`, which is derived from the runways when absent; `vor()`
+takes `vorClass`. Without these options a world is the same as before.
+
+**Airspaces.** `airspace()` and `circularAirspace()` (`navdata/airspaces.ts`) build `BoundaryFacility` objects. Pass
+them as `BootOptions.airspaces`, add them to a flight with `World.addAirspace()`, or call
+`MemoryFacilityClient.addAirspace()`. The boundary session filters by the type mask (`1 << BoundaryType`), selects the
+airspaces whose bounding box meets the search circle, sorts them by distance to the box, cuts at `maxItems` and reports
+removed ones by id. The bounding-box selection is inferred from a comment in `NearestUtils.getAirspaces`, not observed
+in the sim. The SDK's `NearestLodBoundarySearchSession` builds the `LodBoundary` objects in a throttled queue on
+`requestAnimationFrame`, so a test advances the fake clock for a search to finish. The builder sets `lods: []`, so that
+LOD 0 is the exact ring instead of a simplified one, and `resetSingletons` clears the SDK's boundary cache, which is
+keyed by the airspace id. A circular airspace exists for the known gap that `BoundaryUtils` ignores circles. The MSG
+page separates its lines with newline characters inside one `<pre>`, which `Screen.read` does not split into rows, so a
+test of a message reads the text of `.full-page` (see `test/render/harness/airspaces.test.ts`).
+
 `savedFlightplan(idx, legs)` (`test/harness/storage.ts`) returns user data in the V2 format (docs/architecture.md,
 Core 7). Pass it as `storage` to start a test with a flight plan already stored, which is far faster than entering it
 with the knobs.

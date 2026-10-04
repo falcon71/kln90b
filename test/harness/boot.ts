@@ -1,5 +1,5 @@
 import {onTestFinished, vi} from 'vitest';
-import {Facility} from '@microsoft/msfs-sdk';
+import {BoundaryFacility, Facility} from '@microsoft/msfs-sdk';
 import {KLN90BCore, PropsReadyEvent} from '../../kln90b/KLN90BCore';
 import {PageProps} from '../../kln90b/pages/Page';
 import {ErrorEvent} from '../../kln90b/controls/ErrorPage';
@@ -16,6 +16,8 @@ export const MINIMAL_PANEL_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Nam
 
 export interface BootOptions {
     facilities?: Facility[];
+    /** Airspaces the boundary search finds (navdata/airspaces.ts) */
+    airspaces?: BoundaryFacility[];
     position?: { lat: number; lon: number };
     altitudeFt?: number;
     /** A PlaneHTMLConfig document; the parser defaults apply to everything it leaves out */
@@ -148,7 +150,7 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
     }
 
     document.body.innerHTML = '<div id="InstrumentsContainer"></div>';
-    const navdata = new MemoryFacilityClient(opts.facilities ?? []);
+    const navdata = new MemoryFacilityClient(opts.facilities ?? [], opts.airspaces ?? []);
     const core: KLN90BCore = new KLN90BCore(new FakePlatform(navdata), args => core.onInteractionEvent(args));
     const errors: Error[] = [];
     core.bus.getSubscriber<ErrorEvent>().on('error').handle(e => errors.push(e));

@@ -1,9 +1,10 @@
-import {Facility} from '@microsoft/msfs-sdk';
+import {BoundaryFacility, Facility} from '@microsoft/msfs-sdk';
 import {LatLon} from './geo';
 
 /** The navdata and magnetic variation a flight takes place in. Idents must be unique within a world. */
 export class World {
     private readonly facilities: Facility[] = [];
+    private readonly boundaries: BoundaryFacility[] = [];
 
     constructor(private readonly opts: { magvar?: number } = {}) {
     }
@@ -11,6 +12,16 @@ export class World {
     public add(...facs: Facility[]): this {
         this.facilities.push(...facs);
         return this;
+    }
+
+    /** Adds airspaces (navdata/airspaces.ts) */
+    public addAirspace(...airspaces: BoundaryFacility[]): this {
+        this.boundaries.push(...airspaces);
+        return this;
+    }
+
+    public airspaces(): BoundaryFacility[] {
+        return [...this.boundaries];
     }
 
     public get(ident: string): Facility {
