@@ -66,7 +66,8 @@ manager. The sim uses `SIM_PLATFORM`; tests use `FakePlatform` (`test/harness/pl
    document (`MINIMAL_PANEL_XML` unless `panelXml` is given).
 4. Advances simulated time until `propsReady` fires, and returns the `HeadlessUnit`: `core`, `props` (the `PageProps`
    bag), `env` (the fakes), `navdata`, `errors` (everything published on the `error` topic), `atcModel` (the model the
-   unit booted with, which is part of the key its settings are saved under), `send(evt)` and `panel` (the front panel).
+   unit booted with, which is part of the key its settings are saved under), `send(evt)`, `panel` (the front panel),
+   the collectors and `display` probes (below) and, with `efb: true`, the fake `efb`.
 
 By default the engine is running, so the unit skips the welcome and self-test pages (`isForceReadyToUse`). Pass
 `engineRunning: false` to see the cold-and-dark start. Pass `coldGps: true` for an engine-running boot whose GPS has no
@@ -106,7 +107,9 @@ The sim globals are installed once per test file by the setup files `test/harnes
   `bootUnit`, and a file may hold several such tests. The unit is torn down when the test ends:
     - its timers stop;
     - the sim fakes are reset in place (`FakeSim` keeps its registration ids, because SDK objects cache them);
-    - the singletons listed in `test/harness/singletons.ts` are cleared;
+    - the singletons listed in `test/harness/singletons.ts` are cleared. That list includes the module-level
+      `LEFT_PAGE_TREE`, which `PageTreeController` prunes in place on every `MainPage` (#90): the teardown puts it back
+      from a snapshot taken at load, so a later boot in the same file still has the fuel computer pages;
     - the DOM is emptied.
 
   The teardown (`runAll` in `boot.ts`) runs every step even when one throws, then rethrows the first error, so one
@@ -121,15 +124,125 @@ The sim globals are installed once per test file by the setup files `test/harnes
 - `Math.random` is replaced by a seeded generator (`sim/random.ts`, default seed 1), so the GPS clock jitter and scan
   list job ids repeat between runs. A test that needs another jitter passes `seed`.
 
+## Collectors and boot failures
+
+`bootUnit` installs collectors before `KLN90BCore.init`, so that an error while the unit starts up is seen too.
+
+- **`unit.errors`** holds everything published on the `error` topic, and every unhandled promise rejection.
+- **`unit.consoleErrors`** holds the arguments of every `console.error` call. The call is passed on to the
+  `console.error` it replaced, and the teardown puts that one back. `Flight` reads it for its "no console.error"
+  monitor.
+- **Unhandled rejections** are collected through a `process` listener, into `unit.rejections` and `unit.errors`. Many
+  input handlers are not awaited (ENT, for example), so a throw inside one is a rejection nobody sees. Vitest stops
+  reporting unhandled rejections once a second listener exists, which makes this collector the only check. It is
+  strict: a rejection still in `unit.rejections` when the test ends fails that test. The check runs while the unit is
+  still up, before the teardown (Vitest runs `onTestFinished` callbacks last registered first), and a throw in it does
+  not stop the teardown. The teardown removes the listener.
+
+`bootUnitExpectingError({...bootOptions, platform})` is the boot for a start-up that is expected to fail (#50). It
+shares the guard and the teardown with `bootUnit`, but waits for the first `error` event instead of `propsReady`,
+throws `propsReady fired` if the unit came up, and returns `{core, env, errors, consoleErrors, rejections,
+takeRejections(), errorPage()}`. `errorPage()` is the message on the visible error page, or `null` while it is hidden.
+A failed unit keeps ticking and its nearest searches keep rejecting, so a test that advances the clock after the
+failure must call `takeRejections()`, or the strict collector fails the test. `platform` overrides methods of
+`FakePlatform`, for example `createFacilityClient`. The boot stays marked incomplete, so the teardown tolerates
+singletons that were never created.
+
 ## Navdata
 
 `MemoryFacilityClient` (`navdata/MemoryFacilityClient.ts`) is the navdata the unit sees: a set of facilities built
 with `airport()`, `vor()`, `ndb()` and `intersection()` (`navdata/builders.ts`). The builders fill every field the
 instrument reads and nothing else. The data is synthetic; see the limitations in section 6.
 
+**Nearest filters.** A nearest session keeps its filters itself and applies them inside the search, before `maxItems`,
+as the sim does: a nearer facility that the filter hides takes no slot, and a facility hidden by a new filter is reported
+as `removed` at the next search. The airport filters are the class mask of `setAirportFilter` and the surface, length
+and towered filters of `setExtendedAirportFilters` (bit 1 of the towered mask is untowered, bit 2 towered); the VOR
+filters are the class and type masks of `setVorFilter`. An airport without runways passes the extended filter and is
+dropped only by the class mask. That rule is the sim developers' own, quoted to the maintainer from their code: "If
+there are no runways, the minimum runway size and surface types filters should not apply". `airport()` takes `runways`
+(an empty list is a heliport), `towered` and `airportClass`, which is derived from the runways when absent; `vor()`
+takes `vorClass`. Without these options a world is the same as before.
+
+**Airspaces.** `airspace()` and `circularAirspace()` (`navdata/airspaces.ts`) build `BoundaryFacility` objects. Pass
+them as `BootOptions.airspaces`, add them to a flight with `World.addAirspace()`, or call
+`MemoryFacilityClient.addAirspace()`. The boundary session filters by the type mask (`1 << BoundaryType`), selects the
+airspaces whose bounding box meets the search circle, sorts them by distance to the box, cuts at `maxItems` and reports
+removed ones by id. The bounding-box selection is inferred from a comment in `NearestUtils.getAirspaces`, not observed
+in the sim. The SDK's `NearestLodBoundarySearchSession` builds the `LodBoundary` objects in a throttled queue on
+`requestAnimationFrame`, so a test advances the fake clock for a search to finish. The builder sets `lods: []`, so that
+LOD 0 is the exact ring instead of a simplified one, and `resetSingletons` clears the SDK's boundary cache, which is
+keyed by the airspace id. A circular airspace exists for the known gap that `BoundaryUtils` ignores circles. A test of a
+message reads the MSG page with `Screen.read()` (see `test/render/harness/airspaces.test.ts`).
+
 `savedFlightplan(idx, legs)` (`test/harness/storage.ts`) returns user data in the V2 format (docs/architecture.md,
 Core 7). Pass it as `storage` to start a test with a flight plan already stored, which is far faster than entering it
 with the knobs.
+
+`savedUserWaypoints(wpts)` (same file) does the same for user waypoints: a list of `{kind: 'sup' | 'int' | 'apt' | 'vor' |
+'ndb', ident, lat, lon, ...}` becomes the `wpt0`, `wpt1`, ... strings plus `userDataFormat: 2`. Spread it together with
+`savedFlightplan` when a test needs both. The strings are laid out by hand from the format, never produced by the
+persistor, so a test of the restore stays independent of the code that saves. The format tests of the persistor itself
+(`UserWaypointV2.test.ts`) keep their literals. A southern latitude of one degree or more does not survive the restore (#98),
+so keep it out of setup.
+
+`standardRoute()` (`test/harness/fixtures.ts`) returns the world many tests use: KAAA, the VOR ABC and KBBB, fresh objects
+on every call. `insertLeg(unit, idx, fac)` (`test/harness/flightplan.ts`) puts a `USER` leg into FPL 0 at `idx`, the way the
+FPL page does after a waypoint confirmation, which is far faster than typing it with the knobs.
+
+## The EFB
+
+`FakeRouteManager` (`platform.ts`) stands in for the SDK's `FlightPlanRouteManager`, with the members the unit uses
+(`KlnEfbLoader`, `KlnEfbSaver`). `bootUnit({efb: true})` attaches one as `unit.efb`; without it the route manager never
+resolves, like a sim with no EFB.
+
+- `sync(route)` emits a synced route as the EFB would. Pass a new object each time, because the subject compares by
+  identity. The unit loads it into FPL 0 and shows FPL 0 on the left.
+- `request()` asks the unit for its route and returns the request id. The answer lands in `replies`.
+- `efbRoute({departure, destination, enroute})` builds a route on the SDK's empty route. An enroute entry is a facility
+  (its ICAO is the fix) or `{lat, lon}`, which the unit imports as a temporary user waypoint (region `XY`).
+
+## Procedures
+
+`navdata/procedures.ts` builds SIDs, STARs and approaches that the real `SidStar` conversion and the APT 7 and APT 8
+pages accept.
+
+- `Leg.TF(fix, flags)`, `Leg.IF`, `Leg.CF`, `Leg.DF`, `Leg.CA`, `Leg.VM`, `Leg.HM`, `Leg.AF` (a DME arc) and `Leg.RF`
+  (only to test that RF procedures are rejected) return legs as `FlightPlan.createLeg` does. `SidStar` writes into legs
+  (`fixTypeFlags`, `course`), so every call returns a new object; never share a leg between procedures.
+- `sid`, `star` and `approach` take the legs by role: runway transitions, enroute transitions, common legs, or an
+  approach's transitions, final and missed legs. `withProcedures(apt, {...})` returns a copy of an `airport()` that carries
+  them, because the builders in `builders.ts` stay procedure-free.
+- `runwayFix(apt, '27')` is the runway waypoint a procedure can fly to. Add it to the navdata like any facility.
+- **Every fix must be in the navdata**, because `SidStar` loads each one with `getFacility`, and so must an arc's navaid.
+  `bootUnit` checks this on the facilities it is given and throws, naming each missing fix as `IDENT (type region)`
+  (`MemoryFacilityClient.missingProcedureFixes()` is the same check for a unit test).
+- Load a procedure the way a pilot does: `selectPage('R', 'APT 8')`, `cursor('R')`, `ent()` on the approach (a single
+  transition is taken without a question), `ent()` on LOAD IN FPL. APT 7 is the same with the SID or STAR. The unit
+  then shows FPL 0 on the left, but FPL 0 scrolls to the active leg only at the next calculation tick: advance about
+  1 s before you read its rows. The APT pages open on the first airport of the scan list, so with more than one airport
+  select the ident first. `test/render/harness/procedures.test.ts` does all three.
+- A DME arc is converted to an entry waypoint `Dnnnx` and the arc's end fix. The entry is the point of the arc closest to
+  the GPS position at load time (the beginning of the arc when that point is outside it), so the position the unit boots
+  at decides the entry. The arc's radials are true bearings: keep `magvar` at 0 or account for it. The arc must not be the
+  first leg that survives the conversion, which replaces the leg before the arc with the entry.
+- `Leg.TF(fix, FixTypeFlags.IAF)` and its siblings set the fix types. `SidStar` keeps a leg flagged IAF, FAF, MAP or MAHP
+  even when its fix repeats, and drops an unflagged repeat.
+
+## Reading the screen
+
+`Screen.read()` (`render/screen.ts`) turns the DOM into the cells the pilot sees; where the DOM and the screen differ,
+the reader follows the screen:
+
+- A row may carry blank cells past the edge of its half page (the nearest selector of APT 1 and VOR); they read as
+  nothing. A visible character or an inverted cell past the edge is a rendering bug, and the reader throws (#115).
+- With the left cursor on, the status line shows `CRSR` (or `KYBD`) one cell in, because the DOM gives that field a
+  CSS margin of one cell. The reader inserts that blank, so the status line keeps its 23 cells and `CRSR` sits in
+  columns 1 to 4.
+- A newline inside a `<pre>` starts a row, as the browser renders it (the MSG page joins its lines that way).
+- A full page without a status line (the welcome page) owns all seven rows. The orientation and range of NAV 5 are
+  positioned over the map with CSS and are read at row 5 of their half.
+- Super NAV 5 is a map with text over it, not a text grid. `Screen.read()` throws there; section 4 shows how to read it.
 
 # 4. Writing tests
 
@@ -165,8 +278,12 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   Core 2), and a test that calls a tick method by hand skips the ordering the real unit has.
 - `Screen.read()` (`render/screen.ts`) returns the 23×7 screen: six rows of two half pages or one full page, plus the
   status line as row 6.
-    - `text()`, `row(n)`, `half('L' | 'R')`, `leftName()`, `rightName()` and `cell(row, col)` read it.
-    - `mask()` shows the attributes per cell: `.` normal, `I` inverted, `B` blinking, `F` flashing inverse.
+    - `text()`, `row(n)`, `half('L' | 'R')`, `rows(side)` (the six rows of a half as strings), `cell(row, col)` and
+      `status()` read it. `status()` returns `{left, mode, right}` trimmed, so with a cursor on it reads `CRSR` or
+      `KYBD`; prefer it to slicing row 6, whose columns shift with the cursor. `leftName()` and `rightName()` are the
+      raw five-character fields.
+    - `mask()` shows the attributes per cell: `.` normal, `I` inverted, `B` blinking, `F` flashing inverse, and
+      `maskRows(side)` the mask of a half in the columns of `rows(side)`.
     - `dump()` is the text, a blank line and the mask. It is the format for snapshots and for failure messages.
 - **`settle(unit)`** (`boot.ts`) advances the clock until the GPS has a solution, then two calculation ticks more, so that
   FPL 0 has activated and the display shows it (a force-ready boot is valid at once, but FPL 0 activates only at the first
@@ -175,13 +292,26 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   `undefined` for a key never saved. The unit saves a moment after the change, so advance the clock first. Use it instead
   of building the `persistent-setting.<model>.profile_1.` key by hand.
 - **`unit.panel.type(side, text)`** types characters with the keyboard (`KLN90B_Internal_Key`), one display tick each, with
-  that side's cursor on. It is how the ident selectors of the APT, VOR, NDB, INT and SUP pages take input.
+  that side's cursor on. It is the keyboard alternative to `enterIdent` (below), which turns the knobs as a pilot does
+  to fill the ident selectors of the APT, VOR, NDB, INT and SUP pages.
 - **Use these helpers; do not hand-roll them.** A wait-for-GPS loop, a `KLN90B_Internal_Key` loop, a
   `persistent-setting.<model>.profile_1.` key and a `gps.reset()` right after the boot are what `settle`,
   `unit.panel.type`, `storedSetting` and `bootUnit({coldGps: true})` do. A hand-rolled form stays only where it is the
   subject or where the helper does not fit: a test of the raw key event (`KeyboardService.test.ts`), a loop that
   measures the acquisition time (`Gps.test.ts`, `SensorsOut.test.ts`), a unit test with no `HeadlessUnit`, a `gps.reset()`
   in the middle of a test, a storage key written before the boot, and the harness tests.
+- **An expected unhandled rejection is taken, not ignored.** A test that provokes one calls `unit.takeRejections()`,
+  which returns the rejections and empties the list; it also stays in `unit.errors`. One left in the list fails the
+  test when it ends, so a handler that started to throw is not missed. To pin such a failure with `it.fails`, keep the
+  boot in a passing sibling (the rule above).
+- **`unit.consoleErrors`** is the place to assert that the unit logged (or did not log) an error. A test that provokes a
+  `console.error` and wants the test output quiet replaces `console.error` with `vi.spyOn(...).mockImplementation`
+  before the boot and restores it with an `onTestFinished` registered before the boot, which runs after the teardown.
+- **`unit.display`** reads what the unit drives outside the screen grid: `opacity()` is the container's opacity as a
+  number, and `powerWrites()` lists the writes of `L:KLN90B_POWER`.
+- **A start-up failure** is tested with `bootUnitExpectingError({platform: {createFacilityClient: () => client}})`. Build
+  the client from `MemoryFacilityClient` and replace only the method that should fail, so that nothing else in the boot
+  breaks for a reason the test does not name (`test/render/harness/bootFailure.test.ts`).
 - Prefer `toMatchInlineSnapshot` on `screen.dump()` for a whole page, and `toEqual` on `half()` rows when only part of a
   page matters. Snapshots are text, so the diff in review is the diff of the screen.
 - Special glyphs stay as the code points the font maps them to (docs/architecture.md, UI 3). Copy them from the
@@ -190,8 +320,12 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - **Canvas pages** (NAV 5, Super NAV 5, APT 3 draw maps): `canvasToAscii(el)` returns the pixels as `#` and `.`. Snapshot
   it with `toMatchInlineSnapshot` as `test/render/harness/canvas.test.ts` does for a tiny canvas. For a map that is too
   large to read inline, `toMatchFileSnapshot('./__snapshots__/name.txt')` keeps it in a file.
-- `Screen` skips `<canvas>` subtrees (their fallback text) and cannot read Super NAV 5, which is a `SevenLinePage` made
-  of CSS-positioned `<pre>` blocks. It throws on a full page with more than six rows.
+- `Screen` skips `<canvas>` subtrees (their fallback text). It throws on Super NAV 5, a `SevenLinePage` made of
+  CSS-positioned `<pre>` blocks: use `SuperNav5.read()` (`render/superNav5.ts`), which returns
+  `{left, msg, range, right, directTo}`. `right` and `directTo` are `null` while hidden (the right cursor and the pulled
+  scan knob show them).
+- **Pages that show the version** (STA 3) carry the placeholder of `kln90b/Version.ts` in tests, 18 cells wide, which
+  `Screen` rightly refuses to read. Mock the module in the test file, as `selectPage.test.ts` does.
 
 ## Flight
 
@@ -210,7 +344,8 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
 - **`Flight.start(opts)`** boots the unit, starts the aircraft and flies until the GPS has a solution. Call it inside a
   test, because it registers `onTestFailed`. Besides `world` and `aircraft` it takes `aircraftOptions` (roll rate,
   maximum bank), `pilot`, and the `BootOptions` that make sense in flight (`storage`, `panelXml`, `engineRunning`,
-  `start`, `seed`, `atcModel`).
+  `start`, `seed`, `atcModel`, `coldGps`, `efb`, `platform`). Airspaces are not a boot option here: they come from
+  `World.addAirspace()`, and the facilities, position, altitude and magnetic variation from the world and the aircraft.
 - **Aircraft** (`flight/Aircraft.ts`): a point mass with constant ground speed and altitude, coordinated turns and a
   roll rate. No wind. It writes the SimVars the unit reads, 16 times per simulated second.
 - **Pilots** (`flight/pilots.ts`): the default `coupledAutopilot()` banks as `L:KLN90B_RollCommand` says (positive
@@ -231,9 +366,33 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
   A render test that boots with `bootUnit` gets the same panel as `unit.panel`.
     - Raw events: `press(evt)`, `outer(side, clicks)`, `inner(side, clicks)`, `cursor(side)`, `ent()`, `clr()`, `dct()`,
       `msg()`, `alt()`, `scan()`, `power()`. Each click advances one display tick so the screen shows its result.
-    - Helpers: `selectPage(side, 'FPL 0')`, `enterIdent(side, ident)`, `type(side, text)` and `appendToFpl0(idents)`.
-    - `enterIdent` does not blank the positions past a short ident, so an autocompleted longer ident leaves a tail.
-      Enter long idents first, or prefer `savedFlightplan` for setup.
+    - `selectPage(side, 'FPL 0')` turns the outer knob the shorter way round the page groups (`PAGE_GROUPS`) and the
+      inner knob the shorter way round the pages of the group (`PAGE_CYCLES`; the knob wraps, and `SET 0` is the last
+      `SET` page, so it is one click backward from `SET 1`). Page names are those of the status line (`FPL10`, `SET 0`,
+      `D/T 1`, `REF`, `INT`); a page with sub-pages shows `APT+3` and still matches `APT 3`. The cursor on that side must
+      be off. A test of the harness walks the real page trees and checks `PAGE_GROUPS` and `PAGE_CYCLES` against them.
+      `selectPage` cannot end on Super NAV 5, and the shorter way can pass `NAV 5` on either side. Super NAV 5 (both
+      sides on `NAV 5`) hides the status line that `selectPage` reads. So select the side whose way passes `NAV 5`
+      first, and reach Super NAV 5 itself by selecting the page before it and turning the last click with `inner`, as
+      `test/render/harness/superNav5.test.ts` does.
+    - `enterIdent(side, ident)` types with the knobs and does not press ENT. In an editor (FPL, DIR) a short ident is
+      followed by a blank, so `KAA` stays `KAA` and does not autocomplete to `KAAA`. In a waypoint selector (the APT,
+      VOR, NDB, INT and SUP pages: the focused run is one cell) it steps through the characters, and throws if the ident
+      is longer than the selector. Each knob click on a character starts a search, so when the last character already
+      shows the wanted letter (a fresh VOR page showing `ABC SOUTH`, entering `ABC`) it turns that character one click
+      away and one back, as a pilot would, and the search runs for exactly the typed ident. `type(side, text)` is the
+      keyboard alternative that types the same characters.
+    - `focused(side)` returns the one focused field `{row, col, text}`; `cursorTo(side, 'USER POS?')` turns the outer
+      knob until that field has the cursor, stepping over the cursor positions that focus nothing (the SUP and INT pages
+      have one after the ident characters) and throwing with the screen after `maxClicks`.
+      `appendToFpl0(idents)` enters and confirms idents on FPL 0.
+    - Power: `powerOff()`, `powerOn()`, `powerCycle({offSeconds})` and `approveSelfTest()`. After boot every power-on runs
+      the welcome page (17 s) and the self-test, also on an engine-running unit; `approveSelfTest` presses ENT on
+      `APPROVE?` and on `ACKNOWLEDGE?`, and throws with the screen at the VFR only page or the OBS warning. A unit
+      booted with `engineRunning: false` is dark until `powerOn()`. OBS mode set with `obsMode()` is forgotten over a power
+      cycle. The OBS warning appears only with the external GPS CRS switch option (`LegObsSwitchInstalled`) and
+      `GPS OBS ACTIVE` set to true; `approveSelfTest({allowObsWarning: true})` then waits until the switch is back.
+    - `obsMode()` enters ENR-OBS from MOD 2 (the unit needs an active waypoint).
 - **Monitors:** `flight.monitor(name, check)` adds a check that runs once per simulated second and returns `true` or a
   description of what is wrong. Built-in monitors fail the test on an error published to the bus, a SimVar unit error,
   any `console.error` and a non-finite GPS output. The `console.error` wrapper that counts is removed again when the
@@ -242,9 +401,23 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
 - **The recorder** keeps one row per simulated second (position, track, bank, `nav`, a few SimVars and the screen text).
   When a flight test fails, it writes `test/flight/__output__/<test name>.jsonl` and `.kml`. Open the KML in Google Earth
   to see the track against the waypoints, and the JSONL to see what the unit showed at each second.
-- **Display versus calculation:** both ticks fall due together once a second, and the display tick runs first, so the
-  screen can show the previous second's calculation. Before asserting on the screen against `flight.nav`, fly display
-  ticks until one passes without a calculation tick (see the end of the proof flight).
+- **Display versus calculation:** both ticks fall due together once a second. Under the fake timers the calculation runs
+  first at that shared second (the timer that fired longest ago goes first), so the screen is normally current at once;
+  a display tick that ran before the calculation would show the previous second's. Before asserting on the screen
+  against `flight.nav`, call `await flight.syncDisplay()`: it flies display ticks until one passed without a
+  calculation tick, so the screen shows the latest calculation. It recognizes a calculation tick by DIS to the active
+  waypoint changing, so it needs a moving aircraft and an active waypoint. It throws when DIS changed in every display
+  tick.
+- **`flight.flyUntilActive(ident, {timeout})`** is `flyUntil` for the active waypoint becoming `ident`. The timeout error
+  names `"<ident> active"` and carries the screen dump.
+- **Geometry for expectations** (`flight/geo.ts`, written from the textbook, independent of the SDK): `distanceNm`,
+  `courseDeg` and `finalCourseDeg`, plus
+    - `angleDiff(a, b)`, the signed `a - b` in (-180, 180], and `angleBetween(a, b)`, the absolute difference in
+      0 to 180 where a null course (no DTK) counts as 180;
+    - `pointFrom(p, bearingTrue, nm)`, the point `nm` from `p` on a course, and `pointBefore(from, to, nm)`, the point
+      `nm` before `to` on the great circle from `from`. They agree with `distanceNm` and `courseDeg` to 1e-6, so use
+      them to place an aircraft before a waypoint instead of the SDK's `GeoPoint.offset`. The standard world
+      (`standardRoute()`, section 3) is the usual input.
 
 ### Worked example: the proof flight
 
@@ -312,9 +485,13 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **happy-dom is not Coherent GT.** There is no layout, no CSS rendering and no glow. A test cannot see overlap,
   clipping or a font problem in the sim. Skia's text pixels also differ from the sim's, so canvas snapshots hold the
   instrument's own drawing, not a pixel-exact copy of what the sim shows.
-- **The navdata is synthetic.** `MemoryFacilityClient` ignores nearest-search filters (airport surface and length, VOR
-  class, and so on) and has no airspaces and no procedures, so SUA alerts, SIDs, STARs and approaches cannot be tested
-  yet.
+- **The navdata is synthetic, and some of its rules are inferred.** The facilities, airspaces and procedures are
+  invented (section 3). The fake follows two rules, one inferred and one quoted: the nearest airspace search selects
+  by bounding box (inferred from a comment in `NearestUtils.getAirspaces`, not observed in the sim), and the nearest
+  filters let an airport without runways pass the surface and length filters (the sim developers' rule, quoted to the
+  maintainer from their code). A test that passes against the fake proves the instrument's use of those rules, not that
+  the sim applies them.
+  The instrument itself ignores circular airspaces (`BoundaryUtils`); `circularAirspace()` exists to hold that gap.
 - **There is no wind.** Ground speed and track equal airspeed and heading, so crosswind effects are not modeled.
 - **`jump` skips integrated values**, and monitors and the recorder sample once per simulated second.
 - **The 16 Hz loops** run every 62 ms in tests: the fake timers round the 62.5 ms interval down to whole milliseconds.
@@ -330,34 +507,37 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   at a time. A singleton the teardown does not know shows up as a test that passes alone and fails in its file.
 - **SDK upgrades may require updating the fakes.** `FakeSim` mirrors the native layer the SDK builds on, and
   `KLNGPSSatComputer` reaches into private SDK internals (docs/architecture.md, Core 3); recheck both, and run the whole
-  suite, after upgrading `@microsoft/msfs-sdk`.
+  suite, after upgrading `@microsoft/msfs-sdk`. The harness also relies on these SDK internals, and after an upgrade a
+  change in one of them shows up as a confusing harness error, not as a named check:
+    - the boundary search: `NearestLodBoundarySearchSession` builds its `LodBoundary` objects in a throttled queue on
+      `requestAnimationFrame` (the airspace tests advance the fake clock for it), and a facility with `lods: []` makes
+      LOD 0 the exact ring (`navdata/airspaces.ts`);
+    - the singletons `resetSingletons` clears by name (`singletons.ts`): `DefaultLodBoundaryCache.INSTANCE` and the
+      private `FlightPlanner.instances` map, which it checks is a `Map`;
+    - the EFB route: `FakeRouteManager` copies the members of `FlightPlanRouteManager` that `KlnEfbLoader` and
+      `KlnEfbSaver` use (`syncedAvionicsRoute`, `avionicsRouteRequested`, `replyToAvionicsRouteRequest`), and `efbRoute`
+      builds routes with `FlightPlanRouteUtils.emptyRoute()` and `emptyEnrouteLeg()`.
 - **TypeScript 6 no longer includes `@types` automatically.** Harness files that use Node APIs carry
   `/// <reference types="node" />`. The directive makes the Node types available to the whole `tsc` program, because the
-  root `tsconfig.json` has no `include`; it does not keep Node APIs out of the code in `kln90b/`, so `tsc` will not catch
-  an accidental Node call there.
-- **Display limits:** `Screen` cannot read Super NAV 5 and skips `<canvas>` content (section 4).
-- **Errors thrown on the ENT path never reach `unit.errors`.** `MainPage` starts `handleEnter` without awaiting it, so a
-  throw becomes an unhandled rejection instead of an `error` event (the exception handling of ticks and sync input
-  does not see it). The test that caused it stays green; Vitest reports an unhandled error after the fact, fails the run
-  and names the last test that ran, which is not necessarily the culprit. So a test that only asserts `unit.errors` is
-  empty cannot show a broken ENT. Assert a visible effect of the ENT (the page, the status line, the stored value),
-  and when the run fails with an unhandled error, look for the test that pressed ENT before the one it names.
-- **The render harness does not fail on `console.error`.** Only `Flight` counts it (the `no console.error` monitor,
-  which also counts the boot). A render or unit test that must notice a logged error has to spy on `console.error`
-  itself, and restore the spy afterwards.
-- **`FrontPanel.enterIdent` cannot type into the ident selectors** of the APT, VOR, NDB, INT and SUP pages (the waypoint
-  selectors). Use `unit.panel.type(side, text)`, with the cursor on and the field entered.
-- **While a cursor is on, the status line shows `CRSR`** and `leftName()` and `rightName()` are shifted by one cell
-  (`APT 1` reads `PT 1`; with the right cursor on, `rightName()` is `CRSR`). Read `row(6)` or turn the cursor off before
-  reading a page name.
+  `include` of the root `tsconfig.json` compiles `kln90b/` and `test/` together; it does not keep Node APIs out of the
+  code in `kln90b/`, so `tsc` will not catch an accidental Node call there.
+- **Errors thrown on the ENT path do not reach the error page.** `MainPage` starts `handleEnter` without awaiting it,
+  so a throw is an unhandled rejection, not an `error` event (the exception handling of ticks and synchronous input
+  does not see it; #118 asks whether that is intended). The harness collects the rejection and fails the test that
+  leaves one untaken (section 3), so a broken ENT is no longer silent. A test that provokes one takes it with
+  `unit.takeRejections()` (section 4).
+- **The harness collects `console.error` but does not fail on it.** `unit.consoleErrors` holds every call, and only
+  `Flight` fails on one (its `no console.error` monitor, which also counts the boot). A render or unit test that must
+  not log asserts that the list is empty.
+- **`selectPage` cannot end on Super NAV 5**, and a way that passes `NAV 5` on one side while the other side shows
+  `NAV 5` is a hazard too: Super NAV 5 hides the status line the helper reads (section 4).
 - **A bus subscription added after boot is called at once with the last cached value.** A test that subscribes to a
   topic and expects to see only new events must skip that first call (or count from a reference taken after
   subscribing).
-- **`Screen.read()` throws on a half page wider than 11 cells**, and the DOM of some right pages is wider: the ACT page
-  with an active index (the NDB row, #115) and the APT 1 and VOR rows, which carry the four trailing blanks of the
-  nearest selector. `FrontPanel.selectPage('R', …)` only turns the outer knob forward, so it throws when it has to
-  pass such a page (from the boot page SUP, any page after NDB, and INT or VOR going the long way round). Navigate with
-  fixed counts (`outer('R', -1)` from SUP reaches INT) or read the half page's DOM with `readRows`.
+- **`Screen.read()` throws on a visible character, or an inverted cell, past column 11 of a half page.** That is how
+  the ACT page with an active index shows the type letter of an NDB (#115). Blank cells past the edge, such as the
+  trailing blanks of the nearest selector on APT 1 and VOR, are tolerated. A test that pins #115 reads the half page's
+  DOM with `readRows`.
 - **A booted engine-running unit has a GPS fix at once**, in the slow acquisition mode too (the force-ready start calls
   `acquireAndUseSatellites()` in `WelcomePage`). A test that needs an invalid GPS, for example to enter the date on SET 2
   (read-only with a fix), boots with `coldGps: true`.
@@ -375,26 +555,22 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - **The test baseline is being built session by session.** The plan, the rules for those sessions and the regression
   triage table are in [test-coverage.md](test-coverage.md). That document is temporary and its last session retires it
   into a coverage record here; until then, start a test session from it rather than from this list.
-- A power-cycle flight test for #90 (the OTH pages are pruned again on each `MainPage` construction). It needs the
-  `FrontPanel.power()` helper and a boot with `engineRunning: false`.
-- Procedure builders for the navdata, so approach and SID/STAR tests can run, and nearest-search filters in
-  `MemoryFacilityClient`.
-- A `FrontPanel.enterIdent` that blanks the positions past a short ident and that handles the waypoint selectors
-  (APT, VOR, NDB, INT, SUP). `FrontPanel.type` covers the selectors today.
-- A collector for unhandled rejections on `unit.errors`, so that a throw on the ENT path fails the test that caused it.
-- A `Screen.read()` that tolerates trailing blanks beyond column 11 (and reads the status line while a cursor is on
-  without the shift), and a `selectPage` that can turn the outer knob in either direction, so that no test has to
-  navigate with fixed counts.
-- **Flights cannot test the nav-source gate or a cold start.** `Aircraft.writeTo` forces `GPS DRIVES NAV1` true on every
-  16 Hz step, so a flight cannot observe what the unit does when the GPS is not the nav source (`92fbba1` is a render
-  test, which sets the SimVar itself). `Flight.start` waits for a fix, so it cannot start a cold unit (#61 is a render
-  test on `bootUnit`). Lifting either would need an `Aircraft` option that leaves `GPS DRIVES NAV1` alone, or a start
-  that does not wait for the fix.
+- A power-cycle test for #90 (the OTH pages are pruned again on each `MainPage` construction). The helpers exist
+  (`powerCycle` and a boot with `engineRunning: false`, section 4); the test is planned in Session 3b.
+- **Flights cannot test the nav-source gate or a cold start, by the maintainer's decision.** `Aircraft.writeTo` forces
+  `GPS DRIVES NAV1` true on every 16 Hz step, so a flight cannot observe what the unit does when the GPS is not the
+  nav source (`92fbba1` is a render test, which sets the SimVar itself). `Flight.start` waits for a fix, so it cannot
+  start a cold unit (#61 is a render test on `bootUnit`). Lifting either would need an `Aircraft` option that leaves
+  `GPS DRIVES NAV1` alone, or a start that does not wait for the fix. The maintainer dropped both extensions because the
+  render tests prove the same behavior, and the flight copies stay uncovered.
+- `Flight.syncDisplay` throws when DIS changed in every display tick; no test covers that throw.
+- `selectPage.test.ts` mocks the `Version` module for STA 3 (section 4). The harness could set that placeholder up.
 - `restoreMocks: true` in `vitest.config.mts` was considered and declined: tests restore their own spies.
 - Errors thrown on the ENT path never reach the error page, although `CLAUDE.md` and `architecture.md` say input
-  exceptions are shown there (section 6). The question is #118; once it is decided, either the trap goes away or the
-  two documents change.
-- Flip the pins when the bugs are fixed: remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each of which names its issue.
+  exceptions are shown there (section 6). The question is #118; once it is decided, either the code changes or the two
+  documents do. The harness collector stays either way.
+- Flip the pins when the bugs are fixed: remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each of
+  which names its issue.
 - #99 (lat/lon displays show 60.00 minutes just below a whole degree) is filed but has no pin yet; a render test would
   hold it.
 - Further flights: approach arming (ARM to APR scale ramp), waypoint alert without turn anticipation, and the

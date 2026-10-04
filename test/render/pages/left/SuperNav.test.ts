@@ -5,7 +5,7 @@ import {SuperNav1Page} from '../../../../kln90b/pages/left/SuperNav1Page';
 import {SuperNav5Page} from '../../../../kln90b/pages/left/SuperNav5Page';
 
 describe('Super NAV pages', () => {
-    // 3-31: NAV 1 on both sides makes Super NAV 1, NAV 5 on both sides Super NAV 5
+    // 3-32: NAV 1 on both sides makes Super NAV 1, 3-36: NAV 5 on both sides Super NAV 5
     it('show without an active waypoint and without an error (b7fd10a, 44fb0a4)', async () => {
         const unit = await bootUnit();
         const overlay = () => (unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage();

@@ -3,45 +3,27 @@ import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {airport} from '../../../harness/navdata/builders';
 
-/** Rows of the right half page that have highlighted (inverted or flashing) cells */
-function highlightedRows(screen: Screen): number[] {
-    const rows: number[] = [];
-    for (let r = 0; r < 6; r++) {
-        for (let c = 12; c < 23; c++) {
-            if (['I', 'F'].includes(screen.cell(r, c).attr)) {
-                rows.push(r);
-                break;
-            }
-        }
-    }
-    return rows;
-}
-
 describe('APT 1 page', () => {
     // 5-19: a user airport is created by entering its latitude and longitude, and the cursor goes to the latitude
     it('creates a user airport at the user position without an error (#65)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('R', 'APT 1');
         await unit.panel.cursor('R');
-        await unit.panel.type('R', 'ZZZZ');
-        for (let guard = 0; !highlightedRows(Screen.read()).some(r => Screen.read().row(r).slice(12).startsWith('USER POS?')); guard++) {
-            if (guard > 8) throw new Error(`no USER POS?\n${Screen.read().dump()}`);
-            await unit.panel.outer('R', 1);
-        }
+        await unit.panel.enterIdent('R', 'ZZZZ');
+        await unit.panel.cursorTo('R', 'USER POS?');
         await unit.panel.ent();
 
-        let screen = Screen.read();
+        const screen = Screen.read();
         expect(unit.errors).toEqual([]);
-        expect(screen.rightName()).toBe('CRSR ');
-        expect(screen.row(0).slice(12)).toBe(' ZZZZ      ');
+        expect(screen.status().right).toBe('CRSR');
+        expect(screen.rows('R')[0]).toBe(' ZZZZ      ');
         // The latitude is the focused field (row 4), the longitude (row 5) is not
-        expect(highlightedRows(screen)).toEqual([4]);
+        expect(unit.panel.focused('R').row).toBe(4);
 
         await unit.panel.outer('R', 1);
 
-        screen = Screen.read();
         expect(unit.errors).toEqual([]);
-        expect(highlightedRows(screen)).toEqual([5]);
+        expect(unit.panel.focused('R').row).toBe(5);
     });
 });
 
@@ -57,8 +39,6 @@ describe('APT 1 page on a nearest entry', () => {
     const kccc = airport('KCCC', 47.4, 8.0);
     const kzzz = airport('KZZZ', 57.1, 8.0);
 
-    const rightRow = (n: number) => Screen.read().row(n).slice(12);
-
     /** The aircraft is 0.6 NM from KBBB; the emergency nearest function (3-23) shows the nearest airport on APT 1 */
     async function bootAtNearest(): Promise<HeadlessUnit> {
         const unit = await bootUnit({facilities: [kaaa, kbbb, kccc, kzzz], position: {lat: 47.19, lon: 8.0}});
@@ -67,7 +47,7 @@ describe('APT 1 page on a nearest entry', () => {
         await unit.panel.msg();
         await unit.panel.ent();
         // Precondition, not the claim
-        expect(rightRow(0)).toBe(' KBBB  nr 1');
+        expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 1');
         return unit;
     }
 
@@ -85,9 +65,9 @@ describe('APT 1 page on a nearest entry', () => {
         unit.env.sim.set('PLANE LATITUDE', 'degrees', 47.39);
         await vi.advanceTimersByTimeAsync(12000);
 
-        expect(rightRow(0)).toBe(' KBBB  nr 2');
-        expect(rightRow(4)).toBe('     180°to');
-        expect(rightRow(5)).toBe('     11.4nm');
+        expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 2');
+        expect(Screen.read().rows('R')[4]).toBe('     180°to');
+        expect(Screen.read().rows('R')[5]).toBe('     11.4nm');
     });
 
     describe('after the entry dropped off the list (characterization)', () => {
@@ -95,48 +75,40 @@ describe('APT 1 page on a nearest entry', () => {
             const unit = await bootAtNearest();
             await dropEntry(unit);
 
-            expect(rightRow(0)).toBe(' KBBB      ');
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB      ');
             // KBBB's coordinates, no longer bearing and distance
-            expect(rightRow(4)).toBe('N 47°12.00\'');
-            expect(rightRow(5)).toBe('E 08°00.00\'');
+            expect(Screen.read().rows('R')[4]).toBe('N 47°12.00\'');
+            expect(Screen.read().rows('R')[5]).toBe('E 08°00.00\'');
         });
 
-        // The checks are independent: the ident, the coordinates and the error channels (unit.errors and the console.error
-        // spy) each catch a different break (see the commit message)
+        // The checks are independent: the ident, the coordinates and the error channels (unit.errors and
+        // unit.consoleErrors) each catch a different break (see the commit message)
         it('scans left to the previous airport of the complete list (c2e7b8e, d202f4a)', async () => {
             const unit = await bootAtNearest();
             await dropEntry(unit);
-            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-            try {
-                await unit.panel.scan();
-                await unit.panel.inner('R', -1);
 
-                expect(rightRow(0)).toBe(' KAAA      ');
-                expect(rightRow(4)).toBe('N 47°00.00\'');
-                expect(rightRow(5)).toBe('E 08°00.00\'');
-                expect(unit.errors).toEqual([]);
-                expect(consoleError).toHaveBeenCalledTimes(0);
-            } finally {
-                consoleError.mockRestore();
-            }
+            await unit.panel.scan();
+            await unit.panel.inner('R', -1);
+
+            expect(Screen.read().rows('R')[0]).toBe(' KAAA      ');
+            expect(Screen.read().rows('R')[4]).toBe('N 47°00.00\'');
+            expect(Screen.read().rows('R')[5]).toBe('E 08°00.00\'');
+            expect(unit.errors).toEqual([]);
+            expect(unit.consoleErrors).toEqual([]);
         });
 
         it('scans right to the next airport of the complete list (c2e7b8e, d202f4a)', async () => {
             const unit = await bootAtNearest();
             await dropEntry(unit);
-            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-            try {
-                await unit.panel.scan();
-                await unit.panel.inner('R', 1);
 
-                expect(rightRow(0)).toBe(' KCCC      ');
-                expect(rightRow(4)).toBe('N 47°24.00\'');
-                expect(rightRow(5)).toBe('E 08°00.00\'');
-                expect(unit.errors).toEqual([]);
-                expect(consoleError).toHaveBeenCalledTimes(0);
-            } finally {
-                consoleError.mockRestore();
-            }
+            await unit.panel.scan();
+            await unit.panel.inner('R', 1);
+
+            expect(Screen.read().rows('R')[0]).toBe(' KCCC      ');
+            expect(Screen.read().rows('R')[4]).toBe('N 47°24.00\'');
+            expect(Screen.read().rows('R')[5]).toBe('E 08°00.00\'');
+            expect(unit.errors).toEqual([]);
+            expect(unit.consoleErrors).toEqual([]);
         });
     });
 });

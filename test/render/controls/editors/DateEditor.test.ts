@@ -8,30 +8,23 @@ import {Screen} from '../../../harness/render/screen';
  */
 async function bootOnSet2(): Promise<HeadlessUnit> {
     const unit = await bootUnit({storage: {fastGpsAcquisition: false}, coldGps: true});
-    await unit.panel.outer('L', 3);
-    await unit.panel.inner('L', 1);
-    expect(Screen.read().leftName()).toBe('SET 2');
+    await unit.panel.selectPage('L', 'SET 2');
     expect(unit.props.sensors.in.gps.isValid()).toBe(false);
     return unit;
-}
-
-/** The left half page's row n (11 characters) */
-function left(n: number): string {
-    return Screen.read().half('L').split('\n')[n];
 }
 
 describe('date editor on SET 2', () => {
     it('defaults an entered blank date to 1 Jan 1988 (characterization, #64)', async () => {
         const unit = await bootOnSet2();
         await unit.panel.cursor('L');
-        expect(left(2)).toBe('  01 JUN 26');
+        expect(Screen.read().rows('L')[2]).toBe('  01 JUN 26');
 
         await unit.panel.inner('L', 1);
-        expect(left(2)).toBe('  01 ___ __');
+        expect(Screen.read().rows('L')[2]).toBe('  01 ___ __');
 
         await unit.panel.ent();
         expect(unit.errors).toEqual([]);
-        expect(left(2)).toBe('  01 JAN 88');
+        expect(Screen.read().rows('L')[2]).toBe('  01 JAN 88');
         const time = unit.props.sensors.in.gps.timeZulu;
         expect([time.getYear(), time.getMonth(), time.getDate()]).toEqual([1988, 0, 1]);
     });
@@ -40,7 +33,7 @@ describe('date editor on SET 2', () => {
         const unit = await bootOnSet2();
         await unit.panel.cursor('L');
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().mask().split('\n')[2].slice(0, 11)).toBe('..IIIIIIIII');
+        expect(Screen.read().maskRows('L')[2]).toBe('..IIIIIIIII');
     });
 
     // The month is OCT in English; the field offers OKT (EditorField.tsx, MonthEditorField)
@@ -52,6 +45,6 @@ describe('date editor on SET 2', () => {
         await unit.panel.inner('L', 10); // the first click enters JAN
 
         expect(unit.errors).toEqual([]);
-        expect(left(2)).toBe('  01 OCT __');
+        expect(Screen.read().rows('L')[2]).toBe('  01 OCT __');
     });
 });

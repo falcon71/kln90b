@@ -1,13 +1,15 @@
+/// <reference types="node" />
 import {onTestFinished, vi} from 'vitest';
-import {Facility} from '@microsoft/msfs-sdk';
+import {BoundaryFacility, Facility} from '@microsoft/msfs-sdk';
 import {KLN90BCore, PropsReadyEvent} from '../../kln90b/KLN90BCore';
+import {KLN90BPlatform} from '../../kln90b/KLN90BPlatform';
 import {PageProps} from '../../kln90b/pages/Page';
 import {ErrorEvent} from '../../kln90b/controls/ErrorPage';
 import {simEnv, SimEnvironment} from './sim/install';
 import {DEFAULT_NAVDATA_RANGE, startFakeClock} from './sim/clock';
 import {seedRandom} from './sim/random';
 import {MemoryFacilityClient} from './navdata/MemoryFacilityClient';
-import {FakePlatform} from './platform';
+import {FakePlatform, FakeRouteManager} from './platform';
 import {FrontPanel} from './flight/FrontPanel';
 import {Screen} from './render/screen';
 import {resetSingletons} from './singletons';
@@ -16,6 +18,8 @@ export const MINIMAL_PANEL_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Nam
 
 export interface BootOptions {
     facilities?: Facility[];
+    /** Airspaces the boundary search finds (navdata/airspaces.ts) */
+    airspaces?: BoundaryFacility[];
     position?: { lat: number; lon: number };
     altitudeFt?: number;
     /** A PlaneHTMLConfig document; the parser defaults apply to everything it leaves out */
@@ -39,6 +43,10 @@ export interface BootOptions {
     coldGps?: boolean;
     /** Magnetic variation in degrees east; a number for the whole world. Default 0 */
     magvar?: number | ((lat: number, lon: number) => number);
+    /** Attaches a fake EFB route manager, exposed as HeadlessUnit.efb. Without it the unit has no EFB (the manager never resolves) */
+    efb?: boolean;
+    /** Overrides methods of FakePlatform, for example a facility client that fails, or a route manager that rejects */
+    platform?: Partial<KLN90BPlatform>;
 }
 
 export interface HeadlessUnit {
@@ -53,10 +61,37 @@ export interface HeadlessUnit {
     atcModel: string;
     /** The front panel, driven through H events like an aircraft's hardware */
     panel: FrontPanel;
+    /** Every console.error call since before the boot, boot included. The call is passed on to the real console.error */
+    consoleErrors: unknown[][];
+    /**
+     * Unhandled promise rejections since before the boot. Each is also in errors. A test that provokes one takes it with
+     * takeRejections(); a rejection left in the list fails the test when it ends (see prepareBoot).
+     */
+    rejections: unknown[];
+    /** Returns the unhandled rejections collected so far and empties the list, which marks them as expected */
+    takeRejections(): unknown[];
+    /** Probes of what the unit shows and drives outside the 23x7 screen */
+    display: {
+        /** The instrument container's opacity, which the brightness and the power state drive; NaN while it is unset (the unit is fully visible then, not dark) */
+        opacity(): number;
+        /** Every write of L:KLN90B_POWER */
+        powerWrites(): { name: string; value: unknown }[];
+    };
+    /** The fake EFB, when the unit booted with efb: true */
+    efb?: FakeRouteManager;
 }
 
-/** The unit of the running test, if any: its boot state decides how strictly teardown checks the singletons */
-let live: { completed: boolean } | undefined;
+/**
+ * The unit of the running test, if any. completed decides how strictly teardown checks the singletons; the two functions
+ * undo what the collectors installed, so that a boot that throws cannot leak them into the next test.
+ */
+interface LiveState {
+    completed: boolean;
+    restoreConsole: () => void;
+    removeRejectionListener: () => void;
+}
+
+let live: LiveState | undefined;
 
 /** Runs every step even if one throws, then rethrows the first error */
 export function runAll(steps: (() => void)[]): void {
@@ -87,6 +122,8 @@ export function teardown(before: (() => void)[] = []): void {
     try {
         runAll([
             ...before,
+            () => state?.restoreConsole(),
+            () => state?.removeRejectionListener(),
             () => vi.clearAllTimers(),
             () => vi.useRealTimers(),
             () => env.sim.reset(),
@@ -108,11 +145,25 @@ export function teardown(before: (() => void)[] = []): void {
     }
 }
 
+/** Everything a boot sets up before KLN90BCore.init runs; bootUnit and bootUnitExpectingError share it */
+interface PreparedBoot {
+    core: KLN90BCore;
+    env: SimEnvironment;
+    navdata: MemoryFacilityClient;
+    errors: Error[];
+    consoleErrors: unknown[][];
+    rejections: unknown[];
+    state: LiveState;
+    model: string;
+    efb?: FakeRouteManager;
+}
+
 /**
- * Boots the real instrument headless and returns once propsReady fired. One unit per test: the facility repository and
- * the settings managers are singletons. The unit is torn down when the test ends (teardown above).
+ * The part of a boot both entry points share: the live-unit guard, the teardown, the clock, the SimVars and the saved
+ * settings, the DOM, the navdata, the collectors (console.error, unhandled rejections, error events) and the core,
+ * which is built but not initialized.
  */
-export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
+function prepareBoot(opts: BootOptions): PreparedBoot {
     if (live !== undefined) {
         throw new Error('bootUnit: one unit per test; this test already booted one (the singletons allow one live unit)');
     }
@@ -121,7 +172,7 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
     } catch (e) {
         throw new Error(`bootUnit: call it inside a test (it, not beforeAll or the module body); the unit is torn down when the test ends. ${e}`);
     }
-    const state = {completed: false};
+    const state: LiveState = {completed: false, restoreConsole: () => undefined, removeRejectionListener: () => undefined};
     live = state;
 
     const env = simEnv();
@@ -148,10 +199,58 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
     }
 
     document.body.innerHTML = '<div id="InstrumentsContainer"></div>';
-    const navdata = new MemoryFacilityClient(opts.facilities ?? []);
-    const core: KLN90BCore = new KLN90BCore(new FakePlatform(navdata), args => core.onInteractionEvent(args));
+    const navdata = new MemoryFacilityClient(opts.facilities ?? [], opts.airspaces ?? []);
+    const missing = navdata.missingProcedureFixes();
+    if (missing.length > 0) {
+        throw new Error(`bootUnit: procedure fixes missing from the navdata: ${missing.join(', ')}`);
+    }
+
+    // The collectors are installed before init, so that an error while the unit starts up is counted too
     const errors: Error[] = [];
+    const consoleErrors: unknown[][] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+        consoleErrors.push(args);
+        originalError(...args);
+    };
+    state.restoreConsole = () => {
+        console.error = originalError;
+    };
+
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => {
+        rejections.push(reason);
+        errors.push(reason instanceof Error ? reason : new Error(String(reason)));
+    };
+    // Vitest stops reporting unhandled rejections once a second listener exists, so this collector is the only check
+    process.on('unhandledRejection', onRejection);
+    state.removeRejectionListener = () => {
+        process.off('unhandledRejection', onRejection);
+    };
+
+    const efb = opts.efb ? new FakeRouteManager() : undefined;
+    const core: KLN90BCore = new KLN90BCore(new FakePlatform(navdata, efb, opts.platform), args => core.onInteractionEvent(args));
     core.bus.getSubscriber<ErrorEvent>().on('error').handle(e => errors.push(e));
+
+    // Registered after the teardown. Vitest runs onTestFinished callbacks last registered first, so this check runs while
+    // the unit is still up
+    onTestFinished(async () => {
+        // One real macrotask, so a rejection from the test's last input lands before the check
+        await new Promise(resolve => setImmediate(resolve));
+        state.removeRejectionListener();
+        if (rejections.length > 0) {
+            throw new Error(`unhandled rejection(s) during the test; take expected ones with unit.takeRejections():\n${rejections.map(String).join('\n')}`);
+        }
+    });
+    return {core, env, navdata, errors, consoleErrors, rejections, state, model, efb};
+}
+
+/**
+ * Boots the real instrument headless and returns once propsReady fired. One unit per test: the facility repository and
+ * the settings managers are singletons. The unit is torn down when the test ends (teardown above).
+ */
+export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
+    const {core, env, navdata, errors, consoleErrors, rejections, state, model, efb} = prepareBoot(opts);
     let props: PageProps | undefined;
     core.bus.getSubscriber<PropsReadyEvent>().on('propsReady').handle(p => props = p);
 
@@ -167,6 +266,57 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
     return {
         core, props, env, navdata, errors, atcModel: model, send: evt => core.onInteractionEvent([evt]),
         panel: new FrontPanel(evt => core.onInteractionEvent([evt]), () => Screen.read()),
+        consoleErrors, rejections, efb,
+        takeRejections: () => rejections.splice(0, rejections.length),
+        display: {
+            opacity: () => parseFloat(document.getElementById('InstrumentsContainer')!.style.opacity), // NaN while unset: Number('') would read as 0, a dark unit
+            powerWrites: () => env.sim.writes.filter(w => w.name === 'L:KLN90B_POWER'),
+        },
+    };
+}
+
+export interface FailedBoot {
+    core: KLN90BCore;
+    env: SimEnvironment;
+    errors: Error[];
+    /** As on HeadlessUnit. A failed unit keeps ticking, and its nearest searches reject, so a test that advances time takes them */
+    consoleErrors: unknown[][];
+    rejections: unknown[];
+    takeRejections(): unknown[];
+    /** The message on the visible error page, or null while it is hidden */
+    errorPage(): string | null;
+}
+
+/**
+ * Boots a unit whose start-up is expected to fail (#50): waits for the first error event instead of propsReady.
+ * platform overrides methods of FakePlatform, for example a facility client whose nearest session rejects.
+ *
+ * The boot stays marked incomplete, so the teardown tolerates singletons that were never created.
+ * @throws Error if the unit came up (propsReady fired), or if no error came within 30 s
+ */
+export async function bootUnitExpectingError(opts: BootOptions = {}): Promise<FailedBoot> {
+    const {core, env, errors, consoleErrors, rejections} = prepareBoot(opts);
+    let propsReady = false;
+    core.bus.getSubscriber<PropsReadyEvent>().on('propsReady').handle(() => propsReady = true);
+
+    void core.init(new DOMParser().parseFromString(opts.panelXml ?? MINIMAL_PANEL_XML, 'text/xml'));
+    for (let i = 0; i < 120 && errors.length === 0 && !propsReady; i++) {
+        await vi.advanceTimersByTimeAsync(250);
+    }
+    if (propsReady) {
+        throw new Error('bootUnitExpectingError: propsReady fired');
+    }
+    if (errors.length === 0) {
+        throw new Error('bootUnitExpectingError: no error event within 30 s');
+    }
+    return {
+        core, env, errors, consoleErrors, rejections,
+        takeRejections: () => rejections.splice(0, rejections.length),
+        errorPage: () => {
+            const page = document.querySelector('.errorpage');
+            if (page === null || page.classList.contains('d-none')) return null;
+            return page.querySelector('.errormessage')?.textContent ?? '';
+        },
     };
 }
 

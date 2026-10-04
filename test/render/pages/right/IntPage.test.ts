@@ -10,25 +10,23 @@ describe('INT page', () => {
             facilities: [intersection('INTA', 47.1, 8.0), vor('ABC', 47.2, 8.0), vor('XYZ', 48.5, 8.0)],
             position: {lat: 47.0, lon: 8.0},
         });
-        // The right page of a fresh unit is SUP, and INT is one step back. selectPage only turns the knob forward and would
-        // pass the NDB page, which Screen cannot read (#115)
-        await unit.panel.outer('R', -1);
+        await unit.panel.selectPage('R', 'INT  ');
         await vi.advanceTimersByTimeAsync(9000); // the REF calculation takes 8 s (REF_CALCULATION_TIME)
         await unit.panel.cursor('R');
-        await unit.panel.outer('R', 5);
-        await unit.panel.type('R', 'XYZ');
+        await unit.panel.cursorTo('R', 'ABC'); // the REF field, which shows the nearest VOR
+        await unit.panel.enterIdent('R', 'XYZ');
 
         await unit.panel.ent();
 
         // The confirmation page offers ENT (the "ent" message of the status line) and shows the VOR page of XYZ
-        expect(Screen.read().rightName()).toBe('VOR  ');
-        expect(Screen.read().row(6).slice(6, 17)).toBe('enr-leg ent');
+        expect(Screen.read().status().right).toBe('VOR');
+        expect(Screen.read().status().mode).toBe('enr-leg ent');
 
         await unit.panel.ent();
 
         const screen = Screen.read();
         expect(unit.errors).toEqual([]);
-        expect(screen.rightName()).toBe('CRSR ');
-        expect(screen.half('R').split('\n')[1]).toBe('REF:  XYZ  ');
+        expect(screen.status().right).toBe('CRSR');
+        expect(screen.rows('R')[1]).toBe('REF:  XYZ  ');
     });
 });

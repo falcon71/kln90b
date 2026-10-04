@@ -9,7 +9,7 @@ describe('APT 2 page', () => {
         const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 8.0, {elevationFt: 1234})]});
         await unit.panel.selectPage('R', 'APT 2');
 
-        const rows = Screen.read().half('R').split('\n');
+        const rows = Screen.read().rows('R');
 
         expect(rows[3]).toBe('ELV  1230ft');
     });

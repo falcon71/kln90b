@@ -1,10 +1,11 @@
 import {describe, expect, it, vi} from 'vitest';
-import {FlightPlanner, FlightPlannerOptions, GeoPoint, UnitType} from '@microsoft/msfs-sdk';
+import {FlightPlanner, FlightPlannerOptions} from '@microsoft/msfs-sdk';
 import {bootUnit, settle} from '../../../harness/boot';
+import {standardRoute} from '../../../harness/fixtures';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
-import {courseDeg, finalCourseDeg, norm360} from '../../../harness/flight/geo';
+import {courseDeg, pointBefore, pointFrom} from '../../../harness/flight/geo';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
@@ -21,7 +22,7 @@ describe('ActiveWaypoint on FPL 0', () => {
         expect(aw.getActiveFplIdx()).toBe(1); // Precondition: KBBB is active, KAAA is FROM
         expect(aw.getFromWpt()).not.toBeNull();
 
-        await unit.panel.outer('L', -1); // FPL 0
+        await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
         await unit.panel.outer('L', 1); // KBBB
         await unit.panel.clr();
@@ -36,7 +37,7 @@ describe('ActiveWaypoint on FPL 0', () => {
         expect(aw.getFromWpt()).toBeNull();
         expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(1);
         // The remaining leg is neither active nor FROM, so its row has no arrow (4-1: FPL 0 with one waypoint is flagged)
-        expect(Screen.read().half('L').split('\n')[1]).toBe('  1:KAAA   ');
+        expect(Screen.read().rows('L')[1]).toBe('  1:KAAA   ');
     });
 
     // 3-28: a typed Direct To target that is in FPL 0 takes its place in the plan (4-10)
@@ -59,11 +60,11 @@ describe('ActiveWaypoint on FPL 0', () => {
         expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
         expect(aw.getActiveFplIdx()).toBe(2);
         expect(aw.isDctNavigation()).toBe(true);
-        // ENT errors never reach unit.errors, so also check what the pilot sees: back on NAV 2 and NAV 1, flying to KBBB
+        // What the pilot sees: back on NAV 2 and NAV 1, flying to KBBB
         const screen = Screen.read();
-        expect(screen.leftName()).toBe('NAV 2');
-        expect(screen.rightName()).toBe('NAV 1');
-        expect(screen.half('R').split('\n')[0]).toBe('d    ›KBBB ');
+        expect(screen.status().left).toBe('NAV 2');
+        expect(screen.status().right).toBe('NAV 1');
+        expect(screen.rows('R')[0]).toBe('d    ›KBBB ');
     });
 
     it('keeps a deleted direct-to target as a random direct-to (#67)', async () => {
@@ -74,7 +75,7 @@ describe('ActiveWaypoint on FPL 0', () => {
         await settle(unit);
         const aw = unit.props.memory.navPage.activeWaypoint;
 
-        await unit.panel.outer('L', -1); // FPL 0
+        await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
         await unit.panel.outer('L', 2); // KBBB
         await unit.panel.dct();
@@ -91,10 +92,10 @@ describe('ActiveWaypoint on FPL 0', () => {
         expect(aw.getActiveFplIdx()).toBe(-1);
         expect(aw.isDctNavigation()).toBe(true);
         expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(2);
-        // ENT errors never reach unit.errors, so also check the screen: the leg is gone from FPL 0, NAV 1 still flies to KBBB
+        // What the pilot sees: the leg is gone from FPL 0, NAV 1 still flies to KBBB
         const screen = Screen.read();
-        expect(screen.half('L').split('\n').slice(1, 4)).toEqual(['  1:KAAA   ', '  2:ABC    ', '  3:       ']);
-        expect(screen.half('R').split('\n')[0]).toBe('d    ›KBBB ');
+        expect(screen.rows('L').slice(1, 4)).toEqual(['  1:KAAA   ', '  2:ABC    ', '  3:       ']);
+        expect(screen.rows('R')[0]).toBe('d    ›KBBB ');
     });
 });
 
@@ -104,14 +105,13 @@ describe('OBS mode on a flight plan with the same waypoint twice (3415417, #67)'
 
     async function enterObsOnDuplicatedPlan() {
         // Five NM west of KAAA, so the bearing to KAAA is about 090
-        const position = new GeoPoint(kaaa.lat, kaaa.lon).offset(270, UnitType.NMILE.convertTo(5, UnitType.GA_RADIAN));
+        const position = pointFrom(kaaa, 270, 5);
         const unit = await bootUnit({
-            facilities: [kaaa], position: {lat: position.lat, lon: position.lon}, panelXml: OBS_SOURCE_OFF,
+            facilities: [kaaa], position, panelXml: OBS_SOURCE_OFF,
             storage: savedFlightplan(0, [kaaa, kaaa]),
         });
         await settle(unit);
-        await unit.panel.selectPage('L', 'MOD 2');
-        await unit.panel.ent();
+        await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(3000);
         return {unit, position};
     }
@@ -128,7 +128,7 @@ describe('OBS mode on a flight plan with the same waypoint twice (3415417, #67)'
         expect(Number.isFinite(nav.obsMag)).toBe(true);
         expect(Number.isFinite(nav.xtkToActive)).toBe(true);
         // Under the break the OBS course on the left half is blank (OBS:°)
-        expect(Screen.read().half('L').split('\n')[3]).toMatch(/^OBS:\d{3}°/);
+        expect(Screen.read().rows('L')[3]).toMatch(/^OBS:\d{3}°/);
         expect(unit.errors).toEqual([]);
     });
 
@@ -139,26 +139,22 @@ describe('OBS mode on a flight plan with the same waypoint twice (3415417, #67)'
 
         expect(Math.abs(unit.props.memory.navPage.xtkToActive!)).toBeLessThan(0.05);
         expect(Math.abs(unit.props.memory.navPage.obsMag - courseDeg(position, kaaa))).toBeLessThan(0.5);
-        expect(Screen.read().half('L').split('\n')[3]).toBe('OBS:090°   ');
+        expect(Screen.read().rows('L')[3]).toBe('OBS:090°   ');
     });
 });
 
 describe('sequencing after a direct-to to a waypoint of FPL 0 (748151c, #70)', () => {
-    // The standard world of the flight tests; the final course KAAA - ABC is about 51.0 degrees
-    const stdKaaa = airport('KAAA', 47.0, 8.0);
-    const stdAbc = vor('ABC', 47.5, 8.9);
-    const stdKbbb = airport('KBBB', 48.2, 9.2);
-
     async function directToAbc() {
-        const course = finalCourseDeg(stdKaaa, stdAbc);
-        const position = new GeoPoint(stdAbc.lat, stdAbc.lon).offset(norm360(course + 180), UnitType.NMILE.convertTo(5, UnitType.GA_RADIAN));
+        // The final course KAAA - ABC is about 51.0 degrees
+        const {kaaa: stdKaaa, abc: stdAbc, kbbb: stdKbbb} = standardRoute();
+        const position = pointBefore(stdKaaa, stdAbc, 5);
         const unit = await bootUnit({
-            facilities: [stdKaaa, stdAbc, stdKbbb], position: {lat: position.lat, lon: position.lon},
+            facilities: [stdKaaa, stdAbc, stdKbbb], position,
             storage: savedFlightplan(0, [stdKaaa, stdAbc, stdKbbb]),
         });
         await settle(unit);
         const aw = unit.props.memory.navPage.activeWaypoint;
-        await unit.panel.outer('R', 1); // CTR 1, so DCT pre-fills the active waypoint (3-27) instead of opening blank
+        await unit.panel.selectPage('R', 'CTR 1'); // So DCT pre-fills the active waypoint (3-27) instead of opening blank
         await unit.panel.dct();
         await unit.panel.ent();
         // Preconditions of the bug: the direct-to makes the SDK planner leave plan 0 for its own direct-to plan

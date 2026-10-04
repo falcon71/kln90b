@@ -1,4 +1,4 @@
-import {expect, onTestFailed, onTestFinished, vi} from 'vitest';
+import {expect, onTestFailed, vi} from 'vitest';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 import {bootUnit, BootOptions, HeadlessUnit} from '../boot';
 import {Screen} from '../render/screen';
@@ -31,7 +31,7 @@ const RECORDED_SIMVARS: [string, string][] = [
     ['GPS WP CROSS TRK', 'nautical miles'], ['L:KLN90B_RollCommand', 'degrees'], ['L:KLN90B_WptLight', 'bool'],
 ];
 
-export interface FlightOptions extends Omit<BootOptions, 'facilities' | 'position' | 'altitudeFt' | 'magvar'> {
+export interface FlightOptions extends Omit<BootOptions, 'facilities' | 'airspaces' | 'position' | 'altitudeFt' | 'magvar'> {
     world: World;
     aircraft: AircraftInit;
     aircraftOptions?: AircraftOptions;
@@ -68,14 +68,11 @@ export class Flight {
     private readonly monitors: { name: string; check: (f: Flight) => true | string }[] = [];
     private readonly failures: MonitorFailure[] = [];
     private readonly startMs: number;
-    /** Counts console.error calls, boot included; Flight.start installs the counter before the unit boots */
-    private readonly consoleErrors: { count: number };
     /** Clock time up to which the aircraft has been integrated */
     private lastPhysicsMs = 0;
 
-    private constructor(public readonly unit: HeadlessUnit, public readonly world: World, public readonly aircraft: Aircraft, pilot: Pilot, consoleErrors: { count: number }) {
+    private constructor(public readonly unit: HeadlessUnit, public readonly world: World, public readonly aircraft: Aircraft, pilot: Pilot) {
         this.pilot = pilot;
-        this.consoleErrors = consoleErrors;
         this.startMs = Date.now();
         this.panel = new FrontPanel(evt => unit.send(evt), () => this.screen);
     }
@@ -86,21 +83,13 @@ export class Flight {
      */
     public static async start(opts: FlightOptions): Promise<Flight> {
         const {world, aircraft, aircraftOptions, pilot, ...boot} = opts;
-        // Counted from before the boot, so an error logged while the unit starts up trips the monitor too
-        const consoleErrors = {count: 0};
-        const originalError = console.error;
-        console.error = (...args: unknown[]) => {
-            consoleErrors.count++;
-            originalError(...args);
-        };
-        onTestFinished(() => {
-            console.error = originalError;
-        });
+        // bootUnit counts console.error from before the boot (unit.consoleErrors), so an error logged while the unit
+        // starts up trips the monitor too
         const unit = await bootUnit({
-            ...boot, facilities: world.all(), position: {lat: aircraft.lat, lon: aircraft.lon}, altitudeFt: aircraft.altitudeFt,
+            ...boot, facilities: world.all(), airspaces: world.airspaces(), position: {lat: aircraft.lat, lon: aircraft.lon}, altitudeFt: aircraft.altitudeFt,
             magvar: (lat, lon) => world.magvar(lat, lon),
         });
-        const flight = new Flight(unit, world, new Aircraft(aircraft, aircraftOptions), pilot ?? coupledAutopilot(), consoleErrors);
+        const flight = new Flight(unit, world, new Aircraft(aircraft, aircraftOptions), pilot ?? coupledAutopilot());
         flight.installBuiltInMonitors();
         flight.installLoops();
         onTestFailed(() => {
@@ -164,6 +153,32 @@ export class Flight {
             this.throwIfFailed();
         }
         return (Date.now() - t0) / 1000;
+    }
+
+    /** flyUntil the active waypoint is ident */
+    public flyUntilActive(ident: string, o: { timeout: number }): Promise<number> {
+        return this.flyUntil(() => this.nav.activeIdent === ident, {timeout: o.timeout, description: `${ident} active`});
+    }
+
+    /**
+     * Flies display ticks until one ran without a calculation tick, so the screen shows the latest calculation.
+     *
+     * Both fall due together once a second. Under the fake timers the calculation runs first at that shared second
+     * (measured: the timer that fired longest ago goes first, which is the 1 Hz one), so the display tick that follows
+     * already shows it and the screen is normally current at once. This helper is a guard for a state where the display
+     * would run first, such as the first shared second after the tick loops are created; otherwise it flies one or two
+     * display ticks (testing.md section 4).
+     *
+     * A calculation tick is recognized by DIS to the active waypoint changing, so this needs an aircraft that moves
+     * toward or away from an active waypoint. Without one nothing changes, and it returns after one display tick.
+     * @throws Error if DIS changed in every display tick
+     */
+    public async syncDisplay(): Promise<void> {
+        for (let i = 0, before = this.nav.distNm; ; i++, before = this.nav.distNm) {
+            await this.fly(0.25);
+            if (this.nav.distNm === before) return;
+            if (i > 4) throw new Error('syncDisplay: DIS changed in every display tick');
+        }
     }
 
     /**
@@ -239,7 +254,7 @@ export class Flight {
     private installBuiltInMonitors(): void {
         this.monitor('no error page', f => f.unit.errors.length === 0 || `error published: ${f.unit.errors.map(String).join('; ')}`);
         this.monitor('no SimVar unit errors', f => f.sim.errors.length === 0 || f.sim.errors.join('; '));
-        this.monitor('no console.error', () => this.consoleErrors.count === 0 || `${this.consoleErrors.count} console.error call(s)`);
+        this.monitor('no console.error', f => f.unit.consoleErrors.length === 0 || `${f.unit.consoleErrors.length} console.error call(s)`);
         this.monitor('GPS outputs finite', f => {
             for (const name of ['GPS WP DISTANCE', 'GPS WP DESIRED TRACK', 'GPS WP CROSS TRK', 'GPS GROUND SPEED']) {
                 const w = f.sim.lastWrite(name);

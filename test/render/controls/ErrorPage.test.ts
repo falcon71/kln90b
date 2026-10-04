@@ -1,4 +1,4 @@
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, onTestFinished, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../harness/boot';
 import {ErrorEvent} from '../../../kln90b/controls/ErrorPage';
 
@@ -13,6 +13,15 @@ async function publish(unit: HeadlessUnit, e: Error): Promise<void> {
     await vi.advanceTimersByTimeAsync(250);
 }
 
+/**
+ * The error page logs every error it shows with console.error; the mock silences that on purpose. It is installed before
+ * the boot and restored after the harness teardown (onTestFinished callbacks run last registered first).
+ */
+function silenceConsoleError(): void {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    onTestFinished(() => spy.mockRestore());
+}
+
 const page = () => document.querySelector('.errorpage')!;
 const isShown = () => !page().classList.contains('d-none');
 const button = (label: string) => [...page().querySelectorAll('button')].find(b => b.textContent!.trim() === label)!;
@@ -20,7 +29,7 @@ const button = (label: string) => [...page().querySelectorAll('button')].find(b 
 // The error page is a debugging aid of this project and not part of the real unit, so these tests describe the code
 describe('error page (characterization) (#5)', () => {
     it('shows the message and the stack, OK hides the page and the next error shows it again', async () => {
-        vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        silenceConsoleError();
         const unit = await bootUnit();
         expect(isShown()).toBe(false);
 
@@ -40,7 +49,7 @@ describe('error page (characterization) (#5)', () => {
     });
 
     it('OK and suppress hides the page and keeps later errors away', async () => {
-        vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        silenceConsoleError();
         const unit = await bootUnit();
         await publish(unit, errorWithStack('boom'));
         expect(isShown()).toBe(true);

@@ -2,7 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 
-/** The six rows of the full page, without trailing blanks */
+/** The six rows of the full page (SET 0 has no right half), without trailing blanks */
 function rows(): string[] {
     return Screen.read().text().split('\n').slice(0, 6).map(r => r.trimEnd());
 }
@@ -10,8 +10,7 @@ function rows(): string[] {
 describe('SET 0 page, the database update (2b9f811)', () => {
     it('leaves the mode and the right page name out of the status line (2-5)', async () => {
         const unit = await bootUnit();
-        await unit.panel.outer('L', 3);
-        await unit.panel.inner('L', -1);
+        await unit.panel.selectPage('L', 'SET 0');
 
         expect(unit.errors).toEqual([]);
         expect(Screen.read().row(6)).toBe('SET 0|        msg|     ');
@@ -21,8 +20,7 @@ describe('SET 0 page, the database update (2b9f811)', () => {
     // the rows are pinned as the code shows them today and carry no timestamps.
     it('walks through the update steps up to LOADER NOT READY (characterization)', async () => {
         const unit = await bootUnit();
-        await unit.panel.outer('L', 3);
-        await unit.panel.inner('L', -1);
+        await unit.panel.selectPage('L', 'SET 0');
         expect(rows()).toEqual([
             '      U P D A T E',
             '   D A T A   B A S E',
@@ -57,6 +55,6 @@ describe('SET 0 page, the database update (2b9f811)', () => {
             '   N O T   R E A D Y',
             '',
         ]);
-        expect(Screen.read().leftName()).toBe('SET 0');
+        expect(Screen.read().status().left).toBe('SET 0');
     });
 });

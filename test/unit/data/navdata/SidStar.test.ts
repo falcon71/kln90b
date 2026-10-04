@@ -1,38 +1,18 @@
 import {describe, expect, it} from 'vitest';
 import {
-    ApproachProcedure, GeoCircle, GeoPoint, ICAO, LegTurnDirection, LegType, Procedure, RnavTypeFlags, RunwayTransition,
+    FlightPlan, GeoCircle, GeoPoint, LegTurnDirection, LegType, RnavTypeFlags,
 } from '@microsoft/msfs-sdk';
 import {SidStar} from '../../../../kln90b/data/navdata/SidStar';
 import {KLNFlightplanLeg} from '../../../../kln90b/data/flightplan/Flightplan';
 import {Sensors} from '../../../../kln90b/Sensors';
-import {vor} from '../../../harness/navdata/builders';
+import {intersection, vor} from '../../../harness/navdata/builders';
+import {approach, Leg, sid} from '../../../harness/navdata/procedures';
 import {EARTH_RADIUS_NM} from '../../../harness/flight/geo';
 
-function leg(type: LegType, rnp = 0) {
-    return {type, rnp, fixIcaoStruct: ICAO.value('W', 'K1', '', 'FIXAA')};
-}
+const fix = intersection('FIXAA', 47, 8);
 
-interface AppFields {
-    approachType: number;
-    rnavTypeFlags?: number;
-    rnpAr?: boolean;
-    missedApproachRnpAr?: boolean;
-    transitions?: { legs: ReturnType<typeof leg>[] }[];
-    finalLegs?: ReturnType<typeof leg>[];
-    missedLegs?: ReturnType<typeof leg>[];
-}
-
-function app(f: AppFields): ApproachProcedure {
-    return {
-        approachType: f.approachType,
-        rnavTypeFlags: f.rnavTypeFlags ?? 0,
-        rnpAr: f.rnpAr ?? false,
-        missedApproachRnpAr: f.missedApproachRnpAr ?? false,
-        transitions: f.transitions ?? [],
-        finalLegs: f.finalLegs ?? [leg(LegType.IF), leg(LegType.TF)],
-        missedLegs: f.missedLegs ?? [leg(LegType.TF)],
-    } as unknown as ApproachProcedure;
-}
+/** The legs of an approach that tests do not care about; every call returns new legs */
+const legs = () => ({final: [Leg.IF(fix), Leg.TF(fix)], missed: [Leg.TF(fix)]});
 
 const LNAV_LNAVVNAV = RnavTypeFlags.LNAV | RnavTypeFlags.LNAVVNAV;
 
@@ -45,9 +25,9 @@ describe('SidStar.isApproachRecognized', () => {
         ['VORDME', ApproachType.APPROACH_TYPE_VORDME],
         ['NDB', ApproachType.APPROACH_TYPE_NDB],
         ['NDBDME', ApproachType.APPROACH_TYPE_NDBDME],
-    ])('%s approach (#6 cc89fd4)', (_name, approachType) => {
+    ])('%s approach (#6 cc89fd4)', (_name, type) => {
         it('is listed', () => {
-            expect(SidStar.isApproachRecognized(app({approachType}))).toBe(true);
+            expect(SidStar.isApproachRecognized(approach({type, runway: '27', ...legs()}))).toBe(true);
         });
     });
 
@@ -57,8 +37,8 @@ describe('SidStar.isApproachRecognized', () => {
         ['LDA', ApproachType.APPROACH_TYPE_LDA],
         ['SDF', ApproachType.APPROACH_TYPE_SDF],
         ['LOCALIZER_BACK_COURSE', ApproachType.APPROACH_TYPE_LOCALIZER_BACK_COURSE],
-    ])('does not list a %s approach (#6 117f548)', (_name, approachType) => {
-        expect(SidStar.isApproachRecognized(app({approachType}))).toBe(false);
+    ])('does not list a %s approach (#6 117f548)', (_name, type) => {
+        expect(SidStar.isApproachRecognized(approach({type, runway: '27', ...legs()}))).toBe(false);
     });
 
     // The LNAV-bit rule is the code's convention (RNAV approaches only if LNAV without VNAV is allowed), not a
@@ -67,17 +47,17 @@ describe('SidStar.isApproachRecognized', () => {
         const RNAV = ApproachType.APPROACH_TYPE_RNAV;
 
         it('lists an RNAV approach with the LNAV bit and no RF leg (#6 4fa8cea)', () => {
-            expect(SidStar.isApproachRecognized(app({approachType: RNAV, rnavTypeFlags: LNAV_LNAVVNAV}))).toBe(true);
+            expect(SidStar.isApproachRecognized(approach({type: RNAV, runway: '27', rnav: LNAV_LNAVVNAV, ...legs()}))).toBe(true);
         });
 
         it('does not list an RNAV approach without the LNAV bit (LNAV/VNAV and LPV only)', () => {
             const flags = RnavTypeFlags.LNAVVNAV | RnavTypeFlags.LPV;
             expect(flags).toBe(10);
-            expect(SidStar.isApproachRecognized(app({approachType: RNAV, rnavTypeFlags: flags}))).toBe(false);
+            expect(SidStar.isApproachRecognized(approach({type: RNAV, runway: '27', rnav: flags, ...legs()}))).toBe(false);
         });
 
         it('does not list an RNAV approach with no flags at all', () => {
-            expect(SidStar.isApproachRecognized(app({approachType: RNAV, rnavTypeFlags: 0}))).toBe(false);
+            expect(SidStar.isApproachRecognized(approach({type: RNAV, runway: '27', rnav: 0, ...legs()}))).toBe(false);
         });
     });
 
@@ -85,18 +65,18 @@ describe('SidStar.isApproachRecognized', () => {
     // convention: the final legs, any transition or the missed approach.
     describe('RF legs (characterization)', () => {
         const RNAV = ApproachType.APPROACH_TYPE_RNAV;
-        const withRf = [leg(LegType.TF), leg(LegType.RF)];
+        const withRf = () => [Leg.TF(fix), Leg.RF(fix)];
 
         it.each([
-            ['the final legs', {finalLegs: withRf}],
-            ['a transition', {transitions: [{legs: withRf}]}],
-            ['the missed approach', {missedLegs: withRf}],
+            ['the final legs', () => ({final: withRf()})],
+            ['a transition', () => ({transitions: [{name: 'TRANS', legs: withRf()}]})],
+            ['the missed approach', () => ({missed: withRf()})],
         ])('does not list an RNAV approach with an RF leg in %s', (_where, fields) => {
-            expect(SidStar.isApproachRecognized(app({approachType: RNAV, rnavTypeFlags: LNAV_LNAVVNAV, ...fields}))).toBe(false);
+            expect(SidStar.isApproachRecognized(approach({type: RNAV, runway: '27', rnav: LNAV_LNAVVNAV, ...legs(), ...fields()}))).toBe(false);
         });
 
         it('does not list a VOR approach with an RF leg', () => {
-            expect(SidStar.isApproachRecognized(app({approachType: ApproachType.APPROACH_TYPE_VOR, finalLegs: withRf}))).toBe(false);
+            expect(SidStar.isApproachRecognized(approach({type: ApproachType.APPROACH_TYPE_VOR, runway: '27', ...legs(), final: withRf()}))).toBe(false);
         });
     });
 });
@@ -105,27 +85,31 @@ describe('SidStar.isApproachRecognized', () => {
 // though some of their approaches need an RNP below 1. Only RNP AR (authorization required) and RF legs are filtered.
 // The code's comment is the reference here, the Pilot's Guide does not discuss RNP values: characterization.
 describe('RNP is not a filter (characterization, #59 71481dc, b0c16cf)', () => {
-    const procedure = (rnpAr: boolean) => ({
-        enRouteTransitions: [], runwayTransitions: [], commonLegs: [leg(LegType.TF, 1852)], rnpAr,
-    }) as unknown as Procedure;
+    /** A leg with a required navigation performance, in meters (FlightPlanLeg.rnp) */
+    const rnpLeg = (type: LegType, rnp: number) => FlightPlan.createLeg({type, rnp, fixIcaoStruct: fix.icaoStruct});
+    const procedure = (rnpAr: boolean) => sid('RNP1', {common: [rnpLeg(LegType.TF, 1852)], rnpAr});
 
     it('lists an RNAV approach with LNAV whose legs all have an RNP of 0.3 NM', () => {
-        const legs = [leg(LegType.IF, 555.6), leg(LegType.TF, 555.6)];
-        const a = app({approachType: ApproachType.APPROACH_TYPE_RNAV, rnavTypeFlags: LNAV_LNAVVNAV, finalLegs: legs, missedLegs: legs});
+        const a = approach({
+            type: ApproachType.APPROACH_TYPE_RNAV, runway: '27', rnav: LNAV_LNAVVNAV,
+            final: [rnpLeg(LegType.IF, 555.6), rnpLeg(LegType.TF, 555.6)], missed: [rnpLeg(LegType.IF, 555.6), rnpLeg(LegType.TF, 555.6)],
+        });
         expect(SidStar.isApproachRecognized(a)).toBe(true);
     });
 
     it('lists a VOR approach with a leg at an RNP of 1 NM', () => {
-        const a = app({approachType: ApproachType.APPROACH_TYPE_VOR, finalLegs: [leg(LegType.IF), leg(LegType.TF, 1852)]});
+        const a = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27', final: [Leg.IF(fix), rnpLeg(LegType.TF, 1852)], missed: [Leg.TF(fix)],
+        });
         expect(SidStar.isApproachRecognized(a)).toBe(true);
     });
 
     it('does not list an RNP AR approach', () => {
-        expect(SidStar.isApproachRecognized(app({approachType: ApproachType.APPROACH_TYPE_VOR, rnpAr: true}))).toBe(false);
+        expect(SidStar.isApproachRecognized(approach({type: ApproachType.APPROACH_TYPE_VOR, runway: '27', ...legs(), rnpAr: true}))).toBe(false);
     });
 
     it('does not list an approach with an RNP AR missed approach', () => {
-        expect(SidStar.isApproachRecognized(app({approachType: ApproachType.APPROACH_TYPE_VOR, missedApproachRnpAr: true}))).toBe(false);
+        expect(SidStar.isApproachRecognized(approach({type: ApproachType.APPROACH_TYPE_VOR, runway: '27', ...legs(), missedRnpAr: true}))).toBe(false);
     });
 
     it('lists a procedure with a leg at an RNP of 1 NM', () => {
@@ -140,25 +124,22 @@ describe('RNP is not a filter (characterization, #59 71481dc, b0c16cf)', () => {
 // #14: a procedure that only has legs the unit cannot fly (CA, VM: no fix) would show up as an empty procedure on
 // APT 7. The rule is the code's: no manual page describes it, so these are characterization tests.
 describe('SidStar.isProcedureRecognized needs a recognized leg (characterization, #14 8da5eee)', () => {
-    const noFix = (type: LegType) => ({type, rnp: 0, fixIcaoStruct: ICAO.emptyValue()});
-    const procedure = (runwayLegs: ReturnType<typeof leg>[][], commonLegs: ReturnType<typeof leg>[]) => ({
-        enRouteTransitions: [], runwayTransitions: runwayLegs.map(legs => ({legs})), commonLegs, rnpAr: false,
-    }) as unknown as Procedure;
-
     it('does not list a procedure whose only legs are CA and VM without a fix', () => {
-        expect(SidStar.isProcedureRecognized(procedure([[noFix(LegType.CA), noFix(LegType.VM)]], []))).toBe(false);
+        expect(SidStar.isProcedureRecognized(sid('GEG7', {runways: [{runway: '04', legs: [Leg.CA(40), Leg.VM(40)]}]}))).toBe(false);
     });
 
     it('lists it once a common leg to a fix is added', () => {
-        expect(SidStar.isProcedureRecognized(procedure([[noFix(LegType.CA), noFix(LegType.VM)]], [leg(LegType.TF)]))).toBe(true);
+        const p = sid('GEG7', {runways: [{runway: '04', legs: [Leg.CA(40), Leg.VM(40)]}], common: [Leg.TF(fix)]});
+        expect(SidStar.isProcedureRecognized(p)).toBe(true);
     });
 
     it('judges one runway transition on its own legs', () => {
-        const rwy04 = {legs: [noFix(LegType.CA), noFix(LegType.VM)]};
-        const rwy31 = {legs: [noFix(LegType.CA), leg(LegType.TF)]};
-        const p = {enRouteTransitions: [], runwayTransitions: [rwy04, rwy31], commonLegs: [], rnpAr: false} as unknown as Procedure;
-        expect(SidStar.isProcedureRecognized(p, rwy04 as unknown as RunwayTransition)).toBe(false);
-        expect(SidStar.isProcedureRecognized(p, rwy31 as unknown as RunwayTransition)).toBe(true);
+        const p = sid('JFK5', {
+            runways: [{runway: '04', legs: [Leg.CA(40), Leg.VM(40)]}, {runway: '31', legs: [Leg.CA(310), Leg.TF(fix)]}],
+        });
+        const [rwy04, rwy31] = p.runwayTransitions;
+        expect(SidStar.isProcedureRecognized(p, rwy04)).toBe(false);
+        expect(SidStar.isProcedureRecognized(p, rwy31)).toBe(true);
     });
 });
 

@@ -5,7 +5,7 @@ import {Screen} from '../../../harness/render/screen';
 
 /** The first two rows of the right half page: ident row and name row */
 function identAndName(): string[] {
-    return Screen.read().half('R').split('\n').slice(0, 2);
+    return Screen.read().rows('R').slice(0, 2);
 }
 
 describe('VOR page with duplicate idents (d3228dd)', () => {
@@ -23,7 +23,7 @@ describe('VOR page with duplicate idents (d3228dd)', () => {
         });
         await unit.panel.selectPage('R', 'VOR  ');
         await unit.panel.cursor('R');
-        await unit.panel.type('R', 'ABC');
+        await unit.panel.enterIdent('R', 'ABC'); // the fresh page shows ABC SOUTH already, so the helper makes the unit search
         await unit.panel.cursor('R');
         expect(identAndName()).toEqual([' ABC D     ', 'ABC NORTH  ']);
 
