@@ -6,7 +6,12 @@ describe('display probes (harness)', () => {
         const unit = await bootUnit();
         // The brightness ramp of the boot (warm-up and fade-in, BrightnessManager.ts) has run out by then
         await vi.advanceTimersByTimeAsync(15_000);
-        expect(unit.display.opacity()).toBeGreaterThan(0);
+        expect(unit.display.opacity()).toBe(1);
+
+        // A write to L:KLN90B_Brightness sets the opacity (BrightnessManager, public contract)
+        unit.env.sim.set('L:KLN90B_Brightness', 'number', 0.5);
+        await vi.advanceTimersByTimeAsync(300);
+        expect(unit.display.opacity()).toBeCloseTo(0.5, 5);
 
         unit.send('KLN90B_Power_Off');
         await vi.advanceTimersByTimeAsync(1000);

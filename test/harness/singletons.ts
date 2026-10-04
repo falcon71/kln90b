@@ -8,6 +8,7 @@ import {LEFT_PAGE_TREE} from '../../kln90b/pages/PageTreeController';
 /** PageTreeController prunes LEFT_PAGE_TREE in place on every MainPage (#90); restore it for the next unit */
 const LEFT_TREE_AT_LOAD = LEFT_PAGE_TREE.map(group => [...group]);
 
+/** Only the left tree is restored. RIGHT_PAGE_TREE is spliced in place too, but with a delete count of 0 (the other half of #90) */
 export function restorePageTrees(): void {
     LEFT_PAGE_TREE.length = 0;
     LEFT_TREE_AT_LOAD.forEach(group => LEFT_PAGE_TREE.push([...group]));

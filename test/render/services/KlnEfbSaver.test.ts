@@ -1,3 +1,4 @@
+import {ICAO} from '@microsoft/msfs-sdk';
 import {describe, expect, it, onTestFinished, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {efbRoute} from '../../harness/platform';
@@ -23,8 +24,8 @@ async function bootWithRoute(): Promise<HeadlessUnit> {
     return unit;
 }
 
-// KlnEfbSaver sends FPL 0 to the EFB on request. The source is the EFB route sync of the public contract (CLAUDE.md),
-// not a manual page.
+// KlnEfbSaver sends FPL 0 to the EFB on request. The source is the SDK's FlightPlanRouteManager contract (the EFB route
+// sync) and the issue, not a manual page.
 describe('KlnEfbSaver', () => {
     it('answers a route request with the airports of FPL 0 as departure and destination', async () => {
         const unit = await bootWithRoute();
@@ -40,7 +41,7 @@ describe('KlnEfbSaver', () => {
     });
 
     // toEfbRoute() takes the airports off the array getLegs() returns, which is the internal leg array of FPL 0
-    it.fails('a route request leaves FPL 0 unchanged (#NEW-3-1)', async () => {
+    it.fails('a route request leaves FPL 0 unchanged (#91)', async () => {
         const unit = await bootWithRoute();
 
         unit.efb!.request();
@@ -62,7 +63,7 @@ describe('KlnEfbSaver', () => {
 
     // toEfbRoute() reads legs[0] and then the last leg without checking that a leg is left. The SDK's SubEvent catches the
     // TypeError and logs it with console.error, so nothing is thrown at the EFB and it never gets an answer
-    it.fails('a route request with an empty FPL 0 is answered with an empty route (#NEW-3-2)', async () => {
+    it.fails('a route request with an empty FPL 0 is answered with an empty route (#91)', async () => {
         muteConsoleError();
         const unit = await bootUnit({efb: true});
         await settle(unit);
@@ -71,9 +72,11 @@ describe('KlnEfbSaver', () => {
         const id = unit.efb!.request();
 
         expect(unit.efb!.replies.map(r => r.requestId)).toEqual([id]);
+        expect(ICAO.isValueEmpty(unit.efb!.replies[0].route.departureAirport)).toBe(true);
+        expect(ICAO.isValueEmpty(unit.efb!.replies[0].route.destinationAirport)).toBe(true);
     });
 
-    it.fails('a route request with only an airport in FPL 0 is answered (#NEW-3-2)', async () => {
+    it.fails('a route request with only an airport in FPL 0 is answered (#91)', async () => {
         muteConsoleError();
         const unit = await bootUnit({efb: true, facilities: [kaaa]});
         await settle(unit);

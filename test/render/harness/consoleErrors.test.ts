@@ -1,5 +1,7 @@
 import {describe, expect, it, onTestFinished, vi} from 'vitest';
+import {ICAO} from '@microsoft/msfs-sdk';
 import {bootUnit} from '../../harness/boot';
+import {airport} from '../../harness/navdata/builders';
 
 const original = console.error;
 
@@ -28,5 +30,17 @@ describe('console.error collector (harness)', () => {
 
         expect(spy).toHaveBeenCalledExactlyOnceWith('x', 42);
         expect(unit.consoleErrors).toEqual([['x', 42]]);
+    });
+
+    // The collector is installed before init, so what the boot logs is counted. The unit logs when the waypoint it saved
+    // as active is not in the navdata (KLN90BCore.asyncInit)
+    it('counts a console.error raised during the boot', async () => {
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        onTestFinished(() => spy.mockRestore());
+        const lost = ICAO.valueToStringV1(airport('KZZZ', 47.0, 8.0).icaoStruct);
+
+        const unit = await bootUnit({storage: {activeWaypoint: lost}});
+
+        expect(unit.consoleErrors.map(args => args[0])).toEqual([`Last active waypoint not found: ${lost}`]);
     });
 });

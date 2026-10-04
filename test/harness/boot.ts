@@ -43,6 +43,8 @@ export interface BootOptions {
     magvar?: number | ((lat: number, lon: number) => number);
     /** Attaches a fake EFB route manager, exposed as HeadlessUnit.efb. Without it the unit has no EFB (the manager never resolves) */
     efb?: boolean;
+    /** Overrides methods of FakePlatform, for example a facility client that fails, or a route manager that rejects */
+    platform?: Partial<KLN90BPlatform>;
 }
 
 export interface HeadlessUnit {
@@ -159,7 +161,7 @@ interface PreparedBoot {
  * settings, the DOM, the navdata, the collectors (console.error, unhandled rejections, error events) and the core,
  * which is built but not initialized.
  */
-function prepareBoot(opts: BootOptions & { platform?: Partial<KLN90BPlatform> }): PreparedBoot {
+function prepareBoot(opts: BootOptions): PreparedBoot {
     if (live !== undefined) {
         throw new Error('bootUnit: one unit per test; this test already booted one (the singletons allow one live unit)');
     }
@@ -224,8 +226,8 @@ function prepareBoot(opts: BootOptions & { platform?: Partial<KLN90BPlatform> })
     const core: KLN90BCore = new KLN90BCore(new FakePlatform(navdata, efb, opts.platform), args => core.onInteractionEvent(args));
     core.bus.getSubscriber<ErrorEvent>().on('error').handle(e => errors.push(e));
 
-    // Registered after the teardown. Vitest runs onTestFinished callbacks last registered first (sequence.hooks "stack"),
-    // so this check runs while the unit is still up
+    // Registered after the teardown. Vitest runs onTestFinished callbacks last registered first, so this check runs while
+    // the unit is still up
     onTestFinished(async () => {
         // One real macrotask, so a rejection from the test's last input lands before the check
         await new Promise(resolve => setImmediate(resolve));
@@ -271,6 +273,10 @@ export interface FailedBoot {
     core: KLN90BCore;
     env: SimEnvironment;
     errors: Error[];
+    /** As on HeadlessUnit. A failed unit keeps ticking, and its nearest searches reject, so a test that advances time takes them */
+    consoleErrors: unknown[][];
+    rejections: unknown[];
+    takeRejections(): unknown[];
     /** The message on the visible error page, or null while it is hidden */
     errorPage(): string | null;
 }
@@ -282,8 +288,8 @@ export interface FailedBoot {
  * The boot stays marked incomplete, so the teardown tolerates singletons that were never created.
  * @throws Error if the unit came up (propsReady fired), or if no error came within 30 s
  */
-export async function bootUnitExpectingError(opts: BootOptions & { platform?: Partial<KLN90BPlatform> } = {}): Promise<FailedBoot> {
-    const {core, env, errors} = prepareBoot(opts);
+export async function bootUnitExpectingError(opts: BootOptions = {}): Promise<FailedBoot> {
+    const {core, env, errors, consoleErrors, rejections} = prepareBoot(opts);
     let propsReady = false;
     core.bus.getSubscriber<PropsReadyEvent>().on('propsReady').handle(() => propsReady = true);
 
@@ -298,7 +304,8 @@ export async function bootUnitExpectingError(opts: BootOptions & { platform?: Pa
         throw new Error('bootUnitExpectingError: no error event within 30 s');
     }
     return {
-        core, env, errors,
+        core, env, errors, consoleErrors, rejections,
+        takeRejections: () => rejections.splice(0, rejections.length),
         errorPage: () => {
             const page = document.querySelector('.errorpage');
             if (page === null || page.classList.contains('d-none')) return null;

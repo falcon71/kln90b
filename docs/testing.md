@@ -166,7 +166,7 @@ resolves, like a sim with no EFB.
   identity. The unit loads it into FPL 0 and shows FPL 0 on the left.
 - `request()` asks the unit for its route and returns the request id. The answer lands in `replies`.
 - `efbRoute({departure, destination, enroute})` builds a route on the SDK's empty route. An enroute entry is a facility
-  (its ICAO is the fix) or `{lat, lon, name?}`, which the unit imports as a temporary user waypoint (region `XY`).
+  (its ICAO is the fix) or `{lat, lon}`, which the unit imports as a temporary user waypoint (region `XY`).
 
 # 4. Writing tests
 

@@ -45,7 +45,7 @@ export interface EfbRouteSpec {
     departure?: Facility;
     destination?: Facility;
     /** A database facility (its ICAO is the fix) or a lat/lon point, which the unit imports as a temporary waypoint */
-    enroute?: (Facility | { lat: number; lon: number; name?: string })[];
+    enroute?: (Facility | { lat: number; lon: number })[];
 }
 
 /** A route as the EFB syncs it, built on the SDK's empty route so that every field the unit may read exists */
@@ -61,7 +61,6 @@ export function efbRoute(spec: EfbRouteSpec): FlightPlanRoute {
             leg.hasLatLon = true;
             leg.lat = point.lat;
             leg.lon = point.lon;
-            leg.name = point.name ?? '';
         }
         route.enroute.push(leg);
     }

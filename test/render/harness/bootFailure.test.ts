@@ -1,5 +1,6 @@
 import {onTestFinished, describe, expect, it, vi} from 'vitest';
 import {bootUnit, bootUnitExpectingError} from '../../harness/boot';
+import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
 
 /** A facility client that works, except that its nearest search sessions cannot be started */
@@ -25,7 +26,8 @@ describe('bootUnitExpectingError (harness)', () => {
         const failed = await bootUnitExpectingError({platform: {createFacilityClient: () => client as any}});
 
         expect(failed.errors[0].message).toBe('no navdata');
-        expect(failed.errorPage()).toContain('no navdata');
+        // The page shows error.toString(), then the stack
+        expect(failed.errorPage()!.startsWith('Error: no navdata')).toBe(true);
     });
 
     it('reports no message while the error page is hidden', async () => {
@@ -39,12 +41,28 @@ describe('bootUnitExpectingError (harness)', () => {
         expect(failed.errorPage()).toBeNull();
     });
 
+    it('collects the rejections of the failed unit like bootUnit does', async () => {
+        muteConsoleError();
+        const client = clientWithoutNearestSearch('no navdata');
+        const noEfb = new Error('no efb');
+
+        const failed = await bootUnitExpectingError({platform: {createFacilityClient: () => client as any, getRouteManager: () => Promise.reject(noEfb)}});
+
+        expect(failed.takeRejections()).toEqual([noEfb]);
+        expect(failed.rejections).toEqual([]);
+        expect(failed.consoleErrors.length).toBeGreaterThan(0); // The error page logs what it shows
+    });
+
     it('throws when the unit comes up instead', async () => {
         await expect(bootUnitExpectingError()).rejects.toThrow('bootUnitExpectingError: propsReady fired');
     });
 
-    it('has torn the failed boots down: the next test boots a normal unit', async () => {
+    // The boots above stay marked incomplete. The facility repository is a singleton that each of them created
+    it('has torn the failed boots down: the next test finds no singleton and boots a normal unit', async () => {
+        expect((KLNFacilityRepository as any).INSTANCE).toBeUndefined();
+
         const unit = await bootUnit();
+
         expect(unit.errors).toEqual([]);
     });
 });
