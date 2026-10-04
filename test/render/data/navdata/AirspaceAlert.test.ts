@@ -36,7 +36,7 @@ describe('SUA alert, vertical limits of an MSL airspace', () => {
 
     // AirspaceAlert.isVerticallyInsideAirspace compares the aircraft's altitude with minAlt in the ceiling check
     // (AirspaceAlert.ts:155), so every aircraft above the floor plus the buffer counts as outside.
-    it.fails('alerts between the floor and the ceiling (#NEW-2-1)', async () => {
+    it.fails('alerts between the floor and the ceiling (#127)', async () => {
         expect(await messagesInside(3000, 1000, 5000)).toContain('INSIDE SPC USE AIRSPACE');
     });
 });
