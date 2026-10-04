@@ -1,6 +1,6 @@
 import {
     AirportFacility, BoundaryFacility, Facility, FacilitySearchType, FacilityType, GeoKdTree, GeoPoint, ICAO, IcaoValue,
-    NearestSearchResults, UnitType, VorFacility,
+    LegType, NearestSearchResults, UnitType, VorFacility,
 } from '@microsoft/msfs-sdk';
 import {distanceToBoxNm} from './airspaces';
 
@@ -13,6 +13,9 @@ const SEARCH_TYPES: Partial<Record<FacilitySearchType, FacilityType[]>> = {
 };
 
 const treeKey = (fac: Facility, out: Float64Array) => GeoPoint.sphericalToCartesian(fac, out);
+
+/** "MAHAA (W K1)": the ident, then the facility type letter and the region if there is one */
+const describeIcao = (icao: IcaoValue) => `${icao.ident.trim()} (${[icao.type, icao.region.trim()].filter(s => s !== '').join(' ')})`;
 
 /**
  * Nearest search with the same added/removed bookkeeping as KLNNearestRepoFacilitySearchSession. The airport and VOR
@@ -182,6 +185,28 @@ export class MemoryFacilityClient {
 
     public all(): Facility[] {
         return Array.from(this.byUid.values());
+    }
+
+    /** The procedure fixes and arc navaids that are not in the navdata, as "IDENT (type region)", e.g. "MAHAA (W K1)". SidStar loads each with getFacility. */
+    public missingProcedureFixes(): string[] {
+        const missing = new Set<string>();
+        const check = (icao: IcaoValue) => {
+            if (icao.ident.trim() !== '' && !this.byUid.has(ICAO.getUid(icao))) missing.add(describeIcao(icao));
+        };
+        for (const fac of this.all()) {
+            if (ICAO.getFacilityTypeFromValue(fac.icaoStruct) !== FacilityType.Airport) continue;
+            const apt = fac as AirportFacility;
+            const procs = [...apt.departures, ...apt.arrivals];
+            const legs = [
+                ...procs.flatMap(p => [...p.commonLegs, ...p.enRouteTransitions.flatMap(t => t.legs), ...p.runwayTransitions.flatMap(t => t.legs)]),
+                ...apt.approaches.flatMap(a => [...a.finalLegs, ...a.missedLegs, ...a.transitions.flatMap(t => t.legs)]),
+            ];
+            for (const leg of legs) {
+                check(leg.fixIcaoStruct);
+                if (leg.type === LegType.AF) check(leg.originIcaoStruct);
+            }
+        }
+        return [...missing];
     }
 
     public awaitInitialization(): Promise<void> {

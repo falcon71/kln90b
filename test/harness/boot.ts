@@ -200,6 +200,10 @@ function prepareBoot(opts: BootOptions): PreparedBoot {
 
     document.body.innerHTML = '<div id="InstrumentsContainer"></div>';
     const navdata = new MemoryFacilityClient(opts.facilities ?? [], opts.airspaces ?? []);
+    const missing = navdata.missingProcedureFixes();
+    if (missing.length > 0) {
+        throw new Error(`bootUnit: procedure fixes missing from the navdata: ${missing.join(', ')}`);
+    }
 
     // The collectors are installed before init, so that an error while the unit starts up is counted too
     const errors: Error[] = [];
