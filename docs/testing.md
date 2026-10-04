@@ -66,7 +66,8 @@ manager. The sim uses `SIM_PLATFORM`; tests use `FakePlatform` (`test/harness/pl
    document (`MINIMAL_PANEL_XML` unless `panelXml` is given).
 4. Advances simulated time until `propsReady` fires, and returns the `HeadlessUnit`: `core`, `props` (the `PageProps`
    bag), `env` (the fakes), `navdata`, `errors` (everything published on the `error` topic), `atcModel` (the model the
-   unit booted with, which is part of the key its settings are saved under), `send(evt)` and `panel` (the front panel).
+   unit booted with, which is part of the key its settings are saved under), `send(evt)`, `panel` (the front panel),
+   the collectors and `display` probes (below) and, with `efb: true`, the fake `efb`.
 
 By default the engine is running, so the unit skips the welcome and self-test pages (`isForceReadyToUse`). Pass
 `engineRunning: false` to see the cold-and-dark start. Pass `coldGps: true` for an engine-running boot whose GPS has no
@@ -106,7 +107,9 @@ The sim globals are installed once per test file by the setup files `test/harnes
   `bootUnit`, and a file may hold several such tests. The unit is torn down when the test ends:
     - its timers stop;
     - the sim fakes are reset in place (`FakeSim` keeps its registration ids, because SDK objects cache them);
-    - the singletons listed in `test/harness/singletons.ts` are cleared;
+    - the singletons listed in `test/harness/singletons.ts` are cleared. That list includes the module-level
+      `LEFT_PAGE_TREE`, which `PageTreeController` prunes in place on every `MainPage` (#90): the teardown puts it back
+      from a snapshot taken at load, so a later boot in the same file still has the fuel computer pages;
     - the DOM is emptied.
 
   The teardown (`runAll` in `boot.ts`) runs every step even when one throws, then rethrows the first error, so one
@@ -121,6 +124,28 @@ The sim globals are installed once per test file by the setup files `test/harnes
 - `Math.random` is replaced by a seeded generator (`sim/random.ts`, default seed 1), so the GPS clock jitter and scan
   list job ids repeat between runs. A test that needs another jitter passes `seed`.
 
+## Collectors and boot failures
+
+`bootUnit` installs collectors before `KLN90BCore.init`, so that an error while the unit starts up is seen too.
+
+- **`unit.errors`** holds everything published on the `error` topic, and every unhandled promise rejection.
+- **`unit.consoleErrors`** holds the arguments of every `console.error` call. The call is passed on to the
+  `console.error` it replaced, and the teardown puts that one back. `Flight` reads it for its "no console.error"
+  monitor.
+- **Unhandled rejections** are collected through a `process` listener, into `unit.rejections` and `unit.errors`. Many
+  input handlers are not awaited (ENT, for example), so a throw inside one is a rejection nobody sees. Vitest stops
+  reporting unhandled rejections once a second listener exists, which makes this collector the only check. It is
+  strict: a rejection still in `unit.rejections` when the test ends fails that test. The check runs while the unit is
+  still up, before the teardown (Vitest runs `onTestFinished` callbacks last registered first), and a throw in it does
+  not stop the teardown. The teardown removes the listener.
+
+`bootUnitExpectingError({...bootOptions, platform})` is the boot for a start-up that is expected to fail (#50). It
+shares the guard and the teardown with `bootUnit`, but waits for the first `error` event instead of `propsReady`,
+throws `propsReady fired` if the unit came up, and returns `{core, env, errors, errorPage()}`. `errorPage()` is the
+message on the visible error page, or `null` while it is hidden. `platform` overrides methods of `FakePlatform`, for
+example `createFacilityClient`. The boot stays marked incomplete, so the teardown tolerates singletons that were never
+created.
+
 ## Navdata
 
 `MemoryFacilityClient` (`navdata/MemoryFacilityClient.ts`) is the navdata the unit sees: a set of facilities built
@@ -130,6 +155,18 @@ instrument reads and nothing else. The data is synthetic; see the limitations in
 `savedFlightplan(idx, legs)` (`test/harness/storage.ts`) returns user data in the V2 format (docs/architecture.md,
 Core 7). Pass it as `storage` to start a test with a flight plan already stored, which is far faster than entering it
 with the knobs.
+
+## The EFB
+
+`FakeRouteManager` (`platform.ts`) stands in for the SDK's `FlightPlanRouteManager`, with the members the unit uses
+(`KlnEfbLoader`, `KlnEfbSaver`). `bootUnit({efb: true})` attaches one as `unit.efb`; without it the route manager never
+resolves, like a sim with no EFB.
+
+- `sync(route)` emits a synced route as the EFB would. Pass a new object each time, because the subject compares by
+  identity. The unit loads it into FPL 0 and shows FPL 0 on the left.
+- `request()` asks the unit for its route and returns the request id. The answer lands in `replies`.
+- `efbRoute({departure, destination, enroute})` builds a route on the SDK's empty route. An enroute entry is a facility
+  (its ICAO is the fix) or `{lat, lon, name?}`, which the unit imports as a temporary user waypoint (region `XY`).
 
 # 4. Writing tests
 
@@ -182,6 +219,18 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   subject or where the helper does not fit: a test of the raw key event (`KeyboardService.test.ts`), a loop that
   measures the acquisition time (`Gps.test.ts`, `SensorsOut.test.ts`), a unit test with no `HeadlessUnit`, a `gps.reset()`
   in the middle of a test, a storage key written before the boot, and the harness tests.
+- **An expected unhandled rejection is taken, not ignored.** A test that provokes one calls `unit.takeRejections()`,
+  which returns the rejections and empties the list; it also stays in `unit.errors`. One left in the list fails the
+  test when it ends, so a handler that started to throw is not missed. To pin such a failure with `it.fails`, keep the
+  boot in a passing sibling (the rule above).
+- **`unit.consoleErrors`** is the place to assert that the unit logged (or did not log) an error. A test that provokes a
+  `console.error` and wants the test output quiet replaces `console.error` with `vi.spyOn(...).mockImplementation`
+  before the boot and restores it with an `onTestFinished` registered before the boot, which runs after the teardown.
+- **`unit.display`** reads what the unit drives outside the screen grid: `opacity()` is the container's opacity as a
+  number, and `powerWrites()` lists the writes of `L:KLN90B_POWER`.
+- **A start-up failure** is tested with `bootUnitExpectingError({platform: {createFacilityClient: () => client}})`. Build
+  the client from `MemoryFacilityClient` and replace only the method that should fail, so that nothing else in the boot
+  breaks for a reason the test does not name (`test/render/harness/bootFailure.test.ts`).
 - Prefer `toMatchInlineSnapshot` on `screen.dump()` for a whole page, and `toEqual` on `half()` rows when only part of a
   page matters. Snapshots are text, so the diff in review is the diff of the screen.
 - Special glyphs stay as the code points the font maps them to (docs/architecture.md, UI 3). Copy them from the

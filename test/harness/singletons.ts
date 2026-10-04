@@ -3,6 +3,15 @@ import {KLNFacilityRepository} from '../../kln90b/data/navdata/KLNFacilityReposi
 import {KLN90BUserWaypointsSettings} from '../../kln90b/settings/KLN90BUserWaypoints';
 import {KLN90BUserFlightplansSettings} from '../../kln90b/settings/KLN90BUserFlightplans';
 import {KLN90BUserRemarkSettings} from '../../kln90b/settings/KLN90BUserRemarkSettings';
+import {LEFT_PAGE_TREE} from '../../kln90b/pages/PageTreeController';
+
+/** PageTreeController prunes LEFT_PAGE_TREE in place on every MainPage (#90); restore it for the next unit */
+const LEFT_TREE_AT_LOAD = LEFT_PAGE_TREE.map(group => [...group]);
+
+export function restorePageTrees(): void {
+    LEFT_PAGE_TREE.length = 0;
+    LEFT_TREE_AT_LOAD.forEach(group => LEFT_PAGE_TREE.push([...group]));
+}
 
 /**
  * Sets a private static singleton field back to undefined. A required field that does not exist throws, so a renamed
@@ -31,4 +40,5 @@ export function resetSingletons(required: boolean): void {
         throw new Error('resetSingletons: FlightPlanner.instances is not a Map. Did the SDK change? Update test/harness/singletons.ts');
     }
     planners.clear();
+    restorePageTrees();
 }
