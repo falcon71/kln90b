@@ -8,7 +8,9 @@ function left(n: number): string {
 }
 
 describe('ALT page (ee0b000)', () => {
-    it('changes the barometer without an error and stores it', async () => {
+    // 3-39: the ALT page sets the barometer with the left inner knob. Saving it in the settings is the project's own
+    // persistence (the setting key), not a statement about the real unit.
+    it('changes the barometer without an error and stores it (3-39)', async () => {
         const unit = await bootUnit();
         await unit.panel.alt();
         expect(left(0)).toBe(' ALTITUDE  ');

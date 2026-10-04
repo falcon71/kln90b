@@ -38,7 +38,7 @@ describe('date editor on SET 2', () => {
         expect([time.getYear(), time.getMonth(), time.getDate()]).toEqual([1988, 0, 1]);
     });
 
-    it('inverts the static characters of the editor with the cursor on (10c5a3d)', async () => {
+    it('inverts the static characters of the editor with the cursor on (10c5a3d, characterization)', async () => {
         const unit = await bootOnSet2();
         await unit.panel.cursor('L');
         expect(unit.errors).toEqual([]);

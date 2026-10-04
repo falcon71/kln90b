@@ -3,8 +3,10 @@ import {bootUnit} from '../harness/boot';
 
 const opacity = () => Number(document.getElementById('InstrumentsContainer')!.style.opacity);
 
-// LVars.ts: L:KLN90B_Brightness is writable for hardware, and the Brt_Inc and Brt_Dec events still work
-describe('L:KLN90B_Brightness (characterization of the public contract) (#52)', () => {
+// Spec test of the public contract with aircraft; the source is the contract itself (CLAUDE.md, "Public contract", and
+// the doc comments in LVars.ts and HEvents.ts), not a manual page: L:KLN90B_Brightness is writable for hardware, and
+// the Brt_Inc and Brt_Dec events still work
+describe('L:KLN90B_Brightness (public contract) (#52)', () => {
     it('follows a write to the LVar, and the brightness events step from there', async () => {
         const unit = await bootUnit();
         await vi.advanceTimersByTimeAsync(5000); // the fade-in of the boot is done

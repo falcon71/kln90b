@@ -8,9 +8,9 @@ const powerWrites = (unit: HeadlessUnit) => unit.env.sim.writes.filter(w => w.na
 const powercycles = (unit: HeadlessUnit) => unit.props.userSettings.getSetting('powercycles').value;
 const opacity = () => document.getElementById('InstrumentsContainer')!.style.opacity;
 
-// The H events are public contract with hardware (HEvents.ts, wiki page on hardware): Power_On and Power_Off set the
-// switch, they do not toggle it
-describe('Power_On and Power_Off H events (characterization of the public contract) (#51)', () => {
+// Spec test of the public contract with aircraft; the source is the contract itself (CLAUDE.md, "Public contract", and
+// the doc comments in HEvents.ts), not a manual page: Power_On and Power_Off set the switch, they do not toggle it
+describe('Power_On and Power_Off H events (public contract) (#51)', () => {
     it('Power_On does nothing while the unit is on', async () => {
         const unit = await bootUnit();
         expect(powercycles(unit)).toBe(1);

@@ -40,9 +40,12 @@ npm run coverage                           # all tests with V8 coverage of kln90
   `KLN_TEST_LOG=1` when you need to see it. The default reporter also hides the output of passing tests.
 - `npx tsc --noEmit` and `npm run build` are separate checks. `vitest.config.mts` is excluded from `tsc`.
 - `npx tsc --noEmit` needs the gitignored `types/` directory (`types/msfstypes`, the base MSFS types that declare
-  globals such as `registerInstrument`). Nothing in the repository produces it: it is a hand-kept copy that only the
-  maintainer's checkout has. A fresh clone or a git worktree fails with `Cannot find name 'registerInstrument'` until
-  `types/` is copied in from that checkout.
+  globals such as `registerInstrument`). Nothing in the repository creates it, but it is a copy of the direct
+  dependency `node_modules/@microsoft/msfs-types` (same version; only the casing of the directory names differs). A
+  fresh clone or a git worktree fails with `Cannot find name 'registerInstrument'` until you recreate it:
+  `cp -r node_modules/@microsoft/msfs-types types/msfstypes`. This was checked on Windows, where `tsc` came out clean
+  with the copy; on a case-sensitive file system the lowercase directory names may not match the `Coherent`/`JS`/`Pages`
+  names the maintainer's copy uses, which is untested.
 - Coverage is a diagnostic: it shows code no test has run. It is not a target, because a snapshot of every page in its
   default state raises it without proving anything about the real unit. `coverage/` is gitignored.
 - A failed flight test writes its recording to `test/flight/__output__/` (gitignored); see section 4.
@@ -251,6 +254,12 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   (`describe('NAV 3 page (characterization)', …)`), so that `grep characterization test/` lists every test that is not
   evidence of correctness. A characterization test carries no manual citation. When the code and the manual disagree,
   the test asserts the manual and is pinned as a known bug (below); a snapshot never freezes a visible bug as correct.
+- **Public-contract tests are spec tests whose source is the contract.** Tests of the public contract with aircraft (H
+  events, LVars, panel.xml keys, GPS SimVars) and of the persisted-data formats (setting keys, the V1/V2 waypoint and
+  flight-plan strings) have no manual page behind them. They need neither a manual citation nor the word
+  `characterization`; they cite their source in a comment instead: `CLAUDE.md` "Public contract with aircraft", the doc
+  comments in `HEvents.ts` and `LVars.ts`, or the formats in `docs/architecture.md` (Core 7). The tests of
+  `PowerButton.test.ts` and `BrightnessManager.test.ts` are the examples.
 - **Cite the manual page behind an expectation** in a comment (`// 4-8: ...`), the same as in the code. A test is a
   statement of the real unit's behavior, and the page is the evidence.
 - **Derive expected values independently.** Never compute the expectation with the function under test or with the
@@ -261,6 +270,11 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **Pin known bugs with `it.fails('... (#NN)')`.** The test states the correct behavior, fails today, and turns red when
   someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See `KLNNavmath.test.ts`
   (#97), `UserWaypointV2.test.ts` (#98) and `turnDirection.test.ts` (#100).
+- **Prove a pin by fixing the bug, and keep heavy setup out of it.** An `it.fails` test passes on *any* failure, so a
+  broken precondition inside it (a boot that threw, a wrong key sequence) is invisible: the pin stays green for the
+  wrong reason. Prove a pin by fixing the bug temporarily and seeing the test turn red, then restore. Where it is cheap,
+  keep the heavy preconditions in a sibling test that passes today and asserts them, so that a broken setup fails
+  there; `turnDirection.test.ts` is the pattern.
 - **Keep runs deterministic.** The harness fixes the clock and the random seed. Do not read the wall clock in an
   assertion (`performance.now` is the wall clock, because the fake clock does not fake it).
 - **Never commit manual content or navdata recorded from the sim.** The manuals are copyrighted: cite page numbers,
@@ -306,8 +320,13 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **Display limits:** `Screen` cannot read Super NAV 5 and skips `<canvas>` content (section 4).
 - **Errors thrown on the ENT path never reach `unit.errors`.** `MainPage` starts `handleEnter` without awaiting it, so a
   throw becomes an unhandled rejection instead of an `error` event (the exception handling of ticks and sync input
-  does not see it). A test that only asserts `unit.errors` is empty passes with a broken ENT; assert a visible effect
-  of the ENT as well (the page, the status line, the stored value).
+  does not see it). The test that caused it stays green; Vitest reports an unhandled error after the fact, fails the run
+  and names the last test that ran, which is not necessarily the culprit. So a test that only asserts `unit.errors` is
+  empty cannot show a broken ENT. Assert a visible effect of the ENT (the page, the status line, the stored value),
+  and when the run fails with an unhandled error, look for the test that pressed ENT before the one it names.
+- **The render harness does not fail on `console.error`.** Only `Flight` counts it (the `no console.error` monitor,
+  which also counts the boot). A render or unit test that must notice a logged error has to spy on `console.error`
+  itself, and restore the spy afterwards.
 - **`FrontPanel.enterIdent` cannot type into the ident selectors** of the APT, VOR, NDB, INT and SUP pages (the waypoint
   selectors). Send the characters yourself: `unit.send('KLN90B_Internal_Key:RIGHT:<char>')` with a short
   `vi.advanceTimersByTimeAsync` per key (`LEFT` for the left side), with the cursor on and the field entered.
@@ -343,12 +362,26 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - Procedure builders for the navdata, so approach and SID/STAR tests can run, and nearest-search filters in
   `MemoryFacilityClient`.
 - A `FrontPanel.enterIdent` that blanks the positions past a short ident and that handles the waypoint selectors
-  (APT, VOR, NDB, INT, SUP), so that tests do not hand-roll `KLN90B_Internal_Key` events.
+  (APT, VOR, NDB, INT, SUP), so that tests do not hand-roll `KLN90B_Internal_Key` events. Include a
+  `FrontPanel.type(side, text)` for the typing that tests now copy from each other.
 - A collector for unhandled rejections on `unit.errors`, so that a throw on the ENT path fails the test that caused it.
 - A `Screen.read()` that tolerates trailing blanks beyond column 11 (and reads the status line while a cursor is on
   without the shift), and a `selectPage` that can turn the outer knob in either direction, so that no test has to
   navigate with fixed counts.
 - A `bootUnit` option for a cold GPS (an engine-running boot without a fix), replacing the `gps.reset()` call.
+- Harness helpers before session 3, besides `FrontPanel.type`:
+    - a settle/GPS helper, because a force-ready boot is valid at once and FPL 0 activates only after one calculation
+      tick, and tests now loop on `gps.isValid()` and add fixed waits by hand;
+    - a reader for a stored setting, replacing the hand-built `persistent-setting.<model>.profile_1.` key.
+- Teardown robustness:
+    - make the teardown exception-safe (`try`/`finally` around the reset), so that one failing reset does not leave the
+      singletons dirty for the next test;
+    - reset `FakeXhr.requests`;
+    - restore `Flight`'s `console.error` wrapper per flight, before any test file holds several flights;
+    - consider `restoreMocks: true` in `vitest.config.mts`.
+- **For the maintainer:** errors thrown on the ENT path never reach the error page, although `CLAUDE.md` and
+  `architecture.md` say input exceptions are shown there (section 6). Either file it as a bug or correct the two
+  documents.
 - Flip the pins when the bugs are fixed: remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each of which names its issue.
 - #99 (lat/lon displays show 60.00 minutes just below a whole degree) is filed but has no pin yet; a render test would
   hold it.

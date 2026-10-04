@@ -7,7 +7,7 @@ import {savedFlightplan} from '../../../harness/storage';
 describe('NAV 5 page', () => {
     // The same waypoint twice in a row (#19, #8) gives a flight plan leg without length, and the map projects it to
     // two identical points. Drawing it threw before the map skipped such legs (9f0b7e1).
-    it('draws FPL 0 with the same waypoint twice in a row without an error (#8 9f0b7e1)', async () => {
+    it('draws FPL 0 with the same waypoint twice in a row without an error (#8 9f0b7e1, characterization)', async () => {
         const kaaa = airport('KAAA', 46, 7);
         const abc = vor('ABC', 46.05, 7.05);
         const kbbb = airport('KBBB', 46.1, 7.1);

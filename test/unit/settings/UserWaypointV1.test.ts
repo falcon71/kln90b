@@ -36,21 +36,21 @@ describe('user waypoint V1 format', () => {
         expect(wpt.lon).toBeCloseTo(-118.5, 6);
     });
 
-    it('restores an intersection with a western longitude (#101)', () => {
+    it('restores an intersection with a western longitude (#47)', () => {
         restoreV1('WXX    USRA +4730.00-00815.50');
         const wpt = repo.get(ICAO.value('W', 'XX', '', 'USRA'))!;
         expect(wpt.lat).toBeCloseTo(47.5, 6);
         expect(wpt.lon).toBeCloseTo(-8.258333, 6);
     });
 
-    it('restores a southern latitude (#101)', () => {
+    it('restores a southern latitude (#47)', () => {
         restoreV1('WXX    SOUTH-1230.00+01015.00');
         const wpt = repo.get(ICAO.value('W', 'XX', '', 'SOUTH'))!;
         expect(wpt.lat).toBeCloseTo(-12.5, 6);
         expect(wpt.lon).toBeCloseTo(10.25, 6);
     });
 
-    it('restores a VOR with frequency and magnetic variation (#101)', () => {
+    it('restores a VOR with frequency and magnetic variation (#47)', () => {
         restoreV1('VXX    ABC  +4730.00+00854.00+114.30+02');
         const vor = repo.get(ICAO.value('V', 'XX', '', 'ABC')) as VorFacility;
         expect(vor.lat).toBeCloseTo(47.5, 6);
@@ -59,7 +59,7 @@ describe('user waypoint V1 format', () => {
         expect(vor.magneticVariation).toBe(2);
     });
 
-    it('restores an airport with altitude, runway length and surface (#101)', () => {
+    it('restores an airport with altitude, runway length and surface (#47)', () => {
         restoreV1('AXX    UAPT +4700.00-00830.00+01400+03200H');
         const apt = repo.get(ICAO.value('A', 'XX', '', 'UAPT')) as AirportFacility;
         expect(apt.lat).toBeCloseTo(47, 6);

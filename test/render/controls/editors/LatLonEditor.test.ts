@@ -10,7 +10,8 @@ function text(editor: { render(): VNode }): string {
 }
 
 describe('latitude and longitude editors', () => {
-    it('show the hemisphere of a nonzero value', () => {
+    // 3-18, figure 3-59: the position fields show the hemisphere letter
+    it('show the hemisphere of a nonzero value (3-18)', () => {
         const bus = new EventBus();
 
         expect(text(new LatitudeEditor(bus, 47.5, () => undefined))).toBe('N 47°30.00');

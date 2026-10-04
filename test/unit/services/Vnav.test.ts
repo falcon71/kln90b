@@ -51,6 +51,9 @@ describe('Vnav.tick with the VNAV waypoint cleared (#4 f6f62ec)', () => {
         });
         const vnav = new Vnav(nav, sensors, fpl0);
         vnav.state = state;
+        // Left over from an earlier tick, so that the null assertions below see the reset and not the initial value
+        vnav.advisoryAltitude = 2000;
+        vnav.timeToVnav = 60;
 
         vnav.tick();
 

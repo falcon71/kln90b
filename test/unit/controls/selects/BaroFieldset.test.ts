@@ -15,7 +15,7 @@ function digits(fieldset: object): SelectField[] {
 }
 
 describe('barometer fieldset', () => {
-    it('reports one change when the ones digit changes, in millibars', () => {
+    it('reports one change when the ones digit changes, in millibars (characterization)', () => {
         const changes: number[] = [];
         const fieldset = BaroFieldsetFactory.createBaroFieldSet(29.92, settingsWithUnit(BARO_UNIT_HPA), baro => changes.push(baro));
 
@@ -25,7 +25,7 @@ describe('barometer fieldset', () => {
         expect(changes[0]).toBeCloseTo(29.9434, 3);
     });
 
-    it('reports one change when the tens digit changes, in inches', () => {
+    it('reports one change when the tens digit changes, in inches (characterization)', () => {
         const changes: number[] = [];
         const fieldset = BaroFieldsetFactory.createBaroFieldSet(29.92, settingsWithUnit(BARO_UNIT_INHG), baro => changes.push(baro));
 

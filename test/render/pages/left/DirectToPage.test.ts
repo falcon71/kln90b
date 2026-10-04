@@ -69,7 +69,7 @@ describe('Direct To page', () => {
     });
 
     it('shows a blank DIR page when there is nothing to suggest (#49)', async () => {
-        // 3-27: rule 5, the ident is blank when no rule gives a default
+        // 3-27: rule 3 (a waypoint page in view on the right), and the boot SUP page has no facility, so the ident is blank
         const unit = await bootUnit();
         await unit.panel.dct();
 

@@ -8,7 +8,7 @@ function rows(): string[] {
 }
 
 describe('SET 0 page, the database update (2b9f811)', () => {
-    it('leaves the mode and the right page name out of the status line (3-7)', async () => {
+    it('leaves the mode and the right page name out of the status line (2-5)', async () => {
         const unit = await bootUnit();
         await unit.panel.outer('L', 3);
         await unit.panel.inner('L', -1);

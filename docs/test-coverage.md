@@ -471,7 +471,9 @@ later run adds a new entry.
 
 **Fixes that could not be re-broken:** none. Two tests do not guard what their name might suggest, and say so: the
 #12 CLR plus ENT case is titled "sanity check, does not guard #12", and the V2 round-trip assertions that hold nothing
-once #103 is fixed now carry a comment pointing at it.
+once #103 is fixed now carry a comment pointing at it. The unit half of the `f745fb3`/`b14db79` row
+(`UserWaypointV2.test.ts`) stays green when the original bug is put back; only the render half
+(`Apt3UserPage.test.ts`) fails, so that is the half that guards the fix.
 
 **Not covered**
 - The flight halves: #67 (a), the flight half of #27, and every flight row (session 3).
@@ -494,7 +496,8 @@ once #103 is fixed now carry a comment pointing at it.
   in `WelcomePage.tsx:146`. A harness trap, documented in `testing.md`.
 - An error thrown on the ENT path is an unhandled rejection, because `MainPage` does not await `handleEnter` (the call
   carries a deliberate "ignored promise" comment). It never reaches the error page, which the architecture notes say
-  input errors do. Left to the maintainer; documented as a harness trap.
+  input errors do. The test that pressed ENT stays green; Vitest reports the unhandled error afterwards, fails the run
+  and names the last test that ran. Left to the maintainer; documented as a harness trap.
 - `persistAllWaypoints` logs every slot, and `BoundaryUtils.intersects` tests the first edge again in its last
   iteration (`% (lod.length - 1)`); neither changes a result.
 - NAV 5 with a duplicate waypoint: only the `drawFlightplanLine` guard of #8 is observable; the other guards are not
@@ -644,7 +647,7 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 | x | #53 `66204f4` | Fuel on board is read from `FUEL TOTAL QUANTITY WEIGHT EX1`. | render | testable | `FOBTransmitted` on, set the EX1 SimVar: OTH 5 shows it. | `test/render/pages/left/Oth5Page.test.ts` |
 | x | `1676e56` | `L:KLN90B_ElectricitySimVarIndex` was initialized with a string instead of a number. | unit | testable | Parse a panel.xml with `CIRCUIT SWITCH ON:2`: the LVar write is the number 2. | `test/unit/settings/KLN90BPlaneSettings.test.ts` |
 | x | `c673dc2` | `L:KLN90B_RightScan` published the previous state instead of the current one. | unit | testable | `Hardware.setScanPulled(true)`: the last write of the LVar is true. | `test/unit/Hardware.test.ts` |
-| x | `7b4465d` | H events before initialization crashed (the startup fix for the Dukes). | unit | testable | `PageManager.onInteractionEvent` before init: no throw, and the "not yet initialized" `console.error` is logged (spy on it; the render and flight harness fail on any `console.error`). | `test/unit/pages/PageManager.test.ts` |
+| x | `7b4465d` | H events before initialization crashed (the startup fix for the Dukes). | unit | testable | `PageManager.onInteractionEvent` before init: no throw, and the "not yet initialized" `console.error` is logged (spy on it; only `Flight` monitors `console.error`, the render harness does not fail on it). | `test/unit/pages/PageManager.test.ts` |
 | x | #6 `117f548`, `4fa8cea`, `cc89fd4` | Approach filter: RNAV approaches only with LNAV and without RF legs; VOR, NDB and GPS approaches kept (`cc89fd4` restored dropped non-precision approaches). | unit | testable | Static `SidStar.isApproachRecognized` with hand-built approach literals of each kind. | `test/unit/data/navdata/SidStar.test.ts` |
 | x | #59 `71481dc`, `b0c16cf` | RNP filtering removed; only RF-leg and RNP-AR procedures are filtered (`b0c16cf` also dropped the per-leg RNP check for approaches). SET 10 lost its PROCS option. | unit | testable | Same literals: `rnp > 0` accepted, `rnpAr` or an RF leg rejected. | `test/unit/data/navdata/SidStar.test.ts` |
 | x | #14 `8da5eee` | Procedures with no recognized leg type were listed as empty. | unit | testable | Static `SidStar.isProcedureRecognized` with literals: only CA/VM legs gives false, one fix leg gives true. | `test/unit/data/navdata/SidStar.test.ts` |
@@ -666,7 +669,7 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 | x | #72 `3977549` (#88 on 1.x) | Creating an intersection with a REF waypoint threw with nested waypoint pages. | render | testable | INT or SUP, REF ident, ENT, confirm with ENT: no error, field filled. The issue is a video; confirm the steps. | `test/render/pages/right/IntPage.test.ts` |
 | x | #46 `bca17fd` | The SET 10 page threw. | render | testable | Select SET 10: no error. | `test/render/pages/left/Set10Page.test.ts` |
 | x | `fb671c0`, `74134be`, `9d1fe96` | SET 9 was named SET 7, SET 7 was named SET 8, and TRI 5 had the wrong page number. | render | testable | Select each: the status line shows the page's own name. | `test/render/pages/left/pageNames.test.ts` |
-| x | `2b9f811` | Details of the SET 0 database update sequence and its status-line texts, corrected after a video of a real unit. | render | testable | Walk the SET 0 update: each step's screen. Source is the video the commit names (allowed by `CLAUDE.md`); cite its timestamps. The video was not watched, so no timestamps are cited; the status line is a spec (3-7), the step rows are characterization. | `test/render/pages/left/Set0Page.test.ts` |
+| x | `2b9f811` | Details of the SET 0 database update sequence and its status-line texts, corrected after a video of a real unit. | render | testable | Walk the SET 0 update: each step's screen. Source is the video the commit names (allowed by `CLAUDE.md`); cite its timestamps. The video was not watched, so no timestamps are cited; the status line is a spec (2-5 to 2-6, figures 2-2 to 2-8), the step rows are characterization. | `test/render/pages/left/Set0Page.test.ts` |
 | x | `f95d1d7` | The ACT page did not refresh when the flight plan changed. | render | testable | ACT page shown, change FPL 0 (insert a waypoint): the ACT page lists it without a page change. The type letter of an NDB on this page is pinned as #115. | `test/render/pages/right/ActPage.test.ts` |
 | x | `8045b29` | A waypoint confirmation page opened from the ACT page was shown like the ACT page. | render | testable | Enter a new ident from the ACT page: the confirmation page has the waypoint-page layout. Confirm the steps first. | `test/render/pages/right/WaypointConfirmPage.test.ts` |
 | x | `8e9a7c4` | With SCAN pulled and the right cursor active, the inner knob scanned instead of changing the field (KLN 89 trainer behavior). | render | testable | Right cursor on an editable field, `EVT_R_SCAN_RIGHT`: the field value changes as with the inner knob. Trainer-based: characterization unless a manual page supports it. | `test/render/pages/MainPage.test.ts` |
