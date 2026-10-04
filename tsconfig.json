@@ -13,5 +13,11 @@
     "jsxFragmentFactory": "FSComponent.Fragment", /* Required for FSComponent framework JSX */
     "jsx": "react" /* Required for FSComponent framework JSX */
   },
-  "exclude": ["node_modules", "vitest.config.mts"]
+  "include": [
+    "kln90b/**/*",
+    "test/**/*",
+    "node_modules/@microsoft/msfs-types/js/**/*.d.ts",
+    "node_modules/@microsoft/msfs-types/pages/**/*.d.ts",
+    "node_modules/@microsoft/msfs-types/coherent/**/*.d.ts"
+  ]
 }

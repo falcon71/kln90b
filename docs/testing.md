@@ -39,13 +39,10 @@ npm run coverage                           # all tests with V8 coverage of kln90
 - The instrument logs a great deal. By default `vitest.config.mts` drops all console output except stderr; set
   `KLN_TEST_LOG=1` when you need to see it. The default reporter also hides the output of passing tests.
 - `npx tsc --noEmit` and `npm run build` are separate checks. `vitest.config.mts` is excluded from `tsc`.
-- `npx tsc --noEmit` needs the gitignored `types/` directory (`types/msfstypes`, the base MSFS types that declare
-  globals such as `registerInstrument`). Nothing in the repository creates it, but it is a copy of the direct
-  dependency `node_modules/@microsoft/msfs-types` (same version; only the casing of the directory names differs). A
-  fresh clone or a git worktree fails with `Cannot find name 'registerInstrument'` until you recreate it:
-  `cp -r node_modules/@microsoft/msfs-types types/msfstypes`. This was checked on Windows, where `tsc` came out clean
-  with the copy; on a case-sensitive file system the lowercase directory names may not match the `Coherent`/`JS`/`Pages`
-  names the maintainer's copy uses, which is untested.
+- `tsconfig.json` lists what `tsc` compiles in `include`: `kln90b/`, `test/` and the declaration files of the
+  dependency `@microsoft/msfs-types` (the base MSFS types that declare globals such as `registerInstrument`). A fresh
+  clone or a git worktree therefore needs only `npm install`. The gitignored `types/` directory that older checkouts
+  carry is no longer read, and agent worktrees under `.claude/` are not compiled by the main checkout.
 - Coverage is a diagnostic: it shows code no test has run. It is not a target, because a snapshot of every page in its
   default state raises it without proving anything about the real unit. `coverage/` is gitignored.
 - A failed flight test writes its recording to `test/flight/__output__/` (gitignored); see section 4.
