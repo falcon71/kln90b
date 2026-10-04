@@ -1,15 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {bootUnit} from '../../../harness/boot';
 import {vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
-
-/** Types letters into the ident selector of the page on the right side, whose cursor is on (EditorField handles the keys) */
-async function typeIdent(unit: HeadlessUnit, ident: string): Promise<void> {
-    for (const key of ident) {
-        unit.send(`KLN90B_Internal_Key:RIGHT:${key}`);
-        await vi.advanceTimersByTimeAsync(250);
-    }
-}
 
 /** The first two rows of the right half page: ident row and name row */
 function identAndName(): string[] {
@@ -31,7 +23,7 @@ describe('VOR page with duplicate idents (d3228dd)', () => {
         });
         await unit.panel.selectPage('R', 'VOR  ');
         await unit.panel.cursor('R');
-        await typeIdent(unit, 'ABC');
+        await unit.panel.type('R', 'ABC');
         await unit.panel.cursor('R');
         expect(identAndName()).toEqual([' ABC D     ', 'ABC NORTH  ']);
 

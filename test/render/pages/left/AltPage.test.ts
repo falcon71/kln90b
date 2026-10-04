@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
+import {storedSetting} from '../../../harness/storage';
 
 /** The left half page's row n (11 characters) */
 function left(n: number): string {
@@ -25,6 +26,6 @@ describe('ALT page (ee0b000)', () => {
         // The sensors save the barometer in the 1 Hz tick
         await vi.advanceTimersByTimeAsync(1000);
         expect(unit.props.userSettings.getSetting('barosetting').get()).toBe(30.92);
-        expect(unit.env.storage.data.get('persistent-setting.KLN TEST.profile_1.barosetting')).toBe('30.92');
+        expect(storedSetting(unit, 'barosetting')).toBe(30.92);
     });
 });

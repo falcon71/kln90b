@@ -58,7 +58,8 @@ them it is for the convenience of the session, and `testing.md` is the authority
 10. Every new test is verified by breaking its subject on purpose (`testing.md` section 5). For a regression test the
     break is the original bug: reintroduce it in the working tree, by hand when the old commit's diff no longer applies,
     confirm the test fails, restore, and confirm `git diff` shows only the intended changes. Never commit the broken
-    state. Record in the log any fix that could not be re-broken and why.
+    state. Record the proof in the task's commit message, one line per item (`Proof: fails when …`). Record in the log
+    any fix that could not be re-broken and why.
 11. A regression test that cannot fail for its bug is not done. Either make it bite or mark the item "not provable" in
     the triage table with the reason.
 
@@ -109,8 +110,14 @@ subagents, relays their results and merges, but it neither implements nor review
     own git worktree (`isolation: "worktree"`) branched from the session branch. A harness task runs alone before them,
     because they build on it. Subagent-driven development runs implementers one at a time to avoid conflicts. Separate
     worktrees remove those conflicts, so this workflow runs them in parallel.
-22. **Implementers commit per item**, with the one-line proof of rule 10 in the commit message, ending with a
-    `Co-Authored-By` line that names the model that wrote the commit. They do not edit this document and do not file
+    - The harness creates an isolation worktree from the remote's default branch (`origin/main`), not from the session
+      branch. The implementer therefore first resets its worktree branch to the session branch
+      (`git reset --hard <session branch>`, on its own worktree branch, which is still empty), and the controlling
+      session checks the merge base before it reviews.
+22. **Implementers commit once per task**, plus once per fix round. They never amend, so that the re-review diffs
+    against the head the previous review saw. The commit message lists every item with its one-line proof of rule 10
+    (`- #76 …: Proof: fails when …`) and ends with a `Co-Authored-By` line that names the model that wrote the commit.
+    They do not edit this document and do not file
     issues. They write their report to a file and reply with only the status, the head commit and their concerns. The
     report lists, for each item:
     - the test path, and whether the test is a spec or a characterization test;
@@ -193,8 +200,8 @@ numbers.
 
 1. For each row: write the test in the folder mirroring the code under test, cite the issue in the test name
    (`'… (#NN)'`), and cite the manual page when the issue is about matching the real unit.
-2. Prove it bites (rules 10 and 11). Record the proof in the commit message in one line ("fails when the sign flip in
-   `UserWaypointLoaderV2` is restored").
+2. Prove it bites (rules 10 and 11). Record the proof in the task's commit message, one line per row ("fails when the
+   sign flip in `UserWaypointLoaderV2` is restored").
 3. Tick the row in the triage table with the test file's path.
 4. Any issue that turns out not to be fixed, or only half fixed, gets an `it.fails` pin and a new GitHub issue
    referencing the closed one (as #98 did for #78). #101 is pinned here; #102 waits for airspace boundaries.
@@ -256,6 +263,11 @@ numbers.
 
 - [ ] done
 
+A helper that serves several tests is added by the session that needs it (rule 13), as sessions 2 and 3 did with
+`settle`, `storedSetting`, `FrontPanel.type` and `coldGps`. Session H takes the extensions that change the fake world:
+navdata, the platform, the aircraft and the boot paths. Suggested slot: before session 5, because ARM/APR, `SidStar`
+and the nearest filters need items 1 and 2.
+
 Scheduled by the maintainer after session 1 if enough rows carry *needs harness*. Candidates, from `testing.md`
 section 7:
 
@@ -263,7 +275,8 @@ section 7:
    tested.
 2. Nearest-search filters in `MemoryFacilityClient` (airport surface and length, VOR class).
 3. Airspace boundaries in the navdata, for the SUA alert and `AirspacesAlongRoute`.
-4. A `FrontPanel.enterIdent` that blanks the positions past a short ident.
+4. A `FrontPanel.enterIdent` that blanks the positions past a short ident and that handles the waypoint selectors
+   (APT, VOR, NDB, INT, SUP). `FrontPanel.type` covers the selectors today.
 5. A power-cycle helper (`engineRunning: false`, `FrontPanel.power()`), for #90 and the cold-and-dark pages.
 
 Found by the session 1 triage (section 5):
@@ -272,6 +285,14 @@ Found by the session 1 triage (section 5):
 7. A boot-failure helper: a boot that awaits the `error` event instead of `propsReady`, for #50.
 8. A reader for the Super NAV 5 `<pre>` blocks, for `eef92e8`.
 9. A paused aircraft (position frozen, ground speed kept), for the pause half of `43d472b`.
+
+Found by sessions 2 and 3 (`testing.md` section 7):
+
+10. An `Aircraft` option that keeps `GPS DRIVES NAV1` false, for the flight version of `92fbba1`.
+11. A cold start in `Flight.start`, which waits for a fix today, for the flight version of #61.
+12. A collector for unhandled rejections on the ENT path, so that a throw there fails the test that caused it.
+13. A `Screen.read` that tolerates trailing blanks beyond column 11, and a `selectPage` that turns the outer knob in
+    either direction, so that no test has to navigate with fixed counts.
 
 Each extension comes with its own harness test (`test/*/harness/`) and a paragraph in `testing.md` section 3. After
 this session, the *needs harness* rows it unblocked become *testable* and are picked up by a rerun of session 2 or 3.
@@ -463,6 +484,13 @@ later run adds a new entry.
   `07c6e37`, `92fbba1`, #39). All 18 session 3 rows are ticked in section 5 with their test paths. Every test was proven
   to bite by reintroducing its bug in the working tree.
 - **Close-out:** the issues below, the placeholders replaced, `testing.md` sections 6 and 7 extended.
+- **Task 7 (added at the maintainer's request after the final review):** the older tests that hand-rolled what the harness
+  task added now use `settle`, `FrontPanel.type`, `storedSetting` and `coldGps` (15 files; assertions unchanged, local
+  helpers deleted). Kept in their hand-rolled form: `KeyboardService.test.ts` (the raw key event is the subject),
+  `Gps.test.ts` and `SensorsOut.test.ts` (their loops measure the acquisition), `UserWaypointPersistor.test.ts` (a unit
+  test with no `HeadlessUnit`) and the harness tests. The two tests whose waits changed (NAV 3, NAV 5) were proven
+  again against their original bugs. Rule changes in section 2: one commit per task plus one per fix round (rules 10 and
+  22, session 2 step 2), the worktree base of rule 21, and the split and candidates of Session H.
 
 **Re-verdicts and rulings**
 - **Rows go to their cheapest stage** (maintainer's decision, rule 9). Only the rows that need motion stay flight: #76,
@@ -541,7 +569,9 @@ verified to be the same commit). A worktree-isolated agent could not write to th
 report was written inside the worktree and copied. Two reviewers collided on a shared scratch script name: one
 mutation of task 3 ran once in the task 2 worktree and was restored at once, and the task 2 reviewer re-ran its
 mutations. One combined reviewer per task (Opus for tasks 2 and 3, Sonnet for the others) and a scoped re-review after
-each fix round. Implementer commits carry the trailer of the model that wrote them.
+each fix round. Implementer commits carry the trailer of the model that wrote them. At the maintainer's request, the
+history of sessions 2 and 3 was rebuilt to one commit per task from the reviewed trees before the merge into `master`,
+and later sessions commit once per task.
 
 **Coverage at the start of the session** (identical to the end of session 2) **and at the end** (all tests green):
 

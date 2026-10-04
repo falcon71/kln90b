@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {FlightPlanner, FlightPlannerOptions, GeoPoint, UnitType} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
+import {bootUnit, settle} from '../../../harness/boot';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
@@ -11,18 +11,12 @@ const kaaa = airport('KAAA', 47.0, 8.0);
 const abc = vor('ABC', 47.2, 8.0);
 const kbbb = airport('KBBB', 47.4, 8.0);
 
-/** The GPS is valid within about 12 s of boot; until then FPL 0 does not activate */
-async function waitForGps(unit: HeadlessUnit): Promise<void> {
-    for (let i = 0; i < 120 && !unit.props.sensors.in.gps.isValid(); i++) await vi.advanceTimersByTimeAsync(1000);
-    await vi.advanceTimersByTimeAsync(2000);
-}
-
 describe('ActiveWaypoint on FPL 0', () => {
     it('flags navigation and drops the FROM waypoint when deleting leaves fewer than two legs (0031c11, d8edd70)', async () => {
         const unit = await bootUnit({
             facilities: [kaaa, kbbb], position: {lat: 47.2, lon: 8.0}, storage: savedFlightplan(0, [kaaa, kbbb]),
         });
-        await waitForGps(unit);
+        await settle(unit);
         const aw = unit.props.memory.navPage.activeWaypoint;
         expect(aw.getActiveFplIdx()).toBe(1); // Precondition: KBBB is active, KAAA is FROM
         expect(aw.getFromWpt()).not.toBeNull();
@@ -50,7 +44,7 @@ describe('ActiveWaypoint on FPL 0', () => {
         const unit = await bootUnit({
             facilities: [kaaa, abc, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
         });
-        await waitForGps(unit);
+        await settle(unit);
         const aw = unit.props.memory.navPage.activeWaypoint;
         expect(aw.getActiveFplIdx()).toBe(1); // Precondition: ABC is active
 
@@ -77,7 +71,7 @@ describe('ActiveWaypoint on FPL 0', () => {
         const unit = await bootUnit({
             facilities: [kaaa, abc, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
         });
-        await waitForGps(unit);
+        await settle(unit);
         const aw = unit.props.memory.navPage.activeWaypoint;
 
         await unit.panel.outer('L', -1); // FPL 0

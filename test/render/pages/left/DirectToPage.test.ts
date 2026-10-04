@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {bootUnit, settle} from '../../../harness/boot';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
@@ -8,19 +8,13 @@ const kaaa = airport('KAAA', 47.0, 8.0);
 const abc = vor('ABC', 47.2, 8.0);
 const kbbb = airport('KBBB', 47.4, 8.0);
 
-/** The GPS is valid within about 12 s of boot; until then FPL 0 does not activate */
-async function waitForGps(unit: HeadlessUnit): Promise<void> {
-    for (let i = 0; i < 120 && !unit.props.sensors.in.gps.isValid(); i++) await vi.advanceTimersByTimeAsync(1000);
-    await vi.advanceTimersByTimeAsync(2000);
-}
-
 describe('Direct To page', () => {
     it('flies to the second of two identical waypoints when the cursor is on it (#43)', async () => {
         // 4-10 to 4-11: Direct To a waypoint of FPL 0 resumes the plan from the selected occurrence on
         const unit = await bootUnit({
             facilities: [kaaa, abc, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, abc, kbbb, abc]),
         });
-        await waitForGps(unit);
+        await settle(unit);
         const aw = unit.props.memory.navPage.activeWaypoint;
         expect(aw.getActiveFplIdx()).toBe(1); // Precondition: the first ABC is active
 

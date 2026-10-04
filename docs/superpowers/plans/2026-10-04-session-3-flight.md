@@ -677,3 +677,36 @@ log.
 ```json:metadata
 {"files": ["docs/test-coverage.md", "docs/testing.md"], "verifyCommand": "npm test && npx tsc --noEmit && grep -r \"#NEW-\" test/", "acceptanceCriteria": ["bugs filed with bug label after duplicate search", "question issue for self-test date editor", "no #NEW- placeholders", "rows ticked or re-verdicted", "session log complete", "checks clean"], "modelTier": "standard"}
 ```
+
+### Task 7: migrate the older tests to the harness helpers, and update the workflow rules
+
+Added at the maintainer's request after the final review of session 3.
+
+**Goal:** The older tests use the helpers that task 1 added instead of hand-rolling them, and the workflow rules and
+Session H say what the sessions learned.
+
+**Files:**
+- Modify: the render tests that hand-rolled `settle`, `FrontPanel.type`, `storedSetting` or `coldGps` (the list is in
+  the commit message)
+- Modify: `docs/test-coverage.md` (rules 10, 21 and 22, session 2 step 2, Session H, the session 3 log)
+- Modify: `docs/testing.md` sections 4 and 7
+- Modify: this plan and its `.tasks.json`
+
+**Acceptance Criteria:**
+- [ ] Assertions do not change; local helpers are deleted once unused.
+- [ ] A hand-rolled form stays only where it is the subject or the helper does not fit, with the reason in the report.
+- [ ] Every migrated test whose waits changed is proven again against its original bug.
+- [ ] `npm test` gives the same totals as before and `npx tsc --noEmit` is clean.
+- [ ] One commit for the whole task, listing each part.
+
+**Verify:** `npm test && npx tsc --noEmit` -> same totals as before, no type errors.
+
+**Steps:**
+
+- [ ] **Part A:** Migrate the tests, re-prove those whose timing changed, and keep the others as they are.
+- [ ] **Part B:** One commit per task and per fix round (rules 10 and 22), the worktree base (rule 21), Session H split
+  and candidates, the session 3 log and `testing.md`.
+
+```json:metadata
+{"files": ["docs/test-coverage.md", "docs/testing.md"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["assertions unchanged", "kept forms explained", "re-proof where waits changed", "same totals", "one commit"], "modelTier": "standard"}
+```

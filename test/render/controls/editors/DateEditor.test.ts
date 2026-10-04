@@ -4,11 +4,10 @@ import {Screen} from '../../../harness/render/screen';
 
 /**
  * SET 2 with the date editable. A booted unit has a GPS fix at once, even with slow acquisition;
- * the reset starts the slow search, which gives the date and time pages their editable state (3-53).
+ * coldGps resets it and starts the slow search, which gives the date and time pages their editable state (3-53).
  */
 async function bootOnSet2(): Promise<HeadlessUnit> {
-    const unit = await bootUnit({storage: {fastGpsAcquisition: false}});
-    unit.props.sensors.in.gps.reset();
+    const unit = await bootUnit({storage: {fastGpsAcquisition: false}, coldGps: true});
     await unit.panel.outer('L', 3);
     await unit.panel.inner('L', 1);
     expect(Screen.read().leftName()).toBe('SET 2');

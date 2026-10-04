@@ -6,14 +6,6 @@ import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {insertLegIntoFpl} from '../../../../kln90b/services/FlightplanUtils';
 import {Facility} from '@microsoft/msfs-sdk';
 
-/** Typing into the ident selectors and the REF field takes keyboard keys (enterIdent cannot) */
-async function typeRight(unit: HeadlessUnit, text: string): Promise<void> {
-    for (const ch of text) {
-        unit.send(`KLN90B_Internal_Key:RIGHT:${ch}`);
-        await vi.advanceTimersByTimeAsync(250);
-    }
-}
-
 const rightRows = () => readRows(document.querySelector('.right-page')!).map(r => r.map(c => c.ch).join(''));
 
 function append(unit: HeadlessUnit, wpt: Facility, idx: number): void {
@@ -35,7 +27,7 @@ describe('waypoint confirmation page', () => {
         // would pass the NDB page, which Screen cannot read, #115)
         await unit.panel.outer('R', -3);
         await unit.panel.cursor('R');
-        await typeRight(unit, 'XYZ');
+        await unit.panel.type('R', 'XYZ');
         const plainRow0 = rightRows()[0];
         expect(plainRow0).toBe(' XYZ D     ');
         await unit.panel.cursor('R');
@@ -48,7 +40,7 @@ describe('waypoint confirmation page', () => {
         expect(rightRows()[0].slice(0, 11)).toBe('› 2 INTA I');
         await unit.panel.cursor('R');
         await vi.advanceTimersByTimeAsync(9000);
-        await typeRight(unit, 'XYZ');
+        await unit.panel.type('R', 'XYZ');
         await unit.panel.ent();
 
         // The confirmation page is the VOR page of XYZ, without the position in the flight plan of the ACT page

@@ -17,21 +17,13 @@ function highlightedRows(screen: Screen): number[] {
     return rows;
 }
 
-/** The ident selectors of the APT, VOR, NDB, INT and SUP pages take keyboard keys, not knob steps (enterIdent cannot) */
-async function typeRight(unit: HeadlessUnit, text: string): Promise<void> {
-    for (const ch of text) {
-        unit.send(`KLN90B_Internal_Key:RIGHT:${ch}`);
-        await vi.advanceTimersByTimeAsync(250);
-    }
-}
-
 describe('APT 1 page', () => {
     // 5-19: a user airport is created by entering its latitude and longitude, and the cursor goes to the latitude
     it('creates a user airport at the user position without an error (#65)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('R', 'APT 1');
         await unit.panel.cursor('R');
-        await typeRight(unit, 'ZZZZ');
+        await unit.panel.type('R', 'ZZZZ');
         for (let guard = 0; !highlightedRows(Screen.read()).some(r => Screen.read().row(r).slice(12).startsWith('USER POS?')); guard++) {
             if (guard > 8) throw new Error(`no USER POS?\n${Screen.read().dump()}`);
             await unit.panel.outer('R', 1);

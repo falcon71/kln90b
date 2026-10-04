@@ -176,6 +176,12 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   of building the `persistent-setting.<model>.profile_1.` key by hand.
 - **`unit.panel.type(side, text)`** types characters with the keyboard (`KLN90B_Internal_Key`), one display tick each, with
   that side's cursor on. It is how the ident selectors of the APT, VOR, NDB, INT and SUP pages take input.
+- **Use these helpers; do not hand-roll them.** A wait-for-GPS loop, a `KLN90B_Internal_Key` loop, a
+  `persistent-setting.<model>.profile_1.` key and a `gps.reset()` right after the boot are what `settle`,
+  `unit.panel.type`, `storedSetting` and `bootUnit({coldGps: true})` do. A hand-rolled form stays only where it is the
+  subject or where the helper does not fit: a test of the raw key event (`KeyboardService.test.ts`), a loop that
+  measures the acquisition time (`Gps.test.ts`, `SensorsOut.test.ts`), a unit test with no `HeadlessUnit`, a `gps.reset()`
+  in the middle of a test, a storage key written before the boot, and the harness tests.
 - Prefer `toMatchInlineSnapshot` on `screen.dump()` for a whole page, and `toEqual` on `half()` rows when only part of a
   page matters. Snapshots are text, so the diff in review is the diff of the screen.
 - Special glyphs stay as the code points the font maps them to (docs/architecture.md, UI 3). Copy them from the
@@ -379,8 +385,6 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - A `Screen.read()` that tolerates trailing blanks beyond column 11 (and reads the status line while a cursor is on
   without the shift), and a `selectPage` that can turn the outer knob in either direction, so that no test has to
   navigate with fixed counts.
-- Migrate the tests that hand-roll what `settle`, `storedSetting`, `FrontPanel.type` and `coldGps` now provide (the
-  `typeRight` loops, the `persistent-setting.` keys, the `gps.reset()` calls and the fixed waits). They still work.
 - **Flights cannot test the nav-source gate or a cold start.** `Aircraft.writeTo` forces `GPS DRIVES NAV1` true on every
   16 Hz step, so a flight cannot observe what the unit does when the GPS is not the nav source (`92fbba1` is a render
   test, which sets the SimVar itself). `Flight.start` waits for a fix, so it cannot start a cold unit (#61 is a render

@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit} from '../../../harness/boot';
+import {bootUnit, settle} from '../../../harness/boot';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
@@ -18,8 +18,7 @@ describe('NAV 3 page', () => {
             storage: savedFlightplan(0, [kaaa, abc, abc, kbbb]),
         });
         // The FPL activates at the first calculation tick with a GPS fix
-        for (let i = 0; i < 120 && !unit.props.sensors.in.gps.isValid(); i++) await vi.advanceTimersByTimeAsync(1000);
-        await vi.advanceTimersByTimeAsync(3000);
+        await settle(unit);
         expect(Screen.read().leftName()).toBe('NAV 2');
         await unit.panel.inner('L', 1); // NAV 3
         await vi.advanceTimersByTimeAsync(2000);

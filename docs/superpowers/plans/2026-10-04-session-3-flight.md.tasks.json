@@ -54,7 +54,16 @@
         4,
         5
       ]
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: migrate the older tests to the harness helpers, and update the workflow rules",
+      "status": "completed",
+      "description": "**Goal:** The older tests use the helpers that task 1 added instead of hand-rolling them, and the workflow rules and Session H say what the sessions learned.\n\nFull steps: docs/superpowers/plans/2026-10-04-session-3-flight.md, Task 7.\n\n```json:metadata\n{\"files\": [\"docs/test-coverage.md\", \"docs/testing.md\"], \"verifyCommand\": \"npm test && npx tsc --noEmit\", \"acceptanceCriteria\": [\"assertions unchanged\", \"kept forms explained\", \"re-proof where waits changed\", \"same totals\", \"one commit\"], \"modelTier\": \"standard\"}\n```",
+      "blockedBy": [
+        6
+      ]
     }
   ],
-  "lastUpdated": "2026-10-04T17:00:05.312091"
+  "lastUpdated": "2026-10-04T18:00:00.000000"
 }
