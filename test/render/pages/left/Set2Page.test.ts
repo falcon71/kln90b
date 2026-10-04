@@ -6,7 +6,7 @@ import {OneTimeMessage} from '../../../../kln90b/data/MessageHandler';
 describe('SET 2 page', () => {
     // 3-53, 5-14: the figures of SET 2 and CAL 6 show the first zone as CORD UNIV/Z. The half page is 11 characters
     // wide, and the name of the first timezone has 12
-    it.fails('fits the screen with the default timezone (#110)', async () => {
+    it('fits the screen with the default timezone (#110)', async () => {
         const unit = await bootUnit();
         await unit.panel.outer('L', 3);
         await unit.panel.inner('L', 1);

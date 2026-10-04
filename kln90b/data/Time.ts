@@ -7,7 +7,7 @@ export class Timezone {
 }
 
 export const TIMEZONES = [
-    new Timezone("UTC", 0, "CORD UNIV/Z "),
+    new Timezone("UTC", 0, "CORD UNIV/Z"),
     new Timezone("GST", -3, "GREENL STD "),
     new Timezone("GDT", -2, "GREENL DAY "),
     new Timezone("ATS", -4, "ATLANT STD "),
