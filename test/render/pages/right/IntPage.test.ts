@@ -1,15 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {bootUnit} from '../../../harness/boot';
 import {intersection, vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
-
-/** The REF field of the INT page takes keyboard keys; enterIdent cannot type into the ident selectors of the page */
-async function typeRight(unit: HeadlessUnit, text: string): Promise<void> {
-    for (const ch of text) {
-        unit.send(`KLN90B_Internal_Key:RIGHT:${ch}`);
-        await vi.advanceTimersByTimeAsync(250);
-    }
-}
 
 describe('INT page', () => {
     // 3-14 to 3-15: a reference waypoint is confirmed on its waypoint page, and the second ENT accepts it
@@ -24,7 +16,7 @@ describe('INT page', () => {
         await vi.advanceTimersByTimeAsync(9000); // the REF calculation takes 8 s (REF_CALCULATION_TIME)
         await unit.panel.cursor('R');
         await unit.panel.outer('R', 5);
-        await typeRight(unit, 'XYZ');
+        await unit.panel.type('R', 'XYZ');
 
         await unit.panel.ent();
 

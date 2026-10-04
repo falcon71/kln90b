@@ -1,14 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {bootUnit, settle} from '../../../harness/boot';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
-
-/** The GPS is valid within about 12 s of boot; until then FPL 0 does not activate */
-async function waitForGps(unit: HeadlessUnit): Promise<void> {
-    for (let i = 0; i < 120 && !unit.props.sensors.in.gps.isValid(); i++) await vi.advanceTimersByTimeAsync(1000);
-    await vi.advanceTimersByTimeAsync(2000);
-}
 
 describe('D/T 3 page', () => {
     it('shows the same DIS and DTK for a leg that repeats the previous waypoint (#27, dbb01bf)', async () => {
@@ -22,7 +16,7 @@ describe('D/T 3 page', () => {
             facilities: [kaaa, abc, def, kbbb], position: {lat: 47.5, lon: 8.0}, magvar: 0,
             storage: savedFlightplan(0, [kaaa, abc, def, def, kbbb]),
         });
-        await waitForGps(unit);
+        await settle(unit);
         expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(1); // Precondition: ABC is active
 
         await unit.panel.outer('L', -1); // FPL 0, cursor off

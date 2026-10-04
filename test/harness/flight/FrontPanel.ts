@@ -102,6 +102,17 @@ export class FrontPanel {
         }
     }
 
+    /**
+     * Types text with the keyboard (KLN90B_Internal_Key), one display tick per character. The side's cursor must be on.
+     * This is how the waypoint selectors of the APT, VOR, NDB, INT and SUP pages take an ident; enterIdent turns knobs
+     * and cannot do that.
+     */
+    public async type(side: Side, text: string): Promise<void> {
+        for (const ch of text) {
+            await this.press(`KLN90B_Internal_Key:${side === 'L' ? 'LEFT' : 'RIGHT'}:${ch}`);
+        }
+    }
+
     /** Types an ident into the focused editor with the inner and outer knobs. Does not press ENT. */
     public async enterIdent(side: Side, ident: string): Promise<void> {
         for (let i = 0; i < ident.length; i++) {

@@ -1,8 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {bootUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
-
-const KEY = 'persistent-setting.KLN TEST.profile_1.cal12Barometer';
+import {storedSetting} from '../../../harness/storage';
 
 /** The left half page's row n (11 characters) */
 function left(n: number): string {
@@ -28,7 +27,7 @@ describe('CAL 1 page persistence (characterization)', () => {
 
         expect(unit.errors).toEqual([]);
         expect(unit.props.userSettings.getSetting('cal12Barometer').get()).toBe(29.92);
-        expect(unit.env.storage.data.get(KEY)).toBe('29.92');
+        expect(storedSetting(unit, 'cal12Barometer')).toBe(29.92);
         expect(left(2)).toBe('BARO:29.92"');
     });
 

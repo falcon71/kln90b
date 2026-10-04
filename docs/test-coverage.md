@@ -58,7 +58,8 @@ them it is for the convenience of the session, and `testing.md` is the authority
 10. Every new test is verified by breaking its subject on purpose (`testing.md` section 5). For a regression test the
     break is the original bug: reintroduce it in the working tree, by hand when the old commit's diff no longer applies,
     confirm the test fails, restore, and confirm `git diff` shows only the intended changes. Never commit the broken
-    state. Record in the log any fix that could not be re-broken and why.
+    state. Record the proof in the task's commit message, one line per item (`Proof: fails when …`). Record in the log
+    any fix that could not be re-broken and why.
 11. A regression test that cannot fail for its bug is not done. Either make it bite or mark the item "not provable" in
     the triage table with the reason.
 
@@ -109,8 +110,14 @@ subagents, relays their results and merges, but it neither implements nor review
     own git worktree (`isolation: "worktree"`) branched from the session branch. A harness task runs alone before them,
     because they build on it. Subagent-driven development runs implementers one at a time to avoid conflicts. Separate
     worktrees remove those conflicts, so this workflow runs them in parallel.
-22. **Implementers commit per item**, with the one-line proof of rule 10 in the commit message, ending with a
-    `Co-Authored-By` line that names the model that wrote the commit. They do not edit this document and do not file
+    - The harness creates an isolation worktree from the remote's default branch (`origin/main`), not from the session
+      branch. The implementer therefore first resets its worktree branch to the session branch
+      (`git reset --hard <session branch>`, on its own worktree branch, which is still empty), and the controlling
+      session checks the merge base before it reviews.
+22. **Implementers commit once per task**, plus once per fix round. They never amend, so that the re-review diffs
+    against the head the previous review saw. The commit message lists every item with its one-line proof of rule 10
+    (`- #76 …: Proof: fails when …`) and ends with a `Co-Authored-By` line that names the model that wrote the commit.
+    They do not edit this document and do not file
     issues. They write their report to a file and reply with only the status, the head commit and their concerns. The
     report lists, for each item:
     - the test path, and whether the test is a spec or a characterization test;
@@ -193,8 +200,8 @@ numbers.
 
 1. For each row: write the test in the folder mirroring the code under test, cite the issue in the test name
    (`'… (#NN)'`), and cite the manual page when the issue is about matching the real unit.
-2. Prove it bites (rules 10 and 11). Record the proof in the commit message in one line ("fails when the sign flip in
-   `UserWaypointLoaderV2` is restored").
+2. Prove it bites (rules 10 and 11). Record the proof in the task's commit message, one line per row ("fails when the
+   sign flip in `UserWaypointLoaderV2` is restored").
 3. Tick the row in the triage table with the test file's path.
 4. Any issue that turns out not to be fixed, or only half fixed, gets an `it.fails` pin and a new GitHub issue
    referencing the closed one (as #98 did for #78). #101 is pinned here; #102 waits for airspace boundaries.
@@ -228,7 +235,7 @@ numbers.
 
 ## Session 3: regression tests, flight stage
 
-- [ ] done
+- [x] done
 
 **Goal:** the same for the rows whose stage is flight: sequencing, direct-to, turn handling, mode changes, alerts.
 
@@ -256,6 +263,11 @@ numbers.
 
 - [ ] done
 
+A helper that serves several tests is added by the session that needs it (rule 13), as sessions 2 and 3 did with
+`settle`, `storedSetting`, `FrontPanel.type` and `coldGps`. Session H takes the extensions that change the fake world:
+navdata, the platform, the aircraft and the boot paths. Suggested slot: before session 5, because ARM/APR, `SidStar`
+and the nearest filters need items 1 and 2.
+
 Scheduled by the maintainer after session 1 if enough rows carry *needs harness*. Candidates, from `testing.md`
 section 7:
 
@@ -263,7 +275,8 @@ section 7:
    tested.
 2. Nearest-search filters in `MemoryFacilityClient` (airport surface and length, VOR class).
 3. Airspace boundaries in the navdata, for the SUA alert and `AirspacesAlongRoute`.
-4. A `FrontPanel.enterIdent` that blanks the positions past a short ident.
+4. A `FrontPanel.enterIdent` that blanks the positions past a short ident and that handles the waypoint selectors
+   (APT, VOR, NDB, INT, SUP). `FrontPanel.type` covers the selectors today.
 5. A power-cycle helper (`engineRunning: false`, `FrontPanel.power()`), for #90 and the cold-and-dark pages.
 
 Found by the session 1 triage (section 5):
@@ -272,6 +285,14 @@ Found by the session 1 triage (section 5):
 7. A boot-failure helper: a boot that awaits the `error` event instead of `propsReady`, for #50.
 8. A reader for the Super NAV 5 `<pre>` blocks, for `eef92e8`.
 9. A paused aircraft (position frozen, ground speed kept), for the pause half of `43d472b`.
+
+Found by sessions 2 and 3 (`testing.md` section 7):
+
+10. An `Aircraft` option that keeps `GPS DRIVES NAV1` false, for the flight version of `92fbba1`.
+11. A cold start in `Flight.start`, which waits for a fix today, for the flight version of #61.
+12. A collector for unhandled rejections on the ENT path, so that a throw there fails the test that caused it.
+13. A `Screen.read` that tolerates trailing blanks beyond column 11, and a `selectPage` that turns the outer knob in
+    either direction, so that no test has to navigate with fixed counts.
 
 Each extension comes with its own harness test (`test/*/harness/`) and a paragraph in `testing.md` section 3. After
 this session, the *needs harness* rows it unblocked become *testable* and are picked up by a rerun of session 2 or 3.
@@ -448,6 +469,131 @@ lists the gaps.
 One entry per session run, newest first. Format: date, session, branch, what was done, what was left and why, the
 coverage summary for the session's area at start and end. This is a dated record and is never edited afterwards; a
 later run adds a new entry.
+
+## 2026-10-04, session 3, branch `tests-session-3-flight`
+
+**Done**
+- **Harness task** (alone, first): `Flight` restores its `console.error` wrapper at the end of each flight; the teardown
+  runs every step even when an earlier one threw and also empties `FakeXhr.requests`; `settle(unit)` waits for a fix and
+  for FPL 0 to activate; `bootUnit({coldGps: true})` boots an engine-running unit without a fix; `storedSetting`
+  reads a stored setting; `FrontPanel.type` types text. Each has a harness test that fails when it is disabled. The
+  plan's list plus the cold-GPS option was the maintainer's decision.
+- **Four batches**, in parallel worktrees branched after the harness task, each with a report and a combined review:
+  sequencing and leg activation (#76, #41, #34, #19 with #22, the flight half of #27), OBS, direct-to and modes (#67 (a),
+  `014293d`, #70, #29), GPS state (#61, #63, #87, #24) and SimVar outputs and scanning (`6be164c`, `1236025`,
+  `07c6e37`, `92fbba1`, #39). All 18 session 3 rows are ticked in section 5 with their test paths. Every test was proven
+  to bite by reintroducing its bug in the working tree.
+- **Close-out:** the issues below, the placeholders replaced, `testing.md` sections 6 and 7 extended.
+- **Task 7 (added at the maintainer's request after the final review):** the older tests that hand-rolled what the harness
+  task added now use `settle`, `FrontPanel.type`, `storedSetting` and `coldGps` (15 files; assertions unchanged, local
+  helpers deleted). Kept in their hand-rolled form: `KeyboardService.test.ts` (the raw key event is the subject),
+  `Gps.test.ts` and `SensorsOut.test.ts` (their loops measure the acquisition), `UserWaypointPersistor.test.ts` (a unit
+  test with no `HeadlessUnit`) and the harness tests. The two tests whose waits changed (NAV 3, NAV 5) were proven
+  again against their original bugs. Rule changes in section 2: one commit per task plus one per fix round (rules 10 and
+  22, session 2 step 2), the worktree base of rule 21, and the split and candidates of Session H.
+
+**Re-verdicts and rulings**
+- **Rows go to their cheapest stage** (maintainer's decision, rule 9). Only the rows that need motion stay flight: #76,
+  #19 with #27, the TO to FROM flip of #29, and the magnetic track of `6be164c`. #41 and #34 went to unit
+  (`ActiveWaypoint.activateFpl0` with a fake position is the whole subject). #67 (a), `014293d`, #70, #39, #24, #87,
+  #61, #63, the other half of `6be164c`, `1236025` and `07c6e37` went to render: the state is reached at rest, by panel
+  input, by a teleport (`PLANE LATITUDE`) or by a direct call. Each reason is in its row.
+- Two flight versions are not possible today, and the render versions prove the same thing: `92fbba1` (`Aircraft.writeTo`
+  forces `GPS DRIVES NAV1` true every step) and #61 (`Flight.start` cannot start a cold unit).
+- **Turn anticipation near 180° on a long leg starts about 14 NM early** (r tan(θ/2)). The real unit is uncapped too,
+  so the maintainer ruled that it is not a bug. No issue, no pin.
+- #41 is a characterization (the manual is silent); the trainer-sourced behavior (#76, #19, #27, #34) is a spec test
+  citing the trainer and the fix commit; the era shift of #63 is a characterization and its same-era control a spec test
+  (3-53).
+- Review fix rounds: tasks 1 to 4 each needed one, tasks 5 and 6 none. Examples: the #63 epoch was pinned from one side
+  only (a second boundary test was added), and the #76 test missed the XTK kick and the turn stack (now sampled). The
+  final whole-session review added a last round on the branch: a no-op assertion removed from the #87 test, the #19
+  trainer citation corrected, the #67 (a) XTK bound moved from the spec test into the characterization test, a leg
+  activation case before the start of the plan (the `else` branch of `findClosestLegIdx`), the planner `directToData`
+  and the 4-10 resume of #70 asserted, and the pin siblings tagged with their issue numbers.
+
+**Bugs found and filed** (each pinned with `it.fails`):
+- **#120:** the NaN-path early return in `NavCalculator.tick` skips `setOutput()`, so a zero-length last leg leaves all
+  GPS outputs unwritten (continues #19 and #67).
+- **#121:** `ActiveWaypoint.findClosestLegIdx` never uses the perpendicular distance on a DME-arc leg (continues #41).
+- **#122:** `ModeController.setObs` returns when the course equals the stored `obsMag`, so OBS 000 keeps the leg path
+  (5-36).
+- **#123:** `L:KLN90B_ObsSource` switched to 0 at runtime leaves `sensors.in.obsMag` stale.
+- **#124:** `L:KLN90B_IntegrityWarn` and `L:KLN90B_GPS_WP_BEARING` are not written when `Output.WriteGPSSimVars` is off
+  (public contract); two pins, one per LVar.
+
+**The question filed** (no `bug` label, no pin):
+- **#125:** `SelfTestRightPage` builds its date and time editors without the read-only guard for a valid GPS that
+  `Set2Page` has. Since #61 the fast-mode GPS can be valid while the self-test page is up. 3-53 says date and time
+  cannot be changed while the satellite supplies them; what the real unit does on the self-test page is not known.
+
+**Fixes that could not be re-broken**
+- The `fac === undefined` guard of #39 (`WaypointPage.tsx:218`, `d202f4a`) survives every mutation at render stage when it
+  is removed alone. Since `c2e7b8e` keeps the scan out of the nearest-list branch that can produce `undefined`, the
+  guard is a second line of defense that no render test can reach. The scan fix itself (`facility.index > -1` at
+  `WaypointPage.tsx:144` and `:177`) is held: removing it fails the ident, the coordinate rows and, scanning left,
+  the `console.error` spy.
+- Two assertions are not independent of their neighbors, and say so: the second check of the #63 rollover test fails
+  together with the first when only `Gps.ts:192` is reverted (the valid-state tick runs in the same calculation
+  tick), and the `unit.errors` assertion of the #67 (a) test stays empty under the break, so it is only a secondary
+  assertion.
+
+**Not covered**
+- #23 (a STAR with a repeated fix) and the DME-arc half of #19 (`326da1a`) need procedure builders. The missed-approach
+  scenario of #41 does too.
+- The flight versions of `92fbba1` and #61 (see the re-verdicts).
+- The neighbor mutations that survived review and were accepted, each with the session that owns the code:
+    - The ident-versus-coordinates guard of #27 (`NavCalculator`; #22 with the default anticipation would catch it) and
+      the TO/FROM abeam boundary (`<= 90` versus `<= 135`, which needs a laterally offset flight): session 5 item 3.
+    - `setGpsOverriden` only with a fix (`NavCalculator.ts:306`, needs a cold-GPS variant of the #24 test) and the
+      `WriteGPSSimVars` gate in `SimVarSync.setDisabled`: session 4 item 4; `SimVarSync` itself is also session 10
+      item 5.
+    - The future-era `Math.abs` of `Gps.ts:291`: session 7 item 4.
+    - Scanning within the nearest list from a valid index (`NearestList`, `Scanlist`): session 7 item 2.
+- Accepted with no owning session: the hard-coded clock start in `Gps.test.ts` (a change of the default start fails the
+  test loudly), and the harness minors of task 1 (the trailing second of `settle` is not held by a test, the
+  `FrontPanel.type` test passes with the first character only because of autocomplete, and the second `consoleRestore`
+  test is vacuous when run alone).
+
+**Observed but not filed**
+- The #67 (a) plan `[KAAA, KAAA]` logs "invalid path, sequencing to the next waypoint" at the boot of that test. Render
+  tests do not fail on `console` output; it is the #19 guard working.
+- An unguided aircraft in a flight with a zero-length leg curves, because the unit has no DTK for it.
+- In the render tests, `selectPage('L', 'MOD 2')` plus ENT enters OBS without the left cursor.
+- `FlightPlanner.getPlanner(id, bus)` does not type-check against the SDK (a required third options argument); the
+  tests pass `{} as FlightPlannerOptions`, which the SDK ignores for an existing planner.
+
+**Workflow notes.** The isolation worktrees were created at the old master commit `d449d11` instead of the session
+branch, and each implementer reset its worktree to the session branch before starting (the four merge bases were
+verified to be the same commit). A worktree-isolated agent could not write to the shared `.superpowers` path, so its
+report was written inside the worktree and copied. Two reviewers collided on a shared scratch script name: one
+mutation of task 3 ran once in the task 2 worktree and was restored at once, and the task 2 reviewer re-ran its
+mutations. One combined reviewer per task (Opus for tasks 2 and 3, Sonnet for the others) and a scoped re-review after
+each fix round. Implementer commits carry the trailer of the model that wrote them. At the maintainer's request, the
+history of sessions 2 and 3 was rebuilt to one commit per task from the reviewed trees before the merge into `master`,
+and later sessions commit once per task.
+
+**Coverage at the start of the session** (identical to the end of session 2) **and at the end** (all tests green):
+
+| directory                  | % stmts start | % stmts end | % lines start | % lines end |
+|----------------------------|--------------:|------------:|--------------:|------------:|
+| all files                  |         57.49 |       59.49 |         57.27 |       59.33 |
+| `kln90b`                   |         74.90 |       77.45 |         74.60 |       77.22 |
+| `kln90b/controls`          |         60.77 |       65.01 |         60.27 |       64.60 |
+| `kln90b/controls/displays` |         72.34 |       72.94 |         71.73 |       72.36 |
+| `kln90b/controls/editors`  |         75.80 |       75.80 |         75.22 |       75.22 |
+| `kln90b/controls/selects`  |         54.67 |       54.96 |         52.68 |       52.99 |
+| `kln90b/data`              |         73.91 |       76.63 |         73.44 |       76.27 |
+| `kln90b/data/flightplan`   |         88.10 |       89.18 |         88.20 |       89.32 |
+| `kln90b/data/navdata`      |         68.42 |       69.94 |         68.39 |       69.89 |
+| `kln90b/pages`             |         61.42 |       62.42 |         60.81 |       61.83 |
+| `kln90b/pages/left`        |         46.26 |       49.48 |         46.27 |       49.53 |
+| `kln90b/pages/right`       |         44.29 |       44.97 |         45.13 |       45.82 |
+| `kln90b/services`          |         41.06 |       45.91 |         40.10 |       45.23 |
+| `kln90b/settings`          |         87.39 |       87.67 |         87.16 |       87.46 |
+
+The suite at the start: 206 tests passed and 18 expected failures. At the end: 265 tests passed and 24 expected failures
+(the pins), in 87 files.
 
 ## 2026-10-04, session 2, branch `tests-session-2-regressions`
 
@@ -634,15 +780,15 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 
 | done | issue / commit | description | stage | verdict | how / why | test |
 |------|----------------|-------------|-------|---------|-----------|------|
-| | #76 `e7cc3ca` (#71 duplicate) | A turn near 180° made the anticipation distance exceed the distance to the waypoint, and the HSI swung back and forth. Now the next leg is taken at once. | flight | testable | Three waypoints with a ~175° turn at the middle one: `activeIdent` advances once, and DTK switches once between the two leg courses from `geo.ts`. `turnDirection.test.ts` only flies 35° and pins #100. | |
-| | #41 `42099f3` | The "point between two points" check in `findClosestLegIdx` was wrong, so the wrong leg (even a missed-approach leg) was activated. | flight | testable | Dogleg FPL 0, aircraft abeam a later leg: the activated leg is the one at the true minimum distance (`geo.ts`). Activation runs at the first calculation tick, so a booted unit at a fixed position may be enough; try that before flying. | |
-| | #34 `2b06e54` | An FPL 0 with two or more waypoints flagged navigation when the aircraft was not abeam any leg. Now it always activates. | flight | testable | Setup as #41, aircraft far to the side and beyond the end: a leg is active and NAV is not flagged. | |
-| | #19 `3364def` (#22, #23 same fix) | Consecutive identical waypoints (also a REF waypoint on top of an FPL waypoint) gave a NaN path and threw when sequencing. | flight | testable | `savedFlightplan(0, [KAAA, ABC, ABC, KBBB])`, fly through ABC: no error, `activeIdent` ABC then KBBB, DTK finite. #22 variant: two facilities at the same coordinates. The DME-arc half (`326da1a`) is in a procedure-builder row. | |
-| x (render) | #27 `dbb01bf` | Duplicate waypoints: turn anticipation off, the label drawn once on the maps, the same DTK for both legs on DT 3 and OTH 3. | flight + render | testable | Flight as #19: the aircraft overflies ABC without an early turn. Render: DT 3 shows the same DTK on both legs. Session 2 did the render half; the flight half is left to session 3. | `test/render/pages/right/Dt3Page.test.ts` |
-| x (b) | #67 `3415417` | (a) The same waypoint twice plus OBS threw (null DTK). (b) A direct-to target deleted from FPL 0 re-activated a leg instead of staying a random direct-to. | flight + render | testable | (a) `[KAAA, KAAA]`, OBS, fly: no error. (b) Direct-to a leg, delete it on FPL 0: still direct-to the same ident, no active FPL index. Session 2 did (b); the flight half (a) is left to session 3. | `test/render/data/flightplan/ActiveWaypoint.test.ts` |
+| x | #76 `e7cc3ca` (#71 duplicate) | A turn near 180° made the anticipation distance exceed the distance to the waypoint, and the HSI swung back and forth. Now the next leg is taken at once. | flight | testable | Three waypoints with a ~175° turn at the middle one: `activeIdent` advances once, and DTK switches once between the two leg courses from `geo.ts`. `turnDirection.test.ts` only flies 35° and pins #100. Done as a flight: a frozen aircraft does not reproduce it, so the flight stays. | `test/flight/flights/largeTurn.test.ts` |
+| x | #41 `42099f3` | The "point between two points" check in `findClosestLegIdx` was wrong, so the wrong leg (even a missed-approach leg) was activated. | unit | testable | Dogleg FPL 0, aircraft abeam a later leg: the activated leg is the one at the true minimum distance (`geo.ts`). Activation runs at the first calculation tick, so a booted unit at a fixed position may be enough; try that before flying. Re-verdicted from flight to unit: `ActiveWaypoint.activateFpl0` with a fake position is the whole subject. The missed-approach scenario needs procedures and is not covered. | `test/unit/data/flightplan/ActiveWaypoint.test.ts` |
+| x | #34 `2b06e54` | An FPL 0 with two or more waypoints flagged navigation when the aircraft was not abeam any leg. Now it always activates. | unit | testable | Setup as #41, aircraft far to the side and beyond the end: a leg is active and NAV is not flagged. Re-verdicted from flight to unit, as #41. | `test/unit/data/flightplan/ActiveWaypoint.test.ts` |
+| x | #19 `3364def` (#22, #23 same fix) | Consecutive identical waypoints (also a REF waypoint on top of an FPL waypoint) gave a NaN path and threw when sequencing. | flight | testable | `savedFlightplan(0, [KAAA, ABC, ABC, KBBB])`, fly through ABC: no error, `activeIdent` ABC then KBBB, DTK finite. #22 variant: two facilities at the same coordinates. The DME-arc half (`326da1a`) is in a procedure-builder row. Done as a flight (#19 and #22 are one setup). The #23 variant (a STAR with a repeated fix) and the DME-arc half need procedures and are not covered. | `test/flight/flights/duplicateWaypoint.test.ts` |
+| x | #27 `dbb01bf` | Duplicate waypoints: turn anticipation off, the label drawn once on the maps, the same DTK for both legs on DT 3 and OTH 3. | flight + render | testable | Flight as #19: the aircraft overflies ABC without an early turn. Render: DT 3 shows the same DTK on both legs. Session 2 did the render half; the flight half is left to session 3. Session 3 did the flight half, with the #19 setup. | `test/render/pages/right/Dt3Page.test.ts`, `test/flight/flights/duplicateWaypoint.test.ts` |
+| x | #67 `3415417` | (a) The same waypoint twice plus OBS threw (null DTK). (b) A direct-to target deleted from FPL 0 re-activated a leg instead of staying a random direct-to. | render | testable | (a) `[KAAA, KAAA]`, OBS, fly: no error. (b) Direct-to a leg, delete it on FPL 0: still direct-to the same ident, no active FPL index. Session 2 did (b); the flight half (a) is left to session 3. Session 3 did (a) at render stage: OBS on `[KAAA, KAAA]` is reached at rest, so no flight is needed. | `test/render/data/flightplan/ActiveWaypoint.test.ts` |
 | x | `0031c11`, `d8edd70` | Deleting waypoints from FPL 0 until fewer than two remain did not flag navigation, and left the FROM waypoint set. | render | testable | FPL 0 with two waypoints, the first leg active, delete one: navigation flagged, no active or FROM waypoint. | `test/render/data/flightplan/ActiveWaypoint.test.ts` |
-| | `014293d` | `ModeController` must tick before `NavCalculator`, so a changed OBS course is used in the same calculation. | flight | testable | OBS mode, change the course: DTK equals the new course after exactly one calculation tick, not two. The tick list is now built in `KLN90BCore`. | |
-| | #70 `748151c` | Sequencing after a direct-to threw: `activeWaypointChanged` fired before the data was set, so `WTFlightplanSync` read stale state. | flight | testable | FPL KAAA-ABC-KBBB, direct-to ABC, fly through it: no error, KBBB active, and the SDK planner `"kln90b"` has the matching active leg (the stale state showed there). Prove by reverting the event order. | |
+| x | `014293d` | `ModeController` must tick before `NavCalculator`, so a changed OBS course is used in the same calculation. | render | testable | OBS mode, change the course: DTK equals the new course after exactly one calculation tick, not two. The tick list is now built in `KLN90BCore`. Re-verdicted from flight to render: a changed OBS course is enough, one `advanceTimersByTimeAsync(1000)` is one calculation tick. | `test/render/services/ModeController.test.ts` |
+| x | #70 `748151c` | Sequencing after a direct-to threw: `activeWaypointChanged` fired before the data was set, so `WTFlightplanSync` read stale state. | render | testable | FPL KAAA-ABC-KBBB, direct-to ABC, fly through it: no error, KBBB active, and the SDK planner `"kln90b"` has the matching active leg (the stale state showed there). Prove by reverting the event order. Re-verdicted from flight to render: the direct-to and the sequencing are reached by panel input and a direct call. | `test/render/data/flightplan/ActiveWaypoint.test.ts` |
 | x | #43 `ed17e0e` | Direct-to from the FPL 0 page to the second of two identical waypoints flew to the first. | render | testable | `[A, X, B, X]`, cursor on the second X, DCT, ENT: the active FPL index is 3. | `test/render/pages/left/DirectToPage.test.ts` |
 | x | `43d472b` (open #68) | `ActiveWaypoint.directTo` read the previous index instead of the target's when the typed ident is in FPL 0. | render | testable | FPL KAAA-ABC-KBBB with ABC active, DCT, type KBBB, ENT: `activeIdent` KBBB, FPL index 2, no error. The target must differ from the active leg, or the old code reads the right leg by chance. The pause half of the commit is a needs-harness row. | `test/render/data/flightplan/ActiveWaypoint.test.ts` |
 | x | #12 `2922907` (#30 duplicate) | On the direct-to page, CLR followed by the cursor (or ENT) threw "cannot pop the base page". | render | testable | No active waypoint, DCT, CLR, left cursor; separately DCT, CLR, ENT: no error, page usable. | `test/render/pages/left/DirectToPage.test.ts` |
@@ -657,15 +803,15 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 | x | `f745fb3`, `b14db79` | A user airport runway of unknown length (stored as -1) was not recognized as unknown after a restore (unit conversion made it a fraction). | unit | testable | Persist a user airport without runway length, restore it: the length is negative and APT 3 (user) shows none. | `test/unit/settings/UserWaypointV2.test.ts`, `test/render/pages/right/Apt3UserPage.test.ts` |
 | x | `1781156` | Loading user waypoints at boot wrote every one back to storage while importing. | unit | testable | Load V2 user waypoints through the persistor: `FakeStorage` sees no writes during the load. It regressed: `933479d` moved the `ignoreSync` flag into the loaders, where nothing reads it. It is pinned as #103 (`it.fails`) instead of guarded. | `test/unit/settings/UserWaypointPersistor.test.ts` |
 | x | #31 `e0fec22` | CAL page values are kept in user settings instead of volatile memory. | render | testable | Edit CAL 1 BARO: the value is stored under the profile key and still shown after the page is recreated. The default value is a trainer-based choice: characterization only. | `test/render/pages/left/Cal1Page.test.ts` |
-| | #61 `179d37d` | GPS acquisition started only after the self-test instead of at power-on. | flight | testable | `engineRunning: false`, fast acquisition: during the self-test the satellite computer has left idle. | |
-| | #63 `64c203d` | Simulates the GPS week rollover: a manual date in another 1024-week era stays shifted by whole eras after acquisition. | flight | testable | Set the date ~20 years off before acquisition, acquire: the sim date minus the era difference × 1024 weeks, computed from the GPS epoch independently. A same-era date is unchanged. | |
-| | #87 `8a16a33` | New LVar `L:KLN90B_IntegrityWarn`, set while there is no GPS solution. | flight | testable | Boot with slow acquisition: true while acquiring, false once valid. Public contract. | |
-| | #29 `a0678fa` | New LVar `L:KLN90B_HSI_TF_FLAGS` (0 off, 1 TO, 2 FROM), also in OBS. | flight | testable | 1 before the waypoint, 2 after passing it in OBS, 0 with no active waypoint. Public contract. | |
-| | #24 `66b0444` | After a hot swap another GPS reset `GPS OVERRIDDEN`; the unit now re-asserts it every calculation tick. | flight | testable | Clear `GPS OVERRIDDEN` mid-flight: it is 1 again within two seconds. | |
-| | `6be164c` (part) | `GPS MAGVAR` was written in degrees instead of radians; `GPS GROUND MAGNETIC TRACK` was added. | flight | testable | World magvar 4°, fly 090 true: `GPS MAGVAR` is 4° in radians, and the magnetic track matches an independent computation. | |
-| | `1236025` (part) | `GPS WP NEXT LON` and `PREV LON` were written with a string unit. | flight | testable | Three-leg FPL 0: both SimVars equal the waypoint literals in degrees. | |
-| | `07c6e37` | `Output.ObsTarget` wrote SimVars instead of the `K:VOR1_SET`/`K:VOR2_SET` key events. | flight | testable | panel.xml `ObsTarget` 1, fly a leg: `sim.keyEvents` holds `K:VOR1_SET` with the magnetic DTK. | |
-| | `92fbba1` | `Output.ObsTarget` set the NAV OBS even when the GPS was not the nav source. | flight | testable | As the `07c6e37` row with `GPS DRIVES NAV1` false: no `K:VOR1_SET` key event. | |
+| x | #61 `179d37d` | GPS acquisition started only after the self-test instead of at power-on. | render | testable | `engineRunning: false`, fast acquisition: during the self-test the satellite computer has left idle. Re-verdicted from flight to render: `Flight.start` cannot start a cold unit, and a booted `engineRunning: false` unit shows the channels searching while the welcome page is up. The flight version is not covered. | `test/render/Gps.test.ts` |
+| x | #63 `64c203d` | Simulates the GPS week rollover: a manual date in another 1024-week era stays shifted by whole eras after acquisition. | render | testable | Set the date ~20 years off before acquisition, acquire: the sim date minus the era difference × 1024 weeks, computed from the GPS epoch independently. A same-era date is unchanged. Re-verdicted from flight to render: the era shift is read from `gps.timeZulu` after a cold acquisition. | `test/render/Gps.test.ts` |
+| x | #87 `8a16a33` | New LVar `L:KLN90B_IntegrityWarn`, set while there is no GPS solution. | render | testable | Boot with slow acquisition: true while acquiring, false once valid. Public contract. Re-verdicted from flight to render: a cold boot shows the LVar true, then false. | `test/render/SensorsOut.test.ts` |
+| x | #29 `a0678fa` | New LVar `L:KLN90B_HSI_TF_FLAGS` (0 off, 1 TO, 2 FROM), also in OBS. | flight + render | testable | 1 before the waypoint, 2 after passing it in OBS, 0 with no active waypoint. Public contract. The TO to FROM flip flies; the 0 case is a render test (no active waypoint), so the row has both stages. | `test/flight/flights/hsiToFromFlags.test.ts`, `test/render/Sensors.test.ts` |
+| x | #24 `66b0444` | After a hot swap another GPS reset `GPS OVERRIDDEN`; the unit now re-asserts it every calculation tick. | render | testable | Clear `GPS OVERRIDDEN` mid-flight: it is 1 again within two seconds. Re-verdicted from flight to render: clearing `GPS OVERRIDDEN` and one calculation tick is enough (the row said two seconds). The hot-swap and `WriteGPSSimVars` companions are render tests too. | `test/render/SensorsOut.test.ts` |
+| x | `6be164c` (part) | `GPS MAGVAR` was written in degrees instead of radians; `GPS GROUND MAGNETIC TRACK` was added. | flight + render | testable | World magvar 4°, fly 090 true: `GPS MAGVAR` is 4° in radians, and the magnetic track matches an independent computation. The magnetic track flies; `GPS MAGVAR` is a render test. | `test/flight/flights/magneticTrack.test.ts`, `test/render/SensorsOutSimVars.test.ts` |
+| x | `1236025` (part) | `GPS WP NEXT LON` and `PREV LON` were written with a string unit. | render | testable | Three-leg FPL 0: both SimVars equal the waypoint literals in degrees. Re-verdicted from flight to render: the SimVars are written at rest. | `test/render/SensorsOutSimVars.test.ts` |
+| x | `07c6e37` | `Output.ObsTarget` wrote SimVars instead of the `K:VOR1_SET`/`K:VOR2_SET` key events. | render | testable | panel.xml `ObsTarget` 1, fly a leg: `sim.keyEvents` holds `K:VOR1_SET` with the magnetic DTK. Re-verdicted from flight to render: the key events are written at rest. | `test/render/SensorsOutSimVars.test.ts` |
+| x | `92fbba1` | `Output.ObsTarget` set the NAV OBS even when the GPS was not the nav source. | render | testable | As the `07c6e37` row with `GPS DRIVES NAV1` false: no `K:VOR1_SET` key event. Re-verdicted from flight to render: `Aircraft.writeTo` forces `GPS DRIVES NAV1` true every 16 Hz step, so a flight cannot test it. The flight version is not covered. | `test/render/SensorsOutSimVars.test.ts` |
 | x | `955b535` | During the self-test the course output was 130° (the RMI test value) instead of 315°. | render | testable | `engineRunning: false`, during the self-test: the desired-track output is 315° magnetic (3-4 gives OBS out 315°, RMI 130°). | `test/render/pages/left/SelfTestLeftPage.test.ts` |
 | x | #51 `124b094` | New `KLN90B_Power_On`/`Power_Off` H events for hardware (idempotent). | render | testable | Power_Off: `L:KLN90B_Power` 0 and a blank screen; Power_On twice: one power-up only. Public contract. Power_Off during the fade-in is pinned as #114. | `test/render/PowerButton.test.ts` |
 | x | #52 `5da8165` | `L:KLN90B_Brightness` became writable. | render | testable | Write 0.5 to the LVar: the display brightness follows; the brightness H events still change it. Public contract. | `test/render/BrightnessManager.test.ts` |
@@ -683,7 +829,7 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 | x | #42 `07873c0`, `e1e75d0` (part) | Without user waypoints, rebuilding the empty scan index threw and left the unit in the self-test; `init` returned undefined. | unit | testable | Empty user scanlist: `init()` resolves to null. Every boot without user waypoints passes through it, so prove the test bites. | `test/unit/data/navdata/Scanlist.test.ts` |
 | x | `d3228dd` (`b21118b` on 1.x) | With duplicate idents, scanning skipped facilities: the scan list did not search the current ident, and the waypoint selector did not sort by full ICAO. | unit + render | testable | Two VORs named ABC in different regions plus ABD: scanning from the first ABC visits the second ABC before ABD. | `test/unit/data/navdata/Scanlist.test.ts`, `test/render/pages/right/VorPage.test.ts` |
 | x | `e1e75d0` (part) | The merged user and database search result was not sorted by ident, breaking the scan order. | unit | testable | User AAA and CCC, database BBB: `searchByIdentWithIcaoStructs` returns AAA, BBB, CCC. | `test/unit/data/navdata/KLNFacilityLoader.test.ts` |
-| | #39 `c2e7b8e`, `d202f4a` | Scanning threw after the shown nearest entry dropped off the nearest list; distance and bearing now revert to coordinates. | flight | testable | APT 1 on nearest entry 1, fly until it leaves the list, scan: no error. | |
+| x | #39 `c2e7b8e`, `d202f4a` | Scanning threw after the shown nearest entry dropped off the nearest list; distance and bearing now revert to coordinates. | render | testable | APT 1 on nearest entry 1, fly until it leaves the list, scan: no error. Re-verdicted from flight to render: a teleport (`PLANE LATITUDE`) moves the aircraft off the list. The `fac === undefined` guard at `WaypointPage.tsx:218` cannot be re-broken alone: since `c2e7b8e` the scan never reaches it. | `test/render/pages/right/Apt1Page.test.ts` |
 | x | #5 `bf08926`, `795356f` | Errors are shown on a full-screen error page with the stack; OK hides it, "OK and suppress" blocks later ones. | render | testable | Publish an error: the error page shows message and stack; OK hides it; suppress blocks the next. DOM, not `Screen`. | `test/render/controls/ErrorPage.test.ts` |
 | x | #54 `5599e1f`, #55 `603ad0d` (same hunk) | Changing the hundreds or tens digit of an altitude corrupted the stored value. | render | testable | CAL 2 ALT 30000, change the hundreds digit: ALT 30100. Only the hundreds digit can be reached with the cursor (the tens and ones are read-only), so the tens half of the fix is not observable. #55's own report (ALT page stuck) was resolved by #56. | `test/render/controls/selects/AltitudeFieldset.test.ts` |
 | x | #33 `439244d` | CAL page values propagate as on the KLN 89 trainer; viewing CAL 2 overwrote CAL 3 TAS. | render | testable | Change ALT on CAL 1: CAL 2 shows it. Open CAL 3 after CAL 2: TAS unchanged. Trainer-based: characterization unless a manual page supports it. | `test/render/pages/left/Cal2Page.test.ts` |

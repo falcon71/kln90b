@@ -1,19 +1,11 @@
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
-
-/** Types an ident into the right ident selector, which only takes keyboard events (FrontPanel.enterIdent cannot) */
-async function typeIdent(unit: HeadlessUnit, ident: string): Promise<void> {
-    for (const ch of ident) {
-        unit.send(`KLN90B_Internal_Key:RIGHT:${ch}`);
-        await vi.advanceTimersByTimeAsync(250);
-    }
-}
 
 async function showApt3(unit: HeadlessUnit, ident: string): Promise<string[]> {
     await unit.panel.selectPage('R', 'APT 1');
     await unit.panel.cursor('R');
-    await typeIdent(unit, ident);
+    await unit.panel.type('R', ident);
     await unit.panel.cursor('R');
     await unit.panel.selectPage('R', 'APT 3');
     return Screen.read().half('R').split('\n');
