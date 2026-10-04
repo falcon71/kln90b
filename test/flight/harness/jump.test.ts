@@ -4,9 +4,7 @@ import {Flight, minutes, nmBefore} from '../../harness/flight/Flight';
 import {World} from '../../harness/flight/World';
 import {airport, vor} from '../../harness/navdata/builders';
 import {savedFlightplan} from '../../harness/storage';
-import {courseDeg, distanceNm, finalCourseDeg} from '../../harness/flight/geo';
-
-const angleDiff = (a: number, b: number) => ((a - b + 540) % 360) - 180;
+import {angleDiff, courseDeg, distanceNm, finalCourseDeg} from '../../harness/flight/geo';
 
 describe('jump', () => {
     it('moves to a point before the active waypoint and refuses to cross it', async () => {
