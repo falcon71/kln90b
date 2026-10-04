@@ -1,20 +1,19 @@
 import {describe, expect, it} from 'vitest';
-import {Facility, GeoPoint, UnitType} from '@microsoft/msfs-sdk';
+import {Facility} from '@microsoft/msfs-sdk';
 import {Flight} from '../../harness/flight/Flight';
 import {World} from '../../harness/flight/World';
-import {airport, vor} from '../../harness/navdata/builders';
+import {vor} from '../../harness/navdata/builders';
+import {standardRoute} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
-import {courseDeg, distanceNm, finalCourseDeg, norm360} from '../../harness/flight/geo';
+import {angleBetween, courseDeg, distanceNm, finalCourseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
 
 /** The standard world of the proof flight: KAAA - ABC - KBBB, with the aircraft 3 NM before ABC on the first leg */
 async function flyToward(plan: (kaaa: Facility, abc: Facility, kbbb: Facility, world: World) => Facility[], storage: Record<string, unknown>) {
-    const kaaa = airport('KAAA', 47.0, 8.0, {elevationFt: 1400});
-    const abc = vor('ABC', 47.5, 8.9);
-    const kbbb = airport('KBBB', 48.2, 9.2, {elevationFt: 1500});
+    const {kaaa, abc, kbbb} = standardRoute();
     const world = new World({magvar: 0}).add(kaaa, abc, kbbb);
     const legs = plan(kaaa, abc, kbbb, world);
     const leg1 = finalCourseDeg(kaaa, abc);
-    const start = new GeoPoint(abc.lat, abc.lon).offset(norm360(leg1 + 180), UnitType.NMILE.convertTo(3, UnitType.GA_RADIAN));
+    const start = pointBefore(kaaa, abc, 3);
     const flight = await Flight.start({
         world, storage: {...savedFlightplan(0, legs), ...storage},
         aircraft: {lat: start.lat, lon: start.lon, altitudeFt: 3000, groundspeedKt: 120, trackTrue: leg1},
@@ -22,7 +21,6 @@ async function flyToward(plan: (kaaa: Facility, abc: Facility, kbbb: Facility, w
     return {flight, kaaa, abc, kbbb, world};
 }
 
-const angleTo = (a: number | null, b: number) => a === null ? 180 : Math.abs(((a - b + 540) % 360) - 180);
 const withoutRepeats = (values: number[]) => values.filter((v, i) => i === 0 || v !== values[i - 1]);
 
 // Spec: the KLN 89 trainer sequences through consecutive identical waypoints and overflies the duplicate instead of
@@ -47,7 +45,7 @@ describe('consecutive identical waypoints sequence without an error (#19)', () =
 
         expect(withoutRepeats(indices)).toEqual([1, 2, 3]);
         expect(flight.nav.activeIdent).toBe('KBBB');
-        expect(angleTo(flight.nav.dtkTrue, courseDeg(abc, kbbb))).toBeLessThan(1);
+        expect(angleBetween(flight.nav.dtkTrue, courseDeg(abc, kbbb))).toBeLessThan(1);
     });
 
     // #22: a REF waypoint on top of a plan waypoint, two facilities at the same coordinates (the guard compares
@@ -65,11 +63,11 @@ describe('consecutive identical waypoints sequence without an error (#19)', () =
             return dtk === null || Number.isFinite(dtk) || `DTK ${dtk}`;
         });
 
-        await flight.flyUntil(() => flight.nav.activeIdent === 'KBBB', {timeout: 150, description: 'sequenced through ABC and ABD to KBBB'});
+        await flight.flyUntilActive('KBBB', {timeout: 150});
         await flight.fly(2);
 
         expect(idents.filter((v, i) => i === 0 || v !== idents[i - 1])).toEqual(['ABC', 'ABD', 'KBBB']);
-        expect(angleTo(flight.nav.dtkTrue, courseDeg(abc, kbbb))).toBeLessThan(1);
+        expect(angleBetween(flight.nav.dtkTrue, courseDeg(abc, kbbb))).toBeLessThan(1);
     });
 });
 
@@ -112,14 +110,14 @@ describe('a plan whose only leg has no length (#120)', () => {
     const recorded: { moved: number; outputLagNm: number | null } = {moved: 0, outputLagNm: null};
 
     it('flies with KAAA active and the aircraft moving away from its start (#120)', async () => {
-        const kaaa = airport('KAAA', 47.0, 8.0);
+        const {kaaa} = standardRoute();
         const world = new World({magvar: 0}).add(kaaa);
-        const start = new GeoPoint(kaaa.lat, kaaa.lon).offset(270, UnitType.NMILE.convertTo(5, UnitType.GA_RADIAN));
+        const start = pointFrom(kaaa, 270, 5);
         const flight = await Flight.start({
             world, storage: savedFlightplan(0, [kaaa, kaaa]),
             aircraft: {lat: start.lat, lon: start.lon, altitudeFt: 3000, groundspeedKt: 120, trackTrue: 90},
         });
-        await flight.flyUntil(() => flight.nav.activeIdent === 'KAAA', {timeout: 10, description: 'KAAA active'});
+        await flight.flyUntilActive('KAAA', {timeout: 10});
 
         await flight.fly(30);
 

@@ -1,13 +1,9 @@
 import {describe, expect, it} from 'vitest';
-import {GeoPoint, UnitType} from '@microsoft/msfs-sdk';
 import {Flight} from '../../harness/flight/Flight';
 import {World} from '../../harness/flight/World';
 import {airport, vor} from '../../harness/navdata/builders';
 import {savedFlightplan} from '../../harness/storage';
-import {courseDeg, finalCourseDeg, LatLon, norm360} from '../../harness/flight/geo';
-
-const offset = (from: LatLon, bearingDeg: number, nm: number): GeoPoint =>
-    new GeoPoint(from.lat, from.lon).offset(norm360(bearingDeg), UnitType.NMILE.convertTo(nm, UnitType.GA_RADIAN));
+import {angleBetween, courseDeg, finalCourseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
 
 describe('a turn close to 180° at a waypoint (#76)', () => {
     // Spec: the KLN 89 trainer takes the next leg at once when the turn anticipation distance exceeds the distance to
@@ -16,22 +12,21 @@ describe('a turn close to 180° at a waypoint (#76)', () => {
     // turn at 120 kt, so the turn can never be flown ahead of ABC.
     it('sequences to the next leg at once and then keeps one DTK, TO flag and active waypoint (#76)', async () => {
         const a = airport('KAAA', 47.0, 8.0);
-        const b0 = offset(a, 90, 10);
+        const b0 = pointFrom(a, 90, 10);
         const b = vor('ABC', b0.lat, b0.lon);
-        const c0 = offset(b, 265, 12);
+        const c0 = pointFrom(b, 265, 12);
         const c = airport('KBBB', c0.lat, c0.lon);
         const world = new World({magvar: 0}).add(a, b, c);
         const leg1 = finalCourseDeg(a, b);
         const leg2 = courseDeg(b, c);
         // A 175° right turn. At 120 kt the standard-rate radius is about 0.63 NM, so the anticipation R·tan(87.5°) is
         // about 14.4 NM, more than the 10 NM leg.
-        const start = offset(b, leg1 + 180, 7);
+        const start = pointBefore(a, b, 7);
         const flight = await Flight.start({
             world, storage: savedFlightplan(0, [a, b, c]),
             aircraft: {lat: start.lat, lon: start.lon, altitudeFt: 3000, groundspeedKt: 120, trackTrue: leg1},
         });
 
-        const angleTo = (x: number | null, y: number) => x === null ? 180 : Math.abs(((x - y + 540) % 360) - 180);
         const samples: { ident: string | null; dtk: number | null; toFrom: 'TO' | 'FROM' | null; xtk: number | null; turnStackLength: number }[] = [];
         for (let s = 0; s < 60; s++) {
             await flight.fly(1);
@@ -46,7 +41,7 @@ describe('a turn close to 180° at a waypoint (#76)', () => {
         expect(settled.map(s => s.ident)).toEqual(settled.map(() => 'KBBB'));
         expect(settled.map(s => s.toFrom)).toEqual(settled.map(() => 'TO'));
         // Every DTK is one of the two leg courses, it switches at most once and never goes back to the first leg
-        const legOf = (dtk: number | null) => angleTo(dtk, leg1) < 1 ? 1 : angleTo(dtk, leg2) < 1 ? 2 : 0;
+        const legOf = (dtk: number | null) => angleBetween(dtk, leg1) < 1 ? 1 : angleBetween(dtk, leg2) < 1 ? 2 : 0;
         const legs = samples.map(s => legOf(s.dtk));
         expect(legs.filter(l => l === 0)).toEqual([]);
         let switches = 0;
