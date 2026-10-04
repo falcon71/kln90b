@@ -1,4 +1,4 @@
-import {vi} from 'vitest';
+import {onTestFinished, vi} from 'vitest';
 import {Facility} from '@microsoft/msfs-sdk';
 import {KLN90BCore, PropsReadyEvent} from '../../kln90b/KLN90BCore';
 import {PageProps} from '../../kln90b/pages/Page';
@@ -8,6 +8,9 @@ import {DEFAULT_NAVDATA_RANGE, startFakeClock} from './sim/clock';
 import {seedRandom} from './sim/random';
 import {MemoryFacilityClient} from './navdata/MemoryFacilityClient';
 import {FakePlatform} from './platform';
+import {FrontPanel} from './flight/FrontPanel';
+import {Screen} from './render/screen';
+import {resetSingletons} from './singletons';
 
 export const MINIMAL_PANEL_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name></Instrument></PlaneHTMLConfig>';
 
@@ -41,19 +44,46 @@ export interface HeadlessUnit {
     /** Errors published on the bus; the sim would show them on the error page */
     errors: Error[];
     send(evt: string): void;
+    /** The front panel, driven through H events like an aircraft's hardware */
+    panel: FrontPanel;
 }
 
-let booted = false;
+/** The unit of the running test, if any: its boot state decides how strictly teardown checks the singletons */
+let live: { completed: boolean } | undefined;
 
 /**
- * Boots the real instrument headless and returns once propsReady fired. One unit per test file: the facility
- * repository and the settings managers are singletons.
+ * Ends the unit of the test that just finished: stops its clock, empties the sim fakes in place (setup files and simEnv()
+ * keep their references), clears the singletons and the DOM.
+ */
+function teardown(): void {
+    const state = live;
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    const env = simEnv();
+    env.sim.reset();
+    env.storage.reset();
+    env.coherent.reset();
+    env.magvar = () => 0;
+    resetSingletons(state?.completed ?? false);
+    document.body.innerHTML = '';
+    live = undefined;
+}
+
+/**
+ * Boots the real instrument headless and returns once propsReady fired. One unit per test: the facility repository and
+ * the settings managers are singletons. The unit is torn down when the test ends (teardown above).
  */
 export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
-    if (booted) {
-        throw new Error('bootUnit: one unit per test file (KLNFacilityRepository and the settings managers are singletons)');
+    if (live !== undefined) {
+        throw new Error('bootUnit: one unit per test; this test already booted one (the singletons allow one live unit)');
     }
-    booted = true;
+    try {
+        onTestFinished(teardown);
+    } catch (e) {
+        throw new Error(`bootUnit: call it inside a test (it, not beforeAll or the module body); the unit is torn down when the test ends. ${e}`);
+    }
+    const state = {completed: false};
+    live = state;
 
     const env = simEnv();
     startFakeClock(opts.start);
@@ -93,5 +123,9 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
     if (props === undefined) {
         throw new Error(`bootUnit: propsReady did not fire within 30 s. Errors: ${errors.map(String).join('; ')}`);
     }
-    return {core, props, env, navdata, errors, send: evt => core.onInteractionEvent([evt])};
+    state.completed = true;
+    return {
+        core, props, env, navdata, errors, send: evt => core.onInteractionEvent([evt]),
+        panel: new FrontPanel(evt => core.onInteractionEvent([evt]), () => Screen.read()),
+    };
 }

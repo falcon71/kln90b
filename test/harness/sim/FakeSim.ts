@@ -49,6 +49,17 @@ export class FakeSim {
     private readonly registrationIds = new Map<string, number>();
     private simStartMs = 0;
 
+    /** Back to an empty sim for the next unit. Keeps the registration ids, because SDK objects cache them. */
+    public reset(): void {
+        this.writes.length = 0;
+        this.keyEvents.length = 0;
+        this.unsetReads.clear();
+        this.errors.length = 0;
+        this.gameVars.clear();
+        this.values.clear();
+        this.simStartMs = 0;
+    }
+
     /** Sets a value as the sim or the aircraft model would. */
     public set(name: string, unit: string, value: number | boolean | string): void {
         this.values.set(simVarKey(name), {unit, value: typeof value === 'boolean' ? (value ? 1 : 0) : value});

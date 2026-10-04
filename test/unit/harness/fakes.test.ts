@@ -1,6 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {DataStore, SimVarValueType} from '@microsoft/msfs-sdk';
 import {simEnv} from '../../harness/sim/install';
+import {FakeSim} from '../../harness/sim/FakeSim';
 import {DEFAULT_START, startFakeClock} from '../../harness/sim/clock';
 import {seedRandom} from '../../harness/sim/random';
 
@@ -73,6 +74,46 @@ describe('FakeSim through the SDK SimVar functions', () => {
         sim.startClock();
         vi.setSystemTime(new Date('2026-06-01T12:01:30Z'));
         expect(SimVar.GetSimVarValue('E:SIMULATION TIME', SimVarValueType.Seconds)).toBe(90);
+    });
+
+    it('resets to an empty sim but keeps the registration ids, because SDK objects cache them', () => {
+        const fresh = new FakeSim();
+        const g: any = {SimVar: {}};
+        fresh.install(g);
+        const keyId = g.SimVar.GetRegisteredId('K:RESET_TEST', 'number');
+        const valueId = g.SimVar.GetRegisteredId('L:RESET_TEST', 'number');
+        fresh.writeReg(keyId, 1);
+        fresh.writeReg(valueId, 2);
+        fresh.get('L:RESET_UNSET', 'number');
+        fresh.set('PLANE ALTITUDE', 'feet', 1000);
+        fresh.gameVars.set('SOME GAME VAR', 1);
+        fresh.errors.push('stale error');
+        vi.useFakeTimers({toFake: ['Date']});
+        vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
+        fresh.startClock();
+
+        fresh.reset();
+
+        expect(fresh.writes).toEqual([]);
+        expect(fresh.keyEvents).toEqual([]);
+        expect([...fresh.unsetReads]).toEqual([]);
+        expect(fresh.errors).toEqual([]);
+        expect([...fresh.gameVars.keys()]).toEqual([]);
+        expect(fresh.has('PLANE ALTITUDE')).toBe(false);
+        expect(fresh.has('L:RESET_TEST')).toBe(false);
+        // The simulation time counts from the epoch again until the next startClock
+        expect(fresh.get('E:SIMULATION TIME', 'seconds')).toBe(Date.parse('2026-06-01T12:00:00Z') / 1000);
+
+        // An SDK object holds the old ids and never registers again. A new name must not take one of them, and the old
+        // ids must still reach their variables. Re-registering the old names would pass even after a full wipe,
+        // because ids are list positions.
+        const other = g.SimVar.GetRegisteredId('L:RESET_OTHER', 'number');
+        expect([keyId, valueId]).not.toContain(other);
+        fresh.writeReg(valueId, 3);
+        expect(fresh.get('L:RESET_TEST', 'number')).toBe(3);
+        expect(fresh.lastWrite('L:RESET_TEST')).toMatchObject({name: 'L:RESET_TEST', value: 3});
+        fresh.writeReg(keyId, 4);
+        expect(fresh.keyEvents.map(k => [k.name, k.value])).toEqual([['K:RESET_TEST', 4]]);
     });
 
     it('derives E:ABSOLUTE TIME from the clock', () => {

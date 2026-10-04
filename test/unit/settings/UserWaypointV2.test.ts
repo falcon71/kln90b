@@ -5,6 +5,7 @@ import {KLN90BUserWaypointsSettings} from '../../../kln90b/settings/KLN90BUserWa
 import {KLN90BUserSettings} from '../../../kln90b/settings/KLN90BUserSettings';
 import {UserWaypointPersistor} from '../../../kln90b/settings/UserWaypointPersistor';
 import {UserWaypointLoaderV2} from '../../../kln90b/settings/UserWaypointLoaderV2';
+import {airport} from '../../harness/navdata/builders';
 
 const bus = new EventBus();
 const userSettings = new KLN90BUserSettings(bus);
@@ -59,8 +60,31 @@ describe('user waypoint V2 format', () => {
         expect(apt.altitude).toBe(1400);
         expect(UnitType.METER.convertTo(apt.runways[0].length, UnitType.FOOT)).toBeCloseTo(3200, 3);
         expect(apt.runways[0].surface).toBe(RunwaySurfaceType.Asphalt);
-        // Restoring re-persists through the repository sync, so the slot must hold the identical string again
+        // Restoring re-persists through the repository sync, so the slot must hold the identical string again. That is the
+        // bug of #103, not a feature: once it is fixed, this assertion holds nothing (restoreFrom sets the slot itself)
         expect(storedSlot(0)).toBe('AXX        KAAA    +4700.00-00830.00+01400+03200H');
+    });
+
+    // f745fb3, b14db79: an airport without a runway length has -10 m in the model and the stored number is negative
+    it('round-trips a user airport with a runway of unknown length (f745fb3)', () => {
+        const base = airport('UAPT', 47, 8);
+        const apt: AirportFacility = {
+            ...base,
+            icaoStruct: ICAO.value('A', 'XX', '', 'UAPT'),
+            region: 'XX',
+            altitude: -1,
+            runways: [{...base.runways[0], length: -10, surface: RunwaySurfaceType.WrightFlyerTrack}],
+        };
+        repo.add(apt);
+        // -10 m are -32.8 ft, which is stored as -33
+        expect(storedSlot(0)).toBe('AXX        UAPT    +4700.00+00800.00-00001-00033-');
+
+        removeAll();
+        restoreFrom('AXX        UAPT    +4700.00+00800.00-00001-00033-');
+        const restored = repo.get(ICAO.value('A', 'XX', '', 'UAPT')) as AirportFacility;
+        expect(restored.altitude).toBe(-1);
+        expect(restored.runways[0].length).toBeCloseTo(-10.0584, 4);
+        expect(restored.runways[0].surface).toBe(RunwaySurfaceType.WrightFlyerTrack);
     });
 
     it('restores a user NDB', () => {
@@ -68,7 +92,8 @@ describe('user waypoint V2 format', () => {
         const ndb = repo.get(ICAO.value('N', 'XX', '', 'XY')) as NdbFacility;
         expect(ICAO.getFacilityTypeFromValue(ndb.icaoStruct)).toBe(FacilityType.NDB);
         expect(ndb.freqMHz).toBeCloseTo(345, 6);
-        // Restoring re-persists through the repository sync, so the slot must hold the identical string again
+        // Restoring re-persists through the repository sync, so the slot must hold the identical string again. That is the
+        // bug of #103, not a feature: once it is fixed, this assertion holds nothing (restoreFrom sets the slot itself)
         expect(storedSlot(0)).toBe('NXX        XY      +4800.00+00900.00+0345.0');
     });
 
@@ -81,5 +106,48 @@ describe('user waypoint V2 format', () => {
         restoreFrom('WXX        SOUTH   -1230.00+01015.00');
         const wpt = repo.get(ICAO.value('W', 'XX', '', 'SOUTH'))!;
         expect(wpt.lat).toBeCloseTo(-12.5, 6);
+    });
+
+    // 6677fae: the V2 restore flipped the sign of western longitudes of one degree and more
+    it('restores a western longitude of a VOR (#78)', () => {
+        restoreFrom('VXX        ABC     +4730.00-00830.00+114.30+02');
+        const vor = repo.get(ICAO.value('V', 'XX', '', 'ABC')) as VorFacility;
+        expect(vor.lat).toBeCloseTo(47.5, 6);
+        expect(vor.lon).toBeCloseTo(-8.5, 6);
+    });
+
+    it('restores a western longitude of an NDB (#78)', () => {
+        restoreFrom('NXX        XY      +4800.00-00915.00+0345.0');
+        const ndb = repo.get(ICAO.value('N', 'XX', '', 'XY')) as NdbFacility;
+        expect(ndb.lon).toBeCloseTo(-9.25, 6);
+        expect(ndb.freqMHz).toBe(345);
+    });
+
+    // e09cc67: a coordinate between -1 and 0 degrees lost its sign, because the degrees part truncates to zero
+    it('keeps the sign of a longitude west of the prime meridian by less than one degree (#36)', () => {
+        repo.add({
+            icao: '', icaoStruct: ICAO.value('W', 'XX', '', 'ZERO'), name: '', lat: 47.5, lon: -(54.35 / 60), region: 'XX', city: '', routes: [],
+        } as unknown as Facility);
+        expect(storedSlot(0)).toBe('WXX        ZERO    +4730.00-00054.35');
+
+        removeAll();
+        restoreFrom('WXX        ZERO    +4730.00-00054.35');
+        const wpt = repo.get(ICAO.value('W', 'XX', '', 'ZERO'))!;
+        expect(wpt.lat).toBeCloseTo(47.5, 6);
+        expect(wpt.lon).toBeCloseTo(-0.9058333, 6);
+    });
+
+    // Not a pin: #98 only hits southern latitudes of 1 degree and more
+    it('keeps the sign of a latitude south of the equator by less than one degree (#36)', () => {
+        repo.add({
+            icao: '', icaoStruct: ICAO.value('W', 'XX', '', 'SZERO'), name: '', lat: -0.5, lon: 8, region: 'XX', city: '', routes: [],
+        } as unknown as Facility);
+        expect(storedSlot(0)).toBe('WXX        SZERO   -0030.00+00800.00');
+
+        removeAll();
+        restoreFrom('WXX        SZERO   -0030.00+00800.00');
+        const wpt = repo.get(ICAO.value('W', 'XX', '', 'SZERO'))!;
+        expect(wpt.lat).toBeCloseTo(-0.5, 6);
+        expect(wpt.lon).toBeCloseTo(8, 6);
     });
 });

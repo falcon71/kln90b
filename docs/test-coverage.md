@@ -33,7 +33,7 @@ them it is for the convenience of the session, and `testing.md` is the authority
 **Session mechanics**
 
 1. Start on a new git branch named after the session (`tests-session-N-<topic>`), before the first edit.
-2. Treat each session as an architectoral path.
+2. Treat each session as an architectural path of the brainstorming skill. Rules 19 to 27 describe how it is run.
 3. Run `npm test` and `npx tsc --noEmit` first. Both must be clean before any new work starts. If they are not, stop and
    report; do not fix unrelated failures as part of the session.
 4. Run the coverage report (`npm run coverage`, added by session 1) and read it for the session's area before writing
@@ -51,7 +51,7 @@ them it is for the convenience of the session, and `testing.md` is the authority
 8. **When the code and the manual disagree, the test asserts the manual**, is written as `it.fails('… (#NN)')` and the
    bug is filed per `CLAUDE.md`. Never assert a bug as correct, not even in a characterization test: if a snapshot
    contains a visible bug, exclude that row or pin the bug separately.
-9. **Use the cheapest stage** that can observe the behavior (`testing.md` section 1). One headless unit per test file.
+9. **Use the cheapest stage** that can observe the behavior (`testing.md` section 1). One headless unit per test.
 
 **Proving a test holds**
 
@@ -84,6 +84,72 @@ them it is for the convenience of the session, and `testing.md` is the authority
 18. The session log says what was **not** covered in the session's area, so the final record in session 11 can be
     written from the logs.
 
+**Workflow**
+
+A session follows the skills of the superpowers plugin: brainstorming, writing-plans and subagent-driven development.
+The one deliberate difference is rule 21. The *controlling session* is the one the maintainer talks to; it dispatches
+subagents, relays their results and merges, but it neither implements nor reviews.
+
+19. **Design, then plan.** The controlling session settles open questions with the maintainer and writes the design to
+    `docs/superpowers/specs/<date>-session-N-<topic>-design.md`. The writing-plans skill turns it into
+    `docs/superpowers/plans/<date>-session-N-<topic>.md`. Both are committed on the session branch and are deleted
+    together with this document in session 11.
+    - Before the plan is written, a read-only research pass looks at every item. Against the code, it checks the fix
+      diff, whether the reproduction holds, and how to re-break the fix. Against the Pilot's Guide page index, it checks
+      every planned spec or characterization label and every page citation. A planned characterization whose
+      behavior the manual contradicts becomes a pin (rule 8).
+    - The plan carries the result per item: setup, literals, citation and break. The implementer still confirms it,
+      because the research reads the code without running it.
+20. **Tasks.** The plan splits the work into tasks:
+    - a harness task first, when the session needs a harness extension;
+    - then the main tasks, batched by area of the code and sized so that one implementer finishes its batch in one
+      context;
+    - then an issues task and a close-out task, which may be one task.
+21. **Parallel implementers in worktrees.** The main tasks run in parallel, one implementer subagent each, every one in its
+    own git worktree (`isolation: "worktree"`) branched from the session branch. A harness task runs alone before them,
+    because they build on it. Subagent-driven development runs implementers one at a time to avoid conflicts. Separate
+    worktrees remove those conflicts, so this workflow runs them in parallel.
+22. **Implementers commit per item**, with the one-line proof of rule 10 in the commit message, ending with a
+    `Co-Authored-By` line that names the model that wrote the commit. They do not edit this document and do not file
+    issues. They write their report to a file and reply with only the status, the head commit and their concerns. The
+    report lists, for each item:
+    - the test path, and whether the test is a spec or a characterization test;
+    - any change of verdict, with its reason;
+    - every suspected bug, with a reproduction.
+23. **Placeholder issue numbers.** A pin for a bug that has no issue yet is named `'… (#NEW-<task>-<n>)'`, for example
+    `#NEW-3-1`. The issues task then:
+    - files each bug per `CLAUDE.md`, searching open and closed issues first, so that a bug two tasks found becomes one
+      issue;
+    - replaces the placeholders with the real numbers.
+
+    The close-out then confirms that `grep -r "#NEW-" test/` finds nothing.
+24. **One review per task, by a subagent.** When a task reports done, the controlling session dispatches one task
+    reviewer against that task's commits. It returns two verdicts in order, spec compliance first and then code quality,
+    and it runs the mutation pass in the same seat.
+    - The mutation pass verifies the tests by mutation, in the task's worktree. It follows the mutation rules in the
+      maintainer's global instructions: the mutations are never named to the implementer, a surviving mutation is a
+      finding, and the reviewer restores the code and checks that `git diff` is clean.
+    - The reviewer checks every page citation in the diff against the Pilot's Guide page index. This is a required
+      check, not an item it may leave unverified.
+    - A breach of this document's test rules is an Important finding, not a Minor one, so it is fixed inside the task.
+      That covers: a test with neither a citation nor a characterization label, a wrong citation, a permissive or
+      no-op assertion, and a frozen bug (rules 6 to 8 and 17).
+    - The reviewer writes its full report to a file and replies with only its verdicts and the Important findings.
+    - Findings go back to the same implementer. After a fix round, a scoped re-review checks only what the round
+      changed, and the round repeats until the review passes.
+25. **Merging.** The controlling session merges an approved task branch into the session branch, then runs `npm test`
+    and `npx tsc --noEmit` on the result. Task branches and worktrees are deleted only at the end, after the maintainer
+    approves the session (`CLAUDE.md`, Git). Nothing is pushed.
+26. **Models.** Implementers start on Sonnet, and a task whose implementer struggles is re-dispatched on Opus. The
+    controlling session chooses the reviewer's model per task by its complexity, Sonnet or Opus (session 2 ran this
+    way). The final review of the whole session runs on the controlling session's model.
+27. **Close-out** is the last task. It does the following:
+    - ticks the session's items from the implementers' reports (for sessions 2 and 3, the triage table rows);
+    - runs rule 5;
+    - writes the session log, including rule 18.
+
+    After it, a final review of the whole session runs, and then the maintainer is asked to approve the merge.
+
 # 3. The sessions
 
 Sessions 1 to 3 build the regression tests, because a bug that has bitten before has a known reproduction, a known
@@ -91,7 +157,7 @@ expected value and a built-in proof (the test fails on the old bug). Sessions 4 
 of value. Session 11 retires this document. Session H is optional and scheduled by the maintainer when the triage
 shows that it pays off.
 
-A session that was interrupted is rerun with the same number until its checkbox is ticked (rule 6).
+A session that was interrupted is rerun with the same number until its checkbox is ticked.
 
 ## Session 1: coverage tooling and regression triage
 
@@ -121,17 +187,42 @@ numbers.
 
 ## Session 2: regression tests, unit and render stage
 
-- [ ] done
+- [x] done
 
 **Goal:** a test for every triage row with verdict *testable* whose stage is unit or render, in impact order.
 
 1. For each row: write the test in the folder mirroring the code under test, cite the issue in the test name
    (`'… (#NN)'`), and cite the manual page when the issue is about matching the real unit.
-2. Prove it bites (rules 11 and 12). Record the proof in the commit message in one line ("fails when the sign flip in
+2. Prove it bites (rules 10 and 11). Record the proof in the commit message in one line ("fails when the sign flip in
    `UserWaypointLoaderV2` is restored").
 3. Tick the row in the triage table with the test file's path.
 4. Any issue that turns out not to be fixed, or only half fixed, gets an `it.fails` pin and a new GitHub issue
-   referencing the closed one (as #98 did for #78).
+   referencing the closed one (as #98 did for #78). #101 is pinned here; #102 waits for airspace boundaries.
+5. For a row whose stage is *flight + render* or *unit + render*, this session writes the unit or render half. The
+   flight half is left to session 3.
+
+**Tasks** (rules 19 to 27):
+
+1. **Harness: one unit per test.** Teardown in place: `bootUnit` tears its unit down at the end of the test. Teardown
+   does the following:
+    - stops the fake timers;
+    - resets `FakeSim`, keeping its registration ids, because SDK objects cache them;
+    - resets `FakeStorage`, `FakeCoherent` and the magnetic variation;
+    - clears the singletons, both the instrument's and the SDK's `FlightPlanner`, and fails loudly if one has been
+      renamed;
+    - blanks the DOM.
+
+   A harness test proves that a second boot sees nothing of the first. The task also updates rule 9 and `testing.md`.
+2. **Persistence and settings (unit):** #36, #78, #47 with the #101 pin, `f745fb3`, `1781156`, `1676e56`, `c673dc2`,
+   `7b4465d`.
+3. **Navdata and services logic (unit, with two render halves):** #6, #59, #14, #28, `9ce23bf`, #9, `6a6c634`, #42,
+   `e1e75d0`, `d3228dd`, `9adbf97`, #4, #8.
+4. **Direct-to and FPL 0 (render):** `0031c11`, #43, `43d472b`, #12, #49, #81, the render halves of #67 (b) and #27.
+5. **CAL, ALT, SET, overlays and editors (render):** #31, #54, #33, `ee0b000`, #56, #64, #46, `fb671c0`, `2b9f811`,
+   #25, #75, `10c5a3d`, `f347a2c`, `8e9a7c4`.
+6. **Public contract and pages (render):** `955b535`, #51, #52, #53, #5, #65, #72, `f95d1d7`, `8045b29`, `9a17b5b`,
+   #35, #38, #26, `8c3b2e0`, `b7fd10a`.
+7. **Issues and close-out** (rules 23 and 27).
 
 **Done when:** every *testable* unit or render row is ticked or has been moved to another verdict with a reason.
 
@@ -147,6 +238,17 @@ numbers.
    section 5).
 3. Flights are expensive to read when they fail. Keep each flight to one issue, and name the predicate in `flyUntil`.
 4. Prove each test bites (rule 11) and tick the row.
+
+**Tasks** (rules 19 to 27):
+
+- **The harness task comes first.** It takes the harness items that `testing.md` section 7 lists from session 2 before
+  any flight test is written:
+    - restoring `Flight`'s `console.error` wrapper at the end of each flight. This is required, because flight files
+      now hold several flights.
+    - a typing helper on `FrontPanel`, a settle and GPS helper, and a reader for stored settings;
+    - an exception-safe teardown that also resets `FakeXhr.requests`.
+- **The batches are smaller than in session 2:** three or four flight rows each. A flight is slower to run and harder
+  to read when it fails.
 
 **Done when:** every *testable* flight row is ticked or re-verdicted with a reason.
 
@@ -181,7 +283,7 @@ this session, the *needs harness* rows it unblocked become *testable* and are pi
 **Goal:** the interfaces `CLAUDE.md` says must never break, so a change that breaks an aircraft fails a test.
 
 1. **H events** (`kln90b/HEvents.ts`): a sweep that sends every public event to a booted unit and asserts no error was
-   published and no `console.error` occurred (rule 18 applies; name it a sweep). Then spec tests for the events with an
+   published and no `console.error` occurred (rule 17 applies; name it a sweep). Then spec tests for the events with an
    observable effect on the screen or state: knobs, CLR, ENT, DCT, MSG, ALT, SCAN, power, brightness.
 2. **LVars** (`kln90b/LVars.ts`): read-only outputs are written with the right value for a known state (roll command,
    annunciators, integrity warning); writable overrides change the behavior they document.
@@ -281,7 +383,7 @@ Pilot's Guide specifies the content.
 3. Super NAV 5 cannot be read by `Screen` (`testing.md` section 6): snapshot its canvas with `canvasToAscii` and test
    its `<pre>` blocks by DOM text, or list it.
 4. Work in tree order (NAV, FPL, SET, OTH, TRI, CAL, STA, MOD, then ALT, DIRECT TO and DUPLICATE). Stop when the
-   context is spent (rule 6); the log says where.
+   context is spent; the log says where.
 
 **Done when:** every left page has at least its characterization test and the log lists the pages without a spec test.
 
@@ -346,6 +448,114 @@ lists the gaps.
 One entry per session run, newest first. Format: date, session, branch, what was done, what was left and why, the
 coverage summary for the session's area at start and end. This is a dated record and is never edited afterwards; a
 later run adds a new entry.
+
+## 2026-10-04, session 2, branch `tests-session-2-regressions`
+
+**Done**
+- **Harness task:** one unit per test. `bootUnit` tears its unit down at the end of the test (fake timers, `FakeSim`
+  with its registration ids, `FakeStorage`, `FakeCoherent`, magnetic variation, singletons, DOM), with harness tests
+  that prove a second boot sees nothing of the first. `testing.md` and rule 9 were updated.
+- **Five batches**, in parallel worktrees branched after the harness task, each with its own report:
+  persistence and settings (8 rows), navdata and services (13 rows), direct-to and FPL 0 (8 rows), CAL, ALT, SET,
+  overlays and editors (14 rows), public contract and pages (15 rows). All 58 rows are ticked in section 5 with their
+  test paths, which includes the unit and render halves of the mixed rows (#8, `d3228dd`, #27, #67). Every test was
+  proven to bite by reintroducing its bug in the working tree.
+- **Close-out:** the issues below, the placeholders replaced, `testing.md` sections 2, 6 and 7 extended with the
+  harness traps found, rules 24 and 26 reworded to how the session ran.
+
+**Re-verdicts.** None: every row stayed *testable*. Rulings and surprises worth recording:
+- `1781156` is ticked with a pin (#103) instead of a guard: it regressed in `933479d`.
+- `f4f5395` (the `Math.abs`) was expected to be unprovable and is provable, with a track of 090 (the sign of the
+  angle behind is rounding noise at that heading).
+- #28: the characterization cases for the names from 27 NM were dropped (rule 8: the manual states another form,
+  6-6); the test keeps a shape check, and the form from 6-6 is pinned as #107.
+- #54: only the hundreds digit is reachable with the cursor, as the row already said.
+
+**Bugs found and filed** (each pinned with `it.fails` unless noted):
+- **#103:** user waypoints are written to storage again while they are restored; `ignoreSync` moved into the loaders
+  in `933479d` and nothing reads it (a regression of `1781156`).
+- **#104:** the entry of a right-hand DME arc is named `10709ABC` after a recalculation (continues #18).
+- **#105:** the scan list starts at the raw first search result, which can differ from the first entry in list order
+  with duplicate idents (continues `d3228dd`).
+- **#106:** `BoundaryUtils.intersects` mistakes a path across the prime meridian for a date-line crossing, and
+  `getIntersections` ignores the date line (continues #9).
+- **#107:** DME arc entry names beyond 26 NM do not follow 6-6 (continues #28; the maintainer may close it as
+  intended).
+- **#108:** a scan during the first scan-list fill leaves a hole in the cache.
+- **#109:** keyboard entry cannot type the longitude hundreds digit "0", the date or the runway surface (the rest of
+  #25); only the longitude is pinned.
+- **#110:** the UTC timezone name has 12 characters, so SET 2 overflows with the default timezone.
+- **#111:** the message typo RECYLCE.
+- **#112:** OKT instead of OCT in the month editor.
+- **#113:** `HpaBaroFieldset.saveBaro10` calls the callback twice.
+- **#114:** Power_Off during the fade-in is undone by the running `BrightnessManager.powerUp`.
+- **#115:** the type letter of an NDB lands beyond column 11 on the ACT page. The wide APT 1 and VOR rows seen by
+  tasks 4 and 6 are only trailing blanks of the nearest selector, so one issue covers it.
+- **#116:** the V1 loader's unknown-surface error names the wrong character (pin added in the close-out).
+- **#117:** the scan-list job ids are random below 10000 and can collide (found by reading, no pin).
+
+**Fixes that could not be re-broken:** none. Two tests do not guard what their name might suggest, and say so: the
+#12 CLR plus ENT case is titled "sanity check, does not guard #12", and the V2 round-trip assertions that hold nothing
+once #103 is fixed now carry a comment pointing at it. The unit half of the `f745fb3`/`b14db79` row
+(`UserWaypointV2.test.ts`) stays green when the original bug is put back; only the render half
+(`Apt3UserPage.test.ts`) fails, so that is the half that guards the fix.
+
+**Not covered**
+- The flight halves: #67 (a), the flight half of #27, and every flight row (session 3).
+- #102 (it waits for airspace boundaries) and #99 (a pin is planned for session 8).
+- The `getArcEntryData` half of `1ef2a35` and the other procedure rows (they need procedure builders).
+- Neighbors the reviewers noted: the other `cal*` settings, CAL 2 barometer propagation, the left-side keyboard
+  advance, the hPa tens value and the other altitude digit savers, the `List` scroll-up branch, rules 4 and 5 of the
+  direct-to suggestion (the active waypoint and the blank page), the V1 latitude between -1 and 0, the grass surface,
+  the in-memory runway length of -10 in `Apt3UserPage`, the rounding of the APT 2 elevation, the self-test GPS WP
+  bearing, the rounding in `getArcEntryName`, the ident-only comparison in `Vnav`, and the drawing paths of NAV 5 other
+  than `drawFlightplanLine`.
+
+**Observed but not filed**
+- Exactly 0 degrees shows S and W in the latitude and longitude editors. No source says N and E, and the project uses
+  the `> 0` convention consistently (`LatitudeDisplay.tsx:33` too). The pin was removed.
+- DCT at boot with an active waypoint opens a blank DIR page, because the blank boot page SUP counts as a waypoint
+  page in view. Rule 3 of 3-27 reads exactly that way, so the code follows the manual as written; what the real unit
+  pre-fills for a blank waypoint page is not stated. Filed as the question #119.
+- `fastGpsAcquisition: false` still boots with a valid GPS: an engine-running unit calls `acquireAndUseSatellites()`
+  in `WelcomePage.tsx:146`. A harness trap, documented in `testing.md`.
+- An error thrown on the ENT path is an unhandled rejection, because `MainPage` does not await `handleEnter` (the call
+  carries a deliberate "ignored promise" comment). It never reaches the error page, which the architecture notes say
+  input errors do. The test that pressed ENT stays green; Vitest reports the unhandled error afterwards, fails the run
+  and names the last test that ran. Documented as a harness trap; filed as the question #118.
+- `persistAllWaypoints` logs every slot, and `BoundaryUtils.intersects` tests the first edge again in its last
+  iteration (`% (lod.length - 1)`); neither changes a result.
+- NAV 5 with a duplicate waypoint: only the `drawFlightplanLine` guard of #8 is observable; the other guards are not
+  reached by that flight plan.
+
+**Workflow notes.** The harness task ran alone; tasks 2 to 6 ran in parallel worktrees on Sonnet, and the controlling
+session merged each after its review. Each task had one combined reviewer (spec compliance, then code quality, with
+the mutation pass in the same seat; the controlling session chose its model per task) and a scoped re-review after
+each fix round. Tasks 1, 3 and 6 each needed one fix round. Implementer commits carry the trailer of the model that
+wrote them. A fresh worktree has no gitignored `types/` directory, so `npx tsc --noEmit` fails there until it is
+copied (`testing.md` section 2).
+
+**Coverage at the start of the session** (identical to the session 1 baseline, since session 1 added no tests) **and
+at the end** (all tests green):
+
+| directory                  | % stmts start | % stmts end | % lines start | % lines end |
+|----------------------------|--------------:|------------:|--------------:|------------:|
+| all files                  |         34.22 |       57.49 |         33.76 |       57.27 |
+| `kln90b`                   |         68.53 |       74.90 |         68.32 |       74.60 |
+| `kln90b/controls`          |         44.33 |       60.77 |         43.82 |       60.27 |
+| `kln90b/controls/displays` |         54.40 |       72.34 |         53.72 |       71.73 |
+| `kln90b/controls/editors`  |         53.99 |       75.80 |         52.90 |       75.22 |
+| `kln90b/controls/selects`  |         26.18 |       54.67 |         25.65 |       52.68 |
+| `kln90b/data`              |         65.21 |       73.91 |         64.40 |       73.44 |
+| `kln90b/data/flightplan`   |         68.64 |       88.10 |         68.53 |       88.20 |
+| `kln90b/data/navdata`      |         49.28 |       68.42 |         49.29 |       68.39 |
+| `kln90b/pages`             |         37.82 |       61.42 |         36.89 |       60.81 |
+| `kln90b/pages/left`        |         14.35 |       46.26 |         14.27 |       46.27 |
+| `kln90b/pages/right`       |          7.20 |       44.29 |          7.33 |       45.13 |
+| `kln90b/services`          |         36.09 |       41.06 |         34.83 |       40.10 |
+| `kln90b/settings`          |         73.63 |       87.39 |         72.83 |       87.16 |
+
+The suite at the end: 205 tests passed and 19 expected failures (the pins), in 71 files.
 
 ## 2026-10-03, session 1, branch `tests-session-1-triage`
 
@@ -428,25 +638,25 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 | | #41 `42099f3` | The "point between two points" check in `findClosestLegIdx` was wrong, so the wrong leg (even a missed-approach leg) was activated. | flight | testable | Dogleg FPL 0, aircraft abeam a later leg: the activated leg is the one at the true minimum distance (`geo.ts`). Activation runs at the first calculation tick, so a booted unit at a fixed position may be enough; try that before flying. | |
 | | #34 `2b06e54` | An FPL 0 with two or more waypoints flagged navigation when the aircraft was not abeam any leg. Now it always activates. | flight | testable | Setup as #41, aircraft far to the side and beyond the end: a leg is active and NAV is not flagged. | |
 | | #19 `3364def` (#22, #23 same fix) | Consecutive identical waypoints (also a REF waypoint on top of an FPL waypoint) gave a NaN path and threw when sequencing. | flight | testable | `savedFlightplan(0, [KAAA, ABC, ABC, KBBB])`, fly through ABC: no error, `activeIdent` ABC then KBBB, DTK finite. #22 variant: two facilities at the same coordinates. The DME-arc half (`326da1a`) is in a procedure-builder row. | |
-| | #27 `dbb01bf` | Duplicate waypoints: turn anticipation off, the label drawn once on the maps, the same DTK for both legs on DT 3 and OTH 3. | flight + render | testable | Flight as #19: the aircraft overflies ABC without an early turn. Render: DT 3 shows the same DTK on both legs. | |
-| | #67 `3415417` | (a) The same waypoint twice plus OBS threw (null DTK). (b) A direct-to target deleted from FPL 0 re-activated a leg instead of staying a random direct-to. | flight + render | testable | (a) `[KAAA, KAAA]`, OBS, fly: no error. (b) Direct-to a leg, delete it on FPL 0: still direct-to the same ident, no active FPL index. | |
-| | `0031c11`, `d8edd70` | Deleting waypoints from FPL 0 until fewer than two remain did not flag navigation, and left the FROM waypoint set. | render | testable | FPL 0 with two waypoints, the first leg active, delete one: navigation flagged, no active or FROM waypoint. | |
+| x (render) | #27 `dbb01bf` | Duplicate waypoints: turn anticipation off, the label drawn once on the maps, the same DTK for both legs on DT 3 and OTH 3. | flight + render | testable | Flight as #19: the aircraft overflies ABC without an early turn. Render: DT 3 shows the same DTK on both legs. Session 2 did the render half; the flight half is left to session 3. | `test/render/pages/right/Dt3Page.test.ts` |
+| x (b) | #67 `3415417` | (a) The same waypoint twice plus OBS threw (null DTK). (b) A direct-to target deleted from FPL 0 re-activated a leg instead of staying a random direct-to. | flight + render | testable | (a) `[KAAA, KAAA]`, OBS, fly: no error. (b) Direct-to a leg, delete it on FPL 0: still direct-to the same ident, no active FPL index. Session 2 did (b); the flight half (a) is left to session 3. | `test/render/data/flightplan/ActiveWaypoint.test.ts` |
+| x | `0031c11`, `d8edd70` | Deleting waypoints from FPL 0 until fewer than two remain did not flag navigation, and left the FROM waypoint set. | render | testable | FPL 0 with two waypoints, the first leg active, delete one: navigation flagged, no active or FROM waypoint. | `test/render/data/flightplan/ActiveWaypoint.test.ts` |
 | | `014293d` | `ModeController` must tick before `NavCalculator`, so a changed OBS course is used in the same calculation. | flight | testable | OBS mode, change the course: DTK equals the new course after exactly one calculation tick, not two. The tick list is now built in `KLN90BCore`. | |
 | | #70 `748151c` | Sequencing after a direct-to threw: `activeWaypointChanged` fired before the data was set, so `WTFlightplanSync` read stale state. | flight | testable | FPL KAAA-ABC-KBBB, direct-to ABC, fly through it: no error, KBBB active, and the SDK planner `"kln90b"` has the matching active leg (the stale state showed there). Prove by reverting the event order. | |
-| | #43 `ed17e0e` | Direct-to from the FPL 0 page to the second of two identical waypoints flew to the first. | render | testable | `[A, X, B, X]`, cursor on the second X, DCT, ENT: the active FPL index is 3. | |
-| | `43d472b` (open #68) | `ActiveWaypoint.directTo` read the previous index instead of the target's when the typed ident is in FPL 0. | render | testable | FPL KAAA-ABC-KBBB with ABC active, DCT, type KBBB, ENT: `activeIdent` KBBB, FPL index 2, no error. The target must differ from the active leg, or the old code reads the right leg by chance. The pause half of the commit is a needs-harness row. | |
-| | #12 `2922907` (#30 duplicate) | On the direct-to page, CLR followed by the cursor (or ENT) threw "cannot pop the base page". | render | testable | No active waypoint, DCT, CLR, left cursor; separately DCT, CLR, ENT: no error, page usable. | |
-| | #49 `40bfbec` (#69 duplicate on 1.x) | DCT with no waypoint to suggest threw. | render | testable | Empty FPL 0, DCT: the page shows, no error. | |
-| | #81 `ea23a6e` | Changing the right page while a direct-to waypoint awaited confirmation, then the left cursor, threw and locked the unit. | render | testable | DCT, right outer knob, left cursor: no error, not the error page. | |
-| | `9adbf97` | VNAV rejected a direct-to waypoint that is not in FPL 0. | unit | testable | `Vnav.isValidVnavWpt` with a stub nav state whose active waypoint is a direct-to outside FPL 0: true for it, false for another waypoint. | |
-| | #4 `f6f62ec` | `Vnav.tick` threw when VNAV was armed or active and its waypoint had been cleared by a reset. | unit | testable | `Vnav` with a stub nav state, VNAV waypoint null, state Active: no throw, state Inactive. | |
-| | #8 `4cbe2b5`, `9f0b7e1` | Consecutive duplicate waypoints threw in `MSA.getMSAFromTo` (zero distance) and in the NAV 5 map drawing. | unit + render | testable | Unit: `getMSAFromTo(p, p)` equals `getMSA(p)` (MSA grid via `FakeXhr`). Render: NAV 5 with a duplicate in FPL 0, no error. | |
-| | #36 `e09cc67` | User waypoints at 0° latitude or longitude lost their sign. | unit | testable | Extend `UserWaypointV2.test.ts`: a waypoint at 0°54.35'W stores `-00054.35` and restores to the same value; likewise 0°30'S. | |
-| | #78 `6677fae` | Restored V2 user waypoints had their longitude sign flipped. | unit | testable | Held indirectly by the round trip in `UserWaypointV2.test.ts`; add a direct west-longitude assertion and a VOR or NDB case. The latitude half is #98 (pinned). The same commit broke V1 longitudes of 100° and more: pin #101. | |
-| | #47 `933479d` (`d0f5265` duplicate) | V1 user data (waypoints, flight plans) is converted to V2 at boot. | unit | testable | Hand-written V1 strings through `UserWaypointLoaderV1` and `UserFlightplanLoaderV1`, then a boot with V1 storage: V2 strings stored, `userDataFormat` 2. A longitude of 100° or more is pinned as #101. | |
-| | `f745fb3`, `b14db79` | A user airport runway of unknown length (stored as -1) was not recognized as unknown after a restore (unit conversion made it a fraction). | unit | testable | Persist a user airport without runway length, restore it: the length is negative and APT 3 (user) shows none. | |
-| | `1781156` | Loading user waypoints at boot wrote every one back to storage while importing. | unit | testable | Load V2 user waypoints through the persistor: `FakeStorage` sees no writes during the load. | |
-| | #31 `e0fec22` | CAL page values are kept in user settings instead of volatile memory. | render | testable | Edit CAL 1 BARO: the value is stored under the profile key and still shown after the page is recreated. The default value is a trainer-based choice: characterization only. | |
+| x | #43 `ed17e0e` | Direct-to from the FPL 0 page to the second of two identical waypoints flew to the first. | render | testable | `[A, X, B, X]`, cursor on the second X, DCT, ENT: the active FPL index is 3. | `test/render/pages/left/DirectToPage.test.ts` |
+| x | `43d472b` (open #68) | `ActiveWaypoint.directTo` read the previous index instead of the target's when the typed ident is in FPL 0. | render | testable | FPL KAAA-ABC-KBBB with ABC active, DCT, type KBBB, ENT: `activeIdent` KBBB, FPL index 2, no error. The target must differ from the active leg, or the old code reads the right leg by chance. The pause half of the commit is a needs-harness row. | `test/render/data/flightplan/ActiveWaypoint.test.ts` |
+| x | #12 `2922907` (#30 duplicate) | On the direct-to page, CLR followed by the cursor (or ENT) threw "cannot pop the base page". | render | testable | No active waypoint, DCT, CLR, left cursor; separately DCT, CLR, ENT: no error, page usable. | `test/render/pages/left/DirectToPage.test.ts` |
+| x | #49 `40bfbec` (#69 duplicate on 1.x) | DCT with no waypoint to suggest threw. | render | testable | Empty FPL 0, DCT: the page shows, no error. | `test/render/pages/left/DirectToPage.test.ts` |
+| x | #81 `ea23a6e` | Changing the right page while a direct-to waypoint awaited confirmation, then the left cursor, threw and locked the unit. | render | testable | DCT, right outer knob, left cursor: no error, not the error page. | `test/render/pages/left/DirectToPage.test.ts` |
+| x | `9adbf97` | VNAV rejected a direct-to waypoint that is not in FPL 0. | unit | testable | `Vnav.isValidVnavWpt` with a stub nav state whose active waypoint is a direct-to outside FPL 0: true for it, false for another waypoint. | `test/unit/services/Vnav.test.ts` |
+| x | #4 `f6f62ec` | `Vnav.tick` threw when VNAV was armed or active and its waypoint had been cleared by a reset. | unit | testable | `Vnav` with a stub nav state, VNAV waypoint null, state Active: no throw, state Inactive. | `test/unit/services/Vnav.test.ts` |
+| x | #8 `4cbe2b5`, `9f0b7e1` | Consecutive duplicate waypoints threw in `MSA.getMSAFromTo` (zero distance) and in the NAV 5 map drawing. | unit + render | testable | Unit: `getMSAFromTo(p, p)` equals `getMSA(p)` (MSA grid via `FakeXhr`). Render: NAV 5 with a duplicate in FPL 0, no error. | `test/unit/services/MSA.test.ts`, `test/render/pages/left/Nav3Page.test.ts`, `test/render/pages/left/Nav5Page.test.ts` |
+| x | #36 `e09cc67` | User waypoints at 0° latitude or longitude lost their sign. | unit | testable | Extend `UserWaypointV2.test.ts`: a waypoint at 0°54.35'W stores `-00054.35` and restores to the same value; likewise 0°30'S. | `test/unit/settings/UserWaypointV2.test.ts` |
+| x | #78 `6677fae` | Restored V2 user waypoints had their longitude sign flipped. | unit | testable | Held indirectly by the round trip in `UserWaypointV2.test.ts`; add a direct west-longitude assertion and a VOR or NDB case. The latitude half is #98 (pinned). The same commit broke V1 longitudes of 100° and more: pin #101. The V1 half is pinned as #101 (`it.fails`). | `test/unit/settings/UserWaypointV2.test.ts`, `test/unit/settings/UserWaypointV1.test.ts` |
+| x | #47 `933479d` (`d0f5265` duplicate) | V1 user data (waypoints, flight plans) is converted to V2 at boot. | unit | testable | Hand-written V1 strings through `UserWaypointLoaderV1` and `UserFlightplanLoaderV1`, then a boot with V1 storage: V2 strings stored, `userDataFormat` 2. A longitude of 100° or more is pinned as #101. | `test/unit/settings/UserFlightplanLoaderV1.test.ts`, `test/unit/settings/UserWaypointV1.test.ts`, `test/render/KLN90BCore.userDataConversion.test.ts` |
+| x | `f745fb3`, `b14db79` | A user airport runway of unknown length (stored as -1) was not recognized as unknown after a restore (unit conversion made it a fraction). | unit | testable | Persist a user airport without runway length, restore it: the length is negative and APT 3 (user) shows none. | `test/unit/settings/UserWaypointV2.test.ts`, `test/render/pages/right/Apt3UserPage.test.ts` |
+| x | `1781156` | Loading user waypoints at boot wrote every one back to storage while importing. | unit | testable | Load V2 user waypoints through the persistor: `FakeStorage` sees no writes during the load. It regressed: `933479d` moved the `ignoreSync` flag into the loaders, where nothing reads it. It is pinned as #103 (`it.fails`) instead of guarded. | `test/unit/settings/UserWaypointPersistor.test.ts` |
+| x | #31 `e0fec22` | CAL page values are kept in user settings instead of volatile memory. | render | testable | Edit CAL 1 BARO: the value is stored under the profile key and still shown after the page is recreated. The default value is a trainer-based choice: characterization only. | `test/render/pages/left/Cal1Page.test.ts` |
 | | #61 `179d37d` | GPS acquisition started only after the self-test instead of at power-on. | flight | testable | `engineRunning: false`, fast acquisition: during the self-test the satellite computer has left idle. | |
 | | #63 `64c203d` | Simulates the GPS week rollover: a manual date in another 1024-week era stays shifted by whole eras after acquisition. | flight | testable | Set the date ~20 years off before acquisition, acquire: the sim date minus the era difference × 1024 weeks, computed from the GPS epoch independently. A same-era date is unchanged. | |
 | | #87 `8a16a33` | New LVar `L:KLN90B_IntegrityWarn`, set while there is no GPS solution. | flight | testable | Boot with slow acquisition: true while acquiring, false once valid. Public contract. | |
@@ -456,48 +666,48 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 | | `1236025` (part) | `GPS WP NEXT LON` and `PREV LON` were written with a string unit. | flight | testable | Three-leg FPL 0: both SimVars equal the waypoint literals in degrees. | |
 | | `07c6e37` | `Output.ObsTarget` wrote SimVars instead of the `K:VOR1_SET`/`K:VOR2_SET` key events. | flight | testable | panel.xml `ObsTarget` 1, fly a leg: `sim.keyEvents` holds `K:VOR1_SET` with the magnetic DTK. | |
 | | `92fbba1` | `Output.ObsTarget` set the NAV OBS even when the GPS was not the nav source. | flight | testable | As the `07c6e37` row with `GPS DRIVES NAV1` false: no `K:VOR1_SET` key event. | |
-| | `955b535` | During the self-test the course output was 130° (the RMI test value) instead of 315°. | render | testable | `engineRunning: false`, during the self-test: the desired-track output is 315° magnetic (3-4 gives OBS out 315°, RMI 130°). | |
-| | #51 `124b094` | New `KLN90B_Power_On`/`Power_Off` H events for hardware (idempotent). | render | testable | Power_Off: `L:KLN90B_Power` 0 and a blank screen; Power_On twice: one power-up only. Public contract. | |
-| | #52 `5da8165` | `L:KLN90B_Brightness` became writable. | render | testable | Write 0.5 to the LVar: the display brightness follows; the brightness H events still change it. Public contract. | |
-| | #53 `66204f4` | Fuel on board is read from `FUEL TOTAL QUANTITY WEIGHT EX1`. | render | testable | `FOBTransmitted` on, set the EX1 SimVar: OTH 5 shows it. | |
-| | `1676e56` | `L:KLN90B_ElectricitySimVarIndex` was initialized with a string instead of a number. | unit | testable | Parse a panel.xml with `CIRCUIT SWITCH ON:2`: the LVar write is the number 2. | |
-| | `c673dc2` | `L:KLN90B_RightScan` published the previous state instead of the current one. | unit | testable | `Hardware.setScanPulled(true)`: the last write of the LVar is true. | |
-| | `7b4465d` | H events before initialization crashed (the startup fix for the Dukes). | unit | testable | `PageManager.onInteractionEvent` before init: no throw, and the "not yet initialized" `console.error` is logged (spy on it; the render and flight harness fail on any `console.error`). | |
-| | #6 `117f548`, `4fa8cea`, `cc89fd4` | Approach filter: RNAV approaches only with LNAV and without RF legs; VOR, NDB and GPS approaches kept (`cc89fd4` restored dropped non-precision approaches). | unit | testable | Static `SidStar.isApproachRecognized` with hand-built approach literals of each kind. | |
-| | #59 `71481dc`, `b0c16cf` | RNP filtering removed; only RF-leg and RNP-AR procedures are filtered (`b0c16cf` also dropped the per-leg RNP check for approaches). SET 10 lost its PROCS option. | unit | testable | Same literals: `rnp > 0` accepted, `rnpAr` or an RF leg rejected. | |
-| | #14 `8da5eee` | Procedures with no recognized leg type were listed as empty. | unit | testable | Static `SidStar.isProcedureRecognized` with literals: only CA/VM legs gives false, one fix leg gives true. | |
-| | #28 `063a836` | DME-arc entry names for 27 NM and beyond produced garbage characters. | unit | testable | Private static `SidStar.getArcEntryName(navaid, radial, dist)` at 18, 26, 27, 30 and 100 NM. The names up to 26 NM follow 6-16; the forms from 27 NM follow the Jeppesen navdata convention the code cites, not the Pilot's Guide, so those cases are characterization. | |
-| | `9ce23bf`, `f4f5395`, `1ef2a35` (part) | Re-picking a DME-arc entry point could choose a point behind the aircraft (`f4f5395` made the angle check absolute); left-hand arcs used the wrong radial range. | unit | testable | Static `SidStar.recalculateArcEntryData` with a hand-built arc and stub sensors, both turn directions: the entry ahead of the aircraft, radials hand-computed. | |
-| | #9 `103ea59` | `BoundaryUtils.isInside` and `intersects` were wrong for airspaces crossing the date line. | unit | testable | A hand-built `LodBoundary` across ±180°: points on both sides inside, a far point outside. | |
-| | `6a6c634` | Scanning did nothing: the cache lookup compared ICAOs by reference, and an empty index set a bogus start. | unit | testable | Scanlist over a few airports, `getNext` with a structurally equal ICAO copy: the next ident of a hand-sorted list. Empty list: `init()` resolves to null. | |
-| | #42 `07873c0`, `e1e75d0` (part) | Without user waypoints, rebuilding the empty scan index threw and left the unit in the self-test; `init` returned undefined. | unit | testable | Empty user scanlist: `init()` resolves to null. Every boot without user waypoints passes through it, so prove the test bites. | |
-| | `d3228dd` (`b21118b` on 1.x) | With duplicate idents, scanning skipped facilities: the scan list did not search the current ident, and the waypoint selector did not sort by full ICAO. | unit + render | testable | Two VORs named ABC in different regions plus ABD: scanning from the first ABC visits the second ABC before ABD. | |
-| | `e1e75d0` (part) | The merged user and database search result was not sorted by ident, breaking the scan order. | unit | testable | User AAA and CCC, database BBB: `searchByIdentWithIcaoStructs` returns AAA, BBB, CCC. | |
+| x | `955b535` | During the self-test the course output was 130° (the RMI test value) instead of 315°. | render | testable | `engineRunning: false`, during the self-test: the desired-track output is 315° magnetic (3-4 gives OBS out 315°, RMI 130°). | `test/render/pages/left/SelfTestLeftPage.test.ts` |
+| x | #51 `124b094` | New `KLN90B_Power_On`/`Power_Off` H events for hardware (idempotent). | render | testable | Power_Off: `L:KLN90B_Power` 0 and a blank screen; Power_On twice: one power-up only. Public contract. Power_Off during the fade-in is pinned as #114. | `test/render/PowerButton.test.ts` |
+| x | #52 `5da8165` | `L:KLN90B_Brightness` became writable. | render | testable | Write 0.5 to the LVar: the display brightness follows; the brightness H events still change it. Public contract. | `test/render/BrightnessManager.test.ts` |
+| x | #53 `66204f4` | Fuel on board is read from `FUEL TOTAL QUANTITY WEIGHT EX1`. | render | testable | `FOBTransmitted` on, set the EX1 SimVar: OTH 5 shows it. | `test/render/pages/left/Oth5Page.test.ts` |
+| x | `1676e56` | `L:KLN90B_ElectricitySimVarIndex` was initialized with a string instead of a number. | unit | testable | Parse a panel.xml with `CIRCUIT SWITCH ON:2`: the LVar write is the number 2. | `test/unit/settings/KLN90BPlaneSettings.test.ts` |
+| x | `c673dc2` | `L:KLN90B_RightScan` published the previous state instead of the current one. | unit | testable | `Hardware.setScanPulled(true)`: the last write of the LVar is true. | `test/unit/Hardware.test.ts` |
+| x | `7b4465d` | H events before initialization crashed (the startup fix for the Dukes). | unit | testable | `PageManager.onInteractionEvent` before init: no throw, and the "not yet initialized" `console.error` is logged (spy on it; only `Flight` monitors `console.error`, the render harness does not fail on it). | `test/unit/pages/PageManager.test.ts` |
+| x | #6 `117f548`, `4fa8cea`, `cc89fd4` | Approach filter: RNAV approaches only with LNAV and without RF legs; VOR, NDB and GPS approaches kept (`cc89fd4` restored dropped non-precision approaches). | unit | testable | Static `SidStar.isApproachRecognized` with hand-built approach literals of each kind. | `test/unit/data/navdata/SidStar.test.ts` |
+| x | #59 `71481dc`, `b0c16cf` | RNP filtering removed; only RF-leg and RNP-AR procedures are filtered (`b0c16cf` also dropped the per-leg RNP check for approaches). SET 10 lost its PROCS option. | unit | testable | Same literals: `rnp > 0` accepted, `rnpAr` or an RF leg rejected. | `test/unit/data/navdata/SidStar.test.ts` |
+| x | #14 `8da5eee` | Procedures with no recognized leg type were listed as empty. | unit | testable | Static `SidStar.isProcedureRecognized` with literals: only CA/VM legs gives false, one fix leg gives true. | `test/unit/data/navdata/SidStar.test.ts` |
+| x | #28 `063a836` | DME-arc entry names for 27 NM and beyond produced garbage characters. | unit | testable | Private static `SidStar.getArcEntryName(navaid, radial, dist)` at 18, 26, 27, 30 and 100 NM. The names up to 26 NM follow 6-16; the forms from 27 NM follow the Jeppesen navdata convention the code cites, not the Pilot's Guide. The test checks only that those names have five characters, and the name from 6-6 is pinned as #107 (the maintainer may close it as intended). | `test/unit/data/navdata/SidStar.test.ts` |
+| x | `9ce23bf`, `f4f5395`, `1ef2a35` (part) | Re-picking a DME-arc entry point could choose a point behind the aircraft (`f4f5395` made the angle check absolute); left-hand arcs used the wrong radial range. | unit | testable | Static `SidStar.recalculateArcEntryData` with a hand-built arc and stub sensors, both turn directions: the entry ahead of the aircraft, radials hand-computed. The `getArcEntryData` half of `1ef2a35` is not covered (it needs procedures); the right-hand recalculation is pinned as #104. | `test/unit/data/navdata/SidStar.test.ts` |
+| x | #9 `103ea59` | `BoundaryUtils.isInside` and `intersects` were wrong for airspaces crossing the date line. | unit | testable | A hand-built `LodBoundary` across ±180°: points on both sides inside, a far point outside. The remaining date-line cases are pinned as #106. | `test/unit/data/navdata/BoundaryUtils.test.ts` |
+| x | `6a6c634` | Scanning did nothing: the cache lookup compared ICAOs by reference, and an empty index set a bogus start. | unit | testable | Scanlist over a few airports, `getNext` with a structurally equal ICAO copy: the next ident of a hand-sorted list. Empty list: `init()` resolves to null. Duplicate idents at the start of the list and a scan during the first fill are pinned as #105 and #108. | `test/unit/data/navdata/Scanlist.test.ts` |
+| x | #42 `07873c0`, `e1e75d0` (part) | Without user waypoints, rebuilding the empty scan index threw and left the unit in the self-test; `init` returned undefined. | unit | testable | Empty user scanlist: `init()` resolves to null. Every boot without user waypoints passes through it, so prove the test bites. | `test/unit/data/navdata/Scanlist.test.ts` |
+| x | `d3228dd` (`b21118b` on 1.x) | With duplicate idents, scanning skipped facilities: the scan list did not search the current ident, and the waypoint selector did not sort by full ICAO. | unit + render | testable | Two VORs named ABC in different regions plus ABD: scanning from the first ABC visits the second ABC before ABD. | `test/unit/data/navdata/Scanlist.test.ts`, `test/render/pages/right/VorPage.test.ts` |
+| x | `e1e75d0` (part) | The merged user and database search result was not sorted by ident, breaking the scan order. | unit | testable | User AAA and CCC, database BBB: `searchByIdentWithIcaoStructs` returns AAA, BBB, CCC. | `test/unit/data/navdata/KLNFacilityLoader.test.ts` |
 | | #39 `c2e7b8e`, `d202f4a` | Scanning threw after the shown nearest entry dropped off the nearest list; distance and bearing now revert to coordinates. | flight | testable | APT 1 on nearest entry 1, fly until it leaves the list, scan: no error. | |
-| | #5 `bf08926`, `795356f` | Errors are shown on a full-screen error page with the stack; OK hides it, "OK and suppress" blocks later ones. | render | testable | Publish an error: the error page shows message and stack; OK hides it; suppress blocks the next. DOM, not `Screen`. | |
-| | #54 `5599e1f`, #55 `603ad0d` (same hunk) | Changing the hundreds or tens digit of an altitude corrupted the stored value. | render | testable | CAL 2 ALT 30000, change the hundreds digit: ALT 30100. Only the hundreds digit can be reached with the cursor (the tens and ones are read-only), so the tens half of the fix is not observable. #55's own report (ALT page stuck) was resolved by #56. | |
-| | #33 `439244d` | CAL page values propagate as on the KLN 89 trainer; viewing CAL 2 overwrote CAL 3 TAS. | render | testable | Change ALT on CAL 1: CAL 2 shows it. Open CAL 3 after CAL 2: TAS unchanged. Trainer-based: characterization unless a manual page supports it. | |
-| | `ee0b000` | Changing the baro setting threw (unbound callback). | render | testable | ALT page, change baro, ENT: no error, the barometer input holds the value. | |
-| | #56 `14972b6` | An overlay page that does not handle a knob is closed and the event re-dispatched; DCT stays open with the cursor off; ALT and DIR titles. | render | testable | ALT, outer knob: the page changes. ALT, DCT, cursor off, outer knob: DCT closes. The status line shows ALT and DIR. | |
-| | #64 `681181d` | The default date for date editors is 1 Jan 1988. | render | testable | SET 2 before acquisition, start an edit, ENT: 01 JAN 88. | |
-| | #65 `201f443` | Creating a user airport at the user position from APT 1 threw. | render | testable | APT 1, unknown ident, "create at user position", ENT: no error, lat/lon editors shown. | |
-| | #72 `3977549` (#88 on 1.x) | Creating an intersection with a REF waypoint threw with nested waypoint pages. | render | testable | INT or SUP, REF ident, ENT, confirm with ENT: no error, field filled. The issue is a video; confirm the steps. | |
-| | #46 `bca17fd` | The SET 10 page threw. | render | testable | Select SET 10: no error. | |
-| | `fb671c0`, `74134be`, `9d1fe96` | SET 9 was named SET 7, SET 7 was named SET 8, and TRI 5 had the wrong page number. | render | testable | Select each: the status line shows the page's own name. | |
-| | `2b9f811` | Details of the SET 0 database update sequence and its status-line texts, corrected after a video of a real unit. | render | testable | Walk the SET 0 update: each step's screen. Source is the video the commit names (allowed by `CLAUDE.md`); cite its timestamps. | |
-| | `f95d1d7` | The ACT page did not refresh when the flight plan changed. | render | testable | ACT page shown, change FPL 0 (insert a waypoint): the ACT page lists it without a page change. | |
-| | `8045b29` | A waypoint confirmation page opened from the ACT page was shown like the ACT page. | render | testable | Enter a new ident from the ACT page: the confirmation page has the waypoint-page layout. Confirm the steps first. | |
-| | `8e9a7c4` | With SCAN pulled and the right cursor active, the inner knob scanned instead of changing the field (KLN 89 trainer behavior). | render | testable | Right cursor on an editable field, `EVT_R_SCAN_RIGHT`: the field value changes as with the inner knob. Trainer-based: characterization unless a manual page supports it. | |
-| | `9a17b5b` | Moving the cursor down past the last visible row of a list left the focused row one row below the visible area. | render | testable | A list taller than the page (OTH 3 with several user waypoints), cursor down to the bottom: the focused row is the last visible row. | |
-| | #35 `13d360b` | APT 2 showed the elevation in meters instead of feet. | render | testable | Airport at a known elevation in meters: APT 2 shows feet, rounded to 10. | |
-| | #38 `645c008` | APT 3 threw for an airport without runways. | render | testable | Airport without runways: APT 3 not offered, no error. | |
-| | #26 `84a3008` | Deleting an item on OTH 3 skipped the next item. | render | testable | Three user waypoints, delete the middle one: the cursor stays on that row, now showing the next waypoint. | |
-| | `f347a2c` | ENT stopped moving the cursor to the next field. | render | testable | Cursor on a select field, ENT: the inverted field moves on. | |
-| | #25 `96b3de3` | Keyboard mode works for all editor types. | render | testable | `KLN90B_Internal_Key` events into a number field (SUP lat/lon): the characters appear and the cursor advances. | |
-| | #75 `4b11c06` | Escape leaves keyboard mode. | render | testable | Keyboard mode, a `keypress` Escape on the hidden input: mode off after the timeout. Holds the handler only, not how Coherent GT delivers the key. | |
-| | `8c3b2e0` | The FPL leg did not blink while a waypoint awaited confirmation. | render | testable | FPL 0, enter an ident: `Screen.mask()` alternates F and I over the ident cells across blink phases. | |
-| | `10c5a3d` | The static characters of an editor (space, degree sign, dot) were not inverted when selected. | render | testable | Cursor on a lat/lon or date editor: the mask shows I on those cells. | |
-| | `b7fd10a`, `44fb0a4` | Super NAV 1 and Super NAV 5 threw without an active waypoint. | render | testable | No active waypoint, both sides NAV 1 (then NAV 5): no error. Super NAV 5 is checked by the error list only. | |
+| x | #5 `bf08926`, `795356f` | Errors are shown on a full-screen error page with the stack; OK hides it, "OK and suppress" blocks later ones. | render | testable | Publish an error: the error page shows message and stack; OK hides it; suppress blocks the next. DOM, not `Screen`. | `test/render/controls/ErrorPage.test.ts` |
+| x | #54 `5599e1f`, #55 `603ad0d` (same hunk) | Changing the hundreds or tens digit of an altitude corrupted the stored value. | render | testable | CAL 2 ALT 30000, change the hundreds digit: ALT 30100. Only the hundreds digit can be reached with the cursor (the tens and ones are read-only), so the tens half of the fix is not observable. #55's own report (ALT page stuck) was resolved by #56. | `test/render/controls/selects/AltitudeFieldset.test.ts` |
+| x | #33 `439244d` | CAL page values propagate as on the KLN 89 trainer; viewing CAL 2 overwrote CAL 3 TAS. | render | testable | Change ALT on CAL 1: CAL 2 shows it. Open CAL 3 after CAL 2: TAS unchanged. Trainer-based: characterization unless a manual page supports it. | `test/render/pages/left/Cal2Page.test.ts` |
+| x | `ee0b000` | Changing the baro setting threw (unbound callback). | render | testable | ALT page, change baro, ENT: no error, the barometer input holds the value. | `test/render/pages/left/AltPage.test.ts` |
+| x | #56 `14972b6` | An overlay page that does not handle a knob is closed and the event re-dispatched; DCT stays open with the cursor off; ALT and DIR titles. | render | testable | ALT, outer knob: the page changes. ALT, DCT, cursor off, outer knob: DCT closes. The status line shows ALT and DIR. | `test/render/pages/MainPage.test.ts` |
+| x | #64 `681181d` | The default date for date editors is 1 Jan 1988. | render | testable | SET 2 before acquisition, start an edit, ENT: 01 JAN 88. | `test/render/controls/editors/DateEditor.test.ts` |
+| x | #65 `201f443` | Creating a user airport at the user position from APT 1 threw. | render | testable | APT 1, unknown ident, "create at user position", ENT: no error, lat/lon editors shown. | `test/render/pages/right/Apt1Page.test.ts` |
+| x | #72 `3977549` (#88 on 1.x) | Creating an intersection with a REF waypoint threw with nested waypoint pages. | render | testable | INT or SUP, REF ident, ENT, confirm with ENT: no error, field filled. The issue is a video; confirm the steps. | `test/render/pages/right/IntPage.test.ts` |
+| x | #46 `bca17fd` | The SET 10 page threw. | render | testable | Select SET 10: no error. | `test/render/pages/left/Set10Page.test.ts` |
+| x | `fb671c0`, `74134be`, `9d1fe96` | SET 9 was named SET 7, SET 7 was named SET 8, and TRI 5 had the wrong page number. | render | testable | Select each: the status line shows the page's own name. | `test/render/pages/left/pageNames.test.ts` |
+| x | `2b9f811` | Details of the SET 0 database update sequence and its status-line texts, corrected after a video of a real unit. | render | testable | Walk the SET 0 update: each step's screen. Source is the video the commit names (allowed by `CLAUDE.md`); cite its timestamps. The video was not watched, so no timestamps are cited; the status line is a spec (2-5 to 2-6, figures 2-2 to 2-8), the step rows are characterization. | `test/render/pages/left/Set0Page.test.ts` |
+| x | `f95d1d7` | The ACT page did not refresh when the flight plan changed. | render | testable | ACT page shown, change FPL 0 (insert a waypoint): the ACT page lists it without a page change. The type letter of an NDB on this page is pinned as #115. | `test/render/pages/right/ActPage.test.ts` |
+| x | `8045b29` | A waypoint confirmation page opened from the ACT page was shown like the ACT page. | render | testable | Enter a new ident from the ACT page: the confirmation page has the waypoint-page layout. Confirm the steps first. | `test/render/pages/right/WaypointConfirmPage.test.ts` |
+| x | `8e9a7c4` | With SCAN pulled and the right cursor active, the inner knob scanned instead of changing the field (KLN 89 trainer behavior). | render | testable | Right cursor on an editable field, `EVT_R_SCAN_RIGHT`: the field value changes as with the inner knob. Trainer-based: characterization unless a manual page supports it. | `test/render/pages/MainPage.test.ts` |
+| x | `9a17b5b` | Moving the cursor down past the last visible row of a list left the focused row one row below the visible area. | render | testable | A list taller than the page (OTH 3 with several user waypoints), cursor down to the bottom: the focused row is the last visible row. | `test/render/pages/left/Oth3Page.test.ts` |
+| x | #35 `13d360b` | APT 2 showed the elevation in meters instead of feet. | render | testable | Airport at a known elevation in meters: APT 2 shows feet, rounded to 10. | `test/render/pages/right/Apt2Page.test.ts` |
+| x | #38 `645c008` | APT 3 threw for an airport without runways. | render | testable | Airport without runways: APT 3 not offered, no error. | `test/render/pages/right/Apt3Page.test.ts` |
+| x | #26 `84a3008` | Deleting an item on OTH 3 skipped the next item. | render | testable | Three user waypoints, delete the middle one: the cursor stays on that row, now showing the next waypoint. | `test/render/pages/left/Oth3Page.test.ts` |
+| x | `f347a2c` | ENT stopped moving the cursor to the next field. | render | testable | Cursor on a select field, ENT: the inverted field moves on. | `test/render/pages/CursorController.test.ts` |
+| x | #25 `96b3de3` | Keyboard mode works for all editor types. | render | testable | `KLN90B_Internal_Key` events into a number field (SUP lat/lon): the characters appear and the cursor advances. Half fixed: longitudes below 100 degrees and the date cannot be typed, pinned as #109. | `test/render/services/KeyboardService.test.ts` |
+| x | #75 `4b11c06` | Escape leaves keyboard mode. | render | testable | Keyboard mode, a `keypress` Escape on the hidden input: mode off after the timeout. Holds the handler only, not how Coherent GT delivers the key. | `test/render/controls/PageContainer.test.ts` |
+| x | `8c3b2e0` | The FPL leg did not blink while a waypoint awaited confirmation. | render | testable | FPL 0, enter an ident: `Screen.mask()` alternates F and I over the ident cells across blink phases. | `test/render/controls/editors/WaypointEditor.test.ts` |
+| x | `10c5a3d` | The static characters of an editor (space, degree sign, dot) were not inverted when selected. | render | testable | Cursor on a lat/lon or date editor: the mask shows I on those cells. | `test/render/controls/editors/DateEditor.test.ts` |
+| x | `b7fd10a`, `44fb0a4` | Super NAV 1 and Super NAV 5 threw without an active waypoint. | render | testable | No active waypoint, both sides NAV 1 (then NAV 5): no error. Super NAV 5 is checked by the error list only. | `test/render/pages/left/SuperNav.test.ts` |
 | | #15 `34a9cb0` | Lat/lon waypoints of a sim route are imported as temporary SUP waypoints (now in `KlnEfbLoader`). | unit | needs harness: route manager in `FakePlatform` | `getRouteManager` never resolves; a stub that emits a synced route is needed (Session 6 needs it too). | |
 | | #17 `e290ea4` | NAV 5 threw when drawing a DME arc. | render | needs harness: procedure builders | Needs a DME-arc leg in FPL 0. | |
 | | #18 `15d9b35` | DME arcs were drawn and flown the wrong way round. | flight | needs harness: procedure builders | Left and right arcs. The fix carries the author's own doubt (the comment at `circle.reverse()` in `SidStar.ts`); related to #100. | |

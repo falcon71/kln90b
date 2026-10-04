@@ -5,6 +5,10 @@
 export class FakeStorage {
     public readonly data = new Map<string, string>();
 
+    public reset(): void {
+        this.data.clear();
+    }
+
     public install(g: any): void {
         g.GetStoredData = (key: string) => this.data.get(key) ?? '';
         g.SetStoredData = (key: string, value: string) => {
