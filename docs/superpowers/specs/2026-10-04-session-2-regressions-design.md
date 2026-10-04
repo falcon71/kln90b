@@ -58,8 +58,9 @@ The task proves each assertion holds by disabling the matching teardown step.
 
 **Docs**, in the same task: the paragraph on isolation in `testing.md` section 3, the "One unit per test file" line in
 section 6, and the entry in section 7. Also `architecture.md` Core 10 (the singletons paragraph) and rule 9 of
-`test-coverage.md`, which still say one unit per file. `UserWaypointV2.test.ts` keeps its own bus. Unit tests that need
-a fresh repository may call the singleton reset directly.
+`test-coverage.md`, which still say one unit per file. `UserWaypointV2.test.ts` keeps its own bus. The singleton reset is
+strict only after a completed boot, because a static that was never assigned does not exist under the es2017 class
+fields, so teardown after a failed boot clears what exists.
 
 **Model:** Sonnet (rule 26). The design above leaves no open judgment. It runs alone, and tasks 2 to 6 branch from its
 merged commit.
