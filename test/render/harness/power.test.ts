@@ -112,14 +112,17 @@ describe('FrontPanel power cycle time and the OBS warning (harness)', () => {
 
     it('waits through the OBS warning when allowed, until the switch is back in LEG', async () => {
         const unit = await obsUnit();
-        const approving = unit.panel.approveSelfTest({allowObsWarning: true});
-        // The warning stays up while the switch is in OBS; the helper keeps waiting
-        await vi.advanceTimersByTimeAsync(10_000);
-        expect(Screen.read().text()).toContain('SYSTEM IS IN OBS MODE');
+        // The warning comes up about 9 s into approveSelfTest. The fake clock flips the switch well after that, and looks at
+        // the screen between: a helper that gave up at the warning would throw before the flip
+        let screenBeforeFlip = '';
+        setTimeout(() => {
+            screenBeforeFlip = Screen.read().text();
+        }, 18_000);
+        setTimeout(() => unit.env.sim.set('GPS OBS ACTIVE', 'bool', false), 20_000);
 
-        unit.env.sim.set('GPS OBS ACTIVE', 'bool', false);
-        await approving;
+        await unit.panel.approveSelfTest({allowObsWarning: true});
 
+        expect(screenBeforeFlip).toContain('SYSTEM IS IN OBS MODE');
         expect(unit.props.pageManager.getCurrentPage()).toBeInstanceOf(MainPage);
         expect(Screen.read().status().left).toBe('NAV 2');
     });
