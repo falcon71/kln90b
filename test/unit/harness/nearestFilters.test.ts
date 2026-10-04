@@ -49,13 +49,15 @@ describe('MemoryFacilityClient airport filters', () => {
         expect(idents(result.added)).toEqual(['HELI', 'PAVD']);
     });
 
-    it('drops an airport whose only runway is shorter than the minimum length', async () => {
-        const session = await airportSession(airport('SHRT', 47.0, 8.0, {runwayLengthFt: 900}), airport('LONG', 47.1, 8.0, {runwayLengthFt: 1100}));
+    // A runway of exactly the minimum length passes, as in the SDK's hasMatchingRunway (msfssdk.js, length >= minimum).
+    // The builder and the test convert feet to meters with the same function, as the instrument does for the setting.
+    it('drops an airport whose only runway is shorter than the minimum length and keeps one of exactly that length', async () => {
+        const session = await airportSession(airport('SHRT', 47.0, 8.0, {runwayLengthFt: 900}), airport('EXCT', 47.05, 8.0, {runwayLengthFt: 1000}), airport('LONG', 47.1, 8.0, {runwayLengthFt: 1100}));
         session.setExtendedAirportFilters(ANY_SURFACE, 0, TOWERED_OR_NOT, ft(1000));
 
         const result = await session.searchNearest(47.0, 8.0, nm(50), 10);
 
-        expect(idents(result.added)).toEqual(['LONG']);
+        expect(idents(result.added)).toEqual(['EXCT', 'LONG']);
     });
 
     it('needs one runway that meets the length and the surface filter together', async () => {
