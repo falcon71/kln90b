@@ -269,7 +269,9 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
     - Power: `powerOff()`, `powerOn()`, `powerCycle({offSeconds})` and `approveSelfTest()`. After boot every power-on runs
       the welcome page (17 s) and the self-test, also on an engine-running unit; `approveSelfTest` presses ENT on
       `APPROVE?` and on `ACKNOWLEDGE?`, and throws with the screen at the VFR only page or the OBS warning. A unit
-      booted with `engineRunning: false` is dark until `powerOn()`. The unit forgets OBS mode over a power cycle.
+      booted with `engineRunning: false` is dark until `powerOn()`. OBS mode set with `obsMode()` is forgotten over a power
+      cycle. The OBS warning appears only with the external GPS CRS switch option (`LegObsSwitchInstalled`) and
+      `GPS OBS ACTIVE` set to true; `approveSelfTest({allowObsWarning: true})` then waits until the switch is back.
     - `obsMode()` enters ENR-OBS from MOD 2 (the unit needs an active waypoint).
 - **Monitors:** `flight.monitor(name, check)` adds a check that runs once per simulated second and returns `true` or a
   description of what is wrong. Built-in monitors fail the test on an error published to the bus, a SimVar unit error,

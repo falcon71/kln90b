@@ -48,7 +48,7 @@ export function readRows(root: Element): Cell[][] {
         const pre = inPre || el.tagName === 'PRE';
         el.childNodes.forEach(c => walk(c, a, pre));
     };
-    walk(root, '.', root.closest('pre') !== null);
+    walk(root, '.', false);
     if (rows.length > 1 && rows[rows.length - 1].length === 0) rows.pop();
     return rows;
 }

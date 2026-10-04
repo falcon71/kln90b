@@ -7,7 +7,7 @@ import {MainPage} from '../../../kln90b/pages/MainPage';
 import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
 
 describe('SuperNav5.read (harness)', () => {
-    // 3-31: NAV 5 on both sides makes Super NAV 5. 6-8: field 1 shows -.-NM- without a cross track
+    // 3-36: NAV 5 on both sides makes Super NAV 5, with field 1 set to XTK. The -.-NM- text without an active waypoint is a characterization: the guide has no figure of it
     it('reads the left column, the message and range, and hides the right cursor windows', async () => {
         const unit = await bootUnit({storage: {superNav5Field1: SuperNav5Field1.XTK}});
         await unit.panel.selectPage('L', 'NAV 5');

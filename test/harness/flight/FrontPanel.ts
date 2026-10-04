@@ -135,7 +135,7 @@ export class FrontPanel {
     /**
      * Gets a unit that is running its welcome page to its main page the way a pilot does: waits for the self-test page and
      * presses ENT on APPROVE?, then ENT on ACKNOWLEDGE? of the data base page. A unit that stops on another page (FOR VFR
-     * USE ONLY, or the OBS warning unless allowObsWarning is set, which waits until the warning leaves by itself) throws
+     * USE ONLY, or the OBS warning unless allowObsWarning is set, which waits, up to the cap, until the warning leaves, i.e. until the GPS CRS switch is back in LEG) throws
      * with the screen. The main page is recognized by the page name in its status line.
      */
     public async approveSelfTest(o: { allowObsWarning?: boolean } = {}): Promise<void> {
@@ -153,7 +153,11 @@ export class FrontPanel {
             return text.includes('ACKNOWLEDGE?');
         });
         await this.ent();
-        await this.waitFor('the main page', () => this.screen().status().left !== '' && !this.screen().text().includes('ACKNOWLEDGE?'));
+        await this.waitFor('the main page', () => {
+            // The self-test and data base pages show CRSR (or no name) where the main page shows a page name
+            const left = this.screen().status().left;
+            return left !== '' && left !== 'CRSR' && !this.screen().text().includes('ACKNOWLEDGE?');
+        });
     }
 
     /** Advances in steps of one second until the condition holds, at most WAIT_CAP_STEPS seconds */
@@ -254,7 +258,7 @@ export class FrontPanel {
 
     /**
      * A waypoint selector has one field per character, so the outer knob moves between characters, and each change
-     * starts a search that finishes within the display tick after it. Typing K into the APT selector autocompletes the
+     * starts a search that finishes within the display tick the click itself advances. Typing K into the APT selector autocompletes the
      * rest of a unique ident, so a shorter ident ends with a blank on the next character (see enterIdent).
      */
     private async enterIntoSelector(side: Side, ident: string, first: Field): Promise<void> {
@@ -267,7 +271,6 @@ export class FrontPanel {
                 }
             }
             await this.setChar(side, 0, ident[i], SELECTOR_CHARSET);
-            await vi.advanceTimersByTimeAsync(CLICK_MS);
         }
         const next = first.col + ident.length;
         const edge = side === 'L' ? 11 : 23;
@@ -277,7 +280,6 @@ export class FrontPanel {
             const at = this.focused(side);
             if (at.row === first.row && at.col === next && at.text.length === 1) {
                 await this.setChar(side, 0, ' ', SELECTOR_CHARSET);
-                await vi.advanceTimersByTimeAsync(CLICK_MS);
             } else {
                 await this.outer(side, -1);
             }

@@ -74,3 +74,53 @@ describe('FrontPanel.approveSelfTest on other pages (harness)', () => {
         await expect(unit.panel.approveSelfTest()).rejects.toThrow(/VFR only page[^]*FOR VFR USE ONLY/);
     });
 });
+
+describe('FrontPanel power cycle time and the OBS warning (harness)', () => {
+    it('keeps the unit off for the seconds it is given', async () => {
+        const unit = await bootUnit();
+        const t0 = Date.now();
+
+        await unit.panel.powerCycle();
+        const byDefault = Date.now() - t0;
+        await unit.panel.approveSelfTest();
+        const t1 = Date.now();
+        await unit.panel.powerCycle({offSeconds: 5});
+
+        // Two presses of one display tick each around the wait
+        expect(byDefault).toBe(250 + 1000 + 250);
+        expect(Date.now() - t1).toBe(250 + 5000 + 250);
+    });
+
+    // 3-7: a unit powered up with the external GPS CRS switch in OBS shows the OBS warning before the data base page. The
+    // switch is a GPS OBS ACTIVE SimVar read through SimVarSync, which needs the external switch option.
+    const obsUnit = async () => {
+        const unit = await bootUnit({
+            panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ExternalSwitches>'
+                + '<LegObsSwitchInstalled>true</LegObsSwitchInstalled></ExternalSwitches></Input></Instrument></PlaneHTMLConfig>',
+        });
+        unit.env.sim.set('GPS OBS ACTIVE', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        await unit.panel.powerCycle();
+        return unit;
+    };
+
+    it('throws with the screen at the OBS warning', async () => {
+        const unit = await obsUnit();
+
+        await expect(unit.panel.approveSelfTest()).rejects.toThrow(/starts in OBS mode[^]*SYSTEM IS IN OBS MODE/);
+    });
+
+    it('waits through the OBS warning when allowed, until the switch is back in LEG', async () => {
+        const unit = await obsUnit();
+        const approving = unit.panel.approveSelfTest({allowObsWarning: true});
+        // The warning stays up while the switch is in OBS; the helper keeps waiting
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(Screen.read().text()).toContain('SYSTEM IS IN OBS MODE');
+
+        unit.env.sim.set('GPS OBS ACTIVE', 'bool', false);
+        await approving;
+
+        expect(unit.props.pageManager.getCurrentPage()).toBeInstanceOf(MainPage);
+        expect(Screen.read().status().left).toBe('NAV 2');
+    });
+});

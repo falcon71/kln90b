@@ -137,7 +137,7 @@ describe('Screen, the status line', () => {
 });
 
 describe('Screen, pages with their own layout', () => {
-    // 3-7: the welcome page has seven rows, no status line
+    // 3-3: the Turn-On page has seven rows and no status line
     it('reads the seven rows of the welcome page', async () => {
         const unit = await bootUnit({engineRunning: false});
         unit.send('KLN90B_Power_On');
