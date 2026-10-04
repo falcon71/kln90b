@@ -33,7 +33,7 @@ them it is for the convenience of the session, and `testing.md` is the authority
 **Session mechanics**
 
 1. Start on a new git branch named after the session (`tests-session-N-<topic>`), before the first edit.
-2. Treat each session as an architectoral path.
+2. Treat each session as an architectural path of the brainstorming skill. Rules 19 to 27 describe how it is run.
 3. Run `npm test` and `npx tsc --noEmit` first. Both must be clean before any new work starts. If they are not, stop and
    report; do not fix unrelated failures as part of the session.
 4. Run the coverage report (`npm run coverage`, added by session 1) and read it for the session's area before writing
@@ -84,6 +84,55 @@ them it is for the convenience of the session, and `testing.md` is the authority
 18. The session log says what was **not** covered in the session's area, so the final record in session 11 can be
     written from the logs.
 
+**Workflow**
+
+A session follows the skills of the superpowers plugin: brainstorming, writing-plans and subagent-driven development.
+The one deliberate difference is rule 21. The *controlling session* is the one the maintainer talks to; it dispatches
+subagents, relays their results and merges, but it neither implements nor reviews.
+
+19. **Design, then plan.** The controlling session settles open questions with the maintainer and writes the design to
+    `docs/superpowers/specs/<date>-session-N-<topic>-design.md`. The writing-plans skill turns it into
+    `docs/superpowers/plans/<date>-session-N-<topic>.md`. Both are committed on the session branch and are deleted
+    together with this document in session 11.
+20. **Tasks.** The plan splits the work into tasks:
+    - a harness task first, when the session needs a harness extension;
+    - then the main tasks, batched by area of the code and sized so that one implementer finishes its batch in one
+      context;
+    - then an issues task and a close-out task, which may be one task.
+21. **Parallel implementers in worktrees.** The main tasks run in parallel, one implementer subagent each, every one in its
+    own git worktree (`isolation: "worktree"`) branched from the session branch. A harness task runs alone before them,
+    because they build on it. Subagent-driven development runs implementers one at a time to avoid conflicts. Separate
+    worktrees remove those conflicts, so this workflow runs them in parallel.
+22. **Implementers commit per item**, with the one-line proof of rule 10 in the commit message. They do not edit this
+    document and do not file issues. Their report lists, for each item:
+    - the test path, and whether the test is a spec or a characterization test;
+    - any change of verdict, with its reason;
+    - every suspected bug, with a reproduction.
+23. **Placeholder issue numbers.** A pin for a bug that has no issue yet is named `'… (#NEW-<task>-<n>)'`, for example
+    `#NEW-3-1`. The issues task then:
+    - files each bug per `CLAUDE.md`, searching open and closed issues first, so that a bug two tasks found becomes one
+      issue;
+    - replaces the placeholders with the real numbers.
+
+    The close-out then confirms that `grep -r "#NEW-" test/` finds nothing.
+24. **Reviews per task, by subagents.** When a task reports done, the controlling session dispatches a spec-compliance
+    reviewer against that task's commits, and a code-quality reviewer once the first passes.
+    - The code-quality reviewer verifies the tests by mutation, in the task's worktree. It follows the mutation rules in
+      the maintainer's global instructions: the mutations are never named to the implementer, a surviving mutation is a
+      finding, and the reviewer restores the code and checks that `git diff` is clean.
+    - Findings go back to the same implementer, and both reviews repeat until they pass.
+25. **Merging.** The controlling session merges an approved task branch into the session branch, then runs `npm test`
+    and `npx tsc --noEmit` on the result. Task branches and worktrees are deleted only at the end, after the maintainer
+    approves the session (`CLAUDE.md`, Git). Nothing is pushed.
+26. **Models.** Implementers start on Sonnet, and a task whose implementer struggles is re-dispatched on Opus. The
+    controlling session chooses the reviewers' model per task by its complexity: Sonnet or Opus. The final review of the whole session runs on the controlling session's model.
+27. **Close-out** is the last task. It does the following:
+    - ticks the session's items from the implementers' reports (for sessions 2 and 3, the triage table rows);
+    - runs rule 5;
+    - writes the session log, including rule 18.
+
+    After it, a final review of the whole session runs, and then the maintainer is asked to approve the merge.
+
 # 3. The sessions
 
 Sessions 1 to 3 build the regression tests, because a bug that has bitten before has a known reproduction, a known
@@ -91,7 +140,7 @@ expected value and a built-in proof (the test fails on the old bug). Sessions 4 
 of value. Session 11 retires this document. Session H is optional and scheduled by the maintainer when the triage
 shows that it pays off.
 
-A session that was interrupted is rerun with the same number until its checkbox is ticked (rule 6).
+A session that was interrupted is rerun with the same number until its checkbox is ticked.
 
 ## Session 1: coverage tooling and regression triage
 
@@ -127,11 +176,36 @@ numbers.
 
 1. For each row: write the test in the folder mirroring the code under test, cite the issue in the test name
    (`'… (#NN)'`), and cite the manual page when the issue is about matching the real unit.
-2. Prove it bites (rules 11 and 12). Record the proof in the commit message in one line ("fails when the sign flip in
+2. Prove it bites (rules 10 and 11). Record the proof in the commit message in one line ("fails when the sign flip in
    `UserWaypointLoaderV2` is restored").
 3. Tick the row in the triage table with the test file's path.
 4. Any issue that turns out not to be fixed, or only half fixed, gets an `it.fails` pin and a new GitHub issue
-   referencing the closed one (as #98 did for #78).
+   referencing the closed one (as #98 did for #78). #101 is pinned here; #102 waits for airspace boundaries.
+5. For a row whose stage is *flight + render* or *unit + render*, this session writes the unit or render half. The
+   flight half is left to session 3.
+
+**Tasks** (rules 19 to 27):
+
+1. **Harness: one unit per test.** Teardown in place: `bootUnit` tears its unit down at the end of the test. Teardown
+   does the following:
+    - stops the fake timers;
+    - resets `FakeSim`, keeping its registration ids, because SDK objects cache them;
+    - resets `FakeStorage`, `FakeCoherent` and the magnetic variation;
+    - clears the singletons, both the instrument's and the SDK's `FlightPlanner`, and fails loudly if one has been
+      renamed;
+    - blanks the DOM.
+
+   A harness test proves that a second boot sees nothing of the first. The task also updates rule 9 and `testing.md`.
+2. **Persistence and settings (unit):** #36, #78, #47 with the #101 pin, `f745fb3`, `1781156`, `1676e56`, `c673dc2`,
+   `7b4465d`.
+3. **Navdata and services logic (unit, with two render halves):** #6, #59, #14, #28, `9ce23bf`, #9, `6a6c634`, #42,
+   `e1e75d0`, `d3228dd`, `9adbf97`, #4, #8.
+4. **Direct-to and FPL 0 (render):** `0031c11`, #43, `43d472b`, #12, #49, #81, the render halves of #67 (b) and #27.
+5. **CAL, ALT, SET, overlays and editors (render):** #31, #54, #33, `ee0b000`, #56, #64, #46, `fb671c0`, `2b9f811`,
+   #25, #75, `10c5a3d`, `f347a2c`, `8e9a7c4`.
+6. **Public contract and pages (render):** `955b535`, #51, #52, #53, #5, #65, #72, `f95d1d7`, `8045b29`, `9a17b5b`,
+   #35, #38, #26, `8c3b2e0`, `b7fd10a`.
+7. **Issues and close-out** (rules 23 and 27).
 
 **Done when:** every *testable* unit or render row is ticked or has been moved to another verdict with a reason.
 
@@ -181,7 +255,7 @@ this session, the *needs harness* rows it unblocked become *testable* and are pi
 **Goal:** the interfaces `CLAUDE.md` says must never break, so a change that breaks an aircraft fails a test.
 
 1. **H events** (`kln90b/HEvents.ts`): a sweep that sends every public event to a booted unit and asserts no error was
-   published and no `console.error` occurred (rule 18 applies; name it a sweep). Then spec tests for the events with an
+   published and no `console.error` occurred (rule 17 applies; name it a sweep). Then spec tests for the events with an
    observable effect on the screen or state: knobs, CLR, ENT, DCT, MSG, ALT, SCAN, power, brightness.
 2. **LVars** (`kln90b/LVars.ts`): read-only outputs are written with the right value for a known state (roll command,
    annunciators, integrity warning); writable overrides change the behavior they document.
@@ -281,7 +355,7 @@ Pilot's Guide specifies the content.
 3. Super NAV 5 cannot be read by `Screen` (`testing.md` section 6): snapshot its canvas with `canvasToAscii` and test
    its `<pre>` blocks by DOM text, or list it.
 4. Work in tree order (NAV, FPL, SET, OTH, TRI, CAL, STA, MOD, then ALT, DIRECT TO and DUPLICATE). Stop when the
-   context is spent (rule 6); the log says where.
+   context is spent; the log says where.
 
 **Done when:** every left page has at least its characterization test and the log lists the pages without a spec test.
 
