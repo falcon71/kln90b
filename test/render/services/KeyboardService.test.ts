@@ -4,15 +4,15 @@ import {Screen} from '../../harness/render/screen';
 
 /** The right half page's row n (11 characters) */
 function right(n: number): string {
-    return Screen.read().half('R').split('\n')[n];
+    return Screen.read().rows('R')[n];
 }
 
 /** The mask of the right half page's row n */
 function rightMask(n: number): string {
-    return Screen.read().mask().split('\n')[n].slice(12, 23);
+    return Screen.read().maskRows('R')[n];
 }
 
-/** A key as the sim's keyboard sends it (KLN90BCore), followed by one display tick */
+/** A key as the sim's keyboard sends it (KLN90BCore), followed by one display tick. Raw on purpose: the key event is the subject. */
 async function type(unit: HeadlessUnit, key: string): Promise<void> {
     unit.send('KLN90B_Internal_Key:RIGHT:' + key);
     await vi.advanceTimersByTimeAsync(250);
@@ -21,6 +21,7 @@ async function type(unit: HeadlessUnit, key: string): Promise<void> {
 /** The USER POS? page: an empty latitude editor on row 4 and an empty longitude editor on row 5, in the right half */
 async function openUserPos(unit: HeadlessUnit): Promise<void> {
     await unit.panel.cursor('R');
+    // Four ident characters, one step without a field, then USER POS?. Not cursorTo: it throws on the step with no focused field.
     await unit.panel.outer('R', 5);
     await unit.panel.ent();
 }

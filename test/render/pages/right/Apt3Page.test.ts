@@ -12,8 +12,7 @@ describe('APT 3 page (characterization)', () => {
 
         const screen = Screen.read();
         expect(unit.errors).toEqual([]);
-        expect(screen.rightName()).toBe('APT 3');
-        const rows = screen.half('R').split('\n');
-        expect(rows.slice(2, 5)).toEqual(['  RUNWAY   ', ' DATA NOT  ', ' AVAILABLE ']);
+        expect(screen.status().right).toBe('APT 3');
+        expect(screen.rows('R').slice(2, 5)).toEqual(['  RUNWAY   ', ' DATA NOT  ', ' AVAILABLE ']);
     });
 });

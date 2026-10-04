@@ -2,9 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {BoundaryType} from '@microsoft/msfs-sdk';
 import {bootUnit, settle} from '../../../harness/boot';
 import {airspace} from '../../../harness/navdata/airspaces';
-
-/** The text of the MSG page; its lines are newline-separated inside one <pre>, which Screen.read does not split */
-const messagePageText = () => document.querySelector('.full-page')!.textContent!.replace(/ /g, ' ');
+import {Screen} from '../../../harness/render/screen';
 
 const square: [number, number][] = [[47.1, 7.9], [47.1, 8.1], [46.9, 8.1], [46.9, 7.9]];
 
@@ -18,7 +16,7 @@ async function messagesInside(altitudeFt: number, minFt: number, maxFt: number):
     // The alert searches every 10 s
     await vi.advanceTimersByTimeAsync(12000);
     await unit.panel.msg();
-    return messagePageText();
+    return Screen.read().text();
 }
 
 // 3-39, 3-40: the SUA alert is three-dimensional; inside the lateral boundary and between the limits (widened by the

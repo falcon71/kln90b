@@ -5,7 +5,7 @@ import {Screen} from '../../../harness/render/screen';
 
 /** The first two rows of the right half page: ident row and name row */
 function identAndName(): string[] {
-    return Screen.read().half('R').split('\n').slice(0, 2);
+    return Screen.read().rows('R').slice(0, 2);
 }
 
 describe('VOR page with duplicate idents (d3228dd)', () => {
@@ -23,6 +23,8 @@ describe('VOR page with duplicate idents (d3228dd)', () => {
         });
         await unit.panel.selectPage('R', 'VOR  ');
         await unit.panel.cursor('R');
+        // Not enterIdent: the fresh page shows ABC SOUTH, so its first character is an A already, the knobs would leave
+        // it alone, and no search would run. The keyboard sets every character, so it makes the unit search for ABC.
         await unit.panel.type('R', 'ABC');
         await unit.panel.cursor('R');
         expect(identAndName()).toEqual([' ABC D     ', 'ABC NORTH  ']);

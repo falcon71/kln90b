@@ -1,41 +1,26 @@
 import {describe, expect, it, vi} from 'vitest';
-import {GeoPoint, UnitType} from '@microsoft/msfs-sdk';
 import {bootUnit, settle} from '../../harness/boot';
-import {airport, vor} from '../../harness/navdata/builders';
+import {standardRoute} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
-import {courseDeg, distanceNm, EARTH_RADIUS_NM, finalCourseDeg, norm360} from '../../harness/flight/geo';
+import {courseDeg, distanceNm, EARTH_RADIUS_NM, pointBefore} from '../../harness/flight/geo';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 
 // The standard world of the flight tests: the final course KAAA - ABC is about 51.0 degrees
-const kaaa = airport('KAAA', 47.0, 8.0);
-const abc = vor('ABC', 47.5, 8.9);
-const kbbb = airport('KBBB', 48.2, 9.2);
-
-/** The point nm before the facility on the course, as a position for bootUnit */
-function before(f: { lat: number; lon: number }, courseTrue: number, nm: number): { lat: number; lon: number } {
-    const p = new GeoPoint(f.lat, f.lon).offset(norm360(courseTrue + 180), UnitType.NMILE.convertTo(nm, UnitType.GA_RADIAN));
-    return {lat: p.lat, lon: p.lon};
-}
-
-/** MOD 2 shows "PRESS ENT TO ACTIVATE" in ENR-LEG; ENT enters ENR-OBS (the cursor is not needed) */
-async function enterObs(unit: Awaited<ReturnType<typeof bootUnit>>): Promise<void> {
-    await unit.panel.selectPage('L', 'MOD 2');
-    await unit.panel.ent();
-}
+const {kaaa, abc, kbbb} = standardRoute();
 
 describe('ModeController OBS course', () => {
     // 5-34 and 5-35: in OBS the deviation is measured from the selected course through the active waypoint, and the
     // course comes from the external indicator. 014293d: ModeController ticks before NavCalculator, so a course that
     // changed is in the deviation of the same calculation tick instead of one second late.
     it('uses a changed OBS course in the same calculation tick (014293d)', async () => {
-        const position = before(abc, finalCourseDeg(kaaa, abc), 5);
+        const position = pointBefore(kaaa, abc, 5);
         const unit = await bootUnit({
             facilities: [kaaa, abc, kbbb], position, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
         });
         await settle(unit);
         const sim = unit.env.sim;
         sim.set('Nav OBS:1', 'degrees', 51); // Before entering OBS: unset it reads 0
-        await enterObs(unit);
+        await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
         const nav = unit.props.memory.navPage;
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
@@ -59,11 +44,11 @@ describe('ModeController OBS course', () => {
 describe('ModeController OBS course of 000', () => {
     /** Plan [KAAA, ABC], 10 NM before ABC on the leg, the external OBS course set before OBS is entered */
     async function enterObsWithCourse(course: number) {
-        const position = before(abc, finalCourseDeg(kaaa, abc), 10);
+        const position = pointBefore(kaaa, abc, 10);
         const unit = await bootUnit({facilities: [kaaa, abc], position, storage: savedFlightplan(0, [kaaa, abc])});
         await settle(unit);
         unit.env.sim.set('Nav OBS:1', 'degrees', course);
-        await enterObs(unit);
+        await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(3000);
         return {unit, position};
     }

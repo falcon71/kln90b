@@ -11,7 +11,6 @@ describe('D/T 3 page', () => {
         const abc = vor('ABC', 47.4, 8.0);
         const def = intersection('DEF', 47.2, 8.0);
         const kbbb = airport('KBBB', 47.0, 8.0);
-        const error = vi.spyOn(console, 'error');
         const unit = await bootUnit({
             facilities: [kaaa, abc, def, kbbb], position: {lat: 47.5, lon: 8.0}, magvar: 0,
             storage: savedFlightplan(0, [kaaa, abc, def, def, kbbb]),
@@ -19,20 +18,17 @@ describe('D/T 3 page', () => {
         await settle(unit);
         expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(1); // Precondition: ABC is active
 
-        await unit.panel.outer('L', -1); // FPL 0, cursor off
-        // From SUP: CTR, REF, ACT, D/T; then D/T 1 and D/T 2 to D/T 3.
-        // Not selectPage: the ACT page on the way is wider than a half page here, and Screen.read refuses it
-        await unit.panel.outer('R', 4);
-        await unit.panel.inner('R', 2);
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.selectPage('R', 'D/T 3');
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(unit.errors).toEqual([]);
         const screen = Screen.read();
-        expect(screen.leftName()).toBe('FPL 0');
-        expect(screen.rightName()).toBe('D/T 3');
+        expect(screen.status().left).toBe('FPL 0');
+        expect(screen.status().right).toBe('D/T 3');
         // The distances accumulate along the legs, 0.1 degree of latitude is 6.0108 NM: 6, 18 (twice, the repeated DEF), 30.
         // KAAA lies behind the active leg and has no values
-        expect(screen.half('R').split('\n')).toEqual([
+        expect(screen.rows('R')).toEqual([
             'DIS     DTK',
             '           ',
             '  6    180°',
@@ -41,6 +37,6 @@ describe('D/T 3 page', () => {
             ' 30    180°',
         ]);
         // A zero-length leg would give a NaN heading, which the SDK reports with console.error
-        expect(error).not.toHaveBeenCalled();
+        expect(unit.consoleErrors).toEqual([]);
     });
 });
