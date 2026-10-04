@@ -65,10 +65,13 @@ manager. The sim uses `SIM_PLATFORM`; tests use `FakePlatform` (`test/harness/pl
 3. Builds a `KLN90BCore` with a `FakePlatform` around a `MemoryFacilityClient` and calls `init()` with a panel.xml
    document (`MINIMAL_PANEL_XML` unless `panelXml` is given).
 4. Advances simulated time until `propsReady` fires, and returns the `HeadlessUnit`: `core`, `props` (the `PageProps`
-   bag), `env` (the fakes), `navdata`, `errors` (everything published on the `error` topic), `send(evt)` and `panel` (the front panel).
+   bag), `env` (the fakes), `navdata`, `errors` (everything published on the `error` topic), `atcModel` (the model the
+   unit booted with, which is part of the key its settings are saved under), `send(evt)` and `panel` (the front panel).
 
 By default the engine is running, so the unit skips the welcome and self-test pages (`isForceReadyToUse`). Pass
-`engineRunning: false` to see the cold-and-dark start.
+`engineRunning: false` to see the cold-and-dark start. Pass `coldGps: true` for an engine-running boot whose GPS has no
+fix yet (the boot resets the GPS after `propsReady`); it acquires on its own, fast or slow per the `fastGpsAcquisition`
+setting, and `settle` waits for it.
 
 ## The global fakes
 
@@ -105,6 +108,9 @@ The sim globals are installed once per test file by the setup files `test/harnes
     - the sim fakes are reset in place (`FakeSim` keeps its registration ids, because SDK objects cache them);
     - the singletons listed in `test/harness/singletons.ts` are cleared;
     - the DOM is emptied.
+
+  The teardown (`runAll` in `boot.ts`) runs every step even when one throws, then rethrows the first error, so one
+  failing reset cannot leave the singletons dirty for the next test. It also clears `FakeXhr.requests`.
 
   Only one unit is live at a time: `bootUnit` throws on a second call in the same test, and outside a test. A singleton
   added to the instrument must be added to `singletons.ts`.
@@ -162,6 +168,14 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
     - `text()`, `row(n)`, `half('L' | 'R')`, `leftName()`, `rightName()` and `cell(row, col)` read it.
     - `mask()` shows the attributes per cell: `.` normal, `I` inverted, `B` blinking, `F` flashing inverse.
     - `dump()` is the text, a blank line and the mask. It is the format for snapshots and for failure messages.
+- **`settle(unit)`** (`boot.ts`) advances the clock until the GPS has a solution, then two calculation ticks more, so that
+  FPL 0 has activated and the display shows it (a force-ready boot is valid at once, but FPL 0 activates only at the first
+  calculation tick). It throws when there is no fix within its cap (120 s by default).
+- **`storedSetting(unit, name)`** (`storage.ts`) returns the parsed value the unit saved under a user setting, and
+  `undefined` for a key never saved. The unit saves a moment after the change, so advance the clock first. Use it instead
+  of building the `persistent-setting.<model>.profile_1.` key by hand.
+- **`unit.panel.type(side, text)`** types characters with the keyboard (`KLN90B_Internal_Key`), one display tick each, with
+  that side's cursor on. It is how the ident selectors of the APT, VOR, NDB, INT and SUP pages take input.
 - Prefer `toMatchInlineSnapshot` on `screen.dump()` for a whole page, and `toEqual` on `half()` rows when only part of a
   page matters. Snapshots are text, so the diff in review is the diff of the screen.
 - Special glyphs stay as the code points the font maps them to (docs/architecture.md, UI 3). Copy them from the
@@ -211,12 +225,13 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
   A render test that boots with `bootUnit` gets the same panel as `unit.panel`.
     - Raw events: `press(evt)`, `outer(side, clicks)`, `inner(side, clicks)`, `cursor(side)`, `ent()`, `clr()`, `dct()`,
       `msg()`, `alt()`, `scan()`, `power()`. Each click advances one display tick so the screen shows its result.
-    - Helpers: `selectPage(side, 'FPL 0')`, `enterIdent(side, ident)` and `appendToFpl0(idents)`.
+    - Helpers: `selectPage(side, 'FPL 0')`, `enterIdent(side, ident)`, `type(side, text)` and `appendToFpl0(idents)`.
     - `enterIdent` does not blank the positions past a short ident, so an autocompleted longer ident leaves a tail.
       Enter long idents first, or prefer `savedFlightplan` for setup.
 - **Monitors:** `flight.monitor(name, check)` adds a check that runs once per simulated second and returns `true` or a
   description of what is wrong. Built-in monitors fail the test on an error published to the bus, a SimVar unit error,
-  any `console.error` and a non-finite GPS output. A monitor sees whole seconds only, so a transient shorter than a
+  any `console.error` and a non-finite GPS output. The `console.error` wrapper that counts is removed again when the
+  test finishes, so a file may hold several flights. A monitor sees whole seconds only, so a transient shorter than a
   second can slip through.
 - **The recorder** keeps one row per simulated second (position, track, bank, `nav`, a few SimVars and the screen text).
   When a flight test fails, it writes `test/flight/__output__/<test name>.jsonl` and `.kml`. Open the KML in Google Earth
@@ -325,8 +340,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   which also counts the boot). A render or unit test that must notice a logged error has to spy on `console.error`
   itself, and restore the spy afterwards.
 - **`FrontPanel.enterIdent` cannot type into the ident selectors** of the APT, VOR, NDB, INT and SUP pages (the waypoint
-  selectors). Send the characters yourself: `unit.send('KLN90B_Internal_Key:RIGHT:<char>')` with a short
-  `vi.advanceTimersByTimeAsync` per key (`LEFT` for the left side), with the cursor on and the field entered.
+  selectors). Use `unit.panel.type(side, text)`, with the cursor on and the field entered.
 - **While a cursor is on, the status line shows `CRSR`** and `leftName()` and `rightName()` are shifted by one cell
   (`APT 1` reads `PT 1`; with the right cursor on, `rightName()` is `CRSR`). Read `row(6)` or turn the cursor off before
   reading a page name.
@@ -340,7 +354,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   fixed counts (`outer('R', -1)` from SUP reaches INT) or read the half page's DOM with `readRows`.
 - **A booted engine-running unit has a GPS fix at once**, in the slow acquisition mode too (the force-ready start calls
   `acquireAndUseSatellites()` in `WelcomePage`). A test that needs an invalid GPS, for example to enter the date on SET 2
-  (read-only with a fix), calls `unit.props.sensors.in.gps.reset()` after the boot.
+  (read-only with a fix), boots with `coldGps: true`.
 - **There is no CI.** Run `npm test` and `npx tsc --noEmit` before committing.
 
 Measured speed (a dated record): on 2026-10-03 the proof flight (`firstFlight.test.ts`) ran about 1466 simulated
@@ -357,23 +371,14 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - Procedure builders for the navdata, so approach and SID/STAR tests can run, and nearest-search filters in
   `MemoryFacilityClient`.
 - A `FrontPanel.enterIdent` that blanks the positions past a short ident and that handles the waypoint selectors
-  (APT, VOR, NDB, INT, SUP), so that tests do not hand-roll `KLN90B_Internal_Key` events. Include a
-  `FrontPanel.type(side, text)` for the typing that tests now copy from each other.
+  (APT, VOR, NDB, INT, SUP). `FrontPanel.type` covers the selectors today.
 - A collector for unhandled rejections on `unit.errors`, so that a throw on the ENT path fails the test that caused it.
 - A `Screen.read()` that tolerates trailing blanks beyond column 11 (and reads the status line while a cursor is on
   without the shift), and a `selectPage` that can turn the outer knob in either direction, so that no test has to
   navigate with fixed counts.
-- A `bootUnit` option for a cold GPS (an engine-running boot without a fix), replacing the `gps.reset()` call.
-- Harness helpers before session 3, besides `FrontPanel.type`:
-    - a settle/GPS helper, because a force-ready boot is valid at once and FPL 0 activates only after one calculation
-      tick, and tests now loop on `gps.isValid()` and add fixed waits by hand;
-    - a reader for a stored setting, replacing the hand-built `persistent-setting.<model>.profile_1.` key.
-- Teardown robustness:
-    - make the teardown exception-safe (`try`/`finally` around the reset), so that one failing reset does not leave the
-      singletons dirty for the next test;
-    - reset `FakeXhr.requests`;
-    - restore `Flight`'s `console.error` wrapper per flight, before any test file holds several flights;
-    - consider `restoreMocks: true` in `vitest.config.mts`.
+- Migrate the tests that hand-roll what `settle`, `storedSetting`, `FrontPanel.type` and `coldGps` now provide (the
+  `typeRight` loops, the `persistent-setting.` keys, the `gps.reset()` calls and the fixed waits). They still work.
+- `restoreMocks: true` in `vitest.config.mts` was considered and declined: tests restore their own spies.
 - Errors thrown on the ENT path never reach the error page, although `CLAUDE.md` and `architecture.md` say input
   exceptions are shown there (section 6). The question is #118; once it is decided, either the trap goes away or the
   two documents change.

@@ -27,6 +27,9 @@ describe('one unit per test (harness)', () => {
         first.props.remarksManager.saveRemarks('KAAA', ['REMARK ONE ', '           ', '           ']);
         firstPlanner = plannerOf(first);
 
+        // The boot fetched the ephemeris; the second test checks that the teardown forgot it
+        expect(first.env.xhr.requests.map(u => u.slice(u.lastIndexOf('/') + 1))).toEqual(['gps_ephemeris.json', 'msa.json', 'gps_sbas.json']);
+
         expect(first.props.facilityRepository.get(ICAO.value('W', 'XX', '', 'USRA'))!.icaoStruct.ident).toBe('USRA');
         expect(first.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'USRA']);
         expect(first.props.remarksManager.getAirportsWithRemarks()).toEqual(['KAAA']);
@@ -44,6 +47,7 @@ describe('one unit per test (harness)', () => {
         expect(env.magvar(47.2, 8.0)).toBe(0);
         expect(env.coherent.calls).toEqual([]);
         expect(env.coherent.replies.size).toBe(0);
+        expect(env.xhr.requests).toEqual([]);
 
         const oldTick = vi.spyOn(first.props.messageHandler, 'tick');
         // Format 2 is the only data the second unit has, so it reads fpl0 with the loader that would parse a stale value

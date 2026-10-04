@@ -32,6 +32,11 @@ export interface BootOptions {
     start?: Date;
     seed?: number;
     atcModel?: string;
+    /**
+     * An engine-running boot whose GPS has no fix yet: gps.reset() after propsReady. It acquires again on its own, fast
+     * or slow per the fastGpsAcquisition setting. Replaces the hand-written reset in tests of the invalid-GPS state.
+     */
+    coldGps?: boolean;
     /** Magnetic variation in degrees east; a number for the whole world. Default 0 */
     magvar?: number | ((lat: number, lon: number) => number);
 }
@@ -44,6 +49,8 @@ export interface HeadlessUnit {
     /** Errors published on the bus; the sim would show them on the error page */
     errors: Error[];
     send(evt: string): void;
+    /** The ATC MODEL the unit booted with; it is part of the key its settings are saved under (see storedSetting) */
+    atcModel: string;
     /** The front panel, driven through H events like an aircraft's hardware */
     panel: FrontPanel;
 }
@@ -51,22 +58,54 @@ export interface HeadlessUnit {
 /** The unit of the running test, if any: its boot state decides how strictly teardown checks the singletons */
 let live: { completed: boolean } | undefined;
 
+/** Runs every step even if one throws, then rethrows the first error */
+export function runAll(steps: (() => void)[]): void {
+    let first: unknown = undefined;
+    let failed = false;
+    for (const step of steps) {
+        try {
+            step();
+        } catch (e) {
+            if (!failed) first = e;
+            failed = true;
+        }
+    }
+    if (failed) throw first;
+}
+
 /**
  * Ends the unit of the test that just finished: stops its clock, empties the sim fakes in place (setup files and simEnv()
- * keep their references), clears the singletons and the DOM.
+ * keep their references), clears the singletons and the DOM. Every step runs even if one throws, so that a failed reset
+ * never leaves the singletons dirty for the next test.
+ *
+ * Exported for the harness test of the teardown itself: `before` steps run first, so a test can inject a throwing step
+ * and see that the real steps still run.
  */
-function teardown(): void {
+export function teardown(before: (() => void)[] = []): void {
     const state = live;
-    vi.clearAllTimers();
-    vi.useRealTimers();
     const env = simEnv();
-    env.sim.reset();
-    env.storage.reset();
-    env.coherent.reset();
-    env.magvar = () => 0;
-    resetSingletons(state?.completed ?? false);
-    document.body.innerHTML = '';
-    live = undefined;
+    try {
+        runAll([
+            ...before,
+            () => vi.clearAllTimers(),
+            () => vi.useRealTimers(),
+            () => env.sim.reset(),
+            () => env.storage.reset(),
+            () => env.coherent.reset(),
+            () => {
+                env.magvar = () => 0;
+            },
+            () => {
+                env.xhr.requests.length = 0;
+            },
+            () => resetSingletons(state?.completed ?? false),
+            () => {
+                document.body.innerHTML = '';
+            },
+        ]);
+    } finally {
+        live = undefined;
+    }
 }
 
 /**
@@ -78,7 +117,7 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
         throw new Error('bootUnit: one unit per test; this test already booted one (the singletons allow one live unit)');
     }
     try {
-        onTestFinished(teardown);
+        onTestFinished(() => teardown());
     } catch (e) {
         throw new Error(`bootUnit: call it inside a test (it, not beforeAll or the module body); the unit is torn down when the test ends. ${e}`);
     }
@@ -124,8 +163,21 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
         throw new Error(`bootUnit: propsReady did not fire within 30 s. Errors: ${errors.map(String).join('; ')}`);
     }
     state.completed = true;
+    if (opts.coldGps) props.sensors.in.gps.reset();
     return {
-        core, props, env, navdata, errors, send: evt => core.onInteractionEvent([evt]),
+        core, props, env, navdata, errors, atcModel: model, send: evt => core.onInteractionEvent([evt]),
         panel: new FrontPanel(evt => core.onInteractionEvent([evt]), () => Screen.read()),
     };
+}
+
+/**
+ * Advances the clock until the GPS has a solution, then two calculation ticks more, so that FPL 0 has activated and the
+ * display shows it. A force-ready boot is valid at once; FPL 0 activates at the first calculation tick after that.
+ */
+export async function settle(unit: HeadlessUnit, capSeconds = 120): Promise<void> {
+    for (let i = 0; !unit.props.sensors.in.gps.isValid(); i++) {
+        if (i >= capSeconds) throw new Error(`settle: no GPS solution within ${capSeconds} s`);
+        await vi.advanceTimersByTimeAsync(1000);
+    }
+    await vi.advanceTimersByTimeAsync(2000);
 }

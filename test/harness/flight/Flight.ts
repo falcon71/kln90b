@@ -1,4 +1,4 @@
-import {expect, onTestFailed, vi} from 'vitest';
+import {expect, onTestFailed, onTestFinished, vi} from 'vitest';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 import {bootUnit, BootOptions, HeadlessUnit} from '../boot';
 import {Screen} from '../render/screen';
@@ -93,6 +93,9 @@ export class Flight {
             consoleErrors.count++;
             originalError(...args);
         };
+        onTestFinished(() => {
+            console.error = originalError;
+        });
         const unit = await bootUnit({
             ...boot, facilities: world.all(), position: {lat: aircraft.lat, lon: aircraft.lon}, altitudeFt: aircraft.altitudeFt,
             magvar: (lat, lon) => world.magvar(lat, lon),
