@@ -19,6 +19,18 @@ describe('display probes (harness)', () => {
         expect(unit.display.opacity()).toBe(0);
     });
 
+    it('opacity() reads an unset opacity as NaN, not as 0 (a dark unit)', async () => {
+        const unit = await bootUnit();
+        const container = document.getElementById('InstrumentsContainer')!;
+
+        container.style.opacity = '';
+        expect(container.style.opacity).toBe('');
+        expect(unit.display.opacity()).toBeNaN();
+
+        container.style.opacity = '0';
+        expect(unit.display.opacity()).toBe(0);
+    });
+
     it('powerWrites() lists the writes of L:KLN90B_POWER and nothing else', async () => {
         const unit = await bootUnit();
         const writesBefore = unit.display.powerWrites().length;

@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit} from '../harness/boot';
-import {readRows} from '../harness/render/screen';
+import {Screen} from '../harness/render/screen';
 import {TimeStamp} from '../../kln90b/data/Time';
 
 // The channels of the satellite computer stay null until the first onUpdate(), so "all non-null" means that acquisition
@@ -13,12 +13,10 @@ describe('GPS acquisition starts at power-on (179d37d)', () => {
         const gps = unit.props.sensors.in.gps;
         expect(gps.gpsSatComputer.getChannels().every(c => c === null)).toBe(true);
 
-        unit.send('KLN90B_Power_On');
-        await vi.advanceTimersByTimeAsync(5000);
+        await unit.panel.powerOn();
+        await vi.advanceTimersByTimeAsync(5000); // a fixed wait: the time since power-on is the subject
 
-        // The welcome page is a seven-row full page, which Screen cannot read; this is its first row (PowerButton.test.ts)
-        const welcome = readRows(document.querySelector('.full-page')!);
-        expect(welcome[0].map(c => c.ch).join('')).toBe(' GPS             ORS 20');
+        expect(Screen.read().row(0)).toBe(' GPS             ORS 20');
         expect(gps.gpsSatComputer.getChannels().every(c => c !== null)).toBe(true);
     });
 });

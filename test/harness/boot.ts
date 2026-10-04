@@ -72,7 +72,7 @@ export interface HeadlessUnit {
     takeRejections(): unknown[];
     /** Probes of what the unit shows and drives outside the 23x7 screen */
     display: {
-        /** The instrument container's opacity, which the brightness and the power state drive */
+        /** The instrument container's opacity, which the brightness and the power state drive; NaN while it is unset (the unit is fully visible then, not dark) */
         opacity(): number;
         /** Every write of L:KLN90B_POWER */
         powerWrites(): { name: string; value: unknown }[];
@@ -269,7 +269,7 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
         consoleErrors, rejections, efb,
         takeRejections: () => rejections.splice(0, rejections.length),
         display: {
-            opacity: () => Number(document.getElementById('InstrumentsContainer')!.style.opacity),
+            opacity: () => parseFloat(document.getElementById('InstrumentsContainer')!.style.opacity), // NaN while unset: Number('') would read as 0, a dark unit
             powerWrites: () => env.sim.writes.filter(w => w.name === 'L:KLN90B_POWER'),
         },
     };

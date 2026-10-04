@@ -15,12 +15,12 @@ describe('waypoint editor', () => {
 
         // Awaiting the confirmation: the waypoint page of KAAA is on the right
         expect(Screen.read().status().right).toBe('APT 1');
-        expect(Screen.read().row(1).slice(0, 9)).toBe('  1:KAAA ');
+        expect(Screen.read().rows('L')[1].slice(0, 9)).toBe('  1:KAAA ');
         // The ident cells are inverted, and flash (inverted blink) on one display tick in four
         const masks: string[] = [];
         for (let i = 0; i < 4; i++) {
             await vi.advanceTimersByTimeAsync(250);
-            masks.push(Screen.read().mask().split('\n')[1].slice(4, 9));
+            masks.push(Screen.read().maskRows('L')[1].slice(4, 9));
         }
         expect(masks.slice().sort()).toEqual(['FFFFF', 'IIIII', 'IIIII', 'IIIII']);
     });

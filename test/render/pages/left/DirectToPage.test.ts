@@ -18,9 +18,9 @@ describe('Direct To page', () => {
         const aw = unit.props.memory.navPage.activeWaypoint;
         expect(aw.getActiveFplIdx()).toBe(1); // Precondition: the first ABC is active
 
-        await unit.panel.outer('L', -1); // FPL 0
+        await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
-        await unit.panel.outer('L', 3); // the second ABC
+        await unit.panel.outer('L', 3); // the second ABC, by count: the first one has the same ident
         await unit.panel.dct();
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
@@ -34,7 +34,7 @@ describe('Direct To page', () => {
         expect(screen.status().left).toBe('CRSR');
         expect(screen.status().right).toBe('NAV 1');
         // The arrow marks the direct-to target; the first ABC (row 2) is no longer it
-        expect(screen.half('L').split('\n').slice(1, 5).map(r => r.slice(0, 8))).toEqual([
+        expect(screen.rows('L').slice(1, 5).map(r => r.slice(0, 8))).toEqual([
             '  1:KAAA', '  2:ABC ', '  3:KBBB', '› 4:ABC ',
         ]);
     });
@@ -48,8 +48,8 @@ describe('Direct To page', () => {
 
         expect(unit.errors).toEqual([]);
         const screen = Screen.read();
-        expect(screen.leftName()).toBe('DIR  ');
-        expect(screen.row(0).slice(0, 11)).toBe('DIRECT TO: ');
+        expect(screen.status().left).toBe('DIR');
+        expect(screen.rows('L')[0]).toBe('DIRECT TO: ');
     });
 
     it('returns to NAV 2 when CLR and ENT leave the blank DIR page (sanity check, does not guard #12)', async () => {
@@ -59,7 +59,7 @@ describe('Direct To page', () => {
         await unit.panel.ent();
 
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().leftName()).toBe('NAV 2');
+        expect(Screen.read().status().left).toBe('NAV 2');
         expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()).toBeNull();
     });
 
@@ -72,7 +72,7 @@ describe('Direct To page', () => {
         const screen = Screen.read();
         // The cursor is on, so the status line shows CRSR instead of the page name
         expect(screen.status().left).toBe('CRSR');
-        expect(screen.half('L').split('\n')).toEqual([
+        expect(screen.rows('L')).toEqual([
             'DIRECT TO: ', '           ', '           ', '           ', '           ', '           ',
         ]);
     });
@@ -82,19 +82,19 @@ describe('Direct To page', () => {
         const unit = await bootUnit({
             facilities: [kaaa, kbbb], position: {lat: 47.0, lon: 8.0}, storage: savedFlightplan(0, [kaaa, kbbb]),
         });
-        await unit.panel.outer('L', -1); // FPL 0
+        await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L'); // on KAAA
         await unit.panel.dct();
         // Precondition: the APT 1 confirmation page for KAAA is on the right
-        expect(Screen.read().half('R').split('\n')[1]).toBe('KAAA AIRPT ');
+        expect(Screen.read().rows('R')[1]).toBe('KAAA AIRPT ');
 
-        await unit.panel.outer('R', 1);
+        await unit.panel.outer('R', 1); // raw: the knob that changes the right page is the subject (#81)
         await unit.panel.cursor('L');
 
         expect(unit.errors).toEqual([]);
         const screen = Screen.read();
-        expect(screen.leftName()).toBe('DIR  ');
-        expect(screen.rightName()).toBe('CTR 1');
+        expect(screen.status().left).toBe('DIR');
+        expect(screen.status().right).toBe('CTR 1');
 
         await unit.panel.cursor('L');
         expect(unit.errors).toEqual([]);
@@ -102,6 +102,6 @@ describe('Direct To page', () => {
         // The cursor is on again: CRSR in the status line, the ident field highlighted
         expect(again.status().left).toBe('CRSR');
         expect(again.cell(2, 3).attr).toBe('I');
-        expect(again.row(2).slice(0, 11)).toBe('   KAAA    ');
+        expect(again.rows('L')[2]).toBe('   KAAA    ');
     });
 });

@@ -1,16 +1,11 @@
 import {describe, expect, it} from 'vitest';
 import {bootUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
+import {savedUserWaypoints} from '../../../harness/storage';
 
-/** A user intersection in the V2 format: type, region XX, 8 blanks, the ident padded to 8, latitude, longitude */
-function userIntersection(ident: string): string {
-    return `WXX        ${ident.padEnd(8, ' ')}+4730.00-00815.50`;
-}
-
+/** User intersections at 47°30.00'N 8°15.50'W; where they are does not matter to the list */
 function userWaypoints(idents: string[]): Record<string, unknown> {
-    const storage: Record<string, unknown> = {userDataFormat: 2};
-    idents.forEach((ident, i) => storage[`wpt${i}`] = userIntersection(ident));
-    return storage;
+    return savedUserWaypoints(idents.map(ident => ({kind: 'int', ident, lat: 47.5, lon: -(8 + 15.5 / 60)})));
 }
 
 describe('OTH 3 page', () => {
@@ -23,18 +18,18 @@ describe('OTH 3 page', () => {
         await unit.panel.outer('L', 5);
 
         const screen = Screen.read();
-        expect(screen.half('L').split('\n').slice(1)).toEqual([
+        expect(screen.rows('L').slice(1)).toEqual([
             'BBB   I    ',
             'CCC   I    ',
             'DDD   I    ',
             'EEE   I    ',
             'FFF   I    ',
         ]);
-        const mask = screen.mask().split('\n');
+        const mask = screen.maskRows('L');
         // Only the last visible row, FFF, is focused
-        expect(mask[5].slice(0, 11)).toBe('IIIIIIIIIII');
+        expect(mask[5]).toBe('IIIIIIIIIII');
         for (let row = 1; row <= 4; row++) {
-            expect(mask[row].slice(0, 11)).not.toContain('I');
+            expect(mask[row]).not.toContain('I');
         }
     });
 
@@ -47,19 +42,19 @@ describe('OTH 3 page', () => {
 
         await unit.panel.clr();
 
-        expect(Screen.read().half('L').split('\n')[2]).toBe('DEL BBB   ?');
+        expect(Screen.read().rows('L')[2]).toBe('DEL BBB   ?');
 
         await unit.panel.ent();
 
         const screen = Screen.read();
-        expect(screen.half('L').split('\n').slice(1, 4)).toEqual([
+        expect(screen.rows('L').slice(1, 4)).toEqual([
             'AAA   I    ',
             'CCC   I    ',
             'DDD   I    ',
         ]);
-        const mask = screen.mask().split('\n');
-        expect(mask[2].slice(0, 11)).toBe('IIIIIIIIIII');
-        expect(mask[1].slice(0, 11)).not.toContain('I');
-        expect(mask[3].slice(0, 11)).not.toContain('I');
+        const mask = screen.maskRows('L');
+        expect(mask[2]).toBe('IIIIIIIIIII');
+        expect(mask[1]).not.toContain('I');
+        expect(mask[3]).not.toContain('I');
     });
 });
