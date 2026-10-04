@@ -36,3 +36,30 @@ export function finalCourseDeg(a: LatLon, b: LatLon): number {
 export function norm360(deg: number): number {
     return ((deg % 360) + 360) % 360;
 }
+
+/** a - b, signed, in (-180, 180] */
+export function angleDiff(a: number, b: number): number {
+    const d = ((a - b) % 360 + 540) % 360 - 180;
+    return d === -180 ? 180 : d;
+}
+
+/** |a - b| in degrees, 0 to 180; a null course (no DTK) counts as 180, the farthest it can be */
+export function angleBetween(a: number | null, b: number): number {
+    return a === null ? 180 : Math.abs(angleDiff(a, b));
+}
+
+/** The point nm from p on the initial course bearingTrue (textbook destination formula on the same sphere) */
+export function pointFrom(p: LatLon, bearingTrue: number, nm: number): LatLon {
+    const d = nm / EARTH_RADIUS_NM;
+    const b = bearingTrue * RAD;
+    const lat1 = p.lat * RAD;
+    const lon1 = p.lon * RAD;
+    const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(b));
+    const lon2 = lon1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+    return {lat: lat2 / RAD, lon: ((lon2 / RAD + 540) % 360) - 180};
+}
+
+/** The point nm before `to` on the great circle from `from` */
+export function pointBefore(from: LatLon, to: LatLon, nm: number): LatLon {
+    return pointFrom(to, courseDeg(to, from), nm);
+}

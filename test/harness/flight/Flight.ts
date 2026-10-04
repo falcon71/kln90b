@@ -166,6 +166,32 @@ export class Flight {
         return (Date.now() - t0) / 1000;
     }
 
+    /** flyUntil the active waypoint is ident */
+    public flyUntilActive(ident: string, o: { timeout: number }): Promise<number> {
+        return this.flyUntil(() => this.nav.activeIdent === ident, {timeout: o.timeout, description: `${ident} active`});
+    }
+
+    /**
+     * Flies display ticks until one ran without a calculation tick, so the screen shows the latest calculation.
+     *
+     * Both fall due together once a second. Under the fake timers the calculation runs first at that shared second
+     * (measured: the timer that fired longest ago goes first, which is the 1 Hz one), so the display tick that follows
+     * already shows it and the screen is normally current at once. This helper is a guard for a state where the display
+     * would run first, such as the first shared second after the tick loops are created; otherwise it flies one or two
+     * display ticks (testing.md section 4).
+     *
+     * A calculation tick is recognized by DIS to the active waypoint changing, so this needs an aircraft that moves
+     * toward or away from an active waypoint. Without one nothing changes, and it returns after one display tick.
+     * @throws Error if DIS changed in every display tick
+     */
+    public async syncDisplay(): Promise<void> {
+        for (let i = 0, before = this.nav.distNm; ; i++, before = this.nav.distNm) {
+            await this.fly(0.25);
+            if (this.nav.distNm === before) return;
+            if (i > 4) throw new Error('syncDisplay: DIS changed in every display tick');
+        }
+    }
+
     /**
      * Slew-style jump: moves the aircraft along its current great circle and the clock forward without running the
      * ticks in between, then runs one second normally. Integrated values (flight timer, fuel) miss the jumped time.
