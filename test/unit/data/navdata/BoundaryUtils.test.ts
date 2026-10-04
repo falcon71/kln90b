@@ -1,20 +1,13 @@
 import {describe, expect, it} from 'vitest';
-import {LodBoundary} from '@microsoft/msfs-sdk';
+import {BoundaryType, LodBoundary} from '@microsoft/msfs-sdk';
+import {airspace} from '../../../harness/navdata/airspaces';
 import {BoundaryUtils} from '../../../../kln90b/data/navdata/BoundaryUtils';
 
 // An airspace from 179E across the date line to 179W, 10N to 20N. The code detects a crossing from the bounding box
 // (bottomRight.long - topLeft.long > 180), which is its own assumption about the sim's boundary data and has not been
-// checked against real sim records, so these are characterization tests of the date-line handling.
-const dateLineBox = {
-    facility: {topLeft: {lat: 20, long: -179}, bottomRight: {lat: 10, long: 179}},
-    lods: [[[
-        {end: {lat: 10, lon: 179}},
-        {end: {lat: 10, lon: -179}},
-        {end: {lat: 20, lon: -179}},
-        {end: {lat: 20, lon: 179}},
-        {end: {lat: 10, lon: 179}},
-    ]]],
-} as unknown as LodBoundary;
+// checked against real sim records, so these are characterization tests of the date-line handling. airspace() builds
+// that box (min to max longitude of the corners) and the SDK's LodBoundary turns the facility into the shape.
+const dateLineBox = new LodBoundary(airspace('DATELINE', BoundaryType.Restricted, [[10, 179], [10, -179], [20, -179], [20, 179]]));
 
 describe('BoundaryUtils across the date line (characterization, #9 103ea59)', () => {
     describe('isInside', () => {

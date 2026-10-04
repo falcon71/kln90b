@@ -31,7 +31,7 @@ const RECORDED_SIMVARS: [string, string][] = [
     ['GPS WP CROSS TRK', 'nautical miles'], ['L:KLN90B_RollCommand', 'degrees'], ['L:KLN90B_WptLight', 'bool'],
 ];
 
-export interface FlightOptions extends Omit<BootOptions, 'facilities' | 'position' | 'altitudeFt' | 'magvar'> {
+export interface FlightOptions extends Omit<BootOptions, 'facilities' | 'airspaces' | 'position' | 'altitudeFt' | 'magvar'> {
     world: World;
     aircraft: AircraftInit;
     aircraftOptions?: AircraftOptions;
@@ -97,7 +97,7 @@ export class Flight {
             console.error = originalError;
         });
         const unit = await bootUnit({
-            ...boot, facilities: world.all(), position: {lat: aircraft.lat, lon: aircraft.lon}, altitudeFt: aircraft.altitudeFt,
+            ...boot, facilities: world.all(), airspaces: world.airspaces(), position: {lat: aircraft.lat, lon: aircraft.lon}, altitudeFt: aircraft.altitudeFt,
             magvar: (lat, lon) => world.magvar(lat, lon),
         });
         const flight = new Flight(unit, world, new Aircraft(aircraft, aircraftOptions), pilot ?? coupledAutopilot(), consoleErrors);

@@ -1,4 +1,4 @@
-import {FlightPlanner} from '@microsoft/msfs-sdk';
+import {DefaultLodBoundaryCache, FlightPlanner} from '@microsoft/msfs-sdk';
 import {KLNFacilityRepository} from '../../kln90b/data/navdata/KLNFacilityRepository';
 import {KLN90BUserWaypointsSettings} from '../../kln90b/settings/KLN90BUserWaypoints';
 import {KLN90BUserFlightplansSettings} from '../../kln90b/settings/KLN90BUserFlightplans';
@@ -26,6 +26,8 @@ export function resetSingletons(required: boolean): void {
     clearStatic(KLN90BUserWaypointsSettings, 'INSTANCE', required);
     clearStatic(KLN90BUserFlightplansSettings, 'INSTANCE', required);
     clearStatic(KLN90BUserRemarkSettings, 'INSTANCE', required);
+    // Keyed by airspace id: the next unit would get the old boundary for a reused id. Created on the first airspace search
+    clearStatic(DefaultLodBoundaryCache, 'INSTANCE', false);
     const planners = (FlightPlanner as any).instances;
     if (!(planners instanceof Map)) {
         throw new Error('resetSingletons: FlightPlanner.instances is not a Map. Did the SDK change? Update test/harness/singletons.ts');

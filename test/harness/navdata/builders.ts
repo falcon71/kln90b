@@ -1,7 +1,7 @@
 import {
-    AirportFacility, AirportFacilityDataFlags, AirportPrivateType, AirportRunway, FacilityFrequencyType, GpsBoolean, ICAO,
-    IntersectionFacility, IntersectionType, LandingSystemCategory, NdbFacility, NdbType, RunwayLightingType,
-    RunwaySurfaceType, UnitType, VorClass, VorFacility, VorType,
+    AirportClass, AirportFacility, AirportFacilityDataFlags, AirportPrivateType, AirportRunway, FacilityFrequencyType,
+    GpsBoolean, ICAO, IntersectionFacility, IntersectionType, LandingSystemCategory, NdbFacility, NdbType,
+    RunwayLightingType, RunwaySurfaceCategory, RunwaySurfaceType, RunwayUtils, UnitType, VorClass, VorFacility, VorType,
 } from '@microsoft/msfs-sdk';
 
 const DEFAULT_REGION = 'K1';
@@ -20,6 +20,15 @@ function runwayDesignation(heading: number): string {
     return `${String(Math.min(a, b)).padStart(2, '0')}-${String(Math.max(a, b)).padStart(2, '0')}`;
 }
 
+export interface RunwayOptions {
+    /** Default 90 */
+    heading?: number;
+    /** Default 5000 */
+    lengthFt?: number;
+    /** Default Asphalt */
+    surface?: RunwaySurfaceType;
+}
+
 export interface AirportOptions {
     elevationFt?: number;
     runwayHeading?: number;
@@ -27,29 +36,50 @@ export interface AirportOptions {
     surface?: RunwaySurfaceType;
     name?: string;
     city?: string;
+    /**
+     * Zero or more runways. Absent: one runway from runwayHeading, runwayLengthFt and surface. An empty array is a
+     * heliport (the nearest filters treat it specially, see MemoryFacilityClient).
+     */
+    runways?: RunwayOptions[];
+    /** Default false */
+    towered?: boolean;
+    /** Default: HeliportOnly without runways, HardSurface with a hard runway, otherwise SoftSurface */
+    airportClass?: AirportClass;
 }
 
-export function airport(ident: string, lat: number, lon: number, opts: AirportOptions = {}): AirportFacility {
-    const icaoStruct = ICAO.value('A', '', '', ident);
-    const heading = opts.runwayHeading ?? 90;
-    const runway: AirportRunway = {
-        latitude: lat, longitude: lon, elevation: UnitType.FOOT.convertTo(opts.elevationFt ?? 0, UnitType.METER),
+function runway(lat: number, lon: number, elevationFt: number, o: RunwayOptions): AirportRunway {
+    const heading = o.heading ?? 90;
+    return {
+        latitude: lat, longitude: lon, elevation: UnitType.FOOT.convertTo(elevationFt, UnitType.METER),
         direction: heading, designation: runwayDesignation(heading),
-        length: UnitType.FOOT.convertTo(opts.runwayLengthFt ?? 5000, UnitType.METER), width: 30,
-        surface: opts.surface ?? RunwaySurfaceType.Asphalt, lighting: RunwayLightingType.Unknown,
+        length: UnitType.FOOT.convertTo(o.lengthFt ?? 5000, UnitType.METER), width: 30,
+        surface: o.surface ?? RunwaySurfaceType.Asphalt, lighting: RunwayLightingType.Unknown,
         designatorCharPrimary: RunwayDesignator.RUNWAY_DESIGNATOR_NONE,
         designatorCharSecondary: RunwayDesignator.RUNWAY_DESIGNATOR_NONE,
         primaryBlastpadLength: 0, primaryOverrunLength: 0, secondaryOverrunLength: 0, secondaryBlastpadLength: 0,
         primaryILSFrequency: emptyIls(), secondaryILSFrequency: emptyIls(),
         primaryElevation: 0, primaryThresholdLength: 0, secondaryElevation: 0, secondaryThresholdLength: 0,
     } as AirportRunway;
+}
+
+function derivedClass(runways: AirportRunway[]): AirportClass {
+    if (runways.length === 0) return AirportClass.HeliportOnly;
+    return runways.some(r => RunwayUtils.getSurfaceCategory(r) === RunwaySurfaceCategory.Hard) ? AirportClass.HardSurface : AirportClass.SoftSurface;
+}
+
+export function airport(ident: string, lat: number, lon: number, opts: AirportOptions = {}): AirportFacility {
+    const icaoStruct = ICAO.value('A', '', '', ident);
+    const elevationFt = opts.elevationFt ?? 0;
+    const runwayOptions = opts.runways ?? [{heading: opts.runwayHeading, lengthFt: opts.runwayLengthFt, surface: opts.surface}];
+    const runways = runwayOptions.map(o => runway(lat, lon, elevationFt, o));
     // noinspection JSDeprecatedSymbols
     return {
         icao: ICAO.valueToStringV1(icaoStruct), icaoStruct, name: opts.name ?? `${ident} AIRPORT`, lat, lon,
         region: DEFAULT_REGION, city: opts.city ?? '', magvar: 0, airportPrivateType: AirportPrivateType.Public,
-        fuel1: '', fuel2: '', bestApproach: '', radarCoverage: GpsBoolean.Unknown, airspaceType: 0, airportClass: 1,
-        towered: false, frequencies: [], runways: [runway], departures: [], approaches: [], arrivals: [],
-        altitude: UnitType.FOOT.convertTo(opts.elevationFt ?? 0, UnitType.METER),
+        fuel1: '', fuel2: '', bestApproach: '', radarCoverage: GpsBoolean.Unknown, airspaceType: 0,
+        airportClass: opts.airportClass ?? derivedClass(runways),
+        towered: opts.towered ?? false, frequencies: [], runways, departures: [], approaches: [], arrivals: [],
+        altitude: UnitType.FOOT.convertTo(elevationFt, UnitType.METER),
         loadedDataFlags: AirportFacilityDataFlags.All, holdingPatterns: [], transitionAlt: 0, transitionLevel: 0, iata: '',
     } as unknown as AirportFacility;
 }
@@ -61,6 +91,8 @@ export interface VorOptions {
     region?: string;
     name?: string;
     type?: VorType;
+    /** Default HighAlt */
+    vorClass?: VorClass;
 }
 
 export function vor(ident: string, lat: number, lon: number, opts: VorOptions = {}): VorFacility {
@@ -70,7 +102,7 @@ export function vor(ident: string, lat: number, lon: number, opts: VorOptions = 
     return {
         icao: ICAO.valueToStringV1(icaoStruct), icaoStruct, name: opts.name ?? ident, lat, lon, region, city: '',
         magvar: 0, freqMHz: opts.frequencyMHz ?? 114.3, freqBCD16: 0, magneticVariation: opts.magneticVariation ?? 0,
-        type: opts.type ?? VorType.VORDME, vorClass: VorClass.HighAlt, navRange: 0, dme: null, ils: null,
+        type: opts.type ?? VorType.VORDME, vorClass: opts.vorClass ?? VorClass.HighAlt, navRange: 0, dme: null, ils: null,
         tacan: null, trueReferenced: false, alt: 0,
     } as unknown as VorFacility;
 }
