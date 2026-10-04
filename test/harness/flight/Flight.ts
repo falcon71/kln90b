@@ -166,6 +166,28 @@ export class Flight {
         return (Date.now() - t0) / 1000;
     }
 
+    /** flyUntil the active waypoint is ident */
+    public flyUntilActive(ident: string, o: { timeout: number }): Promise<number> {
+        return this.flyUntil(() => this.nav.activeIdent === ident, {timeout: o.timeout, description: `${ident} active`});
+    }
+
+    /**
+     * Flies display ticks until one ran without a calculation tick, so the screen shows the latest calculation (both fall
+     * due together once a second, and a display tick that ran before the calculation shows the previous one;
+     * testing.md section 4).
+     *
+     * A calculation tick is recognized by DIS to the active waypoint changing, so this needs an aircraft that moves
+     * toward or away from an active waypoint. Without one nothing changes, and it returns after one display tick.
+     * @throws Error if DIS changed in every display tick
+     */
+    public async syncDisplay(): Promise<void> {
+        for (let i = 0, before = this.nav.distNm; ; i++, before = this.nav.distNm) {
+            await this.fly(0.25);
+            if (this.nav.distNm === before) return;
+            if (i > 4) throw new Error('syncDisplay: DIS changed in every display tick');
+        }
+    }
+
     /**
      * Slew-style jump: moves the aircraft along its current great circle and the clock forward without running the
      * ticks in between, then runs one second normally. Integrated values (flight timer, fuel) miss the jumped time.

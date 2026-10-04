@@ -131,6 +131,17 @@ instrument reads and nothing else. The data is synthetic; see the limitations in
 Core 7). Pass it as `storage` to start a test with a flight plan already stored, which is far faster than entering it
 with the knobs.
 
+`savedUserWaypoints(wpts)` (same file) does the same for user waypoints: a list of `{kind: 'sup' | 'int' | 'apt' | 'vor' |
+'ndb', ident, lat, lon, ...}` becomes the `wpt0`, `wpt1`, ... strings plus `userDataFormat: 2`. Spread it together with
+`savedFlightplan` when a test needs both. The strings are laid out by hand from the format, never produced by the
+persistor, so a test of the restore stays independent of the code that saves. The format tests of the persistor itself
+(`UserWaypointV2.test.ts`) keep their literals. A southern latitude of one degree or more does not survive the restore (#98),
+so keep it out of setup.
+
+`standardRoute()` (`test/harness/fixtures.ts`) returns the world many tests use: KAAA, the VOR ABC and KBBB, fresh objects
+on every call. `insertLeg(unit, idx, fac)` (`test/harness/flightplan.ts`) puts a `USER` leg into FPL 0 at `idx`, the way the
+FPL page does after a waypoint confirmation, which is far faster than typing it with the knobs.
+
 # 4. Writing tests
 
 ## Unit
@@ -242,9 +253,21 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
 - **The recorder** keeps one row per simulated second (position, track, bank, `nav`, a few SimVars and the screen text).
   When a flight test fails, it writes `test/flight/__output__/<test name>.jsonl` and `.kml`. Open the KML in Google Earth
   to see the track against the waypoints, and the JSONL to see what the unit showed at each second.
-- **Display versus calculation:** both ticks fall due together once a second, and the display tick runs first, so the
-  screen can show the previous second's calculation. Before asserting on the screen against `flight.nav`, fly display
-  ticks until one passes without a calculation tick (see the end of the proof flight).
+- **Display versus calculation:** both ticks fall due together once a second, and a display tick that runs before the
+  calculation shows the previous second's. Before asserting on the screen against `flight.nav`, call
+  `await flight.syncDisplay()`: it flies display ticks until one passed without a calculation tick, so the screen shows
+  the latest calculation. It recognizes a calculation tick by DIS to the active waypoint changing, so it needs a moving
+  aircraft and an active waypoint. It throws when DIS changed in every display tick.
+- **`flight.flyUntilActive(ident, {timeout})`** is `flyUntil` for the active waypoint becoming `ident`. The timeout error
+  names `"<ident> active"` and carries the screen dump.
+- **Geometry for expectations** (`flight/geo.ts`, written from the textbook, independent of the SDK): `distanceNm`,
+  `courseDeg` and `finalCourseDeg`, plus
+    - `angleDiff(a, b)`, the signed `a - b` in (-180, 180], and `angleBetween(a, b)`, the absolute difference in
+      0 to 180 where a null course (no DTK) counts as 180;
+    - `pointFrom(p, bearingTrue, nm)`, the point `nm` from `p` on a course, and `pointBefore(from, to, nm)`, the point
+      `nm` before `to` on the great circle from `from`. They agree with `distanceNm` and `courseDeg` to 1e-6, so use
+      them to place an aircraft before a waypoint instead of the SDK's `GeoPoint.offset`. The standard world
+      (`standardRoute()`, section 3) is the usual input.
 
 ### Worked example: the proof flight
 
