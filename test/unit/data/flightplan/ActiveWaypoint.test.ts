@@ -109,7 +109,7 @@ describe('ActiveWaypoint.activateFpl0 on a DME arc', () => {
         return {station, legs: [{...user(P), arcData}, user(Q), user(R)] as KLNFlightplanLeg[]};
     }
 
-    it('activates the arc leg P to Q for an aircraft at the start of the arc, so the setup holds (#NEW-2-2)', () => {
+    it('activates the arc leg P to Q for an aircraft at the start of the arc, so the setup holds (#121)', () => {
         // The pin below stands on this: the plan and the hand-built arc work when the aircraft is at P
         const {station, legs} = arcPlan();
         const atStart = activeWaypointOver(legs, at(station, 270, 10));
@@ -117,7 +117,7 @@ describe('ActiveWaypoint.activateFpl0 on a DME arc', () => {
         expect(atStart.getActiveFplIdx()).toBe(1);
     });
 
-    it.fails('activates the arc leg P to Q when the aircraft is on the arc at the 330° radial (#NEW-2-2)', () => {
+    it.fails('activates the arc leg P to Q when the aircraft is on the arc at the 330° radial (#121)', () => {
         const {station, legs} = arcPlan();
         const aw = activeWaypointOver(legs, at(station, 330, 10));
 

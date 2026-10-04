@@ -86,11 +86,11 @@ describe('GPS OVERRIDDEN (public contract) (#24)', () => {
     });
 });
 
-// Suspected bug #NEW-4-1: SensorsOut.setPos (Sensors.ts:371-373) and setWpBearing (342-345) return before the LVar write
+// Bug #124: SensorsOut.setPos (Sensors.ts:371-373) and setWpBearing (342-345) return before the LVar write
 // when Output.WriteGPSSimVars is off, unlike the other L:KLN90B_* outputs. CLAUDE.md lists the LVars and the GPS SimVars as
 // separate contracts, and LVars.ts documents the LVars as outputs of the unit, so an aircraft that leaves the GPS SimVars to
 // another GPS should still get the integrity flag and the bearing from the unit.
-describe('LVar outputs with Output.WriteGPSSimVars off (public contract) (#NEW-4-1)', () => {
+describe('LVar outputs with Output.WriteGPSSimVars off (public contract) (#124)', () => {
     it('the gate holds the GPS SimVars back and lets the HSI flag LVar through', async () => {
         const unit = await bootUnit({panelXml: NO_GPS_SIMVARS_XML});
         await settle(unit);
@@ -109,7 +109,7 @@ describe('LVar outputs with Output.WriteGPSSimVars off (public contract) (#NEW-4
         expect(unit.env.sim.lastWrite('L:KLN90B_GPS_WP_BEARING')?.value).toBe(0);
     });
 
-    it.fails('L:KLN90B_IntegrityWarn is still written (#NEW-4-1)', async () => {
+    it.fails('L:KLN90B_IntegrityWarn is still written (#124)', async () => {
         const unit = await bootUnit({panelXml: NO_GPS_SIMVARS_XML});
         await settle(unit);
         await vi.advanceTimersByTimeAsync(3000);
@@ -117,7 +117,7 @@ describe('LVar outputs with Output.WriteGPSSimVars off (public contract) (#NEW-4
         expect(unit.env.sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(0);
     });
 
-    it.fails('L:KLN90B_GPS_WP_BEARING is still written (#NEW-4-1)', async () => {
+    it.fails('L:KLN90B_GPS_WP_BEARING is still written (#124)', async () => {
         const unit = await bootUnit({panelXml: NO_GPS_SIMVARS_XML});
         await settle(unit);
         await vi.advanceTimersByTimeAsync(3000);

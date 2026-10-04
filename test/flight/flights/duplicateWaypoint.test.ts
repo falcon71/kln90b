@@ -130,7 +130,7 @@ describe('a plan whose only leg has no length (suspected bug A)', () => {
         recorded.outputLagNm = flight.sim.lastWrite('GPS POSITION LAT') === undefined ? null : distanceNm({lat, lon}, flight.aircraft);
     });
 
-    it.fails('keeps the GPS position outputs current while the aircraft moves (#NEW-2-1)', () => {
+    it.fails('keeps the GPS position outputs current while the aircraft moves (#120)', () => {
         expect(recorded.moved).toBeGreaterThan(0.5);
         expect(recorded.outputLagNm).not.toBeNull();
         expect(recorded.outputLagNm!).toBeLessThan(0.1);

@@ -90,7 +90,7 @@ describe('ModeController OBS course of 000', () => {
 
     // 5-36: the OBS course is the one the indicator selects, 000 included. ModeController.setObs returns at once when the
     // course equals navState.obsMag, which is 0 at start and after a switch to LEG, so the leg path stays in force.
-    it.fails('measures the deviation from an OBS course of 000 through the waypoint (#NEW-3-1)', async () => {
+    it.fails('measures the deviation from an OBS course of 000 through the waypoint (#122)', async () => {
         const {unit, position} = await enterObsWithCourse(0);
         const nav = unit.props.memory.navPage;
 

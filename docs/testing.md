@@ -355,6 +355,9 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **A booted engine-running unit has a GPS fix at once**, in the slow acquisition mode too (the force-ready start calls
   `acquireAndUseSatellites()` in `WelcomePage`). A test that needs an invalid GPS, for example to enter the date on SET 2
   (read-only with a fix), boots with `coldGps: true`.
+- **`ActiveWaypoint` replaces its `turnStack` array** (`clearTurnStack`) instead of emptying it. A reference captured once
+  goes stale and can read as empty or unchanged while the unit has pushed turns; read `activeWaypoint.turnStack` through
+  the property each time.
 - **There is no CI.** Run `npm test` and `npx tsc --noEmit` before committing.
 
 Measured speed (a dated record): on 2026-10-03 the proof flight (`firstFlight.test.ts`) ran about 1466 simulated
@@ -378,6 +381,11 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
   navigate with fixed counts.
 - Migrate the tests that hand-roll what `settle`, `storedSetting`, `FrontPanel.type` and `coldGps` now provide (the
   `typeRight` loops, the `persistent-setting.` keys, the `gps.reset()` calls and the fixed waits). They still work.
+- **Flights cannot test the nav-source gate or a cold start.** `Aircraft.writeTo` forces `GPS DRIVES NAV1` true on every
+  16 Hz step, so a flight cannot observe what the unit does when the GPS is not the nav source (`92fbba1` is a render
+  test, which sets the SimVar itself). `Flight.start` waits for a fix, so it cannot start a cold unit (#61 is a render
+  test on `bootUnit`). Lifting either would need an `Aircraft` option that leaves `GPS DRIVES NAV1` alone, or a start
+  that does not wait for the fix.
 - `restoreMocks: true` in `vitest.config.mts` was considered and declined: tests restore their own spies.
 - Errors thrown on the ENT path never reach the error page, although `CLAUDE.md` and `architecture.md` say input
   exceptions are shown there (section 6). The question is #118; once it is decided, either the trap goes away or the
@@ -385,5 +393,5 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - Flip the pins when the bugs are fixed: remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each of which names its issue.
 - #99 (lat/lon displays show 60.00 minutes just below a whole degree) is filed but has no pin yet; a render test would
   hold it.
-- Further flights: OBS mode, direct-to, approach arming (ARM to APR scale ramp), waypoint alert without turn
-  anticipation, and the GPS-invalid path.
+- Further flights: approach arming (ARM to APR scale ramp), waypoint alert without turn anticipation, and the
+  GPS-invalid path.

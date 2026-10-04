@@ -41,7 +41,7 @@ describe('external OBS course and L:KLN90B_ObsSource', () => {
     // Public contract: L:KLN90B_ObsSource changes Input.ObsSource on the fly (LVars.ts), and the panel.xml sample says 0
     // disables the input (cfg/panel.xml). A disabled input has no external course, so obsMag must be null; it keeps its
     // last value today, so the stale course is forced on OBS mode and MOD 2 stays read-only.
-    it.fails('has no external course after ObsSource is switched to 0 (#NEW-3-2)', async () => {
+    it.fails('has no external course after ObsSource is switched to 0 (#123)', async () => {
         const unit = await bootWithExternalCourse();
 
         unit.env.sim.set('L:KLN90B_ObsSource', 'number', 0);
