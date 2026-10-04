@@ -94,6 +94,12 @@ subagents, relays their results and merges, but it neither implements nor review
     `docs/superpowers/specs/<date>-session-N-<topic>-design.md`. The writing-plans skill turns it into
     `docs/superpowers/plans/<date>-session-N-<topic>.md`. Both are committed on the session branch and are deleted
     together with this document in session 11.
+    - Before the plan is written, a read-only research pass looks at every item. Against the code, it checks the fix
+      diff, whether the reproduction holds, and how to re-break the fix. Against the Pilot's Guide page index, it checks
+      every planned spec or characterization label and every page citation. A planned characterization whose
+      behavior the manual contradicts becomes a pin (rule 8).
+    - The plan carries the result per item: setup, literals, citation and break. The implementer still confirms it,
+      because the research reads the code without running it.
 20. **Tasks.** The plan splits the work into tasks:
     - a harness task first, when the session needs a harness extension;
     - then the main tasks, batched by area of the code and sized so that one implementer finishes its batch in one
@@ -103,8 +109,10 @@ subagents, relays their results and merges, but it neither implements nor review
     own git worktree (`isolation: "worktree"`) branched from the session branch. A harness task runs alone before them,
     because they build on it. Subagent-driven development runs implementers one at a time to avoid conflicts. Separate
     worktrees remove those conflicts, so this workflow runs them in parallel.
-22. **Implementers commit per item**, with the one-line proof of rule 10 in the commit message. They do not edit this
-    document and do not file issues. Their report lists, for each item:
+22. **Implementers commit per item**, with the one-line proof of rule 10 in the commit message, ending with a
+    `Co-Authored-By` line that names the model that wrote the commit. They do not edit this document and do not file
+    issues. They write their report to a file and reply with only the status, the head commit and their concerns. The
+    report lists, for each item:
     - the test path, and whether the test is a spec or a characterization test;
     - any change of verdict, with its reason;
     - every suspected bug, with a reproduction.
@@ -121,6 +129,12 @@ subagents, relays their results and merges, but it neither implements nor review
     - The mutation pass verifies the tests by mutation, in the task's worktree. It follows the mutation rules in the
       maintainer's global instructions: the mutations are never named to the implementer, a surviving mutation is a
       finding, and the reviewer restores the code and checks that `git diff` is clean.
+    - The reviewer checks every page citation in the diff against the Pilot's Guide page index. This is a required
+      check, not an item it may leave unverified.
+    - A breach of this document's test rules is an Important finding, not a Minor one, so it is fixed inside the task.
+      That covers: a test with neither a citation nor a characterization label, a wrong citation, a permissive or
+      no-op assertion, and a frozen bug (rules 6 to 8 and 17).
+    - The reviewer writes its full report to a file and replies with only its verdicts and the Important findings.
     - Findings go back to the same implementer. After a fix round, a scoped re-review checks only what the round
       changed, and the round repeats until the review passes.
 25. **Merging.** The controlling session merges an approved task branch into the session branch, then runs `npm test`
@@ -224,6 +238,17 @@ numbers.
    section 5).
 3. Flights are expensive to read when they fail. Keep each flight to one issue, and name the predicate in `flyUntil`.
 4. Prove each test bites (rule 11) and tick the row.
+
+**Tasks** (rules 19 to 27):
+
+- **The harness task comes first.** It takes the harness items that `testing.md` section 7 lists from session 2 before
+  any flight test is written:
+    - restoring `Flight`'s `console.error` wrapper at the end of each flight. This is required, because flight files
+      now hold several flights.
+    - a typing helper on `FrontPanel`, a settle and GPS helper, and a reader for stored settings;
+    - an exception-safe teardown that also resets `FakeXhr.requests`.
+- **The batches are smaller than in session 2:** three or four flight rows each. A flight is slower to run and harder
+  to read when it fails.
 
 **Done when:** every *testable* flight row is ticked or re-verdicted with a reason.
 
@@ -491,13 +516,13 @@ once #103 is fixed now carry a comment pointing at it. The unit half of the `f74
   the `> 0` convention consistently (`LatitudeDisplay.tsx:33` too). The pin was removed.
 - DCT at boot with an active waypoint opens a blank DIR page, because the blank boot page SUP counts as a waypoint
   page in view. Rule 3 of 3-27 reads exactly that way, so the code follows the manual as written; what the real unit
-  pre-fills for a blank waypoint page is not stated.
+  pre-fills for a blank waypoint page is not stated. Filed as the question #119.
 - `fastGpsAcquisition: false` still boots with a valid GPS: an engine-running unit calls `acquireAndUseSatellites()`
   in `WelcomePage.tsx:146`. A harness trap, documented in `testing.md`.
 - An error thrown on the ENT path is an unhandled rejection, because `MainPage` does not await `handleEnter` (the call
   carries a deliberate "ignored promise" comment). It never reaches the error page, which the architecture notes say
   input errors do. The test that pressed ENT stays green; Vitest reports the unhandled error afterwards, fails the run
-  and names the last test that ran. Left to the maintainer; documented as a harness trap.
+  and names the last test that ran. Documented as a harness trap; filed as the question #118.
 - `persistAllWaypoints` logs every slot, and `BoundaryUtils.intersects` tests the first edge again in its last
   iteration (`% (lod.length - 1)`); neither changes a result.
 - NAV 5 with a duplicate waypoint: only the `drawFlightplanLine` guard of #8 is observable; the other guards are not

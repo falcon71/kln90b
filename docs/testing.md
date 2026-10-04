@@ -376,9 +376,9 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
     - reset `FakeXhr.requests`;
     - restore `Flight`'s `console.error` wrapper per flight, before any test file holds several flights;
     - consider `restoreMocks: true` in `vitest.config.mts`.
-- **For the maintainer:** errors thrown on the ENT path never reach the error page, although `CLAUDE.md` and
-  `architecture.md` say input exceptions are shown there (section 6). Either file it as a bug or correct the two
-  documents.
+- Errors thrown on the ENT path never reach the error page, although `CLAUDE.md` and `architecture.md` say input
+  exceptions are shown there (section 6). The question is #118; once it is decided, either the trap goes away or the
+  two documents change.
 - Flip the pins when the bugs are fixed: remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each of which names its issue.
 - #99 (lat/lon displays show 60.00 minutes just below a whole degree) is filed but has no pin yet; a render test would
   hold it.
