@@ -131,6 +131,22 @@ instrument reads and nothing else. The data is synthetic; see the limitations in
 Core 7). Pass it as `storage` to start a test with a flight plan already stored, which is far faster than entering it
 with the knobs.
 
+## Reading the screen
+
+`Screen.read()` (`render/screen.ts`) turns the DOM into the cells the pilot sees; where the DOM and the screen differ,
+the reader follows the screen:
+
+- A row may carry blank cells past the edge of its half page (the nearest selector of APT 1 and VOR); they read as
+  nothing. A visible character or an inverted cell past the edge is a rendering bug, and the reader throws (#115).
+- With the left cursor on, the status line shows `CRSR` (or `KYBD`) one cell in, because the DOM gives that field a
+  CSS margin of one cell. The reader inserts that blank, so the status line keeps its 23 cells and `CRSR` sits in
+  columns 1 to 4.
+- A newline inside a `<pre>` starts a row, as the browser renders it (the MSG page joins its lines that way).
+- A full page without a status line (the welcome page) owns all seven rows. The orientation and range of NAV 5 are
+  positioned over the map with CSS and are read at row 5 of their half.
+- Super NAV 5 is a map with text over it, not a text grid. `Screen.read()` throws there, and `SuperNav5.read()`
+  (`render/superNav5.ts`) reads its parts.
+
 # 4. Writing tests
 
 ## Unit
@@ -165,8 +181,12 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   Core 2), and a test that calls a tick method by hand skips the ordering the real unit has.
 - `Screen.read()` (`render/screen.ts`) returns the 23×7 screen: six rows of two half pages or one full page, plus the
   status line as row 6.
-    - `text()`, `row(n)`, `half('L' | 'R')`, `leftName()`, `rightName()` and `cell(row, col)` read it.
-    - `mask()` shows the attributes per cell: `.` normal, `I` inverted, `B` blinking, `F` flashing inverse.
+    - `text()`, `row(n)`, `half('L' | 'R')`, `rows(side)` (the six rows of a half as strings), `cell(row, col)` and
+      `status()` read it. `status()` returns `{left, mode, right}` trimmed, so with a cursor on it reads `CRSR` or
+      `KYBD`; prefer it to slicing row 6, whose columns shift with the cursor. `leftName()` and `rightName()` are the
+      raw five-character fields.
+    - `mask()` shows the attributes per cell: `.` normal, `I` inverted, `B` blinking, `F` flashing inverse, and
+      `maskRows(side)` the mask of a half in the columns of `rows(side)`.
     - `dump()` is the text, a blank line and the mask. It is the format for snapshots and for failure messages.
 - **`settle(unit)`** (`boot.ts`) advances the clock until the GPS has a solution, then two calculation ticks more, so that
   FPL 0 has activated and the display shows it (a force-ready boot is valid at once, but FPL 0 activates only at the first
@@ -190,8 +210,13 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - **Canvas pages** (NAV 5, Super NAV 5, APT 3 draw maps): `canvasToAscii(el)` returns the pixels as `#` and `.`. Snapshot
   it with `toMatchInlineSnapshot` as `test/render/harness/canvas.test.ts` does for a tiny canvas. For a map that is too
   large to read inline, `toMatchFileSnapshot('./__snapshots__/name.txt')` keeps it in a file.
-- `Screen` skips `<canvas>` subtrees (their fallback text) and cannot read Super NAV 5, which is a `SevenLinePage` made
-  of CSS-positioned `<pre>` blocks. It throws on a full page with more than six rows.
+- `Screen` skips `<canvas>` subtrees (their fallback text). It cannot read Super NAV 5, a `SevenLinePage` made of
+  CSS-positioned `<pre>` blocks: use `SuperNav5.read()`, which returns `{left, msg, range, right, directTo}`. `right` and
+  `directTo` are `null` while hidden (the right cursor and the pulled scan knob show them).
+- **`selectPage` cannot end on Super NAV 5**: the overlay hides the status line it reads. Select the page before it and
+  turn the last click with `inner`, as `test/render/harness/superNav5.test.ts` does.
+- **Pages that show the version** (STA 3) carry the placeholder of `kln90b/Version.ts` in tests, 18 cells wide, which
+  `Screen` rightly refuses to read. Mock the module in the test file, as `selectPage.test.ts` does.
 
 ## Flight
 
@@ -231,9 +256,21 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
   A render test that boots with `bootUnit` gets the same panel as `unit.panel`.
     - Raw events: `press(evt)`, `outer(side, clicks)`, `inner(side, clicks)`, `cursor(side)`, `ent()`, `clr()`, `dct()`,
       `msg()`, `alt()`, `scan()`, `power()`. Each click advances one display tick so the screen shows its result.
-    - Helpers: `selectPage(side, 'FPL 0')`, `enterIdent(side, ident)`, `type(side, text)` and `appendToFpl0(idents)`.
-    - `enterIdent` does not blank the positions past a short ident, so an autocompleted longer ident leaves a tail.
-      Enter long idents first, or prefer `savedFlightplan` for setup.
+    - `selectPage(side, 'FPL 0')` turns the outer knob the shorter way round the page groups (`PAGE_GROUPS`) and the
+      inner knob toward the page number. Page names are those of the status line (`FPL10`, `SET 0`, `D/T 1`, `REF`, `INT`);
+      a page with sub-pages shows `APT+3` and still matches `APT 3`. The cursor on that side must be off. A test of the
+      harness walks the real page trees and checks `PAGE_GROUPS` against them.
+    - `enterIdent(side, ident)` types with the knobs and does not press ENT. In an editor (FPL, DIR) a short ident is
+      followed by a blank, so `KAA` stays `KAA` and does not autocomplete to `KAAA`. In a waypoint selector (the APT,
+      VOR, NDB, INT and SUP pages: the focused run is one cell) it steps through the characters, and throws if the ident
+      is longer than the selector. `type(side, text)` types the same with the keyboard instead.
+    - `focused(side)` returns the one focused field `{row, col, text}`; `cursorTo(side, 'USER POS?')` turns the outer
+      knob until that field has the cursor. `appendToFpl0(idents)` enters and confirms idents on FPL 0.
+    - Power: `powerOff()`, `powerOn()`, `powerCycle({offSeconds})` and `approveSelfTest()`. After boot every power-on runs
+      the welcome page (17 s) and the self-test, also on an engine-running unit; `approveSelfTest` presses ENT on
+      `APPROVE?` and on `ACKNOWLEDGE?`, and throws with the screen at the VFR only page or the OBS warning. A unit
+      booted with `engineRunning: false` is dark until `powerOn()`. The unit forgets OBS mode over a power cycle.
+    - `obsMode()` enters ENR-OBS from MOD 2 (the unit needs an active waypoint).
 - **Monitors:** `flight.monitor(name, check)` adds a check that runs once per simulated second and returns `true` or a
   description of what is wrong. Built-in monitors fail the test on an error published to the bus, a SimVar unit error,
   any `console.error` and a non-finite GPS output. The `console.error` wrapper that counts is removed again when the
