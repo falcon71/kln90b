@@ -25,14 +25,14 @@ describe('L:KLN90B_IntegrityWarn (public contract) (#87)', () => {
         expect(gps.isValid()).toBe(false);
         expect(sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(1);
 
-        // The acquisition time comes from the seeded random; only a generous window is asserted
+        // The acquisition time comes from the seeded random; only a generous window is asserted. The lower bound is the
+        // "still invalid at 30 s" check above, the upper bound is the check below.
         let seconds = 30;
         while (!gps.isValid()) {
             expect(seconds).toBeLessThan(900);
             await vi.advanceTimersByTimeAsync(1000);
             seconds++;
         }
-        expect(seconds).toBeGreaterThan(10);
         expect(seconds).toBeLessThan(400);
 
         await vi.advanceTimersByTimeAsync(2000);

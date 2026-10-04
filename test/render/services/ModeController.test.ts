@@ -77,7 +77,7 @@ describe('ModeController OBS course of 000', () => {
     // The sibling of the pin: the same entry with an OBS course other than the stored one works, so a broken setup fails here.
     // Spec: the OBS course is the one the external indicator shows (5-34), and going from LEG to OBS keeps the active
     // waypoint and takes that course (5-36, rule 2.i); the deviation is measured from it through the waypoint.
-    it('measures the deviation from an OBS course of 077 through the waypoint', async () => {
+    it('measures the deviation from an OBS course of 077 through the waypoint (#122)', async () => {
         const {unit, position} = await enterObsWithCourse(77);
         const nav = unit.props.memory.navPage;
 

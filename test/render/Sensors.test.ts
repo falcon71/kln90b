@@ -28,7 +28,7 @@ describe('external OBS course and L:KLN90B_ObsSource', () => {
     // The sibling of the pin: the setup works, the unit reads 51 and takes the switch to 0 over from the LVar.
     // Public contract: Input.ObsSource of the panel.xml sample (cfg/panel.xml, "synced with L:KLN90B_ObsSource") and the
     // LVars.ts doc comment of LVAR_OBS_SOURCE (changes Input.ObsSource on the fly).
-    it('reads the external course and takes ObsSource 0 from the LVar', async () => {
+    it('reads the external course and takes ObsSource 0 from the LVar (#123)', async () => {
         const unit = await bootWithExternalCourse();
         expect(unit.props.sensors.in.obsMag).toBe(51);
 

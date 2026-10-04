@@ -25,9 +25,10 @@ async function flyToward(plan: (kaaa: Facility, abc: Facility, kbbb: Facility, w
 const angleTo = (a: number | null, b: number) => a === null ? 180 : Math.abs(((a - b + 540) % 360) - 180);
 const withoutRepeats = (values: number[]) => values.filter((v, i) => i === 0 || v !== values[i - 1]);
 
-// Spec: the KLN 89 trainer sequences through consecutive identical waypoints (fix commit 3364def); the Pilot's Guide has
-// no page for it. Turn anticipation is off here so that only the #19 path is under test: with it on, the guard of
-// #27 (dbb01bf) keeps the flight out of the code that would fail first.
+// Spec: the KLN 89 trainer sequences through consecutive identical waypoints and overflies the duplicate instead of
+// anticipating the turn (the comment at the anticipation condition in NavCalculator.ts, added by dbb01bf); 3364def is
+// the fix of the error. The Pilot's Guide has no page for it. Turn anticipation is off here so that only the #19 path
+// is under test: with it on, the guard of #27 (dbb01bf) keeps the flight out of the code that would fail first.
 // #23 (the same fix for a STAR with a repeated fix) needs procedures, which the harness navdata does not have yet.
 describe('consecutive identical waypoints sequence without an error (#19)', () => {
     it('sequences through both ABC legs to KBBB, with a finite DTK (#19)', async () => {
@@ -102,15 +103,15 @@ describe('no turn anticipation into a duplicated waypoint (#27)', () => {
     });
 });
 
-// Suspected bug A: with a plan whose only leg has no length, [KAAA, KAAA], sequencing cannot advance, so every
+// #120: with a plan whose only leg has no length, [KAAA, KAAA], sequencing cannot advance, so every
 // calculation tick takes the NaN-path return of NavCalculator.tick (the fix of #19) before setOutput(). Every other
 // early return of tick calls setOutput(), so the GPS SimVars are refreshed, flagged or not. Here they are not written
 // at all. Expected behavior (public contract, CLAUDE.md "GPS SimVars written when Output.WriteGPSSimVars is set"): the
 // position outputs follow the aircraft. The Pilot's Guide 4-1 does not say what a plan without leg length shows.
-describe('a plan whose only leg has no length (suspected bug A)', () => {
+describe('a plan whose only leg has no length (#120)', () => {
     const recorded: { moved: number; outputLagNm: number | null } = {moved: 0, outputLagNm: null};
 
-    it('flies with KAAA active and the aircraft moving away from its start', async () => {
+    it('flies with KAAA active and the aircraft moving away from its start (#120)', async () => {
         const kaaa = airport('KAAA', 47.0, 8.0);
         const world = new World({magvar: 0}).add(kaaa);
         const start = new GeoPoint(kaaa.lat, kaaa.lon).offset(270, UnitType.NMILE.convertTo(5, UnitType.GA_RADIAN));

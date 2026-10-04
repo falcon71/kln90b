@@ -34,6 +34,8 @@ describe('GPS week rollover (64c203d)', () => {
         const gps = unit.props.sensors.in.gps;
         expect(gps.isValid()).toBe(false);
         gps.timeZulu = TimeStamp.create(userDate);
+        // Not settle(): the era check runs at the acquisition tick, before the valid-state tick recalculates, so the loop
+        // must stop at the first valid second
         for (let i = 0; i < 60 && !gps.isValid(); i++) {
             await vi.advanceTimersByTimeAsync(1000);
         }

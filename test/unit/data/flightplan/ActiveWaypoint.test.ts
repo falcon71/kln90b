@@ -57,6 +57,15 @@ describe('ActiveWaypoint.activateFpl0 activates the leg the aircraft is on (#41,
         expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('GHI');
     });
 
+    it('activates the first leg when the aircraft is 10 NM before A, the start of the plan (#41)', () => {
+        // Before the start of the plan the closest point of the first leg lies outside the leg, so the distance to its
+        // start decides: 10 NM for the first leg against at least 50 NM for the second
+        const aw = activeWaypointOver([A, B, C].map(user), at(A, 270, 10));
+
+        expect(aw.activateFpl0()).not.toBeNull();
+        expect(aw.getActiveFplIdx()).toBe(1);
+    });
+
     it('activates the first leg when the aircraft is 2 NM beside its middle (#41)', () => {
         // Predicted survivor of the #41 break: the leg the aircraft is nearest to is also the one the pre-fix check
         // picks, because the second leg is 20 NM away whichever way its closest point is judged
@@ -90,7 +99,8 @@ describe('ActiveWaypoint.activateFpl0 with two waypoints always activates (#34)'
 });
 
 describe('ActiveWaypoint.activateFpl0 on a DME arc', () => {
-    // #41 continued (closed): isPointOnCircleBetween compares distances along one great circle, so a point on a DME
+    // #41 continued (closed): the expected leg is the leg the aircraft is on, the rule of the #41 describe above.
+    // isPointOnCircleBetween compares distances along one great circle, so a point on a DME
     // arc, a small circle, is never between the ends and the perpendicular distance is never used for an arc leg.
     // The arc P to Q runs 10 NM around a VOR from the west radial to the north radial; R is 30 NM east of Q.
     function arcPlan() {
@@ -113,6 +123,9 @@ describe('ActiveWaypoint.activateFpl0 on a DME arc', () => {
         // The pin below stands on this: the plan and the hand-built arc work when the aircraft is at P
         const {station, legs} = arcPlan();
         const atStart = activeWaypointOver(legs, at(station, 270, 10));
+        // The position of the pin below lies on the arc as well, so it is a point of the leg and not a stray one
+        const onArc = at(station, 330, 10);
+        expect(legs[0].arcData!.circle.distance(onArc)).toBeCloseTo(0, 6);
         atStart.activateFpl0();
         expect(atStart.getActiveFplIdx()).toBe(1);
     });

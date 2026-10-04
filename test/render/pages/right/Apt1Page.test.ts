@@ -109,8 +109,8 @@ describe('APT 1 page on a nearest entry', () => {
             expect(rightRow(5)).toBe('E 08°00.00\'');
         });
 
-        // The three assertions are independent: the ident, the coordinates and the error channels each catch a
-        // different break (see the commit message)
+        // The checks are independent: the ident, the coordinates and the error channels (unit.errors and the console.error
+        // spy) each catch a different break (see the commit message)
         it('scans left to the previous airport of the complete list (c2e7b8e, d202f4a)', async () => {
             const unit = await bootAtNearest();
             await dropEntry(unit);

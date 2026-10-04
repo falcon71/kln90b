@@ -46,7 +46,7 @@
     {
       "id": 6,
       "subject": "Task 6: issues and close-out",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** File the confirmed bugs and the question, replace the placeholders, tick the triage rows, and write the session\nlog.\n\n**Files:**\n- Modify: test files containing `#NEW-` placeholders\n- Modify: `docs/test-coverage.md` (section 3 checkbox, section 4 log, section 5 rows)\n- Modify: `docs/testing.md` section 7\n\n**Acceptance Criteria:**\n- [ ] Every confirmed bug from the four reports and the reviews has a GitHub issue with the `bug` label, filed after a\n      search of open and closed issues; duplicates found by two tasks are one issue.\n- [ ] A question issue (no `bug` label, no pin) for the self-test date and time editors, citing 3-53.\n- [ ] `grep -r \"#NEW-\" test/` finds nothing.\n- [ ] Every session 3 row is ticked with its test path or re-verdicted with a reason; the stage changes are in the rows.\n- [ ] The session log entry has: done, re-verdicts, bugs filed, fixes not re-broken, not covered, coverage at start and\n      end, the suite totals.\n- [ ] `npm test`, `npx tsc --noEmit` and `npm run coverage` are clean.\n\n**Verify:** `npm test && npx tsc --noEmit && grep -r \"#NEW-\" test/` → tests pass, no type errors, grep prints nothing.\n\nFull steps: docs/superpowers/plans/2026-10-04-session-3-flight.md, Task 6.\n\n```json:metadata\n{\"files\": [\"docs/test-coverage.md\", \"docs/testing.md\"], \"verifyCommand\": \"npm test && npx tsc --noEmit && grep -r \\\"#NEW-\\\" test/\", \"acceptanceCriteria\": [\"bugs filed with bug label after duplicate search\", \"question issue for self-test date editor\", \"no #NEW- placeholders\", \"rows ticked or re-verdicted\", \"session log complete\", \"checks clean\"], \"modelTier\": \"standard\"}\n```",
       "blockedBy": [
         2,
@@ -56,5 +56,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-10-04T16:33:37.031948"
+  "lastUpdated": "2026-10-04T17:00:05.312091"
 }

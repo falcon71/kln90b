@@ -45,7 +45,7 @@ describe('GPS SimVars written by SensorsOut', () => {
 
             const sim = unit.env.sim;
             expect(unit.errors).toEqual([]);
-            // The aircraft sits on KAAA, so DTK is the initial course KAAA - ABC (about 50.37), less the 4 degrees east variation
+            // The aircraft sits on KAAA, so DTK is the initial course KAAA - ABC, less the 4 degrees east variation
             const expectedMag = courseDeg(kaaa, abc) - 4;
             const events = vorKeyEvents(unit);
             expect(events.length).toBeGreaterThan(0);
@@ -66,8 +66,8 @@ describe('GPS SimVars written by SensorsOut', () => {
             expect(unit.env.sim.writes.filter(w => w.name === 'VOR2_SET')).toEqual([]);
         });
 
-        // 92fbba1: the OBS is written only while the GPS drives NAV 1. The condition is documented in that commit message
-        // (and as a comment on the OBS input in Sensors.ts), not in cfg/panel.xml. Render stage only: a flight's
+        // 92fbba1: the OBS is written only while the GPS drives NAV 1. The condition is documented in that commit message,
+        // not in cfg/panel.xml. Render stage only: a flight's
         // Aircraft.writeTo writes GPS DRIVES NAV1 true at 16 Hz, which would overwrite the value set here.
         it('writes the OBS only while the GPS drives NAV 1 (92fbba1)', async () => {
             const unit = await bootOnRoute(obsPanelXml(1), 4);

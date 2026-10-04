@@ -132,19 +132,18 @@ describe('OBS mode on a flight plan with the same waypoint twice (3415417, #67)'
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
         expect(nav.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('KAAA');
         expect(Number.isFinite(nav.obsMag)).toBe(true);
-        // Under the break the deviation is the 5 NM to the waypoint
         expect(Number.isFinite(nav.xtkToActive)).toBe(true);
-        expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
         // Under the break the OBS course on the left half is blank (OBS:°)
         expect(Screen.read().half('L').split('\n')[3]).toMatch(/^OBS:\d{3}°/);
         expect(unit.errors).toEqual([]);
     });
 
-    // characterization: 5-36 does not say which course OBS takes when the plan has no desired track; the unit takes the
-    // bearing to the waypoint, which leaves the deviation at zero
+    // The Pilot's Guide does not say which course OBS takes when the plan has no desired track. The unit takes the
+    // bearing to the waypoint, which leaves the deviation at zero (under the break it is the 5 NM to the waypoint).
     it('takes the bearing to the waypoint as the OBS course (characterization, #67)', async () => {
         const {unit, position} = await enterObsOnDuplicatedPlan();
 
+        expect(Math.abs(unit.props.memory.navPage.xtkToActive!)).toBeLessThan(0.05);
         expect(Math.abs(unit.props.memory.navPage.obsMag - courseDeg(position, kaaa))).toBeLessThan(0.5);
         expect(Screen.read().half('L').split('\n')[3]).toBe('OBS:090°   ');
     });
@@ -187,6 +186,7 @@ describe('sequencing after a direct-to to a waypoint of FPL 0 (748151c, #70)', (
 
         expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
         expect(aw.getActiveFplIdx()).toBe(2);
+        expect(aw.isDctNavigation()).toBe(false); // 4-10: the plan is resumed
     });
 
     // Public contract (CLAUDE.md, the SDK FlightPlanner id "kln90b" mirrored from FPL 0): the planner follows the sequence.
@@ -200,5 +200,7 @@ describe('sequencing after a direct-to to a waypoint of FPL 0 (748151c, #70)', (
         expect(planner.hasFlightPlan(1)).toBe(false);
         expect(planner.getFlightPlan(0).activeLateralLeg).toBe(2);
         expect(planner.getFlightPlan(0).getLeg(2).leg.fixIcaoStruct.ident).toBe('KBBB');
+        // The direct-to of the planner is cleared; a stale one is the symptom of #70
+        expect(planner.getFlightPlan(0).directToData).toEqual({segmentIndex: -1, segmentLegIndex: -1});
     });
 });

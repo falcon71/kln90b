@@ -477,8 +477,12 @@ later run adds a new entry.
 - #41 is a characterization (the manual is silent); the trainer-sourced behavior (#76, #19, #27, #34) is a spec test
   citing the trainer and the fix commit; the era shift of #63 is a characterization and its same-era control a spec test
   (3-53).
-- Review fix rounds: each task needed one, except task 5. Examples: the #63 epoch was pinned from one side only (a
-  second boundary test was added), and the #76 test missed the XTK kick and the turn stack (now sampled).
+- Review fix rounds: tasks 1 to 4 each needed one, tasks 5 and 6 none. Examples: the #63 epoch was pinned from one side
+  only (a second boundary test was added), and the #76 test missed the XTK kick and the turn stack (now sampled). The
+  final whole-session review added a last round on the branch: a no-op assertion removed from the #87 test, the #19
+  trainer citation corrected, the #67 (a) XTK bound moved from the spec test into the characterization test, a leg
+  activation case before the start of the plan (the `else` branch of `findClosestLegIdx`), the planner `directToData`
+  and the 4-10 resume of #70 asserted, and the pin siblings tagged with their issue numbers.
 
 **Bugs found and filed** (each pinned with `it.fails`):
 - **#120:** the NaN-path early return in `NavCalculator.tick` skips `setOutput()`, so a zero-length last leg leaves all
@@ -510,15 +514,18 @@ later run adds a new entry.
 - #23 (a STAR with a repeated fix) and the DME-arc half of #19 (`326da1a`) need procedure builders. The missed-approach
   scenario of #41 does too.
 - The flight versions of `92fbba1` and #61 (see the re-verdicts).
-- The neighbor mutations that survived review and are listed in the ledger as deferred: the ident-versus-coordinates
-  guard of #27 (#22 with the default anticipation would catch it); the to/from else-branch at
-  `ActiveWaypoint.ts:302` for an aircraft before A; the xtk bound of #67 (a), a characterized value inside a spec test;
-  the planner `directToData` not asserted cleared (`WTFlightplanSync.ts:161`); the TO/FROM abeam boundary
-  (<=90 versus <=135) unprobed; the 4-10 test not asserting that the plan resumed; the future-era `Math.abs` of
-  `Gps.ts:291`; `setGpsOverriden` only with a fix (`NavCalculator.ts:306`); the `WriteGPSSimVars` gate in
-  `SimVarSync.setDisabled`; the hard-coded clock start in `Gps.test.ts`.
-- Harness minors from task 1: the trailing second of `settle` is not held by a test, the `FrontPanel.type` test passes
-  with the first character only (autocomplete), and the second `consoleRestore` test is vacuous when run alone.
+- The neighbor mutations that survived review and were accepted, each with the session that owns the code:
+    - The ident-versus-coordinates guard of #27 (`NavCalculator`; #22 with the default anticipation would catch it) and
+      the TO/FROM abeam boundary (`<= 90` versus `<= 135`, which needs a laterally offset flight): session 5 item 3.
+    - `setGpsOverriden` only with a fix (`NavCalculator.ts:306`, needs a cold-GPS variant of the #24 test) and the
+      `WriteGPSSimVars` gate in `SimVarSync.setDisabled`: session 4 item 4; `SimVarSync` itself is also session 10
+      item 5.
+    - The future-era `Math.abs` of `Gps.ts:291`: session 7 item 4.
+    - Scanning within the nearest list from a valid index (`NearestList`, `Scanlist`): session 7 item 2.
+- Accepted with no owning session: the hard-coded clock start in `Gps.test.ts` (a change of the default start fails the
+  test loudly), and the harness minors of task 1 (the trailing second of `settle` is not held by a test, the
+  `FrontPanel.type` test passes with the first character only because of autocomplete, and the second `consoleRestore`
+  test is vacuous when run alone).
 
 **Observed but not filed**
 - The #67 (a) plan `[KAAA, KAAA]` logs "invalid path, sequencing to the next waypoint" at the boot of that test. Render
@@ -555,7 +562,7 @@ each fix round. Implementer commits carry the trailer of the model that wrote th
 | `kln90b/services`          |         41.06 |       45.91 |         40.10 |       45.23 |
 | `kln90b/settings`          |         87.39 |       87.67 |         87.16 |       87.46 |
 
-The suite at the start: 206 tests passed and 18 expected failures. At the end: 264 tests passed and 24 expected failures
+The suite at the start: 206 tests passed and 18 expected failures. At the end: 265 tests passed and 24 expected failures
 (the pins), in 87 files.
 
 ## 2026-10-04, session 2, branch `tests-session-2-regressions`
@@ -769,7 +776,7 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 | x | #61 `179d37d` | GPS acquisition started only after the self-test instead of at power-on. | render | testable | `engineRunning: false`, fast acquisition: during the self-test the satellite computer has left idle. Re-verdicted from flight to render: `Flight.start` cannot start a cold unit, and a booted `engineRunning: false` unit shows the channels searching while the welcome page is up. The flight version is not covered. | `test/render/Gps.test.ts` |
 | x | #63 `64c203d` | Simulates the GPS week rollover: a manual date in another 1024-week era stays shifted by whole eras after acquisition. | render | testable | Set the date ~20 years off before acquisition, acquire: the sim date minus the era difference × 1024 weeks, computed from the GPS epoch independently. A same-era date is unchanged. Re-verdicted from flight to render: the era shift is read from `gps.timeZulu` after a cold acquisition. | `test/render/Gps.test.ts` |
 | x | #87 `8a16a33` | New LVar `L:KLN90B_IntegrityWarn`, set while there is no GPS solution. | render | testable | Boot with slow acquisition: true while acquiring, false once valid. Public contract. Re-verdicted from flight to render: a cold boot shows the LVar true, then false. | `test/render/SensorsOut.test.ts` |
-| x | #29 `a0678fa` | New LVar `L:KLN90B_HSI_TF_FLAGS` (0 off, 1 TO, 2 FROM), also in OBS. | flight | testable | 1 before the waypoint, 2 after passing it in OBS, 0 with no active waypoint. Public contract. The TO to FROM flip flies; the 0 case is a render test (no active waypoint), so the row has both stages. | `test/flight/flights/hsiToFromFlags.test.ts`, `test/render/Sensors.test.ts` |
+| x | #29 `a0678fa` | New LVar `L:KLN90B_HSI_TF_FLAGS` (0 off, 1 TO, 2 FROM), also in OBS. | flight + render | testable | 1 before the waypoint, 2 after passing it in OBS, 0 with no active waypoint. Public contract. The TO to FROM flip flies; the 0 case is a render test (no active waypoint), so the row has both stages. | `test/flight/flights/hsiToFromFlags.test.ts`, `test/render/Sensors.test.ts` |
 | x | #24 `66b0444` | After a hot swap another GPS reset `GPS OVERRIDDEN`; the unit now re-asserts it every calculation tick. | render | testable | Clear `GPS OVERRIDDEN` mid-flight: it is 1 again within two seconds. Re-verdicted from flight to render: clearing `GPS OVERRIDDEN` and one calculation tick is enough (the row said two seconds). The hot-swap and `WriteGPSSimVars` companions are render tests too. | `test/render/SensorsOut.test.ts` |
 | x | `6be164c` (part) | `GPS MAGVAR` was written in degrees instead of radians; `GPS GROUND MAGNETIC TRACK` was added. | flight + render | testable | World magvar 4°, fly 090 true: `GPS MAGVAR` is 4° in radians, and the magnetic track matches an independent computation. The magnetic track flies; `GPS MAGVAR` is a render test. | `test/flight/flights/magneticTrack.test.ts`, `test/render/SensorsOutSimVars.test.ts` |
 | x | `1236025` (part) | `GPS WP NEXT LON` and `PREV LON` were written with a string unit. | render | testable | Three-leg FPL 0: both SimVars equal the waypoint literals in degrees. Re-verdicted from flight to render: the SimVars are written at rest. | `test/render/SensorsOutSimVars.test.ts` |
