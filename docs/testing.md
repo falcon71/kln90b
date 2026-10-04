@@ -253,9 +253,10 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
 - **The recorder** keeps one row per simulated second (position, track, bank, `nav`, a few SimVars and the screen text).
   When a flight test fails, it writes `test/flight/__output__/<test name>.jsonl` and `.kml`. Open the KML in Google Earth
   to see the track against the waypoints, and the JSONL to see what the unit showed at each second.
-- **Display versus calculation:** both ticks fall due together once a second, and a display tick that runs before the
-  calculation shows the previous second's. Before asserting on the screen against `flight.nav`, call
-  `await flight.syncDisplay()`: it flies display ticks until one passed without a calculation tick, so the screen shows
+- **Display versus calculation:** both ticks fall due together once a second. Under the fake timers the calculation runs
+  first at that shared second (the timer that fired longest ago goes first), so the screen is normally current at once;
+  a display tick that ran before the calculation would show the previous second's. Before asserting on the screen
+  against `flight.nav`, call `await flight.syncDisplay()`: it flies display ticks until one passed without a calculation tick, so the screen shows
   the latest calculation. It recognizes a calculation tick by DIS to the active waypoint changing, so it needs a moving
   aircraft and an active waypoint. It throws when DIS changed in every display tick.
 - **`flight.flyUntilActive(ident, {timeout})`** is `flyUntil` for the active waypoint becoming `ident`. The timeout error

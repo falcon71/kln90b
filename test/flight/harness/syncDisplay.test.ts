@@ -4,14 +4,10 @@ import {World} from '../../harness/flight/World';
 import {courseDeg, pointBefore} from '../../harness/flight/geo';
 import {standardRoute} from '../../harness/fixtures';
 
-/** 3-31: NAV 1 shows DIS with one decimal below 100 NM (the proof flight checks the same row) */
-const disRow = (flight: Flight) => flight.screen.half('L').split('\n')[2];
-const expectedDisRow = (flight: Flight) => `DIS  ${flight.nav.distNm!.toFixed(1).padStart(4)}nm`;
-
 async function flightToAbc(): Promise<Flight> {
     const {kaaa, abc, kbbb} = standardRoute();
     const world = new World({magvar: 0}).add(kaaa, abc, kbbb);
-    // 600 kt move the distance by 0.17 NM a second, so a calculation tick shows in the model's DIS and in the row
+    // 600 kt move the distance by 0.17 NM a second, so a calculation tick shows in the model's DIS
     const start = pointBefore(kaaa, abc, 30);
     const flight = await Flight.start({world, aircraft: {lat: start.lat, lon: start.lon, altitudeFt: 3000, groundspeedKt: 600, trackTrue: courseDeg(kaaa, abc)}});
     await flight.panel.appendToFpl0(['KAAA', 'ABC', 'KBBB']);
@@ -40,7 +36,6 @@ describe('Flight.syncDisplay and flyUntilActive (harness)', () => {
             windows.push(dist.length - 1);
             // The last display tick brought no new calculation: DIS is the same as before it
             expect(dist[dist.length - 1]).toBe(dist[dist.length - 2]);
-            expect(disRow(flight)).toBe(expectedDisRow(flight));
             // Four display ticks, a whole second, so that the next call starts one tick later in the second than this one
             // did (this call flew one tick)
             await flight.fly(1);

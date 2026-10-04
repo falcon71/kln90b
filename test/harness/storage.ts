@@ -10,7 +10,7 @@ export function savedFlightplan(idx: number, legs: Facility[]): Record<string, u
 }
 
 interface SavedPosition {
-    /** 5 to 8 characters of the display set (A-Z, 0-9, space, -); padded to 8 in the string */
+    /** Characters of the display set (A-Z, 0-9, space, -), at most 8 (the width of the field); padded to 8 in the string */
     ident: string;
     /** Degrees, north positive */
     lat: number;

@@ -14,6 +14,9 @@ describe('savedUserWaypoints (harness)', () => {
             {kind: 'apt', ident: 'UNOL', lat: 47, lon: 8},
             {kind: 'vor', ident: 'ABC', lat: 47.5, lon: 8.9, freqMHz: 114.3, magvar: 2},
             {kind: 'ndb', ident: 'XY', lat: 48, lon: 9, freqKHz: 345},
+            // Off the 0.01 minute grid: 0.12345 degrees are 7.407 minutes in both, which round to 7.41 (a floor gives 7.40)
+            {kind: 'int', ident: 'OFFGRID', lat: 47.12345, lon: -8.12345},
+            {kind: 'vor', ident: 'XYZ', lat: 47.5, lon: 8.9, freqMHz: 108.05, magvar: -3},
         ])).toEqual({
             userDataFormat: 2,
             wpt0: 'UXX        USUP    +4715.00+00830.00',
@@ -23,6 +26,8 @@ describe('savedUserWaypoints (harness)', () => {
             wpt4: 'AXX        UNOL    +4700.00+00800.00-00001-00033-',
             wpt5: 'VXX        ABC     +4730.00+00854.00+114.30+02',
             wpt6: 'NXX        XY      +4800.00+00900.00+0345.0',
+            wpt7: 'WXX        OFFGRID +4707.41-00807.41',
+            wpt8: 'VXX        XYZ     +4730.00+00854.00+108.05-03',
         });
     });
 
@@ -35,6 +40,8 @@ describe('savedUserWaypoints (harness)', () => {
                 {kind: 'apt', ident: 'UNOL', lat: 46.5, lon: 8},
                 {kind: 'vor', ident: 'ABC', lat: 47.5, lon: 8.9, freqMHz: 114.3, magvar: 2},
                 {kind: 'ndb', ident: 'XY', lat: 48, lon: 9, freqKHz: 345},
+                {kind: 'int', ident: 'OFFGRID', lat: 47.12345, lon: -8.12345},
+                {kind: 'vor', ident: 'XYZ', lat: 47.5, lon: 8.9, freqMHz: 108.05, magvar: -3},
             ]),
         });
         await settle(unit);
@@ -71,5 +78,14 @@ describe('savedUserWaypoints (harness)', () => {
         expect(ndb.lat).toBeCloseTo(48, 6);
         expect(ndb.lon).toBeCloseTo(9, 6);
         expect(ndb.freqMHz).toBeCloseTo(345, 6);
+
+        // The coordinates are stored to 0.01 minute: 47 degrees 7.41 minutes, 8 degrees 7.41 minutes west
+        const offGrid = repo.get(ICAO.value('W', 'XX', '', 'OFFGRID'))!;
+        expect(offGrid.lat).toBeCloseTo(47 + 7.41 / 60, 6);
+        expect(offGrid.lon).toBeCloseTo(-(8 + 7.41 / 60), 6);
+
+        const westVor = repo.get(ICAO.value('V', 'XX', '', 'XYZ')) as VorFacility;
+        expect(westVor.freqMHz).toBeCloseTo(108.05, 6);
+        expect(westVor.magneticVariation).toBe(-3);
     });
 });
