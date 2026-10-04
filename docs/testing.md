@@ -141,10 +141,12 @@ The sim globals are installed once per test file by the setup files `test/harnes
 
 `bootUnitExpectingError({...bootOptions, platform})` is the boot for a start-up that is expected to fail (#50). It
 shares the guard and the teardown with `bootUnit`, but waits for the first `error` event instead of `propsReady`,
-throws `propsReady fired` if the unit came up, and returns `{core, env, errors, errorPage()}`. `errorPage()` is the
-message on the visible error page, or `null` while it is hidden. `platform` overrides methods of `FakePlatform`, for
-example `createFacilityClient`. The boot stays marked incomplete, so the teardown tolerates singletons that were never
-created.
+throws `propsReady fired` if the unit came up, and returns `{core, env, errors, consoleErrors, rejections,
+takeRejections(), errorPage()}`. `errorPage()` is the message on the visible error page, or `null` while it is hidden.
+A failed unit keeps ticking and its nearest searches keep rejecting, so a test that advances the clock after the
+failure must call `takeRejections()`, or the strict collector fails the test. `platform` overrides methods of
+`FakePlatform`, for example `createFacilityClient`. The boot stays marked incomplete, so the teardown tolerates
+singletons that were never created.
 
 ## Navdata
 
@@ -170,9 +172,8 @@ removed ones by id. The bounding-box selection is inferred from a comment in `Ne
 in the sim. The SDK's `NearestLodBoundarySearchSession` builds the `LodBoundary` objects in a throttled queue on
 `requestAnimationFrame`, so a test advances the fake clock for a search to finish. The builder sets `lods: []`, so that
 LOD 0 is the exact ring instead of a simplified one, and `resetSingletons` clears the SDK's boundary cache, which is
-keyed by the airspace id. A circular airspace exists for the known gap that `BoundaryUtils` ignores circles. The MSG
-page separates its lines with newline characters inside one `<pre>`, which `Screen.read` does not split into rows, so a
-test of a message reads the text of `.full-page` (see `test/render/harness/airspaces.test.ts`).
+keyed by the airspace id. A circular airspace exists for the known gap that `BoundaryUtils` ignores circles. A test of a
+message reads the MSG page with `Screen.read()` (see `test/render/harness/airspaces.test.ts`).
 
 `savedFlightplan(idx, legs)` (`test/harness/storage.ts`) returns user data in the V2 format (docs/architecture.md,
 Core 7). Pass it as `storage` to start a test with a flight plan already stored, which is far faster than entering it
@@ -201,6 +202,8 @@ resolves, like a sim with no EFB.
 - `efbRoute({departure, destination, enroute})` builds a route on the SDK's empty route. An enroute entry is a facility
   (its ICAO is the fix) or `{lat, lon}`, which the unit imports as a temporary user waypoint (region `XY`).
 
+## Procedures
+
 `navdata/procedures.ts` builds SIDs, STARs and approaches that the real `SidStar` conversion and the APT 7 and APT 8
 pages accept.
 
@@ -216,7 +219,8 @@ pages accept.
   (`MemoryFacilityClient.missingProcedureFixes()` is the same check for a unit test).
 - Load a procedure the way a pilot does: `selectPage('R', 'APT 8')`, `cursor('R')`, `ent()` on the approach (a single
   transition is taken without a question), `ent()` on LOAD IN FPL. APT 7 is the same with the SID or STAR. The unit
-  then shows FPL 0 on the left. The APT pages open on the first airport of the scan list, so with more than one airport
+  then shows FPL 0 on the left, but FPL 0 scrolls to the active leg only at the next calculation tick: advance about
+  1 s before you read its rows. The APT pages open on the first airport of the scan list, so with more than one airport
   select the ident first. `test/render/harness/procedures.test.ts` does all three.
 - A DME arc is converted to an entry waypoint `Dnnnx` and the arc's end fix. The entry is the point of the arc closest to
   the GPS position at load time (the beginning of the arc when that point is outside it), so the position the unit boots
@@ -288,7 +292,8 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   `undefined` for a key never saved. The unit saves a moment after the change, so advance the clock first. Use it instead
   of building the `persistent-setting.<model>.profile_1.` key by hand.
 - **`unit.panel.type(side, text)`** types characters with the keyboard (`KLN90B_Internal_Key`), one display tick each, with
-  that side's cursor on. It is how the ident selectors of the APT, VOR, NDB, INT and SUP pages take input.
+  that side's cursor on. It is the keyboard alternative to `enterIdent` (below), which turns the knobs as a pilot does
+  to fill the ident selectors of the APT, VOR, NDB, INT and SUP pages.
 - **Use these helpers; do not hand-roll them.** A wait-for-GPS loop, a `KLN90B_Internal_Key` loop, a
   `persistent-setting.<model>.profile_1.` key and a `gps.reset()` right after the boot are what `settle`,
   `unit.panel.type`, `storedSetting` and `bootUnit({coldGps: true})` do. A hand-rolled form stays only where it is the
@@ -339,7 +344,8 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
 - **`Flight.start(opts)`** boots the unit, starts the aircraft and flies until the GPS has a solution. Call it inside a
   test, because it registers `onTestFailed`. Besides `world` and `aircraft` it takes `aircraftOptions` (roll rate,
   maximum bank), `pilot`, and the `BootOptions` that make sense in flight (`storage`, `panelXml`, `engineRunning`,
-  `start`, `seed`, `atcModel`).
+  `start`, `seed`, `atcModel`, `coldGps`, `efb`, `platform`). Airspaces are not a boot option here: they come from
+  `World.addAirspace()`, and the facilities, position, altitude and magnetic variation from the world and the aircraft.
 - **Aircraft** (`flight/Aircraft.ts`): a point mass with constant ground speed and altitude, coordinated turns and a
   roll rate. No wind. It writes the SimVars the unit reads, 16 times per simulated second.
 - **Pilots** (`flight/pilots.ts`): the default `coupledAutopilot()` banks as `L:KLN90B_RollCommand` says (positive
@@ -374,8 +380,8 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       VOR, NDB, INT and SUP pages: the focused run is one cell) it steps through the characters, and throws if the ident
       is longer than the selector. Each knob click on a character starts a search, so when the last character already
       shows the wanted letter (a fresh VOR page showing `ABC SOUTH`, entering `ABC`) it turns that character one click
-      away and one back, as a pilot would, and the search runs for exactly the typed ident. `type(side, text)` types the same with the keyboard
-      instead.
+      away and one back, as a pilot would, and the search runs for exactly the typed ident. `type(side, text)` is the
+      keyboard alternative that types the same characters.
     - `focused(side)` returns the one focused field `{row, col, text}`; `cursorTo(side, 'USER POS?')` turns the outer
       knob until that field has the cursor, stepping over the cursor positions that focus nothing (the SUP and INT pages
       have one after the ident characters) and throwing with the screen after `maxClicks`.
@@ -480,10 +486,11 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   clipping or a font problem in the sim. Skia's text pixels also differ from the sim's, so canvas snapshots hold the
   instrument's own drawing, not a pixel-exact copy of what the sim shows.
 - **The navdata is synthetic, and some of its rules are inferred.** The facilities, airspaces and procedures are
-  invented (section 3). The fake follows two rules that nobody observed in the sim: the nearest airspace search
-  selects by bounding box (from a comment in `NearestUtils.getAirspaces`), and the nearest filters let an airport
-  without runways pass the surface and length filters (the sim developers' rule, quoted to the maintainer from their
-  code). A test that passes against the fake proves the instrument's use of those rules, not that the sim applies them.
+  invented (section 3). The fake follows two rules, one inferred and one quoted: the nearest airspace search selects
+  by bounding box (inferred from a comment in `NearestUtils.getAirspaces`, not observed in the sim), and the nearest
+  filters let an airport without runways pass the surface and length filters (the sim developers' rule, quoted to the
+  maintainer from their code). A test that passes against the fake proves the instrument's use of those rules, not that
+  the sim applies them.
   The instrument itself ignores circular airspaces (`BoundaryUtils`); `circularAirspace()` exists to hold that gap.
 - **There is no wind.** Ground speed and track equal airspeed and heading, so crosswind effects are not modeled.
 - **`jump` skips integrated values**, and monitors and the recorder sample once per simulated second.
@@ -500,11 +507,20 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   at a time. A singleton the teardown does not know shows up as a test that passes alone and fails in its file.
 - **SDK upgrades may require updating the fakes.** `FakeSim` mirrors the native layer the SDK builds on, and
   `KLNGPSSatComputer` reaches into private SDK internals (docs/architecture.md, Core 3); recheck both, and run the whole
-  suite, after upgrading `@microsoft/msfs-sdk`.
+  suite, after upgrading `@microsoft/msfs-sdk`. The harness also relies on these SDK internals, and after an upgrade a
+  change in one of them shows up as a confusing harness error, not as a named check:
+    - the boundary search: `NearestLodBoundarySearchSession` builds its `LodBoundary` objects in a throttled queue on
+      `requestAnimationFrame` (the airspace tests advance the fake clock for it), and a facility with `lods: []` makes
+      LOD 0 the exact ring (`navdata/airspaces.ts`);
+    - the singletons `resetSingletons` clears by name (`singletons.ts`): `DefaultLodBoundaryCache.INSTANCE` and the
+      private `FlightPlanner.instances` map, which it checks is a `Map`;
+    - the EFB route: `FakeRouteManager` copies the members of `FlightPlanRouteManager` that `KlnEfbLoader` and
+      `KlnEfbSaver` use (`syncedAvionicsRoute`, `avionicsRouteRequested`, `replyToAvionicsRouteRequest`), and `efbRoute`
+      builds routes with `FlightPlanRouteUtils.emptyRoute()` and `emptyEnrouteLeg()`.
 - **TypeScript 6 no longer includes `@types` automatically.** Harness files that use Node APIs carry
   `/// <reference types="node" />`. The directive makes the Node types available to the whole `tsc` program, because the
-  root `tsconfig.json` has no `include`; it does not keep Node APIs out of the code in `kln90b/`, so `tsc` will not catch
-  an accidental Node call there.
+  `include` of the root `tsconfig.json` compiles `kln90b/` and `test/` together; it does not keep Node APIs out of the
+  code in `kln90b/`, so `tsc` will not catch an accidental Node call there.
 - **Errors thrown on the ENT path do not reach the error page.** `MainPage` starts `handleEnter` without awaiting it,
   so a throw is an unhandled rejection, not an `error` event (the exception handling of ticks and synchronous input
   does not see it; #118 asks whether that is intended). The harness collects the rejection and fails the test that
@@ -553,7 +569,8 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - Errors thrown on the ENT path never reach the error page, although `CLAUDE.md` and `architecture.md` say input
   exceptions are shown there (section 6). The question is #118; once it is decided, either the code changes or the two
   documents do. The harness collector stays either way.
-- Flip the pins when the bugs are fixed: remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each of which names its issue.
+- Flip the pins when the bugs are fixed: remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each of
+  which names its issue.
 - #99 (lat/lon displays show 60.00 minutes just below a whole degree) is filed but has no pin yet; a render test would
   hold it.
 - Further flights: approach arming (ARM to APR scale ramp), waypoint alert without turn anticipation, and the

@@ -1,11 +1,11 @@
 import {describe, expect, it, vi} from 'vitest';
-import {Facility, FixTypeFlags, GeoPoint, LegTurnDirection, UnitType} from '@microsoft/msfs-sdk';
+import {Facility, FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, sid, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
-import {courseDeg, distanceNm} from '../../harness/flight/geo';
+import {courseDeg, distanceNm, pointFrom} from '../../harness/flight/geo';
 import {KLNFixType, KLNLegType} from '../../../kln90b/data/flightplan/Flightplan';
 
 const RNAV = ApproachType.APPROACH_TYPE_RNAV;
@@ -85,7 +85,7 @@ describe('procedures through APT 8 (harness)', () => {
 
     it('converts a DME arc to an entry waypoint followed by the arc end fix', async () => {
         const abc = vor('ABC', 47.3, 8.3);
-        const at = (bearing: number, nm: number) => new GeoPoint(abc.lat, abc.lon).offset(bearing, UnitType.NMILE.convertTo(nm, UnitType.GA_RADIAN));
+        const at = (bearing: number, nm: number) => pointFrom({lat: abc.lat, lon: abc.lon}, bearing, nm);
         const arcbg = intersection('ARCBG', at(270, 10).lat, at(270, 10).lon);
         const arcen = intersection('ARCEN', at(180, 10).lat, at(180, 10).lon);
         const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
@@ -126,7 +126,7 @@ describe('procedures through APT 8 (harness)', () => {
 
     it('enters at the beginning of the arc when the aircraft is outside it', async () => {
         const abc = vor('ABC', 47.3, 8.3);
-        const at = (bearing: number, nm: number) => new GeoPoint(abc.lat, abc.lon).offset(bearing, UnitType.NMILE.convertTo(nm, UnitType.GA_RADIAN));
+        const at = (bearing: number, nm: number) => pointFrom({lat: abc.lat, lon: abc.lon}, bearing, nm);
         const arcbg = intersection('ARCBG', at(270, 10).lat, at(270, 10).lon);
         const arcen = intersection('ARCEN', at(180, 10).lat, at(180, 10).lon);
         const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {

@@ -16,7 +16,7 @@ export interface SuperNav5Text {
 const text = (row: Cell[] | undefined): string => (row ?? []).map(c => c.ch).join('');
 
 /**
- * Super NAV 5 (NAV 5 on both sides, 3-31) is a map with text positioned over it by CSS, not a 23x7 text grid, so Screen
+ * Super NAV 5 (NAV 5 on both sides, 3-36) is a map with text positioned over it by CSS, not a 23x7 text grid, so Screen
  * cannot read it (Screen.read throws and points here). This reads the text parts from the DOM, built by
  * SuperNav5Page, SuperNav5Left, SuperNav5Right and SuperNav5DirectToSelector. The map itself is not read. Where the
  * parts sit on screen is CSS (KLN90B.scss, .super-nav5-*), so they are separate fields here.

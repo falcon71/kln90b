@@ -50,7 +50,7 @@ describe('bootUnitExpectingError (harness)', () => {
 
         expect(failed.takeRejections()).toEqual([noEfb]);
         expect(failed.rejections).toEqual([]);
-        expect(failed.consoleErrors.length).toBeGreaterThan(0); // The error page logs what it shows
+        expect(failed.consoleErrors[0][0]).toBe(failed.errors[0]); // The unit logs the error it fails with, and so does the error page
     });
 
     it('throws when the unit comes up instead', async () => {
