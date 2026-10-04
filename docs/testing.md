@@ -142,16 +142,17 @@ pages accept.
   them, because the builders in `builders.ts` stay procedure-free.
 - `runwayFix(apt, '27')` is the runway waypoint a procedure can fly to. Add it to the navdata like any facility.
 - **Every fix must be in the navdata**, because `SidStar` loads each one with `getFacility`, and so must an arc's navaid.
-  `bootUnit` checks this on the facilities it is given and throws, naming the missing idents
+  `bootUnit` checks this on the facilities it is given and throws, naming each missing fix as `IDENT (type region)`
   (`MemoryFacilityClient.missingProcedureFixes()` is the same check for a unit test).
 - Load a procedure the way a pilot does: `selectPage('R', 'APT 8')`, `cursor('R')`, `ent()` on the approach (a single
   transition is taken without a question), `ent()` on LOAD IN FPL. APT 7 is the same with the SID or STAR. The unit
-  then shows FPL 0 on the left. `test/render/harness/procedures.test.ts` does all three.
+  then shows FPL 0 on the left. The APT pages open on the first airport of the scan list, so with more than one airport
+  select the ident first. `test/render/harness/procedures.test.ts` does all three.
 - A DME arc is converted to an entry waypoint `Dnnnx` and the arc's end fix. The entry is the point of the arc closest to
   the GPS position at load time (the beginning of the arc when that point is outside it), so the position the unit boots
   at decides the entry. The arc's radials are true bearings: keep `magvar` at 0 or account for it. The arc must not be the
   first leg that survives the conversion, which replaces the leg before the arc with the entry.
-- `Leg.TF(fix, FixTypeFlags.IAF)` and its siblings set the fix types. The unit keeps a leg flagged IAF, FAF, MAP or MAHP
+- `Leg.TF(fix, FixTypeFlags.IAF)` and its siblings set the fix types. `SidStar` keeps a leg flagged IAF, FAF, MAP or MAHP
   even when its fix repeats, and drops an unflagged repeat.
 
 # 4. Writing tests

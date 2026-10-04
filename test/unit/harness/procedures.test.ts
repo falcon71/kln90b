@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {LegTurnDirection, RnavTypeFlags} from '@microsoft/msfs-sdk';
+import {FixTypeFlags, LegTurnDirection, RnavTypeFlags} from '@microsoft/msfs-sdk';
 import {SidStar} from '../../../kln90b/data/navdata/SidStar';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, runwayFix, sid, star, withProcedures} from '../../harness/navdata/procedures';
@@ -7,8 +7,6 @@ import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
 
 const fix = intersection('FIXAA', 47.1, 8.1);
 const RNAV = ApproachType.APPROACH_TYPE_RNAV;
-/** The V2 ICAO string is fixed-width; collapse the padding */
-const compact = (icaos: string[]) => icaos.map(s => s.replace(/\s+/g, ' ').trim());
 
 describe('procedure builders (harness)', () => {
     it('returns a new, unfrozen leg on every call', () => {
@@ -26,6 +24,27 @@ describe('procedure builders (harness)', () => {
         expect(Leg.TF(fix, 1)).toMatchObject({fixIcaoStruct: fix.icaoStruct, fixTypeFlags: 1, flyOver: false});
         expect(Leg.CA(270).fixIcaoStruct.ident).toBe('');
         expect(Leg.CA(270).course).toBe(270);
+    });
+
+    // Each option with a value other than its default, so that a builder that drops an option fails
+    it('passes the options of a leg into it', () => {
+        expect(Leg.TF(fix, 0, true).flyOver).toBe(true);
+        expect(Leg.CF(fix, 123, FixTypeFlags.FAF)).toMatchObject({course: 123, fixTypeFlags: FixTypeFlags.FAF, fixIcaoStruct: fix.icaoStruct});
+        expect(Leg.HM(fix, 90, LegTurnDirection.Left, FixTypeFlags.MAHP)).toMatchObject({course: 90, turnDirection: LegTurnDirection.Left, fixTypeFlags: FixTypeFlags.MAHP});
+        expect(Leg.HM(fix, 90).turnDirection).toBe(LegTurnDirection.Right);
+        // A fix may be given as an ICAO value as well as a facility
+        expect(Leg.TF(fix.icaoStruct).fixIcaoStruct).toEqual(fix.icaoStruct);
+        expect(Leg.IF(fix.icaoStruct, FixTypeFlags.IAF)).toMatchObject({fixIcaoStruct: fix.icaoStruct, fixTypeFlags: FixTypeFlags.IAF});
+    });
+
+    it('passes the names, the suffix and the transitions of a procedure into it', () => {
+        const a = approach({
+            type: RNAV, runway: '27', name: 'RNAV Z 27', suffix: 'Z', transitions: [{name: 'IAFAA', legs: [Leg.IF(fix)]}], final: [Leg.TF(fix)],
+        });
+        expect([a.name, a.approachSuffix, a.transitions.map(t => t.name)]).toEqual(['RNAV Z 27', 'Z', ['IAFAA']]);
+
+        const p = star('STAR1', {transitions: [{name: 'TRANS', legs: [Leg.TF(fix)]}, {name: 'OTHER', legs: [Leg.TF(fix)]}]});
+        expect([p.name, p.enRouteTransitions.map(t => t.name)]).toEqual(['STAR1', ['TRANS', 'OTHER']]);
     });
 
     describe('approach', () => {
@@ -125,7 +144,7 @@ describe('procedure builders (harness)', () => {
                 departures: [sid('AAA1', {common: [Leg.TF(fix)]})],
             })]);
 
-            expect(compact(navdata.missingProcedureFixes())).toEqual(['WK1 FIXAA']);
+            expect(navdata.missingProcedureFixes()).toEqual(['FIXAA (W K1)']);
 
             navdata.add(fix);
 
@@ -143,7 +162,7 @@ describe('procedure builders (harness)', () => {
                 })],
             })]);
 
-            expect(compact(navdata.missingProcedureFixes()).sort()).toEqual(idents.map(i => `WK1 ${i}`));
+            expect(navdata.missingProcedureFixes().sort()).toEqual(idents.map(i => `${i} (W K1)`));
         });
 
         it('names the navaid of an arc, and ignores legs without a fix', () => {
@@ -154,7 +173,7 @@ describe('procedure builders (harness)', () => {
                 approaches: [approach({type: RNAV, runway: '27', final: [Leg.CA(270), arc]})],
             }), end]);
 
-            expect(compact(navdata.missingProcedureFixes())).toEqual(['VK1 ARC']);
+            expect(navdata.missingProcedureFixes()).toEqual(['ARC (V K1)']);
         });
     });
 });

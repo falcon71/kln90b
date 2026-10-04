@@ -13,6 +13,9 @@ const SEARCH_TYPES: Partial<Record<FacilitySearchType, FacilityType[]>> = {
 
 const treeKey = (fac: Facility, out: Float64Array) => GeoPoint.sphericalToCartesian(fac, out);
 
+/** "MAHAA (W K1)": the ident, then the facility type letter and the region if there is one */
+const describeIcao = (icao: IcaoValue) => `${icao.ident.trim()} (${[icao.type, icao.region.trim()].filter(s => s !== '').join(' ')})`;
+
 /**
  * Nearest search with the same added/removed bookkeeping as KLNNearestRepoFacilitySearchSession. Filters are accepted
  * and ignored: every facility of the type is a candidate.
@@ -108,11 +111,11 @@ export class MemoryFacilityClient {
         return Array.from(this.byUid.values());
     }
 
-    /** Idents of procedure fixes and arc navaids that are not in the navdata. SidStar loads each with getFacility. */
+    /** The procedure fixes and arc navaids that are not in the navdata, as "IDENT (type region)", e.g. "MAHAA (W K1)". SidStar loads each with getFacility. */
     public missingProcedureFixes(): string[] {
         const missing = new Set<string>();
         const check = (icao: IcaoValue) => {
-            if (icao.ident.trim() !== '' && !this.byUid.has(ICAO.getUid(icao))) missing.add(ICAO.tryValueToStringV2(icao));
+            if (icao.ident.trim() !== '' && !this.byUid.has(ICAO.getUid(icao))) missing.add(describeIcao(icao));
         };
         for (const fac of this.all()) {
             if (ICAO.getFacilityTypeFromValue(fac.icaoStruct) !== FacilityType.Airport) continue;

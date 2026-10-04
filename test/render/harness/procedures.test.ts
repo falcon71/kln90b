@@ -45,7 +45,7 @@ describe('procedures through APT 8 (harness)', () => {
         await unit.panel.cursor('R');
         await unit.panel.ent(); // the only transition is taken without a question: the preview
 
-        // The preview lists the first three legs and the last one; the cursor is on LOAD IN FPL (3-49)
+        // The preview lists the first three legs and the last one; the cursor is on LOAD IN FPL (6-4)
         expect(rows('R')).toEqual(['R27-KPRC', ' 1 IAFAAà', ' 2 IFAAA', ' 3 FAFAAá', ' 5 MAHAAâ', 'LOAD IN FPL']);
         await unit.panel.outer('R', -1);
         expect(rows('R')).toEqual(['R27-KPRC', ' 2 IFAAA', ' 3 FAFAAá', ' 4 MAPAAã', ' 5 MAHAAâ', 'LOAD IN FPL']);
@@ -64,6 +64,21 @@ describe('procedures through APT 8 (harness)', () => {
         expect(left).toContain('  3 FAFAAá');
         expect(left.some(r => r.endsWith('4 MAPAAã'))).toBe(true);
         expect(left.some(r => r.endsWith('5 MAHAAâ'))).toBe(true);
+    });
+
+    // The unit above sits at the MAP, so FPL 0 has scrolled to the later legs; here it sits at the IAF
+    it('shows the IAF suffix on FPL 0', async () => {
+        const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {approaches: [rnav27()]});
+        const unit = await bootWith(kprc, [iafaa, ifaaa, fafaa, mapaa, mahaa], {lat: iafaa.lat, lon: iafaa.lon});
+        await settle(unit);
+
+        await unit.panel.selectPage('R', 'APT 8');
+        await unit.panel.cursor('R');
+        await unit.panel.ent();
+        await unit.panel.ent();
+
+        expect(Screen.read().leftName()).toBe('FPL 0');
+        expect(rows('L').some(r => r.endsWith(' 1 IAFAAà'))).toBe(true);
     });
 
     it('converts a DME arc to an entry waypoint followed by the arc end fix', async () => {
@@ -164,7 +179,7 @@ describe('the missing-fix check of bootUnit (harness)', () => {
     it('rejects a boot whose procedure fix is not in the navdata, naming the fix', async () => {
         const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {approaches: [rnav27()]});
 
-        await expect(bootUnit({facilities: [kprc, iafaa, ifaaa, fafaa, mapaa]})).rejects.toThrow(/procedure fixes missing from the navdata: .*MAHAA/);
+        await expect(bootUnit({facilities: [kprc, iafaa, ifaaa, fafaa, mapaa]})).rejects.toThrow('bootUnit: procedure fixes missing from the navdata: MAHAA (W K1)');
     });
 
     it('rejects a boot whose arc navaid is not in the navdata', async () => {
@@ -175,12 +190,17 @@ describe('the missing-fix check of bootUnit (harness)', () => {
             })],
         });
 
-        await expect(bootUnit({facilities: [kprc, fafaa, mapaa]})).rejects.toThrow(/procedure fixes missing from the navdata: .*ABC/);
+        await expect(bootUnit({facilities: [kprc, fafaa, mapaa]})).rejects.toThrow('bootUnit: procedure fixes missing from the navdata: ABC (V K1)');
     });
 
     it('lets a boot with every fix present through', async () => {
         const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {approaches: [rnav27()]});
 
-        await expect(bootUnit({facilities: [kprc, iafaa, ifaaa, fafaa, mapaa, mahaa]})).resolves.toBeDefined();
+        const unit = await bootUnit({facilities: [kprc, iafaa, ifaaa, fafaa, mapaa, mahaa]});
+        await settle(unit);
+
+        expect(unit.navdata.missingProcedureFixes()).toEqual([]);
+        await unit.panel.selectPage('R', 'APT 8');
+        expect(rows('R').slice(0, 2)).toEqual([' KPRC IAP', ' 1 RNAV 27']);
     });
 });
