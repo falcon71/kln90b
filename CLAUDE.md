@@ -124,8 +124,8 @@ change what they mean; add new ones instead:
   `controls/StatusLine.tsx`. MSG-page entries use `messageHandler.addMessage(new OneTimeMessage([...]))`, or a
   condition-driven message in `data/PersistentMessages.ts`.
 - Exceptions in ticks or input are caught and shown on the on-screen `ErrorPage`. Async ticks are not caught.
-- Commit messages are `Fixes #NN <description>` or `references #NN <description>` for GitHub issues, and plain
-  sentences otherwise. A commit that fixes an issue always says `Fixes #NN`, because GitHub then closes the issue
+- Commit messages are `fixes #NN <description>` or `references #NN <description>` for GitHub issues, and plain
+  sentences otherwise. A commit that fixes an issue always says `fixes #NN`, because GitHub then closes the issue
   when the maintainer pushes. **Never close an issue manually**, neither through the API nor with a comment.
 
 ## Bugs go to GitHub issues
