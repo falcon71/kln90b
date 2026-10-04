@@ -60,7 +60,8 @@ describe('user waypoint V2 format', () => {
         expect(apt.altitude).toBe(1400);
         expect(UnitType.METER.convertTo(apt.runways[0].length, UnitType.FOOT)).toBeCloseTo(3200, 3);
         expect(apt.runways[0].surface).toBe(RunwaySurfaceType.Asphalt);
-        // Restoring re-persists through the repository sync, so the slot must hold the identical string again
+        // Restoring re-persists through the repository sync, so the slot must hold the identical string again. That is the
+        // bug of #103, not a feature: once it is fixed, this assertion holds nothing (restoreFrom sets the slot itself)
         expect(storedSlot(0)).toBe('AXX        KAAA    +4700.00-00830.00+01400+03200H');
     });
 
@@ -91,7 +92,8 @@ describe('user waypoint V2 format', () => {
         const ndb = repo.get(ICAO.value('N', 'XX', '', 'XY')) as NdbFacility;
         expect(ICAO.getFacilityTypeFromValue(ndb.icaoStruct)).toBe(FacilityType.NDB);
         expect(ndb.freqMHz).toBeCloseTo(345, 6);
-        // Restoring re-persists through the repository sync, so the slot must hold the identical string again
+        // Restoring re-persists through the repository sync, so the slot must hold the identical string again. That is the
+        // bug of #103, not a feature: once it is fixed, this assertion holds nothing (restoreFrom sets the slot itself)
         expect(storedSlot(0)).toBe('NXX        XY      +4800.00+00900.00+0345.0');
     });
 

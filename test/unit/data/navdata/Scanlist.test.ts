@@ -64,7 +64,8 @@ describe('FacilityLoaderScanlist scanning (6a6c634)', () => {
 
     // The fill job reads lastIcao again when it starts its second half, so a scan from another waypoint while the
     // first fill still runs makes it start behind that waypoint: KAAB is never searched and the scan KAAA to KAAB is lost.
-    it.fails('keeps every waypoint when a scan starts during the first fill (#NEW-3-6)', async () => {
+    // In the sim this needs a scan from an ident-only ICAO (a typed ident, WaypointPage.tsx:156).
+    it.fails('keeps every waypoint when a scan starts during the first fill (#108)', async () => {
         const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, airports() as unknown as FacilityClient, new EventBus());
         await list.init();
         await list.getNext(ICAO.value('A', '', '', 'KAAB'), 1);
@@ -148,7 +149,7 @@ describe('FacilityLoaderScanlist with duplicate idents (d3228dd)', () => {
     // ident and then by full ICAO. With the K2 VOR returned first, the start of the list is behind the K1 VOR that
     // the sorted list starts with. The test database returns equal idents in insertion order; what the sim returns
     // for equal idents is not known.
-    it.fails('starts at the first of two VORs with the same ident in list order (#NEW-3-2)', async () => {
+    it.fails('starts at the first of two VORs with the same ident in list order (#105)', async () => {
         const client = new MemoryFacilityClient([vor('ABC', 40, -100, {region: 'K2'}), vor('ABC', 47, 8, {region: 'K1'})]);
         const list = new FacilityLoaderScanlist(FacilitySearchType.Vor, client as unknown as FacilityClient, new EventBus());
         const first = await list.init();

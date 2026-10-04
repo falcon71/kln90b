@@ -68,4 +68,9 @@ describe('user waypoint V1 format', () => {
         expect(UnitType.METER.convertTo(apt.runways[0].length, UnitType.FOOT)).toBeCloseTo(3200, 3);
         expect(apt.runways[0].surface).toBe(RunwaySurfaceType.Asphalt);
     });
+
+    // The error names the character of the V2 offset (48), which is empty in a V1 slot
+    it.fails('names the unknown runway surface character in its error (#116)', () => {
+        expect(() => restoreV1('AXX    UAPT +4700.00-00830.00+01400+03200X')).toThrow('runwaySurface:X');
+    });
 });

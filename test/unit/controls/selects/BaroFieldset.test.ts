@@ -35,7 +35,7 @@ describe('barometer fieldset', () => {
     });
 
     // BaroFieldset.tsx, HpaBaroFieldset.saveBaro10 calls the callback twice
-    it.fails('reports one change when the tens digit changes, in millibars (#NEW-5-5)', () => {
+    it.fails('reports one change when the tens digit changes, in millibars (#113)', () => {
         const changes: number[] = [];
         const fieldset = BaroFieldsetFactory.createBaroFieldSet(29.92, settingsWithUnit(BARO_UNIT_HPA), baro => changes.push(baro));
 

@@ -79,7 +79,7 @@ describe('ACT page', () => {
     });
 
     // 4-10: the type letter is on the right of the first row
-    it.fails('shows the type letter of an NDB inside the half page (#NEW-6-2)', async () => {
+    it.fails('shows the type letter of an NDB inside the half page (#115)', async () => {
         const kaaa = airport('KAAA', 47.0, 7.9);
         const abc = ndb('ABC', 47.0, 8.3);
         const unit = await bootUnit({facilities: [kaaa, abc], position: {lat: 47.0, lon: 8.0}});

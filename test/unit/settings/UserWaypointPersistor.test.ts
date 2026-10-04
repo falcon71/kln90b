@@ -12,7 +12,7 @@ describe('user waypoint persistor', () => {
     // 1781156 ("Do not write user waypoints while importing them") was undone by 933479d: the persistor still sets
     // ignoreSync, but the delegation to the loaders moved it out of the persistor's reach, so every restored waypoint
     // rewrites all slots in the saved data. A crash during a restore would lose waypoints.
-    it.fails('does not write storage while restoring (1781156) (#NEW-2-1)', () => {
+    it.fails('does not write storage while restoring (1781156) (#103)', () => {
         const data = simEnv().storage.data;
         data.set(K + 'userDataFormat', '2');
         data.set(K + 'wpt0', JSON.stringify('VXX        ABC     +4730.00+00854.00+114.30+02'));

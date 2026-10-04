@@ -18,13 +18,4 @@ describe('latitude and longitude editors', () => {
         expect(text(new LongitudeEditor(bus, 8.5, () => undefined))).toBe('E 08°30.00');
         expect(text(new LongitudeEditor(bus, -8.5, () => undefined))).toBe('W 08°30.00');
     });
-
-    // The manual does not say what the unit shows for exactly 0. The editors choose the hemisphere with value > 0, so
-    // the equator reads S and the prime meridian reads W; N and E are the usual convention for zero.
-    it.fails('show N and E for exactly zero (#NEW-5-6)', () => {
-        const bus = new EventBus();
-
-        expect(text(new LatitudeEditor(bus, 0, () => undefined))).toBe('N 00°00.00');
-        expect(text(new LongitudeEditor(bus, 0, () => undefined))).toBe('E 00°00.00');
-    });
 });

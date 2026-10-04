@@ -57,7 +57,7 @@ describe('Power_On and Power_Off H events (characterization of the public contra
 
     // BrightnessManager.powerUp() keeps ramping after the unit was switched off, and raises the opacity of the dark unit
     // to 1 again. The page is blank (NullPage), so the effect is small, but the instrument is no longer dark.
-    it.fails('Power_Off during the fade-in keeps the instrument dark (#NEW-6-1)', async () => {
+    it.fails('Power_Off during the fade-in keeps the instrument dark (#114)', async () => {
         const unit = await bootUnit();
 
         unit.send('KLN90B_Power_Off');

@@ -19,7 +19,7 @@ describe('INT page', () => {
             position: {lat: 47.0, lon: 8.0},
         });
         // The right page of a fresh unit is SUP, and INT is one step back. selectPage only turns the knob forward and would
-        // pass the NDB page, which Screen cannot read (#NEW-6-2)
+        // pass the NDB page, which Screen cannot read (#115)
         await unit.panel.outer('R', -1);
         await vi.advanceTimersByTimeAsync(9000); // the REF calculation takes 8 s (REF_CALCULATION_TIME)
         await unit.panel.cursor('R');

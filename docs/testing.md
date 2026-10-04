@@ -39,6 +39,10 @@ npm run coverage                           # all tests with V8 coverage of kln90
 - The instrument logs a great deal. By default `vitest.config.mts` drops all console output except stderr; set
   `KLN_TEST_LOG=1` when you need to see it. The default reporter also hides the output of passing tests.
 - `npx tsc --noEmit` and `npm run build` are separate checks. `vitest.config.mts` is excluded from `tsc`.
+- `npx tsc --noEmit` needs the gitignored `types/` directory (`types/msfstypes`, the base MSFS types that declare
+  globals such as `registerInstrument`). Nothing in the repository produces it: it is a hand-kept copy that only the
+  maintainer's checkout has. A fresh clone or a git worktree fails with `Cannot find name 'registerInstrument'` until
+  `types/` is copied in from that checkout.
 - Coverage is a diagnostic: it shows code no test has run. It is not a target, because a snapshot of every page in its
   default state raises it without proving anything about the real unit. `coverage/` is gitignored.
 - A failed flight test writes its recording to `test/flight/__output__/` (gitignored); see section 4.
@@ -300,6 +304,29 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   root `tsconfig.json` has no `include`; it does not keep Node APIs out of the code in `kln90b/`, so `tsc` will not catch
   an accidental Node call there.
 - **Display limits:** `Screen` cannot read Super NAV 5 and skips `<canvas>` content (section 4).
+- **Errors thrown on the ENT path never reach `unit.errors`.** `MainPage` starts `handleEnter` without awaiting it, so a
+  throw becomes an unhandled rejection instead of an `error` event (the exception handling of ticks and sync input
+  does not see it). A test that only asserts `unit.errors` is empty passes with a broken ENT; assert a visible effect
+  of the ENT as well (the page, the status line, the stored value).
+- **`FrontPanel.enterIdent` cannot type into the ident selectors** of the APT, VOR, NDB, INT and SUP pages (the waypoint
+  selectors). Send the characters yourself: `unit.send('KLN90B_Internal_Key:RIGHT:<char>')` with a short
+  `vi.advanceTimersByTimeAsync` per key (`LEFT` for the left side), with the cursor on and the field entered.
+- **While a cursor is on, the status line shows `CRSR`** and `leftName()` and `rightName()` are shifted by one cell
+  (`APT 1` reads `PT 1`; with the right cursor on, `rightName()` is `CRSR`). Read `row(6)` or turn the cursor off before
+  reading a page name.
+- **A bus subscription added after boot is called at once with the last cached value.** A test that subscribes to a
+  topic and expects to see only new events must skip that first call (or count from a reference taken after
+  subscribing).
+- **`Screen.read()` throws on a half page wider than 11 cells**, and the DOM of some right pages is wider: the ACT page
+  with an active index (the NDB row, #115) and the APT 1 and VOR rows, which carry the four trailing blanks of the
+  nearest selector. `FrontPanel.selectPage('R', …)` only turns the outer knob forward, so it throws when it has to
+  pass such a page (from the boot page SUP, any page after NDB, and INT or VOR going the long way round). Navigate with
+  fixed counts (`outer('R', -1)` from SUP reaches INT) or read the half page's DOM with `readRows`.
+- **SET 2 cannot be read with the default timezone** until #110 is fixed (the name of UTC is 12 characters). Boot with
+  `storage: {timezone: 1}`.
+- **A booted engine-running unit has a GPS fix at once**, in the slow acquisition mode too (the force-ready start calls
+  `acquireAndUseSatellites()` in `WelcomePage`). A test that needs an invalid GPS, for example to enter the date on SET 2
+  (read-only with a fix), calls `unit.props.sensors.in.gps.reset()` after the boot.
 - **There is no CI.** Run `npm test` and `npx tsc --noEmit` before committing.
 
 Measured speed (a dated record): on 2026-10-03 the proof flight (`firstFlight.test.ts`) ran about 1466 simulated
@@ -315,8 +342,14 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
   `FrontPanel.power()` helper and a boot with `engineRunning: false`.
 - Procedure builders for the navdata, so approach and SID/STAR tests can run, and nearest-search filters in
   `MemoryFacilityClient`.
-- A `FrontPanel.enterIdent` that blanks the positions past a short ident.
-- Flip the pins when the bugs are fixed: remove `.fails` from the #97, #98 and #100 tests.
+- A `FrontPanel.enterIdent` that blanks the positions past a short ident and that handles the waypoint selectors
+  (APT, VOR, NDB, INT, SUP), so that tests do not hand-roll `KLN90B_Internal_Key` events.
+- A collector for unhandled rejections on `unit.errors`, so that a throw on the ENT path fails the test that caused it.
+- A `Screen.read()` that tolerates trailing blanks beyond column 11 (and reads the status line while a cursor is on
+  without the shift), and a `selectPage` that can turn the outer knob in either direction, so that no test has to
+  navigate with fixed counts.
+- A `bootUnit` option for a cold GPS (an engine-running boot without a fix), replacing the `gps.reset()` call.
+- Flip the pins when the bugs are fixed: remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each of which names its issue.
 - #99 (lat/lon displays show 60.00 minutes just below a whole degree) is filed but has no pin yet; a render test would
   hold it.
 - Further flights: OBS mode, direct-to, approach arming (ARM to APR scale ramp), waypoint alert without turn

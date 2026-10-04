@@ -42,7 +42,7 @@ describe('keyboard input for editors (characterization, sim-only feature, #25)',
 
     // Half-fixed #25: the hundreds digit of the longitude has the charset [" ", "1"], and a key is matched against the
     // whole entry, so "0" is rejected. A longitude below 100 degrees cannot be typed, and the cursor does not advance.
-    it.fails('types a longitude below 100 degrees, with a 0 for the hundreds digit (#NEW-5-1)', async () => {
+    it.fails('types a longitude below 100 degrees, with a 0 for the hundreds digit (#109)', async () => {
         const unit = await bootUnit();
         await openUserPos(unit);
         for (const key of ['N', '4', '7', '3', '0', '0', '0']) {

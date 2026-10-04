@@ -183,7 +183,7 @@ describe('SidStar.getArcEntryName (#28 063a836)', () => {
 
     // 6-6: DME arcs beyond 26 NM have waypoints named with the first two letters of the DME ident and the three-digit
     // radial. The code uses the along-radial form of the same page instead (ident plus distance).
-    it.fails('names an arc entry beyond 26 NM with two letters of the DME ident and the radial (#NEW-3-5)', () => {
+    it.fails('names an arc entry beyond 26 NM with two letters of the DME ident and the radial (#107)', () => {
         expect(getArcEntryName('ABC', 45, 27)).toBe('AB045');
         expect(getArcEntryName('ABC', 45, 30)).toBe('AB045');
     });
@@ -283,8 +283,8 @@ describe('SidStar.recalculateArcEntryData (9ce23bf, f4f5395, 1ef2a35)', () => {
     });
 
     // The distance is read from the radius of the circle, and a right-hand circle is reversed (radius pi minus the
-    // arc radius, 10809.9 NM). The name then reads like a 100+ NM waypoint.
-    it.fails('names a right-hand arc entry D030J (#NEW-3-1)', () => {
+    // arc radius, 10809.3 NM). The name then reads like a 100+ NM waypoint.
+    it.fails('names a right-hand arc entry D030J (#104)', () => {
         const arc = arcLeg(LegTurnDirection.Right, 10, 170);
         const data = SidStar.recalculateArcEntryData(arc, sensorsAt(SOUTH_EAST.lat, SOUTH_EAST.lon, 0))!;
         const entry = data.entryFacility as unknown as { icaoStruct: { ident: string }, reference1Distance: number };

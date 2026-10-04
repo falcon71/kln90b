@@ -32,7 +32,7 @@ describe('waypoint confirmation page', () => {
         });
 
         // The plain VOR page of XYZ: SUP, INT, NDB, VOR in the right page tree, so VOR is three steps back (selectPage
-        // would pass the NDB page, which Screen cannot read, #NEW-6-2)
+        // would pass the NDB page, which Screen cannot read, #115)
         await unit.panel.outer('R', -3);
         await unit.panel.cursor('R');
         await typeRight(unit, 'XYZ');

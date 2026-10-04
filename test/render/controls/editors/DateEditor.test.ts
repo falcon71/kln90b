@@ -46,7 +46,7 @@ describe('date editor on SET 2', () => {
     });
 
     // The month is OCT in English; the field offers OKT (EditorField.tsx, MonthEditorField)
-    it.fails('names the tenth month OCT (#NEW-5-4)', async () => {
+    it.fails('names the tenth month OCT (#112)', async () => {
         const unit = await bootOnSet2();
         await unit.panel.cursor('L');
         await unit.panel.inner('L', 1); // day 01

@@ -51,11 +51,11 @@ describe('BoundaryUtils across the date line (characterization, #9 103ea59)', ()
     // Both bugs come from the same shift: a path from 10W to 10E has its western end shifted to 350E, so it appears to
     // span the whole box, and getIntersections does no shifting at all.
     describe('known bugs', () => {
-        it.fails('finds no intersection for a short path around 0 degrees longitude (#NEW-3-3)', () => {
+        it.fails('finds no intersection for a short path around 0 degrees longitude (#106)', () => {
             expect(BoundaryUtils.intersects(dateLineBox, 15, -10, 15, 10)).toBe(false);
         });
 
-        it.fails('returns both crossing points of a path across the date line (#NEW-3-3)', () => {
+        it.fails('returns both crossing points of a path across the date line (#106)', () => {
             const points = BoundaryUtils.getIntersections(dateLineBox, 15, 178, 15, -178);
             expect(points.map(p => p.lat)).toEqual([15, 15]);
             expect(points.map(p => ((p.lon + 540) % 360) - 180).sort((a, b) => a - b)).toEqual([-179, 179]);
