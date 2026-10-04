@@ -14,8 +14,7 @@ describe('waypoint editor', () => {
         await unit.panel.ent();
 
         // Awaiting the confirmation: the waypoint page of KAAA is on the right
-        // (the status line is shifted by one cell while the cursor is on, so rightName() cannot be used)
-        expect(Screen.read().row(6).trimEnd().endsWith('|APT 1')).toBe(true);
+        expect(Screen.read().status().right).toBe('APT 1');
         expect(Screen.read().row(1).slice(0, 9)).toBe('  1:KAAA ');
         // The ident cells are inverted, and flash (inverted blink) on one display tick in four
         const masks: string[] = [];

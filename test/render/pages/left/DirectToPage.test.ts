@@ -30,8 +30,9 @@ describe('Direct To page', () => {
         expect(aw.isDctNavigation()).toBe(true);
         expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('ABC');
         const screen = Screen.read();
-        // While the FPL 0 cursor is on, the status line shows CRSR and the page names shift by one cell
-        expect(screen.row(6).slice(-6)).toBe('NAV 1 ');
+        // While the FPL 0 cursor is on, the status line shows CRSR on the left and the right page name stays
+        expect(screen.status().left).toBe('CRSR');
+        expect(screen.status().right).toBe('NAV 1');
         // The arrow marks the direct-to target; the first ABC (row 2) is no longer it
         expect(screen.half('L').split('\n').slice(1, 5).map(r => r.slice(0, 8))).toEqual([
             '  1:KAAA', '  2:ABC ', '  3:KBBB', '› 4:ABC ',
@@ -70,7 +71,7 @@ describe('Direct To page', () => {
         expect(unit.errors).toEqual([]);
         const screen = Screen.read();
         // The cursor is on, so the status line shows CRSR instead of the page name
-        expect(screen.row(6).slice(0, 4)).toBe('CRSR');
+        expect(screen.status().left).toBe('CRSR');
         expect(screen.half('L').split('\n')).toEqual([
             'DIRECT TO: ', '           ', '           ', '           ', '           ', '           ',
         ]);
@@ -99,7 +100,7 @@ describe('Direct To page', () => {
         expect(unit.errors).toEqual([]);
         const again = Screen.read();
         // The cursor is on again: CRSR in the status line, the ident field highlighted
-        expect(again.row(6).slice(0, 4)).toBe('CRSR');
+        expect(again.status().left).toBe('CRSR');
         expect(again.cell(2, 3).attr).toBe('I');
         expect(again.row(2).slice(0, 11)).toBe('   KAAA    ');
     });
