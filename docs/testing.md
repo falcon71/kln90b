@@ -366,8 +366,8 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       `D/T 1`, `REF`, `INT`); a page with sub-pages shows `APT+3` and still matches `APT 3`. The cursor on that side must
       be off. A test of the harness walks the real page trees and checks `PAGE_GROUPS` and `PAGE_CYCLES` against them.
       `selectPage` cannot end on Super NAV 5, and the shorter way can pass `NAV 5` on either side. Super NAV 5 (both
-      sides on `NAV 5`) hides the status line that `selectPage` reads. So select the side whose way passes `NAV 5` first,
-      and reach Super NAV 5 itself by selecting the page before it and turning the last click with `inner`, as
+      sides on `NAV 5`) hides the status line that `selectPage` reads. So select the side whose way passes `NAV 5`
+      first, and reach Super NAV 5 itself by selecting the page before it and turning the last click with `inner`, as
       `test/render/harness/superNav5.test.ts` does.
     - `enterIdent(side, ident)` types with the knobs and does not press ENT. In an editor (FPL, DIR) a short ident is
       followed by a blank, so `KAA` stays `KAA` and does not autocomplete to `KAAA`. In a waypoint selector (the APT,
@@ -480,11 +480,11 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   clipping or a font problem in the sim. Skia's text pixels also differ from the sim's, so canvas snapshots hold the
   instrument's own drawing, not a pixel-exact copy of what the sim shows.
 - **The navdata is synthetic, and some of its rules are inferred.** The facilities, airspaces and procedures are
-  invented (section 3). The fake follows three rules that nobody observed in the sim: the nearest airspace search
-  selects by bounding box (from a comment in `NearestUtils.getAirspaces`), the instrument ignores circular airspaces
-  (`BoundaryUtils`, which is why `circularAirspace()` exists), and the nearest filters let an airport without runways
-  pass the surface and length filters (the sim developers' rule, quoted to the maintainer from their code). A test that
-  passes against the fake proves the instrument's use of those rules, not that the sim applies them.
+  invented (section 3). The fake follows two rules that nobody observed in the sim: the nearest airspace search
+  selects by bounding box (from a comment in `NearestUtils.getAirspaces`), and the nearest filters let an airport
+  without runways pass the surface and length filters (the sim developers' rule, quoted to the maintainer from their
+  code). A test that passes against the fake proves the instrument's use of those rules, not that the sim applies them.
+  The instrument itself ignores circular airspaces (`BoundaryUtils`); `circularAirspace()` exists to hold that gap.
 - **There is no wind.** Ground speed and track equal airspeed and heading, so crosswind effects are not modeled.
 - **`jump` skips integrated values**, and monitors and the recorder sample once per simulated second.
 - **The 16 Hz loops** run every 62 ms in tests: the fake timers round the 62.5 ms interval down to whole milliseconds.

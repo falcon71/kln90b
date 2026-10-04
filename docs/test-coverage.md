@@ -317,9 +317,9 @@ first), each at the cheapest stage and proven to bite.
    the triage table with the test file's path.
 3. One issue per flight, three or four flight rows per batch, and a row stays a flight only when it needs motion
    (session 3, rule 9).
-4. A row whose bug is not fixed, or only half fixed, gets an `it.fails` pin and a GitHub issue that references the closed
-   one. #102 (the airspace filter, with `133f4d8`) and #90 (the page tree pruning) are open and are pinned here. The
-   arc rows continue #18, #100 and #104, so look at those pins when an arc is flown.
+4. A row whose bug is not fixed, or only half fixed, gets an `it.fails` pin and a GitHub issue that references the
+   closed one. #102 (the airspace filter, with `133f4d8`) and #90 (the page tree pruning) are open and are pinned here.
+   The arc rows continue #18, #100 and #104, so look at those pins when an arc is flown.
 5. Build on the harness as `testing.md` documents it: the procedure builders, the nearest filters, the airspaces, the
    EFB fake, `bootUnitExpectingError`, `SuperNav5.read()` and the power helpers. A harness gap that a test finds goes to
    `testing.md` section 7, unless several tests need it (rule 13).
@@ -452,8 +452,8 @@ Pilot's Guide specifies the content.
 **Goal:** the same for `kln90b/pages/right/`, then the shared controls.
 
 1. Pages as in session 8: APT 1 to 8 (APT 3 has list, map and user variants), VOR, NDB, INT, SUP, REF, ACT, D/T 1 to 4
-   (FPL and other variants), CTR, waypoint confirmation and the generic waypoint page. Pages that show procedures use the
-   builders of Session H.
+   (FPL and other variants), CTR, waypoint confirmation and the generic waypoint page. Pages that show procedures use
+   the builders of Session H.
 2. Controls (`kln90b/controls/`, `displays/`, `editors/`, `selects/`): a render test per editor and select type driving
    it with the knobs through the front panel, asserting the committed value. `List` and `FlightplanList` scrolling
    (#40), `WaypointDeleteListItem`, `StatusLine` messages, `Blink` and `Inverted` masks, `MessagePage`, `ErrorPage`
@@ -533,8 +533,8 @@ later run adds a new entry.
   module-level `LEFT_PAGE_TREE` (#90).
 - **Task 4, screen and panel** (candidates 4, 5, 8 and 13): `Screen.read` tolerates blanks past column 11 (#115 still
   throws on a visible character), reads the status line with the CRSR cell and a newline inside a `<pre>`, and
-  `status()`, `rows`, `maskRows`; `SuperNav5.read()`; `selectPage` in both directions with a drift guard against the real
-  page trees; `enterIdent` for editors and waypoint selectors; `focused`, `cursorTo`; `powerOn`, `powerOff`,
+  `status()`, `rows`, `maskRows`; `SuperNav5.read()`; `selectPage` in both directions with a drift guard against the
+  real page trees; `enterIdent` for editors and waypoint selectors; `focused`, `cursorTo`; `powerOn`, `powerOff`,
   `powerCycle`, `approveSelfTest` (with `allowObsWarning`), `obsMode`. The MSG-page newline split was added to the task
   by the controller. Two rounds fixed citations (3-3 Turn-On, 3-36 Super NAV 5, 3-32 Super NAV 1) and labeled the
   `-.-NM-` expectation a characterization.
@@ -544,11 +544,11 @@ later run adds a new entry.
 - **Integration fix:** after the merges, the procedures test waits one calculation tick before it reads FPL 0, because
   FPL 0 scrolls to the active leg at the first display tick after a calculation tick.
 - **Tasks 6, 7 and 8, the refactor:** the older tests moved onto the harness, by folder: render left pages, controls and
-  root tests (task 6), render right pages, data and services (task 7), flight and unit (task 8). Local readers, fixed-count
-  navigation, hand-built V2 strings, hand-rolled power-on and console spies became `rows`, `status`, `selectPage`,
-  `savedUserWaypoints`, `powerOn`, `unit.consoleErrors` and the geometry helpers. The assertions keep their meaning, the
-  totals before and after each task were identical, and nothing under `kln90b/` changed. Task 6 also fixed the harness
-  opacity probe (an unset opacity read as NaN, not 0).
+  root tests (task 6), render right pages, data and services (task 7), flight and unit (task 8). Local readers,
+  fixed-count navigation, hand-built V2 strings, hand-rolled power-on and console spies became `rows`, `status`,
+  `selectPage`, `savedUserWaypoints`, `powerOn`, `unit.consoleErrors` and the geometry helpers. The assertions keep
+  their meaning, the totals before and after each task were identical, and nothing under `kln90b/` changed. Task 6 also
+  fixed the harness opacity probe (an unset opacity read as NaN, not 0).
 - **Task 8b (added by the controller before the close-out):** the refactor found three FrontPanel gaps. `selectPage`
   takes the shorter way round the inner knob with wrap (`PAGE_CYCLES`), `enterIdent` forces the search when the
   selector already shows the ident, and `cursorTo` steps over cursor positions that focus nothing. The tests that had
@@ -582,9 +582,9 @@ later run adds a new entry.
 - **A runway-less airport passes the extended nearest filter.** The sim developers quoted this to the maintainer from
   their code ("If there are no runways, the minimum runway size and surface types filters should not apply"), and the
   fake follows it. Only the class mask drops a heliport.
-- **Inferred, not observed:** the nearest airspace search by bounding box (from a comment in `NearestUtils`), and the
-  calculation-before-display tick order under the fake timers (a property of the fake clock). Both are named in
-  `testing.md`.
+- **Inferred, not observed:** the nearest airspace search by bounding box (from a comment in `NearestUtils`). The
+  calculation-before-display tick order under the fake timers was measured, and is a property of the fake clock, not
+  of the sim. Both are named in `testing.md`.
 - **Review fix rounds:** task 4 needed two; tasks 1, 2, 3, 5, 6 and 8b one each; tasks 7 and 8 none.
 
 **Bugs found and filed**
@@ -616,15 +616,24 @@ below).
   by the maintainer's decision (candidates 9, 10 and 11).
 - The rows Session 3b takes (#23, the #41 missed approach, the DME-arc half of #19, #90 and the unblocked triage rows).
 - The #90 pin and a power-cycle test: the helpers exist, the test does not.
+- No test runs the VNAV arm and active path any more (`Vnav.ts` lines 34-49, 68-85 and 107-184: NAV 4 with an active
+  waypoint), nor the NAV 5 map of a flight plan in flight, nor the APT 3 runway map. Session 6 item 4 owns `Vnav`, and
+  sessions 8 and 9 own the pages; each needs a test that asserts on the page instead of passing through it.
 
 **Observed but not filed**
 - `KLNNearestAirportFacilitySearchSession.setAirportFilter` forwards the class mask to the sim session only, so
-  repository airports (user waypoints) are not filtered by class. Not verified against the real unit, and possibly
-  intended.
+  repository airports (user waypoints) are not filtered by class. This is intended in effect: user airports have
+  class 0, so the mask would drop every one of them, and the repository session gets the runway filter of
+  `setExtendedAirportFilters` (surface category and minimum length), which does the job of the class mask there.
 - Coverage of `Canvas.tsx` (69 % to 38 % of statements) and `Vnav.ts` (49 % to 33 %) fell although nothing in
-  `kln90b/` changed. The cause was not investigated; the likely reason is that older tests passed through the NAV 5 and
-  VNAV code on their way with fixed counts and the shorter `selectPage` route no longer does. `Vnav.ts` belongs to session 6, and
-  `Canvas.tsx` to sessions 8 and 9.
+  `kln90b/` changed. The cause, found by measuring coverage at each merge and per test file, is that the inner-knob
+  route of `FrontPanel.selectPage` got shorter twice. Task 4 (`62b412b`) made it step toward the page number instead of
+  forward only: `firstFlight.test.ts` (`selectPage('L', 'NAV 1')`) no longer walks NAV 3, NAV 4 and NAV 5 during the
+  flight (Canvas 67.6 to 2.4 %, Vnav 44.7 to 17.6 % for that file). Task 8b (`118f553`) made it take the shorter way
+  with wrap: `Nav5Page.test.ts` no longer passes through NAV 4 on its way to NAV 5, and `procedures.test.ts` no longer
+  passes through APT 3 on its way to APT 8 (Canvas 51 to 2.4 %). Restoring the old direction behind a temporary switch
+  brought the numbers back. No assertion read those pages, so no test claim was weakened: it was incidental reach, and
+  the flight monitors and the strict rejection check no longer see those pages rendered either.
 
 **Workflow notes.** Phase 1 ran in parallel worktrees despite the files the tasks share (rule 21), and the controller
 merged tasks as they were approved instead of in the planned order 5, 4, 1, 2, 3. The merge of task 4 broke one
@@ -657,7 +666,8 @@ the end** (all tests green):
 
 Read the rise with care. Part of it is the harness tests that walk every page of both trees and boot procedures,
 airspaces and failing starts: they run code without asserting on a page's content, which is the diagnostic use of
-coverage and not evidence of protection (section 1). `kln90b/controls` fell because of `Canvas.tsx` (above).
+coverage and not evidence of protection (section 1). `kln90b/controls` fell because of `Canvas.tsx`, whose incidental
+reach through NAV 5 and APT 3 ended when `selectPage` took shorter routes (see "Observed but not filed").
 
 The suite at the start: 265 tests passed and 24 expected failures, in 87 files. At the end: 440 tests passed and 29
 expected failures, in 110 files. Five expected failures are new: the SUA ceiling pin (#127), the three `KlnEfbSaver`
@@ -1048,7 +1058,7 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 | x | `8c3b2e0` | The FPL leg did not blink while a waypoint awaited confirmation. | render | testable | FPL 0, enter an ident: `Screen.mask()` alternates F and I over the ident cells across blink phases. | `test/render/controls/editors/WaypointEditor.test.ts` |
 | x | `10c5a3d` | The static characters of an editor (space, degree sign, dot) were not inverted when selected. | render | testable | Cursor on a lat/lon or date editor: the mask shows I on those cells. | `test/render/controls/editors/DateEditor.test.ts` |
 | x | `b7fd10a`, `44fb0a4` | Super NAV 1 and Super NAV 5 threw without an active waypoint. | render | testable | No active waypoint, both sides NAV 1 (then NAV 5): no error. Super NAV 5 is checked by the error list only. | `test/render/pages/left/SuperNav.test.ts` |
-| | #15 `34a9cb0` | Lat/lon waypoints of a sim route are imported as temporary SUP waypoints (now in `KlnEfbLoader`). | unit | testable | `bootUnit({efb: true})` gives `unit.efb`; `unit.efb.sync(efbRoute({enroute: [{lat, lon}]}))` emits a synced route, and the lat/lon fix must appear as a temporary SUP waypoint (region `XY`) in FPL 0. Extension: the EFB fake (`FakeRouteManager`, `efbRoute`). Session 6 uses it for `KlnEfbLoader` too. | |
+| | #15 `34a9cb0` | Lat/lon waypoints of a sim route are imported as temporary SUP waypoints (now in `KlnEfbLoader`). | render | testable | `bootUnit({efb: true})` gives `unit.efb`; `unit.efb.sync(efbRoute({enroute: [{lat, lon}]}))` emits a synced route, and the lat/lon fix must appear as a temporary SUP waypoint (region `XY`) in FPL 0. Extension: the EFB fake (`FakeRouteManager`, `efbRoute`). Session 6 uses it for `KlnEfbLoader` too. | |
 | | #17 `e290ea4` | NAV 5 threw when drawing a DME arc. | render | testable | A DME-arc leg (`Leg.AF`) in a procedure loaded through APT 8 or APT 7 puts the arc in FPL 0; draw NAV 5: no error. Extension: procedure builders (`navdata/procedures.ts`). | |
 | | #18 `15d9b35` | DME arcs were drawn and flown the wrong way round. | flight | testable | Left and right arcs (`Leg.AF`) loaded through APT 8: the flown and the drawn direction agree with the side of the arc. The fix carries the author's own doubt (the comment at `circle.reverse()` in `SidStar.ts`); related to #100 and #104. Extension: procedure builders. | |
 | | #20 (no commit) | Wrong turn between two DME arcs whose end and entry coincide. | flight | testable | Closed as not reproducible after #21 (`1e1a8f5`). Two arcs whose end and entry coincide (`Leg.AF` twice). Extension: procedure builders. | |
@@ -1057,9 +1067,9 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 | | `633fdad` | Switching to APR-LEG uses a 110° course tolerance, not 70°. | flight | testable | FAF and MAP legs come from `Leg.TF(fix, FixTypeFlags.FAF)` and `FixTypeFlags.MAP`; load the approach through APT 8, then switch to APR-LEG. Extension: procedure builders (`savedFlightplan` still does not store fix types). | |
 | | `7fd640e` (part), `1ef2a35` (part) | Arcs ending at the IF lost their arc data; left-hand entry ranges during conversion; the Super NAV 5 arc-move state after ENT; degenerate dashed arc segments. | unit + render | testable | Private conversion paths, reached through `approach()` with `Leg.AF` and `Leg.IF` loaded through APT 8: an arc ending at the IF keeps its arc data, the left-hand entry ranges, the Super NAV 5 arc-move state (`SuperNav5.read()`) and the dashed arc segments (`canvasToAscii`). Extension: procedure builders and the Super NAV 5 reader. | |
 | | `80631c8` | APT 7 and APT 8 were not redrawn after a waypoint confirmation page. | render | testable | APT 7 and APT 8 with a loaded procedure: the page is redrawn after a waypoint confirmation page. Extension: procedure builders (`withProcedures`). | |
-| | #57 `531b0f9` | Heliports and airports without runways are filtered from the nearest list and Super NAV 5. | unit | testable | `airport({runways: []})` is a heliport; hard-surface, short-runway and runway-less airports in the world: the nearest list and Super NAV 5 hide what the filters hide, and a nearer hidden facility takes no slot. A runway-less airport passes the extended filter (the sim developers' rule, `testing.md` section 3). Extension: nearest-search filters in `MemoryFacilityClient`. | |
-| | `133f4d8` | Airspaces were selected by bounding box; now by polygon. | unit | testable | Airspaces were selected by bounding box; now by polygon. The fix over-filters the route searches: #102 gets its pin here. `airspace()` and `BootOptions.airspaces` build the world; the fake selects by bounding box (inferred, `testing.md` section 3), so a test asserts what `NearestUtils` does with that result. Extension: airspaces. | |
-| | #50 `b4a4ff2` | Errors during startup are published instead of leaving the unit in the self-test. | unit | testable | `bootUnitExpectingError({platform: {createFacilityClient}})` with a throwing client awaits the `error` event: the error is published and the error page shows it. Extension: the boot-failure helper. | |
+| | #57 `531b0f9` | Heliports and airports without runways are filtered from the nearest list and Super NAV 5. | render | testable | `airport(ident, lat, lon, {runways: []})` is a heliport; hard-surface, short-runway and runway-less airports in the world: the nearest list and Super NAV 5 hide what the filters hide, and a nearer hidden facility takes no slot. A runway-less airport passes the extended filter (the sim developers' rule, `testing.md` section 3). Extension: nearest-search filters in `MemoryFacilityClient`. | |
+| | `133f4d8` | Airspaces were selected by bounding box; now by polygon. | render | testable | The fix over-filters the route searches: #102 gets its pin here. `airspace()` and `BootOptions.airspaces` build the world; the fake selects by bounding box (inferred, `testing.md` section 3), so a test asserts what `NearestUtils` does with that result. Extension: airspaces. | |
+| | #50 `b4a4ff2` | Errors during startup are published instead of leaving the unit in the self-test. | render | testable | `bootUnitExpectingError({platform: {createFacilityClient}})` with a throwing client awaits the `error` event: the error is published and the error page shows it. Extension: the boot-failure helper. | |
 | | `eef92e8` | Super NAV 5 showed `--.-NM-` instead of `-.-NM-` without XTK. | render | testable | Super NAV 5 without XTK: `SuperNav5.read()` shows `-.-NM-`, not `--.-NM-`. Extension: the Super NAV 5 reader. | |
 | | `43d472b` (part) | The track is not recomputed while the sim is paused (identical positions). | render | testable | A render test sets ground speed above 2 kt, teleports once and holds; no harness needed. The track is not recomputed while the position stays identical. The paused aircraft of Session H was dropped. | |
 | | #7 `30f2216` | Import of `.fpl` files via SET 10. | — | superseded | `86a6d44` replaced it with the EFB route sync (`KlnEfbLoader`); see #15. | |
