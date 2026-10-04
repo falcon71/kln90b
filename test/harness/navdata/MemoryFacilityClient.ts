@@ -1,4 +1,7 @@
-import {Facility, FacilitySearchType, FacilityType, GeoKdTree, GeoPoint, ICAO, IcaoValue, NearestSearchResults, UnitType} from '@microsoft/msfs-sdk';
+import {
+    AirportFacility, Facility, FacilitySearchType, FacilityType, GeoKdTree, GeoPoint, ICAO, IcaoValue, LegType, NearestSearchResults,
+    UnitType,
+} from '@microsoft/msfs-sdk';
 
 const SEARCH_TYPES: Partial<Record<FacilitySearchType, FacilityType[]>> = {
     [FacilitySearchType.Airport]: [FacilityType.Airport],
@@ -103,6 +106,28 @@ export class MemoryFacilityClient {
 
     public all(): Facility[] {
         return Array.from(this.byUid.values());
+    }
+
+    /** Idents of procedure fixes and arc navaids that are not in the navdata. SidStar loads each with getFacility. */
+    public missingProcedureFixes(): string[] {
+        const missing = new Set<string>();
+        const check = (icao: IcaoValue) => {
+            if (icao.ident.trim() !== '' && !this.byUid.has(ICAO.getUid(icao))) missing.add(ICAO.tryValueToStringV2(icao));
+        };
+        for (const fac of this.all()) {
+            if (ICAO.getFacilityTypeFromValue(fac.icaoStruct) !== FacilityType.Airport) continue;
+            const apt = fac as AirportFacility;
+            const procs = [...apt.departures, ...apt.arrivals];
+            const legs = [
+                ...procs.flatMap(p => [...p.commonLegs, ...p.enRouteTransitions.flatMap(t => t.legs), ...p.runwayTransitions.flatMap(t => t.legs)]),
+                ...apt.approaches.flatMap(a => [...a.finalLegs, ...a.missedLegs, ...a.transitions.flatMap(t => t.legs)]),
+            ];
+            for (const leg of legs) {
+                check(leg.fixIcaoStruct);
+                if (leg.type === LegType.AF) check(leg.originIcaoStruct);
+            }
+        }
+        return [...missing];
     }
 
     public awaitInitialization(): Promise<void> {

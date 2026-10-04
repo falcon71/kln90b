@@ -149,6 +149,10 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
 
     document.body.innerHTML = '<div id="InstrumentsContainer"></div>';
     const navdata = new MemoryFacilityClient(opts.facilities ?? []);
+    const missing = navdata.missingProcedureFixes();
+    if (missing.length > 0) {
+        throw new Error(`bootUnit: procedure fixes missing from the navdata: ${missing.join(', ')}`);
+    }
     const core: KLN90BCore = new KLN90BCore(new FakePlatform(navdata), args => core.onInteractionEvent(args));
     const errors: Error[] = [];
     core.bus.getSubscriber<ErrorEvent>().on('error').handle(e => errors.push(e));
