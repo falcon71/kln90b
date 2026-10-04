@@ -5,11 +5,12 @@ import {Screen} from '../../../harness/render/screen';
 describe('self-test page', () => {
     it('outputs a course of 315° and an RMI bearing of 130° during the self-test (955b535)', async () => {
         const unit = await bootUnit({engineRunning: false, magvar: 0});
-        unit.send('KLN90B_Power_On');
+        await unit.panel.powerOn();
+        // A fixed wait: the self-test page follows the 17 s welcome page and stays until it is approved
         await vi.advanceTimersByTimeAsync(19_000);
 
         // 3-4: the self-test shows OBS out 315° and RMI 130°
-        const left = Screen.read().half('L').split('\n');
+        const left = Screen.read().rows('L');
         expect(left).toContain('   OUT 315°');
         expect(left).toContain('RMI    130°');
 

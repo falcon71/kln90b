@@ -23,6 +23,6 @@ describe('NAV 5 page', () => {
 
         expect(unit.props.memory.navPage.activeWaypoint.getFutureLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['ABC', 'ABC', 'KBBB']);
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().leftName()).toBe('NAV 5');
+        expect(Screen.read().status().left).toBe('NAV 5');
     });
 });

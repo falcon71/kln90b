@@ -17,7 +17,7 @@ describe('OTH 5 page', () => {
         await unit.panel.selectPage('L', 'OTH 5');
         await vi.advanceTimersByTimeAsync(1500);
 
-        const rows = Screen.read().half('L').split('\n');
+        const rows = Screen.read().rows('L');
         // 300 lb of avgas at 6 lb per US gallon
         expect(rows[1]).toBe('FOB      50');
         expect(rows[0].endsWith('GAL')).toBe(true);

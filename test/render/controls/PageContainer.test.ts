@@ -14,13 +14,13 @@ describe('keyboard mode (characterization, #75)', () => {
         input.focus(); // Coherent focuses the input through FOCUS_INPUT_FIELD; happy-dom needs it here
         await vi.advanceTimersByTimeAsync(250);
         expect(unit.props.pageManager.isRightKeyboardActive()).toBe(true);
-        expect(Screen.read().rightName()).toBe('KYBD ');
+        expect(Screen.read().status().right).toBe('KYBD');
 
         input.dispatchEvent(new KeyboardEvent('keypress', {keyCode: 27}));
         await vi.advanceTimersByTimeAsync(250);
 
         expect(unit.errors).toEqual([]);
         expect(unit.props.pageManager.isRightKeyboardActive()).toBe(false);
-        expect(Screen.read().rightName()).toBe('CRSR ');
+        expect(Screen.read().status().right).toBe('CRSR');
     });
 });

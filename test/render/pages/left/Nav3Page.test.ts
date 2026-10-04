@@ -19,8 +19,7 @@ describe('NAV 3 page', () => {
         });
         // The FPL activates at the first calculation tick with a GPS fix
         await settle(unit);
-        expect(Screen.read().leftName()).toBe('NAV 2');
-        await unit.panel.inner('L', 1); // NAV 3
+        await unit.panel.selectPage('L', 'NAV 3');
         await vi.advanceTimersByTimeAsync(2000);
 
         // KAAA is the FROM waypoint and ABC the active one, followed by the duplicate and KBBB
@@ -29,7 +28,7 @@ describe('NAV 3 page', () => {
         expect(activeWaypoint.getFutureLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['ABC', 'ABC', 'KBBB']);
 
         expect(unit.errors).toEqual([]);
-        const rows = Screen.read().half('L').split('\n');
+        const rows = Screen.read().rows('L');
         expect(rows[0]).toBe('KAAA ›ABC  ');
         expect(rows[5]).toBe('ESA 16800ft');
     });
