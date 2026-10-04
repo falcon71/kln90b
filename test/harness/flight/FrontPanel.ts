@@ -227,8 +227,9 @@ export class FrontPanel {
      * Selects a page by its status-line name, e.g. 'FPL 0' or 'NAV 1'. The cursor on that side must be off. The outer
      * knob turns the shorter way around the groups of PAGE_GROUPS, and the inner knob the shorter way around the pages
      * of the group (PAGE_CYCLES; SET 0 is the last SET page, so it is one click backward from SET 1); a group without
-     * page numbers is stepped forward. The shorter way can pass through a page that changes the screen: NAV 5 on the
-     * right while the left shows NAV 5 is Super NAV 5, which has no status line, so select the right side first.
+     * page numbers is stepped forward. The shorter way can pass through a page that changes the screen: NAV 5 on
+     * either side while the other side shows NAV 5 is Super NAV 5, which has no status line, so select the side whose
+     * way passes NAV 5 first.
      */
     public async selectPage(side: Side, name: string): Promise<void> {
         name = name.replace(/^(.{3}) (\d\d)$/, '$1$2'); // The status line shows two-digit pages as "FPL10", not "FPL 10"

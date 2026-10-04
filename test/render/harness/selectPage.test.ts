@@ -82,6 +82,18 @@ describe('FrontPanel.selectPage (harness)', () => {
         expect(Screen.read().status().left).toBe('SET10');
     });
 
+    // MOD has two pages, so the way is one click either direction: a tie, which goes forward
+    it('turns the inner knob forward on a tie: MOD 2 is one click forward from MOD 1', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'MOD 1');
+        const inner = vi.spyOn(unit.panel, 'inner');
+
+        await unit.panel.selectPage('L', 'MOD 2');
+
+        expect(inner.mock.calls).toEqual([['L', 1]]);
+        expect(Screen.read().status().left).toBe('MOD 2');
+    });
+
     it('wraps the inner knob in a group with a first page 0 too: FPL 25 is one click back from FPL 0', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'FPL 0');

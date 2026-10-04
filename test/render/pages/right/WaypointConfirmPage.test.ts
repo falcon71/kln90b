@@ -4,7 +4,6 @@ import {insertLeg} from '../../../harness/flightplan';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 
-
 describe('waypoint confirmation page', () => {
     // 3-14: the confirmation page shows the waypoint as the waypoint page does (the ACT page is the one with a position
     // in the flight plan in front of the ident)

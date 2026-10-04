@@ -367,17 +367,19 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       `SET` page, so it is one click backward from `SET 1`). Page names are those of the status line (`FPL10`, `SET 0`,
       `D/T 1`, `REF`, `INT`); a page with sub-pages shows `APT+3` and still matches `APT 3`. The cursor on that side must
       be off. A test of the harness walks the real page trees and checks `PAGE_GROUPS` and `PAGE_CYCLES` against them.
-      The shorter way can pass `NAV 5` on the right while the left shows `NAV 5`, which is Super NAV 5 and hides the
-      status line, so select the right side first.
+      The shorter way can pass `NAV 5` on either side while the other side shows `NAV 5`, which is Super NAV 5 and
+      hides the status line, so select the side whose way passes `NAV 5` first.
     - `enterIdent(side, ident)` types with the knobs and does not press ENT. In an editor (FPL, DIR) a short ident is
       followed by a blank, so `KAA` stays `KAA` and does not autocomplete to `KAAA`. In a waypoint selector (the APT,
       VOR, NDB, INT and SUP pages: the focused run is one cell) it steps through the characters, and throws if the ident
       is longer than the selector. Each knob click on a character starts a search, so when the last character already
       shows the wanted letter (a fresh VOR page showing `ABC SOUTH`, entering `ABC`) it turns that character one click
-      away and one back, as a pilot would, and the search runs for exactly the typed ident. `type(side, text)` types the same with the keyboard instead.
+      away and one back, as a pilot would, and the search runs for exactly the typed ident. `type(side, text)` types the same with the keyboard
+      instead.
     - `focused(side)` returns the one focused field `{row, col, text}`; `cursorTo(side, 'USER POS?')` turns the outer
       knob until that field has the cursor, stepping over the cursor positions that focus nothing (the SUP and INT pages
-      have one after the ident characters) and throwing with the screen after `maxClicks`. `appendToFpl0(idents)` enters and confirms idents on FPL 0.
+      have one after the ident characters) and throwing with the screen after `maxClicks`.
+      `appendToFpl0(idents)` enters and confirms idents on FPL 0.
     - Power: `powerOff()`, `powerOn()`, `powerCycle({offSeconds})` and `approveSelfTest()`. After boot every power-on runs
       the welcome page (17 s) and the self-test, also on an engine-running unit; `approveSelfTest` presses ENT on
       `APPROVE?` and on `ACKNOWLEDGE?`, and throws with the screen at the VFR only page or the OBS warning. A unit

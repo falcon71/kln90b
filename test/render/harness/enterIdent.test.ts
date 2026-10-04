@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {bootUnit} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
@@ -136,8 +136,26 @@ describe('FrontPanel.enterIdent (harness)', () => {
             await unit.panel.selectPage('R', 'SUP  ');
             await unit.panel.cursor('R');
 
-            // Four ident characters, the position without a field, and the clicks are used up before USER POS?
+            const outer = vi.spyOn(unit.panel, 'outer');
+
+            // The six clicks cross the position without a field, and then the cap is reached
             await expect(unit.panel.cursorTo('R', 'NO SUCH FIELD', 6)).rejects.toThrow(/no field "NO SUCH FIELD" within 6 clicks/);
+            expect(outer).toHaveBeenCalledTimes(6);
+        });
+
+        it('throws with the screen when a side shows more than one focused field', async () => {
+            const unit = await bootUnit();
+            await unit.panel.selectPage('R', 'SUP  ');
+            await unit.panel.cursor('R');
+            const real = Screen.read();
+            // Two inverted runs on the right side: the cells at row 0, column 13 and row 2, column 14
+            const stub = Object.create(real) as Screen;
+            stub.cell = (r: number, c: number) => (r === 0 && c === 13) || (r === 2 && c === 14) ? {...real.cell(r, c), attr: 'I'} : real.cell(r, c);
+            vi.spyOn(unit.panel as any, 'screen').mockReturnValue(stub);
+            const outer = vi.spyOn(unit.panel, 'outer');
+
+            await expect(unit.panel.cursorTo('R', 'USER POS?')).rejects.toThrow(/expected one focused field on side R, found 2/);
+            expect(outer).not.toHaveBeenCalled();
         });
 
         it('throws with the screen when the field is not within the clicks', async () => {
@@ -145,8 +163,10 @@ describe('FrontPanel.enterIdent (harness)', () => {
             await unit.panel.selectPage('R', 'APT 1');
             await unit.panel.cursor('R');
             await unit.panel.enterIdent('R', 'KZZZ');
+            const outer = vi.spyOn(unit.panel, 'outer');
 
             await expect(unit.panel.cursorTo('R', 'NO SUCH FIELD', 3)).rejects.toThrow(/no field "NO SUCH FIELD" within 3 clicks/);
+            expect(outer).toHaveBeenCalledTimes(3);
         });
     });
 });
