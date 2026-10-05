@@ -62,3 +62,19 @@ describe('Power_On and Power_Off H events (public contract) (#51)', () => {
         expect(unit.display.opacity()).toBe(0);
     });
 });
+
+// Public contract: the doc comment of LVAR_POWER in LVars.ts says the LVar is the position of the power switch and that the
+// unit itself is still off when electricity is not available. The screen is asserted, not the opacity (#114 lets the
+// opacity ramp on an unpowered unit).
+describe('L:KLN90B_Power reports the switch, not the powered state (public contract)', () => {
+    it('is 1 while the unit has no electricity and shows nothing', async () => {
+        const unit = await bootUnit({
+            panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ElectricitySimVar>CIRCUIT ON:1</ElectricitySimVar></Input></Instrument></PlaneHTMLConfig>',
+        });
+        // CIRCUIT ON:1 stays unset (reads 0), so the first SimVarSync tick takes the electricity away
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().row(0)).toBe(' '.repeat(23));
+        expect(unit.env.sim.lastWrite('L:KLN90B_Power')?.value).toBe(1);
+    });
+});
