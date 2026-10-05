@@ -1,13 +1,15 @@
 import {describe, expect, it} from 'vitest';
 import {
-    FlightPlan, GeoCircle, GeoPoint, LegTurnDirection, LegType, RnavTypeFlags,
+    AirportFacility, ApproachProcedure, Facility, FixTypeFlags, FlightPlan, GeoCircle, GeoPoint, LegTurnDirection, LegType,
+    RnavTypeFlags,
 } from '@microsoft/msfs-sdk';
 import {SidStar} from '../../../../kln90b/data/navdata/SidStar';
-import {KLNFlightplanLeg} from '../../../../kln90b/data/flightplan/Flightplan';
+import {KLNFixType, KLNFlightplanLeg, KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {Sensors} from '../../../../kln90b/Sensors';
-import {intersection, vor} from '../../../harness/navdata/builders';
-import {approach, Leg, sid} from '../../../harness/navdata/procedures';
-import {EARTH_RADIUS_NM} from '../../../harness/flight/geo';
+import {airport, intersection, vor} from '../../../harness/navdata/builders';
+import {approach, Leg, sid, star} from '../../../harness/navdata/procedures';
+import {MemoryFacilityClient} from '../../../harness/navdata/MemoryFacilityClient';
+import {EARTH_RADIUS_NM, pointFrom} from '../../../harness/flight/geo';
 
 const fix = intersection('FIXAA', 47, 8);
 
@@ -271,5 +273,217 @@ describe('SidStar.recalculateArcEntryData (9ce23bf, f4f5395, 1ef2a35)', () => {
         const entry = data.entryFacility as unknown as { icaoStruct: { ident: string }, reference1Distance: number };
         expect(entry.icaoStruct.ident).toBe('D030J');
         expect(entry.reference1Distance).toBeCloseTo(10, 3);
+    });
+});
+
+// The conversion of procedures to KLN legs. SidStar reads only getFacility, repo.add and gps.coords here, so the unit
+// is built without a boot. The VOR ABC is at 47.3 N 8.3 E; every arc has a radius of 10 NM and runs through the
+// south-west quarter: a left (counterclockwise) arc from radial 270 to 180, a right (clockwise) one from 180 to 270.
+describe('SidStar conversion of procedures to KLN legs', () => {
+    const abc = vor('ABC', 47.3, 8.3);
+    const at = (radial: number, nm: number) => pointFrom({lat: abc.lat, lon: abc.lon}, radial, nm);
+    const fixAt = (ident: string, radial: number, nm: number) => {
+        const p = at(radial, nm);
+        return intersection(ident, p.lat, p.lon);
+    };
+    const kprc = airport('KPRC', 47.0, 8.0);
+    const fafaa = intersection('FAFAA', 47.1, 7.9);
+    const mapaa = intersection('MAPAA', 47.0, 8.0);
+    const LEFT = LegTurnDirection.Left;
+    const RIGHT = LegTurnDirection.Right;
+
+    const sidStar = (facs: Facility[], where: { lat: number; lon: number }) =>
+        new SidStar(new MemoryFacilityClient(facs) as any, {add() {}} as any,
+                    {in: {gps: {coords: new GeoPoint(where.lat, where.lon)}}} as any);
+    const convert = (facs: Facility[], where: { lat: number; lon: number }, apt: AirportFacility, app: ApproachProcedure) =>
+        sidStar(facs, where).getKLNApproachLegList(apt, app, app.transitions[0]);
+    const idents = (legs: KLNFlightplanLeg[]) => legs.map(l => l.wpt.icaoStruct.ident);
+    /** The radius in NM of the circle of a leg's arc; the circle's radius is a great-arc radian (geo.ts: EARTH_RADIUS_NM) */
+    const radiusNm = (leg: KLNFlightplanLeg) => leg.arcData!.circle.radius * EARTH_RADIUS_NM;
+
+    /** An approach whose transition is IF at the begin of the arc, the arc, FAF; the MAP is the final */
+    function arcApproach(turn: LegTurnDirection, from: number, to: number) {
+        const arcbg = fixAt('ARCBG', from, 10);
+        const arcen = fixAt('ARCEN', to, 10);
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [Leg.IF(arcbg, FixTypeFlags.IAF), Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: from, toRadial: to, turn}), Leg.TF(fafaa, FixTypeFlags.FAF)],
+            }],
+            final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        return {app, facs: [abc, arcbg, arcen, fafaa, mapaa, kprc]};
+    }
+
+    // 6-16, 6-17: the unit replaces the published start of an arc by an entry on the radial the aircraft is on now.
+    // 7fd640e: PHNY ends its transition on an arc and starts the final at the same fix.
+    describe('an arc whose end fix is also the IF of the final (7fd640e)', () => {
+        const arcbg = fixAt('ARCBG', 270, 10);
+        const ifaaa = fixAt('IFAAA', 180, 10);
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [Leg.IF(arcbg, FixTypeFlags.IAF), Leg.AF(ifaaa, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: LEFT})],
+            }],
+            final: [Leg.IF(ifaaa, FixTypeFlags.IF), Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+
+        it('keeps the arc and its end fix instead of the plain IF', async () => {
+            const legs = await convert([abc, arcbg, ifaaa, fafaa, mapaa, kprc], at(225, 20), kprc, app);
+            expect(idents(legs)).toEqual(['D225J', 'IFAAA', 'FAFAA', 'MAPAA']);
+            expect(legs.map(l => l.fixType)).toEqual([KLNFixType.IAF, undefined, KLNFixType.FAF, KLNFixType.MAP]);
+            const entry = legs[0];
+            expect(entry.arcData).toBeDefined();
+            expect(entry.arcData!.endFacility.icaoStruct.ident).toBe('IFAAA');
+            expect(entry.arcData!.vor.icaoStruct.ident).toBe('ABC');
+            expect(entry.arcData!.beginRadial).toBe(270);
+            expect(entry.arcData!.endRadial).toBe(180);
+            expect(radiusNm(entry)).toBeCloseTo(10, 2);
+            expect(legs[1].arcData).toBeUndefined();
+        });
+    });
+
+    // 6-16: the entry lies on the radial the aircraft is on, or at the beginning of the arc when that radial is outside
+    // the arc. 1ef2a35 reads the range of a left-hand arc from its end radial to its begin radial.
+    describe('the entry of an arc (1ef2a35)', () => {
+        it.each([
+            ['left arc 270 to 180, aircraft on radial 225', LEFT, 270, 180, 225, 'D225J'],
+            ['left arc 270 to 180, aircraft on radial 45, outside the arc: the beginning of the arc', LEFT, 270, 180, 45, 'D270J'],
+            ['right arc 180 to 270, aircraft on radial 45, outside the arc: the beginning of the arc', RIGHT, 180, 270, 45, 'D180J'],
+        ])('%s', async (_name, turn, from, to, aircraftRadial, entry) => {
+            const {app, facs} = arcApproach(turn, from, to);
+            const legs = await convert(facs, at(aircraftRadial, 20), kprc, app);
+            expect(idents(legs)).toEqual([entry, 'ARCEN', 'FAFAA', 'MAPAA']);
+        });
+    });
+
+    // 6-10: the example lists a fix that is both IAF and FAF twice. 6-11: switching to LEG makes the FAF the active
+    // waypoint when IAF and FAF are the same waypoint, which needs the second entry.
+    describe('a repeated fix is kept when it is flagged (a6acb5c)', () => {
+        const txo = vor('TXO', 47.2, 7.9);
+        const vorApproach = (transitionFlags: number, finalFlags: number) => approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'TXO', legs: [Leg.IF(txo, transitionFlags)]}],
+            final: [Leg.IF(txo, finalFlags), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const far = {lat: 47.5, lon: 7.5};
+
+        it('lists the co-located IAF and FAF twice', async () => {
+            const legs = await convert([txo, mapaa, kprc], far, kprc, vorApproach(FixTypeFlags.IAF, FixTypeFlags.FAF));
+            expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+                ['TXO', KLNFixType.IAF], ['TXO', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+            ]);
+        });
+
+        it('lists an unflagged repeat once (control)', async () => {
+            const legs = await convert([txo, mapaa, kprc], far, kprc, vorApproach(0, 0));
+            expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+                ['TXO', undefined], ['MAPAA', KLNFixType.MAP],
+            ]);
+        });
+    });
+
+    // 6-18: the unit has no step-down fixes on an arc, they are not in its database. Consecutive arcs around the same
+    // navaid become one arc that runs from the start of the first to the end of the last.
+    describe('consecutive arcs around the same navaid are one arc (a6acb5c)', () => {
+        const arcbg = fixAt('ARCBG', 270, 10);
+        const step = fixAt('STEPD', 225, 10);
+        const arcen = fixAt('ARCEN', 180, 10);
+
+        it('merges the arcs, drops the step-down fix and enters on the aircraft radial', async () => {
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{
+                    name: 'ARCBG',
+                    legs: [
+                        Leg.IF(arcbg, FixTypeFlags.IAF),
+                        Leg.AF(step, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT}),
+                        Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                        Leg.TF(fafaa, FixTypeFlags.FAF),
+                    ],
+                }],
+                final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+            });
+            const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, app);
+            expect(idents(legs)).toEqual(['D260J', 'ARCEN', 'FAFAA', 'MAPAA']);
+            const arc = legs[0].arcData!;
+            expect((arc.entryFacility as unknown as { reference1Radial: number }).reference1Radial).toBeCloseTo(260, 0);
+            expect(arc.beginRadial).toBe(270);
+            expect(arc.endRadial).toBe(180);
+            expect(arc.endFacility.icaoStruct.ident).toBe('ARCEN');
+            expect(radiusNm(legs[0])).toBeCloseTo(10, 2);
+        });
+    });
+
+    // 6-5, B-3: the unit tells the pilot that the enroute part of the flight plan already holds waypoints of the
+    // procedure (all tests of this block).
+    describe('SidStar.hasDuplicates', () => {
+        const wpt = vor('KPT', 47, 8);
+        const fplLeg = (w: Facility) => ({wpt: w, type: KLNLegType.USER}) as unknown as KLNFlightplanLeg;
+        const procLeg = (w: Facility) => ({wpt: w, type: KLNLegType.STAR}) as unknown as KLNFlightplanLeg;
+
+        it('finds a waypoint that is in both lists by the same ICAO object', () => {
+            expect(SidStar.hasDuplicates([fplLeg(wpt)], [procLeg({...wpt})])).toBe(true);
+        });
+
+        it('finds no duplicate between different waypoints', () => {
+            expect(SidStar.hasDuplicates([fplLeg(wpt)], [procLeg(vor('KPU', 47, 8))])).toBe(false);
+        });
+
+        // The code compares the ICAO objects by reference; a copy of the same waypoint is not found.
+        it.fails('finds a waypoint whose ICAO is an equal copy (#NEW-2-1)', () => {
+            const copy = {...wpt, icaoStruct: {...wpt.icaoStruct}};
+            expect(copy.icaoStruct).toEqual(wpt.icaoStruct);
+            expect(copy.icaoStruct).not.toBe(wpt.icaoStruct);
+            expect(SidStar.hasDuplicates([fplLeg(wpt)], [procLeg(copy)])).toBe(true);
+        });
+    });
+
+    // 6-16 to 6-18: a DME arc is flown at its published distance. Real STARs fly AF, CI (no fix), AF around one navaid
+    // with two radii. The conversion drops the fixless CI leg, takes the first arc for a step-down fix of the second
+    // and flies the whole arc at the radius of the second.
+    describe('AF, CI, AF around one navaid with two radii', () => {
+        const stfix = fixAt('STFIX', 270, 20);
+        const arc1end = fixAt('ARC1E', 225, 13);
+        const arc2end = fixAt('ARC2E', 180, 10);
+        const final = fixAt('FINAL', 150, 10);
+        const ci = () => FlightPlan.createLeg({type: LegType.CI, course: 135});
+        const arrival = () => star('ARR1', {
+            common: [
+                Leg.IF(stfix),
+                Leg.AF(arc1end, abc, {radiusNm: 13, fromRadial: 270, toRadial: 225, turn: LEFT}),
+                ci(),
+                Leg.AF(arc2end, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                Leg.TF(final),
+            ],
+        });
+        const facs = [abc, stfix, arc1end, arc2end, final, kprc];
+        const convertStar = () => sidStar(facs, at(270, 25)).getKLNProcedureLegList(kprc, arrival(), KLNLegType.STAR, null, null);
+
+        it('converts, ends at the second arc and the final, and flies the second arc at 10 NM', async () => {
+            const procedure = arrival();
+            const [first, second] = procedure.commonLegs.filter(l => l.type === LegType.AF);
+            expect(first.originIcaoStruct).toEqual(second.originIcaoStruct);
+            expect(first.rho).toBeCloseTo(13 * 1852, 3);
+            expect(second.rho).toBeCloseTo(10 * 1852, 3);
+            expect(procedure.commonLegs.find(l => l.type === LegType.CI)!.fixIcaoStruct.ident.trim()).toBe('');
+
+            const legs = await convertStar();
+            const idx = idents(legs);
+            expect(idx).toContain('ARC2E');
+            expect(idx[idx.length - 1]).toBe('FINAL');
+            const secondArc = legs.find(l => l.arcData?.endFacility.icaoStruct.ident === 'ARC2E');
+            expect(secondArc).toBeDefined();
+            expect(radiusNm(secondArc!)).toBeCloseTo(10, 1);
+        });
+
+        it.fails('flies the first arc at its own radius of 13 NM (#NEW-2-2)', async () => {
+            const legs = await convertStar();
+            const firstArc = legs.find(l => l.arcData?.endFacility.icaoStruct.ident === 'ARC1E');
+            expect(firstArc).toBeDefined();
+            expect(radiusNm(firstArc!)).toBeCloseTo(13, 1);
+        });
     });
 });
