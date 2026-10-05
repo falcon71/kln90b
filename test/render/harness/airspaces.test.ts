@@ -62,4 +62,33 @@ describe('airspaces served by the harness', () => {
         expect(rows[0]).toBe('P.POS-KBBB ');
         expect(rows.slice(2, 4)).toEqual(['R-ROUTE    ', ' REST      ']);
     });
+
+    // OTH 2 reads frequency.name of every Center (Oth2Page.redraw), so the helper has to give the name
+    it('shows the name and frequency of a Center on OTH 2', async () => {
+        const unit = await bootUnit({
+            position: {lat: 47.0, lon: 8.0}, altitudeFt: 0,
+            airspaces: [airspace('TEST CENTER', BoundaryType.Center, around(47.0, 8.0, 0.5), {frequencyMHz: 118.55})],
+        });
+        await settle(unit);
+
+        await unit.panel.selectPage('L', 'OTH 2');
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().half('L').split('\n').slice(0, 3)).toEqual(['TEST CENTER', 'CTR        ', '     118.55']);
+        expect(unit.errors).toEqual([]);
+    });
+
+    it('shows the frequency name of a Center when one is given', async () => {
+        const unit = await bootUnit({
+            position: {lat: 47.0, lon: 8.0}, altitudeFt: 0,
+            airspaces: [airspace('TEST CENTER', BoundaryType.Center, around(47.0, 8.0, 0.5), {frequencyMHz: 118.55, frequencyName: 'ZURICH'})],
+        });
+        await settle(unit);
+
+        await unit.panel.selectPage('L', 'OTH 2');
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().half('L').split('\n').slice(0, 3)).toEqual(['ZURICH     ', 'CTR        ', '     118.55']);
+        expect(unit.errors).toEqual([]);
+    });
 });

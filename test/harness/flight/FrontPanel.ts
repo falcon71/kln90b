@@ -352,6 +352,28 @@ export class FrontPanel {
         }
     }
 
+    /**
+     * Loads the first procedure of APT 7 or APT 8 into FPL 0 the way a pilot does (testing.md, Procedures): select the
+     * page, enter the airport when given (the APT pages open on the first airport of the scan list), cursor, ENT on the
+     * first entry (its only transition is taken without a question), ENT on LOAD IN FPL, cursor off. FPL 0 scrolls to the
+     * active leg only at the next calculation tick, so it waits one second.
+     */
+    public async loadProcedure(page: 'APT 7' | 'APT 8', o: { ident?: string } = {}): Promise<void> {
+        if (o.ident !== undefined) {
+            // The APT pages show one airport; it is chosen with the ident selector of APT 1 (3-42)
+            await this.selectPage('R', 'APT 1');
+            await this.cursor('R');
+            await this.enterIdent('R', o.ident);
+            await this.cursor('R');
+        }
+        await this.selectPage('R', page);
+        await this.cursor('R');
+        await this.ent();
+        await this.ent();
+        if (this.screen().status().right === 'CRSR') await this.cursor('R');
+        await vi.advanceTimersByTimeAsync(1000);
+    }
+
     /** Appends waypoints to FPL 0 with waypoint confirmation (two ENTs each), then turns the cursor off. */
     public async appendToFpl0(idents: string[]): Promise<void> {
         await this.selectPage('L', 'FPL 0');

@@ -13,6 +13,7 @@ import {FakePlatform, FakeRouteManager} from './platform';
 import {FrontPanel} from './flight/FrontPanel';
 import {Screen} from './render/screen';
 import {resetSingletons} from './singletons';
+import {pointFrom} from './flight/geo';
 
 export const MINIMAL_PANEL_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name></Instrument></PlaneHTMLConfig>';
 
@@ -330,4 +331,27 @@ export async function settle(unit: HeadlessUnit, capSeconds = 120): Promise<void
         await vi.advanceTimersByTimeAsync(1000);
     }
     await vi.advanceTimersByTimeAsync(2000);
+}
+
+/**
+ * Moves the aircraft of a render test so that the GPS computes a track (Gps.ts takes it from the last two positions
+ * when the ground speed is at least 2 kt, 3-35). Without trackTrue the track is that of the jump from the present
+ * position; with it, the aircraft first jumps to a point 0.05 NM behind the target on that track. Each jump is followed
+ * by exactly one calculation tick. Afterwards the position holds, which is a paused sim: the unit keeps the track.
+ * The order of the two ticks relative to the display tick does not matter, because only the calculation reads the
+ * position.
+ */
+export async function moveAircraft(unit: HeadlessUnit, to: { lat: number; lon: number },
+                                   o: { groundspeedKt: number; trackTrue?: number }): Promise<void> {
+    const sim = unit.env.sim;
+    sim.set('GROUND VELOCITY', 'knots', o.groundspeedKt);
+    if (o.trackTrue !== undefined) {
+        const from = pointFrom(to, (o.trackTrue + 180) % 360, 0.05);
+        sim.set('PLANE LATITUDE', 'degrees', from.lat);
+        sim.set('PLANE LONGITUDE', 'degrees', from.lon);
+        await vi.advanceTimersByTimeAsync(1000);
+    }
+    sim.set('PLANE LATITUDE', 'degrees', to.lat);
+    sim.set('PLANE LONGITUDE', 'degrees', to.lon);
+    await vi.advanceTimersByTimeAsync(1000);
 }
