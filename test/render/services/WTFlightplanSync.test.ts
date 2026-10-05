@@ -13,6 +13,8 @@ import {pointBefore, pointFrom} from '../../harness/flight/geo';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
+import {KLNLegType} from '../../../kln90b/data/flightplan/Flightplan';
+import {insertLegIntoFpl} from '../../../kln90b/services/FlightplanUtils';
 
 // Public contract: the SDK FlightPlanner with the id "kln90b" mirrors FPL 0 (CLAUDE.md, "Public contract with aircraft";
 // the wiki page Accessing the Flight Plan; WTFlightplanSync). Plan 0 holds the legs of FPL 0, and a direct-to that leaves
@@ -92,6 +94,46 @@ describe('the "kln90b" flight planner on the standard route', () => {
         expect(legs[1].leg.lon).toBeCloseTo(8.7, 6);
         expect(dto.activeLateralLeg).toBe(1);
         expect(identsOf(planner.getFlightPlan(0))).toEqual(['KAAA', 'ABC', 'KBBB']);
+    });
+
+    // The wiki page Accessing the Flight Plan: plan 0 always matches FPL 0, the direct-to plan is only there while a
+    // direct-to is flown. When the direct-to ends the planner returns to plan 0 and plan 1 is gone.
+    it('returns to plan 0 and drops plan 1 when the direct-to ends', async () => {
+        const unit = await bootOnRoute();
+        const planner = plannerOf(unit);
+        const aw = unit.props.memory.navPage.activeWaypoint;
+
+        // A direct-to to ABC, a waypoint of FPL 0: reaching it resumes the plan (4-10)
+        await unit.panel.press('KLN90B_DCT_Push');
+        await unit.panel.enterIdent('L', 'ABC');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(planner.activePlanIndex).toBe(1); // Precondition: the direct-to is on plan 1
+        expect(aw.isDctNavigation()).toBe(true);
+        expect(aw.getActiveFplIdx()).toBe(1);
+
+        aw.sequenceToNextWaypoint();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(aw.isDctNavigation()).toBe(false);
+        expect(planner.activePlanIndex).toBe(0);
+        expect(planner.hasFlightPlan(1)).toBe(false);
+        expect(identsOf(planner.getFlightPlan(0))).toEqual(['KAAA', 'ABC', 'KBBB']);
+    });
+
+    // The planner mirrors FPL 0 only: an edit of another flight plan must not overwrite plan 0
+    it('does not overwrite plan 0 with an edit of FPL 1', async () => {
+        const unit = await bootOnRoute();
+        const plan = plannerOf(unit).getFlightPlan(0);
+        expect(identsOf(plan)).toEqual(['KAAA', 'ABC', 'KBBB']); // Precondition
+
+        const fpl1 = unit.props.memory.fplPage.flightplans[1];
+        insertLegIntoFpl(fpl1, unit.props.memory.navPage, 0, {wpt: xray, type: KLNLegType.USER});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fpl1.getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['XRAY']); // The edit happened
+        expect(identsOf(plan)).toEqual(['KAAA', 'ABC', 'KBBB']);
     });
 
     // Not part of the contract's wording, but the reason the pins below can say "none": with the option off the unit does
@@ -183,8 +225,15 @@ describe('the "kln90b" flight planner behind a fence', () => {
         expect(identsOf(plan)).toEqual(['ENRAA', 'IFAAA', 'VVV', 'MAPAA']);
         expect(plan.activeLateralLeg).toBe(2);
 
-        // Sequenced past the MAP, the missed approach is sent: the active leg is the missed approach VVV
+        // With the MAP itself active the missed approach is still not available: the fence holds up to and including the MAP
         aw.sequenceToNextWaypoint();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(aw.getActiveFplIdx()).toBe(3);
+        expect(identsOf(plan)).toEqual(['ENRAA', 'IFAAA', 'VVV', 'MAPAA']);
+        expect(plan.activeLateralLeg).toBe(3);
+
+        // Sequenced past the MAP, the missed approach is sent: the active leg is the missed approach VVV
         aw.sequenceToNextWaypoint();
         await vi.advanceTimersByTimeAsync(1000);
 

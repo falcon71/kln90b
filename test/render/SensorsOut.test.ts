@@ -170,8 +170,15 @@ describe('GPS SimVars with Output.WriteGPSSimVars off (public contract) (#126)',
     it('the default panel.xml writes GPS WP CROSS TRK and GPS COURSE TO STEER', async () => {
         const unit = await bootMovingOnRoute();
 
-        expect(unit.env.sim.lastWrite('GPS WP CROSS TRK')).toBeDefined();
-        expect(unit.env.sim.lastWrite('GPS COURSE TO STEER')).toBeDefined();
+        // 1 NM right of the leg; the sign follows the SDK convention (negated), see SensorsOutSimVars.test.ts
+        expect(unit.env.sim.get('GPS WP CROSS TRK', 'meters')).toBeCloseTo(-1852, -1);
+        // The value of GPS COURSE TO STEER has no contract source beyond its unit, radians (written as a plain number). The
+        // roll steering intercepts a leg it is 1 NM right of at 45 degrees, so the course is the leg's 50.75 less 45. This
+        // is the code's behavior, here only so that the control is not permissive.
+        const {kaaa, abc} = standardRoute();
+        const legCourse = courseDeg(pointBefore(kaaa, abc, 20), abc);
+        const cts = unit.env.sim.lastWrite('GPS COURSE TO STEER')!.value as number;
+        expect(cts).toBeCloseTo((legCourse - 45) * Math.PI / 180, 2);
     });
 
     it.fails('GPS COURSE TO STEER is not written (#126)', async () => {
