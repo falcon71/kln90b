@@ -160,8 +160,10 @@ them, the APT, VOR, NDB and INT pages of a world that lacks the type post `NO AP
 no real unit shows. They lie at 45 S 150 W, far beyond the 500 NM nearest search of every test position, so the nearest
 lists, the maps and the INT reference VOR are unchanged. Their idents (`ZZXA`, `ZZV`, `ZZN`, `ZZXIN`) sort after the idents
 of the tests, which matters because the scan lists are in ident order and the pages open on the first entry, and they are
-unique across the types, so no DUPLICATE page appears. The prefix `ZZ` is reserved for them: `bootUnit` throws when a
-test facility has one of their idents. There is no default user waypoint, so `NO SUP WPTS` stays real. A test that needs
+unique across the types, so no DUPLICATE page appears. `bootUnit` throws when a test facility has exactly one of their
+idents, whatever its type. The guard checks exact idents only; the ordering is the test's part: a test ident that sorts
+after `ZZXA` (or after the default of its own type) would put the default first on its page, so choose test idents that
+sort before the defaults. There is no default user waypoint, so `NO SUP WPTS` stays real. A test that needs
 the bare world (the `NO ... WPTS` messages themselves, or a count of the facilities) passes `defaultNavdata: false`.
 `MemoryFacilityClient` itself is unchanged, so a unit test that builds one gets exactly the facilities it is given.
 `test/render/harness/defaultNavdata.test.ts` holds this behavior.

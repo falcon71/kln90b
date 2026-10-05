@@ -9,8 +9,9 @@ export const DEFAULT_NAVDATA_POSITION = {lat: -45, lon: -150};
  * unit always has a database: without them, the APT, VOR, NDB and INT pages of a world that lacks the type post NO APT
  * WPTS, NO VOR WPTS, ... on the status line, a state no real unit shows. There is no user waypoint: NO SUP WPTS is real.
  *
- * The idents start with ZZ, so they sort after the idents of the tests (the scan lists are in ident order, and the APT,
- * VOR, NDB and INT pages open on the first entry), and they are unique across the types, so no DUPLICATE page appears.
+ * The idents start with ZZ, so they sort after the idents tests use: the scan lists are in ident order, and the APT, VOR,
+ * NDB and INT pages open on the first entry. A test ident that sorts after its type's default would put the default
+ * first; bootUnit only refuses an exact clash. The idents are unique across the types, so no DUPLICATE page appears.
  * They lie far from every test position, so the nearest lists, the maps and the INT reference VOR are unchanged.
  */
 export function defaultNavdata(): Facility[] {
