@@ -1,14 +1,14 @@
 //##############
 //###Readonly###
 //##############
-export const LVAR_POWER = "L:KLN90B_Power"; // Boolean, position of the power switch. The unit itelf will still be off if electricity is not avaiable. Use H:KLN90B_Power_Toggle to set
+export const LVAR_POWER = "L:KLN90B_Power"; // Boolean, position of the power switch. The unit itelf will still be off if electricity is not avaiable. Use H:KLN90B_Power_Toggle, H:KLN90B_Power_On or H:KLN90B_Power_Off to set
 export const LVAR_RIGHT_SCAN = "L:KLN90B_RightScan"; //Boolean. false = in, normal. true = out, scan. Use H:KLN90B_RightScan_Toggle to set
 
 // Do not use GPS WP BEARING to animate a RMI, as that is optimized for the autopilot. This one will display the bearing according to appendix A of the manual.
 // Please see https://github.com/falcon71/kln90b/wiki/RMI for details
 export const LVAR_GPS_WP_BEARING = "L:KLN90B_GPS_WP_BEARING";
 
-export const LVAR_HSI_TF_FLAGS = "L:KLN90B_HSI_TF_FLAGS"; //To from to animate the HSI. Please see https://github.com/falcon71/kln90b/wiki/CDI--HSI for details
+export const LVAR_HSI_TF_FLAGS = "L:KLN90B_HSI_TF_FLAGS"; //Enum. To from to animate the HSI: 0 = flagged (no TO/FROM), 1 = TO, 2 = FROM. Please see https://github.com/falcon71/kln90b/wiki/CDI--HSI for details
 
 export const LVAR_ROLL_COMMAND = "L:KLN90B_RollCommand"; //Roll steering command for the autopilot. Please see https://github.com/falcon71/kln90b/wiki/Autopilot for details
 

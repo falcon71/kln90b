@@ -84,7 +84,11 @@ The sim globals are installed once per test file by the setup files `test/harnes
   `simvar.getValueReg*` and `Coherent.call('setValueReg_*')`, so a replacement of the public functions would be
   overwritten. The fake therefore sits below the SDK, and the SDK's own unit conversion runs for real.
     - `sim.set(name, unit, value)` sets a value as the sim would. `sim.get(name, unit)` reads it in any unit.
-    - `sim.writes`, `sim.lastWrite(name)` and `sim.keyEvents` log what the instrument wrote.
+    - `sim.writes`, `sim.lastWrite(name)` and `sim.keyEvents` log what the instrument wrote. `sim.writes` stores the
+      names in upper case, so a filter over it compares with `name.toUpperCase()`; `lastWrite` does that itself.
+    - **Key events have no effect.** `sim.keyEvents` records a `K:` event, but nothing acts on it: `K:GPS_OBS_ON` does
+      not set `GPS OBS ACTIVE`, and `K:VOR1_SET` does not move `Nav OBS:1`. A test asserts the event, or sets the
+      SimVar the sim would set itself.
     - `sim.unsetReads` lists variables the instrument read that nobody set, which helps when wiring a new input.
     - The SDK swallows exceptions inside `GetSimVarValue`, so unit-conversion problems would vanish. `FakeSim` collects
       them in `sim.errors`, and the flight driver turns them into a failure.
@@ -282,6 +286,14 @@ it('serializes a user VOR', () => {
 ```
 
 The expected string is a literal laid out by hand from the format, not produced by the serializer.
+
+**A unit test resets the fakes it writes.** Without `bootUnit` there is no teardown, so `FakeSim` and `FakeStorage` keep
+what one test of the file wrote for the next. A unit test that writes either resets it before it writes
+(`simEnv().sim.reset()`, `simEnv().storage.data.clear()`), in `beforeEach` as the panel.xml parser tests
+(`KLN90BPlaneSettings.test.ts`) do, or at the start of the test as the stored-key pin
+(`KLN90BUserSettingsSaverManager.test.ts`) does. The settings
+manager and the repository are singletons bound to the first bus that reaches them, so a unit file that needs both uses
+one `EventBus` for all its tests (`UserWaypointPersistor.test.ts`).
 
 ## Render
 
@@ -610,3 +622,24 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
   hold it.
 - Further flights: approach arming (ARM to APR scale ramp), waypoint alert without turn anticipation, and the
   GPS-invalid path.
+- Harness gaps that the Session 4 contract tests worked around (each serves one or two tests today, so none was built,
+  per rule 13 of test-coverage.md):
+    - **SimVars before `init`.** `BootOptions` cannot set an arbitrary SimVar before the core reads it. An electricity
+      test therefore boots powered, loses power at the first `SimVarSync` tick and powers up when the test sets the
+      circuit (`SimVarSync.test.ts`, `PowerButton.test.ts`). A `simVars` boot option would remove the detour.
+    - **Counting and sampling writes.** Tests count the writes of one SimVar by filtering `sim.writes` (upper-case names)
+      and sample an LVar over display ticks with a hand-written loop (`SimVarSync.test.ts`, `StatusLine.test.ts`,
+      `SelfTestLeftPage.test.ts`). A `sim.writeCount(name)` and a sampling helper would remove the pitfall.
+    - **The self-test page and the `"kln90b"` planner.** The cold boot to the self-test page is written out in
+      `SelfTestLeftPage.test.ts` and `SensorsOut.test.ts`, and the planner is read through
+      `FlightPlanner.getPlanner('kln90b', …)` in `WTFlightplanSync.test.ts`, `ActiveWaypoint.test.ts` and `reboot.test.ts`.
+    - **Shared worlds.** The approach world of `ModeController.test.ts` is copied into `HEvents.test.ts`, and the arc world
+      of `SensorsOutSimVars.test.ts` into `WTFlightplanSync.test.ts`. A fixture in `test/harness/fixtures.ts` would keep
+      them in step.
+    - **A `FakeXhr` mount.** `FakeXhr` serves `resources/` only at the default path, so a custom `BasePath` fails the
+      boot; a mount option would let a test hold the BasePath effect.
+    - **A persistent message.** No cheap trigger was found for a message that stays while its condition lasts, so the
+      steady MSG light (`StatusLine.tsx`) is untested.
+- Costs to keep in mind: the H event sweep boots a fresh unit for every public event in four states (about 5 s), and
+  `test/unit/KLN90B.test.ts` imports the whole instrument statically (about 1 s at collection; a dynamic import timed
+  out under load).
