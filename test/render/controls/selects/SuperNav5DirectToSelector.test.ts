@@ -13,8 +13,8 @@ const abc = vor('ABC', 47.3, 8.3);
 const at = (bearing: number, nm: number) => pointFrom({lat: abc.lat, lon: abc.lon}, bearing, nm);
 const arcbg = intersection('ARCBG', at(270, 10).lat, at(270, 10).lon);
 const arcen = intersection('ARCEN', at(180, 10).lat, at(180, 10).lon);
-const fafaa = intersection('FAFAA', 47.1, 7.9);
-const mapaa = intersection('MAPAA', 47.0, 8.0);
+const fafaa = intersection('FAFAA', 47.1, 8.7);
+const mapaa = intersection('MAPAA', 47.0, 8.7);
 const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
     approaches: [approach({
         type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
@@ -54,12 +54,13 @@ describe('Super NAV 5 direct-to window on a DME arc entry', () => {
         await unit.panel.inner('R', 1); // NAV 5 on both sides: Super NAV 5
         await unit.panel.scan();
         await vi.advanceTimersByTimeAsync(250);
-        // The window opens on the active leg. The held aircraft with a ground speed has sequenced past ARCEN to FAFAA, so
-        // scan left until the arc's entry shows, with the IAF symbol that SidStar gives it
-        for (let i = 0; i < 4 && !SuperNav5.read().directTo!.startsWith('D225J'); i++) {
-            await unit.panel.inner('R', -1);
-            await vi.advanceTimersByTimeAsync(250);
-        }
+        // The window opens on the active leg, the arc: its end ARCEN shows. The left arc ends heading east, and FAFAA
+        // lies east of ARCEN (a turn of a few degrees, so the anticipation does not skip ARCEN; with FAFAA west of it the
+        // turn is near 180 degrees and ARCEN is sequenced at once, #76). One step left shows the arc's entry, with the IAF
+        // symbol that SidStar gives it.
+        expect(SuperNav5.read().directTo).toBe('ARCEN ');
+        await unit.panel.inner('R', -1);
+        await vi.advanceTimersByTimeAsync(250);
         expect(SuperNav5.read().directTo).toBe('D225Jà');
 
         await unit.panel.clr();

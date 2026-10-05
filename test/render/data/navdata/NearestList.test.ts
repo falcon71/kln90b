@@ -60,6 +60,7 @@ describe('the nearest airport list', () => {
 
             const rows = await nearestRows(unit);
 
+            expect(rows).toEqual([' KAAA  nr 1', ' KGRS  nr 2', ' KBBB  nr 3']);
             expect(rows.join()).not.toContain('KSHT');
         });
 
