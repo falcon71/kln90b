@@ -417,6 +417,8 @@ describe('SidStar conversion of procedures to KLN legs', () => {
         });
     });
 
+    // 6-5, B-3: the unit tells the pilot that the enroute part of the flight plan already holds waypoints of the
+    // procedure (all tests of this block).
     describe('SidStar.hasDuplicates', () => {
         const wpt = vor('KPT', 47, 8);
         const fplLeg = (w: Facility) => ({wpt: w, type: KLNLegType.USER}) as unknown as KLNFlightplanLeg;
@@ -430,8 +432,7 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(SidStar.hasDuplicates([fplLeg(wpt)], [procLeg(vor('KPU', 47, 8))])).toBe(false);
         });
 
-        // 6-5, B-3: the unit tells the pilot that the enroute part of the flight plan already holds waypoints of the
-        // procedure. The code compares the ICAO objects by reference; a copy of the same waypoint is not found.
+        // The code compares the ICAO objects by reference; a copy of the same waypoint is not found.
         it.fails('finds a waypoint whose ICAO is an equal copy (#NEW-2-1)', () => {
             const copy = {...wpt, icaoStruct: {...wpt.icaoStruct}};
             expect(copy.icaoStruct).toEqual(wpt.icaoStruct);
