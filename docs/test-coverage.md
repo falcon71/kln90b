@@ -340,7 +340,7 @@ Result (session log, section 4): every row is ticked or re-verdicted. #20, `7fd6
 
 ## Session 4: the public contract
 
-- [ ] done
+- [x] done
 
 **Goal:** the interfaces `CLAUDE.md` says must never break, so a change that breaks an aircraft fails a test.
 
@@ -363,6 +363,10 @@ Result (session log, section 4): every row is ticked or re-verdicted. #20, `7fd6
 
 **Done when:** each of the five items has tests at the cheapest stage, and the log lists any key, event or LVar left
 without a test.
+
+Result (session log, section 4): each of the five items has tests, plus a default navdata fixture in the harness. The
+bugs found were filed and pinned (#135 to #144), invalid panel.xml values are the enhancement #145, and #100, #101 and
+#133 have comments. Invalid values have no test, by the maintainer's decision.
 
 ## Session 5: navigation core
 
@@ -510,6 +514,199 @@ lists the gaps.
 One entry per session run, newest first. Format: date, session, branch, what was done, what was left and why, the
 coverage summary for the session's area at start and end. This is a dated record and is never edited afterwards; a
 later run adds a new entry.
+
+## 2026-10-05, session 4, branch `tests-session-4-contract`
+
+**Done**
+- **Design and plan:** `docs/superpowers/specs/2026-10-05-session-4-contract-design.md` and the matching plan, after a
+  read-only research pass of five agents (H events, LVars, panel.xml with the GPS SimVars and the planner, persisted
+  user data, the default navdata). Eight tasks: the fixture alone first, tasks 2 to 7 in parallel worktrees, this
+  close-out last.
+- **Task 1, default navdata fixture (harness):** `defaultNavdata()` in `test/harness/fixtures.ts` (`ZZXA`, `ZZV`, `ZZN`,
+  `ZZXIN` near 45 S 150 W, more than 8000 NM from every test position, idents that sort after the test idents),
+  `BootOptions.defaultNavdata` (on by default, `false` opts out) merged in `prepareBoot`, a guard that refuses a test
+  facility with a default ident, and the harness test `defaultNavdata.test.ts`. No `NO APT/VOR/NDB/INT WPTS` appears in
+  the suite any more; `NO SUP WPTS`, the realistic one, stays. The INT row of the `cursorTo` step-over test was dropped.
+  The regression tests that ran in worlds lacking a type were re-proven by their original breaks with the fixture on.
+- **Task 2, H events:** a unit pin of every public event name as a literal (`test/unit/HEvents.test.ts`), the adapter
+  `KLN90B.tsx` (registration name, template id, forwarding of H events, `Init` and `onSoundEnd`;
+  `test/unit/KLN90B.test.ts`), a sweep of every public event in four states (main page, welcome page, the database
+  approval after the self-test, dark unit), and spec tests sent as literals: the knobs (3-12, 3-13, the ACT pages 4-10),
+  the cursors (3-11), MSG (3-16), ALT (3-55, 3-56, 3-39), DCT, ENT and CLR (3-29, 4-7, 5-37), the scan knob (3-13,
+  3-21), Power_Toggle and ApprArm (6-1, C-1), with the pin #139.
+- **Task 3, LVars:** `L:KLN90B_Power` reports the switch, the HSI flag TO and FROM (3-31), the self-test outputs one `it`
+  each (3-4, Installation Manual 2-69, 2-70) and after the approval, the MSG light flashing and dark (3-16, 3-59), the
+  WPT light steady during the alert, the roll command's zero, sign and 30 degree cap (wiki Autopilot), and every
+  writable LVar in `SimVarSync.test.ts` (Disabled, ObsSource, ElectricitySimVar and its index, ObsTarget,
+  WriteGpsSimvars). Pins #135 (five), #136, #137, #138 and #143.
+- **Task 4, panel.xml keys:** the sample `cfg/panel.xml` read from disk, the defaults of four documents, each key alone
+  against the whole defaults object (TakeHomeMode excluded), the parser's LVar writes, and SET 9 with the alert off and
+  on. Pin #141.
+- **Task 5, GPS SimVars and the `"kln90b"` planner:** the SimVar groups against `flight/geo.ts` at a held position, one
+  `it` per group, the track angle error as a characterization, a sequence, `GPS APPROACH MODE` in ARM, APR and the
+  self-test, the `K:GPS_OBS_*` events, nothing written with `WriteGPSSimVars` off (apart from #126, now pinned twice),
+  and the planner: mirror, edit, direct-to on plan 1 and back, an edit of FPL 1, the MAP fence, an arc ahead and the arc
+  itself. Pins #126 (two) and #142 (two). `GPS IS APPROACH ACTIVE` and the course-to-steer value are characterizations.
+- **Task 6, waypoint and flight-plan formats:** V2 flight plans (every leg kind in FPL 0 and FPL 25, only USER legs
+  stored, the empty plan, a round trip, a missing facility, the 30-leg cut), V1 `fpl24` to FPL 25, SUP and grass in V1
+  and V2, a negative VOR magnetic variation, a V2 longitude of 100 degrees or more, the cleared trailing slots, the
+  250th slot, the V1 NDB and unknown runway, the conversion of every kind (#47) and `activeWaypoint` read and written as
+  V1. Pin #144.
+- **Task 7, remarks and the setting keys:** the remark save and load literals, APT 5 and OTH 4 (3-47), one exact pin of
+  every stored key and default, and SET 5 (3-58). Pins #92 (two, its stale slots and its slot limit), #140 and #89.
+- **The steady MSG light (final fix wave):** `StatusLine.test.ts` raises the persistent message `ADJ NAV IND CRS TO nnn`
+  with an external course 30 degrees off the DTK, reads every message, and asserts the light steady at every display
+  tick (3-16, 3-59); with the course set onto the DTK the message and the light go. The trigger was the maintainer's
+  hint.
+- **Task 8, this close-out:** the issues and comments below, the placeholders replaced (`references #135` to `#144`),
+  the comments of `LVars.ts` corrected (the HSI flag values; `H:KLN90B_Power_On` and `H:KLN90B_Power_Off` set
+  `L:KLN90B_Power` too; comments only), and `testing.md` sections 3, 4 and 7. The two test comments that said `LVars.ts`
+  documents the flag values (`Sensors.test.ts`, `hsiToFromFlags.test.ts`) are true now and were left unchanged.
+
+**Rulings**
+- **The maintainer's:** wiki and code disagreements were ruled per case: `AltitudeAlertEnabled` should default to false
+  (#141); the planner must not be written with `WriteGPSSimVars` off, both paths gated (#142); a disabled unit ignores
+  input (#138); the outputs go to zero at power-off only, while Disabled stays a freeze (`61f6b61`; #135); the WPT
+  light is steady during the alert, although 3-29 and 4-8 describe a flashing light (the code cites a video), and the
+  test asserts steady as a contract test. Roll steering without a heading input is a bug with a comment on #100 (#143).
+  `AppArmSwitchInstalled` gets a comment on #133 and no pin; ApprArm is tested with the key at its default. A failed V2
+  restore should wipe the corrupt data like V1 (#144). Invalid panel.xml values: an enhancement and no test (#145).
+  Only comments are corrected in the code (`LVars.ts`); `cfg/panel.xml` stays as it is (BasePath is needed only in
+  special cases) and TakeHomeMode is not documented. The default navdata fixture is on by default.
+- **The controller's** (the ledger): the HSI flag test went into `SensorsOut.test.ts`, so that this task's comment edit
+  of `Sensors.test.ts` did not conflict; tasks 2 to 7 ran in parallel although tasks 3 and 5 shared two files (separate
+  end blocks, task 3 merged first, the import line merged by hand); task 7 merged before task 6; the surviving
+  mutations of task 1 entered a fix round instead of the minor list, because tasks 2 to 7 built on the fixture.
+- **Review fix rounds:** every task needed one, task 5 two. Task 1: the sort-last property per type, the cross-type
+  guard and the distance of the fixture were unheld. Task 2: unasserted sweep preconditions, a no-op `toHaveLength` and
+  a citation. Task 3: the steady WPT light was sampled once per second, so a display-tick flash survived; the 5 kt title
+  claimed more than 0 kt; a 3-31 over-attribution; a `toBeGreaterThan`. Task 4: the SET 9 rows were partly held by a
+  regex. Task 5: the MAP fence (`>=` to `>`) survived, a wiki page was cited for `GPS IS APPROACH ACTIVE` that does not
+  name it, the planner's return to plan 0 and the FPL 1 gate were unheld, and the course-to-steer value needed its own
+  characterization. Task 6: the 250th slot on load survived, and the V1 NDB type and unknown-runway surface moved into
+  characterizations. Task 7: a remark line entered on line 2 or 3 of APT 5 was unheld, and a 3-47 citation overstated.
+- **Re-verdicts by the implementers:** a held position cannot sit inside the waypoint alert for long, so the steady WPT
+  light test moves the aircraft each display tick; the roll command's zero on the ground is tested off the leg (on the
+  leg it is about zero anyway); the brief's break of the arc index did not bite with one leg before the entry, so a test
+  with an enroute fix before the arc was added; the right inner knob on the ACT pages got its own test.
+
+**Bugs found and filed** (each after a search of the open and closed issues: the semantic issue search returned no
+result for any query in this repository, so the titles of all issues were read, and the bodies of the candidates: #24,
+#29, #58, #79, #92, #100, #101, #114, #124, #126, #133). None was reproduced in the sim; all were found in the headless
+harness, #141 by reading the code.
+- **#135:** the `L:KLN90B_*` outputs keep their last value when the unit is switched off (`SensorsOut.reset`,
+  `Sensors.ts:566-596`; Installation Manual 2-69). Five pins in `SensorsOut.test.ts`.
+- **#136:** an ElectricitySimVar with a prefix and no index (`L:MY_AVIONICS_BUS`) never powers the unit
+  (`KLN90BPlaneSettings.ts:97-99`, `SimVarSync.ts:31-35`). Pinned in `SimVarSync.test.ts`.
+- **#137:** toggling `L:KLN90B_WriteGpsSimvars` while disabled sets `GPS OVERRIDDEN` (`SimVarSync.ts:52-56`). Pinned in
+  `SimVarSync.test.ts`.
+- **#138:** H events are processed while the unit is disabled (`KLN90BCore.onInteractionEvent`; wiki Hot Swapping and
+  Package Detection). Pinned in `SimVarSync.test.ts`.
+- **#139:** the approach cannot be disarmed within 30 NM (`ModeController.ts:49-52, 233-237, 310`; 6-1, B-1). It notes
+  the untested second observation: an arm by the button within 30 NM sets the scale at once instead of the 30 s ramp
+  (6-1, 6-3). Pinned in `test/render/HEvents.test.ts`.
+- **#140:** the remarks of an airport with a 3-character ident are corrupted after a reload (`RemarksManager.ts:63,
+  74`). A user airport may have 1 to 4 characters (5-16); whether the sim's database has airport idents of 3 or of more
+  than 4 characters was not checked in the sim (a local ARINC 424 export stores 4 characters). Pinned in
+  `RemarksManager.test.ts`.
+- **#141:** `Output.AltitudeAlertEnabled` defaults to true, the samples show false (`KLN90BPlaneSettings.ts:86`). Pinned
+  in `KLN90BPlaneSettings.test.ts`.
+- **#142:** the `"kln90b"` planner is written while `WriteGPSSimVars` is off (`WTFlightplanSync.ts:50-60`). Two pins in
+  `WTFlightplanSync.test.ts`.
+- **#143:** roll steering is output without a heading input (`RollSteeringController.ts`; Installation Manual 2-69).
+  References #100. Pinned in `RollSteeringController.test.ts`.
+- **#144:** a failed V2 restore keeps the corrupt data, so `USER DATA LOST` (B-4) shows on every boot and the data is
+  wiped piecemeal later (`KLN90BCore.ts:254-308`, `UserWaypointLoaderV2.ts:40-60`). Suggested fix: persist the empty
+  state as the V1 conversion does; restoring the valid records only is named as the alternative. Pinned in
+  `KLN90BCore.userDataConversion.test.ts`.
+- **#145 (`enhancement`):** an invalid panel.xml value should not load, and the unit should show a highly visible error
+  (`KLN90BPlaneSettings.getOption`). No test.
+- **#100 comment:** the heading input (#143) for the rework, and a wrong-way bank 5 NM left of the leg on a parallel
+  track (roll +25, `GPS COURSE TO STEER` DTK + 250; the signed `xtk < 0.1` of case 1). Not pinned (Session 5).
+- **#101 comment:** data converted at the first boot stays wrong after the fix, because the conversion saved it as V2.
+- **#133 comment:** `KLN90B_ApprArm_Push` arms and disarms with `AppArmSwitchInstalled` false, and the unit arms on its
+  own within 30 NM; the wiki page External Annunciators implies that the event needs the key.
+- **Not filed, the placeholder ident:** `VolatileMemory.ts:278, 296` store `"0   "` (4 cells) for an empty SUP or INT
+  list in a 5-cell selector, which gives a cursor position that focuses nothing on the empty SUP page. The Pilot's Guide
+  does not show an empty SUP or INT page (3-51, 5-18, 5-19 show defined waypoints and the CREATE NEW WPT page; C-2 gives
+  only the `NO SUP WPTS` message), so the unit cannot be said to differ from the manual. Recorded here, no issue. (C-2
+  describes `NO SUP WPTS` and the other empty-list messages for a unit without a database cartridge; not pursued.)
+
+**Fixes that could not be re-broken:** none; every regression test that task 1 re-proved failed under its original
+break. The #24 fix (the doubled tick
+rate after a hot swap) is held only jointly: removing both guards (`SimVarSync.ts:62-64`, `TickController.ts:103-105`)
+fails the Disabled test, removing either alone does not change the tick rate.
+
+**Not covered** (rule 18; the task ledger is not committed, so the list is complete here)
+- Events: the `Internal_*` events (private; `KeyboardService.test.ts` covers `Internal_Key`); ApprArm in APR and in the
+  OBS modes, and the arm by the button within 30 NM (reachable only once #139 is fixed). The MSG page's posting order
+  against 3-16 is not checked (the test reads the two boot messages as a set). The sweep's "self-test page" title
+  describes the APPROVE? page after the self-test.
+- LVars: the roll command's 5 kt threshold (only 0 kt is held; 2-70 names no threshold, and `< 5` to `< 1` survives);
+  the brightness clamp and the boot-0 quirk of `L:KLN90B_Brightness` (undocumented); the TickController `setEnabled`
+  guard alone (see above).
+- panel.xml keys: `TakeHomeMode` (by decision); the BasePath effect (needs a `FakeXhr` mount); the effects of the keys
+  owned by other sessions (HeadingInput, BaroSource, AltimeterInterfaced, the fuel computer units); the effect of
+  `AppArmSwitchInstalled` (none today, #133); a lookup path without its parent survives (`getElementsByTagName` finds
+  descendants, so `"ObsSource"` instead of `"Input.ObsSource"` passes); the `true` row of `AltitudeAlertEnabled` and the
+  SET 9 enabled test cannot fail until #141 is fixed.
+- GPS SimVars: `GPS COURSE TO STEER`'s value (a characterization only); the XTK filter dynamics; ARM_OBS; the
+  `"kln90b"` planner gate is not tested through the runtime LVar `L:KLN90B_WriteGpsSimvars`: the planner gate test sets
+  the option through panel.xml only, and a mutation that freezes `writeGPSSimVars` at construction in
+  `WTFlightplanSync.ts:51` survives the whole suite. The fix of #142 needs such a test.
+- Persisted data: temporary (`XY`) waypoints round-tripped through storage; the 10-message cap of the flight-plan loader
+  (`OTHER WAYPOINTS DELETED`); the failing V1 restore path; APT 5 lines blanked by the pilot keep the airport in the
+  remarks list (the real unit's behavior is unknown). `UserWaypointV2.test.ts:87` (Session 2) still asserts
+  `WrightFlyerTrack` inside a contract test.
+- Elsewhere: the second half of `d3228dd` (`Scanlist.invalidateCache` keeping `lastIcao` in the cache) survives with the
+  fixture on and off (pre-existing); the left-side `isCustomPageTreeController` branch of `MainPage`'s left inner knob is
+  unobservable (no left page has a page tree controller).
+- Review notes left as they are: the one-row `it.each` of the `cursorTo` step-over; the VOR ordering case of the
+  fixture test pins the whole row with the class glyph; the ETA tolerance of the SimVar test relies on the tick phase;
+  the approach world and the arc world are copied between files (`testing.md` section 7).
+
+**Wiki corrections for the maintainer** (not made by this session)
+- panel.xml customization: the `AltitudeAlertEnabled` default, once #141 is fixed; `GPS OBS ACTIVE` is set through the
+  key events `K:GPS_OBS_ON` and `K:GPS_OBS_OFF`, and only without `LegObsSwitchInstalled`; ObsTarget writes the OBS only
+  while `GPS DRIVES NAV1`; the ElectricitySimVar index syntax (a trailing `:<digits>`, once #136 is fixed).
+- External Annunciators: `L:KLN90B_MsgLight` flashes by itself while a message is unread, so the aircraft must not add
+  its own flashing.
+- CDI/HSI: the values of `L:KLN90B_HSI_TF_FLAGS` (0 flagged, 1 TO, 2 FROM), now in `LVars.ts`.
+- Accessing the Flight Plan: the sample code reads `this.getFlightPlan(0)` where `flightplanner.getFlightPlan(0)` is
+  meant; on a direct-to it is `flightplanner.activePlanIndex` that becomes 1; the from leg of plan 1 is an IF at the
+  present position without an ident.
+- Once fixed: the outputs at power-off (#135), roll steering only with `HeadingInput` (#143), the planner gated by
+  `WriteGPSSimVars` (#142).
+
+**Workflow notes.** The isolation worktrees again started at `origin/main` and were reset to the session branch first.
+Reviewers: Opus for tasks 2, 3 and 5, Sonnet for 1, 4, 6 and 7. The close-out ran in the main checkout on the session
+branch, because it needed GitHub. The issue body of #124 still names the Session 3 placeholder (`#NEW-4-1`); its pins
+carry #124.
+
+**Coverage at the start of the session** (identical to the end of session 3b) **and at the end** (all tests green):
+
+| directory                  | % stmts start | % stmts end | % lines start | % lines end |
+|----------------------------|--------------:|------------:|--------------:|------------:|
+| all files                  |         72.48 |       73.98 |         72.34 |       73.82 |
+| `kln90b`                   |         80.50 |       84.84 |         80.36 |       84.68 |
+| `kln90b/controls`          |         74.84 |       76.49 |         74.39 |       76.08 |
+| `kln90b/controls/displays` |         84.80 |       84.80 |         84.47 |       84.47 |
+| `kln90b/controls/editors`  |         78.83 |       80.34 |         78.34 |       79.68 |
+| `kln90b/controls/selects`  |         63.16 |       63.45 |         61.44 |       61.75 |
+| `kln90b/data`              |         80.43 |       80.43 |         79.94 |       79.94 |
+| `kln90b/data/flightplan`   |         94.05 |       94.59 |         93.82 |       94.38 |
+| `kln90b/data/navdata`      |         86.13 |       86.13 |         86.17 |       86.17 |
+| `kln90b/pages`             |         71.91 |       77.15 |         71.50 |       76.84 |
+| `kln90b/pages/left`        |         67.62 |       68.25 |         67.83 |       68.41 |
+| `kln90b/pages/right`       |         62.50 |       63.18 |         63.30 |       63.82 |
+| `kln90b/services`          |         67.81 |       69.70 |         66.66 |       68.67 |
+| `kln90b/settings`          |         89.97 |       95.98 |         89.85 |       95.82 |
+
+Read the rise with care (section 1): the number says what ran, not what is held.
+
+The suite at the start: 505 tests passed and 40 expected failures, in 124 files. At the end: 768 tests passed and 60
+expected failures, in 139 files. All twenty new expected failures are pins: #135 (five), #136, #137, #138, #139, #140,
+#141, #142 (two), #143, #144, #126 (two), #92 (two) and #89.
 
 ## 2026-10-05, session 3b, branch `tests-session-3b-unblocked`
 

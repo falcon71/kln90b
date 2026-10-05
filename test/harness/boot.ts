@@ -14,11 +14,17 @@ import {FrontPanel} from './flight/FrontPanel';
 import {Screen} from './render/screen';
 import {resetSingletons} from './singletons';
 import {pointFrom} from './flight/geo';
+import {defaultNavdata} from './fixtures';
 
 export const MINIMAL_PANEL_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name></Instrument></PlaneHTMLConfig>';
 
 export interface BootOptions {
     facilities?: Facility[];
+    /**
+     * Adds the default navdata (fixtures.ts, defaultNavdata): one airport, VOR, NDB and intersection far away, so that
+     * no scan list but SUP is empty, as in a real unit. False boots with exactly the facilities given. Default true
+     */
+    defaultNavdata?: boolean;
     /** Airspaces the boundary search finds (navdata/airspaces.ts) */
     airspaces?: BoundaryFacility[];
     position?: { lat: number; lon: number };
@@ -200,7 +206,12 @@ function prepareBoot(opts: BootOptions): PreparedBoot {
     }
 
     document.body.innerHTML = '<div id="InstrumentsContainer"></div>';
-    const navdata = new MemoryFacilityClient(opts.facilities ?? [], opts.airspaces ?? []);
+    const defaults = (opts.defaultNavdata ?? true) ? defaultNavdata() : [];
+    const clash = (opts.facilities ?? []).filter(f => defaults.some(d => d.icaoStruct.ident === f.icaoStruct.ident));
+    if (clash.length > 0) {
+        throw new Error(`bootUnit: ${clash.map(f => f.icaoStruct.ident).join(', ')} is an ident of the default navdata (fixtures.ts); rename it or pass defaultNavdata: false`);
+    }
+    const navdata = new MemoryFacilityClient([...opts.facilities ?? [], ...defaults], opts.airspaces ?? []);
     const missing = navdata.missingProcedureFixes();
     if (missing.length > 0) {
         throw new Error(`bootUnit: procedure fixes missing from the navdata: ${missing.join(', ')}`);

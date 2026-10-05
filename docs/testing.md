@@ -84,7 +84,11 @@ The sim globals are installed once per test file by the setup files `test/harnes
   `simvar.getValueReg*` and `Coherent.call('setValueReg_*')`, so a replacement of the public functions would be
   overwritten. The fake therefore sits below the SDK, and the SDK's own unit conversion runs for real.
     - `sim.set(name, unit, value)` sets a value as the sim would. `sim.get(name, unit)` reads it in any unit.
-    - `sim.writes`, `sim.lastWrite(name)` and `sim.keyEvents` log what the instrument wrote.
+    - `sim.writes`, `sim.lastWrite(name)` and `sim.keyEvents` log what the instrument wrote. `sim.writes` stores the
+      names in upper case, so a filter over it compares with `name.toUpperCase()`; `lastWrite` does that itself.
+    - **Key events have no effect.** `sim.keyEvents` records a `K:` event, but nothing acts on it: `K:GPS_OBS_ON` does
+      not set `GPS OBS ACTIVE`, and `K:VOR1_SET` does not move `Nav OBS:1`. A test asserts the event, or sets the
+      SimVar the sim would set itself.
     - `sim.unsetReads` lists variables the instrument read that nobody set, which helps when wiring a new input.
     - The SDK swallows exceptions inside `GetSimVarValue`, so unit-conversion problems would vanish. `FakeSim` collects
       them in `sim.errors`, and the flight driver turns them into a failure.
@@ -153,6 +157,20 @@ singletons that were never created.
 `MemoryFacilityClient` (`navdata/MemoryFacilityClient.ts`) is the navdata the unit sees: a set of facilities built
 with `airport()`, `vor()`, `ndb()` and `intersection()` (`navdata/builders.ts`). The builders fill every field the
 instrument reads and nothing else. The data is synthetic; see the limitations in section 6.
+
+**Default navdata.** `bootUnit`, `bootUnitExpectingError` and `Flight.start` add one airport, VOR, NDB and intersection
+to every world (`defaultNavdata()` in `test/harness/fixtures.ts`), because a real unit always has a database: without
+them, the APT, VOR, NDB and INT pages of a world that lacks the type post `NO APT WPTS`, `NO VOR WPTS`, and so on, a state
+no real unit shows. They lie at 45 S 150 W, far beyond the 500 NM nearest search of every test position, so the nearest
+lists, the maps and the INT reference VOR are unchanged. Their idents (`ZZXA`, `ZZV`, `ZZN`, `ZZXIN`) sort after the idents
+of the tests, which matters because the scan lists are in ident order and the pages open on the first entry, and they are
+unique across the types, so no DUPLICATE page appears. `bootUnit` throws when a test facility has exactly one of their
+idents, whatever its type. The guard checks exact idents only; the ordering is the test's part: a test ident that sorts
+after `ZZXA` (or after the default of its own type) would put the default first on its page, so choose test idents that
+sort before the defaults. There is no default user waypoint, so `NO SUP WPTS` stays real. A test that needs
+the bare world (the `NO ... WPTS` messages themselves, or a count of the facilities) passes `defaultNavdata: false`.
+`MemoryFacilityClient` itself is unchanged, so a unit test that builds one gets exactly the facilities it is given.
+`test/render/harness/defaultNavdata.test.ts` holds this behavior.
 
 **Nearest filters.** A nearest session keeps its filters itself and applies them inside the search, before `maxItems`,
 as the sim does: a nearer facility that the filter hides takes no slot, and a facility hidden by a new filter is reported
@@ -269,6 +287,14 @@ it('serializes a user VOR', () => {
 
 The expected string is a literal laid out by hand from the format, not produced by the serializer.
 
+**A unit test resets the fakes it writes.** Without `bootUnit` there is no teardown, so `FakeSim` and `FakeStorage` keep
+what one test of the file wrote for the next. A unit test that writes either resets it before it writes
+(`simEnv().sim.reset()`, `simEnv().storage.data.clear()`), in `beforeEach` as the panel.xml parser tests
+(`KLN90BPlaneSettings.test.ts`) do, or at the start of the test as the stored-key pin
+(`KLN90BUserSettingsSaverManager.test.ts`) does. The settings
+manager and the repository are singletons bound to the first bus that reaches them, so a unit file that needs both uses
+one `EventBus` for all its tests (`UserWaypointPersistor.test.ts`).
+
 ## Render
 
 Boot, let the page settle, read the screen.
@@ -356,11 +382,12 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
 
 (`test/flight/flights/firstFlight.test.ts`, the proof flight.)
 
-- **`World`** holds the facilities and the magnetic variation. Idents must be unique within a world.
+- **`World`** holds the facilities and the magnetic variation. Idents must be unique within a world, and must differ from
+  those of the default navdata (section 3), which `Flight.start` adds like `bootUnit`.
 - **`Flight.start(opts)`** boots the unit, starts the aircraft and flies until the GPS has a solution. Call it inside a
   test, because it registers `onTestFailed`. Besides `world` and `aircraft` it takes `aircraftOptions` (roll rate,
   maximum bank), `pilot`, and the `BootOptions` that make sense in flight (`storage`, `panelXml`, `engineRunning`,
-  `start`, `seed`, `atcModel`, `coldGps`, `efb`, `platform`). Airspaces are not a boot option here: they come from
+  `start`, `seed`, `atcModel`, `coldGps`, `efb`, `platform`, `defaultNavdata`). Airspaces are not a boot option here: they come from
   `World.addAirspace()`, and the facilities, position, altitude and magnetic variation from the world and the aircraft.
 - **Aircraft** (`flight/Aircraft.ts`): a point mass with constant ground speed and altitude, coordinated turns and a
   roll rate. No wind. It writes the SimVars the unit reads, 16 times per simulated second.
@@ -399,8 +426,8 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       away and one back, as a pilot would, and the search runs for exactly the typed ident. `type(side, text)` is the
       keyboard alternative that types the same characters.
     - `focused(side)` returns the one focused field `{row, col, text}`; `cursorTo(side, 'USER POS?')` turns the outer
-      knob until that field has the cursor, stepping over the cursor positions that focus nothing (the SUP and INT pages
-      have one after the ident characters) and throwing with the screen after `maxClicks`.
+      knob until that field has the cursor, stepping over the cursor positions that focus nothing (the SUP page without
+      user waypoints has one after the ident characters) and throwing with the screen after `maxClicks`.
       `appendToFpl0(idents)` enters and confirms idents on FPL 0.
     - Power: `powerOff()`, `powerOn()`, `powerCycle({offSeconds})` and `approveSelfTest()`. After boot every power-on runs
       the welcome page (17 s) and the self-test, also on an engine-running unit; `approveSelfTest` presses ENT on
@@ -595,3 +622,22 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
   hold it.
 - Further flights: approach arming (ARM to APR scale ramp), waypoint alert without turn anticipation, and the
   GPS-invalid path.
+- Harness gaps that the Session 4 contract tests worked around (each serves few tests, so none was built, per rule 13
+  of test-coverage.md):
+    - **SimVars before `init`.** `BootOptions` cannot set an arbitrary SimVar before the core reads it. An electricity
+      test therefore boots powered, loses power at the first `SimVarSync` tick and powers up when the test sets the
+      circuit (`SimVarSync.test.ts`, `PowerButton.test.ts`). A `simVars` boot option would remove the detour.
+    - **Counting and sampling writes.** Tests count the writes of one SimVar by filtering `sim.writes` (upper-case names)
+      and sample an LVar over display ticks with a hand-written loop (`SimVarSync.test.ts`, `StatusLine.test.ts`,
+      `SelfTestLeftPage.test.ts`). A `sim.writeCount(name)` and a sampling helper would remove the pitfall.
+    - **The self-test page and the `"kln90b"` planner.** The cold boot to the self-test page is written out in
+      `SelfTestLeftPage.test.ts` and `SensorsOut.test.ts`, and the planner is read through
+      `FlightPlanner.getPlanner('kln90b', …)` in `WTFlightplanSync.test.ts`, `ActiveWaypoint.test.ts` and `reboot.test.ts`.
+    - **Shared worlds.** The approach world of `ModeController.test.ts` is copied into `HEvents.test.ts`, and the arc world
+      of `SensorsOutSimVars.test.ts` into `WTFlightplanSync.test.ts`. A fixture in `test/harness/fixtures.ts` would keep
+      them in step.
+    - **A `FakeXhr` mount.** `FakeXhr` serves `resources/` only at the default path, so a custom `BasePath` fails the
+      boot; a mount option would let a test hold the BasePath effect.
+- Costs to keep in mind: the H event sweep boots a fresh unit for every public event in four states, and
+  `test/unit/KLN90B.test.ts` imports the whole instrument statically, which is slow at collection (a dynamic import
+  timed out under load).
