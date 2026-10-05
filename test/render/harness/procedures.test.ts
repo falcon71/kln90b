@@ -169,6 +169,8 @@ describe('FrontPanel.loadProcedure (harness)', () => {
         expect(idents(unit, KLNLegType.APP)).toEqual(['IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA']);
         expect(Screen.read().status().right).not.toBe('CRSR');
         expect(Screen.read().leftName()).toBe('FPL 0');
+        // The unit sits at the MAP, so FPL 0 has scrolled to the active leg: the wait of the helper is what shows it
+        expect(rows('L')).toEqual(['  2 IFAAA', '  3 FAFAAá', 'Á 4 MAPAAã', '*NO WPT SEQ', 'À 5 MAHAAâ', '  6:KPRC']);
     });
 
     it('selects the given airport when the world has two', async () => {
