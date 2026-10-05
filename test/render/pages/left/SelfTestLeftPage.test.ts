@@ -37,7 +37,7 @@ describe('self-test page', () => {
 
 const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
 
-/** Cold boot, power on, wait for the self-test page (it follows the 17 s welcome page). HeadingInput is on, so that the roll command does not depend on the heading input pin (#NEW-3-9) */
+/** Cold boot, power on, wait for the self-test page (it follows the 17 s welcome page). HeadingInput is on, so that the roll command does not depend on the heading input pin (#143) */
 async function onSelfTestPage() {
     const unit = await bootUnit({engineRunning: false, magvar: 0, panelXml: HEADING_INPUT_XML});
     await unit.panel.powerOn();

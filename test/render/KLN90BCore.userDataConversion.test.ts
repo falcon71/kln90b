@@ -85,7 +85,7 @@ describe('the stored last active waypoint is an ICAO V1 string', () => {
 });
 
 // Core 7: a failed restore replaces the plans by empty ones and posts USER DATA LOST. The maintainer ruled that the
-// corrupt data is then wiped once from the saved data, as the V1 conversion does, which the V2 restore does not (#NEW-6-1).
+// corrupt data is then wiped once from the saved data, as the V1 conversion does, which the V2 restore does not (#144).
 describe('a failed V2 restore of the user data', () => {
     // Written by hand: savedFlightplan sets userDataFormat 2 as well, but its strings come from the SDK. The type letter Q
     // is no facility type, so the V2 waypoint loader throws "Unsupported facility type".
@@ -121,7 +121,7 @@ describe('a failed V2 restore of the user data', () => {
         expect(storedSetting(unit, 'fpl1')).toBe('A          KAAA    ');
     });
 
-    it.fails('wipes the corrupt waypoint and the plan from the saved data (#NEW-6-1)', async () => {
+    it.fails('wipes the corrupt waypoint and the plan from the saved data (#144)', async () => {
         const unit = await bootCorruptFile();
 
         expect(storedSetting(unit, 'wpt0')).toBe('');

@@ -27,7 +27,7 @@ async function onRoute(panelXml?: string) {
 
 // Public contract: the Autopilot wiki page and the doc comment of LVAR_ROLL_COMMAND in LVars.ts: the roll command is in
 // degrees, a left bank is positive and a right bank negative. The Installation Manual (2-69) lets the unit give roll
-// steering only with a heading input; these tests run with HeadingInput on, the case without is pinned below (#NEW-3-9).
+// steering only with a heading input; these tests run with HeadingInput on, the case without is pinned below (#143).
 describe('L:KLN90B_RollCommand (public contract)', () => {
     it('is written as 0 without a flight plan', async () => {
         const unit = await bootUnit({panelXml: HEADING_INPUT_XML});
@@ -101,7 +101,7 @@ describe('L:KLN90B_RollCommand without a heading input (public contract)', () =>
         expect(unit.props.sensors.in.gps.groundspeed).toBeCloseTo(120, 6);
     });
 
-    it.fails('is 0 (#NEW-3-9)', async () => {
+    it.fails('is 0 (#143)', async () => {
         const {unit, mid, dtk} = await onRoute();
 
         await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});

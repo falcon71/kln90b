@@ -108,7 +108,7 @@ describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract
     // The wiki panel.xml customization names any boolean SimVar, with an index only after a colon. The parser takes the
     // part after the first colon for the index (KLN90BPlaneSettings.ts:97-99) and SimVarSync replaces it (:31-35), so the
     // name becomes L:NaN and the unit never powers up. The sibling is the CIRCUIT ON:1 test above.
-    it.fails('an LVar as the ElectricitySimVar powers the unit (#NEW-3-6)', async () => {
+    it.fails('an LVar as the ElectricitySimVar powers the unit (#136)', async () => {
         const unit = await bootUnit({panelXml: xml('<Input><ElectricitySimVar>L:MY_AVIONICS_BUS</ElectricitySimVar></Input>')});
         unit.env.sim.set('L:MY_AVIONICS_BUS', 'bool', true);
         await vi.advanceTimersByTimeAsync(2000);
@@ -179,7 +179,7 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
         expect(unit.env.sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
     });
 
-    it.fails('stays released when WriteGpsSimvars is toggled (#NEW-3-7)', async () => {
+    it.fails('stays released when WriteGpsSimvars is toggled (#137)', async () => {
         const {unit} = await onRoute();
         const sim = unit.env.sim;
         sim.set('L:KLN90B_Disabled', 'bool', true);
@@ -208,7 +208,7 @@ describe('H events while the unit is disabled (public contract)', () => {
         expect(Screen.read().status().left).toBe('NAV 3');
     });
 
-    it.fails('are ignored: the left page is still NAV 1 after the resume (#NEW-3-8)', async () => {
+    it.fails('are ignored: the left page is still NAV 1 after the resume (#138)', async () => {
         const {unit} = await onRoute();
         await unit.panel.selectPage('L', 'NAV 1');
         unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);

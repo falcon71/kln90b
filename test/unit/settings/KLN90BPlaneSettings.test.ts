@@ -24,7 +24,7 @@ const DEFAULTS = {
     output: {obsTarget: 0, writeGPSSimVars: true},
 };
 
-/** The parsed settings without altitudeAlertEnabled, whose default is the pinned bug (#NEW-4-1) */
+/** The parsed settings without altitudeAlertEnabled, whose default is the pinned bug (#141) */
 const withoutAltAlert = (s: KLN90PlaneSettings) => {
     const {altitudeAlertEnabled, ...output} = s.output;
     return {...s, output};
@@ -148,7 +148,7 @@ describe('panel.xml parser', () => {
             expect(withoutAltAlert(parse(kln(inner)))).toEqual(withField(path, value));
         });
 
-        // The default of this key is pinned separately (#NEW-4-1), so both values are compared on that field alone.
+        // The default of this key is pinned separately (#141), so both values are compared on that field alone.
         // The `true` row equals the code default, so it cannot fail while that is true; it bites once the default is fixed.
         it.each([
             ['false', false],
@@ -184,7 +184,7 @@ describe('panel.xml parser', () => {
 
     // The maintainer's ruling: false is intended, and the sample, the wiki sample and cfg/panel.xml all show false.
     // The code defaults to true today, so every aircraft that omits the key gets an enabled alert.
-    it.fails('defaults AltitudeAlertEnabled to false (#NEW-4-1)', () => {
+    it.fails('defaults AltitudeAlertEnabled to false (#141)', () => {
         expect(parse('<PlaneHTMLConfig></PlaneHTMLConfig>').output.altitudeAlertEnabled).toBe(false);
     });
 });

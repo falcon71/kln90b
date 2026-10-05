@@ -109,11 +109,11 @@ describe('remarks of a deleted airport and of many airports (#92)', () => {
     });
 });
 
-describe('remarks of an airport with a three-character ident (#NEW-7-1)', () => {
+describe('remarks of an airport with a three-character ident (#140)', () => {
     // 3-47: remarks belong to an airport. The ident-length premise is not from 3-47: the stored format holds the ident in a
     // 4-cell field (docs/architecture.md Core 7), and real airport databases carry 3-character idents, so a shorter ident
     // has to survive the save and the load.
-    it.fails('restores the remarks of an airport with a three-character ident after a reload (#NEW-7-1)', () => {
+    it.fails('restores the remarks of an airport with a three-character ident after a reload (#140)', () => {
         const manager = new RemarksManager(bus, userSettings);
         manager.saveRemarks('ABC', ['LINE ONE   ', 'LINE TWO   ', 'LINE THREE ']);
 

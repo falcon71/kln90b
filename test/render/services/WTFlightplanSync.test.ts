@@ -150,10 +150,10 @@ describe('the "kln90b" flight planner on the standard route', () => {
         expect(identsOf(plan)).toEqual(before);
     });
 
-    // The planner is filled with WriteGPSSimVars off: the active-waypoint path of WTFlightplanSync is not gated (#NEW-5-1,
-    // #NEW-5-2). The wiki lists the planner with the options that WriteGPSSimVars gates; the maintainer ruled "Gate both".
+    // The planner is filled with WriteGPSSimVars off: the active-waypoint path of WTFlightplanSync is not gated
+    // (#142). The wiki lists the planner with the options that WriteGPSSimVars gates; the maintainer ruled "Gate both".
     // The sibling holds the setup: the boot, the route and a working sequence.
-    it('the unit with Output.WriteGPSSimVars off has the route and sequences (setup of #NEW-5-1 and #NEW-5-2)', async () => {
+    it('the unit with Output.WriteGPSSimVars off has the route and sequences (setup of the #142 pins)', async () => {
         const unit = await bootOnRoute(NO_GPS_SIMVARS_XML);
         const aw = unit.props.memory.navPage.activeWaypoint;
 
@@ -168,13 +168,13 @@ describe('the "kln90b" flight planner on the standard route', () => {
         expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
     });
 
-    it.fails('leaves plan 0 empty with Output.WriteGPSSimVars off, after the boot (#NEW-5-1)', async () => {
+    it.fails('leaves plan 0 empty with Output.WriteGPSSimVars off, after the boot (#142)', async () => {
         const unit = await bootOnRoute(NO_GPS_SIMVARS_XML);
 
         expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
     });
 
-    it.fails('leaves plan 0 empty with Output.WriteGPSSimVars off, after a sequence (#NEW-5-2)', async () => {
+    it.fails('leaves plan 0 empty with Output.WriteGPSSimVars off, after a sequence (#142)', async () => {
         const unit = await bootOnRoute(NO_GPS_SIMVARS_XML);
         unit.props.memory.navPage.activeWaypoint.sequenceToNextWaypoint();
         await vi.advanceTimersByTimeAsync(1000);

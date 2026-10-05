@@ -269,7 +269,7 @@ describe('outputs at power-off (public contract)', () => {
         expect(Screen.read().text()).toBe(BLANK_SCREEN);
     });
 
-    it.fails('the roll command is 0 (#NEW-3-1)', async () => {
+    it.fails('the roll command is 0 (#135)', async () => {
         const unit = await banking();
 
         unit.send('KLN90B_Power_Off');
@@ -278,7 +278,7 @@ describe('outputs at power-off (public contract)', () => {
         expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBe(0);
     });
 
-    it.fails('the HSI flag is 0, flagged (#NEW-3-2)', async () => {
+    it.fails('the HSI flag is 0, flagged (#135)', async () => {
         const unit = await banking();
 
         unit.send('KLN90B_Power_Off');
@@ -287,7 +287,7 @@ describe('outputs at power-off (public contract)', () => {
         expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(0);
     });
 
-    it.fails('the MSG light is 0 (#NEW-3-3)', async () => {
+    it.fails('the MSG light is 0 (#135)', async () => {
         const unit = await onSelfTestPage();
 
         unit.send('KLN90B_Power_Off');
@@ -296,7 +296,7 @@ describe('outputs at power-off (public contract)', () => {
         expect(unit.env.sim.get('L:KLN90B_MsgLight', 'bool')).toBe(0);
     });
 
-    it.fails('the WPT light is 0 (#NEW-3-4)', async () => {
+    it.fails('the WPT light is 0 (#135)', async () => {
         const unit = await onSelfTestPage();
 
         unit.send('KLN90B_Power_Off');
@@ -305,7 +305,7 @@ describe('outputs at power-off (public contract)', () => {
         expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(0);
     });
 
-    it.fails('the annunciator test is 0 (#NEW-3-5)', async () => {
+    it.fails('the annunciator test is 0 (#135)', async () => {
         const unit = await onSelfTestPage();
 
         unit.send('KLN90B_Power_Off');

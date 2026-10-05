@@ -24,7 +24,7 @@ describe('SET 9 page and Output.AltitudeAlertEnabled (contract)', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // The explicit true equals the code default (#NEW-4-1), so this cannot fail if the key stops being read; it bites
+    // The explicit true equals the code default (#141), so this cannot fail if the key stops being read; it bites
     // once that default is fixed to false. The volume 99 is the default of the altAlertVolume setting.
     it('shows the volume instead when the alert is enabled', async () => {
         const unit = await bootUnit({panelXml: panelXml(true)});
