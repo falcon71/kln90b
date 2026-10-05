@@ -585,13 +585,20 @@ later run adds a new entry.
   representation of the CI legs was not checked. Pinned in `SidStar.test.ts`.
 - **#132:** SET 3 labels the hard-surface-only option `SFT` (`Set3Page.tsx:39`; 3-22, 3-23). Pinned in
   `Set3Page.test.ts`. Not reproduced in the sim.
-- **#133 (question, no `bug` label):** whether APT 8 should be removed from the page tree when the unit is not installed
+- **#133 (`question`):** whether APT 8 should be removed from the page tree when the unit is not installed
   for non-precision approaches (3-49, the approach-arm switch of the Installation Manual, the unread
   `AppArmSwitchInstalled`, the `Apt8Page` that `FlightplanList.tsx:550` constructs directly). It references #90 and has
   no pin, by the maintainer's decision.
 - **#134 (`enhancement`):** MOVE? on the FPL 0 page (6-17); only `SuperNav5DirectToSelector` has it.
 - **#102 comment:** the APT 1 reproduction (the airport shown before decides the type row; two orders with a Class B
   triangle, `KINS` and `KOUT`), the per-call session that fixes both orders, and the two pins' names.
+- **#100 comment:** the roll command during an anticipated turn at the end of a DME arc (the 326da1a flight: the bank
+  collapses to about -6 degrees mid-turn and the aircraft passes the FAF leg by 0.65 NM, about 0.25 NM for an ideal
+  turn). The maintainer ruled that it belongs to #100, because the roll steering still searches its intercept against
+  `fromLeg.path` while the turn is anticipated; the roll steering issues are to be reworked together. No pin.
+- After the final review, the texts of #129 to #133 were corrected (the pin names carry the real numbers, #129 relates
+  to `633fdad` instead of #41, #131 marks the start radial as read from the code, #133 names the tests that hold the
+  page tree) and #133 got the `question` label.
 
 **Fixes that could not be re-broken:** #20 (no fix), `7fd640e` (d) (canvas identical), the #102 `fill([])` array (no
 visible effect), and two parts of `15d9b35`: its no-op `nextDtk` change and the arrowhead moved by a full revert (the
@@ -635,12 +642,6 @@ drawn #18 test holds the arc, not the arrowhead).
     held now by the first-boot siblings for neither and fuel only (`splice(8, 1)` fails both).
 - APT 8 and the page tree for an approach-incapable installation: waiting on the answer to #133.
 - MOVE? on FPL 0: not implemented (#134).
-
-**Observed but not filed**
-- On the tight arc of the 326da1a flight (5 NM radius, 180 kt) the roll command drops to about -6 degrees between 110 and
-  123 s although the track has turned only 11 to 23 degrees. FAFAA is sequenced 0.30 NM from ARCEN, and the aircraft
-  passes the FAF leg by 0.65 NM (about 0.25 NM for an ideal turn). Whether the real unit does this is unknown, so it is
-  for the maintainer's decision, not an issue.
 
 **Workflow notes.** The isolation worktrees again started at `origin/main` and were reset to the session branch first.
 Reviewers: Opus for tasks 2, 3 and 4, Sonnet for 1, 5 and 6, scoped re-reviews on Sonnet or Haiku. The close-out worktree
