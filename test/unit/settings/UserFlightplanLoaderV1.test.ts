@@ -1,5 +1,5 @@
 import {beforeEach, describe, expect, it} from 'vitest';
-import {EventBus} from '@microsoft/msfs-sdk';
+import {EventBus, ICAO, UserFacility, UserFacilityType} from '@microsoft/msfs-sdk';
 import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
 import {ActualFacilityClient, KLNFacilityLoader} from '../../../kln90b/data/navdata/KLNFacilityLoader';
 import {KLN90BUserFlightplansSettings} from '../../../kln90b/settings/KLN90BUserFlightplans';
@@ -8,7 +8,7 @@ import {UserFlightplanLoaderV1} from '../../../kln90b/settings/UserFlightplanLoa
 import {UserFlightplanPersistor} from '../../../kln90b/settings/UserFlightplanPersistor';
 import {MessageHandler} from '../../../kln90b/data/MessageHandler';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
-import {airport, vor} from '../../harness/navdata/builders';
+import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
 
 // The version 1 file stored FPL 1 to 25 in fpl0 to fpl24 as 12 character ICAOs (type, region(2), airport(4), ident
 // padded to 5) and did not store FPL 0. Version 2 stores FPL n in fpln as 19 character ICAOs.
@@ -19,9 +19,19 @@ const bus = new EventBus();
 const repo = KLNFacilityRepository.getRepository(bus);
 const settings = KLN90BUserFlightplansSettings.getManager(bus);
 const loader = new KLNFacilityLoader(
-    new MemoryFacilityClient([airport('KAAA', 47, 8), vor('ABC', 47.2, 8, {region: 'K1'})]) as unknown as ActualFacilityClient,
+    new MemoryFacilityClient([
+        airport('KAAA', 47, 8),
+        vor('ABC', 47.2, 8, {region: 'K1'}),
+        ndb('XY', 47.3, 8.1, {region: 'K2'}),
+        intersection('FIXA', 47.4, 8.2, {region: 'K1'}),
+    ]) as unknown as ActualFacilityClient,
     repo,
 );
+// Legs of the kind USER are looked up in the repository of user waypoints
+repo.add({
+    icao: '', icaoStruct: ICAO.value('U', 'XX', '', 'MYWPT'), name: '', lat: 47.5, lon: 8.3, region: 'XX', city: '',
+    isTemporary: false, userFacilityType: UserFacilityType.LAT_LONG,
+} as unknown as UserFacility);
 
 beforeEach(() => {
     for (let i = 0; i <= 25; i++) {
@@ -52,5 +62,18 @@ describe('user flight plan V1 format (#47)', () => {
 
         expect(plans[0].getLegs()).toEqual([]);
         expect(plans[1].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'ABC']);
+    });
+
+    // Contract source: docs/architecture.md Core 7 (fpl{i-1} stores FPL i, 1 to 25). The highest plan sits in fpl24.
+    it('restores fpl24 of the old file as FPL 25, every facility kind', async () => {
+        settings.getSetting('fpl24').set('A      KAAA ' + 'VK1    ABC  ' + 'NK2    XY   ' + 'WK1    FIXA ' + 'UXX    MYWPT');
+
+        const plans = await new UserFlightplanLoaderV1(bus, loader, new MessageHandler()).restoreAllFlightplan();
+
+        expect(plans[25].idx).toBe(25);
+        expect(plans[25].getLegs().map(l => [l.wpt.icaoStruct.type, l.wpt.icaoStruct.region, l.wpt.icaoStruct.ident])).toEqual([
+            ['A', '', 'KAAA'], ['V', 'K1', 'ABC'], ['N', 'K2', 'XY'], ['W', 'K1', 'FIXA'], ['U', 'XX', 'MYWPT'],
+        ]);
+        expect(plans[24].getLegs()).toEqual([]);
     });
 });

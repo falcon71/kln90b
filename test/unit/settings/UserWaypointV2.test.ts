@@ -1,5 +1,5 @@
 import {beforeEach, describe, expect, it} from 'vitest';
-import {AirportFacility, EventBus, Facility, FacilityType, ICAO, NdbFacility, RunwaySurfaceType, UnitType, VorFacility} from '@microsoft/msfs-sdk';
+import {AirportFacility, EventBus, Facility, FacilityType, ICAO, NdbFacility, RunwaySurfaceType, UnitType, UserFacility, UserFacilityType, VorFacility} from '@microsoft/msfs-sdk';
 import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
 import {KLN90BUserWaypointsSettings} from '../../../kln90b/settings/KLN90BUserWaypoints';
 import {KLN90BUserSettings} from '../../../kln90b/settings/KLN90BUserSettings';
@@ -149,5 +149,70 @@ describe('user waypoint V2 format', () => {
         const wpt = repo.get(ICAO.value('W', 'XX', '', 'SZERO'))!;
         expect(wpt.lat).toBeCloseTo(-0.5, 6);
         expect(wpt.lon).toBeCloseTo(8, 6);
+    });
+
+    // Contract source for the cases below: docs/architecture.md Core 7 (V2: the 19 character ICAO, then latitude
+    // +DDMM.MM, longitude +DDDMM.MM and the type-specific fields)
+
+    it('serializes and restores a supplementary waypoint of the SUP page', () => {
+        repo.add({
+            icao: '', icaoStruct: ICAO.value('U', 'XX', '', 'MYWPT'), name: '', lat: 47.5, lon: 8.25, region: 'XX', city: '',
+            isTemporary: false, userFacilityType: UserFacilityType.LAT_LONG,
+        } as unknown as UserFacility);
+        expect(storedSlot(0)).toBe('UXX        MYWPT   +4730.00+00815.00');
+
+        removeAll();
+        restoreFrom('UXX        MYWPT   +4730.00+00815.00');
+        const wpt = repo.get(ICAO.value('U', 'XX', '', 'MYWPT')) as UserFacility;
+        expect(wpt.lat).toBeCloseTo(47.5, 6);
+        expect(wpt.lon).toBeCloseTo(8.25, 6);
+        expect(wpt.userFacilityType).toBe(UserFacilityType.LAT_LONG);
+        expect(wpt.isTemporary).toBe(false);
+    });
+
+    it('serializes a grass runway as S and restores it as grass', () => {
+        const base = airport('UAPT', 47, 8);
+        repo.add({
+            ...base,
+            icaoStruct: ICAO.value('A', 'XX', '', 'UAPT'),
+            region: 'XX',
+            altitude: 1400,
+            runways: [{...base.runways[0], length: UnitType.FOOT.convertTo(2500, UnitType.METER), surface: RunwaySurfaceType.Grass}],
+        } as AirportFacility);
+        expect(storedSlot(0)).toBe('AXX        UAPT    +4700.00+00800.00+01400+02500S');
+
+        removeAll();
+        restoreFrom('AXX        UAPT    +4700.00+00800.00+01400+02500S');
+        const apt = repo.get(ICAO.value('A', 'XX', '', 'UAPT')) as AirportFacility;
+        expect(apt.runways[0].surface).toBe(RunwaySurfaceType.Grass);
+        expect(UnitType.METER.convertTo(apt.runways[0].length, UnitType.FOOT)).toBeCloseTo(2500, 3);
+    });
+
+    it('serializes and restores a negative magnetic variation of a VOR', () => {
+        repo.add({
+            icao: '', icaoStruct: ICAO.value('V', 'XX', '', 'ABC'), name: '', lat: 47.5, lon: 8.9, region: 'XX', city: '',
+            magvar: 0, freqMHz: 108.0, freqBCD16: 0, magneticVariation: -5, type: 0, vorClass: 0, navRange: 0,
+            dme: null, ils: null, tacan: null, trueReferenced: false, alt: 0,
+        } as unknown as VorFacility);
+        expect(storedSlot(0)).toBe('VXX        ABC     +4730.00+00854.00+108.00-05');
+
+        removeAll();
+        restoreFrom('VXX        ABC     +4730.00+00854.00+108.00-05');
+        expect((repo.get(ICAO.value('V', 'XX', '', 'ABC')) as VorFacility).magneticVariation).toBe(-5);
+    });
+
+    // The V1 half of this is #101
+    it('serializes and restores a longitude of 100 degrees or more', () => {
+        repo.add({
+            icao: '', icaoStruct: ICAO.value('N', 'XX', '', 'XY'), name: '', lat: 35.25, lon: 139.75, region: 'XX', city: '',
+            magvar: 0, freqMHz: 1700, type: 0, range: 0, bfoRequired: false, alt: 0,
+        } as unknown as NdbFacility);
+        expect(storedSlot(0)).toBe('NXX        XY      +3515.00+13945.00+1700.0');
+
+        removeAll();
+        restoreFrom('NXX        XY      +3515.00-13945.00+1700.0');
+        const ndb = repo.get(ICAO.value('N', 'XX', '', 'XY')) as NdbFacility;
+        expect(ndb.lon).toBeCloseTo(-139.75, 6);
+        expect(ndb.freqMHz).toBe(1700);
     });
 });

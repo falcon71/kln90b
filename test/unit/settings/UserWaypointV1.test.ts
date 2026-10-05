@@ -1,5 +1,5 @@
 import {beforeEach, describe, expect, it} from 'vitest';
-import {AirportFacility, EventBus, Facility, ICAO, RunwaySurfaceType, UnitType, VorFacility} from '@microsoft/msfs-sdk';
+import {AirportFacility, EventBus, Facility, ICAO, NdbFacility, NdbType, RunwaySurfaceType, UnitType, UserFacility, UserFacilityType, VorFacility} from '@microsoft/msfs-sdk';
 import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
 import {KLN90BUserWaypointsSettings} from '../../../kln90b/settings/KLN90BUserWaypoints';
 import {UserWaypointLoaderV1} from '../../../kln90b/settings/UserWaypointLoaderV1';
@@ -72,5 +72,44 @@ describe('user waypoint V1 format', () => {
     // The error names the character of the V2 offset (48), which is empty in a V1 slot
     it.fails('names the unknown runway surface character in its error (#116)', () => {
         expect(() => restoreV1('AXX    UAPT +4700.00-00830.00+01400+03200X')).toThrow('runwaySurface:X');
+    });
+
+    // Contract source for the cases below: docs/architecture.md Core 7 (V1: the 12 character ICAO, then latitude
+    // +DDMM.MM, longitude +DDDMM.MM and the type-specific fields)
+
+    it('restores a supplementary waypoint of the SUP page', () => {
+        restoreV1('UXX    MYWPT+4730.00+00815.00');
+        const wpt = repo.get(ICAO.value('U', 'XX', '', 'MYWPT')) as UserFacility;
+        expect(wpt.lat).toBeCloseTo(47.5, 6);
+        expect(wpt.lon).toBeCloseTo(8.25, 6);
+        expect(wpt.userFacilityType).toBe(UserFacilityType.LAT_LONG);
+        expect(wpt.isTemporary).toBe(false);
+    });
+
+    it('restores a grass runway', () => {
+        restoreV1('AXX    UAPT +4700.00+00800.00+01400+02500S');
+        const apt = repo.get(ICAO.value('A', 'XX', '', 'UAPT')) as AirportFacility;
+        expect(apt.altitude).toBe(1400);
+        expect(apt.runways[0].surface).toBe(RunwaySurfaceType.Grass);
+        expect(UnitType.METER.convertTo(apt.runways[0].length, UnitType.FOOT)).toBeCloseTo(2500, 3);
+    });
+
+    // f745fb3: an airport without a runway length has -10 m in the model, and the stored number is negative
+    it('restores an airport with a runway of unknown length (f745fb3)', () => {
+        restoreV1('AXX    UAPU +4700.00+00800.00-00001-00033-');
+        const apt = repo.get(ICAO.value('A', 'XX', '', 'UAPU')) as AirportFacility;
+        expect(apt.altitude).toBe(-1);
+        // -33 ft are -10.0584 m
+        expect(apt.runways[0].length).toBeCloseTo(-10.0584, 4);
+        expect(apt.runways[0].surface).toBe(RunwaySurfaceType.WrightFlyerTrack);
+    });
+
+    it('restores an NDB with its frequency and type', () => {
+        restoreV1('NXX    XY   +4800.00-00915.00+0345.0');
+        const ndb = repo.get(ICAO.value('N', 'XX', '', 'XY')) as NdbFacility;
+        expect(ndb.lat).toBeCloseTo(48, 6);
+        expect(ndb.lon).toBeCloseTo(-9.25, 6);
+        expect(ndb.freqMHz).toBe(345);
+        expect(ndb.type).toBe(NdbType.H);
     });
 });
