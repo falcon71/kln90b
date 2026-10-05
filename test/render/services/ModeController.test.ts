@@ -1,8 +1,12 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, settle} from '../../harness/boot';
+import {FixTypeFlags} from '@microsoft/msfs-sdk';
+import {bootUnit, moveAircraft, settle} from '../../harness/boot';
 import {standardRoute} from '../../harness/fixtures';
+import {airport, intersection} from '../../harness/navdata/builders';
+import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
-import {courseDeg, distanceNm, EARTH_RADIUS_NM, pointBefore} from '../../harness/flight/geo';
+import {courseDeg, distanceNm, EARTH_RADIUS_NM, pointBefore, pointFrom} from '../../harness/flight/geo';
+import {KLNFixType} from '../../../kln90b/data/flightplan/Flightplan';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 
 // The standard world of the flight tests: the final course KAAA - ABC is about 51.0 degrees
@@ -83,5 +87,126 @@ describe('ModeController OBS course of 000', () => {
         expect(nav.activeWaypoint.isDctNavigation()).toBe(true);
         expect(xtkFromCourse(position, 0)).toBeCloseTo(-7.77, 1);
         expect(Math.abs(nav.xtkToActive! - xtkFromCourse(position, 0))).toBeLessThan(0.05);
+    });
+});
+
+// 6-3: the unit switches from ARM to APR when the FAF is the active waypoint and the aircraft is within 2 NM of it and
+// heading toward it. 633fdad widened the allowed difference between the track and the final course to 110 degrees.
+describe('arming to approach active at the FAF (633fdad)', () => {
+    const kprc = airport('KPRC', 47.0, 8.0);
+    const mapaa = intersection('MAPAA', 47.0, 8.0);
+    // The final course is 180: the FAF is 5 NM north of the MAP. At rest the unit's GPS track is 0, so a final course within
+    // 110 degrees of 000 would switch to APR before the aircraft moves.
+    const fafPos = pointFrom(mapaa, 0, 5);
+    const fafaa = intersection('FAFAA', fafPos.lat, fafPos.lon);
+
+    /**
+     * The IF is 5 NM and the IAF 10 NM before the FAF on the inbound track, which may differ from the final course; the
+     * unit starts 1.6 NM before the FAF on that track with the FAF active and the mode ARM.
+     */
+    async function armedNearFaf(inboundTrack: number) {
+        const ifPos = pointFrom(fafaa, inboundTrack + 180, 5);
+        const iafPos = pointFrom(fafaa, inboundTrack + 180, 10);
+        const ifaaa = intersection('IFAAA', ifPos.lat, ifPos.lon);
+        const iafaa = intersection('IAFAA', iafPos.lat, iafPos.lon);
+        const apt = withProcedures(kprc, {
+            approaches: [approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '18',
+                transitions: [{name: 'IAFAA', legs: [Leg.IF(iafaa, FixTypeFlags.IAF), Leg.TF(ifaaa)]}],
+                final: [Leg.IF(ifaaa), Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            })],
+        });
+        const unit = await bootUnit({
+            facilities: [apt, iafaa, ifaaa, fafaa, mapaa], position: pointFrom(fafaa, inboundTrack + 180, 1.6),
+            storage: {...savedFlightplan(0, [apt]), turnAnticipation: false},
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        await vi.advanceTimersByTimeAsync(2000);
+        const nav = unit.props.memory.navPage;
+        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('FAFAA'); // Preconditions
+        expect(nav.navmode).toBe(NavMode.ARM_LEG);
+        return {unit, nav, inboundTrack};
+    }
+
+    /** The aircraft moves on to 1.55 NM before the FAF on the inbound track */
+    async function flyOn(unit: Awaited<ReturnType<typeof armedNearFaf>>['unit'], inboundTrack: number) {
+        await moveAircraft(unit, pointFrom(fafaa, inboundTrack + 180, 1.55), {groundspeedKt: 120, trackTrue: inboundTrack});
+    }
+
+    // 6-3: the aircraft flies toward the FAF, 100 degrees off the final course
+    it('switches to APR with a track of 100 degrees off the final course (633fdad)', async () => {
+        const {unit, nav, inboundTrack} = await armedNearFaf(80);
+
+        await flyOn(unit, inboundTrack);
+
+        expect(unit.props.sensors.in.gps.trackTrue).toBeCloseTo(80, 0); // The unit has the track of the move
+        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('FAFAA');
+        expect(nav.navmode).toBe(NavMode.APR_LEG);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The Pilot's Guide does not give the limit; the unit uses 110 degrees, so a track 120 degrees off stays in ARM
+    it('stays in ARM with a track of 120 degrees off the final course (characterization, 633fdad)', async () => {
+        const {unit, nav, inboundTrack} = await armedNearFaf(60);
+
+        await flyOn(unit, inboundTrack);
+
+        expect(unit.props.sensors.in.gps.trackTrue).toBeCloseTo(60, 0);
+        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('FAFAA');
+        expect(nav.navmode).toBe(NavMode.ARM_LEG);
+        expect(unit.errors).toEqual([]);
+    });
+});
+
+// 6-3 lists a waypoint that is the IAF and the FAF at once as the active waypoint of the switch; 6-10 gives the example
+// where the unit switches to APR 2 NM from the IAF/FAF. ModeController.checkSwitchAprArmToActive returns unless the
+// active waypoint is typed FAF, but with such a fix the IAF copy is active during the last 2 NM (#129).
+describe('arming to approach active at a fix that is IAF and FAF (#129)', () => {
+    async function armedNearIafFaf() {
+        const kprc = airport('KPRC', 47.0, 8.0);
+        const mapaa = intersection('MAPAA', 47.0, 8.0);
+        const txoPos = pointFrom(kprc, 0, 5);
+        const txo = intersection('TXOAA', txoPos.lat, txoPos.lon);
+        const enrPos = pointFrom(txo, 0, 30);
+        const enraa = intersection('ENRAA', enrPos.lat, enrPos.lon);
+        const apt = withProcedures(kprc, {
+            approaches: [approach({
+                type: ApproachType.APPROACH_TYPE_VOR, runway: '18',
+                transitions: [{name: 'TXOAA', legs: [Leg.IF(txo, FixTypeFlags.IAF)]}],
+                final: [Leg.IF(txo, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            })],
+        });
+        const unit = await bootUnit({
+            facilities: [apt, enraa, txo, mapaa], position: pointFrom(txo, 0, 1.6),
+            storage: {...savedFlightplan(0, [enraa, apt]), turnAnticipation: false},
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        return {unit, txo};
+    }
+
+    // The sibling of the pin: the setup works, the IAF copy is active and the unit stays armed 1.6 NM from the fix because the
+    // rest track of 0 points away from it
+    it('is armed with the IAF copy of the fix active at 1.6 NM from it, on a rest track that points away from the fix (6-3)', async () => {
+        const {unit} = await armedNearIafFaf();
+        const nav = unit.props.memory.navPage;
+
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['ENRAA', 'TXOAA', 'TXOAA', 'MAPAA', 'KPRC']);
+        expect(nav.activeWaypoint.getActiveFplIdx()).toBe(1);
+        expect(nav.activeWaypoint.getActiveLeg()!.fixType).toBe(KLNFixType.IAF);
+        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('TXOAA');
+        expect(nav.navmode).toBe(NavMode.ARM_LEG);
+        expect(unit.errors).toEqual([]);
+    });
+
+    it.fails('switches to APR within 2 NM of the fix, heading toward it (#129)', async () => {
+        const {unit, txo} = await armedNearIafFaf();
+        const nav = unit.props.memory.navPage;
+
+        await moveAircraft(unit, pointFrom(txo, 0, 1.55), {groundspeedKt: 120, trackTrue: 180});
+
+        expect(unit.props.sensors.in.gps.trackTrue).toBeCloseTo(180, 0);
+        expect(nav.navmode).toBe(NavMode.APR_LEG);
     });
 });

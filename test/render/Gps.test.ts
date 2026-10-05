@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit} from '../harness/boot';
+import {bootUnit, moveAircraft, settle} from '../harness/boot';
 import {Screen} from '../harness/render/screen';
 import {TimeStamp} from '../../kln90b/data/Time';
 
@@ -82,5 +82,64 @@ describe('GPS week rollover (64c203d)', () => {
         const ERA_MS = 1024 * 7 * 24 * 60 * 60 * 1000;
 
         expect(Math.abs(gps.timeZulu.getTimestamp() - (Date.now() - ERA_MS))).toBeLessThan(TOLERANCE_MS);
+    });
+});
+
+// The track of the GPS is the bearing between two successive fixes, and it needs a ground speed of at least 2 kt (3-32,
+// 3-35). When the position then stops changing (a paused sim), the unit keeps the last track instead of computing the
+// bearing between two equal points (43d472b). The jump from 47/8 to 47.1/8.1 is flown on the true course of 34.232
+// degrees (great circle, by hand from the spherical formula); with the variation of 4 degrees east the magnetic track is
+// 30.232 degrees, which NAV 3 rounds to 030.
+describe('GPS track while the sim is paused (43d472b)', () => {
+    const TRUE_TRACK_RAD = 34.232 * Math.PI / 180;
+    const MAGNETIC_TRACK_RAD = 30.232 * Math.PI / 180;
+
+    async function bootAndJump() {
+        const unit = await bootUnit({position: {lat: 47, lon: 8}, magvar: 4});
+        await settle(unit);
+        await unit.panel.selectPage('L', 'NAV 3');
+        await moveAircraft(unit, {lat: 47.1, lon: 8.1}, {groundspeedKt: 120});
+        return unit;
+    }
+
+    // 3-32: TK shows the track as a number when the speed is sufficient
+    it('shows the magnetic track on NAV 3 and writes both track SimVars after a jump at 120 kt', async () => {
+        const unit = await bootAndJump();
+
+        expect(Screen.read().rows('L')[2]).toBe('TK     030°');
+        expect(unit.env.sim.get('GPS GROUND TRUE TRACK', 'radians')).toBeCloseTo(TRUE_TRACK_RAD, 3);
+        expect(unit.env.sim.get('GPS GROUND MAGNETIC TRACK', 'radians')).toBeCloseTo(MAGNETIC_TRACK_RAD, 3);
+    });
+
+    // The hold is a characterization: the Pilot's Guide does not describe a paused sim. One test per output, so that each
+    // says on its own whether it kept the track.
+    async function bootJumpAndHold() {
+        const unit = await bootAndJump();
+        await vi.advanceTimersByTimeAsync(5000);
+        return unit;
+    }
+
+    it('characterization: keeps the track on NAV 3 while the position holds for 5 s', async () => {
+        await bootJumpAndHold();
+
+        expect(Screen.read().rows('L')[2]).toBe('TK     030°');
+    });
+
+    it('characterization: keeps the true track SimVar while the position holds for 5 s', async () => {
+        const unit = await bootJumpAndHold();
+
+        expect(unit.env.sim.get('GPS GROUND TRUE TRACK', 'radians')).toBeCloseTo(TRUE_TRACK_RAD, 3);
+    });
+
+    it('characterization: keeps the magnetic track SimVar while the position holds for 5 s', async () => {
+        const unit = await bootJumpAndHold();
+
+        expect(unit.env.sim.get('GPS GROUND MAGNETIC TRACK', 'radians')).toBeCloseTo(MAGNETIC_TRACK_RAD, 3);
+    });
+
+    it('characterization: logs no error while the position holds for 5 s', async () => {
+        const unit = await bootJumpAndHold();
+
+        expect(unit.consoleErrors).toEqual([]);
     });
 });

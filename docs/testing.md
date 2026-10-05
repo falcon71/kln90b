@@ -174,6 +174,9 @@ in the sim. The SDK's `NearestLodBoundarySearchSession` builds the `LodBoundary`
 LOD 0 is the exact ring instead of a simplified one, and `resetSingletons` clears the SDK's boundary cache, which is
 keyed by the airspace id. A circular airspace exists for the known gap that `BoundaryUtils` ignores circles. A test of a
 message reads the MSG page with `Screen.read()` (see `test/render/harness/airspaces.test.ts`).
+A Center airspace (`BoundaryType.Center`) built with `frequencyMHz` carries the frequency that OTH 2 lists. OTH 2 also
+reads the frequency's name, and throws on every display tick without it, so the builder gives the airspace's own name
+unless `frequencyName` says otherwise.
 
 `savedFlightplan(idx, legs)` (`test/harness/storage.ts`) returns user data in the V2 format (docs/architecture.md,
 Core 7). Pass it as `storage` to start a test with a flight plan already stored, which is far faster than entering it
@@ -217,15 +220,20 @@ pages accept.
 - **Every fix must be in the navdata**, because `SidStar` loads each one with `getFacility`, and so must an arc's navaid.
   `bootUnit` checks this on the facilities it is given and throws, naming each missing fix as `IDENT (type region)`
   (`MemoryFacilityClient.missingProcedureFixes()` is the same check for a unit test).
-- Load a procedure the way a pilot does: `selectPage('R', 'APT 8')`, `cursor('R')`, `ent()` on the approach (a single
-  transition is taken without a question), `ent()` on LOAD IN FPL. APT 7 is the same with the SID or STAR. The unit
-  then shows FPL 0 on the left, but FPL 0 scrolls to the active leg only at the next calculation tick: advance about
-  1 s before you read its rows. The APT pages open on the first airport of the scan list, so with more than one airport
-  select the ident first. `test/render/harness/procedures.test.ts` does all three.
+- **`unit.panel.loadProcedure('APT 8')`** loads the first procedure of APT 7 or APT 8 into FPL 0 the way a pilot does:
+  select the page, cursor, ENT on the first entry (a single transition is taken without a question), ENT on LOAD IN
+  FPL, cursor off, then one second of clock, because FPL 0 scrolls to the active leg only at the next calculation tick.
+  The APT pages open on the first airport of the scan list, so with more than one airport pass
+  `{ident: 'KPRC'}`: the helper first enters that ident on APT 1. A test that needs another entry or a transition
+  question does the sequence by hand (`selectPage`, `cursor`, `ent`). `test/render/harness/procedures.test.ts` does
+  both.
 - A DME arc is converted to an entry waypoint `Dnnnx` and the arc's end fix. The entry is the point of the arc closest to
   the GPS position at load time (the beginning of the arc when that point is outside it), so the position the unit boots
   at decides the entry. The arc's radials are true bearings: keep `magvar` at 0 or account for it. The arc must not be the
   first leg that survives the conversion, which replaces the leg before the arc with the entry.
+  Boot on the arc, so that the arc leg is the closest and becomes active (activation in the middle of an arc is #121).
+  A test that recalculates the entry (MOVE? on Super NAV 5) uses a left arc, because the entry of a right arc is named
+  wrongly after a recalculation (#104).
 - `Leg.TF(fix, FixTypeFlags.IAF)` and its siblings set the fix types. `SidStar` keeps a leg flagged IAF, FAF, MAP or MAHP
   even when its fix repeats, and drops an unflagged repeat.
 
@@ -288,6 +296,14 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - **`settle(unit)`** (`boot.ts`) advances the clock until the GPS has a solution, then two calculation ticks more, so that
   FPL 0 has activated and the display shows it (a force-ready boot is valid at once, but FPL 0 activates only at the first
   calculation tick). It throws when there is no fix within its cap (120 s by default).
+- **`moveAircraft(unit, point, {groundspeedKt, trackTrue?})`** (`boot.ts`) moves the aircraft so that the GPS computes a
+  track, which it takes from the last two positions once the ground speed is at least 2 kt (3-35). The helper sets
+  `GROUND VELOCITY`, jumps to the point and runs one calculation tick, so the track is that of the jump from the present
+  position. With `trackTrue` the aircraft first jumps to a point 0.05 NM behind the target on that track, ticks, then
+  jumps to the target. Afterwards the position holds, which is a paused sim: the unit keeps the last track (see
+  `test/render/harness/moveAircraft.test.ts`). Only the calculation tick reads the position, so the order of these ticks
+  relative to a display tick does not matter. A held position with ground speed can sequence the leg, so keep the
+  aircraft away from the next waypoint or boot with `storage: {turnAnticipation: false}`.
 - **`storedSetting(unit, name)`** (`storage.ts`) returns the parsed value the unit saved under a user setting, and
   `undefined` for a key never saved. The unit saves a moment after the change, so advance the clock first. Use it instead
   of building the `persistent-setting.<model>.profile_1.` key by hand.
@@ -492,6 +508,11 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   maintainer from their code). A test that passes against the fake proves the instrument's use of those rules, not that
   the sim applies them.
   The instrument itself ignores circular airspaces (`BoundaryUtils`); `circularAirspace()` exists to hold that gap.
+- **One fact about real procedures came from a navigation database queried locally and is not committed.** The pattern
+  `AF, CI (no fix), AF` around one navaid with two radii, which `SidStar` merges into one arc (#131), was found in an
+  AIRAC 2607 export (five STARs). No row of it is in the repo (section 5 forbids recorded navdata), and the sim's own
+  representation of the CI legs was not checked: the invented procedure of the pin in `SidStar.test.ts` is built from the
+  pattern, not from the data.
 - **There is no wind.** Ground speed and track equal airspeed and heading, so crosswind effects are not modeled.
 - **`jump` skips integrated values**, and monitors and the recorder sample once per simulated second.
 - **The 16 Hz loops** run every 62 ms in tests: the fake timers round the 62.5 ms interval down to whole milliseconds.
@@ -555,8 +576,6 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - **The test baseline is being built session by session.** The plan, the rules for those sessions and the regression
   triage table are in [test-coverage.md](test-coverage.md). That document is temporary and its last session retires it
   into a coverage record here; until then, start a test session from it rather than from this list.
-- A power-cycle test for #90 (the OTH pages are pruned again on each `MainPage` construction). The helpers exist
-  (`powerCycle` and a boot with `engineRunning: false`, section 4); the test is planned in Session 3b.
 - **Flights cannot test the nav-source gate or a cold start, by the maintainer's decision.** `Aircraft.writeTo` forces
   `GPS DRIVES NAV1` true on every 16 Hz step, so a flight cannot observe what the unit does when the GPS is not the
   nav source (`92fbba1` is a render test, which sets the SimVar itself). `Flight.start` waits for a fix, so it cannot
@@ -570,7 +589,8 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
   exceptions are shown there (section 6). The question is #118; once it is decided, either the code changes or the two
   documents do. The harness collector stays either way.
 - Flip the pins when the bugs are fixed: remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each of
-  which names its issue.
+  which names its issue. The real fix of #90 (a copy of the page tree per controller) also changes
+  `test/render/harness/pageTree.test.ts`, which asserts the in-place pruning.
 - #99 (lat/lon displays show 60.00 minutes just below a whole degree) is filed but has no pin yet; a render test would
   hold it.
 - Further flights: approach arming (ARM to APR scale ramp), waypoint alert without turn anticipation, and the

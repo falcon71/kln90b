@@ -191,7 +191,9 @@ describe('airspace builders and the SDK LodBoundary', () => {
     });
 
     it('carries a center frequency only when given', () => {
-        expect((airspace('CTR', BoundaryType.Center, corners, {frequencyMHz: 132.5}) as any).frequency).toEqual({freqMHz: 132.5});
+        // The frequency carries the name that OTH 2 reads: the airspace's own unless frequencyName says otherwise
+        expect((airspace('CTR', BoundaryType.Center, corners, {frequencyMHz: 132.5}) as any).frequency).toEqual({freqMHz: 132.5, name: 'CTR'});
+        expect((airspace('CTR', BoundaryType.Center, corners, {frequencyMHz: 132.5, frequencyName: 'ZURICH'}) as any).frequency).toEqual({freqMHz: 132.5, name: 'ZURICH'});
         expect('frequency' in airspace('NOFQ', BoundaryType.Center, corners)).toBe(false);
     });
 });
