@@ -554,6 +554,10 @@ later run adds a new entry.
   V1. Pin #144.
 - **Task 7, remarks and the setting keys:** the remark save and load literals, APT 5 and OTH 4 (3-47), one exact pin of
   every stored key and default, and SET 5 (3-58). Pins #92 (two, its stale slots and its slot limit), #140 and #89.
+- **The steady MSG light (final fix wave):** `StatusLine.test.ts` raises the persistent message `ADJ NAV IND CRS TO nnn`
+  with an external course 30 degrees off the DTK, reads every message, and asserts the light steady at every display
+  tick (3-16, 3-59); with the course set onto the DTK the message and the light go. The trigger was the maintainer's
+  hint.
 - **Task 8, this close-out:** the issues and comments below, the placeholders replaced (`references #135` to `#144`),
   the comments of `LVars.ts` corrected (the HSI flag values; `H:KLN90B_Power_On` and `H:KLN90B_Power_Off` set
   `L:KLN90B_Power` too; comments only), and `testing.md` sections 3, 4 and 7. The two test comments that said `LVars.ts`
@@ -638,15 +642,18 @@ fails the Disabled test, removing either alone does not change the tick rate.
   OBS modes, and the arm by the button within 30 NM (reachable only once #139 is fixed). The MSG page's posting order
   against 3-16 is not checked (the test reads the two boot messages as a set). The sweep's "self-test page" title
   describes the APPROVE? page after the self-test.
-- LVars: the MSG light steady while a persistent message stays (no cheap trigger); the roll command's 5 kt threshold
-  (only 0 kt is held; 2-70 names no threshold, and `< 5` to `< 1` survives); the brightness clamp and the boot-0 quirk
-  of `L:KLN90B_Brightness` (undocumented); the TickController `setEnabled` guard alone (see above).
+- LVars: the roll command's 5 kt threshold (only 0 kt is held; 2-70 names no threshold, and `< 5` to `< 1` survives);
+  the brightness clamp and the boot-0 quirk of `L:KLN90B_Brightness` (undocumented); the TickController `setEnabled`
+  guard alone (see above).
 - panel.xml keys: `TakeHomeMode` (by decision); the BasePath effect (needs a `FakeXhr` mount); the effects of the keys
   owned by other sessions (HeadingInput, BaroSource, AltimeterInterfaced, the fuel computer units); the effect of
   `AppArmSwitchInstalled` (none today, #133); a lookup path without its parent survives (`getElementsByTagName` finds
   descendants, so `"ObsSource"` instead of `"Input.ObsSource"` passes); the `true` row of `AltitudeAlertEnabled` and the
   SET 9 enabled test cannot fail until #141 is fixed.
-- GPS SimVars: `GPS COURSE TO STEER`'s value (a characterization only); the XTK filter dynamics; ARM_OBS.
+- GPS SimVars: `GPS COURSE TO STEER`'s value (a characterization only); the XTK filter dynamics; ARM_OBS; the
+  `"kln90b"` planner gate is not tested through the runtime LVar `L:KLN90B_WriteGpsSimvars`: the planner gate test sets
+  the option through panel.xml only, and a mutation that freezes `writeGPSSimVars` at construction in
+  `WTFlightplanSync.ts:51` survives the whole suite. The fix of #142 needs such a test.
 - Persisted data: temporary (`XY`) waypoints round-tripped through storage; the 10-message cap of the flight-plan loader
   (`OTHER WAYPOINTS DELETED`); the failing V1 restore path; APT 5 lines blanked by the pilot keep the airport in the
   remarks list (the real unit's behavior is unknown). `UserWaypointV2.test.ts:87` (Session 2) still asserts
@@ -697,7 +704,7 @@ carry #124.
 
 Read the rise with care (section 1): the number says what ran, not what is held.
 
-The suite at the start: 505 tests passed and 40 expected failures, in 124 files. At the end: 767 tests passed and 60
+The suite at the start: 505 tests passed and 40 expected failures, in 124 files. At the end: 768 tests passed and 60
 expected failures, in 139 files. All twenty new expected failures are pins: #135 (five), #136, #137, #138, #139, #140,
 #141, #142 (two), #143, #144, #126 (two), #92 (two) and #89.
 

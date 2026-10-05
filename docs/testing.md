@@ -622,8 +622,8 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
   hold it.
 - Further flights: approach arming (ARM to APR scale ramp), waypoint alert without turn anticipation, and the
   GPS-invalid path.
-- Harness gaps that the Session 4 contract tests worked around (each serves one or two tests today, so none was built,
-  per rule 13 of test-coverage.md):
+- Harness gaps that the Session 4 contract tests worked around (each serves few tests, so none was built, per rule 13
+  of test-coverage.md):
     - **SimVars before `init`.** `BootOptions` cannot set an arbitrary SimVar before the core reads it. An electricity
       test therefore boots powered, loses power at the first `SimVarSync` tick and powers up when the test sets the
       circuit (`SimVarSync.test.ts`, `PowerButton.test.ts`). A `simVars` boot option would remove the detour.
@@ -638,8 +638,6 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       them in step.
     - **A `FakeXhr` mount.** `FakeXhr` serves `resources/` only at the default path, so a custom `BasePath` fails the
       boot; a mount option would let a test hold the BasePath effect.
-    - **A persistent message.** No cheap trigger was found for a message that stays while its condition lasts, so the
-      steady MSG light (`StatusLine.tsx`) is untested.
-- Costs to keep in mind: the H event sweep boots a fresh unit for every public event in four states (about 5 s), and
-  `test/unit/KLN90B.test.ts` imports the whole instrument statically (about 1 s at collection; a dynamic import timed
-  out under load).
+- Costs to keep in mind: the H event sweep boots a fresh unit for every public event in four states, and
+  `test/unit/KLN90B.test.ts` imports the whole instrument statically, which is slow at collection (a dynamic import
+  timed out under load).
