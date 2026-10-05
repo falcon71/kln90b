@@ -87,19 +87,38 @@ function downsampled(ascii: string, block = 4): string {
 }
 
 describe('NAV 5 page with a DME arc', () => {
-    /** Lit pixels of the NAV 5 canvas (396 x 312) in the four quarters around its center, less a margin of 8 px */
-    function quarters() {
+    /**
+     * Lit pixels of the NAV 5 canvas (396 x 312) in the four quarters around its center, less a margin of 8 px, and
+     * `onRing(from, to)`: the lit pixels within 6 px of the 10 NM ring around ABC between two radials. The map is north
+     * up with the aircraft in the middle and its range is the distance from the aircraft to the top of the screen
+     * (Pilot's Guide 3-35), so 25 NM are half the canvas height (6.24 px per NM) and the 10 NM ring has a radius of 62.4
+     * px. ABC is 0.5 NM west of the aircraft, which is the center of the canvas.
+     */
+    function readMap() {
         const rows = canvasToAscii(document.querySelector('canvas') as HTMLCanvasElement).split('\n');
         const width = rows[0].length, height = rows.length;
         const cx = Math.floor(width / 2), cy = Math.floor(height / 2);
-        const count = (x0: number, x1: number, y0: number, y1: number) => {
+        const lit = (x0: number, x1: number, y0: number, y1: number) => {
             let n = 0;
             for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (rows[y][x] === '#') n++;
             return n;
         };
+        const pxPerNm = (height / 2) / 25;
+        const onRing = (fromRadial: number, toRadial: number) => {
+            let n = 0;
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    if (rows[y][x] !== '#') continue;
+                    const dx = x + 0.5 - (width / 2 - 0.5 * pxPerNm), dy = y + 0.5 - height / 2;
+                    const radial = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+                    if (Math.abs(Math.hypot(dx, dy) - 10 * pxPerNm) <= 6 && radial >= fromRadial && radial <= toRadial) n++;
+                }
+            }
+            return n;
+        };
         return {
-            ne: count(cx + 8, width, 0, cy - 8), sw: count(0, cx - 8, cy + 8, height),
-            nw: count(0, cx - 8, 0, cy - 8), se: count(cx + 8, width, cy + 8, height),
+            ne: lit(cx + 8, width, 0, cy - 8), sw: lit(0, cx - 8, cy + 8, height),
+            nw: lit(0, cx - 8, 0, cy - 8), se: lit(cx + 8, width, cy + 8, height), onRing,
         };
     }
 
@@ -110,9 +129,9 @@ describe('NAV 5 page with a DME arc', () => {
     // The map is north up and 25 NM, centered on the aircraft 0.5 NM east of the VOR; the rest of the plan lies far
     // south-west, so nothing but the arc can reach the north-east quarter. The north-west quarter holds labels.
     it.each([
-        ['right', LegTurnDirection.Right],
-        ['left', LegTurnDirection.Left],
-    ] as const)('draws a %s arc through the south-west quarter only (#18)', async (_name, turn) => {
+        ['right', LegTurnDirection.Right, 240, 254],
+        ['left', LegTurnDirection.Left, 196, 208],
+    ] as const)('draws a %s arc through the south-west quarter only (#18)', async (_name, turn, fromRadial, toRadial) => {
         const w = arcApproach(turn);
         const unit = await bootUnit({
             facilities: w.facilities, position: w.at(225, 10),
@@ -126,10 +145,17 @@ describe('NAV 5 page with a DME arc', () => {
         await unit.panel.selectPage('L', 'NAV 5');
         await vi.advanceTimersByTimeAsync(2000);
 
-        const q = quarters();
+        const map = readMap();
         expect(unit.errors).toEqual([]);
-        expect(q.ne).toBe(0);
-        expect(q.sw).toBeGreaterThan(20);
+        // Nothing the long way round, in the north-east quarter
+        expect(map.ne).toBe(0);
+        // The solid arc itself, in a window of the sector between the entry (225) and the arc's end that holds no labels
+        // or other lines (right 240 to 254, left 196 to 208). The line is 4 px wide (one map pixel), so a full line is
+        // the window's length on the 62.4 px ring times 4 and at least half of it must be lit (measured 71 and 58 of
+        // about 61 and 52). The dashed arc from the beginning to the entry lies on the other side of the entry. Without
+        // the solid arc (a map that stops drawing it) no pixel is left in the window.
+        const fullLine = (toRadial - fromRadial) * Math.PI / 180 * 62.4 * 4;
+        expect(map.onRing(fromRadial, toRadial)).toBeGreaterThan(fullLine / 2);
     });
 
     // characterization: pins what NAV 5 draws today, and claims nothing about the real unit.

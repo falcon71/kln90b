@@ -1,11 +1,11 @@
 import {describe, expect, it} from 'vitest';
-import {FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
+import {FixTypeFlags, GeoCircle, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {Flight} from '../../harness/flight/Flight';
 import {World} from '../../harness/flight/World';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
-import {angleBetween, angleDiff, courseDeg, distanceNm, pointFrom} from '../../harness/flight/geo';
+import {angleBetween, angleDiff, courseDeg, distanceNm, EARTH_RADIUS_NM, pointFrom} from '../../harness/flight/geo';
 
 const RNAV = ApproachType.APPROACH_TYPE_RNAV;
 
@@ -83,7 +83,9 @@ describe('DME arc flown', () => {
             // Quiet for the first 20 s, while the aircraft settles on the arc
             if (f.t - loadedAt < 20) return true;
             const off = distanceNm(abc, f.aircraft) - 10;
-            // The coupled autopilot cuts the corner at the arc's end by up to about 0.2 NM (measured 0.18)
+            // The turn onto the next leg is anticipated and cuts the corner at the arc's end. At 120 kt the bank is
+            // 18.3 degrees (57.3 * atan(120 / 362.1)), the turn radius 0.63 NM, and a 90 degree turn cuts the corner by
+            // r * (sqrt(2) - 1) = 0.26 NM, so 0.3 NM holds it (measured 0.18)
             if (Math.abs(off) >= 0.3) return `${off.toFixed(2)} NM off the 10 NM circle at ${(f.t - loadedAt).toFixed(0)} s`;
             // The radial never steps back against the direction of the arc (a few thousandths of noise are allowed)
             return step > -0.01 || `the radial stepped back by ${step.toFixed(2)} degrees`;
@@ -104,7 +106,7 @@ describe('DME arc flown', () => {
     // 120 kt the broken and the correct turn start differ by only about 0.06 NM, which no bound can tell apart. Do not
     // "simplify" this to the arc of the test above.
     it('starts the turn at the arc end from the DTK there, not the present one (326da1a)', async () => {
-        const {flight, arcen, fafaa} = await loadedOnArc(LegTurnDirection.Right, 200, {radiusNm: 5, groundspeedKt: 180});
+        const {flight, abc, arcen, fafaa} = await loadedOnArc(LegTurnDirection.Right, 200, {radiusNm: 5, groundspeedKt: 180});
         expect(flight.nav.activeIdent).toBe('ARCEN');
         // The arc ends on the 270 radial going north, and the next leg runs east: a right turn of 90 degrees
         const nextCourse = courseDeg(arcen, fafaa);
@@ -117,9 +119,47 @@ describe('DME arc flown', () => {
         expect(flight.nav.activeIdent).toBe('ARCEN');
         // Lower bound: the turn radius at 180 kt and the 25 degree bank cap is 1.01 NM, and a 90 degree turn needs
         // r * tan(45) of lead. Upper bound: the roll-in adds 25 deg / (5 deg/s) * 180 kt = 0.25 NM and one calculation
-        // tick 0.05 NM (measured 1.24 NM). The broken start is at 5.5 NM.
+        // tick 0.05 NM, 1.01 + 0.25 + 0.05 = 1.31 (measured 1.24 NM). The broken start is at 5.5 NM.
         const distance = distanceNm(flight.aircraft, arcen);
         expect(distance).toBeGreaterThan(1.01);
-        expect(distance).toBeLessThan(1.35);
+        expect(distance).toBeLessThan(1.31);
+
+        // The same fromDtk builds the turn itself (4-8: the unit saves how the turn was calculated), so it must put the
+        // turn circle where the geometry says. The arc ends going along the tangent there, which is the course to the
+        // VOR minus 90 for a clockwise arc. The turn starts r * tan(45) before ARCEN on that line, and its circle has
+        // its center r to the right of the start. Reversing fromDtk on arcs only moves the start behind ARCEN and the
+        // center to the left of it; the start distance above does not see that, the turn it flies does.
+        const radius = (180 * 1852 / 3600) ** 2 / (9.80665 * Math.tan(25 * Math.PI / 180)) / 1852; // NM, 1.012
+        const tangent = courseDeg(arcen, abc) - 90;
+        const start = pointFrom(arcen, tangent + 180, radius * Math.tan(Math.PI / 4));
+        const center = pointFrom(start, tangent + 90, radius);
+        const turn = flight.unit.props.memory.navPage.activeWaypoint.turnStack
+            .map(entry => entry.path)
+            .reduce((smallest, path) => circleRadiusNm(path) < circleRadiusNm(smallest) ? path : smallest);
+        expect(circleRadiusNm(turn)).toBeCloseTo(radius, 1);
+        expect(distanceNm(circleCenter(turn), center)).toBeLessThan(0.03);
+
+        // Flown through, the aircraft is on the FAF leg and never passes it by more than one turn radius. That is what
+        // a turn that starts at the waypoint, without any lead, would give; the turn flown here stays inside it
+        // (measured 0.65 NM).
+        let northOfLeg = 0;
+        flight.monitor('beyond the FAF leg', f => {
+            const d = distanceNm(arcen, f.aircraft);
+            const off = Math.asin(Math.sin(d / EARTH_RADIUS_NM) * Math.sin((courseDeg(arcen, f.aircraft) - nextCourse) * Math.PI / 180)) * EARTH_RADIUS_NM;
+            northOfLeg = Math.max(northOfLeg, -off); // the leg runs east, so north is on its left
+            return true;
+        });
+        await flight.flyUntil(
+            () => angleBetween(flight.sim.get('GPS GROUND TRUE TRACK', 'degrees'), nextCourse) < 1,
+            {timeout: 120, description: 'established on the FAF leg course'});
+        expect(flight.nav.activeIdent).toBe('FAFAA');
+        expect(northOfLeg).toBeLessThan(radius);
     });
 });
+
+/** A GeoCircle as the SDK keeps it: a reversed one has the antipode of its center and the radius pi - r */
+const circleRadiusNm = (c: GeoCircle) => (c.radius > Math.PI / 2 ? Math.PI - c.radius : c.radius) * EARTH_RADIUS_NM;
+const circleCenter = (c: GeoCircle) => {
+    const [x, y, z] = c.radius > Math.PI / 2 ? [-c.center[0], -c.center[1], -c.center[2]] : [c.center[0], c.center[1], c.center[2]];
+    return {lat: Math.asin(z) * 180 / Math.PI, lon: Math.atan2(y, x) * 180 / Math.PI};
+};

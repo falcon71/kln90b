@@ -119,6 +119,7 @@ describe('GPS SimVars written by SensorsOut', () => {
 // docs/architecture.md; Pilot's Guide appendix A). 1e1a8f5: on a DME arc the autopilot SimVars carry the desired track,
 // because the bearing to the arc's end fix would make the autopilot fly straight at it.
 describe('GPS WP TRUE BEARING on a DME arc (#21 1e1a8f5)', () => {
+    const MAGVAR = 4;
     // A left arc around ABC from the 270 to the 180 radial through the south-west, then FAFAA and the MAP
     const arcAbc = vor('ABC', 47.3, 8.3);
     const at = (bearing: number, nm: number) => pointFrom({lat: arcAbc.lat, lon: arcAbc.lon}, bearing, nm);
@@ -142,13 +143,23 @@ describe('GPS WP TRUE BEARING on a DME arc (#21 1e1a8f5)', () => {
 
     /** Booted on the arc and loaded, so FPL 0 is D225J ARCEN FAFAA MAPAA KPRC with ARCEN active */
     async function loadedOnArc() {
+        // 4 degrees east variation, so that a true and a magnetic output cannot be mistaken for each other. The arc's
+        // radials and all positions are true, and magnetic = true - 4.
         const unit = await bootUnit({
             facilities: [kprc, arcAbc, arcbg, arcen, fafaa, mapaa], position: at(225, 10), storage: savedFlightplan(0, [kprc]),
+            magvar: MAGVAR,
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
         return unit;
     }
+
+    /** The three outputs of the active leg in degrees: GPS WP TRUE BEARING, GPS WP BEARING (magnetic), the RMI LVar */
+    const outputs = (unit: HeadlessUnit) => ({
+        trueBearing: norm360(unit.env.sim.get('GPS WP TRUE BEARING', 'degrees')),
+        magBearing: norm360(unit.env.sim.get('GPS WP BEARING', 'degrees')),
+        rmi: norm360(unit.env.sim.get('L:KLN90B_GPS_WP_BEARING', 'degrees')),
+    });
 
     it('is the desired track on the arc, while the RMI LVar is the bearing to the end fix', async () => {
         const unit = await loadedOnArc();
@@ -157,11 +168,18 @@ describe('GPS WP TRUE BEARING on a DME arc (#21 1e1a8f5)', () => {
         await moveAircraft(unit, p, {groundspeedKt: 0});
         await vi.advanceTimersByTimeAsync(2000);
 
-        const sim = unit.env.sim;
-        // The tangent of a counterclockwise arc is the course to the VOR plus 90 (119.91 here), not the bearing to
-        // ARCEN (104.91)
-        expect(norm360(sim.get('GPS WP TRUE BEARING', 'degrees'))).toBeCloseTo(norm360(courseDeg(p, arcAbc) + 90), 1);
-        expect(norm360(sim.get('L:KLN90B_GPS_WP_BEARING', 'degrees'))).toBeCloseTo(courseDeg(p, arcen), 1);
+        // The tangent of a counterclockwise arc is the course to the VOR plus 90 (119.91 true here), not the bearing to
+        // ARCEN (104.91 true). The autopilot SimVars carry the tangent, true and magnetic; the RMI LVar carries the
+        // magnetic bearing to ARCEN.
+        const tangent = norm360(courseDeg(p, arcAbc) + 90);
+        const out = outputs(unit);
+        expect(out.trueBearing).toBeCloseTo(tangent, 1);
+        expect(out.magBearing).toBeCloseTo(tangent - MAGVAR, 1);
+        expect(out.rmi).toBeCloseTo(courseDeg(p, arcen) - MAGVAR, 1);
+        // The unit of all three is radians (Sensors.setWpBearing), which is what an aircraft reads
+        for (const name of ['GPS WP TRUE BEARING', 'GPS WP BEARING', 'L:KLN90B_GPS_WP_BEARING']) {
+            expect(unit.env.sim.lastWrite(name)!.unit).toBe('radians');
+        }
         expect(unit.errors).toEqual([]);
     });
 
@@ -179,7 +197,10 @@ describe('GPS WP TRUE BEARING on a DME arc (#21 1e1a8f5)', () => {
 
         expect(active.getActiveWpt()!.icaoStruct.ident).toBe('FAFAA');
         expect(angleBetween(unit.props.memory.navPage.desiredTrack, courseDeg(p, fafaa))).toBeGreaterThan(3);
-        expect(norm360(unit.env.sim.get('GPS WP TRUE BEARING', 'degrees'))).toBeCloseTo(courseDeg(p, fafaa), 1);
+        const out = outputs(unit);
+        expect(out.trueBearing).toBeCloseTo(courseDeg(p, fafaa), 1);
+        expect(out.magBearing).toBeCloseTo(courseDeg(p, fafaa) - MAGVAR, 1);
+        expect(out.rmi).toBeCloseTo(courseDeg(p, fafaa) - MAGVAR, 1);
         expect(unit.errors).toEqual([]);
     });
 });
