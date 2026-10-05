@@ -215,4 +215,13 @@ describe('user waypoint V2 format', () => {
         expect(ndb.lon).toBeCloseTo(-139.75, 6);
         expect(ndb.freqMHz).toBe(1700);
     });
+
+    // docs/architecture.md Core 7: wpt0 to wpt249 are restored
+    it('restores the last slot, wpt249', () => {
+        wptSettings.getSetting('wpt249').set('UXX        MYWPT   +4730.00+00815.00');
+        new UserWaypointLoaderV2(bus, repo).restoreWaypoints();
+        const wpt = repo.get(ICAO.value('U', 'XX', '', 'MYWPT')) as UserFacility;
+        expect(wpt.lat).toBeCloseTo(47.5, 6);
+        expect(wpt.lon).toBeCloseTo(8.25, 6);
+    });
 });

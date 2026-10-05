@@ -22,7 +22,7 @@ function removeAll(): void {
     const all: Facility[] = [];
     repo.forEach(f => all.push(f));
     all.forEach(f => repo.remove(f));
-    for (let i = 0; i < 5; i++) {
+    for (const i of [0, 1, 2, 3, 4, 249]) {
         wptSettings.getSetting(`wpt${i}`).set('');
     }
 }
@@ -101,15 +101,34 @@ describe('user waypoint V1 format', () => {
         expect(apt.altitude).toBe(-1);
         // -33 ft are -10.0584 m
         expect(apt.runways[0].length).toBeCloseTo(-10.0584, 4);
+    });
+
+    it('restores the surface character - of an unknown runway as the Wright Flyer track (characterization)', () => {
+        restoreV1('AXX    UAPU +4700.00+00800.00-00001-00033-');
+        const apt = repo.get(ICAO.value('A', 'XX', '', 'UAPU')) as AirportFacility;
         expect(apt.runways[0].surface).toBe(RunwaySurfaceType.WrightFlyerTrack);
     });
 
-    it('restores an NDB with its frequency and type', () => {
+    it('restores an NDB with its position and frequency', () => {
         restoreV1('NXX    XY   +4800.00-00915.00+0345.0');
         const ndb = repo.get(ICAO.value('N', 'XX', '', 'XY')) as NdbFacility;
         expect(ndb.lat).toBeCloseTo(48, 6);
         expect(ndb.lon).toBeCloseTo(-9.25, 6);
         expect(ndb.freqMHz).toBe(345);
+    });
+
+    it('restores a V1 NDB as the NDB type H (characterization)', () => {
+        restoreV1('NXX    XY   +4800.00-00915.00+0345.0');
+        const ndb = repo.get(ICAO.value('N', 'XX', '', 'XY')) as NdbFacility;
         expect(ndb.type).toBe(NdbType.H);
+    });
+
+    // docs/architecture.md Core 7: wpt0 to wpt249 are restored
+    it('restores the last slot, wpt249', () => {
+        wptSettings.getSetting('wpt249').set('UXX    MYWPT+4730.00+00815.00');
+        new UserWaypointLoaderV1(bus, repo).restoreWaypoints();
+        const wpt = repo.get(ICAO.value('U', 'XX', '', 'MYWPT')) as UserFacility;
+        expect(wpt.lat).toBeCloseTo(47.5, 6);
+        expect(wpt.lon).toBeCloseTo(8.25, 6);
     });
 });
