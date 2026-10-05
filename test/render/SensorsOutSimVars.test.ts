@@ -1,7 +1,9 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit} from '../harness/boot';
-import {courseDeg} from '../harness/flight/geo';
-import {airport, vor} from '../harness/navdata/builders';
+import {FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
+import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../harness/boot';
+import {angleBetween, courseDeg, norm360, pointFrom} from '../harness/flight/geo';
+import {airport, intersection, vor} from '../harness/navdata/builders';
+import {approach, Leg, withProcedures} from '../harness/navdata/procedures';
 import {savedFlightplan} from '../harness/storage';
 
 // Invented facilities; KAAA is at non-round coordinates so that no default or stale value can match its longitude
@@ -109,5 +111,75 @@ describe('GPS SimVars written by SensorsOut', () => {
         expect(sim.get('GPS WP PREV LAT', 'degrees')).toBeCloseTo(47.1, 6);
         expect(sim.lastWrite('GPS WP NEXT LON')!.unit).toBe('degrees');
         expect(sim.lastWrite('GPS WP PREV LON')!.unit).toBe('degrees');
+    });
+});
+
+// Public contract: GPS WP TRUE BEARING and GPS WP BEARING are what an autopilot follows (CLAUDE.md, "Public contract with
+// aircraft", the GPS SimVars). L:KLN90B_GPS_WP_BEARING is the RMI bearing and differs from them (kln90b/LVars.ts,
+// docs/architecture.md; Pilot's Guide appendix A). 1e1a8f5: on a DME arc the autopilot SimVars carry the desired track,
+// because the bearing to the arc's end fix would make the autopilot fly straight at it.
+describe('GPS WP TRUE BEARING on a DME arc (#21 1e1a8f5)', () => {
+    // A left arc around ABC from the 270 to the 180 radial through the south-west, then FAFAA and the MAP
+    const arcAbc = vor('ABC', 47.3, 8.3);
+    const at = (bearing: number, nm: number) => pointFrom({lat: arcAbc.lat, lon: arcAbc.lon}, bearing, nm);
+    const arcbg = intersection('ARCBG', at(270, 10).lat, at(270, 10).lon);
+    const arcen = intersection('ARCEN', at(180, 10).lat, at(180, 10).lon);
+    const fafaa = intersection('FAFAA', 47.1, 7.9);
+    const mapaa = intersection('MAPAA', 47.0, 8.0);
+    const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
+        approaches: [approach({
+            type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+            transitions: [{
+                name: 'ARCBG', legs: [
+                    Leg.IF(arcbg, FixTypeFlags.IAF),
+                    Leg.AF(arcen, arcAbc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: LegTurnDirection.Left}),
+                    Leg.TF(fafaa, FixTypeFlags.FAF),
+                ],
+            }],
+            final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+        })],
+    });
+
+    /** Booted on the arc and loaded, so FPL 0 is D225J ARCEN FAFAA MAPAA KPRC with ARCEN active */
+    async function loadedOnArc() {
+        const unit = await bootUnit({
+            facilities: [kprc, arcAbc, arcbg, arcen, fafaa, mapaa], position: at(225, 10), storage: savedFlightplan(0, [kprc]),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        return unit;
+    }
+
+    it('is the desired track on the arc, while the RMI LVar is the bearing to the end fix', async () => {
+        const unit = await loadedOnArc();
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ARCEN');
+        const p = at(210, 10);
+        await moveAircraft(unit, p, {groundspeedKt: 0});
+        await vi.advanceTimersByTimeAsync(2000);
+
+        const sim = unit.env.sim;
+        // The tangent of a counterclockwise arc is the course to the VOR plus 90 (119.91 here), not the bearing to
+        // ARCEN (104.91)
+        expect(norm360(sim.get('GPS WP TRUE BEARING', 'degrees'))).toBeCloseTo(norm360(courseDeg(p, arcAbc) + 90), 1);
+        expect(norm360(sim.get('L:KLN90B_GPS_WP_BEARING', 'degrees'))).toBeCloseTo(courseDeg(p, arcen), 1);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The unchanged half of the contract: on a great-circle leg the bearing to the waypoint is written, which the break
+    // of the arc case does not touch
+    it('is the bearing to the waypoint on a great-circle leg', async () => {
+        const unit = await loadedOnArc();
+        const active = unit.props.memory.navPage.activeWaypoint;
+        active.sequenceToNextWaypoint(); // FAFAA from ARCEN: a great circle
+        // 2 NM along ARCEN to FAFAA and 1 NM to its right, so that the bearing to FAFAA differs from the DTK
+        const along = pointFrom(arcen, courseDeg(arcen, fafaa), 2);
+        const p = pointFrom(along, courseDeg(arcen, fafaa) + 90, 1);
+        await moveAircraft(unit, p, {groundspeedKt: 0});
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(active.getActiveWpt()!.icaoStruct.ident).toBe('FAFAA');
+        expect(angleBetween(unit.props.memory.navPage.desiredTrack, courseDeg(p, fafaa))).toBeGreaterThan(3);
+        expect(norm360(unit.env.sim.get('GPS WP TRUE BEARING', 'degrees'))).toBeCloseTo(courseDeg(p, fafaa), 1);
+        expect(unit.errors).toEqual([]);
     });
 });
