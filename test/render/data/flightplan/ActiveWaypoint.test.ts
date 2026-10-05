@@ -201,15 +201,16 @@ describe('sequencing after a direct-to to a waypoint of FPL 0 (748151c, #70)', (
 // (characterization): it takes the leg whose segment, between its two waypoints, is closest.
 describe('the active leg after loading an approach with a missed approach to its FAF (characterization, #41, 42099f3)', () => {
     /**
-     * VOR 36 of KDST: the VOR VVV is the FAF 5 NM south of the MAP and the missed approach holding point, IFAAA is the IF
-     * 10 NM south. The aircraft is 7 NM south of the MAP and 1 NM east, abeam the leg IFAAA - VVV and 2 NM before the FAF.
+     * VOR 36 of KDST: the VOR VVV is the FAF 5 NM south of the MAP and the missed approach holding point. IFAAA is the IF
+     * 10 NM from VVV on bearing 210, so the leg IFAAA - VVV (course 030) is not on the final course. The aircraft is 2 NM
+     * before VVV on that leg and 1 NM to the right of it.
      */
     async function loadVorApproachAbeamFinal() {
         const kdst = airport('KDST', 47.0, 8.0);
         const mapaa = intersection('MAPAA', 47.0, 8.0);
         const vvvPos = pointFrom(mapaa, 180, 5);
         const vvv = vor('VVV', vvvPos.lat, vvvPos.lon);
-        const ifPos = pointFrom(mapaa, 180, 10);
+        const ifPos = pointFrom(vvv, 210, 10);
         const ifaaa = intersection('IFAAA', ifPos.lat, ifPos.lon);
         const enrPos = pointFrom(ifaaa, 240, 30);
         const enraa = intersection('ENRAA', enrPos.lat, enrPos.lon);
@@ -221,7 +222,7 @@ describe('the active leg after loading an approach with a missed approach to its
                 missed: [Leg.DF(vvv), Leg.HM(vvv, 0, LegTurnDirection.Right, FixTypeFlags.MAHP)],
             })],
         });
-        const position = pointFrom(pointFrom(mapaa, 180, 7), 90, 1);
+        const position = pointFrom(pointFrom(vvv, 210, 2), 120, 1);
         const unit = await bootUnit({
             facilities: [apt, vvv, ifaaa, enraa, mapaa], position, storage: savedFlightplan(0, [enraa, apt]),
         });
@@ -238,8 +239,11 @@ describe('the active leg after loading an approach with a missed approach to its
 
         expect(idents).toEqual(['ENRAA', 'IFAAA', 'VVV', 'MAPAA', 'VVV', 'KDST']); // Precondition
         expect(unit.errors).toEqual([]);
-        // The leg IFAAA - VVV passes 1.0 NM from the aircraft. The extension of the missed approach leg MAPAA - VVV,
-        // which is also 1 NM away, lies beyond VVV: its closest point is not between its two waypoints.
+        // By hand (flat earth): the aircraft is 0.13 NM west of the final course and 2.23 NM south of VVV, beyond it. Its
+        // closest point on the circle of the legs VVV - MAPAA and MAPAA - VVV is not between their waypoints, so those
+        // legs count by the distance to their first waypoint (2.23 and 7.23 NM). The leg IFAAA - VVV passes 1.0 NM away,
+        // its closest point is between its waypoints, and it wins. Without the between check the legs on the final course
+        // count 0.13 NM (index 3 wins); the old rule of 42099f3 gives index 4.
         expect(aw.getActiveFplIdx()).toBe(2);
         expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('VVV');
     });
