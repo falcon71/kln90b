@@ -172,9 +172,17 @@ describe('GPS SimVars with Output.WriteGPSSimVars off (public contract) (#126)',
 
         // 1 NM right of the leg; the sign follows the SDK convention (negated), see SensorsOutSimVars.test.ts
         expect(unit.env.sim.get('GPS WP CROSS TRK', 'meters')).toBeCloseTo(-1852, -1);
-        // The value of GPS COURSE TO STEER has no contract source beyond its unit, radians (written as a plain number). The
-        // roll steering intercepts a leg it is 1 NM right of at 45 degrees, so the course is the leg's 50.75 less 45. This
-        // is the code's behavior, here only so that the control is not permissive.
+        // Only that the name is written, with a finite number; the value is the characterization below
+        const written = unit.env.sim.lastWrite('GPS COURSE TO STEER');
+        expect(written).toBeDefined();
+        expect(Number.isFinite(written!.value)).toBe(true);
+    });
+
+    // No contract source beyond the unit, radians (written as a plain number): this is what the code writes today. The
+    // roll steering intercepts a leg it is 1 NM right of at 45 degrees, so the course is the leg's 50.75 less 45.
+    it('writes GPS COURSE TO STEER as the intercept course in radians (characterization)', async () => {
+        const unit = await bootMovingOnRoute();
+
         const {kaaa, abc} = standardRoute();
         const legCourse = courseDeg(pointBefore(kaaa, abc, 20), abc);
         const cts = unit.env.sim.lastWrite('GPS COURSE TO STEER')!.value as number;
