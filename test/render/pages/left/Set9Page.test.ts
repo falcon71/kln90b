@@ -13,21 +13,32 @@ describe('SET 9 page and Output.AltitudeAlertEnabled (contract)', () => {
         await unit.panel.selectPage('L', 'SET 9');
         await vi.advanceTimersByTimeAsync(1000);
 
-        const rows = Screen.read().rows('L');
-        expect(rows[4]).toBe(' FEATURE   ');
-        expect(rows[5]).toBe(' DISABLED  ');
+        expect(Screen.read().rows('L')).toEqual([
+            'ALTITUDE   ',
+            '  ALERT    ',
+            ' VOLUME    ',
+            '   OFF     ',
+            ' FEATURE   ',
+            ' DISABLED  ',
+        ]);
         expect(unit.errors).toEqual([]);
     });
 
+    // The explicit true equals the code default (#NEW-4-1), so this cannot fail if the key stops being read; it bites
+    // once that default is fixed to false. The volume 99 is the default of the altAlertVolume setting.
     it('shows the volume instead when the alert is enabled', async () => {
         const unit = await bootUnit({panelXml: panelXml(true)});
         await unit.panel.selectPage('L', 'SET 9');
         await vi.advanceTimersByTimeAsync(1000);
 
-        const rows = Screen.read().rows('L');
-        expect(rows.slice(0, 3)).toEqual(['ALTITUDE   ', '  ALERT    ', ' VOLUME:   ']);
-        expect(rows[4]).toMatch(/^ +\d+ +$/);
-        expect(rows[5]).toBe('           ');
+        expect(Screen.read().rows('L')).toEqual([
+            'ALTITUDE   ',
+            '  ALERT    ',
+            ' VOLUME:   ',
+            '           ',
+            '    99     ',
+            '           ',
+        ]);
         expect(unit.errors).toEqual([]);
     });
 });

@@ -148,7 +148,8 @@ describe('panel.xml parser', () => {
             expect(withoutAltAlert(parse(kln(inner)))).toEqual(withField(path, value));
         });
 
-        // The default of this key is pinned separately (#NEW-4-1), so both values are compared on that field alone
+        // The default of this key is pinned separately (#NEW-4-1), so both values are compared on that field alone.
+        // The `true` row equals the code default, so it cannot fail while that is true; it bites once the default is fixed.
         it.each([
             ['false', false],
             ['true', true],
