@@ -538,6 +538,10 @@ later run adds a new entry.
   `80631c8` for APT 7 and APT 8, `eef92e8` (the field width) and the pause half of `43d472b`.
 - **Task 7, this close-out:** the issues below, the placeholders replaced (`references #129` to `#132`), the triage rows
   ticked or re-verdicted, `testing.md` sections 3, 6 and 7 reconciled.
+- **Final fix wave** (after the whole-session review): the first-boot siblings of #90 for neither and fuel only, the
+  MOVE? test moved to a world where the arc stays active (FAFAA east of ARCEN) with its comment corrected, the title of
+  the #129 sibling made true (the unit boots 1.6 NM from the fix), the KSHT test asserting the full list, the #20 row
+  unticked and moved with the rows that have no test, and the "Not covered" list below completed.
 
 **Re-verdicts and rulings**
 - **#20 is *not provable*** (rule 11). It was closed without a commit of its own, so there is no fix to re-break, and the
@@ -599,9 +603,36 @@ drawn #18 test holds the arc, not the arrowhead).
 - The stale `gps.trackTrue` in `ModeController.checkSwitchAprArmToActive` at rest: not reproduced. Both APR worlds use a
   final course of 180, so a rest track of 0 keeps ARM.
 - The throw exactly over an arc VOR (the aircraft over the navaid of an arc).
-- The deferred Minors in the task ledger that name a surviving mutation, for example the 2 NM condition of 6-3, the
-  `> 110` limit pinned only between 100 and 120 degrees, `entryPoint.set(beginPoint)` caught only by a harness test,
-  the first-boot pruning of the neither and fuel-only configurations of #90, and the plan number constant of OTH 3.
+- Surviving mutations and untested neighbors that the review rounds and the final review found (the task ledger is
+  not committed, so the list is complete here):
+  - The flag copy of `addArcInfoIfPrevIsSame` (`SidStar.ts:455`, `prevLeg.fixTypeFlags = currentLeg.fixTypeFlags`): no
+    test has an arc whose fix carries different flags than the arc leg before it.
+  - `entryPoint.set(beginPoint)` in `getArcEntryData` (`SidStar.ts:636`): the unit tests of `SidStar.test.ts` survive
+    dropping it; only the harness test `procedures.test.ts` fails.
+  - The 2 NM condition of 6-3 (`ModeController.ts:354`): `> 2` to `> 20` survives. It belongs to Session 5
+    (`ModeController`).
+  - The limit of 110 degrees (`ModeController.ts:369`) is pinned only between 100 and 120 degrees, so any limit from 100
+    to 119 passes (`> 105` survives).
+  - A halved roll-in distance (`NavCalculator.ts:190`, `distanceToAchieveBankAngleChange`) survives the lower bound of
+    the 326da1a flight (`dmeArc.test.ts:123-125`, 1.01 NM, which ignores the roll-in; measured 1.24 NM). The roll-in is
+    a neighbor of 326da1a, not its subject.
+  - The excursion bound of the 326da1a flight (`dmeArc.test.ts:157`, `northOfLeg` below one turn radius) cannot tell
+    the mutants apart; the turn-circle assertion in the same test holds the turn.
+  - The MOVE? test does not hold `leg.arcData = newData` (`SuperNav5DirectToSelector.tsx:101`): it checks the entry
+    name, position and the FPL 0 idents, not `entry.arcData`.
+  - The plan number of OTH 3 (`Oth3Page.tsx:97-98`, from `findUsageInFlightplans`): every OTH 3 test sees plan 0 only,
+    so a constant `0` survives.
+  - The `AirspacesAlongRoute` siblings (`AirspacesAlongRoute.test.ts:78, 106, 124`, one each for TRI 2, TRI 4 and
+    TRI 6) have no off-route case: nothing shows that an area away from the route stays out of the list.
+  - The Super NAV 5 width test (`SuperNav5Field1Selector.test.ts:10`) kills no text mutation alone (`-.-N--` survives
+    it); the harness test `superNav5.test.ts` holds the text.
+  - The two halves of the SET 3 hard-surface-only filter cover each other (`NearestList.ts:163`, the class mask, and
+    `NearestList.ts:191-198`, the surface mask). Letting soft surfaces through the class mask, or grass through the
+    surface mask, survives the whole suite as long as the other half is intact (the same pattern as the SUA polygon
+    guards above).
+  - The first-boot pruning of the OTH pages in #90 (`PageTreeController.ts:133`, `splice(8, 2)`) was held by nothing
+    until the final review: the siblings asserted only after a power cycle, where the second pruning hides it. It is
+    held now by the first-boot siblings for neither and fuel only (`splice(8, 1)` fails both).
 - APT 8 and the page tree for an approach-incapable installation: waiting on the answer to #133.
 - MOVE? on FPL 0: not implemented (#134).
 
@@ -619,24 +650,24 @@ could not run `git` with chained commands or loops, so each command ran on its o
 
 | directory                  | % stmts start | % stmts end | % lines start | % lines end |
 |----------------------------|--------------:|------------:|--------------:|------------:|
-| all files                  |         68.67 |       72.46 |         68.53 |       72.32 |
+| all files                  |         68.67 |       72.48 |         68.53 |       72.34 |
 | `kln90b`                   |         79.74 |       80.50 |         79.58 |       80.36 |
-| `kln90b/controls`          |         63.20 |       75.00 |         62.92 |       74.55 |
+| `kln90b/controls`          |         63.20 |       74.84 |         62.92 |       74.39 |
 | `kln90b/controls/displays` |         80.85 |       84.80 |         80.43 |       84.47 |
 | `kln90b/controls/editors`  |         78.83 |       78.83 |         78.34 |       78.34 |
-| `kln90b/controls/selects`  |         58.41 |       62.30 |         56.37 |       60.52 |
+| `kln90b/controls/selects`  |         58.41 |       63.16 |         56.37 |       61.44 |
 | `kln90b/data`              |         80.16 |       80.43 |         79.66 |       79.94 |
 | `kln90b/data/flightplan`   |         93.51 |       94.05 |         93.25 |       93.82 |
 | `kln90b/data/navdata`      |         83.98 |       86.13 |         84.00 |       86.17 |
 | `kln90b/pages`             |         71.41 |       71.91 |         70.99 |       71.50 |
-| `kln90b/pages/left`        |         60.61 |       67.73 |         60.83 |       67.94 |
+| `kln90b/pages/left`        |         60.61 |       67.62 |         60.83 |       67.83 |
 | `kln90b/pages/right`       |         61.55 |       62.50 |         62.36 |       63.30 |
 | `kln90b/services`          |         60.59 |       67.81 |         59.52 |       66.66 |
 | `kln90b/settings`          |         89.97 |       89.97 |         89.85 |       89.85 |
 
 Read the rise with care (section 1): the number says what ran, not what is held.
 
-The suite at the start: 440 tests passed and 29 expected failures, in 110 files. At the end: 503 tests passed and 40
+The suite at the start: 440 tests passed and 29 expected failures, in 110 files. At the end: 505 tests passed and 40
 expected failures, in 124 files. All eleven new expected failures are pins: #129, #130, #131 and #132, the four #102
 pins for TRI 2, TRI 4 and TRI 6, the two #102 pins for APT 1, and the #90 pin.
 
@@ -1193,7 +1224,6 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 | x | #15 `34a9cb0` | Lat/lon waypoints of a sim route are imported as temporary SUP waypoints (now in `KlnEfbLoader`). | render | testable | `bootUnit({efb: true})` gives `unit.efb`; `unit.efb.sync(efbRoute({enroute: [{lat, lon}]}))` emits a synced route, and the lat/lon fix must appear as a temporary SUP waypoint (region `XY`) in FPL 0. Extension: the EFB fake (`FakeRouteManager`, `efbRoute`). Session 6 uses it for `KlnEfbLoader` too. Session 3b: the regression test is in `KlnEfbLoader.test.ts` (public contract of the EFB route sync, and 5-20 for OTH 3): two lat/lon legs, the facility type, the repository entries in region XY and the OTH 3 list. The harness test `test/render/harness/efb.test.ts` holds one half: a single lat/lon leg imported as a temporary waypoint in region XY. Breaking the region to XX fails the leg and repository tests but not the OTH 3 test, which lists XX user waypoints as well. | `test/render/services/KlnEfbLoader.test.ts` |
 | x | #17 `e290ea4` | NAV 5 threw when drawing a DME arc. | render | testable | A DME-arc leg (`Leg.AF`) in a procedure loaded through APT 8 or APT 7 puts the arc in FPL 0; draw NAV 5: no error. Extension: procedure builders (`navdata/procedures.ts`). Session 3b: a characterization test of the canvas (`nav5ArcEndOffCircle.txt`, downsampled by the map's 4 px block) with the no-error assertions; the break that draws to the end waypoint instead of the end point changes the pixels, and reverting `Canvas.tsx` and `Nav5Page.tsx` to the old files makes `GeoCircle` throw. | `test/render/pages/left/Nav5Page.test.ts` |
 | x | #18 `15d9b35` | DME arcs were drawn and flown the wrong way round. | flight | testable | Left and right arcs (`Leg.AF`) loaded through APT 8: the flown and the drawn direction agree with the side of the arc. The fix carries the author's own doubt (the comment at `circle.reverse()` in `SidStar.ts`); related to #100 and #104. Extension: procedure builders. Session 3b: flown as a flight (a right and a left arc held to 10 NM, the radial never stepping back) and drawn on NAV 5 (the arc through the south-west quarter only, with its lit pixels on the 10 NM ring). Removing `circle.reverse()` fails the right arc in both tests and leaves the left arc green. The arrowhead that the full revert of the fix moves is not held (see the session log). The merged-radius bug of the same family is #131. | `test/flight/flights/dmeArc.test.ts`, `test/render/pages/left/Nav5Page.test.ts` |
-| x | #20 (no commit) | Wrong turn between two DME arcs whose end and entry coincide. | flight | not provable | Closed as not reproducible after #21 (`1e1a8f5`). Two arcs whose end and entry coincide (`Leg.AF` twice). Extension: procedure builders. Re-verdicted in Session 3b to *not provable* (rule 11): the issue was closed without a commit of its own, so there is no fix to re-break, and the symptom (an autopilot turn in the sim) is not observable in the headless unit. The nearest provable bug is the `AF, CI, AF` merge of #131, which real STARs with a fixless leg between two arcs of one navaid reach, and it is pinned there. | |
 | x | #21 `1e1a8f5` | `GPS WP TRUE BEARING` is the desired track on a DME arc, so autopilots track the arc. | flight | testable | On an arc the SimVar equals DTK; on a great-circle leg it is the bearing to the waypoint. Extension: procedure builders (`Leg.AF`). Session 3b: the test runs at magnetic variation 4 and asserts `GPS WP TRUE BEARING`, `GPS WP BEARING` and the RMI LVar on an arc (the arc case fails when `bearingForAP` is the bearing to the active waypoint); the great-circle case is the unchanged half and passes under the break. | `test/render/SensorsOutSimVars.test.ts` |
 | x | `326da1a` (#19 reference) | Turn anticipation in a DME arc uses the DTK at the end of the arc. | flight | testable | A DME-arc leg followed by a turn: the anticipation uses the DTK at the end of the arc. Extension: procedure builders. Session 3b: a flight on a tight arc (5 NM radius, 180 kt) that checks where the turn starts and the turn circle from `turnStack`. A turn that starts from the present DTK begins 5.5 NM early, and a reversed `fromDtk` on arc legs moves the circle 2 NM. | `test/flight/flights/dmeArc.test.ts` |
 | x | `633fdad` | Switching to APR-LEG uses a 110° course tolerance, not 70°. | flight | testable | FAF and MAP legs come from `Leg.TF(fix, FixTypeFlags.FAF)` and `FixTypeFlags.MAP`; load the approach through APT 8, then switch to APR-LEG. Extension: procedure builders (`savedFlightplan` still does not store fix types). Session 3b: a track of 100 degrees off the final course switches to APR, 120 degrees stays in ARM (characterization). The limit at 70 fails the first, the limit at 130 the second. A fix that is IAF and FAF at once never switches: pinned as #129. | `test/render/services/ModeController.test.ts` |
@@ -1203,8 +1233,9 @@ key-driven page bugs: `FrontPanel` drives a booted unit without a flight.
 | x | `133f4d8` | Airspaces were selected by bounding box; now by polygon. | render | testable | The fix over-filters the route searches: #102 gets its pin here. `airspace()` and `BootOptions.airspaces` build the world; the fake selects by bounding box (inferred, `testing.md` section 3), so a test asserts what `NearestUtils` does with that result. Extension: airspaces. Session 3b: OTH 2 and APT 1 test the polygon (3-52, 3-42); the #102 pins are TRI 2, 4 and 6 and two APT 1 visit orders, and #102 has a comment with the APT 1 reproduction. The shared `fill([])` array of #102 is *not provable*: it has no visible effect (rule 11). | `test/render/data/navdata/NearestUtils.test.ts`, `test/render/services/AirspacesAlongRoute.test.ts` |
 | x | #50 `b4a4ff2` | Errors during startup are published instead of leaving the unit in the self-test. | render | testable | `bootUnitExpectingError({platform: {createFacilityClient}})` with a throwing client awaits the `error` event: the error is published and the error page shows it. Extension: the boot-failure helper. `test/render/harness/bootFailure.test.ts` already shows the error page on a failing start (a harness test); Session 3b either proves it against the old bug and says so here, or writes the regression test in the mirrored folder, so that no duplicate proves nothing new. Session 3b: the new test holds the throw inside `init()` (the catch of the core); the existing harness test `bootFailure.test.ts` holds the other half, the catch on the `propsReady` chain. Removing the catch of `init()` fails only the new test. | `test/render/KLN90BCore.startup.test.ts` |
 | x | `eef92e8` | Super NAV 5 showed `--.-NM-` instead of `-.-NM-` without XTK. | render | testable | Super NAV 5 without XTK: `SuperNav5.read()` shows `-.-NM-`, not `--.-NM-`. Extension: the Super NAV 5 reader. `test/render/harness/superNav5.test.ts` already reads `-.-NM-` (labeled characterization); Session 3b either proves it against the old bug and says so here, or writes the regression test in the mirrored folder. Session 3b: the new test holds the field width (6-8, a field of six cells). The text `-.-NM-` stays held by the harness test `test/render/harness/superNav5.test.ts`, which also fails under the old bug. | `test/render/controls/selects/SuperNav5Field1Selector.test.ts` |
-| x | `43d472b` (part) | The track is not recomputed while the sim is paused (identical positions). | render | testable | A render test sets ground speed above 2 kt, teleports once and holds; no harness needed. The track is not recomputed while the position stays identical. The paused aircraft of Session H was dropped. Session 3b: four hold tests (NAV 3 track, both track SimVars, no console errors) fail when the paused-sim check is removed; the test after a jump stays green. | `test/render/Gps.test.ts` |
-| x | #90 | The page tree pruning removed the OTH pages again on every power cycle (part 1), and APT 8 is never removed (part 2). | render | testable | Part 1: a unit with air data and no fuel computer shows OTH 1 to OTH 6 after a power cycle (5-42, 5-39). The `it.fails` pin shows OTH 1 to OTH 4 today, and its four siblings (the four interface combinations) pass. A copy of the tree per controller turns the pin red and also changes `test/render/harness/pageTree.test.ts`, which asserts the in-place pruning. Part 2 has no test by the maintainer's decision; it is the question #133. | `test/render/pages/PageTreeController.test.ts` |
+| x | `43d472b` (part) | The track is not recomputed while the sim is paused (identical positions). | render | testable | A render test sets ground speed above 2 kt, teleports once and holds; no harness needed. The track is not recomputed while the position stays identical. The paused aircraft of Session H was dropped. Session 3b: the hold tests (NAV 3 track, both track SimVars, no console errors) fail when the paused-sim check is removed; the test after a jump stays green. | `test/render/Gps.test.ts` |
+| x | #90 | The page tree pruning removed the OTH pages again on every power cycle (part 1), and APT 8 is never removed (part 2). | render | testable | Part 1: a unit with air data and no fuel computer shows OTH 1 to OTH 6 after a power cycle (5-42, 5-39). The `it.fails` pin shows OTH 1 to OTH 4 today, and its siblings (the interface combinations, before any power cycle where that differs, and after one) pass; the first-boot siblings of neither and fuel only fail under `splice(8, 1)` at `PageTreeController.ts:133`. A copy of the tree per controller turns the pin red and also changes `test/render/harness/pageTree.test.ts`, which asserts the in-place pruning. Part 2 has no test by the maintainer's decision; it is the question #133. | `test/render/pages/PageTreeController.test.ts` |
+| | #20 (no commit) | Wrong turn between two DME arcs whose end and entry coincide. | — | not provable | Closed as not reproducible after #21 (`1e1a8f5`). Two arcs whose end and entry coincide (`Leg.AF` twice). Extension: procedure builders. Re-verdicted in Session 3b to *not provable* (rule 11): the issue was closed without a commit of its own, so there is no fix to re-break, and the symptom (an autopilot turn in the sim) is not observable in the headless unit. The nearest provable bug is the `AF, CI, AF` merge of #131, which real STARs with a fixless leg between two arcs of one navaid reach, and it is pinned there. | |
 | | #7 `30f2216` | Import of `.fpl` files via SET 10. | — | superseded | `86a6d44` replaced it with the EFB route sync (`KlnEfbLoader`); see #15. | |
 | | `6ed57d9` | The AIRAC cycle was treated as expired on its last day. | — | superseded | `22b4532` moved to the SDK AIRAC utilities. A boundary test of today's code belongs in Session 7. | |
 | | `7fd640e` (part) | Direction parameter for arc drawing. | — | superseded | `15d9b35` (#18) removed it again. | |

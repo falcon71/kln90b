@@ -186,8 +186,9 @@ describe('arming to approach active at a fix that is IAF and FAF (#129)', () => 
         return {unit, txo};
     }
 
-    // The sibling of the pin: the setup works, the IAF copy is active and the unit is armed, 1.6 NM from the fix
-    it('is armed with the IAF copy of the fix active before the aircraft is within 2 NM (6-3)', async () => {
+    // The sibling of the pin: the setup works, the IAF copy is active and the unit stays armed 1.6 NM from the fix because the
+    // rest track of 0 points away from it
+    it('is armed with the IAF copy of the fix active at 1.6 NM from it, on a rest track that points away from the fix (6-3)', async () => {
         const {unit} = await armedNearIafFaf();
         const nav = unit.props.memory.navPage;
 

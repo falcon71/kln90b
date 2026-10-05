@@ -37,6 +37,18 @@ describe('OTH pages of a unit with and without air data and fuel computer (#90)'
         expect(await walk(unit, 'L', 'OTH 1')).toEqual(oth(6));
     });
 
+    it('neither: OTH 1 to OTH 4 before any power cycle (5-42, 5-39)', async () => {
+        const unit = await bootUnit({panelXml: panelXml({})});
+
+        expect(await walk(unit, 'L', 'OTH 1')).toEqual(oth(4));
+    });
+
+    it('fuel computer only: OTH 1 to OTH 8 before any power cycle (5-39)', async () => {
+        const unit = await bootUnit({panelXml: panelXml({fuel: true})});
+
+        expect(await walk(unit, 'L', 'OTH 1')).toEqual(oth(8));
+    });
+
     it('neither: OTH 1 to OTH 4 after a power cycle (5-42, 5-39)', async () => {
         const unit = await bootUnit({panelXml: panelXml({})});
         await unit.panel.powerCycle();
