@@ -131,8 +131,8 @@ describe('LVar outputs with Output.WriteGPSSimVars off (public contract) (#124)'
 });
 
 // Public contract: LVars.ts documents L:KLN90B_HSI_TF_FLAGS without values; the values 0 (flagged), 1 (TO) and 2 (FROM)
-// follow the convention of the sim's HSI TF FLAGS. 3-31: the triangle on NAV 1 points to TO or FROM, and a unit that has
-// passed the last waypoint shows FROM, because the last waypoint does not sequence.
+// follow the convention of the sim's HSI TF FLAGS. 3-31: the triangle on NAV 1 behaves like the TO/FROM flag of a
+// conventional CDI. The last waypoint does not sequence, so a unit that has passed it shows FROM.
 describe('L:KLN90B_HSI_TF_FLAGS (public contract)', () => {
     it('is 1, TO, before the last waypoint and 2, FROM, past it (3-31)', async () => {
         const {kaaa, abc} = standardRoute();
@@ -170,17 +170,25 @@ describe('L:KLN90B_WptLight during the waypoint alert (public contract)', () => 
         await settle(unit);
         // The turn starts about 0.3 NM before ABC (firstFlight.test.ts) and the alert 20 s earlier, about 0.7 NM at 120 kt,
         // so the unit is inside the alert from 0.8 NM on. A held position would sequence ABC within a few seconds, so the
-        // aircraft advances 0.0333 NM, one second at 120 kt, between the samples. The LVar changes once per calculation tick
+        // aircraft advances 0.00833 NM, 250 ms at 120 kt, per display tick and the light is sampled at every one, so that a
+        // light that flashes with the display blink shows a 0 in some sample
+        const sim = unit.env.sim;
         const samples: number[] = [];
         const alerts: boolean[] = [];
-        for (let i = 0; i < 6; i++) {
-            await moveAircraft(unit, pointBefore(kaaa, abc, 0.8 - i * 120 / 3600), {groundspeedKt: 120, trackTrue: i === 0 ? courseDeg(kaaa, abc) : undefined});
+        await moveAircraft(unit, pointBefore(kaaa, abc, 0.8), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
+        for (let i = 0; i < 24; i++) {
+            if (i > 0) {
+                const p = pointBefore(kaaa, abc, 0.8 - i * 120 / 3600 / 4);
+                sim.set('PLANE LATITUDE', 'degrees', p.lat);
+                sim.set('PLANE LONGITUDE', 'degrees', p.lon);
+                await vi.advanceTimersByTimeAsync(250);
+            }
             alerts.push(unit.props.memory.navPage.waypointAlert);
-            samples.push(unit.env.sim.get('L:KLN90B_WptLight', 'bool'));
+            samples.push(sim.get('L:KLN90B_WptLight', 'bool'));
         }
 
-        expect(alerts).toEqual(Array(6).fill(true));
-        expect(samples).toEqual(Array(6).fill(1));
+        expect(alerts).toEqual(Array(24).fill(true));
+        expect(samples).toEqual(Array(24).fill(1));
     });
 
     it('is 0 before the alert', async () => {
@@ -201,9 +209,10 @@ describe('L:KLN90B_WptLight during the waypoint alert (public contract)', () => 
 });
 
 // Public contract: LVars.ts and the wiki pages Autopilot, CDI/HSI and External Annunciators describe the L:KLN90B_*
-// outputs. Installation Manual 2-69: the annunciator outputs are inactive unless the unit drives them. The outputs are
-// written by ticks, and ticks stop when the unit loses power (TickController), so a switched-off unit keeps its last
-// values. SensorsOut.reset writes nothing for the LVars. Disabled is a deliberate freeze (61f6b61) and not pinned here.
+// outputs. The basis is the maintainer's ruling "power-off only": the outputs go to zero when the unit is switched off,
+// while a hot-swap Disabled stays a freeze (61f6b61) and is not pinned here. The outputs are written by ticks, and ticks
+// stop when the unit loses power (TickController), so a switched-off unit keeps its last values. SensorsOut.reset writes
+// nothing for the LVars. Installation Manual 2-69 states that the annunciators light during the self-test (setup B).
 describe('outputs at power-off (public contract)', () => {
     const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
     const BLANK_SCREEN = Array.from({length: 7}, () => ' '.repeat(23)).join('\n');

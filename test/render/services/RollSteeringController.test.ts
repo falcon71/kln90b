@@ -37,9 +37,9 @@ describe('L:KLN90B_RollCommand (public contract)', () => {
         expect(unit.env.sim.lastWrite('L:KLN90B_RollCommand')?.value).toBe(0);
     });
 
-    // Installation Manual 2-70: roll steering needs a ground speed. The aircraft is 2 NM off the leg, where it would bank
-    // if it moved
-    it('is 0 on the ground, off the leg and below 5 kt (2-70)', async () => {
+    // Installation Manual 2-70: roll steering needs a ground speed (the page names no threshold). The aircraft is 2 NM off
+    // the leg, where it would bank if it moved
+    it('is 0 without ground speed, off the leg (2-70)', async () => {
         const {unit, mid, dtk} = await onRoute(HEADING_INPUT_XML);
 
         await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 0});

@@ -158,9 +158,12 @@ describe('L:KLN90B_WriteGpsSimvars (public contract)', () => {
         expect(writeCount(unit, 'GPS WP DISTANCE')).toBe(stoppedAt);
 
         sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
-        await vi.advanceTimersByTimeAsync(3000);
+        await vi.advanceTimersByTimeAsync(300);
         expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
-        expect(writeCount(unit, 'GPS WP DISTANCE')).toBeGreaterThan(stoppedAt);
+        const resumedAt = writeCount(unit, 'GPS WP DISTANCE');
+        await vi.advanceTimersByTimeAsync(10_000);
+        // One write per calculation tick
+        expect(writeCount(unit, 'GPS WP DISTANCE') - resumedAt).toBe(10);
     });
 });
 
