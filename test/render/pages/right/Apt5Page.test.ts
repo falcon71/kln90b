@@ -28,6 +28,27 @@ describe('APT 5 remarks', () => {
         expect(Screen.read().rows('R')[2]).toBe('FUEL       ');
     });
 
+    // The second and third lines are their own fields: each lands in its own place of the slot and on its own row
+    it('stores remarks entered on the second and third line in their own places of rmk0', async () => {
+        const unit = await bootUnit({facilities: [KAAA()], position: {lat: 47, lon: 8}});
+        await unit.panel.selectPage('R', 'APT 5');
+        await unit.panel.cursor('R');
+        for (const [row, text] of [[3, 'CTAF'], [4, 'EXTRA']] as const) {
+            for (let i = 0; i < 10 && unit.panel.focused('R').row !== row; i++) {
+                await unit.panel.outer('R', 1);
+            }
+            expect(unit.panel.focused('R').row).toBe(row);
+            await unit.panel.type('R', text);
+            await unit.panel.ent();
+        }
+        await unit.panel.cursor('R');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
+        expect(storedSetting(unit, 'rmk0')).toBe('KAAA' + ' '.repeat(11) + 'CTAF       ' + 'EXTRA      ');
+        expect(Screen.read().rows('R').slice(2, 5)).toEqual(['           ', 'CTAF       ', 'EXTRA      ']);
+    });
+
     it('shows the remarks of the airport in a stored slot', async () => {
         const unit = await bootUnit({
             facilities: [KAAA()], position: {lat: 47, lon: 8},
