@@ -13,6 +13,8 @@ import {NavMode} from '../../kln90b/data/VolatileMemory';
 // the constants: the constants move with a renamed event, and the literals are the contract (CLAUDE.md, "Public
 // contract with aircraft"; the wiki page External Hardware).
 
+const BLANK_SCREEN = Array.from({length: 7}, () => ' '.repeat(23)).join('\n');
+
 const PUBLIC_EVENTS = [
     'KLN90B_Brt_Inc', 'KLN90B_Brt_Dec', 'KLN90B_Power_Toggle', 'KLN90B_Power_On', 'KLN90B_Power_Off', 'KLN90B_MSG_Push',
     'KLN90B_DCT_Push', 'KLN90B_CLR_Push', 'KLN90B_ENT_Push', 'KLN90B_ALT_Push',
@@ -47,6 +49,8 @@ describe('every public H event (sweep)', () => {
         const unit = await bootUnit({engineRunning: false});
         unit.send('KLN90B_Power_On');
         await vi.advanceTimersByTimeAsync(2000);
+        // 3-3: the turn-on page; a timing change must not move this sweep to another state
+        expect(Screen.read().row(0)).toBe(' GPS             ORS 20');
 
         unit.send(evt);
         await vi.advanceTimersByTimeAsync(2000);
@@ -58,6 +62,8 @@ describe('every public H event (sweep)', () => {
         const unit = await bootUnit({engineRunning: false});
         unit.send('KLN90B_Power_On');
         await vi.advanceTimersByTimeAsync(20_000);
+        // The self-test is through and the unit waits for the database to be approved
+        expect(Screen.read().rows('R')[5]).toBe('  APPROVE? ');
 
         unit.send(evt);
         await vi.advanceTimersByTimeAsync(2000);
@@ -67,6 +73,7 @@ describe('every public H event (sweep)', () => {
 
     it.each(PUBLIC_EVENTS)('accepts %s on a dark unit without an error (sweep)', async evt => {
         const unit = await bootUnit({engineRunning: false});
+        expect(Screen.read().text()).toBe(BLANK_SCREEN);
 
         unit.send(evt);
         await vi.advanceTimersByTimeAsync(2000);
@@ -149,7 +156,7 @@ describe('right knobs (3-13)', () => {
     });
 });
 
-// 3-13: the ACT pages of an active airport (the page group that follows the active waypoint) are turned by the right inner
+// 3-13, 4-10: the ACT pages of an active airport (the page group that follows the active waypoint) are turned by the right inner
 // knob like any group, but the ACT page keeps its own list of sub-pages, which MainPage steps through a separate branch
 describe('right inner knob on the ACT pages (3-13)', () => {
     it('moves through the pages of the active airport and wraps', async () => {
@@ -210,7 +217,7 @@ describe('cursor buttons (3-11)', () => {
         await unit.panel.press('KLN90B_LeftCursor_Toggle');
 
         expect(Screen.read().status().left).toBe('NAV 2');
-        expect(Screen.read().maskRows('L').join('').includes('I')).toBe(false);
+        expect(Screen.read().maskRows('L')).toEqual(Array.from({length: 6}, () => '...........'));
         expect(unit.errors).toEqual([]);
     });
 });
@@ -228,7 +235,6 @@ describe('MSG button (3-16)', () => {
         expect(screen.status().right).toBe('');
         // Two messages of two rows each. Unordered: the posting order of the two is not checked against 3-16 (newest first)
         const messages = [[0, 1], [2, 3]].map(([a, b]) => [screen.row(a).trimEnd(), screen.row(b).trimEnd()]);
-        expect(messages).toHaveLength(2);
         expect(messages).toContainEqual(['SYSTEM TIME UPDATED', ' TO GPS TIME']);
         expect(messages).toContainEqual(['POSITION DIFFERS FROM', ' LAST POSITION BY >2NM']);
         expect([screen.row(4).trim(), screen.row(5).trim()]).toEqual(['', '']);
@@ -386,7 +392,7 @@ describe('Power_Toggle H event (public contract)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(unit.env.sim.get('L:KLN90B_Power', 'bool')).toBe(0);
-        expect(Screen.read().text()).toBe(Array.from({length: 7}, () => ' '.repeat(23)).join('\n'));
+        expect(Screen.read().text()).toBe(BLANK_SCREEN);
 
         unit.send('KLN90B_Power_Toggle');
         await vi.advanceTimersByTimeAsync(1000);

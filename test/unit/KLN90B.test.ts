@@ -7,6 +7,8 @@ afterEach(() => vi.restoreAllMocks());
 
 // Contract tests; the source is the sim's BaseInstrument lifecycle that panel.cfg and panel.xml rely on (CLAUDE.md,
 // "Public contract with aircraft"): the adapter is how the sim delivers H events and the panel.xml document to the unit.
+// panel.cfg refers to the template file KLN90B.html, and the template id of the adapter must match the id of the script
+// element in that file (resources/html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B/KLN90B.html).
 // The harness's fake registerInstrument keeps the class that kln90b/KLN90B.tsx registers.
 describe('KLN90B adapter (public contract)', () => {
     /** A new adapter around a real KLN90BCore on SIM_PLATFORM; nothing is initialized, so nothing is awaited */
@@ -19,7 +21,7 @@ describe('KLN90B adapter (public contract)', () => {
         expect((globalThis as any).__registeredInstruments.has('kln-90b')).toBe(true);
     });
 
-    it('has the template id KLN90B that panel.cfg refers to', () => {
+    it('has the template id KLN90B, the id of the script in KLN90B.html', () => {
         expect(adapter().templateID).toBe('KLN90B');
     });
 
