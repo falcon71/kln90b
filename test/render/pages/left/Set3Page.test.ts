@@ -24,7 +24,7 @@ describe('SET 3 page', () => {
 
     // Set3Page.tsx labels the second option "SFT", but it stores hard surface only: a pilot who picks "SFT" is told soft
     // surface and gets hard surface only
-    it.fails('labels the hard surface only option HRD (#NEW-5-1)', async () => {
+    it.fails('labels the hard surface only option HRD (#132)', async () => {
         const unit = await bootUnit();
 
         await pickSecondSurfaceOption(unit);

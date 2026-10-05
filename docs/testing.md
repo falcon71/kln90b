@@ -231,6 +231,9 @@ pages accept.
   the GPS position at load time (the beginning of the arc when that point is outside it), so the position the unit boots
   at decides the entry. The arc's radials are true bearings: keep `magvar` at 0 or account for it. The arc must not be the
   first leg that survives the conversion, which replaces the leg before the arc with the entry.
+  Boot on the arc, so that the arc leg is the closest and becomes active (activation in the middle of an arc is #121).
+  A test that recalculates the entry (MOVE? on Super NAV 5) uses a left arc, because the entry of a right arc is named
+  wrongly after a recalculation (#104).
 - `Leg.TF(fix, FixTypeFlags.IAF)` and its siblings set the fix types. `SidStar` keeps a leg flagged IAF, FAF, MAP or MAHP
   even when its fix repeats, and drops an unflagged repeat.
 
@@ -505,6 +508,11 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   maintainer from their code). A test that passes against the fake proves the instrument's use of those rules, not that
   the sim applies them.
   The instrument itself ignores circular airspaces (`BoundaryUtils`); `circularAirspace()` exists to hold that gap.
+- **One fact about real procedures came from a navigation database queried locally and is not committed.** The pattern
+  `AF, CI (no fix), AF` around one navaid with two radii, which `SidStar` merges into one arc (#131), was found in an
+  AIRAC 2607 export (five STARs). No row of it is in the repo (section 5 forbids recorded navdata), and the sim's own
+  representation of the CI legs was not checked: the invented procedure of the pin in `SidStar.test.ts` is built from the
+  pattern, not from the data.
 - **There is no wind.** Ground speed and track equal airspeed and heading, so crosswind effects are not modeled.
 - **`jump` skips integrated values**, and monitors and the recorder sample once per simulated second.
 - **The 16 Hz loops** run every 62 ms in tests: the fake timers round the 62.5 ms interval down to whole milliseconds.
@@ -568,8 +576,6 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - **The test baseline is being built session by session.** The plan, the rules for those sessions and the regression
   triage table are in [test-coverage.md](test-coverage.md). That document is temporary and its last session retires it
   into a coverage record here; until then, start a test session from it rather than from this list.
-- A power-cycle test for #90 (the OTH pages are pruned again on each `MainPage` construction). The helpers exist
-  (`powerCycle` and a boot with `engineRunning: false`, section 4); the test is planned in Session 3b.
 - **Flights cannot test the nav-source gate or a cold start, by the maintainer's decision.** `Aircraft.writeTo` forces
   `GPS DRIVES NAV1` true on every 16 Hz step, so a flight cannot observe what the unit does when the GPS is not the
   nav source (`92fbba1` is a render test, which sets the SimVar itself). `Flight.start` waits for a fix, so it cannot
@@ -583,7 +589,8 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
   exceptions are shown there (section 6). The question is #118; once it is decided, either the code changes or the two
   documents do. The harness collector stays either way.
 - Flip the pins when the bugs are fixed: remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each of
-  which names its issue.
+  which names its issue. The real fix of #90 (a copy of the page tree per controller) also changes
+  `test/render/harness/pageTree.test.ts`, which asserts the in-place pruning.
 - #99 (lat/lon displays show 60.00 minutes just below a whole degree) is filed but has no pin yet; a render test would
   hold it.
 - Further flights: approach arming (ARM to APR scale ramp), waypoint alert without turn anticipation, and the
