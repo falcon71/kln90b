@@ -39,6 +39,8 @@ describe('EFB route import of lat/lon legs (34a9cb0, #15)', () => {
         }
     });
 
+    // Public contract (CLAUDE.md "Public contract with aircraft": the EFB route sync, #15, 34a9cb0): the temporary
+    // waypoints of the route are in the facility repository, where the waypoint lookup finds them.
     it('registers both temporary waypoints in the facility repository, in region XY (#15)', async () => {
         const unit = await bootWithTwoLatLonLegs();
         const repository = KLNFacilityRepository.getRepository(unit.props.bus);
