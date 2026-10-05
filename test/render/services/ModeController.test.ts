@@ -161,8 +161,8 @@ describe('arming to approach active at the FAF (633fdad)', () => {
 
 // 6-3 lists a waypoint that is the IAF and the FAF at once as the active waypoint of the switch; 6-10 gives the example
 // where the unit switches to APR 2 NM from the IAF/FAF. ModeController.checkSwitchAprArmToActive returns unless the
-// active waypoint is typed FAF, but with such a fix the IAF copy is active during the last 2 NM (#NEW-3-1).
-describe('arming to approach active at a fix that is IAF and FAF (#NEW-3-1)', () => {
+// active waypoint is typed FAF, but with such a fix the IAF copy is active during the last 2 NM (#129).
+describe('arming to approach active at a fix that is IAF and FAF (#129)', () => {
     async function armedNearIafFaf() {
         const kprc = airport('KPRC', 47.0, 8.0);
         const mapaa = intersection('MAPAA', 47.0, 8.0);
@@ -199,7 +199,7 @@ describe('arming to approach active at a fix that is IAF and FAF (#NEW-3-1)', ()
         expect(unit.errors).toEqual([]);
     });
 
-    it.fails('switches to APR within 2 NM of the fix, heading toward it (#NEW-3-1)', async () => {
+    it.fails('switches to APR within 2 NM of the fix, heading toward it (#129)', async () => {
         const {unit, txo} = await armedNearIafFaf();
         const nav = unit.props.memory.navPage;
 

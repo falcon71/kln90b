@@ -433,7 +433,7 @@ describe('SidStar conversion of procedures to KLN legs', () => {
         });
 
         // The code compares the ICAO objects by reference; a copy of the same waypoint is not found.
-        it.fails('finds a waypoint whose ICAO is an equal copy (#NEW-2-1)', () => {
+        it.fails('finds a waypoint whose ICAO is an equal copy (#130)', () => {
             const copy = {...wpt, icaoStruct: {...wpt.icaoStruct}};
             expect(copy.icaoStruct).toEqual(wpt.icaoStruct);
             expect(copy.icaoStruct).not.toBe(wpt.icaoStruct);
@@ -479,7 +479,7 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(radiusNm(secondArc!)).toBeCloseTo(10, 1);
         });
 
-        it.fails('flies the first arc at its own radius of 13 NM (#NEW-2-2)', async () => {
+        it.fails('flies the first arc at its own radius of 13 NM (#131)', async () => {
             const legs = await convertStar();
             const firstArc = legs.find(l => l.arcData?.endFacility.icaoStruct.ident === 'ARC1E');
             expect(firstArc).toBeDefined();
