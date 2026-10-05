@@ -157,6 +157,38 @@ describe('arming to approach active at the FAF (633fdad)', () => {
         expect(nav.navmode).toBe(NavMode.ARM_LEG);
         expect(unit.errors).toEqual([]);
     });
+
+    // Public contract: GPS APPROACH MODE is 0 off, 1 ARM, 2 ACTV and 3 self-test (the External Annunciators wiki page, "ARM = 1
+    // or 3, ACTV = 2 or 3"; 6-1 for the ARM annunciator). It sits in this describe because armedNearFaf is local to it.
+    it('writes GPS APPROACH MODE 1 in ARM and 2 in APR', async () => {
+        const {unit, nav, inboundTrack} = await armedNearFaf(80);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(nav.navmode).toBe(NavMode.ARM_LEG);
+        expect(unit.env.sim.lastWrite('GPS APPROACH MODE')!.value).toBe(1);
+
+        await flyOn(unit, inboundTrack);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(nav.navmode).toBe(NavMode.APR_LEG);
+        expect(unit.env.sim.lastWrite('GPS APPROACH MODE')!.value).toBe(2);
+    });
+
+    // No source states the value of GPS IS APPROACH ACTIVE in ARM: the panel.xml customization wiki only lists the SimVar
+    // under WriteGPSSimVars. This is what the code writes today, 1 in ARM and in APR.
+    it('writes GPS IS APPROACH ACTIVE 1 in ARM and in APR (characterization)', async () => {
+        const {unit, nav, inboundTrack} = await armedNearFaf(80);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(nav.navmode).toBe(NavMode.ARM_LEG);
+        expect(unit.env.sim.lastWrite('GPS IS APPROACH ACTIVE')!.value).toBe(1);
+
+        await flyOn(unit, inboundTrack);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(nav.navmode).toBe(NavMode.APR_LEG);
+        expect(unit.env.sim.lastWrite('GPS IS APPROACH ACTIVE')!.value).toBe(1);
+    });
 });
 
 // 6-3 lists a waypoint that is the IAF and the FAF at once as the active waypoint of the switch; 6-10 gives the example

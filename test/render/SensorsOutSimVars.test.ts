@@ -1,7 +1,9 @@
 import {describe, expect, it, vi} from 'vitest';
 import {FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../harness/boot';
-import {angleBetween, courseDeg, norm360, pointFrom} from '../harness/flight/geo';
+import {angleBetween, courseDeg, distanceNm, norm360, pointBefore, pointFrom} from '../harness/flight/geo';
+import {standardRoute} from '../harness/fixtures';
+import {NavMode} from '../../kln90b/data/VolatileMemory';
 import {airport, intersection, vor} from '../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../harness/navdata/procedures';
 import {savedFlightplan} from '../harness/storage';
@@ -202,5 +204,165 @@ describe('GPS WP TRUE BEARING on a DME arc (#21 1e1a8f5)', () => {
         expect(out.magBearing).toBeCloseTo(courseDeg(p, fafaa) - MAGVAR, 1);
         expect(out.rmi).toBeCloseTo(courseDeg(p, fafaa) - MAGVAR, 1);
         expect(unit.errors).toEqual([]);
+    });
+});
+
+// Public contract: the GPS SimVars written when Output.WriteGPSSimVars is set (CLAUDE.md, "Public contract with
+// aircraft"; the wiki page panel.xml customization lists them under WriteGPSSimVars, and the units are the MSFS GPS SimVar
+// definitions). One known state, expected values from geo.ts: the aircraft is held 1 NM right of the first leg of the
+// standard route, 20 NM before ABC, with a ground speed of 120 kt and a track 10 degrees right of the leg. The variation
+// is 4 degrees east, so a true value cannot be taken for a magnetic one. Each group is its own `it`, so that one break
+// cannot hide another (Vitest stops at the first failed assertion of an `it`).
+describe('GPS SimVars for a known state', () => {
+    const MAGVAR = 4;
+    const route = standardRoute();
+    const onLeg = pointBefore(route.kaaa, route.abc, 20);
+    const legCourse = courseDeg(onLeg, route.abc); // About 50.75 true
+    const p = pointFrom(onLeg, legCourse + 90, 1); // 1 NM right of the leg
+    const trackTrue = norm360(legCourse + 10);
+
+    const sim = (unit: HeadlessUnit) => unit.env.sim;
+
+    async function bootKnownState(panelXml?: string) {
+        const unit = await bootUnit({
+            facilities: [route.kaaa, route.abc, route.kbbb],
+            storage: savedFlightplan(0, [route.kaaa, route.abc, route.kbbb]),
+            position: p, magvar: MAGVAR, panelXml,
+        });
+        await settle(unit);
+        await moveAircraft(unit, p, {groundspeedKt: 120, trackTrue});
+        await vi.advanceTimersByTimeAsync(4000); // The 16 Hz XTK filter converges on a constant input
+        expect(unit.errors).toEqual([]);
+        return unit;
+    }
+
+    it('writes the position, ground speed, magnetic variation and tracks', async () => {
+        const unit = await bootKnownState();
+
+        expect(sim(unit).get('GPS POSITION LAT', 'degrees')).toBeCloseTo(p.lat, 6);
+        expect(sim(unit).get('GPS POSITION LON', 'degrees')).toBeCloseTo(p.lon, 6);
+        expect(sim(unit).get('GPS GROUND SPEED', 'meters per second')).toBeCloseTo(120 * 1852 / 3600, 3);
+        expect(sim(unit).get('GPS MAGVAR', 'degrees')).toBeCloseTo(4, 4);
+        expect(norm360(sim(unit).get('GPS GROUND TRUE TRACK', 'degrees'))).toBeCloseTo(trackTrue, 2);
+        expect(norm360(sim(unit).get('GPS GROUND MAGNETIC TRACK', 'degrees'))).toBeCloseTo(trackTrue - 4, 2);
+    });
+
+    it('writes the distance and the true and magnetic bearing to the active waypoint', async () => {
+        const unit = await bootKnownState();
+
+        expect(sim(unit).get('GPS WP NEXT ID', 'string')).toBe('ABC'); // Precondition: ABC is the active waypoint
+        expect(sim(unit).get('GPS WP DISTANCE', 'meters')).toBeCloseTo(distanceNm(p, route.abc) * 1852, -1);
+        expect(norm360(sim(unit).get('GPS WP TRUE BEARING', 'degrees'))).toBeCloseTo(courseDeg(p, route.abc), 2);
+        expect(norm360(sim(unit).get('GPS WP BEARING', 'degrees'))).toBeCloseTo(courseDeg(p, route.abc) - 4, 2);
+    });
+
+    // The sign of GPS WP CROSS TRK follows the SDK's GpsSynchronizer, which writes the negated cross track: 1 NM right of
+    // the leg is -1852 m. The scaling is the 5 NM of the enroute CDI (3-3), in meters.
+    it('writes the desired track, the OBS value, the cross track and the CDI scaling', async () => {
+        const unit = await bootKnownState();
+
+        // The desired track is the course of the leg, less the variation, in radians
+        expect(sim(unit).get('GPS WP DESIRED TRACK', 'degrees')).toBeCloseTo(courseDeg(onLeg, route.abc) - 4, 1);
+        expect(sim(unit).lastWrite('GPS WP DESIRED TRACK')!.unit).toBe('radians');
+        // In LEG mode the OBS value is the desired track
+        expect(sim(unit).get('GPS OBS VALUE', 'degrees')).toBeCloseTo(courseDeg(onLeg, route.abc) - 4, 1);
+        expect(sim(unit).get('GPS WP CROSS TRK', 'meters')).toBeCloseTo(-1852, -1);
+        expect(sim(unit).get('GPS CDI SCALING', 'meters')).toBeCloseTo(9260, 3);
+    });
+
+    it('writes the time to the active waypoint and to the destination, and the arrival times', async () => {
+        const unit = await bootKnownState();
+        const toAbc = distanceNm(p, route.abc);
+        const toKbbb = toAbc + distanceNm(route.abc, route.kbbb);
+        const eteWp = toAbc / 120 * 3600;
+        const eteDest = toKbbb / 120 * 3600;
+        // The arrival time is the zulu time of day plus the time to go; the clock is the harness's fake clock
+        const now = (Date.now() % 86_400_000) / 1000;
+
+        expect(Math.abs(sim(unit).get('GPS WP ETE', 'seconds') - eteWp)).toBeLessThan(1);
+        expect(Math.abs(sim(unit).get('GPS ETE', 'seconds') - eteDest)).toBeLessThan(1);
+        expect(Math.abs(sim(unit).get('GPS WP ETA', 'seconds') - (now + eteWp))).toBeLessThan(1.5);
+        expect(Math.abs(sim(unit).get('GPS ETA', 'seconds') - (now + eteDest))).toBeLessThan(1.5);
+    });
+
+    it('writes the flight plan size, the active index and the previous and next waypoint', async () => {
+        const unit = await bootKnownState();
+
+        expect(sim(unit).get('GPS FLIGHT PLAN WP COUNT', 'number')).toBe(3);
+        expect(sim(unit).get('GPS FLIGHT PLAN WP INDEX', 'number')).toBe(2); // One based: ABC is the second waypoint
+        expect(sim(unit).get('GPS WP PREV VALID', 'bool')).toBe(1);
+        expect(sim(unit).get('GPS WP PREV ID', 'string')).toBe('KAAA');
+        expect(sim(unit).get('GPS WP PREV LAT', 'degrees')).toBeCloseTo(47.0, 6);
+        expect(sim(unit).get('GPS WP NEXT ID', 'string')).toBe('ABC');
+        expect(sim(unit).get('GPS WP NEXT LAT', 'degrees')).toBeCloseTo(47.5, 6);
+        expect(sim(unit).get('GPS IS ACTIVE FLIGHT PLAN', 'bool')).toBe(1);
+        expect(sim(unit).get('GPS IS ACTIVE WAY POINT', 'bool')).toBe(1);
+    });
+
+    // The wiki lists the vertical outputs as set to 0: the KLN does not give vertical guidance. The values are asserted
+    // through the last write, because a variable nobody wrote reads 0 too.
+    it('writes the leg mode and the vertical outputs as zero, and switches the OBS off', async () => {
+        const unit = await bootKnownState();
+
+        for (const name of ['GPS IS APPROACH ACTIVE', 'GPS APPROACH MODE', 'GPS HAS GLIDEPATH', 'GPS GSI SCALING', 'GPS VERTICAL ANGLE',
+            'GPS VERTICAL ANGLE ERROR', 'GPS VERTICAL ERROR']) {
+            expect([name, sim(unit).lastWrite(name)?.value]).toEqual([name, 0]);
+        }
+        const obsEvents = sim(unit).keyEvents.filter(k => k.name.startsWith('K:GPS_OBS'));
+        expect(obsEvents[obsEvents.length - 1].name).toBe('K:GPS_OBS_OFF');
+    });
+
+    // No contract states the sign of GPS WP TRACK ANGLE ERROR: this is what the code writes today, a negative angle for a
+    // track to the right of the desired track
+    it('writes a negative track angle error for a track 10 degrees right of the desired track (characterization)', async () => {
+        const unit = await bootKnownState();
+
+        expect(sim(unit).get('GPS WP TRACK ANGLE ERROR', 'degrees')).toBeCloseTo(-10, 0);
+        expect(sim(unit).lastWrite('GPS WP TRACK ANGLE ERROR')!.unit).toBe('radians');
+    });
+
+    it('moves the index and the previous and next waypoint on after a sequence', async () => {
+        const unit = await bootKnownState();
+        unit.props.memory.navPage.activeWaypoint.sequenceToNextWaypoint();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(sim(unit).get('GPS FLIGHT PLAN WP INDEX', 'number')).toBe(3);
+        expect(sim(unit).get('GPS WP PREV ID', 'string')).toBe('ABC');
+        expect(sim(unit).get('GPS WP PREV LON', 'degrees')).toBeCloseTo(8.9, 6);
+        expect(sim(unit).get('GPS WP NEXT ID', 'string')).toBe('KBBB');
+        expect(sim(unit).get('GPS WP NEXT LAT', 'degrees')).toBeCloseTo(48.2, 6);
+    });
+
+    // The K:GPS_OBS_ON and K:GPS_OBS_OFF key events stand in for GPS OBS ACTIVE, which cannot be written (Sensors.setMode);
+    // the External Annunciators wiki page describes the OBS light. FakeSim gives key events no effect, so the events
+    // themselves are the contract.
+    describe('GPS OBS key events', () => {
+        const obsEvents = (unit: HeadlessUnit) => unit.env.sim.keyEvents.filter(k => k.name.startsWith('K:GPS_OBS'));
+
+        it('ends on K:GPS_OBS_ON in OBS mode', async () => {
+            const unit = await bootKnownState();
+            unit.env.sim.set('Nav OBS:1', 'degrees', 51);
+            await unit.panel.obsMode();
+            await vi.advanceTimersByTimeAsync(2000);
+
+            expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
+            const events = obsEvents(unit);
+            expect(events[events.length - 1].name).toBe('K:GPS_OBS_ON');
+        });
+
+        // The switch makes GPS OBS ACTIVE read-only, so the unit leaves the key events out
+        it('writes no K:GPS_OBS event with LegObsSwitchInstalled', async () => {
+            const unit = await bootKnownState('<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ExternalSwitches>'
+                + '<LegObsSwitchInstalled>true</LegObsSwitchInstalled></ExternalSwitches></Input></Instrument></PlaneHTMLConfig>');
+            // The switch, not the unit, selects OBS: the unit follows GPS OBS ACTIVE
+            unit.env.sim.set('Nav OBS:1', 'degrees', 51);
+            unit.env.sim.set('GPS OBS ACTIVE', 'bool', true);
+            await vi.advanceTimersByTimeAsync(2000);
+
+            // The other outputs run, so the silence is the option
+            expect(unit.env.sim.get('GPS WP NEXT ID', 'string')).toBe('ABC');
+            expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
+            expect(obsEvents(unit)).toEqual([]);
+        });
     });
 });

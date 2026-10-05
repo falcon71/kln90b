@@ -21,6 +21,18 @@ describe('self-test page', () => {
         expect(sim.get('L:KLN90B_GPS_WP_BEARING', 'degrees')).toBeCloseTo(130, 1);
         expect(unit.errors).toEqual([]);
     });
+
+    // Public contract: during the self-test GPS APPROACH MODE is 3, so that the ARM and ACTV external annunciators both
+    // light (the External Annunciators wiki page; Sensors.setMode)
+    it('writes GPS APPROACH MODE 3 during the self-test', async () => {
+        const unit = await bootUnit({engineRunning: false, magvar: 0});
+        await unit.panel.powerOn();
+        await vi.advanceTimersByTimeAsync(19_000);
+
+        expect(Screen.read().rows('L')).toContain('   OUT 315°'); // Precondition: the self-test page is showing
+        expect(unit.env.sim.lastWrite('GPS APPROACH MODE')!.value).toBe(3);
+        expect(unit.errors).toEqual([]);
+    });
 });
 
 const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
