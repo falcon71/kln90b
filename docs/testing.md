@@ -174,6 +174,9 @@ in the sim. The SDK's `NearestLodBoundarySearchSession` builds the `LodBoundary`
 LOD 0 is the exact ring instead of a simplified one, and `resetSingletons` clears the SDK's boundary cache, which is
 keyed by the airspace id. A circular airspace exists for the known gap that `BoundaryUtils` ignores circles. A test of a
 message reads the MSG page with `Screen.read()` (see `test/render/harness/airspaces.test.ts`).
+A Center airspace (`BoundaryType.Center`) built with `frequencyMHz` carries the frequency that OTH 2 lists. OTH 2 also
+reads the frequency's name, and throws on every display tick without it, so the builder gives the airspace's own name
+unless `frequencyName` says otherwise.
 
 `savedFlightplan(idx, legs)` (`test/harness/storage.ts`) returns user data in the V2 format (docs/architecture.md,
 Core 7). Pass it as `storage` to start a test with a flight plan already stored, which is far faster than entering it
@@ -217,11 +220,13 @@ pages accept.
 - **Every fix must be in the navdata**, because `SidStar` loads each one with `getFacility`, and so must an arc's navaid.
   `bootUnit` checks this on the facilities it is given and throws, naming each missing fix as `IDENT (type region)`
   (`MemoryFacilityClient.missingProcedureFixes()` is the same check for a unit test).
-- Load a procedure the way a pilot does: `selectPage('R', 'APT 8')`, `cursor('R')`, `ent()` on the approach (a single
-  transition is taken without a question), `ent()` on LOAD IN FPL. APT 7 is the same with the SID or STAR. The unit
-  then shows FPL 0 on the left, but FPL 0 scrolls to the active leg only at the next calculation tick: advance about
-  1 s before you read its rows. The APT pages open on the first airport of the scan list, so with more than one airport
-  select the ident first. `test/render/harness/procedures.test.ts` does all three.
+- **`unit.panel.loadProcedure('APT 8')`** loads the first procedure of APT 7 or APT 8 into FPL 0 the way a pilot does:
+  select the page, cursor, ENT on the first entry (a single transition is taken without a question), ENT on LOAD IN
+  FPL, cursor off, then one second of clock, because FPL 0 scrolls to the active leg only at the next calculation tick.
+  The APT pages open on the first airport of the scan list, so with more than one airport pass
+  `{ident: 'KPRC'}`: the helper first enters that ident on APT 1. A test that needs another entry or a transition
+  question does the sequence by hand (`selectPage`, `cursor`, `ent`). `test/render/harness/procedures.test.ts` does
+  both.
 - A DME arc is converted to an entry waypoint `Dnnnx` and the arc's end fix. The entry is the point of the arc closest to
   the GPS position at load time (the beginning of the arc when that point is outside it), so the position the unit boots
   at decides the entry. The arc's radials are true bearings: keep `magvar` at 0 or account for it. The arc must not be the
@@ -288,6 +293,14 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - **`settle(unit)`** (`boot.ts`) advances the clock until the GPS has a solution, then two calculation ticks more, so that
   FPL 0 has activated and the display shows it (a force-ready boot is valid at once, but FPL 0 activates only at the first
   calculation tick). It throws when there is no fix within its cap (120 s by default).
+- **`moveAircraft(unit, point, {groundspeedKt, trackTrue?})`** (`boot.ts`) moves the aircraft so that the GPS computes a
+  track, which it takes from the last two positions once the ground speed is at least 2 kt (3-35). The helper sets
+  `GROUND VELOCITY`, jumps to the point and runs one calculation tick, so the track is that of the jump from the present
+  position. With `trackTrue` the aircraft first jumps to a point 0.05 NM behind the target on that track, ticks, then
+  jumps to the target. Afterwards the position holds, which is a paused sim: the unit keeps the last track (see
+  `test/render/harness/moveAircraft.test.ts`). Only the calculation tick reads the position, so the order of these ticks
+  relative to a display tick does not matter. A held position with ground speed can sequence the leg, so keep the
+  aircraft away from the next waypoint or boot with `storage: {turnAnticipation: false}`.
 - **`storedSetting(unit, name)`** (`storage.ts`) returns the parsed value the unit saved under a user setting, and
   `undefined` for a key never saved. The unit saves a moment after the change, so advance the clock first. Use it instead
   of building the `persistent-setting.<model>.profile_1.` key by hand.

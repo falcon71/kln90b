@@ -15,6 +15,8 @@ export interface AirspaceOptions {
     maxType?: BoundaryAltitudeType;
     /** Center boundaries carry a frequency that OTH 2 reads (the field is untyped in the SDK, see Oth2Page) */
     frequencyMHz?: number;
+    /** The name OTH 2 shows for the Center; defaults to the airspace name (Oth2Page reads frequency.name, and fails without it) */
+    frequencyName?: string;
 }
 
 function facility(name: string, type: BoundaryType, vectors: BoundaryFacility['vectors'], box: {
@@ -29,7 +31,7 @@ function facility(name: string, type: BoundaryType, vectors: BoundaryFacility['v
         minAltType: o.minType ?? BoundaryAltitudeType.MSL, maxAltType: o.maxType ?? BoundaryAltitudeType.MSL,
         topLeft: {lat: box.top, long: box.left}, bottomRight: {lat: box.bottom, long: box.right},
         vectors, lods: [],
-        ...(o.frequencyMHz !== undefined ? {frequency: {freqMHz: o.frequencyMHz}} : {}),
+        ...(o.frequencyMHz !== undefined ? {frequency: {freqMHz: o.frequencyMHz, name: o.frequencyName ?? name}} : {}),
     } as unknown as BoundaryFacility;
 }
 

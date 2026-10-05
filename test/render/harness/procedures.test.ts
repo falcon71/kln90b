@@ -157,6 +157,37 @@ describe('procedures through APT 8 (harness)', () => {
     });
 });
 
+describe('FrontPanel.loadProcedure (harness)', () => {
+    it('loads the first approach of APT 8 into FPL 0 and turns the cursor off', async () => {
+        const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {approaches: [rnav27()]});
+        const unit = await bootWith(kprc, [iafaa, ifaaa, fafaa, mapaa, mahaa]);
+        await settle(unit);
+
+        await unit.panel.loadProcedure('APT 8');
+
+        // The same legs as the hand-written sequence above asserts: the last ENT is the one that loads them
+        expect(idents(unit, KLNLegType.APP)).toEqual(['IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA']);
+        expect(Screen.read().status().right).not.toBe('CRSR');
+        expect(Screen.read().leftName()).toBe('FPL 0');
+    });
+
+    it('selects the given airport when the world has two', async () => {
+        // KAAB is the nearer one, so the APT pages open on it, and it has no approach
+        const kaab = airport('KAAB', 47.0, 8.0);
+        const kprc = withProcedures(airport('KPRC', 47.2, 8.0), {approaches: [rnav27()]});
+        const unit = await bootWith(kprc, [kaab, iafaa, ifaaa, fafaa, mapaa, mahaa]);
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 8');
+        expect(rows('R').slice(0, 2)).toEqual([' KAAB IAP', 'NO APPROACH']);
+        await unit.panel.selectPage('R', 'APT 1');
+
+        await unit.panel.loadProcedure('APT 8', {ident: 'KPRC'});
+
+        expect(idents(unit, KLNLegType.APP)).toEqual(['IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA']);
+        expect(Screen.read().status().right).not.toBe('CRSR');
+    });
+});
+
 describe('procedures through APT 7 (harness)', () => {
     it('loads a SID without its CA leg', async () => {
         const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
