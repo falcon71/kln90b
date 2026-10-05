@@ -49,8 +49,8 @@ describe('FrontPanel.enterIdent (harness)', () => {
             expect(Screen.read().row(0).slice(12)).toBe(' KAA       ');
         });
 
-        // The cursor starts on the first character of each selector. The nearer facility of each type (47.1, 8.1) shows
-        // without any typing, so the screens below, which show the one at 48, 9, prove the typed ident
+        // The cursor starts on the first character of each selector. The alphabetically first facility of each type (the
+        // one at 47.1, 8.1) shows without any typing, so the screens below, which show the one at 48, 9, prove the typed ident
         const facilities = () => [vor('ABC', 47.1, 8.1), vor('XYZ', 48.0, 9.0), ndb('NDA', 47.1, 8.1), ndb('NDB', 48.0, 9.0),
             intersection('ALPHA', 47.1, 8.1), intersection('BRAVO', 48.0, 9.0)];
 
@@ -119,9 +119,10 @@ describe('FrontPanel.enterIdent (harness)', () => {
             expect(unit.panel.focused('R')).toEqual({row: 4, col: 12, text: 'USER POS?'});
         });
 
-        // The cursor of the SUP and INT pages has a position between the ident characters and the next field that
-        // focuses nothing (the cells of no field are inverted there)
-        it.each([['SUP  '], ['INT  ']])('steps over the cursor position without a field on the %s page', async page => {
+        // The cursor of the SUP page without user waypoints has a position between the ident characters and the next
+        // field that focuses nothing (the cells of no field are inverted there). The INT page has none any more: the
+        // default navdata (fixtures.ts) gives it an entry, and only an empty list stores the 4-character placeholder
+        it.each([['SUP  ']])('steps over the cursor position without a field on the %s page', async page => {
             const unit = await bootUnit({facilities: [airport('KAAA', 47.0, 8.0)]});
             await unit.panel.selectPage('R', page);
             await unit.panel.cursor('R');

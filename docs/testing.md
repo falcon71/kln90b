@@ -154,6 +154,18 @@ singletons that were never created.
 with `airport()`, `vor()`, `ndb()` and `intersection()` (`navdata/builders.ts`). The builders fill every field the
 instrument reads and nothing else. The data is synthetic; see the limitations in section 6.
 
+**Default navdata.** `bootUnit`, `bootUnitExpectingError` and `Flight.start` add one airport, VOR, NDB and intersection
+to every world (`defaultNavdata()` in `test/harness/fixtures.ts`), because a real unit always has a database: without
+them, the APT, VOR, NDB and INT pages of a world that lacks the type post `NO APT WPTS`, `NO VOR WPTS`, and so on, a state
+no real unit shows. They lie at 45 S 150 W, far beyond the 500 NM nearest search of every test position, so the nearest
+lists, the maps and the INT reference VOR are unchanged. Their idents (`ZZXA`, `ZZV`, `ZZN`, `ZZXIN`) sort after the idents
+of the tests, which matters because the scan lists are in ident order and the pages open on the first entry, and they are
+unique across the types, so no DUPLICATE page appears. The prefix `ZZ` is reserved for them: `bootUnit` throws when a
+test facility has one of their idents. There is no default user waypoint, so `NO SUP WPTS` stays real. A test that needs
+the bare world (the `NO ... WPTS` messages themselves, or a count of the facilities) passes `defaultNavdata: false`.
+`MemoryFacilityClient` itself is unchanged, so a unit test that builds one gets exactly the facilities it is given.
+`test/render/harness/defaultNavdata.test.ts` holds this behavior.
+
 **Nearest filters.** A nearest session keeps its filters itself and applies them inside the search, before `maxItems`,
 as the sim does: a nearer facility that the filter hides takes no slot, and a facility hidden by a new filter is reported
 as `removed` at the next search. The airport filters are the class mask of `setAirportFilter` and the surface, length
@@ -356,11 +368,12 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
 
 (`test/flight/flights/firstFlight.test.ts`, the proof flight.)
 
-- **`World`** holds the facilities and the magnetic variation. Idents must be unique within a world.
+- **`World`** holds the facilities and the magnetic variation. Idents must be unique within a world, and must differ from
+  those of the default navdata (section 3), which `Flight.start` adds like `bootUnit`.
 - **`Flight.start(opts)`** boots the unit, starts the aircraft and flies until the GPS has a solution. Call it inside a
   test, because it registers `onTestFailed`. Besides `world` and `aircraft` it takes `aircraftOptions` (roll rate,
   maximum bank), `pilot`, and the `BootOptions` that make sense in flight (`storage`, `panelXml`, `engineRunning`,
-  `start`, `seed`, `atcModel`, `coldGps`, `efb`, `platform`). Airspaces are not a boot option here: they come from
+  `start`, `seed`, `atcModel`, `coldGps`, `efb`, `platform`, `defaultNavdata`). Airspaces are not a boot option here: they come from
   `World.addAirspace()`, and the facilities, position, altitude and magnetic variation from the world and the aircraft.
 - **Aircraft** (`flight/Aircraft.ts`): a point mass with constant ground speed and altitude, coordinated turns and a
   roll rate. No wind. It writes the SimVars the unit reads, 16 times per simulated second.
@@ -399,8 +412,8 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       away and one back, as a pilot would, and the search runs for exactly the typed ident. `type(side, text)` is the
       keyboard alternative that types the same characters.
     - `focused(side)` returns the one focused field `{row, col, text}`; `cursorTo(side, 'USER POS?')` turns the outer
-      knob until that field has the cursor, stepping over the cursor positions that focus nothing (the SUP and INT pages
-      have one after the ident characters) and throwing with the screen after `maxClicks`.
+      knob until that field has the cursor, stepping over the cursor positions that focus nothing (the SUP page without
+      user waypoints has one after the ident characters) and throwing with the screen after `maxClicks`.
       `appendToFpl0(idents)` enters and confirms idents on FPL 0.
     - Power: `powerOff()`, `powerOn()`, `powerCycle({offSeconds})` and `approveSelfTest()`. After boot every power-on runs
       the welcome page (17 s) and the self-test, also on an engine-running unit; `approveSelfTest` presses ENT on
