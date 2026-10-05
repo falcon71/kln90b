@@ -103,15 +103,20 @@ describe('the nearest airport list', () => {
             expect(idents(await nearestRows(unit))).toEqual(['KMID', 'KAAA', 'KGRS', 'KBBB']);
         });
 
+        // The runways of KLOW (1650 ft) and KHIG (1750 ft) lie either side of the selected 1700 ft
         it('drops an airport below the new minimum length', async () => {
-            const unit = await bootUnit(world());
+            const klow = airport('KLOW', 47.15, 8.0, {runways: [{lengthFt: 1650}]});
+            const khig = airport('KHIG', 47.25, 8.0, {runways: [{lengthFt: 1750}]});
+            const unit = await bootUnit({facilities: [heli(), kmid(), klow, kaaa(), khig, kgrs(), kbbb()], position: POSITION});
             await unit.panel.selectPage('L', 'SET 3');
             await unit.panel.cursor('L');
             await unit.panel.inner('L', 7); // 1000 ft plus 7 steps of 100 ft
-            expect(Screen.read().rows('L')[3]).toBe('      1700\'');
+            expect(Screen.read().rows('L')[3]).toBe("      1700'");
             await unit.panel.cursor('L');
+            await vi.advanceTimersByTimeAsync(2000);
+            expect(storedSetting(unit, 'nearestAptMinRunwayLength')).toBe(1700);
 
-            expect(idents(await nearestRows(unit))).toEqual(['KAAA', 'KGRS', 'KBBB']);
+            expect(idents(await nearestRows(unit))).toEqual(['KAAA', 'KHIG', 'KGRS', 'KBBB']);
         });
 
         it('drops the soft airport with the second surface option', async () => {

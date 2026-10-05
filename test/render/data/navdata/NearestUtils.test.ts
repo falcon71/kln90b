@@ -57,9 +57,10 @@ describe('NearestUtils.getAirspaces tests the polygon, not the bounding box (133
             expect((await oth2At(INSIDE)).slice(0, 3)).toEqual(['TEST CENTER', 'CTR        ', '     118.55']);
         });
 
-        // The text outside any Center is the unit's own (Oth2Page cites a video); the guide shows only the inside case.
-        // The claim under test is that a position in the box but outside the shape gets no Center.
-        it('names no Center for a position in the bounding box outside the triangle', async () => {
+        // The text outside any Center is the unit's own (Oth2Page cites a video); the guide shows only the inside case,
+        // so this is a characterization of the text. The claim under test is that a position in the box but outside the
+        // shape gets no Center.
+        it('names no Center for a position in the bounding box outside the triangle (characterization of the text)', async () => {
             expect((await oth2At(IN_BOX_ONLY)).slice(0, 2)).toEqual(['OUTSIDE    ', 'ARTCC      ']);
         });
     });
