@@ -339,7 +339,7 @@ export class FrontPanel {
 
     /**
      * Turns the outer knob until the focused field shows the text, e.g. 'USER POS?'. A cursor position without a focused
-     * field (the SUP and INT pages have one between the ident characters and the next field) is stepped over. Throws
+     * field (the SUP page without user waypoints has one between the ident characters and the next field) is stepped over. Throws
      * with the screen if the field does not come within maxClicks.
      */
     public async cursorTo(side: Side, text: string, maxClicks = 20): Promise<void> {

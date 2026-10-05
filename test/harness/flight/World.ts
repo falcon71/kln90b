@@ -1,7 +1,7 @@
 import {BoundaryFacility, Facility} from '@microsoft/msfs-sdk';
 import {LatLon} from './geo';
 
-/** The navdata and magnetic variation a flight takes place in. Idents must be unique within a world. */
+/** The navdata and magnetic variation a flight takes place in. Idents must be unique within a world, and must differ from those of the default navdata (fixtures.ts), which bootUnit adds. */
 export class World {
     private readonly facilities: Facility[] = [];
     private readonly boundaries: BoundaryFacility[] = [];
