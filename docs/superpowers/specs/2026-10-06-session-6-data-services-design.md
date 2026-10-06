@@ -94,7 +94,7 @@ Findings that shape the tests:
 - **Power-on reset:** every reset and every kept value of `VolatileMemory` (the NAV 4 selected altitude, the TRI fuel
   flow and reserve, the Super NAV 5 range) is characterized as is, with a GitHub question to research later.
 - **VNAV re-arm on the ANGLE cursor:** a characterization plus a `question` issue, after the trainer check (see
-  "Pending results"). VNAV at the end of the path: a comment on #73, no pin.
+  "Results that came in after the design"). VNAV at the end of the path: a comment on #73, no pin.
 - **HAA:** the alert once per entry into the cylinder is a characterization.
 - **Temporary waypoints:**
     - The power-off purge is the spec (5-22, 5-26).
@@ -109,7 +109,8 @@ Findings that shape the tests:
     - The EFB route sync is added to the public contract list in `CLAUDE.md`, and the EFB tests cite it.
 - **MSA south of 56° S:** an enhancement issue (the dataset has no more data; whether a free source exists is to be
   researched). The dashes there are a characterization.
-- **The SET 9 alert volume** (stored, never used): an enhancement issue for a read-only LVar (see "Results that came in after the design").
+- **The SET 9 alert volume** (stored, never used): an enhancement issue for a read-only LVar (see "Results that came in
+  after the design").
 
 **The controller's defaults** (presented to the maintainer with the design, not objected to):
 - These are characterizations: the flight timer at exactly 30 kt (4-13 is ambiguous), VNAV at the end of the path, the
