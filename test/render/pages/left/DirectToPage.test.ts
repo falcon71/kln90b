@@ -30,8 +30,8 @@ describe('Direct To page', () => {
         expect(aw.isDctNavigation()).toBe(true);
         expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('ABC');
         const screen = Screen.read();
-        // While the FPL 0 cursor is on, the status line shows CRSR on the left and the right page name stays
-        expect(screen.status().left).toBe('CRSR');
+        // The left cursor is deliberately not asserted: figure 4-42 (4-11) shows it off after the approval, and the unit
+        // leaves it on (#82, pinned in DirectToObs.test.ts)
         expect(screen.status().right).toBe('NAV 1');
         // The arrow marks the direct-to target; the first ABC (row 2) is no longer it
         expect(screen.rows('L').slice(1, 5).map(r => r.slice(0, 8))).toEqual([
@@ -103,5 +103,51 @@ describe('Direct To page', () => {
         expect(again.status().left).toBe('CRSR');
         expect(again.cell(2, 3).attr).toBe('I');
         expect(again.rows('L')[2]).toBe('   KAAA    ');
+    });
+
+    // The plan KAAA, ABC, KBBB with the aircraft on the first leg: ABC is active. The boot has no stored last active
+    // waypoint, so the right side shows the empty SUP page, as in the reproduction of #119
+    async function bootWithAbcActive() {
+        const unit = await bootUnit({
+            facilities: [kaaa, abc, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
+        });
+        await settle(unit);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        return unit;
+    }
+
+    // 3-27 rule 4: with no rule 1 to 3 candidate, the DIRECT TO page shows the active waypoint. NAV 1 is not a waypoint
+    // page, so rule 3 does not apply; this is the sibling of the pin below and holds the setup (#119)
+    it('prefills the active waypoint on the DIRECT TO page when NAV 1 is on the right (3-27 rule 4, sibling of #119)', async () => {
+        const unit = await bootWithAbcActive();
+        await unit.panel.selectPage('R', 'NAV 1');
+
+        await unit.panel.dct();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[0]).toBe('DIRECT TO: ');
+        expect(Screen.read().rows('L')[2]).toBe('   ABC     ');
+    });
+
+    // 3-27: the sibling of the pin below; its setup holds and the DIRECT TO page opens
+    it('opens the DIRECT TO page with ABC active and the empty SUP page on the right, as after power-up (the setup of #119)', async () => {
+        const unit = await bootWithAbcActive();
+        expect(Screen.read().status().right).toBe('SUP');
+
+        await unit.panel.dct();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[0]).toBe('DIRECT TO: ');
+    });
+
+    // 3-27 rule 4, "checked in the KLN 89 trainer: the active waypoint is prefilled after power-up from a waypoint page
+    // and from NAV 1". Rule 3 applies only when a waypoint is shown on the page: the empty SUP page of the boot has none,
+    // but the unit returns its null and never reaches rule 4 (#119)
+    it.fails('prefills the active waypoint on the DIRECT TO page when the right page is the empty SUP page of the boot (#119)', async () => {
+        const unit = await bootWithAbcActive();
+
+        await unit.panel.dct();
+
+        expect(Screen.read().rows('L')[2]).toBe('   ABC     ');
     });
 });

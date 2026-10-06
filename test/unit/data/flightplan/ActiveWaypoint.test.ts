@@ -1,11 +1,11 @@
 import {describe, expect, it} from 'vitest';
 import {EventBus, Facility, GeoCircle, GeoPoint, UnitType} from '@microsoft/msfs-sdk';
-import {ActiveWaypoint} from '../../../../kln90b/data/flightplan/ActiveWaypoint';
-import {Flightplan, KLNFlightplanLeg, KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
+import {ActiveWaypoint, TurnStackEntry} from '../../../../kln90b/data/flightplan/ActiveWaypoint';
+import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {ArcData} from '../../../../kln90b/data/navdata/SidStar';
 import {KLN90BUserSettings} from '../../../../kln90b/settings/KLN90BUserSettings';
 import {Sensors} from '../../../../kln90b/Sensors';
-import {airport, vor} from '../../../harness/navdata/builders';
+import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {pointFrom} from '../../../harness/flight/geo';
 
 const NM = (nm: number) => UnitType.NMILE.convertTo(nm, UnitType.GA_RADIAN);
@@ -17,9 +17,16 @@ const user = (wpt: Facility): KLNFlightplanLeg => ({wpt, type: KLNLegType.USER})
  * sensors, so nothing is booted.
  */
 function activeWaypointOver(legs: KLNFlightplanLeg[], position: { lat: number; lon: number }) {
+    return activeWaypointWith(legs, position).aw;
+}
+
+/** The same, with the settings and FPL 0 the ActiveWaypoint works on, for tests that read or edit them */
+function activeWaypointWith(legs: KLNFlightplanLeg[], position: { lat: number; lon: number }) {
     const bus = new EventBus();
+    const settings = new KLN90BUserSettings(bus);
     const sensors = {in: {gps: {coords: new GeoPoint(position.lat, position.lon)}}} as unknown as Sensors;
-    return new ActiveWaypoint(bus, new KLN90BUserSettings(bus), sensors, new Flightplan(0, legs, bus), null);
+    const fpl = new Flightplan(0, legs, bus);
+    return {aw: new ActiveWaypoint(bus, settings, sensors, fpl, null), settings, fpl};
 }
 
 // An open box of invented waypoints: B is 40 NM east of A, C 40 NM north of B, D 40 NM west of C
@@ -132,5 +139,136 @@ describe('ActiveWaypoint.activateFpl0 on a DME arc', () => {
 
         expect(aw.activateFpl0()).not.toBeNull();
         expect(aw.getActiveFplIdx()).toBe(1);
+    });
+});
+
+const fromHere = (p: { lat: number; lon: number }) => intersection('PPOS', p.lat, p.lon);
+const identsOf = (legs: KLNFlightplanLeg[]) => legs.map(l => l.wpt.icaoStruct.ident);
+
+describe('ActiveWaypoint direct-to flows', () => {
+    // characterization: the Pilot's Guide does not say which leg a cancelled direct-to returns to; the unit takes the
+    // rule of the #41 tests (the comment in ActiveWaypoint.cancelDirectTo says it never keeps the old leg)
+    it('characterization: cancelDirectTo activates the leg closest to the aircraft, not the leg before the direct-to', () => {
+        const position = pointFrom(pointFrom(C, 270, 20), 0, 1); // beside the middle of C-D
+        const aw = activeWaypointOver([A, B, C, D].map(user), position);
+        aw.directToFlightplanIndex(fromHere(position), 1); // direct to B
+        // Precondition: the direct-to to B is active and is not the closest leg
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.isDctNavigation()).toBe(true);
+
+        aw.cancelDirectTo();
+
+        expect(aw.isDctNavigation()).toBe(false);
+        expect(aw.getActiveFplIdx()).toBe(3);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('GHI');
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('DEF');
+    });
+
+    // 4-10: a direct-to to a waypoint of FPL 0 flies to it and then resumes the plan after it
+    it('a direct-to to a waypoint of FPL 0 skips the earlier waypoints and resumes the plan after it (4-10)', () => {
+        const position = pointFrom(A, 90, 10); // on the first leg
+        const aw = activeWaypointOver([A, B, C, D].map(user), position);
+        aw.directTo(fromHere(position), C);
+
+        expect(aw.getActiveFplIdx()).toBe(2);
+        expect(identsOf(aw.getFutureLegs())).toEqual(['DEF', 'GHI']);
+        expect(aw.getFollowingLeg()!.wpt.icaoStruct.ident).toBe('GHI');
+
+        aw.sequenceToNextWaypoint();
+
+        expect(aw.isDctNavigation()).toBe(false);
+        expect(aw.getActiveFplIdx()).toBe(3);
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('DEF'); // the plan leg C-D, not the direct-to start
+        // The path of the new leg is the great circle C-D: its midpoint lies on it
+        expect(aw.getFromLeg()!.path.distance(pointFrom(C, 270, 20))).toBeLessThan(NM(0.01));
+    });
+
+    // 4-10: the plan is only resumed when the direct-to target is a waypoint of FPL 0
+    it('a direct-to to a waypoint outside FPL 0 never resumes the plan (4-10)', () => {
+        const position = pointFrom(A, 90, 10);
+        const off = vor('OFF', 46.5, 8.5);
+        const aw = activeWaypointOver([A, B, C, D].map(user), position);
+        aw.directTo(fromHere(position), off);
+
+        expect(aw.getActiveFplIdx()).toBe(-1);
+        expect(aw.getFollowingLeg()).toBeNull();
+        expect(identsOf(aw.getFutureLegs())).toEqual(['OFF']);
+        expect(aw.getDestination()!.icaoStruct.ident).toBe('OFF');
+
+        aw.sequenceToNextWaypoint();
+
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('OFF');
+        expect(aw.isDctNavigation()).toBe(true);
+    });
+
+    // characterization: nothing follows the last waypoint, so the unit keeps it active (no page states it)
+    it('characterization: stays on the last leg when sequencing at the end of FPL 0', () => {
+        const aw = activeWaypointOver([A, B, C, D].map(user), pointFrom(C, 270, 30));
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(3); // Precondition: the last leg is active
+
+        aw.sequenceToNextWaypoint();
+
+        expect(aw.getActiveFplIdx()).toBe(3);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('GHI');
+        expect(aw.getFollowingLeg()).toBeNull();
+    });
+
+    // 6-20: the destination defaults to the MAP of a loaded approach, else the last waypoint
+    it('the destination is the MAP of an approach, not the last waypoint (6-20)', () => {
+        const legs: KLNFlightplanLeg[] = [
+            user(A), user(B),
+            {wpt: C, type: KLNLegType.APP, fixType: KLNFixType.FAF},
+            {wpt: D, type: KLNLegType.APP, fixType: KLNFixType.MAP},
+            {wpt: B, type: KLNLegType.APP, fixType: KLNFixType.MAHP},
+        ];
+        const aw = activeWaypointOver(legs, pointFrom(A, 90, 10));
+        aw.activateFpl0();
+
+        // The future legs stop at the MAP, so the missed approach waypoint B at the end is not among them
+        expect(identsOf(aw.getFutureLegs())).toEqual(['ABC', 'DEF', 'GHI']);
+        expect(aw.getDestination()!.icaoStruct.ident).toBe('GHI');
+    });
+
+    // characterization: the turn of the old leg no longer applies after a direct-to
+    it('characterization: a direct-to clears the turn stack', () => {
+        const aw = activeWaypointOver([A, B, C, D].map(user), pointFrom(A, 90, 10));
+        aw.activateFpl0();
+        const circle = GeoCircle.createGreatCircle(A, B);
+        aw.turnStack.push(new TurnStackEntry(circle, new GeoPoint(B.lat, B.lon), circle));
+        expect(aw.turnStack.length).toBe(1); // Precondition: the stack holds an entry
+
+        aw.directTo(fromHere(pointFrom(A, 90, 10)), C);
+
+        expect(aw.turnStack).toEqual([]);
+    });
+
+    // characterization: the saved waypoint is the one the unit restores at the next power-up. The V1 ICAO literal is
+    // region K1, four blanks, the ident padded to five
+    it('characterization: a direct-to saves the active waypoint', () => {
+        const position = pointFrom(A, 90, 10);
+        const {aw, settings} = activeWaypointWith([A, B, C, D].map(user), position);
+        aw.activateFpl0();
+        expect(settings.getSetting('activeWaypoint').get()).toBe('VK1    ABC  '); // Precondition: the leg before the direct-to is saved
+
+        aw.directTo(fromHere(position), C);
+
+        expect(settings.getSetting('activeWaypoint').get()).toBe('VK1    DEF  ');
+        expect(aw.lastactiveWaypoint!.icaoStruct.ident).toBe('DEF');
+    });
+
+    // characterization (#41 rule): after an edit the active leg is found again by position, so the inserted waypoint
+    // moves the index but not the leg
+    it('characterization: an edit of FPL 0 ahead of the active leg re-activates the leg the aircraft is on', () => {
+        const position = pointFrom(B, 0, 20); // on the leg B-C
+        const {aw, fpl} = activeWaypointWith([A, B, C, D].map(user), position);
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(2); // Precondition
+        const xPos = pointFrom(A, 180, 30);
+        fpl.insertLeg(1, user(vor('XXX', xPos.lat, xPos.lon)));
+
+        expect(aw.getActiveFplIdx()).toBe(3);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('DEF');
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('ABC');
     });
 });
