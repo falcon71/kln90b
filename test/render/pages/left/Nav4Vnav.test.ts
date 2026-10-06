@@ -97,6 +97,27 @@ describe('NAV 4 VNAV', () => {
         expect((await showNav4(unit))[0]).toBe('VNV IN 3:35');
     });
 
+    // 5-8: the boundary lies at ten minutes. 56.3 NM west the start is 56.3 - 2 - 29.33 = 24.97 NM ahead, 620 s at 145 kt:
+    // still ARMED
+    it('shows VNV ARMED just over ten minutes before the descent (5-8)', async () => {
+        const unit = await bootAt(56.3, {angle: -1.8});
+        unit.props.vnav.armVnav();
+
+        const title = (await showNav4(unit))[0];
+        expect(unit.props.vnav.timeToVnav).toBeCloseTo(620, -1);
+        expect(title).toBe('VNV ARMED  ');
+    });
+
+    // 5-8: 54.7 NM west the start is 23.37 NM ahead, 580 s at 145 kt: the countdown, 9:40
+    it('counts down just under ten minutes before the descent (5-8)', async () => {
+        const unit = await bootAt(54.7, {angle: -1.8});
+        unit.props.vnav.armVnav();
+
+        const title = (await showNav4(unit))[0];
+        expect(unit.props.vnav.timeToVnav).toBeCloseTo(580, -1);
+        expect(title).toBe('VNV IN 9:40');
+    });
+
     // 5-8 step 7 (figure 5-28): past the start the top line shows the advisory altitude. 31 NM west the target is 29 NM
     // away: 1900 + tan(1.8 deg) * 29 * 6076.12 = 7437 ft, shown in hundreds
     it('shows the advisory altitude once the descent has started (5-8)', async () => {
@@ -124,6 +145,26 @@ describe('NAV 4 VNAV', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(unit.props.vnav.timeToVnav).toBeGreaterThan(140);
+        expect(messages(unit)).not.toContain('VNV ALERT');
+    });
+
+    // The threshold is about 90 s (5-8, B-4): 80 s before the descent (34.55 NM west, 3.22 NM ahead) the alert is there,
+    // 105 s before it (35.56 NM west, 4.23 NM ahead) it is not
+    it('posts VNV ALERT 80 s before the descent (5-8, B-4)', async () => {
+        const unit = await bootAt(34.55, {angle: -1.8});
+        unit.props.vnav.armVnav();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.vnav.timeToVnav).toBeCloseTo(80, -1);
+        expect(messages(unit)).toContain('VNV ALERT');
+    });
+
+    it('posts no VNV ALERT 105 s before the descent (5-8, B-4)', async () => {
+        const unit = await bootAt(35.56, {angle: -1.8});
+        unit.props.vnav.armVnav();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.vnav.timeToVnav).toBeCloseTo(105, -1);
         expect(messages(unit)).not.toContain('VNV ALERT');
     });
 

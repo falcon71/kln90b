@@ -150,6 +150,14 @@ describe('Vnav angle', () => {
         expect(vnav.state).toBe(VnavState.Inactive);
     });
 
+    // characterization: the limit holds for a climb too: from 3000 to 9000 ft over 5 NM is atan(6000 / 30380) = 11.2 deg
+    it('gives 0 for a climb of 10 degrees or more (characterization)', () => {
+        const {vnav} = dct({distToActive: 5, ind: 3000, sel: 9000});
+        expect(vnav.getAngle()).toBe(0);
+        vnav.armVnav();
+        expect(vnav.state).toBe(VnavState.Inactive);
+    });
+
     // A programmed angle is shown as entered
     it('keeps a programmed angle (5-8)', () => {
         const {vnav} = dct({distToActive: 64.8, ind: 7500, angle: -1.8});

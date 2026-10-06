@@ -68,7 +68,7 @@ describe('AltAlert', () => {
     });
 
     // characterization: the service rounds IND to 100 ft before comparing, also for an air data input that is more
-    // precise than an encoder (3-55 explains the 100 ft only for encoders), so 4960 ft counts as 5000.
+    // precise than an encoder, so 4960 ft counts as 5000.
     it('counts SEL as reached when IND rounds to it (characterization)', () => {
         const r = rig({sel: 5000});
         r.at(4000);
