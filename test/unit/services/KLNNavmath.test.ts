@@ -58,6 +58,12 @@ describe('bankeAngleForStandardTurn', () => {
         expect(Math.abs(bankeAngleForStandardTurn(kt) - physicalBank(kt))).toBeLessThan(0.15);
     });
 
+    // The code takes the constants of the avform147 page literally (57.3 degrees per radian, 362.1). The values below
+    // are 57.3 * atan(V / 362.1), worked out by hand and rounded to two places, so a change of either constant shows
+    it.each([[60, 9.41], [90, 13.96], [120, 18.34], [150, 22.50]])('banks the avform147 angle at %s kt: %s°', (kt, bank) => {
+        expect(bankeAngleForStandardTurn(kt)).toBeCloseTo(bank, 2);
+    });
+
     it('turns at the standard rate: the turn radius of the SDK at that bank is V / omega', () => {
         // 120 kt: V / omega = 61.73 m/s / 0.05236 rad/s = 1179 m. The SDK's radius is an independent formula
         const radiusM = NavMath.turnRadius(120, bankeAngleForStandardTurn(120));

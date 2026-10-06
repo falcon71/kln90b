@@ -142,6 +142,18 @@ describe('insertLegIntoFpl', () => {
         expect(identsOf(fpl0)).toEqual(['KAAA', 'DEF', 'ABC']);
     });
 
+    // 4-4: a plan of 29 takes a 30th without losing its first waypoint
+    it('inserts the 30th leg into FPL 0 and keeps the first leg', () => {
+        const {fpl0, aw} = build(fullPlanLegs().slice(0, 29), START);
+
+        insertLegIntoFpl(fpl0, navState(aw, null), 29, user(NEW));
+
+        expect(fpl0.getLegs()).toHaveLength(30);
+        expect(identsOf(fpl0)[0]).toBe('FIX00');
+        expect(identsOf(fpl0)[28]).toBe('FIX28');
+        expect(identsOf(fpl0)[29]).toBe('NEWWP');
+    });
+
     // 4-1: at most 30 waypoints. Only FPL 0 makes room (the status line message FPL FULL, C-1, names the case of the
     // active first leg), so a numbered plan refuses the 31st
     it('refuses the 31st leg of a numbered plan and leaves the plan alone', () => {

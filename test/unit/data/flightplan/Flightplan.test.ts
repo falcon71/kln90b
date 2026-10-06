@@ -22,7 +22,7 @@ function planWithEvents(idx: number, legs: KLNFlightplanLeg[]) {
 }
 
 describe('Flightplan insert and delete', () => {
-    it('inserts a leg at the index, behind the legs it shifts, and publishes the plan once', () => {
+    it('inserts a leg at the index, behind the legs it shifts, and publishes the plan once (4-4)', () => {
         const {fpl, events} = planWithEvents(3, [user(A), user(C)]);
 
         fpl.insertLeg(1, user(B));
@@ -100,7 +100,8 @@ describe('Flightplan procedures', () => {
         expect(idents(fpl)).toEqual(['KAAA', 'KBBB']);
     });
 
-    it('removeProcedure removes one kind and keeps the others', () => {
+    // characterization: the callers (APT 7/8, the procedure rows of FPL 0) rely on it, the Pilot's Guide describes no API
+    it('removeProcedure removes one kind and keeps the others (characterization)', () => {
         const {fpl} = planWithEvents(0, mixed());
 
         fpl.removeProcedure(KLNLegType.STAR);
@@ -123,14 +124,27 @@ describe('Flightplan copies', () => {
         expect(events).toHaveLength(2);
     });
 
-    it('loadInverted reverses the copy and leaves the source in order (4-4, USE? INVRT?)', () => {
+    it('loadInverted reverses the copy, leaves the source in order and publishes the plan (4-4, USE? INVRT?)', () => {
         const {fpl: source} = planWithEvents(4, [user(A), user(B), user(C)]);
-        const {fpl: target} = planWithEvents(0, []);
+        const {fpl: target, events} = planWithEvents(0, []);
 
         target.loadInverted(source);
 
         expect(idents(target)).toEqual(['KBBB', 'ABC', 'KAAA']);
         expect(idents(source)).toEqual(['KAAA', 'ABC', 'KBBB']);
+        expect(events).toEqual([target]);
+    });
+
+    // characterization: unlike load, loadInverted keeps the procedure legs. Only FPL 0 holds procedures (6-5), and
+    // USE? INVRT? copies a numbered plan into FPL 0, so no page reaches this case
+    it('loadInverted keeps the procedure legs of the source (characterization)', () => {
+        const {fpl: source} = planWithEvents(4, [user(A), proc(B, KLNLegType.SID), user(C)]);
+        const {fpl: target} = planWithEvents(0, []);
+
+        target.loadInverted(source);
+
+        expect(target.getLegs().map(l => l.type)).toEqual([KLNLegType.USER, KLNLegType.SID, KLNLegType.USER]);
+        expect(idents(target)).toEqual(['KBBB', 'ABC', 'KAAA']);
     });
 
     it('delete empties the plan (4-5)', () => {

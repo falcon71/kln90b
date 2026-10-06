@@ -64,6 +64,19 @@ describe('the flight plans of a booted unit', () => {
     });
 });
 
+describe('the flight plans of a booted unit after a failed plan restore', () => {
+    // characterization: a stored plan that cannot be read (a number where the V2 format has a string) makes
+    // restoreAllFlightplan throw, and the unit starts with 26 empty plans (the catch in KLN90BCore.init)
+    it('are 26 empty plans when a stored plan cannot be read (characterization)', async () => {
+        const unit = await bootUnit({storage: {userDataFormat: 2, fpl3: 5}});
+
+        const plans = unit.props.memory.fplPage.flightplans;
+        expect(plans.map(p => p.idx)).toEqual(Array.from({length: 26}, (_, i) => i));
+        expect(plans.every(p => p.getLegs().length === 0)).toBe(true);
+        expect(unit.props.messageHandler.getMessages().map(m => m.message.join(' '))).toContain('USER DATA LOST');
+    });
+});
+
 describe('adding a waypoint to a full FPL 0', () => {
     // C-1: FPL FULL when the 30th waypoint is taken and the first waypoint is part of the active leg
     it('answers FPL FULL and leaves the plan alone while the first leg is active (C-1)', async () => {
@@ -109,13 +122,25 @@ describe('adding a waypoint to a full FPL 0', () => {
     });
 
     // 4-4: typed over a row, the new waypoint goes in front of the one that was there
-    it('puts a waypoint typed over the second row in front of it, and drops the first leg', async () => {
+    it('puts a waypoint typed over the second row in front of it (4-4)', async () => {
         const unit = await bootFull(100);
 
         await typeKnewOver(unit, 1);
 
         expect(legIdents(unit).slice(0, 3)).toEqual(['KNEW', 'FA01', 'FA02']);
-        expect(legIdents(unit)).toHaveLength(30);
+    });
+
+    // characterization: the Pilot's Guide names no rule for a full plan beyond the refusal (C-1), the unit drops the
+    // first leg to make room
+    it('keeps a full plan at 30 legs by dropping the first leg (characterization)', async () => {
+        const unit = await bootFull(100);
+
+        await typeKnewOver(unit, 1);
+
+        const idents = legIdents(unit);
+        expect(idents).toHaveLength(30);
+        expect(idents).not.toContain('FA00');
+        expect(idents[29]).toBe('FA29');
     });
 
     it.fails('puts a waypoint typed over the first row first (#NEW-2-1)', async () => {

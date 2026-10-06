@@ -22,8 +22,8 @@ class TestLoader extends Flightplanloader {
         super(bus, client as unknown as FacilityClient, messageHandler);
     }
 
-    public load(icaos: IcaoValue[]): Promise<Flightplan> {
-        return this.loadIcaos(icaos);
+    public load(icaos: IcaoValue[], fplIdx?: number): Promise<Flightplan> {
+        return this.loadIcaos(icaos, fplIdx);
     }
 }
 
@@ -39,6 +39,15 @@ async function load(icaos: IcaoValue[]) {
 }
 
 describe('Flightplanloader.loadIcaos', () => {
+    // characterization of the loader API: the loaded plan takes the number it was asked for (FPL 0 without one)
+    it('builds the plan with the index it is given (characterization)', async () => {
+        const mh = new MessageHandler();
+        const loader = new TestLoader(mh);
+
+        expect((await loader.load([known(0)], 7)).idx).toBe(7);
+        expect((await loader.load([known(0)])).idx).toBe(0);
+    });
+
     it('drops a missing waypoint, keeps the order of the others and reports it', async () => {
         const {fpl, messages} = await load([known(0), gone(1), known(2), known(3)]);
 
