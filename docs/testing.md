@@ -211,6 +211,13 @@ so keep it out of setup.
 on every call. `insertLeg(unit, idx, fac)` (`test/harness/flightplan.ts`) puts a `USER` leg into FPL 0 at `idx`, the way the
 FPL page does after a waypoint confirmation, which is far faster than typing it with the knobs.
 
+`approachWorld()` (same file) returns an RNAV approach to KPRC from the north with fresh objects on every call: the IAF
+IAFAA and IFAAA, the FAF FAFAA 5 NM north of the MAP, a step-down fix SDFAA between the FAF and the MAP, the MAP MAPAA at the
+airport and an enroute fix ENRAA. Its FAF is not its IAF, so the unit can reach APR there, and the step-down fix lets a test
+check that APR does not come back past the FAF. Boot with its `facilities`, store `[enraa, kprc]` in FPL 0 with
+`savedFlightplan` and load the approach with `await unit.panel.loadProcedure('APT 8')` after `settle`; `north(nm)` gives a
+point on the final course line.
+
 ## The EFB
 
 `FakeRouteManager` (`platform.ts`) stands in for the SDK's `FlightPlanRouteManager`, with the members the unit uses
@@ -633,9 +640,9 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
     - **The self-test page and the `"kln90b"` planner.** The cold boot to the self-test page is written out in
       `SelfTestLeftPage.test.ts` and `SensorsOut.test.ts`, and the planner is read through
       `FlightPlanner.getPlanner('kln90b', …)` in `WTFlightplanSync.test.ts`, `ActiveWaypoint.test.ts` and `reboot.test.ts`.
-    - **Shared worlds.** The approach world of `ModeController.test.ts` is copied into `HEvents.test.ts`, and the arc world
-      of `SensorsOutSimVars.test.ts` into `WTFlightplanSync.test.ts`. A fixture in `test/harness/fixtures.ts` would keep
-      them in step.
+    - **Shared worlds.** The approach world now exists as a fixture (`approachWorld()` in `test/harness/fixtures.ts`,
+      section 3). The older copies in `ModeController.test.ts` and `HEvents.test.ts` (IAF = FAF, #129) and the arc world
+      of `SensorsOutSimVars.test.ts`, copied into `WTFlightplanSync.test.ts`, stay copied.
     - **A `FakeXhr` mount.** `FakeXhr` serves `resources/` only at the default path, so a custom `BasePath` fails the
       boot; a mount option would let a test hold the BasePath effect.
 - Costs to keep in mind: the H event sweep boots a fresh unit for every public event in four states, and
