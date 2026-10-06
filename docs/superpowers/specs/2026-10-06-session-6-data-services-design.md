@@ -93,7 +93,8 @@ Findings that shape the tests:
     - The forced window of ADJ NAV IND CRS TO is 30 s (the maintainer re-checked the video), so the code's 10 s is a bug.
 - **Power-on reset:** every reset and every kept value of `VolatileMemory` (the NAV 4 selected altitude, the TRI fuel
   flow and reserve, the Super NAV 5 range) is characterized as is, with a GitHub question to research later.
-- **VNAV re-arm on the ANGLE cursor:** a trainer agent is checking it in the KLN 89 trainer. *Pending; see below.*
+- **VNAV re-arm on the ANGLE cursor:** a characterization plus a `question` issue, after the trainer check (see
+  "Pending results"). VNAV at the end of the path: a comment on #73, no pin.
 - **HAA:** the alert once per entry into the cylinder is a characterization.
 - **Temporary waypoints:**
     - The power-off purge is the spec (5-22, 5-26).
@@ -108,7 +109,7 @@ Findings that shape the tests:
     - The EFB route sync is added to the public contract list in `CLAUDE.md`, and the EFB tests cite it.
 - **MSA south of 56° S:** an enhancement issue (the dataset has no more data; whether a free source exists is to be
   researched). The dashes there are a characterization.
-- **The SET 9 alert volume** (stored, never used): an enhancement issue for a read-only LVar (see "Pending results").
+- **The SET 9 alert volume** (stored, never used): an enhancement issue for a read-only LVar (see "Results that came in after the design").
 
 **The controller's defaults** (presented to the maintainer with the design, not objected to):
 - These are characterizations: the flight timer at exactly 30 kt (4-13 is ambiguous), VNAV at the end of the path, the
@@ -123,11 +124,20 @@ Findings that shape the tests:
 - No `Name_Z` fake and no `XY` option for `savedUserWaypoints` (rule 13: each serves one file; `testing.md` section 7
   lists both).
 
-## Pending results
+## Results that came in after the design (trainer, volume)
 
-- **VNAV re-arm (trainer agent):** the test of an active VNAV that stays under the ANGLE cursor becomes a spec test, a
-  pin or a characterization according to the trainer. The same applies to VNAV at the end of the path and to a second
-  VNAV (#73). This section is updated when the result is in.
+- **VNAV (trainer agent, done; `trainer-vnav.md`; KLN 89 trainer, 2026-10-06):**
+    - **Re-arm:** with VNAV active, moving the cursor onto the VS field (the 89's equivalent of ANGLE) changed nothing,
+      and the advisory altitude stayed. From Inactive, the same move starts VNAV. The confidence is medium, because the
+      trainer updates VNAV only when a knob turns, and an aircraft below the path could not be produced. 400 to 500 ft
+      above the path, VNAV stayed active with the path altitude.
+        - **The maintainer's ruling:** a `question` issue. Today's re-arm (an active VNAV below the path flips back to
+          `VNV IN :ss`) is held as a characterization.
+    - **End of descent:** the 89 goes Inactive and resets its inputs: the from-altitude becomes the target, the offset
+      0 and the VS 0. A second VNAV then starts at once after the selected altitude is changed. The 90B code goes
+      Inactive but keeps the programmed angle and the waypoint.
+        - **The maintainer's ruling:** a comment on #73 with this result, and no pin. The end-of-path tests assert only
+          the Inactive state, never the kept angle or waypoint, so that no possible cause of #73 is frozen.
 - **Alert volume (research agent, done; `research-volume.md`):**
     - The framework cannot set a volume: `PLAY_INSTRUMENT_SOUND` takes only the sound id. Working Title's G3X shows its
       message volume as a fixed, disabled control.
@@ -248,7 +258,8 @@ Files:
 
 What it covers:
 - **Vnav:** angle, distance, arming, activation, advisory, climb, waypoint validity (5-7 to 5-9, C-1); NAV 4 titles and
-  VNV ALERT (5-8, B-4). The re-arm test follows the pending trainer result.
+  VNV ALERT (5-8, B-4). The re-arm of an active VNAV under the ANGLE cursor is a characterization (question issue).
+  The end-of-path tests (characterizations) assert the Inactive state only, not the kept angle or waypoint (#73).
 - **MSA:** sectors, hemispheres, bounds, legs and routes (3-33). South of 56° S is a characterization.
 - **AltAlert:** 3, 2 and 4 tones (3-55 to 3-57); after a deviation and switched on inside the window are
   characterizations.
@@ -344,11 +355,13 @@ after a fix round on Sonnet.
       `KLNMagvar.ts:20-22`; Session 7);
     - the MSG page seen-marking, if task 3 reproduced it;
     - `question` issues: the power-on reset of `VolatileMemory` (what the real unit keeps); the power-on purge of
-      temporary waypoints and the purge of an active one;
+      temporary waypoints and the purge of an active one; the re-arm of an active VNAV under the ANGLE cursor (the
+      trainer evidence and its limits);
     - `enhancement` issues: PBD legs and airways in the EFB loader; MSA and ESA south of 56° S (the data source);
-    - an `enhancement` issue for the read-only `L:KLN90B_AlertVolume` (see "Pending results").
+    - an `enhancement` issue for the read-only `L:KLN90B_AlertVolume` (see "Results that came in after the design").
 2. **Comment:**
-    - #73: the VNAV leads and the trainer result;
+    - #73: the VNAV leads (the angle and waypoint kept after the descent ends) and the trainer's end-of-descent reset
+      and second VNAV;
     - #89: the reading half is pinned;
     - #94: pinned;
     - #97: pinned at the ESA level.
