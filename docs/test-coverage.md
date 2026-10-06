@@ -411,8 +411,15 @@ maintainer's decision.
    `HtAboveAirportAlert`, `TemporaryWaypointDeleter`, `KlnEfbLoader` and `KlnEfbSaver` (route in, route out, through
    the `FakePlatform` route manager), `AudioGenerator` (what it asks the sim to play, not the sound).
 5. **`VolatileMemory`**: what survives a page change and what a power cycle clears.
+6. **Harness: a cross-track helper.** Add `crossTrackNm(position, through, courseTrue)` to `test/harness/flight/geo.ts`
+   (the spherical cross-track distance of a position from the great circle through a point on a true course, positive
+   right of course) with its own harness test against hand-computed values. Then refactor the tests that compute it by
+   hand to use it: `xtkFromCourse` in `DirectToObs.test.ts` and `ModeControllerObs.test.ts`, and the inline formulas in
+   `ModeController.test.ts` and `dmeArc.test.ts` (found by the Session 5 final review). The refactored tests keep their
+   assertions and must still fail under the breaks recorded for them.
 
-**Done when:** every module above has a test file or a line in the log saying why not.
+**Done when:** every module above has a test file or a line in the log saying why not, and no test computes the
+cross-track distance by hand.
 
 ## Session 7: navdata and fragile code
 
