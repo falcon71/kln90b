@@ -34,7 +34,7 @@
     {
       "id": 6,
       "subject": "Task 6: issues and close-out",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** File the bugs, question and enhancement issues, comment on #73, #89, #94 and #97, replace the placeholders,\nadd the EFB route sync to the public contract in `CLAUDE.md`, update `testing.md` and write the session log.\n\n**Files:**\n- Modify: test files containing `#NEW-` placeholders\n- Modify: `CLAUDE.md` (\"Public contract with aircraft\")\n- Modify: `docs/testing.md`\n- Modify: `docs/test-coverage.md` (section 3 checkbox, section 4 log)\n\n**Acceptance Criteria:**\n- [ ] Filed after a search of open and closed issues with several wordings:\n    - the bugs `#NEW-1-1` to `#NEW-1-7`, `#NEW-2-1` to `#NEW-2-3`, `#NEW-3-1` to `#NEW-3-4`, `#NEW-4-1` to `#NEW-4-8`\n      and `#NEW-5-1` to `#NEW-5-3` (`bug` label), plus the AIRSPACE ALERT 2 NM rule, MAGNETIC VAR INVALID in OBS mode,\n      and the MSG page seen-marking if task 3 reproduced it;\n    - three `question` issues;\n    - three `enhancement` issues.\n- [ ] #73, #89, #94 and #97 have their comments.\n- [ ] `grep -r \"#NEW-\" test/` finds nothing.\n- [ ] `CLAUDE.md` names the EFB route sync in \"Public contract with aircraft\".\n- [ ] The session log has: done, rulings, trainer and research results, bugs filed, fixes not re-broken, not covered\n      (rule 18), coverage at start and end, suite totals.\n- [ ] `npm test`, `npx tsc --noEmit` and `npm run coverage` are clean.\n\n**Verify:** `npm test && npx tsc --noEmit && grep -r \"#NEW-\" test/` → tests pass, no type errors, grep prints nothing.\n\n```json:metadata\n{\"files\": [\"CLAUDE.md\", \"docs/test-coverage.md\", \"docs/testing.md\"], \"verifyCommand\": \"npm test && npx tsc --noEmit && grep -r \\\"#NEW-\\\" test/\", \"acceptanceCriteria\": [\"bugs #NEW-1-1..7, #NEW-2-1..3, #NEW-3-1..4, #NEW-4-1..8, #NEW-5-1..3 filed after duplicate search, plus AIRSPACE ALERT 2 NM, MAGVAR OBS, MSG page seen (if reproduced)\", \"three question and three enhancement issues filed\", \"#73, #89, #94, #97 comments\", \"no #NEW- placeholders\", \"CLAUDE.md lists the EFB route sync\", \"session log complete\", \"checks clean\"], \"modelTier\": \"frontier\"}\n```",
       "blockedBy": [
         1,
@@ -45,5 +45,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-10-06T19:06:42"
+  "lastUpdated": "2026-10-06T19:38:25"
 }
