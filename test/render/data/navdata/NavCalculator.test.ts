@@ -433,6 +433,8 @@ describe('GPS invalid (3-31)', () => {
         unit.props.sensors.in.gps.reset(); // before the next calculation tick, which would sequence the held position
         await vi.advanceTimersByTimeAsync(1500);
 
+        expect(unit.props.sensors.in.gps.isValid()).toBe(false); // the fast acquisition takes 10 s
+        expect(activeIdent(unit)).toBe('ABC'); // the held position has not been sequenced, so that is not why the light is off
         expect(nav(unit).waypointAlert).toBe(false);
         expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(0);
     });
@@ -442,20 +444,24 @@ describe('GPS invalid (3-31)', () => {
 // no page of the Pilot's Guide gives a ground speed threshold for either.
 describe('ground speed below 2 kt (characterization)', () => {
     it('shows no ETE and does not sequence past the waypoint', async () => {
-        const {unit, kaaa, abc} = await onStandardRoute({turnAnticipation: false});
+        const {unit, kaaa, abc, kbbb} = await onStandardRoute({turnAnticipation: false});
         await unit.panel.selectPage('L', 'NAV 1');
         const leg1 = finalCourseDeg(kaaa, abc);
 
-        await moveAircraft(unit, pointFrom(abc, leg1, 0.2), {groundspeedKt: 1, trackTrue: leg1});
+        const past = pointFrom(abc, leg1, 0.2);
+        await moveAircraft(unit, past, {groundspeedKt: 1, trackTrue: leg1});
         await vi.advanceTimersByTimeAsync(500);
         expect(activeIdent(unit)).toBe('ABC');
         expect(nav(unit).toFrom).toBe(false); // FROM: past ABC
         expect(nav(unit).eteToActive).toBeNull();
         expect(Screen.read().rows('L')[4]).toBe('ETE   --:--');
 
-        // Control: at 5 kt the same position sequences
-        await moveAircraft(unit, pointFrom(abc, leg1, 0.2), {groundspeedKt: 5, trackTrue: leg1});
+        // Control just above the threshold: at 3 kt the same position sequences and has an ETE, to KBBB by then
+        await moveAircraft(unit, past, {groundspeedKt: 3, trackTrue: leg1});
+        await vi.advanceTimersByTimeAsync(500);
         expect(activeIdent(unit)).toBe('KBBB');
+        expect(nav(unit).eteToActive!).toBeCloseTo(distanceNm(past, kbbb) / 3 * 3600, -1);
+        expect(Screen.read().rows('L')[4]).toBe('ETE   14:32');
     });
 });
 
@@ -468,7 +474,8 @@ describe('self-test outputs (3-4)', () => {
         const unit = await bootUnit({engineRunning: false, magvar: 0});
         await unit.panel.powerOn();
         await vi.advanceTimersByTimeAsync(30_000);
-        expect(Screen.read().text()).toContain('APPROVE?'); // Precondition: still the self-test page
+        expect(Screen.read().rows('L')[0]).toBe('DIS  34.5NM'); // Precondition: still the self-test page, showing its DIS
+        expect(Screen.read().rows('R')[5]).toBe('  APPROVE? ');
 
         const sim = unit.env.sim;
         expect(sim.get('GPS WP DISTANCE', 'nautical miles')).toBeCloseTo(34.5, 3);
@@ -523,16 +530,17 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
     });
 
     // 5-38: in the approach-arm mode the unit allows nothing less sensitive than 1 NM; 2 NM before the MAP the unit is in
-    // ARM with the 1 NM scale. MOD 1 then shows no scale at all ("CDI:±NM"), because 5 is not one of the ARM choices.
+    // ARM with the 1 NM scale.
     it('control: the approach-arm mode has the 1 NM scale on MOD 1 while the GPS is valid', async () => {
         const unit = await armedOnApproach();
         await unit.panel.selectPage('L', 'MOD 1');
 
-        expect(Screen.read().status().mode.startsWith('arm-leg')).toBe(true); // the mode field, followed by the unread msg prompt
+        expect(Screen.read().status().mode).toBe('arm-leg msg'); // the mode field, followed by the unread msg prompt
         expect(nav(unit).xtkScale).toBe(1);
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');
     });
 
+    // After the loss MOD 1 shows no scale at all ("CDI:±NM") today, because the reset 5 is not one of the ARM choices
     it.fails('keeps the 1 NM approach-arm scale while the GPS is lost (#NEW-4-1)', async () => {
         const unit = await armedOnApproach();
         await unit.panel.selectPage('L', 'MOD 1');
@@ -547,6 +555,7 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
     it.fails('keeps the selected 1.00 NM without an active waypoint (#NEW-4-1)', async () => {
         const unit = await bootUnit();
         await settle(unit);
+        expect(activeIdent(unit)).toBeUndefined(); // Precondition: there is no active waypoint
         await selectOneNm(unit);
 
         expect(nav(unit).xtkScale).toBe(1);

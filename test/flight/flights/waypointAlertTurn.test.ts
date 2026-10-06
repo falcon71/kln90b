@@ -73,6 +73,8 @@ describe('waypoint alert through an anticipated turn', () => {
 
     // The same rule at a turn onto the last leg: KCCC has no following leg, so NavCalculator takes the branch without
     // turn anticipation, which sets the alert from the 36 s ETE alone and ignores the turn still being flown
+    // This judge reads what the test above recorded, so it means something only when that test ran and passed first (run
+    // alone it passes vacuously as an expected failure)
     it.fails('stays on past the sequencing at KBBB while the turn onto the last leg is flown (#NEW-4-2)', () => {
         expect(atKbbbSequencing).toHaveLength(1);
         expect(atKbbbSequencing[0].turnStackLength).toBeGreaterThan(0);
