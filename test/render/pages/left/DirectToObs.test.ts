@@ -1,6 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
+import {Facility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {standardRoute} from '../../../harness/fixtures';
+import {vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 import {courseDeg, distanceNm, EARTH_RADIUS_NM, pointBefore, pointFrom} from '../../../harness/flight/geo';
@@ -17,8 +19,9 @@ function xtkFromCourse(position: { lat: number; lon: number }, wpt: { lat: numbe
 }
 
 /** Plan KAAA, ABC, KBBB, ABC active, OBS mode; with `obs` the external indicator is on that course */
-async function planInObs(position: { lat: number; lon: number }, o: { obs?: number, panelXml?: string } = {}): Promise<HeadlessUnit> {
-    const unit = await bootUnit({facilities: [kaaa, abc, kbbb], position, panelXml: o.panelXml, storage: savedFlightplan(0, [kaaa, abc, kbbb])});
+async function planInObs(position: { lat: number; lon: number }, o: { obs?: number, panelXml?: string, abc?: Facility } = {}): Promise<HeadlessUnit> {
+    const wpt = o.abc ?? abc;
+    const unit = await bootUnit({facilities: [kaaa, wpt, kbbb], position, panelXml: o.panelXml, storage: savedFlightplan(0, [kaaa, wpt, kbbb])});
     await settle(unit);
     if (o.obs !== undefined) unit.env.sim.set('Nav OBS:1', 'degrees', o.obs);
     await unit.panel.obsMode();
@@ -89,11 +92,15 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
 
 describe('Direct To in OBS mode (5-37)', () => {
     const offLeg = pointFrom(pointBefore(kaaa, abc, 10), 141, 3); // 3 NM right of KAAA - ABC
+    // ABC with a published variation of 10 E (the sim stores east as negative), so that the magnetic course the unit shows
+    // is the true course minus 10: the direct course from offLeg is 034.2 true, so 024.2 magnetic. At a variation of 0 a
+    // unit that mixes up true and magnetic, or the sign of the variation, would pass
+    const abcE = vor('ABC', abc.lat, abc.lon, {magneticVariation: -10});
 
     // 5-37 (5.9.6): the direct-to selects the OBS that leads from the present position to the waypoint when the unit
     // is not the displayed source (ObsSource 0: the unit cannot read the indicator)
     it('sets the OBS to the course from the present position and centres the deviation', async () => {
-        const unit = await planInObs(offLeg, {panelXml: panelXml('<ObsSource>0</ObsSource>')});
+        const unit = await planInObs(offLeg, {panelXml: panelXml('<ObsSource>0</ObsSource>'), abc: abcE});
         const nav = unit.props.memory.navPage;
         await unit.panel.selectPage('R', 'CTR 1'); // So DCT pre-fills the active waypoint (3-27 rule 4)
 
@@ -102,25 +109,25 @@ describe('Direct To in OBS mode (5-37)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(courseDeg(offLeg, abc)).toBeCloseTo(34.2, 1);
-        expect(Math.abs(nav.obsMag - courseDeg(offLeg, abc))).toBeLessThan(0.05);
+        expect(Math.abs(nav.obsMag - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.2 magnetic
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
     });
 
     // 5-37 (5.9.6) and C-1: on a non-driven indicator that shows the unit, the status line tells the course to set
     it('shows CRS with the direct course when the unit reads a non-driven indicator', async () => {
-        const unit = await planInObs(offLeg, {obs: 50});
+        const unit = await planInObs(offLeg, {obs: 50, abc: abcE});
         await unit.panel.selectPage('R', 'CTR 1');
 
         await unit.panel.dct();
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(500);
 
-        expect(Screen.read().status().mode).toBe('d› CRS 034');
+        expect(Screen.read().status().mode).toBe('d› CRS 024'); // 034.2 true less the variation of 10 E
     });
 
     // 5-37 (5.9.6): a driven indicator (ObsTarget 1, VOR 1) is slewed to the direct course, with no message
     it('slews a driven indicator to the direct course without a CRS message', async () => {
-        const unit = await planInObs(offLeg, {panelXml: panelXml('<ObsSource>0</ObsSource>', '<ObsTarget>1</ObsTarget>')});
+        const unit = await planInObs(offLeg, {panelXml: panelXml('<ObsSource>0</ObsSource>', '<ObsTarget>1</ObsTarget>'), abc: abcE});
         await unit.panel.selectPage('R', 'CTR 1');
 
         await unit.panel.dct();
@@ -129,7 +136,7 @@ describe('Direct To in OBS mode (5-37)', () => {
 
         expect(Screen.read().status().mode).not.toMatch(/CRS/);
         const vor1 = unit.env.sim.keyEvents.filter(k => k.name === 'K:VOR1_SET');
-        expect(Math.abs(vor1[vor1.length - 1].value - courseDeg(offLeg, abc))).toBeLessThan(0.5);
+        expect(Math.abs(vor1[vor1.length - 1].value - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.5); // 024 magnetic
     });
 });
 

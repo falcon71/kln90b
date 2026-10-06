@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
+import {Facility, FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {standardRoute} from '../../harness/fixtures';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
@@ -48,6 +48,43 @@ describe('LEG to OBS (5-36)', () => {
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
         expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC'); // 5-36 rule 1
         expect(nav.xtkToActive!).toBeCloseTo(2, 1);
+    });
+
+    // The same with a magnetic variation, so that the unit must convert the true course it chooses to the magnetic OBS.
+    // The OBS course is magnetic and the path true: at a variation of 0 a missing conversion cannot be seen. The course
+    // the unit chooses is the leg's DTK at the aircraft (its final course to within 0.2 degrees, 5 NM before the end) less the variation.
+    describe('keeps a deviation of 2 NM and sets the magnetic OBS course', () => {
+        /** ObsSource 0, 5 NM before the end of the leg KAAA - `end`, 2 NM right of it */
+        async function twoNmRight(end: Facility, magvar: number | undefined) {
+            const position = pointFrom(pointBefore(kaaa, end, 5), finalCourseDeg(kaaa, end) + 90, 2);
+            const unit = await bootUnit({facilities: [kaaa, end], position, panelXml: OBS_SOURCE_OFF, magvar, storage: savedFlightplan(0, [kaaa, end])});
+            await settle(unit);
+            const nav = unit.props.memory.navPage;
+            expect(nav.xtkToActive!).toBeCloseTo(2, 1); // Precondition, by construction
+
+            await unit.panel.obsMode();
+            await vi.advanceTimersByTimeAsync(2000);
+            return {nav, trueCourse: finalCourseDeg(kaaa, end)};
+        }
+
+        // 5-35 item 6: an active VOR counts with its published variation, here 10 E (the sim stores east as negative)
+        it('with the published variation of the active VOR (10 E)', async () => {
+            const end = vor('ABC', abc.lat, abc.lon, {magneticVariation: -10});
+            const {nav, trueCourse} = await twoNmRight(end, undefined);
+
+            expect(nav.navmode).toBe(NavMode.ENR_OBS);
+            expect(Math.abs(nav.obsMag - (trueCourse - 10))).toBeLessThan(0.2);
+            expect(nav.xtkToActive!).toBeCloseTo(2, 1);
+        });
+
+        // 5-35: for a waypoint that is not a VOR the unit uses the variation at the aircraft, here 10 E
+        it('with the variation at the aircraft for an active airport (10 E)', async () => {
+            const {nav, trueCourse} = await twoNmRight(kbbb, 10);
+
+            expect(nav.navmode).toBe(NavMode.ENR_OBS);
+            expect(Math.abs(nav.obsMag - (trueCourse - 10))).toBeLessThan(0.2);
+            expect(nav.xtkToActive!).toBeCloseTo(2, 1);
+        });
     });
 
     // 5-36 rule 2.ii. The unit takes the DTK at the aircraft as the OBS, but the OBS course is laid through the active
@@ -154,7 +191,8 @@ describe('OBS to LEG (5-36)', () => {
         await legMode(unit);
 
         expect(nav.navmode).toBe(NavMode.ENR_LEG);
-        expect(nav.activeWaypoint.getActiveWpt()).not.toBeNull();
+        // The unit re-orients on FPL 0 and flies to the leg's waypoint, KBBB, today and under the fix of the pin
+        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
     });
 
     // 5-36 rules 1 and 2: on the FROM side the unit re-orients on FPL 0, computes the DTK for the new leg, and the
@@ -261,7 +299,7 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
     });
 
     // 6-11 step 5: after the course reversal at an IAF that is also the FAF, switching to LEG makes the FAF active.
-    // Run as a plain it, the pin fails at its last assertion: expected 1 to be 2
+    // Run as a plain it, the pin fails at the index assertion: expected 1 to be 2
     it.fails('makes the FAF copy active when the IAF and the FAF are the same fix (#NEW-3-3)', async () => {
         const {unit, aw} = await iafIsFafInObs();
 
@@ -272,7 +310,8 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
     });
 
     // 6-11 note and 6-19 note: after holding at a missed approach holding point that is also the FAF, switching to LEG
-    // makes the FAF active
+    // makes the FAF active. This passes only because ActiveWaypoint.directTo takes the first copy of the waypoint, the
+    // lookup of #NEW-3-2: a fix of that pin that keeps the active copy turns this test red
     it('makes the FAF copy active when the missed approach holding point is the FAF', async () => {
         const vvvPos = pointFrom(mapaa, 0, 5);
         const vvv = vor('VVV', vvvPos.lat, vvvPos.lon);

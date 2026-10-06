@@ -257,18 +257,20 @@ describe('ActiveWaypoint direct-to flows', () => {
         expect(aw.lastactiveWaypoint!.icaoStruct.ident).toBe('DEF');
     });
 
-    // characterization (#41 rule): after an edit the active leg is found again by position, so the inserted waypoint
-    // moves the index but not the leg
-    it('characterization: an edit of FPL 0 ahead of the active leg re-activates the leg the aircraft is on', () => {
+    // characterization (#41 rule): after an edit the active leg is found again by position, not kept as the same leg.
+    // XXX goes into the active leg B-C, 30 NM past B on the line and beyond the aircraft (20 NM past B), so the aircraft is
+    // now on B-XXX: by position the leg is B-XXX (index 2); keeping the old leg would keep C at its shifted index 3
+    it('characterization: an edit inside the active leg re-activates the leg the aircraft is on', () => {
         const position = pointFrom(B, 0, 20); // on the leg B-C
         const {aw, fpl} = activeWaypointWith([A, B, C, D].map(user), position);
         aw.activateFpl0();
-        expect(aw.getActiveFplIdx()).toBe(2); // Precondition
-        const xPos = pointFrom(A, 180, 30);
-        fpl.insertLeg(1, user(vor('XXX', xPos.lat, xPos.lon)));
-
-        expect(aw.getActiveFplIdx()).toBe(3);
+        expect(aw.getActiveFplIdx()).toBe(2); // Precondition: DEF is active
         expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('DEF');
+        const xPos = pointFrom(B, 0, 30);
+        fpl.insertLeg(2, user(vor('XXX', xPos.lat, xPos.lon)));
+
+        expect(aw.getActiveFplIdx()).toBe(2);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('XXX');
         expect(aw.getFromWpt()!.icaoStruct.ident).toBe('ABC');
     });
 });
