@@ -5,18 +5,12 @@ import {standardRoute} from '../../../harness/fixtures';
 import {vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
-import {courseDeg, distanceNm, EARTH_RADIUS_NM, pointBefore, pointFrom} from '../../../harness/flight/geo';
+import {courseDeg, crossTrackNm, pointBefore, pointFrom} from '../../../harness/flight/geo';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
 const {kaaa, abc, kbbb} = standardRoute();
 const panelXml = (input: string, output = '') =>
     `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input>${input}</Input><Output>${output}</Output></Instrument></PlaneHTMLConfig>`;
-
-/** The deviation from the great circle through wpt with the true course `course` there, by hand (right positive) */
-function xtkFromCourse(position: { lat: number; lon: number }, wpt: { lat: number; lon: number }, course: number): number {
-    const d = distanceNm(wpt, position);
-    return EARTH_RADIUS_NM * Math.asin(Math.sin(d / EARTH_RADIUS_NM) * Math.sin((course - (courseDeg(wpt, position) + 180)) * Math.PI / 180));
-}
 
 /** Plan KAAA, ABC, KBBB, ABC active, OBS mode; with `obs` the external indicator is on that course */
 async function planInObs(position: { lat: number; lon: number }, o: { obs?: number, panelXml?: string, abc?: Facility } = {}): Promise<HeadlessUnit> {
@@ -63,7 +57,7 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
     async function activateKbbbOnCourse50() {
         const position = pointBefore(kaaa, abc, 5);
         const unit = await planInObs(position, {obs: 50});
-        const expected = xtkFromCourse(position, kbbb, 50);
+        const expected = crossTrackNm(position, kbbb, 50);
         expect(expected).toBeCloseTo(24.5, 0); // Far from zero, so a recentered bar cannot match
 
         await directToKbbbFromFpl0(unit, true);

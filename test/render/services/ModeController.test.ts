@@ -5,7 +5,7 @@ import {standardRoute} from '../../harness/fixtures';
 import {airport, intersection} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
-import {courseDeg, distanceNm, EARTH_RADIUS_NM, pointBefore, pointFrom} from '../../harness/flight/geo';
+import {crossTrackNm, pointBefore, pointFrom} from '../../harness/flight/geo';
 import {KLNFixType} from '../../../kln90b/data/flightplan/Flightplan';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 
@@ -33,10 +33,8 @@ describe('ModeController OBS course', () => {
         sim.set('Nav OBS:1', 'degrees', 100);
         await vi.advanceTimersByTimeAsync(1000); // Exactly one calculation tick
 
-        // The aircraft is d from ABC on the bearing brg; the course through ABC is 100: XTK = R asin(sin(d/R) sin(100 - brg))
-        const d = distanceNm(position, abc);
-        const brg = courseDeg(position, abc);
-        const expectedXtk = EARTH_RADIUS_NM * Math.asin(Math.sin(d / EARTH_RADIUS_NM) * Math.sin((100 - brg) * Math.PI / 180));
+        // The deviation from the course 100 through ABC
+        const expectedXtk = crossTrackNm(position, abc, 100);
         expect(expectedXtk).toBeCloseTo(3.77, 1); // The hand value is not about zero, so a stale course cannot match it
         expect(Math.abs(sim.get('GPS OBS VALUE', 'degrees') - 100)).toBeLessThan(0.01);
         expect(Math.abs(sim.get('GPS WP DESIRED TRACK', 'degrees') - 100)).toBeLessThan(0.01);
@@ -57,12 +55,6 @@ describe('ModeController OBS course of 000', () => {
         return {unit, position};
     }
 
-    /** The deviation from the course through ABC for an aircraft at the position, by hand */
-    function xtkFromCourse(position: { lat: number; lon: number }, course: number): number {
-        const d = distanceNm(position, abc);
-        return EARTH_RADIUS_NM * Math.asin(Math.sin(d / EARTH_RADIUS_NM) * Math.sin((course - courseDeg(position, abc)) * Math.PI / 180));
-    }
-
     // The sibling of the pin: the same entry with an OBS course other than the stored one works, so a broken setup fails here.
     // Spec: the OBS course is the one the external indicator shows (5-34), and going from LEG to OBS keeps the active
     // waypoint and takes that course (5-36, rule 2.i); the deviation is measured from it through the waypoint.
@@ -73,8 +65,8 @@ describe('ModeController OBS course of 000', () => {
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
         expect(nav.obsMag).toBe(77);
         expect(nav.activeWaypoint.isDctNavigation()).toBe(true);
-        expect(xtkFromCourse(position, 77)).toBeCloseTo(4.38, 1);
-        expect(Math.abs(nav.xtkToActive! - xtkFromCourse(position, 77))).toBeLessThan(0.05);
+        expect(crossTrackNm(position, abc, 77)).toBeCloseTo(4.38, 1);
+        expect(Math.abs(nav.xtkToActive! - crossTrackNm(position, abc, 77))).toBeLessThan(0.05);
     });
 
     // 5-36: the OBS course is the one the indicator selects, 000 included. ModeController.setObs returns at once when the
@@ -85,8 +77,8 @@ describe('ModeController OBS course of 000', () => {
 
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
         expect(nav.activeWaypoint.isDctNavigation()).toBe(true);
-        expect(xtkFromCourse(position, 0)).toBeCloseTo(-7.77, 1);
-        expect(Math.abs(nav.xtkToActive! - xtkFromCourse(position, 0))).toBeLessThan(0.05);
+        expect(crossTrackNm(position, abc, 0)).toBeCloseTo(-7.77, 1);
+        expect(Math.abs(nav.xtkToActive! - crossTrackNm(position, abc, 0))).toBeLessThan(0.05);
     });
 });
 

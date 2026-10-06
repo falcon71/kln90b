@@ -63,3 +63,15 @@ export function pointFrom(p: LatLon, bearingTrue: number, nm: number): LatLon {
 export function pointBefore(from: LatLon, to: LatLon, nm: number): LatLon {
     return pointFrom(to, courseDeg(to, from), nm);
 }
+
+/**
+ * The signed cross-track distance in NM of `position` from the great circle that passes through `through` on the true
+ * course `courseTrue` there, positive right of the course. Textbook spherical cross-track: asin(sin(d13) sin(b13 - c)),
+ * with d13 the angular distance and b13 the initial course from `through` to `position`. The whole great circle counts,
+ * not only the part ahead of `through`, so a position behind it is measured the same way.
+ */
+export function crossTrackNm(position: LatLon, through: LatLon, courseTrue: number): number {
+    const d13 = distanceNm(through, position) / EARTH_RADIUS_NM;
+    const b13 = courseDeg(through, position);
+    return EARTH_RADIUS_NM * Math.asin(Math.sin(d13) * Math.sin((b13 - courseTrue) * RAD));
+}

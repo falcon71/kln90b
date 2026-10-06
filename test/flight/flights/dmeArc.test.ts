@@ -5,7 +5,7 @@ import {World} from '../../harness/flight/World';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
-import {angleBetween, angleDiff, courseDeg, distanceNm, EARTH_RADIUS_NM, pointFrom} from '../../harness/flight/geo';
+import {angleBetween, angleDiff, courseDeg, crossTrackNm, distanceNm, EARTH_RADIUS_NM, pointFrom} from '../../harness/flight/geo';
 
 const RNAV = ApproachType.APPROACH_TYPE_RNAV;
 
@@ -144,8 +144,7 @@ describe('DME arc flown', () => {
         // (measured 0.65 NM).
         let northOfLeg = 0;
         flight.monitor('beyond the FAF leg', f => {
-            const d = distanceNm(arcen, f.aircraft);
-            const off = Math.asin(Math.sin(d / EARTH_RADIUS_NM) * Math.sin((courseDeg(arcen, f.aircraft) - nextCourse) * Math.PI / 180)) * EARTH_RADIUS_NM;
+            const off = crossTrackNm(f.aircraft, arcen, nextCourse);
             northOfLeg = Math.max(northOfLeg, -off); // the leg runs east, so north is on its left
             return true;
         });

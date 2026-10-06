@@ -6,7 +6,7 @@ import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
 import {Screen} from '../../harness/render/screen';
-import {angleBetween, courseDeg, distanceNm, EARTH_RADIUS_NM, finalCourseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
+import {angleBetween, courseDeg, crossTrackNm, finalCourseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
 import {KLNFixType} from '../../../kln90b/data/flightplan/Flightplan';
 import {FROM, NavMode} from '../../../kln90b/data/VolatileMemory';
 
@@ -15,16 +15,6 @@ const {kaaa, abc, kbbb} = standardRoute();
 const OBS_SOURCE_OFF = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input></Instrument></PlaneHTMLConfig>';
 const LEG_OBS_SWITCH = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ExternalSwitches>'
     + '<LegObsSwitchInstalled>true</LegObsSwitchInstalled></ExternalSwitches></Input></Instrument></PlaneHTMLConfig>';
-
-/**
- * The deviation of the position from the great circle through wpt with the given true course there, by hand (spherical
- * cross-track, right of course positive): the angle at wpt between the course and the bearing from wpt to the aircraft
- */
-function xtkFromCourse(position: { lat: number; lon: number }, wpt: { lat: number; lon: number }, course: number): number {
-    const d = distanceNm(wpt, position);
-    const bearingFromWptToAircraft = courseDeg(wpt, position);
-    return EARTH_RADIUS_NM * Math.asin(Math.sin(d / EARTH_RADIUS_NM) * Math.sin((course - (bearingFromWptToAircraft + 180)) * Math.PI / 180));
-}
 
 async function legMode(unit: HeadlessUnit) {
     await unit.panel.selectPage('L', 'MOD 1');
@@ -152,7 +142,7 @@ describe('OBS to LEG (5-36)', () => {
         const position = pointBefore(kaaa, abc, 5);
         const unit = await inObs(position, 70);
         const nav = unit.props.memory.navPage;
-        expect(xtkFromCourse(position, abc, 70)).toBeCloseTo(1.63, 1); // Not about zero, so a recentered leg cannot match
+        expect(crossTrackNm(position, abc, 70)).toBeCloseTo(1.63, 1); // Not about zero, so a recentered leg cannot match
 
         await legMode(unit);
 
@@ -160,7 +150,7 @@ describe('OBS to LEG (5-36)', () => {
         expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
         expect(nav.activeWaypoint.isDctNavigation()).toBe(true);
         expect(Math.abs(nav.desiredTrack! - 70)).toBeLessThan(0.2);
-        expect(Math.abs(nav.xtkToActive! - xtkFromCourse(position, abc, 70))).toBeLessThan(0.05);
+        expect(Math.abs(nav.xtkToActive! - crossTrackNm(position, abc, 70))).toBeLessThan(0.05);
     });
 
     /**
