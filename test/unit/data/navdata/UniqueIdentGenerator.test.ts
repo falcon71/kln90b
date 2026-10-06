@@ -2,10 +2,15 @@ import {describe, expect, it} from 'vitest';
 import {Facility, FacilityClient} from '@microsoft/msfs-sdk';
 import {getUniqueIdent, getUniqueIdentWithNumbers} from '../../../../kln90b/data/navdata/UniqueIdentGenerator';
 import {MemoryFacilityClient} from '../../../harness/navdata/MemoryFacilityClient';
-import {airport, intersection, vor} from '../../../harness/navdata/builders';
+import {buildIcaoStruct, TEMPORARY_WAYPOINT} from '../../../../kln90b/data/navdata/IcaoBuilder';
+import {airport, intersection, ndb, vor} from '../../../harness/navdata/builders';
 
 // The callers pass the KLNFacilityLoader, which merges the user waypoints; the memory client stands in for it.
 const memory = (facilities: Facility[]) => new MemoryFacilityClient(facilities) as unknown as FacilityClient;
+
+/** A supplementary (USR) waypoint in the temporary region, as the REF page files its reference waypoints */
+const userWaypoint = (ident: string, lat: number, lon: number): Facility =>
+    ({...intersection(ident, lat, lon, {region: TEMPORARY_WAYPOINT}), icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, ident)});
 
 describe('getUniqueIdent (REF and EFB waypoint names)', () => {
     it('appends the first free letter to the ident (5-22)', async () => {
@@ -16,9 +21,17 @@ describe('getUniqueIdent (REF and EFB waypoint names)', () => {
         expect(await getUniqueIdent('ABC', withA)).toBe('ABCB');
     });
 
-    it('counts every facility type that starts with the ident, not only the type of the source', async () => {
-        const client = memory([vor('ABC', 47, 8), airport('ABCA', 47.2, 8), intersection('ABCB', 47.1, 8)]);
-        expect(await getUniqueIdent('ABC', client)).toBe('ABCC');
+    it('counts every facility type that starts with the ident, not only the type of the source (characterization)', async () => {
+        // The user waypoint is the real case: a reference waypoint is stored as a USR waypoint in region XY, and the
+        // next reference waypoint from the same source must see it.
+        const client = memory([
+            vor('ABC', 47, 8),
+            airport('ABCA', 47.2, 8),
+            intersection('ABCB', 47.1, 8),
+            ndb('ABCC', 47.3, 8),
+            userWaypoint('ABCD', 47.4, 8),
+        ]);
+        expect(await getUniqueIdent('ABC', client)).toBe('ABCE');
     });
 
     it('keeps the first four characters of a longer ident (5-22)', async () => {

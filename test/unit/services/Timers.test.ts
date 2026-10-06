@@ -23,7 +23,7 @@ function setup(mode: boolean, totalTime = 0) {
     return {gps, state, timers};
 }
 
-describe('flight timer and departure time with RUN WHEN GS > 30KT (4-13)', () => {
+describe('flight timer and departure time with RUN WHEN GS > 30KT', () => {
     // 4-13: FLT is the time spent above 30 kt, and DEP the time the ground speed first reached 30 kt
     it('does not count the seconds below 30 kt and leaves DEP empty', () => {
         const {gps, state, timers} = setup(FLT_TIMER_GS30);
@@ -34,6 +34,7 @@ describe('flight timer and departure time with RUN WHEN GS > 30KT (4-13)', () =>
         expect(state.departureTime).toBeNull();
     });
 
+    // 4-13: FLT is the time spent above 30 kt, and DEP the time the ground speed first reached 30 kt
     it('counts the seconds above 30 kt and takes DEP at the first of them', () => {
         const {gps, state, timers} = setup(FLT_TIMER_GS30);
         gps.groundspeed = 31;
@@ -59,8 +60,10 @@ describe('flight timer and departure time with RUN WHEN GS > 30KT (4-13)', () =>
         expect(state.flightTimer).toBe(2);
         expect(state.departureTime!.getTimestamp()).toBe(Date.UTC(2026, 5, 1, 15, 3, 0));
     });
+});
 
-    it('counts exactly 30 kt as reached (characterization of the boundary)', () => {
+describe('flight timer at exactly 30 kt (characterization of the boundary)', () => {
+    it('counts exactly 30 kt as reached', () => {
         const {gps, state, timers} = setup(FLT_TIMER_GS30);
         gps.groundspeed = 30;
         timers.tick();
@@ -68,11 +71,12 @@ describe('flight timer and departure time with RUN WHEN GS > 30KT (4-13)', () =>
     });
 });
 
-describe('flight timer and departure time with RUN WHEN POWER IS ON (4-13)', () => {
+describe('flight timer and departure time with RUN WHEN POWER IS ON', () => {
     // 4-13: FLT is the time since power on, DEP the time power was applied
     it('counts from the first tick and takes DEP at once', () => {
-        const {state, timers} = setup(FLT_TIMER_POWER);
+        const {gps, state, timers} = setup(FLT_TIMER_POWER);
         timers.tick();
+        gps.timeZulu = at(15, 2, 1); // the GPS hands out a new time object each second
         timers.tick();
         expect(state.flightTimer).toBe(2);
         expect(state.departureTime!.getTimestamp()).toBe(Date.UTC(2026, 5, 1, 15, 2, 0));
@@ -99,5 +103,11 @@ describe('total time (STA 4)', () => {
         expect(settings.getSetting('totalTime').get()).toBe(3600);
         timers.tick();
         expect(settings.getSetting('totalTime').get()).toBe(3660);
+        for (let i = 0; i < 59; i++) {
+            timers.tick();
+        }
+        expect(settings.getSetting('totalTime').get()).toBe(3660);
+        timers.tick();
+        expect(settings.getSetting('totalTime').get()).toBe(3720);
     });
 });
