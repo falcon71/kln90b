@@ -1,8 +1,8 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {standardRoute} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
-import {courseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
+import {angleDiff, courseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
 
 const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
 
@@ -107,5 +107,47 @@ describe('L:KLN90B_RollCommand without a heading input (public contract)', () =>
         await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});
 
         expect(unit.env.sim.lastWrite('L:KLN90B_RollCommand')?.value).toBe(0);
+    });
+});
+
+// #100 (second comment of session 4): far left of the leg on a track parallel to it, case 1 ("on track") of
+// RollSteeringController.updateBankAngle takes any negative XTK, and its course to steer DTK - 50 x XTK passes 180 degrees
+// off the DTK beyond about 3.6 NM, so the unit banks away from the leg. HeadingInput is on, so the pin survives the
+// fix of #143.
+describe('L:KLN90B_RollCommand far left of the leg on a parallel track (#100)', () => {
+    /** Abeam the point 20 NM before ABC, 5 NM left of the leg KAAA - ABC, flying the leg's course at 120 kt */
+    async function farLeftParallel() {
+        const {unit, kaaa, abc} = await onRoute(HEADING_INPUT_XML);
+        const abeam = pointBefore(kaaa, abc, 20);
+        const dtk = courseDeg(abeam, abc);
+        await moveAircraft(unit, pointFrom(abeam, dtk - 90, 5), {groundspeedKt: 120, trackTrue: dtk});
+        await vi.advanceTimersByTimeAsync(1000);
+        return {unit, dtk};
+    }
+
+    // The sibling of the pin: the setup works. The heading input is on, ABC is active, the aircraft is 5 NM left of the
+    // leg (XTK negative) at 120 kt, with the track of the leg.
+    it('the pin setup: 5 NM left of the leg, parallel to it, at 120 kt with HeadingInput on', async () => {
+        const {unit, dtk} = await farLeftParallel();
+        const nav = unit.props.memory.navPage;
+
+        expect(unit.props.planeSettings.input.headingInput).toBe(true);
+        expect(nav.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('ABC');
+        expect(nav.xtkToActive).toBeCloseTo(-5, 1);
+        expect(nav.desiredTrack).toBeCloseTo(dtk, 0);
+        expect(unit.props.sensors.in.gps.groundspeed).toBeCloseTo(120, 6);
+        expect(Math.abs(angleDiff(unit.props.sensors.in.gps.trackTrue!, dtk))).toBeLessThan(1);
+    });
+
+    // Autopilot wiki: far from the leg the unit turns toward it to a 45 degree intercept, from either side. The leg is to
+    // the right, so the bank is right (negative) and the course to steer lies right of the track, less than 90 off it.
+    it.fails('banks right, toward the leg (#100)', async () => {
+        const {unit, dtk} = await farLeftParallel();
+
+        expect(roll(unit)).toBeLessThan(0);
+        const cts = (unit.env.sim.lastWrite('GPS COURSE TO STEER')!.value as number) * 180 / Math.PI;
+        const offTrack = angleDiff(cts, dtk);
+        expect(offTrack).toBeGreaterThan(0);
+        expect(offTrack).toBeLessThan(90);
     });
 });
