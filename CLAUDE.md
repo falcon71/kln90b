@@ -60,12 +60,12 @@ change what they mean; add new ones instead:
   is mirrored from FPL 0 by `WTFlightplanSync`.
 - **The EFB route sync** through the SDK `FlightPlanRouteManager`: the synced route is loaded into FPL 0
   (`KlnEfbLoader`), and the route request is answered from FPL 0 in the SDK's `FlightPlanRoute` format
-  (`KlnEfbSaver`).
+  (`KlnEfbSaver`), but only with `Output.WriteGPSSimVars` set.
 - **Persisted user data** (setting keys, the V1/V2 waypoint and flight-plan string formats). Users keep their data
   across
   versions. Add keys with defaults; never repurpose a key or break the V1 loaders.
 - If you change any of these, the wiki pages (panel.xml customization, External Annunciators, Autopilot, RMI,
-  CDI/HSI, Hot Swapping, Accessing the Flight Plan) need the same change.
+  CDI/HSI, Hot Swapping, Accessing the Flight Plan, FAQ for the EFB sync) need the same change.
 
 ## Architecture in brief
 

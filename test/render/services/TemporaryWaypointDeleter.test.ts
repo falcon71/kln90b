@@ -142,10 +142,10 @@ describe('TemporaryWaypointDeleter', () => {
     });
 
     // The entry waypoint of a DME arc (SidStar) is a temporary waypoint in the repository while the approach is in FPL 0.
-    // A power-on removes the procedures from FPL 0 (VolatileMemory.reset) before the purge runs, so the entry is gone
-    // after one power cycle. The arc: right, 10 NM around ABC from the 180 to the 270 radial; the unit starts on the
+    // A power cycle of more than 5 minutes removes the procedures from FPL 0 (6-5, VolatileMemory.reset) before the purge
+    // runs, so the entry is gone after it. The arc: right, 10 NM around ABC from the 180 to the 270 radial; the unit starts on the
     // 190 radial, so the entry is D190J
-    it('deletes the entry waypoint of a DME arc at the power cycle that removes the approach (characterization)', async () => {
+    it('deletes the entry waypoint of a DME arc at a power cycle of more than 5 minutes that removes the approach (characterization)', async () => {
         const abc = vor('ABC', 47.3, 8.3);
         const at = (radial: number, nm: number) => pointFrom(abc, radial, nm);
         const arcbg = intersection('ARCBG', at(180, 10).lat, at(180, 10).lon);
@@ -168,7 +168,8 @@ describe('TemporaryWaypointDeleter', () => {
         await unit.panel.loadProcedure('APT 8');
         expect(userWaypoints(unit)).toEqual(['D190J XY']); // Precondition: the entry waypoint exists
 
-        await unit.panel.powerCycle();
+        await unit.panel.powerCycle({offSeconds: 6 * 60});
+        await unit.panel.approveSelfTest();
 
         expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KPRC']);
         expect(userWaypoints(unit)).toEqual([]);

@@ -233,7 +233,8 @@ describe('VNV ALERT', () => {
         expect(armed(90).h.tick()).toEqual(['VNV ALERT']);
     });
 
-    it('does not show 91 s before the start (B-4)', () => {
+    // The manual says about 90 s, so the exact cut-off at 91 s is the code's choice (PersistentMessages.ts, timeToVnav <= 90)
+    it('does not show 91 s before the start (characterization)', () => {
         expect(armed(91).h.tick()).toEqual([]);
     });
 

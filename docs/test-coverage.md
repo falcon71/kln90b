@@ -648,7 +648,8 @@ later run adds a new entry.
 **Bugs found and filed** (each after a search of the open and closed issues: the titles of all 163 issues, the bodies of
 #15, #73, #89, #91, #94, #97, #109 and #138, and semantic searches with several wordings until the search API's rate
 limit; research A, C and D had searched as well). All were found in the headless harness and not reproduced in the
-sim; #189 and #190 were found by reading the code.
+sim; #189 and #190 and #175's self-test date path (task 3, which publishes no `timeUpdatedEvent`) were found by reading
+the code.
 - **#164:** CAL 7 uses a zenith of 91° instead of 90°50', so sunrise is a minute early and sunset a minute late against
   the KATL figures of 5-15 and the USNO almanac. Pinned in `Sun.test.ts` (three rows).
 - **#165:** CAL 7 depends on the seconds of the stored date (`Sun.ts:91`, `withTime` keeps them). Pinned in
@@ -733,7 +734,7 @@ said what ran, not what was held (section 1).
   (Session 7, #190); the MSG page seen-marking (Session 9, #191).
 - IF REQUIRED SELECT OBS at the render stage (unit only); ARM GPS APPROACH at the render stage (unreachable while #139
   stands); the double evaluation of the persistent conditions per tick (no observable effect today); VNV ALERT while
-  VNAV is Active (not claimed).
+  VNAV is Active is held at the unit stage only (characterization).
 - The `PLAY_INSTRUMENT_SOUND` call itself (no `Name_Z` fake); the forwarding of the sound end to the SDK server
   (`AudioGenerator.ts:54`; in the sim only the first tone would play without it, the bus-level test cannot see it);
   `BEEP: n` without debug mode (no negative assertion).
