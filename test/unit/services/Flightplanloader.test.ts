@@ -48,7 +48,8 @@ describe('Flightplanloader.loadIcaos', () => {
         expect((await loader.load([known(0)])).idx).toBe(0);
     });
 
-    it('drops a missing waypoint, keeps the order of the others and reports it', async () => {
+    // B-4: a waypoint that is no longer in the database is reported as WAYPOINT ___ DELETED
+    it('drops a missing waypoint, keeps the order of the others and reports it (B-4)', async () => {
         const {fpl, messages} = await load([known(0), gone(1), known(2), known(3)]);
 
         expect(identsOf(fpl)).toEqual(['K00', 'K02', 'K03']);
@@ -89,7 +90,8 @@ describe('Flightplanloader.loadIcaos', () => {
         expect(messages).toEqual(['WAYPOINT K30 DELETED', 'WAYPOINT K31 DELETED']);
     });
 
-    it('counts the cut legs and the missing ones together towards the ten', async () => {
+    // B-3 does not settle whether cut legs count toward the ten; this is the behavior of the loader as it is
+    it('counts the cut legs and the missing ones together towards the ten (characterization)', async () => {
         // 6 cut legs and 5 missing legs inside the first 30: eleven in all, so ten are named and OTHER follows
         const icaos = [...Array.from({length: 25}, (_, i) => known(i)), ...Array.from({length: 5}, (_, i) => gone(i)),
             ...Array.from({length: 6}, (_, i) => known(30 + i))];

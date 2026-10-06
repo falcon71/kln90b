@@ -64,7 +64,7 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
         const position = pointBefore(kaaa, abc, 5);
         const unit = await planInObs(position, {obs: 50});
         const expected = xtkFromCourse(position, kbbb, 50);
-        expect(expected).toBeCloseTo(24.5, 0); // Far from zero, so a recentred bar cannot match
+        expect(expected).toBeCloseTo(24.5, 0); // Far from zero, so a recentered bar cannot match
 
         await directToKbbbFromFpl0(unit, true);
         return {unit, nav: unit.props.memory.navPage, expected};
@@ -80,10 +80,10 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
         expect(nav.obsMag).toBe(50);
     });
 
-    // 5-37 (5.9.7) step 3: the D-bar is not recentred, the deviation is from the 050 course through KBBB. DirectToPage
+    // 5-37 (5.9.7) step 3: the D-bar is not recentered, the deviation is from the 050 course through KBBB. DirectToPage
     // makes a direct-to from the present position and then calls setObs with the unchanged course, which returns early
     // (ModeController.setObs), so the direct-to path stays and the deviation is zero
-    it.fails('does not recentre the deviation: it is measured from the OBS course through the new waypoint (#154)', async () => {
+    it.fails('does not recenter the deviation: it is measured from the OBS course through the new waypoint (#154)', async () => {
         const {nav, expected} = await activateKbbbOnCourse50();
 
         expect(Math.abs(nav.xtkToActive! - expected)).toBeLessThan(0.05);
@@ -99,7 +99,7 @@ describe('Direct To in OBS mode (5-37)', () => {
 
     // 5-37 (5.9.6): the direct-to selects the OBS that leads from the present position to the waypoint when the unit
     // is not the displayed source (ObsSource 0: the unit cannot read the indicator)
-    it('sets the OBS to the course from the present position and centres the deviation', async () => {
+    it('sets the OBS to the course from the present position and centers the deviation', async () => {
         const unit = await planInObs(offLeg, {panelXml: panelXml('<ObsSource>0</ObsSource>'), abc: abcE});
         const nav = unit.props.memory.navPage;
         await unit.panel.selectPage('R', 'CTR 1'); // So DCT pre-fills the active waypoint (3-27 rule 4)

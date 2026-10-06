@@ -90,14 +90,14 @@ describe('calcDistToDestination', () => {
 
 describe('ActiveWaypoint.getDestination', () => {
     // 6-20: the default destination is the MAP of a loaded approach, else the last waypoint of the plan
-    it('is the last waypoint of the plan', () => {
+    it('is the last waypoint of the plan (6-20)', () => {
         const {aw} = build([A, B, C].map(user), pointFrom(B, 270, 7));
         aw.activateFpl0();
 
         expect(aw.getDestination()!.icaoStruct.ident).toBe('DEF');
     });
 
-    it('is the MAP when an approach is loaded, not the missed approach point behind it', () => {
+    it('is the MAP when an approach is loaded, not the missed approach point behind it (6-20)', () => {
         const map: KLNFlightplanLeg = {wpt: C, type: KLNLegType.APP, fixType: KLNFixType.MAP};
         const missed: KLNFlightplanLeg = {wpt: D, type: KLNLegType.APP, fixType: KLNFixType.MAHP};
         const {aw} = build([user(A), user(B), map, missed], pointFrom(B, 270, 7));
@@ -106,14 +106,16 @@ describe('ActiveWaypoint.getDestination', () => {
         expect(aw.getDestination()!.icaoStruct.ident).toBe('DEF');
     });
 
-    it('is the direct-to waypoint for a direct-to outside the plan', () => {
+    // Not stated by the 6-20 rule above; the behavior of the code
+    it('is the direct-to waypoint for a direct-to outside the plan (characterization)', () => {
         const {aw} = build([A, B, C].map(user), pointFrom(A, 0, 3));
         aw.directTo(A, E);
 
         expect(aw.getDestination()!.icaoStruct.ident).toBe('EEEEE');
     });
 
-    it('is null without an active waypoint', () => {
+    // Not in the manual; the behavior of the code
+    it('is null without an active waypoint (characterization)', () => {
         const {aw} = build([], {lat: 47, lon: 8});
 
         expect(aw.getDestination()).toBeNull();
@@ -143,7 +145,7 @@ describe('insertLegIntoFpl', () => {
     });
 
     // 4-4: a plan of 29 takes a 30th without losing its first waypoint
-    it('inserts the 30th leg into FPL 0 and keeps the first leg', () => {
+    it('inserts the 30th leg into FPL 0 and keeps the first leg (4-4)', () => {
         const {fpl0, aw} = build(fullPlanLegs().slice(0, 29), START);
 
         insertLegIntoFpl(fpl0, navState(aw, null), 29, user(NEW));

@@ -212,7 +212,7 @@ on every call. `insertLeg(unit, idx, fac)` (`test/harness/flightplan.ts`) puts a
 FPL page does after a waypoint confirmation, which is far faster than typing it with the knobs.
 
 `approachWorld()` (same file) returns an RNAV approach to KPRC from the north with fresh objects on every call: the IAF
-IAFAA and IFAAA, the FAF FAFAA 5 NM north of the MAP, a step-down fix SDFAA between the FAF and the MAP, the MAP MAPAA at the
+IAFAA, the intermediate fix IFAAA, the FAF FAFAA 5 NM north of the MAP, a step-down fix SDFAA between the FAF and the MAP, the MAP MAPAA at the
 airport and an enroute fix ENRAA. Its FAF is not its IAF, so the unit can reach APR there, and the step-down fix lets a test
 check that APR does not come back past the FAF. Boot with its `facilities`, store `[enraa, kprc]` in FPL 0 with
 `savedFlightplan` and load the approach with `await unit.panel.loadProcedure('APT 8')` after `settle`; `north(nm)` gives a

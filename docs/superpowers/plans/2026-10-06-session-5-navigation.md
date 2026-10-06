@@ -360,8 +360,8 @@ pins `#NEW-3-1` to `#NEW-3-5`, #82 and #119, and the #43 test freed from its CRS
       `activateFpl0()` (keep the obsMag reset). Restore.
 
 - [ ] **Step 5: direct-to in OBS** (`research-B.md` 4.1 to 4.5): ACTIVATE keeps the OBS (5-37; ObsSource 0; break
-  `if (this.activateMode)` to `if (false)`); pin `#NEW-3-4` not recentred (fix: remove the early return in `setObs`;
-  confirm that the #122 pin also turns red under that fix and note it); a direct-to sets the OBS and centres (5-37);
+  `if (this.activateMode)` to `if (false)`); pin `#NEW-3-4` not recentered (fix: remove the early return in `setObs`;
+  confirm that the #122 pin also turns red under that fix and note it); a direct-to sets the OBS and centers (5-37);
   `CRS xxx` (5-37, C-1; break `obsTarget === 1`); the driven indicator (5-37).
 
 - [ ] **Step 6: #82 and #43.** In `test/render/pages/left/DirectToPage.test.ts`, the #43 test (around line 34) asserts
@@ -577,7 +577,7 @@ update `testing.md` and write the session log.
     - `#NEW-3-1` LEG to OBS moves the deviation on long legs (5-36);
     - `#NEW-3-2` OBS to LEG activates the first copy of a duplicated waypoint (5-36);
     - `#NEW-3-3` OBS to LEG at an IAF = FAF keeps the IAF copy (6-11; references #129);
-    - `#NEW-3-4` ACTIVATE in OBS recentres the D-bar (5-37; references #122, the same early return);
+    - `#NEW-3-4` ACTIVATE in OBS recenters the D-bar (5-37; references #122, the same early return);
     - `#NEW-3-5` OBS to LEG on the FROM side makes a direct-to instead of re-activating the plan leg (5-36; trainer);
     - `#NEW-4-1` a NAV flag or no active waypoint resets the CDI scale to 5 (5-38);
     - `#NEW-4-2` the WPT light goes out at the sequencing onto the last leg while the turn is flown (4-8);

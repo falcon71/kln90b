@@ -388,7 +388,8 @@ bugs found were filed and pinned (#135 to #144), invalid panel.xml values are th
 
 **Done when:** each item has spec tests, and the log says which behaviors are left.
 
-Result (session log, section 4): each of the five items has spec tests, plus the `approachWorld()` fixture. The bugs
+Result (session log, section 4): items 1 to 4 have spec tests and item 5 has pins and characterizations only, by the
+maintainer's decisions, plus the `approachWorld()` fixture. The bugs
 found were filed and pinned (#148 to #160; #161 is filed without a pin), the two approach questions are #162 and #163,
 #119 is now a bug with a pin, and #82, #100, #119 and #122 have comments. Roll steering has only the #100 pin, by the
 maintainer's decision.
@@ -546,7 +547,7 @@ later run adds a new entry.
   setting, re-activation by position after an edit inside the active leg); `ModeControllerObs.test.ts` (LEG to OBS keeps
   the deviation and sets the magnetic course, `NO ACTV WPT`, OBS to LEG on the TO side, MAHP = FAF, the VOR variation,
   `OBS WPT > 200NM`, the external CRS switch); `DirectToObs.test.ts` (ACTIVATE keeps the OBS, a direct-to sets and
-  centres it, `CRS xxx`, the driven indicator, all at a non-zero variation). The `CRSR` assertion of the #43 test was
+  centers it, `CRS xxx`, the driven indicator, all at a non-zero variation). The `CRSR` assertion of the #43 test was
   removed (figure 4-42) and the #43 test re-proven by its original break. Pins #151 to #155, #82 and #119.
 - **Task 4, `NavCalculator`:** `NavCalculator.test.ts` appended: `FLY L`/`FLY R` and the NAV 1 bar, DTK along a great
   circle, DIS as a chord on an arc, the 36 s alert (SET 6 off, and an off-plan direct-to), the 20 s alert between
@@ -622,7 +623,7 @@ headless harness and not reproduced in the sim.
 - **#153:** OBS to LEG at an IAF that is also the FAF keeps the IAF copy (6-11; references #129). Pinned in
   `ModeControllerObs.test.ts` (proven by running it as a plain `it` and by a "last match" change, since a fix needs FAF
   promotion).
-- **#154:** ACTIVATE in OBS mode recentres the D-bar (5-37); the same early return of `setObs` as #122, whose suggested
+- **#154:** ACTIVATE in OBS mode recenters the D-bar (5-37); the same early return of `setObs` as #122, whose suggested
   fix would not cure it. Pinned in `DirectToObs.test.ts`.
 - **#155:** OBS to LEG on the FROM side makes a direct-to from the present position instead of re-activating the plan
   leg (5-36). Pinned in `ModeControllerObs.test.ts`.
@@ -696,13 +697,12 @@ ran, not what was held (section 1).
 - Numbered flight plans with legs on the FPL pages (the `USE? INVRT?` reader gap, `testing.md` section 7); CTR 1 (#161,
   not pinned).
 - `ActiveWaypoint`'s shared `CACHED_CIRCLE` aliases only across two instances, which the singletons rule out.
-- Review notes left as they are: the 29-leg test of `FlightplanUtils.test.ts` carries its 4-4 citation in the comment
-  above it, not in the title; lines 12, 14 and 31 of `test/harness/fixtures.ts` are 121 to 122 characters
+- Review notes left as they are: lines 12, 14 and 31 of `test/harness/fixtures.ts` are 121 to 122 characters
   (pre-existing); the first commit of task 4 has two imprecise proof lines, corrected in its fix round's message.
 
 **Workflow notes.** The isolation worktrees again started at `origin/main` and were reset to the session branch first.
-Implementers ran on Sonnet; reviewers on Sonnet for tasks 1 and 2 and on Opus for tasks 3, 4 and 5; re-reviews on
-Sonnet. The implementers' sandbox refused writes outside the worktree, so the controller saved their reports. The
+Implementers ran on Sonnet for tasks 1 to 5 and the close-out (task 6) on Opus; reviewers on Sonnet for tasks 1 and 2
+and on Opus for tasks 3, 4 and 5; re-reviews on Sonnet. The implementers' sandbox refused writes outside the worktree, so the controller saved their reports. The
 close-out ran in the main checkout on the session branch, because it needed GitHub.
 
 **Coverage at the start of the session** (identical to the end of session 4) **and at the end** (all tests green):
@@ -730,7 +730,7 @@ The files of the area, statements at the start (from the design) and at the end:
 `KLNNavmath.ts` and `SignalOutputFilter.ts` 100 and 100. Read the rise with care (section 1): the number says what ran,
 not what is held.
 
-The suite at the start: 768 tests passed and 60 expected failures, in 139 files. At the end: 904 tests passed and 83
+The suite at the start: 768 tests passed and 60 expected failures, in 139 files. At the end: 905 tests passed and 83
 expected failures, in 151 files. The twenty-three new expected failures are pins: #148 (two), #149, #150, #151, #152,
 #153, #154, #155, #156, #157, #158, #159 (three), #160, #82, #119, #100 (the wrong-way bank), and #97, which went from
 one pin to five (one per fraction and the on-segment pin).

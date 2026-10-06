@@ -76,7 +76,7 @@ describe('bankeAngleForStandardTurn', () => {
     });
 
     // MAX_BANK_ANGLE is 25° (NavCalculator.ts). The standard-rate bank reaches it at about 169 kt (tan 25° * 362.1)
-    it('stays below the limit up to 160 kt and is limited to 25° from 170 kt on', () => {
+    it('stays below the limit up to 160 kt and is limited to 25° from 170 kt on (characterization)', () => {
         expect(bankeAngleForStandardTurn(160)).toBeLessThan(25);
         expect(bankeAngleForStandardTurn(160)).toBeGreaterThan(23);
         expect(bankeAngleForStandardTurn(170)).toBe(25);

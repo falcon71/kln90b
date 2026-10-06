@@ -517,13 +517,25 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');
     });
 
+    // The sibling of the pin below: the GPS is flagged after a reset and valid again 20 s later (fast acquisition: 10 s),
+    // so the pin tests the scale and not a fix that never came back
+    it('control: the GPS is flagged after a mid-flight reset and valid again 20 s later', async () => {
+        const {unit, kaaa, abc} = await onStandardRoute();
+        await moveAircraft(unit, pointBefore(kaaa, abc, 20), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
+        unit.props.sensors.in.gps.reset();
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(unit.props.sensors.in.gps.isValid()).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(18_500);
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true);
+    });
+
     it.fails('keeps the selected 1.00 NM over a GPS loss (#159)', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
         await moveAircraft(unit, pointBefore(kaaa, abc, 20), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
         await selectOneNm(unit);
         unit.props.sensors.in.gps.reset();
-        await vi.advanceTimersByTimeAsync(20_000); // flagged, then reacquired (fast acquisition: 10 s)
-        expect(unit.props.sensors.in.gps.isValid()).toBe(true);
+        await vi.advanceTimersByTimeAsync(20_000); // flagged, then reacquired (see the control above)
 
         expect(nav(unit).xtkScale).toBe(1);
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');

@@ -152,7 +152,7 @@ describe('OBS to LEG (5-36)', () => {
         const position = pointBefore(kaaa, abc, 5);
         const unit = await inObs(position, 70);
         const nav = unit.props.memory.navPage;
-        expect(xtkFromCourse(position, abc, 70)).toBeCloseTo(1.63, 1); // Not about zero, so a recentred leg cannot match
+        expect(xtkFromCourse(position, abc, 70)).toBeCloseTo(1.63, 1); // Not about zero, so a recentered leg cannot match
 
         await legMode(unit);
 

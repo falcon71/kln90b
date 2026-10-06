@@ -145,13 +145,13 @@ assertion only).
 - **LEG/OBS (render):** LEG to OBS keeps a 2 NM deviation (5-36); `NO ACTV WPT` (C-1); OBS to LEG on the TO side
   (5-36); the MAHP = FAF case works (6-11, 6-19 notes); the VOR's published variation in OBS (5-35);
   `OBS WPT > 200NM` (B-3); the external GPS CRS switch back to LEG (5-33).
-- **Direct-to in OBS (render):** ACTIVATE keeps the OBS (5-37), a direct-to sets the OBS to the course and centres,
+- **Direct-to in OBS (render):** ACTIVATE keeps the OBS (5-37), a direct-to sets the OBS to the course and centers,
   `CRS xxx` with a non-driven indicator, a driven indicator gets `K:VOR1_SET` (5-37, C-1).
 - **#82 and #43:** the `status().left === 'CRSR'` assertion of the #43 test is removed (its index assertion stays); the
   #82 pin (an ENT after the direct-to inserts nothing; 4-11, figure 4-42).
 - **Pins:** `#NEW-3-1` LEG to OBS moves the deviation on a long leg (5-36); `#NEW-3-2` OBS to LEG activates the first
   copy of a duplicated waypoint (5-36); `#NEW-3-3` OBS to LEG at an IAF = FAF keeps the IAF copy (6-11); `#NEW-3-4`
-  ACTIVATE in OBS recentres (5-37; the fix must also satisfy the #122 pin); `#NEW-3-5` OBS to LEG on the FROM side
+  ACTIVATE in OBS recenters (5-37; the fix must also satisfy the #122 pin); `#NEW-3-5` OBS to LEG on the FROM side
   makes a direct-to instead of re-activating the plan leg (5-36, trainer-confirmed; replaces research B's
   characterization 3.5); #82; #119 (DCT after power-up prefills the active waypoint, 3-27 rules 3 and 4).
 - **Reviewer:** Opus.
