@@ -11,7 +11,7 @@ const messages = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages()
 const panelXml = (input: string) =>
     `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input>${input}</Input></Instrument></PlaneHTMLConfig>`;
 
-describe('ALTITUDE FAIL (B-1)', () => {
+describe('ALTITUDE FAIL', () => {
     // B-1: the message shows when the altitude input fails. Input.AltimeterInterfaced false is a unit without the input
     // (CLAUDE.md, public contract: the panel.xml keys)
     it('shows on a unit without an altitude input (B-1)', async () => {
@@ -100,6 +100,7 @@ describe('PRESS ALT TO SET BARO (6-8, B-3)', () => {
     it('goes once the ALT page has been shown (6-8, B-3)', async () => {
         const unit = await armedAt29();
         await vi.advanceTimersByTimeAsync(1000);
+        expect(messages(unit)).toContain('PRESS ALT TO SET BARO'); // The precondition: it is there before the ALT page
         await unit.panel.alt();
         await vi.advanceTimersByTimeAsync(2000);
 

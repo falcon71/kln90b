@@ -157,7 +157,7 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
         expect(m.isReady).toBe(true);
     });
 
-    // KLNMagvar.tick sets the pilot's variation to 0 on every tick inside the primary coverage area (5-44), so the reset at
+    // KLNMagvar.tick sets the pilot's variation to 0 on every tick inside the primary coverage area, so the reset at
     // the power-on is visible only outside it
     it('forgets the pilot-entered magnetic variation outside the coverage area (characterization)', async () => {
         const unit = await bootUnit({position: {lat: 74.5, lon: 8.0}});

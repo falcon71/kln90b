@@ -58,16 +58,28 @@ describe('the MSG page as the place a message is read (3-16)', () => {
     });
 });
 
-describe('SET FUEL ON BOARD ON OTH 5 IF NECESSARY (B-4)', () => {
+describe('SET FUEL ON BOARD ON OTH 5 IF NECESSARY', () => {
+    const FUEL_TEXT = 'SET FUEL ON BOARD ON OTH 5 IF NECESSARY';
+
     // B-4: the message comes after the start-up with a fuel computer on which the KLN 90B sets the fuel on board.
     // Input.FuelComputer.FOBTransmitted false is that computer (cfg/panel.xml)
-    it('shows after the start with a fuel computer that does not send the fuel on board (B-4)', async () => {
+    it('shows once after the start with a fuel computer that does not send the fuel on board (B-4)', async () => {
         const unit = await bootUnit({
             panelXml: panelXml('<FuelComputer><IsInterfaced>true</IsInterfaced><FOBTransmitted>false</FOBTransmitted></FuelComputer>'),
         });
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(messages(unit)).toContain('SET FUEL ON BOARD ON OTH 5 IF NECESSARY');
+        expect(messages(unit).filter(m => m === FUEL_TEXT)).toHaveLength(1);
+    });
+
+    it('does not show without a fuel computer, whatever the fuel on board flag says (characterization)', async () => {
+        const unit = await bootUnit({
+            panelXml: panelXml('<FuelComputer><IsInterfaced>false</IsInterfaced><FOBTransmitted>false</FOBTransmitted></FuelComputer>'),
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(messages(unit)).not.toContain(FUEL_TEXT);
+        expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME'); // The list is the live one
     });
 
     it('does not show with a fuel computer that sends the fuel on board (B-4)', async () => {
@@ -112,7 +124,7 @@ describe('messages over a power cycle', () => {
     });
 
     // The sibling of the pin: the cycle itself completes, and the message is there before it
-    it('holds the message before the cycle (sibling of #NEW-3-3)', async () => {
+    it('holds the message before the cycle (sibling of #NEW-3-3) (characterization)', async () => {
         const unit = await bootUnit();
         await settle(unit);
         unit.props.messageHandler.addMessage(new OneTimeMessage(['BEFORE THE CYCLE']));

@@ -52,7 +52,7 @@ describe('MessageHandler, one-time messages', () => {
         expect(handler.hasUnreadMessages()).toBe(true);
     });
 
-    // The MSG page lists the newest first (3-16) by reversing this list, so the handler must keep the posting order
+    // The MSG page lists the newest first by reversing this list, so the handler must keep the posting order
     it('keeps the messages in posting order (characterization)', () => {
         const handler = new MessageHandler();
         handler.addMessage(new OneTimeMessage(['FIRST']));
@@ -95,7 +95,7 @@ describe('MessageHandler, persistent messages', () => {
         expect(handler.hasUnreadMessages()).toBe(false);
     });
 
-    it('drops an unread message when its condition ends (3-16)', () => {
+    it('drops an unread message when its condition ends (characterization)', () => {
         const handler = new MessageHandler();
         const cond = new Condition('OBS WPT > 200NM');
         handler.persistentMessages = [cond];

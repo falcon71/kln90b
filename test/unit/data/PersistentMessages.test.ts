@@ -132,8 +132,8 @@ describe('the quiet world', () => {
     });
 });
 
-describe('ARM GPS APPROACH (B-1)', () => {
-    // B-1: with the approach disarmed (ENR), the unit reminds the pilot 3 NM before the FAF
+describe('ARM GPS APPROACH', () => {
+    // With the approach disarmed (ENR), the unit reminds the pilot 3 NM before the FAF (B-1, on the spec tests below)
     const atFaf = (navmode: NavMode, dist: number, fixType = KLNFixType.FAF) => {
         const w = quietWorld();
         w.activeLeg = {fixType};
@@ -164,8 +164,8 @@ describe('ARM GPS APPROACH (B-1)', () => {
     });
 });
 
-describe('IF REQUIRED SELECT OBS (B-2)', () => {
-    // B-2: 4 NM before a waypoint usable for a procedure turn or a holding pattern, in LEG mode
+describe('IF REQUIRED SELECT OBS', () => {
+    // B-2: 4 NM before a waypoint usable for a procedure turn or a holding pattern, in LEG mode (all spec tests)
     const before = (dist: number, askObs: boolean, obsMode = false) => {
         const w = quietWorld();
         w.activeLeg = {askObs};
@@ -198,19 +198,29 @@ describe('MAGNETIC VAR INVALID (B-2, 5-44)', () => {
         expect(harness(w).tick()).toEqual(['MAGNETIC VAR INVALID ALL DATA REFERENCED TO TRUE NORTH']);
     });
 
-    it('goes when the pilot enters a variation (B-2, 5-44)', () => {
+    it('goes when the pilot enters an east variation (B-2, 5-44)', () => {
         const w = quietWorld();
         w.magvarValid = false;
         const h = harness(w);
-        h.tick();
+        expect(h.tick()).toHaveLength(1); // The precondition: it shows before the entry
         w.userMagvar = 10;
+        expect(h.tick()).toEqual([]);
+    });
+
+    // West variations are stored negative (MagvarEditor)
+    it('goes when the pilot enters a west variation (B-2, 5-44)', () => {
+        const w = quietWorld();
+        w.magvarValid = false;
+        const h = harness(w);
+        expect(h.tick()).toHaveLength(1); // The precondition: it shows before the entry
+        w.userMagvar = -10;
         expect(h.tick()).toEqual([]);
     });
 });
 
-describe('VNV ALERT (B-4)', () => {
-    // B-4 (5-8 writes VNAV ALERT): about 90 s before the VNAV start, unless NAV 4 is on the screen. VNAV is armed on
-    // NAV 4 (5-8), so the unit ticks with VNAV inactive first
+describe('VNV ALERT', () => {
+    // About 90 s before the VNAV start, unless NAV 4 is on the screen (B-4 on the spec tests below). VNAV is armed on
+    // NAV 4, so the unit ticks with VNAV inactive first
     const armed = (seconds: number, w = quietWorld()) => {
         const h = harness(w);
         h.tick();
@@ -231,6 +241,14 @@ describe('VNV ALERT (B-4)', () => {
         const {w, h} = armed(60);
         expect(h.tick()).toEqual(['VNV ALERT']); // The precondition: it shows while armed
         w.vnavState = VnavState.Inactive;
+        expect(h.tick()).toEqual([]);
+    });
+
+    // The alert warns of the start of the descent, so it has no purpose once VNAV is active
+    it('goes when the descent has started and VNAV is active (B-4)', () => {
+        const {w, h} = armed(60);
+        expect(h.tick()).toEqual(['VNV ALERT']); // The precondition: it shows while armed
+        w.vnavState = VnavState.Active;
         expect(h.tick()).toEqual([]);
     });
 
@@ -328,7 +346,7 @@ describe('PRESS ALT TO SET BARO (6-8, B-3)', () => {
     });
 });
 
-describe('DATA BASE OUT OF DATE (B-2)', () => {
+describe('DATA BASE OUT OF DATE', () => {
     const DB_TEXT = 'DATA BASE OUT OF DATE ALL DATA MUST BE CONFIRMED BEFORE USE';
 
     it('is posted at the tick the data base becomes out of date (characterization)', () => {
@@ -348,7 +366,9 @@ describe('DATA BASE OUT OF DATE (B-2)', () => {
     });
 
     // B-2, 3-16: a message is there for the pilot to read. Today the condition is true for one calculation tick only, so
-    // the message is gone a second later, unread, and the MSG prompt with it
+    // the message is gone a second later, unread, and the MSG prompt with it.
+    // This pin is bound to the persistent DatabaseOutOfDateMessage class (PersistentMessages.ts). If the fix deletes that
+    // class, delete this pin with it: the render pin below ("lists the message once") then carries the bug.
     it.fails('stays until it is read (B-2, 3-16) (#NEW-3-2)', () => {
         const w = quietWorld();
         const h = harness(w);
@@ -360,19 +380,25 @@ describe('DATA BASE OUT OF DATE (B-2)', () => {
     });
 });
 
-describe('ADJ NAV IND CRS, a driven indicator (B-1)', () => {
-    // B-1: with an indicator the unit slews (Output.ObsTarget other than 0), the message shows when the indicator's
-    // course differs from the unit's selected course by more than 0.5 degrees
-    const driven = (out: number | null, inp: number | null) => {
+describe('ADJ NAV IND CRS, a driven indicator', () => {
+    // With an indicator the unit slews (Output.ObsTarget other than 0), the message shows when the indicator's
+    // course differs from the unit's selected course by more than 0.5 degrees (B-1, on the spec tests below)
+    const driven = (out: number | null, inp: number | null, obsTarget = 1) => {
         const w = quietWorld();
-        w.obsTarget = 1;
+        w.obsTarget = obsTarget;
         w.obsOut = out;
         w.obsIn = inp;
         return harness(w).tick();
     };
 
-    it('shows at 0.6 degrees off (B-1)', () => {
+    it('shows at 0.6 degrees off, to either side (B-1)', () => {
         expect(driven(100, 100.6)).toEqual(['ADJ NAV IND CRS']);
+        expect(driven(100, 99.4)).toEqual(['ADJ NAV IND CRS']);
+    });
+
+    it('does the same for the second indicator target (characterization)', () => {
+        expect(driven(100, 100.6, 2)).toEqual(['ADJ NAV IND CRS']);
+        expect(driven(100, 100.4, 2)).toEqual([]);
     });
 
     it('does not show at 0.4 degrees off (B-1)', () => {
@@ -389,10 +415,10 @@ describe('ADJ NAV IND CRS, a driven indicator (B-1)', () => {
     });
 });
 
-describe('ADJ NAV IND CRS TO nnn, a readable indicator (B-1)', () => {
-    // B-1: in LEG mode, with an HSI course the unit can read, the message shows while the course differs from the DTK
-    // by more than 5 degrees. The unit also shows it for a while after every DTK change of more than 5 degrees,
-    // whatever the indicator shows (the force window, below)
+describe('ADJ NAV IND CRS TO nnn, a readable indicator', () => {
+    // In LEG mode, with an HSI course the unit can read, the message shows while the course differs from the DTK
+    // by more than 5 degrees (B-1, on the spec tests below). The unit also shows it for a while after every DTK change
+    // of more than 5 degrees, whatever the indicator shows (the force window, below)
     const readable = () => {
         vi.useFakeTimers({toFake: ['Date']});
         vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
@@ -409,6 +435,13 @@ describe('ADJ NAV IND CRS TO nnn, a readable indicator (B-1)', () => {
         const {w, h} = readable();
         expect(h.tick()).toEqual([]); // The precondition: the force window has closed
         w.obsIn = 52;
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 046°']);
+    });
+
+    it('shows at 6 degrees off the DTK on the other side (B-1)', () => {
+        const {w, h} = readable();
+        expect(h.tick()).toEqual([]); // The precondition: the force window has closed
+        w.obsIn = 40;
         expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 046°']);
     });
 
@@ -470,6 +503,13 @@ describe('ADJ NAV IND CRS TO nnn, a readable indicator (B-1)', () => {
         w.dtkMag = 52;
         w.obsIn = 52;
         expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 052°']);
+    });
+
+    it('opens the window for a DTK change of 6 degrees to the left (characterization)', () => {
+        const {w, h} = readable();
+        w.dtkMag = 40;
+        w.obsIn = 40;
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 040°']);
     });
 
     it('opens the window at the first DTK, even on course (characterization)', () => {
