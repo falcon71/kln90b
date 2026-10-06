@@ -44,6 +44,10 @@ describe('approach arm and the CDI scale ramp to 1 NM (6-1, 6-3)', () => {
     it('arms at 30 NM and ramps the scale from 5 to 1 over 30 s (6-3)', async () => {
         const {w, unit} = await approachLoaded(40);
 
+        await moveAircraft(unit, w.north(31), {groundspeedKt: 120});
+        expect(nav(unit).navmode).toBe(NavMode.ENR_LEG); // Still outside 30 NM
+        expect(nav(unit).xtkScale).toBe(5);
+
         await moveAircraft(unit, w.north(29), {groundspeedKt: 120});
         expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
         expect(nav(unit).xtkScale).toBe(5); // The tick that arms leaves the scale
@@ -51,17 +55,10 @@ describe('approach arm and the CDI scale ramp to 1 NM (6-1, 6-3)', () => {
         const mid = await scaleAfter(unit, 15);
         expect(mid).toBeGreaterThan(1.5); // A ramp, not a jump
         expect(mid).toBeLessThan(4.5);
-        expect(await scaleAfter(unit, 16)).toBe(1); // 31 s: done, one calculation tick of slack
+        expect(await scaleAfter(unit, 10)).toBeGreaterThan(1); // 25 s: not done yet, so not a faster ramp
+        expect(await scaleAfter(unit, 6)).toBe(1); // 31 s: done, one calculation tick of slack
         expect(await scaleAfter(unit, 10)).toBe(1); // and it stays
         expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
-    });
-
-    it('ramps linearly, 4/30 per calculation tick (characterization)', async () => {
-        const {w, unit} = await approachLoaded(40);
-        await moveAircraft(unit, w.north(29), {groundspeedKt: 120});
-
-        expect(await scaleAfter(unit, 15)).toBeCloseTo(3, 6);
-        expect(await scaleAfter(unit, 14)).toBeCloseTo(5 - 29 * 4 / 30, 6);
     });
 
     // 6-1: armed with the switch beyond 30 NM, the unit keeps the scale until the aircraft reaches 30 NM
@@ -100,6 +97,21 @@ describe('approach arm and the CDI scale ramp to 1 NM (6-1, 6-3)', () => {
     });
 });
 
+describe('GPS APR switch while armed', () => {
+    // 6-1: pressing the switch while armed disarms the approach: ENR and +-5. Sent without moving the clock: inside 30 NM
+    // the unit arms itself again at the next calculation tick (#139), so only the press is held
+    it('goes to ENR at +-5 on the press while armed (6-1)', async () => {
+        const {unit} = await approachLoaded(20);
+        expect(await scaleAfter(unit, 31)).toBe(1);
+        expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
+
+        unit.send('KLN90B_ApprArm_Push');
+
+        expect(nav(unit).navmode).toBe(NavMode.ENR_LEG);
+        expect(nav(unit).xtkScale).toBe(5);
+    });
+});
+
 describe('approach active and the CDI scale ramp to 0.3 NM (6-3, 6-11)', () => {
     /**
      * 2.5 NM before the FAF (7.5 NM north of KPRC), FAFAA active, armed, the arming ramp finished. At rest the GPS track
@@ -123,6 +135,10 @@ describe('approach active and the CDI scale ramp to 0.3 NM (6-3, 6-11)', () => {
     // changes from +-1 to +-0.3 over the 2 NM to the FAF; at the FAF it is +-0.3 and stays there
     it('ramps the scale from 1 at 2 NM to 0.3 at the FAF, and keeps 0.3 to the MAP (6-3)', async () => {
         const {w, unit} = await armedBeforeFaf();
+
+        await flyTo(w, unit, 5 + 2.3); // Inbound, but outside 2 NM: still armed at +-1
+        expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
+        expect(nav(unit).xtkScale).toBe(1);
 
         await flyTo(w, unit, 5 + 1.95);
         expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
@@ -151,14 +167,6 @@ describe('approach active and the CDI scale ramp to 0.3 NM (6-3, 6-11)', () => {
         expect(activeIdent(unit)).toBe('MAPAA');
         expect(await scaleAfter(unit, 5)).toBe(0.3);
         expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
-    });
-
-    it('ramps linearly with the distance to the FAF, 0.65 at 1 NM (characterization)', async () => {
-        const {w, unit} = await armedBeforeFaf();
-        await flyTo(w, unit, 5 + 1.95);
-        await flyTo(w, unit, 5 + 1);
-
-        expect(nav(unit).xtkScale).toBeCloseTo(0.65, 2);
     });
 
     /** 1 NM past the FAF with the step-down fix active, approach active */
@@ -210,11 +218,31 @@ describe('approach active and the CDI scale ramp to 0.3 NM (6-3, 6-11)', () => {
         await flyTo(w, unit, 5 + 1.5);
         expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
 
-        await unit.panel.press('KLN90B_ApprArm_Push');
+        // Sent without moving the clock: the state asserted below lasts only until the next calculation tick, which
+        // re-activates the approach, so panel.press (250 ms) would make the test depend on the tick phase
+        unit.send('KLN90B_ApprArm_Push');
 
         expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
         expect(nav(unit).xtkScale).toBe(1);
         expect(activeIdent(unit)).toBe('FAFAA');
+    });
+
+    // 6-3: the unit goes ACTV only while the aircraft heads toward the FAF. Inside 2 NM but flying away from it the
+    // unit stays armed at +-1; turning inbound then activates it. The unit starts inside 2 NM (1.5 NM from the FAF), so
+    // that no inbound jump of the harness precedes the outbound track
+    it('stays armed at +-1 inside 2 NM of the FAF while flying away from it (6-3)', async () => {
+        const {w, unit} = await approachLoaded(5 + 1.5);
+        expect(await scaleAfter(unit, 31)).toBe(1);
+        expect(activeIdent(unit)).toBe('FAFAA');
+
+        await moveAircraft(unit, w.north(5 + 1.6), {groundspeedKt: 120, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(activeIdent(unit)).toBe('FAFAA');
+        expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
+        expect(nav(unit).xtkScale).toBe(1);
+
+        await moveAircraft(unit, w.north(5 + 1.5), {groundspeedKt: 120, trackTrue: 180});
+        expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
     });
 
     // 6-3 (step 5): changing to OBS cancels ACTV; 5-32: APR together with OBS is not a valid mode, so the unit is armed
@@ -232,5 +260,28 @@ describe('approach active and the CDI scale ramp to 0.3 NM (6-3, 6-11)', () => {
         expect(await scaleAfter(unit, 3)).toBe(1);
         expect(nav(unit).navmode).toBe(NavMode.ARM_OBS);
         expect(Screen.read().row(6).slice(6, 13)).toMatch(/^arm:\d\d\d$/);
+    });
+});
+
+describe('approach arm ramp (characterization)', () => {
+    it('ramps linearly, 4/30 per calculation tick', async () => {
+        const {w, unit} = await approachLoaded(40);
+        await moveAircraft(unit, w.north(29), {groundspeedKt: 120});
+
+        expect(await scaleAfter(unit, 15)).toBeCloseTo(3, 6);
+        expect(await scaleAfter(unit, 14)).toBeCloseTo(5 - 29 * 4 / 30, 6);
+    });
+});
+
+describe('approach active ramp (characterization)', () => {
+    it('ramps linearly with the distance to the FAF, 0.65 at 1 NM', async () => {
+        const {w, unit} = await approachLoaded(7.5);
+        expect(await scaleAfter(unit, 31)).toBe(1);
+        for (const nm of [5 + 1.95, 5 + 1]) {
+            await moveAircraft(unit, w.north(nm), {groundspeedKt: 120, trackTrue: 180});
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+
+        expect(nav(unit).xtkScale).toBeCloseTo(0.65, 2);
     });
 });
