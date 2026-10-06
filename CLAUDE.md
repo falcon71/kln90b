@@ -58,6 +58,9 @@ change what they mean; add new ones instead:
 - **GPS SimVars** written when `Output.WriteGPSSimVars` is set (`SensorsOut` in `Sensors.ts`). The SDK `FlightPlanner`
   id `"kln90b"`
   is mirrored from FPL 0 by `WTFlightplanSync`.
+- **The EFB route sync** through the SDK `FlightPlanRouteManager`: the synced route is loaded into FPL 0
+  (`KlnEfbLoader`), and the route request is answered from FPL 0 in the SDK's `FlightPlanRoute` format
+  (`KlnEfbSaver`).
 - **Persisted user data** (setting keys, the V1/V2 waypoint and flight-plan string formats). Users keep their data
   across
   versions. Add keys with defaults; never repurpose a key or break the V1 loaders.

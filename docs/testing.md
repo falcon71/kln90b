@@ -467,7 +467,11 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
     - `pointFrom(p, bearingTrue, nm)`, the point `nm` from `p` on a course, and `pointBefore(from, to, nm)`, the point
       `nm` before `to` on the great circle from `from`. They agree with `distanceNm` and `courseDeg` to 1e-6, so use
       them to place an aircraft before a waypoint instead of the SDK's `GeoPoint.offset`. The standard world
-      (`standardRoute()`, section 3) is the usual input.
+      (`standardRoute()`, section 3) is the usual input;
+    - `crossTrackNm(position, through, courseTrue)`, the spherical cross-track distance of `position` from the great
+      circle through `through` on the true course `courseTrue`: signed, positive right of the course, and measured
+      against the whole great circle, so a position behind `through` counts the same way. Use it for every XTK
+      expectation instead of writing the formula out in a test; the unit's own XTK agrees with it to 1e-11.
 
 ### Worked example: the proof flight
 
@@ -508,6 +512,10 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   sphere of the SDK's `UnitType.GA_RADIAN` (`6378100 / 1852` NM), which the instrument computes on, so the numbers
   agree while the formulas stay independent. Prefer literals, and derive bounds from physics where a literal would be a
   guess (the turn-start bounds above).
+- **Independent physical or published sources are valid spec sources** when the test names them in a comment, next to
+  the manual page where one exists: the ICAO standard atmosphere computed by hand (`Conversions.test.ts`), the wind
+  triangle as a vector sum (`Wind.test.ts`), the USNO almanac with its URL (`Sun.test.ts`). The code's own source never
+  is: `Conversions.ts` and `Wind.ts` follow avform, and an expectation computed from avform restates the code.
 - **Pin known bugs with `it.fails('... (#NN)')`.** The test states the correct behavior, fails today, and turns red when
   someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See `KLNNavmath.test.ts`
   (#97), `UserWaypointV2.test.ts` (#98) and `turnDirection.test.ts` (#100).
@@ -605,6 +613,12 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **`ActiveWaypoint` replaces its `turnStack` array** (`clearTurnStack`) instead of emptying it. A reference captured once
   goes stale and can read as empty or unchanged while the unit has pushed turns; read `activeWaypoint.turnStack` through
   the property each time.
+- **`AudioGenerator` is observed at the bus level.** The SDK `SoundServer` reads `window` when it is built, so the tests
+  run at the render stage, give the generator its own `EventBus` and listen on the topic `sound_server_play_sound`, the
+  unit's request for a tone (`test/render/services/AudioGenerator.test.ts`). The `PLAY_INSTRUMENT_SOUND` call itself is
+  not seen: the SDK server makes it only in the in-game state (a `gamestate` attribute on `document.body`), and its own
+  sound-end handling needs a `Name_Z` global, neither of which the harness provides (section 7). The tests report the
+  end of a tone by calling `AudioGenerator.onSoundEnd` themselves, as `KLN90B.onSoundEnd` does in the sim.
 - **There is no CI.** Run `npm test` and `npx tsc --noEmit` before committing.
 
 Measured speed (a dated record): on 2026-10-03 the proof flight (`firstFlight.test.ts`) ran about 1466 simulated
@@ -667,6 +681,23 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       and `ModeControllerObs.test.ts` builds the IAF = FAF and the MAHP = FAF approaches it needs (#153).
     - **A `FakeXhr` mount.** `FakeXhr` serves `resources/` only at the default path, so a custom `BasePath` fails the
       boot; a mount option would let a test hold the BasePath effect.
+- Harness gaps that the Session 6 tests worked around (each serves one file, so none was built, per rule 13 of
+  test-coverage.md):
+    - **No `Name_Z` fake and no in-game state.** A test that sees `PLAY_INSTRUMENT_SOUND` itself would need both
+      (section 6, `AudioGenerator`).
+    - **`savedUserWaypoints` writes region `XX` only.** The temporary-waypoint tests lay out the `XY` strings by hand
+      (`savedTemporary` in `test/render/services/TemporaryWaypointDeleter.test.ts`); an `XY` option, or a temporary
+      kind, would replace them.
+- **The flown-through bound of `dmeArc.test.ts` does not hold the arc reversal.** With `fromDtk` reversed on arc legs,
+  the monitor's bound north of the leg stays green (0.895 NM against a radius of 1.012 NM); only the circle-center
+  assertion of the same test fails. A tighter bound, or a second monitor on the arc's radius, would make the flight
+  hold it twice.
+- The XTK expectations of `ModeController.test.ts`, `ModeControllerObs.test.ts` and `DirectToObs.test.ts` now come
+  from `crossTrackNm` (section 4) and are exact, while their tolerances (0.05 NM) date from the hand-written
+  approximation they replaced. They could be tightened.
+- **ARM GPS APPROACH is tested at the unit stage only** (`test/unit/data/PersistentMessages.test.ts`): while #139
+  stands, the unit re-arms within 30 NM on every tick, so ENR-LEG within 3 NM of the FAF is unreachable in a booted
+  unit. Add a render test once #139 is fixed.
 - Costs to keep in mind: the H event sweep boots a fresh unit for every public event in four states, and
   `test/unit/KLN90B.test.ts` imports the whole instrument statically, which is slow at collection (a dynamic import
   timed out under load).

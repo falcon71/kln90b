@@ -396,7 +396,7 @@ maintainer's decision.
 
 ## Session 6: data and pure services
 
-- [ ] done
+- [x] done
 
 **Goal:** the pure logic under `kln90b/data/` and `kln90b/services/` that unit tests cover cheaply.
 
@@ -420,6 +420,12 @@ maintainer's decision.
 
 **Done when:** every module above has a test file or a line in the log saying why not, and no test computes the
 cross-track distance by hand.
+
+Result (session log, section 4): every module has a test file except `Units.ts` (type aliases only), and the four
+hand-written cross-track copies use `crossTrackNm`. The bugs found were filed and pinned (#164 to #188), three more are
+filed without a pin (#189 to #191), the three questions are #192 to #194 and the three enhancements #195 to #197. #89,
+#94 and #97 gained pins, and #73, #89, #94, #97 and #109 have comments. The EFB route sync is now on the public-contract
+list of `CLAUDE.md`.
 
 ## Session 7: navdata and fragile code
 
@@ -527,6 +533,272 @@ lists the gaps.
 One entry per session run, newest first. Format: date, session, branch, what was done, what was left and why, the
 coverage summary for the session's area at start and end. This is a dated record and is never edited afterwards; a
 later run adds a new entry.
+
+## 2026-10-06, session 6, branch `tests-session-6-data-services`
+
+**Done**
+- **Design and plan:** `docs/superpowers/specs/2026-10-06-session-6-data-services-design.md` and the matching plan,
+  after a read-only research pass of four agents (A: formats, conversions, identifiers, `Timers`, `TimezoneService`; B:
+  messages and `VolatileMemory`; C: VNAV, MSA, the two alerts, audio; D: the EFB services, the deleter and the
+  cross-track helper), a KLN 89 trainer check of VNAV and a research pass on the alert volume (below). Six tasks:
+  tasks 1 to 5 in parallel worktrees, this close-out last. No harness task was needed.
+- **Task 1, formats and conversions:** `Conversions.test.ts` (the CAL 1 and CAL 2 figures of 5-10 and 5-11, and the
+  exact ICAO standard atmosphere computed by hand to 15 and 25 ft and 0.2 kt; the 118.6 ft per degree of avform as a
+  characterization), `Time.test.ts` (the zone list of 3-5, the CAL 6 names and example of 5-14, 87 → 2087 of 5-15, the
+  `TimeStamp` operations and 88 → 1988 as characterizations), `Text.test.ts` (3-47, 3-26), `NullDashes.test.ts` (the
+  null dash layout of each display, characterization), `Sun.test.ts` (the USNO almanac at 90°50' within 90 s, no rise
+  or set at 70 N), `Wind.test.ts` (the wind triangle as a vector sum, 5-2, 5-12), `CalFigures.test.ts` (CAL 1 and CAL 2
+  wired as the figures show), `Tri3Wind.test.ts` and `CountryMap.test.ts` (with `FIRMAP`, Appendix D). Pins #164 (three
+  rows), #165, #166, #167, #168, #169 (six rows), #170.
+- **Task 2, identifiers and time services:** `IcaoBuilder.test.ts` (`XX` and `XY`, the V1 layout, with
+  `IcaoFixedLength`), `UniqueIdentGenerator.test.ts` (5-22, 5-26; the bare ident first, null after 27 names, every
+  facility type counted and the count past 09 as characterizations), `Timers.test.ts` (DEP and FLT of 4-13; exactly 30
+  kt and the total time as characterizations), `TimezoneService.test.ts` (the sim call, characterization),
+  `RefNaming.test.ts` and `VorUserWaypoint.test.ts`. Pins #171, #172, #173 (two).
+- **Task 3, messages and `VolatileMemory`:** `MessageHandler.test.ts` (post once, keep while the condition holds, new
+  again when it returns, 3-16), `PersistentMessages.test.ts` at the unit stage (every threshold of B-1 to B-4, 6-8 and
+  5-44 on a stub world with the real handler, the exact message list asserted; the ADJ NAV IND CRS TO window and the
+  rest the manual leaves open as characterizations) and at the render stage (ALTITUDE FAIL, MAGNETIC VAR INVALID at N
+  74.5, PRESS ALT TO SET BARO on `approachWorld()`, DATA BASE OUT OF DATE after SET 2), `Messages.test.ts` (the MSG
+  page order and paging of 3-16, SET FUEL ON BOARD of B-4) and `VolatileMemory.test.ts` (CAL 6 over a page change and a
+  power cycle, 5-14; ENR-LEG at power-up, 3-3; the approach deleted after 6 minutes off, 6-5; every other reset and the
+  kept values as characterizations). Pins #174, #175 (unit and render), #176, #177 and #94. A scratch render test
+  reproduced the MSG page seen-marking (#191); it was not committed.
+- **Task 4, VNAV, MSA, the alerts and audio:** `Vnav.test.ts` appended (the Dubuque example of 5-7 to 5-9 worked by
+  hand, arming, activation, the advisory, the climb, C-1; the 10 degree limits, the end of the path and the re-arm as
+  characterizations), `MSA.test.ts` appended (the grid read with `fs` and anchored on Everest and Aconcagua, sectors,
+  hemispheres, bounds, legs, routes, 3-33), `AltAlert.test.ts` (3-55 to 3-57), `HtAboveAirportAlert.test.ts` (3-58,
+  3-59; the alert once per entry as a characterization), `AudioGenerator.test.ts` (render stage, bus level),
+  `VnavObs.test.ts`, `Nav4Vnav.test.ts` (the NAV 4 titles, the ten-minute boundary, VNV ALERT around 90 s, 5-8, B-4) and
+  `Nav3Esa.test.ts`. Pins #178, #179, #180, #181, #182, #183, #184, #185, #89 (the reading half) and #97 (at the ESA
+  level).
+- **Task 5, the EFB, temporary waypoints and the cross-track helper:** `TemporaryWaypointDeleter.test.ts` (the purge at
+  power-off of 5-22 and 5-26; kept when FPL 0 or a numbered plan holds it, and a user waypoint kept, 5-20; the boot
+  purge, the DME arc entry and the active direct-to target as characterizations), `KlnEfbLoader.test.ts` and
+  `KlnEfbSaver.test.ts` appended (contract tests citing the EFB route sync; USR DB FULL of C-2; the four-character name,
+  CUST to CUSTZ, the 30-waypoint cut, the import while powered off and with `WriteGPSSimVars` off, and the saver's gate
+  as characterizations), and `crossTrackNm(position, through, courseTrue)` in `test/harness/flight/geo.ts` with five
+  hand-derived harness tests. `DirectToObs.test.ts`, `ModeControllerObs.test.ts`, `ModeController.test.ts` and
+  `dmeArc.test.ts` now use it, with their assertions unchanged; each was re-run under its recorded break and still
+  fails (the #122 sibling, which had no recorded break, fails under `getObsTrue() - 179`). The remaining `Math.asin`
+  calls in `test/` are the helpers of `geo.ts`, `airspaces.ts:65` and the circle-center latitude of `dmeArc.test.ts`,
+  none of them a cross-track. Pins #186, #187, #188.
+- **Task 6, this close-out:** the issues and comments below, the placeholders replaced in one commit (`references #164`
+  to `#188`), the EFB route sync added to "Public contract with aircraft" in `CLAUDE.md` (the EFB tests already cite it
+  by that name), `testing.md` sections 4 to 7, and this log.
+
+**Rulings**
+- **The maintainer's:**
+    - Sun: "Bug: pin 90°50'" (zenith 91 is a bug).
+    - Accented letters: "check this in the nav database… I don't think there are any accented letters". The newest
+      real navdata, AIRAC 2607, has no non-ASCII character in any navigation table (LSZH is `ZURICH`), so there is no
+      test and no issue. The sim's own copy of the navdata was not checked.
+    - Countries: "App. D, modern for new". The six Caribbean entries and the missing USA are bugs; the other modern
+      codes stay.
+    - Messages over a power cycle: "Bug: clear at power-off" (#176).
+    - The ADJ NAV IND CRS TO window: "30s is right, this is a bug" (#177).
+    - The power-on reset: "characterize as is and create a Github question" (#192).
+    - The VNAV re-arm under the ANGLE cursor: "Question issue", after the trainer check (#194). The VNAV end of descent:
+      "Comment on #73, no pin".
+    - The HAA alert once per entry: "Characterize per entry".
+    - Temporary waypoints: "Characterize + question" (the power-on purge and the active waypoint; #193).
+    - The EFB user-waypoint round trip: "Bug, pin" (#187). The EFB gating: "Bug. Power off is fine for usability, but
+      it must not load while disabled" (#188).
+    - PBD legs, airways, the 30-waypoint cut: "Enhancement issue, characterize" (#195).
+    - The SET 9 volume: "Enhancement: read-only LVar" (#197).
+    - The EFB contract: "Add it to CLAUDE.md".
+    - MSA south of 56° S: "File this as an Enhancement… research if that data is freely available" (#196).
+- **The controller's** (the ledger, and the design's defaults that the maintainer did not object to):
+    - characterizations for the flight timer at exactly 30 kt, VNAV at the end of the path, the tones after a deviation,
+      a VFR-only unit without ALTITUDE FAIL and the display dash layouts;
+    - ARM GPS APPROACH at the unit stage only while #139 stands; plain real coordinates in the `Sun` tests;
+      `shortYearToLongYear` split into a spec test (87, 5-15) and a characterization (88); `>2NM` left as it is;
+    - no `Name_Z` fake and no `XY` option for `savedUserWaypoints` (rule 13; `testing.md` section 7 lists both);
+    - during task 1: the ICAO standard atmosphere and the vector geometry of the wind triangle are valid independent
+      spec sources when a test names them, avform (the code's own source) never is (now in `testing.md` section 5);
+    - during task 5: three Minor findings (a C-2 test asserting the code's own drop and message, a precondition inside
+      the #188 pin, a citation over a describe holding characterizations) were raised to Important, because rule 24
+      makes test-rule breaches Important;
+    - task 5 merged before task 4, out of the plan's order (2, 1, 4, 5, 3), because the two share no file.
+- **Review fix rounds:** every task needed one, task 3 two. Task 1: the standard-atmosphere and wind spec tests named no
+  independent source (Wind named avform). Task 2: the generator's NDB and USR types were unheld, a characterization
+  carried a citation (`TimezoneService`, the `Timers` describe titles), the zone pass-through was unheld, one generator
+  test was unlabeled. Task 3: the #175 unit pin lacked its binding comment, citations sat above characterizations, three
+  `Math.abs` removals, the VNV ALERT Armed-to-Active change and a west user variation survived; round 2 relabeled the
+  two VNV ALERT disarm tests as characterizations, because B-4 does not say the message goes then. Task 4: the
+  ten-minute ARMED boundary, the 90 s VNV ALERT threshold and the climb side of the 10 degree limit were unheld, and a
+  characterization carried a citation. Task 5: the FPL 0 half of the purge was unheld, two characterizations carried
+  citations, the round-trip describe was unlabeled, plus the three raised findings above.
+
+**Trainer and research results** (2026-10-06; paraphrased)
+- **KLN 89 trainer, VNAV** (the maintainer started the VM): with VNAV active, moving the cursor onto the VS field (the
+  89's equivalent of ANGLE) changed nothing and the advisory altitude stayed; from Inactive the same move starts VNAV.
+  400 to 500 ft above the path VNAV stayed active with the path altitude. Medium confidence: the trainer recomputes VNAV
+  only when a knob changes a value on ALT 2, and an aircraft below the path could not be produced. At the end of the
+  descent the 89 goes Inactive and resets its inputs (the from-altitude becomes the target, the offset 0, the VS 0), and
+  a second VNAV starts at once after a new selected altitude. The 90B code goes Inactive but keeps the programmed angle
+  and the waypoint. Recorded in #194 and in the comment on #73.
+- **The alert volume** (research in the avionics framework and the MSFS sound.xml documentation): the framework cannot
+  set a volume (`PLAY_INSTRUMENT_SOUND` takes only the sound id), and Working Title's G3X shows its message volume as a
+  fixed, disabled control. An aircraft can drive the loudness itself with a `<WwiseRtpc LocalVar=…>` on its
+  `kln_short_beep` and `kln_long_beep` `AvionicSounds` and a volume curve in its Wwise package; a sim test must first
+  confirm that MSFS 2024 accepts an LVar RTPC there. Recorded in #197.
+- **Accented letters:** AIRAC 2607 has none in its navigation tables (above).
+
+**Bugs found and filed** (each after a search of the open and closed issues: the titles of all 163 issues, the bodies of
+#15, #73, #89, #91, #94, #97, #109 and #138, and semantic searches with several wordings until the search API's rate
+limit; research A, C and D had searched as well). All were found in the headless harness and not reproduced in the
+sim; #189 and #190 were found by reading the code.
+- **#164:** CAL 7 uses a zenith of 91° instead of 90°50', so sunrise is a minute early and sunset a minute late against
+  the KATL figures of 5-15 and the USNO almanac. Pinned in `Sun.test.ts` (three rows).
+- **#165:** CAL 7 depends on the seconds of the stored date (`Sun.ts:91`, `withTime` keeps them). Pinned in
+  `Sun.test.ts`.
+- **#166:** CAL 7 computes for the UTC date instead of the date in the selected zone (5-15). Pinned in `Sun.test.ts`;
+  the pin moves to a CAL 7 render test if the fix goes into `Cal7Page`.
+- **#167:** TRI 1, 3 and 5 pass the course as the heading to the wind triangle, so a crosswind raises the ground speed
+  (153 instead of 147 kt; 5-2, 5-3). Pinned in `Tri3Wind.test.ts`.
+- **#168:** a US airport has no country on the Duplicate Waypoint page (3-15). Pinned in `CountryMap.test.ts`.
+- **#169:** six Caribbean regions have a wrong or no country (Appendix D). Pinned in `CountryMap.test.ts` (six rows).
+- **#170:** `FIRMAP` gives New York in two cells, which shifts the CTR 2 row. Pinned in `CountryMap.test.ts`.
+- **#171:** D/T 4 DEP is the GPS time object itself and runs with the clock while the GPS advances it in place (4-13).
+  Pinned in `Timers.test.ts`.
+- **#172:** REF names a reference waypoint from a five-character ident without a letter (5-22); the EFB's bare ident
+  must stay. Pinned in `RefNaming.test.ts`.
+- **#173:** a user VOR from the VOR page is stored as a supplementary waypoint (`VorPage.tsx:215`; 5-18). Pinned twice
+  in `VorUserWaypoint.test.ts` (the repository and OTH 3).
+- **#174:** PRESS ALT TO SET BARO is posted although an air data computer supplies the baro (6-8). Pinned at the unit
+  stage.
+- **#175:** the persistent DATA BASE OUT OF DATE message lasts one tick: listed twice after SET 2, gone unread after a
+  self-test date entry (which publishes no `timeUpdatedEvent`) (B-2). Pinned at the unit and the render stage; the issue
+  records how the pins couple to the two possible fixes.
+- **#176:** messages survive a power cycle. Pinned in `Messages.test.ts`.
+- **#177:** the ADJ NAV IND CRS TO window is 10 s instead of 30 s (the YouTube timestamps the code cites). Pinned at the
+  unit stage, with a passing sibling inside 10 s.
+- **#178:** the height above airport alert adds the field elevation in meters (3-58; references #35). Pinned in
+  `HtAboveAirportAlert.test.ts`.
+- **#179:** the height above airport alert sounds without a position (`null <= 5`). Pinned in the same file.
+- **#180:** `AudioGenerator` plays a pattern backwards (latent). Pinned in `AudioGenerator.test.ts`.
+- **#181:** the ESA of a leg misses the sector of its end (3-33; independent of #97). Pinned in `MSA.test.ts`.
+- **#182:** longitude 180 reads the filler column of the MSA grid. Pinned in `MSA.test.ts`.
+- **#183:** NAV 3 shows ESA dashes on the last leg of FPL 0 (3-33). Pinned in `Nav3Esa.test.ts`.
+- **#184:** the VNAV countdown can show `m:60` (5-8; the same kind as #99). Pinned in `Vnav.test.ts`.
+- **#185:** VNAV accepts a waypoint ahead in FPL 0 in OBS mode (C-1). Pinned in `VnavObs.test.ts`.
+- **#186:** the EFB route sends runway numbers below 10 as one digit (`KlnEfbSaver.ts:55, 67, 82`; lettered runways 37
+  and up are wrong too). Pinned for line 82 in `KlnEfbSaver.test.ts`.
+- **#187:** a user waypoint sent to the EFB comes back as a new temporary waypoint (FARM becomes FARMA). Pinned in
+  `KlnEfbLoader.test.ts`.
+- **#188:** the EFB route is imported while the unit is disabled for hot swapping (same family as #138). Pinned in
+  `KlnEfbLoader.test.ts`.
+- **#189 (no pin):** AIRSPACE ALERT ignores the 2 NM rule of B-1 (`AirspaceAlert.ts:125`); Session 7 pins it.
+- **#190 (no pin):** MAGNETIC VAR INVALID is missing in OBS mode with the active waypoint outside the area (5-44,
+  `KLNMagvar.ts:20-22`); Session 7.
+- **#191 (no pin):** the MSG page marks the messages of a page the pilot never saw as read (3-16); reproduced by task 3
+  in a scratch render test; Session 9.
+- **#192 (`question`):** what `VolatileMemory` keeps over a power cycle; names the characterization tests.
+- **#193 (`question`):** the temporary-waypoint purge at power-on and of an active direct-to target.
+- **#194 (`question`):** an active VNAV re-arming from the present altitude under the ANGLE cursor, with the trainer
+  evidence and its limits.
+- **#195 (`enhancement`):** EFB point-bearing-distance legs dropped silently, airways flown direct, the 30-waypoint cut
+  that loses the destination.
+- **#196 (`enhancement`):** MSA and ESA south of 56° S, and whether a free data source exists.
+- **#197 (`enhancement`):** a read-only `L:KLN90B_AlertVolume`, with the stale class comment of `AudioGenerator.ts`.
+- **Comments:** #73 (the leads and the trainer's end of descent), #89 (the reading half pinned), #94 (pinned; the exact
+  5-minute boundary is not held yet), #97 (pinned at the ESA level; the pin turns red only with both corrections of the
+  issue), #109 (the keyboard longitude case seen again on the VOR page, where ENT then stores longitude 0; the real unit
+  has no keyboard, so no new issue was filed).
+- **Not filed:** the 4-cell placeholder ident of the empty SUP and INT pages (the Session 4 note,
+  `VolatileMemory.ts:278, 296`) also exists for the NDB page (`VolatileMemory.ts:307`, `"0   "` in a 3-cell selector):
+  an odd ident width on an NDB page with no NDB at all, a no-cartridge case MSFS never has. The manual does not show
+  these pages, so there is no test and no issue.
+
+**Fixes that could not be re-broken:** none. This session's subjects were mostly untested behavior, not past fixes. The
+refactored cross-track tests were re-run under their recorded breaks (`c2d3566`, `6e9c90d`, `90e690f`, `fabd141`) and
+all still fail; the #15 EFB import tests keep their earlier proofs.
+
+**The coverage of the area hid unheld code.** At the start most files of the area were at 75 % or more, but the numbers
+came from the boot running the code once. The research pass found that every one-line break of `Conversions`, `Time`
+(except `getSecondsSinceMidnight`), `Text` (except the blank), `Sun`, `Wind`, `CountryMap`, `FirMap`, `Timers`,
+`TimezoneService`, `AltAlert`, `HtAboveAirportAlert`, `AudioGenerator` and VNAV left the whole suite green, as did 24
+of 29 breaks of the persistent messages, 21 of 25 breaks of `VolatileMemory.reset`, the deleter switched off entirely,
+and five breaks of the EFB loader and six of the saver. `VolatileMemory.ts` was at 97.5 % statements at the start and is
+at 97.5 % at the end; `MessageHandler.ts` is at 84.6 % at both (its uncovered lines are the AIRSPACE ALERT message
+class, Session 7). In between, nothing held what a power cycle clears; now each reset line fails a test. The number
+said what ran, not what was held (section 1).
+
+**Not covered** (rule 18; the ledger is not committed, so the list is complete here)
+- `Units.ts`: type aliases only, no runtime code (0 % at the start, 100 % of no statements at the end).
+- The APT 2 time zone line (Session 9; `coherent.replies` makes it cheap); the REF flow's second ENT showing `NO SUP
+  WPTS` and not inserting the waypoint into FPL 0 (research A, unverified; Session 9).
+- AIRSPACE ALERT and the airspace message subclasses (Session 7, #189); the `KLNMagvar` limits and the OBS case of 5-44
+  (Session 7, #190); the MSG page seen-marking (Session 9, #191).
+- IF REQUIRED SELECT OBS at the render stage (unit only); ARM GPS APPROACH at the render stage (unreachable while #139
+  stands); the double evaluation of the persistent conditions per tick (no observable effect today); VNV ALERT while
+  VNAV is Active (not claimed).
+- The `PLAY_INSTRUMENT_SOUND` call itself (no `Name_Z` fake); the forwarding of the sound end to the SDK server
+  (`AudioGenerator.ts:54`; in the sim only the first tone would play without it, the bus-level test cannot see it);
+  `BEEP: n` without debug mode (no negative assertion).
+- The full `COUNTRYMAP` and `FIRMAP` tables against Appendix D (spot checks only). Research A's open Appendix D items
+  are not pinned: the codes LV PSE, LY SCG, FZ COD, GS ESH and LK CZE that Appendix D does not list, the regions HC, SF,
+  VQ and ZJ that have no entry, and OKAC as KWT.
+- The `dmeArc.test.ts` flown-through bound under the arc reversal (only the circle-center assertion holds it;
+  `testing.md` section 7).
+- The exact 5-minute boundary of #94 (a test belongs with the fix); the ADJ NAV IND CRS TO characterization holds the
+  first 9 s only (the #177 pin carries the upper bound); the Super NAV 5 range kept over a power cycle has no test.
+- VNAV: the offset to a waypoint ahead in FPL 0 (`Vnav.ts:173`; the 5-9 test uses offset 0). NAV 3 ESA in OBS mode and
+  with an off-plan direct-to (3-33). The MSA 40 NM sampling step (unobservable before #97 is fixed).
+- AltAlert reaching SEL directly from ARMED (`AltAlert.ts:40`); HAA a new active airport while inside the cylinder
+  (`HtAboveAirportAlert.ts:37`).
+- `Time.addSeconds` and `withTime` keeping the zone (the tests use UTC stamps); `Sun` returning its result in UTC (the
+  CST stamps appear only in pins); the non-null result in the `Sun` precondition test; the ETE cell of TRI 3; the
+  `DurationDisplay` dashes of 100 hours and more.
+- `getUniqueIdentWithNumbers` driven to exhaustion (the loop bound of 100).
+- The saver's `departureTransition`, the STAR runway number (`KlnEfbSaver.ts:55`, part of #186), the runway designators
+  and the approach suffix.
+- Review notes left as they are: the `KlnEfbLoader.test.ts` "reports nothing deleted" check reads a positional window
+  of the message list; `Nav4Vnav.test.ts` "posts VNV ALERT about 90 s" uses `toContain` on the parsed list; the header
+  comment of `Nav3Esa.test.ts` still says all waypoints but one test's lie in one sector; the #182 pin's expected sector
+  follows the code's north-east convention for a point on a sector edge, which the manual does not state; the subject
+  line of task 1's fix commit `10f593a` starts with a UTF-8 byte order mark (not amended).
+
+**Workflow notes.** The isolation worktrees again started at `origin/main` and were reset to the session branch first.
+Implementers ran on Sonnet for tasks 1 to 5 and the close-out (task 6) on Opus; reviewers on Sonnet for tasks 1 and 2
+and on Opus for tasks 3, 4 and 5; re-reviews on Sonnet. The implementers of tasks 2 and 3 were refused writes outside
+their worktree, so the controller saved their reports. The parallel research agents shared one scratchpad, and one
+overwrote another's script; the implementers kept their scripts in per-task folders. The close-out ran in the main
+checkout on the session branch, because it needed GitHub.
+
+**Coverage at the start of the session** (identical to the end of session 5) **and at the end** (all tests green):
+
+| directory                  | % stmts start | % stmts end | % lines start | % lines end |
+|----------------------------|--------------:|------------:|--------------:|------------:|
+| all files                  |         75.51 |       78.06 |         75.38 |       77.96 |
+| `kln90b`                   |         85.98 |       85.98 |         85.73 |       85.73 |
+| `kln90b/controls`          |         81.52 |       82.46 |         81.21 |       82.10 |
+| `kln90b/controls/displays` |         86.01 |       86.01 |         85.71 |       85.71 |
+| `kln90b/controls/editors`  |         81.42 |       83.15 |         80.80 |       82.58 |
+| `kln90b/controls/selects`  |         63.45 |       63.45 |         61.75 |       61.75 |
+| `kln90b/data`              |         80.70 |       98.09 |         80.22 |       98.30 |
+| `kln90b/data/flightplan`   |         98.91 |       98.91 |         98.87 |       98.87 |
+| `kln90b/data/navdata`      |         86.13 |       87.29 |         86.17 |       87.20 |
+| `kln90b/pages`             |         77.27 |       78.52 |         76.97 |       78.24 |
+| `kln90b/pages/left`        |         69.74 |       70.20 |         69.93 |       70.39 |
+| `kln90b/pages/right`       |         63.38 |       66.15 |         64.03 |       66.82 |
+| `kln90b/services`          |         75.73 |       88.40 |         74.93 |       88.22 |
+| `kln90b/settings`          |         96.56 |       96.56 |         96.41 |       96.41 |
+
+The files of the area, statements at the start (from the design) and at the end: `Sun.ts` 0 and 100, `AltAlert.ts`
+23.3 and 100, `UniqueIdentGenerator.ts` 42.1 and 94.7, `Vnav.ts` 49.4 and 97.6, `KlnEfbSaver.ts` 50 and 87.9,
+`Conversions.ts` 66.7 and 100, `HtAboveAirportAlert.ts` 66.7 and 100, `CountryMap.ts` 75 and 100, `AudioGenerator.ts`
+78.9 and 100, `Time.ts` 82.9 and 100, `MessageHandler.ts` 84.6 and 84.6, `KlnEfbLoader.ts` 84.8 and 95.7,
+`IcaoBuilder.ts` 85.7 and 100, `TemporaryWaypointDeleter.ts` 85.7 and 100, `PersistentMessages.ts` 87.3 and 100,
+`MSA.ts` 89.2 and 97.3, `VolatileMemory.ts` 97.5 and 97.5, and 100 and 100 for `Text.ts`, `Wind.ts`, `FirMap.ts`,
+`Timers.ts`, `TimezoneService.ts` and `IcaoFixedLength.ts`. Read the rise with care (section 1, and the paragraph on
+unheld code above): the number says what ran, not what is held.
+
+The suite at the start: 905 tests passed and 83 expected failures, in 151 files. At the end: 1172 tests passed and 120
+expected failures, in 178 files. The thirty-seven new expected failures are pins: #164 (three rows), #165, #166, #167,
+#168, #169 (six rows), #170, #171, #172, #173 (two), #174, #175 (two), #176, #177, #178, #179, #180, #181, #182, #183,
+#184, #185, #186, #187, #188, #89 (the reading half), #94 and #97 (at the ESA level).
 
 ## 2026-10-06, session 5, branch `tests-session-5-navigation`
 
