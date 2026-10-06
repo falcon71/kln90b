@@ -239,7 +239,7 @@ approve the merge into `master` and the deletion of the task branches and worktr
 
 - Roll steering beyond the #100 pin (by decision); the arc bank adjustment (`adjustBankAngleForArc`, unused).
 - The four approach-scale cases and the APR cancel before the FAF (question issues).
-- Open questions for a later trainer check: the alert time for a direct-to an FPL 0 waypoint that has a following leg
+- Open questions for a later trainer check (#146, #147): the alert time for a direct-to an FPL 0 waypoint that has a following leg
   (the code anticipates the turn and alerts 20 s before it; 3-29 says 36 s without distinguishing); the alert in OBS
   mode (the code forces it off; 5-35 is silent).
 - `CRS xxx` also shows with ObsSource 0 (5-37 gives it only for a non-driven indicator showing the unit); the
