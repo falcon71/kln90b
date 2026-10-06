@@ -237,7 +237,7 @@ describe('VNV ALERT', () => {
         expect(armed(91).h.tick()).toEqual([]);
     });
 
-    it('goes when VNAV is no longer armed (B-4)', () => {
+    it('goes when VNAV is no longer armed (characterization)', () => {
         const {w, h} = armed(60);
         expect(h.tick()).toEqual(['VNV ALERT']); // The precondition: it shows while armed
         w.vnavState = VnavState.Inactive;
@@ -245,7 +245,7 @@ describe('VNV ALERT', () => {
     });
 
     // The alert warns of the start of the descent, so it has no purpose once VNAV is active
-    it('goes when the descent has started and VNAV is active (B-4)', () => {
+    it('goes when the descent has started and VNAV is active (characterization)', () => {
         const {w, h} = armed(60);
         expect(h.tick()).toEqual(['VNV ALERT']); // The precondition: it shows while armed
         w.vnavState = VnavState.Active;
