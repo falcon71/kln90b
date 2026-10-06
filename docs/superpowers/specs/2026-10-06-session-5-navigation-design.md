@@ -90,8 +90,8 @@ The maintainer ran the KLN 89 trainer and the AVsoftech KLN 90B trainer in the V
 
 - **`approachWorld()`** in `test/harness/fixtures.ts`: research D's RNAV approach to `KPRC` (47.0 N, 8.0 E) from the
   north, final course 180: IAF `IAFAA` 10 NM and IF `IFAAA` 5 NM north of the FAF, FAF `FAFAA` 5 NM north of the MAP, a
-  step-down fix `SDFAA` 2.5 NM north of the MAP, MAP `MAPAA` at the airport, an enroute fix `ENRAA` 60 NM north, plus a
-  missed approach so that the MAP is not the last leg. Fresh objects on every call, idents that sort before the default
+  step-down fix `SDFAA` 2.5 NM north of the MAP, MAP `MAPAA` at the airport, an enroute fix `ENRAA` 60 NM north, and
+  KPRC after the MAP in FPL 0 (no missed approach). Fresh objects on every call, idents that sort before the default
   navdata, every fix in the navdata (`bootUnit`'s procedure check). It returns the facilities and the named points the
   tests position by.
 - **Harness test** `test/render/harness/approachWorld.test.ts`: `loadProcedure('APT 8')` loads it into FPL 0 with the
