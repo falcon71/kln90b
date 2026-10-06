@@ -113,7 +113,7 @@ describe('EFB route import (KlnEfbLoader)', () => {
     });
 
     // CUST and CUSTA to CUSTZ are the 27 names the unit tries. The 28th lat/lon leg finds them all taken and is dropped
-    // with the message of a waypoint that cannot be found (B-4 names it for a waypoint the data base no longer has)
+    // with the message of a waypoint that cannot be found
     it('drops a lat/lon leg that finds CUST to CUSTZ taken, with WAYPOINT CUST DELETED (characterization)', async () => {
         const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
         await settle(unit);
@@ -127,23 +127,34 @@ describe('EFB route import (KlnEfbLoader)', () => {
         expect(messageTexts(unit)).toContain('WAYPOINT CUST DELETED');
     });
 
-    // C-2: USR DB FULL when a user waypoint is to be created while the user data base holds 250. The lat/lon leg is
-    // dropped and reported like a waypoint that cannot be found
-    it('shows USR DB FULL and drops the lat/lon leg when the user data base holds 250 waypoints (C-2)', async () => {
+    /** The route KAAA, a lat/lon leg, KBBB synced into a unit whose user data base holds 250 waypoints */
+    async function syncLatLonLegIntoFullUserDataBase(): Promise<HeadlessUnit> {
         const full = Array.from({length: 250}, (_, i) => ({kind: 'sup' as const, ident: `U${String(i).padStart(3, '0')}`, lat: 46 + i * 0.001, lon: 9}));
         const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true, storage: savedUserWaypoints(full)});
         await settle(unit);
 
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [{lat: 47.1, lon: 8.1}]}));
         await vi.advanceTimersByTimeAsync(1000);
+        return unit;
+    }
+
+    // C-2: USR DB FULL when a user waypoint is to be created while the user data base holds 250
+    it('shows USR DB FULL when the lat/lon leg needs a waypoint and the user data base holds 250 waypoints (C-2)', async () => {
+        const unit = await syncLatLonLegIntoFullUserDataBase();
 
         expect(Screen.read().status().mode).toBe('USR DB FULL');
+    });
+
+    // What the import does with the leg it could not create: it is dropped and reported like a waypoint that cannot be found
+    it('drops the lat/lon leg and reports WAYPOINT CUST DELETED when the user data base is full (characterization)', async () => {
+        const unit = await syncLatLonLegIntoFullUserDataBase();
+
         expect(fpl0Idents(unit)).toEqual(['KAAA', 'KBBB']);
         expect(messageTexts(unit)).toContain('WAYPOINT CUST DELETED');
     });
 
-    // A flight plan holds 30 waypoints (4-1). The loader keeps the first 30 of a longer route, so the destination of a
-    // route of 31 is the one reported deleted (B-4 message)
+    // The loader keeps the first 30 waypoints of a longer route, so the destination of a route of 31 is the one reported
+    // deleted
     it('keeps the first 30 waypoints of a route of 31 and reports the destination deleted (characterization)', async () => {
         const fixes = Array.from({length: 29}, (_, i) => intersection(`W${String(i + 1).padStart(2, '0')}`, 47.0 + i * 0.01, 8.5));
         const unit = await bootUnit({facilities: [kaaa, kbbb, ...fixes], efb: true});
@@ -203,6 +214,7 @@ describe('EFB route import while the unit is disabled for hot swapping (public c
     // The sibling of the pin: the same route is imported with the LVar unset
     it('the sibling: imports the route with the LVar unset', async () => {
         const unit = await disabledUnit(false);
+        expect(fpl0Idents(unit)).toEqual([]); // Precondition of the pin as well: nothing in FPL 0 before the sync
 
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
         await vi.advanceTimersByTimeAsync(2000);
@@ -228,7 +240,6 @@ describe('EFB route import while the unit is disabled for hot swapping (public c
 
     it.fails('does not import a route while the unit is disabled for hot swapping (#NEW-5-3)', async () => {
         const unit = await disabledUnit(true);
-        expect(fpl0Idents(unit)).toEqual([]);
 
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
         await vi.advanceTimersByTimeAsync(2000);
@@ -237,8 +248,9 @@ describe('EFB route import while the unit is disabled for hot swapping (public c
     });
 });
 
-// The saver sends a user waypoint as a lat/lon leg named by its user ICAO (U, XX, ident). When the EFB syncs that route
-// back, the loader makes every lat/lon leg a new temporary waypoint, so FARM comes back as FARMA in region XY next to FARM
+// Public contract (CLAUDE.md "Public contract with aircraft": the EFB route sync). The saver sends a user waypoint as a
+// lat/lon leg named by its user ICAO (U, XX, ident). When the EFB syncs that route back, the loader makes every lat/lon
+// leg a new temporary waypoint, so FARM comes back as FARMA in region XY next to FARM
 describe('EFB round trip of a user waypoint', () => {
     /** FPL 0 KAAA, FARM (a user waypoint), KBBB; the route the unit answers with is synced back as the EFB got it */
     async function roundTrip(): Promise<HeadlessUnit> {

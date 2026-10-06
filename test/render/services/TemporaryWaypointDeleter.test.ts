@@ -28,11 +28,11 @@ const savedTemporary = (ident: string, latMin: string, lonMin: string) => `UXY  
 /** The ICAO of that waypoint, for savedFlightplan, which reads only the ICAO */
 const temporaryIcao = (ident: string) => ({icaoStruct: ICAO.value('U', 'XY', '', ident)}) as unknown as Facility;
 
-// 5-22 and 5-26: reference and center waypoints are kept as supplementary user waypoints, and those that no flight plan
-// holds any more are deleted from the user waypoint list when the unit is turned off. The unit treats every temporary
-// waypoint (region XY: reference, center, EFB lat/lon and DME arc entry waypoints) that way.
+// The unit treats every temporary waypoint (region XY: reference, center, EFB lat/lon and DME arc entry waypoints) alike.
+// The spec tests cite their pages; the tests labeled characterization pin what the code does beyond the manual.
 describe('TemporaryWaypointDeleter', () => {
-    // 5-22: the waypoint stays as long as the unit is on, and is gone once it is turned off
+    // 5-22 and 5-26: reference and center waypoints that no flight plan holds any more are deleted from the user waypoint
+    // list when the unit is turned off. The waypoint stays as long as the unit is on, and is gone once it is turned off
     it('deletes a temporary waypoint that no flight plan holds when the unit is turned off', async () => {
         const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
         await settle(unit);
@@ -49,8 +49,25 @@ describe('TemporaryWaypointDeleter', () => {
         expect(userWaypoints(unit)).toEqual([]);
     });
 
-    // 5-22: a reference waypoint that is part of a flight plan stays, and OTH 3 lists it with the number of that plan
-    // (5-20). Plan 3, so that a check of FPL 0 alone cannot keep it
+    // 5-22 and 5-26: a reference waypoint that is part of a flight plan stays, and OTH 3 lists it with the number of that
+    // plan (5-20). FPL 0 is plan number 0, which a truthiness check of the plan number would count as "not held"
+    it('keeps a temporary waypoint that FPL 0 holds, over a power cycle', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
+        await settle(unit);
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [{lat: 47.1, lon: 8.1}]}));
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'CUST', 'KBBB']); // Precondition
+
+        await unit.panel.powerCycle();
+        await unit.panel.approveSelfTest();
+
+        expect(userWaypoints(unit)).toEqual(['CUST XY']);
+        await unit.panel.selectPage('L', 'OTH 3');
+        expect(Screen.read().rows('L').slice(0, 2)).toEqual([' USER WPTS ', 'CUST  S   0']);
+    });
+
+    // 5-22 and 5-26: the same for a numbered plan, which OTH 3 lists by its number (5-20). Plan 3, so that a check of FPL 0
+    // alone cannot keep it
     it('keeps a temporary waypoint that a numbered flight plan holds, over a power cycle', async () => {
         const unit = await bootUnit({
             facilities: [kaaa],
