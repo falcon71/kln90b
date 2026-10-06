@@ -108,8 +108,7 @@ Findings that shape the tests:
     - The EFB route sync is added to the public contract list in `CLAUDE.md`, and the EFB tests cite it.
 - **MSA south of 56° S:** an enhancement issue (the dataset has no more data; whether a free source exists is to be
   researched). The dashes there are a characterization.
-- **The SET 9 alert volume** (stored, never used): a research agent is checking whether the Avionics Framework can set
-  a volume, or whether a read-only LVar would let aircraft developers control it. *Pending; see below.*
+- **The SET 9 alert volume** (stored, never used): an enhancement issue for a read-only LVar (see "Pending results").
 
 **The controller's defaults** (presented to the maintainer with the design, not objected to):
 - These are characterizations: the flight timer at exactly 30 kt (4-13 is ambiguous), VNAV at the end of the path, the
@@ -129,8 +128,15 @@ Findings that shape the tests:
 - **VNAV re-arm (trainer agent):** the test of an active VNAV that stays under the ANGLE cursor becomes a spec test, a
   pin or a characterization according to the trainer. The same applies to VNAV at the end of the path and to a second
   VNAV (#73). This section is updated when the result is in.
-- **Alert volume (research agent):** the outcome decides the issue task 6 files (a bug, an enhancement with a read-only
-  LVar, or a known limitation). This section is updated when the result is in.
+- **Alert volume (research agent, done; `research-volume.md`):**
+    - The framework cannot set a volume: `PLAY_INSTRUMENT_SOUND` takes only the sound id. Working Title's G3X shows its
+      message volume as a fixed, disabled control.
+    - An aircraft can drive the loudness itself, with a `<WwiseRtpc LocalVar=…>` on its `kln_short_beep` and
+      `kln_long_beep` `AvionicSounds` and a volume curve in its Wwise package.
+    - **The maintainer's ruling:** one `enhancement` issue to add a read-only `L:KLN90B_AlertVolume`. It mirrors SET 9
+      (0 to 99, written at boot and on change), with the sound.xml snippet for the wiki. One test in the sim must first
+      confirm that MSFS 2024 accepts an LVar RTPC inside `AvionicSounds`.
+    - A side note for the issue: the class comment of `AudioGenerator.ts` still names `tone_altitude_alert_default`.
 
 ## Tasks 1 to 5 (parallel)
 
@@ -340,7 +346,7 @@ after a fix round on Sonnet.
     - `question` issues: the power-on reset of `VolatileMemory` (what the real unit keeps); the power-on purge of
       temporary waypoints and the purge of an active one;
     - `enhancement` issues: PBD legs and airways in the EFB loader; MSA and ESA south of 56° S (the data source);
-    - the alert volume, per the pending research.
+    - an `enhancement` issue for the read-only `L:KLN90B_AlertVolume` (see "Pending results").
 2. **Comment:**
     - #73: the VNAV leads and the trainer result;
     - #89: the reading half is pinned;
