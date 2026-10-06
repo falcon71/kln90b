@@ -38,9 +38,10 @@ export function standardRoute() {
 /**
  * An RNAV approach to KPRC (47.0, 8.0) from the north, final course 180: IAFAA 10 NM and IFAAA 5 NM north of the FAF,
  * the FAF FAFAA 5 NM north of the MAP, a step-down fix SDFAA 2.5 NM north of the MAP, the MAP MAPAA at the airport, and
- * an enroute fix ENRAA 60 NM north of KPRC. Unlike the IAF = FAF worlds of ModeController.test.ts and HEvents.test.ts (#129), the unit can
- * reach APR here, and the step-down fix lets a test check that APR does not come back past the FAF. Store
- * [enraa, kprc] in FPL 0 and load the approach with unit.panel.loadProcedure('APT 8'). Fresh objects on every call.
+ * an enroute fix ENRAA 60 NM north of KPRC. Unlike the IAF = FAF worlds of ModeController.test.ts and HEvents.test.ts
+ * (#129), the unit can reach APR here, and the step-down fix lets a test check that APR does not come back past the
+ * FAF. Store [enraa, kprc] in FPL 0 and load the approach with unit.panel.loadProcedure('APT 8'). Fresh objects on
+ * every call.
  */
 export function approachWorld() {
     const kprcBase = airport('KPRC', 47.0, 8.0);
