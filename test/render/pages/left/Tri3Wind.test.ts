@@ -36,7 +36,7 @@ describe('TRI 3 ground speed from the TRI 0 TAS and wind (5-2, 5-5)', () => {
     // crosswind on a 150 kt TAS needs a wind correction of asin(30 / 150) = 11.5 deg, so the ground speed along the
     // course is 150 * cos(11.5 deg) = 147.0 kt. The pages pass the course as the heading of calculateGroundspeed,
     // which gives 153 kt (the speed over ground when flying heading 180 and drifting off course).
-    it.fails('shows 147kt for TAS 150 with a 30 kt crosswind on a 180 course (#NEW-1-4)', async () => {
+    it.fails('shows 147kt for TAS 150 with a 30 kt crosswind on a 180 course (#167)', async () => {
         const rows = await tri3(150, 90, 30);
         expect(rows[2].slice(0, 5)).toBe('147kt');
     });

@@ -151,7 +151,7 @@ describe('DATA BASE OUT OF DATE after a date entered on SET 2 (B-2)', () => {
 
     // B-2 names one message. The one-time message of Database.onGPSAcquired and the persistent DatabaseOutOfDateMessage
     // both fire, so for one calculation tick the MSG page lists it twice
-    it.fails('lists the message once (B-2) (#NEW-3-2)', async () => {
+    it.fails('lists the message once (B-2) (#175)', async () => {
         const unit = await outOfDateBySet2();
 
         expect(Math.max(...await countsOverTwoSeconds(unit))).toBe(1);

@@ -27,7 +27,7 @@ describe('getCountry', () => {
 
     // 3-15, figure 3-52: the Duplicate Waypoint page lists the US entries as USA. A US airport ident starts with K and
     // a letter (KAAA), whose first two letters are no region, so the page shows three blanks.
-    it.fails('names a US airport USA (#NEW-1-5)', () => {
+    it.fails('names a US airport USA (#168)', () => {
         expect(getCountry(airport('KAAA', 40, -100))).toBe('USA');
     });
 
@@ -36,7 +36,7 @@ describe('getCountry', () => {
     // of D-3, not a country.
     it.fails.each([
         ['TD', 'DMA'], ['TR', 'MSR'], ['TT', 'TTO'], ['TU', 'VGB'], ['TV', 'VCT'], ['TX', 'BMU'],
-    ])('names region %s %s (#NEW-1-6)', (region, country) => {
+    ])('names region %s %s (#169)', (region, country) => {
         expect(getCountry(vor('ABC', 15, -61, {region}))).toBe(country);
     });
 });
@@ -69,7 +69,7 @@ describe('FIRMAP', () => {
     });
 
     // D-3 to D-6: New York is NY. The CTR 2 row is <from>-<to> CTR in 3 + 1 + 3 cells; unpadded, NY shifts the row by a cell.
-    it.fails('pads NY to three cells like FW (#NEW-1-7)', () => {
+    it.fails('pads NY to three cells like FW (#170)', () => {
         expect(FIRMAP['KZNY']).toBe('NY ');
         expect(FIRMAP['KZWY']).toBe('NY ');
     });

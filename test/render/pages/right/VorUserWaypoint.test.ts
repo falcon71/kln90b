@@ -44,7 +44,7 @@ describe('user VOR (5-18)', () => {
 
     // The V1 string says VOR ('VXX    QQQ  ') but the ICAO value says U, so the repository files it under the
     // supplementary waypoints: OTH 3 lists it as S, and the persistor saves it in the SUP format without frequency.
-    it.fails('is a VOR, not a supplementary waypoint (#NEW-2-3)', async () => {
+    it.fails('is a VOR, not a supplementary waypoint (#173)', async () => {
         const unit = await createUserVor();
         expect(userWaypoints(unit)).toEqual([['XX', 'QQQ', FacilityType.VOR]]);
     });
@@ -57,7 +57,7 @@ describe('user VOR (5-18)', () => {
         expect(Screen.read().rows('L')[1].slice(0, 6)).toBe('QQQ   ');
     });
 
-    it.fails('is listed as V on OTH 3 (#NEW-2-3)', async () => {
+    it.fails('is listed as V on OTH 3 (#173)', async () => {
         const unit = await createUserVor();
         await unit.panel.cursor('R');
         await unit.panel.selectPage('L', 'OTH 3');

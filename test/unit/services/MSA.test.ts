@@ -107,12 +107,12 @@ describe('MSA.getMSA', () => {
     // 3-33: 180E and 180W are the same meridian, so a position on it lies in the sector from 180W (column 0) by the
     // north-east rule above. The file has a 361st column, all 1000 ft, which the service reads for lon = 180 exactly.
     // At 17S the two differ (Fiji). Suspected bug, low impact.
-    it.fails('gives the sector from 180W for a position on the date line at 180E (#NEW-4-5)', () => {
+    it.fails('gives the sector from 180W for a position on the date line at 180E (#182)', () => {
         expect(msa.getMSA({lat: -16.5, lon: 180})).toBe(sector(-17, -180));
     });
 
     // 3-33: the passing sibling of the pin above: the two columns differ at 17S, and 179.5W reads column 0
-    it('reads the sector from 180W just east of the date line (sibling of #NEW-4-5, 3-33)', () => {
+    it('reads the sector from 180W just east of the date line (sibling of #182, 3-33)', () => {
         expect(sector(-17, -180)).not.toBe(GRID[-17 + 56][360]);
         expect(msa.getMSA({lat: -16.5, lon: -179.5})).toBe(sector(-17, -180));
     });
@@ -126,13 +126,13 @@ describe('MSA.getMSAFromTo (the ESA of one leg)', () => {
     // 3-33: the ESA of a leg is the highest sector MSA from the start to the end, so the end's sector counts. The
     // service samples every 40 NM from the start (f = 0, 40 NM / d, ...) and never the end point itself, so on a leg
     // shorter than 40 NM it reads the start sector only.
-    it.fails('includes the sector of the end of a short leg (#NEW-4-4)', () => {
+    it.fails('includes the sector of the end of a short leg (#181)', () => {
         expect(msa.getMSAFromTo(SHORT_FROM, SHORT_TO)).toBe(sector(46, 8));
     });
 
     // 3-33: the passing sibling of the pin above: the leg is 30 NM long and ends in the sector from 46N, which is
     // higher than the start sector, and a leg of the same length inside one sector gives that sector
-    it('has a short leg into a higher sector, and a short leg inside one sector gives it (sibling of #NEW-4-4, 3-33)', () => {
+    it('has a short leg into a higher sector, and a short leg inside one sector gives it (sibling of #181, 3-33)', () => {
         expect(distanceNm(SHORT_FROM, SHORT_TO)).toBeCloseTo(30, 6);
         expect(SHORT_TO.lat).toBeGreaterThan(46);
         expect(SHORT_TO.lat).toBeLessThan(47);

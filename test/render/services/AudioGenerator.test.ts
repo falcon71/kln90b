@@ -66,7 +66,7 @@ describe('AudioGenerator', () => {
     // The order of an asymmetric pattern. No caller passes one today (the only pattern, 3-58, is a palindrome), so this
     // states the method's own documentation ("Plays the pattern of beeps") rather than a manual page. doBeep takes the
     // tones from the end of the array (pop), so [short, long] plays long first.
-    it.fails('plays an asymmetric pattern in the given order (#NEW-4-3)', () => {
+    it.fails('plays an asymmetric pattern in the given order (#180)', () => {
         const {audio, played, end} = generator();
 
         audio.beepPattern([SHORT_BEEP_ID, LONG_BEEP_ID]);

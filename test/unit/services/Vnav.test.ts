@@ -303,7 +303,7 @@ describe('Vnav.formatDuration', () => {
     // The time is a fraction of seconds (distance / GS). The seconds are rounded after the minutes were cut, so 539.6 s
     // shows 8:60. 5-8, 5-9: the countdown is minutes and seconds. Whether the real unit rounds or truncates is unknown;
     // either way it never shows 60 seconds.
-    it.fails('never shows 60 seconds (#NEW-4-7)', () => {
+    it.fails('never shows 60 seconds (#184)', () => {
         const vnav = new Vnav({} as NavPageState, {} as Sensors, {} as Flightplan);
         expect([' 8:59', ' 9:00']).toContain(vnav.formatDuration(539.6));
     });

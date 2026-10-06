@@ -238,7 +238,7 @@ describe('EFB route import while the unit is disabled for hot swapping (public c
         expect(writeCount(unit, 'GPS WP DISTANCE')).toBe(frozenAt);
     });
 
-    it.fails('does not import a route while the unit is disabled for hot swapping (#NEW-5-3)', async () => {
+    it.fails('does not import a route while the unit is disabled for hot swapping (#188)', async () => {
         const unit = await disabledUnit(true);
 
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
@@ -268,14 +268,14 @@ describe('EFB round trip of a user waypoint', () => {
     }
 
     // The setup of the pin: the route comes back with its three waypoints, the airports by their ICAO
-    it('loads the route the unit sent with its three waypoints (the setup of #NEW-5-2)', async () => {
+    it('loads the route the unit sent with its three waypoints (the setup of #187)', async () => {
         const unit = await roundTrip();
 
         expect(fpl0Idents(unit).length).toBe(3);
         expect([fpl0Idents(unit)[0], fpl0Idents(unit)[2]]).toEqual(['KAAA', 'KBBB']);
     });
 
-    it.fails('loads a user waypoint that comes back from the EFB as that waypoint (#NEW-5-2)', async () => {
+    it.fails('loads a user waypoint that comes back from the EFB as that waypoint (#187)', async () => {
         const unit = await roundTrip();
 
         expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => ICAO.valueToStringV2(l.wpt.icaoStruct)))

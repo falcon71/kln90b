@@ -32,7 +32,7 @@ describe('Vnav waypoint in OBS mode', () => {
 
     // In the Leg mode KCCC (ahead in FPL 0) is valid; in OBS it must not be. The service does not look at the mode:
     // OBS keeps the plan index of the active leg, so a waypoint ahead still passes.
-    it.fails('rejects a waypoint ahead in FPL 0 in OBS mode (#NEW-4-8)', async () => {
+    it.fails('rejects a waypoint ahead in FPL 0 in OBS mode (#185)', async () => {
         const unit = await bootInObs();
         expect(unit.props.vnav.isValidVnavWpt(KCCC)).toBe(false);
     });

@@ -66,7 +66,7 @@ describe('NAV 3 ESA in Leg mode', () => {
     // On the last leg the rest of the route is the destination alone. MSA.getMSAForRoute returns 0 for one waypoint,
     // and Nav3Page.calculateESA takes that 0 for "no value" (`esaAlongRoute ? ... : null`), so the ESA shows dashes on
     // every final leg, also of a two-waypoint plan. Expected: the ESA from the present position to the destination.
-    it.fails('shows the ESA on the last leg of FPL 0 (#NEW-4-6)', async () => {
+    it.fails('shows the ESA on the last leg of FPL 0 (#183)', async () => {
         const kaaa = airport('KAAA', 47.1, 8.1);
         const kbbb = airport('KBBB', 47.5, 8.5);
         const {unit, esaRow} = await nav3Esa([kaaa, kbbb], {lat: 47.3, lon: 8.3});
@@ -77,7 +77,7 @@ describe('NAV 3 ESA in Leg mode', () => {
 
     // The setup sibling of the pin: the boot lands on the last leg, the page is NAV 3, and the ESA row is the dashed one
     // (asserted as the row's label only, so that no passing test claims the dashes are right)
-    it('reaches the last leg of a two-waypoint FPL 0 on NAV 3 (sibling of #NEW-4-6, 3-33)', async () => {
+    it('reaches the last leg of a two-waypoint FPL 0 on NAV 3 (sibling of #183, 3-33)', async () => {
         const kaaa = airport('KAAA', 47.1, 8.1);
         const kbbb = airport('KBBB', 47.5, 8.5);
         const {unit, esaRow} = await nav3Esa([kaaa, kbbb], {lat: 47.3, lon: 8.3});

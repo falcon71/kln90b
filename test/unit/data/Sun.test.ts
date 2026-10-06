@@ -63,7 +63,7 @@ describe('CAL 7 figures (5-15)', () => {
         ['03 MAR 89 CST', 2, 3, CST, '06:04', '17:35'],
         ['10 MAR 89 CST', 2, 10, CST, '05:55', '17:41'],
         ['10 MAR 89 EST', 2, 10, EST, '06:55', '18:41'],
-    ] as const)('shows the figure times for %s with the default zenith (#NEW-1-1)', (_n, m, d, tz, rise, set) => {
+    ] as const)('shows the figure times for %s with the default zenith (#164)', (_n, m, d, tz, rise, set) => {
         const date = TimeStamp.createDate(1989, m, d);
         expect(shown(calculateSunrise(date, ATL)?.atTimezone(tz) ?? null)).toBe(rise);
         expect(shown(calculateSunset(date, ATL)?.atTimezone(tz) ?? null)).toBe(set);
@@ -88,12 +88,12 @@ describe('what the sunrise depends on', () => {
     });
 
     // 5-15: CAL 7 gives the times for a waypoint and a date. The second at which the date was taken is not an input.
-    it.fails('does not depend on the seconds of the date it is given (#NEW-1-2)', () => {
+    it.fails('does not depend on the seconds of the date it is given (#165)', () => {
         expect(calculateSunrise(noonPlus59s, ORD)!.getTimestamp()).toBe(calculateSunrise(noon, ORD)!.getTimestamp());
     });
 
     // 5-15: the date on CAL 7 is shown in the selected time zone, and the rise is for that date.
-    it.fails('uses the calendar date in the zone of the stamp, not the UTC date (#NEW-1-3)', () => {
+    it.fails('uses the calendar date in the zone of the stamp, not the UTC date (#166)', () => {
         expect(shown(calculateSunrise(evening, ORD)!.atTimezone(CST))).toBe(shown(calculateSunrise(morning, ORD)!.atTimezone(CST)));
     });
 });

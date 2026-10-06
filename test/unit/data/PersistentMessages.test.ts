@@ -325,7 +325,7 @@ describe('PRESS ALT TO SET BARO (6-8, B-3)', () => {
     });
 
     // 6-8 (the note): with an air data computer supplying the baro the message is not shown
-    it.fails('does not show when an air data computer supplies the baro (6-8) (#NEW-3-1)', () => {
+    it.fails('does not show when an air data computer supplies the baro (6-8) (#174)', () => {
         const w = quietWorld();
         w.airdataInterfaced = true;
         w.baroSource = 1;
@@ -335,7 +335,7 @@ describe('PRESS ALT TO SET BARO (6-8, B-3)', () => {
         expect(h.tick()).toEqual([]);
     });
 
-    it('shows when the approach arms with air data that does not supply the baro (sibling of #NEW-3-1)', () => {
+    it('shows when the approach arms with air data that does not supply the baro (sibling of #174)', () => {
         const w = quietWorld();
         w.airdataInterfaced = true;
         w.baroSource = 0;
@@ -369,7 +369,7 @@ describe('DATA BASE OUT OF DATE', () => {
     // the message is gone a second later, unread, and the MSG prompt with it.
     // This pin is bound to the persistent DatabaseOutOfDateMessage class (PersistentMessages.ts). If the fix deletes that
     // class, delete this pin with it: the render pin below ("lists the message once") then carries the bug.
-    it.fails('stays until it is read (B-2, 3-16) (#NEW-3-2)', () => {
+    it.fails('stays until it is read (B-2, 3-16) (#175)', () => {
         const w = quietWorld();
         const h = harness(w);
         h.tick();
@@ -470,7 +470,7 @@ describe('ADJ NAV IND CRS TO nnn, a readable indicator', () => {
     // The code comment (PersistentMessages.ts, forceShow) cites two YouTube timestamps for about 30 s; the maintainer
     // re-checked the video: https://youtu.be/S1lt2W95bLA?t=2244 and https://youtu.be/S1lt2W95bLA?t=2574. The code
     // closes the window after 10 s.
-    it.fails('keeps ADJ NAV IND CRS TO for 30 s after a DTK change of more than 5 degrees, even on course (#NEW-3-4)', () => {
+    it.fails('keeps ADJ NAV IND CRS TO for 30 s after a DTK change of more than 5 degrees, even on course (#177)', () => {
         const {w, h} = readable();
         w.dtkMag = 100;
         w.obsIn = 100;

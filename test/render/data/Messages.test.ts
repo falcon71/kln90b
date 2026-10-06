@@ -111,7 +111,7 @@ describe('SET FUEL ON BOARD ON OTH 5 IF NECESSARY', () => {
 describe('messages over a power cycle', () => {
     // MessageHandler.ts:32 carries "todo clear messages when power is off". Today an unread message posted before the
     // power-off is still on the MSG page after the power-on. The maintainer ruled it a bug: clear at the power-off
-    it.fails('does not keep an unread message of the previous power-on (#NEW-3-3)', async () => {
+    it.fails('does not keep an unread message of the previous power-on (#176)', async () => {
         const unit = await bootUnit();
         await settle(unit);
         unit.props.messageHandler.addMessage(new OneTimeMessage(['BEFORE THE CYCLE']));
@@ -124,7 +124,7 @@ describe('messages over a power cycle', () => {
     });
 
     // The sibling of the pin: the cycle itself completes, and the message is there before it
-    it('holds the message before the cycle (sibling of #NEW-3-3) (characterization)', async () => {
+    it('holds the message before the cycle (sibling of #176) (characterization)', async () => {
         const unit = await bootUnit();
         await settle(unit);
         unit.props.messageHandler.addMessage(new OneTimeMessage(['BEFORE THE CYCLE']));

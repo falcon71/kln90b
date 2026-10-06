@@ -202,7 +202,7 @@ describe('KlnEfbSaver route contents', () => {
 
     // RunwayIdentifier.number is the SDK's runway number string, two digits for 01 to 36 (RunwayUtils.getNumberString).
     // KlnEfbSaver writes runwayNumber.toString(), which gives 9 for runway 09
-    it.fails('sends runway 09 of an approach as 09 (#NEW-5-1)', async () => {
+    it.fails('sends runway 09 of an approach as 09 (#186)', async () => {
         const unit = await bootWithStarAndApproach09();
 
         expect(requestRoute(unit).approach.runway.number).toBe('09');

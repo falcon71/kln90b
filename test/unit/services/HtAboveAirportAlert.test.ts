@@ -142,7 +142,7 @@ describe('HtAboveAirportAlert', () => {
     // builder converts like the sim data; APT 2 converts it back), but the service adds it to feet unconverted. A field
     // at 3000 ft (914.4 m) with offset 1000 ft has its top at 4000 ft; the service uses 1914.4 ft, so an aircraft at
     // 3900 ft, 900 ft above the field, gets no alert.
-    it.fails('adds the field elevation in feet (#NEW-4-1)', () => {
+    it.fails('adds the field elevation in feet (#178)', () => {
         const r = rig({active: airport('KHHH', 47, 8, {elevationFt: 3000}), offset: 1000});
         r.at(3, 3900);
         expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
@@ -150,7 +150,7 @@ describe('HtAboveAirportAlert', () => {
 
     // The passing sibling of the pin above: at 1800 ft, below 1914 ft, the service alerts today, so the pin's setup
     // reaches the comparison
-    it('alerts an aircraft below the top of a field at 3000 ft (sibling of #NEW-4-1, 3-58)', () => {
+    it('alerts an aircraft below the top of a field at 3000 ft (sibling of #178, 3-58)', () => {
         const r = rig({active: airport('KHHH', 47, 8, {elevationFt: 3000}), offset: 1000});
         r.at(3, 1800);
         expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
@@ -159,7 +159,7 @@ describe('HtAboveAirportAlert', () => {
     // Without a navigation solution (GPS invalid, NavCalculator.setFlag) distToActive is null while the active waypoint
     // stays. `null <= 5` is true in JavaScript, so the service treats an unknown position as inside the cylinder.
     // An aircraft below the top with no position must not alert: 3-58 compares the aircraft's position with the cylinder.
-    it.fails('gives no alert without a distance to the airport (#NEW-4-2)', () => {
+    it.fails('gives no alert without a distance to the airport (#179)', () => {
         const r = rig({active: airport('KHHH', 47, 8), offset: 1000});
         r.at(null, 500);
         expect(r.patterns).toEqual([]);
