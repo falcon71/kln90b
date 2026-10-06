@@ -552,6 +552,12 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **The 16 Hz loops** run every 62 ms in tests: the fake timers round the 62.5 ms interval down to whole milliseconds.
   The aircraft integrates the time that really passed, but the instrument's own 16 Hz signal loop (the XTK output
   filter) also runs at that rate, which matters for any future test of filter timing.
+- **The XTK output filter overshoots a step** (#158): after the XTK jumps (a sequencing, a direct-to, an OBS course
+  change, the self-test) `GPS WP CROSS TRK` runs on to about twice the step one second later and settles a second after
+  that. An XTK output read right after a step therefore depends on the tick phase. Read the output once it has settled
+  (the self-test test in `NavCalculator.test.ts` reads it 30 s in), read `navPage.xtkToActive` instead, or test the
+  filter itself at the unit stage, as `test/unit/services/SignalOutputFilter.test.ts` does: only `Date` is faked
+  (`vi.useFakeTimers({toFake: ['Date']})`), a value is set every 1000 ms and the output sampled every 62 ms.
 - **A booted engine-running unit starts with the MSG annunciator lit.** Empty storage means the last position is 0/0, so
   `POSITION DIFFERS FROM LAST POSITION BY >2NM` posts, and the GPS clock starts an hour behind, so
   `SYSTEM TIME UPDATED TO GPS TIME` posts. The NAV 2 snapshot shows it. Seeding a last position in `storage`
@@ -627,8 +633,22 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
   `test/render/harness/pageTree.test.ts`, which asserts the in-place pruning.
 - #99 (lat/lon displays show 60.00 minutes just below a whole degree) is filed but has no pin yet; a render test would
   hold it.
-- Further flights: approach arming (ARM to APR scale ramp), waypoint alert without turn anticipation, and the
-  GPS-invalid path.
+- Approach arming (the ARM and APR scale ramps), the waypoint alert without turn anticipation and the GPS-invalid path
+  are held at the render stage (Session 5: a held position plus `moveAircraft` observes them); flights would only add the
+  motion. The one navigation flight Session 5 needed is the alert through a turn (`waypointAlertTurn.test.ts`).
+- **`Screen.read()` cannot read a numbered FPL page with legs.** `FlightplanList.tsx` shows `USE?` over the start of
+  `USE? INVRT?` in row 0 with a negative CSS margin (`.use-invert`, `KLN90B.scss`), and happy-dom has no layout, so the
+  reader sees `USE? INVRT?USE?`, 15 cells, and throws. `selectPage('L', 'FPL 5')` on a stored plan throws for the same
+  reason, as do `focused` and `enterIdent` there. That blocks UI tests of FPL 1 to 25 with legs (USE?, USE? INVRT?,
+  LOAD FPL 0?, deleting a numbered plan, FPL FULL on a numbered plan). The fix belongs in `test/harness/render/screen.ts`:
+  treat `.use-invert` like the margin of the CRSR field, as text that overlays the first cells of its row.
+- **Open trainer questions** for the next KLN 89 trainer session (the maintainer starts the VM): #146 (the alert time on
+  a Direct To a waypoint of FPL 0 that has a following leg) and #147 (whether there is a waypoint alert in OBS mode). The
+  approach questions #162 (the GPS APR switch before the FAF) and #163 (four approach-scale cases) cannot be answered
+  there, because that trainer shows neither ARM nor ACTV.
+- **CTR 1 (#161) has no pin yet.** A render test reaches it with two Center airspaces that share a boundary across a
+  full FPL 0, but only when OTH 2 is shown first: the shared airspace search session of #102 drops a Center first seen
+  from outside it, so without that step CTR 1 computes no waypoints at all. The CTR pages belong to Session 9.
 - Harness gaps that the Session 4 contract tests worked around (each serves few tests, so none was built, per rule 13
   of test-coverage.md):
     - **SimVars before `init`.** `BootOptions` cannot set an arbitrary SimVar before the core reads it. An electricity
@@ -642,7 +662,9 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       `FlightPlanner.getPlanner('kln90b', …)` in `WTFlightplanSync.test.ts`, `ActiveWaypoint.test.ts` and `reboot.test.ts`.
     - **Shared worlds.** The approach world now exists as a fixture (`approachWorld()` in `test/harness/fixtures.ts`,
       section 3). The older copies in `ModeController.test.ts` and `HEvents.test.ts` (IAF = FAF, #129) and the arc world
-      of `SensorsOutSimVars.test.ts`, copied into `WTFlightplanSync.test.ts`, stay copied.
+      of `SensorsOutSimVars.test.ts`, copied into `WTFlightplanSync.test.ts`, stay copied. `approachWorld()` has no
+      missed approach, so the MAP tests of `NavCalculator.test.ts` build their own approach with a missed approach leg,
+      and `ModeControllerObs.test.ts` builds the IAF = FAF and the MAHP = FAF approaches it needs (#153).
     - **A `FakeXhr` mount.** `FakeXhr` serves `resources/` only at the default path, so a custom `BasePath` fails the
       boot; a mount option would let a test hold the BasePath effect.
 - Costs to keep in mind: the H event sweep boots a fresh unit for every public event in four states, and

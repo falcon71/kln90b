@@ -370,7 +370,7 @@ bugs found were filed and pinned (#135 to #144), invalid panel.xml values are th
 
 ## Session 5: navigation core
 
-- [ ] done
+- [x] done
 
 **Goal:** the project's own navigation model, which is deliberately not the SDK's.
 
@@ -387,6 +387,11 @@ bugs found were filed and pinned (#135 to #144), invalid panel.xml values are th
    (`testing.md` section 6 notes the rate).
 
 **Done when:** each item has spec tests, and the log says which behaviors are left.
+
+Result (session log, section 4): each of the five items has spec tests, plus the `approachWorld()` fixture. The bugs
+found were filed and pinned (#148 to #160; #161 is filed without a pin), the two approach questions are #162 and #163,
+#119 is now a bug with a pin, and #82, #100, #119 and #122 have comments. Roll steering has only the #100 pin, by the
+maintainer's decision.
 
 ## Session 6: data and pure services
 
@@ -514,6 +519,221 @@ lists the gaps.
 One entry per session run, newest first. Format: date, session, branch, what was done, what was left and why, the
 coverage summary for the session's area at start and end. This is a dated record and is never edited afterwards; a
 later run adds a new entry.
+
+## 2026-10-06, session 5, branch `tests-session-5-navigation`
+
+**Done**
+- **Design and plan:** `docs/superpowers/specs/2026-10-06-session-5-navigation-design.md` and the matching plan, after a
+  read-only research pass of four agents (A: nav math and the flight plan model; B: `ActiveWaypoint` direct-to flows and
+  LEG/OBS; C: `NavCalculator`; D: the approach modes, the #100 pin and the XTK filter) and trainer checks in the VM
+  (below). Six tasks: the fixture alone first, tasks 2 to 5 in parallel worktrees, this close-out last.
+- **Task 1, `approachWorld()` (harness):** an RNAV approach to KPRC from the north in `test/harness/fixtures.ts`, with a
+  FAF that is not the IAF (so the unit reaches APR, unlike the IAF = FAF worlds of #129) and a step-down fix past the
+  FAF (so "no re-activation past the FAF" can fail). The harness test `test/render/harness/approachWorld.test.ts` holds
+  the leg list, the fix types, the geometry, fresh objects per call, the sort order before the default navdata and the
+  APR activation from ARM.
+- **Task 2, nav math and the flight plan model:** `KLNNavmath.test.ts` replaced: the permissive midpoint sibling is
+  gone, the #97 pin is split per fraction plus an on-segment pin, with a passing sibling tying `flight/geo.ts` to the
+  avform literals; the standard-rate bank against physics and against the avform147 constants; the bank-change distance
+  as a characterization. New: `Flightplan.test.ts` (insert, delete, the 31st leg refused, batch publishing, procedures,
+  `load`, `loadInverted`, delete; 4-1, 4-4, 4-5, 6-5, 6-23), `FlightplanUtils.test.ts` (`calcDistToDestination` with the
+  MAP fence, 4-11, 6-20; `insertLegIntoFpl` on a full FPL 0, the 29-leg boundary, the C-1 refusals),
+  `Flightplanloader.test.ts` (the 30-leg cut, ten named then `OTHER WAYPOINTS DELETED`, B-3, B-4),
+  `FlightplanEdit.test.ts` (26 plans, the failed restores, FPL FULL, typing over rows of a full FPL 0, DELETE FPL?) and
+  `DuplicateWaypoints.test.ts` (OBS on the second copy keeps index 3, the #67 gap). Pins #148 (two), #149, #150.
+- **Task 3, `ActiveWaypoint`, LEG/OBS and direct-to in OBS:** `ActiveWaypoint.test.ts` appended (cancel, resume after a
+  direct-to a plan waypoint, a random direct-to, the last leg, the MAP as destination, the turn stack and the saved
+  setting, re-activation by position after an edit inside the active leg); `ModeControllerObs.test.ts` (LEG to OBS keeps
+  the deviation and sets the magnetic course, `NO ACTV WPT`, OBS to LEG on the TO side, MAHP = FAF, the VOR variation,
+  `OBS WPT > 200NM`, the external CRS switch); `DirectToObs.test.ts` (ACTIVATE keeps the OBS, a direct-to sets and
+  centres it, `CRS xxx`, the driven indicator, all at a non-zero variation). The `CRSR` assertion of the #43 test was
+  removed (figure 4-42) and the #43 test re-proven by its original break. Pins #151 to #155, #82 and #119.
+- **Task 4, `NavCalculator`:** `NavCalculator.test.ts` appended: `FLY L`/`FLY R` and the NAV 1 bar, DTK along a great
+  circle, DIS as a chord on an arc, the 36 s alert (SET 6 off, and an off-plan direct-to), the 20 s alert between
+  independently derived bounds, the sequencing without turn anticipation, fly-over, no sequencing past the MAP, the
+  GPS-invalid path (NAV 1 `FLAG`, the HSI flag, the WPT light), the 2 kt thresholds (characterization, with a 3 kt
+  control) and the self-test DIS and XTK outputs. The flight `waypointAlertTurn.test.ts` holds the alert through a turn
+  until its end. Pins #159 (three), #156, #157.
+- **Task 5, approach modes, the #100 pin and the XTK filter:** `ModeControllerApproach.test.ts` on `approachWorld()`:
+  ENR beyond 30 NM, ARM at 30 NM (held from both sides) and the 5-to-1 ramp over 30 s, ARM by the switch at 40 NM, the
+  approach deleted, APR at 2 NM (held from both sides) and the 1-to-0.3 ramp, the press past the FAF, a direct-to to the
+  MAP, OBS in ACTV, the press 1.5 NM before the FAF (sibling only), armed inside 2 NM while flying away (6-3), the press
+  while armed (6-1); the two ramp shapes as characterizations. `Mod1Page.test.ts` (pin #160 with two siblings),
+  `RollSteeringController.test.ts` (pin #100 with its sibling) and `SignalOutputFilter.test.ts` (pin #158, the settle
+  and the ramp-tracking characterizations, at the unit stage with only `Date` faked).
+- **Task 6, this close-out:** the issues, comments and relabel below, the placeholders replaced in one commit
+  (`references #148` to `#160`), `testing.md` sections 6 and 7, and this log. The `Ctr1Page` check became #161.
+
+**Rulings**
+- **The maintainer's:** roll steering pins only (the wrong-way bank, #100), because #100 plans a rework. The XTK filter
+  overshoot is a bug and the ramp tracking a characterization. Abeam sequencing, the direct-to index shift, OBS to LEG
+  on the FROM side and #119 are bugs, by the KLN 89 trainer. #82 is pinned and the `CRSR` assertion of the #43 test
+  dropped. The APR cancel before the FAF is intended for now, with a `question` issue (#162); the four approach-scale
+  cases get one `question` issue and no tests (#163). The two open alert questions of research C became #146 and #147,
+  to be checked in the trainer in another session.
+- **The controller's** (the ledger): tasks 2 to 5 ran in parallel worktrees, since their files were disjoint; task 1's
+  minors entered its fix round, because tasks 2 to 5 built on the fixture's geometry; the 1.5 NM press test of task 5
+  sends the switch with `unit.send` instead of `panel.press`, because the press's 250 ms made it depend on the tick
+  phase; two spec tests the reviewer suggested for task 5 (6-3 armed while flying away, 6-1 the press while armed) were
+  added in its fix round; tasks 4, 5 and 3 merged before task 2, which was still in its fix round.
+- **Review fix rounds:** every task needed one. Task 1: the APR test did not pin its geometry, and SDFAA, ENRAA and the
+  freshness were unheld. Task 2: the catch of the plan restore (`KLN90BCore.ts:292`) was called unreachable but is
+  reachable with a non-string stored plan, and the 29-leg boundary of `insertLegIntoFpl` survived; minors: the avform
+  constants, the `loadInverted` publish, the loader's plan index, labels. Task 3: the edit re-activation could not tell
+  "by position" from "the same leg kept", the #155 sibling's check after LEG was permissive, and every OBS course test
+  ran at variation 0, so true/magnetic mutations survived. Task 4: the 2 kt thresholds were unheld, and its commit's
+  proof record needed a correction. Task 5: the 1.5 NM press test was tick-phase dependent, and the 30 NM arming and 2
+  NM activation radii were held from one side only.
+- **Re-verdicts by the implementers:** the #119 pin setup of the brief (NAV 1 on the right) is green today, because NAV
+  1 is not a waypoint page; the pin uses the empty SUP page of the boot, #119's own reproduction, and the NAV 1 case is
+  a passing sibling. The IAF = FAF sibling ends in ARM-OBS and ARM-LEG, not ENR (within 30 NM). Research B's
+  characterization of OBS to LEG on the FROM side became the pin #155 after the trainer check.
+- **Corrected in the close-out:** research D listed a pilot-selected ±0.3 being overwritten with about 1.0 at the APR
+  activation as an approach-scale question. A scratch run showed the unit keeps the 0.3 (`adjustXtkScaleActive` returns
+  early at 0.3); #163 records the case as checked and not reproduced.
+
+**Trainer checks** (2026-10-06, the maintainer started the VM; paraphrased. The KLN 89 trainer is the reference; the
+AVsoftech KLN 90B trainer is a third-party, unreliable interpretation)
+- KLN 89: with turn anticipation on, a waypoint passed about 3.5 NM abeam at 240 kt was sequenced (#157).
+- KLN 89: after a direct-to a waypoint of FPL 0, inserting a waypoint in front of the target kept the direct-to on the
+  target at its new index (#149).
+- KLN 89: right after power-up D-> prefilled the active waypoint from a waypoint page and from NAV 1 (#119).
+- KLN 89: OBS to LEG on the FROM side re-activated the plan leg with its DTK and the deviation kept, TO (#155); LEG to
+  OBS on a short leg took the DTK and kept the deviation.
+- AVsoftech: in APR before the FAF the GPS APR switch gave ARM, and APR was back within about 2 s, as in the code
+  (#162).
+- KLN 89: the approach modes are not observable (ARM and ACTV are external annunciators the trainer does not draw, and
+  the demo approach never armed), so #162 and #163 stay open questions.
+
+**Bugs found and filed** (each after a search of the open and closed issues: the titles of all issues, the bodies of
+#65, #71, #80, #82, #100, #102, #119, #122, #139 and #146, and semantic searches with several wordings per bug, which
+returned results this time). #149, #155 and #157 were checked in the KLN 89 trainer; the others were found in the
+headless harness and not reproduced in the sim.
+- **#148:** a waypoint typed over the first row of a full FPL 0 lands in front of the last waypoint
+  (`FlightplanUtils.ts:35-37`, `insertLeg(idx - 1)`; also reachable from APT 7 and CTR 1). Pinned twice (unit, UI).
+- **#149:** an insert or delete in front of an FPL 0 direct-to target makes it a random direct-to
+  (`ActiveWaypoint.assertToMatchesFplIdx`). Pinned in `FlightplanUtils.test.ts`.
+- **#150:** DELETE FPL? is not saved (`Flightplan.delete()` does not publish; same family as #92). Pinned in
+  `FlightplanEdit.test.ts`.
+- **#151:** LEG to OBS moves the deviation on a long leg (5-36; the course is the DTK at the aircraft, laid through the
+  waypoint). Pinned in `ModeControllerObs.test.ts`.
+- **#152:** OBS to LEG activates the first copy of a duplicated waypoint (5-36); the naive fix breaks the MAHP = FAF
+  test. Pinned in `ModeControllerObs.test.ts`.
+- **#153:** OBS to LEG at an IAF that is also the FAF keeps the IAF copy (6-11; references #129). Pinned in
+  `ModeControllerObs.test.ts` (proven by running it as a plain `it` and by a "last match" change, since a fix needs FAF
+  promotion).
+- **#154:** ACTIVATE in OBS mode recentres the D-bar (5-37); the same early return of `setObs` as #122, whose suggested
+  fix would not cure it. Pinned in `DirectToObs.test.ts`.
+- **#155:** OBS to LEG on the FROM side makes a direct-to from the present position instead of re-activating the plan
+  leg (5-36). Pinned in `ModeControllerObs.test.ts`.
+- **#156:** the waypoint alert ends at the sequencing onto the last leg while the turn is still flown (4-8, 4-9). Pinned
+  by the judge of `waypointAlertTurn.test.ts`.
+- **#157:** with turn anticipation on, a waypoint passed more than about 1 NM abeam is never sequenced. Pinned in
+  `NavCalculator.test.ts`.
+- **#158:** the XTK output filter overshoots a step by 100 % for one second (Component Maintenance Manual 34-50-14, page
+  29). Pinned in `SignalOutputFilter.test.ts`.
+- **#159:** a NAV flag or no active waypoint resets the CDI scale to 5 NM, also in ARM (5-38). Three pins in
+  `NavCalculator.test.ts`.
+- **#160:** MOD 1 and MOD 2 show `CDI:±NM` without a value in ARM beyond 30 NM and for one tick at the APR activation
+  (5-38; references #159). Pinned for MOD 1 in `Mod1Page.test.ts`; MOD 2 and the one-tick blank are not pinned.
+- **#161:** CTR 1 never shows `NOT ENOUGH ROOM IN FPL` (the `FULL` state is overwritten by `CALCULATED` at the end of
+  `calculateCenterWaypoints`), and ENT then calls `insertLegIntoFpl` without a catch: an unhandled rejection on a full
+  FPL 0 whose first waypoint is on the active leg (reproduced in a scratch render test, not committed), a throw part-way
+  on a full numbered plan (by reading), or dropped first waypoints otherwise (5-25, 5-26). Not pinned: the setup needs
+  the #102 workaround (OTH 2 before CTR 1), and the CTR pages belong to Session 9.
+- **#162 (`question`):** the GPS APR switch cancels APR ACTV before the FAF only until the next calculation tick (6-1,
+  AFMS B-13, the AVsoftech observation; references #139). Treated as intended; only the press is held.
+- **#163 (`question`):** the four approach-scale cases: a late OBS-to-LEG switch jumps the scale (6-11), a direct-to the
+  FAF inside 2 NM is back in ACTV after one tick (3-29, 6-3), a pilot-selected 0.3 (checked: kept), and a scale above 1
+  when moving back beyond 2 NM in ACTV (6-3). No tests.
+- **#119:** relabeled from `question` to `bug` with the KLN 89 result, the pin and the one-line fix in a comment.
+- **#82 comment:** the headless reproduction (the cursor stays on after the direct-to, the next ENT inserts a blank leg;
+  figure 4-42), the one-line fix, and the `CRSR` assertion removed from the #43 test.
+- **#100 comment:** the wrong-way bank 5 NM left of the leg is pinned (`banks right, toward the leg (#100)`).
+- **#122 comment:** #154 shares the early return of `setObs`, and #122's suggested fix would not cure it.
+- **Not bugs (recorded here only):** the catch of `restoreAllFlightplan` is reachable only with a non-string stored
+  value (a type a real user would not produce; a corrupt string goes through the loader's own error path), and it is now
+  held as a characterization. `loadInverted` keeps procedure legs, unlike `load`, but no page reaches the case (only FPL
+  0 holds procedures, and USE? INVRT? copies a numbered plan); it is held as a characterization.
+
+**Fixes that could not be re-broken:** none. The #43 test was re-proven by its original break after its `CRSR` assertion
+was removed. Of the parts of the #67 fix (3415417), the OBS entry on the second copy is now held by
+`DuplicateWaypoints.test.ts`; the reset of the OBS course on the way back to LEG is held only through the #122 pin, and
+the ICAO of the synthetic direct-to waypoint is not tested (trivial). Two removals survive as equivalent mutants; they
+are not fixes: the `fplIdx === -1` early return of `calcDistToDestination` (`getFutureLegs` returns the one active leg)
+and `this.legs = fpl.legs` alone in `Flightplan.load` (`removeProcedures` reassigns the array right after).
+
+**`NavCalculator.ts` at 98.85 % statements hid untested branches.** At the start nearly every line ran, and the number
+is unchanged at the end. But at the start the whole suite stayed green under each of these breaks: SET 6 ignored, the 36
+s alert set to 20 s, the 20 s alert set to 15 s or 24 s, the fly-over flag ignored, each of the three MAP guards
+removed, the GPS-invalid branch removed, either 2 kt threshold changed, the self-test DIS and XTK sign, the alert's
+turn-stack term, and the alert and scale resets of `setFlag`. Every one of them now fails a test. The number said what
+ran, not what was held (section 1).
+
+**Not covered** (rule 18; the ledger is not committed, so the list is complete here)
+- Roll steering beyond the #100 pin (by decision); the arc bank adjustment (`adjustBankAngleForArc`, unused).
+- The approach-scale cases and the APR cancel before the FAF (#162, #163); the 30 NM radius in the arming by the press
+  (`ModeController.ts:44, 59`, the scale set to 1 at once, #139's second observation) and in the ramp guard (`:318`)
+  were not mutated; MOD 2 and the one-tick blank at the APR activation (#160).
+- The alert questions #146 (a direct-to a waypoint of FPL 0 with a following leg) and #147 (the alert in OBS mode); the
+  alert after the last waypoint is passed (it stays on until the ETE exceeds 36 s; the real unit is unknown).
+- `CRS xxx` also shows with ObsSource 0, where 5-37 gives it only for a non-driven indicator showing the unit; the
+  published variation of an approach waypoint in OBS (5-35; only VORs are handled); the loader's message cap applies per
+  plan, while B-3 may mean a total (a restore of several damaged plans can post more than ten); `FPL FULL` also shows
+  for a full numbered plan (C-1 names only the active-leg case); procedures are not persisted, so they do not survive a
+  short power cycle (only USER legs are stored; possibly part of #94).
+- The OBS entry's mapping from ARM-LEG to ARM-OBS beyond 30 NM (always entering ENR-OBS survives, because the tick
+  re-arms within 30 NM); `setExternalObsMode(true)` without an active waypoint enters OBS with `NO ACTV WPT` (the code's
+  TODO); a typed-ident direct-to a waypoint that is twice in FPL 0 takes the first copy (the manual is silent); a
+  direct-to started exactly on its target gives a NaN path and `NavCalculator` returns before its outputs (same family
+  as #120); the OBS ESA rule (5-35) and MOD 1 / MOD 2 with the external switch (Session 8).
+- The turn-circle geometry on a great-circle leg (only the arc case is held); the end-of-turn detection beyond the
+  flight; the stale `lastDistanceToActive` and `lastDistanceToTurn` after an activation (no reproduction found); the
+  turn-start fallback `waypointAlert && distanceToTurn >= lastDistanceToTurn` can be deleted with the suite green (not a
+  claimed subject); the flagged NAV 3 still shows the ESA from the stale position (page sessions).
+- Removing `activeIdx === -1` in `insertLegIntoFpl` is held by the unit tests only (the render tests boot with an active
+  waypoint); `Array(26)` of `UserFlightplanLoaderV2` is held only by `UserFlightplanLoaderV2.test.ts` (not re-verified).
+- Numbered flight plans with legs on the FPL pages (the `USE? INVRT?` reader gap, `testing.md` section 7); CTR 1 (#161,
+  not pinned).
+- `ActiveWaypoint`'s shared `CACHED_CIRCLE` aliases only across two instances, which the singletons rule out.
+- Review notes left as they are: the 29-leg test of `FlightplanUtils.test.ts` carries its 4-4 citation in the comment
+  above it, not in the title; lines 12, 14 and 31 of `test/harness/fixtures.ts` are 121 to 122 characters
+  (pre-existing); the first commit of task 4 has two imprecise proof lines, corrected in its fix round's message.
+
+**Workflow notes.** The isolation worktrees again started at `origin/main` and were reset to the session branch first.
+Implementers ran on Sonnet; reviewers on Sonnet for tasks 1 and 2 and on Opus for tasks 3, 4 and 5; re-reviews on
+Sonnet. The implementers' sandbox refused writes outside the worktree, so the controller saved their reports. The
+close-out ran in the main checkout on the session branch, because it needed GitHub.
+
+**Coverage at the start of the session** (identical to the end of session 4) **and at the end** (all tests green):
+
+| directory                  | % stmts start | % stmts end | % lines start | % lines end |
+|----------------------------|--------------:|------------:|--------------:|------------:|
+| all files                  |         73.98 |       75.51 |         73.82 |       75.38 |
+| `kln90b`                   |         84.84 |       85.98 |         84.68 |       85.73 |
+| `kln90b/controls`          |         76.49 |       81.52 |         76.08 |       81.21 |
+| `kln90b/controls/displays` |         84.80 |       86.01 |         84.47 |       85.71 |
+| `kln90b/controls/editors`  |         80.34 |       81.42 |         79.68 |       80.80 |
+| `kln90b/controls/selects`  |         63.45 |       63.45 |         61.75 |       61.75 |
+| `kln90b/data`              |         80.43 |       80.70 |         79.94 |       80.22 |
+| `kln90b/data/flightplan`   |         94.59 |       98.91 |         94.38 |       98.87 |
+| `kln90b/data/navdata`      |         86.13 |       86.13 |         86.17 |       86.17 |
+| `kln90b/pages`             |         77.15 |       77.27 |         76.84 |       76.97 |
+| `kln90b/pages/left`        |         68.25 |       69.74 |         68.41 |       69.93 |
+| `kln90b/pages/right`       |         63.18 |       63.38 |         63.82 |       64.03 |
+| `kln90b/services`          |         69.70 |       75.73 |         68.67 |       74.93 |
+| `kln90b/settings`          |         95.98 |       96.56 |         95.82 |       96.41 |
+
+The files of the area, statements at the start (from the design) and at the end: `NavCalculator.ts` 98.85 and 98.85,
+`ActiveWaypoint.ts` 96.62 and 98.64, `Flightplan.ts` 86.48 and 100, `ModeController.ts` 61.7 and 85.1,
+`RollSteeringController.ts` 87.77 and 87.77, `FlightplanUtils.ts` 72.22 and 100, `Flightplanloader.ts` 88 and 96,
+`KLNNavmath.ts` and `SignalOutputFilter.ts` 100 and 100. Read the rise with care (section 1): the number says what ran,
+not what is held.
+
+The suite at the start: 768 tests passed and 60 expected failures, in 139 files. At the end: 904 tests passed and 83
+expected failures, in 151 files. The twenty-three new expected failures are pins: #148 (two), #149, #150, #151, #152,
+#153, #154, #155, #156, #157, #158, #159 (three), #160, #82, #119, #100 (the wrong-way bank), and #97, which went from
+one pin to five (one per fraction and the on-segment pin).
 
 ## 2026-10-05, session 4, branch `tests-session-4-contract`
 
