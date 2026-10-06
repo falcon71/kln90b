@@ -467,7 +467,7 @@ describe('ground speed below 2 kt (characterization)', () => {
 
 // 3-4: during the self-test DIS is 34.5 NM and the D-bar shows half scale right, which is 2.5 NM left of course on the
 // 5 NM scale. GPS WP CROSS TRK is the negated cross track (SensorsOutSimVars.test.ts), so 2.5 NM left is +4630 m. The
-// XTK output filter overshoots after its step from zero (#NEW-5-1), so the outputs are read late, 30 s into the self-test
+// XTK output filter overshoots after its step from zero (#158), so the outputs are read late, 30 s into the self-test
 // page, when it has settled.
 describe('self-test outputs (3-4)', () => {
     it('writes DIS 34.5 NM and a half-scale right deviation', async () => {
@@ -517,7 +517,7 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');
     });
 
-    it.fails('keeps the selected 1.00 NM over a GPS loss (#NEW-4-1)', async () => {
+    it.fails('keeps the selected 1.00 NM over a GPS loss (#159)', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
         await moveAircraft(unit, pointBefore(kaaa, abc, 20), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
         await selectOneNm(unit);
@@ -541,7 +541,7 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
     });
 
     // After the loss MOD 1 shows no scale at all ("CDI:±NM") today, because the reset 5 is not one of the ARM choices
-    it.fails('keeps the 1 NM approach-arm scale while the GPS is lost (#NEW-4-1)', async () => {
+    it.fails('keeps the 1 NM approach-arm scale while the GPS is lost (#159)', async () => {
         const unit = await armedOnApproach();
         await unit.panel.selectPage('L', 'MOD 1');
         unit.props.sensors.in.gps.reset();
@@ -552,7 +552,7 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');
     });
 
-    it.fails('keeps the selected 1.00 NM without an active waypoint (#NEW-4-1)', async () => {
+    it.fails('keeps the selected 1.00 NM without an active waypoint (#159)', async () => {
         const unit = await bootUnit();
         await settle(unit);
         expect(activeIdent(unit)).toBeUndefined(); // Precondition: there is no active waypoint
@@ -584,7 +584,7 @@ describe('passing a waypoint off course', () => {
         expect(activeIdent(unit)).toBe('KBBB');
     });
 
-    it.fails('with turn anticipation the unit sequences to KBBB once ABC is behind (#NEW-4-3)', async () => {
+    it.fails('with turn anticipation the unit sequences to KBBB once ABC is behind (#157)', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
         await abeamPositions(unit, kaaa, abc);
 

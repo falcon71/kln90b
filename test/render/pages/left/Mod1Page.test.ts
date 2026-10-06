@@ -41,7 +41,7 @@ describe('MOD 1 CDI scale field with an approach loaded 40 NM from the airport',
 
     // 6-1: armed with the switch beyond 30 NM the scale stays +-5, so MOD 1 must show it. Mod1Page.getScaleIdx looks 5 up in
     // the scales valid for ARM, [0.3, 1], gets -1 and the field shows no value
-    it.fails('shows CDI:±5.00NM when armed by the switch 40 NM from the airport (#NEW-5-2)', async () => {
+    it.fails('shows CDI:±5.00NM when armed by the switch 40 NM from the airport (#160)', async () => {
         const unit = await approachLoaded40();
         await vi.advanceTimersByTimeAsync(6000);
         await unit.panel.press('KLN90B_ApprArm_Push');

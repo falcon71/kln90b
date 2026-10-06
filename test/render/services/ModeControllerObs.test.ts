@@ -108,7 +108,7 @@ describe('LEG to OBS (5-36)', () => {
         return nav;
     }
 
-    it('enters OBS with EEE active for an aircraft on a long leg, 100 NM before the waypoint (the setup of #NEW-3-1)', async () => {
+    it('enters OBS with EEE active for an aircraft on a long leg, 100 NM before the waypoint (the setup of #151)', async () => {
         const nav = await longLegInObs();
 
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
@@ -116,7 +116,7 @@ describe('LEG to OBS (5-36)', () => {
         expect(nav.activeWaypoint.isDctNavigation()).toBe(true);
     });
 
-    it.fails('keeps the deviation of an aircraft on a long leg, 100 NM before the waypoint (#NEW-3-1)', async () => {
+    it.fails('keeps the deviation of an aircraft on a long leg, 100 NM before the waypoint (#151)', async () => {
         const nav = await longLegInObs();
 
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.1);
@@ -182,7 +182,7 @@ describe('OBS to LEG (5-36)', () => {
 
     // The sibling of the pin below: its setup holds, and the switch itself works (5-36: the mode changes, a waypoint is
     // active)
-    it('the pin setup: OBS 050 to ABC, 10 NM past ABC, 2 NM right of ABC - KBBB, FROM (the setup of #NEW-3-5)', async () => {
+    it('the pin setup: OBS 050 to ABC, 10 NM past ABC, 2 NM right of ABC - KBBB, FROM (the setup of #155)', async () => {
         const {unit, nav} = await pastAbcInObs();
 
         expect(nav.activeWaypoint.getActiveFplIdx()).toBe(1);
@@ -199,7 +199,7 @@ describe('OBS to LEG (5-36)', () => {
     // deviation from that leg is kept; checked in the KLN 89 trainer: the leg comes back with its deviation. The unit
     // makes a direct-to from the present position to KBBB instead (ModeController.switchToEnrLegMode, FROM branch), so the
     // plan leg is lost and the deviation is zero
-    it.fails('re-activates the plan leg ABC - KBBB instead of a direct-to from the present position (#NEW-3-5)', async () => {
+    it.fails('re-activates the plan leg ABC - KBBB instead of a direct-to from the present position (#155)', async () => {
         const {unit, nav, foot} = await pastAbcInObs();
 
         await legMode(unit);
@@ -235,7 +235,7 @@ describe('OBS to LEG (5-36)', () => {
     }
 
     // 5-36 rule 1: the sibling of the pin below; its setup holds and the switch back to LEG works
-    it('the pin setup: the second ABC of FPL 0 stays active in OBS, and LEG brings the unit back to ENR-LEG (the setup of #NEW-3-2)', async () => {
+    it('the pin setup: the second ABC of FPL 0 stays active in OBS, and LEG brings the unit back to ENR-LEG (the setup of #152)', async () => {
         const {unit, aw} = await secondAbcInObs();
 
         await legMode(unit);
@@ -244,7 +244,7 @@ describe('OBS to LEG (5-36)', () => {
         expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
     });
 
-    it.fails('keeps the second copy of a waypoint that is twice in FPL 0 active (#NEW-3-2)', async () => {
+    it.fails('keeps the second copy of a waypoint that is twice in FPL 0 active (#152)', async () => {
         const {unit, aw} = await secondAbcInObs();
 
         await legMode(unit);
@@ -289,7 +289,7 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
     }
 
     // 5-36 and 6-11: the sibling of the pin below; its setup holds and the switch back to LEG works
-    it('the pin setup: the IAF copy is active in ARM-OBS, and LEG brings the unit to ARM-LEG with TXOAA active (the setup of #NEW-3-3)', async () => {
+    it('the pin setup: the IAF copy is active in ARM-OBS, and LEG brings the unit to ARM-LEG with TXOAA active (the setup of #153)', async () => {
         const {unit, aw} = await iafIsFafInObs();
 
         await legMode(unit);
@@ -300,7 +300,7 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
 
     // 6-11 step 5: after the course reversal at an IAF that is also the FAF, switching to LEG makes the FAF active.
     // Run as a plain it, the pin fails at the index assertion: expected 1 to be 2
-    it.fails('makes the FAF copy active when the IAF and the FAF are the same fix (#NEW-3-3)', async () => {
+    it.fails('makes the FAF copy active when the IAF and the FAF are the same fix (#153)', async () => {
         const {unit, aw} = await iafIsFafInObs();
 
         await legMode(unit);
@@ -311,7 +311,7 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
 
     // 6-11 note and 6-19 note: after holding at a missed approach holding point that is also the FAF, switching to LEG
     // makes the FAF active. This passes only because ActiveWaypoint.directTo takes the first copy of the waypoint, the
-    // lookup of #NEW-3-2: a fix of that pin that keeps the active copy turns this test red
+    // lookup of #152: a fix of that pin that keeps the active copy turns this test red
     it('makes the FAF copy active when the missed approach holding point is the FAF', async () => {
         const vvvPos = pointFrom(mapaa, 0, 5);
         const vvv = vor('VVV', vvvPos.lat, vvvPos.lon);

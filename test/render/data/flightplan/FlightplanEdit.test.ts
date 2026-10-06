@@ -143,7 +143,7 @@ describe('adding a waypoint to a full FPL 0', () => {
         expect(idents[29]).toBe('FA29');
     });
 
-    it.fails('puts a waypoint typed over the first row first (#NEW-2-1)', async () => {
+    it.fails('puts a waypoint typed over the first row first (#148)', async () => {
         const unit = await bootFull(100);
 
         await typeKnewOver(unit, 0);
@@ -179,7 +179,7 @@ describe('deleting a flight plan (4-5)', () => {
 
     // Public contract (CLAUDE.md, persisted user data): the user's flight plans are saved. Flightplan.delete() does not
     // publish flightplanChanged, so the stored plan stays and comes back at the next start.
-    it.fails('saves the deleted plan as empty (#NEW-2-3)', async () => {
+    it.fails('saves the deleted plan as empty (#150)', async () => {
         const unit = await deleteFpl0();
 
         expect(storedSetting(unit, 'fpl0')).toBe(''); // An empty plan is the stored empty string

@@ -51,7 +51,7 @@ describe('SignalOutputFilter (the XTK output filter)', () => {
     // an averaging circuit, which smooths a change of the deviation but does not carry the needle past the new value.
     // The filter extrapolates the last change for one more second, so after a step it runs on to twice the step before
     // it comes back.
-    it.fails('does not overshoot a step in XTK (#NEW-5-1)', () => {
+    it.fails('does not overshoot a step in XTK (#158)', () => {
         const samples = run(new SignalOutputFilter(), step, 8000);
 
         const peak = Math.max(...samples.map(([, v]) => v));

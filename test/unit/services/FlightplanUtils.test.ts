@@ -235,7 +235,7 @@ describe('insertLegIntoFpl', () => {
 
     // 4-4: a waypoint typed over the first row goes in front of the first waypoint, so it becomes the first one. Today
     // the index becomes -1 after the first leg is dropped, and splice(-1) puts the leg in front of the last one.
-    it.fails('puts a waypoint typed in front of the first leg of a full FPL 0 first (#NEW-2-1)', () => {
+    it.fails('puts a waypoint typed in front of the first leg of a full FPL 0 first (#148)', () => {
         const {fpl0, aw} = build(fullPlanLegs(), START);
 
         insertLegIntoFpl(fpl0, navState(aw, null), 0, user(NEW));
@@ -265,7 +265,7 @@ describe('ActiveWaypoint after a leg is inserted in front of the active waypoint
         expect(aw.getFutureLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['ABC', 'DEF', 'GHI']);
     });
 
-    it.fails('keeps a direct-to to a waypoint of the plan in the plan (#NEW-2-2)', () => {
+    it.fails('keeps a direct-to to a waypoint of the plan in the plan (#149)', () => {
         const {fpl0, aw} = build([A, B, C, D].map(user), pointFrom(A, 0, 3));
         aw.directToFlightplanIndex(A, 2); // Direct to C
         expect(aw.getActiveFplIdx()).toBe(2);

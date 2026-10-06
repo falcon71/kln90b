@@ -72,7 +72,7 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
 
     // 5-37 (5.9.7) step 2: the sibling of the pin below. The same flow makes KBBB active and keeps the mode, so the pin
     // fails only on the deviation
-    it('the pin setup: ACTIVATE with OBS 050 makes KBBB active and keeps ENR-OBS (the setup of #NEW-3-4)', async () => {
+    it('the pin setup: ACTIVATE with OBS 050 makes KBBB active and keeps ENR-OBS (the setup of #154)', async () => {
         const {nav} = await activateKbbbOnCourse50();
 
         expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
@@ -83,7 +83,7 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
     // 5-37 (5.9.7) step 3: the D-bar is not recentred, the deviation is from the 050 course through KBBB. DirectToPage
     // makes a direct-to from the present position and then calls setObs with the unchanged course, which returns early
     // (ModeController.setObs), so the direct-to path stays and the deviation is zero
-    it.fails('does not recentre the deviation: it is measured from the OBS course through the new waypoint (#NEW-3-4)', async () => {
+    it.fails('does not recentre the deviation: it is measured from the OBS course through the new waypoint (#154)', async () => {
         const {nav, expected} = await activateKbbbOnCourse50();
 
         expect(Math.abs(nav.xtkToActive! - expected)).toBeLessThan(0.05);
