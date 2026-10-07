@@ -121,11 +121,14 @@ describe('FrontPanel.selectPage (harness)', () => {
                 for (let clicks = 0; clicks < 100; clicks++) {
                     await unit.panel.inner(side, 1);
                     const n = number(Screen.read().status()[side === 'L' ? 'left' : 'right']);
-                    if (n === cycle[0] && seen.length > 1) break;
+                    if (n === cycle[0] && seen.length > 1) {
+                        seen.push(n); // the wrap back to the first page
+                        break;
+                    }
                     if (n !== seen[seen.length - 1]) seen.push(n);
                 }
 
-                expect(seen).toEqual(cycle);
+                expect(seen).toEqual([...cycle, cycle[0]]);
             });
     });
 
