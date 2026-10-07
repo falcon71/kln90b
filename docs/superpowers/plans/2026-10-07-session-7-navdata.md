@@ -129,6 +129,7 @@ Each task uses only its own numbers. Task 7 files one issue per row and replaces
 | `#NEW-6-1` | F-1 | bug | pin (task 6) |
 | `#NEW-6-2` | F-2 | question (hold after the MAHP-flagged leg) | issue only; the draft pin is not committed |
 | `#NEW-6-3` | F, Q4 + trainer Q3 | question (FPL FULL during a procedure load) | comment on the FPL FULL characterization |
+| `#NEW-6-4` | task 6 (found during implementation) | bug (approach legs after the first land one slot too far when FPL 0 makes room; `FlightplanUtils.ts:41-42`) | pin (task 6) |
 
 ---
 

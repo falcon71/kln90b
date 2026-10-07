@@ -4,7 +4,7 @@
     {
       "id": 0,
       "subject": "Task 0: harness",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Remove the CAL 6 load flake, add the hold and procedure-turn leg builders, correct the `BootOptions` comment on\nthe navdata cycle, and add the session's harness notes to `testing.md`.\n\n**Files:**\n- Modify: `test/render/data/VolatileMemory.test.ts` (the two tests of `describe('CAL 6 time (5-14)')`)\n- Modify: `test/harness/navdata/procedures.ts` (the `Leg` object)\n- Modify: `test/unit/harness/procedures.test.ts` (the options test)\n- Modify: `test/harness/boot.ts:38-42` (the `start` doc comment)\n- Modify: `docs/testing.md` (sections 3 \"Procedures\", 4 \"Render\", 6)\n\n**Acceptance Criteria:**\n- [ ] The two CAL 6 tests carry a per-test timeout of 20 000 ms; nothing else in the file changes.\n- [ ] `Leg.HF`, `Leg.HA` and `Leg.PI` exist with the signature of `Leg.HM`, and the harness test asserts each option of\n      each builder with a non-default value.\n- [ ] The `start` comment of `BootOptions` no longer says that a test can set the navdata cycle; it says the cycle is\n      fixed per test file.\n- [ ] `testing.md` documents: `coldGps` is a hot start and time to first fix needs `engineRunning: false` plus\n      `powerOn()`; long render tests need a per-test timeout; the SDK internals `Gps.ts` reads; the new builders.\n- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.\n\n**Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.\n\n```json:metadata\n{\"files\": [\"test/render/data/VolatileMemory.test.ts\", \"test/harness/navdata/procedures.ts\", \"test/unit/harness/procedures.test.ts\", \"test/harness/boot.ts\", \"docs/testing.md\"], \"verifyCommand\": \"npm test && npx tsc --noEmit\", \"acceptanceCriteria\": [\"CAL 6 tests have a 20 s per-test timeout\", \"Leg.HF/HA/PI exist with HM's signature and a harness test of every option\", \"BootOptions start comment corrected\", \"testing.md documents coldGps hot start, long-test timeout, Gps SDK internals, the builders\", \"suite green, kln90b unchanged\"], \"modelTier\": \"standard\"}\n```"
     },
     {
@@ -76,5 +76,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-10-07T13:07:37.563975"
+  "lastUpdated": "2026-10-07T13:19:55.530609"
 }
