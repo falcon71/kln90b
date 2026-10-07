@@ -235,7 +235,8 @@ resolves, like a sim with no EFB.
 `navdata/procedures.ts` builds SIDs, STARs and approaches that the real `SidStar` conversion and the APT 7 and APT 8
 pages accept.
 
-- `Leg.TF(fix, flags)`, `Leg.IF`, `Leg.CF`, `Leg.DF`, `Leg.CA`, `Leg.VM`, `Leg.HM`, `Leg.AF` (a DME arc) and `Leg.RF`
+- `Leg.TF(fix, flags)`, `Leg.IF`, `Leg.CF`, `Leg.DF`, `Leg.CA`, `Leg.VM`, `Leg.HM`, `Leg.HF`, `Leg.HA`, `Leg.PI`
+  (holds and a procedure turn, with the arguments of `Leg.HM`), `Leg.AF` (a DME arc) and `Leg.RF`
   (only to test that RF procedures are rejected) return legs as `FlightPlan.createLeg` does. `SidStar` writes into legs
   (`fixTypeFlags`, `course`), so every call returns a new object; never share a leg between procedures.
 - `sid`, `star` and `approach` take the legs by role: runway transitions, enroute transitions, common legs, or an
@@ -329,6 +330,11 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - **`settle(unit)`** (`boot.ts`) advances the clock until the GPS has a solution, then two calculation ticks more, so that
   FPL 0 has activated and the display shows it (a force-ready boot is valid at once, but FPL 0 activates only at the first
   calculation tick). It throws when there is no fix within its cap (120 s by default).
+- **Time to first fix.** `bootUnit({coldGps: true})` resets the GPS after a forced acquisition, so every satellite keeps
+  its ephemeris and the last known position is the present one: it acquires in about 62 s (slow) whatever the almanac,
+  the stored position or the clock, and cannot measure a cold or warm start. Boot with `engineRunning: false` and the
+  stored position, almanac time and `fastGpsAcquisition` in `storage`, then `powerOn()`; the GPS acquires while the
+  welcome and self-test pages run.
 - **`moveAircraft(unit, point, {groundspeedKt, trackTrue?})`** (`boot.ts`) moves the aircraft so that the GPS computes a
   track, which it takes from the last two positions once the ground speed is at least 2 kt (3-35). The helper sets
   `GROUND VELOCITY`, jumps to the point and runs one calculation tick, so the track is that of the jump from the present
@@ -572,11 +578,19 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   (`lastLatitude`, `lastLongitude`) removes only the first message; the second still posts on an engine-running boot
   (the hour is not added back when `forceReadyToUse` skips the power-on), so no `storage` setting gives an unlit MSG
   annunciator.
+- **Long render tests need their own timeout.** The render stage keeps Vitest's 5 s default. A test that advances
+  minutes of simulated time with every tick running can pass alone and time out while other suites load the machine,
+  which makes a mutation run report a false kill. Give such a test a per-test timeout (the CAL 6 tests in
+  `VolatileMemory.test.ts`).
 - **One live unit per test.** `bootUnit` refuses a second boot in the same test, because the singletons allow one unit
   at a time. A singleton the teardown does not know shows up as a test that passes alone and fails in its file.
 - **SDK upgrades may require updating the fakes.** `FakeSim` mirrors the native layer the SDK builds on, and
   `KLNGPSSatComputer` reaches into private SDK internals (docs/architecture.md, Core 3); recheck both, and run the whole
-  suite, after upgrading `@microsoft/msfs-sdk`. The harness also relies on these SDK internals, and after an upgrade a
+  suite, after upgrading `@microsoft/msfs-sdk`. `KLNGPSSatComputer` reads private fields of `GPSSatComputer` and the shape
+  of `activeSimulationContext` (`channels`, the almanac time `lastAlamanacTime`). SDK 2.3.3 moved `simTime` and
+  `distanceFromLastKnownPos` into `activeSimulationContext` without a type error, because the reads go through
+  `as any`; after an upgrade run `test/render/GpsAcquisition.test.ts` first (session 7, task 4 adds it). The harness
+  also relies on these SDK internals, and after an upgrade a
   change in one of them shows up as a confusing harness error, not as a named check:
     - the boundary search: `NearestLodBoundarySearchSession` builds its `LodBoundary` objects in a throttled queue on
       `requestAnimationFrame` (the airspace tests advance the fake clock for it), and a facility with `lods: []` makes

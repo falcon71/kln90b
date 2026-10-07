@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {FixTypeFlags, LegTurnDirection, RnavTypeFlags} from '@microsoft/msfs-sdk';
+import {FixTypeFlags, LegTurnDirection, LegType, RnavTypeFlags} from '@microsoft/msfs-sdk';
 import {SidStar} from '../../../kln90b/data/navdata/SidStar';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, runwayFix, sid, star, withProcedures} from '../../harness/navdata/procedures';
@@ -32,6 +32,11 @@ describe('procedure builders (harness)', () => {
         expect(Leg.CF(fix, 123, FixTypeFlags.FAF)).toMatchObject({course: 123, fixTypeFlags: FixTypeFlags.FAF, fixIcaoStruct: fix.icaoStruct});
         expect(Leg.HM(fix, 90, LegTurnDirection.Left, FixTypeFlags.MAHP)).toMatchObject({course: 90, turnDirection: LegTurnDirection.Left, fixTypeFlags: FixTypeFlags.MAHP});
         expect(Leg.HM(fix, 90).turnDirection).toBe(LegTurnDirection.Right);
+        expect(Leg.HF(fix, 90, LegTurnDirection.Left, FixTypeFlags.IAF)).toMatchObject({type: LegType.HF, course: 90, turnDirection: LegTurnDirection.Left, fixTypeFlags: FixTypeFlags.IAF, fixIcaoStruct: fix.icaoStruct});
+        expect(Leg.HA(fix, 270, LegTurnDirection.Left, FixTypeFlags.IAF)).toMatchObject({type: LegType.HA, course: 270, turnDirection: LegTurnDirection.Left, fixTypeFlags: FixTypeFlags.IAF, fixIcaoStruct: fix.icaoStruct});
+        expect(Leg.PI(fix, 45, LegTurnDirection.Left, FixTypeFlags.IAF)).toMatchObject({type: LegType.PI, course: 45, turnDirection: LegTurnDirection.Left, fixTypeFlags: FixTypeFlags.IAF, fixIcaoStruct: fix.icaoStruct});
+        expect(Leg.HF(fix, 90).turnDirection).toBe(LegTurnDirection.Right);
+        expect(Leg.HF(fix, 90).fixTypeFlags).toBe(0);
         // A fix may be given as an ICAO value as well as a facility
         expect(Leg.TF(fix.icaoStruct).fixIcaoStruct).toEqual(fix.icaoStruct);
         expect(Leg.IF(fix.icaoStruct, FixTypeFlags.IAF)).toMatchObject({fixIcaoStruct: fix.icaoStruct, fixTypeFlags: FixTypeFlags.IAF});

@@ -24,6 +24,13 @@ export const Leg = {
     VM: (courseMag: number) => FlightPlan.createLeg({type: LegType.VM, course: courseMag}),
     HM: (fix: Fix, inboundMag: number, turn = LegTurnDirection.Right, flags = 0) =>
         FlightPlan.createLeg({type: LegType.HM, fixIcaoStruct: icaoOf(fix), course: inboundMag, turnDirection: turn, fixTypeFlags: flags}),
+    HF: (fix: Fix, inboundMag: number, turn = LegTurnDirection.Right, flags = 0) =>
+        FlightPlan.createLeg({type: LegType.HF, fixIcaoStruct: icaoOf(fix), course: inboundMag, turnDirection: turn, fixTypeFlags: flags}),
+    HA: (fix: Fix, inboundMag: number, turn = LegTurnDirection.Right, flags = 0) =>
+        FlightPlan.createLeg({type: LegType.HA, fixIcaoStruct: icaoOf(fix), course: inboundMag, turnDirection: turn, fixTypeFlags: flags}),
+    /** A procedure turn; courseMag is the outbound course of the turn */
+    PI: (fix: Fix, courseMag: number, turn = LegTurnDirection.Right, flags = 0) =>
+        FlightPlan.createLeg({type: LegType.PI, fixIcaoStruct: icaoOf(fix), course: courseMag, turnDirection: turn, fixTypeFlags: flags}),
     /**
      * DME arc to endFix around navaid. SidStar uses fromRadial (course) and toRadial (theta) as true bearings, and the arc
      * must not be the first leg that survives filtering (the conversion replaces the leg before it with the entry).

@@ -33,7 +33,7 @@ describe('CAL 6 time (5-14)', () => {
 
         expect(utcNow()).not.toBe(first); // The precondition: the clock has moved on
         expect(Screen.read().rows('L')[1]).toBe(` ${first} UTC `);
-    });
+    }, 20_000); // Five simulated minutes with every tick: the 5 s default times out when the machine is busy
 
     it('shows the system time again at its first view after a power cycle (5-14)', async () => {
         const unit = await bootUnit();
@@ -48,7 +48,7 @@ describe('CAL 6 time (5-14)', () => {
 
         expect(utcNow()).not.toBe(first);
         expect(Screen.read().rows('L')[1]).toBe(` ${utcNow()} UTC `);
-    });
+    }, 20_000); // Five simulated minutes with every tick: the 5 s default times out when the machine is busy
 });
 
 describe('the mode after a power cycle (3-3)', () => {
