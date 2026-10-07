@@ -647,6 +647,18 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   not log asserts that the list is empty.
 - **`selectPage` cannot end on Super NAV 5**, and a way that passes `NAV 5` on one side while the other side shows
   `NAV 5` is a hazard too: Super NAV 5 hides the status line the helper reads (section 4).
+- **`selectPage` runs the pages it passes.** Each page on the way is built and runs its side effects: on the way from
+  CAL 1 to CAL 3 the unit shows CAL 2, which overwrites the CAL 3 TAS (#33), so a CAL 3 test enters its TAS with the
+  knobs after arriving; the TRI pages read their fields from `unit.props.memory.triPage` when they are built, so a test
+  seeds the memory first and selects the page after.
+- **`selectPage` throws once a row overflows**, because it reads the screen after every click, and `Screen.read()`
+  throws on a character past column 11 (below). A pin of an overflow (a distance that rounds up to its cutoff) selects
+  its page first, then moves the aircraft into the overflow, and its sibling reads the raw row with `readRows`
+  (`Nav1Page.test.ts`, `Nav3Page.test.ts`).
+- **The fuel computer reads `NUMBER OF ENGINES` once, while it is built.** A test without the `simVars` option
+  (section 4) counts no real engine and sees every fuel flow and every fuel used as 0. The pages that show them exist
+  only with the matching interfaces: OTH 5 to OTH 8 with the fuel computer and OTH 9 and OTH 10 with the air data
+  computer (`PageTreeController` removes them otherwise), so their tests boot with both the panel.xml and the SimVar.
 - **A bus subscription added after boot is called at once with the last cached value.** A test that subscribes to a
   topic and expects to see only new events must skip that first call (or count from a reference taken after
   subscribing).
@@ -692,8 +704,6 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - Flip the pins when the bugs are fixed: remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each of
   which names its issue. The real fix of #90 (a copy of the page tree per controller) also changes
   `test/render/harness/pageTree.test.ts`, which asserts the in-place pruning.
-- #99 (lat/lon displays show 60.00 minutes just below a whole degree) is filed but has no pin yet; a render test would
-  hold it.
 - Approach arming (the ARM and APR scale ramps), the waypoint alert without turn anticipation and the GPS-invalid path
   are held at the render stage (Session 5: a held position plus `moveAircraft` observes them); flights would only add the
   motion. The one navigation flight Session 5 needed is the alert through a turn (`waypointAlertTurn.test.ts`).
@@ -719,7 +729,9 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       section 3). The older copies in `ModeController.test.ts` and `HEvents.test.ts` (IAF = FAF, #129) and the arc world
       of `SensorsOutSimVars.test.ts`, copied into `WTFlightplanSync.test.ts`, stay copied. `approachWorld()` has no
       missed approach, so the MAP tests of `NavCalculator.test.ts` build their own approach with a missed approach leg,
-      and `ModeControllerObs.test.ts` builds the IAF = FAF and the MAHP = FAF approaches it needs (#153).
+      and `ModeControllerObs.test.ts` builds the IAF = FAF and the MAHP = FAF approaches it needs (#153). That MAP world
+      is now copied twice more, into `SuperNav5Page.test.ts` (AUTO near the MAP) and `DirectToPage.test.ts` (a Direct To
+      at the MAP); a missed approach option of `approachWorld()` would replace all of them.
     - **A `FakeXhr` mount.** `FakeXhr` serves `resources/` only at the default path, so a custom `BasePath` fails the
       boot; a mount option would let a test hold the BasePath effect.
 - Harness gaps that the Session 6 tests worked around (each serves one file, so none was built, per rule 13 of
@@ -744,6 +756,26 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       panel.xml key Session 4 left out). A probe found that a cold-and-dark unit in take-home never gets a fix and that
       the position dead-reckons a straight line on the SET 1 track instead of following the plan (5-46, 3-19); no issue
       was filed.
+- Harness gaps and leads from Session 8 (none was built, per rule 13 of test-coverage.md):
+    - **Super NAV 5's cursor is read by local helpers.** `SuperNav5.read()` has no mask, so `SuperNav5Page.test.ts`
+      reads the focused field with its own helpers (`focusedIn`, `focusedLeft`, `focusedRight`) over the `.inverted`
+      spans (skipping the message field, and turning the no-break spaces of the field 3 selector back into blanks). A `focused` field in the reader would
+      replace them.
+    - **`vitest -t` takes a regular expression.** Titles with `(`, `)`, `+`, `?` or `#` (every pin and most citations)
+      need escaping in a filtered run, which matters for the mutation pass more than for the tests.
+    - **Leads that were seen and not confirmed or not filed** (each needs evidence or is out of reach today):
+        - FPL 0 shows an empty top row when the active waypoint is the first one, and after a list rebuild with the
+          cursor on (the blank first-line item takes row 0). The guide's figures do not show the case; a question for
+          the next KLN 89 trainer session. `DirectToPage.test.ts` reads rows 1 to 5 around it.
+        - An XTK of exactly 0 shows `-.-` on NAV 3 (`Nav3Page.tsx:55,95` treat 0 as no value); unreachable in practice.
+        - `AltitudeFieldset` shows `00000` below sea level, while a low-confidence photo of the self-test page shows a
+          negative altitude (Session 10).
+        - Debug `console.log` calls in `SupPage.tsx` and `WaypointPage.tsx`, and the ` 0` in the top row of the SUP
+          page at boot (Session 9).
+        - `ModObsElement.innerRight` (MOD 2) and `FuelOnBoardSelect.innerRight` return `false` while `innerLeft`
+          returns `true`; neither page is an overlay, so nothing visible follows (the Super NAV 5 case is a bug, #238).
+        - CAL 2's `setTemp` writes the CAL 1 temperature too; 5-11 does not say whether the pages share it, so no test
+          holds it.
 - **The flown-through bound of `dmeArc.test.ts` does not hold the arc reversal.** With `fromDtk` reversed on arc legs,
   the monitor's bound north of the leg stays green (0.895 NM against a radius of 1.012 NM); only the circle-center
   assertion of the same test fails. A tighter bound, or a second monitor on the arc's radius, would make the flight

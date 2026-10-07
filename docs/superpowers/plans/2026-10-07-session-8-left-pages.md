@@ -274,26 +274,26 @@ each in `testing.md`.
 - Modify: `docs/testing.md` (sections 3, 4 and 7)
 
 **Acceptance Criteria:**
-- [ ] `Screen.read()`, `selectPage`, `focused` and `cursorTo` work on FPL 3 with waypoints; the overlay tests and the
+- [x] `Screen.read()`, `selectPage`, `focused` and `cursorTo` work on FPL 3 with waypoints; the overlay tests and the
       booted FPL 3 test pass, and each fails with the overlay branch removed except the one whose overlay is hidden.
-- [ ] `recordMap` records the last complete redraw by name and pixel and still draws; `downsampled` lives in
+- [x] `recordMap` records the last complete redraw by name and pixel and still draws; `downsampled` lives in
       `canvas.ts`, and `Nav5Page.test.ts` imports it with its tests unchanged and green.
-- [ ] `bootUnit({simVars})` sets SimVars before `KLN90BCore.init`, after the boot's own: a fuel computer booted with
+- [x] `bootUnit({simVars})` sets SimVars before `KLN90BCore.init`, after the boot's own: a fuel computer booted with
       `NUMBER OF ENGINES` 2 counts two engines, and one booted without counts one.
-- [ ] `FakeSim.applyObsKeyEvents` is off by default and after `reset()`; on, `K:VOR1_SET` and `K:VOR2_SET` set
+- [x] `FakeSim.applyObsKeyEvents` is off by default and after `reset()`; on, `K:VOR1_SET` and `K:VOR2_SET` set
       `Nav OBS:1` and `Nav OBS:2`.
-- [ ] `enterIdent` enters `AAA` over the NAV 4 VNAV waypoint `ABC`; `cursorTo` with the cursor off throws without a
+- [x] `enterIdent` enters `AAA` over the NAV 4 VNAV waypoint `ABC`; `cursorTo` with the cursor off throws without a
       click.
-- [ ] The selector `it.each` of `enterIdent.test.ts` no longer asserts the `E 09°` rows (`#NEW-1-8`, rule 8).
-- [ ] `testing.md` documents each change; the section 7 notes on the `.use-invert` gap and on SimVars before `init` are
+- [x] The selector `it.each` of `enterIdent.test.ts` no longer asserts the `E 09°` rows (`#NEW-1-8`, rule 8).
+- [x] `testing.md` documents each change; the section 7 notes on the `.use-invert` gap and on SimVars before `init` are
       replaced.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: the `USE?` overlay** (research C, part 1; `research\drafts-C\harness.patch`). `FlightplanList.tsx`
+- [x] **Step 1: the `USE?` overlay** (research C, part 1; `research\drafts-C\harness.patch`). `FlightplanList.tsx`
   renders `USE? INVRT?` and then, in a `<span class="use-invert">`, the `USE?` button, which `KLN90B.scss` pulls back
   eleven cells over the first four cells of `USE? INVRT?`. Apply the patch's hunks for `test/harness/render/screen.ts`
   and `test/render/harness/screen.test.ts` by hand with the Edit tool (the patch is LF). In `screen.ts`, after
@@ -362,7 +362,7 @@ function overlay(rows: Cell[][], read: () => void): void {
   break of `UseInvertButton.tick` no longer hiding USE? (`FlightplanList.tsx:78`), which fails the booted test. Run
   them.
 
-- [ ] **Step 2: the map recorder and `downsampled`** (research B, "How the maps are observed").
+- [x] **Step 2: the map recorder and `downsampled`** (research B, "How the maps are observed").
     - Copy `research\drafts-B\test\harness\render\mapRecorder.ts` to `test/harness/render/mapRecorder.ts` with the
       Write tool. It exports `recordMap(names: Record<string, LatLonInterface> = {})`, which wraps the drawing methods of
       `CoordinateCanvasDrawContext` (`drawIcon`, `drawLabel`, `drawFlightplanLine`, `drawFlightplanArrow`, `drawLine`,
@@ -460,7 +460,7 @@ describe('downsampled (harness)', () => {
   Predicted: before the two files exist the test file fails to import. Prove the recorder with your own breaks (a spy
   that does not call the original fails "still draws"; a `fill` wrapper that does not end the frame fails the others).
 
-- [ ] **Step 3: the `simVars` boot option.** In `test/harness/boot.ts`, add to `BootOptions` after `platform`:
+- [x] **Step 3: the `simVars` boot option.** In `test/harness/boot.ts`, add to `BootOptions` after `platform`:
 
 ```ts
     /**
@@ -512,7 +512,7 @@ describe('bootUnit simVars (harness)', () => {
 
   Predicted without the option: the first and the third test fail, the second passes (it holds the default).
 
-- [ ] **Step 4: the course key events of `FakeSim`.** In `test/harness/sim/FakeSim.ts`, above `ABSOLUTE_TIME_OFFSET_S`:
+- [x] **Step 4: the course key events of `FakeSim`.** In `test/harness/sim/FakeSim.ts`, above `ABSOLUTE_TIME_OFFSET_S`:
 
 ```ts
 /** The key events that set a course SimVar when FakeSim.applyObsKeyEvents is on */
@@ -579,7 +579,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
 
   Predicted without the option: the second and third test fail, the first passes.
 
-- [ ] **Step 5: `enterIdent` and `cursorTo`** (research A and B, "Harness gaps"). In `FrontPanel.enterIdent`, replace
+- [x] **Step 5: `enterIdent` and `cursorTo`** (research A and B, "Harness gaps"). In `FrontPanel.enterIdent`, replace
   the editor loop with:
 
 ```ts
@@ -656,7 +656,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
   fails because the old code turns the outer knob twenty times and throws `no field "USER POS?"`. A DIRECT TO page does
   not show the gap (its single field takes the outer knob back to itself), which is why the test uses NAV 4.
 
-- [ ] **Step 6: `testing.md`.**
+- [x] **Step 6: `testing.md`.**
     - Section 3, "The composition root", step 1 of `bootUnit()`: after the SimVars a booting unit reads, "then the
       test's own `simVars` (section 4), which win".
     - Section 3, "The global fakes", the `FakeSim` bullet **Key events have no effect**: keep it for every key event,
@@ -679,7 +679,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
       **SimVars before `init`** with a line that the `simVars` boot option (section 4) now exists and that the
       electricity tests (`SimVarSync.test.ts`, `PowerButton.test.ts`) still take the detour of a powered boot.
 
-- [ ] **Step 7: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines (each
+- [x] **Step 7: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines (each
   harness test against the removal of its harness code, as predicted above, plus the research C breaks).
 
 ```json:metadata
@@ -706,26 +706,26 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
 - Modify: `test/render/controls/editors/LatLonEditor.test.ts:19-20` (the longitudes)
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] The pins `#NEW-1-1` to `#NEW-1-8` and the #99 pins turn red under their fixes; each has a passing sibling.
-- [ ] The existing test of `Nav2Page.test.ts` carries `characterization` and no longer asserts `E 08°00.00'`; that row
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] The pins `#NEW-1-1` to `#NEW-1-8` and the #99 pins turn red under their fixes; each has a passing sibling.
+- [x] The existing test of `Nav2Page.test.ts` carries `characterization` and no longer asserts `E 08°00.00'`; that row
       is a `#NEW-1-8` pin expecting `E  8°00.00'`.
-- [ ] `NullDashes.test.ts` no longer asserts the longitude dashes `- --°--.--'`; a `#NEW-1-2` pin expects
+- [x] `NullDashes.test.ts` no longer asserts the longitude dashes `- --°--.--'`; a `#NEW-1-2` pin expects
       `----°--.--'`.
-- [ ] `ActiveWaypoint.test.ts` no longer asserts `'d    ›KBBB '`; each of the two tests has a `#NEW-1-5` pin beside it.
-- [ ] No test of the task asserts a degree below 10 written with a zero or a duration of `:60`.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] `ActiveWaypoint.test.ts` no longer asserts `'d    ›KBBB '`; each of the two tests has a `#NEW-1-5` pin beside it.
+- [x] No test of the task asserts a degree below 10 written with a zero or a duration of `:60`.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the drafts.** Read `research-A.md` and `research\trainer.md` Q1 to Q3. Copy
+- [x] **Step 1: start from the drafts.** Read `research-A.md` and `research\trainer.md` Q1 to Q3. Copy
   `research\drafts-A\test\render\pages\left\{Nav1Page,Nav4Page,SuperNav1Page}.test.ts` to the same paths; from
   `drafts-A\…\Nav2Page.test.ts` and `drafts-A\…\left\Nav3Page.test.ts` take the appended describes. Rename `#NEW-A-1` to
   `#NEW-1-1` and so on: `#NEW-A-n` becomes `#NEW-1-n` for each n of the drafts.
 
-- [ ] **Step 2: NAV 1** (`Nav1Page.test.ts`; world: KDDD at 47 N 9 E, KAAA 200 NM west of it on the great circle that
+- [x] **Step 2: NAV 1** (`Nav1Page.test.ts`; world: KDDD at 47 N 9 E, KAAA 200 NM west of it on the great circle that
   leaves KDDD on 270 true, FPL 0 KAAA, KDDD, the aircraft `nm` west of KDDD with `moveAircraft`; boot 5 NM further west
   and select NAV 1 before moving, because the DIS pin makes the screen unreadable).
     - `NAV 1 page (characterization)`: the leg, the bar, DIS, GS, ETE and BRG on an FPL 0 leg; `half('L')`
@@ -752,7 +752,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
       (today `ηηηηηΥηηηηη`). Fix: `(this.to ? TO_LETTERS[9] : FROM_LETTERS[9]) + targetChar` (`DeviationBar.tsx:72`).
     - The characterization at 64.8 NM shows `:27`, not near an hour; no snapshot holds `:60`.
 
-- [ ] **Step 3: NAV 2** (`test/render/pages/Nav2Page.test.ts`; `nav2At(position, facilities, magvar)` boots and waits
+- [x] **Step 3: NAV 2** (`test/render/pages/Nav2Page.test.ts`; `nav2At(position, facilities, magvar)` boots and waits
   12 s).
     - **The existing test** (`describe('NAV 2 page')`, `'shows radial and distance from the nearest VOR and the present
       position'`) has neither a citation nor a label. Retitle it `(characterization)`, take the longitude row
@@ -786,7 +786,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
       `- --°--.--'`. Break: the distance dashes. **Pin** `it.fails('shows the longitude dashes in the cells of the three
       degree digits (3-8, #NEW-1-2)')`: row 5 `----°--.--'`. Fix: `LongitudeDisplay.tsx:31`.
 
-- [ ] **Step 4: NAV 3** (append to `Nav3Page.test.ts`; KDDD, KAAA 200 NM west, KEEE 30 NM east, FPL 0 KAAA, KDDD, KEEE so
+- [x] **Step 4: NAV 3** (append to `Nav3Page.test.ts`; KDDD, KAAA 200 NM west, KEEE 30 NM east, FPL 0 KAAA, KDDD, KEEE so
   the ESA avoids #183; the aircraft 30 NM west of KDDD, `rightNm` south of the course, 120 kt; `ObsSource 0` where the OBS
   is entered).
     - `NAV 3 page (characterization)`: `KAAA ›KDDD `, `DTK    089°`, `TK     090°`, `FLY L 0.3nm`, `MSA 15900ft`,
@@ -802,7 +802,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
       `it.fails('keeps the cross track in its three cells just below 10 NM (3-32, #NEW-1-4)')` (figures 3-104, 3-105):
       accepts `FLY L  10nm` or `FLY L 9.9nm` (today `FLY L 10.0nm`). Fix: the `DistanceDisplay` fix of step 2.
 
-- [ ] **Step 5: NAV 4** (`Nav4Page.test.ts`; KDDD, KAAA 100 NM west, KEEE 30 NM east, FPL 0 KAAA, KDDD, KEEE; the
+- [x] **Step 5: NAV 4** (`Nav4Page.test.ts`; KDDD, KAAA 100 NM west, KEEE 30 NM east, FPL 0 KAAA, KDDD, KEEE; the
   aircraft 40 NM west of KDDD at 7500 ft, no ground speed).
     - `NAV 4 page (characterization)`: the right variant, `VNV INACTV`, `IND 07500ft`, `SEL:00000ft`, `KDDD :-00nm`,
       `ANGLE:-1.8°`, `maskRows` with `I` at row 3 col 4. Break: `Alt10` not read-only.
@@ -822,7 +822,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
       (`Vnav.ts:36-37`).
     - The below-sea-level IND (research A Q5) is not tested; the report says so.
 
-- [ ] **Step 6: Super NAV 1** (`SuperNav1Page.test.ts`; the NAV 1 world, reached by `selectPage('L', 'NAV 1')`, then
+- [x] **Step 6: Super NAV 1** (`SuperNav1Page.test.ts`; the NAV 1 world, reached by `selectPage('L', 'NAV 1')`, then
   `selectPage('R', 'NAV 1')`).
     - `Super NAV 1 page (characterization)`: rows 0-5 `      KAAA ›KDDD       `, ` Ш Ш Ш Ш Ш Ў Ш Ш Ш Ш Ш `,
       `DIS  64.8nm   ETE   :27`, `GS    145kt   BRG  089°`, two blank rows. Break: ETE null.
@@ -834,7 +834,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
       symbol directly in front of the waypoint (3-31, figure 3-97, 3-32, #NEW-1-5)')`: row 0 trimmed matches
       `/d›KDDD$/` (today `      d    ›KDDD`). Fix in `SuperNav1Page.tsx:51,78`.
 
-- [ ] **Step 7: the existing rows that freeze bugs** (rule 8).
+- [x] **Step 7: the existing rows that freeze bugs** (rule 8).
     - `NullDashes.test.ts:31`: take the `LongitudeDisplay` row out of the `it.each` (the describe is a characterization
       of the dash layouts) and add beside it `it.fails('LongitudeDisplay shows its dashes in the cells of the three
       degree digits (3-8, #NEW-1-2)')` asserting `----°--.--'`, citing figure 3-26 and the photo. Its sibling is the
@@ -853,7 +853,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
     - `test/render/services/KeyboardService.test.ts:50` (the #109 pin) types into an open edit field, where the trainer
       saw zeros; leave it as it is.
 
-- [ ] **Step 8: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 8: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/render/pages/left/Nav1Page.test.ts", "test/render/pages/Nav2Page.test.ts", "test/render/pages/left/Nav3Page.test.ts", "test/render/pages/left/Nav4Page.test.ts", "test/render/pages/left/SuperNav1Page.test.ts", "test/render/controls/displays/NullDashes.test.ts", "test/render/data/flightplan/ActiveWaypoint.test.ts", "test/render/pages/right/Apt1Page.test.ts", "test/render/controls/editors/LatLonEditor.test.ts"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "#NEW-1-1..8 and #99 pins turn red under their fixes, with siblings", "existing NAV 2 test labeled; its E 08 row is a #NEW-1-8 pin", "NullDashes longitude row is a #NEW-1-2 pin", "ActiveWaypoint direct-to rows are #NEW-1-5 pins", "no assertion of a zero-padded degree below 10 or a :60 duration", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -873,23 +873,23 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
 - Create: `test/render/pages/left/__snapshots__/nav5Route.txt`, `test/render/pages/left/__snapshots__/superNav5Route.txt`
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] The pins `#NEW-2-1` to `#NEW-2-3` turn red under their fixes; each has a passing sibling.
-- [ ] AUTO 0.3 NM before the MAP of a world with a missed approach is either a spec test showing `1` (6-9, figure 6-16)
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] The pins `#NEW-2-1` to `#NEW-2-3` turn red under their fixes; each has a passing sibling.
+- [x] AUTO 0.3 NM before the MAP of a world with a missed approach is either a spec test showing `1` (6-9, figure 6-16)
       or the pin `#NEW-2-4` with a sibling; the report says which.
-- [ ] The OBS knob turned right on Super NAV 5 in OBS mode is either a spec test or the pin `#NEW-2-7`; the report says
+- [x] The OBS knob turned right on Super NAV 5 in OBS mode is either a spec test or the pin `#NEW-2-7`; the report says
       which.
-- [ ] The full scale list of each map is a characterization with the comment
+- [x] The full scale list of each map is a characterization with the comment
       `// the scales between 1 and 1000 NM are a question: #NEW-2-5`.
-- [ ] No snapshot or literal shows a VOR or NDB of FPL 0 labeled twice; the menu's ` 000° N^` row is not asserted
+- [x] No snapshot or literal shows a VOR or NDB of FPL 0 labeled twice; the menu's ` 000° N^` row is not asserted
       under a spec title.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the drafts.** Read `research-B.md`, `research\trainer.md` Q4 and Q15 (the trainer has no map)
+- [x] **Step 1: start from the drafts.** Read `research-B.md`, `research\trainer.md` Q4 and Q15 (the trainer has no map)
   and the design's "Maintainer's decisions". From `research\drafts-B\test\render\pages\left\Nav5Page.test.ts` take only
   the describes under the "Session 8 research drafts" banner (leave out the banner), and import `downsampled` from
   `test/harness/render/canvas.ts` (task 0 moved it) and `recordMap` from `test/harness/render/mapRecorder.ts`. Copy
@@ -897,7 +897,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
   `#NEW-2-1`, `#NEW-B-2` to `#NEW-2-2`, `#NEW-B-3` to `#NEW-2-3`. The map-font characters are asserted as code points
   with a comment naming the glyph (`$` diamond, `#` aircraft, `%` star, `+`, `@` square, `&` airport, `)` VOR, `(` NDB).
 
-- [ ] **Step 2: NAV 5** (`nav5OnRoute()`: the standard route in FPL 0, the aircraft at KAAA, NAV 5 left, the recorder
+- [x] **Step 2: NAV 5** (`nav5OnRoute()`: the standard route in FPL 0, the aircraft at KAAA, NAV 5 left, the recorder
   with KAAA, ABC, KBBB).
     - `NAV 5 page (characterization)`: FPL 0 north up at 40 NM, the aircraft 10 NM along the first leg; `rows('L')` and
       `maskRows('L')` inline (row 5 `N^       40`), the canvas file snapshot `nav5Route.txt`. Break: the FPL label
@@ -934,7 +934,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
       offers it, with the comment `// the scales between 1 and 1000 NM are a question: #NEW-2-5`. Break: a scale removed
       from the middle.
 
-- [ ] **Step 3: Super NAV 5** (the standard route plus a low VOR LOW, a high VOR HIG, the NDB AB and the airport KAAB a few
+- [x] **Step 3: Super NAV 5** (the standard route plus a low VOR LOW, a high VOR HIG, the NDB AB and the airport KAAB a few
   NM from KAAA; a local `focused` helper over the `.inverted` spans, skipping `msg` and turning U+00A0 back into blanks).
     - `Super NAV 5 page (characterization)`: every layer on, ABC replaced by the intersection ABCDE (a VOR of FPL 0 would
       be labeled twice, `#NEW-2-2`), the aircraft 10 NM along the leg at 120 kt, the 15 NM scale; `SuperNav5.read()`
@@ -987,7 +987,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
       the next one is nearer (3-36, #NEW-2-3)')`: `20` (today `5`). Fix: `Math.max(distToActive ?? 0,
       distanceToFollowing)` (`SuperNav5Page.tsx:212-220`).
 
-- [ ] **Step 4: AUTO near the MAP (`#NEW-2-4`).** Build an approach with a missed approach leg away from the MAP
+- [x] **Step 4: AUTO near the MAP (`#NEW-2-4`).** Build an approach with a missed approach leg away from the MAP
   (`approachWorld()` has none: copy the MAP world of the MAP tests in `test/render/data/navdata/NavCalculator.test.ts`,
   the third copy, which task 8 notes). Put the aircraft 0.3 NM before the MAP on the final course with the MAP active,
   Super NAV 5 on AUTO. 6-9 (figure 6-16) shows the 1 NM scale there. Run it on the unchanged code first:
@@ -998,7 +998,7 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
       NM before the MAP (6-9, figure 6-16, #NEW-2-4)')`. Prove it with AUTO ignoring the legs after the MAP and record
       the scale it showed.
 
-- [ ] **Step 5: the `ObsDtkElement` lead (`#NEW-2-7`).** `ObsDtkElement.innerRight` returns false
+- [x] **Step 5: the `ObsDtkElement` lead (`#NEW-2-7`).** `ObsDtkElement.innerRight` returns false
   (`ObsDtkElement.tsx:47`), and `MainPage.tsx:438-443` pops an overlay page whose handler returns false. With
   `ObsSource 0` (the OBS can be entered, 5-34, 5-35), the standard route, `obsMode()`, Super NAV 5 and the left cursor on
   the line that shows the OBS course, turn the left inner knob one click right:
@@ -1008,11 +1008,11 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
       (one click left: one degree less, the page stays) and the pin `it.fails('turns the OBS course up with the inner
       knob and stays on Super NAV 5 (5-34, 5-35, #NEW-2-7)')`. Fix: `innerRight` returns true.
 
-- [ ] **Step 6: not covered.** The report lists what research B left (no weather, terrain or SUA, which no break can
+- [x] **Step 6: not covered.** The report lists what research B left (no weather, terrain or SUA, which no break can
   reach; OBS drawing; TK and HDG up in pixels; no lines past the MAP; the arc on Super NAV 5; DTK flashing) and
   NO INTRCPT, which is the question `#NEW-2-6` and gets no test.
 
-- [ ] **Step 7: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 7: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/render/pages/left/Nav5Page.test.ts", "test/render/pages/left/SuperNav5Page.test.ts", "test/render/pages/left/__snapshots__/nav5Route.txt", "test/render/pages/left/__snapshots__/superNav5Route.txt"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "#NEW-2-1..3 turn red under their fixes, with siblings", "AUTO near the MAP is a spec test or the #NEW-2-4 pin", "the OBS knob on Super NAV 5 is a spec test or the #NEW-2-7 pin", "scale lists characterized with the #NEW-2-5 comment", "no double VOR label in snapshots; menu north-up row not under a spec title", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -1030,26 +1030,26 @@ checked.
 - Create: `test/render/pages/left/FplPage.test.ts`
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] `#NEW-3-1`, `#NEW-3-2`, `#NEW-3-3` and the `#150` pin turn red under their fixes; each has a passing sibling.
-- [ ] The FPL 0 scroll rule, the `?` column of the DEL prompt and the approach waypoints left out of a stored plan are
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] `#NEW-3-1`, `#NEW-3-2`, `#NEW-3-3` and the `#150` pin turn red under their fixes; each has a passing sibling.
+- [x] The FPL 0 scroll rule, the `?` column of the DEL prompt and the approach waypoints left out of a stored plan are
       spec tests citing the KLN 89 trainer next to their 90B pages.
-- [ ] No test asserts a blank 31st position of a full plan; FPL FULL is reached by inserting a waypoint.
-- [ ] An unknown ident entered on FPL 0 is either the `#NEW-7-5` pin with a sibling or a log line; the report says
+- [x] No test asserts a blank 31st position of a full plan; FPL FULL is reached by inserting a waypoint.
+- [x] An unknown ident entered on FPL 0 is either the `#NEW-7-5` pin with a sibling or a log line; the report says
       which.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the draft.** Read `research-C.md` part 2 (part 1 is task 0) and `research\trainer.md` Q6 to
+- [x] **Step 1: start from the draft.** Read `research-C.md` part 2 (part 1 is task 0) and `research\trainer.md` Q6 to
   Q9. Copy `research\drafts-C\test\render\pages\left\FplPage.test.ts`. Rename `#NEW-C-1` to `#NEW-3-1` and `#NEW-C-2`
   to `#NEW-3-2`. The glyphs are asserted as code points with a comment: `À` the head of the leg symbol, `Á` the tail,
   `Â` the shaft on a header row, `›` the direct-to arrow, `à á ã â` the suffixes -i, -f, -m, -h. Header rows are read
   with column 0 sliced off (the shaft glyph on a header row is a log line: the figures are illegible there).
 
-- [ ] **Step 2: FPL 0** (`route7()`: KAAA, ABC, KBBB, DEFAA, EFGAA, KCCC, GHIAA, the aircraft at 47.2/8.3 on the first
+- [x] **Step 2: FPL 0** (`route7()`: KAAA, ABC, KBBB, DEFAA, EFGAA, KCCC, GHIAA, the aircraft at 47.2/8.3 on the first
   leg).
     - `FPL 0 page (characterization)`: the left half and its mask: `Á 1:KAAA`, `À 2:ABC`, 3, 4, 5, ` 7:GHIAA`, mask all
       `.`. Breaks: the head glyph (`FlightplanArrow.tsx:49`); the tail glyph (`:62`); the last-waypoint rule
@@ -1076,7 +1076,7 @@ checked.
       (4-7, 4-8, 6-23, #NEW-3-1)')` (figure 6-43): rows 0-2 `Á 1:ENRAA  `, the header `R18-KPRC`, `À 2 IAFAAà `. Fix:
       anchor the scroll on the from waypoint's row (`FlightplanList.tsx:613`).
 
-- [ ] **Step 3: FPL 1 to FPL 25** (the same seven waypoints stored in FPL 3; every test runs on task 0's reader).
+- [x] **Step 3: FPL 1 to FPL 25** (the same seven waypoints stored in FPL 3; every test runs on task 0's reader).
     - `FPL 1 to FPL 25 pages (characterization)`: `USE? INVRT?`, `  1:KAAA` to `  4:DEFAA`, `  7:GHIAA`, mask all `.`.
     - `shows USE? INVRT?, the first four waypoints and the last one (4-3)` (figure 4-9; number columns figures 4-35,
       6-8). Break: the last-waypoint rule.
@@ -1108,7 +1108,7 @@ checked.
       `  4:EFGAA`, `  6:GHIAA`. Break: ENT on DEL does nothing (`FlightplanListItem.tsx:167`).
     - `keeps the waypoint when DEL is answered with CLR (4-5)`. Break: the second CLR (`:226`).
 
-- [ ] **Step 4: a full numbered plan** (FPL 5 with FA00 to FA29; research C tests 24 and 25 and the trainer Q7).
+- [x] **Step 4: a full numbered plan** (FPL 5 with FA00 to FA29; research C tests 24 and 25 and the trainer Q7).
     - **Change from the draft:** the draft reached FPL FULL through the blank ` 31:` position, which is the bug
       `#NEW-3-3`. Reach it by inserting instead (4-4): the cursor on ` 30:FA29`, the inner knob opens an insert in front
       of it, enter FA30, ENT, ENT.
@@ -1125,7 +1125,7 @@ checked.
       the KLN 89 trainer, 2026-10-07, #NEW-3-3)')`: no row seen during the walk starts ` 31:`. The walk is a fixed number
       of outer clicks over the fields, so it does not depend on #218. Fix: no blank entry when the plan holds 30.
 
-- [ ] **Step 5: the FPL half of `#NEW-7-5`.** 4-2 says an ident not in the database, entered on the FPL page, opens the
+- [x] **Step 5: the FPL half of `#NEW-7-5`.** 4-2 says an ident not in the database, entered on the FPL page, opens the
   page that creates a user waypoint. On FPL 0, cursor on the blank position, `enterIdent('L', 'QQQQ')`, ENT:
     - if the status line shows `NO SUCH WPT`, write the sibling `shows the typed unknown ident on FPL 0 (4-2)` (the row
       shows QQQQ before ENT) and the pin `it.fails('offers to create a user waypoint for an unknown ident (4-2,
@@ -1135,7 +1135,7 @@ checked.
     - if the unit already offers the creation, write it as the spec test of 4-2 and say in the report that the FPL half
       is not a bug.
 
-- [ ] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/render/pages/left/FplPage.test.ts"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "#NEW-3-1..3 and the #150 pin turn red under their fixes, with siblings", "scroll rule, DEL ? column, approach left out of a stored plan are spec tests citing the trainer", "no assertion of a blank 31st position; FPL FULL reached by inserting", "unknown ident on FPL 0 is the #NEW-7-5 pin or a log line", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -1160,26 +1160,26 @@ its first and last zone, the wrap and CDT.
 - Modify: `test/render/pages/left/Set9Page.test.ts` (append)
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] `#NEW-4-1` to `#NEW-4-5` and the SET 2 MAG V `#217` pin turn red under their fixes; each has a passing sibling.
-- [ ] `#NEW-4-1` asserts no error and the old ident kept; `#NEW-4-5` asserts the cursor on CONFIRM? after the
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] `#NEW-4-1` to `#NEW-4-5` and the SET 2 MAG V `#217` pin turn red under their fixes; each has a passing sibling.
+- [x] `#NEW-4-1` asserts no error and the old ident kept; `#NEW-4-5` asserts the cursor on CONFIRM? after the
       waypoint's second ENT.
-- [ ] The SET 1 tests use a position and a waypoint with two-digit longitudes; no snapshot holds `E 0n°`.
-- [ ] The SET 2 zone tests assert UTC, the last zone of 3-5, the wrap back to UTC and CDT, not the ordered list.
-- [ ] No characterization carries a page number or a KLN 89 citation.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] The SET 1 tests use a position and a waypoint with two-digit longitudes; no snapshot holds `E 0n°`.
+- [x] The SET 2 zone tests assert UTC, the last zone of 3-5, the wrap back to UTC and CDT, not the ordered list.
+- [x] No characterization carries a page number or a KLN 89 citation.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the drafts.** Read `research-D.md` and `research\trainer.md` Q5. From
+- [x] **Step 1: start from the drafts.** Read `research-D.md` and `research\trainer.md` Q5. From
   `research\drafts-D\test\render\pages\left\` copy the new files and take the appended describes of the others. Rename
   `#NEW-D-1` to `#NEW-4-1`, `#NEW-D-2` to `#NEW-4-2`, `#NEW-D-4` to `#NEW-4-3`, `#NEW-D-5` to `#NEW-4-4`, and
   `#NEW-D-3` to `#217`. The existing pins (#199, #217, #110, #111, #112, #132, #89, #141) stay as they are. Persisted
   keys a knob changes are read with `storedSetting` (contract: the setting keys, `CLAUDE.md`).
 
-- [ ] **Step 2: SET 0.**
+- [x] **Step 2: SET 0.**
     - `goes back from the expiry to UPDATE PUBLISHED DB with one CLR (characterization)`: SET 0, cursor, ENT (row 5
       `     U P D A T E ?`), CLR: rows `['      U P D A T E', '   D A T A   B A S E', '', '  UPDATE PUBLISHED DB', '', '']`,
       status `CRSR`. Break: `this.step -= 2` in `clear()`.
@@ -1187,7 +1187,7 @@ its first and last zone, the wrap and CDT.
       `SET 0` (cursor off) and rows 0-3 with `O N   G R O U N D` / `O N L Y` (figure 2-2); the KEY row is not asserted.
       Fix: at step 0 with the cursor on, CLR turns the cursor off and returns true (`Set0Page.tsx:87-97`).
 
-- [ ] **Step 3: SET 1** (`Set1Page.test.ts`). **Change from the draft:** the draft's position (47.5, 8.25) and KAAA
+- [x] **Step 3: SET 1** (`Set1Page.test.ts`). **Change from the draft:** the draft's position (47.5, 8.25) and KAAA
   (47.1, 8.0) show `E 08°…`, the zero of `#NEW-1-8`. Use the position 47.5 N 11.25 E and KAAA at 47.1 N 11.0 E: the
   literals become `E 11°15.00'` and, after the waypoint, `N 47°06.00'`, `E 11°00.00'` (0.1° is 6.00', by hand).
     - `SET 1 page (characterization)`: the left rows without row 4 (`#NEW-4-2`) and the mask: `INIT POSN`, `WPT:`,
@@ -1218,7 +1218,7 @@ its first and last zone, the wrap and CDT.
       (the same setup up to CLR: focus `{1, 5, 'KAAA '}`). Fix: `setWpt` keeps the old waypoint on null
       (`Set1Page.tsx:73`).
 
-- [ ] **Step 4: SET 2** (append to `Set2Page.test.ts`).
+- [x] **Step 4: SET 2** (append to `Set2Page.test.ts`).
     - `shows no variation line inside the area, and the cursor stays on the time zone (5-44)` (figure 5-133): row 5
       blank; after `outer 1` the focus `{3, 8, 'UTC'}`. Breaks: the line shown inside; the MAG V field editable inside.
     - `takes a variation entered with the knobs outside the area (5-44, B-2)`: boot N 74.5, magvar 10, track 090
@@ -1241,7 +1241,7 @@ its first and last zone, the wrap and CDT.
     - `sets the time in the selected zone (3-54)` (figures 3-171 to 3-174): cold GPS, cursor, outer 2, inner 8 (CDT),
       outer -1, hour 18, minutes 3 and 7, ENT → `18:37 CDT`, GPS time UTC `[1, 23, 37]`. Break: `saveTime` from UTC.
 
-- [ ] **Step 5: SET 3 to SET 9.**
+- [x] **Step 5: SET 3 to SET 9.**
     - SET 3: `SET 3 page (characterization)` (rows 0-3 and 5; row 4 is the pin), `turns the cursor on over the minimum
       length (3-22)` (`{3, 6, '1000'}`), `reaches 5000 ft in steps of 100 ft (3-22)` (inner 40, `      5000'`, stored
       5000). **Pin** `it.fails('labels the surface row SURFACE: (3-22, #NEW-4-4)')` (figures 3-73 to 3-75): row 4
@@ -1270,7 +1270,7 @@ its first and last zone, the wrap and CDT.
     - SET 10: nothing (fictitious page, held by `Set10Page.test.ts` and `GpsAcquisition.test.ts`); the report lists it
       among the pages without a spec test.
 
-- [ ] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/render/pages/left/Set0Page.test.ts", "test/render/pages/left/Set1Page.test.ts", "test/render/pages/left/Set2Page.test.ts", "test/render/pages/left/Set3Page.test.ts", "test/render/pages/left/Set4Page.test.ts", "test/render/pages/left/Set5Page.test.ts", "test/render/pages/left/Set6Page.test.ts", "test/render/pages/left/Set7Page.test.ts", "test/render/pages/left/Set8Page.test.ts", "test/render/pages/left/Set9Page.test.ts"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "#NEW-4-1..5 and the SET 2 MAG V #217 pin turn red under their fixes, with siblings", "#NEW-4-1 expects no error and the old ident; #NEW-4-5 expects CONFIRM?", "SET 1 uses two-digit longitudes", "zone tests: UTC, the last zone, the wrap, CDT", "no citation on a characterization", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -1293,26 +1293,26 @@ defaults only.
 - Modify: `test/unit/settings/RemarksManager.test.ts` (append the `#NEW-5-5` pin)
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] `#NEW-5-1` to `#NEW-5-5`, `#NEW-1-1` and #213 turn red under their fixes; each has a passing sibling.
-- [ ] The OTH 3 plan number (the lowest plan, `0` for FPL 0) and the OTH 4 order by ident are spec tests citing the KLN
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] `#NEW-5-1` to `#NEW-5-5`, `#NEW-1-1` and #213 turn red under their fixes; each has a passing sibling.
+- [x] The OTH 3 plan number (the lowest plan, `0` for FPL 0) and the OTH 4 order by ident are spec tests citing the KLN
       89 trainer.
-- [ ] No test sets `NUMBER OF ENGINES` with `simEnv()`; every fuel boot uses `simVars`.
-- [ ] OTH 6 NM/GAL of 10 or more, the OTH 6 RANGE dashes and the OTH 10 negative temperature are characterizations; no
+- [x] No test sets `NUMBER OF ENGINES` with `simEnv()`; every fuel boot uses `simVars`.
+- [x] OTH 6 NM/GAL of 10 or more, the OTH 6 RANGE dashes and the OTH 10 negative temperature are characterizations; no
       snapshot holds an endurance of `:60` or a wind direction without its symbol.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the drafts.** Read `research-E.md` and `research\trainer.md` Q10. Copy the drafts of
+- [x] **Step 1: start from the drafts.** Read `research-E.md` and `research\trainer.md` Q10. Copy the drafts of
   `research\drafts-E\test\render\pages\left\` (append the OTH 3 and OTH 5 describes). Rename `#NEW-E-1` to `#NEW-5-1`,
   `#NEW-E-2` to `#NEW-1-1`, `#NEW-E-3` to `#NEW-5-2`, `#NEW-E-4` to `#NEW-5-3`, `#NEW-E-5` to `#NEW-5-4`. **Change from
   the drafts:** replace every `simEnv().sim.set('NUMBER OF ENGINES', …)` before a boot by
   `bootUnit({…, simVars: [{name: 'NUMBER OF ENGINES', unit: 'number', value: n}]})`.
 
-- [ ] **Step 2: OTH 1 to OTH 4.**
+- [x] **Step 2: OTH 1 to OTH 4.**
     - OTH 1: `OTH 1 page (characterization)`, the empty page `NO NEAREST` / `FSS` (the sim has no FSS data). Break: `FSS`
       → `FSX`. 3-52's FSS pages cannot be tested; the report lists OTH 1 among the pages without a spec test.
     - OTH 2: `OTH 2 page (characterization)`: six sectors of one Center, five frequencies, one repeated: `TEST CENTER`,
@@ -1340,7 +1340,7 @@ defaults only.
       `it.fails('lists an airport again when its remarks are saved anew while the page is shown (3-47, #NEW-5-4)')`.
       Fix: drop `.whenChanged()` (`Oth4Page.tsx:36`).
 
-- [ ] **Step 3: OTH 5 to OTH 10** (a twin, 90 and 84 pph, 756 lb = 126 GAL, FPL 0 KAAA ABC KBBB, `moveAircraft` to
+- [x] **Step 3: OTH 5 to OTH 10** (a twin, 90 and 84 pph, 756 lb = 126 GAL, FPL 0 KAAA ABC KBBB, `moveAircraft` to
   47.01/8.02 at 120 kt where a route ETE is needed).
     - OTH 5 (append): characterization (` KBBB   GAL`, `FOB     126`, `REQD     22`, `L FOB   104`, `RES:  00000`,
       `EXTRA   104`); `shows REQD, L FOB and EXTRA from the fuel flow, the ETE along the route and the reserve (5-39,
@@ -1377,7 +1377,7 @@ defaults only.
       altitude to the nearest 100 ft (5-43)` (6460 ft → 6500; SAT 20, TAT 26); `shows the density altitude to the nearest
       100 ft (5-43, 5-10)` (9000 ft at 5 °C → 9900, the CAL 1 figures; the 5-43 figure's DEN is not used as a literal).
 
-- [ ] **Step 4: `#NEW-5-5`** (`test/unit/settings/RemarksManager.test.ts`; the unit stage is the cheapest, and the
+- [x] **Step 4: `#NEW-5-5`** (`test/unit/settings/RemarksManager.test.ts`; the unit stage is the cheapest, and the
   stored slots are #92's, ten today). In a new describe `remarks of a 101st airport (3-47, C-2)`:
     - Sibling `holds the remarks of 100 airports (3-47)`: a manager whose private `remarks` map is seeded with 100
       airports (`(manager as unknown as {remarks: Record<string, [string, string, string]>}).remarks`; the slots cannot
@@ -1387,7 +1387,7 @@ defaults only.
       save goes on and fails on a missing slot. Fix: `Object.keys(this.remarks).length >= 100`
       (`RemarksManager.ts:28`). Task 8 checks #92 before filing.
 
-- [ ] **Step 5: STA 1 to STA 5.**
+- [x] **Step 5: STA 1 to STA 5.**
     - STA 1 (cold and dark, slow acquisition, stored position 0/0, right after the self-test): `marks every satellite as
       not used in the solution during a sky search (5-30)` (all eight rows start with `*`); `has a second page, STA+1,
       with eight satellites (5-29)`. Sibling `lists satellites below the horizon during a sky search (5-30)` (no fix; the
@@ -1405,7 +1405,7 @@ defaults only.
       from `Date.now()` and the `geo.ts` ETE, `UTC`, ` COMPUTING `); the prediction is untestable (#214), and the result
       row and the `__:__` empty ETA are not asserted.
 
-- [ ] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/render/pages/left/Oth1Page.test.ts", "test/render/pages/left/Oth2Page.test.ts", "test/render/pages/left/Oth3Page.test.ts", "test/render/pages/left/Oth4Page.test.ts", "test/render/pages/left/Oth5Page.test.ts", "test/render/pages/left/Oth6Page.test.ts", "test/render/pages/left/Oth7Page.test.ts", "test/render/pages/left/Oth8Page.test.ts", "test/render/pages/left/Oth9Page.test.ts", "test/render/pages/left/Oth10Page.test.ts", "test/render/pages/left/Sta1Page.test.ts", "test/render/pages/left/Sta2Page.test.ts", "test/render/pages/left/Sta3Page.test.ts", "test/render/pages/left/Sta4Page.test.ts", "test/render/pages/left/Sta5Page.test.ts", "test/unit/settings/RemarksManager.test.ts"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "#NEW-5-1..5, #NEW-1-1 and #213 turn red under their fixes, with siblings", "OTH 3 plan number and OTH 4 order are spec tests citing the trainer", "fuel boots use simVars", "OTH 6 NM/GAL, RANGE dashes, OTH 10 negative temperature are characterizations; no :60 or wind row in snapshots", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -1426,22 +1426,22 @@ defaults only.
   `Cal7Page.test.ts`
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] `#NEW-6-1` to `#NEW-6-3`, `#NEW-1-1` and `#NEW-5-1` turn red under their fixes; each has a passing sibling.
-- [ ] No snapshot holds `010°F`, `115mph`, a blank F REQ at a ground speed of 0, the TRI 5 ground speed row, the CAL 3
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] `#NEW-6-1` to `#NEW-6-3`, `#NEW-1-1` and `#NEW-5-1` turn red under their fixes; each has a passing sibling.
+- [x] No snapshot holds `010°F`, `115mph`, a blank F REQ at a ground speed of 0, the TRI 5 ground speed row, the CAL 3
       wind direction or the CAL 7 rise and set.
-- [ ] TRI 3 taking the variation at the "from" waypoint and TRI 1/TRI 2 dashes without a fix are characterizations.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] TRI 3 taking the variation at the "from" waypoint and TRI 1/TRI 2 dashes without a fix are characterizations.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the drafts.** Read `research-F.md`. Copy the drafts of `research\drafts-F\test\render\pages\left\`
+- [x] **Step 1: start from the drafts.** Read `research-F.md`. Copy the drafts of `research\drafts-F\test\render\pages\left\`
   (append the CAL 1 and CAL 2 describes). Rename `#NEW-F-1` to `#NEW-1-1`, `#NEW-F-2` to `#NEW-6-1`, `#NEW-F-3` to
   `#NEW-5-1`, `#NEW-F-4` to `#NEW-6-2`, `#NEW-F-5` to `#NEW-6-3`. Seed `unit.props.memory.triPage` before `selectPage`.
 
-- [ ] **Step 2: TRI 0 to TRI 4.**
+- [x] **Step 2: TRI 0 to TRI 4.**
     - TRI 0: `shows the TAS and wind estimates of a fresh unit (characterization)`; `moves the cursor over the TAS digits,
       the wind direction in two parts and the wind speed digits (5-2)` (stops `3,6 1`, `3,7 5`, `3,8 0`, `4,6 00`,
       `4,8 0`, `5,6` to `5,8`); `takes a TAS of 200 and a wind of 180 at 25 kt from the knobs and applies them on TRI 3
@@ -1466,7 +1466,7 @@ defaults only.
       #NEW-1-1)')`. Fix: the `DurationDisplay` fix of task 1.
     - TRI 4: characterization; `shows the route of TRI 3 and an ESA line without a GPS fix (5-5)` (figure 5-17).
 
-- [ ] **Step 3: TRI 5 and TRI 6.**
+- [x] **Step 3: TRI 5 and TRI 6.**
     - TRI 5: `shows the analysis of FPL 0 with fuel flow and reserve (characterization)` on `standardRoute()`; **change
       from the draft:** leave row 2 (the ground speed and the ETE) out of the snapshot until the fix decides what
       "average" means. Spec `shows FPL 0 from its first to its last waypoint, 60nm in :24, without a GPS fix (5-6)`
@@ -1477,7 +1477,7 @@ defaults only.
     - TRI 6: characterizations `shows the ESA of FPL 0` and `shows only the plan number for a plan of one waypoint`;
       `shows the flight plan selected on TRI 5 (5-6)` (figures 5-19, 5-20: `FP 3`, `R-CCC`, ` REST`).
 
-- [ ] **Step 4: CAL 1 to CAL 4.**
+- [x] **Step 4: CAL 1 to CAL 4.**
     - CAL 1 (append): characterization (9000 ft, 29.92", 5 °C: `PRS  9000ft`, `DEN  9900ft`); `moves the cursor over
       three IND digits, then BARO, then TEMP (5-10)`; `takes -5 C from the sign digit and shows DEN 8700ft at 9000 ft and
       29.92" (5-10)` (ISA by hand, DA 8743); `takes BARO in millibars when SET 7 selects them: 1017MB gives PRS 8400ft
@@ -1498,7 +1498,7 @@ defaults only.
       after the thousands digit of 0500 is set to 1 (5-12)`; **pin** `it.fails('shows ANGLE 5.3 for the 1500 ft/min
       shown (5-12, #NEW-6-2)')`. Fix: `this.fpm = Fpm` in `FpmFieldset.setFpm`.
 
-- [ ] **Step 5: CAL 5 to CAL 7.**
+- [x] **Step 5: CAL 5 to CAL 7.**
     - CAL 5: characterization of a fresh unit (`000°C`, `032°F`, `000kt`, `000mph`); `converts 25 C to 077°F (5-13)`
       (figure 5-43); `converts 50 F to 010°C (5-13)`; `converts -40 C to -40°F (5-10, 5-13)`; `converts 145 kt to
       167mph (5-13)` (figure 5-44); `converts 115 mph to 100kt (5-13)` (figure 5-42). Sibling `shows -40°C when the sign
@@ -1513,7 +1513,7 @@ defaults only.
       in EST than in CST (5-15)` (figures 5-51, 5-52); `changes rise and set only when the new date is entered with ENT
       (5-15)` (later by 115 to 140 min, derived 128).
 
-- [ ] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/render/pages/left/Tri0Page.test.ts", "test/render/pages/left/Tri1Page.test.ts", "test/render/pages/left/Tri2Page.test.ts", "test/render/pages/left/Tri3Page.test.ts", "test/render/pages/left/Tri4Page.test.ts", "test/render/pages/left/Tri5Page.test.ts", "test/render/pages/left/Tri6Page.test.ts", "test/render/pages/left/Cal1Page.test.ts", "test/render/pages/left/Cal2Page.test.ts", "test/render/pages/left/Cal3Page.test.ts", "test/render/pages/left/Cal4Page.test.ts", "test/render/pages/left/Cal5Page.test.ts", "test/render/pages/left/Cal6Page.test.ts", "test/render/pages/left/Cal7Page.test.ts"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "#NEW-6-1..3, #NEW-1-1 and #NEW-5-1 turn red under their fixes, with siblings", "no out-of-range value, blank F REQ, TRI 5 GS row, CAL 3 wind row or CAL 7 rise/set in snapshots", "TRI 3 variation point and TRI 1/2 no-fix dashes are characterizations", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -1537,27 +1537,27 @@ pins `#NEW-7-1` to `#NEW-7-6` and the MOD 2 pin of #160, the ALT warn row of
 - Modify: `test/render/data/VolatileMemory.test.ts:147` (the `altPage` assertion; a new pin)
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] `#NEW-7-1` to `#NEW-7-5` and the MOD 2 `#160` pin turn red under their fixes; each has a passing sibling.
-- [ ] `#NEW-7-6` is a pin with a sibling that asserts the course in `[359.5, 360)`.
-- [ ] The `#NEW-7-4` pin uses `FakeSim.applyObsKeyEvents`, not a wrapper of `keyEvents.push`.
-- [ ] The OBS step of one degree per click, north shown as `000°` and the wrap are spec tests citing the KLN 89 trainer.
-- [ ] `VolatileMemory.test.ts` no longer asserts `alertWarn: 300`; its `alertEnabled` half is unchanged.
-- [ ] The self-test page has its characterizations only; the DIRECT TO snapshot leaves out the right page's longitude
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] `#NEW-7-1` to `#NEW-7-5` and the MOD 2 `#160` pin turn red under their fixes; each has a passing sibling.
+- [x] `#NEW-7-6` is a pin with a sibling that asserts the course in `[359.5, 360)`.
+- [x] The `#NEW-7-4` pin uses `FakeSim.applyObsKeyEvents`, not a wrapper of `keyEvents.push`.
+- [x] The OBS step of one degree per click, north shown as `000°` and the wrap are spec tests citing the KLN 89 trainer.
+- [x] `VolatileMemory.test.ts` no longer asserts `alertWarn: 300`; its `alertEnabled` half is unchanged.
+- [x] The self-test page has its characterizations only; the DIRECT TO snapshot leaves out the right page's longitude
       row.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the drafts.** Read `research-G.md` and `research\trainer.md` Q11 to Q14. Copy
+- [x] **Step 1: start from the drafts.** Read `research-G.md` and `research\trainer.md` Q11 to Q14. Copy
   `research\drafts-G\test\render\pages\left\{Mod2Page,DuplicateWaypointPage}.test.ts` and take the appended describes of
   the others. Rename `#NEW-G-1` to `#NEW-7-1`, `#NEW-G-2` to `#NEW-7-2`, `#NEW-G-3` to `#NEW-7-3`, `#NEW-G-4` to
   `#NEW-7-4`. **Change from the draft:** in `Mod2Page.test.ts` replace the wrapper of `sim.keyEvents.push` by
   `unit.env.sim.applyObsKeyEvents = true` (task 0).
 
-- [ ] **Step 2: MOD 1** (the standard route, 5 NM before ABC, ENR-OBS for the characterization).
+- [x] **Step 2: MOD 1** (the standard route, 5 NM before ABC, ENR-OBS for the characterization).
     - `MOD 1 page (characterization)`: `PRESS ENT / TO ACTIVATE / / LEG / / CDI:±5.00NM` with the mask.
     - `shows ACTIVE MODE, LEG and CDI:±5.00NM in ENR-LEG, without the ent prompt (5-32)` (figure 5-107, 5-33);
       `selects ±5.00, ±1.00 and ±0.30 NM with the cursor on the CDI scale (5-38)` (figures 5-120, 5-121);
@@ -1567,7 +1567,7 @@ pins `#NEW-7-1` to `#NEW-7-6` and the MOD 2 pin of #160, the ALT warn row of
       scale when the knob turns after the unit armed with MOD 1 in view (5-38, #NEW-7-3)')`: one click, `xtkScale` in
       `[0.3, 1]` and `GPS CDI SCALING` finite. Fix: clamp the index in `setCDIScale` (or rebuild the choices per redraw).
 
-- [ ] **Step 3: MOD 2** (a leg due east along the equator, KAAA 0/8 to ABC 0/9, the aircraft at 8.4 E; the OBS taken is
+- [x] **Step 3: MOD 2** (a leg due east along the equator, KAAA 0/8 to ABC 0/9, the aircraft at 8.4 E; the OBS taken is
   090 by construction).
     - `MOD 2 page (characterization)`: `ACTIVE MODE / / / OBS 070° / / CDI:±5.00NM` (ObsSource 1, `Nav OBS:1` 70).
     - **New** `shows OBS ---° without a colon in ENR-LEG with the default installation (characterization)`: the colon in
@@ -1600,7 +1600,7 @@ pins `#NEW-7-1` to `#NEW-7-6` and the MOD 2 pin of #160, the ALT warn row of
       armed by the switch 40 NM from the airport (5-38, 6-1, #160)')`. Fix: ARM choices `[0.3, 1, 5]` in `Mod2Page`.
       Task 8 comments on #160.
 
-- [ ] **Step 4: ALT and `VolatileMemory.test.ts`.**
+- [x] **Step 4: ALT and `VolatileMemory.test.ts`.**
     - `ALT page (characterization)`: ALERT ON with the cursor on it (` ALTITUDE`, blank, `BARO:29.92"`,
       `ALERT: ON ›`, `WARN:±300ft`, blank; the ON field `IIII`); `shows the baro setting of the altimeter and skips it
       with the cursor` (air data and `BaroSource 1`, 30.12 then 29.85).
@@ -1618,7 +1618,7 @@ pins `#NEW-7-1` to `#NEW-7-6` and the MOD 2 pin of #160, the ALT warn row of
       `settle`, `m.altPage.alertWarn = 500`, `cycle(unit)`, `alertWarn` 500. The characterization is its sibling. Prove:
       the fix turns both `#NEW-7-2` pins red and leaves the characterization green.
 
-- [ ] **Step 5: DIRECT TO and DUPLICATE WAYPOINT.**
+- [x] **Step 5: DIRECT TO and DUPLICATE WAYPOINT.**
     - `DIRECT TO page (characterization)`: the active waypoint ABC awaiting confirmation with its VOR page on the right.
       **Change from the draft:** the draft snapshots the whole `dump()`, whose right page shows `E 08°00.00'`
       (`#NEW-1-8`). Snapshot `half('L')`, `status()` and `rows('R').slice(0, 5)`.
@@ -1645,13 +1645,13 @@ pins `#NEW-7-1` to `#NEW-7-6` and the MOD 2 pin of #160, the ALT warn row of
       (figures 3-52, 3-53; the trainer's header row with the type and area titles). Fix: a header row and `List`
       height 4.
 
-- [ ] **Step 6: the self-test page.** **Change from the draft:** the design gives the self-test page its snapshot only
+- [x] **Step 6: the self-test page.** **Change from the draft:** the design gives the self-test page its snapshot only
   (the self-test values are Session 10's). Keep `self-test left page (characterization)` (`Nav OBS:1` 242:
   `DIS  34.5NM`, the bar, `OBS IN 242°`, `   OUT 315°`, `RMI    130°`, `ANNUN    ON`) and `shows OBS IN ---° when the
   unit reads no indicator (characterization)`. Leave out the three spec tests of the draft (OBS IN following the
   indicator, ANNUN ON, the D-bar half scale); the report lists them for Session 10.
 
-- [ ] **Step 7: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 7: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/render/pages/left/Mod1Page.test.ts", "test/render/pages/left/Mod2Page.test.ts", "test/render/pages/left/AltPage.test.ts", "test/render/pages/left/DirectToPage.test.ts", "test/render/pages/left/DuplicateWaypointPage.test.ts", "test/render/pages/left/SelfTestLeftPage.test.ts", "test/render/data/VolatileMemory.test.ts"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "#NEW-7-1..5 and the MOD 2 #160 pin turn red under their fixes, with siblings", "#NEW-7-6 pinned with a sibling asserting the course in [359.5, 360)", "#NEW-7-4 uses applyObsKeyEvents", "OBS step, 000 and wrap are spec tests citing the trainer", "VolatileMemory warn half is a #NEW-7-2 pin; alertEnabled half unchanged", "self-test page characterizations only; DIRECT TO snapshot without the longitude row", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -1671,22 +1671,22 @@ the checkbox.
 - Modify: `docs/superpowers/plans/2026-10-07-session-8-left-pages.md` (the task checkboxes)
 
 **Acceptance Criteria:**
-- [ ] Every row of the placeholder table is an issue or, where a search finds one, a comment on the existing issue,
+- [x] Every row of the placeholder table is an issue or, where a search finds one, a comment on the existing issue,
       each searched first in open and closed issues with several wordings; a row marked "if confirmed" whose task did
       not confirm it is a log line, not an issue.
-- [ ] #150, #160, #217 and #192 have the comments the design lists; #92, #168 and #122 were read before `#NEW-5-5`,
+- [x] #150, #160, #217 and #192 have the comments the design lists; #92, #168 and #122 were read before `#NEW-5-5`,
       `#NEW-7-1` and `#NEW-7-6` were filed.
-- [ ] `grep -r "#NEW-" test/` prints nothing.
-- [ ] `testing.md` sections 6 and 7 carry the design's notes, and the section 7 line that #99 has no pin is gone.
-- [ ] The session log has the coverage at the start and the end, the bugs filed, the rulings, the trainer results and
+- [x] `grep -r "#NEW-" test/` prints nothing.
+- [x] `testing.md` sections 6 and 7 carry the design's notes, and the section 7 line that #99 has no pin is gone.
+- [x] The session log has the coverage at the start and the end, the bugs filed, the rulings, the trainer results and
       the "not covered" list with the pages without a spec test (rule 18).
-- [ ] `npm test` and `npx tsc --noEmit` pass.
+- [x] `npm test` and `npx tsc --noEmit` pass.
 
 **Verify:** `npm test && npx tsc --noEmit && grep -r "#NEW-" test/` → tests pass, no type errors, grep prints nothing.
 
 **Steps:**
 
-- [ ] **Step 1: issues.** Runs in the main checkout on the session branch (GitHub access). For each row of the
+- [x] **Step 1: issues.** Runs in the main checkout on the session branch (GitHub access). For each row of the
   placeholder table: search open and closed issues (`mcp__github__search_issues`, repo `falcon71/kln90b`) with at least
   three wordings, paced at about ten searches a minute; file a new issue with the label the table gives (`bug` or
   `question`) per `CLAUDE.md` "Bugs go to GitHub issues": what is wrong, the reproduction with observed and expected
@@ -1709,16 +1709,16 @@ the checkbox.
     - `#NEW-7-1`: read #168 (a US airport without a country) first and reference it.
     - `#NEW-7-2` references #192; `#NEW-7-3` references #159 and #160; `#NEW-7-5` names both halves if task 3 confirmed
       the FPL one.
-- [ ] **Step 2: comments on existing issues.**
+- [x] **Step 2: comments on existing issues.**
     - #150: deleting a numbered plan with DELETE FPL? is not saved either (`Flightplan.delete` publishes nothing); the
       pin in `FplPage.test.ts`.
     - #160: the MOD 2 half is pinned in `Mod2Page.test.ts`.
     - #217: the second reproduction on SET 2 (the cursor on the MAG V line when the aircraft enters the coverage area),
       the pin in `Set2Page.test.ts`; a fix in `CursorController` would cover both.
     - #192: the ALT warn altitude reset at every power-on (`#NEW-7-2`, its issue number).
-- [ ] **Step 3: replace the placeholders** in one commit (`references #…` for every issue), and check
+- [x] **Step 3: replace the placeholders** in one commit (`references #…` for every issue), and check
   `grep -r "#NEW-" test/` prints nothing.
-- [ ] **Step 4: `testing.md`.**
+- [x] **Step 4: `testing.md`.**
     - Section 6: **the fuel computer reads `NUMBER OF ENGINES` once, while it is built**: a test without the `simVars`
       option counts no real engine and sees every fuel flow and fuel used as 0; OTH 5 to OTH 10 exist only with the
       matching interfaces. **`selectPage` runs the pages it passes:** each is built and runs its side effects (CAL 2
@@ -1730,7 +1730,7 @@ the checkbox.
       **`vitest -t` takes a regular expression**: titles with `(`, `)`, `+`, `?` or `#` need escaping in a filtered run.
       The MAP world with a missed approach now has its third and fourth copies (tasks 2 and 7; the "Shared worlds"
       bullet). Remove the line that #99 has no pin yet. Add the leads the tasks reported and did not confirm.
-- [ ] **Step 5: the session log** in `docs/test-coverage.md` section 4, newest first, in the format of the Session 7
+- [x] **Step 5: the session log** in `docs/test-coverage.md` section 4, newest first, in the format of the Session 7
   entry: Done (per task), Rulings (the maintainer's decisions and the controller's defaults of the design, plus the
   changes the plan made to the drafts), Trainer results, Bugs found and filed (one line per issue with its pins),
   Fixes that could not be re-broken, Not covered (rule 18: the design's log-only items, each task report's uncovered
@@ -1738,8 +1738,8 @@ the checkbox.
   (`scratchpad\coverage-start.txt`) and at the end (`npm run coverage`), with the files of `kln90b/pages/left` below 50 %
   at the start and their end values, plus the suite counts. Tick the Session 8 checkbox and add its "Result" paragraph
   in section 3.
-- [ ] **Step 6: the plan's checkboxes.** Tick the task checkboxes of this plan.
-- [ ] **Step 7: verify and commit.** `npm test`, `npx tsc --noEmit`, `grep -r "#NEW-" test/`, then commit.
+- [x] **Step 6: the plan's checkboxes.** Tick the task checkboxes of this plan.
+- [x] **Step 7: verify and commit.** `npm test`, `npx tsc --noEmit`, `grep -r "#NEW-" test/`, then commit.
 
 ```json:metadata
 {"files": ["docs/testing.md", "docs/test-coverage.md", "docs/superpowers/plans/2026-10-07-session-8-left-pages.md"], "verifyCommand": "npm test && npx tsc --noEmit && grep -r \"#NEW-\" test/", "acceptanceCriteria": ["every placeholder row filed or commented after a search; unconfirmed rows are log lines", "comments on #150, #160, #217, #192; #92, #168, #122 read first", "no #NEW- left in test/", "testing.md sections 6 and 7 updated; #99 no-pin line removed", "session log complete with coverage, rulings, trainer results, rule 18 and the pages without a spec test", "suite green"], "modelTier": "frontier"}

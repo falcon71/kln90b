@@ -463,7 +463,7 @@ questions are #207, #215, #220 and #221 and the enhancements #200, #209 and #210
 
 ## Session 8: pages, left side
 
-- [ ] done
+- [x] done
 
 **Goal:** a render test per page under `kln90b/pages/left/` in a representative state, plus spec assertions where the
 Pilot's Guide specifies the content.
@@ -479,6 +479,16 @@ Pilot's Guide specifies the content.
    context is spent; the log says where.
 
 **Done when:** every left page has at least its characterization test and the log lists the pages without a spec test.
+
+Result (session log, section 4): every left page has a render test, in tree order from NAV 1 to the self-test page,
+with spec tests where the Pilot's Guide or the KLN 89 trainer gives the rule. The pages without a spec test are OTH 1,
+SET 10, STA 2 and STA 3; SET 9 has spec and contract tests but no characterization snapshot, and STA 5 only its
+defaults (#214). Item 3 is done with the map recorder of task 0: Super NAV 5's `<pre>` blocks are read with
+`SuperNav5.read()` and its canvas as a file snapshot. #99 is pinned (latitude and longitude), and the altitude editor
+cases of #54 and #55 were already held on CAL 2. The bugs found were filed and pinned (#223 to #230, #232 to #235, #238
+to #252, #254 to #256, #258 to #263), the questions are #231, #236, #237, #253 and #257, and #92, #150, #160, #213 and
+#217 gained pins. #92, #150, #160, #192 and #217 have comments. The harness gaps the session hit are in `testing.md`
+sections 6 and 7.
 
 ## Session 9: pages, right side, and controls
 
@@ -541,6 +551,319 @@ lists the gaps.
 One entry per session run, newest first. Format: date, session, branch, what was done, what was left and why, the
 coverage summary for the session's area at start and end. This is a dated record and is never edited afterwards; a
 later run adds a new entry.
+
+## 2026-10-07, session 8, branch `tests-session-8-left-pages`
+
+**Done**
+- **Design and plan:** `docs/superpowers/specs/2026-10-07-session-8-left-pages-design.md` and the matching plan, after a
+  read-only research pass of seven agents in isolated worktrees (A: NAV 1 to 4 and Super NAV 1; B: NAV 5 and Super
+  NAV 5; C: FPL 0 and FPL 1 to 25; D: SET 0 to 10; E: OTH 1 to 10 and STA 1 to 5; F: TRI 0 to 6 and CAL 1 to 7; G:
+  MOD 1 and 2, ALT, DIRECT TO, DUPLICATE WAYPOINT and the self-test page) and an eighth agent on the KLN 89 trainer
+  (below). Nine tasks: a harness task alone, tasks 1 to 7 in parallel worktrees, this close-out last.
+- **Task 0, harness:** `Screen.read()` lays the `.use-invert` overlay of the numbered FPL pages over the cells it
+  covers (`USE? INVRT?`), so a numbered plan with waypoints can be read; `recordMap` (`test/harness/render/mapRecorder.ts`)
+  records what NAV 5, Super NAV 5 and APT 3 draw per redraw, and `downsampled()` moved into
+  `test/harness/render/canvas.ts`; the `simVars` boot option sets SimVars before `KLN90BCore.init` (the fuel computer's
+  `NUMBER OF ENGINES`); `FakeSim.applyObsKeyEvents` lets `K:VOR1_SET` and `K:VOR2_SET` move `Nav OBS:1` and `:2`;
+  `enterIdent` starts the edit when an editor's first character already matches, and `cursorTo` throws at once when the
+  cursor of that side is off. Harness tests for each (`screen.test.ts`, `mapRecorder.test.ts`, `simVars.test.ts`,
+  `fakes.test.ts`, `enterIdent.test.ts`) and `testing.md` sections 3, 4 and 7. The selector `it.each` of
+  `enterIdent.test.ts` no longer asserts the `E 09°` rows (#230).
+- **Task 1, NAV 1 to NAV 4 and Super NAV 1:** `Nav1Page.test.ts`, `Nav4Page.test.ts` and `SuperNav1Page.test.ts`
+  (new), `Nav3Page.test.ts` and `test/render/pages/Nav2Page.test.ts` appended (the existing NAV 2 test labeled, its
+  `E 08°` row turned into a pin), `NullDashes.test.ts` (the longitude dashes became a pin), `ActiveWaypoint.test.ts`
+  (the two direct-to rows became pins), `Apt1Page.test.ts` and `LatLonEditor.test.ts` (rows with a one-digit degree left
+  out). Spec tests for DIS, GS, ETE and BRG against the VNAV example of 5-7, whole NM from 100 NM, BRG, DTK and TK
+  magnetic (5-44), the deviation bar left, right, clamped and FROM (3-31), FLY L and FLY R, OBS with and without the colon
+  (5-35), the NAV 4 SEL steps, FR/TO and INVALID VNV, the Super NAV 1 IAF suffix (6-6). Pins #99 (two), #223, #224 (two),
+  #225, #226 (two), #227 (four), #228, #229, #230 (two).
+- **Task 2, NAV 5 and Super NAV 5:** `Nav5Page.test.ts` appended and `SuperNav5Page.test.ts` (new), with file
+  snapshots of both canvases (`__snapshots__/nav5Route.txt`, `superNav5Route.txt`), on the map recorder. Spec tests for
+  the orientations and the range (3-34, 3-35), the Super NAV 5 fields, menu and layers (3-36, 3-37), declutter and the
+  scan window (3-38), AUTO (3-36), the waypoint alert flash (3-29, 4-8), the MAP world (6-9) and the OBS course (5-34,
+  5-35); the scale lists as characterizations. Pins #232, #233, #234, #235, #238.
+- **Task 3, FPL 0 and FPL 1 to FPL 25:** `FplPage.test.ts` (new) on the `.use-invert` reader: the leg symbol and the
+  scroll rule (4-7, 4-8, the trainer), the approach header, suffixes and fence (6-5 to 6-7), INVALID ADD and INVALID DEL
+  (C-1), the SID period (6-23), USE? and USE? INVRT? (4-3, 4-4), LOAD FPL 0? and the approach and SID waypoints left out
+  of a stored plan (4-6, 6-23, the trainer), DELETE FPL? and DEL with their CLR (4-5, the trainer for the `?` column),
+  FPL FULL (4-4, C-1), the insert with the inner knob (4-4). Pins #150 (numbered plan), #239, #240, #241, #242, #243,
+  #262 (the FPL half).
+- **Task 4, SET 0 to SET 10:** `Set0Page.test.ts` to `Set9Page.test.ts` appended (SET 10 was held already): the SET 0
+  update steps (2-5), SET 1's editors, the waypoint initialization (3-18) and CONFIRM? with the first fix, the SET 2
+  magnetic variation editor with the knobs (5-44, B-2) and the time zone sweep cut to UTC, the last zone, the wrap and
+  CDT, the SET 3 to SET 9 fields (3-22 to 3-57). Pins #217 (the MAG V line), #244, #245, #246, #247, #248.
+- **Task 5, OTH 1 to OTH 10 and STA 1 to STA 5:** `Oth1Page.test.ts` to `Oth10Page.test.ts`, `Sta1Page.test.ts` to
+  `Sta5Page.test.ts` and `test/unit/settings/RemarksManager.test.ts`, on the `simVars` option: the OTH 3 plan number and
+  the OTH 4 order from the trainer (5-20, 3-47), the remarks deletion (3-47), the fuel pages (5-41), the air data pages
+  (5-42, 5-43), STA 1 and STA 4, STA 5's defaults only (6-20). Pins #92 (the dead RMKS FULL check), #213, #223 (OTH 6),
+  #249 (OTH 9), #250 (two), #251, #252 (two).
+- **Task 6, TRI 0 to TRI 6 and CAL 1 to CAL 7:** the fourteen files appended or new (the existing `#31` and CAL 2 tests
+  untouched): the trip calculations against hand-computed wind triangles (5-2 to 5-6), the airspace lists of TRI 2, 4
+  and 6, the CAL 1 to CAL 7 conversions (5-10 to 5-15), CAL 6 in both directions with a non-UTC bottom zone; the
+  out-of-range values left out of every snapshot. Pins #223 (TRI 3), #249 (CAL 3), #254, #255, #256 (two).
+- **Task 7, MOD 1 and 2, ALT, DIRECT TO, DUPLICATE WAYPOINT and the self-test page:** `Mod1Page.test.ts`,
+  `Mod2Page.test.ts`, `AltPage.test.ts`, `DirectToPage.test.ts`, `DuplicateWaypointPage.test.ts` and
+  `SelfTestLeftPage.test.ts` appended or new, and `VolatileMemory.test.ts` (its WARN reset became a pin): the mode pages
+  (5-32, 5-33, 5-35, 5-36, 5-38), the OBS knob from the trainer, the ALT page (3-39, 3-55, 3-57), DIRECT TO (3-27 to
+  3-29, 4-7), the Duplicate Waypoint order and cursor (3-15), the self-test snapshot. Pins #160 (MOD 2), #258, #259
+  (two), #260, #261, #262 (the D-> half), #263.
+- **Task 8, this close-out:** the issues and comments below, the placeholders replaced in one commit, `testing.md`
+  sections 6 and 7, and this log.
+
+**Rulings**
+- **The maintainer's:**
+    - The trainer: one agent for all trainer questions, before the design.
+    - Evidence: the guide's figures and photos of real units count as evidence for a bug with a pin, as for #199.
+    - Map scales: the code's list is characterized and a `question` issue lists the scales the figures and photos show
+      (#236).
+    - Super NAV 5 near the MAP: figure 6-16 is the spec for AUTO; task 2 checked it with a missed-approach world and
+      pinned it (#235).
+    - NO INTRCPT on Super NAV 5: a `question` issue, no pin (#237).
+    - Out of scope: STA 5's RAIM prediction (#214), the boot and the self-test values (Session 10), take-home mode
+      (unsupported).
+    - The task split, the rulings and the controller's defaults of the design: approved.
+- **The controller's** (the design's defaults that the maintainer did not object to, and the ledger):
+    - every bug of the design's table filed and pinned (rule 8); degrees below 10 a bug on the trainer and the KLN 90
+      photo (#230); the ALT warn reset a bug on 3-55, referencing #192 (#259);
+    - trainer answers that agree with the code are spec tests citing the trainer (the FPL 0 scroll rule, the delete
+      prompt's column, approach waypoints left out of a stored plan, the OTH 3 plan number, the OTH 4 order, the OBS step
+      and wrap);
+    - characterizations without an issue: SET 1 showing CONFIRM? with the cursor off (the code cites a video of a real
+      unit), STA 3's version row, OTH 6 NM/GAL of 10 or more with zeros, the OTH 6 RANGE dashes, the OTH 10 negative
+      temperature format, TRI 3 taking the variation at the "from" waypoint, TRI 1 and TRI 2 dashes without a fix, the
+      MOD 2 colon after OBS in Leg mode, the SET 2 MAG V columns;
+    - one `question` issue for the out-of-range calculator values, which stay out of the snapshots (#257);
+    - the TRI 5 pin asserts the ETE only, and the ground speed row stays out of the snapshot until the fix decides what
+      "average" means (#254);
+    - the SET 2 time zone sweep cut to a few zones, because the full ordered list mirrors a table of the guide;
+    - known issues gain pins and comments instead of new issues: #217 (the SET 2 MAG V crash), #150 (the numbered plan),
+      #160 (MOD 2);
+    - log only: the SET 1 track stored as true (take-home), the shaft glyph of a procedure header row on FPL 0, the
+      `__:__` empty ETA of STA 5 (Session 9), the `-0100` altitude of a low-confidence self-test photo (Session 10), the
+      CAL 3 TAS label (the code follows the guide), CAL 1 showing `0700MB` for its 0.00" default (Session 2
+      characterized the default);
+    - tasks 1 to 7 in parallel worktrees (rule 21 over the skill's sequential default), implementers on Sonnet (rule 26),
+      reviewers on Opus for tasks 2, 3 and 7; reports and review packages in the SDD workspace; the mutation pass in the
+      task worktrees (rule 24 over the template's read-only rule);
+    - minor findings that were label, citation or copyright breaches were raised to Important, and surviving mutations
+      joined the fix rounds;
+    - task 2: the AUTO tests place their waypoints so that their expectations hold with or without a 7 NM scale, and the
+      7 NM scale of figure 6-15 went into #236;
+    - task 1: the NAV 3 cross track below 1 NM in tenths became a characterization and a `question`, because figure
+      3-105 (tenths) conflicts with a real-unit photo and the trainer (hundredths) (#231);
+    - task 5: the trainer's arrow for the active waypoint on its user waypoint list became a `question`, no pin, because
+      the 89 may differ (#253);
+    - task 3: ENT on an approach waypoint throws, found in fix round 1 and pinned in round 2 (#243), because a throw on
+      input is never the real unit's behavior;
+    - task 1, parked: the NAV 3 ESA along the route (it needs a non-flat MSA grid, beyond the brief) and a
+      `not.toBe(VnavState.Inactive)` that guards a state precondition, not the subject;
+    - during the close-out: the dead RMKS FULL check is the first point of #92, so the pin was renamed `#92` and #92 got a
+      comment instead of a new issue; the leads below were logged, not filed (none had the evidence of a bug).
+- **The plan's changes to the drafts:** the research placeholders `#NEW-A-n` to `#NEW-G-n` were renamed to the task
+  numbers; the drafts that asserted a single-digit degree or a `:60` duration were changed to avoid both; the SET 2 zone
+  sweep was cut; the trainer turned the research's open questions on SET 1, FPL, OTH 3, OTH 4, the OBS knob, DUPLICATE
+  WAYPOINT and D-> into spec tests or pins.
+- **Review fix rounds:** every task needed at least one; task 3 three, tasks 2 and 6 two. Task 0: the recorder wrappers
+  were unheld, and eight minor survivors. Task 1: FLY R and the off-center deviation bar unheld, weak citations for BRG
+  magnetic and the NAV 2 radial, the cross track tenths (above), survivors and page numbers in helper comments. Task 2:
+  menu choices found by count, citations and a scale that did not reach the map, the 7 NM risk, runs of manual text in
+  comments; then DTK-up tests citing 3-34 and 3-35 for the code's aircraft position. Task 3: the FPL FULL helper hid the
+  inner-knob cursor bug and the blank 31st path, a missing numbered-plan sibling, the end clamp of figure 4-32 unheld,
+  INVALID ADD and DEL survivors, runs of manual text; then a copied 4-4 run, then 6-6 cited where 6-7 says it. Task 4:
+  a label and a citation raised to Important, survivors in SET 1, SET 5 and SET 8. Task 5: the OTH 4 `refreshChildren`
+  call was not redundant after all, the second trigger of #252, a STA 1 sibling with a page number, the OTH 3 ACTIVE WPT
+  test conflating C-1 with the plan check. Task 6: the CAL 6 bottom zone unheld, page numbers beside characterizations;
+  then a TRI 1 literal that committed to rounding. Task 7: the MOD 2 colon sibling never checked the colon, a DIRECT TO
+  citation, a near-verbatim comment.
+
+**Trainer results** (KLN 89 trainer, 2026-10-07; the maintainer started the VM; paraphrased)
+- **Durations:** the 89 never shows `:60`; the hour rolls over (high). NAV 1 truncates the ETE to whole minutes
+  (medium-high); the CAL page looks rounded (low-medium). The pins accept either.
+- **Coordinates:** never `60.00'`; from `59.99'` the next value is the next whole degree (high); rounding or truncation of
+  the hundredths unsettled.
+- **Degrees below 10** are blank-padded, with zeros only inside an open edit field (high); a KLN 90 photo agrees (#230).
+- **SET 1:** after the ident and two ENT the cursor goes straight to `Ok?` (high, #248); CLR then ENT on the ident has no
+  visible effect (medium, #244).
+- **FPL pages:** the waypoint before the active one goes to the top row (medium-high; the code agrees); a full plan has
+  no blank position after its last waypoint (high, #241); approach waypoints are not stored when FPL 0 is copied
+  (high); the `?` of the delete prompt stands in a fixed column after a five-cell ident field (high; the code agrees).
+- **OTH:** the user waypoint list shows the lowest plan number, `0` for FPL 0, and an arrow for the active waypoint
+  (high; the arrow is #253); the remarks list is sorted by ident (high).
+- **OBS:** one degree per click; north shows `000`, never `360`, and the course wraps (high, #263).
+- **DUPLICATE WAYPOINT:** a header row with the ident and the column titles, then one row per waypoint (high, #258).
+- **Direct To an unknown ident** offers the user waypoint creation, not `NO SUCH WPT` (high, #262).
+- **Not answerable:** the map page (the trainer has none: neither the NAV 5 cursor start nor the range list), the fuel
+  efficiency format (no fuel flow input), the alert values over a power cycle (no power switch).
+
+**Bugs found and filed** (each after a search of the open and closed issues: the titles of all 222 issues, the bodies of
+#56, #57, #65, #73, #82, #92, #96, #122, #132, #160, #168 and #192, and at least three semantic searches per row, paced by
+the search API's limit of about ten a minute). Each issue says whether it was found in the headless harness or by
+reading the code, and none was reproduced in the sim.
+- **#223:** durations show `:60` and `h:60` (`DurationDisplay`; 3-31, 5-5, 5-7, 5-41, the trainer; like #99 and #184).
+  Pinned in `Nav1Page.test.ts`, `Oth6Page.test.ts` and `Tri3Page.test.ts`.
+- **#224:** the longitude dashes have the latitude layout (3-8, figure 3-26, a photo). Pinned in `Nav2Page.test.ts` and
+  `NullDashes.test.ts`.
+- **#225:** half of the deviation bar is missing next to the TO triangle (an operator precedence slip, 3-31). Pinned in
+  `Nav1Page.test.ts`.
+- **#226:** a distance that rounds up to the cutoff overflows its field (3-31, 3-32). Pinned in `Nav1Page.test.ts` and
+  `Nav3Page.test.ts`.
+- **#227:** the Direct To symbol is split from the waypoint on NAV 1, NAV 3 and Super NAV 1 (3-31, figures 3-97, 3-104,
+  5-21, a photo). Pinned in `Nav1Page.test.ts`, `SuperNav1Page.test.ts` and twice in `ActiveWaypoint.test.ts`.
+- **#228:** a two-letter VOR moves the NAV 2 radial (3-32, a photo). Pinned in `Nav2Page.test.ts`.
+- **#229:** VNAV started at zero ground speed shows `VNV INNaN:` (5-8). Pinned in `Nav4Page.test.ts`.
+- **#230:** degrees below 10 are shown with a zero (the trainer, a KLN 90 photo). Pinned twice in `Nav2Page.test.ts`.
+- **#232:** the NAV 5 cursor starts on the orientation instead of the range (3-34). Pinned in `Nav5Page.test.ts`.
+- **#233:** Super NAV 5 labels a VOR or NDB of FPL 0 twice (3-37, figures 3-121, 3-122). Pinned in
+  `SuperNav5Page.test.ts`.
+- **#234:** Super NAV 5 AUTO ignores the active waypoint when a next one exists (3-36). Pinned in
+  `SuperNav5Page.test.ts`.
+- **#235:** Super NAV 5 AUTO counts the missed approach near the MAP (6-9, figure 6-16). Pinned in
+  `SuperNav5Page.test.ts`.
+- **#238:** turning the OBS course up on Super NAV 5 closes the page (`ObsDtkElement.innerRight`; 5-34, 5-35). Pinned
+  in `SuperNav5Page.test.ts`.
+- **#239:** FPL 0 scrolls the from waypoint off above a procedure header (4-7, 4-8, figure 6-43). Pinned in
+  `FplPage.test.ts`.
+- **#240:** the refused waypoint stays as a row after FPL FULL (4-4, C-1). Pinned in `FplPage.test.ts`.
+- **#241:** a full numbered plan shows a blank 31st position (4-4, the trainer); the fix must rework the FPL FULL helper.
+  Pinned in `FplPage.test.ts`.
+- **#242:** on a numbered plan the inner knob opens a blank entry but the cursor stays on the waypoint before it
+  (`refreshButtons`; 4-4). Pinned in `FplPage.test.ts`.
+- **#243:** ENT on an approach waypoint of FPL 0 throws (6-7, C-1). Pinned in `FplPage.test.ts`.
+- **#244:** CLR then ENT on the SET 1 WPT field throws (the trainer); the fix must also reset the editor's value. Pinned
+  in `Set1Page.test.ts`.
+- **#245:** SET 1 shows the ground speed ` 00 KT` (3-18, figures 3-57 to 3-60). Pinned in `Set1Page.test.ts`.
+- **#246:** repeated CLR never returns SET 0 to its starting page (2-5). Pinned in `Set0Page.test.ts`.
+- **#247:** `SURFACE` lacks its colon (3-22). Pinned in `Set3Page.test.ts`.
+- **#248:** after the waypoint's ENT the SET 1 cursor moves to the latitude, not CONFIRM? (3-18, the trainer). Pinned in
+  `Set1Page.test.ts`.
+- **#249:** the wind direction lacks the true-north symbol on OTH 9 and CAL 3 (5-43, 5-12, a photo). Pinned in
+  `Oth9Page.test.ts` and `Cal3Page.test.ts`.
+- **#250:** OTH 8 shows TOTAL `0` when the fuel used is not transmitted (5-41). Pinned twice in `Oth8Page.test.ts`.
+- **#251:** OTH 2 keeps the old Center while it stays on screen (3-52). Pinned in `Oth2Page.test.ts`.
+- **#252:** OTH 4 misses two changes for the same airport in a row (3-47), with both triggers. Pinned twice in
+  `Oth4Page.test.ts`.
+- **#254:** TRI 5 averages the leg ground speeds without weighting (5-6). Pinned in `Tri5Page.test.ts`.
+- **#255:** CAL 4 edits the FPM from a stale value after an angle entry (5-12). Pinned in `Cal4Page.test.ts`.
+- **#256:** a temperature entered sign first loses its minus (5-10, 5-13). Pinned in `Cal1Page.test.ts` and
+  `Cal5Page.test.ts`.
+- **#258:** the Duplicate Waypoint page has no header row and five waypoints (3-15, the trainer; see #168). Pinned in
+  `DuplicateWaypointPage.test.ts`.
+- **#259:** the ALT warn altitude is reset at every power-on (3-55; references #192). Pinned in `AltPage.test.ts` and
+  `VolatileMemory.test.ts`.
+- **#260:** after a mode change with MOD 1 or MOD 2 in view a knob click makes the CDI scale undefined, then NaN (5-38;
+  related to #159, #160). Pinned in `Mod1Page.test.ts`.
+- **#261:** with an indicator the unit reads and drives, a course set on MOD 2 is overwritten before it is sent
+  (5-35). Pinned in `Mod2Page.test.ts`, on `FakeSim.applyObsKeyEvents`.
+- **#262:** an unknown ident on D-> and on FPL 0 gives `NO SUCH WPT` instead of the user waypoint creation (4-2,
+  the trainer). Pinned in `DirectToPage.test.ts` and `FplPage.test.ts`.
+- **#263:** an OBS course of 359.5 or more shows `360°` (5-35, the trainer; related to #122). Pinned in
+  `Mod2Page.test.ts`.
+- **#231 (`question`):** the NAV 3 cross track below 1 NM, tenths or hundredths.
+- **#236 (`question`):** the map scales between 1 and 1000 NM, with the scales the figures and photos show.
+- **#237 (`question`):** where NO INTRCPT shows on Super NAV 5.
+- **#253 (`question`):** the arrow for the active waypoint on the user waypoint list.
+- **#257 (`question`):** the out-of-range calculator values (`010°F`, `115mph`, a blank F REQ).
+- **Known issues pinned:** #99 (two pins, latitude and longitude, in `Nav2Page.test.ts`, planned since Session 2), #213
+  (`Sta1Page.test.ts`), #217 (the SET 2 MAG V line, `Set2Page.test.ts`), #150 (the numbered plan, `FplPage.test.ts`),
+  #160 (MOD 2, `Mod2Page.test.ts`), #92 (the RMKS FULL check, `RemarksManager.test.ts`).
+- **Comments:** #92 (the pin of its first point, and that a fixed check must still let a full list change or delete an
+  existing airport's remarks), #150 (the numbered plan: `Flightplan.delete` publishes nothing), #160 (the MOD 2 half
+  pinned; #260 is the separate stale-list failure), #192 (the WARN half decided and filed as #259) and #217 (the second
+  reproduction on the SET 2 MAG V line; one fix in `CursorController` covers both).
+
+**Fixes that could not be re-broken:** no test of an old fix was added or rewritten this session, and the existing ones
+in the touched files were left as they were. Survivors that stay unheld: `this.applyValueToFields` in `Editor.enter`
+(removing it leaves the SET 1 latitude test green through the callback path; possibly redundant for `LatitudeEditor`,
+nothing holds it for the other editors), the constructor-only `magvar.isReadonly = true` of SET 2 (equivalent to the one
+in `redraw()`), and CAL 2's `setTemp` writing the CAL 1 temperature (5-11 does not claim it).
+
+**The coverage of the area rose by about 21 points, which says what ran, not what is held** (section 1).
+`kln90b/pages/left` went from 70.95 % to 92.19 % of statements, and the shared controls rose with it
+(`kln90b/controls/selects` from 63.45 % to 81.72 %). What holds the pages is the proof of each test against a break of
+its own (the `Proof:` lines of the task commits) and the reviewers' mutation passes, whose survivors joined the fix
+rounds.
+
+**Not covered** (rule 18; the ledger is not committed, so the list is complete here)
+- **Pages without a spec test:** OTH 1 (the sim has no FSS data; only the empty page is characterized), SET 10 (the
+  page is fictitious, #46; a render test only), STA 2 and STA 3 (characterizations only; the guide gives no rule the code
+  could break). SET 9 has its contract and spec tests but no characterization snapshot; STA 5 has only its defaults
+  (#214).
+- Take-home mode, including the SET 1 track stored as true after CONFIRM? (`Set1Page.tsx:102`) and the take-home ground
+  speed and track (3-19, 5-46): unsupported by decision.
+- NAV 1 to NAV 4, Super NAV 1: the NAV 3 ESA along the route (needs a non-flat MSA grid); the NAV 3 MSA dashes where the
+  grid has no value (3-33); the Super NAV 1 deviation bar beyond the on-course snapshot (#225 is pinned on NAV 1 only);
+  NAV 4 IND below sea level (no 90B page; the `-0100` photo is Session 10's); the NAV 3 direct-to symbol (one helper fix
+  covers it with #227).
+- NAV 5 and Super NAV 5: weather, terrain and SUA (no code path, so no break can fail a test); `drawObs` on both pages;
+  TK up and HDG up in pixels; no route lines past the MAP; the DME arc on Super NAV 5 (shares the NAV 5 code); DTK
+  flashing (4-9, 6-18) and the ARC radial line; NO INTRCPT (#237); route lines during an off-plan Direct To (figure 3-109
+  does not settle it); Super NAV 5 track up below 2 kt (the NAV 5 path).
+- FPL 0 and FPL 1 to 25: numbered plans scrolling with FPL 0's active index (no page decides it); creating a plan in an
+  empty numbered plan (4-2); LOAD FPL 0? not persisted (`Flightplan.load`, the contract); the cursor memory of 4-3 (pages
+  are recreated on every knob step); the fly-over TYPE WPT page of 4-2 (right side); CHANGE SID?/CHANGE STAR? and the
+  STAR header glyph; the leg symbol without navigation; inserting a waypoint before a procedure header; the alert blink of
+  the head arrow; the shaft glyph of a procedure header row; the cursor after FPL FULL (#218).
+- SET 0 to SET 10: SET 1 CONFIRM? for its real purpose, a faster first fix (the harness acquisition does not depend on the
+  position); SET 0 beyond LOADER NOT READY (not simulated); SET 9 with the feature disabled and the cursor; the CAL 1
+  `0700MB` default in millibars.
+- OTH and STA: STA 5's prediction (#214); the `__:__` empty ETA of STA 5 (an editor glyph, Session 9); STA 1's TRAN,
+  DEGRD and FAILR states and the health letters (#215); the OTH 1 FSS data (none in the sim).
+- TRI and CAL: take-home on the TRI pages; CAL 7 sunrise values on the page (#164 makes exact literals impossible; held
+  at the unit stage) and polar day and night; the TRI 2, 4 and 6 list away from the start (#102); airspace names over
+  11 characters (figures 5-11 and 5-20 disagree); the CAL 3 TAS label (guide against a later photo); the out-of-range
+  values (#257).
+- MOD, ALT, DIRECT TO, DUPLICATE WAYPOINT, self-test: the self-test spec tests left to Session 10 (OBS IN following the
+  indicator, 3-4; ANNUN ON in the bottom row, 3-4; the D-bar at half scale right, figure 3-4); the flashing TEST FAIL (no
+  failure model); D-> rule 2 from Super NAV 5 with the scan knob pulled; MOD 2 and NAV 3 with a driven indicator beyond
+  the #261 pin; the MOD 2 half of #260; ALERT ON/OFF over a power cycle (#192).
+- Leads seen and not filed (`testing.md` section 7): FPL 0 showing an empty top row when the active waypoint is the
+  first one (a trainer question); an XTK of exactly 0 shown as `-.-` on NAV 3 (unreachable); `AltitudeFieldset` clamping
+  below sea level; debug `console.log` calls in `SupPage.tsx` and `WaypointPage.tsx` and the SUP page's ` 0` top row
+  (Session 9); `ModObsElement.innerRight` and `FuelOnBoardSelect.innerRight` returning `false` (no visible effect); CAL
+  2's `setTemp` writing the CAL 1 temperature. The OTH 6 RANGE row overflows at an unrealistic 151200 NM: not a bug.
+- Review notes left as they are: the MOD 2 #160 pin also turns red when the arming is removed (its sibling tells the two
+  apart); the `#259` pin of `VolatileMemory.test.ts` sits in its own describe, so the characterization describe holds only
+  characterizations; the MAP world with a missed approach is copied a third and a fourth time (`testing.md` section 7).
+
+**Workflow notes.** The isolation worktrees again started at `origin/main` and were reset to the session branch first.
+Task 0 ran alone in the main checkout; tasks 1 to 7 ran in parallel on Sonnet and merged in the order 4, 7, 2, 5, 6, 1,
+3; the close-out ran on Opus in the main checkout, because it needed GitHub. Reviewers ran on Opus for tasks 2, 3 and 7
+and on Sonnet for the others; re-reviews on Sonnet. Every worktree implementer had its Write and Bash heredoc to the
+shared report path refused by the worktree guard, so the reports were written inside the worktree (`.task-report.md`,
+untracked) or saved by the controller from the reply. The controller hit the usage limit three times and resumed from the
+ledger; one ledger line had recorded dispatches that had not happened, and the resume corrected it. The Edit and Write
+tools strip trailing blanks inside template literals, so inline snapshots with blank cells were regenerated with
+`vitest -u`. The GitHub semantic search allows about ten searches a minute; the close-out paced them between the
+filings.
+
+**Coverage at the start of the session** (identical to the end of session 7, measured again) **and at the end** (all
+tests green):
+
+| directory                  | % stmts start | % stmts end | % lines start | % lines end |
+|----------------------------|--------------:|------------:|--------------:|------------:|
+| all files                  |         79.40 |       84.84 |         79.29 |       84.78 |
+| `kln90b`                   |         86.75 |       88.15 |         86.51 |       87.95 |
+| `kln90b/controls`          |         83.09 |       87.81 |         82.74 |       87.56 |
+| `kln90b/controls/displays` |         86.01 |       90.27 |         85.71 |       90.06 |
+| `kln90b/controls/editors`  |         83.15 |       86.17 |         82.58 |       85.71 |
+| `kln90b/controls/selects`  |         63.45 |       81.72 |         61.75 |       80.49 |
+| `kln90b/data`              |         99.18 |       99.18 |         99.15 |       99.15 |
+| `kln90b/data/flightplan`   |         98.91 |       98.91 |         98.87 |       98.87 |
+| `kln90b/data/navdata`      |         94.00 |       94.09 |         93.79 |       93.88 |
+| `kln90b/pages`             |         79.77 |       82.52 |         79.51 |       82.31 |
+| `kln90b/pages/left`        |         70.95 |       92.19 |         71.15 |       92.24 |
+| `kln90b/pages/right`       |         67.65 |       67.73 |         68.36 |       68.45 |
+| `kln90b/services`          |         88.40 |       88.75 |         88.22 |       88.59 |
+| `kln90b/settings`          |         96.56 |       96.56 |         96.41 |       96.41 |
+
+The files of `kln90b/pages/left` below 50 % at the start (statements, from the design) and at the end: `Cal4Page.tsx`
+23.8 and 100, `Cal5Page.tsx` 23.8 and 100, `DuplicateWaypointPage.tsx` 0 and 87.5, `Sta5Page.tsx` 37.3 and 60.8 (the
+rest is the prediction, #214), `Set1Page.tsx` 41.7 and 95.8, `SuperNav5Page.tsx` 47.1 and 88.4.
+
+The suite at the start: 1411 tests passed and 154 expected failures, in 186 files. At the end: 1782 tests passed and 211 expected failures, in 225 files. The new expected
+failures are pins: #92, #99 (two), #150, #160, #213, #217, #223 (three), #224 (two), #225, #226 (two), #227 (four), #228,
+#229, #230 (two), #232, #233, #234, #235, #238, #239, #240, #241, #242, #243, #244, #245, #246, #247, #248, #249 (two),
+#250 (two), #251, #252 (two), #254, #255, #256 (two), #258, #259 (two), #260, #261, #262 (two) and #263.
 
 ## 2026-10-07, session 7, branch `tests-session-7-navdata`
 
