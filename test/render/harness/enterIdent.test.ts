@@ -1,7 +1,9 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit} from '../../harness/boot';
+import {bootUnit, settle} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
+import {savedFlightplan} from '../../harness/storage';
+import {standardRoute} from '../../harness/fixtures';
 
 describe('FrontPanel.enterIdent (harness)', () => {
     describe('in an editor', () => {
@@ -14,6 +16,28 @@ describe('FrontPanel.enterIdent (harness)', () => {
             await unit.panel.enterIdent('L', 'KAA');
 
             expect(Screen.read().row(1).slice(0, 11)).toBe('  1:KAA    ');
+        });
+
+        // The first knob click on an editor starts the edit (Editor.innerRight); while the editor is not in its edit, the
+        // outer knob moves the page cursor to the next field (CursorController.outerRight). When the field already shows
+        // the first character, enterIdent clicks once anyway, as a pilot would. NAV 4 shows the active waypoint ABC as
+        // its VNAV waypoint, and the page has more fields after it.
+        it('starts the edit when the editor already shows the first character: AAA over ABC on NAV 4', async () => {
+            const {kaaa, abc, kbbb} = standardRoute();
+            const unit = await bootUnit({
+                facilities: [kaaa, abc, kbbb, vor('AAA', 47.3, 8.3)], position: {lat: kaaa.lat, lon: kaaa.lon},
+                storage: savedFlightplan(0, [kaaa, abc, kbbb]),
+            });
+            await settle(unit);
+            await unit.panel.selectPage('L', 'NAV 4');
+            await unit.panel.cursor('L');
+            await unit.panel.cursorTo('L', 'ABC');
+            const at = unit.panel.focused('L'); // the precondition: the VNAV waypoint field, first character A
+
+            await unit.panel.enterIdent('L', 'AAA');
+
+            expect(Screen.read().row(at.row).slice(at.col, at.col + 5)).toBe('AAA  ');
+            expect(unit.panel.focused('L')).toEqual({row: at.row, col: at.col, text: 'AAA  '});
         });
 
         it('enters an ident that fills the editor', async () => {
@@ -55,9 +79,9 @@ describe('FrontPanel.enterIdent (harness)', () => {
             intersection('ALPHA', 47.1, 8.1), intersection('BRAVO', 48.0, 9.0)];
 
         it.each([
-            ['VOR  ', 'XYZ', [' XYZ D     ', 'XYZ        ', '          H', '114.30  0°E', "N 48°00.00'", "E 09°00.00'"]],
-            ['NDB  ', 'NDB', [' NDB       ', 'NDB        ', '           ', 'FREQ  350.0', "N 48°00.00'", "E 09°00.00'"]],
-            ['INT  ', 'BRAVO', [' BRAVO     ', 'REF:  _____', 'RAD: ___._°', 'DIS:___._NM', "N 48°00.00'", "E 09°00.00'"]],
+            ['VOR  ', 'XYZ', [' XYZ D     ', 'XYZ        ', '          H', '114.30  0°E', "N 48°00.00'"]],
+            ['NDB  ', 'NDB', [' NDB       ', 'NDB        ', '           ', 'FREQ  350.0', "N 48°00.00'"]],
+            ['INT  ', 'BRAVO', [' BRAVO     ', 'REF:  _____', 'RAD: ___._°', 'DIS:___._NM', "N 48°00.00'"]],
         ])('enters an ident on the %s page', async (page, ident, expected) => {
             const unit = await bootUnit({facilities: facilities()});
             await unit.panel.selectPage('R', page);
@@ -65,7 +89,8 @@ describe('FrontPanel.enterIdent (harness)', () => {
 
             await unit.panel.enterIdent('R', ident);
 
-            expect(Screen.read().rows('R')).toEqual(expected);
+            // The longitude row is left out because of #NEW-1-8 (the latitude row still shows the typed facility)
+            expect(Screen.read().rows('R').slice(0, 5)).toEqual(expected);
         });
 
         it('enters an ident of the full selector length on the SUP page, where an unknown ident offers to create it', async () => {
@@ -157,6 +182,16 @@ describe('FrontPanel.enterIdent (harness)', () => {
 
             await expect(unit.panel.cursorTo('R', 'USER POS?')).rejects.toThrow(/expected one focused field on side R, found 2/);
             expect(outer).not.toHaveBeenCalled();
+        });
+
+        it('throws at once when the cursor of that side is off, without turning the pages', async () => {
+            const unit = await bootUnit({facilities: [airport('KAAA', 47.0, 8.0)]});
+            await unit.panel.selectPage('R', 'APT 1');
+            const outer = vi.spyOn(unit.panel, 'outer');
+
+            await expect(unit.panel.cursorTo('R', 'USER POS?')).rejects.toThrow(/the R cursor is off/);
+            expect(outer).not.toHaveBeenCalled();
+            expect(Screen.read().status().right).toBe('APT 1');
         });
 
         it('throws with the screen when the field is not within the clicks', async () => {

@@ -3,7 +3,7 @@ import {FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {bootUnit, moveAircraft, settle} from '../../../harness/boot';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
-import {canvasToAscii} from '../../../harness/render/canvas';
+import {canvasToAscii, downsampled} from '../../../harness/render/canvas';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
 import {LatLon, pointFrom} from '../../../harness/flight/geo';
@@ -63,27 +63,6 @@ function arcApproach(turn: LegTurnDirection, o: {
         })],
     });
     return {abc, at, kprc, facilities: [kprc, abc, arcbg, arcen, fafaa, mapaa]};
-}
-
-/**
- * The map draws in blocks of ZOOM_FACTOR (4) canvas pixels, so one character per block keeps every drawn pixel and makes
- * the snapshot readable: a block is lit when any of its pixels is.
- */
-function downsampled(ascii: string, block = 4): string {
-    const rows = ascii.split('\n');
-    const out: string[] = [];
-    for (let y = 0; y < rows.length; y += block) {
-        let line = '';
-        for (let x = 0; x < rows[y].length; x += block) {
-            let lit = false;
-            for (let dy = 0; dy < block && !lit; dy++) {
-                lit = rows[y + dy]?.slice(x, x + block).includes('#') === true;
-            }
-            line += lit ? '#' : '.';
-        }
-        out.push(line);
-    }
-    return out.join('\n') + '\n';
 }
 
 describe('NAV 5 page with a DME arc', () => {

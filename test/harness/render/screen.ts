@@ -19,6 +19,45 @@ function attrOf(el: Element, inherited: CellAttr): CellAttr {
 }
 
 /**
+ * How far the USE? button of a numbered flight plan is pulled back over `USE? INVRT?`: a negative CSS margin of eleven
+ * cells (KLN90B.scss .use-invert, FlightplanList.tsx UseInvertButton), so it covers the first four cells of its row.
+ */
+const USE_INVERT_SHIFT = 11;
+
+/**
+ * Reads the text that `read` adds to the current row as an overlay that starts USE_INVERT_SHIFT cells further left,
+ * over cells already in the row. An inverted or flashing overlay cell replaces the cell below. A normal overlay cell has
+ * no background of its own, so it shows the cell below, which must then be normal too: over an inverted cell its green
+ * glyph would cover the black one and fill the cell green, which `UseInvertButton.tick` hides the USE? button to avoid
+ * (FlightplanList.tsx). Both must be the same character, since the screen cannot show two glyphs in one cell. Either
+ * case is a rendering bug and throws.
+ */
+function overlay(rows: Cell[][], read: () => void): void {
+    const row = rows[rows.length - 1];
+    const end = row.length;
+    const count = rows.length;
+    read();
+    if (rows.length !== count) throw new Error('Screen: a line break inside the USE? overlay (.use-invert)');
+    const cells = row.splice(end);
+    if (cells.length === 0) return;
+    const at = end - USE_INVERT_SHIFT;
+    if (at < 0 || at + cells.length > end) {
+        throw new Error(`Screen: the USE? overlay "${cells.map(c => c.ch).join('')}" does not lie over its row "${row.map(c => c.ch).join('')}"`);
+    }
+    cells.forEach((cell, i) => {
+        const below = row[at + i];
+        if (cell.ch !== below.ch) {
+            throw new Error(`Screen: the USE? overlay shows "${cell.ch}" over "${below.ch}" in cell ${at + i}`);
+        }
+        if (cell.attr !== '.') {
+            row[at + i] = cell;
+        } else if (below.attr !== '.') {
+            throw new Error(`Screen: the USE? overlay draws a normal "${cell.ch}" over an inverted cell ${at + i}`);
+        }
+    });
+}
+
+/**
  * Text rows of an element as the font renders them: <br> and a newline inside a <pre> start a row, d-none subtrees are
  * skipped, and so is the fallback text inside a <canvas> ("ERROR" in Canvas.tsx), which a browser that supports canvas never shows. The map
  * itself is not read, and text positioned over it with CSS (the NAV 5 range) reads in DOM order, not at its row.
@@ -46,6 +85,10 @@ export function readRows(root: Element): Cell[][] {
         if (el.classList.contains('offset-left-cursor')) rows[rows.length - 1].push({ch: ' ', attr: '.'});
         const a = attrOf(el, attr);
         const pre = inPre || el.tagName === 'PRE';
+        if (el.classList.contains('use-invert')) {
+            overlay(rows, () => el.childNodes.forEach(c => walk(c, a, pre)));
+            return;
+        }
         el.childNodes.forEach(c => walk(c, a, pre));
     };
     walk(root, '.', false);

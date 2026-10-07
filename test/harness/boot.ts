@@ -55,6 +55,11 @@ export interface BootOptions {
     efb?: boolean;
     /** Overrides methods of FakePlatform, for example a facility client that fails, or a route manager that rejects */
     platform?: Partial<KLN90BPlatform>;
+    /**
+     * SimVars set before KLN90BCore.init, after the ones bootUnit sets itself (so they win), for values the unit reads
+     * only while it is built: the fuel computer reads NUMBER OF ENGINES in its constructor (Sensors.ts)
+     */
+    simVars?: { name: string; unit: string; value: number | boolean | string }[];
 }
 
 export interface HeadlessUnit {
@@ -201,6 +206,9 @@ function prepareBoot(opts: BootOptions): PreparedBoot {
     env.sim.set('PRESSURE ALTITUDE', 'feet', altitude);
     env.sim.set('GROUND VELOCITY', 'knots', 0);
     env.sim.set('GPS DRIVES NAV1', 'bool', true);
+    for (const v of opts.simVars ?? []) {
+        env.sim.set(v.name, v.unit, v.value);
+    }
     // UserSettingSaveManager key format: persistent-setting.<save key>.<setting name>, with "<ATC MODEL>.profile_1"
     for (const [name, value] of Object.entries(opts.storage ?? {})) {
         env.storage.data.set(`persistent-setting.${model}.profile_1.${name}`, JSON.stringify(value));

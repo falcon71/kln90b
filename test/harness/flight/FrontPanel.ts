@@ -277,7 +277,14 @@ export class FrontPanel {
         }
         for (let i = 0; i < ident.length; i++) {
             if (i > 0) await this.outer(side, 1);
-            await this.setChar(side, i, ident[i], ALPHABET);
+            const turned = await this.setChar(side, i, ident[i], ALPHABET);
+            if (i === 0 && !turned) {
+                // The first character showed the wanted letter already, so no click started the edit (Editor.innerRight:
+                // the first click enters the editor), and the outer knob would leave the field. Start it as a pilot
+                // would, with one click, and set the character again.
+                await this.inner(side, 1);
+                await this.setChar(side, 0, ident[0], ALPHABET);
+            }
         }
         if (ident.length < first.text.length) {
             await this.outer(side, 1);
@@ -343,6 +350,12 @@ export class FrontPanel {
      * with the screen if the field does not come within maxClicks.
      */
     public async cursorTo(side: Side, text: string, maxClicks = 20): Promise<void> {
+        // A page name in the status field means the cursor is off: the outer knob would turn the pages, and the search
+        // would end on another page. (The self-test pages show no name there.)
+        const status = this.screen().status()[side === 'L' ? 'left' : 'right'];
+        if (status !== '' && status !== 'CRSR' && status !== 'KYBD') {
+            throw new Error(`cursorTo: the ${side} cursor is off (the status line shows ${status}); turn it on first\n${this.screen().dump()}`);
+        }
         for (let i = 0; ; i++) {
             const runs = this.focusedRuns(side);
             if (runs.length > 1) this.focused(side); // throws with the screen

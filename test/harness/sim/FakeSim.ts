@@ -24,6 +24,9 @@ interface Registration {
     unit: string;
 }
 
+/** The key events that set a course SimVar when FakeSim.applyObsKeyEvents is on */
+const OBS_KEY_EVENTS: Record<string, string> = {'K:VOR1_SET': 'NAV OBS:1', 'K:VOR2_SET': 'NAV OBS:2'};
+
 /** Seconds from 0001-01-01 to 1970-01-01: E:ABSOLUTE TIME counts from year 1. */
 const ABSOLUTE_TIME_OFFSET_S = 62135596800;
 
@@ -44,6 +47,12 @@ export class FakeSim {
     /** Conversion failures. The SDK catches exceptions in GetSimVarValue, so they are collected here for monitors. */
     public readonly errors: string[] = [];
     public readonly gameVars = new Map<string, string | number>();
+    /**
+     * Off by default: key events only go to keyEvents. On, K:VOR1_SET and K:VOR2_SET set Nav OBS:1 and Nav OBS:2 to
+     * their value in degrees, as the sim does, for a test of an indicator the unit drives (ObsTarget). reset() turns it
+     * off again.
+     */
+    public applyObsKeyEvents = false;
     private readonly values = new Map<string, Stored>();
     private readonly registrations: Registration[] = [];
     private readonly registrationIds = new Map<string, number>();
@@ -58,6 +67,7 @@ export class FakeSim {
         this.gameVars.clear();
         this.values.clear();
         this.simStartMs = 0;
+        this.applyObsKeyEvents = false;
     }
 
     /** Sets a value as the sim or the aircraft model would. */
@@ -114,6 +124,10 @@ export class FakeSim {
         const time = Date.now();
         if (reg.key.startsWith('K:')) {
             this.keyEvents.push({time, name: reg.key, value: Number(v)});
+            const obs = OBS_KEY_EVENTS[reg.key];
+            if (this.applyObsKeyEvents && obs !== undefined) {
+                this.set(obs, 'degrees', Number(v));
+            }
             return;
         }
         this.values.set(reg.key, {unit: reg.unit, value: v});

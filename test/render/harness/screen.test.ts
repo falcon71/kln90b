@@ -1,6 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
+import {savedFlightplan} from '../../harness/storage';
+import {standardRoute} from '../../harness/fixtures';
 
 function mount(html: string): Element {
     document.body.innerHTML = `<div id="pageContainer">${html}</div>`;
@@ -198,5 +200,78 @@ describe('Screen, pages with their own layout', () => {
         expect(screen.maskRows('R')).toEqual(['.II........', ...Array(5).fill('.'.repeat(11))]);
         expect(screen.maskRows('L')).toEqual(Array(6).fill('.'.repeat(11)));
         expect(screen.half('R')).toBe(screen.rows('R').join('\n'));
+    });
+});
+
+// FlightplanList.tsx draws USE? over the first four cells of USE? INVRT? with a negative margin of eleven cells
+// (KLN90B.scss .use-invert), so that the cursor on USE? inverts those four cells only
+describe('Screen, the USE? overlay of a numbered flight plan', () => {
+    /** The first row of a numbered plan as UseInvertButton renders it: USE? INVRT?, then USE? in the overlay span */
+    const useRow = (invrtClass: string, useHtml: string) => mount(`<div><div class="left-page"><pre><span><span class="${invrtClass}">USE? INVRT?</span>`
+        + `<span class="use-invert">${useHtml}</span></span><br/>  1:KAAA<br/></pre></div><div class="right-page"><pre></pre></div>${STATUS}</div>`);
+
+    it('reads USE? INVRT? once, with the overlay over its first cells', () => {
+        useRow('', '<span>USE?</span>');
+        const screen = Screen.read();
+
+        expect(screen.rows('L').slice(0, 2)).toEqual(['USE? INVRT?', '  1:KAAA   ']);
+        expect(screen.maskRows('L')[0]).toBe('...........');
+    });
+
+    it('inverts only the four cells of USE? when the cursor is on it', () => {
+        useRow('', '<span class="inverted">USE?</span>');
+
+        expect(Screen.read().maskRows('L')[0]).toBe('IIII.......');
+    });
+
+    it('keeps the flashing attribute of the overlay', () => {
+        useRow('', '<span class="inverted inverted-blink">USE?</span>');
+
+        expect(Screen.read().maskRows('L')[0]).toBe('FFFF.......');
+    });
+
+    it('inverts all eleven cells when the cursor is on USE? INVRT? and the overlay is hidden', () => {
+        useRow('inverted', '<span class="d-none">USE?</span>');
+        const screen = Screen.read();
+
+        expect(screen.rows('L')[0]).toBe('USE? INVRT?');
+        expect(screen.maskRows('L')[0]).toBe('IIIIIIIIIII');
+    });
+
+    // UseInvertButton.tick hides USE? while USE? INVRT? has the cursor, because a normal USE? over the inverted cells
+    // would fill them green
+    it('throws when a normal overlay lies over inverted cells', () => {
+        useRow('inverted', '<span>USE?</span>');
+
+        expect(() => Screen.read()).toThrow(/USE\? overlay draws a normal "U" over an inverted cell 0/);
+    });
+
+    it('throws when the overlay shows other characters than the cells below it', () => {
+        useRow('', '<span>LOAD</span>');
+
+        expect(() => Screen.read()).toThrow(/USE\? overlay shows "L" over "U" in cell 0/);
+    });
+
+    it('throws when the overlay would start left of its row', () => {
+        mount(`<div><div class="left-page"><pre><span>USE?</span><span class="use-invert"><span>USE?</span></span><br/></pre></div>`
+            + `<div class="right-page"><pre></pre></div>${STATUS}</div>`);
+
+        expect(() => Screen.read()).toThrow(/USE\? overlay "USE\?" does not lie over its row "USE\?"/);
+    });
+
+    // The rows of a numbered plan with waypoints could not be read before (testing.md section 7): selectPage, focused
+    // and Screen.read() threw on 15 cells
+    it('reads FPL 3 with waypoints and lets the panel find USE? and USE? INVRT? (booted unit)', async () => {
+        const {kaaa, abc, kbbb} = standardRoute();
+        const unit = await bootUnit({facilities: [kaaa, abc, kbbb], position: {lat: 47.0, lon: 8.0}, storage: savedFlightplan(3, [kaaa, abc, kbbb])});
+
+        await unit.panel.selectPage('L', 'FPL 3');
+        expect(Screen.read().rows('L')).toEqual(['USE? INVRT?', '  1:KAAA   ', '  2:ABC    ', '  3:KBBB   ', '  4:       ', '           ']);
+
+        await unit.panel.cursor('L');
+        expect(unit.panel.focused('L')).toEqual({row: 0, col: 0, text: 'USE?'});
+
+        await unit.panel.outer('L', 1);
+        expect(unit.panel.focused('L')).toEqual({row: 0, col: 0, text: 'USE? INVRT?'});
     });
 });

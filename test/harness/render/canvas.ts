@@ -42,3 +42,25 @@ export function canvasToAscii(el: HTMLCanvasElement, threshold = 128): string {
     }
     return rows.join('\n');
 }
+
+/**
+ * The maps draw in blocks of ZOOM_FACTOR (4) canvas pixels (Canvas.tsx), so one character per block keeps every drawn
+ * pixel and makes a map snapshot readable: a block is lit when any of its pixels is. Takes the output of canvasToAscii;
+ * a block cut off at the right or bottom edge counts the pixels it has.
+ */
+export function downsampled(ascii: string, block = 4): string {
+    const rows = ascii.split('\n');
+    const out: string[] = [];
+    for (let y = 0; y < rows.length; y += block) {
+        let line = '';
+        for (let x = 0; x < rows[y].length; x += block) {
+            let lit = false;
+            for (let dy = 0; dy < block && !lit; dy++) {
+                lit = rows[y + dy]?.slice(x, x + block).includes('#') === true;
+            }
+            line += lit ? '#' : '.';
+        }
+        out.push(line);
+    }
+    return out.join('\n') + '\n';
+}

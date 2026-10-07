@@ -12,6 +12,36 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
+describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
+    afterEach(() => sim.reset());
+
+    it('records K:VOR1_SET without moving Nav OBS:1 by default', () => {
+        sim.reset();
+        SimVar.SetSimVarValue('K:VOR1_SET', SimVarValueType.Number, 93);
+
+        expect(sim.keyEvents.map(k => k.name)).toEqual(['K:VOR1_SET']);
+        expect(sim.has('Nav OBS:1')).toBe(false);
+    });
+
+    it('sets Nav OBS:1 and Nav OBS:2 from K:VOR1_SET and K:VOR2_SET when on, as the sim does', () => {
+        sim.reset();
+        sim.applyObsKeyEvents = true;
+        SimVar.SetSimVarValue('K:VOR1_SET', SimVarValueType.Number, 93);
+        SimVar.SetSimVarValue('K:VOR2_SET', SimVarValueType.Number, 271);
+
+        expect(sim.get('Nav OBS:1', 'degrees')).toBe(93);
+        expect(sim.get('Nav OBS:2', 'degrees')).toBe(271);
+        expect(sim.keyEvents.map(k => [k.name, k.value])).toEqual([['K:VOR1_SET', 93], ['K:VOR2_SET', 271]]);
+    });
+
+    it('turns the option off again on reset, so the next unit starts without it', () => {
+        sim.applyObsKeyEvents = true;
+        sim.reset();
+
+        expect(sim.applyObsKeyEvents).toBe(false);
+    });
+});
+
 describe('FakeSim through the SDK SimVar functions', () => {
     it('converts a value the instrument writes in radians when read in degrees', () => {
         SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, Math.PI / 2);

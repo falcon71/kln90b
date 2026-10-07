@@ -60,7 +60,7 @@ manager. The sim uses `SIM_PLATFORM`; tests use `FakePlatform` (`test/harness/pl
 `bootUnit()` (`test/harness/boot.ts`) does the following:
 
 1. Installs the fake clock, seeds `Math.random` and sets the SimVars a booting unit reads (position, `ATC MODEL`,
-   `ENG COMBUSTION:1`, and so on).
+   `ENG COMBUSTION:1`, and so on), then the test's own `simVars` (section 4), which win.
 2. Writes saved user settings into `FakeStorage` if the test passes `storage`.
 3. Builds a `KLN90BCore` with a `FakePlatform` around a `MemoryFacilityClient` and calls `init()` with a panel.xml
    document (`MINIMAL_PANEL_XML` unless `panelXml` is given).
@@ -88,7 +88,9 @@ The sim globals are installed once per test file by the setup files `test/harnes
       names in upper case, so a filter over it compares with `name.toUpperCase()`; `lastWrite` does that itself.
     - **Key events have no effect.** `sim.keyEvents` records a `K:` event, but nothing acts on it: `K:GPS_OBS_ON` does
       not set `GPS OBS ACTIVE`, and `K:VOR1_SET` does not move `Nav OBS:1`. A test asserts the event, or sets the
-      SimVar the sim would set itself.
+      SimVar the sim would set itself. The one exception is opt-in: `sim.applyObsKeyEvents = true` makes `K:VOR1_SET`
+      and `K:VOR2_SET` set `Nav OBS:1` and `Nav OBS:2` to their value in degrees, as the sim does, for a test of an
+      indicator the unit drives (`ObsTarget`). `reset()` turns it off, so it lasts one test.
     - `sim.unsetReads` lists variables the instrument read that nobody set, which helps when wiring a new input.
     - The SDK swallows exceptions inside `GetSimVarValue`, so unit-conversion problems would vanish. `FakeSim` collects
       them in `sim.errors`, and the flight driver turns them into a failure.
@@ -274,6 +276,11 @@ the reader follows the screen:
   CSS margin of one cell. The reader inserts that blank, so the status line keeps its 23 cells and `CRSR` sits in
   columns 1 to 4.
 - A newline inside a `<pre>` starts a row, as the browser renders it (the MSG page joins its lines that way).
+- The top row of a numbered flight plan (FPL 1 to 25) with waypoints shows `USE?` over the first four cells of
+  `USE? INVRT?`: `FlightplanList.tsx` pulls it back with a negative CSS margin of eleven cells (`.use-invert`,
+  `KLN90B.scss`). The reader lays the text of a `.use-invert` element over the cells it covers, so the row keeps its
+  eleven cells and the cursor on `USE?` inverts four of them. An overlay with other characters than the cells below it,
+  or a normal overlay over inverted cells (which would fill them green), is a rendering bug and throws.
 - A full page without a status line (the welcome page) owns all seven rows. The orientation and range of NAV 5 are
   positioned over the map with CSS and are read at row 5 of their half.
 - Super NAV 5 is a map with text over it, not a text grid. `Screen.read()` throws there; section 4 shows how to read it.
@@ -349,6 +356,9 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - **`unit.panel.type(side, text)`** types characters with the keyboard (`KLN90B_Internal_Key`), one display tick each, with
   that side's cursor on. It is the keyboard alternative to `enterIdent` (below), which turns the knobs as a pilot does
   to fill the ident selectors of the APT, VOR, NDB, INT and SUP pages.
+- **SimVars the unit reads while it is built.** `bootUnit({simVars: [{name, unit, value}]})` sets them before
+  `KLN90BCore.init`, after the SimVars the boot sets itself, so a test can override one of those too. The fuel computer
+  reads `NUMBER OF ENGINES` only in its constructor, so a fuel test with two engines boots with it.
 - **Use these helpers; do not hand-roll them.** A wait-for-GPS loop, a `KLN90B_Internal_Key` loop, a
   `persistent-setting.<model>.profile_1.` key and a `gps.reset()` right after the boot are what `settle`,
   `unit.panel.type`, `storedSetting` and `bootUnit({coldGps: true})` do. A hand-rolled form stays only where it is the
@@ -374,7 +384,13 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - The cursor and the blink phase change the mask. If a test is flaky on `B` or `F` cells, assert text only.
 - **Canvas pages** (NAV 5, Super NAV 5, APT 3 draw maps): `canvasToAscii(el)` returns the pixels as `#` and `.`. Snapshot
   it with `toMatchInlineSnapshot` as `test/render/harness/canvas.test.ts` does for a tiny canvas. For a map that is too
-  large to read inline, `toMatchFileSnapshot('./__snapshots__/name.txt')` keeps it in a file.
+  large to read inline, `toMatchFileSnapshot('./__snapshots__/name.txt')` keeps it in a file. `downsampled()`
+  (`render/canvas.ts`) turns the output of `canvasToAscii` into one character per block of four pixels, the size the
+  maps draw in, which makes a map file snapshot readable. `recordMap(names)` (`render/mapRecorder.ts`), installed before
+  the boot, records per redraw what NAV 5, Super NAV 5 and APT 3 draw: `drawn` lists the symbols, labels and flight plan
+  lines of the last complete redraw by point, `pixels` the symbols by pixel, and `reset()` forgets the frame. A point is
+  named after the entry of `names` it equals, so pass the facilities of the test. The spies pass every call on, so the
+  canvas still draws.
 - `Screen` skips `<canvas>` subtrees (their fallback text). It throws on Super NAV 5, a `SevenLinePage` made of
   CSS-positioned `<pre>` blocks: use `SuperNav5.read()` (`render/superNav5.ts`), which returns
   `{left, msg, range, right, directTo}`. `right` and `directTo` are `null` while hidden (the right cursor and the pulled
@@ -436,11 +452,15 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       VOR, NDB, INT and SUP pages: the focused run is one cell) it steps through the characters, and throws if the ident
       is longer than the selector. Each knob click on a character starts a search, so when the last character already
       shows the wanted letter (a fresh VOR page showing `ABC SOUTH`, entering `ABC`) it turns that character one click
-      away and one back, as a pilot would, and the search runs for exactly the typed ident. `type(side, text)` is the
-      keyboard alternative that types the same characters.
+      away and one back, as a pilot would, and the search runs for exactly the typed ident. In an editor whose first
+      character already shows the wanted letter (the VNAV waypoint `ABC` of NAV 4, entering `AAA`) no click has started
+      the edit, and the outer knob would leave the field, so `enterIdent` clicks once to start it. `type(side, text)` is
+      the keyboard alternative that types the same characters.
     - `focused(side)` returns the one focused field `{row, col, text}`; `cursorTo(side, 'USER POS?')` turns the outer
       knob until that field has the cursor, stepping over the cursor positions that focus nothing (the SUP page without
-      user waypoints has one after the ident characters) and throwing with the screen after `maxClicks`.
+      user waypoints has one after the ident characters) and throwing with the screen after `maxClicks`. It throws at
+      once when the status field of that side shows a page name, which means the cursor is off: the outer knob would
+      turn the pages and the search would end on another page.
       `appendToFpl0(idents)` enters and confirms idents on FPL 0.
     - Power: `powerOff()`, `powerOn()`, `powerCycle({offSeconds})` and `approveSelfTest()`. After boot every power-on runs
       the welcome page (17 s) and the self-test, also on an engine-running unit; `approveSelfTest` presses ENT on
@@ -676,12 +696,6 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - Approach arming (the ARM and APR scale ramps), the waypoint alert without turn anticipation and the GPS-invalid path
   are held at the render stage (Session 5: a held position plus `moveAircraft` observes them); flights would only add the
   motion. The one navigation flight Session 5 needed is the alert through a turn (`waypointAlertTurn.test.ts`).
-- **`Screen.read()` cannot read a numbered FPL page with legs.** `FlightplanList.tsx` shows `USE?` over the start of
-  `USE? INVRT?` in row 0 with a negative CSS margin (`.use-invert`, `KLN90B.scss`), and happy-dom has no layout, so the
-  reader sees `USE? INVRT?USE?`, 15 cells, and throws. `selectPage('L', 'FPL 5')` on a stored plan throws for the same
-  reason, as do `focused` and `enterIdent` there. That blocks UI tests of FPL 1 to 25 with legs (USE?, USE? INVRT?,
-  LOAD FPL 0?, deleting a numbered plan, FPL FULL on a numbered plan). The fix belongs in `test/harness/render/screen.ts`:
-  treat `.use-invert` like the margin of the CRSR field, as text that overlays the first cells of its row.
 - **Open trainer questions** for the next KLN 89 trainer session (the maintainer starts the VM): #146 (the alert time on
   a Direct To a waypoint of FPL 0 that has a following leg) and #147 (whether there is a waypoint alert in OBS mode). The
   approach questions #162 (the GPS APR switch before the FAF) and #163 (four approach-scale cases) cannot be answered
@@ -691,9 +705,9 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
   from outside it, so without that step CTR 1 computes no waypoints at all. The CTR pages belong to Session 9.
 - Harness gaps that the Session 4 contract tests worked around (each serves few tests, so none was built, per rule 13
   of test-coverage.md):
-    - **SimVars before `init`.** `BootOptions` cannot set an arbitrary SimVar before the core reads it. An electricity
-      test therefore boots powered, loses power at the first `SimVarSync` tick and powers up when the test sets the
-      circuit (`SimVarSync.test.ts`, `PowerButton.test.ts`). A `simVars` boot option would remove the detour.
+    - **SimVars before `init`.** The `simVars` boot option now exists (section 4). The electricity tests
+      (`SimVarSync.test.ts`, `PowerButton.test.ts`) still take the detour of a powered boot: they boot powered, lose
+      power at the first `SimVarSync` tick and power up when the test sets the circuit.
     - **Counting and sampling writes.** Tests count the writes of one SimVar by filtering `sim.writes` (upper-case names)
       and sample an LVar over display ticks with a hand-written loop (`SimVarSync.test.ts`, `StatusLine.test.ts`,
       `SelfTestLeftPage.test.ts`). A `sim.writeCount(name)` and a sampling helper would remove the pitfall.
