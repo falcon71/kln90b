@@ -11,12 +11,14 @@ describe('GPS acquisition starts at power-on (179d37d)', () => {
     it('the satellite channels are searching while the turn-on page is still up', async () => {
         const unit = await bootUnit({engineRunning: false});
         const gps = unit.props.sensors.in.gps;
+        expect(gps.gpsSatComputer.getChannels()).toHaveLength(8); // 5-29: an empty list would pass the every() checks
         expect(gps.gpsSatComputer.getChannels().every(c => c === null)).toBe(true);
 
         await unit.panel.powerOn();
         await vi.advanceTimersByTimeAsync(5000); // a fixed wait: the time since power-on is the subject
 
         expect(Screen.read().row(0)).toBe(' GPS             ORS 20');
+        expect(gps.gpsSatComputer.getChannels()).toHaveLength(8);
         expect(gps.gpsSatComputer.getChannels().every(c => c !== null)).toBe(true);
     });
 });
@@ -141,5 +143,28 @@ describe('GPS track while the sim is paused (43d472b)', () => {
         const unit = await bootJumpAndHold();
 
         expect(unit.consoleErrors).toEqual([]);
+    });
+});
+
+// 3-32: NAV 3 shows dashes for TK when the speed is insufficient; 3-35: the track is usable from 2 knots. The jump from
+// 47/8 to 47.1/8.1 is the true course 34.232 degrees, 030 magnetic with 4 degrees east (see above)
+describe('TK and the 2 kt limit (3-32, 3-35)', () => {
+    async function jumpAt(groundspeedKt: number) {
+        const unit = await bootUnit({position: {lat: 47, lon: 8}, magvar: 4});
+        await settle(unit);
+        await unit.panel.selectPage('L', 'NAV 3');
+        await moveAircraft(unit, {lat: 47.1, lon: 8.1}, {groundspeedKt});
+    }
+
+    it('shows the track at 2 kt (3-35)', async () => {
+        await jumpAt(2);
+
+        expect(Screen.read().rows('L')[2]).toBe('TK     030°');
+    });
+
+    it('shows dashes at 1.9 kt (3-32, 3-35)', async () => {
+        await jumpAt(1.9);
+
+        expect(Screen.read().rows('L')[2]).toBe('TK     ---°');
     });
 });
