@@ -269,10 +269,10 @@ describe('Super NAV 5 page', () => {
         ]);
     });
 
-    // 3-34, 3-35: desired track up turns the map so that the course points up, with the aircraft three quarters down
-    // and the range still measured from the aircraft to the top. The map is 148 x 91 map pixels, so the aircraft is at
-    // (74, 68.25) and, at 10 NM, a waypoint 8 NM ahead on the desired track of 060 is 8/10 of the 68.25 pixels above
-    // it, at (74, 13.65).
+    // 3-34, 3-35: desired track up turns the map so that the course points up, and 3-35: the range is the distance from
+    // the aircraft to the top of the map. Where the aircraft sits on the map is the layout of the code, not a statement
+    // of those pages: three quarters down. The map is 148 x 91 map pixels, so the aircraft is at (74, 68.25) and, at
+    // 10 NM, a waypoint 8 NM ahead on the desired track of 060 is 8/10 of the 68.25 pixels above it, at (74, 13.65).
     it('draws desired track up with the course pointing up (3-34, 3-35)', async () => {
         const w = world();
         const ahead = pointFrom(w.kaaa, 60, 8);

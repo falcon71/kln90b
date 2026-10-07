@@ -335,9 +335,10 @@ describe('NAV 5 page map', () => {
         expect(Math.abs(at('3')[2] - 39)).toBeLessThanOrEqual(1);
     });
 
-    // 3-34, 3-35: desired track up turns the map so that the course points up. The range is still measured from the
-    // aircraft to the top. The map puts the aircraft three quarters down (y = 58.5 of 78), so at 10 NM a waypoint 8 NM
-    // ahead on the desired track of 060 is 8/10 of the 58.5 pixels above the aircraft, at x = 49.5, y = 11.7.
+    // 3-34, 3-35: desired track up turns the map so that the course points up, and 3-35: the range is the distance from
+    // the aircraft to the top of the map. Where the aircraft sits on the map is the layout of the code, not a statement
+    // of those pages: three quarters down (y = 58.5 of 78). With it, at 10 NM a waypoint 8 NM ahead on the desired
+    // track of 060 is 8/10 of the 58.5 pixels above the aircraft, at x = 49.5, y = 11.7.
     it('draws desired track up with the course pointing up (3-34, 3-35)', async () => {
         const w = standardRoute();
         const ahead = pointFrom(w.kaaa, 60, 8);
