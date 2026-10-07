@@ -246,6 +246,18 @@ describe('Screen, the USE? overlay of a numbered flight plan', () => {
         expect(() => Screen.read()).toThrow(/USE\? overlay draws a normal "U" over an inverted cell 0/);
     });
 
+    it('throws when a normal overlay lies over flashing cells', () => {
+        useRow('inverted inverted-blink', '<span>USE?</span>');
+
+        expect(() => Screen.read()).toThrow(/USE\? overlay draws a normal "U" over an inverted cell 0/);
+    });
+
+    it('throws when the overlay contains a line break', () => {
+        useRow('', '<span>USE?<br/></span>');
+
+        expect(() => Screen.read()).toThrow(/a line break inside the USE\? overlay/);
+    });
+
     it('throws when the overlay shows other characters than the cells below it', () => {
         useRow('', '<span>LOAD</span>');
 

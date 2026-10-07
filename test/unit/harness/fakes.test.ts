@@ -34,6 +34,18 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
         expect(sim.keyEvents.map(k => [k.name, k.value])).toEqual([['K:VOR1_SET', 93], ['K:VOR2_SET', 271]]);
     });
 
+    it('only records another key event when on: K:GPS_OBS_ON sets nothing', () => {
+        sim.reset();
+        sim.applyObsKeyEvents = true;
+        // The write goes straight to the fake: the SDK's SetSimVarValue swallows an exception thrown below it
+        const id = SimVar.GetRegisteredId('K:GPS_OBS_ON', 'number', '');
+
+        expect(() => sim.writeReg(id, 1)).not.toThrow();
+        expect(sim.keyEvents.map(k => [k.name, k.value])).toEqual([['K:GPS_OBS_ON', 1]]);
+        expect(sim.has('GPS OBS ACTIVE')).toBe(false);
+        expect(sim.has('Nav OBS:1')).toBe(false);
+    });
+
     it('turns the option off again on reset, so the next unit starts without it', () => {
         sim.applyObsKeyEvents = true;
         sim.reset();

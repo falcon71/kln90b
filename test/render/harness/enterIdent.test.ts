@@ -194,6 +194,18 @@ describe('FrontPanel.enterIdent (harness)', () => {
             expect(Screen.read().status().right).toBe('APT 1');
         });
 
+        // The self-test page shows no page name in its left status field, so a blank is not a cursor that is off: the
+        // search runs and ends at the cap, on that page
+        it('searches on a page with a blank status field, the left one of the self-test page', async () => {
+            const unit = await bootUnit({engineRunning: false, magvar: 0});
+            await unit.panel.powerOn();
+            await vi.advanceTimersByTimeAsync(19_000);
+            expect(Screen.read().status().left).toBe('');
+            expect(Screen.read().text()).toContain('APPROVE?');
+
+            await expect(unit.panel.cursorTo('L', 'NO SUCH FIELD', 2)).rejects.toThrow(/no field "NO SUCH FIELD" within 2 clicks/);
+        });
+
         it('throws with the screen when the field is not within the clicks', async () => {
             const unit = await bootUnit({facilities: [airport('KAAA', 47.0, 8.0)]});
             await unit.panel.selectPage('R', 'APT 1');

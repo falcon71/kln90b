@@ -19,6 +19,18 @@ describe('bootUnit simVars (harness)', () => {
         expect(unit.props.sensors.in.fuelComputer.numberOfEngines).toBe(1);
     });
 
+    // Both entries are applied, each in its own unit: 1000 feet read back in meters is the SDK's conversion of the unit
+    // the value was set in (0.3048 m per foot), not the number as given
+    it('sets every entry in the unit it names', async () => {
+        const unit = await bootUnit({simVars: [
+            {name: 'NUMBER OF ENGINES', unit: 'number', value: 2},
+            {name: 'PLANE ALT ABOVE GROUND', unit: 'feet', value: 1000},
+        ]});
+
+        expect(unit.env.sim.get('NUMBER OF ENGINES', 'number')).toBe(2);
+        expect(unit.env.sim.get('PLANE ALT ABOVE GROUND', 'meters')).toBeCloseTo(304.8, 6);
+    });
+
     it('sets its values after the ones bootUnit sets, so a test can override one', async () => {
         const unit = await bootUnit({simVars: [{name: 'GPS DRIVES NAV1', unit: 'bool', value: false}]});
 
