@@ -248,6 +248,17 @@ describe('NAV 1 deviation bar', () => {
         expect(Screen.read().rows('L')[1]).toBe('ηηηηηαηηηηη');
     });
 
+    // 3-31: the same band, 0.55 NM left of the course, past the waypoint (FROM). The bar sits between the FROM triangle
+    // and the first dot right of it, which the font draws with two glyphs: the triangle with the bar at its right edge
+    // (ζ) and the dot with the bar at its left edge (Α). Worked by hand from the display's rules: 0.55 NM of the 5 NM
+    // scale is 5.55 of the 10 steps, the fraction .55 selects the second glyph pair and the step rounds to 6.
+    it('draws the whole bar next to the FROM triangle 0.55 NM left of the course (3-31)', async () => {
+        const unit = await pastWaypoint(0.55);
+
+        expect(unit.props.memory.navPage.toFrom).toBe(false);
+        expect(Screen.read().rows('L')[1]).toBe('ηηηηηζΑηηηη');
+    });
+
     // The setup sibling of the pin: 0.55 NM left of the course, TO the active waypoint, on the 5 NM scale
     it('reaches 0.55 NM left of the course flying TO (3-31)', async () => {
         const unit = await leftOfCourse(0.55);

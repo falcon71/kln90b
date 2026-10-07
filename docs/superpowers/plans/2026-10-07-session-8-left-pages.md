@@ -1604,7 +1604,7 @@ pins `#NEW-7-1` to `#NEW-7-6` and the MOD 2 pin of #160, the ALT warn row of
     - `ALT page (characterization)`: ALERT ON with the cursor on it (` ALTITUDE`, blank, `BARO:29.92"`,
       `ALERT: ON ›`, `WARN:±300ft`, blank; the ON field `IIII`); `shows the baro setting of the altimeter and skips it
       with the cursor` (air data and `BaroSource 1`, 30.12 then 29.85).
-    - `steps the cursor through the three baro positions to ALERT (3-55)`; `opens with the cursor over the first two
+    - `steps the cursor through the three baro positions to ALERT (3-55)`; `starts the cursor on the two leading
       digits of the millibar baro (3-39)`; `shows the arrow after ON and the WARN line (3-55)` (figure 3-178);
       `offers the warn altitudes 200 to 900 ft in 100 ft steps (3-55)`; `shows ALERT OFF and keeps the cursor off it when
       the installation disables altitude alerting (3-57)` (the OFF row compared with collapsed blanks: its spacing is

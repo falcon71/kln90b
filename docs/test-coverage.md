@@ -482,8 +482,8 @@ Pilot's Guide specifies the content.
 
 Result (session log, section 4): every left page has a render test, in tree order from NAV 1 to the self-test page,
 with spec tests where the Pilot's Guide or the KLN 89 trainer gives the rule. The pages without a spec test are OTH 1,
-SET 10, STA 2 and STA 3; SET 9 has spec and contract tests but no characterization snapshot, and STA 5 only its
-defaults (#214). Item 3 is done with the map recorder of task 0: Super NAV 5's `<pre>` blocks are read with
+SET 10, STA 2 and STA 3; every left page has a characterization snapshot, STA 5 only of its defaults before a
+prediction (#214). Item 3 is done with the map recorder of task 0: Super NAV 5's `<pre>` blocks are read with
 `SuperNav5.read()` and its canvas as a file snapshot. #99 is pinned (latitude and longitude), and the altitude editor
 cases of #54 and #55 were already held on CAL 2. The bugs found were filed and pinned (#223 to #230, #232 to #235, #238
 to #252, #254 to #256, #258 to #263), the questions are #231, #236, #237, #253 and #257, and #92, #150, #160, #213 and
@@ -647,6 +647,11 @@ later run adds a new entry.
       task worktrees (rule 24 over the template's read-only rule);
     - minor findings that were label, citation or copyright breaches were raised to Important, and surviving mutations
       joined the fix rounds;
+    - task 8's review was folded into the final whole-session review, as in Session 7, which saved a review seat;
+    - after task 8: the missing characterization snapshots of SET 9 and STA 5 were raised from Minor to Important,
+      because the Done-when asks for one per left page (STA 5's only of its defaults, as its prediction cannot be
+      tested); the duplicated helpers `cursorToCell` and `setDigit` and the lowercase comments of the question notes were
+      left as they are, because a harness move is beyond the session and neither changes behavior;
     - task 2: the AUTO tests place their waypoints so that their expectations hold with or without a 7 NM scale, and the
       7 NM scale of figure 6-15 went into #236;
     - task 1: the NAV 3 cross track below 1 NM in tenths became a characterization and a `question`, because figure
@@ -786,8 +791,7 @@ rounds.
 **Not covered** (rule 18; the ledger is not committed, so the list is complete here)
 - **Pages without a spec test:** OTH 1 (the sim has no FSS data; only the empty page is characterized), SET 10 (the
   page is fictitious, #46; a render test only), STA 2 and STA 3 (characterizations only; the guide gives no rule the code
-  could break). SET 9 has its contract and spec tests but no characterization snapshot; STA 5 has only its defaults
-  (#214).
+  could break). STA 5's characterization snapshot shows only its defaults before a prediction (#214).
 - Take-home mode, including the SET 1 track stored as true after CONFIRM? (`Set1Page.tsx:102`) and the take-home ground
   speed and track (3-19, 5-46): unsupported by decision.
 - NAV 1 to NAV 4, Super NAV 1: the NAV 3 ESA along the route (needs a non-flat MSA grid); the NAV 3 MSA dashes where the
@@ -860,8 +864,8 @@ The files of `kln90b/pages/left` below 50 % at the start (statements, from the d
 23.8 and 100, `Cal5Page.tsx` 23.8 and 100, `DuplicateWaypointPage.tsx` 0 and 87.5, `Sta5Page.tsx` 37.3 and 60.8 (the
 rest is the prediction, #214), `Set1Page.tsx` 41.7 and 95.8, `SuperNav5Page.tsx` 47.1 and 88.4.
 
-The suite at the start: 1411 tests passed and 154 expected failures, in 186 files. At the end: 1782 tests passed and 211 expected failures, in 225 files. The new expected
-failures are pins: #92, #99 (two), #150, #160, #213, #217, #223 (three), #224 (two), #225, #226 (two), #227 (four), #228,
+The suite at the start: 1411 tests passed and 154 expected failures, in 186 files. At the end: 1785 tests passed and
+211 expected failures, in 225 files. The new expected failures are pins: #92, #99 (two), #150, #160, #213, #217, #223 (three), #224 (two), #225, #226 (two), #227 (four), #228,
 #229, #230 (two), #232, #233, #234, #235, #238, #239, #240, #241, #242, #243, #244, #245, #246, #247, #248, #249 (two),
 #250 (two), #251, #252 (two), #254, #255, #256 (two), #258, #259 (two), #260, #261, #262 (two) and #263.
 

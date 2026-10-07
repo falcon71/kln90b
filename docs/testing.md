@@ -730,8 +730,8 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       of `SensorsOutSimVars.test.ts`, copied into `WTFlightplanSync.test.ts`, stay copied. `approachWorld()` has no
       missed approach, so the MAP tests of `NavCalculator.test.ts` build their own approach with a missed approach leg,
       and `ModeControllerObs.test.ts` builds the IAF = FAF and the MAHP = FAF approaches it needs (#153). That MAP world
-      is now copied twice more, into `SuperNav5Page.test.ts` (AUTO near the MAP) and `DirectToPage.test.ts` (a Direct To
-      at the MAP); a missed approach option of `approachWorld()` would replace all of them.
+      is now also copied into `SuperNav5Page.test.ts` (AUTO near the MAP) and `DirectToPage.test.ts` (a Direct To at the
+      MAP); a missed approach option of `approachWorld()` would replace all of them.
     - **A `FakeXhr` mount.** `FakeXhr` serves `resources/` only at the default path, so a custom `BasePath` fails the
       boot; a mount option would let a test hold the BasePath effect.
 - Harness gaps that the Session 6 tests worked around (each serves one file, so none was built, per rule 13 of
@@ -759,8 +759,8 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - Harness gaps and leads from Session 8 (none was built, per rule 13 of test-coverage.md):
     - **Super NAV 5's cursor is read by local helpers.** `SuperNav5.read()` has no mask, so `SuperNav5Page.test.ts`
       reads the focused field with its own helpers (`focusedIn`, `focusedLeft`, `focusedRight`) over the `.inverted`
-      spans (skipping the message field, and turning the no-break spaces of the field 3 selector back into blanks). A `focused` field in the reader would
-      replace them.
+      spans (skipping the message field, and turning the no-break spaces of the field 3 selector back into blanks). A
+      `focused` field in the reader would replace them.
     - **`vitest -t` takes a regular expression.** Titles with `(`, `)`, `+`, `?` or `#` (every pin and most citations)
       need escaping in a filtered run, which matters for the mutation pass more than for the tests.
     - **Leads that were seen and not confirmed or not filed** (each needs evidence or is out of reach today):

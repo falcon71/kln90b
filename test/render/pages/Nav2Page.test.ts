@@ -82,9 +82,9 @@ describe('NAV 2 page', () => {
     // 3-8 (figure 3-27) and 3-32 (figure 3-103): latitude as N or S, a blank and two digits of degrees, longitude as E
     // or W and three digits of degrees with no blank, both with minutes to the hundredth
     it('shows latitude and longitude in degrees and minutes to the hundredth (3-8, 3-32)', async () => {
-        await nav2At({lat: -(33 + 30.25 / 60), lon: -(122 + 15.5 / 60)});
+        await nav2At({lat: -(33 + 30.25 / 60), lon: -(122 + 15.47 / 60)});
 
-        expect(Screen.read().rows('L').slice(4)).toEqual(["S 33°30.25'", "W122°15.50'"]);
+        expect(Screen.read().rows('L').slice(4)).toEqual(["S 33°30.25'", "W122°15.47'"]);
     });
 
     // The Pilot's Guide has no figure of a degree below 10, so the KLN 89 trainer decides (2026-10-07): a user waypoint

@@ -6,6 +6,22 @@ import {storedSetting} from '../../../harness/storage';
 const panelXml = (alertEnabled: boolean) => '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output>'
     + `<AltitudeAlertEnabled>${alertEnabled}</AltitudeAlertEnabled></Output></Instrument></PlaneHTMLConfig>`;
 
+describe('SET 9 page (characterization)', () => {
+    it('characterization: the alert volume with the alert enabled by default', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'SET 9');
+
+        expect(Screen.read().half('L')).toMatchInlineSnapshot(`
+          "ALTITUDE   
+            ALERT    
+           VOLUME:   
+                     
+              99     
+                     "
+        `);
+    });
+});
+
 // Contract: wiki page panel.xml customization, "the SET 9 page will display FEATURE DISABLED" when the altitude alert
 // is disabled; cfg/panel.xml (Output.AltitudeAlertEnabled).
 describe('SET 9 page and Output.AltitudeAlertEnabled (contract)', () => {

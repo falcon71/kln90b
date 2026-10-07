@@ -5,6 +5,23 @@ import {distanceNm} from '../../../harness/flight/geo';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
 
+describe('STA 5 page (characterization)', () => {
+    it('characterization: the defaults before a prediction on a unit with no flight plan', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        await unit.panel.selectPage('L', 'STA 5');
+
+        expect(Screen.read().half('L')).toMatchInlineSnapshot(`
+          "RAIM STATUS
+          DEST:      
+          ETA:  __:__
+                  UTC
+            ççççççç  
+          -15  0  •15"
+        `);
+    });
+});
+
 // The prediction itself cannot be tested: Sta5Page builds its own GPSSatComputer with the sync role 'primary', which
 // never finishes init() in the harness, so every offset comes out as not available (testing.md section 6, #214). The
 // defaults of the entry fields and the COMPUTING text come before the prediction and can be tested.
