@@ -177,6 +177,7 @@ describe('airspace builders and the SDK LodBoundary', () => {
         const lod = new LodBoundary(circle);
 
         expect(lod.lods[0][0].length).toBe(2);
+        // circular airspaces are not implemented: #NEW-3-2
         expect(BoundaryUtils.isInside(lod, 47.0, 8.0)).toBe(false);
     });
 
