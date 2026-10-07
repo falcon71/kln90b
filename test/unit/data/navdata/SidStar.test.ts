@@ -631,17 +631,6 @@ describe('the OBS reminder of holds and procedure turns', () => {
         ]);
     });
 
-    // The code flies over a hold or procedure turn fix and over a fix the database marks as fly-over; no page of the
-    // manual describes the database flag.
-    it('flies over a hold fix and a published fly-over fix, and anticipates the others (characterization)', async () => {
-        const app = approach({
-            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
-            final: [Leg.HF(hldaa, 90, RIGHT, FixTypeFlags.IAF), Leg.TF(fafaa, FixTypeFlags.FAF, true), Leg.TF(mapaa, FixTypeFlags.MAP)],
-        });
-        const legs = await convertApp(app, null);
-        expect(legs.map(l => l.flyOver)).toEqual([true, true, false]);
-    });
-
     // The database pattern IF X (IAF), HF X: the flagged IF is kept, the hold is dropped as a repeat, and the OBS
     // reminder of the hold is lost with it. Whether the sim flags its data this way is not verified.
     it.fails('asks for OBS at an IAF whose hold follows it as a separate leg (#NEW-6-1)', async () => {
@@ -669,6 +658,19 @@ describe('the OBS reminder of holds and procedure turns', () => {
     });
 });
 
+// The code flies over a hold or procedure turn fix and over a fix the database marks as fly-over, and anticipates the
+// others.
+describe('the fly-over of hold fixes and published fly-over fixes (characterization)', () => {
+    it('flies over a hold fix and a published fly-over fix, and anticipates the others', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.HF(hldaa, 90, LegTurnDirection.Right, FixTypeFlags.IAF), Leg.TF(fafaa, FixTypeFlags.FAF, true), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => l.flyOver)).toEqual([true, true, false]);
+    });
+});
+
 describe('an unflagged repeat of the last kept fix (characterization)', () => {
     it('is dropped when other legs precede it', async () => {
         const app = approach({
@@ -683,8 +685,8 @@ describe('an unflagged repeat of the last kept fix (characterization)', () => {
     });
 });
 
-// 6-7: the missed approach follows the MAP behind the fence. The manual shows no approach whose missed approach holds
-// at the MAP; the code lists the fix twice, once per flag, as it does for a co-located IAF and FAF (6-10).
+// The manual shows no approach whose missed approach holds at the MAP; the code lists the fix twice, once per flag, as it
+// does for a co-located IAF and FAF.
 describe('a missed approach that holds at the MAP (characterization)', () => {
     it('lists the MAP and the holding point at the same fix as two waypoints', async () => {
         const app = approach({
@@ -699,8 +701,8 @@ describe('a missed approach that holds at the MAP (characterization)', () => {
     });
 });
 
-// 6-16 to 6-18: the unit enters an arc on the aircraft's radial and flies it to its end fix; step-down fixes on the arc
-// are not in its database (6-18).
+// The conversion of DME arcs: the entry on the aircraft's radial, one arc for consecutive arcs, the FAF kept. The pages
+// are cited on the spec tests.
 describe('DME arcs in the conversion', () => {
     const abc = vor('ABC', 47.3, 8.3);
     const fixAt = (ident: string, radial: number, nm: number) => {
@@ -720,8 +722,9 @@ describe('DME arcs in the conversion', () => {
             .getKLNApproachLegList(kprc, app, app.transitions[0]);
     };
 
-    // 6-18: two step-down fixes make three arc legs, flown as one arc from the start of the first to the end of the
-    // last; the arc ends at the FAF, which keeps its suffix (6-6, 6-7: every approach has a FAF).
+    // 6-16 to 6-18: the unit enters an arc on the aircraft's radial and flies it to its end fix. 6-18: two step-down
+    // fixes make three arc legs, flown as one arc from the start of the first to the end of the last (the step-down
+    // fixes are not in its database); the arc ends at the FAF, which keeps its suffix (6-6, 6-7: every approach has a FAF).
     it('flies three arcs around one navaid as one arc that ends at the FAF', async () => {
         const app = approach({
             type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
@@ -742,7 +745,7 @@ describe('DME arcs in the conversion', () => {
         ]);
         expect(legs[0].arcData!.beginRadial).toBe(270);
         expect(legs[0].arcData!.endRadial).toBe(180);
-        // 6-16 step 4: the arc approach loads like any other, so the entry is an approach waypoint of the airport too
+        // 6-17 step 4: the arc approach loads like any other, so the entry is an approach waypoint of the airport too
         // (ModeController finds the approach airport for the 30 NM arming of 6-1 on the first approach waypoint). 6-18
         // step 8: the unit anticipates the turn onto the arc, so the entry is not a fly-over waypoint.
         expect(legs.map(l => [l.type, l.parentFacility, l.flyOver])).toEqual([
@@ -786,8 +789,8 @@ describe('DME arcs in the conversion', () => {
     });
 });
 
-// The real unit leaves out procedures that do not suit it (6-21); the code leaves out those with an RF leg anywhere and
-// judges each transition by its own legs, as it does for runway transitions (#14).
+// The code leaves out procedures with an RF leg anywhere and judges each transition by its own legs, as it does for
+// runway transitions (#14).
 describe('SidStar.isProcedureRecognized for SIDs and STARs (characterization)', () => {
     const f = intersection('FIXAA', 47, 8);
     const g = intersection('FIXAB', 47.1, 8.1);
@@ -851,7 +854,7 @@ describe('SidStar.getKLNProcedureLegList', () => {
         expect(legs.map(l => l.procedure!.displayName)).toEqual(Array(5).fill('PORT9-SID'));
     });
 
-    // 6-22: some steps of the selection are not needed; a SID without a runway part starts at the common route.
+    // 6-21: some steps of the selection may not be necessary; a SID without a runway part starts at the common route.
     it('lists a SID without a runway part from the common route', async () => {
         const legs = await convert(departure(false), KLNLegType.SID, null, 0);
         expect(idents(legs)).toEqual(['COMAA', 'COMAB', 'TRNAA', 'TRNAB']);
@@ -911,6 +914,10 @@ describe('SidStar.getVorIfWithin30NMOfArc', () => {
 
     it('names no VOR when the arc entry is 35 NM ahead along the plan (20 NM to WPTAA, 15 NM on)', () => {
         expect(SidStar.getVorIfWithin30NMOfArc(navState(20, [legA, entryLeg]), fpl0([]))).toBeNull();
+    });
+
+    it('names no VOR when the arc entry is 31 NM ahead along the plan (16 NM to WPTAA, 15 NM on)', () => {
+        expect(SidStar.getVorIfWithin30NMOfArc(navState(16, [legA, entryLeg]), fpl0([]))).toBeNull();
     });
 
     it('names the arc VOR while the arc entry is the active waypoint 29 NM away', () => {

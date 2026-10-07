@@ -90,7 +90,7 @@ describe('APT 8 putting an approach into FPL 0', () => {
         await unit.panel.outer('R', 1); // the second entry, VOR 09
         await unit.panel.ent();
         await unit.panel.ent();
-        if (Screen.read().status().right === 'CRSR') await unit.panel.cursor('R');
+        expect(Screen.read().status().right).toBe('APT 8'); // the load switched the cursor off
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(fpl0Legs(unit)).toEqual([
@@ -159,7 +159,7 @@ describe('APT 8 loading an approach into a full FPL 0 (characterization)', () =>
 });
 
 // When FPL 0 is full and its first leg is not part of the active leg, the unit makes room by deleting the first leg
-// (C-1). The approach waypoints must still come in order before the airport.
+// (C-1 implies it). The approach waypoints must still come in order before the airport.
 describe('APT 8 loading an approach when FPL 0 has to make room', () => {
     /** 26 filler fixes and KPRC in FPL 0, the aircraft on the way to the seventh filler: the active leg has index 6 */
     async function loadIntoFullPlan() {

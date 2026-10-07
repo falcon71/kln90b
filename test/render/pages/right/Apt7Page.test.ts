@@ -57,7 +57,8 @@ describe('APT 7 page after a waypoint confirmation page (80631c8)', () => {
 const fpl0Legs = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => [l.wpt.icaoStruct.ident, l.type]);
 
 describe('APT 7 putting a procedure into FPL 0', () => {
-    // 6-23: the STAR comes before the approach, so a STAR chosen after the approach goes in front of the approach waypoints
+    // 6-23: the STAR goes in front of the airport. That it also goes in front of an approach already loaded is inferred
+    // from the flying order (the approach follows the STAR)
     it('puts a STAR in front of an approach that FPL 0 already holds (6-23)', async () => {
         const w = approachWorld();
         const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
@@ -118,7 +119,7 @@ describe('APT 7 putting a procedure into FPL 0', () => {
 });
 
 // When FPL 0 is full and its first leg is not part of the active leg, the unit makes room by deleting the first leg
-// (C-1). The STAR waypoints must still come in order before the airport.
+// (C-1 implies it). The STAR waypoints must still come in order before the airport.
 describe('APT 7 loading a STAR when FPL 0 has to make room', () => {
     /** 26 filler fixes and KPRC in FPL 0, the aircraft on the way to the seventh filler: the active leg has index 6 */
     async function loadStarIntoFullPlan() {
@@ -157,5 +158,52 @@ describe('APT 7 loading a STAR when FPL 0 has to make room', () => {
             ['STRAA', KLNLegType.STAR], ['STRAB', KLNLegType.STAR], ['STRAC', KLNLegType.STAR], ['STRAD', KLNLegType.STAR],
             ['STRAE', KLNLegType.STAR], ['KPRC', KLNLegType.USER],
         ]);
+    });
+});
+
+// A full FPL 0 that lacks the airport of the SID: the airport goes in at index 0, where the unit has to make room first.
+describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
+    /** 30 filler fixes in FPL 0, no KPRC, the aircraft on the way to the seventh filler: the active leg has index 6 */
+    async function loadSidIntoFullPlan() {
+        const w = approachWorld();
+        const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
+        const sidaa = intersection('SIDAA', east(8).lat, east(8).lon);
+        const sidab = intersection('SIDAB', east(20).lat, east(20).lon);
+        const kprc = withProcedures(w.kprc, {
+            approaches: [],
+            departures: [sid('DEP1', {runways: [{runway: '09', legs: [Leg.CA(90), Leg.DF(sidaa)]}], common: [Leg.TF(sidab)]})],
+        });
+        const fillers = Array.from({length: 30}, (_, i) => intersection(`FL${String(i).padStart(2, '0')}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [kprc, sidaa, sidab, ...fillers], position: {lat: 46.5, lon: 7.12},
+            storage: savedFlightplan(0, fillers),
+        });
+        await settle(unit);
+        // Preconditions: a full plan without KPRC, an active leg that does not need the first leg
+        expect(fpl0Legs(unit)).toHaveLength(30);
+        expect(fpl0Legs(unit).map(l => l[0])).not.toContain('KPRC');
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(6);
+
+        await unit.panel.loadProcedure('APT 7', {ident: 'KPRC'});
+        expect(rows('R').slice(0, 4)).toEqual(['DEP1-SID', 'PRESS ENT', 'TO ADD KPRC', 'AND SID TO']); // the question of the unit
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // APPROVE?
+        await vi.advanceTimersByTimeAsync(1000);
+        return unit;
+    }
+
+    it('asks to add the airport and keeps FPL 0 at 30 legs with the airport in it once (setup of #NEW-6-4)', async () => {
+        const unit = await loadSidIntoFullPlan();
+        const legs = fpl0Legs(unit);
+
+        expect(legs).toHaveLength(30);
+        expect(legs.filter(l => l[0] === 'KPRC')).toEqual([['KPRC', KLNLegType.USER]]);
+    });
+
+    // 6-22: the airport comes first, followed by the SID in its order (figure 6-38)
+    it.fails('puts the airport first, then every SID leg in order, when FPL 0 makes room (6-22, #NEW-6-4)', async () => {
+        const unit = await loadSidIntoFullPlan();
+
+        expect(fpl0Legs(unit).slice(0, 3)).toEqual([['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID]]);
     });
 });
