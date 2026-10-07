@@ -46,6 +46,20 @@ describe('OTH 6 page (characterization)', () => {
         expect(Screen.read().rows('L').slice(2, 5)).toEqual([' ENDUR12:36', ' RANGE 1512', ' NM/GAL 012']);
     });
 
+    // The efficiency is clamped at 999: 120 kt on 0.1 GAL/HR is 1200 NM per gallon
+    it('characterization: clamps NM/GAL at 999', async () => {
+        await single({fobLb: 30, reserve: 0, groundspeedKt: 120, flowPph: 0.6});
+
+        expect(Screen.read().rows('L')[4]).toBe(' NM/GAL 999');
+    });
+
+    // A reserve above the fuel on board leaves no endurance, and the page shows dashes for the endurance and the range
+    it('characterization: dashes for the endurance and the range when the reserve exceeds the fuel on board', async () => {
+        await single({fobLb: 120, reserve: 30, groundspeedKt: 120});
+
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual([' ENDUR--:--', ' RANGE --.-']);
+    });
+
     it('characterization: dashes without fuel flow', async () => {
         const unit = await bootUnit({panelXml: FUEL_PANEL_XML, simVars: [{name: 'NUMBER OF ENGINES', unit: 'number', value: 1}]});
         await unit.panel.selectPage('L', 'OTH 6');

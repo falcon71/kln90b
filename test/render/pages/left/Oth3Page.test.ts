@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {Facility, ICAO} from '@microsoft/msfs-sdk';
 import {bootUnit, settle} from '../../../harness/boot';
 import {standardRoute} from '../../../harness/fixtures';
@@ -153,8 +153,28 @@ describe('OTH 3 page, the user waypoint list (5-20)', () => {
         expect(entry(Screen.read().rows('L')[3])).toBe('AVOR V 6');
     });
 
-    // C-1: the active waypoint cannot be deleted; CLR says ACTIVE WPT. AINT is the active waypoint of FPL 0 KAAA AINT
+    // C-1: the active waypoint cannot be deleted; CLR says ACTIVE WPT. AINT is a user waypoint in no flight plan that a
+    // Direct To made the active waypoint, so only the active check can refuse the deletion
     it('refuses to delete the active waypoint with ACTIVE WPT (C-1)', async () => {
+        const unit = await bootUnit({storage: savedUserWaypoints(MIXED)});
+        await unit.panel.dct();
+        await unit.panel.enterIdent('L', 'AINT');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('AINT');
+        await unit.panel.selectPage('L', 'OTH 3');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 4); // AINT
+
+        await unit.panel.clr();
+
+        expect(Screen.read().status().mode).toBe('ACTIVE WPT');
+        expect(entry(Screen.read().rows('L')[5])).toBe('AINT I');
+    });
+
+    // The waypoint is the active one and is also in FPL 0: the unit then answers ACTIVE WPT, not USED IN FPL
+    it('characterization: refuses to delete the active waypoint of FPL 0 with ACTIVE WPT', async () => {
         const kaaa = airport('KAAA', 47.0, 8.0);
         const unit = await bootUnit({facilities: [kaaa], storage: {...savedUserWaypoints(MIXED), ...savedFlightplan(0, [kaaa, aint])}});
         await settle(unit);

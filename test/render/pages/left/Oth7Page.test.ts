@@ -71,7 +71,7 @@ describe('OTH 7 page, fuel flow (5-41)', () => {
         await oth7(1, [75], 'LB');
 
         const rows = Screen.read().rows('L');
-        expect(rows[2].trim()).toBe('LB/HR');
+        expect(rows[2]).toBe('      LB/HR'); // the unit is right-aligned in three cells, as GAL is
         expect([rows[3].trim(), rows[4].trim(), rows[5].trim()]).toEqual(['', '', '75']);
     });
 });

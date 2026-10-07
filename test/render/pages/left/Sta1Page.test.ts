@@ -60,9 +60,9 @@ describe('STA 1 page during a sky search', () => {
         expect((await satelliteRows(unit)).map(r => prnAndEle(r)[0])).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     });
 
-    // 5-30: the sibling of the #213 pin below, on the same sequence: during a sky search with no fix the page lists
+    // The precondition of the #213 pin below, on the same sequence: during a sky search with no fix the receiver tracks
     // satellites that are below the horizon by the SDK's own zenith angle (with the seed and the ephemeris of the harness)
-    it('lists satellites below the horizon during a sky search (5-30)', async () => {
+    it('characterization: the receiver tracks satellites below the horizon during a sky search (precondition of #213)', async () => {
         const unit = await skySearch();
 
         expect(unit.props.sensors.in.gps.isValid()).toBe(false);

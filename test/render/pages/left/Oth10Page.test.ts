@@ -2,7 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 
-/** Air data and a fuel computer, so the air data pages are OTH 9 and OTH 10 (5-42) */
+/** Air data and a fuel computer, so the air data pages are OTH 9 and OTH 10 */
 const AIRDATA_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input>'
     + '<Airdata><IsInterfaced>true</IsInterfaced></Airdata>'
     + '<FuelComputer><IsInterfaced>true</IsInterfaced></FuelComputer>'
@@ -19,6 +19,8 @@ async function oth10(o: { satC: number; tatC: number; pressureAltFt: number }): 
 }
 
 describe('OTH 10 page (characterization)', () => {
+    // The density altitude is the code's linear rule (a fixed number of feet per degree above the standard temperature),
+    // not the exact density altitude of the standard atmosphere, which would be about 80 ft lower here
     it('characterization: 12340 ft at 8 °C', async () => {
         await oth10({satC: 8, tatC: 12, pressureAltFt: 12340});
 

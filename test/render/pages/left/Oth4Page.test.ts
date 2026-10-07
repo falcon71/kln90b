@@ -87,4 +87,52 @@ describe('OTH 4 page, deleting remarks (3-47)', () => {
 
         expect(listed()).toEqual(['KAAA', 'KBBB']);
     });
+
+    // 3-47: CLR and ENT delete the remarks of the airport under the cursor, so the airport leaves the list. KCCC, the
+    // deleted one, was not the airport saved last; the sibling is the delete test above, where KCCC was saved last and
+    // KBBB (the middle one) was deleted
+    it.fails('removes a deleted airport from the list when its remarks were the last saved (3-47, #NEW-5-4)', async () => {
+        const unit = await withRemarks(['KAAA', 'KBBB', 'KCCC']);
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 2); // KCCC, the last airport saved
+
+        await unit.panel.clr();
+        await unit.panel.ent();
+
+        expect(unit.props.remarksManager.getAirportsWithRemarks()).toEqual(['KAAA', 'KBBB']);
+        await unit.panel.cursor('L');
+        expect(listed()).toEqual(['KAAA', 'KBBB']);
+    });
+});
+
+// The guide is silent on where the cursor goes when the last row of the list is deleted or the list becomes empty. The
+// deleted airport is never the one saved last in these setups, so that the list is redrawn at all (#NEW-5-4)
+describe('OTH 4 page, the cursor after a deletion (characterization)', () => {
+    it('characterization: moves the cursor to the new last airport when the last airport is deleted', async () => {
+        const unit = await withRemarks(['KCCC', 'KAAA', 'KBBB']);
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 2); // KCCC, the last row of the list KAAA, KBBB, KCCC
+
+        await unit.panel.clr();
+        await unit.panel.ent();
+
+        expect(listed()).toEqual(['KAAA', 'KBBB']);
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 0, text: 'KBBB'});
+    });
+
+    it('characterization: turns the cursor off when the only airport is deleted', async () => {
+        const unit = await bootUnit();
+        unit.props.remarksManager.saveRemarks('KBBB', REMARK);
+        unit.props.remarksManager.saveRemarks('KAAA', REMARK);
+        unit.props.remarksManager.deleteRemarks('KAAA');
+        await unit.panel.selectPage('L', 'OTH 4');
+        await unit.panel.cursor('L');
+        expect(listed()).toEqual(['KBBB']);
+
+        await unit.panel.clr();
+        await unit.panel.ent();
+
+        expect(listed()).toEqual([]);
+        expect(Screen.read().status().left).toBe('OTH 4');
+    });
 });

@@ -41,6 +41,16 @@ describe('OTH 8 page (characterization)', () => {
         `);
     });
 
+    it('characterization: follows the fuel used while the page is shown', async () => {
+        const unit = await oth8(1, [72]);
+        expect(Screen.read().rows('L')[5].trim()).toBe('12');
+
+        unit.env.sim.set('GENERAL ENG FUEL USED SINCE START:1', 'pounds', 108);
+        await vi.advanceTimersByTimeAsync(1500);
+
+        expect(Screen.read().rows('L')[5].trim()).toBe('18');
+    });
+
     it('characterization: a single, 12 GAL used', async () => {
         await oth8(1, [72]);
 

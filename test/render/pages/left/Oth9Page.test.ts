@@ -2,7 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 
-/** Air data and a fuel computer, so the air data pages are OTH 9 and OTH 10 (5-42), optionally a heading input */
+/** Air data and a fuel computer, so the air data pages are OTH 9 and OTH 10, optionally a heading input */
 function airdataXml(headingInput: boolean): string {
     return '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input>'
         + `<HeadingInput>${headingInput}</HeadingInput>`
