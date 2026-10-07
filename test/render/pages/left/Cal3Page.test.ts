@@ -9,7 +9,7 @@ const POS = {lat: 47.0, lon: 8.0};
 const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
 
 /**
- * 5-12, step 3: enters a TAS in whole hundreds with the knobs. The way to CAL 3 passes CAL 2, which overwrites the
+ * Enters a TAS in whole hundreds with the knobs. The way to CAL 3 passes CAL 2, which overwrites the
  * CAL 3 TAS when it is shown (#33, Cal2Page.test.ts), so the TAS cannot come from storage.
  */
 async function enterTasHundreds(unit: HeadlessUnit, hundreds: number): Promise<void> {

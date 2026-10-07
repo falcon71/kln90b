@@ -9,7 +9,9 @@ import {Screen} from '../../../harness/render/screen';
 const POS = {lat: 47.0, lon: 8.0};
 const world = () => ({kaaa: airport('KAAA', POS.lat, POS.lon), kbbb: airport('KBBB', 46.0, 8.0)});
 
-async function bootTri1(o: { magvar?: number, coldGps?: boolean, ff?: number, reserve?: number } = {}): Promise<HeadlessUnit> {
+async function bootTri1(o: {
+    magvar?: number, coldGps?: boolean, ff?: number, reserve?: number, tas?: number, windDirTrue?: number, windSpeed?: number
+} = {}): Promise<HeadlessUnit> {
     const {kaaa, kbbb} = world();
     const unit = await bootUnit({facilities: [kaaa, kbbb], position: POS, magvar: o.magvar ?? 0, coldGps: o.coldGps});
     if (!o.coldGps) {
@@ -17,6 +19,11 @@ async function bootTri1(o: { magvar?: number, coldGps?: boolean, ff?: number, re
     }
     // Fuel flow and reserve are volatile memory, read when the page is built
     Object.assign(unit.props.memory.triPage, {ff: o.ff ?? 0, reserve: o.reserve ?? 0});
+    for (const key of ['tas', 'windDirTrue', 'windSpeed'] as const) {
+        if (o[key] !== undefined) {
+            unit.props.memory.triPage[key] = o[key]!;
+        }
+    }
     await unit.panel.selectPage('L', 'TRI 1');
     return unit;
 }
@@ -80,6 +87,14 @@ describe('TRI 1 page (5-3, 5-4)', () => {
         expect(Screen.read().rows('L').slice(0, 3)).toEqual(['P.POS-KBBB ', '  60nm 170°', '150kt   :24']);
     });
 
+    // 5-2 and 5-3: the ground speed comes from the TAS and wind of TRI 0. TAS 200 with a wind from 180 at 25 kt on the
+    // course 180 (a headwind, no crosswind) is 175 kt; 60.107 NM at 175 kt is 20.6 min
+    it('shows the ground speed of the TRI 0 TAS and wind: 175kt and :21 (5-3)', async () => {
+        const unit = await bootTri1({tas: 200, windDirTrue: 180, windSpeed: 25});
+        await enterTo(unit, 'KBBB');
+        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['P.POS-KBBB ', '  60nm 180°', '175kt   :21']);
+    });
+
     // 5-3: any ground speed may be entered instead of the TAS and wind result; the ETE follows it.
     // 60.107 NM at 120 kt is 30.05 min
     it('recomputes the ETE from a ground speed entered with the knobs: 120 kt gives :30 (5-3)', async () => {
@@ -104,7 +119,7 @@ describe('TRI 1 page (5-3, 5-4)', () => {
         expect(Screen.read().rows('L').slice(3)).toEqual(['FF: 00030.0', 'RES:00025.0', 'F REQ  37.0']);
     });
 
-    // 5-5 and 5-6, figures 5-16, 5-18 and 5-19: a fuel requirement of 100 or more is shown without the decimal.
+    // 5-5 and 5-6, figures 5-16 and 5-18: a fuel requirement of 100 or more is shown without the decimal.
     // 0.40072 h * 300 = 120.2
     it('shows F REQ 120 without a decimal for a fuel flow of 300 (5-5, 5-6)', async () => {
         const unit = await bootTri1();

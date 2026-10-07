@@ -31,6 +31,16 @@ async function enterRoute(unit: HeadlessUnit, from: string, to: string): Promise
     await unit.panel.cursor('L');
 }
 
+/** Turns the outer knob until the cursor is on the cell at row, col */
+async function cursorToCell(unit: HeadlessUnit, row: number, col: number): Promise<void> {
+    for (let i = 0; i < 20; i++) {
+        const f = unit.panel.focused('L');
+        if (f.row === row && f.col === col) return;
+        await unit.panel.outer('L', 1);
+    }
+    throw new Error(`no field at ${row},${col}\n${Screen.read().dump()}`);
+}
+
 describe('TRI 3 page (characterization)', () => {
     it('shows the trip between two waypoints with fuel flow and reserve (characterization)', async () => {
         const unit = await bootUnit({facilities: [kaaa(), kbbb()]});
@@ -83,6 +93,18 @@ describe('TRI 3 page (5-5)', () => {
         expect(distanceNm({lat: 47.0, lon: 8.0}, {lat: 46.0, lon: 8.0})).toBeCloseTo(60.107, 3);
         expect(Screen.read().rows('L').slice(0, 3)).toEqual(['KAAA -KBBB ', '  60nm 180°', '150kt   :24']);
     });
+
+    // 5-5: any ground speed may be entered instead of the TAS and wind result; the ETE follows it.
+    // 60.107 NM at 120 kt is 30.05 min
+    it('recomputes the ETE from a ground speed entered with the knobs: 120 kt gives :30 (5-5)', async () => {
+        const unit = await bootTri3([kaaa(), kbbb()]);
+        await enterRoute(unit, 'KAAA', 'KBBB');
+        await unit.panel.cursor('L');
+        await cursorToCell(unit, 2, 1);
+        expect(unit.panel.focused('L').text).toBe('5');
+        await unit.panel.inner('L', -3); // 150 -> 120
+        expect(Screen.read().rows('L')[2]).toBe('120kt   :30');
+    });
 });
 
 describe('TRI 3 ETE just under an hour', () => {
@@ -102,7 +124,8 @@ describe('TRI 3 ETE just under an hour', () => {
     });
 
     // 5-5, figures 5-12 to 5-16: the ETE is hours and minutes, h:mm. 59.56 minutes is 1:00 rounded or :59 truncated,
-    // never 60 minutes (the same kind as #99 and #184)
+    // never 60 minutes (the same kind as #99 and #184). The page numbers show the h:mm form only; that the real unit
+    // never shows :60 was checked in the KLN 89 trainer, 2026-10-07
     it.fails('shows 59.56 minutes as 1:00 or :59, not :60 (5-5, #NEW-1-1)', async () => {
         const unit = await bootTri3([kaaa(), far()]);
         await enterRoute(unit, 'KAAA', 'KBBB');

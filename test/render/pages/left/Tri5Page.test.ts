@@ -41,6 +41,19 @@ describe('TRI 5 page (characterization)', () => {
     });
 });
 
+describe('TRI 5 page of one waypoint (characterization)', () => {
+    // The plan has one waypoint: there is no last waypoint and no distance. The ground speed row is left out
+    it('shows the first waypoint and dashes for the distance and the fuel of a plan of one waypoint (characterization)', async () => {
+        const kaaa = airport('KAAA', 47.0, 8.0);
+        const unit = await bootTri5([kaaa], savedFlightplan(0, [kaaa]));
+        expect(unit.errors).toEqual([]);
+        const rows = Screen.read().rows('L');
+        expect(rows[0]).toBe('FP 0 ----nm');
+        expect(rows[1]).toBe('KAAA -     ');
+        expect(rows[5]).toBe('F REQ ---.-');
+    });
+});
+
 describe('TRI 5 page (5-6)', () => {
     // 5-6, step 3 and figure 5-18: the first and last waypoints of the plan, its total distance and ETE. TRI 5 needs no
     // GPS. 60.107 NM at 150 kt is 24.04 min
@@ -50,6 +63,21 @@ describe('TRI 5 page (5-6)', () => {
         expect(unit.props.sensors.in.gps.isValid()).toBe(false); // The precondition: no fix
         expect(distanceNm(kaaa, abc) + distanceNm(abc, kbbb)).toBeCloseTo(60.107, 3); // The derivation of the literals
         expect(Screen.read().rows('L').slice(0, 3)).toEqual(['FP 0   60nm', 'KAAA -KBBB ', '150kt   :24']);
+    });
+
+    // 5-6: any ground speed may be entered instead of the average of the plan; the ETE follows it.
+    // 60.107 NM at 120 kt is 30.05 min
+    it('recomputes the ETE from a ground speed entered with the knobs: 120 kt gives :30 (5-6)', async () => {
+        const {kaaa, abc, kbbb} = meridianRoute();
+        const unit = await bootTri5([kaaa, abc, kbbb], savedFlightplan(0, [kaaa, abc, kbbb]));
+        await unit.panel.cursor('L');
+        for (let i = 0; i < 10 && unit.panel.focused('L').row !== 2; i++) {
+            await unit.panel.outer('L', 1);
+        }
+        await unit.panel.outer('L', 1); // the tens digit of the ground speed
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 1, text: '5'});
+        await unit.panel.inner('L', -3); // 150 -> 120
+        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['FP 0   60nm', 'KAAA -KBBB ', '120kt   :30']);
     });
 
     // 5-6, steps 2 and 3: the cursor comes on over the flight plan number, and the inner knob selects the plan.

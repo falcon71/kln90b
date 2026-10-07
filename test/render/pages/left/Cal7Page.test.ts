@@ -67,9 +67,9 @@ describe('CAL 7 page (5-15)', () => {
     });
 
     // 5-15, step 4: a new date counts only once ENT is pressed. Source of the bound: the sunrise hour angle at 42 N,
-    // computed by hand with the 0.83 deg of refraction and semidiameter: 112.4 deg on 1 June (declination +22.0) and
-    // 84.0 deg on 1 March (-7.8), 113.5 min less half-day, plus 14.7 min from the equation of time (+2.2 and -12.5 min):
-    // the March sunrise is about 128 min later
+    // computed by hand with the 0.83 deg of refraction and semidiameter: 112.6 deg on 1 June (declination +22.0) and
+    // 84.1 deg on 1 March (-7.8), 114 min less half-day, plus 14.7 min from the equation of time (+2.2 and -12.5 min):
+    // the March sunrise is about 129 min later
     it('changes rise and set only when the new date is entered with ENT (5-15)', async () => {
         const unit = await cal7();
         const before = Screen.read().rows('L');
