@@ -72,7 +72,6 @@ describe('GPS time to first fix, slow acquisition', () => {
     }, SLOW);
 
     // The sibling of the pin above: the same key sequence, on a start where INIT is right today and after the fix.
-    // characterization: the installation manual calls this state "search the sky" (STS), which the Pilot's Guide does not list
     // the receiver states are a question: #NEW-4-5
     it('characterization: a start 3000 NM from the stored position shows INIT on STA 1 right after the self-test', async () => {
         const unit = await powerOnCold({...WARM, lastLatitude: 0, lastLongitude: 0});
@@ -82,7 +81,9 @@ describe('GPS time to first fix, slow acquisition', () => {
         expect(Screen.read().rows('L')[0]).toBe('STATE  INIT');
     }, SLOW);
 
-    // 3-17: the receiver's own view of the almanac. The tripwire for the SDK internals isAlmanacValid reads
+    // 3-17: the receiver's own view of the almanac. The tripwire for the SDK internals isAlmanacValid reads. Whoever
+    // removes the .fails of the three pins confirms that the warm start is ACQ, not merely fast: a faster sky search also
+    // turns the 5 minute pin red
     it.fails('a warm start considers its almanac valid (#NEW-4-1)', async () => {
         const unit = await powerOnCold(WARM);
         await vi.advanceTimersByTimeAsync(5000);
@@ -99,9 +100,22 @@ describe('GPS time to first fix, slow acquisition', () => {
     }, SLOW);
 
     // 3-5, 3-17: without the right position the unit searches the whole sky: usually about six minutes, at most 12. The
-    // lower bound is three minutes, between the 2 minutes of a warm start (119 s measured) and the six of a cold one
+    // lower bound is three minutes, between the 2 minutes of a warm start (3-17) and the six of a cold one (3-5). At this
+    // distance the SDK's own 100 NM rule on the last known position decides, whatever the KLN's almanac check says: the
+    // case holds the SDK rule, and the 80 NM case below holds the KLN's own 60 NM clause
     it('a start 3000 NM from the stored position is not NAV ready within 3 minutes, and is within 12 (3-5, 3-17)', async () => {
         const unit = await powerOnCold({...WARM, lastLatitude: 0, lastLongitude: 0});
+
+        expect(await secondsToFix(unit, 180)).toBe(180);
+        expect(await secondsToFix(unit, 540)).toBeLessThan(540);
+    }, SLOW);
+
+    // Install manual 2-66: only a position within 60 NM of the stored one is a warm start, so 80 NM is a sky search (3-5,
+    // 3-17: usually about six minutes, at most 12). The SDK accepts the position up to 100 NM, so this is the KLN's own 60
+    // NM clause (Gps.ts isAlmanacValid). Today the whole almanac check is dead (#NEW-4-1) and every start is a sky search,
+    // so only a check that is always valid breaks this case; once #NEW-4-1 is fixed it also holds the 60 NM clause
+    it('a start 80 NM from the stored position is not NAV ready within 3 minutes, and is within 12 (install manual 2-66, 3-5, 3-17)', async () => {
+        const unit = await powerOnCold({...WARM, lastLatitude: 47 + 80 / 60});
 
         expect(await secondsToFix(unit, 180)).toBe(180);
         expect(await secondsToFix(unit, 540)).toBeLessThan(540);
@@ -115,7 +129,8 @@ describe('GPS time to first fix, slow acquisition', () => {
         expect(await secondsToFix(unit, 540)).toBeLessThan(540);
     }, SLOW);
 
-    // Install manual 2-66: the time must be within 10 minutes for the fast search
+    // Install manual 2-66: the time must be within 10 minutes for the fast search; otherwise 3-5: about six minutes, and
+    // 3-17: at most 12 (the 15 minutes of 2-66 for the sky search are the looser bound of the installation)
     it('a start with the clock 15 minutes behind is not NAV ready within 3 minutes, and is within 12 (install manual 2-66, 3-17)', async () => {
         const unit = await powerOnCold(WARM, -15 * MINUTE);
 
@@ -206,8 +221,8 @@ describe('POSITION DIFFERS FROM LAST POSITION BY >2NM (B-3)', () => {
     });
 });
 
-// 3-17: the unit keeps its position and the almanac in memory when the power is removed. Persisted user data
-// (CLAUDE.md, public contract): the setting keys lastLatitude, lastLongitude and lastAlmanacDownload.
+// Persisted user data (CLAUDE.md, public contract): the setting keys lastLatitude, lastLongitude and lastAlmanacDownload.
+// The 3-17 tests below cite the manual on the unit keeping them when the power is removed.
 describe('GPS data kept over a power-off', () => {
     it('saves the position at power-off (3-17)', async () => {
         const unit = await bootUnit();
@@ -301,8 +316,8 @@ describe('DATA BASE OUT OF DATE after the GPS sets the date (B-2)', () => {
 });
 
 // 5-29: the receiver tracks up to eight satellites. The channel list is a private SDK field (KLNGPSSatComputer.getChannels
-// reads activeSimulationContext.channels); an SDK that moves or empties it fails here, where the every() checks of the #61
-// test pass on an empty list
+// reads activeSimulationContext.channels); an SDK that moves or empties it fails here. The #61 test in Gps.test.ts
+// asserts the length too; this test adds the empty state of a unit that is not yet powered
 describe('GPS receiver channels (5-29)', () => {
     it('has eight channels, empty before the power-on and all assigned 5 s after it (5-29)', async () => {
         const unit = await bootUnit({engineRunning: false});
@@ -360,6 +375,7 @@ describe('the system clock without a fix (3-53)', () => {
         const gps = unit.props.sensors.in.gps;
         expect(gps.isValid()).toBe(false);
 
+        // The tolerance: the unit's clock starts up to 2.5 s off (Gps.ts constructor) and lags by up to one 1 s tick
         expect(Math.abs(gps.timeZulu.getTimestamp() - Date.now())).toBeLessThan(3500);
     });
 });
