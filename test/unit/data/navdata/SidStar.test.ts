@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {
-    AirportFacility, ApproachProcedure, Facility, FixTypeFlags, FlightPlan, GeoCircle, GeoPoint, LegTurnDirection, LegType,
-    RnavTypeFlags,
+    AirportFacility, ApproachProcedure, Facility, FixTypeFlags, FlightPlan, FlightPlanLeg, GeoCircle, GeoPoint, LegTurnDirection,
+    LegType, Procedure, RnavTypeFlags,
 } from '@microsoft/msfs-sdk';
 import {SidStar} from '../../../../kln90b/data/navdata/SidStar';
 import {KLNFixType, KLNFlightplanLeg, KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
@@ -179,12 +179,14 @@ describe('SidStar.recalculateArcEntryData (9ce23bf, f4f5395, 1ef2a35)', () => {
     const R = EARTH_RADIUS_NM;
     const toDeg = (nm: number) => nm / R * 180 / Math.PI;
 
+    const arcEnd = intersection('ARCEN', 0.14, 0.08);
+
     function arcLeg(turnDirection: LegTurnDirection, beginRadial: number, endRadial: number): KLNFlightplanLeg {
         const circle = new GeoCircle(GeoPoint.sphericalToCartesian({lat: 0, lon: 0}, new Float64Array(3)), 10 / R);
         if (turnDirection === LegTurnDirection.Right) {
             circle.reverse(); // as getArcEntryData does for right-hand arcs
         }
-        return {arcData: {beginRadial, endRadial, turnDirection, vor: vor('ABC', 0, 0), circle}} as unknown as KLNFlightplanLeg;
+        return {arcData: {beginRadial, endRadial, turnDirection, vor: vor('ABC', 0, 0), endFacility: arcEnd, circle}} as unknown as KLNFlightplanLeg;
     }
 
     function sensorsAt(lat: number, lon: number, track: number | null): Sensors {
@@ -236,6 +238,7 @@ describe('SidStar.recalculateArcEntryData (9ce23bf, f4f5395, 1ef2a35)', () => {
         expect(data.endRadial).toBe(10);
         expect(data.turnDirection).toBe(LegTurnDirection.Left);
         expect(data.circle).toBe(arc.arcData!.circle);
+        expect(data.endFacility).toBe(arcEnd);
     });
 
     it('finds no entry without a track', () => {
@@ -485,5 +488,442 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(firstArc).toBeDefined();
             expect(radiusNm(firstArc!)).toBeCloseTo(13, 1);
         });
+    });
+});
+
+// Session 7 task 6: the conversion paths of SidStar that the tests above leave out. The worlds are invented.
+const kprc = airport('KPRC', 47.0, 8.0);
+const iafaa = intersection('IAFAA', 47.4, 7.6);
+const ifaaa = intersection('IFAAA', 47.3, 7.7);
+const fafaa = intersection('FAFAA', 47.2, 7.8);
+const mapaa = intersection('MAPAA', 47.05, 7.95);
+const misaa = intersection('MISAA', 46.9, 8.1);
+const mahaa = intersection('MAHAA', 46.8, 8.2);
+const hldaa = intersection('HLDAA', 47.35, 7.65);
+const WORLD: Facility[] = [kprc, iafaa, ifaaa, fafaa, mapaa, misaa, mahaa, hldaa];
+const FAR = {lat: 48, lon: 9};
+
+const sidStar = (facs: Facility[] = WORLD) =>
+    new SidStar(new MemoryFacilityClient(facs) as any, {add() {}} as any, {in: {gps: {coords: new GeoPoint(FAR.lat, FAR.lon)}}} as any);
+const convertApp = (app: ApproachProcedure, iafIdx: number | null = 0, apt: AirportFacility = kprc) =>
+    sidStar().getKLNApproachLegList(apt, app, iafIdx === null ? null : app.transitions[iafIdx]);
+const idents = (legs: KLNFlightplanLeg[]) => legs.map(l => l.wpt.icaoStruct.ident);
+
+describe('SidStar.formatApproachName', () => {
+    const name = (type: ApproachType, runway: string, suffix?: string) =>
+        SidStar.formatApproachName(approach({type, runway, suffix, final: [Leg.IF(fafaa)]}), kprc);
+
+    // 6-5: the approach header is the first letter of the approach type, the runway, a dash and the airport (figure 6-8
+    // shows V25R-KLAX, figure 6-24 V12-KOWA). 3-49 lists the RNAV approaches as RNAV.
+    it.each([
+        ['VOR 25R', ApproachType.APPROACH_TYPE_VOR, '25R', 'V25R-KPRC'],
+        ['VOR/DME 12', ApproachType.APPROACH_TYPE_VORDME, '12', 'V12-KPRC'],
+        ['NDB 24L', ApproachType.APPROACH_TYPE_NDB, '24L', 'N24L-KPRC'],
+        ['NDB/DME 33', ApproachType.APPROACH_TYPE_NDBDME, '33', 'N33-KPRC'],
+        ['RNAV 15C', ApproachType.APPROACH_TYPE_RNAV, '15C', 'R15C-KPRC'],
+    ])('names the %s approach', (_n, type, runway, expected) => {
+        expect(name(type, runway)).toBe(expected);
+    });
+
+    // The manual shows no header for a GPS approach, a runway below 10, a circling approach or a suffix; these are the
+    // code's forms.
+    describe('(characterization)', () => {
+        it('names a GPS approach like an RNAV approach', () => {
+            expect(name(ApproachType.APPROACH_TYPE_GPS, '27')).toBe('R27-KPRC');
+        });
+
+        it('pads a runway below 10 with a zero', () => {
+            expect(name(ApproachType.APPROACH_TYPE_VOR, '09')).toBe('V09-KPRC');
+        });
+
+        it('names a circling approach with a dash for the runway', () => {
+            expect(name(ApproachType.APPROACH_TYPE_VOR, '', 'A')).toBe('V-A-KPRC');
+        });
+
+        it('puts the suffix after the runway', () => {
+            expect(name(ApproachType.APPROACH_TYPE_RNAV, '27', 'Y')).toBe('R27Y-KPRC');
+        });
+    });
+});
+
+describe('SidStar.getKLNApproachLegList', () => {
+    const rnav27 = () => approach({
+        type: ApproachType.APPROACH_TYPE_RNAV, runway: '27L', suffix: 'Y', name: 'RNAV 27L Y',
+        transitions: [
+            {name: 'HLDAA', legs: [Leg.IF(hldaa, FixTypeFlags.IAF), Leg.TF(ifaaa)]},
+            {name: 'IAFAA', legs: [Leg.IF(iafaa, FixTypeFlags.IAF), Leg.TF(ifaaa)]},
+        ],
+        final: [Leg.IF(ifaaa, FixTypeFlags.IF), Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        missed: [Leg.CA(270), Leg.DF(misaa), Leg.TF(mahaa, FixTypeFlags.MAHP)],
+    });
+
+    // 6-4, 6-5: the list of an approach starts at the selected IAF and runs through the final approach to the missed
+    // approach (figures 6-5 and 6-6: ELMOO-i ... FREBY-f, MA25B-m, then LAX and INISH); every waypoint appears once
+    // (the IF that ends the transition and starts the final is one waypoint). 6-6, 6-7: the suffixes mark IAF, FAF, MAP
+    // and the missed approach holding point.
+    it('lists the selected transition, the final and the missed approach in order, with the fix types', async () => {
+        const legs = await convertApp(rnav27(), 1);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+            ['IAFAA', KLNFixType.IAF], ['IFAAA', undefined], ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+            ['MISAA', undefined], ['MAHAA', KLNFixType.MAHP],
+        ]);
+    });
+
+    // 6-5: the header V25R-KLAX stands above the approach waypoints on FPL 0 (figure 6-8); 6-7: approach waypoints cannot
+    // be added or deleted (no colon). FlightplanList draws the header from procedure.displayName.
+    it('marks every waypoint as an approach waypoint of the airport under the approach header', async () => {
+        const legs = await convertApp(rnav27(), 1);
+        expect(legs.map(l => l.type)).toEqual(Array(6).fill(KLNLegType.APP));
+        expect(legs.every(l => l.parentFacility === kprc)).toBe(true);
+        expect(legs.map(l => l.procedure!.displayName)).toEqual(Array(6).fill('R27LY-KPRC'));
+    });
+
+    // The EFB route sync answers the route request from these fields (KlnEfbSaver; CLAUDE.md "Public contract with
+    // aircraft", the EFB route sync).
+    it('carries the approach and the transition for the EFB route', async () => {
+        const legs = await convertApp(rnav27(), 1);
+        const p = legs[0].procedure!;
+        expect(p.procedureName).toBe('RNAV 27L Y');
+        expect(p.approachType).toBe(ApproachType.APPROACH_TYPE_RNAV);
+        expect(p.approachSuffix).toBe('Y');
+        expect(p.transition).toBe('IAFAA');
+        expect(p.runwayNumber).toBe(27);
+        expect(p.runwayDesignator).toBe(RunwayDesignator.RUNWAY_DESIGNATOR_LEFT);
+    });
+
+    it('converts the final and the missed approach alone without a transition (characterization)', async () => {
+        const legs = await convertApp(rnav27(), null);
+        expect(idents(legs)).toEqual(['IFAAA', 'FAFAA', 'MAPAA', 'MISAA', 'MAHAA']);
+        expect(legs[0].procedure!.transition).toBeUndefined();
+    });
+});
+
+// B-2, 6-10, 6-14: the unit reminds the pilot to select OBS (IF REQUIRED SELECT OBS) 4 NM before a waypoint that can be
+// the basis of a hold or a course reversal. PersistentMessages reads askObs for it.
+describe('the OBS reminder of holds and procedure turns', () => {
+    const RIGHT = LegTurnDirection.Right;
+    const withLeg = (first: FlightPlanLeg) => approach({
+        type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+        final: [first, Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+    });
+
+    it.each([
+        ['a hold to an altitude (HA)', (f: Facility, flags: number) => Leg.HA(f, 90, RIGHT, flags)],
+        ['a hold to a fix (HF)', (f: Facility, flags: number) => Leg.HF(f, 90, RIGHT, flags)],
+        ['a hold to a manual termination (HM)', (f: Facility, flags: number) => Leg.HM(f, 90, RIGHT, flags)],
+        ['a procedure turn (PI)', (f: Facility, flags: number) => Leg.PI(f, 90, RIGHT, flags)],
+    ])('asks for OBS at %s', async (_n, build) => {
+        const legs = await convertApp(withLeg(build(hldaa, FixTypeFlags.IAF)), null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType, l.askObs])).toEqual([
+            ['HLDAA', KLNFixType.IAF, true], ['FAFAA', KLNFixType.FAF, false], ['MAPAA', KLNFixType.MAP, false],
+        ]);
+    });
+
+    it('asks for OBS at a hold that follows a leg to the same fix, as the database stores many IAF holds', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'IAFAA', legs: [Leg.IF(iafaa), Leg.TF(hldaa), Leg.HF(hldaa, 90, RIGHT, FixTypeFlags.IAF)]}],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.askObs])).toEqual([
+            ['IAFAA', false], ['HLDAA', true], ['FAFAA', false], ['MAPAA', false],
+        ]);
+    });
+
+    // The code flies over a hold or procedure turn fix and over a fix the database marks as fly-over; no page of the
+    // manual describes the database flag.
+    it('flies over a hold fix and a published fly-over fix, and anticipates the others (characterization)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.HF(hldaa, 90, RIGHT, FixTypeFlags.IAF), Leg.TF(fafaa, FixTypeFlags.FAF, true), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => l.flyOver)).toEqual([true, true, false]);
+    });
+
+    // The database pattern IF X (IAF), HF X: the flagged IF is kept, the hold is dropped as a repeat, and the OBS
+    // reminder of the hold is lost with it. Whether the sim flags its data this way is not verified.
+    it.fails('asks for OBS at an IAF whose hold follows it as a separate leg (#NEW-6-1)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'HLDAA', legs: [Leg.IF(hldaa, FixTypeFlags.IAF), Leg.HF(hldaa, 90)]}],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType, l.askObs])).toEqual([
+            ['HLDAA', KLNFixType.IAF, true], ['FAFAA', KLNFixType.FAF, false], ['MAPAA', KLNFixType.MAP, false],
+        ]);
+    });
+
+    it('lists an IAF whose hold follows it as a separate leg once (setup of #NEW-6-1)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'HLDAA', legs: [Leg.IF(hldaa, FixTypeFlags.IAF), Leg.HF(hldaa, 90)]}],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+            ['HLDAA', KLNFixType.IAF], ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+        ]);
+    });
+});
+
+describe('an unflagged repeat of the last kept fix (characterization)', () => {
+    it('is dropped when other legs precede it', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'IAFAA', legs: [Leg.IF(iafaa, FixTypeFlags.IAF), Leg.TF(hldaa, FixTypeFlags.IAF), Leg.HF(hldaa, 90)]}],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+            ['IAFAA', KLNFixType.IAF], ['HLDAA', KLNFixType.IAF], ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+        ]);
+    });
+});
+
+// 6-7: the missed approach follows the MAP behind the fence. The manual shows no approach whose missed approach holds
+// at the MAP; the code lists the fix twice, once per flag, as it does for a co-located IAF and FAF (6-10).
+describe('a missed approach that holds at the MAP (characterization)', () => {
+    it('lists the MAP and the holding point at the same fix as two waypoints', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.HM(mapaa, 90, undefined, FixTypeFlags.MAHP), Leg.TF(misaa)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+            ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP], ['MAPAA', KLNFixType.MAHP], ['MISAA', undefined],
+        ]);
+    });
+});
+
+// 6-16 to 6-18: the unit enters an arc on the aircraft's radial and flies it to its end fix; step-down fixes on the arc
+// are not in its database (6-18).
+describe('DME arcs in the conversion', () => {
+    const abc = vor('ABC', 47.3, 8.3);
+    const fixAt = (ident: string, radial: number, nm: number) => {
+        const p = pointFrom({lat: abc.lat, lon: abc.lon}, radial, nm);
+        return intersection(ident, p.lat, p.lon);
+    };
+    const arcbg = fixAt('ARCBG', 270, 10);
+    const step1 = fixAt('STEPA', 240, 10);
+    const step2 = fixAt('STEPB', 210, 10);
+    const arcen = fixAt('ARCEN', 180, 10);
+    const facs = [kprc, abc, arcbg, step1, step2, arcen, fafaa, mapaa];
+    const L = LegTurnDirection.Left;
+    const convertAt = (app: ApproachProcedure, radial: number) => {
+        const from = pointFrom({lat: abc.lat, lon: abc.lon}, radial, 20);
+        return new SidStar(new MemoryFacilityClient(facs) as any, {add() {}} as any,
+                           {in: {gps: {coords: new GeoPoint(from.lat, from.lon)}}} as any)
+            .getKLNApproachLegList(kprc, app, app.transitions[0]);
+    };
+
+    // 6-18: two step-down fixes make three arc legs, flown as one arc from the start of the first to the end of the
+    // last; the arc ends at the FAF, which keeps its suffix (6-6, 6-7: every approach has a FAF).
+    it('flies three arcs around one navaid as one arc that ends at the FAF', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [
+                    Leg.IF(arcbg, FixTypeFlags.IAF),
+                    Leg.AF(step1, abc, {radiusNm: 10, fromRadial: 270, toRadial: 240, turn: L}),
+                    Leg.AF(step2, abc, {radiusNm: 10, fromRadial: 240, toRadial: 210, turn: L}),
+                    Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 210, toRadial: 180, turn: L, flags: FixTypeFlags.FAF}),
+                ],
+            }],
+            final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertAt(app, 260);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+            ['D260J', KLNFixType.IAF], ['ARCEN', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+        ]);
+        expect(legs[0].arcData!.beginRadial).toBe(270);
+        expect(legs[0].arcData!.endRadial).toBe(180);
+        // 6-16 step 4: the arc approach loads like any other, so the entry is an approach waypoint of the airport too
+        // (ModeController finds the approach airport for the 30 NM arming of 6-1 on the first approach waypoint). 6-18
+        // step 8: the unit anticipates the turn onto the arc, so the entry is not a fly-over waypoint.
+        expect(legs.map(l => [l.type, l.parentFacility, l.flyOver])).toEqual([
+            [KLNLegType.APP, kprc, false], [KLNLegType.APP, kprc, false], [KLNLegType.APP, kprc, false],
+        ]);
+    });
+
+    it('makes the arc entry a user waypoint on the arc radius from the VOR (characterization)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [Leg.IF(arcbg, FixTypeFlags.IAF), Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: L}), Leg.TF(fafaa, FixTypeFlags.FAF)],
+            }],
+            final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertAt(app, 225);
+        const entry = legs[0].wpt as unknown as { icaoStruct: { ident: string }, reference1IcaoStruct: { ident: string }, reference1Radial: number, reference1Distance: number };
+        expect(entry.icaoStruct.ident).toBe('D225J');
+        expect(entry.reference1IcaoStruct.ident).toBe('ABC');
+        expect(entry.reference1Radial).toBeCloseTo(225, 0);
+        expect(entry.reference1Distance).toBeCloseTo(10, 6);
+    });
+
+    // 6-6, 6-7: the FAF keeps its suffix when the arc ends at the fix where the final starts (the PHNY pattern of
+    // 7fd640e, here with the FAF on the final's first leg).
+    it('keeps the FAF of the final when the arc of the transition ends at it', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [Leg.IF(arcbg, FixTypeFlags.IAF), Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: L})],
+            }],
+            final: [Leg.IF(arcen, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertAt(app, 225);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+            ['D225J', KLNFixType.IAF], ['ARCEN', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+        ]);
+        expect(legs[0].arcData!.endFacility.icaoStruct.ident).toBe('ARCEN');
+    });
+});
+
+// The real unit leaves out procedures that do not suit it (6-21); the code leaves out those with an RF leg anywhere and
+// judges each transition by its own legs, as it does for runway transitions (#14).
+describe('SidStar.isProcedureRecognized for SIDs and STARs (characterization)', () => {
+    const f = intersection('FIXAA', 47, 8);
+    const g = intersection('FIXAB', 47.1, 8.1);
+    it.each([
+        ['the runway part', () => sid('RF1', {runways: [{runway: '27', legs: [Leg.TF(f), Leg.RF(g)]}], common: [Leg.TF(g)]})],
+        ['an enroute transition', () => sid('RF1', {common: [Leg.TF(f)], transitions: [{name: 'FIXAB', legs: [Leg.TF(f), Leg.RF(g)]}]})],
+        ['the common route', () => star('RF1', {common: [Leg.TF(f), Leg.RF(g)]})],
+    ])('does not list a procedure with an RF leg in %s', (_w, build) => {
+        expect(SidStar.isProcedureRecognized(build())).toBe(false);
+    });
+
+    it('judges one enroute transition on its own legs', () => {
+        const p = star('ARR1', {transitions: [{name: 'FIXAA', legs: [Leg.IF(f), Leg.TF(g)]}, {name: 'VECTR', legs: [Leg.VM(90)]}]});
+        const [withFix, vectors] = p.enRouteTransitions;
+        expect(SidStar.isProcedureRecognized(p, null, withFix)).toBe(true);
+        expect(SidStar.isProcedureRecognized(p, null, vectors)).toBe(false);
+    });
+});
+
+describe('the fix type of a leg with two flags (characterization)', () => {
+    it('makes a leg that is IAF and FAF the FAF', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.IAF | FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => l.fixType)).toEqual([KLNFixType.FAF, KLNFixType.MAP]);
+    });
+});
+
+describe('SidStar.getKLNProcedureLegList', () => {
+    const depaa = intersection('DEPAA', 47.05, 8.0);
+    const comaa = intersection('COMAA', 47.2, 8.1);
+    const comab = intersection('COMAB', 47.4, 8.3);
+    const trnaa = intersection('TRNAA', 47.6, 8.5);
+    const trnab = intersection('TRNAB', 47.8, 8.7);
+    const rwyaa = intersection('RWYAA', 46.95, 7.95);
+    const facs = [kprc, depaa, comaa, comab, trnaa, trnab, rwyaa];
+    const convert = (proc: Procedure, type: KLNLegType, rwy: number | null, trans: number | null) =>
+        sidStar(facs).getKLNProcedureLegList(kprc, proc, type, rwy === null ? null : proc.runwayTransitions[rwy],
+                                             trans === null ? null : proc.enRouteTransitions[trans]);
+
+    const departure = (withRunway = true) => sid('PORT9', {
+        runways: withRunway ? [{runway: '01L', legs: [Leg.CA(10), Leg.CF(depaa, 350)]}] : [],
+        common: [Leg.DF(comaa), Leg.TF(comab)],
+        transitions: [{name: 'TRNAB', legs: [Leg.IF(comab), Leg.TF(trnaa), Leg.TF(trnab)]}],
+    });
+    const arrival = () => star('ARRV4', {
+        transitions: [{name: 'TRNAB', legs: [Leg.IF(trnab), Leg.TF(trnaa), Leg.TF(comab)]}],
+        common: [Leg.IF(comab), Leg.TF(comaa)],
+        runways: [{runway: '27R', legs: [Leg.TF(comaa), Leg.TF(rwyaa)]}],
+    });
+
+    // 6-21: a SID has three parts, the name, a transition and a runway part. 6-22: the waypoints start with the runway
+    // part and end with the transition (figure 6-37: SFO04, PORTE, PESCA ... FLW), each once; the header is the name
+    // followed by -SID (figures 6-35 to 6-38).
+    it('lists a SID from the runway part through the common route to the transition', async () => {
+        const legs = await convert(departure(), KLNLegType.SID, 0, 0);
+        expect(idents(legs)).toEqual(['DEPAA', 'COMAA', 'COMAB', 'TRNAA', 'TRNAB']);
+        expect(legs.map(l => l.type)).toEqual(Array(5).fill(KLNLegType.SID));
+        expect(legs.map(l => l.procedure!.displayName)).toEqual(Array(5).fill('PORT9-SID'));
+    });
+
+    // 6-22: some steps of the selection are not needed; a SID without a runway part starts at the common route.
+    it('lists a SID without a runway part from the common route', async () => {
+        const legs = await convert(departure(false), KLNLegType.SID, null, 0);
+        expect(idents(legs)).toEqual(['COMAA', 'COMAB', 'TRNAA', 'TRNAB']);
+    });
+
+    // 6-23: a STAR starts with its transition and runs through the common route (figure 6-42: INK, PHILS, TQA ...
+    // CREEK); the header is the name, a dash and the STAR glyph (figures 6-41 to 6-43; Æ in the font,
+    // docs/architecture.md).
+    it('lists a STAR from the transition through the common route', async () => {
+        const legs = await convert(arrival(), KLNLegType.STAR, null, 0);
+        expect(idents(legs)).toEqual(['TRNAB', 'TRNAA', 'COMAB', 'COMAA']);
+        expect(legs.map(l => l.type)).toEqual(Array(4).fill(KLNLegType.STAR));
+        expect(legs.map(l => l.procedure!.displayName)).toEqual(Array(4).fill('ARRV4-Æ'));
+    });
+
+    // The manual's example STAR has no runway part; the code appends it after the common route.
+    it('appends the runway part of a STAR after the common route (characterization)', async () => {
+        const legs = await convert(arrival(), KLNLegType.STAR, 0, 0);
+        expect(idents(legs)).toEqual(['TRNAB', 'TRNAA', 'COMAB', 'COMAA', 'RWYAA']);
+    });
+
+    // The EFB route sync answers the route request from these fields (KlnEfbSaver; CLAUDE.md "Public contract with
+    // aircraft", the EFB route sync).
+    it.each([
+        ['SID', KLNLegType.SID, departure, 1],
+        ['STAR', KLNLegType.STAR, arrival, 27],
+    ] as const)('carries the %s, its transition and its runway for the EFB route', async (_n, type, build, number) => {
+        const legs = await convert(build(), type, 0, 0);
+        const p = legs[0].procedure!;
+        expect(p.procedureName).toBe(type === KLNLegType.SID ? 'PORT9' : 'ARRV4');
+        expect(p.transition).toBe('TRNAB');
+        expect(p.runwayNumber).toBe(number);
+        expect(p.runwayDesignator).toBe(type === KLNLegType.SID ? RunwayDesignator.RUNWAY_DESIGNATOR_LEFT : RunwayDesignator.RUNWAY_DESIGNATOR_RIGHT);
+    });
+});
+
+// 3-32: on an approach with a DME arc, NAV 2 shows the arc's VOR when the aircraft is within 30 NM of the arc; 6-18:
+// the arc radial on Super NAV 5 is forced at the same distance. The manual measures to the arc, so the distance runs
+// along the flight plan to the arc entry.
+describe('SidStar.getVorIfWithin30NMOfArc', () => {
+    const abc = vor('ABC', 47.3, 8.3);
+    const at = (p: { lat: number; lon: number }, ident: string) => intersection(ident, p.lat, p.lon);
+    const wptA = at({lat: 47.0, lon: 8.0}, 'WPTAA');
+    const entry = at(pointFrom({lat: 47.0, lon: 8.0}, 90, 15), 'D270J');
+    const legA = {wpt: wptA, type: KLNLegType.APP} as unknown as KLNFlightplanLeg;
+    const entryLeg = {wpt: entry, type: KLNLegType.APP, arcData: {vor: abc}} as unknown as KLNFlightplanLeg;
+    const greatCircle = {path: {isGreatCircle: () => true}};
+    const navState = (distToActive: number, future: KLNFlightplanLeg[], fplIdx = 1, from: unknown = greatCircle) => ({
+        activeWaypoint: {getActiveFplIdx: () => fplIdx, getFromLeg: () => from, getFutureLegs: () => future},
+        distToActive,
+    }) as any;
+    const fpl0 = (legs: KLNFlightplanLeg[]) => ({getLegs: () => legs}) as any;
+
+    it('names the arc VOR when the arc entry is 25 NM ahead along the plan (10 NM to WPTAA, 15 NM on)', () => {
+        expect(SidStar.getVorIfWithin30NMOfArc(navState(10, [legA, entryLeg]), fpl0([]))).toBe(abc);
+    });
+
+    it('names no VOR when the arc entry is 35 NM ahead along the plan (20 NM to WPTAA, 15 NM on)', () => {
+        expect(SidStar.getVorIfWithin30NMOfArc(navState(20, [legA, entryLeg]), fpl0([]))).toBeNull();
+    });
+
+    it('names the arc VOR while the arc entry is the active waypoint 29 NM away', () => {
+        expect(SidStar.getVorIfWithin30NMOfArc(navState(29, [entryLeg]), fpl0([]))).toBe(abc);
+    });
+
+    it('names the arc VOR while the aircraft flies the arc', () => {
+        const onArc = {path: {isGreatCircle: () => false}};
+        const legs = [legA, entryLeg, {wpt: wptA, type: KLNLegType.APP} as unknown as KLNFlightplanLeg];
+        expect(SidStar.getVorIfWithin30NMOfArc(navState(5, [legs[2]], 2, onArc), fpl0(legs))).toBe(abc);
+    });
+
+    it('names no VOR without an active flight plan leg', () => {
+        expect(SidStar.getVorIfWithin30NMOfArc(navState(1, [entryLeg], -1), fpl0([]))).toBeNull();
     });
 });

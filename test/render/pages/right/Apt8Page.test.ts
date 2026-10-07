@@ -1,10 +1,13 @@
 import {describe, expect, it, vi} from 'vitest';
 import {FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
-import {bootUnit, settle} from '../../../harness/boot';
+import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
+import {approachWorld} from '../../../harness/fixtures';
+import {pointFrom} from '../../../harness/flight/geo';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, sid, withProcedures} from '../../../harness/navdata/procedures';
 import {savedFlightplan} from '../../../harness/storage';
+import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 
 const rows = (side: 'L' | 'R') => Screen.read().half(side).split('\n').map(r => r.trimEnd());
 
@@ -48,5 +51,109 @@ describe('APT 8 page after a waypoint confirmation page (80631c8)', () => {
         expect(Screen.read().status().right).toBe('APT 8');
         expect(rows('R').slice(0, 2)).toEqual([' KPRC IAP', ' 1 RNAV 27']);
         expect(Screen.read().text()).not.toContain('NO APPROACH');
+    });
+});
+
+const fpl0Legs = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => [l.wpt.icaoStruct.ident, l.type]);
+const messageList = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
+
+// The world of approachWorld() (KPRC at 47.0 8.0, the RNAV 18 approach, ENRAA 60 NM north)
+describe('APT 8 putting an approach into FPL 0', () => {
+    /** approachWorld() with a second approach to KPRC, VOR 09 from the west, listed after RNAV 18 */
+    function twoApproaches() {
+        const w = approachWorld();
+        const west = (nm: number) => pointFrom(w.mapaa, 270, nm);
+        const iafbb = intersection('IAFBB', west(12).lat, west(12).lon);
+        const fafbb = intersection('FAFBB', west(5).lat, west(5).lon);
+        const vor09 = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '09',
+            transitions: [{name: 'IAFBB', legs: [Leg.IF(iafbb, FixTypeFlags.IAF), Leg.TF(fafbb)]}],
+            final: [Leg.IF(fafbb), Leg.TF(fafbb, FixTypeFlags.FAF), Leg.TF(w.mapaa, FixTypeFlags.MAP)],
+        });
+        const kprc = withProcedures(w.kprc, {approaches: [...w.kprc.approaches, vor09]});
+        return {w, kprc, facilities: [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.sdfaa, w.mapaa, iafbb, fafbb]};
+    }
+
+    // 6-7: choosing another approach replaces the one that is in the flight plan (the unit holds one approach at a time).
+    it('replaces the approach that FPL 0 already holds (6-7)', async () => {
+        const {w, kprc, facilities} = twoApproaches();
+        const unit = await bootUnit({facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, kprc])});
+        await settle(unit);
+
+        await unit.panel.loadProcedure('APT 8'); // the first entry, RNAV 18
+        expect(fpl0Legs(unit)).toEqual([
+            ['ENRAA', KLNLegType.USER], ['IAFAA', KLNLegType.APP], ['IFAAA', KLNLegType.APP], ['FAFAA', KLNLegType.APP],
+            ['SDFAA', KLNLegType.APP], ['MAPAA', KLNLegType.APP], ['KPRC', KLNLegType.USER],
+        ]);
+
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1); // the second entry, VOR 09
+        await unit.panel.ent();
+        await unit.panel.ent();
+        if (Screen.read().status().right === 'CRSR') await unit.panel.cursor('R');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fpl0Legs(unit)).toEqual([
+            ['ENRAA', KLNLegType.USER], ['IAFBB', KLNLegType.APP], ['FAFBB', KLNLegType.APP], ['MAPAA', KLNLegType.APP],
+            ['KPRC', KLNLegType.USER],
+        ]);
+    });
+
+    // 6-5, B-3: the message after loading an approach whose waypoint is also an enroute waypoint of FPL 0
+    describe('the REDUNDANT WPTS message (6-5)', () => {
+        const REDUNDANT = 'REDUNDANT WPTS IN FPL EDIT ENROUTE WPTS AS NECESSARY';
+
+        it('is posted when an enroute waypoint is also in the approach', async () => {
+            const w = approachWorld();
+            const unit = await bootUnit({facilities: w.facilities, position: w.north(40), storage: savedFlightplan(0, [w.ifaaa, w.kprc])});
+            await settle(unit);
+            const before = messageList(unit);
+            expect(before).not.toContain(REDUNDANT);
+
+            await unit.panel.loadProcedure('APT 8');
+
+            expect(fpl0Legs(unit).map(l => l[0])).toEqual(['IFAAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+            expect(messageList(unit)).toEqual([...before, REDUNDANT]);
+        });
+
+        it('is not posted when the enroute waypoints are not in the approach', async () => {
+            const w = approachWorld();
+            const unit = await bootUnit({facilities: w.facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, w.kprc])});
+            await settle(unit);
+            const before = messageList(unit);
+
+            await unit.panel.loadProcedure('APT 8');
+
+            expect(fpl0Legs(unit).map(l => l[0])).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+            expect(messageList(unit)).toEqual(before);
+        });
+    });
+});
+
+// FPL 0 holds 30 legs. While the first leg is part of the active leg, the unit cannot make room by deleting it, so the
+// insertion stops and leaves a partial approach. Whether the approach should be refused as a whole is open.
+// a question: #NEW-6-3
+describe('APT 8 loading an approach into a full FPL 0 (characterization)', () => {
+    it('inserts the legs that fit, leaves out the rest and shows FPL FULL', async () => {
+        const w = approachWorld();
+        const fillers = Array.from({length: 26}, (_, i) => intersection(`FIL${String.fromCharCode(65 + i)}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [...w.facilities, ...fillers], position: {lat: 46.5, lon: 6.9}, // before the first filler: it is the active leg
+            storage: savedFlightplan(0, [...fillers, w.kprc]),
+        });
+        await settle(unit);
+        // Preconditions: 27 legs, the first leg is part of the active leg (index 1), three places free for five approach legs
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(27);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(1);
+        const before = messageList(unit);
+
+        await unit.panel.loadProcedure('APT 8');
+
+        expect(fpl0Legs(unit)).toEqual([
+            ...fillers.map(f => [f.icaoStruct.ident, KLNLegType.USER]),
+            ['IAFAA', KLNLegType.APP], ['IFAAA', KLNLegType.APP], ['FAFAA', KLNLegType.APP], ['KPRC', KLNLegType.USER],
+        ]);
+        expect(Screen.read().status().mode).toBe('FPL FULL');
+        expect(messageList(unit)).toEqual(before);
     });
 });
