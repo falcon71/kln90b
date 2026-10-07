@@ -490,22 +490,36 @@ to #252, #254 to #256, #258 to #263), the questions are #231, #236, #237, #253 a
 #217 gained pins. #92, #150, #160, #192 and #217 have comments. The harness gaps the session hit are in `testing.md`
 sections 6 and 7.
 
-## Session 9: pages, right side, and controls
+## Session 9a: pages, right side
 
 - [ ] done
 
-**Goal:** the same for `kln90b/pages/right/`, then the shared controls.
+The maintainer split the former Session 9 (right pages, then the shared controls) in two on 2026-10-07: 9a takes the
+pages, 9b the controls.
+
+**Goal:** the same as session 8 for `kln90b/pages/right/`.
 
 1. Pages as in session 8: APT 1 to 8 (APT 3 has list, map and user variants), VOR, NDB, INT, SUP, REF, ACT, D/T 1 to 4
    (FPL and other variants), CTR, waypoint confirmation and the generic waypoint page. Pages that show procedures use
    the builders of Session H.
-2. Controls (`kln90b/controls/`, `displays/`, `editors/`, `selects/`): a render test per editor and select type driving
-   it with the knobs through the front panel, asserting the committed value. `List` and `FlightplanList` scrolling
-   (#40), `WaypointDeleteListItem`, `StatusLine` messages, `Blink` and `Inverted` masks, `MessagePage`, `ErrorPage`
-   showing a thrown error.
+2. A bug in a shared control that a right page shows is pinned on that page; Session 9b references the same issue.
 
-**Done when:** every right page has its characterization test, every editor and select type has a test, and the log
-lists the gaps.
+**Done when:** every right page has its characterization test, and the log lists the pages without a spec test.
+
+## Session 9b: controls
+
+- [ ] done
+
+**Goal:** the shared controls (`kln90b/controls/`, `displays/`, `editors/`, `selects/`).
+
+1. A render test per editor and select type driving it with the knobs through the front panel, asserting the committed
+   value. `List` and `FlightplanList` scrolling (#40), `WaypointDeleteListItem`, `StatusLine` messages, `Blink` and
+   `Inverted` masks, `MessagePage` (with the pin of #191, which Session 6 deferred), `ErrorPage` showing a thrown
+   error.
+2. The controls' bugs that Sessions 8 and 9a pinned on pages keep those pins; the control tests reference the same
+   issues. Session 9a's log lists the leads it left for this session.
+
+**Done when:** every editor and select type has a test, and the log lists the gaps.
 
 ## Session 10: boot, power and the unit as a whole
 
