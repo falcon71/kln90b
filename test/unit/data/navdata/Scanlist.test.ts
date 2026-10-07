@@ -1,10 +1,10 @@
 import {describe, expect, it} from 'vitest';
-import {EventBus, Facility, FacilityClient, FacilitySearchType, ICAO, UserFacilityType} from '@microsoft/msfs-sdk';
-import {FacilityLoaderScanlist} from '../../../../kln90b/data/navdata/Scanlist';
+import {EventBus, Facility, FacilityClient, FacilitySearchType, ICAO, IcaoValue, UserFacilityType} from '@microsoft/msfs-sdk';
+import {FacilityLoaderScanlist, MAX_SCROLL_SPEED} from '../../../../kln90b/data/navdata/Scanlist';
 import {ActualFacilityClient, KLNFacilityLoader} from '../../../../kln90b/data/navdata/KLNFacilityLoader';
 import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
 import {MemoryFacilityClient} from '../../../harness/navdata/MemoryFacilityClient';
-import {airport, vor} from '../../../harness/navdata/builders';
+import {airport, intersection, ndb, vor} from '../../../harness/navdata/builders';
 import {clearStatic} from '../../../harness/singletons';
 
 /** The scan list's private job: the cache is filled in the background and an error there is only a rejection. */
@@ -154,5 +154,165 @@ describe('FacilityLoaderScanlist with duplicate idents (d3228dd)', () => {
         const list = new FacilityLoaderScanlist(FacilitySearchType.Vor, client as unknown as FacilityClient, new EventBus());
         const first = await list.init();
         expect([first?.ident, first?.region]).toEqual(['ABC', 'K1']);
+    });
+});
+
+async function scanlist(type: FacilitySearchType, facilities: Facility[], bus = new EventBus()): Promise<FacilityLoaderScanlist> {
+    const list = new FacilityLoaderScanlist(type, new MemoryFacilityClient(facilities) as unknown as FacilityClient, bus);
+    await list.init();
+    await managerJob(list);
+    return list;
+}
+
+/**
+ * One slow knob step as WaypointPage does it: getNext, then the page shows the waypoint and changeFacility syncs the
+ * list to it (WaypointPage.changeFacility).
+ */
+async function step(list: FacilityLoaderScanlist, from: IcaoValue, direction: number): Promise<IcaoValue | null> {
+    const next = await list.getNext(from, direction);
+    if (next !== null) list.sync(next);
+    return next;
+}
+
+/** Shows the waypoint (sync, as a page does) and scans one way until the list ends; returns the idents shown */
+async function scanToEnd(list: FacilityLoaderScanlist, from: IcaoValue, direction: number, max: number): Promise<string[]> {
+    list.sync(from);
+    await managerJob(list);
+    const shown: string[] = [];
+    let current: IcaoValue | null = from;
+    while (current !== null && shown.length < max) {
+        shown.push(current.ident);
+        current = await step(list, current, direction);
+    }
+    return shown;
+}
+
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+/**
+ * n invented five-letter intersection idents that start with the letter, in alphabetical order by construction: the
+ * counter i is written in base 26 into characters 2 to 4 (AAAAA, AAABA, ..., AAAZA, AABAA, ...).
+ */
+function idents(letter: string, n: number): string[] {
+    return Array.from({length: n}, (_, i) => letter + LETTERS[Math.floor(i / 676) % 26] + LETTERS[Math.floor(i / 26) % 26] + LETTERS[i % 26] + 'A');
+}
+
+// 3-21: clockwise scanning goes through the waypoints in alphabetical order, and numbers come before letters; the
+// guide's own example is the airport K98 before KAAF.
+describe('FacilityLoaderScanlist order (3-21)', () => {
+    it('scans from K98 to KAAF and back: numbers are lower than letters', async () => {
+        const list = await scanlist(FacilitySearchType.Airport, [airport('KAAF', 47.1, 8), airport('K98', 47, 8), airport('KBBB', 47.2, 8)]);
+
+        const shown = [
+            (await list.getNext(ICAO.value('A', '', '', 'K98'), 1))?.ident,
+            (await list.getNext(ICAO.value('A', '', '', 'KAAF'), -1))?.ident,
+        ];
+
+        expect(shown).toEqual(['KAAF', 'K98']);
+    });
+});
+
+// 3-21: scanning slowly steps through the waypoints one at a time. The list keeps a window of about 1000 ICAOs and
+// refills it with ident searches as the pilot scans (#40, 8abd5f7); these lists are longer than one refill.
+describe('FacilityLoaderScanlist across the edge of its cache window (#40 8abd5f7)', () => {
+    // 650 intersections AAAAA to AAYZA, then 10 BAAAA to BAAJA: 660 in all, in this order
+    const world = () => [...idents('A', 650), ...idents('B', 10)];
+    const facilities = (list: string[]) => list.map((ident, i) => intersection(ident, 47 + i * 0.0001, 8));
+
+    it.fails('shows every intersection once scanning clockwise from the first (#NEW-2-1)', async () => {
+        const all = world();
+        const list = await scanlist(FacilitySearchType.Intersection, facilities(all));
+
+        const shown = await scanToEnd(list, ICAO.value('W', 'K1', '', all[0]), 1, 1000);
+
+        expect(shown).toEqual(all);
+    });
+
+    it.fails('shows every intersection once scanning counterclockwise from the last (#NEW-2-1)', async () => {
+        const all = world();
+        const list = await scanlist(FacilitySearchType.Intersection, facilities(all));
+
+        const shown = await scanToEnd(list, ICAO.value('W', 'K1', '', all[all.length - 1]), -1, 1000);
+
+        expect(shown).toEqual(all.slice().reverse());
+    });
+
+    // The pins above are about the window: a list that fits one refill (600 idents, two groups of 300) scans completely
+    it('shows every intersection of a list that fits one refill, in both directions', async () => {
+        const all = [...idents('A', 300), ...idents('B', 300)];
+        const list = await scanlist(FacilitySearchType.Intersection, facilities(all));
+
+        const clockwise = await scanToEnd(list, ICAO.value('W', 'K1', '', all[0]), 1, 1000);
+        const counterclockwise = await scanToEnd(list, ICAO.value('W', 'K1', '', all[all.length - 1]), -1, 1000);
+
+        expect([clockwise, counterclockwise]).toEqual([all, all.slice().reverse()]);
+    });
+});
+
+// 3-21: scanning visits every waypoint. When a user waypoint is added or deleted, the list throws its cache away and
+// refills it around the waypoint shown (waypointsChanged). NDB idents of different length share prefixes (AB, ABC).
+describe('FacilityLoaderScanlist after a user waypoint change', () => {
+    it.fails('scans counterclockwise from ABC to AB (#NEW-2-3)', async () => {
+        const bus = new EventBus();
+        const list = await scanlist(FacilitySearchType.Ndb, [ndb('AA', 47, 8), ndb('AB', 47, 8.1), ndb('ABC', 47, 8.2), ndb('ABD', 47, 8.3)], bus);
+        const abc = ICAO.value('N', 'K1', '', 'ABC');
+        list.sync(abc);
+        await managerJob(list);
+        bus.getPublisher<any>().pub(KLNFacilityRepository.SYNC_TOPIC, undefined); // what the repository publishes on a change
+        await managerJob(list);
+
+        expect((await step(list, abc, -1))?.ident).toBe('AB');
+    });
+
+    // The same list scans correctly before the change: the pin above is about the refill, not the order
+    it('scans counterclockwise from ABC to AB before any change', async () => {
+        const list = await scanlist(FacilitySearchType.Ndb, [ndb('AA', 47, 8), ndb('AB', 47, 8.1), ndb('ABC', 47, 8.2), ndb('ABD', 47, 8.3)]);
+        const abc = ICAO.value('N', 'K1', '', 'ABC');
+        list.sync(abc);
+        await managerJob(list);
+
+        expect((await step(list, abc, -1))?.ident).toBe('AB');
+    });
+});
+
+// 3-21 (SUP is one of the scanned types): a user waypoint made after the start is in the SUP scan list
+describe('FacilityLoaderScanlist of the user waypoints', () => {
+    const user = (ident: string, lat: number) => ({
+        icao: '', icaoStruct: ICAO.value('U', 'XX', '', ident), name: '', lat, lon: 8, region: 'XX', city: '',
+        isTemporary: false, userFacilityType: UserFacilityType.LAT_LONG,
+    }) as unknown as Facility;
+
+    it('scans to a user waypoint added after the list was built', async () => {
+        clearStatic(KLNFacilityRepository, 'INSTANCE', false);
+        const bus = new EventBus();
+        const repo = KLNFacilityRepository.getRepository(bus);
+        repo.add(user('USRA', 47));
+        const loader = new KLNFacilityLoader(new MemoryFacilityClient([]) as unknown as ActualFacilityClient, repo);
+        const list = new FacilityLoaderScanlist(FacilitySearchType.User, loader, bus);
+        await list.init();
+        await managerJob(list);
+
+        repo.add(user('USRB', 47.1));
+        await managerJob(list);
+
+        expect((await list.getNext(ICAO.value('U', 'XX', '', 'USRA'), 1))?.ident).toBe('USRB');
+    });
+});
+
+// The guide says only that a faster turn gives larger steps. At the top speed the list jumps to the first waypoint of the
+// next (or, counterclockwise, the current or previous) first letter: the code's own rule (getNextFromIndex).
+describe('FacilityLoaderScanlist at the top scan speed (characterization)', () => {
+    const world = () => [airport('KAAA', 47, 8), airport('KAAB', 47.1, 8), airport('LAAA', 47.2, 8), airport('LBBB', 47.3, 8), airport('MAAA', 47.4, 8)];
+
+    it('jumps clockwise to the first waypoint of the next letter', async () => {
+        const list = await scanlist(FacilitySearchType.Airport, world());
+
+        expect((await list.getNext(ICAO.value('A', '', '', 'KAAA'), MAX_SCROLL_SPEED))?.ident).toBe('LAAA');
+    });
+
+    it('jumps counterclockwise to the first waypoint of the letter', async () => {
+        const list = await scanlist(FacilitySearchType.Airport, world());
+
+        expect((await list.getNext(ICAO.value('A', '', '', 'LBBB'), -MAX_SCROLL_SPEED))?.ident).toBe('LAAA');
     });
 });
