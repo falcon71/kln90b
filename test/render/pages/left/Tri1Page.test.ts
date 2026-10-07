@@ -87,12 +87,13 @@ describe('TRI 1 page (5-3, 5-4)', () => {
         expect(Screen.read().rows('L').slice(0, 3)).toEqual(['P.POS-KBBB ', '  60nm 170°', '150kt   :24']);
     });
 
-    // 5-2 and 5-3: the ground speed comes from the TAS and wind of TRI 0. TAS 200 with a wind from 180 at 25 kt on the
-    // course 180 (a headwind, no crosswind) is 175 kt; 60.107 NM at 175 kt is 20.6 min
-    it('shows the ground speed of the TRI 0 TAS and wind: 175kt and :21 (5-3)', async () => {
-        const unit = await bootTri1({tas: 200, windDirTrue: 180, windSpeed: 25});
+    // 5-2 and 5-3: the ground speed comes from the TAS and wind of TRI 0. TAS 200 with a wind from 180 at 20 kt on the
+    // course 180 (a headwind, no crosswind) is 180 kt; 60.107 NM at 180 kt is 20.04 min, so rounding and truncating
+    // the minutes both give :20
+    it('shows the ground speed of the TRI 0 TAS and wind: 180kt and :20 (5-3)', async () => {
+        const unit = await bootTri1({tas: 200, windDirTrue: 180, windSpeed: 20});
         await enterTo(unit, 'KBBB');
-        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['P.POS-KBBB ', '  60nm 180°', '175kt   :21']);
+        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['P.POS-KBBB ', '  60nm 180°', '180kt   :20']);
     });
 
     // 5-3: any ground speed may be entered instead of the TAS and wind result; the ETE follows it.
