@@ -13,12 +13,25 @@ const KDDD = airport('KDDD', 47.0, 9.0);
 const KAAA = airport('KAAA', pointFrom(KDDD, 270, 200).lat, pointFrom(KDDD, 270, 200).lon);
 const west = (nm: number) => pointFrom(KDDD, 270, nm);
 
-/** NAV 1 on both sides: Super NAV 1 (3-32) */
+/** NAV 1 on both sides: Super NAV 1 */
 async function superNav1(unit: HeadlessUnit): Promise<void> {
     await unit.panel.selectPage('L', 'NAV 1');
     await unit.panel.selectPage('R', 'NAV 1');
     await vi.advanceTimersByTimeAsync(1000);
     expect((unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage()).toBeInstanceOf(SuperNav1Page);
+}
+
+/**
+ * The approach of approachWorld() loaded, the aircraft 20 NM north of KPRC on the way from ENRAA to the IAF IAFAA, which
+ * is the active waypoint
+ */
+async function onApproach(): Promise<HeadlessUnit> {
+    const w = approachWorld();
+    const unit = await bootUnit({facilities: w.facilities, position: w.north(20), storage: savedFlightplan(0, [w.enraa, w.kprc])});
+    await settle(unit);
+    await unit.panel.loadProcedure('APT 8');
+    expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('IAFAA'); // Precondition
+    return unit;
 }
 
 /** On the leg KAAA to KDDD, `nm` west of KDDD at `groundspeedKt`, Super NAV 1 shown */
@@ -50,6 +63,14 @@ describe('Super NAV 1 page (characterization)', () => {
           ]
         `);
     });
+
+    // The code leaves the suffix of the IAF off NAV 1 and shows it on Super NAV 1 (the test below)
+    it('shows the active waypoint of an approach without a suffix on NAV 1', async () => {
+        const unit = await onApproach();
+
+        await unit.panel.selectPage('L', 'NAV 1');
+        expect(Screen.read().rows('L')[0]).toBe('ENRAA›IAFAA');
+    });
 });
 
 describe('Super NAV 1 page', () => {
@@ -63,25 +84,25 @@ describe('Super NAV 1 page', () => {
         expect(rows[3]).toBe('GS    145kt   BRG  089°');
     });
 
-    // 3-31, 3-32: BRG is magnetic. At a variation of 10 degrees east the 088.8 true bearing of the example reads 079
-    it('shows BRG magnetic (3-31, 3-32)', async () => {
+    // 3-32 holds the data of NAV 1, and 5-44 says everything is referenced to true north only outside the coverage area,
+    // so inside it the bearing is magnetic. At a variation of 10 degrees east the 088.8 true bearing of the example reads 079
+    it('shows BRG magnetic (3-32, 5-44)', async () => {
         await onLeg(64.8, 145, 10);
 
         expect(pageRows()[3]).toBe('GS    145kt   BRG  079°');
     });
 
-    // 6-6: the waypoint suffixes (-i for the IAF) show on FPL 0, Super NAV 5 and Super NAV 1, not on NAV 1, whose
-    // 11 cells the two idents and the arrow already fill. The approach of approachWorld() loaded, the aircraft 20 NM
-    // north of KPRC on the way from ENRAA to the IAF IAFAA.
-    it('shows the IAF suffix of the active waypoint, which NAV 1 does not show (6-6)', async () => {
-        const w = approachWorld();
-        const unit = await bootUnit({facilities: w.facilities, position: w.north(20), storage: savedFlightplan(0, [w.enraa, w.kprc])});
-        await settle(unit);
-        await unit.panel.loadProcedure('APT 8');
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('IAFAA'); // Precondition
+    // 5-7, 3-32: an ETE under an hour has no hour digit and shows the minutes to the cell. 60 NM at 80 kt is 45 minutes
+    it('shows an ETE of 45 minutes without an hour digit (5-7, 3-32)', async () => {
+        await onLeg(60, 80);
 
-        await unit.panel.selectPage('L', 'NAV 1');
-        expect(Screen.read().rows('L')[0]).toBe('ENRAA›IAFAA');
+        expect(pageRows()[2]).toBe('DIS  60.0nm   ETE   :45');
+    });
+
+    // 6-6: the waypoint suffixes (-i for the IAF) show on FPL 0, Super NAV 5 and Super NAV 1. The aircraft is on the way
+    // from ENRAA to the IAF IAFAA of the approach
+    it('shows the IAF suffix of the active waypoint (6-6)', async () => {
+        const unit = await onApproach();
 
         await superNav1(unit);
         // The font draws the -i suffix as one glyph on the code point à (SidStar.getWptSuffix)

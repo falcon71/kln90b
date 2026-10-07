@@ -77,8 +77,25 @@ describe('NAV 1 page', () => {
         expect(rows[4]).toBe('ETE    1:02');
     });
 
-    // 3-31: BRG is magnetic. At a variation of 10 degrees east the 088.8 true bearing of the example reads 079
-    it('shows BRG magnetic (3-31)', async () => {
+    // 3-31, figure 3-97: the whole-NM display starts at 100 NM, so 101.4 NM shows 101 and not 101.4 (five cells)
+    it('shows whole NM just above 100 NM (3-31)', async () => {
+        await onLeg(101.4, 145);
+
+        expect(Screen.read().rows('L')[2]).toBe('DIS   101nm');
+    });
+
+    // 5-7, 3-31: an ETE under an hour has no hour digit and shows the minutes to the cell. 60 NM at 80 kt is 45 minutes,
+    // which an hour taken by rounding would turn into 1:45
+    it('shows an ETE of 45 minutes without an hour digit (5-7, 3-31)', async () => {
+        await onLeg(60, 80);
+
+        expect(Screen.read().rows('L').slice(2, 5)).toEqual(['DIS  60.0nm', 'GS     80kt', 'ETE     :45']);
+    });
+
+    // 3-31 gives BRG as the bearing to the active waypoint, and 5-44 says everything is referenced to true north only
+    // outside the coverage area, so inside it the bearing is magnetic. At a variation of 10 degrees east the 088.8 true
+    // bearing of the example reads 079
+    it('shows BRG magnetic (3-31, 5-44)', async () => {
         await onLeg(64.8, 145, 10);
 
         expect(Screen.read().rows('L')[5]).toBe('BRG    079°');
@@ -170,6 +187,66 @@ describe('NAV 1 deviation bar', () => {
         await vi.advanceTimersByTimeAsync(500);
         return unit;
     }
+
+    /** On the leg 30 NM west of KDDD, then `nm` away from the course on `bearingTrue` (0 is left of the eastbound course) */
+    async function offCourse(bearingTrue: number, nm: number): Promise<HeadlessUnit> {
+        const unit = await onLeg(30, 120);
+        await moveAircraft(unit, pointFrom(west(30), bearingTrue, nm), {groundspeedKt: 120, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(500);
+        return unit;
+    }
+
+    // 3-31: the CDI has five dots each side with 1 NM a dot, and the bar moves like the needle of a CDI: the aircraft
+    // left of the course puts the bar right of the center. The triangle in the center points up for TO. 2 NM left is two
+    // dots right of the center. The bar sits on a dot, which the font draws as the dot glyph with the bar through its middle.
+    it('draws the bar two dots right of the center 2 NM left of the course flying TO (3-31)', async () => {
+        const unit = await offCourse(0, 2);
+
+        expect(unit.props.memory.navPage.toFrom).toBe(true);
+        expect(Screen.read().rows('L')[1]).toBe('ηηηηηθηΕηηη');
+    });
+
+    // 3-31: the same 2 NM on the other side puts the bar two dots left of the center
+    it('draws the bar two dots left of the center 2 NM right of the course flying TO (3-31)', async () => {
+        await offCourse(180, 2);
+
+        expect(Screen.read().rows('L')[1]).toBe('ηηηΕηθηηηηη');
+    });
+
+    // 3-31: the bar stops at the outer dot, 5 NM off the course, on either side
+    it('stops the bar at the outer dot on the right 7 NM left of the course (3-31)', async () => {
+        await offCourse(0, 7);
+        expect(Screen.read().rows('L')[1]).toBe('ηηηηηθηηηηΕ');
+    });
+
+    it('stops the bar at the outer dot on the left 7 NM right of the course (3-31)', async () => {
+        await offCourse(180, 7);
+        expect(Screen.read().rows('L')[1]).toBe('Εηηηηθηηηηη');
+    });
+
+    /** 3 NM past KDDD, `nm` left of the course (the great circle of the leg continues through KDDD) */
+    async function pastWaypoint(nm: number): Promise<HeadlessUnit> {
+        const unit = await onLeg(30, 120);
+        await moveAircraft(unit, pointFrom(pointFrom(KDDD, 90, 3), 0, nm), {groundspeedKt: 120, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(500);
+        return unit;
+    }
+
+    // 3-31: past the waypoint the triangle in the center points down for FROM; the bar moves the same way
+    it('shows the FROM triangle past the waypoint with the bar two dots right of the center (3-31)', async () => {
+        const unit = await pastWaypoint(2);
+
+        expect(unit.props.memory.navPage.toFrom).toBe(false);
+        expect(Screen.read().rows('L')[1]).toBe('ηηηηηιηΕηηη');
+    });
+
+    // 3-31: on the course the bar sits in the triangle, which the font draws as the FROM triangle with the bar through it
+    it('draws the bar in the FROM triangle on the course past the waypoint (3-31)', async () => {
+        const unit = await pastWaypoint(0);
+
+        expect(unit.props.memory.navPage.toFrom).toBe(false);
+        expect(Screen.read().rows('L')[1]).toBe('ηηηηηαηηηηη');
+    });
 
     // The setup sibling of the pin: 0.55 NM left of the course, TO the active waypoint, on the 5 NM scale
     it('reaches 0.55 NM left of the course flying TO (3-31)', async () => {

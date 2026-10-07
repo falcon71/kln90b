@@ -42,21 +42,22 @@ const KDDD = airport('KDDD', 47.0, 9.0);
 const KAAA = airport('KAAA', pointFrom(KDDD, 270, 200).lat, pointFrom(KDDD, 270, 200).lon);
 const KEEE = airport('KEEE', pointFrom(KDDD, 90, 30).lat, pointFrom(KDDD, 90, 30).lon);
 const west = (nm: number) => pointFrom(KDDD, 270, nm);
-// Without an OBS input there is no external course: DTK does not flash for a mismatch (4-9), and OBS can be entered
+// Without an OBS input there is no external course: DTK does not flash for a mismatch, and OBS can be entered
 const OBS_SOURCE_OFF = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input></Instrument></PlaneHTMLConfig>';
 
 /**
  * Boots on the leg KAAA to KDDD, 30 NM west of KDDD, selects NAV 3 on the left and holds the position `rightNm` right of
- * the course (south of it, the leg is eastbound) at 120 kt with the track of the leg
+ * the course (south of it, the leg is eastbound; a negative value is left of the course) at 120 kt with the track of
+ * the leg
  */
-async function nav3OnLeg(rightNm: number, panelXml = OBS_SOURCE_OFF): Promise<HeadlessUnit> {
+async function nav3OnLeg(rightNm: number, panelXml = OBS_SOURCE_OFF, magvar = 0): Promise<HeadlessUnit> {
     const unit = await bootUnit({
-        facilities: [KAAA, KDDD, KEEE], position: west(30), panelXml,
+        facilities: [KAAA, KDDD, KEEE], position: west(30), panelXml, magvar,
         storage: savedFlightplan(0, [KAAA, KDDD, KEEE]),
     });
     await settle(unit);
     await unit.panel.selectPage('L', 'NAV 3');
-    await moveAircraft(unit, pointFrom(west(30), 180, rightNm), {groundspeedKt: 120, trackTrue: 90});
+    await moveAircraft(unit, pointFrom(west(30), rightNm >= 0 ? 180 : 0, Math.abs(rightNm)), {groundspeedKt: 120, trackTrue: 90});
     expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('KDDD'); // Precondition
     await vi.advanceTimersByTimeAsync(1000);
     return unit;
@@ -74,6 +75,14 @@ describe('NAV 3 page (characterization)', () => {
             'MSA 15900ft',
             'ESA 15900ft',
         ]);
+    });
+
+    // The code shows the cross track below 1 NM in tenths; the test holds that and claims nothing about the real unit.
+    // tenths or hundredths below 1 NM is a question: #NEW-1-9
+    it('reads FLY L 0.3nm 0.3 NM right of the course (characterization)', async () => {
+        await nav3OnLeg(0.3);
+
+        expect(Screen.read().rows('L')[3]).toBe('FLY L 0.3nm');
     });
 });
 
@@ -122,11 +131,29 @@ describe('NAV 3 page on an FPL 0 leg', () => {
         expect(Screen.read().rows('L')[1]).toBe('OBS:   088°');
     });
 
-    // 3-32: FLY L or R and the distance to the course. 0.3 NM right of the course reads FLY L 0.3nm
-    it('reads FLY L 0.3nm 0.3 NM right of the course (3-32)', async () => {
-        await nav3OnLeg(0.3);
+    // 3-32 (figure 3-104): FLY L or R is the direction to fly back to the course, and the distance follows. 2.7 NM right
+    // of the course reads FLY L 2.7nm
+    it('reads FLY L 2.7nm 2.7 NM right of the course (3-32)', async () => {
+        await nav3OnLeg(2.7);
 
-        expect(Screen.read().rows('L')[3]).toBe('FLY L 0.3nm');
+        expect(Screen.read().rows('L')[3]).toBe('FLY L 2.7nm');
+    });
+
+    // 3-32 (figure 3-105): 2.7 NM left of the course reads FLY R 2.7nm
+    it('reads FLY R 2.7nm 2.7 NM left of the course (3-32)', async () => {
+        await nav3OnLeg(-2.7);
+
+        expect(Screen.read().rows('L')[3]).toBe('FLY R 2.7nm');
+    });
+
+    // 3-32 and 5-44: DTK and TK are magnetic, like every direction inside the coverage area. At a variation of 10 degrees
+    // east the 088.8 true course from the aircraft to KDDD reads 079 and the 090 true track reads 080.
+    it('shows DTK and TK magnetic (3-32, 5-44)', async () => {
+        await nav3OnLeg(0, OBS_SOURCE_OFF, 10);
+
+        const rows = Screen.read().rows('L');
+        expect(rows[1]).toBe('DTK    079°');
+        expect(rows[2]).toBe('TK     080°');
     });
 
     // The setup sibling of the pin: 9.97 NM right of the course, NAV 3 on the left

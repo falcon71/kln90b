@@ -4,6 +4,7 @@ import {airport} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
+import {VnavState} from '../../../../kln90b/services/Vnav';
 
 // An invented world: KDDD, KAAA 100 NM west of it and KEEE 30 NM east of it. FPL 0 is KAAA, KDDD, KEEE, and the
 // aircraft is on the leg to KDDD, 40 NM west of it, at 7500 ft (IND is the SimVar PRESSURE ALTITUDE at the default baro).
@@ -141,7 +142,7 @@ describe('NAV 4 VNAV started at zero ground speed', () => {
         const unit = await cursorOverAngle();
 
         expect(unit.props.sensors.in.gps.groundspeed).toBe(0);
-        expect(unit.props.vnav.state).not.toBe(0); // VnavState.Inactive
+        expect(unit.props.vnav.state).not.toBe(VnavState.Inactive);
         expect(Screen.read().rows('L')[0].startsWith('VNV ')).toBe(true);
     });
 

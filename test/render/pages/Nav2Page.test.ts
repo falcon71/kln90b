@@ -66,6 +66,16 @@ describe('NAV 2 page (characterization)', () => {
             "W122°15.50'",
         ]);
     });
+
+    // A radial is referenced to the station's own magnetic variation, not to the variation at the aircraft: ABC is
+    // declared 10 degrees east (stored -10 in the sim's VOR record, see the builder), the variation at the aircraft is 3
+    // degrees east. The aircraft is due south, the radial 180 true, 170 magnetic at the station (177 at the aircraft's
+    // variation would be wrong). The code does this; the test claims nothing about the real unit.
+    it('shows the radial from the VOR in the station\'s magnetic variation', async () => {
+        await nav2At({lat: 47.0, lon: 8.0}, [vor('ABC', 47.2, 8.0, {magneticVariation: -10})], 3);
+
+        expect(Screen.read().rows('L')[2]).toBe('ABC  170°fr');
+    });
 });
 
 describe('NAV 2 page', () => {
@@ -102,14 +112,20 @@ describe('NAV 2 page', () => {
         expect(Screen.read().rows('L')[5]).toBe("E 47°00.00'");
     });
 
-    // 3-32: the position as the radial from the VOR. A radial is referenced to the station's own magnetic variation,
-    // not to the variation at the aircraft: ABC is declared 10 degrees east (stored -10 in the sim's VOR record, see the
-    // builder), the variation at the aircraft is 3 degrees east. The aircraft is due south, the radial 180 true,
-    // 170 magnetic at the station (177 at the aircraft's variation would be wrong).
-    it('shows the radial from the VOR in the station\'s magnetic variation (3-32)', async () => {
-        await nav2At({lat: 47.0, lon: 8.0}, [vor('ABC', 47.2, 8.0, {magneticVariation: -10})], 3);
+    // The setup sibling of the longitude pin: the position 47 N 8 E (8 degrees, which the first characterization above no
+    // longer shows in row 5), with the VOR 12 NM north
+    it('reads a position 8 degrees east with the VOR 12 NM north (3-32)', async () => {
+        const unit = await nav2At({lat: 47.0, lon: 8.0}, [vor('ABC', 47.2, 8.0, {magneticVariation: 0})]);
 
-        expect(Screen.read().rows('L')[2]).toBe('ABC  170°fr');
+        expect(unit.props.sensors.in.gps.coords.lon).toBeCloseTo(8.0, 9);
+        expect(Screen.read().rows('L').slice(2, 5)).toEqual(['ABC  180°fr', '     12.0nm', "N 47°00.00'"]);
+    });
+
+    // 3-8, 3-32: the reference VOR is the nearest one. Two invented VORs, the nearer one sorting after the farther one
+    it('shows the nearer of two VORs (3-8, 3-32)', async () => {
+        await nav2At({lat: 47.0, lon: 8.0}, [vor('BBB', 47.4, 8.0), vor('CCC', 47.2, 8.0)]);
+
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(['CCC  180°fr', '     12.0nm']);
     });
 
     // The real unit keeps the radial in its cells for a two-letter VOR ident: the reference photo image3-2-scaled.jpeg
