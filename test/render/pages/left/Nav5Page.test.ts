@@ -5,8 +5,10 @@ import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
 import {canvasToAscii, downsampled} from '../../../harness/render/canvas';
 import {Screen} from '../../../harness/render/screen';
-import {savedFlightplan} from '../../../harness/storage';
-import {LatLon, pointFrom} from '../../../harness/flight/geo';
+import {savedFlightplan, storedSetting} from '../../../harness/storage';
+import {courseDeg, LatLon, pointFrom} from '../../../harness/flight/geo';
+import {standardRoute} from '../../../harness/fixtures';
+import {recordMap} from '../../../harness/render/mapRecorder';
 
 const RNAV = ApproachType.APPROACH_TYPE_RNAV;
 
@@ -163,5 +165,325 @@ describe('NAV 5 page with a DME arc', () => {
         expect(unit.consoleErrors).toEqual([]);
         await expect(downsampled(canvasToAscii(document.querySelector('canvas') as HTMLCanvasElement)))
             .toMatchFileSnapshot('./__snapshots__/nav5ArcEndOffCircle.txt');
+    });
+});
+
+/** The standard route KAAA, ABC, KBBB in FPL 0, the aircraft at KAAA, NAV 5 on the left. */
+async function nav5OnRoute(o: { storage?: Record<string, unknown>, panelXml?: string, magvar?: number } = {}) {
+    const w = standardRoute();
+    const map = recordMap({KAAA: w.kaaa, ABC: w.abc, KBBB: w.kbbb});
+    const unit = await bootUnit({
+        facilities: [w.kaaa, w.abc, w.kbbb], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
+        storage: {...savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]), ...o.storage}, panelXml: o.panelXml, magvar: o.magvar,
+    });
+    await settle(unit);
+    await unit.panel.selectPage('L', 'NAV 5');
+    await vi.advanceTimersByTimeAsync(1000);
+    return {unit, map, w};
+}
+
+const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
+
+describe('NAV 5 page (characterization)', () => {
+    it('shows FPL 0 north up at 40 NM with the aircraft 10 NM along the first leg', async () => {
+        const w = standardRoute();
+        const unit = await bootUnit({
+            facilities: [w.kaaa, w.abc, w.kbbb], position: pointFrom(w.kaaa, courseDeg(w.kaaa, w.abc), 10),
+            storage: savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]),
+        });
+        await settle(unit);
+        await unit.panel.selectPage('L', 'NAV 5');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const screen = Screen.read();
+        const blank = ' '.repeat(11);
+        expect(screen.rows('L')).toEqual([blank, blank, blank, blank, blank, 'N^       40']);
+        expect(screen.maskRows('L')).toEqual(Array(6).fill('.'.repeat(11)));
+        await expect(downsampled(canvasToAscii(document.querySelector('canvas') as HTMLCanvasElement)))
+            .toMatchFileSnapshot('./__snapshots__/nav5Route.txt');
+    });
+
+    // The scales between 1 and 1000 NM are not known to be those of the real unit (the code says so itself), so this
+    // pins the list the inner knob offers today, in its order, and claims nothing about the real unit.
+    // the scales between 1 and 1000 NM are a question: #NEW-2-5
+    it('NAV 5 range scales (characterization)', async () => {
+        const {unit} = await nav5OnRoute({storage: {nav5MapRange: 1}});
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', '1');
+
+        const seen: string[] = [];
+        for (let i = 0; i < 20; i++) {
+            seen.push(unit.panel.focused('L').text.trim());
+            await unit.panel.inner('L', 1);
+        }
+        expect(seen).toEqual([
+            '1', '2', '3', '5', '10', '15', '20', '25', '30', '40', '60', '80', '100', '120', '160', '240', '320', '480', '1000',
+            '1',
+        ]);
+    });
+});
+
+describe('NAV 5 page map', () => {
+    // 3-34, 3-35: FPL 0 waypoints are drawn with their number on the FPL 0 page, lines connect them, and the leg to the
+    // active waypoint ends in an arrowhead. 3-35: north up and DTK up draw the aircraft as a diamond ("$" in the map
+    // font). The aircraft is at KAAA, so the first leg is active and ABC is the active waypoint.
+    it('draws the FPL 0 waypoints by number, the active leg as an arrow and the next leg as a line (3-34, 3-35)', async () => {
+        const {unit, map} = await nav5OnRoute();
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+
+        expect(map.drawn).toEqual([
+            'arrow KAAA ABC',
+            'line ABC KBBB',
+            'icon 1 KAAA',
+            'icon 2 ABC',
+            'icon 3 KBBB',
+            'icon $ KAAA', // the diamond
+        ]);
+    });
+
+    // 3-34: the lines connect all waypoints of FPL 0, also the legs behind the aircraft. With the aircraft past ABC the
+    // second leg is the active one: the first leg is a plain line, the second one carries the arrow.
+    it('draws the legs before the active leg as lines (3-34)', async () => {
+        const {unit, map, w} = await nav5OnRoute({storage: {turnAnticipation: false}});
+        const course = courseDeg(w.kaaa, w.abc);
+        await moveAircraft(unit, pointFrom(w.abc, course, 0.3), {groundspeedKt: 120, trackTrue: course});
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
+
+        expect(map.drawn.filter(d => d.startsWith('arrow') || d.startsWith('line'))).toEqual([
+            'line KAAA ABC',
+            'arrow ABC KBBB',
+        ]);
+    });
+
+    // 3-34 (figure 3-109): a Direct To waypoint that is not in FPL 0 is marked with a star ("%" in the map font), and the
+    // arrow runs to it from where the Direct To started. The FPL 0 waypoints stay numbered. Whether the route lines stay
+    // during such a Direct To is not asserted.
+    it('marks an off-plan Direct To waypoint with the star and draws the arrow to it (3-34)', async () => {
+        const w = standardRoute();
+        const xyz = vor('XYZ', 47.2, 8.0);
+        const map = recordMap({KAAA: w.kaaa, ABC: w.abc, KBBB: w.kbbb, XYZ: xyz});
+        const unit = await bootUnit({
+            facilities: [w.kaaa, w.abc, w.kbbb, xyz], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
+            storage: savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]),
+        });
+        await settle(unit);
+        await unit.panel.dct();
+        await unit.panel.enterIdent('L', 'XYZ');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('XYZ');
+        await unit.panel.selectPage('L', 'NAV 5');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(map.drawn).toContain('arrow KAAA XYZ');
+        expect(map.drawn.filter(d => d.startsWith('icon'))).toEqual([
+            'icon % XYZ', // the star
+            'icon 1 KAAA',
+            'icon 2 ABC',
+            'icon 3 KBBB',
+            'icon $ KAAA',
+        ]);
+    });
+
+    // 3-35 (figure 3-117): with NAV 5 on the left and a waypoint page on the right, the waypoint of that page is marked
+    // with a small plus ("+" in the map font)
+    it('marks the waypoint of the page on the right with "+" (3-35)', async () => {
+        const w = standardRoute();
+        const xyz = vor('XYZ', 47.2, 8.0);
+        const map = recordMap({KAAA: w.kaaa, ABC: w.abc, KBBB: w.kbbb, XYZ: xyz});
+        const unit = await bootUnit({
+            facilities: [w.kaaa, w.abc, w.kbbb, xyz], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
+            storage: savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]),
+        });
+        await settle(unit);
+        await unit.panel.selectPage('R', 'VOR  ');
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'XYZ');
+        await unit.panel.cursor('R');
+        await unit.panel.selectPage('L', 'NAV 5');
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('R')[0].slice(0, 5)).toBe(' XYZ ');
+
+        expect(map.drawn[0]).toBe('icon + XYZ');
+    });
+
+    // 3-35: the range is the distance from the aircraft to the top of the map. North up the aircraft is in the middle
+    // of the map (99 x 78 map pixels, center 49.5, 39), so at 10 NM a point 8 NM north is 8/10 of the 39 pixels above
+    // it, at y = 39 - 31.2 = 7.8, and a point 8 NM east is 31.2 pixels right of it, at x = 80.7.
+    it('draws north up with the range from the aircraft to the top (3-35)', async () => {
+        const w = standardRoute();
+        const n = pointFrom(w.kaaa, 0, 8), e = pointFrom(w.kaaa, 90, 8);
+        const north = intersection('NORTH', n.lat, n.lon);
+        const east = intersection('EAST', e.lat, e.lon);
+        const map = recordMap();
+        const unit = await bootUnit({
+            facilities: [w.kaaa, north, east], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
+            storage: {...savedFlightplan(0, [w.kaaa, north, east]), nav5MapRange: 10, nav5MapOrientation: 0},
+        });
+        await settle(unit);
+        await unit.panel.selectPage('L', 'NAV 5');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const at = (sym: string) => map.pixels.find(p => p[0] === sym)!;
+        expect(Math.abs(at('$')[1] - 49.5)).toBeLessThanOrEqual(1);
+        expect(Math.abs(at('$')[2] - 39)).toBeLessThanOrEqual(1);
+        expect(Math.abs(at('2')[1] - 49.5)).toBeLessThanOrEqual(1);
+        expect(Math.abs(at('2')[2] - 7.8)).toBeLessThanOrEqual(1);
+        expect(Math.abs(at('3')[1] - 80.7)).toBeLessThanOrEqual(1);
+        expect(Math.abs(at('3')[2] - 39)).toBeLessThanOrEqual(1);
+    });
+
+    // 3-34, 3-35: desired track up turns the map so that the course points up, and 3-35: the range is the distance from
+    // the aircraft to the top of the map. Where the aircraft sits on the map is the layout of the code, not a statement
+    // of those pages: three quarters down (y = 58.5 of 78). With it, at 10 NM a waypoint 8 NM ahead on the desired
+    // track of 060 is 8/10 of the 58.5 pixels above the aircraft, at x = 49.5, y = 11.7.
+    it('draws desired track up with the course pointing up (3-34, 3-35)', async () => {
+        const w = standardRoute();
+        const ahead = pointFrom(w.kaaa, 60, 8);
+        const wpt = intersection('AHEAD', ahead.lat, ahead.lon);
+        const map = recordMap();
+        const unit = await bootUnit({
+            facilities: [w.kaaa, wpt], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
+            storage: {...savedFlightplan(0, [w.kaaa, wpt]), nav5MapRange: 10, nav5MapOrientation: 1},
+        });
+        await settle(unit);
+        await unit.panel.selectPage('L', 'NAV 5');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const at = (sym: string) => map.pixels.find(p => p[0] === sym)!;
+        expect(Math.abs(at('$')[1] - 49.5)).toBeLessThanOrEqual(1);
+        expect(Math.abs(at('$')[2] - 58.5)).toBeLessThanOrEqual(1);
+        expect(Math.abs(at('2')[1] - 49.5)).toBeLessThanOrEqual(1);
+        expect(Math.abs(at('2')[2] - 11.7)).toBeLessThanOrEqual(1);
+    });
+
+    // 3-35: actual track up and heading up draw the aircraft symbol instead of the diamond ("#" in the map font)
+    it('draws the aircraft symbol track up (3-35)', async () => {
+        const {unit, map} = await nav5OnRoute({storage: {nav5MapOrientation: 2}});
+        await moveAircraft(unit, {lat: 47.05, lon: 8.05}, {groundspeedKt: 120, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(map.drawn.filter(d => d.startsWith('icon $') || d.startsWith('icon #'))).toEqual(['icon # 47.0500,8.0500']);
+    });
+
+    // 3-35, 3-38: the track up map can only be shown when the aircraft moves at 2 kt or more. Standing still, nothing
+    // is drawn, and the orientation field has no track to show.
+    it('draws nothing track up while the aircraft stands still (3-35, 3-38)', async () => {
+        const {map} = await nav5OnRoute({storage: {nav5MapOrientation: 2}});
+        map.reset();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(map.drawn).toEqual([]);
+        expect(canvasToAscii(document.querySelector('canvas') as HTMLCanvasElement)).not.toContain('#');
+        expect(Screen.read().rows('L')[5].slice(0, 4)).toBe('---°');
+    });
+
+    // 3-34, 3-35: away from the orientation field, DTK, TK and HDG up show their value with the degree sign in the
+    // lower left; North up shows N with the up arrow. The DTK of the first leg is the course KAAA to ABC, 049.6 by
+    // geo.ts, so 050.
+    it.each([
+        ['north up', 0, 'N^  '],
+        ['desired track up', 1, '050°'],
+    ] as const)('shows %s as the orientation value (3-34, 3-35)', async (_name, orientation, text) => {
+        await nav5OnRoute({storage: {nav5MapOrientation: orientation}});
+
+        expect(Screen.read().rows('L')[5].slice(0, 4)).toBe(text);
+    });
+
+    // 3-35 (figure 3-115): track up shows the actual track, here the 090 the aircraft moves on
+    it('shows the actual track as the orientation value track up (3-35)', async () => {
+        const {unit} = await nav5OnRoute({storage: {nav5MapOrientation: 2}});
+        await moveAircraft(unit, {lat: 47.05, lon: 8.05}, {groundspeedKt: 120, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().rows('L')[5].slice(0, 4)).toBe('090°');
+    });
+
+    // 3-35: the value is a magnetic bearing. With a variation of 10 degrees east, magnetic = true - 10: the true track
+    // 090 shows as 080 and the DTK of the first leg (049.6 true) as 040 (039.6).
+    it.each([
+        ['actual track', 2, '080°'],
+        ['desired track', 1, '040°'],
+    ] as const)('shows the %s orientation value in magnetic degrees (3-35)', async (_name, orientation, text) => {
+        const {unit} = await nav5OnRoute({storage: {nav5MapOrientation: orientation}, magvar: 10});
+        await moveAircraft(unit, {lat: 47.0, lon: 8.0}, {groundspeedKt: 120, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().rows('L')[5].slice(0, 4)).toBe(text);
+    });
+
+    // 3-35: heading up shows the heading, here the gyro's 123
+    it('shows the heading as the orientation value heading up (3-35)', async () => {
+        const {unit} = await nav5OnRoute({storage: {nav5MapOrientation: 3}, panelXml: HEADING_INPUT_XML});
+        unit.env.sim.set('PLANE HEADING DEGREES GYRO', 'degrees', 123);
+        await vi.advanceTimersByTimeAsync(1500);
+
+        expect(Screen.read().rows('L')[5].slice(0, 4)).toBe('123°');
+    });
+
+    // 3-34, 3-35: on the orientation field the inner knob offers N, DTK and TK up, and HDG up only with a heading
+    // input. While the cursor is on the field it shows the choice with the up arrow.
+    it.each([
+        ['without', undefined, ['N^  ', 'DTK^', 'TK^ ']],
+        ['with', HEADING_INPUT_XML, ['N^  ', 'DTK^', 'TK^ ', 'HDG^']],
+    ] as const)('offers the orientations %s a heading input (3-34, 3-35)', async (_name, panelXml, choices) => {
+        const {unit} = await nav5OnRoute({panelXml});
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'N^');
+
+        const seen: string[] = [];
+        for (let i = 0; i < choices.length + 1; i++) {
+            seen.push(unit.panel.focused('L').text);
+            await unit.panel.inner('L', 1);
+        }
+        expect(seen).toEqual([...choices, 'N^  ']);
+    });
+
+    // 3-34: the left cursor on NAV 5 visits two fields, the orientation and the range scale. This is the passing
+    // sibling of the pin below.
+    it('visits the orientation and the range scale with the cursor (3-34)', async () => {
+        const {unit} = await nav5OnRoute();
+        await unit.panel.cursor('L');
+        expect(Screen.read().status().left).toBe('CRSR');
+
+        const seen = [unit.panel.focused('L')];
+        await unit.panel.outer('L', 1);
+        seen.push(unit.panel.focused('L'));
+        await unit.panel.outer('L', 1);
+        seen.push(unit.panel.focused('L'));
+
+        expect(new Set(seen.slice(0, 2).map(f => `${f.row},${f.col},${f.text}`))).toEqual(new Set(['5,0,N^  ', '5,7,  40']));
+        expect(seen[2]).toEqual(seen[0]);
+    });
+
+    // 3-34 (figure 3-110): the cursor first lands on the range scale; the orientation is one step counterclockwise
+    it.fails('puts the cursor on the range scale first (3-34, #NEW-2-1)', async () => {
+        const {unit} = await nav5OnRoute();
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L')).toEqual({row: 5, col: 7, text: '  40'});
+    });
+
+    // 3-35 (figures 3-110, 3-116): range scales from 1 to 1000 NM with the inner knob on the range scale; the figures
+    // show 40 and 15 among them
+    it('offers range scales from 1 to 1000 NM (3-35)', async () => {
+        const {unit} = await nav5OnRoute();
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', '40');
+
+        const seen = new Set<number>();
+        for (let i = 0; i < 40; i++) {
+            seen.add(Number(unit.panel.focused('L').text));
+            await unit.panel.inner('L', 1);
+        }
+        expect(Math.min(...seen)).toBe(1);
+        expect(Math.max(...seen)).toBe(1000);
+        expect(seen.has(15)).toBe(true);
+        expect(seen.has(40)).toBe(true);
+        // The scale picked with the knob is the scale the map takes: the saved setting is the number shown
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(storedSetting(unit, 'nav5MapRange')).toBe(Number(unit.panel.focused('L').text));
     });
 });
