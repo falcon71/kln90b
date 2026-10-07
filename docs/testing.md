@@ -586,12 +586,12 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   at a time. A singleton the teardown does not know shows up as a test that passes alone and fails in its file.
 - **SDK upgrades may require updating the fakes.** `FakeSim` mirrors the native layer the SDK builds on, and
   `KLNGPSSatComputer` reaches into private SDK internals (docs/architecture.md, Core 3); recheck both, and run the whole
-  suite, after upgrading `@microsoft/msfs-sdk`. `KLNGPSSatComputer` reads private fields of `GPSSatComputer` and the shape
-  of `activeSimulationContext` (`channels`, the almanac time `lastAlamanacTime`). SDK 2.3.3 moved `simTime` and
-  `distanceFromLastKnownPos` into `activeSimulationContext` without a type error, because the reads go through
-  `as any`; after an upgrade run `test/render/GpsAcquisition.test.ts` first (session 7, task 4 adds it). The harness
-  also relies on these SDK internals, and after an upgrade a
-  change in one of them shows up as a confusing harness error, not as a named check:
+  suite, after upgrading `@microsoft/msfs-sdk`. `KLNGPSSatComputer` (`Gps.ts`) reads `activeSimulationContext.channels`
+  and the computer's own private `lastAlamanacTime`. It also reads `this.simTime` and `this.distanceFromLastKnownPos`
+  through `as any`: both were fields of the computer until SDK 2.3.3 moved them to `activeSimulationContext.time` and
+  `activeSimulationContext.distanceFromLastKnownPos`, which no type error reports. After an upgrade run
+  `test/render/GpsAcquisition.test.ts` first (session 7, task 4 adds it). The harness also relies on these SDK
+  internals, and after an upgrade a change in one of them shows up as a confusing harness error, not as a named check:
     - the boundary search: `NearestLodBoundarySearchSession` builds its `LodBoundary` objects in a throttled queue on
       `requestAnimationFrame` (the airspace tests advance the fake clock for it), and a facility with `lods: []` makes
       LOD 0 the exact ring (`navdata/airspaces.ts`);

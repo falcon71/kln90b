@@ -37,6 +37,10 @@ describe('procedure builders (harness)', () => {
         expect(Leg.PI(fix, 45, LegTurnDirection.Left, FixTypeFlags.IAF)).toMatchObject({type: LegType.PI, course: 45, turnDirection: LegTurnDirection.Left, fixTypeFlags: FixTypeFlags.IAF, fixIcaoStruct: fix.icaoStruct});
         expect(Leg.HF(fix, 90).turnDirection).toBe(LegTurnDirection.Right);
         expect(Leg.HF(fix, 90).fixTypeFlags).toBe(0);
+        expect(Leg.HA(fix, 270).turnDirection).toBe(LegTurnDirection.Right);
+        expect(Leg.HA(fix, 270).fixTypeFlags).toBe(0);
+        expect(Leg.PI(fix, 45).turnDirection).toBe(LegTurnDirection.Right);
+        expect(Leg.PI(fix, 45).fixTypeFlags).toBe(0);
         // A fix may be given as an ICAO value as well as a facility
         expect(Leg.TF(fix.icaoStruct).fixIcaoStruct).toEqual(fix.icaoStruct);
         expect(Leg.IF(fix.icaoStruct, FixTypeFlags.IAF)).toMatchObject({fixIcaoStruct: fix.icaoStruct, fixTypeFlags: FixTypeFlags.IAF});
