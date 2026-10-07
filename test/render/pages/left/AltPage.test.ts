@@ -24,11 +24,19 @@ describe('ALT page (ee0b000)', () => {
     });
 });
 
-/** ALT, then the cursor moved to ALERT and the inner knob turned to ON */
+/**
+ * ALT, then the cursor moved to ALERT, whichever of OFF and ON it shows, and the inner knob turned to ON when it reads
+ * OFF
+ */
 async function alertOn(unit: HeadlessUnit) {
     await unit.panel.alt();
-    await unit.panel.cursorTo('L', 'OFF');
-    await unit.panel.inner('L', 1);
+    for (let i = 0; !['OFF', 'ON ›'].includes(unit.panel.focused('L').text.trim()); i++) {
+        if (i >= 20) throw new Error(`alertOn: no ALERT field within 20 clicks\n${Screen.read().dump()}`);
+        await unit.panel.outer('L', 1);
+    }
+    if (unit.panel.focused('L').text.trim() === 'OFF') {
+        await unit.panel.inner('L', 1);
+    }
 }
 
 describe('ALT page (characterization)', () => {
@@ -89,8 +97,8 @@ describe('ALT page (spec)', () => {
         expect(fields.map(f => [f.row, f.text.trim()])).toEqual([[1, '29'], [1, '9'], [1, '2'], [2, 'OFF']]);
     });
 
-    // 3-39: with millibars selected on SET 7 the cursor is over the first two digits of the millibar field
-    it('opens with the cursor over the first two digits of the millibar baro (3-39)', async () => {
+    // 3-39: with millibars chosen on SET 7, the page starts with the cursor on the leading two digits of the reading
+    it('starts the cursor on the two leading digits of the millibar baro (3-39)', async () => {
         const unit = await bootUnit({storage: {barounit: false}});
         await unit.panel.alt();
 
@@ -167,7 +175,7 @@ describe('ALT page WARN altitude over a power cycle', () => {
         const unit = await warn500ThenCycle();
 
         expect(Screen.read().rows('L')[3]).toBe('ALERT: ON ›');
-        expect(Screen.read().rows('L')[4]).toMatch(/^WARN:±\d00ft$/);
+        expect(Screen.read().rows('L')[4]).toMatch(/^WARN:±[2-9]00ft$/);
     });
 
     it.fails('keeps the WARN altitude of 500 ft over a power cycle (3-55, #NEW-7-2)', async () => {

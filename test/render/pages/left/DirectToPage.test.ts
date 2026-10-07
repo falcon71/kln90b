@@ -283,7 +283,8 @@ describe('DIRECT TO page (spec)', () => {
 // of the missed approach. RNAV 18 to KPRC with the MAP MAPAA on the airport and the missed approach to MAHAA 5 NM east
 // (the world of the MAP tests in NavCalculator.test.ts; approachWorld() has no missed approach)
 describe('DIRECT TO page at the missed approach point (3-27)', () => {
-    async function pastTheMap() {
+    /** The aircraft 0.3 NM from MAPAA at `bearingFromMap` (180: past it, on its FROM side; 0: before it, TO side) */
+    async function nearTheMap(bearingFromMap: number) {
         const kprc = airport('KPRC', 47.0, 8.0);
         const mapaa = intersection('MAPAA', 47.0, 8.0);
         const fafPos = pointFrom(mapaa, 0, 5);
@@ -306,10 +307,13 @@ describe('DIRECT TO page at the missed approach point (3-27)', () => {
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
-        await moveAircraft(unit, pointFrom(mapaa, 180, 0.3), {groundspeedKt: 120, trackTrue: 180});
+        await moveAircraft(unit, pointFrom(mapaa, bearingFromMap, 0.3), {groundspeedKt: 120, trackTrue: 180});
         await unit.panel.selectPage('R', 'NAV 1'); // Not a waypoint page, so rule 3 does not apply
         return unit;
     }
+
+    const pastTheMap = () => nearTheMap(180);
+    const beforeTheMap = () => nearTheMap(0);
 
     it('MAPAA active and the aircraft on its FROM side (3-27)', async () => {
         const unit = await pastTheMap();
@@ -325,6 +329,17 @@ describe('DIRECT TO page at the missed approach point (3-27)', () => {
 
         expect(Screen.read().rows('L')[2]).toBe('   MAHAA   ');
     });
+
+    // 3-27 rule 4: the missed approach is offered only after the MAP; before it, the MAP itself is the suggestion
+    it('offers MAPAA itself while the aircraft is on its TO side (3-27)', async () => {
+        const unit = await beforeTheMap();
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('MAPAA'); // Precondition
+        expect(unit.props.memory.navPage.toFrom).toBe(true); // TO
+
+        await unit.panel.dct();
+
+        expect(Screen.read().rows('L')[2]).toBe('   MAPAA   ');
+    });
 });
 
 // The KLN 89 trainer (2026-10-07): an identifier that is not in the database, entered with D->, offers the creation of
@@ -339,7 +354,8 @@ describe('DIRECT TO page with an unknown identifier', () => {
         return unit;
     }
 
-    it('shows the typed unknown ident on the DIRECT TO page (3-27)', async () => {
+    // 3-28 procedure 1: an identifier typed with the knobs shows in the identifier field of the DIRECT TO page (3-27)
+    it('shows the typed unknown ident on the DIRECT TO page (3-27, 3-28)', async () => {
         const unit = await unknownIdentEntered();
 
         expect(Screen.read().rows('L').slice(0, 3)).toEqual(['DIRECT TO: ', '           ', '   QQQQ    ']);

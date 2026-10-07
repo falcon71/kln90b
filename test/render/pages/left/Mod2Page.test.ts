@@ -172,6 +172,7 @@ describe('MOD 2 OBS course with a driven indicator', () => {
         const unit = await drivenIndicatorOn90();
 
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
+        expect(Screen.read().rows('L')[3]).toBe('OBS:090°   ');
         expect(unit.panel.focused('L')).toEqual({row: 3, col: 4, text: '090°'});
     });
 

@@ -123,7 +123,7 @@ async function selfTestWithCourse(obs: number, panelXml?: string) {
     unit.env.sim.set('Nav OBS:1', 'degrees', obs);
     await unit.panel.powerOn();
     await vi.advanceTimersByTimeAsync(19_000);
-    expect(Screen.read().text()).toContain('APPROVE?'); // Precondition: the self-test page
+    expect(Screen.read().rows('R').map(r => r.trim())).toContain('APPROVE?'); // Precondition: the self-test page
     return unit;
 }
 

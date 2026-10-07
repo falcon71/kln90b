@@ -198,8 +198,8 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
 });
 
 // 3-55 step 4: the pilot normally enters the warn altitude only the first time altitude alerting is used, so the unit
-// keeps it. The first characterization of the describe above is the sibling: it sets the same state and runs the same
-// power cycle, and passes
+// keeps it. The sibling is 'puts the page state back to its defaults at the power-on (characterization)' above: it sets
+// the same state and runs the same power cycle, and passes
 describe('the ALT warn altitude over a power cycle', () => {
     it.fails('keeps the ALT warn altitude over a power cycle (3-55, #NEW-7-2)', async () => {
         const unit = await bootUnit();
