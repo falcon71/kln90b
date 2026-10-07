@@ -143,10 +143,10 @@ describe('CursorController field order (characterization)', () => {
 });
 
 // 4-3 tells the pilot to turn the left outer knob all the way counterclockwise to reach USE? on the FPL page, which only
-// makes sense when the cursor stops at the first field. Checked in the KLN 89 trainer (2026-10-07) on FPL 0 and SET 2: turned further, the cursor
-// stays on the first field counterclockwise and on the last field clockwise, and never wraps. The code wraps both ways
-// (CursorController.ts, outerLeft and outerRight). The trainer's first field is its mode field in the status column,
-// which the 90B does not have, so only the ends of the page's own fields are asserted.
+// makes sense when the cursor stops at the first field. Checked in the KLN 89 trainer (2026-10-07) on FPL 0 and SET 2:
+// turned further, the cursor stays on the first field counterclockwise and on the last field clockwise, and never wraps.
+// The code wraps both ways (CursorController.ts, outerLeft and outerRight). The trainer's first field is its mode field
+// in the status column, which the 90B does not have, so only the ends of the page's own fields are asserted.
 describe('CursorController outer knob at the ends of the page (4-3, checked in the KLN 89 trainer, 2026-10-07)', () => {
     // The sibling of the pins: inside the list the knob steps one field at a time in both directions
     it('steps from field to field clockwise and counterclockwise inside the list', () => {

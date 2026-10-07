@@ -145,8 +145,8 @@ describe('page memory of the page groups (3-12, 3-13)', () => {
     });
 });
 
-// 3-8 shows NAV 2 on the left at the start, but says nothing about whether the NAV group then counts that page as the
-// one last viewed; that follows from the page memory above and is what the code does
+// The unit starts with NAV 2 on the left. The code records that start page in the NAV group, so the outer knob comes
+// back to it and the inner knob moves on from it, as for any page viewed
 describe('page memory of the page the unit starts on (characterization)', () => {
     it('counts the NAV 2 page of the start as the NAV page last viewed', async () => {
         const unit = await bootUnit();
@@ -204,13 +204,14 @@ describe('page memory of the ACT group (checked in the KLN 89 trainer, 2026-10-0
 
 // 3-9, 3-10: a "+" in the page name (APT+3) means there are two or more pages with that number. 3-44: the primary APT 3
 // page, the runway list, follows the runway diagram, so the inner knob turns from the diagram to the list before it moves
-// on to APT 4. The way back, which enters APT 3 on its last page, is a characterization: the manual does not say it.
+// on to APT 4.
+const kaaa = airport('KAAA', 47.1, 8.0);
+/** The first row of the right page: blank on the runway diagram, the ident on the runway list */
+const firstRow = () => Screen.read().rows('R')[0];
+const DIAGRAM = '           ';
+const LIST = ' KAAA      ';
+
 describe('pages with several pages of the same number (3-9, 3-10, 3-44)', () => {
-    const kaaa = airport('KAAA', 47.1, 8.0);
-    /** The first row of the right page: blank on the runway diagram, the ident on the runway list */
-    const firstRow = () => Screen.read().rows('R')[0];
-    const DIAGRAM = '           ';
-    const LIST = ' KAAA      ';
 
     it('turns the inner knob clockwise through the runway diagram and the runway list of APT 3 to APT 4', async () => {
         const unit = await bootUnit({facilities: [kaaa]});
@@ -223,7 +224,10 @@ describe('pages with several pages of the same number (3-9, 3-10, 3-44)', () => 
         await unit.panel.inner('R', 1);
         expect(right()).toBe('APT 4');
     });
+});
 
+// The way back from APT 4 enters APT 3 on its last page (the runway list), then the diagram. The manual does not say it.
+describe('pages with several pages of the same number, backward (characterization)', () => {
     it('turns the inner knob counterclockwise from APT 4 to the last APT 3 page, then the first (characterization)', async () => {
         const unit = await bootUnit({facilities: [kaaa]});
         await unit.panel.selectPage('R', 'APT 4');
