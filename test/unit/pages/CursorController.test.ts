@@ -133,8 +133,11 @@ describe('CursorController field order (characterization)', () => {
         expect(walk(cc, all, 1)).toEqual(['a', 'd']);
     });
 
-    it('turns on only on a page with a field (3-11)', () => {
-        // 3-11: on a page without data entry the cursor button has no effect
+});
+
+// 3-11: on a page without data entry the cursor button has no effect
+describe('CursorController on a page without data entry (3-11)', () => {
+    it('turns on only on a page with a field', () => {
         const cc = new CursorController(children({text: new Box(), ro: new FakeField('ro', true)}));
 
         expect(cc.toggleCursor()).toBe(false);
@@ -230,10 +233,10 @@ describe('CursorController outer knob (characterization)', () => {
     });
 });
 
-describe('CursorController cursor on and off', () => {
-    // The code remembers the field the cursor was on and puts it back on that field (CursorController.setCursorActive).
-    // The manual does not state this for pages in general, so this is a characterization.
-    it('comes back on the field it was on when it was turned off (characterization)', () => {
+// The code remembers the field the cursor was on and puts it back on that field (CursorController.setCursorActive). The
+// manual does not state this for pages in general.
+describe('CursorController cursor on and off (characterization)', () => {
+    it('comes back on the field it was on when it was turned off', () => {
         const all = [new FakeField('a'), new FakeField('b'), new FakeField('c')];
         const cc = new CursorController(children({a: all[0], b: all[1], c: all[2]}));
         cc.setCursorActive(true);
@@ -246,10 +249,13 @@ describe('CursorController cursor on and off', () => {
 
         expect(focused(cc, all)).toBe('c');
     });
+});
 
-    // 3-53: the date and time cannot be set while satellites provide them, so on SET 2 they turn read-only at the first
-    // fix. A cursor turned on afterwards must land on a field that is still there; it throws today (Math.min against
-    // fields.length instead of fields.length - 1, CursorController.ts:123). The render pin on SET 2 is in Set2Page.test.ts.
+// 3-53: the date and time cannot be set while satellites provide them, so on SET 2 they turn read-only at the first fix.
+// A cursor turned on afterwards must land on a field that is still there; it throws today (Math.min against
+// fields.length instead of fields.length - 1, CursorController.ts:123). The passing sibling is the cursor memory test
+// above (the same flow without a field turning read-only); the render pins on SET 2 are in Set2Page.test.ts.
+describe('CursorController when fields turn read-only (3-53, #NEW-5-2)', () => {
     it.fails('comes back on the last field when the field it was on has turned read-only (#NEW-5-2)', () => {
         const all = [new FakeField('date'), new FakeField('time'), new FakeField('zone')];
         const cc = new CursorController(children({date: all[0], time: all[1], zone: all[2]}));
@@ -342,7 +348,8 @@ describe('CursorController lists (characterization)', () => {
 });
 
 // ENT always moves the cursor to the next field (f347a2c; https://www.youtube.com/shorts/9We5fcd2-VE, cited in the
-// code), unless the field keeps the focus. The render test of f347a2c holds the case of a field that does not handle ENT.
+// code), unless the field keeps the focus. The render test of f347a2c holds the case of a field that does not handle
+// ENT.
 describe('CursorController ENT (characterization, f347a2c)', () => {
     it.each([
         ['did not handle it', 'b', EnterResult.Not_Handled],
@@ -360,8 +367,8 @@ describe('CursorController ENT (characterization, f347a2c)', () => {
         expect(focused(cc, all)).toBe(expected);
     });
 
-    // A field that keeps the focus but lost it while handling ENT (the delete of OTH 3, where the next item moves into the
-    // row) gets the focus back
+    // A field that keeps the focus but lost it while handling ENT (the delete of OTH 3, where the next item moves into
+    // the row) gets the focus back
     it('focuses the field at the cursor again when ENT keeps the focus but the field lost it', async () => {
         const all = [new FakeField('a'), new FakeField('b')];
         const cc = new CursorController(children({a: all[0], b: all[1]}));
