@@ -41,8 +41,8 @@ describe('ActiveWaypoint on FPL 0', () => {
         expect(Screen.read().rows('L')[1]).toBe('  1:KAAA   ');
     });
 
-    // 3-28: a typed Direct To target that is in FPL 0 takes its place in the plan (4-10)
-    it('directTo reads the target leg, not the previous active index (43d472b)', async () => {
+    /** FPL 0 is KAAA, ABC, KBBB with ABC active; a Direct To KBBB is typed on the DIR page and confirmed */
+    async function typedDirectToKbbb() {
         const unit = await bootUnit({
             facilities: [kaaa, abc, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
         });
@@ -56,20 +56,36 @@ describe('ActiveWaypoint on FPL 0', () => {
         await unit.panel.ent(); // APT 1 confirmation
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
+        return unit;
+    }
+
+    // 3-28: a typed Direct To target that is in FPL 0 takes its place in the plan (4-10)
+    it('directTo reads the target leg, not the previous active index (43d472b)', async () => {
+        const unit = await typedDirectToKbbb();
+        const aw = unit.props.memory.navPage.activeWaypoint;
 
         expect(unit.errors).toEqual([]);
         expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
         expect(aw.getActiveFplIdx()).toBe(2);
         expect(aw.isDctNavigation()).toBe(true);
-        // What the pilot sees: back on NAV 2 and NAV 1, flying to KBBB
+        // What the pilot sees: back on NAV 2 and NAV 1, flying to KBBB. The arrow and the ident are asserted without the
+        // Direct To symbol in front of them: its place is the pin below (#NEW-1-5)
         const screen = Screen.read();
         expect(screen.status().left).toBe('NAV 2');
         expect(screen.status().right).toBe('NAV 1');
-        expect(screen.rows('R')[0]).toBe('d    ›KBBB ');
+        expect(screen.rows('R')[0].slice(5)).toBe('›KBBB ');
     });
 
-    it('keeps a deleted direct-to target as a random direct-to (#67)', async () => {
-        // 4-10 to 4-11: a Direct To waypoint is flown on its own, the plan only resumes after it
+    // 3-31, figure 3-97: the Direct To symbol stands directly in front of the waypoint. The code pads it to five cells,
+    // so the d stands in cell 0, away from its arrow. The passing test above is the sibling.
+    it.fails('directTo shows the Direct To symbol right before KBBB on NAV 1 (3-31, figure 3-97, #NEW-1-5)', async () => {
+        await typedDirectToKbbb();
+
+        expect(Screen.read().rows('R')[0]).toBe('    d›KBBB ');
+    });
+
+    /** The same plan with a direct-to KBBB from FPL 0 (DCT on the KBBB leg), then KBBB deleted from the plan */
+    async function deletedDirectToTarget() {
         const unit = await bootUnit({
             facilities: [kaaa, abc, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
         });
@@ -87,16 +103,32 @@ describe('ActiveWaypoint on FPL 0', () => {
         await unit.panel.clr();
         await unit.panel.ent(); // DEL KBBB ?
         await vi.advanceTimersByTimeAsync(1000);
+        return unit;
+    }
+
+    it('keeps a deleted direct-to target as a random direct-to (#67)', async () => {
+        // 4-10 to 4-11: a Direct To waypoint is flown on its own, the plan only resumes after it
+        const unit = await deletedDirectToTarget();
+        const aw = unit.props.memory.navPage.activeWaypoint;
 
         expect(unit.errors).toEqual([]);
         expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
         expect(aw.getActiveFplIdx()).toBe(-1);
         expect(aw.isDctNavigation()).toBe(true);
         expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(2);
-        // What the pilot sees: the leg is gone from FPL 0, NAV 1 still flies to KBBB
+        // What the pilot sees: the leg is gone from FPL 0, NAV 1 still flies to KBBB (the symbol in front of it is the
+        // pin below, #NEW-1-5)
         const screen = Screen.read();
         expect(screen.rows('L').slice(1, 4)).toEqual(['  1:KAAA   ', '  2:ABC    ', '  3:       ']);
-        expect(screen.rows('R')[0]).toBe('d    ›KBBB ');
+        expect(screen.rows('R')[0].slice(5)).toBe('›KBBB ');
+    });
+
+    // 3-31, figure 3-97: the same symbol directly in front of KBBB after its leg was deleted (4-10 to 4-11). The passing
+    // test above is the sibling.
+    it.fails('a deleted direct-to target shows the Direct To symbol right before KBBB on NAV 1 (3-31, figure 3-97, #NEW-1-5)', async () => {
+        await deletedDirectToTarget();
+
+        expect(Screen.read().rows('R')[0]).toBe('    d›KBBB ');
     });
 });
 
