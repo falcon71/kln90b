@@ -116,3 +116,42 @@ describe('LVar outputs after the self-test is approved (spec)', () => {
         expect(unit.env.sim.lastWrite('L:KLN90B_RollCommand')?.value).toBe(0);
     });
 });
+
+/** Cold boot with the external indicator on `obs`, power on, and the self-test page after the 17 s welcome page */
+async function selfTestWithCourse(obs: number, panelXml?: string) {
+    const unit = await bootUnit({engineRunning: false, magvar: 0, panelXml});
+    unit.env.sim.set('Nav OBS:1', 'degrees', obs);
+    await unit.panel.powerOn();
+    await vi.advanceTimersByTimeAsync(19_000);
+    expect(Screen.read().rows('R').map(r => r.trim())).toContain('APPROVE?'); // Precondition: the self-test page
+    return unit;
+}
+
+describe('self-test left page (characterization)', () => {
+    it('shows the test values and the course read from the indicator (characterization)', async () => {
+        await selfTestWithCourse(242);
+
+        const screen = Screen.read();
+        expect([...screen.rows('L'), ...screen.maskRows('L')].join('\n')).toMatchInlineSnapshot(`
+          "DIS  34.5NM
+          ηηηηηιηΚΑηη
+          OBS IN 242°
+             OUT 315°
+          RMI    130°
+          ANNUN    ON
+          ...........
+          ...........
+          ...........
+          ...........
+          ...........
+          ..........."
+        `);
+    });
+
+    // Without a course input (ObsSource 0) OBS IN shows dashes
+    it('shows OBS IN ---° when the unit reads no indicator (characterization)', async () => {
+        await selfTestWithCourse(242, '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input></Instrument></PlaneHTMLConfig>');
+
+        expect(Screen.read().rows('L')[2]).toBe('OBS IN ---°');
+    });
+});
