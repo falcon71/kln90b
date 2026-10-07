@@ -162,6 +162,9 @@ describe('APT 7 loading a STAR when FPL 0 has to make room', () => {
 });
 
 // A full FPL 0 that lacks the airport of the SID: the airport goes in at index 0, where the unit has to make room first.
+// 6-22 step 7 (the unit asks to add the airport) and C-1 (room is made when the first leg is not part of the
+// active leg) imply the setup test below. Under the fix of #148 alone it turns red, because the next SID leg then
+// deletes the airport; that is a guard, intended.
 describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
     /** 30 filler fixes in FPL 0, no KPRC, the aircraft on the way to the seventh filler: the active leg has index 6 */
     async function loadSidIntoFullPlan() {

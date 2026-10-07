@@ -79,7 +79,7 @@ Findings that shape the tests:
 - **Circular airspaces** (`BoundaryUtils` ignores circles; the local AIRAC 2607 data has full circles for 25 to 55 % of
   the restricted, prohibited and warning shapes): an `enhancement` issue, no pin. `test/unit/harness/airspaces.test.ts:180`
   stays as the documented gap and cites the issue. The drafted circle pins of research C are not committed.
-- **Almanac age:** 3-17 is the unit's own threshold ("considered current for up to six months"), so the 90 days of
+- **Almanac age:** 3-17 gives six months as the unit's own limit for a stored almanac, so the 90 days of
   `Gps.ts:91` is a bug, pinned. The pin is proven together with the fix of `#NEW-4-1`, because today the check never
   passes.
 - **Nearest search radius** (500 NM in the code, none in the 90B guide, 200 NM in the KLN 89 guide): a `question` issue;

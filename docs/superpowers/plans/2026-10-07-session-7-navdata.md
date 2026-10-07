@@ -1,7 +1,7 @@
 # Session 7 (navdata and fragile code): implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers-extended-cc:subagent-driven-development (recommended)
-> or superpowers-extended-cc:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`)
+> or superpowers-extended-cc:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`)
 > syntax for tracking.
 
 **Goal:** Tests that hold the navdata layer and the fragile code: the facility loader and repository, `Database`, the
