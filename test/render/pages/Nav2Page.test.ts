@@ -18,7 +18,7 @@ describe('NAV 2 page (characterization)', () => {
 
         const screen = Screen.read();
         // Row 5, the longitude, is left out of this test and of the snapshot: it shows a degree below 10 written with a
-        // zero, the bug of the pin below (#NEW-1-8)
+        // zero, the bug of the pin below (#230)
         expect(screen.half('L').split('\n').slice(0, 5)).toEqual([
             'PRESENT POS',
             '           ',
@@ -91,14 +91,14 @@ describe('NAV 2 page', () => {
     // at 8 degrees west showed "W  8°" with two blanks once confirmed, and the zeros ("W008°") only in the open edit
     // field. A photo of a KLN 90 (reference-photos-index.md, 0260952.jpg) shows the same blank on NAV 2. The code pads the
     // degrees with zeros (LongitudeDisplay). The sibling is the characterization above, which boots the same position.
-    it.fails('shows a longitude below 10 degrees with a blank, not a zero (checked in the KLN 89 trainer, 2026-10-07, #NEW-1-8)', async () => {
+    it.fails('shows a longitude below 10 degrees with a blank, not a zero (checked in the KLN 89 trainer, 2026-10-07, #230)', async () => {
         await nav2At({lat: 47.0, lon: 8.0}, [vor('ABC', 47.2, 8.0, {magneticVariation: 0})]);
 
         expect(Screen.read().rows('L')[5]).toBe("E  8°00.00'");
     });
 
     // The same for the latitude: the trainer showed "N  8°" blank-padded once confirmed (2026-10-07)
-    it.fails('shows a latitude below 10 degrees with a blank, not a zero (checked in the KLN 89 trainer, 2026-10-07, #NEW-1-8)', async () => {
+    it.fails('shows a latitude below 10 degrees with a blank, not a zero (checked in the KLN 89 trainer, 2026-10-07, #230)', async () => {
         await nav2At({lat: 8.5, lon: 47});
 
         expect(Screen.read().rows('L')[4]).toBe("N  8°30.00'");
@@ -137,7 +137,7 @@ describe('NAV 2 page', () => {
         expect(Screen.read().rows('L')[2]).toBe('ABC  180°fr');
     });
 
-    it.fails('shows the radial of a two-letter VOR in cells 5 to 8 (3-32, #NEW-1-6)', async () => {
+    it.fails('shows the radial of a two-letter VOR in cells 5 to 8 (3-32, #228)', async () => {
         await nav2At({lat: 47.0, lon: 8.0}, [vor('AB', 47.2, 8.0)]);
 
         expect(Screen.read().rows('L')[2]).toBe('AB   180°fr');
@@ -202,7 +202,7 @@ describe('NAV 2 before the first fix (3-8)', () => {
         ]);
     });
 
-    it.fails('shows the longitude dashes in the cells of the three degree digits (3-8, #NEW-1-2)', async () => {
+    it.fails('shows the longitude dashes in the cells of the three degree digits (3-8, #224)', async () => {
         await bootUnit({coldGps: true});
         await vi.advanceTimersByTimeAsync(1000);
 

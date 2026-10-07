@@ -33,7 +33,7 @@ const items = (rows: string[]) => rows.filter(isItem).map(r => r.trim().replace(
 
 describe('DUPLICATE WAYPOINT page (characterization)', () => {
     // Four waypoints, so that the number of visible lines does not matter; the line positions are left out, because the
-    // page has no header line (#NEW-7-1, pinned below)
+    // page has no header line (#258, pinned below)
     it('lists the waypoints with the cursor on the first (characterization)', async () => {
         await duplicatePage([abdChe, abdFra, abdDeu, abdIta]);
 
@@ -74,7 +74,7 @@ describe('DUPLICATE WAYPOINT page (spec)', () => {
     });
 
     // 3-15 step 3: the cursor starts on the first waypoint and the left outer knob moves it down the list to the others
-    // (figure 3-53). Whether the first one scrolls out depends on the four visible lines, which #NEW-7-1 pins
+    // (figure 3-53). Whether the first one scrolls out depends on the four visible lines, which #258 pins
     it('starts the cursor on the first waypoint and moves it to the fifth with the outer knob (3-15)', async () => {
         const unit = await duplicatePage();
         expect(unit.panel.focused('L').text.trim()).toBe('1 VOR CHE?');
@@ -116,7 +116,7 @@ describe('DUPLICATE WAYPOINT page layout', () => {
         expect(items(Screen.read().rows('L'))[0]).toBe('1 VOR CHE?');
     });
 
-    it.fails('shows the header TYPE AREA in row 1 and four waypoints in rows 2 to 5 (3-15, checked in the KLN 89 trainer, 2026-10-07, #NEW-7-1)', async () => {
+    it.fails('shows the header TYPE AREA in row 1 and four waypoints in rows 2 to 5 (3-15, checked in the KLN 89 trainer, 2026-10-07, #258)', async () => {
         await duplicatePage();
 
         const rows = Screen.read().rows('L');

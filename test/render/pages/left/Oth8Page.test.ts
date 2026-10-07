@@ -86,7 +86,7 @@ describe('OTH 8 page, fuel used (5-41)', () => {
     });
 
     // 5-41: the same installation as the passing test above (the sibling): the total is dashes too
-    it.fails('shows dashes for the total of a twin when the fuel used is not transmitted (5-41, #NEW-5-2)', async () => {
+    it.fails('shows dashes for the total of a twin when the fuel used is not transmitted (5-41, #250)', async () => {
         await oth8(2, [102, 96], false);
 
         expect(usedOf(Screen.read().rows('L')[5], 'TOTAL')).toBe('-----');
@@ -101,7 +101,7 @@ describe('OTH 8 page, fuel used (5-41)', () => {
     });
 
     // 5-41: the same single, but the computer does not transmit the fuel used
-    it.fails('shows dashes for a single when the fuel used is not transmitted (5-41, #NEW-5-2)', async () => {
+    it.fails('shows dashes for a single when the fuel used is not transmitted (5-41, #250)', async () => {
         await oth8(1, [72], false);
 
         expect(Screen.read().rows('L')[5].trim()).toBe('-----');

@@ -78,7 +78,7 @@ describe('NAV 3 page (characterization)', () => {
     });
 
     // The code shows the cross track below 1 NM in tenths; the test holds that and claims nothing about the real unit.
-    // tenths or hundredths below 1 NM is a question: #NEW-1-9
+    // tenths or hundredths below 1 NM is a question: #231
     it('reads FLY L 0.3nm 0.3 NM right of the course (characterization)', async () => {
         await nav3OnLeg(0.3);
 
@@ -167,7 +167,7 @@ describe('NAV 3 page on an FPL 0 leg', () => {
 
     // 3-32 (figures 3-104, 3-105): the cross track has three cells. Just below 10 NM the tenths round up to 10.0, four
     // cells, which runs past the edge of the half page. Expected: 10 (rounded) or 9.9 (truncated) in the three cells.
-    it.fails('keeps the cross track in its three cells just below 10 NM (3-32, #NEW-1-4)', async () => {
+    it.fails('keeps the cross track in its three cells just below 10 NM (3-32, #226)', async () => {
         await nav3OnLeg(9.97);
 
         expect(['FLY L  10nm', 'FLY L 9.9nm']).toContain(Screen.read().rows('L')[3]);

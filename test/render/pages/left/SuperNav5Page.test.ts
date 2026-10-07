@@ -67,7 +67,7 @@ const labels = (drawn: string[]) => drawn.filter(d => d.startsWith('label ')).ma
 
 describe('Super NAV 5 page (characterization)', () => {
     // The middle waypoint is an intersection where the VOR ABC of the other tests lies: a VOR of FPL 0 is labeled twice
-    // with the VORs on (#NEW-2-2), and the snapshot must not hold that
+    // with the VORs on (#233), and the snapshot must not hold that
     it('shows FPL 0 with every layer on, the aircraft 10 NM along the first leg at 120 kt', async () => {
         const w = world();
         const mid = intersection('ABCDE', w.abc.lat, w.abc.lon);
@@ -104,7 +104,7 @@ describe('Super NAV 5 page (characterization)', () => {
 
     // The scales between 1 and 1000 NM are not known to be those of the real unit (the code says so itself), so this
     // pins the list the inner knob offers today, in its order, and claims nothing about the real unit.
-    // the scales between 1 and 1000 NM are a question: #NEW-2-5
+    // the scales between 1 and 1000 NM are a question: #236
     // The list has no 7 NM scale, although a figure of the guide's approach chapter shows AUTO at 7 NM; that goes into
     // the question as well.
     it('Super NAV 5 range scales (characterization)', async () => {
@@ -308,7 +308,7 @@ describe('Super NAV 5 page', () => {
     });
 
     // 3-37 (figures 3-121 and 3-122): with the VORs on, the flight plan VOR LRP is labeled once
-    it.fails('labels a VOR of FPL 0 once with the VORs on (3-37, #NEW-2-2)', async () => {
+    it.fails('labels a VOR of FPL 0 once with the VORs on (3-37, #233)', async () => {
         const {map} = await superNav5OnRoute({storage: {superNav5Vor: 1}});
 
         expect(labels(map.drawn).filter(l => l === 'ABC')).toEqual(['ABC']);
@@ -483,7 +483,7 @@ describe('Super NAV 5 AUTO scale', () => {
     });
 
     // 3-36: AUTO must also show the active waypoint, 19.5 NM north, when the waypoint after it is nearer (4 NM): 20
-    it.fails('takes a scale that shows the active waypoint when the next one is nearer (3-36, #NEW-2-3)', async () => {
+    it.fails('takes a scale that shows the active waypoint when the next one is nearer (3-36, #234)', async () => {
         const a0 = fix('AAAA', 180, 2), a1 = fix('AAAB', 0, 19.5), a2 = fix('AAAC', 45, 4);
         const unit = await bootUnit({
             facilities: [a0, a1, a2], position: P,
@@ -545,7 +545,7 @@ describe('Super NAV 5 near the MAP', () => {
 
     // 6-9 (figure 6-16): 0.3 NM before the MAP the map shows the 1 NM scale, which is where the airport diagram is drawn.
     // AUTO takes the waypoint after the active one into account even when that is the missed approach.
-    it.fails('takes the 1 NM scale 0.3 NM before the MAP (6-9, figure 6-16, #NEW-2-4)', async () => {
+    it.fails('takes the 1 NM scale 0.3 NM before the MAP (6-9, figure 6-16, #235)', async () => {
         const {unit} = await nearMap({superNav5MapRange: 0});
         expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('MAPAA');
 
@@ -591,7 +591,7 @@ describe('Super NAV 5 OBS course', () => {
     });
 
     // 5-34, 5-35: turned right, the course is one degree more and Super NAV 5 stays
-    it.fails('turns the OBS course up with the inner knob and stays on Super NAV 5 (5-34, 5-35, #NEW-2-7)', async () => {
+    it.fails('turns the OBS course up with the inner knob and stays on Super NAV 5 (5-34, 5-35, #238)', async () => {
         const unit = await onObsCourse();
         await unit.panel.inner('L', 1);
 

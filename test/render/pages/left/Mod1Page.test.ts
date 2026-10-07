@@ -201,7 +201,7 @@ describe('MOD 1 CDI scale when the unit arms with the page in view', () => {
 
     // 5-38 note: in ARM nothing less sensitive than 1 NM can be selected, so a click leaves 1 or 0.3 NM, and the CDI
     // output stays a number
-    it.fails('keeps a valid CDI scale when the knob turns after the unit armed with MOD 1 in view (5-38, #NEW-7-3)', async () => {
+    it.fails('keeps a valid CDI scale when the knob turns after the unit armed with MOD 1 in view (5-38, #260)', async () => {
         const unit = await armedWithMod1InView();
 
         await unit.panel.inner('L', 1);

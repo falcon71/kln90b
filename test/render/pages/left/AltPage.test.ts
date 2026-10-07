@@ -178,7 +178,7 @@ describe('ALT page WARN altitude over a power cycle', () => {
         expect(Screen.read().rows('L')[4]).toMatch(/^WARN:±[2-9]00ft$/);
     });
 
-    it.fails('keeps the WARN altitude of 500 ft over a power cycle (3-55, #NEW-7-2)', async () => {
+    it.fails('keeps the WARN altitude of 500 ft over a power cycle (3-55, #259)', async () => {
         const unit = await warn500ThenCycle();
 
         expect(Screen.read().rows('L')[4]).toBe('WARN:±500ft');

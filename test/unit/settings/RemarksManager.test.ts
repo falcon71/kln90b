@@ -155,7 +155,7 @@ describe('remarks of a 101st airport (3-47, C-2)', () => {
 
     // C-2: the message RMKS FULL says that the remarks of another airport do not fit. Today the guard reads the length
     // of an object that has none, so it never fires and the save goes on to a slot that does not exist
-    it.fails('refuses the remarks of a 101st airport with RMKS FULL (3-47, C-2, #NEW-5-5)', () => {
+    it.fails('refuses the remarks of a 101st airport with RMKS FULL (3-47, C-2, #92)', () => {
         const manager = managerWith100Airports();
 
         expect(() => manager.saveRemarks('KZZA', ['X          ', '           ', '           '])).toThrow('RMKS FULL');

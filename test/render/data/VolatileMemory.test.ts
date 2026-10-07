@@ -201,7 +201,7 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
 // keeps it. The sibling is 'puts the page state back to its defaults at the power-on (characterization)' above: it sets
 // the same state and runs the same power cycle, and passes
 describe('the ALT warn altitude over a power cycle', () => {
-    it.fails('keeps the ALT warn altitude over a power cycle (3-55, #NEW-7-2)', async () => {
+    it.fails('keeps the ALT warn altitude over a power cycle (3-55, #259)', async () => {
         const unit = await bootUnit();
         await settle(unit);
         const m = unit.props.memory;

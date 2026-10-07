@@ -89,7 +89,7 @@ describe('FrontPanel.enterIdent (harness)', () => {
 
             await unit.panel.enterIdent('R', ident);
 
-            // The longitude row is left out because of #NEW-1-8 (the latitude row still shows the typed facility)
+            // The longitude row is left out because of #230 (the latitude row still shows the typed facility)
             expect(Screen.read().rows('R').slice(0, 5)).toEqual(expected);
         });
 

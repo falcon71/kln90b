@@ -149,7 +149,7 @@ describe('NAV 4 VNAV started at zero ground speed', () => {
     // 5-8 (figure 5-26): bringing the cursor over ANGLE starts VNAV at the displayed angle, and the top line shows the
     // advisory altitude, at the start the present altitude. The code computes the time to the start as 0 / 0 and shows
     // VNV INNaN: instead.
-    it.fails('shows the advisory altitude when VNAV starts at zero ground speed (5-8, #NEW-1-7)', async () => {
+    it.fails('shows the advisory altitude when VNAV starts at zero ground speed (5-8, #229)', async () => {
         await cursorOverAngle();
 
         expect(Screen.read().rows('L')[0]).toBe('VNV 7500ft ');

@@ -78,7 +78,7 @@ describe('CAL 5 page (5-13)', () => {
 
     // 5-10 and 5-13: the sign digit makes the temperature negative. Set on 000, the minus is lost when the next digit is
     // turned (TempFieldset formats -0 as +00), so the page converts +40 C instead of -40 C
-    it.fails('converts -40 C entered sign first to -40°F (5-10, 5-13, #NEW-6-3)', async () => {
+    it.fails('converts -40 C entered sign first to -40°F (5-10, 5-13, #256)', async () => {
         const unit = await cal5();
         await setCell(unit, 1, 3, '-');
         await setCell(unit, 1, 4, '4');

@@ -28,7 +28,7 @@ describe('TRI 5 page (characterization)', () => {
         Object.assign(unit.props.memory.triPage, {ff: 30, reserve: 25}); // volatile memory, read when the page is built
         await unit.panel.selectPage('L', 'TRI 5');
         expect(unit.errors).toEqual([]);
-        // Row 2 (the ground speed and the ETE) is left out until the average of the leg speeds is decided (#NEW-6-1)
+        // Row 2 (the ground speed and the ETE) is left out until the average of the leg speeds is decided (#254)
         expect(Screen.read().rows('L').filter((_, i) => i !== 2)).toMatchInlineSnapshot(`
           [
             "FP 0   91nm",
@@ -124,7 +124,7 @@ describe('TRI 5 ground speed with a wind that differs per leg', () => {
     // 5-6: the TAS and wind are applied to each leg of the plan, and the page gives the ETE of the plan. 10 NM at
     // 100 kt and 90 NM at 200 kt take 0.1 h + 0.45 h = 33 min (an average ground speed of 100 / 0.55 = 182 kt). The
     // page averages the two leg speeds without weighting them by distance, 150 kt, and shows 40 min
-    it.fails('shows the ETE of the plan as the sum of the leg times, :33 (5-6, #NEW-6-1)', async () => {
+    it.fails('shows the ETE of the plan as the sum of the leg times, :33 (5-6, #254)', async () => {
         await bootWindRoute();
         expect(Screen.read().rows('L')[2].slice(6)).toBe('  :33');
     });

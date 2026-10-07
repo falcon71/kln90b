@@ -205,7 +205,7 @@ describe('NAV 5 page (characterization)', () => {
 
     // The scales between 1 and 1000 NM are not known to be those of the real unit (the code says so itself), so this
     // pins the list the inner knob offers today, in its order, and claims nothing about the real unit.
-    // the scales between 1 and 1000 NM are a question: #NEW-2-5
+    // the scales between 1 and 1000 NM are a question: #236
     it('NAV 5 range scales (characterization)', async () => {
         const {unit} = await nav5OnRoute({storage: {nav5MapRange: 1}});
         await unit.panel.cursor('L');
@@ -459,7 +459,7 @@ describe('NAV 5 page map', () => {
     });
 
     // 3-34 (figure 3-110): the cursor first lands on the range scale; the orientation is one step counterclockwise
-    it.fails('puts the cursor on the range scale first (3-34, #NEW-2-1)', async () => {
+    it.fails('puts the cursor on the range scale first (3-34, #232)', async () => {
         const {unit} = await nav5OnRoute();
         await unit.panel.cursor('L');
 

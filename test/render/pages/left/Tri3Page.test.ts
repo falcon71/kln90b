@@ -126,7 +126,7 @@ describe('TRI 3 ETE just under an hour', () => {
     // 5-5, figures 5-12 to 5-16: the ETE is hours and minutes, h:mm. 59.56 minutes is 1:00 rounded or :59 truncated,
     // never 60 minutes (the same kind as #99 and #184). The page numbers show the h:mm form only; that the real unit
     // never shows :60 was checked in the KLN 89 trainer, 2026-10-07
-    it.fails('shows 59.56 minutes as 1:00 or :59, not :60 (5-5, #NEW-1-1)', async () => {
+    it.fails('shows 59.56 minutes as 1:00 or :59, not :60 (5-5, #223)', async () => {
         const unit = await bootTri3([kaaa(), far()]);
         await enterRoute(unit, 'KAAA', 'KBBB');
         expect([' 1:00', '  :59']).toContain(Screen.read().rows('L')[2].slice(6));

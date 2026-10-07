@@ -107,7 +107,7 @@ describe('OTH 9 page, wind (5-43)', () => {
 
     // 5-43, the figures: the wind direction carries the true-north symbol after the degree sign, the same symbol as the
     // wind on TRI 0 (5-2, figures 5-1 to 5-5), which Tri0Page renders as ¥. The setup is the headwind test above
-    it.fails('marks the wind direction as true with the true-north symbol (5-43, #NEW-5-1)', async () => {
+    it.fails('marks the wind direction as true with the true-north symbol (5-43, #249)', async () => {
         await windAt(83.282, 353.103);
 
         expect(Screen.read().rows('L')[4]).toBe('WIND  030°¥');

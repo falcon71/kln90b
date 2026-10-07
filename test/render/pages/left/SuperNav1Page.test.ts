@@ -119,7 +119,7 @@ describe('Super NAV 1 page', () => {
 
     // 3-31 (figure 3-97), 3-32 and figure 5-21: on a direct-to the Direct To symbol stands directly in front of the
     // waypoint (the font's d plus the arrow). The code pads the d to five cells, four cells away from the arrow.
-    it.fails('draws the Direct To symbol directly in front of the waypoint (3-31, figure 3-97, 3-32, #NEW-1-5)', async () => {
+    it.fails('draws the Direct To symbol directly in front of the waypoint (3-31, figure 3-97, 3-32, #227)', async () => {
         await directToKddd();
 
         expect(Screen.read().row(0).trimEnd()).toMatch(/d›KDDD$/);

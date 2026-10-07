@@ -5,7 +5,7 @@ import {airport} from '../../../harness/navdata/builders';
 
 /** An airport 0.4° south and 0.25° west of the aircraft, far enough that the two positions read differently */
 const kaaa = () => airport('KAAA', 47.1, 11.0);
-// Two-digit longitudes everywhere: a degree below 10 shows with a zero (#NEW-1-8), which no row here may hold
+// Two-digit longitudes everywhere: a degree below 10 shows with a zero (#230), which no row here may hold
 const POSITION = {lat: 47.5, lon: 11.25};
 
 async function onSet1(): Promise<HeadlessUnit> {
@@ -16,7 +16,7 @@ async function onSet1(): Promise<HeadlessUnit> {
 }
 
 describe('SET 1 page (characterization)', () => {
-    // Row 4 (ground speed and track) is left out: its ground speed format is the #NEW-4-2 pin below. The CONFIRM? row
+    // Row 4 (ground speed and track) is left out: its ground speed format is the #245 pin below. The CONFIRM? row
     // shows with the cursor off, which is the code's choice (a comment in Set1Page.tsx cites a video of a real unit)
     it('shows the present position with the cursor off', async () => {
         const unit = await onSet1();
@@ -56,7 +56,7 @@ describe('SET 1 initialization (3-18)', () => {
 
     // 3-18, figures 3-59 and 3-60: the first ENT shows the waypoint page on the right and leaves the position alone; the
     // second ENT confirms the waypoint, and the position rows take its latitude and longitude. KAAA is at 47.1 N 11.0 E,
-    // which is N 47°06.00' and E 11°00.00' (0.1° is 6.00'). The sibling of the #NEW-4-5 pin below.
+    // which is N 47°06.00' and E 11°00.00' (0.1° is 6.00'). The sibling of the #248 pin below.
     it('takes the position of a confirmed waypoint (3-18)', async () => {
         const unit = await onSet1();
         await unit.panel.cursor('L');
@@ -73,7 +73,7 @@ describe('SET 1 initialization (3-18)', () => {
 
     // 3-18 step 8 and the KLN 89 trainer (2026-10-07): once the waypoint is confirmed the cursor goes straight to
     // CONFIRM?, over the latitude and the longitude. Set1Page.setWpt leaves it on the latitude.
-    it.fails('moves the cursor to CONFIRM? once the waypoint is confirmed (3-18, checked in the KLN 89 trainer, 2026-10-07, #NEW-4-5)', async () => {
+    it.fails('moves the cursor to CONFIRM? once the waypoint is confirmed (3-18, checked in the KLN 89 trainer, 2026-10-07, #248)', async () => {
         const unit = await onSet1();
         await unit.panel.cursor('L');
         await unit.panel.enterIdent('L', 'KAAA');
@@ -251,7 +251,7 @@ describe('SET 1 bugs', () => {
     // the tens digit of SpeedEditor is a plain digit (SpeedEditor.tsx). The aircraft is parked and the world has no
     // magnetic variation, so the track is 000. The sibling is the characterization of the page above, which holds every
     // other row of the page.
-    it.fails('shows the ground speed of a parked aircraft as 0 KT (3-18, #NEW-4-2)', async () => {
+    it.fails('shows the ground speed of a parked aircraft as 0 KT (3-18, #245)', async () => {
         await onSet1();
 
         expect(Screen.read().rows('L')[4]).toBe('  0 KT 000°');
@@ -282,7 +282,7 @@ describe('SET 1 bugs', () => {
     // Checked in the KLN 89 trainer (2026-10-07): CLR then ENT on the WPT field changes nothing, the old ident stays and
     // no error shows. Here the CLR asks for the confirmation of no waypoint, and the ENT that confirms it hands null to
     // Set1Page.setWpt, which reads waypoint!.lat (Set1Page.tsx:73) and throws on the ENT path.
-    it.fails('keeps the old ident without an error after CLR and ENT on the WPT field (checked in the KLN 89 trainer, 2026-10-07, #NEW-4-1)', async () => {
+    it.fails('keeps the old ident without an error after CLR and ENT on the WPT field (checked in the KLN 89 trainer, 2026-10-07, #244)', async () => {
         const unit = await onConfirmedWptField();
         await unit.panel.clr();
         await unit.panel.ent();

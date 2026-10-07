@@ -174,7 +174,7 @@ describe('DIRECT TO page (characterization)', () => {
         await unit.panel.dct();
 
         // The longitude row of the right page is left out of the snapshot: it shows a degree below 10 written with a
-        // zero (#NEW-1-8)
+        // zero (#230)
         const screen = Screen.read();
         expect({
             left: screen.half('L'), leftMask: screen.maskRows('L'), status: screen.status(), right: screen.rows('R').slice(0, 5),
@@ -362,7 +362,7 @@ describe('DIRECT TO page with an unknown identifier', () => {
         expect(Screen.read().status().right).toBe('NAV 1');
     });
 
-    it.fails('offers to create a user waypoint for an unknown ident (checked in the KLN 89 trainer, 2026-10-07, #NEW-7-5)', async () => {
+    it.fails('offers to create a user waypoint for an unknown ident (checked in the KLN 89 trainer, 2026-10-07, #262)', async () => {
         const unit = await unknownIdentEntered();
 
         await unit.panel.ent();

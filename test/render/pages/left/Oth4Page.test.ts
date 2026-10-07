@@ -75,7 +75,7 @@ describe('OTH 4 page, deleting remarks (3-47)', () => {
     });
 
     // The same sequence as the test above, but the new remark is for KAAA, the airport whose remarks were just deleted
-    it.fails('lists an airport again when its remarks are saved anew while the page is shown (3-47, #NEW-5-4)', async () => {
+    it.fails('lists an airport again when its remarks are saved anew while the page is shown (3-47, #252)', async () => {
         const unit = await withRemarks(['KAAA', 'KBBB']);
         await unit.panel.cursor('L');
         await unit.panel.clr();
@@ -91,7 +91,7 @@ describe('OTH 4 page, deleting remarks (3-47)', () => {
     // 3-47: CLR and ENT delete the remarks of the airport under the cursor, so the airport leaves the list. KCCC, the
     // deleted one, was not the airport saved last; the sibling is the delete test above, where KCCC was saved last and
     // KBBB (the middle one) was deleted
-    it.fails('removes a deleted airport from the list when its remarks were the last saved (3-47, #NEW-5-4)', async () => {
+    it.fails('removes a deleted airport from the list when its remarks were the last saved (3-47, #252)', async () => {
         const unit = await withRemarks(['KAAA', 'KBBB', 'KCCC']);
         await unit.panel.cursor('L');
         await unit.panel.outer('L', 2); // KCCC, the last airport saved
@@ -106,7 +106,7 @@ describe('OTH 4 page, deleting remarks (3-47)', () => {
 });
 
 // The guide is silent on where the cursor goes when the last row of the list is deleted or the list becomes empty. The
-// deleted airport is never the one saved last in these setups, so that the list is redrawn at all (#NEW-5-4)
+// deleted airport is never the one saved last in these setups, so that the list is redrawn at all (#252)
 describe('OTH 4 page, the cursor after a deletion (characterization)', () => {
     it('characterization: moves the cursor to the new last airport when the last airport is deleted', async () => {
         const unit = await withRemarks(['KCCC', 'KAAA', 'KBBB']);

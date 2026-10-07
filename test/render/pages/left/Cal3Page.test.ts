@@ -29,7 +29,7 @@ async function cal3(tasHundreds: number, headingMag: number, groundspeedKt: numb
 }
 
 describe('CAL 3 page (characterization)', () => {
-    // Row 4 (the wind direction) is left out: it lacks the true-north symbol, pinned below (#NEW-5-1)
+    // Row 4 (the wind direction) is left out: it lacks the true-north symbol, pinned below (#249)
     it('shows the wind for TAS 100 kt, heading 000 and 120 kt over the ground on track 000 (characterization)', async () => {
         const unit = await cal3(1, 0, 120, 0);
         expect(unit.errors).toEqual([]);
@@ -90,7 +90,7 @@ describe('CAL 3 page (5-12)', () => {
     // 5-12, figures 5-37 and 5-38: the wind direction carries the true-north symbol after the degree sign, as on TRI 0.
     // A real unit with a heading input shows WIND, two blanks, the direction, the degree sign and that symbol in eleven
     // cells (reference photo 0283863.jpg)
-    it.fails('marks the wind direction as true: WIND  180°¥ (5-12, #NEW-5-1)', async () => {
+    it.fails('marks the wind direction as true: WIND  180°¥ (5-12, #249)', async () => {
         await cal3(1, 0, 120, 0);
         expect(Screen.read().rows('L')[4]).toBe('WIND  180°¥');
     });

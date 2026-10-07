@@ -176,7 +176,7 @@ describe('MOD 2 OBS course with a driven indicator', () => {
         expect(unit.panel.focused('L')).toEqual({row: 3, col: 4, text: '090°'});
     });
 
-    it.fails('keeps a course turned on MOD 2 and slews the indicator to it (5-35, #NEW-7-4)', async () => {
+    it.fails('keeps a course turned on MOD 2 and slews the indicator to it (5-35, #261)', async () => {
         const unit = await drivenIndicatorOn90();
 
         await unit.panel.inner('L', 3);
@@ -242,7 +242,7 @@ describe('MOD 2 OBS course just below north', () => {
         expect(obs).toBeLessThan(360);
     }, 30_000);
 
-    it.fails('shows a course just below north as 000° (5-35, checked in the KLN 89 trainer, 2026-10-07, #NEW-7-6)', async () => {
+    it.fails('shows a course just below north as 000° (5-35, checked in the KLN 89 trainer, 2026-10-07, #263)', async () => {
         const unit = await turned90Left();
 
         expect(Screen.read().rows('L')[3]).toBe('OBS:000°   ');

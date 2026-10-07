@@ -88,7 +88,7 @@ describe('OTH 6 page, endurance, range and efficiency (5-41)', () => {
 
     // 5-41: the endurance is shown in hours and minutes, so a minute never reads 60. 49.95 GAL on board at 10 GAL/HR are
     // 4 h 59.7 min; the page may round or truncate, but not show 4:60
-    it.fails('never shows 60 minutes of endurance (5-41, #NEW-1-1)', async () => {
+    it.fails('never shows 60 minutes of endurance (5-41, #223)', async () => {
         await single({fobLb: 299.7, reserve: 0});
 
         expect([' 4:59', ' 5:00']).toContain(Screen.read().rows('L')[2].slice(6));

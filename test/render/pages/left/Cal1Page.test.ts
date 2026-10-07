@@ -113,7 +113,7 @@ describe('CAL 1 temperature entered sign first', () => {
 
     // 5-10, step 5: the first digit makes the temperature negative. Set on 000, the minus is lost when the next digit is
     // turned, so DEN is that of +5 C (9900 ft) while TEMP shows -05. Source of 8700: as for the -5 C test above
-    it.fails('shows DEN 8700ft for -5 C entered sign first (5-10, #NEW-6-3)', async () => {
+    it.fails('shows DEN 8700ft for -5 C entered sign first (5-10, #256)', async () => {
         const unit = await signFirst();
         expect(Screen.read().rows('L')[5]).toBe('DEN  8700ft');
         expect(unit.props.userSettings.getSetting('cal1SAT').get()).toBe(-5);

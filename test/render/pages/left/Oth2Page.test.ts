@@ -62,7 +62,7 @@ describe('OTH 2 page, the Center of the present position (3-52)', () => {
 
     // 3-52: the page left on display follows the present position too; today it keeps the Center it found when it was
     // selected
-    it.fails('names the Center of the new position while the page stays selected (3-52, #NEW-5-3)', async () => {
+    it.fails('names the Center of the new position while the page stays selected (3-52, #251)', async () => {
         const unit = await bootUnit({position: {lat: 47.0, lon: 8.0}, altitudeFt: 0, airspaces: ALPHA_BRAVO()});
         await settle(unit);
         await unit.panel.selectPage('L', 'OTH 2');

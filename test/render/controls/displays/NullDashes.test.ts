@@ -37,12 +37,12 @@ describe('a null value renders as dashes (characterization of the dash layouts)'
     });
 });
 
-// The LongitudeDisplay row is not in the table above: its dashes show the bug below (#NEW-1-2)
+// The LongitudeDisplay row is not in the table above: its dashes show the bug below (#224)
 describe('a null longitude renders as dashes (3-8)', () => {
     // 3-8, figure 3-26 (and a photo of a real unit, reference-photos-index.md, KLN90B 2.jpg): the longitude has three
     // digits of degrees and no blank after the hemisphere letter, so its dashes fill those four cells. The code draws
     // the latitude layout. The sibling is the LatitudeDisplay row of the table above (the same rendering path).
-    it.fails('LongitudeDisplay shows its dashes in the cells of the three degree digits (3-8, #NEW-1-2)', () => {
+    it.fails('LongitudeDisplay shows its dashes in the cells of the three degree digits (3-8, #224)', () => {
         expect(rendered(new LongitudeDisplay(null))).toBe("----°--.--'");
     });
 });

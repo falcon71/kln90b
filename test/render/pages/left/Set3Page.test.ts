@@ -36,7 +36,7 @@ describe('SET 3 page', () => {
 });
 
 describe('SET 3 page (characterization)', () => {
-    // Row 4 is left out: its label is the #NEW-4-4 pin below
+    // Row 4 is left out: its label is the #247 pin below
     it('shows the default criteria with the cursor off', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 3');
@@ -90,7 +90,7 @@ describe('SET 3 minimum runway length (3-22)', () => {
 
     // Figures 3-73 to 3-75 label the surface row SURFACE: with a colon, like MIN LENGTH: above it; Set3Page.tsx renders
     // SURFACE without one. The sibling is the characterization above, which holds the other rows of the page.
-    it.fails('labels the surface row SURFACE: (3-22, #NEW-4-4)', async () => {
+    it.fails('labels the surface row SURFACE: (3-22, #247)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 3');
 

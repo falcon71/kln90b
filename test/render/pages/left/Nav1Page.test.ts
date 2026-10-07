@@ -115,7 +115,7 @@ describe('NAV 1 page', () => {
     // 3-31, 5-7: the ETE is hours and minutes, so the minutes are 00 to 59. 59.7 minutes rounds to 1:00 (the figures of
     // 5-7 round); a unit that truncates would show :59 (the KLN 89 trainer, 2026-10-07, truncates its NAV 1 ETE and
     // never showed :60 across the hour). The code rounds the minutes alone and shows :60.
-    it.fails('never shows 60 minutes in the ETE (3-31, 5-7, #NEW-1-1)', async () => {
+    it.fails('never shows 60 minutes in the ETE (3-31, 5-7, #223)', async () => {
         await onLeg(99.5, 100);
 
         expect(['ETE    1:00', 'ETE     :59']).toContain(Screen.read().rows('L')[4]);
@@ -135,7 +135,7 @@ describe('NAV 1 page', () => {
     // 3-31: DIS fills four cells, tenths below 100 NM and whole NM above (figures 3-97, 5-21). Just below 100 NM the
     // tenths round up to 100.0, five cells, which runs past the edge of the half page (Screen.read() throws on it).
     // Expected: 100 (rounded) or 99.9 (truncated), in the four cells.
-    it.fails('keeps DIS in its four cells just below 100 NM (3-31, #NEW-1-4)', async () => {
+    it.fails('keeps DIS in its four cells just below 100 NM (3-31, #226)', async () => {
         await onLeg(99.97, 145);
 
         expect(['DIS   100nm', 'DIS  99.9nm']).toContain(Screen.read().rows('L')[2]);
@@ -172,7 +172,7 @@ describe('NAV 1 page, direct-to', () => {
     // the waypoint, the symbol (the font's d plus the arrow, docs/architecture.md) directly in front of the ident; a
     // photo of a real unit (reference-photos-index.md, the approach select page) shows it the same way. The code pads
     // the "d" FROM ident to five cells like a waypoint ident, so the d stands in cell 0, four cells away from its arrow.
-    it.fails('draws the Direct To symbol directly in front of the waypoint (3-31, figure 3-97, #NEW-1-5)', async () => {
+    it.fails('draws the Direct To symbol directly in front of the waypoint (3-31, figure 3-97, #227)', async () => {
         await directToKddd();
 
         expect(Screen.read().rows('R')[0]).toBe('    d›KDDD ');
@@ -264,7 +264,7 @@ describe('NAV 1 deviation bar', () => {
     // triangle with the bar at its right edge (TO: Υ, FROM: ζ) and the dot with the bar at its left edge (Α). The FROM
     // case draws both; the TO case drops the second glyph (DeviationBar.ts:72, an operator precedence slip), so half of
     // the bar is missing.
-    it.fails('draws the whole bar next to the TO triangle (3-31, #NEW-1-3)', async () => {
+    it.fails('draws the whole bar next to the TO triangle (3-31, #225)', async () => {
         await leftOfCourse(0.55);
 
         expect(Screen.read().rows('L')[1]).toBe('ηηηηηΥΑηηηη');

@@ -104,7 +104,7 @@ describe('SET 0 page, CLR during the update', () => {
     // 2-5 (the NOTE after step 7): during steps 5 to 7, CLR pressed repeatedly ends the update and brings back the
     // starting SET 0 page of figure 2-2, which has no cursor (ON GROUND ONLY). Set0Page.clear returns false at the first
     // step, so the page stays on UPDATE PUBLISHED DB with the cursor on. The KEY row is not asserted.
-    it.fails('ends the update on the starting page after repeated CLR (2-5, #NEW-4-3)', async () => {
+    it.fails('ends the update on the starting page after repeated CLR (2-5, #246)', async () => {
         const unit = await oneClrFromExpiry();
         await unit.panel.clr();
         await unit.panel.clr();

@@ -258,7 +258,7 @@ describe('FPL 0 page with an approach', () => {
         expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
     });
 
-    it.fails('does not throw on ENT on an approach waypoint (6-7, C-1, #NEW-3-5)', async () => {
+    it.fails('does not throw on ENT on an approach waypoint (6-7, C-1, #243)', async () => {
         const unit = await enterOnApproachWaypoint();
 
         expect(unit.takeRejections()).toEqual([]);
@@ -318,7 +318,7 @@ describe('FPL 0 page, the active leg across a procedure header', () => {
         expect(left().filter(r => r.startsWith('À'))).toEqual(['À 2 IAFAAà ']);
     });
 
-    it.fails('shows the from waypoint with the tail above the header (4-7, 4-8, 6-23, #NEW-3-1)', async () => {
+    it.fails('shows the from waypoint with the tail above the header (4-7, 4-8, 6-23, #239)', async () => {
         const unit = await bootOnTheFirstApproachLeg();
 
         const rows = left();
@@ -560,7 +560,7 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
         await unit.panel.inner('L', 1); // the insert in front of FA29
         expect(left()[5]).toBe(' 31:FA29   '); // Precondition: FA29 moved down to make room, so an insert is open
         if (unit.panel.focused('L').text !== '     ') {
-            // The cursor stays on the waypoint before the new entry (#NEW-3-4); one click moves it on
+            // The cursor stays on the waypoint before the new entry (#242); one click moves it on
             await unit.panel.outer('L', 1);
         }
         expect(unit.panel.focused('L').text).toBe('     '); // Precondition: the cursor is on the new blank entry
@@ -599,7 +599,7 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
     // The refused waypoint stays on the page as a row until the page is left: the entry that held it is not removed
     // from the list. The sibling above holds that the plan itself is unchanged. The cursor is walked over the page: it
     // wraps today (#218), so the walk does not depend on where the cursor stands
-    it.fails('does not show the refused waypoint after FPL FULL (4-4, C-1, #NEW-3-2)', async () => {
+    it.fails('does not show the refused waypoint after FPL FULL (4-4, C-1, #240)', async () => {
         const unit = await insertIntoFullFpl5();
 
         const rows = numbered(await walkRows(unit, 40));
@@ -622,7 +622,7 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
 
     // 4-4: only a plan of fewer than 30 offers a blank position for another waypoint; the KLN 89 trainer (2026-10-07)
     // shows no blank position behind the last waypoint of a full plan and no cursor field there either
-    it.fails('shows no blank position after the 30th waypoint (4-4, checked in the KLN 89 trainer, 2026-10-07, #NEW-3-3)', async () => {
+    it.fails('shows no blank position after the 30th waypoint (4-4, checked in the KLN 89 trainer, 2026-10-07, #241)', async () => {
         const fixes = FIXES31();
         const unit = await bootUnit({facilities: fixes, position: {lat: 46.5, lon: 8}, storage: savedFlightplan(5, fixes.slice(0, 30))});
         await settle(unit);
@@ -680,7 +680,7 @@ describe('inserting a waypoint with the inner knob', () => {
 
     // 4-4 puts the cursor on the entry being typed, whichever plan it is. On a numbered plan with waypoints it stays
     // on the waypoint before the new entry, which is open for typing but not under the cursor
-    it.fails('puts the cursor on the new blank entry when the inner knob opens an insert on a numbered plan (4-4, #NEW-3-4)', async () => {
+    it.fails('puts the cursor on the new blank entry when the inner knob opens an insert on a numbered plan (4-4, #242)', async () => {
         const unit = await cursorOnAbcOfFpl3();
 
         await unit.panel.inner('L', 1);
@@ -712,7 +712,7 @@ describe('FPL 0 page, an ident that is not in the database', () => {
         expect(Screen.read().rows('R')[2]).not.toBe('CREATE NEW '); // Precondition: the right side shows no creation rows yet
     });
 
-    it.fails('offers to create a user waypoint for an unknown ident (4-2, #NEW-7-5)', async () => {
+    it.fails('offers to create a user waypoint for an unknown ident (4-2, #262)', async () => {
         const unit = await cursorOnBlankPosition();
         await unit.panel.enterIdent('L', 'QQQQ');
 
