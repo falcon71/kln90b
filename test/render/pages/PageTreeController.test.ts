@@ -92,8 +92,8 @@ describe('OTH pages of a unit with and without air data and fuel computer (#90)'
 });
 
 
-// 3-12: turning the outer knob onto a page type shows the page of that type that was viewed last ("the CAL page that you
-// last viewed"); the right side works the same way (3-13)
+// 3-12: when the outer knob lands on a page type, the unit shows the page of that type the pilot looked at most recently
+// (the manual's example is a CAL page); the right side works the same way (3-13)
 describe('page memory of the page groups (3-12, 3-13)', () => {
     it('the left outer knob comes back to the CAL page last viewed', async () => {
         const unit = await bootUnit();
@@ -121,20 +121,6 @@ describe('page memory of the page groups (3-12, 3-13)', () => {
         expect(right()).toBe('D/T 3');
     });
 
-    // 3-8: the unit starts with NAV 2 on the left. That page counts as viewed: the group comes back to it, and the inner
-    // knob moves on from it
-    it('counts the NAV 2 page of the start as the NAV page last viewed', async () => {
-        const unit = await bootUnit();
-        expect(left()).toBe('NAV 2');
-
-        await unit.panel.outer('L', 1);
-        await unit.panel.outer('L', -1);
-        expect(left()).toBe('NAV 2');
-
-        await unit.panel.inner('L', 1);
-        expect(left()).toBe('NAV 3');
-    });
-
     // 3-28: the approval of a Direct To shows NAV 1 on the right. 3-12: the NAV group then remembers NAV 1, not the NAV page
     // the right knobs showed before
     it('continues from the NAV 1 page that a Direct To put on the right', async () => {
@@ -156,6 +142,22 @@ describe('page memory of the page groups (3-12, 3-13)', () => {
         await unit.panel.outer('R', 1);
         await unit.panel.outer('R', -1);
         expect(right()).toBe('NAV 2');
+    });
+});
+
+// 3-8 shows NAV 2 on the left at the start, but says nothing about whether the NAV group then counts that page as the
+// one last viewed; that follows from the page memory above and is what the code does
+describe('page memory of the page the unit starts on (characterization)', () => {
+    it('counts the NAV 2 page of the start as the NAV page last viewed', async () => {
+        const unit = await bootUnit();
+        expect(left()).toBe('NAV 2');
+
+        await unit.panel.outer('L', 1);
+        await unit.panel.outer('L', -1);
+        expect(left()).toBe('NAV 2');
+
+        await unit.panel.inner('L', 1);
+        expect(left()).toBe('NAV 3');
     });
 });
 
@@ -236,30 +238,32 @@ describe('pages with several pages of the same number (3-9, 3-10, 3-44)', () => 
 });
 
 // CLAUDE.md: page names are exactly five characters; the status line shows them in its five cells. The prefixes and
-// numbers are the page types of 3-12 and 3-13; a type with a single page has no number (3-9). SET10 is the fictitious
-// settings page (Set10Page.tsx) and ACT names the page of the active waypoint, which is the empty SUP page at the boot.
+// numbers are the page types of 3-12 and 3-13; a type with a single page has no number (3-9). The names the manual does
+// not give (SET 10, the position of SET 0, ACT) are in the characterization describe below.
+const numbered = (type: string, from: number, to: number) =>
+    Array.from({length: to - from + 1}, (_, i) => `${type}${String(from + i).padStart(2, ' ')}`);
+
+/** The name of a page built from each slot, by group */
+async function names(tree: unknown[][]): Promise<string[][]> {
+    const unit = await bootUnit({panelXml: panelXml({airdata: true, fuel: true})});
+    return tree.map(group => group.map(cls => (new (cls as any)(unit.props)).name as string));
+}
+
 describe('page names of the tree slots (3-9, 3-12, 3-13)', () => {
-    const numbered = (type: string, from: number, to: number) =>
-        Array.from({length: to - from + 1}, (_, i) => `${type}${String(from + i).padStart(2, ' ')}`);
-
-    /** The name of a page built from each slot, by group */
-    async function names(tree: unknown[][]): Promise<string[][]> {
-        const unit = await bootUnit({panelXml: panelXml({airdata: true, fuel: true})});
-        return tree.map(group => group.map(cls => (new (cls as any)(unit.props)).name as string));
-    }
-
+    // The SET group has two slots more than the manual's SET 1 to SET 9 (see the characterization below)
     it('names the left pages TRI 0 to OTH10', async () => {
-        expect(await names(LEFT_PAGE_TREE)).toEqual([
+        const left = await names(LEFT_PAGE_TREE);
+        expect([...left.slice(0, 6), left[6].slice(0, 9), left[7]]).toEqual([
             numbered('TRI', 0, 6), numbered('MOD', 1, 2), numbered('FPL', 0, 25), numbered('NAV', 1, 5),
-            numbered('CAL', 1, 7), numbered('STA', 1, 5), [...numbered('SET', 1, 10), 'SET 0'], numbered('OTH', 1, 10),
+            numbered('CAL', 1, 7), numbered('STA', 1, 5), numbered('SET', 1, 9), numbered('OTH', 1, 10),
         ]);
     });
 
-    // The REF group (index 1) is left out here and pinned below
+    // The REF group (index 1) and the ACT group (index 2) are left out here: REF is pinned below, ACT is a characterization
     it('names the right pages CTR 1 to SUP', async () => {
         const right = await names(RIGHT_PAGE_TREE);
-        expect([right[0], ...right.slice(2)]).toEqual([
-            numbered('CTR', 1, 2), ['ACT  '], numbered('D/T', 1, 4), numbered('NAV', 1, 5), numbered('APT', 1, 8),
+        expect([right[0], ...right.slice(3)]).toEqual([
+            numbered('CTR', 1, 2), numbered('D/T', 1, 4), numbered('NAV', 1, 5), numbered('APT', 1, 8),
             ['VOR  '], ['NDB  '], ['INT  '], ['SUP  '],
         ]);
     });
@@ -267,5 +271,17 @@ describe('page names of the tree slots (3-9, 3-12, 3-13)', () => {
     // RefPage.name is "REF " today. The status line pads it (StatusLine.tsx), so the screen shows the five cells anyway
     it.fails('names the REF page with five characters (#NEW-5-1)', async () => {
         expect(await names([[RIGHT_PAGE_TREE[1][0]]])).toEqual([['REF  ']]);
+    });
+});
+
+// The manual lists SET 0 to SET 9 and gives no name for the ACT slot, whose pages vary with the active waypoint. The code
+// has SET 10 (the fictitious settings, Set10Page.tsx), puts SET 0 after it, and names the ACT slot "ACT  "
+describe('page names of the tree slots that the manual does not give (characterization)', () => {
+    it('names the last two SET slots SET10 and SET 0', async () => {
+        expect((await names(LEFT_PAGE_TREE))[6].slice(9)).toEqual(['SET10', 'SET 0']);
+    });
+
+    it('names the ACT slot ACT with two blanks', async () => {
+        expect((await names(RIGHT_PAGE_TREE))[2]).toEqual(['ACT  ']);
     });
 });

@@ -46,8 +46,9 @@ class FakeField implements Field {
         return false;
     }
 
-    keyboard(): boolean {
-        return false;
+    keyboard(key: string): boolean {
+        this.events.push(`keyboard ${key}`);
+        return true;
     }
 
     isEnterAccepted(): boolean {
@@ -141,8 +142,8 @@ describe('CursorController field order (characterization)', () => {
     });
 });
 
-// 4-3 speaks of the outer knob's "full counterclockwise position" on the FPL page, which only makes sense when the cursor
-// stops at the first field. Checked in the KLN 89 trainer (2026-10-07) on FPL 0 and SET 2: turned further, the cursor
+// 4-3 tells the pilot to turn the left outer knob all the way counterclockwise to reach USE? on the FPL page, which only
+// makes sense when the cursor stops at the first field. Checked in the KLN 89 trainer (2026-10-07) on FPL 0 and SET 2: turned further, the cursor
 // stays on the first field counterclockwise and on the last field clockwise, and never wraps. The code wraps both ways
 // (CursorController.ts, outerLeft and outerRight). The trainer's first field is its mode field in the status column,
 // which the 90B does not have, so only the ends of the page's own fields are asserted.
@@ -211,12 +212,28 @@ describe('CursorController outer knob (characterization)', () => {
         expect(a.events).toEqual([]);
         expect(b.events).toEqual(['innerRight', 'innerLeft']);
     });
+
+    // The real unit has no keyboard; the code takes key presses from the sim's keyboard (KeyboardService) and hands them
+    // to the field under the cursor
+    it('hands a key press to the focused field, and nothing when the cursor is off', () => {
+        const a = new FakeField('a');
+        const b = new FakeField('b');
+        const cc = new CursorController(children({a, b}));
+
+        expect(cc.keyboard('X')).toBe(false);
+        cc.setCursorActive(true);
+        cc.outerRight();
+        expect(cc.keyboard('Y')).toBe(true);
+
+        expect(a.events).toEqual([]);
+        expect(b.events).toEqual(['keyboard Y']);
+    });
 });
 
 describe('CursorController cursor on and off', () => {
-    // 4-3: as long as the numbered flight plan page has not been left, the cursor comes back where it was, so the pilot
-    // turns the outer knob back to USE?. The code cites the same section (4.1.2) at setCursorActive.
-    it('comes back on the field it was on when it was turned off (4-3)', () => {
+    // The code remembers the field the cursor was on and puts it back on that field (CursorController.setCursorActive).
+    // The manual does not state this for pages in general, so this is a characterization.
+    it('comes back on the field it was on when it was turned off (characterization)', () => {
         const all = [new FakeField('a'), new FakeField('b'), new FakeField('c')];
         const cc = new CursorController(children({a: all[0], b: all[1], c: all[2]}));
         cc.setCursorActive(true);
