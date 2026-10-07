@@ -89,7 +89,7 @@ change what they mean; add new ones instead:
       stack.
     - `NavCalculator.ts` (1 Hz): DTK/XTK, sequencing and turn anticipation, sim outputs.
     - `ModeController.ts`: ENR/ARM/APR and LEG/OBS modes. OBS is a direct-to from a synthetic waypoint 1000 NM away.
-    - `SidStar.ts`: converts SDK procedures to KLN legs and filters out RNAV procedures.
+    - `SidStar.ts`: converts SDK procedures to KLN legs and filters out procedures with RF legs or RNP AR.
 - **Navdata:** always go through `KLNFacilityLoader`. It merges `KLNFacilityRepository` (user waypoints of *any* type;
   ICAO region `XX` = user, `XY` = temporary) with the sim database.
 - **UI:**

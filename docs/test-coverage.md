@@ -429,7 +429,7 @@ list of `CLAUDE.md`.
 
 ## Session 7: navdata and fragile code
 
-- [ ] done
+- [x] done
 
 **Goal:** the places the architecture notes call fragile, and the navdata layer every page depends on.
 
@@ -452,6 +452,14 @@ list of `CLAUDE.md`.
 
 **Done when:** each item has a test or a log line, and any fragile spot found during the session that is not in this
 list is added to `testing.md` section 6 or 7.
+
+Result (session log, section 4): every item has tests, and what is left has a log line. Item 5 got no sweep of every
+page from every page: the research found the navigation generic over the tree data, so the slot classes, the group
+sizes, the group memory and two existing walks that now fail on a stuck page hold it instead. Item 6 does not wrap: the
+KLN 89 trainer showed the cursor stopping at both ends, so the wrap is a bug (#218). The bugs found were filed and
+pinned (#198, #199, #201 to #206, #208, #211, #212, #216 to #219, #222), two more are filed without a pin (#213, #214), the
+questions are #207, #215, #220 and #221 and the enhancements #200, #209 and #210. #189 and #190 gained pins, and #90,
+#128, #133, #148, #175 and #190 have comments. The fragile spots are in `testing.md` sections 6 and 7.
 
 ## Session 8: pages, left side
 
@@ -533,6 +541,266 @@ lists the gaps.
 One entry per session run, newest first. Format: date, session, branch, what was done, what was left and why, the
 coverage summary for the session's area at start and end. This is a dated record and is never edited afterwards; a
 later run adds a new entry.
+
+## 2026-10-07, session 7, branch `tests-session-7-navdata`
+
+**Done**
+- **Design and plan:** `docs/superpowers/specs/2026-10-07-session-7-navdata-design.md` and the matching plan, after a
+  read-only research pass of six agents in isolated worktrees (A: the loader, the repository and `Database`; B: the
+  nearest lists and the scan list; C: `KLNMagvar`, `BoundaryUtils`, `AirspaceAlert`; D: `Gps.ts`; E: the page tree and
+  the cursor; F: `SidStar`) and a seventh agent on the KLN 89 trainer (below). Eight tasks: a harness task alone, tasks
+  1 to 6 in parallel worktrees, this close-out last.
+- **Task 0, harness:** a 20 s per-test timeout for the two CAL 6 tests of `VolatileMemory.test.ts` (they timed out
+  under load in every research pass and gave false kills); `Leg.HF`, `Leg.HA` and `Leg.PI` in
+  `test/harness/navdata/procedures.ts` with a harness test of every option and default; the `BootOptions` comment on the
+  navdata cycle corrected (the cycle is fixed per test file); `testing.md` on `coldGps` being a hot start, time to
+  first fix with `engineRunning: false` plus `powerOn()`, long render tests and the SDK internals `Gps.ts` reads.
+- **Task 1, the loader, the repository and `Database`:** `KLNFacilityLoader.test.ts` appended (numbers before letters
+  across both sources, 3-21; a user waypoint found only by the search of its type, 3-14; the Duplicate Waypoint order
+  nearest first, 3-15, also with the user waypoint farthest; user waypoints in the nearest lists as a spec test, 5-45;
+  the SET 3 criteria on user airports, 3-22, 3-23), `KLNFacilityRepository.test.ts` (250 waypoints with the
+  temporary `XY` ones counted, 2-8, C-2, 5-22, 5-26; the sync events, the re-key on update, the dump response as
+  characterizations) and `Database.test.ts` (2-3, 3-7, B-2). The `Set0Page.test.ts` row that froze the four-digit year
+  became a pin. Pins #198 (two), #199 (two).
+- **Task 2, the nearest lists and the scan list:** `Scanlist.test.ts` appended (3-21 order, the cache window, the user
+  list after a change, top speed as a characterization), `NearestListSurfaces.test.ts` (every surface of 3-23 with HRD
+  and HRD SFT), `NearestList.test.ts` appended (the hand-over between the nearest and the complete list of 3-22 in a
+  world where nr 1, the last nearest and the start of the complete list are three waypoints; the order after a move;
+  nine entries with a user NDB; the NAV 2 guard of 3-8 and 3-32; the 500 NM radius and the 1 s distance refresh as
+  characterizations), `IntPage.test.ts` appended (the closest VOR, 3-50) and `Apt1Page.test.ts` appended (the scan from
+  an ident without a waypoint, with the trainer's expectation). The #39 tests are unchanged and were re-broken. Pins
+  #201 (two), #202 (two), #203, #204 (three), #205, #206 (two).
+- **Task 3, `KLNMagvar`, `BoundaryUtils`, `AirspaceAlert`:** `KLNMagvar.test.ts` (the southern limit, the true track
+  outside the area and the pilot's variation, 3-1, 5-44, B-2; the variation forgotten inside the area as a
+  characterization), `AirspaceAlert.test.ts` appended at the render stage (the 10-minute rule, the vertical limits and
+  the buffer of 3-41, AGL limits, no altitude input, the type filter, SET 8, the approach modes; once-only and re-alert
+  as characterizations) and new at the unit stage (the type names of 3-39), `BoundaryUtils.test.ts` appended (polygons
+  and paths computed by hand in the lat/lon plane, characterizations). Pins #189, #190 (two), #208. The circle gap of
+  `test/unit/harness/airspaces.test.ts:180` stays as documented and names #209.
+- **Task 4, `Gps.ts`:** `GpsAcquisition.test.ts` (cold and warm starts from a cold-and-dark boot with bounds from 3-5,
+  3-17 and the install manual 2-66, the almanac, the 80 NM and 3000 NM starts, the clock while searching, 3-53, the two
+  GPS messages of B-3 and B-4, the data saved at power-off, eight channels of 5-29, DATA BASE OUT OF DATE on the GPS
+  path, FAST acquisition and the STA 1 snapshot as characterizations) and `Gps.test.ts` (eight channels in the #61
+  test, the 2 kt track limit of 3-32 and 3-35). Pins #211 (three), #212.
+- **Task 5, the page tree and the cursor:** `test/unit/pages/PageTreeController.test.ts` (every slot its own class,
+  none a subclass of another; the group sizes of 3-12 and 3-13), `test/render/pages/PageTreeController.test.ts`
+  appended (the group memory of 3-12 and 3-13 and after a Direct To, 3-28; the ACT group from the trainer; the `+`
+  sub-pages of 3-44; the page names; the start page and the backward step into a `+` page as characterizations),
+  `test/unit/pages/CursorController.test.ts` (field order, read-only fields, 3-11, lists, ENT and the keyboard as
+  characterizations) and `Set2Page.test.ts` appended (3-53). The walks of `PageTreeController.test.ts` and the
+  `PAGE_CYCLES` loop of `selectPage.test.ts` now fail when a page gets stuck or the inner knob does not wrap. Pins #216,
+  #217 (two unit, two render), #218 (two).
+- **Task 6, `SidStar` and the placement in FPL 0:** `SidStar.test.ts` appended (the approach header letters of 6-5, the
+  leg lists of approaches, SIDs and STARs, 6-4 to 6-7 and 6-21 to 6-23, the OBS reminder of B-2, 6-10 and 6-14, the
+  three-arc merge of 6-16 to 6-18, `getVorIfWithin30NMOfArc` with the 30 NM limit of 3-32 and 6-18, the EFB fields as
+  contract tests; the circling and suffix headers, the RF filters and the flag priorities as characterizations; the
+  recalculated arc keeps its end facility), `Apt8Page.test.ts` and `Apt7Page.test.ts` appended (an approach replacing
+  the old one, 6-7; REDUNDANT WPTS, 6-5; a STAR before an approach, 6-23; a SID whose airport is missing, 6-22; FPL FULL
+  during a load as a characterization). Pins #219, #222 (three; the SID one also names #148).
+- **Task 7, this close-out:** the issues and comments below, the placeholders replaced in one commit (`references #198`
+  and on), the `SidStar` line of `CLAUDE.md` (it filters procedures with RF legs or RNP AR, not RNAV procedures, since
+  #59), `testing.md` sections 6 and 7, and this log.
+
+**Rulings**
+- **The maintainer's:**
+    - Circular airspaces: "Enhancement, no pin" (#209).
+    - Almanac age: "Six months, bug + pin" (#212).
+    - The nearest search radius: "Question issue", characterized meanwhile (#207).
+    - Take-home mode: "Unsupported, log only".
+    - Hold shapes in `SidStar`: "F-1 bug, F-2 question" (#219, #220).
+    - FPL FULL during a procedure load: decided by the trainer; with no 90B answer, a characterization and a question
+      (#221).
+    - The trainer: one agent for all trainer work at the end of the research.
+    - The flaky CAL 6 tests: "Fix in harness task".
+    - A second KLN in one aircraft: "File an issue with the `enhancement` tag" (#200).
+    - STA 5 RAIM prediction: "Bug, sim check noted", no pin (#214).
+    - STA 1 states: "Characterize + question" (#215).
+    - The task split, the rulings and the controller's defaults of the design: approved.
+- **The controller's** (the ledger, and the design's defaults that the maintainer did not object to):
+    - user waypoints in the nearest lists are a spec test (5-45), not a characterization;
+    - characterizations without an issue: DME arc entries and EFB temporaries counting toward the 250, the approach
+      header letter R for GPS and the circling and suffix forms, the pilot's variation forgotten inside the area, the
+      INSIDE and ALERT messages staying until read;
+    - one enhancement for the Class B/C and agency lines (#210), and the comments on #90, #133, #175 and #190;
+    - tasks 1 to 6 in parallel worktrees (rule 21 over the skill's sequential default); reports and review packages in
+      the SDD workspace instead of the scratchpad; task 0 in the main checkout;
+    - reviewers ran the mutation pass in the task worktrees (rule 24 over the template's read-only rule);
+    - surviving mutations graded Minor joined the fix rounds anyway (the task 0 builder defaults, the task 1
+      survivors, the task 5 keyboard forwarding), because a survivor is a finding; a verbatim manual quote in a task 5
+      comment and citations left on characterizations (tasks 5 and 6) were raised to Important;
+    - #NEW-6-4 (#222) was added during task 6 and pinned before its review, and its SID variant was folded into the
+      same issue (one room-making path); a close-out search then found the index-0 half of the SID variant in #148, so
+      #148 got a comment and the SID pin names both;
+    - the commit hashes in the titles of the #39 characterizations are not manual citations;
+    - during the close-out: #206 is a new issue with a comment on #128, not a comment alone, because #128 found no
+      observable effect and its suggested fix does not admit a user VOR.
+- **Review fix rounds:** every task needed one, task 5 three. Task 0: the SDK-internals bullet of `testing.md` named
+  the wrong fields, and two builder defaults were unheld. Task 1: a figure cited by its own number instead of its page,
+  the Duplicate Waypoint order surviving a sort from 0/0, and four survivors (the update payload, the dump and the cap
+  with USR only, the type of `getFacilities`). Task 2: the nearest-list world made nr 1, the last nearest and the start
+  of the complete list the same waypoint, so a scan to the wrong one survived; the trainer evidence in a
+  characterization comment; pins without siblings on their own path. Task 3: ABOVE text under a spec title and an
+  unlabeled precondition test. Task 4: the 3000 NM case held the SDK's own 100 NM rule, not the KLN's 60 NM; manual
+  citations above a characterization. Task 5: characterization content under spec titles, the manual quote, weak
+  citations (4-3 for the cursor memory, 3-8 for NAV 2), the unheld keyboard forwarding, then a 3-11 test inside a
+  characterization describe and long lines. Task 6: citations on characterization describes, two wrong pages (6-16 for
+  6-17, 6-22 for 6-21), the 30 NM limit unheld, and the SID variant of #222 pinned.
+
+**Trainer results** (KLN 89 trainer, 2026-10-07; the maintainer started the VM; paraphrased; high confidence)
+- **Cursor wrap:** on FPL 0 and SET 2 the outer knob stops at the first and the last cursor field and never wraps
+  (#218). The 89's first field is its status-column mode field, which the 90B pages do not have.
+- **Scanning from an ident without a match:** the 89 offers no CREATE NEW WPT and scans from the last waypoint the
+  entry matched, to its successor or predecessor; two of four cases told this apart from the typed ident (#202).
+- **FPL FULL during an approach load:** approach waypoints do not count against the 89's 20; the approach loaded whole
+  with 19 and 20 en-route waypoints, without a message (#221).
+- **ACT group memory:** returning to ACT always shows ACT 1, while APT and SET remember their page; a spec test.
+- **Nearest radius:** NRST APT lists only airports within 200 NM and shows `No Nrst` beyond (#207).
+
+**Bugs found and filed** (each after a search of the open and closed issues: the titles of all 197 issues, the bodies
+of #40, #62, #65, #90, #96, #108, #128, #133, #148, #161, #175 and #190, and at least three semantic searches per row,
+paced by the search API's limit of about ten a minute). All were found in the headless harness or by reading the code
+(each issue says which) and none was reproduced in the sim.
+- **#198:** `tryGetFacility` and `getFacilities` reject on an unknown ICAO instead of answering null (the SDK
+  interface; the `"kln90b"` planner's path calculation). Pinned twice in `KLNFacilityLoader.test.ts`.
+- **#199:** the database expiry shows a four-digit year on the Database page and SET 0 (figures 2-4, 3-24, 3-25; a
+  regression of `22b4532`). Pinned in `Database.test.ts` and `Set0Page.test.ts`.
+- **#201:** slow scanning through a list longer than the cache window skips waypoints (637 and 600 of 660; 3-21); sim
+  check noted. Pinned twice in `Scanlist.test.ts`.
+- **#202:** scanning from a typed ident without a waypoint starts from the wrong place (3-21, the trainer). Pinned
+  twice in `Apt1Page.test.ts`.
+- **#203:** after a user waypoint change, scanning back from ABC skips AB (a residual of `d3228dd`; its proof fix also
+  turns the #108 pin red). Pinned in `Scanlist.test.ts`.
+- **#204:** the nearest VOR list leaves out terminal and undefined-class VORs everywhere, not only on NAV 2 (3-22,
+  3-37, 3-49). Pinned three times in `NearestList.test.ts`; the NAV 2 guard turns red under the list-mask change alone.
+- **#205:** HRD SFT leaves out snow runways (3-23). Pinned in `NearestListSurfaces.test.ts`.
+- **#206:** a user VOR is never the nearest VOR, for two causes (the filter line of #128, and `getNearestVor` keeping
+  the last result; 3-50, 5-45; references #173). Pinned in `IntPage.test.ts` and `NearestList.test.ts`.
+- **#208:** `getIntersections` returns the crossing of a closed ring's first edge twice (latent). Pinned in
+  `BoundaryUtils.test.ts`.
+- **#211:** a warm start with REAL acquisition takes about 6 minutes: the almanac check reads SDK fields that moved in
+  2.3.3, and the first tick after power-on runs an hour behind (3-8, 3-17, install manual 2-66). Pinned three times in
+  `GpsAcquisition.test.ts`.
+- **#212:** the almanac expires after 90 days instead of six months (3-17); turns red only together with the #211 fix.
+  Pinned in `GpsAcquisition.test.ts`.
+- **#213 (no pin):** STA 1 shows a below-horizon satellite with a high elevation during a sky search (5-30); Session 9.
+- **#214 (no pin):** the STA 5 RAIM prediction computes every offset for now and here since SDK 2.3.3 (6-19, 6-20);
+  sim check noted; Session 9.
+- **#216:** the REF page name has four characters. Pinned in `test/render/pages/PageTreeController.test.ts`.
+- **#217:** SET 2 throws on every display tick when the first fix comes while the cursor is on, or was on, the time
+  (3-53). Pinned twice in `CursorController.test.ts` and twice in `Set2Page.test.ts`.
+- **#218:** the cursor wraps at both ends (4-3, the trainer); the issue warns that ENT moves on through `outerRight`.
+  Pinned twice in `CursorController.test.ts`.
+- **#219:** `IF X` (IAF) followed by `HF X` or `PI X` loses the IF REQUIRED SELECT OBS reminder (B-2, 6-10). Pinned in
+  `SidStar.test.ts`.
+- **#222:** a procedure loaded into a full FPL 0 lands out of order when the unit makes room (6-5, 6-7, 6-22, 6-23).
+  Pinned in `Apt8Page.test.ts` and twice in `Apt7Page.test.ts`.
+- **#207 (`question`):** the nearest search radius, 500 NM and 100 NM against the 89's 200 NM.
+- **#215 (`question`):** the STA 1 states INIT or STS, TRAN, NAV A.
+- **#220 (`question`):** the missed approach holding point after a MAHP-flagged DF; the drafted pin is not committed.
+- **#221 (`question`):** FPL FULL during a procedure load, with the trainer evidence.
+- **#200 (`enhancement`):** a second KLN 90B in one aircraft (the repository sync handles single facilities only).
+- **#209 (`enhancement`):** circular airspaces, with the share of circles in AIRAC 2607.
+- **#210 (`enhancement`):** the Class B/C reference to APT 4 and the controlling agency line (figures 3-125, 3-126).
+- **Comments:** #90 and #133 (the controller prunes the module-level right tree, which every ACT visit and every
+  waypoint confirmation hands to a new controller, so a fix must copy the tree; the inverted `!vfrOnly` condition),
+  #128 (its line has an effect after all, #206), #148 (the APT 7 SID path, and why its suggested fix is not enough),
+  #175 (the reproduction on the GPS path) and #190 (the OBS course is magnetic too; 5-35 against 5-44 for an active
+  VOR outside the area).
+- **Not filed:** the sim's own `FacilityRepository` may bring other avionics' user waypoints into the SUP list and the
+  waypoint entry (needs a sim check); take-home mode (unsupported).
+
+**Fixes that could not be re-broken:** none failed to re-break. The #39 tests failed under all five of their recorded
+breaks, the #57 heliport filter, #61 (now also with eight channels), #63 and the #90 walks under theirs. Two things stay
+unproven: the `fac === undefined` guard of `WaypointPage.tsx:218` (as Session 3b recorded), and the CAL 6 timeout of
+task 0, because the flake never reproduced on demand before or after it.
+
+**The coverage of the area hid unheld code.** The research found that one-line breaks left the whole suite green in
+every module of the session: about 45 in `SidStar` (every hold and procedure-turn type of the OBS reminder, the header
+letters, the SID and STAR labels, three EFB fields, the three-arc merge, `getVorIfWithin30NMOfArc`); 38 in `KLNMagvar`,
+`BoundaryUtils` and `AirspaceAlert` together (the suite held only the floor buffer sign, the INSIDE message and the
+10 s interval); over 20 in `Gps.ts` (the #61 test's `every()` checks passed on an empty channel list); five in
+`PageTreeController` (the group memory, both `+` steps, NAV 2 after a direct-to; the walks passed a stuck last page);
+user waypoints dropped from every nearest list, the All search finding SUP only, the Duplicate Waypoint order, the SET
+3 filter on user airports, the update sync and the `XY` count in the loader and the repository; the nine-entry slice,
+the 1 s update, the terminal filter, `findClosest`, the top speed and `waypointsChanged` in the nearest lists and the
+scan list. `SidStar.ts` was at 94.8 % statements and `NearestList.ts` at 98.3 %; the number said what ran, not what
+was held (section 1).
+
+**Not covered** (rule 18; the ledger is not committed, so the list is complete here)
+- Take-home mode (`Gps.ts:154-165`): unsupported and untested by decision (`testing.md` section 7).
+- The force-ready SYSTEM TIME UPDATED message on every engine-running boot (Session 10); the self-test date entry
+  without `timeUpdatedEvent` (Session 10, #175).
+- The SET 2 magnetic variation editor (Session 8; the tests write the store), STA 1 beyond the snapshot, STA 2, STA 5
+  (#214, the harness cannot initialize a primary computer), `getMagvarForCoordinates` on TRI 3 and D/T 3 (Sessions 8
+  and 9).
+- Loader and repository: an exact repository match unshifted or pushed (equivalent after the stable sort); the type
+  `getFacilities` passes down (unobservable with `MemoryFacilityClient`, which ignores it; `testing.md` sections 6 and
+  7); `getFacilitiesOfType`; the nearest session for INT and USR throwing; `setVorFilter` beyond #206; the repository
+  hearing its own sync (equivalent with one instrument); the repository search radius; the other avionics' user
+  waypoints through the SDK `FacilityRepository` (needs the sim).
+- Nearest lists and scan list: `findClosest` (its drafts were dropped after the trainer); VORTAC, the low-altitude
+  class and the DME-only, TACAN and VOT exclusions; the `ShortGrass` mask; the `getNearestVor` radius (#207) and its
+  stale value on `removed`; `isCalculating` (the fake answers synchronously); the removal by reference
+  (`NearestList.ts:89`, needs a cloning fake); the tie order; the NR display while the GPS is invalid; `rebuildIndex`
+  with more than 1000 entries of the last letter; the cache pruning at both ends and `waypointsChanged` without
+  `rebuildIndex`; `changeFacility` not syncing the scan list; the 3-23 note on the primary database area.
+- `KLNMagvar`, `BoundaryUtils`, `AirspaceAlert`: the exact 74.0 N and 60.0 S boundary; points on an edge or vertex;
+  the empty-LOD returns; the GPS-invalid gate of the alert; an airspace leaving the 100 NM search; multi-shape
+  boundaries and arcs drawn as chords; circles (#209); the INSIDE message after a vertical exit.
+- `Gps.ts`: the random acquisition range; `coords = pos` in `gpsAcquired`; the `simTime` and `gps-position` publishes
+  (dead with SDK 2.3.3); DEGRD, FAILR, RAIM and three satellites plus altitude (not modeled); the acquisition timeout
+  (with 1 minute instead of 4 the cold-start tests stay green inside their wide bounds; only the warm-start pins turn
+  red, for the wrong reason, which their comment warns about).
+- Page tree and cursor: `WaypointConfirmPage`'s own tree navigation; the group memory over a power cycle; two-digit
+  `+` names (latent); the #90/#133 traps (comments only); ENT on the last cursor field (#218); the dead `fields` array
+  and the `Oth3Page` subscription (#96; `testing.md` section 7).
+- `SidStar`: RF legs in `isLegSupported` (equivalent through the pages); the MAP/FAF and MAHP/IAF flag priorities on
+  one leg (no real case); arc names beyond 99 NM (#107); the suffix glyphs (FPL 0 render, Session 8); the arc entry
+  at the arc start (harness tests only); line 109 (unreachable); FPL FULL through APT 7 (the APT 8 path is held).
+- Review notes left as they are: the pre-existing describe at `test/render/data/navdata/AirspaceAlert.test.ts:28-45`
+  (`0260b19`) holds four unlabeled tests; the describe comments of two mixed `KLNMagvar` describes and of the GPS
+  power-off describe still mention pages; several comment lines in the task 5 files exceed 120 characters; the SET 0
+  date padding is held only by the #199 pin; "3000 NM" in a test title is about 2850 NM.
+
+**Workflow notes.** The isolation worktrees again started at `origin/main` and were reset to the session branch first.
+Task 0 ran alone in the main checkout; tasks 1 to 6 ran in parallel on Sonnet, merged in the order 1, 5, 3, 4, 2, 6;
+the close-out (task 7) ran on Opus in the main checkout, because it needed GitHub. Reviewers ran on Opus for tasks 4
+and 6 and on Sonnet for the others; re-reviews on Sonnet. The research agents had seen the CAL 6 tests time out under
+load in many mutation runs; task 0 could not make them time out on demand, before or after its fix. The GitHub semantic
+search allows about ten searches a minute, so the close-out paced them between the filings.
+
+**Coverage at the start of the session** (identical to the end of session 6, measured again) **and at the end** (all
+tests green):
+
+| directory                  | % stmts start | % stmts end | % lines start | % lines end |
+|----------------------------|--------------:|------------:|--------------:|------------:|
+| all files                  |         78.09 |       79.40 |         77.99 |       79.29 |
+| `kln90b`                   |         85.98 |       86.75 |         85.73 |       86.51 |
+| `kln90b/controls`          |         82.46 |       83.09 |         82.10 |       82.74 |
+| `kln90b/controls/displays` |         86.01 |       86.01 |         85.71 |       85.71 |
+| `kln90b/controls/editors`  |         83.15 |       83.15 |         82.58 |       82.58 |
+| `kln90b/controls/selects`  |         63.45 |       63.45 |         61.75 |       61.75 |
+| `kln90b/data`              |         98.09 |       99.18 |         98.30 |       99.15 |
+| `kln90b/data/flightplan`   |         98.91 |       98.91 |         98.87 |       98.87 |
+| `kln90b/data/navdata`      |         87.29 |       94.00 |         87.20 |       93.79 |
+| `kln90b/pages`             |         79.02 |       79.77 |         78.75 |       79.51 |
+| `kln90b/pages/left`        |         70.20 |       70.95 |         70.39 |       71.15 |
+| `kln90b/pages/right`       |         66.15 |       67.65 |         66.82 |       68.36 |
+| `kln90b/services`          |         88.40 |       88.40 |         88.22 |       88.22 |
+| `kln90b/settings`          |         96.56 |       96.56 |         96.41 |       96.41 |
+
+The files of the area, statements at the start (from the design) and at the end: `KLNFacilityRepository.ts` 64.5 and
+80.0, `KLNFacilityLoader.ts` 74.2 and 85.6, `AirspaceAlert.ts` 76.5 and 97.5, `Scanlist.ts` 85.5 and 93.3,
+`NearestUtils.ts` 90.9 and 90.9, `CursorController.ts` 91.8 and 98.0, `BoundaryUtils.ts` 92.1 and 93.4, `Gps.ts` 92.1
+and 92.1 (the rest is take-home mode), `SidStar.ts` 94.8 and 99.6, `NearestList.ts` 98.3 and 98.3,
+`PageTreeController.ts` 98.4 and 98.4, and 100 and 100 for `Database.ts` and `KLNMagvar.ts`. `MessageHandler.ts` went
+from 84.6 to 100 (the AIRSPACE ALERT message class now runs). Read the rise with care (section 1, and the paragraph on
+unheld code above): most of this session's tests hold code that was already counted as covered.
+
+The suite at the start: 1172 tests passed and 120 expected failures, in 178 files. At the end: 1411 tests passed and
+154 expected failures, in 186 files. The thirty-four new expected failures are pins: #189, #190 (two), #198 (two),
+#199 (two), #201 (two), #202 (two), #203, #204 (three), #205, #206 (two), #208, #211 (three), #212, #216, #217 (four),
+#218 (two), #219 and #222 (three).
 
 ## 2026-10-06, session 6, branch `tests-session-6-data-services`
 

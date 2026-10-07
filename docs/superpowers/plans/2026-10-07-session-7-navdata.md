@@ -1,7 +1,7 @@
 # Session 7 (navdata and fragile code): implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers-extended-cc:subagent-driven-development (recommended)
-> or superpowers-extended-cc:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`)
+> or superpowers-extended-cc:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`)
 > syntax for tracking.
 
 **Goal:** Tests that hold the navdata layer and the fragile code: the facility loader and repository, `Database`, the
@@ -183,20 +183,20 @@ the navdata cycle, and add the session's harness notes to `testing.md`.
 - Modify: `docs/testing.md` (sections 3 "Procedures", 4 "Render", 6)
 
 **Acceptance Criteria:**
-- [ ] The two CAL 6 tests carry a per-test timeout of 20 000 ms; nothing else in the file changes.
-- [ ] `Leg.HF`, `Leg.HA` and `Leg.PI` exist with the signature of `Leg.HM`, and the harness test asserts each option of
+- [x] The two CAL 6 tests carry a per-test timeout of 20 000 ms; nothing else in the file changes.
+- [x] `Leg.HF`, `Leg.HA` and `Leg.PI` exist with the signature of `Leg.HM`, and the harness test asserts each option of
       each builder with a non-default value.
-- [ ] The `start` comment of `BootOptions` no longer says that a test can set the navdata cycle; it says the cycle is
+- [x] The `start` comment of `BootOptions` no longer says that a test can set the navdata cycle; it says the cycle is
       fixed per test file.
-- [ ] `testing.md` documents: `coldGps` is a hot start and time to first fix needs `engineRunning: false` plus
+- [x] `testing.md` documents: `coldGps` is a hot start and time to first fix needs `engineRunning: false` plus
       `powerOn()`; long render tests need a per-test timeout; the SDK internals `Gps.ts` reads; the new builders.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: the CAL 6 timeout.** In `test/render/data/VolatileMemory.test.ts` give both tests of
+- [x] **Step 1: the CAL 6 timeout.** In `test/render/data/VolatileMemory.test.ts` give both tests of
   `describe('CAL 6 time (5-14)')` a third argument, as `test/render/harness/power.test.ts:120` does:
 
 ```ts
@@ -210,7 +210,7 @@ the navdata cycle, and add the session's harness notes to `testing.md`.
   terminals); before the change a timeout is likely, after it none. Record the result in the report (a flake fix has no
   break to run).
 
-- [ ] **Step 2: write the failing builder test.** In `test/unit/harness/procedures.test.ts`, inside
+- [x] **Step 2: write the failing builder test.** In `test/unit/harness/procedures.test.ts`, inside
   `'passes the options of a leg into it'`, add (`LegType` imported from `@microsoft/msfs-sdk`):
 
 ```ts
@@ -223,7 +223,7 @@ the navdata cycle, and add the session's harness notes to `testing.md`.
 
   Run `npx vitest run test/unit/harness/procedures.test.ts`: it fails (`Leg.HF is not a function`).
 
-- [ ] **Step 3: add the builders.** In `test/harness/navdata/procedures.ts`, after `HM`:
+- [x] **Step 3: add the builders.** In `test/harness/navdata/procedures.ts`, after `HM`:
 
 ```ts
     HF: (fix: Fix, inboundMag: number, turn = LegTurnDirection.Right, flags = 0) =>
@@ -237,7 +237,7 @@ the navdata cycle, and add the session's harness notes to `testing.md`.
 
   Run the test again: it passes. Break each builder once (drop `turnDirection`, pass `LegType.HM`) and see it fail.
 
-- [ ] **Step 4: the boot comment.** Replace the `start` comment in `test/harness/boot.ts` with:
+- [x] **Step 4: the boot comment.** Replace the `start` comment in `test/harness/boot.ts` with:
 
 ```ts
     /**
@@ -248,7 +248,7 @@ the navdata cycle, and add the session's harness notes to `testing.md`.
      */
 ```
 
-- [ ] **Step 5: `testing.md`.**
+- [x] **Step 5: `testing.md`.**
     - Section 3 "Procedures", first bullet: add `Leg.HF`, `Leg.HA`, `Leg.PI` (holds and a procedure turn, same
       arguments as `Leg.HM`) to the list.
     - Section 4 "Render", after the `settle` bullet, a new bullet: **Time to first fix.** `bootUnit({coldGps: true})`
@@ -266,7 +266,7 @@ the navdata cycle, and add the session's harness notes to `testing.md`.
       `activeSimulationContext` without a type error (the reads go through `as any`); after an upgrade run
       `test/render/GpsAcquisition.test.ts` first (task 4 adds it).
 
-- [ ] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/render/data/VolatileMemory.test.ts", "test/harness/navdata/procedures.ts", "test/unit/harness/procedures.test.ts", "test/harness/boot.ts", "docs/testing.md"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["CAL 6 tests have a 20 s per-test timeout", "Leg.HF/HA/PI exist with HM's signature and a harness test of every option", "BootOptions start comment corrected", "testing.md documents coldGps hot start, long-test timeout, Gps SDK internals, the builders", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -286,25 +286,25 @@ and the `Set0Page` row that freezes `#NEW-1-2` turned into a pin.
 - Modify: `test/render/pages/left/Set0Page.test.ts:41-42`
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] User waypoints in the nearest lists are a spec test citing 5-45; the `removed` bookkeeping stays a
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] User waypoints in the nearest lists are a spec test citing 5-45; the `removed` bookkeeping stays a
       characterization.
-- [ ] `#NEW-1-1` and `#NEW-1-2` turn red under their fixes; each has a passing sibling.
-- [ ] `Set0Page.test.ts` no longer asserts the four-digit year: the row is a `#NEW-1-2` pin, and the rest of the
+- [x] `#NEW-1-1` and `#NEW-1-2` turn red under their fixes; each has a passing sibling.
+- [x] `Set0Page.test.ts` no longer asserts the four-digit year: the row is a `#NEW-1-2` pin, and the rest of the
       snapshot stays a characterization.
-- [ ] The dump-response characterization carries the comment `// a second KLN 90B in one aircraft: #NEW-1-3`.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] The dump-response characterization carries the comment `// a second KLN 90B in one aircraft: #NEW-1-3`.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the drafts.** Read `research-A.md` sections 1 to 3. Copy
+- [x] **Step 1: start from the drafts.** Read `research-A.md` sections 1 to 3. Copy
   `research\drafts-A\test\unit\data\navdata\{KLNFacilityLoader,KLNFacilityRepository,Database}.test.ts` to the same
   paths (the loader draft is the existing file with the new tests appended). Rename `#NEW-A-1` to `#NEW-1-1` and
   `#NEW-A-2` to `#NEW-1-2`.
 
-- [ ] **Step 2: the loader** (`research-A.md` section 1, the table "Proposed tests"). Keep the drafts with these
+- [x] **Step 2: the loader** (`research-A.md` section 1, the table "Proposed tests"). Keep the drafts with these
   labels and literals:
     - numbers before letters across both sources (3-21): user K98, KAAF and database K99, KAAB; Airport search `K` →
       `K98 A XX, K99 A, KAAB A, KAAF A XX`.
@@ -327,7 +327,7 @@ and the `Set0Page` row that freezes `#NEW-1-2` turned into a pin.
       asphalt, UNEW length -10 → HRD 2000 `[UHRD]`; HRD SFT 2000 `[UHRD, USFT]`; HRD 1800 `[UHRD, USHT]`; HRD SFT 1000
       `[UHRD, USFT, USHT]`.
 
-- [ ] **Step 3: the repository** (`research-A.md` section 2). New file; `beforeEach` clears the singleton, makes a new
+- [x] **Step 3: the repository** (`research-A.md` section 2). New file; `beforeEach` clears the singleton, makes a new
   bus and collects the sync topic.
     - holds 250 and refuses the 251st (2-8, C-2).
     - temporary waypoints count toward the 250 (5-22, 5-26): 249 `XX` and one `XY`, the next `XX` add throws.
@@ -340,7 +340,7 @@ and the `Set0Page` row that freezes `#NEW-1-2` turned into a pin.
     - answers another instrument's dump request (characterization), with the comment
       `// a second KLN 90B in one aircraft: #NEW-1-3`.
 
-- [ ] **Step 4: Database** (`research-A.md` section 3). New file; `beforeEach` clears `databaseCycleCache` and resets
+- [x] **Step 4: Database** (`research-A.md` section 3). New file; `beforeEach` clears `databaseCycleCache` and resets
   the sim; the game var `MAY14JUN11/26`.
     - current from 14 MAY 00:01 through 10 JUN 23:59 (2-3).
     - out of date from 11 JUN 00:01 and on 2027-01-01 (2-3).
@@ -350,14 +350,14 @@ and the `Set0Page` row that freezes `#NEW-1-2` turned into a pin.
       `Database.ts:18`. Sibling: the "last valid day" test.
     - DATA BASE OUT OF DATE posted for a time past the expiry, not for a time inside the cycle (B-2).
 
-- [ ] **Step 5: `Set0Page.test.ts`.** Lines 41-42 assert `'       11 JUN 2026'` inside a characterization. Take that row
+- [x] **Step 5: `Set0Page.test.ts`.** Lines 41-42 assert `'       11 JUN 2026'` inside a characterization. Take that row
   out of the characterization (assert the other rows as before), and add next to it
   `it.fails('shows the database expiry with a two-digit year (3-7, #NEW-1-2)')` asserting the row with `11 JUN 26`.
   Work out the expected padding from the figures 3-24 and 3-25 (the date centered as in the figure) and say in the
   report which column you chose and why. Prove: the `{YY}` fix turns both `#NEW-1-2` pins red; if the padding differs
   after the fix, assert the padding the figure shows and note it in the report.
 
-- [ ] **Step 6: verify and commit.** Run `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 6: verify and commit.** Run `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/unit/data/navdata/KLNFacilityLoader.test.ts", "test/unit/data/navdata/KLNFacilityRepository.test.ts", "test/unit/data/navdata/Database.test.ts", "test/render/pages/left/Set0Page.test.ts"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "user waypoints in nearest lists are a spec test (5-45)", "pins #NEW-1-1 and #NEW-1-2 turn red under their fixes, each with a sibling", "Set0Page four-digit year row is a #NEW-1-2 pin", "dump-response characterization cites #NEW-1-3", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -378,25 +378,25 @@ characterization, and the pins `#NEW-2-1` to `#NEW-2-6`, with `#NEW-2-2` asserti
 - Modify or create: `test/render/pages/right/Apt1Page.test.ts` (the `#NEW-2-2` pins, see step 5)
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] The pins `#NEW-2-1` to `#NEW-2-6` turn red under their fixes; each has a passing sibling.
-- [ ] `#NEW-2-2` asserts the successor and the predecessor of the last waypoint the ident entry matched, not of the
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] The pins `#NEW-2-1` to `#NEW-2-6` turn red under their fixes; each has a passing sibling.
+- [x] `#NEW-2-2` asserts the successor and the predecessor of the last waypoint the ident entry matched, not of the
       typed ident, citing 3-21 and the KLN 89 trainer.
-- [ ] The NAV 2 test shows the nearest low or high VOR, not a nearer terminal one (3-8, 3-32), and fails when Terminal
+- [x] The NAV 2 test shows the nearest low or high VOR, not a nearer terminal one (3-8, 3-32), and fails when Terminal
       joins the list mask.
-- [ ] The radius characterization carries the comment `// the radius is a question: #NEW-2-7`.
-- [ ] The #39 tests of `Apt1Page.test.ts` are unchanged and still pass.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] The radius characterization carries the comment `// the radius is a question: #NEW-2-7`.
+- [x] The #39 tests of `Apt1Page.test.ts` are unchanged and still pass.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the drafts.** Read `research-B.md` sections 0 to 4. The drafts are in
+- [x] **Step 1: start from the drafts.** Read `research-B.md` sections 0 to 4. The drafts are in
   `research\drafts-B\test\…`. Merge them into the existing files the Files list names (one `describe` per draft file
   where that reads better), and rename `#NEW-B-n` to `#NEW-2-n`.
 
-- [ ] **Step 2: nearest lists** (`research-B.md` 3.1 to 3.8).
+- [x] **Step 2: nearest lists** (`research-B.md` 3.1 to 3.8).
     - puts the nearer NDB first after the aircraft moved (3-22): NAA 47.05 N, NBB 46.9 N, aircraft 47.0/8.0, then
       46.92 → `[' NBB   nr 1', ' NAA   nr 2']`. Break: the sort removed.
     - holds nine NDBs, the user NDB first (3-22, 5-45): NA0..NA8 from 47.05 N 0.05° apart, user QQ (XX) 47.01 N →
@@ -418,7 +418,7 @@ characterization, and the pins `#NEW-2-1` to `#NEW-2-6`, with `#NEW-2-2` asserti
       added results in `NearestUtils.getNearestVor`). Siblings: `takes the closest VOR` and `takes a closer terminal VOR`
       (3-50).
 
-- [ ] **Step 3: the scan list** (`research-B.md` 3.10).
+- [x] **Step 3: the scan list** (`research-B.md` 3.10).
     - scans from K98 to KAAF and back (3-21).
     - the nearest list in front of the complete list on the NDB page (3-22): counterclockwise from the start of the
       complete list `' NCC   nr 3'`; at nr 1 it stays; clockwise from the last nearest the start of the complete list;
@@ -432,11 +432,11 @@ characterization, and the pins `#NEW-2-1` to `#NEW-2-6`, with `#NEW-2-2` asserti
       the same before any change. Fix: refill backwards from the first letter (it also turns #108 red; say so in the
       report).
 
-- [ ] **Step 4: #39.** Run the #39 tests of `Apt1Page.test.ts` against two of their recorded breaks (the `index > -1`
+- [x] **Step 4: #39.** Run the #39 tests of `Apt1Page.test.ts` against two of their recorded breaks (the `index > -1`
   guard of `scanLeft`, and the removed entry not spliced in `NearestList.ts:91`) and record the result. No change to
   them.
 
-- [ ] **Step 5: `#NEW-2-2` with the trainer's expectation.** The research draft asserted the waypoint after the typed
+- [x] **Step 5: `#NEW-2-2` with the trainer's expectation.** The research draft asserted the waypoint after the typed
   ident; the KLN 89 trainer scans from the **last waypoint the ident entry matched** (checked in the KLN 89 trainer,
   2026-10-07: clockwise to its successor, counterclockwise to its predecessor). Write it at the render stage on APT 1:
     - World: airports KAAA, KBBB, KCCC, KDDD (invented, a few NM apart).
@@ -454,7 +454,7 @@ characterization, and the pins `#NEW-2-1` to `#NEW-2-6`, with `#NEW-2-2` asserti
     - Keep the research's unit draft for `findClosest` only if it asserts something the trainer result still supports;
       otherwise leave it out and say why.
 
-- [ ] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/unit/data/navdata/Scanlist.test.ts", "test/unit/data/navdata/NearestListSurfaces.test.ts", "test/render/data/navdata/NearestList.test.ts", "test/render/pages/right/IntPage.test.ts", "test/render/pages/right/Apt1Page.test.ts"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "pins #NEW-2-1..6 turn red under their fixes, each with a sibling", "#NEW-2-2 asserts the trainer's last-match behavior", "NAV 2 terminal-VOR guard fails when Terminal joins the list mask", "radius characterization cites #NEW-2-7", "#39 tests unchanged and passing", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -475,23 +475,23 @@ characterization, and the pins `#NEW-2-1` to `#NEW-2-6`, with `#NEW-2-2` asserti
 - Modify: `test/unit/harness/airspaces.test.ts:180` (a comment only)
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] The #189 pin and the two #190 pins turn red under their temporary fixes; each has passing siblings for the setup.
-- [ ] `#NEW-3-1` turns red under its fix.
-- [ ] No circle pin is committed; `airspaces.test.ts:180` keeps its assertion and gains the comment
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] The #189 pin and the two #190 pins turn red under their temporary fixes; each has passing siblings for the setup.
+- [x] `#NEW-3-1` turns red under its fix.
+- [x] No circle pin is committed; `airspaces.test.ts:180` keeps its assertion and gains the comment
       `// circular airspaces are not implemented: #NEW-3-2`.
-- [ ] `BoundaryUtils` tests say in the file that the expectations are hand-computed in the lat/lon plane.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] `BoundaryUtils` tests say in the file that the expectations are hand-computed in the lat/lon plane.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the drafts.** Read `research-C.md` sections 1 to 3. The drafts are in
+- [x] **Step 1: start from the drafts.** Read `research-C.md` sections 1 to 3. The drafts are in
   `research\drafts-C\test\…`. Leave out every circle test (`#NEW-C-2`: the unit pair and the render pin). Rename
   `#NEW-C-1` to `#NEW-3-1`.
 
-- [ ] **Step 2: KLNMagvar** (`research-C.md` section 1; render, `bootUnit({magvar: 10})`).
+- [x] **Step 2: KLNMagvar** (`research-C.md` section 1; render, `bootUnit({magvar: 10})`).
     - MAGNETIC VAR INVALID at S 60.5, not at S 59.5 (3-1, 5-44, B-2); the negative case also asserts the list is live.
     - the track true outside the area (5-44): settle at N 73.5, track 090 at 120 kt, NAV 3 `'TK     080°'`, then N 74.5:
       `'TK     090°'`.
@@ -507,7 +507,7 @@ characterization, and the pins `#NEW-2-1` to `#NEW-2-6`, with `#NEW-2-2` asserti
         - Fix: in `isMagvarValid`, false in ENR_OBS and ARM_OBS when the active waypoint is above 74 or below -60
           (`research\drafts-C\proof-190.json`).
 
-- [ ] **Step 3: BoundaryUtils** (`research-C.md` section 2; unit). Header comment: the expectations are hand-computed in
+- [x] **Step 3: BoundaryUtils** (`research-C.md` section 2; unit). Header comment: the expectations are hand-computed in
   the lat/lon plane, the plane the code works in; cases keep 0.1° from the edges, crossings sit on meridian edges.
     - `isInside` on a U open to the north, on a diamond with corners on 47.5 N, on a triangle (characterization, with
       independent expectations; no manual page).
@@ -518,7 +518,7 @@ characterization, and the pins `#NEW-2-1` to `#NEW-2-6`, with `#NEW-2-2` asserti
       `for (current = 0; current < lod.length - 1; current++)` with `next = current + 1` (`BoundaryUtils.ts:121-122`).
       Sibling: the set test above.
 
-- [ ] **Step 4: AirspaceAlert** (`research-C.md` section 3; render). Aircraft 47 N 8 E, 1200 ft, `moveAircraft` at
+- [x] **Step 4: AirspaceAlert** (`research-C.md` section 3; render). Aircraft 47 N 8 E, 1200 ft, `moveAircraft` at
   120 kt, then 12 s; limits 1000-18000 ft; `sua(unit)` = the MSG entries containing `AIRSPACE`, joined per message.
   Every row of the table "Proposed tests" except the circle pin, with its label as the table gives it:
     - spec rows: alerts 5 minutes before (3-40, B-1); the name, type and limits on the MSG page (3-39, figure 3-125);
@@ -535,10 +535,10 @@ characterization, and the pins `#NEW-2-1` to `#NEW-2-6`, with `#NEW-2-2` asserti
       directions crosses the boundary).
     - Unit, `AirspaceAlert.test.ts`: the type names of the nine SDK types (3-39), `it.each`.
 
-- [ ] **Step 5: the circle gap.** Add `// circular airspaces are not implemented: #NEW-3-2` above the assertion at
+- [x] **Step 5: the circle gap.** Add `// circular airspaces are not implemented: #NEW-3-2` above the assertion at
   `test/unit/harness/airspaces.test.ts:180`. Do not change the assertion.
 
-- [ ] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 6: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/render/data/navdata/KLNMagvar.test.ts", "test/render/data/navdata/AirspaceAlert.test.ts", "test/unit/data/navdata/BoundaryUtils.test.ts", "test/unit/data/navdata/AirspaceAlert.test.ts", "test/unit/harness/airspaces.test.ts"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "#189 and #190 pins turn red under their fixes, with siblings", "#NEW-3-1 turns red under its fix", "no circle pin; airspaces.test.ts:180 cites #NEW-3-2", "BoundaryUtils tests state the lat/lon plane method", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -557,23 +557,23 @@ list, the STA 1 state as a characterization, and the pins `#NEW-4-1` (three) and
 - Modify: `test/render/Gps.test.ts` (the #61 test: `toHaveLength(8)`; the 2 kt tests)
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] The three `#NEW-4-1` pins turn red with the fix of `research-D.md` section 0 (fix 1 and 2); `#NEW-4-2` turns red
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] The three `#NEW-4-1` pins turn red with the fix of `research-D.md` section 0 (fix 1 and 2); `#NEW-4-2` turns red
       with that fix plus `almanacExpireTime` at 182 days; each has a passing sibling.
-- [ ] The cold-start lower bounds are 180 s, not 120 s.
-- [ ] The #61 test asserts eight channels, so an empty channel list fails it.
-- [ ] The STA 1 snapshot is a characterization with the comment `// the receiver states are a question: #NEW-4-5`.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] The cold-start lower bounds are 180 s, not 120 s.
+- [x] The #61 test asserts eight channels, so an empty channel list fails it.
+- [x] The STA 1 snapshot is a characterization with the comment `// the receiver states are a question: #NEW-4-5`.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the draft.** Read `research-D.md` sections 0 to 2. Copy
+- [x] **Step 1: start from the draft.** Read `research-D.md` sections 0 to 2. Copy
   `research\drafts-D\test\render\GpsAcquisition.test.ts` to the same path. Rename `#NEW-D-1` to `#NEW-4-1` and
   `#NEW-D-2` to `#NEW-4-2`. The probes in `drafts-D\probes\` are not tests; leave them out.
 
-- [ ] **Step 2: acquisition** (`research-D.md` 2.1; setup `bootUnit({engineRunning: false, storage: WARM})`, then
+- [x] **Step 2: acquisition** (`research-D.md` 2.1; setup `bootUnit({engineRunning: false, storage: WARM})`, then
   `powerOn()`; `WARM = {fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 8, lastAlmanacDownload:
   DEFAULT_START - 1 day}`; a 1 s loop measures the time to `isValid()`).
     - **Pins `#NEW-4-1`** (3-17, 3-8, install manual 2-66): a warm start is NAV ready within 300 s; it shows
@@ -591,7 +591,7 @@ list, the STA 1 state as a characterization, and the pins `#NEW-4-1` (three) and
       `#NEW-4-1` plus `almanacExpireTime` at 182 days. The issue references `#NEW-4-1`; say in the test comment that the
       pin can turn red only together with that fix.
 
-- [ ] **Step 3: the rest of the draft** (`research-D.md` 2.2 to 2.8), with the labels the report gives:
+- [x] **Step 3: the rest of the draft** (`research-D.md` 2.2 to 2.8), with the labels the report gives:
     - saves the time of the last almanac download at power-off (3-17).
     - eight channels (5-29): none in use before power-on, eight 5 s after. Also add `toHaveLength(8)` to the two
       `every()` checks of the #61 test in `Gps.test.ts`.
@@ -609,7 +609,7 @@ list, the STA 1 state as a characterization, and the pins `#NEW-4-1` (three) and
     - the STA 1 snapshot after a force-ready boot (characterization; the tripwire for the SDK satellite shape), with the
       `#NEW-4-5` comment.
 
-- [ ] **Step 4: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 4: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/render/GpsAcquisition.test.ts", "test/render/Gps.test.ts"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "three #NEW-4-1 pins and #NEW-4-2 turn red under their fixes, with siblings", "cold-start lower bounds are 180 s", "#61 test asserts eight channels", "STA 1 snapshot is a characterization citing #NEW-4-5", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -631,29 +631,29 @@ memory, and the pins `#NEW-5-1`, `#NEW-5-2` (unit and render) and `#NEW-5-3`.
 - Modify: `test/render/pages/left/Set2Page.test.ts` (append the drafts of `Set2Cursor.test.ts`)
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] The slot-class test fails when one slot class extends another (`Oth10Page extends Oth9Page`).
-- [ ] After the walk fix, the existing walks fail when the last page of a group gets stuck and when the inner knob does
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] The slot-class test fails when one slot class extends another (`Oth10Page extends Oth9Page`).
+- [x] After the walk fix, the existing walks fail when the last page of a group gets stuck and when the inner knob does
       not wrap forward.
-- [ ] The ACT group memory is a spec test citing the KLN 89 trainer: returning to ACT shows ACT 1.
-- [ ] The cursor wrap is the `#NEW-5-3` pin (it stops at the first and the last field), not a characterization.
-- [ ] `#NEW-5-1`, `#NEW-5-2` and `#NEW-5-3` turn red under their fixes; each has a passing sibling.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] The ACT group memory is a spec test citing the KLN 89 trainer: returning to ACT shows ACT 1.
+- [x] The cursor wrap is the `#NEW-5-3` pin (it stops at the first and the last field), not a characterization.
+- [x] `#NEW-5-1`, `#NEW-5-2` and `#NEW-5-3` turn red under their fixes; each has a passing sibling.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the drafts.** Read `research-E.md` and `research\trainer.md` Q1 and Q4. The drafts are in
+- [x] **Step 1: start from the drafts.** Read `research-E.md` and `research\trainer.md` Q1 and Q4. The drafts are in
   `research\drafts-E\test\…`. Rename `#NEW-E-1` to `#NEW-5-1` and `#NEW-E-2` to `#NEW-5-2`.
 
-- [ ] **Step 2: tree structure** (unit; `research-E.md` P1).
+- [x] **Step 2: tree structure** (unit; `research-E.md` P1).
     - every slot has its own class and none is a subclass of another, left and right (the `CLAUDE.md` rule that a slot
       is found by `instanceof`; no manual page, cite `CLAUDE.md`). Break: `Oth10Page extends Oth9Page`.
     - the group sizes: left `[7, 2, 26, 5, 7, 5, 11, 10]` (3-12; SET has the fictitious SET 10), right
       `[2, 1, 1, 4, 5, 8, 1, 1, 1, 1]` (3-13).
 
-- [ ] **Step 3: knobs** (render; `research-E.md` P2 to P4).
+- [x] **Step 3: knobs** (render; `research-E.md` P2 to P4).
     - group memory (3-12, 3-13): left CAL 5 → STA → back is CAL 5; right D/T 3 → NAV 1 → back is D/T 3; the start page
       counts as viewed (3-8). Break: `movePage` opens every group on its first page.
     - NAV 2 after a direct-to put NAV 1 on the right (3-28, 3-12): inner +1 is NAV 2.
@@ -666,12 +666,12 @@ memory, and the pins `#NEW-5-1`, `#NEW-5-2` (unit and render) and `#NEW-5-3`.
       ACT 3 → outer to another group → back: ACT 1. Use the world of `test/render/HEvents.test.ts` "right inner knob on
       the ACT pages (3-13)". Break: a controller that remembers the ACT sub-page.
 
-- [ ] **Step 4: the walk fix.** Apply `research\drafts-E\walk-wrap.patch` by hand with the Edit tool (it carries LF
+- [x] **Step 4: the walk fix.** Apply `research\drafts-E\walk-wrap.patch` by hand with the Edit tool (it carries LF
   lines): `walk` in `test/render/pages/PageTreeController.test.ts` returns on the wrap and throws otherwise;
   `PAGE_CYCLES` in `test/render/harness/selectPage.test.ts` pushes the wrap and expects `[...cycle, cycle[0]]`. Prove:
   `Oth10Page extends Oth9Page` fails two #90 walks, and no forward wrap in `moveSubpage` fails every `PAGE_CYCLES` case.
 
-- [ ] **Step 5: the cursor** (unit, synthetic page; `research-E.md` item 6). Keep the draft tests 1 to 3 and 5 to 9 with
+- [x] **Step 5: the cursor** (unit, synthetic page; `research-E.md` item 6). Keep the draft tests 1 to 3 and 5 to 9 with
   the labels the report gives (field order, read-only skipped, 3-11, the entered field, the inner knob, 4-3 memory, the
   list cases, ENT).
     - **Change from the draft:** test 4 (the wrap) becomes the pin `#NEW-5-3` (4-3; checked in the KLN 89 trainer,
@@ -685,12 +685,12 @@ memory, and the pins `#NEW-5-1`, `#NEW-5-2` (unit and render) and `#NEW-5-3`.
     - **Pins `#NEW-5-2`** (unit, two): a field under the cursor turning read-only; the clamp of `CursorController.ts:123`.
       Fix: `Math.min(this.cursorField, fields.length - 1)` and a clamp in `getCurrentFocusedField()`.
 
-- [ ] **Step 6: SET 2** (render; `research-E.md` "Render, SET 2"). The sibling (3-53: the date and time read-only after
+- [x] **Step 6: SET 2** (render; `research-E.md` "Render, SET 2"). The sibling (3-53: the date and time read-only after
   the fix, the cursor reaches the zone, no errors) and the two `#NEW-5-2` pins (the cursor on again on the same page
   after the fix; the cursor left on the time while the fix comes). Each pin takes the expected rejections or errors with
   `unit.takeRejections()` where the harness requires it; the sibling holds the setup.
 
-- [ ] **Step 7: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 7: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/unit/pages/PageTreeController.test.ts", "test/render/pages/PageTreeController.test.ts", "test/render/harness/selectPage.test.ts", "test/unit/pages/CursorController.test.ts", "test/render/pages/left/Set2Page.test.ts"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "slot-class test fails on a subclass slot", "walks fail on a stuck last page and a missing forward wrap", "ACT group memory spec test citing the KLN 89 trainer", "cursor wrap is the #NEW-5-3 pin", "#NEW-5-1..3 turn red under their fixes, with siblings", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -708,24 +708,24 @@ and APT 8, FPL FULL during a load as a characterization, and the pin `#NEW-6-1`.
 - Modify: `test/render/pages/right/Apt7Page.test.ts`, `test/render/pages/right/Apt8Page.test.ts` (the placement)
 
 **Acceptance Criteria:**
-- [ ] Every test passes or is an `it.fails` pin; each was run against its break and failed.
-- [ ] The drafts use `Leg.HF`, `Leg.HA` and `Leg.PI` of task 0 instead of their local `legOf` helper.
-- [ ] `#NEW-6-1` turns red under its fix and has a passing sibling; no `#NEW-6-2` pin is committed.
-- [ ] APT 8 replacing an old approach, the APT 8 REDUNDANT WPTS message, a STAR before an existing approach and a SID
+- [x] Every test passes or is an `it.fails` pin; each was run against its break and failed.
+- [x] The drafts use `Leg.HF`, `Leg.HA` and `Leg.PI` of task 0 instead of their local `legOf` helper.
+- [x] `#NEW-6-1` turns red under its fix and has a passing sibling; no `#NEW-6-2` pin is committed.
+- [x] APT 8 replacing an old approach, the APT 8 REDUNDANT WPTS message, a STAR before an existing approach and a SID
       whose airport is not in FPL 0 each have a render test citing their page.
-- [ ] FPL FULL during an approach load is a characterization with the comment `// a question: #NEW-6-3`.
-- [ ] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
+- [x] FPL FULL during an approach load is a characterization with the comment `// a question: #NEW-6-3`.
+- [x] `npm test` and `npx tsc --noEmit` pass; nothing under `kln90b/` changes.
 
 **Verify:** `npm test && npx tsc --noEmit` → all pass, no type errors.
 
 **Steps:**
 
-- [ ] **Step 1: start from the drafts.** Read `research-F.md` sections 1 to 4 and `research\trainer.md` Q3. Merge
+- [x] **Step 1: start from the drafts.** Read `research-F.md` sections 1 to 4 and `research\trainer.md` Q3. Merge
   `research\drafts-F\test\unit\data\navdata\SidStarS7.test.ts` into `SidStar.test.ts` (its own `describe` blocks), and
   apply `SidStar.test.ts.amend.diff` (the recalculated arc keeps its `endFacility`). Replace `legOf(LegType.HF, …)` and
   its siblings by `Leg.HF`, `Leg.HA` and `Leg.PI`. Rename `#NEW-F-1` to `#NEW-6-1`. Leave out the `#NEW-F-2` pin.
 
-- [ ] **Step 2: the conversion** (`research-F.md` section 2, the table "Draft tests"), with the labels it gives:
+- [x] **Step 2: the conversion** (`research-F.md` section 2, the table "Draft tests"), with the labels it gives:
     - the approach header for VOR, VOR/DME, NDB, NDB/DME, RNAV (6-5, figures 6-8 and 6-24, 3-49); GPS as R, runway 09
       padded, circling and suffix forms (characterization).
     - the approach legs in order with fix types (6-4, 6-5, 6-6, 6-7); every leg APP with parent and header (6-5, 6-7);
@@ -745,7 +745,7 @@ and APT 8, FPL FULL during a load as a characterization, and the pin `#NEW-6-1`.
       type (`SidStar.ts:414-415`; `research\drafts-F\apply-fix.mjs 1`). Sibling: the passing test of the common shape
       `TF X` then `HF X (IAF)`.
 
-- [ ] **Step 3: the placement in FPL 0** (render; `research-F.md` "Placement in FPL 0"; no drafts). Use the setups of
+- [x] **Step 3: the placement in FPL 0** (render; `research-F.md` "Placement in FPL 0"; no drafts). Use the setups of
   `Apt7Page.test.ts` and `Apt8Page.test.ts` and `approachWorld()`:
     - APT 8 replaces an approach already in FPL 0 (6-7): load one approach, then another; FPL 0 holds only the second.
       Break: `removeProcedure(APP)` at `Apt8Page.tsx:201` skipped.
@@ -757,7 +757,7 @@ and APT 8, FPL FULL during a load as a characterization, and the pin `#NEW-6-1`.
       remain than the approach has; assert what FPL 0 holds and the message the unit shows. The 89 has no 90B answer
       (`research\trainer.md` Q3), so assert today's behavior without a citation.
 
-- [ ] **Step 4: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
+- [x] **Step 4: verify and commit.** `npm test` and `npx tsc --noEmit`, then one commit with the `Proof:` lines.
 
 ```json:metadata
 {"files": ["test/unit/data/navdata/SidStar.test.ts", "test/render/pages/right/Apt7Page.test.ts", "test/render/pages/right/Apt8Page.test.ts"], "verifyCommand": "npm test && npx tsc --noEmit", "acceptanceCriteria": ["every test passes or is a pin, each proven against its break", "drafts use Leg.HF/HA/PI", "#NEW-6-1 turns red under its fix with a sibling; no #NEW-6-2 pin", "four placement render tests with citations", "FPL FULL characterization cites #NEW-6-3", "suite green, kln90b unchanged"], "modelTier": "standard"}
@@ -778,21 +778,21 @@ the session log and tick the checkbox.
 - Modify: `docs/superpowers/plans/2026-10-07-session-7-navdata.md` (the task checkboxes)
 
 **Acceptance Criteria:**
-- [ ] Every row of the placeholder table is an issue (or, where a search finds it, a comment on the existing issue),
+- [x] Every row of the placeholder table is an issue (or, where a search finds it, a comment on the existing issue),
       each searched first in open and closed issues with several wordings.
-- [ ] #133 and #90, #190 and #175 have the comments the spec lists.
-- [ ] `grep -r "#NEW-" test/` prints nothing.
-- [ ] `CLAUDE.md` says `SidStar` filters procedures with RF legs or RNP AR.
-- [ ] `testing.md` sections 6 and 7 carry the fragile spots and gaps the spec lists.
-- [ ] The session log has the coverage at the start and the end, the bugs filed, the rulings and the "not covered" list
+- [x] #133 and #90, #190 and #175 have the comments the spec lists.
+- [x] `grep -r "#NEW-" test/` prints nothing.
+- [x] `CLAUDE.md` says `SidStar` filters procedures with RF legs or RNP AR.
+- [x] `testing.md` sections 6 and 7 carry the fragile spots and gaps the spec lists.
+- [x] The session log has the coverage at the start and the end, the bugs filed, the rulings and the "not covered" list
       (rule 18).
-- [ ] `npm test` and `npx tsc --noEmit` pass.
+- [x] `npm test` and `npx tsc --noEmit` pass.
 
 **Verify:** `npm test && npx tsc --noEmit && grep -r "#NEW-" test/` → tests pass, no type errors, grep prints nothing.
 
 **Steps:**
 
-- [ ] **Step 1: issues.** Runs in the main checkout on the session branch (GitHub access). For each row of the
+- [x] **Step 1: issues.** Runs in the main checkout on the session branch (GitHub access). For each row of the
   placeholder table: search open and closed issues (`mcp__github__search_issues`, repo `falcon71/kln90b`) with at least
   three wordings; file a new issue with the label the table gives (`bug`, `question`, `enhancement`) per `CLAUDE.md`
   "Bugs go to GitHub issues": what is wrong, the reproduction with observed and expected values, the file and line, the
@@ -801,7 +801,7 @@ the session log and tick the checkbox.
   decided the case. `#NEW-2-6` references #173; `#NEW-4-2` references `#NEW-4-1`; `#NEW-2-3` mentions #108; `#NEW-2-1`
   and `#NEW-4-4` carry the sim-check caveat; `#NEW-2-7` and `#NEW-6-3` carry the trainer evidence.
 
-- [ ] **Step 2: comments on existing issues.**
+- [x] **Step 2: comments on existing issues.**
     - #133 and #90: the controller prunes the module-level `RIGHT_PAGE_TREE`, which every ACT visit
       (`ActPage.tsx:49`) and every waypoint confirmation (`WaypointConfirmPage.tsx:71`) hand to a new controller, so an
       in-place `splice(7, 1)` would remove one more APT page each time; a fix must copy the tree per controller; the
@@ -810,13 +810,13 @@ the session log and tick the checkbox.
       of an active VOR) and 5-44 (true north) conflict for an active VOR outside the area.
     - #175: the reproduction on the GPS path (a pilot date overridden by the GPS lists the message twice at the fix).
 
-- [ ] **Step 3: replace the placeholders** in one commit (`references #…` for every issue), and check
+- [x] **Step 3: replace the placeholders** in one commit (`references #…` for every issue), and check
   `grep -r "#NEW-" test/` prints nothing.
 
-- [ ] **Step 4: `CLAUDE.md`.** In "Architecture in brief", the `SidStar.ts` bullet: "converts SDK procedures to KLN legs
+- [x] **Step 4: `CLAUDE.md`.** In "Architecture in brief", the `SidStar.ts` bullet: "converts SDK procedures to KLN legs
   and filters out procedures with RF legs or RNP AR".
 
-- [ ] **Step 5: `testing.md`.**
+- [x] **Step 5: `testing.md`.**
     - Section 6: the STA 5 `primary` satellite computer cannot initialize in the harness (its `SharedGlobal` never
       resolves), so STA 5 is untestable as it is; the fake hands out one ICAO object per facility in search results,
       nearest `added`/`removed` and `getFacility`, which hides reference comparisons (`6a6c634`, `NearestList.ts:89`).
@@ -826,14 +826,14 @@ the session log and tick the checkbox.
     - Replace the Session 5 note on the open trainer questions if this session answered any of them (it did not:
       #146 and #147 stay).
 
-- [ ] **Step 6: the session log** in `docs/test-coverage.md` section 4, newest first, in the format of the Session 6
+- [x] **Step 6: the session log** in `docs/test-coverage.md` section 4, newest first, in the format of the Session 6
   entry: Done (per task), Rulings (the maintainer's and the controller's), Trainer results, Bugs found and filed (one
   line per issue with its pin), Fixes that could not be re-broken, the unheld code the research found (the survivor
   counts of the spec), Not covered (rule 18; the log-only items of the spec plus each task report's uncovered rest),
   Workflow notes, and the coverage table at the start (`scratchpad\coverage-start.txt`) and at the end (`npm run
   coverage`), plus the suite counts. Tick the Session 7 checkbox and add its "Result" paragraph in section 3.
 
-- [ ] **Step 7: verify and commit.** `npm test`, `npx tsc --noEmit`, `grep -r "#NEW-" test/`, then commit.
+- [x] **Step 7: verify and commit.** `npm test`, `npx tsc --noEmit`, `grep -r "#NEW-" test/`, then commit.
 
 ```json:metadata
 {"files": ["CLAUDE.md", "docs/testing.md", "docs/test-coverage.md", "docs/superpowers/plans/2026-10-07-session-7-navdata.md"], "verifyCommand": "npm test && npx tsc --noEmit && grep -r \"#NEW-\" test/", "acceptanceCriteria": ["every placeholder row filed or commented after a search", "comments on #133/#90, #190, #175", "no #NEW- left in test/", "CLAUDE.md SidStar wording corrected", "testing.md sections 6 and 7 updated", "session log complete with coverage and rule 18", "suite green"], "modelTier": "frontier"}

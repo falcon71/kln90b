@@ -555,7 +555,15 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   filters let an airport without runways pass the surface and length filters (the sim developers' rule, quoted to the
   maintainer from their code). A test that passes against the fake proves the instrument's use of those rules, not that
   the sim applies them.
-  The instrument itself ignores circular airspaces (`BoundaryUtils`); `circularAirspace()` exists to hold that gap.
+  The instrument itself ignores circular airspaces (`BoundaryUtils`, #209); `circularAirspace()` exists to hold that
+  gap.
+- **The fake navdata is looser than the sim in two ways that hide bugs.** `MemoryFacilityClient` hands out one
+  `IcaoValue` object per facility, the same in search results, in the nearest `added` and `removed` lists and in
+  `getFacility`; the sim answers with new objects each time. Code that compares ICAOs by reference instead of with
+  `ICAO.valueEquals` therefore passes against the fake: `6a6c634` fixed such a bug in `Scanlist`, and the removal in
+  `NearestList.ts:89` would be the next (a break there survives the suite). The fake's `getFacility` also ignores its
+  type argument and looks up by ICAO alone, so the type that `KLNFacilityLoader.getFacilities` passes down cannot be
+  observed. Section 7 has the options.
 - **One fact about real procedures came from a navigation database queried locally and is not committed.** The pattern
   `AF, CI (no fix), AF` around one navaid with two radii, which `SidStar` merges into one arc (#131), was found in an
   AIRAC 2607 export (five STARs). No row of it is in the repo (section 5 forbids recorded navdata), and the sim's own
@@ -589,8 +597,8 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   suite, after upgrading `@microsoft/msfs-sdk`. `KLNGPSSatComputer` (`Gps.ts`) reads `activeSimulationContext.channels`
   and the computer's own private `lastAlamanacTime`. It also reads `this.simTime` and `this.distanceFromLastKnownPos`
   through `as any`: both were fields of the computer until SDK 2.3.3 moved them to `activeSimulationContext.time` and
-  `activeSimulationContext.distanceFromLastKnownPos`, which no type error reports. After an upgrade run
-  `test/render/GpsAcquisition.test.ts` first (session 7, task 4 adds it). The harness also relies on these SDK
+  `activeSimulationContext.distanceFromLastKnownPos`, which no type error reports (#211; three pins hold it). After an
+  upgrade run `test/render/GpsAcquisition.test.ts` first. The harness also relies on these SDK
   internals, and after an upgrade a change in one of them shows up as a confusing harness error, not as a named check:
     - the boundary search: `NearestLodBoundarySearchSession` builds its `LodBoundary` objects in a throttled queue on
       `requestAnimationFrame` (the airspace tests advance the fake clock for it), and a facility with `lods: []` makes
@@ -600,6 +608,10 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
     - the EFB route: `FakeRouteManager` copies the members of `FlightPlanRouteManager` that `KlnEfbLoader` and
       `KlnEfbSaver` use (`syncedAvionicsRoute`, `avionicsRouteRequested`, `replyToAvionicsRouteRequest`), and `efbRoute`
       builds routes with `FlightPlanRouteUtils.emptyRoute()` and `emptyEnrouteLeg()`.
+- **STA 5 cannot be tested as it is.** `Sta5Page` builds its own `GPSSatComputer` with the sync role `'primary'`, and
+  that computer never finishes `init()` in the harness: the `SharedGlobal` a primary creates never resolves, so the
+  page shows `Searching` at every offset. A probe with the role `'none'` runs, which is also the suggested fix of the
+  prediction bug #214; whether the primary role works in the sim is part of that issue's sim check.
 - **TypeScript 6 no longer includes `@types` automatically.** Harness files that use Node APIs carry
   `/// <reference types="node" />`. The directive makes the Node types available to the whole `tsc` program, because the
   `include` of the root `tsconfig.json` compiles `kln90b/` and `test/` together; it does not keep Node APIs out of the
@@ -702,6 +714,21 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
     - **`savedUserWaypoints` writes region `XX` only.** The temporary-waypoint tests lay out the `XY` strings by hand
       (`savedTemporary` in `test/render/services/TemporaryWaypointDeleter.test.ts`); an `XY` option, or a temporary
       kind, would replace them.
+- Harness gaps and code notes from Session 7 (none was built, per rule 13 of test-coverage.md):
+    - **A cloning option for the fake's ICAO values.** `MemoryFacilityClient` could hand out a copy of the `IcaoValue`
+      per call (section 6). That would make the two reference comparisons observable (`Scanlist`, `6a6c634`, and the
+      nearest list removal, `NearestList.ts:89`); no test of Session 7 needed it. A `getFacility` that checks its type
+      argument would make the type `getFacilities` passes observable.
+    - **`Oth3Page` subscribes to the repository sync and never unsubscribes** (`Oth3Page.tsx:36`, filed as #96 with the
+      same leak on OTH 4): every visit leaves a handler that refreshes a detached page. Not seen as a user-visible
+      effect; a test that counts handlers would hold the fix.
+    - **The `fields` array of the `CursorController` constructor is dead** (`CursorController.ts:62-63`, behind
+      `@ts-ignore`): nothing reads it, and the field list is recomputed on every call. It looks like a cache, so do not
+      rely on it.
+    - **Take-home mode is unsupported and untested**, by the maintainer's decision (`Gps.ts:154-165`, the undocumented
+      panel.xml key Session 4 left out). A probe found that a cold-and-dark unit in take-home never gets a fix and that
+      the position dead-reckons a straight line on the SET 1 track instead of following the plan (5-46, 3-19); no issue
+      was filed.
 - **The flown-through bound of `dmeArc.test.ts` does not hold the arc reversal.** With `fromDtk` reversed on arc legs,
   the monitor's bound north of the leg stays green (0.895 NM against a radius of 1.012 NM); only the circle-center
   assertion of the same test fails. A tighter bound, or a second monitor on the arc's radius, would make the flight
