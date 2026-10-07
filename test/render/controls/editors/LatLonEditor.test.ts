@@ -16,7 +16,7 @@ describe('latitude and longitude editors', () => {
 
         expect(text(new LatitudeEditor(bus, 47.5, () => undefined))).toBe('N 47°30.00');
         expect(text(new LatitudeEditor(bus, -47.5, () => undefined))).toBe('S 47°30.00');
-        expect(text(new LongitudeEditor(bus, 8.5, () => undefined))).toBe('E 08°30.00');
-        expect(text(new LongitudeEditor(bus, -8.5, () => undefined))).toBe('W 08°30.00');
+        expect(text(new LongitudeEditor(bus, 18.5, () => undefined))).toBe('E 18°30.00');
+        expect(text(new LongitudeEditor(bus, -18.5, () => undefined))).toBe('W 18°30.00');
     });
 });

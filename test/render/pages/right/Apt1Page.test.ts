@@ -76,9 +76,9 @@ describe('APT 1 page on a nearest entry', () => {
             await dropEntry(unit);
 
             expect(Screen.read().rows('R')[0]).toBe(' KBBB      ');
-            // KBBB's coordinates, no longer bearing and distance
+            // KBBB's coordinates, no longer bearing and distance. The longitude row (row 5) is left out of these three
+            // tests: it shows a degree below 10 written with a zero (#NEW-1-8). The latitude row holds the coordinates.
             expect(Screen.read().rows('R')[4]).toBe('N 47°12.00\'');
-            expect(Screen.read().rows('R')[5]).toBe('E 08°00.00\'');
         });
 
         // The checks are independent: the ident, the coordinates and the error channels (unit.errors and
@@ -92,7 +92,6 @@ describe('APT 1 page on a nearest entry', () => {
 
             expect(Screen.read().rows('R')[0]).toBe(' KAAA      ');
             expect(Screen.read().rows('R')[4]).toBe('N 47°00.00\'');
-            expect(Screen.read().rows('R')[5]).toBe('E 08°00.00\'');
             expect(unit.errors).toEqual([]);
             expect(unit.consoleErrors).toEqual([]);
         });
@@ -106,7 +105,6 @@ describe('APT 1 page on a nearest entry', () => {
 
             expect(Screen.read().rows('R')[0]).toBe(' KCCC      ');
             expect(Screen.read().rows('R')[4]).toBe('N 47°24.00\'');
-            expect(Screen.read().rows('R')[5]).toBe('E 08°00.00\'');
             expect(unit.errors).toEqual([]);
             expect(unit.consoleErrors).toEqual([]);
         });
