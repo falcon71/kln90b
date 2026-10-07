@@ -56,17 +56,18 @@ describe('Database validity', () => {
 });
 
 describe('Database expiration date', () => {
-    // 2-4: figure 2-4 shows the date as 17 AUG 94, the day before the AIRAC date 18 AUG 1994, so the page shows the
-    // last day of validity. 3-7 shows the same field on the Database page.
-    it('is the last day of the cycle (2-4, 3-7)', () => {
+    // 2-3: the old data are used up to the effective date of the next cycle, so the last valid day is the day before it
+    // (10 JUN for a cycle whose successor is effective 11 JUN; that reading is our own, the guide gives no example
+    // for it). 3-7 and figure 2-4 on 2-5 show this field on the Database page as EXPIRES, then EXPIRED once it has passed.
+    it('is the last day of the cycle (2-3, 3-7)', () => {
         const db = new Database(bus, sensors, handler);
 
         expect(db.expirationDateString.substring(0, 6)).toBe('10 JUN');
     });
 
-    // Figures 2-4, 3-24 and 3-25 show a two-digit year. 22b4532 changed the format from the two digits of the sim's
+    // Figure 2-4 (on 2-5) and figures 3-24 and 3-25 (3-7) show a two-digit year. 22b4532 changed the format from the two digits of the sim's
     // range to {YYYY}. The test above is the passing sibling: the day and month are right.
-    it.fails('shows the expiry with a two-digit year (2-4, 3-7, #NEW-1-2)', () => {
+    it.fails('shows the expiry with a two-digit year (2-5, 3-7, #NEW-1-2)', () => {
         const db = new Database(bus, sensors, handler);
 
         expect(db.expirationDateString).toBe('10 JUN 26');

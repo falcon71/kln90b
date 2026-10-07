@@ -129,17 +129,19 @@ describe('KLNFacilityLoader.findNearestFacilitiesByIdent', () => {
         expect(found.map(f => describeIcao(f.icaoStruct))).toEqual(['D V XX', 'D N K1', 'D W K1']);
     });
 
-    // Same rule with the user waypoint farthest away, so that the order of the two sources cannot give the answer:
-    // the user NDB 120 NM, the database VOR 6 NM, the database intersection 60 NM.
-    it('puts a user waypoint behind nearer database waypoints with the same ident (3-15)', async () => {
+    // Same rule with the user waypoint farthest away, so that the order of the two sources cannot give the answer, and
+    // with one waypoint south of the aircraft, so that the answer is the distance from the aircraft and not the
+    // latitude or the distance from 0/0. Distances from N47 E8: the database intersection 12 NM north, the database VOR
+    // 60 NM south, the user NDB 120 NM north.
+    it('orders waypoints with the same ident by their distance from the aircraft, north or south (3-15)', async () => {
         const {loader} = setup(
-            [vor('D', 47.1, 8), intersection('D', 48, 8)],
+            [vor('D', 46, 8), intersection('D', 47.2, 8)],
             [ndb('D', 49, 8, {region: 'XX'})],
         );
 
         const found = await loader.findNearestFacilitiesByIdent(FacilitySearchType.All, 'D', 47, 8, 99);
 
-        expect(found.map(f => describeIcao(f.icaoStruct))).toEqual(['D V K1', 'D W K1', 'D N XX']);
+        expect(found.map(f => describeIcao(f.icaoStruct))).toEqual(['D W K1', 'D V K1', 'D N XX']);
     });
 
     it('finds nothing for an ident that only begins another ident (3-15)', async () => {
@@ -163,14 +165,24 @@ describe('KLNFacilityLoader.getFacility', () => {
         expect([fromDatabase.lat, fromDatabase.lon]).toEqual([48, 9]);
     });
 
-    it('answers a list of facilities from both sources in the order asked (characterization)', async () => {
+    it('answers a list of facilities of several types from both sources in the order asked (characterization)', async () => {
         const user = vor('ABC', 47, 8, {region: 'XX'});
         const known = vor('ABC', 48, 9);
-        const {loader} = setup([known], [user]);
+        const beacon = ndb('NDB', 47, 8);
+        const {loader} = setup([known, beacon], [user]);
 
-        const result = await loader.getFacilities([known.icaoStruct, user.icaoStruct]);
+        const result = await loader.getFacilities([beacon.icaoStruct, known.icaoStruct, user.icaoStruct]);
 
-        expect(result).toEqual([known, user]);
+        expect(result).toEqual([beacon, known, user]);
+    });
+
+    it('answers a known facility from either source (characterization)', async () => {
+        const user = vor('ABC', 47, 8, {region: 'XX'});
+        const beacon = ndb('NDB', 47, 8);
+        const {loader} = setup([beacon], [user]);
+
+        await expect(loader.tryGetFacility(FacilityType.NDB, beacon.icaoStruct)).resolves.toEqual(beacon);
+        await expect(loader.tryGetFacility(FacilityType.VOR, user.icaoStruct)).resolves.toBe(user);
     });
 
     it('rejects a facility that is in neither source (characterization)', async () => {
@@ -181,14 +193,19 @@ describe('KLNFacilityLoader.getFacility', () => {
 
     // The FacilityClient interface the SDK's FlightPathCalculator calls (WTFlightplanSync) promises null for a facility
     // that cannot be retrieved, and getFacilities a null in its place. KLNFacilityLoader passes the rejection of the
-    // database through instead, so one unknown fix fails the whole batch.
-    it.fails('answers null for a facility that is in neither source, as FacilityClient promises (#NEW-1-1)', async () => {
-        const known = vor('ABC', 48, 9);
-        const {loader} = setup([known]);
-        const unknown = ICAO.value('V', 'K1', '', 'NONE');
+    // database through instead, so one unknown fix fails the whole batch. Two pins, one for each method, so that a fix
+    // of one shows; the passing siblings are the two characterizations above that answer known facilities.
+    it.fails('tryGetFacility answers null for a facility that is in neither source (#NEW-1-1)', async () => {
+        const {loader} = setup([vor('ABC', 48, 9)]);
 
-        await expect(loader.tryGetFacility(FacilityType.VOR, unknown)).resolves.toBeNull();
-        await expect(loader.getFacilities([known.icaoStruct, unknown])).resolves.toEqual([known, null]);
+        await expect(loader.tryGetFacility(FacilityType.VOR, ICAO.value('V', 'K1', '', 'NONE'))).resolves.toBeNull();
+    });
+
+    it.fails('getFacilities answers null in the place of a facility that is in neither source (#NEW-1-1)', async () => {
+        const beacon = ndb('NDB', 47, 8);
+        const {loader} = setup([beacon]);
+
+        await expect(loader.getFacilities([beacon.icaoStruct, ICAO.value('N', 'K1', '', 'NONE')])).resolves.toEqual([beacon, null]);
     });
 });
 
@@ -222,7 +239,8 @@ describe('KLNFacilityLoader nearest search sessions', () => {
     });
 
     // 3-22, 3-23: only airports with a runway of at least the SET 3 length qualify, and with HRD only hard runways.
-    // A user airport created on APT 1 has an unknown runway (Apt1Page stores a length of -10 m), so it never qualifies.
+    // A user airport created on APT 1 has an unknown runway (Apt1Page stores a length of -10 m). The pages do not say
+    // what the nearest list does with it; the last test below records what the code does.
     // setExtendedAirportFilters takes the length in meters (the SET 3 value converted by NearestList).
     describe('the SET 3 criteria on user airports', () => {
         const hardMask = BitFlags.union(BitFlags.createFlag(RunwaySurfaceType.Asphalt), BitFlags.createFlag(RunwaySurfaceType.Concrete));
@@ -260,7 +278,7 @@ describe('KLNFacilityLoader nearest search sessions', () => {
             expect(await airportsFound(hardMask, 1800)).toEqual(['UHRD', 'USHT']);
         });
 
-        it('HRD SFT 1000 ft still leaves out the airport with an unknown runway (3-23)', async () => {
+        it('HRD SFT 1000 ft leaves out the airport with an unknown runway (characterization)', async () => {
             expect(await airportsFound(hardSoftMask, 1000)).toEqual(['UHRD', 'USFT', 'USHT']);
         });
     });

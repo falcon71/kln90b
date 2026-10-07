@@ -35,9 +35,11 @@ describe('KLNFacilityRepository capacity', () => {
     // 2-2, 2-8, 5-16: up to 250 user-defined waypoints. C-2: USR DB FULL when 250 exist. The pages turn the error into
     // the status line message (Apt1Page, SupPage and others catch it).
     it('holds 250 user waypoints and refuses the 251st (2-8, C-2)', () => {
-        for (let i = 0; i < 250; i++) {
+        // The 250 cover the other waypoint types as well (5-16): the last one is a user VOR
+        for (let i = 0; i < 249; i++) {
             repo.add(sup(`W${i}`, 47, 8));
         }
+        repo.add(vor('ABC', 47, 8, {region: 'XX'}));
         expect(repo.size()).toBe(250);
 
         expect(() => repo.add(sup('W250', 47, 8))).toThrow();
@@ -68,6 +70,9 @@ describe('KLNFacilityRepository add, update and remove', () => {
 
         expect(syncs.map(s => s.type)).toEqual([FacilityRepositorySyncType.Add, FacilityRepositorySyncType.Update, FacilityRepositorySyncType.Remove]);
         expect((syncs[0] as { facs: Facility[] }).facs).toEqual([wpt]);
+        expect((syncs[1] as { facs: Facility[] }).facs).toHaveLength(1);
+        expect((syncs[1] as { facs: Facility[] }).facs[0]).toBe(wpt);
+        expect(wpt.lat).toBe(47.5);
         expect((syncs[2] as { facs: unknown[] }).facs.map(i => ICAO.valueToStringV2(i as never))).toEqual([ICAO.valueToStringV2(wpt.icaoStruct)]);
     });
 
@@ -129,13 +134,15 @@ describe('KLNFacilityRepository sync between instruments', () => {
     // a second KLN 90B in one aircraft: #NEW-1-3
     it('answers a dump request of another instrument with all its waypoints (characterization)', () => {
         const wpt = sup('ONE', 47, 8);
+        const userVor = vor('ABC', 47, 8, {region: 'XX'});
         repo.add(wpt);
+        repo.add(userVor);
         syncs.length = 0;
 
         bus.getPublisher<any>().pub(KLNFacilityRepository.SYNC_TOPIC, {type: FacilityRepositorySyncType.DumpRequest, uid: 42}, false, false);
 
         // The response is published inside the handling of the request, so it reaches this listener first
         expect(syncs.filter(s => s.type === FacilityRepositorySyncType.DumpResponse))
-            .toEqual([{type: FacilityRepositorySyncType.DumpResponse, uid: 42, facs: [wpt]}]);
+            .toEqual([{type: FacilityRepositorySyncType.DumpResponse, uid: 42, facs: [wpt, userVor]}]);
     });
 });
