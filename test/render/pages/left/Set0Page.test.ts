@@ -34,14 +34,15 @@ describe('SET 0 page, the database update (2b9f811)', () => {
         expect(rows()[3]).toBe('  UPDATE PUBLISHED DB');
 
         await unit.panel.ent();
-        expect(rows()).toEqual([
+        // The date row (index 4) is left out here: its year is the #NEW-1-2 pin below
+        expect(rows().filter((_, i) => i !== 4)).toEqual([
             '      U P D A T E',
             '',
             '     INTERNATIONAL',
             '   DATA BASE EXPIRES',
-            '       11 JUN 2026',
             '     U P D A T E ?',
         ]);
+        expect(rows()[4].trimStart().startsWith('11 JUN')).toBe(true);
 
         await unit.panel.ent();
         // The page turns the cursor off while it redraws, one display tick later
@@ -56,5 +57,18 @@ describe('SET 0 page, the database update (2b9f811)', () => {
             '',
         ]);
         expect(Screen.read().status().left).toBe('SET 0');
+    });
+
+    // Figures 3-24 and 3-25 show the date of the Database page with a two-digit year, and SET 0 shows the same field.
+    // The nine characters of 11 JUN 26 are centered on the 23 columns with seven blanks, the way the other rows of the
+    // page are centered (the figures are not exact enough to read a column off them). The sibling above holds the day
+    // and month of this row.
+    it.fails('shows the database expiry with a two-digit year (3-7, #NEW-1-2)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'SET 0');
+        await unit.panel.cursor('L');
+        await unit.panel.ent();
+
+        expect(rows()[4]).toBe('       11 JUN 26');
     });
 });
