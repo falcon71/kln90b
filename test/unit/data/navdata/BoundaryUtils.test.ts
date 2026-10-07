@@ -116,9 +116,9 @@ describe('BoundaryUtils.intersects on hand-computed paths (characterization)', (
 
 describe('BoundaryUtils.getIntersections on hand-computed paths (characterization)', () => {
     // The meridian 8.5 E enters the triangle through its sloping edge at 47.5 N and leaves through the south edge at 47 N.
-    // Both points are on the meridian, so the longitude is exact; the latitude of the crossing with the south edge, a
-    // great circle on the sphere, differs from 47 by under 0.001 degree at 8.5 E. The points are compared as a set: the
-    // pin below holds that each comes once.
+    // Both points are on the meridian, so the longitude is exact, and the plane puts the crossing with the south edge at
+    // 47 N. The rounding to 0.001 degree only absorbs float noise. The points are compared as a set: the pin below holds
+    // that each comes once.
     const crossings = (lat1: number, lon1: number, lat2: number, lon2: number) => {
         const points = BoundaryUtils.getIntersections(TRIANGLE, lat1, lon1, lat2, lon2).map(p => [Math.round(p.lat * 1000) / 1000, Math.round(p.lon * 1000) / 1000]);
         return [...new Set(points.map(p => p.join(' ')))].sort();

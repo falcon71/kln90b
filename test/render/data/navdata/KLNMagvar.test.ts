@@ -40,7 +40,7 @@ describe('MAGNETIC VAR INVALID at the southern limit (3-1, 5-44, B-2)', () => {
 // 5-44: outside the primary coverage area all navigation data is referenced to true north, unless the pilot enters a
 // magnetic variation on SET 2. The world's variation is 10 E everywhere, so a magnetic track is the true track less 10.
 // The unit settles inside the area first, so that it has a database variation to lose.
-describe('the reference of the displayed track outside the coverage area (5-44)', () => {
+describe('the reference of the displayed track outside the coverage area', () => {
     async function flownOut() {
         const unit = await bootUnit({position: {lat: 73.5, lon: 8.0}, magvar: 10});
         await settle(unit);
@@ -83,7 +83,7 @@ describe('the reference of the displayed track outside the coverage area (5-44)'
 
 // 5-44: the same holds in OBS mode while the active waypoint lies outside the area, even with the aircraft inside it.
 // KFAR is at N 75; the aircraft is at N 73.5 on the leg KAAA - KFAR, inside the area.
-describe('OBS mode with the active waypoint outside the coverage area (5-44)', () => {
+describe('OBS mode with the active waypoint outside the coverage area', () => {
     const kaaa = airport('KAAA', 73.0, 8.0);
     const kfar = airport('KFAR', 75.0, 8.0);
     const OBS_SOURCE_OFF = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input></Instrument></PlaneHTMLConfig>';
@@ -107,7 +107,8 @@ describe('OBS mode with the active waypoint outside the coverage area (5-44)', (
         expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME'); // The list is the live one
     });
 
-    it('switches to OBS mode with KFAR active (precondition of #190)', async () => {
+    // The setup of the pins below, held where it passes: the unit enters OBS mode on the leg to KFAR (characterization)
+    it('switches to OBS mode with KFAR active (characterization, setup of #190)', async () => {
         const unit = await toKfar();
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);

@@ -69,7 +69,7 @@ async function flying(trackTrue: number, airspaces: ReturnType<typeof airspace>[
 // default buffer of 500 ft, so the ceiling check of #127 (it compares with the floor plus the buffer) passes as well.
 const LIMITS: AirspaceOptions = {minFt: 1000, maxFt: 18000};
 
-describe('AIRSPACE ALERT ahead on the track (3-40, B-1)', () => {
+describe('AIRSPACE ALERT ahead on the track', () => {
     // 10 NM ahead at 120 kt: 5 minutes to the boundary
     const fiveMinutes = () => airspace('R-AHEAD', BoundaryType.Restricted, box(47 + 10 * NM_LAT, 47.4, 7.9, 8.1), LIMITS);
 
@@ -155,16 +155,29 @@ describe('AIRSPACE ALERT within 2 NM (3-40, B-1)', () => {
     });
 });
 
-describe('INSIDE SPC USE AIRSPACE after the alert (3-40, B-2)', () => {
+describe('INSIDE SPC USE AIRSPACE after the alert', () => {
     // 1 NM ahead: the aircraft is alerted, then enters
-    it('shows INSIDE SPC USE AIRSPACE once the aircraft is in the area, and the alert goes (3-40; the removal is characterization)', async () => {
-        const unit = await flying(0, [airspace('R-ENTER', BoundaryType.Restricted, box(47 + NM_LAT, 47.4, 7.9, 8.1), LIMITS)]);
+    const enter = () => airspace('R-ENTER', BoundaryType.Restricted, box(47 + NM_LAT, 47.4, 7.9, 8.1), LIMITS);
+
+    it('shows INSIDE SPC USE AIRSPACE once the aircraft is in the area (3-40)', async () => {
+        const unit = await flying(0, [enter()]);
         expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-ENTER           REST 1000ft to 18000ft']); // Precondition
 
         await moveAircraft(unit, {lat: 47 + 2 * NM_LAT, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
         await vi.advanceTimersByTimeAsync(10000);
 
-        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-ENTER           REST 1000ft to 18000ft']);
+        expect(sua(unit).filter(m => m.startsWith('INSIDE'))).toEqual(['INSIDE SPC USE AIRSPACE R-ENTER           REST 1000ft to 18000ft']);
+    });
+
+    // The alert goes once the aircraft is in the area (characterization)
+    it('removes AIRSPACE ALERT once the aircraft is in the area (characterization)', async () => {
+        const unit = await flying(0, [enter()]);
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-ENTER           REST 1000ft to 18000ft']); // Precondition
+
+        await moveAircraft(unit, {lat: 47 + 2 * NM_LAT, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(10000);
+
+        expect(sua(unit).filter(m => m.startsWith('AIRSPACE ALERT'))).toEqual([]);
     });
 
     // The message goes with the aircraft leaving the area laterally (characterization)
@@ -202,7 +215,7 @@ describe('INSIDE SPC USE AIRSPACE after the alert (3-40, B-2)', () => {
     });
 });
 
-describe('the vertical limits (3-39 to 3-41)', () => {
+describe('the vertical limits', () => {
     /** Parked inside a box around the aircraft at the given altitude, after one search */
     async function inside(altitudeFt: number, o: AirspaceOptions, boot: Partial<BootOptions> = {}) {
         const unit = await bootUnit({
@@ -237,8 +250,17 @@ describe('the vertical limits (3-39 to 3-41)', () => {
             .toEqual(['INSIDE SPC USE AIRSPACE R-TEST            REST BELOW 5000ft']);
     });
 
-    // 3-39: a ceiling charted AGL is stored as unlimited. The ABOVE line is characterization: no figure shows it
+    // 3-39: a ceiling charted AGL is stored as unlimited, so the aircraft at 25000 ft is inside an area "up to 3000 ft AGL".
+    // Only the start of the message is looked at here; the limits line has its own test below
     it('treats a ceiling above ground as unlimited (3-39)', async () => {
+        const messages = await inside(25000, {minFt: 1000, maxFt: 3000, maxType: BoundaryAltitudeType.AGL});
+
+        expect(messages).toHaveLength(1);
+        expect(messages[0].slice(0, 30)).toBe('INSIDE SPC USE AIRSPACE R-TEST');
+    });
+
+    // No figure shows the limits line of an area without a ceiling
+    it('shows ABOVE and the floor for an area without a ceiling (characterization)', async () => {
         expect(await inside(25000, {minFt: 1000, maxFt: 3000, maxType: BoundaryAltitudeType.AGL}))
             .toEqual(['INSIDE SPC USE AIRSPACE R-TEST            REST ABOVE 1000ft']);
     });
@@ -251,7 +273,7 @@ describe('the vertical limits (3-39 to 3-41)', () => {
     });
 });
 
-// The name is cut so that a blank stays before the type (characterization; figure 3-125 shows a short name only)
+// The name is cut so that a blank stays before the type (characterization)
 describe('a long airspace name', () => {
     it('is cut one character before the type (characterization)', async () => {
         const unit = await bootUnit({
