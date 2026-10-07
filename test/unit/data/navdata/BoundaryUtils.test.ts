@@ -140,7 +140,7 @@ describe('BoundaryUtils.getIntersections on hand-computed paths (characterizatio
     // The loop visits the first edge of the closed ring twice (BoundaryUtils.ts:121-122, next = (current + 1) % (length - 1)),
     // so a path across the first edge, here the sloping one, gets that point twice. CTR 1 drops the copy (cleanup in
     // AirspacesAlongRoute skips crossings within 1 NM), so nothing shows on the screen today.
-    it.fails('returns each crossing point once (#NEW-3-1)', () => {
+    it.fails('returns each crossing point once (#208)', () => {
         expect(BoundaryUtils.getIntersections(TRIANGLE, 48, 8.5, 46.5, 8.5)).toHaveLength(2);
     });
 

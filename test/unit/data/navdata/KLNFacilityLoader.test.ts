@@ -195,13 +195,13 @@ describe('KLNFacilityLoader.getFacility', () => {
     // that cannot be retrieved, and getFacilities a null in its place. KLNFacilityLoader passes the rejection of the
     // database through instead, so one unknown fix fails the whole batch. Two pins, one for each method, so that a fix
     // of one shows; the passing siblings are the two characterizations above that answer known facilities.
-    it.fails('tryGetFacility answers null for a facility that is in neither source (#NEW-1-1)', async () => {
+    it.fails('tryGetFacility answers null for a facility that is in neither source (#198)', async () => {
         const {loader} = setup([vor('ABC', 48, 9)]);
 
         await expect(loader.tryGetFacility(FacilityType.VOR, ICAO.value('V', 'K1', '', 'NONE'))).resolves.toBeNull();
     });
 
-    it.fails('getFacilities answers null in the place of a facility that is in neither source (#NEW-1-1)', async () => {
+    it.fails('getFacilities answers null in the place of a facility that is in neither source (#198)', async () => {
         const beacon = ndb('NDB', 47, 8);
         const {loader} = setup([beacon]);
 

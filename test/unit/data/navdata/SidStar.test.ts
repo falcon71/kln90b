@@ -633,7 +633,7 @@ describe('the OBS reminder of holds and procedure turns', () => {
 
     // The database pattern IF X (IAF), HF X: the flagged IF is kept, the hold is dropped as a repeat, and the OBS
     // reminder of the hold is lost with it. Whether the sim flags its data this way is not verified.
-    it.fails('asks for OBS at an IAF whose hold follows it as a separate leg (#NEW-6-1)', async () => {
+    it.fails('asks for OBS at an IAF whose hold follows it as a separate leg (#219)', async () => {
         const app = approach({
             type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
             transitions: [{name: 'HLDAA', legs: [Leg.IF(hldaa, FixTypeFlags.IAF), Leg.HF(hldaa, 90)]}],
@@ -645,7 +645,7 @@ describe('the OBS reminder of holds and procedure turns', () => {
         ]);
     });
 
-    it('lists an IAF whose hold follows it as a separate leg once (setup of #NEW-6-1)', async () => {
+    it('lists an IAF whose hold follows it as a separate leg once (setup of #219)', async () => {
         const app = approach({
             type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
             transitions: [{name: 'HLDAA', legs: [Leg.IF(hldaa, FixTypeFlags.IAF), Leg.HF(hldaa, 90)]}],

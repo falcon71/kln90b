@@ -219,7 +219,7 @@ describe('FacilityLoaderScanlist across the edge of its cache window (#40 8abd5f
     const world = () => [...idents('A', 650), ...idents('B', 10)];
     const facilities = (list: string[]) => list.map((ident, i) => intersection(ident, 47 + i * 0.0001, 8));
 
-    it.fails('shows every intersection once scanning clockwise from the first (#NEW-2-1)', async () => {
+    it.fails('shows every intersection once scanning clockwise from the first (#201)', async () => {
         const all = world();
         const list = await scanlist(FacilitySearchType.Intersection, facilities(all));
 
@@ -228,7 +228,7 @@ describe('FacilityLoaderScanlist across the edge of its cache window (#40 8abd5f
         expect(shown).toEqual(all);
     });
 
-    it.fails('shows every intersection once scanning counterclockwise from the last (#NEW-2-1)', async () => {
+    it.fails('shows every intersection once scanning counterclockwise from the last (#201)', async () => {
         const all = world();
         const list = await scanlist(FacilitySearchType.Intersection, facilities(all));
 
@@ -252,7 +252,7 @@ describe('FacilityLoaderScanlist across the edge of its cache window (#40 8abd5f
 // 3-21: scanning visits every waypoint. When a user waypoint is added or deleted, the list throws its cache away and
 // refills it around the waypoint shown (waypointsChanged). NDB idents of different length share prefixes (AB, ABC).
 describe('FacilityLoaderScanlist after a user waypoint change', () => {
-    it.fails('scans counterclockwise from ABC to AB (#NEW-2-3)', async () => {
+    it.fails('scans counterclockwise from ABC to AB (#203)', async () => {
         const bus = new EventBus();
         const list = await scanlist(FacilitySearchType.Ndb, [ndb('AA', 47, 8), ndb('AB', 47, 8.1), ndb('ABC', 47, 8.2), ndb('ABD', 47, 8.3)], bus);
         const abc = ICAO.value('N', 'K1', '', 'ABC');

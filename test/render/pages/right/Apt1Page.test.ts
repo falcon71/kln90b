@@ -183,14 +183,14 @@ describe('APT 1 page scanning from a typed ident that matches no airport (3-21)'
         expect([rows[0], rows[2], rows[3]]).toEqual([' KCZ       ', 'CREATE NEW ', 'WPT AT:    ']);
     });
 
-    it.fails('scans clockwise to the waypoint after the last match (3-21, #NEW-2-2)', async () => {
+    it.fails('scans clockwise to the waypoint after the last match (3-21, #202)', async () => {
         const unit = await scanFromKcz(1);
 
         expect(Screen.read().rows('R')[0]).toBe(' KDDD      ');
     });
 
     // A scan from the typed ident would show KCCC (the airport before KCZ), so this case tells the two readings apart
-    it.fails('scans counterclockwise to the waypoint before the last match (3-21, #NEW-2-2)', async () => {
+    it.fails('scans counterclockwise to the waypoint before the last match (3-21, #202)', async () => {
         const unit = await scanFromKcz(-1);
 
         expect(Screen.read().rows('R')[0]).toBe(' KBBB      ');

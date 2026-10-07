@@ -273,7 +273,7 @@ describe('page names of the tree slots (3-9, 3-12, 3-13)', () => {
     });
 
     // RefPage.name is "REF " today. The status line pads it (StatusLine.tsx), so the screen shows the five cells anyway
-    it.fails('names the REF page with five characters (#NEW-5-1)', async () => {
+    it.fails('names the REF page with five characters (#216)', async () => {
         expect(await names([[RIGHT_PAGE_TREE[1][0]]])).toEqual([['REF  ']]);
     });
 });

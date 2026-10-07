@@ -64,7 +64,7 @@ describe('nearest airport surfaces (3-23)', () => {
             .toEqual([['KAAA'], ['KMIX', 'KAAA']]);
     });
 
-    it.fails('admits a snow runway with HRD SFT (#NEW-2-5)', async () => {
+    it.fails('admits a snow runway with HRD SFT (#205)', async () => {
         expect(await nearestAirports(world([['SNOW', RunwaySurfaceType.Snow]]), SURFACE_HRD_SFT)).toEqual(['SNOW']);
     });
 });

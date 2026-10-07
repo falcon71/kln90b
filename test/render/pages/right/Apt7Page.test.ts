@@ -140,7 +140,7 @@ describe('APT 7 loading a STAR when FPL 0 has to make room', () => {
         return unit;
     }
 
-    it('deletes the two first legs and loads all five STAR waypoints (setup of #NEW-6-4)', async () => {
+    it('deletes the two first legs and loads all five STAR waypoints (setup of #222)', async () => {
         const unit = await loadStarIntoFullPlan();
         const legs = fpl0Legs(unit);
 
@@ -151,7 +151,7 @@ describe('APT 7 loading a STAR when FPL 0 has to make room', () => {
     });
 
     // 6-23: the STAR waypoints stand in front of the airport, in the order of the STAR
-    it.fails('keeps the STAR legs in order before the airport when FPL 0 makes room (6-23, #NEW-6-4)', async () => {
+    it.fails('keeps the STAR legs in order before the airport when FPL 0 makes room (6-23, #222)', async () => {
         const unit = await loadStarIntoFullPlan();
 
         expect(fpl0Legs(unit).slice(24)).toEqual([
@@ -192,7 +192,7 @@ describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
         return unit;
     }
 
-    it('asks to add the airport and keeps FPL 0 at 30 legs with the airport in it once (setup of #NEW-6-4)', async () => {
+    it('asks to add the airport and keeps FPL 0 at 30 legs with the airport in it once (setup of #222)', async () => {
         const unit = await loadSidIntoFullPlan();
         const legs = fpl0Legs(unit);
 
@@ -201,7 +201,7 @@ describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
     });
 
     // 6-22: the airport comes first, followed by the SID in its order (figure 6-38)
-    it.fails('puts the airport first, then every SID leg in order, when FPL 0 makes room (6-22, #NEW-6-4)', async () => {
+    it.fails('puts the airport first, then every SID leg in order, when FPL 0 makes room (6-22, #148, #222)', async () => {
         const unit = await loadSidIntoFullPlan();
 
         expect(fpl0Legs(unit).slice(0, 3)).toEqual([['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID]]);

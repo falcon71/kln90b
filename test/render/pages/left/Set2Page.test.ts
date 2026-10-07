@@ -68,7 +68,7 @@ describe('SET 2 cursor when the GPS gets its first fix (3-53)', () => {
 
     // CursorController.setCursorActive clamps the remembered field to fields.length instead of fields.length - 1
     // (CursorController.ts:123), so the cursor comes on at a field that is gone and throws
-    it.fails('turns the cursor on at the time zone when it was on the time before the fix (#NEW-5-2)', async () => {
+    it.fails('turns the cursor on at the time zone when it was on the time before the fix (#217)', async () => {
         const unit = await bootUnit({coldGps: true});
         await unit.panel.selectPage('L', 'SET 2');
         await unit.panel.cursor('L');
@@ -84,7 +84,7 @@ describe('SET 2 cursor when the GPS gets its first fix (3-53)', () => {
 
     // Nothing moves the cursor when the focused field turns read-only under it, so every display tick asks a field that is
     // gone whether it takes ENT, and throws
-    it.fails('stays usable when the fix comes while the cursor is on the time (#NEW-5-2)', async () => {
+    it.fails('stays usable when the fix comes while the cursor is on the time (#217)', async () => {
         const unit = await bootUnit({coldGps: true});
         await unit.panel.selectPage('L', 'SET 2');
         await unit.panel.cursor('L');

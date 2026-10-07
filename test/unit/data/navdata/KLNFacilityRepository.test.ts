@@ -131,7 +131,7 @@ describe('KLNFacilityRepository add, update and remove', () => {
 describe('KLNFacilityRepository sync between instruments', () => {
     // Every instrument has its own repository; a new one asks the others for their waypoints (a dump request) and
     // answers such requests itself. With one KLN 90B per aircraft there is nobody to answer.
-    // a second KLN 90B in one aircraft: #NEW-1-3
+    // a second KLN 90B in one aircraft: #200
     it('answers a dump request of another instrument with all its waypoints (characterization)', () => {
         const wpt = sup('ONE', 47, 8);
         const userVor = vor('ABC', 47, 8, {region: 'XX'});

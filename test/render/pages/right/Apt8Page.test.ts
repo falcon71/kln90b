@@ -132,7 +132,7 @@ describe('APT 8 putting an approach into FPL 0', () => {
 
 // FPL 0 holds 30 legs. While the first leg is part of the active leg, the unit cannot make room by deleting it, so the
 // insertion stops and leaves a partial approach. Whether the approach should be refused as a whole is open.
-// a question: #NEW-6-3
+// a question: #221
 describe('APT 8 loading an approach into a full FPL 0 (characterization)', () => {
     it('inserts the legs that fit, leaves out the rest and shows FPL FULL', async () => {
         const w = approachWorld();
@@ -177,7 +177,7 @@ describe('APT 8 loading an approach when FPL 0 has to make room', () => {
         return unit;
     }
 
-    it('deletes the two first legs and loads all five approach waypoints (setup of #NEW-6-4)', async () => {
+    it('deletes the two first legs and loads all five approach waypoints (setup of #222)', async () => {
         const unit = await loadIntoFullPlan();
         const legs = fpl0Legs(unit);
 
@@ -189,7 +189,7 @@ describe('APT 8 loading an approach when FPL 0 has to make room', () => {
 
     // 6-5, 6-7 (figure 6-9): the approach waypoints, the MAP included, stand in front of the airport. The order is the one of the
     // load that needs no room (the tests above).
-    it.fails('keeps the approach legs in order before the airport when FPL 0 makes room (6-5, 6-7, #NEW-6-4)', async () => {
+    it.fails('keeps the approach legs in order before the airport when FPL 0 makes room (6-5, 6-7, #222)', async () => {
         const unit = await loadIntoFullPlan();
 
         expect(fpl0Legs(unit).slice(24)).toEqual([

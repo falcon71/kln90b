@@ -283,7 +283,7 @@ describe('the nearest airport list radius (characterization)', () => {
         // 7.5 degrees of latitude north of the aircraft are 450 NM
         const unit = await bootUnit({facilities: [airport('KFAR', 54.5, 8.0)], position: POSITION});
 
-        // the radius is a question: #NEW-2-7
+        // the radius is a question: #207
         expect(await nearestRows(unit)).toEqual([' KFAR  nr 1']);
     });
 });
@@ -305,11 +305,11 @@ describe('VOR classes in the nearest VOR list', () => {
         return nearestRowsBackwards(unit);
     }
 
-    it.fails('lists a terminal VOR (#NEW-2-4)', async () => {
+    it.fails('lists a terminal VOR (#204)', async () => {
         expect(await nearestVorRows(trm(), hig())).toEqual([' TRM D nr 1', ' HIG D nr 2']);
     });
 
-    it.fails('lists a VOR of undefined class (#NEW-2-4)', async () => {
+    it.fails('lists a VOR of undefined class (#204)', async () => {
         expect(await nearestVorRows(und(), hig())).toEqual([' UND D nr 1', ' HIG D nr 2']);
     });
 
@@ -336,13 +336,13 @@ describe('VOR classes in the nearest VOR list', () => {
         expect(await superNav5Labels(vor('HIG', 47.1, 8.05))).toEqual(['HIG']);
     });
 
-    it.fails('draws a terminal VOR on Super NAV 5 with VOR: TLH (#NEW-2-4)', async () => {
+    it.fails('draws a terminal VOR on Super NAV 5 with VOR: TLH (#204)', async () => {
         expect(await superNav5Labels(trm(), vor('HIG', 47.1, 8.05))).toEqual(['HIG', 'TRM']);
     });
 
     // 5-45: the nearest functions work on user-defined waypoints (see the NDB case above). A user VOR has the class
     // and type the user waypoint loaders give it (Unknown, Unknown); its page shows no D.
-    it.fails('lists a user VOR (#NEW-2-6)', async () => {
+    it.fails('lists a user VOR (#206)', async () => {
         const unit = await bootUnit({facilities: [hig()], position: POSITION});
         KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.02, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
         await vi.advanceTimersByTimeAsync(12000);

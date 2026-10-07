@@ -61,7 +61,7 @@ describe('INT page reference VOR (3-50)', () => {
 
     // A user VOR in the repository has the class and type the user waypoint loaders give it (Unknown, Unknown).
     // IntPage.tsx:221 computes the REF itself because the database field "does not respect user VORs".
-    it.fails('takes a closer user VOR (#NEW-2-6)', async () => {
+    it.fails('takes a closer user VOR (#206)', async () => {
         const unit = await bootUnit({facilities: [inta(), far()], position: {lat: 47.0, lon: 8.0}});
         KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.12, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
 

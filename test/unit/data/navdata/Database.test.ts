@@ -67,7 +67,7 @@ describe('Database expiration date', () => {
 
     // Figure 2-4 (on 2-5) and figures 3-24 and 3-25 (3-7) show a two-digit year. 22b4532 changed the format from the two digits of the sim's
     // range to {YYYY}. The test above is the passing sibling: the day and month are right.
-    it.fails('shows the expiry with a two-digit year (2-5, 3-7, #NEW-1-2)', () => {
+    it.fails('shows the expiry with a two-digit year (2-5, 3-7, #199)', () => {
         const db = new Database(bus, sensors, handler);
 
         expect(db.expirationDateString).toBe('10 JUN 26');

@@ -161,7 +161,7 @@ describe('CursorController outer knob at the ends of the page (4-3, checked in t
         expect(walk(cc, all, 2, -1)).toEqual(['c', 'b', 'a']);
     });
 
-    it.fails('stays on the last field when turned further clockwise (4-3, #NEW-5-3)', () => {
+    it.fails('stays on the last field when turned further clockwise (4-3, #218)', () => {
         const all = [new FakeField('a'), new FakeField('b'), new FakeField('c')];
         const cc = new CursorController(children({a: all[0], b: all[1], c: all[2]}));
         cc.setCursorActive(true);
@@ -174,7 +174,7 @@ describe('CursorController outer knob at the ends of the page (4-3, checked in t
         expect(focused(cc, all)).toBe('c');
     });
 
-    it.fails('stays on the first field when turned further counterclockwise (4-3, #NEW-5-3)', () => {
+    it.fails('stays on the first field when turned further counterclockwise (4-3, #218)', () => {
         const all = [new FakeField('a'), new FakeField('b'), new FakeField('c')];
         const cc = new CursorController(children({a: all[0], b: all[1], c: all[2]}));
         cc.setCursorActive(true);
@@ -255,8 +255,8 @@ describe('CursorController cursor on and off (characterization)', () => {
 // A cursor turned on afterwards must land on a field that is still there; it throws today (Math.min against
 // fields.length instead of fields.length - 1, CursorController.ts:123). The passing sibling is the cursor memory test
 // above (the same flow without a field turning read-only); the render pins on SET 2 are in Set2Page.test.ts.
-describe('CursorController when fields turn read-only (3-53, #NEW-5-2)', () => {
-    it.fails('comes back on the last field when the field it was on has turned read-only (#NEW-5-2)', () => {
+describe('CursorController when fields turn read-only (3-53, #217)', () => {
+    it.fails('comes back on the last field when the field it was on has turned read-only (#217)', () => {
         const all = [new FakeField('date'), new FakeField('time'), new FakeField('zone')];
         const cc = new CursorController(children({date: all[0], time: all[1], zone: all[2]}));
         cc.setCursorActive(true);
@@ -272,7 +272,7 @@ describe('CursorController when fields turn read-only (3-53, #NEW-5-2)', () => {
 
     // The same, with the cursor on: the focused field turns read-only under it. Every later call on the focused field
     // throws today
-    it.fails('moves on to a field that is still there when the focused field turns read-only (#NEW-5-2)', () => {
+    it.fails('moves on to a field that is still there when the focused field turns read-only (#217)', () => {
         const all = [new FakeField('date'), new FakeField('time'), new FakeField('zone')];
         const cc = new CursorController(children({date: all[0], time: all[1], zone: all[2]}));
         cc.setCursorActive(true);
