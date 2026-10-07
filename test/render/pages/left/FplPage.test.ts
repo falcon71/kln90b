@@ -236,6 +236,34 @@ describe('FPL 0 page with an approach', () => {
         expect(unit.errors).toEqual([]);
         expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
     });
+
+    // 6-6: approach waypoints cannot be edited, and C-1 answers INVALID ADD and INVALID DEL where the knobs try. ENT on one
+    // is not answered at all: the unit throws while it rebuilds the list. The sibling holds the setup and takes the
+    // rejection the ENT leaves; the pin holds that there is none
+    async function enterOnApproachWaypoint() {
+        const unit = await bootWithApproach();
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 2);
+        expect(unit.panel.focused('L').text).toBe('IAFAAà'); // Precondition: an approach waypoint under the cursor
+        expect(left().map(r => r.slice(1))).toContain(' 2 IAFAAà ');
+        await unit.panel.ent();
+        return unit;
+    }
+
+    it('takes ENT on an approach waypoint and leaves the plan alone (6-6, C-1)', async () => {
+        const unit = await enterOnApproachWaypoint();
+
+        unit.takeRejections(); // the rejection of the ENT, see the pin below
+        expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
+    });
+
+    it.fails('does not throw on ENT on an approach waypoint (6-6, C-1, #NEW-3-5)', async () => {
+        const unit = await enterOnApproachWaypoint();
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
+    });
 });
 
 /** FPL 0 is KPRC with the departure DEP1 loaded: KPRC, DEPAA, ENRAA */
@@ -639,8 +667,8 @@ describe('inserting a waypoint with the inner knob', () => {
         return unit;
     }
 
-    // 4-4: a waypoint can be added to any flight plan of fewer than 30 waypoints, not only to FPL 0: the inner knob opens
-    // a blank entry in front of the waypoint under the cursor and the waypoint moves down. This holds the insert of the
+    // 4-4: the inner knob can insert into any plan below the 30-waypoint limit, not only into FPL 0: it opens a blank
+    // entry in front of the waypoint under the cursor and the waypoint moves down. This holds the insert of the
     // numbered plan; the cursor on it is the pin below
     it('opens a blank entry in front of the waypoint when the inner knob turns on a numbered plan (4-4)', async () => {
         const unit = await cursorOnAbcOfFpl3();
@@ -650,7 +678,7 @@ describe('inserting a waypoint with the inner knob', () => {
         expect(left().slice(2, 4)).toEqual(['  2:       ', '  3:ABC    ']);
     });
 
-    // 4-4 says the cursor is on the entry being typed, for any flight plan. On a numbered plan with waypoints it stays
+    // 4-4 puts the cursor on the entry being typed, whichever plan it is. On a numbered plan with waypoints it stays
     // on the waypoint before the new entry, which is open for typing but not under the cursor
     it.fails('puts the cursor on the new blank entry when the inner knob opens an insert on a numbered plan (4-4, #NEW-3-4)', async () => {
         const unit = await cursorOnAbcOfFpl3();
