@@ -133,3 +133,31 @@ describe('remarks of an airport with a three-character ident (#140)', () => {
         expect(manager.getRemarks('ABC')).toEqual(['LINE ONE   ', 'LINE TWO   ', 'LINE THREE ']);
     });
 });
+
+describe('remarks of a 101st airport (3-47, C-2)', () => {
+    /** A manager that holds the remarks of 100 airports. The slots cannot hold them (#92), so the manager's own map is filled. */
+    function managerWith100Airports(): RemarksManager {
+        const manager = new RemarksManager(bus, userSettings);
+        const remarks = (manager as unknown as { remarks: Record<string, [string, string, string]> }).remarks;
+        for (let i = 0; i < 100; i++) {
+            remarks[`K${String(i).padStart(3, '0')}`] = ['X          ', '           ', '           '];
+        }
+        return manager;
+    }
+
+    // 3-47: the unit holds the remarks of up to 100 airports. This is the sibling of the pin below: the same manager
+    it('holds the remarks of 100 airports (3-47)', () => {
+        const manager = managerWith100Airports();
+
+        expect(manager.getAirportsWithRemarks()).toHaveLength(100);
+        expect(manager.getRemarks('K099')).toEqual(['X          ', '           ', '           ']);
+    });
+
+    // C-2: the message RMKS FULL says that the remarks of another airport do not fit. Today the guard reads the length
+    // of an object that has none, so it never fires and the save goes on to a slot that does not exist
+    it.fails('refuses the remarks of a 101st airport with RMKS FULL (3-47, C-2, #NEW-5-5)', () => {
+        const manager = managerWith100Airports();
+
+        expect(() => manager.saveRemarks('KZZA', ['X          ', '           ', '           '])).toThrow('RMKS FULL');
+    });
+});
