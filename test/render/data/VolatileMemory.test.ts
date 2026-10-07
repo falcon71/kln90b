@@ -144,7 +144,7 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
 
         await cycle(unit);
 
-        expect(m.altPage).toEqual({alertEnabled: false, alertWarn: 300});
+        expect(m.altPage.alertEnabled).toBe(false); // Whether the on/off switch survives is not settled
         expect(m.dtPage.departureTime).toBeNull();
         expect(m.triPage).toMatchObject({tas: 150, windSpeed: 0, windDirTrue: 0, tri1To: null, tri3From: null, tri3To: null, tri5Fpl: 0});
         expect(m.navPage.nav4VnavWpt).toBeNull();
@@ -194,6 +194,24 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
         expect(m.navPage.nav4SelectedAltitude).toBe(8000);
         expect(m.triPage.ff).toBe(12);
         expect(m.triPage.reserve).toBe(30);
+    });
+});
+
+// 3-55 step 4: the pilot normally enters the warn altitude only the first time altitude alerting is used, so the unit
+// keeps it. The first characterization of the describe above is the sibling: it sets the same state and runs the same
+// power cycle, and passes
+describe('the ALT warn altitude over a power cycle', () => {
+    it.fails('keeps the ALT warn altitude over a power cycle (3-55, #NEW-7-2)', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        const m = unit.props.memory;
+        m.altPage.alertWarn = 500;
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(m.altPage.alertWarn).toBe(500); // The precondition: nothing else resets it
+
+        await cycle(unit);
+
+        expect(m.altPage.alertWarn).toBe(500);
     });
 });
 
