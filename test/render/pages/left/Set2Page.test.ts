@@ -1,5 +1,5 @@
-import {describe, expect, it} from 'vitest';
-import {bootUnit} from '../../../harness/boot';
+import {describe, expect, it, vi} from 'vitest';
+import {bootUnit, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {OneTimeMessage} from '../../../../kln90b/data/MessageHandler';
 
@@ -33,5 +33,66 @@ describe('SET 2 page', () => {
         expect(unit.props.database.isAiracCurrent()).toBe(false);
         const messages = unit.props.messageHandler.getMessages().map(m => (m as OneTimeMessage).message);
         expect(messages).toContainEqual(['RECYCLE POWER TO USE', 'CORRECT DATA BASE DATA']);
+    });
+});
+
+/** The mask of the left half page's rows 2 and 3: the date, and the time with its zone */
+const dateTimeMask = () => Screen.read().maskRows('L').slice(2, 4);
+
+const ON_DATE = ['..IIIIIIIII', '...........'];
+const ON_TIME = ['...........', 'IIIII......'];
+const ON_ZONE = ['...........', '........III'];
+
+// 3-53: the date and time cannot be set while the unit receives them from a satellite. SET 2 makes both read-only at the
+// first fix, which leaves the time zone as the only field (the magnetic variation is read-only while it is valid, 5-44).
+describe('SET 2 cursor when the GPS gets its first fix (3-53)', () => {
+    // Holds the setup of the pins below: a cold unit lets the cursor on the date and the time, and after the fix a SET 2
+    // page built anew puts it on the time zone
+    it('moves the cursor over the date and the time without a fix, and only the time zone is left after it', async () => {
+        const unit = await bootUnit({coldGps: true});
+        await unit.panel.selectPage('L', 'SET 2');
+        await unit.panel.cursor('L');
+        expect(dateTimeMask()).toEqual(ON_DATE);
+        await unit.panel.outer('L', 1);
+        expect(dateTimeMask()).toEqual(ON_TIME);
+        await unit.panel.cursor('L');
+
+        await settle(unit);
+        await unit.panel.selectPage('L', 'SET 1');
+        await unit.panel.selectPage('L', 'SET 2');
+        await unit.panel.cursor('L');
+
+        expect(unit.errors).toEqual([]);
+        expect(dateTimeMask()).toEqual(ON_ZONE);
+    });
+
+    // CursorController.setCursorActive clamps the remembered field to fields.length instead of fields.length - 1
+    // (CursorController.ts:123), so the cursor comes on at a field that is gone and throws
+    it.fails('turns the cursor on at the time zone when it was on the time before the fix (#NEW-5-2)', async () => {
+        const unit = await bootUnit({coldGps: true});
+        await unit.panel.selectPage('L', 'SET 2');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1);
+        await unit.panel.cursor('L');
+        await settle(unit);
+
+        await unit.panel.cursor('L');
+
+        expect(unit.errors).toEqual([]);
+        expect(dateTimeMask()).toEqual(ON_ZONE);
+    });
+
+    // Nothing moves the cursor when the focused field turns read-only under it, so every display tick asks a field that is
+    // gone whether it takes ENT, and throws
+    it.fails('stays usable when the fix comes while the cursor is on the time (#NEW-5-2)', async () => {
+        const unit = await bootUnit({coldGps: true});
+        await unit.panel.selectPage('L', 'SET 2');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1);
+
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
     });
 });
