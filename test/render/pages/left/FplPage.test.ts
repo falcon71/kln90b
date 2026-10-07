@@ -237,9 +237,9 @@ describe('FPL 0 page with an approach', () => {
         expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
     });
 
-    // 6-6: approach waypoints cannot be edited, and C-1 answers INVALID ADD and INVALID DEL where the knobs try. ENT on one
-    // is not answered at all: the unit throws while it rebuilds the list. The sibling holds the setup and takes the
-    // rejection the ENT leaves; the pin holds that there is none
+    // 6-7: approach waypoints can be neither added nor deleted, and C-1 answers INVALID ADD and INVALID DEL where the
+    // knobs try. ENT on one is not answered at all: the unit throws while it rebuilds the list. The sibling holds the
+    // setup and takes the rejection the ENT leaves; the pin holds that there is none
     async function enterOnApproachWaypoint() {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
@@ -251,14 +251,14 @@ describe('FPL 0 page with an approach', () => {
         return unit;
     }
 
-    it('takes ENT on an approach waypoint and leaves the plan alone (6-6, C-1)', async () => {
+    it('takes ENT on an approach waypoint and leaves the plan alone (6-7, C-1)', async () => {
         const unit = await enterOnApproachWaypoint();
 
         unit.takeRejections(); // the rejection of the ENT, see the pin below
         expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
     });
 
-    it.fails('does not throw on ENT on an approach waypoint (6-6, C-1, #NEW-3-5)', async () => {
+    it.fails('does not throw on ENT on an approach waypoint (6-7, C-1, #NEW-3-5)', async () => {
         const unit = await enterOnApproachWaypoint();
 
         expect(unit.takeRejections()).toEqual([]);
