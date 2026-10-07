@@ -168,9 +168,11 @@ async function nearestRowsBackwards(unit: HeadlessUnit): Promise<string[]> {
 // 3-22: the nearest list sits in front of the complete list. Counterclockwise from the start of the complete list
 // reaches nr 9 (here the last of three), clockwise from the last nearest one reaches the start of the complete list, and
 // neither end wraps. The NDB page has no nearest filter, which keeps the world small. ZZN is the default NDB, far away.
+// The nearest order (NBB, NAA, NCC) differs from the alphabetical order, so nr 1, the last nearest and the start of the
+// complete list (NAA) are three different waypoints.
 describe('the nearest list in front of the complete list (3-22)', () => {
     async function ndbPage(): Promise<HeadlessUnit> {
-        const unit = await bootUnit({facilities: [ndb('NBB', 47.2, 8.0), ndb('NAA', 47.1, 8.0), ndb('NCC', 47.3, 8.0)], position: POSITION});
+        const unit = await bootUnit({facilities: [ndb('NBB', 47.1, 8.0), ndb('NAA', 47.2, 8.0), ndb('NCC', 47.3, 8.0)], position: POSITION});
         await vi.advanceTimersByTimeAsync(12000);
         await unit.panel.selectPage('R', 'NDB  ');
         expect(identRow()).toBe(' NAA       '); // precondition: the first waypoint of the complete list
@@ -191,11 +193,11 @@ describe('the nearest list in front of the complete list (3-22)', () => {
         await slowStep(unit, -1);
         await slowStep(unit, -1);
         await slowStep(unit, -1);
-        expect(identRow()).toBe(' NAA   nr 1'); // precondition
+        expect(identRow()).toBe(' NBB   nr 1'); // precondition
 
         await slowStep(unit, -1);
 
-        expect(identRow()).toBe(' NAA   nr 1');
+        expect(identRow()).toBe(' NBB   nr 1');
     });
 
     it('scans clockwise from the last nearest waypoint to the start of the complete list', async () => {
@@ -233,6 +235,12 @@ describe('the nearest NDB list follows the aircraft (3-22)', () => {
 
         expect(await nearestRowsBackwards(unit)).toEqual([' NBB   nr 1', ' NAA   nr 2']);
     });
+});
+
+// The code recomputes bearing and distance every second and searches every 10 s; the guide gives no refresh interval.
+describe('the nearest page distance refresh (characterization)', () => {
+    // NAA 0.05 degrees (3.0 NM) north, NBB 0.1 degrees (6.0 NM) south of the start
+    const world = () => ({facilities: [ndb('NAA', 47.05, 8.0), ndb('NBB', 46.9, 8.0)], position: POSITION});
 
     // The nearest search runs every 10 s and the first one ran within the first 12 s; the page step and the move fall
     // about 2 s after it, and the check 1.5 s later, well before the next search
@@ -269,8 +277,7 @@ describe('the nearest NDB list with a user NDB (3-22, 5-45)', () => {
     });
 });
 
-// The code searches 500 NM around the aircraft and the guide gives no radius; the KLN 89 trainer lists nothing beyond
-// 200 NM (the 89 is another product). Whether the 90B radius is 500 NM is open, so this holds the code's value.
+// The code searches 500 NM around the aircraft; the guide gives no radius. This holds the code's value.
 describe('the nearest airport list radius (characterization)', () => {
     it('lists an airport 450 NM away as nr 1 when nothing is nearer', async () => {
         // 7.5 degrees of latitude north of the aircraft are 450 NM
@@ -306,13 +313,14 @@ describe('VOR classes in the nearest VOR list', () => {
         expect(await nearestVorRows(und(), hig())).toEqual([' UND D nr 1', ' HIG D nr 2']);
     });
 
-    it.fails('draws a terminal VOR on Super NAV 5 with VOR: TLH (#NEW-2-4)', async () => {
+    /** The labels Super NAV 5 draws with VOR: TLH (3 in the settings) for the given VORs; they are a few NM from the aircraft */
+    async function superNav5Labels(...facilities: ReturnType<typeof vor>[]): Promise<string[]> {
         const labels: string[] = [];
         const spy = vi.spyOn(CoordinateCanvasDrawContext.prototype, 'drawLabel').mockImplementation((_facility, text) => {
             labels.push(text);
         });
         onTestFinished(() => spy.mockRestore());
-        const unit = await bootUnit({storage: {superNav5Vor: 3}, facilities: [trm(), vor('HIG', 47.1, 8.05)], position: POSITION}); // 3 = TLH
+        const unit = await bootUnit({storage: {superNav5Vor: 3}, facilities, position: POSITION}); // 3 = TLH
         await vi.advanceTimersByTimeAsync(12000);
         await unit.panel.selectPage('R', 'NAV 4'); // as above: the right side first, then NAV 5 becomes Super NAV 5
         await unit.panel.selectPage('L', 'NAV 5');
@@ -320,7 +328,16 @@ describe('VOR classes in the nearest VOR list', () => {
         await vi.advanceTimersByTimeAsync(2000);
         expect((unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage()).toBeInstanceOf(SuperNav5Page);
 
-        expect([...new Set(labels)].sort()).toEqual(['HIG', 'TRM']);
+        return [...new Set(labels)].sort();
+    }
+
+    // The sibling of the Super NAV 5 pin: the same page and spy see a high altitude VOR
+    it('draws a high altitude VOR on Super NAV 5 with VOR: TLH', async () => {
+        expect(await superNav5Labels(vor('HIG', 47.1, 8.05))).toEqual(['HIG']);
+    });
+
+    it.fails('draws a terminal VOR on Super NAV 5 with VOR: TLH (#NEW-2-4)', async () => {
+        expect(await superNav5Labels(trm(), vor('HIG', 47.1, 8.05))).toEqual(['HIG', 'TRM']);
     });
 
     // 5-45: the nearest functions work on user-defined waypoints (see the NDB case above). A user VOR has the class

@@ -128,13 +128,19 @@ describe('APT 1 page scanning from a typed ident that matches no airport (3-21)'
     });
     const CHARSET = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
-    /** KCZ typed with the knobs, the cursor off and the scan knob pulled; one slow click of the inner knob follows */
-    async function scanFromKcz(clicks: number): Promise<HeadlessUnit> {
+    /** APT 1 with KCZ entered with the knobs (enterIdent) and the cursor off: the state the pins scan from */
+    async function enterKcz(): Promise<HeadlessUnit> {
         const unit = await bootUnit(world());
         await unit.panel.selectPage('R', 'APT 1');
         await unit.panel.cursor('R');
         await unit.panel.enterIdent('R', 'KCZ');
         await unit.panel.cursor('R');
+        return unit;
+    }
+
+    /** KCZ entered as above, the scan knob pulled; one slow click of the inner knob follows */
+    async function scanFromKcz(clicks: number): Promise<HeadlessUnit> {
+        const unit = await enterKcz();
         await unit.panel.scan();
         await unit.panel.inner('R', clicks);
         await vi.advanceTimersByTimeAsync(400);
@@ -152,8 +158,8 @@ describe('APT 1 page scanning from a typed ident that matches no airport (3-21)'
         }
     }
 
-    // The passing sibling of the pins: after KC the page shows KCCC, the last match, and after KCZ the page offers to
-    // create a waypoint. Without it the scans below could start from anywhere.
+    // The passing siblings of the pins: after KC the page shows KCCC, the last match, and after KCZ the page offers to
+    // create a waypoint, typed char by char and (below) on the pins' own path. Without them the scans could start anywhere.
     it('shows KCCC after KC and the CREATE NEW state after KCZ', async () => {
         const unit = await bootUnit(world());
         await unit.panel.selectPage('R', 'APT 1');
@@ -165,6 +171,13 @@ describe('APT 1 page scanning from a typed ident that matches no airport (3-21)'
 
         await unit.panel.outer('R', 1);
         await setChar(unit, 'Z');
+
+        const rows = Screen.read().rows('R');
+        expect([rows[0], rows[2], rows[3]]).toEqual([' KCZ       ', 'CREATE NEW ', 'WPT AT:    ']);
+    });
+
+    it('shows the CREATE NEW state for KCZ entered the way the pins enter it', async () => {
+        const unit = await enterKcz();
 
         const rows = Screen.read().rows('R');
         expect([rows[0], rows[2], rows[3]]).toEqual([' KCZ       ', 'CREATE NEW ', 'WPT AT:    ']);
