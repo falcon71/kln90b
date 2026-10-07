@@ -7,7 +7,7 @@ import {canvasToAscii, downsampled} from '../../../harness/render/canvas';
 import {SuperNav5} from '../../../harness/render/superNav5';
 import {recordMap} from '../../../harness/render/mapRecorder';
 import {Screen} from '../../../harness/render/screen';
-import {savedFlightplan} from '../../../harness/storage';
+import {savedFlightplan, storedSetting} from '../../../harness/storage';
 import {standardRoute} from '../../../harness/fixtures';
 import {courseDeg, pointFrom} from '../../../harness/flight/geo';
 import {MainPage} from '../../../../kln90b/pages/MainPage';
@@ -105,6 +105,8 @@ describe('Super NAV 5 page (characterization)', () => {
     // The scales between 1 and 1000 NM are not known to be those of the real unit (the code says so itself), so this
     // pins the list the inner knob offers today, in its order, and claims nothing about the real unit.
     // the scales between 1 and 1000 NM are a question: #NEW-2-5
+    // The list has no 7 NM scale, although a figure of the guide's approach chapter shows AUTO at 7 NM; that goes into
+    // the question as well.
     it('Super NAV 5 range scales (characterization)', async () => {
         const {unit} = await superNav5OnRoute({storage: {superNav5MapRange: 0}});
         await unit.panel.cursor('L');
@@ -177,6 +179,9 @@ describe('Super NAV 5 page', () => {
         seen.push(focusedLeft());
 
         expect(seen.map(s => s.join('').trim())).toEqual(['1', 'AUTO', '1000']);
+        // The scale picked with the knob is the scale the map takes: the saved setting is the number shown
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(storedSetting(unit, 'superNav5MapRange')).toBe(1000);
     });
 
     // 3-37: the right cursor opens the menu with the cursor on the VOR selection; the right outer knob moves it over
@@ -203,8 +208,8 @@ describe('Super NAV 5 page', () => {
     // 3-37: the VOR selection is TLH, LH, H or OFF; NDB and APT are ON or OFF; the orientations are those of NAV 5
     // (3-34), N, DTK and TK up, and HDG up only with a heading input
     it.each([
-        ['without', undefined, 3],
-        ['with', HEADING_INPUT_XML, 4],
+        ['without', undefined, ['N^', 'Ó^', 'Ö^']], // north up, then the DTK and TK glyphs of the map font
+        ['with', HEADING_INPUT_XML, ['N^', 'Ó^', 'Ö^', 'Ú^']],
     ] as const)('offers the menu choices %s a heading input (3-37, 3-34)', async (_name, panelXml, orientations) => {
         const {unit} = await superNav5OnRoute({panelXml});
         await unit.panel.cursor('R');
@@ -223,7 +228,7 @@ describe('Super NAV 5 page', () => {
         await unit.panel.outer('R', 1);
         expect(await choices(4)).toEqual(new Set(['OFF', 'ON']));
         await unit.panel.outer('R', 1);
-        expect((await choices(8)).size).toBe(orientations);
+        expect(await choices(8)).toEqual(new Set(orientations));
     });
 
     // 3-37: H draws only high altitude VORs, LH low and high altitude VORs, OFF none. (TLH and terminal VORs: #204 in
@@ -264,6 +269,32 @@ describe('Super NAV 5 page', () => {
         ]);
     });
 
+    // 3-34, 3-35: desired track up turns the map so that the course points up, with the aircraft three quarters down
+    // and the range still measured from the aircraft to the top. The map is 148 x 91 map pixels, so the aircraft is at
+    // (74, 68.25) and, at 10 NM, a waypoint 8 NM ahead on the desired track of 060 is 8/10 of the 68.25 pixels above
+    // it, at (74, 13.65).
+    it('draws desired track up with the course pointing up (3-34, 3-35)', async () => {
+        const w = world();
+        const ahead = pointFrom(w.kaaa, 60, 8);
+        const wpt = intersection('AHEAD', ahead.lat, ahead.lon);
+        const map = recordMap();
+        const unit = await bootUnit({
+            facilities: [w.kaaa, wpt], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
+            storage: {...savedFlightplan(0, [w.kaaa, wpt]), superNav5MapRange: 10, superNav5MapOrientation: 1},
+        });
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(12_000);
+        await showSuperNav5(unit);
+
+        const at = (sym: string) => map.pixels.find(p => p[0] === sym)!;
+        expect(Math.abs(at('$')[1] - 74)).toBeLessThanOrEqual(1);
+        expect(Math.abs(at('$')[2] - 68.25)).toBeLessThanOrEqual(1);
+        const squares = map.pixels.filter(p => p[0] === '@'); // KAAA, then the waypoint ahead
+        expect(squares).toHaveLength(2);
+        expect(Math.abs(squares[1][1] - 74)).toBeLessThanOrEqual(1);
+        expect(Math.abs(squares[1][2] - 13.65)).toBeLessThanOrEqual(1);
+    });
+
     // The sibling of the pin below: with VOR: OFF the route labels ABC once, and with VOR: H ABC is a nearest VOR
     it('labels a VOR of FPL 0 with the VORs off, and draws it as a nearest VOR with VOR: H (3-37)', async () => {
         const off = await superNav5OnRoute();
@@ -299,8 +330,9 @@ describe('Super NAV 5 page', () => {
         expect(labels(map.drawn)).toEqual(full);
     });
 
-    // 3-38: pulling the right inner knob opens a window at the bottom right with the active waypoint in reverse video;
-    // the knob scans FPL 0 forward to its end and backward to its beginning, and pushing it in removes the window
+    // 3-38: pulling out the right inner knob opens a small window at the bottom right that starts on the active
+    // waypoint, inverted; turning the knob steps through FPL 0 up to its last and down to its first waypoint, and
+    // pushing the knob in closes the window again
     it('scans FPL 0 in the window of the pulled right inner knob (3-38)', async () => {
         const {unit} = await superNav5OnRoute();
         await unit.panel.scan();
@@ -382,16 +414,21 @@ describe('Super NAV 5 page', () => {
 });
 
 describe('Super NAV 5 AUTO scale', () => {
-    // The scales 5, 10, 15 and 20 are all shown in the Pilot's Guide figures (3-35, 3-116, 6-26) or on photos of real
-    // units, so they are scales of the real unit; the list between them is not known (the code's own list is a guess).
+    // The scales 5 and 15 are shown in figures of the Pilot's Guide (5 NM on 6-8, 6-12 and 6-17; 15 NM in figure 3-116 on
+    // 3-35), and 10 and 20 on photos of real units, so they are scales of the real unit. The list between them is not
+    // known (the code's own list is a guess), so the distances below sit just under a scale (9.5 and 19.5 NM): the
+    // expected scale then holds whether or not the real unit has a scale between.
     const P = {lat: 47.0, lon: 8.0};
     const at = (bearing: number, nm: number) => pointFrom(P, bearing, nm);
     const fix = (ident: string, bearing: number, nm: number) => intersection(ident, at(bearing, nm).lat, at(bearing, nm).lon);
 
     // 3-36: AUTO is the smallest scale that shows the active waypoint and the waypoint after it. Active A1 3 NM north,
-    // A2 17 NM north: the smallest scale that reaches 17 NM north is 20.
+    // A2 19.5 NM north: the smallest scale that reaches 19.5 NM north is 20. The map is drawn at the scale it shows:
+    // north up, the aircraft is in the middle of the map (148 x 91 map pixels, center 74, 45.5) and the range is the
+    // distance to the top, so A2 lies 19.5/20 of the 45.5 pixels above the center, at y = 45.5 - 44.36 = 1.14.
     it('takes the smallest scale that shows the waypoint after the active one (3-36)', async () => {
-        const a0 = fix('AAAA', 180, 2), a1 = fix('AAAB', 0, 3), a2 = fix('AAAC', 0, 17);
+        const a0 = fix('AAAA', 180, 2), a1 = fix('AAAB', 0, 3), a2 = fix('AAAC', 0, 19.5);
+        const map = recordMap();
         const unit = await bootUnit({
             facilities: [a0, a1, a2], position: P,
             storage: {...savedFlightplan(0, [a0, a1, a2]), superNav5MapRange: 0},
@@ -401,12 +438,18 @@ describe('Super NAV 5 AUTO scale', () => {
         expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('AAAB');
 
         expect(SuperNav5.read().range.trim()).toBe('20');
+        const squares = map.pixels.filter(p => p[0] === '@'); // the three waypoints of FPL 0, in order
+        expect(squares).toHaveLength(3);
+        expect(Math.abs(squares[2][1] - 74)).toBeLessThanOrEqual(1);
+        expect(Math.abs(squares[2][2] - 1.14)).toBeLessThanOrEqual(1);
     });
 
     // 3-36: with no waypoint after the active one (a Direct To off the flight plan), AUTO shows the active waypoint:
-    // 7 NM north takes the 10 NM scale
+    // 9.5 NM north takes the 10 NM scale. The map is drawn at that scale: the active waypoint ("%", the star of an
+    // off-plan Direct To) lies 9.5/10 of the 45.5 pixels above the center, at y = 45.5 - 43.2 = 2.3.
     it('takes the smallest scale that shows the Direct To waypoint (3-36)', async () => {
-        const dct = fix('AAAD', 0, 7);
+        const dct = fix('AAAD', 0, 9.5);
+        const map = recordMap();
         const unit = await bootUnit({facilities: [dct], position: P, storage: {superNav5MapRange: 0}});
         await settle(unit);
         await unit.panel.dct();
@@ -418,11 +461,16 @@ describe('Super NAV 5 AUTO scale', () => {
         await showSuperNav5(unit);
 
         expect(SuperNav5.read().range.trim()).toBe('10');
+        const star = map.pixels.find(p => p[0] === '%')!;
+        expect(Math.abs(star[1] - 74)).toBeLessThanOrEqual(1);
+        expect(Math.abs(star[2] - 2.3)).toBeLessThanOrEqual(1);
     });
 
-    // The sibling of the pin below: the active waypoint is A1, 17 NM north, and A2 4 NM north-east comes after it
-    it('activates the far waypoint before the near one (3-36)', async () => {
-        const a0 = fix('AAAA', 180, 2), a1 = fix('AAAB', 0, 17), a2 = fix('AAAC', 45, 4);
+    // The sibling of the pin below: the active waypoint is A1, 19.5 NM north, and A2 4 NM north-east comes after it.
+    // 3-36 names the waypoint after the active one; which waypoint is active depends on the leg sequencing of 4-7 and
+    // 4-8, here the first leg of the plan, so that the second waypoint is active and the third follows.
+    it('activates the far waypoint before the near one (3-36, 4-7, 4-8)', async () => {
+        const a0 = fix('AAAA', 180, 2), a1 = fix('AAAB', 0, 19.5), a2 = fix('AAAC', 45, 4);
         const unit = await bootUnit({
             facilities: [a0, a1, a2], position: P,
             storage: {...savedFlightplan(0, [a0, a1, a2]), superNav5MapRange: 0, turnAnticipation: false},
@@ -434,9 +482,9 @@ describe('Super NAV 5 AUTO scale', () => {
         expect(unit.props.memory.navPage.activeWaypoint.getFollowingLeg()!.wpt.icaoStruct.ident).toBe('AAAC');
     });
 
-    // 3-36: AUTO must also show the active waypoint, 17 NM north, when the waypoint after it is nearer (4 NM): 20
+    // 3-36: AUTO must also show the active waypoint, 19.5 NM north, when the waypoint after it is nearer (4 NM): 20
     it.fails('takes a scale that shows the active waypoint when the next one is nearer (3-36, #NEW-2-3)', async () => {
-        const a0 = fix('AAAA', 180, 2), a1 = fix('AAAB', 0, 17), a2 = fix('AAAC', 45, 4);
+        const a0 = fix('AAAA', 180, 2), a1 = fix('AAAB', 0, 19.5), a2 = fix('AAAC', 45, 4);
         const unit = await bootUnit({
             facilities: [a0, a1, a2], position: P,
             storage: {...savedFlightplan(0, [a0, a1, a2]), superNav5MapRange: 0, turnAnticipation: false},

@@ -5,7 +5,7 @@ import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
 import {canvasToAscii, downsampled} from '../../../harness/render/canvas';
 import {Screen} from '../../../harness/render/screen';
-import {savedFlightplan} from '../../../harness/storage';
+import {savedFlightplan, storedSetting} from '../../../harness/storage';
 import {courseDeg, LatLon, pointFrom} from '../../../harness/flight/geo';
 import {standardRoute} from '../../../harness/fixtures';
 import {recordMap} from '../../../harness/render/mapRecorder';
@@ -169,12 +169,12 @@ describe('NAV 5 page with a DME arc', () => {
 });
 
 /** The standard route KAAA, ABC, KBBB in FPL 0, the aircraft at KAAA, NAV 5 on the left. */
-async function nav5OnRoute(o: { storage?: Record<string, unknown>, panelXml?: string } = {}) {
+async function nav5OnRoute(o: { storage?: Record<string, unknown>, panelXml?: string, magvar?: number } = {}) {
     const w = standardRoute();
     const map = recordMap({KAAA: w.kaaa, ABC: w.abc, KBBB: w.kbbb});
     const unit = await bootUnit({
         facilities: [w.kaaa, w.abc, w.kbbb], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
-        storage: {...savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]), ...o.storage}, panelXml: o.panelXml,
+        storage: {...savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]), ...o.storage}, panelXml: o.panelXml, magvar: o.magvar,
     });
     await settle(unit);
     await unit.panel.selectPage('L', 'NAV 5');
@@ -223,9 +223,9 @@ describe('NAV 5 page (characterization)', () => {
     });
 });
 
-describe('NAV 5 page', () => {
-    // 3-34, 3-35: FPL 0 waypoints are drawn with their number on the FPL 0 page, lines connect them, and an arrow points to
-    // the active waypoint along the active leg. 3-35: north up and DTK up draw the aircraft as a diamond ("$" in the map
+describe('NAV 5 page map', () => {
+    // 3-34, 3-35: FPL 0 waypoints are drawn with their number on the FPL 0 page, lines connect them, and the leg to the
+    // active waypoint ends in an arrowhead. 3-35: north up and DTK up draw the aircraft as a diamond ("$" in the map
     // font). The aircraft is at KAAA, so the first leg is active and ABC is the active waypoint.
     it('draws the FPL 0 waypoints by number, the active leg as an arrow and the next leg as a line (3-34, 3-35)', async () => {
         const {unit, map} = await nav5OnRoute();
@@ -238,6 +238,21 @@ describe('NAV 5 page', () => {
             'icon 2 ABC',
             'icon 3 KBBB',
             'icon $ KAAA', // the diamond
+        ]);
+    });
+
+    // 3-34: the lines connect all waypoints of FPL 0, also the legs behind the aircraft. With the aircraft past ABC the
+    // second leg is the active one: the first leg is a plain line, the second one carries the arrow.
+    it('draws the legs before the active leg as lines (3-34)', async () => {
+        const {unit, map, w} = await nav5OnRoute({storage: {turnAnticipation: false}});
+        const course = courseDeg(w.kaaa, w.abc);
+        await moveAircraft(unit, pointFrom(w.abc, course, 0.3), {groundspeedKt: 120, trackTrue: course});
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
+
+        expect(map.drawn.filter(d => d.startsWith('arrow') || d.startsWith('line'))).toEqual([
+            'line KAAA ABC',
+            'arrow ABC KBBB',
         ]);
     });
 
@@ -385,6 +400,19 @@ describe('NAV 5 page', () => {
         expect(Screen.read().rows('L')[5].slice(0, 4)).toBe('090°');
     });
 
+    // 3-35: the value is a magnetic bearing. With a variation of 10 degrees east, magnetic = true - 10: the true track
+    // 090 shows as 080 and the DTK of the first leg (049.6 true) as 040 (039.6).
+    it.each([
+        ['actual track', 2, '080°'],
+        ['desired track', 1, '040°'],
+    ] as const)('shows the %s orientation value in magnetic degrees (3-35)', async (_name, orientation, text) => {
+        const {unit} = await nav5OnRoute({storage: {nav5MapOrientation: orientation}, magvar: 10});
+        await moveAircraft(unit, {lat: 47.0, lon: 8.0}, {groundspeedKt: 120, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().rows('L')[5].slice(0, 4)).toBe(text);
+    });
+
     // 3-35: heading up shows the heading, here the gyro's 123
     it('shows the heading as the orientation value heading up (3-35)', async () => {
         const {unit} = await nav5OnRoute({storage: {nav5MapOrientation: 3}, panelXml: HEADING_INPUT_XML});
@@ -453,5 +481,8 @@ describe('NAV 5 page', () => {
         expect(Math.max(...seen)).toBe(1000);
         expect(seen.has(15)).toBe(true);
         expect(seen.has(40)).toBe(true);
+        // The scale picked with the knob is the scale the map takes: the saved setting is the number shown
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(storedSetting(unit, 'nav5MapRange')).toBe(Number(unit.panel.focused('L').text));
     });
 });
