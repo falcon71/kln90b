@@ -98,12 +98,30 @@ describe('SET 2 cursor when the GPS gets its first fix (3-53)', () => {
     });
 });
 
+const MAGVAR_INVALID = 'MAGNETIC VAR INVALID ALL DATA REFERENCED TO TRUE NORTH';
+const messages = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
+
+/** At N 74.5, tracking 090 true, with 10 W entered on SET 2 line 6 and the cursor left where ENT puts it */
+async function tenWestOutside(): Promise<HeadlessUnit> {
+    const unit = await bootUnit({position: {lat: 74.5, lon: 8.0}, magvar: 10});
+    await settle(unit);
+    await moveAircraft(unit, {lat: 74.5, lon: 8.0}, {groundspeedKt: 120, trackTrue: 90});
+    expect(messages(unit)).toContain(MAGVAR_INVALID); // The precondition: no variation yet
+    await unit.panel.selectPage('L', 'SET 2');
+    await unit.panel.cursor('L'); // the time zone: the date and the time are read-only with a fix
+    await unit.panel.outer('L', 1); // line 6
+    await unit.panel.inner('L', 2); // the first click enters a blank tens digit, so this is a 1
+    await unit.panel.outer('L', 1);
+    await unit.panel.inner('L', 1); // a 0
+    await unit.panel.outer('L', 1);
+    await unit.panel.inner('L', 2); // E, then W
+    await unit.panel.ent();
+    return unit;
+}
+
 // 5-44: outside the primary coverage area (N 74 to S 60) line 6 of SET 2 takes a pilot-entered magnetic variation,
 // and the navigation data is referenced to it; inside the area line 6 is not shown (figure 5-133)
 describe('SET 2 magnetic variation (5-44)', () => {
-    const MAGVAR_INVALID = 'MAGNETIC VAR INVALID ALL DATA REFERENCED TO TRUE NORTH';
-    const messages = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
-
     it('shows no variation line inside the area, and the cursor stays on the time zone (5-44)', async () => {
         const unit = await bootUnit();
         await settle(unit);
@@ -115,24 +133,6 @@ describe('SET 2 magnetic variation (5-44)', () => {
         expect(Screen.read().rows('L')[5]).toBe('           ');
         expect(unit.panel.focused('L')).toEqual({row: 3, col: 8, text: 'UTC'});
     });
-
-    /** At N 74.5, tracking 090 true, with 10 W entered on SET 2 line 6 and the cursor left where ENT puts it */
-    async function tenWestOutside(): Promise<HeadlessUnit> {
-        const unit = await bootUnit({position: {lat: 74.5, lon: 8.0}, magvar: 10});
-        await settle(unit);
-        await moveAircraft(unit, {lat: 74.5, lon: 8.0}, {groundspeedKt: 120, trackTrue: 90});
-        expect(messages(unit)).toContain(MAGVAR_INVALID); // The precondition: no variation yet
-        await unit.panel.selectPage('L', 'SET 2');
-        await unit.panel.cursor('L'); // the time zone: the date and the time are read-only with a fix
-        await unit.panel.outer('L', 1); // line 6
-        await unit.panel.inner('L', 2); // the first click enters a blank tens digit, so this is a 1
-        await unit.panel.outer('L', 1);
-        await unit.panel.inner('L', 1); // a 0
-        await unit.panel.outer('L', 1);
-        await unit.panel.inner('L', 2); // E, then W
-        await unit.panel.ent();
-        return unit;
-    }
 
     // Figure 5-134 shows the entered variation on line 6, which is too inexact to read a column off: the row is held
     // up to the blanks between the label and the value, and the characterization below holds the exact row. With 10 W,
@@ -151,13 +151,6 @@ describe('SET 2 magnetic variation (5-44)', () => {
         expect(messages(unit)).not.toContain(MAGVAR_INVALID);
     });
 
-    it('shows the variation as MAG V  10°W (characterization)', async () => {
-        const unit = await tenWestOutside();
-
-        expect(unit.errors).toEqual([]);
-        expect(Screen.read().rows('L')[5]).toBe('MAG V  10°W');
-    });
-
     // The sibling of the pin below: back inside the area with the cursor off, line 6 is gone again (figure 5-133)
     it('hides the variation line again back inside the area (5-44)', async () => {
         const unit = await tenWestOutside();
@@ -170,8 +163,9 @@ describe('SET 2 magnetic variation (5-44)', () => {
         expect(Screen.read().rows('L')[5]).toBe('           ');
     });
 
-    // The same cause as the pins above: nothing moves the cursor off line 6 when it turns read-only inside the area, so
-    // every display tick asks a field that is gone whether it takes ENT, and throws
+    // The same cause as the #217 pins of the first-fix describe above, on another field: nothing moves the cursor off
+    // line 6 when it turns read-only inside the area, so every display tick asks a field that is gone whether it takes
+    // ENT, and throws
     it.fails('stays usable when the aircraft enters the area with the cursor on line 6 (5-44, #217)', async () => {
         const unit = await tenWestOutside();
         await unit.panel.outer('L', 1); // ENT moved the cursor to the time zone; back to line 6
@@ -180,6 +174,15 @@ describe('SET 2 magnetic variation (5-44)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(unit.errors).toEqual([]);
+    });
+});
+
+describe('SET 2 magnetic variation line (characterization)', () => {
+    it('shows the variation as MAG V  10°W', async () => {
+        const unit = await tenWestOutside();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[5]).toBe('MAG V  10°W');
     });
 });
 

@@ -70,6 +70,44 @@ describe('SET 5 page (characterization)', () => {
     });
 });
 
+describe('SET 5 offset while the alert is off (characterization)', () => {
+    // The hidden offset takes no cursor: the enable field is the only one, so the outer knob stays on it
+    it('keeps the cursor on the enable field on a unit booted with the alert off', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'SET 5');
+        await unit.panel.cursor('L');
+        const enable = unit.panel.focused('L');
+        expect(enable.text.trim()).toBe('OFF');
+
+        await unit.panel.outer('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('L')).toEqual(enable);
+    });
+
+    it('takes the offset out of the cursor again when the alert is turned off', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'SET 5');
+        await unit.panel.cursor('L');
+        const at = () => {
+            const f = unit.panel.focused('L');
+            return {row: f.row, col: f.col};
+        };
+        const enable = at();
+        await unit.panel.inner('L', 1); // ON
+        await unit.panel.outer('L', 1);
+        expect(unit.panel.focused('L').text.trim()).toBe('8'); // the offset field holds the hundreds of feet
+        await unit.panel.outer('L', 1);
+        expect(at()).toEqual(enable);
+        await unit.panel.inner('L', 1); // OFF
+
+        await unit.panel.outer('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(at()).toEqual(enable);
+    });
+});
+
 describe('SET 5 height above airport alert (3-58)', () => {
     // 3-58: the offset runs from 800 ft to 2000 ft; from the default 800 ft that is twelve steps of 100 ft. The row only
     // is asserted: the stored key is the #89 pin above.
@@ -99,7 +137,14 @@ describe('SET 5 height above airport alert (3-58)', () => {
         await unit.panel.cursor('L');
 
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().rows('L').map(r => r.trim())).toEqual(['HT ABOVE', 'APT ALERT', 'OFF', '', 'FEATURE', 'DISABLED']);
+        expect(Screen.read().rows('L')).toEqual([
+            ' HT ABOVE  ',
+            ' APT ALERT ',
+            '   OFF     ',
+            '           ',
+            ' FEATURE   ',
+            ' DISABLED  ',
+        ]);
         expect(Screen.read().status().left).toBe('SET 5');
     });
 });

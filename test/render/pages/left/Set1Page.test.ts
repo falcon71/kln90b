@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
+import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {airport} from '../../../harness/navdata/builders';
 
@@ -83,10 +83,12 @@ describe('SET 1 initialization (3-18)', () => {
         expect(unit.errors).toEqual([]);
         expect(unit.panel.focused('L').text.trim()).toBe('CONFIRM?');
     });
+});
 
-    // 3-18 (the NOTE after step 7): the latitude can be entered directly instead of a waypoint. The editor starts at N
-    // with blank digits; the null digits take 0 at ENT, so N, 4, 6 and the first minute digit 0 give N 46°00.00'.
-    it('takes a latitude entered with the knobs (3-18)', async () => {
+describe('SET 1 editors (characterization)', () => {
+    // The editor starts at N with blank digits; the blank digits take 0 at ENT, so N, 4, 6 and the first minute digit 0
+    // give N 46°00.00'. The row is what the code shows, with the zero fill.
+    it('takes a latitude entered with the knobs', async () => {
         const unit = await onSet1();
         await unit.panel.cursor('L');
         await unit.panel.outer('L', 1); // the latitude
@@ -95,7 +97,62 @@ describe('SET 1 initialization (3-18)', () => {
         expect(unit.errors).toEqual([]);
         expect(Screen.read().rows('L')[2]).toBe("N 46°00.00'");
     });
+
+    // The same for the longitude: E, the blank hundreds digit skipped, then 1 and 2 for the degrees
+    it('takes a longitude entered with the knobs', async () => {
+        const unit = await onSet1();
+        await unit.panel.cursor('L');
+        await enterLongitude12E(unit);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[3]).toBe("E 12°00.00'");
+    });
+
+    // The track field shows the magnetic track. The world's variation is 10 E (east positive, as in KLNMagvar.test.ts),
+    // so a true track of 090 is a magnetic track of 080, flown at 120 kt.
+    it('shows the track of a moving aircraft as a magnetic track', async () => {
+        const unit = await bootUnit({position: POSITION, magvar: 10});
+        await settle(unit);
+        await moveAircraft(unit, POSITION, {groundspeedKt: 120, trackTrue: 90});
+        await unit.panel.selectPage('L', 'SET 1');
+
+        expect(Screen.read().rows('L')[4]).toBe('120 KT 080°');
+    });
+
+    // A track entered with the knobs and confirmed is the track of the next SET 1 page. The world has no magnetic
+    // variation and the aircraft is parked, so nothing else changes the track.
+    it('keeps a track entered with the knobs after CONFIRM?', async () => {
+        const unit = await onSet1();
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 4); // the track
+        await unit.panel.inner('L', 3); // the first click enters a 0, so this is a 2
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 8); // a 7
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1); // a 0
+        await unit.panel.ent();
+        await unit.panel.cursorTo('L', 'CONFIRM?');
+        await unit.panel.ent();
+        expect(Screen.read().status().left).toBe('SET 1');
+
+        await unit.panel.selectPage('L', 'SET 2');
+        await unit.panel.selectPage('L', 'SET 1');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[4].slice(7)).toBe('270°');
+    });
 });
+
+/** With the cursor on the WPT field: E 12°00.00' on the longitude with the knobs, then ENT */
+async function enterLongitude12E(unit: HeadlessUnit): Promise<void> {
+    await unit.panel.outer('L', 2); // the longitude
+    await unit.panel.inner('L', 1); // enters the editor: E, the other digits blank
+    await unit.panel.outer('L', 2); // past the hundreds digit, which stays blank
+    await unit.panel.inner('L', 2); // the first click enters a 0, so this is a 1
+    await unit.panel.outer('L', 1);
+    await unit.panel.inner('L', 3); // a 2
+    await unit.panel.ent();
+}
 
 /** With the cursor on the latitude field: N 46°00.00' with the knobs, then ENT */
 async function enterLatitude46N(unit: HeadlessUnit): Promise<void> {
@@ -168,7 +225,24 @@ describe('SET 1 CONFIRM? before the first fix (characterization)', () => {
         await settle(unit);
 
         expect(unit.errors).toEqual([]);
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true); // The first fix happened
         expect(messages(unit)).not.toContain(MESSAGE);
+    });
+
+    // E 12°00.00' on the same latitude is 0.75° of longitude, about 30 NM, east of the aircraft
+    it('turns the cursor off, and the first fix compares with a confirmed longitude entered with the knobs', async () => {
+        const unit = await coldOnSet1();
+        await unit.panel.cursor('L');
+        await enterLongitude12E(unit);
+        await unit.panel.cursorTo('L', 'CONFIRM?');
+        await unit.panel.ent();
+        expect(Screen.read().status().left).toBe('SET 1');
+
+        await settle(unit);
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true);
+        expect(messages(unit)).toContain(MESSAGE);
     });
 });
 

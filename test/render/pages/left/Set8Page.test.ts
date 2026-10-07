@@ -50,6 +50,42 @@ describe('SET 8 airspace alert (3-41)', () => {
         expect(storedSetting(unit, 'airspaceAlertEnabled')).toBe(false);
     });
 
+    // 3-41: the buffer is selected once the alert is enabled, so a disabled alert leaves the hidden buffer out of the
+    // cursor: the enable field is the only one, and the outer knob stays on it
+    it('takes no cursor on the hidden buffer on a unit booted with the alert disabled (3-41)', async () => {
+        const unit = await bootUnit({storage: {airspaceAlertEnabled: false}});
+        await unit.panel.selectPage('L', 'SET 8');
+        await unit.panel.cursor('L');
+        const enable = unit.panel.focused('L');
+        expect(enable.text.trim()).toBe('DISABLE');
+
+        await unit.panel.outer('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('L')).toEqual(enable);
+    });
+
+    it('takes the buffer out of the cursor when the alert is disabled (3-41)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'SET 8');
+        await unit.panel.cursor('L');
+        const at = () => {
+            const f = unit.panel.focused('L');
+            return {row: f.row, col: f.col};
+        };
+        const enable = at();
+        expect(unit.panel.focused('L').text.trim()).toBe('ENABLE');
+        await unit.panel.outer('L', 1);
+        expect(unit.panel.focused('L').row).toBe(5); // the buffer takes the cursor while the alert is enabled
+        await unit.panel.outer('L', -1);
+        await unit.panel.inner('L', 1); // DISABLE
+
+        await unit.panel.outer('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(at()).toEqual(enable);
+    });
+
     // Figures 3-131 and 3-132: the outer knob moves the cursor over the buffer digits, and the inner knob sets each one;
     // 00500 becomes 01000 with the thousands digit 1 and the hundreds digit 0
     it('sets the buffer digit by digit (3-41)', async () => {
