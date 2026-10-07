@@ -116,3 +116,46 @@ describe('APT 7 putting a procedure into FPL 0', () => {
         ]);
     });
 });
+
+// When FPL 0 is full and its first leg is not part of the active leg, the unit makes room by deleting the first leg
+// (C-1). The STAR waypoints must still come in order before the airport.
+describe('APT 7 loading a STAR when FPL 0 has to make room', () => {
+    /** 26 filler fixes and KPRC in FPL 0, the aircraft on the way to the seventh filler: the active leg has index 6 */
+    async function loadStarIntoFullPlan() {
+        const w = approachWorld();
+        const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
+        const stars = ['STRAA', 'STRAB', 'STRAC', 'STRAD', 'STRAE'].map((ident, i) => intersection(ident, east(40 - 5 * i).lat, east(40 - 5 * i).lon));
+        const kprc = withProcedures(w.kprc, {arrivals: [star('ARR1', {common: [Leg.IF(stars[0]), ...stars.slice(1).map(s => Leg.TF(s))]})]});
+        const fillers = Array.from({length: 26}, (_, i) => intersection(`FIL${String.fromCharCode(65 + i)}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [kprc, ...stars, ...fillers], position: {lat: 46.5, lon: 7.12},
+            storage: savedFlightplan(0, [...fillers, kprc]),
+        });
+        await settle(unit);
+        // Preconditions: 27 legs, an active leg that does not need the first leg, five STAR legs for three free places
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(27);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(6);
+        await unit.panel.loadProcedure('APT 7', {ident: 'KPRC'});
+        return unit;
+    }
+
+    it('deletes the two first legs and loads all five STAR waypoints (setup of #NEW-6-4)', async () => {
+        const unit = await loadStarIntoFullPlan();
+        const legs = fpl0Legs(unit);
+
+        expect(legs).toHaveLength(30);
+        expect(legs[0]).toEqual(['FILC', KLNLegType.USER]); // FILA and FILB are gone
+        expect(legs.filter(l => l[1] === KLNLegType.STAR).map(l => l[0]).sort()).toEqual(['STRAA', 'STRAB', 'STRAC', 'STRAD', 'STRAE']);
+        expect(legs.filter(l => l[0] === 'KPRC')).toEqual([['KPRC', KLNLegType.USER]]);
+    });
+
+    // 6-23: the STAR waypoints stand in front of the airport, in the order of the STAR
+    it.fails('keeps the STAR legs in order before the airport when FPL 0 makes room (6-23, #NEW-6-4)', async () => {
+        const unit = await loadStarIntoFullPlan();
+
+        expect(fpl0Legs(unit).slice(24)).toEqual([
+            ['STRAA', KLNLegType.STAR], ['STRAB', KLNLegType.STAR], ['STRAC', KLNLegType.STAR], ['STRAD', KLNLegType.STAR],
+            ['STRAE', KLNLegType.STAR], ['KPRC', KLNLegType.USER],
+        ]);
+    });
+});

@@ -157,3 +157,44 @@ describe('APT 8 loading an approach into a full FPL 0 (characterization)', () =>
         expect(messageList(unit)).toEqual(before);
     });
 });
+
+// When FPL 0 is full and its first leg is not part of the active leg, the unit makes room by deleting the first leg
+// (C-1). The approach waypoints must still come in order before the airport.
+describe('APT 8 loading an approach when FPL 0 has to make room', () => {
+    /** 26 filler fixes and KPRC in FPL 0, the aircraft on the way to the seventh filler: the active leg has index 6 */
+    async function loadIntoFullPlan() {
+        const w = approachWorld();
+        const fillers = Array.from({length: 26}, (_, i) => intersection(`FIL${String.fromCharCode(65 + i)}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [...w.facilities, ...fillers], position: {lat: 46.5, lon: 7.12},
+            storage: savedFlightplan(0, [...fillers, w.kprc]),
+        });
+        await settle(unit);
+        // Preconditions: 27 legs, an active leg that does not need the first leg, five approach legs for three free places
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(27);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(6);
+        await unit.panel.loadProcedure('APT 8');
+        return unit;
+    }
+
+    it('deletes the two first legs and loads all five approach waypoints (setup of #NEW-6-4)', async () => {
+        const unit = await loadIntoFullPlan();
+        const legs = fpl0Legs(unit);
+
+        expect(legs).toHaveLength(30);
+        expect(legs[0]).toEqual(['FILC', KLNLegType.USER]); // FILA and FILB are gone
+        expect(legs.filter(l => l[1] === KLNLegType.APP).map(l => l[0]).sort()).toEqual(['FAFAA', 'IAFAA', 'IFAAA', 'MAPAA', 'SDFAA']);
+        expect(legs.filter(l => l[0] === 'KPRC')).toEqual([['KPRC', KLNLegType.USER]]);
+    });
+
+    // 6-5, 6-7 (figure 6-9): the approach waypoints, the MAP included, stand in front of the airport. The order is the one of the
+    // load that needs no room (the tests above).
+    it.fails('keeps the approach legs in order before the airport when FPL 0 makes room (6-5, 6-7, #NEW-6-4)', async () => {
+        const unit = await loadIntoFullPlan();
+
+        expect(fpl0Legs(unit).slice(24)).toEqual([
+            ['IAFAA', KLNLegType.APP], ['IFAAA', KLNLegType.APP], ['FAFAA', KLNLegType.APP], ['SDFAA', KLNLegType.APP],
+            ['MAPAA', KLNLegType.APP], ['KPRC', KLNLegType.USER],
+        ]);
+    });
+});
