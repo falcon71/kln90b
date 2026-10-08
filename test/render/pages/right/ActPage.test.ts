@@ -2,13 +2,14 @@ import {describe, expect, it, vi} from 'vitest';
 import {Facility, FixTypeFlags, ICAO, VorType} from '@microsoft/msfs-sdk';
 import {BootOptions, bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {insertLeg} from '../../../harness/flightplan';
-import {approachWorld, dtWorld} from '../../../harness/fixtures';
+import {approachWorld, dtWorld, sidStarWorld} from '../../../harness/fixtures';
 import {pointFrom} from '../../../harness/flight/geo';
 import {airport, intersection, ndb, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
 import {readRows, Screen} from '../../../harness/render/screen';
 import {savedFlightplan, savedUserWaypoints} from '../../../harness/storage';
 import {collectStatusMessages} from '../../../harness/statusLine';
+import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 
 describe('ACT page', () => {
     // 4-10: the ACT page shows the active waypoint, or tells that there is none. 4-10 does not describe the state without
@@ -194,11 +195,11 @@ describe('ACT page, the first row (4-10)', () => {
     });
 
     // 4-10: the letter stands to the far right (figures 4-37 and 4-38 show A and V in the last column), and the KLN 89
-    // trainer, 2026-10-07 (T25, medium confidence) puts U and I in the same fixed column for a 3-letter and a 5-letter
+    // trainer, 2026-10-07 (medium confidence) puts U and I in the same fixed column for a 3-letter and a 5-letter
     // ident. The code puts the I of an intersection one blank after the ident, so a 3-letter ident leaves it in the
     // middle of the row. The cause is #290: the ident selector has five cells, and the blank cells of a short ident
     // have index -1 and no width, so the letter moves up to the ident
-    it.fails('shows the type letter of an intersection in the last column (4-10, trainer T25, #290)', async () => {
+    it.fails('shows the type letter of an intersection in the last column (4-10, the KLN 89 trainer, 2026-10-07, #290)', async () => {
         const {kaaa, abc, def, kbbb} = dtWorld();
         const unit = await bootOnAct([kaaa, abc, def, kbbb], [kaaa, abc, def, kbbb]);
         await unit.panel.scan();
@@ -209,7 +210,7 @@ describe('ACT page, the first row (4-10)', () => {
         expect(Screen.read().rows('R')[0]).toBe('  3 DEF   I');
     });
 
-    it.fails('shows the type letter of a supplemental waypoint in the last column (4-10, trainer T25, #290)', async () => {
+    it.fails('shows the type letter of a supplemental waypoint in the last column (4-10, the KLN 89 trainer, 2026-10-07, #290)', async () => {
         const {kaaa} = dtWorld();
         const supa = {icaoStruct: ICAO.value('U', 'XX', '', 'SUPA')} as Facility;
         await bootOnAct([kaaa, supa], [kaaa], {
@@ -259,10 +260,10 @@ describe('ACT page, scanning FPL 0 (4-10)', () => {
         expect(Screen.read().rows('R')[0]).toBe('  1 KAAA  A');
     });
 
-    // 4-10: the arrow designates the active waypoint, and the KLN 89 trainer, 2026-10-07 (T26): with a waypoint twice in
+    // 4-10: the arrow designates the active waypoint, and the KLN 89 trainer, 2026-10-07: with a waypoint twice in
     // the plan and the first copy active, the scan shows the second copy without the arrow. ActiveArrow compares ICAOs, so
     // the second copy gets the arrow as well
-    it.fails('shows no arrow at the second copy of the active waypoint (4-10, trainer T26, #294)', async () => {
+    it.fails('shows no arrow at the second copy of the active waypoint (4-10, the KLN 89 trainer, 2026-10-07, #294)', async () => {
         const {kaaa, abc, def} = dtWorld();
         const unit = await bootOnAct([kaaa, abc, def, abc], [kaaa, abc, def]);
         await unit.panel.scan();
@@ -282,9 +283,10 @@ describe('ACT page without an active waypoint', () => {
         return unit;
     }
 
-    // The setup sibling of the pin below: without a plan the page shows NO ACTIVE WAYPOINT (4-10 does not describe the
-    // state: the code's video reference, see above), and the boot has left no message on the status line
-    it('shows NO ACTIVE WAYPOINT when there is no plan (4-10)', async () => {
+    // The setup sibling of the pin below: without a plan the page shows NO ACTIVE WAYPOINT, and the boot has left no
+    // message on the status line. 4-10 does not describe the state; the source is the code's reference, a video of a real
+    // unit (https://youtu.be/Q6m7_CVGPCg?t=19, cited in ActPage.tsx), as for the f95d1d7 tests above
+    it('shows NO ACTIVE WAYPOINT when there is no plan (video of a real unit, youtu.be/Q6m7_CVGPCg)', async () => {
         const unit = await bootWithoutPlan();
         expect(Screen.read().status().mode).toMatch(/^enr-leg/); // precondition: no message left from the boot
 
@@ -296,9 +298,9 @@ describe('ACT page without an active waypoint', () => {
     });
 
     // C-2: NO SUP WPTS belongs to selecting the SUP page type when there are no supplemental waypoints, and the KLN 89
-    // trainer, 2026-10-07 (T27): ACT with nothing active shows its text and posts no message. The ACT page builds a
+    // trainer, 2026-10-07: ACT with nothing active shows its text and posts no message. The ACT page builds a
     // SupPage as the placeholder behind NO ACTIVE WAYPOINT, and its constructor posts the message
-    it.fails('does not post NO SUP WPTS (C-2, trainer T27, #293)', async () => {
+    it.fails('does not post NO SUP WPTS (C-2, the KLN 89 trainer, 2026-10-07, #293)', async () => {
         const unit = await bootWithoutPlan();
         const messages = collectStatusMessages(unit);
 
@@ -410,5 +412,58 @@ describe('ACT 8 (characterization)', () => {
             "           ",
           ]
         `);
+    });
+});
+
+/** The ACT page of KPRC in sidStarWorld() (the SID DEP1, the STARs ARR1 and ARR2), FPL 0 ENRAA, KPRC with KPRC active */
+async function bootOnActWithSidStar(): Promise<HeadlessUnit> {
+    const w = sidStarWorld({sids: ['DEP1'], stars: true});
+    const [kprc, enraa] = w.facilities;
+    const unit = await bootUnit({facilities: w.facilities, position: w.position, storage: savedFlightplan(0, [enraa, kprc])});
+    await settle(unit);
+    await unit.panel.selectPage('R', 'ACT');
+    expect(Screen.read().rows('R')[0]).toBe('› 2 KPRC  A'); // precondition: the ACT page of the active KPRC
+    return unit;
+}
+
+describe('ACT 7 (characterization)', () => {
+    // Backwards from ACT 1 the inner knob passes ACT 8, then the two ACT 7 pages of an airport with SIDs and STARs: the
+    // STAR page, then the SID page. Both keep the ACT header row (arrow, position in FPL 0, ident, type letter)
+    it('shows the STAR and the SID page of the active airport under the ACT header', async () => {
+        const unit = await bootOnActWithSidStar();
+        await unit.panel.inner('R', -2);
+        const starPage = [Screen.read().status().right, ...Screen.read().rows('R')];
+        await unit.panel.inner('R', -1);
+        const sidPage = [Screen.read().status().right, ...Screen.read().rows('R')];
+
+        expect(starPage).toEqual(['ACT+7', '› 2 KPRC  A', 'SELECT STAR', ' 1 ARR1    ', ' 2 ARR2    ', '           ', '           ']);
+        expect(sidPage).toEqual(['ACT+7', '› 2 KPRC  A', 'SELECT SID ', ' 1 DEP1    ', '           ', '           ', '           ']);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The cursor comes on the first SID; ENT on it, the runway 09, the transition TRNAA and LOAD IN FPL put the SID's
+    // waypoints after KPRC, which FPL 0 already holds, so no question to add the airport comes. FPL 0 comes up on the
+    // left, and the right page stays on ACT 7 of KPRC
+    it('loads a SID into FPL 0 after the active airport and stays on ACT 7', async () => {
+        const unit = await bootOnActWithSidStar();
+        await unit.panel.inner('R', -3);
+        expect(Screen.read().rows('R')[1]).toBe('SELECT SID '); // precondition
+
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP1
+        await unit.panel.ent(); // runway 09
+        await unit.panel.ent(); // transition TRNAA
+        await unit.panel.ent(); // LOAD IN FPL
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const legs = unit.props.memory.fplPage.flightplans[0].getLegs().map(l => [l.wpt.icaoStruct.ident, l.type]);
+        expect(legs).toEqual([
+            ['ENRAA', KLNLegType.USER], ['KPRC', KLNLegType.USER],
+            ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID], ['TRNAA', KLNLegType.SID],
+        ]);
+        expect(Screen.read().status().left).toBe('FPL 0');
+        expect(Screen.read().status().right).toBe('ACT+7');
+        expect(Screen.read().rows('R').slice(0, 3)).toEqual(['› 2 KPRC  A', 'SELECT SID ', ' 1 DEP1    ']);
+        expect(unit.errors).toEqual([]);
     });
 });

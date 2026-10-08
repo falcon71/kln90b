@@ -136,7 +136,7 @@ describe('REF page', () => {
     });
 
     // 5-21 step 2: the reference waypoint works on the active flight plan as well. The page of the reference waypoint
-    // is cancelled as soon as it is shown: FlightplanList turns the left cursor off when the confirmation page is up,
+    // is canceled as soon as it is shown: FlightplanList turns the left cursor off when the confirmation page is up,
     // which unfocuses the waiting entry, and WaypointEditor.setEntered(false) cancels the confirmation. FPL 2 escapes
     // only because its focus lands on the wrong entry (#242)
     it.fails('inserts the reference waypoint into FPL 0 after the approval (5-21, #291)', async () => {
@@ -204,11 +204,11 @@ describe('REF page', () => {
 describe('REF page, the radial of the reference waypoint', () => {
     // 5-22, figure 5-85, with figure 5-81 (the chart's 330 degree radial from TXK): RAD is the radial of the reference
     // waypoint from the waypoint used to create it. Radials are magnetic, with the variation of the reference VOR itself:
-    // checked in the KLN 89 trainer, 2026-10-07 (T1, high confidence: the true initial bearing at the VOR minus the VOR's
+    // checked in the KLN 89 trainer, 2026-10-07 (high confidence: the true initial bearing at the VOR minus the VOR's
     // own variation), and 5-44. On the equator a perpendicular to a north-south leg leaves TXK due west, 270 degrees true.
     // The area has 10 degrees of easterly variation and TXK 4, so the radial is 266.0 (a conversion with the local
     // variation would give 260.0). The SUP page shows the stored true value
-    it.fails('shows RAD as a magnetic radial with the variation of the reference VOR (5-44, trainer T1, #280)', async () => {
+    it.fails('shows RAD as a magnetic radial with the variation of the reference VOR (5-44, the KLN 89 trainer, 2026-10-07, #280)', async () => {
         const unit = await bootOnEquator();
 
         await enterReference(unit, 'TXK');

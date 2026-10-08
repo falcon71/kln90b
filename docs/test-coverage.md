@@ -508,10 +508,10 @@ pages, 9b the controls.
 
 Result (session log, section 4): every right page has a render test with a characterization, and every page except the
 self-test right page (left to Session 10) has spec tests where the Pilot's Guide, the KLN 89 trainer or a photo of a
-real unit gives the rule. ACT 7 has no test. The bugs found were filed and pinned (#264 to #269, #271 to #301), the
-macadam surface is the question #270, and #92, #161, #102 and #223 gained pins. #92, #161, #102 and #38 have comments.
-The controls' bugs pinned on right pages (#277, #282, #288, #290) are Session 9b's to reference; the leads are in
-`testing.md` section 7.
+real unit gives the rule. ACT 7 has characterizations only. The bugs found were filed and pinned (#264 to #269, #271 to
+#301), the macadam surface is the question #270, and #92, #161, #102 and #223 gained pins. #92, #161, #102 and #38 have
+comments. The controls' bugs pinned on right pages (#277, #282, #288, #290) are Session 9b's to reference; the leads are
+in `testing.md` section 7.
 
 ## Session 9b: controls
 
@@ -624,6 +624,13 @@ later run adds a new entry.
   and `Ctr2Page` class comments cite 5-25 to 5-27 instead of 5-21. Pins #102, #161, #300, #301.
 - **Task 7, this close-out:** the issues and comments below, the placeholders replaced in one commit, `testing.md`
   sections 6 and 7, and this log.
+- **The final review's fixes:** ACT 7 characterizations in `ActPage.test.ts` (the STAR and SID pages under the ACT
+  header, and a SID loaded after the active airport), on `sidStarWorld()`, which moved from `Apt7Page.test.ts` into
+  `test/harness/fixtures.ts`; three older rows that held #265 and #266 as correct now stay clear of them (the airport
+  names in `HEvents.test.ts` and `DirectToPage.test.ts`, the nearest distance in `NearestList.test.ts`, now 18.0 NM);
+  the CTR 2 magnetic test gives its VORs the area's variation, so that it holds only "magnetic"; the half-kHz NDB test
+  is a characterization (#287 leaves that form open); the trainer's research ids left the test titles and comments.
+  The suite then stood at 2122 passed and 279 expected failures in 241 files.
 
 **Rulings**
 - **The maintainer's:**
@@ -675,7 +682,9 @@ later run adds a new entry.
   page instead of 4-10, the entered-radial pin typed a distance the #282 fix would refuse, survivors; it also found #285
   on SUP. Task 5: the #280 pin set both variations to the same value, INVALID REF cited C-2 instead of C-1, the
   placement of the reference waypoint was unheld; it also found #299. Task 6: three survivors held by the #102 pin under
-  its fix, one characterization, minors.
+  its fix, one characterization, minors. The commit subjects number the controller's rounds that moved misfiled rows
+  between tasks 4 and 5 too (`fa735d5`, `feb8911`, `1074694`), so the one review round of task 4 is "fix round 3"
+  (`6b96ecc`) and that of task 5 "fix round 2" (`f9cb9eb`).
 
 **Trainer results** (KLN 89 trainer, 2026-10-07; the maintainer started the VM; paraphrased; high confidence unless
 noted)
@@ -732,8 +741,9 @@ between the filings). Each issue says it was found in the headless harness, and 
   photo, the trainer). Pinned twice in `IntPage.test.ts`, twice in `SupPage.test.ts` and in `RefPage.test.ts`.
 - **#281:** INT's RAD is the final bearing at the intersection (figure 5-76, 5-19, the trainer); SUP has the same line,
   unpinned. Pinned in `IntPage.test.ts`.
-- **#282:** DIS shows leading zeros on INT and SUP (figures, a photo, the trainer); a control bug for 9b. Pinned in
-  `IntPage.test.ts` and `SupPage.test.ts`.
+- **#282:** DIS shows leading zeros on INT and SUP (figures, a photo, the trainer); a control bug for 9b. Below 10 NM
+  the guide disagrees with itself: figure 3-155 shows `3.7nm` without a tens-place zero, figure 3-159 shows one. Pinned
+  in `IntPage.test.ts` and `SupPage.test.ts`.
 - **#283:** INT and SUP write `NM` in full-size letters (figures, the trainer). Pinned in `IntPage.test.ts` and
   `SupPage.test.ts`.
 - **#284:** after the REF approval the cursor stays on REF (5-19, figure 5-72, the trainer). Pinned in `IntPage.test.ts`
@@ -789,16 +799,17 @@ fix rounds.
 
 **Not covered** (rule 18; the ledger is not committed, so the list is complete here)
 - **Pages without a spec test:** the self-test right page (a characterization without the ALT row; its spec belongs to
-  Session 10, below). ACT 7 has no test at all (no SID or STAR world on ACT).
+  Session 10, below). ACT 7 has characterizations only (added after the final review).
 - **The name and city search of 3-24 to 3-26:** impossible with the SDK, which offers no such search; out of scope by
   the maintainer's decision, no issue.
 - APT: the APT 7 page order (SID first going forward) is a characterization, because the trainer had no airport with
   both; APT 6 with real service data (none in the sim); the city row of a long city name (cut or wrapped, the trainer
   hint was weak); the order of the comm frequencies (the trainer suggested a fixed type order; a lead); whether the sim
-  carries HF frequencies (#267).
-- INT and SUP: the tens place of a distance below 10 NM (figure 3-159 shows a zero, the trainer a blank; the #282 pins
-  hold only the hundreds place); #281 on SUP; #289 on any path but SUP's PRES POS?; #285's distance edit on INT (a
-  characterization); the INT page of a terminal waypoint.
+  carries HF frequencies (#267); a second SID replaces the first without a question (a characterization; the trainer
+  showed that a second approach asks first, #274, and whether a second SID or STAR asks too was not checked).
+- INT and SUP: the tens place of a distance below 10 NM (figure 3-159 shows a zero; figure 3-155 and the trainer a
+  blank; the #282 pins hold only the hundreds place); #281 on SUP; #289 on any path but SUP's PRES POS?; #285's distance
+  edit on INT (a characterization); the INT page of a terminal waypoint.
 - REF, ACT, D/T: REF on a plan of fewer than two waypoints, and with a left page that is not a flight plan; ACT while
   the active waypoint sequences during a scan; D/T 4 with RUN WHEN POWER IS ON (held at the unit stage by
   `Timers.test.ts`); the flight timer through a NAV flag.

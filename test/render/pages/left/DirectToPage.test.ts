@@ -82,14 +82,16 @@ describe('Direct To page', () => {
 
     it('keeps the DIR page usable when the right page changes during the confirmation (#81)', async () => {
         // 3-27: DCT from FPL 0 with the cursor on a leg suggests that leg and asks for its confirmation on the right
+        // KAAA with a name that no abbreviation of the airport name touches (#265)
+        const alpha = airport('KAAA', 47.0, 8.0, {name: 'ALPHA'});
         const unit = await bootUnit({
-            facilities: [kaaa, kbbb], position: {lat: 47.0, lon: 8.0}, storage: savedFlightplan(0, [kaaa, kbbb]),
+            facilities: [alpha, kbbb], position: {lat: 47.0, lon: 8.0}, storage: savedFlightplan(0, [alpha, kbbb]),
         });
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L'); // on KAAA
         await unit.panel.dct();
         // Precondition: the APT 1 confirmation page for KAAA is on the right
-        expect(Screen.read().rows('R')[1]).toBe('KAAA AIRPT ');
+        expect(Screen.read().rows('R')[1]).toBe('ALPHA      ');
 
         await unit.panel.outer('R', 1); // raw: the knob that changes the right page is the subject (#81)
         await unit.panel.cursor('L');

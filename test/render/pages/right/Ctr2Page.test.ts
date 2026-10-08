@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {centerWorld} from '../../../harness/fixtures';
+import {vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 
@@ -10,10 +11,13 @@ import {Screen} from '../../../harness/render/screen';
  * Center from being first returned from outside it (#102). The VORs BGD and GCK lie 0.5 degrees north of the crossings.
  * Boots with that plan as FPL 1, FPL 1 on the left, and computes the Center waypoints on CTR 1.
  */
-async function computed(o: { magvar?: number } = {}): Promise<HeadlessUnit> {
+async function computed(o: { magvar?: number, vorMagneticVariation?: number } = {}): Promise<HeadlessUnit> {
     const w = centerWorld();
+    // The VORs of centerWorld() again, with the given variation (stored as the sim stores it, 10 E as -10)
+    const magneticVariation = o.vorMagneticVariation ?? 0;
+    const vors = [vor('BGD', w.bgd.lat, w.bgd.lon, {magneticVariation}), vor('GCK', w.gck.lat, w.gck.lon, {magneticVariation})];
     const unit = await bootUnit({
-        facilities: [w.kaaa, w.kbbb, w.kccc, w.bgd, w.gck],
+        facilities: [w.kaaa, w.kbbb, w.kccc, ...vors],
         position: {lat: 39.0, lon: -100.0}, magvar: o.magvar ?? 0, airspaces: w.centers,
         storage: savedFlightplan(1, [w.kaaa, w.kbbb, w.kccc]),
     });
@@ -96,10 +100,11 @@ describe('CTR 2 page (5-25, 5-26)', () => {
         expect(right()).toEqual([' GCK00  new', 'ABQ-DEN CTR', 'GCK    180°', '     30.1nm', 'N 47°45.00\'', 'W100°00.00\'']);
     });
 
-    // 5-44: within the coverage area the unit shows magnetic angles. A variation of 10 degrees east everywhere turns
-    // the true radial 180 into 170
+    // 5-44: within the coverage area the unit shows magnetic angles. A variation of 10 degrees east everywhere, at the
+    // aircraft and at both VORs (stored as -10, as NAV 2 reads a VOR's variation), turns the true radial 180 into 170.
+    // The same variation everywhere keeps the test to "magnetic": which variation converts the radial is not its subject
     it('shows the radial magnetic (5-26, 5-44)', async () => {
-        const unit = await computed({magvar: 10});
+        const unit = await computed({magvar: 10, vorMagneticVariation: -10});
         await unit.panel.inner('R', 1);
 
         expect(right()[2]).toBe('BGD    170°');

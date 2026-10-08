@@ -2,7 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
-import {approachWorld} from '../../../harness/fixtures';
+import {approachWorld, sidStarWorld} from '../../../harness/fixtures';
 import {pointFrom} from '../../../harness/flight/geo';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, sid, star, withProcedures} from '../../../harness/navdata/procedures';
@@ -213,42 +213,6 @@ describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
         expect(fpl0Legs(unit).slice(0, 3)).toEqual([['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID]]);
     });
 });
-
-/**
- * KPRC of approachWorld() with invented SIDs and STARs to the east of it, and every fix the procedures use. FPL 0 stays
- * empty and the aircraft is 40 NM north of KPRC, so the APT pages open on KPRC (the nearest airport) and the unit asks to
- * add KPRC on LOAD IN FPL.
- * - a SID has the runway transitions 09 and 27L, the common leg to SIDAB and the enroute transitions TRNAA and TRNAB;
- * - ARR1 has no transition and no runway transition; ARR2 has the transitions TRNAA and TRNAB and the runways 09 and 27L.
- */
-function sidStarWorld(o: { sids: string[], stars: boolean, rf?: boolean }) {
-    const w = approachWorld();
-    const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
-    const sidaa = intersection('SIDAA', east(8).lat, east(8).lon);
-    const sidab = intersection('SIDAB', east(20).lat, east(20).lon);
-    const trnaa = intersection('TRNAA', east(30).lat, east(30).lon);
-    const trnab = intersection('TRNAB', east(35).lat, east(35).lon);
-    const departures = o.sids.map(name => sid(name, {
-        runways: [{runway: '09', legs: [Leg.CA(90), Leg.DF(sidaa)]}, {runway: '27L', legs: [Leg.CA(270), Leg.DF(sidaa)]}],
-        common: [Leg.TF(sidab)],
-        transitions: [{name: 'TRNAA', legs: [Leg.TF(trnaa)]}, {name: 'TRNAB', legs: [Leg.TF(trnab)]}],
-    }));
-    const arrivals = o.stars ? [
-        star('ARR1', {common: [Leg.IF(trnaa), Leg.TF(sidab)]}),
-        star('ARR2', {
-            transitions: [{name: 'TRNAA', legs: [Leg.IF(trnaa)]}, {name: 'TRNAB', legs: [Leg.IF(trnab)]}],
-            common: [Leg.TF(sidab)],
-            runways: [{runway: '09', legs: [Leg.TF(sidaa)]}, {runway: '27L', legs: [Leg.TF(sidaa)]}],
-        }),
-    ] : [];
-    if (o.rf) {
-        // A procedure with an RF leg is one the unit leaves out (SidStar.isProcedureRecognized); it stands first in the data
-        departures.unshift(sid('DEPRF', {runways: [{runway: '09', legs: [Leg.CA(90), Leg.RF(sidaa)]}], common: [Leg.TF(sidab)]}));
-        arrivals.unshift(star('ARRRF', {common: [Leg.IF(trnaa), Leg.RF(sidab)]}));
-    }
-    const kprc = withProcedures(w.kprc, {approaches: [...w.kprc.approaches], departures, arrivals});
-    return {facilities: [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.sdfaa, w.mapaa, sidaa, sidab, trnaa, trnab], position: w.north(40)};
-}
 
 /** Boots in sidStarWorld and turns the right inner knob from APT 6 the given number of clicks */
 async function bootOnApt7(o: { sids: string[], stars: boolean, rf?: boolean }, clicksFromApt6 = 1, opts: { start?: Date } = {}): Promise<HeadlessUnit> {

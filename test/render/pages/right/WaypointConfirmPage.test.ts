@@ -43,7 +43,7 @@ describe('waypoint confirmation page', () => {
     });
 
     // 4-10 (figures 4-37 and 4-38: the type letter stands to the far right of the identifier) and the KLN 89 trainer,
-    // 2026-10-07 (T25, medium confidence: the letter stands in one fixed column for a three- and a five-letter ident).
+    // 2026-10-07 (medium confidence: the letter stands in one fixed column for a three- and a five-letter ident).
     // The identifier of an intersection has five cells, so the letter of a four-letter one keeps the column of a
     // five-letter one: a blank cell and then the letter (an inference from the fixed column and the five cells). The
     // cause is the blank selector cell, which has no glyph (3-20 describes that cell, it is not evidence for the column;

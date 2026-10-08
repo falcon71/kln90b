@@ -145,7 +145,7 @@ describe('D/T 3 page, the DTK of the active waypoint', () => {
     });
 
     // 4-12: the DTK belongs to the leg, a great-circle course from one waypoint to the next; Appendix A draws DTK as the
-    // course from the from waypoint to the to waypoint, apart from BRG. Checked in the KLN 89 trainer, 2026-10-07 (T23): 3 NM off course, FPL 0
+    // course from the from waypoint to the to waypoint, apart from BRG. Checked in the KLN 89 trainer, 2026-10-07: 3 NM off course, FPL 0
     // shows the leg DTK (5) beside the active waypoint while NAV 1 shows a bearing of 12. Off course the code shows the
     // bearing to the active waypoint. Figures 4-51 and 4-52 (one flight state) show 063 and 064 for the active waypoint,
     // which do not settle it

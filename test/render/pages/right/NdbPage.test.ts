@@ -72,6 +72,16 @@ describe('NDB page (characterization)', () => {
     });
 });
 
+describe('NDB page frequency with a half kHz (characterization)', () => {
+    // How a database NDB on a half kHz shows its frequency is not settled (#287); this holds the code's format, the
+    // tenth after a decimal point in the last column
+    it('shows a frequency with a half kHz (characterization)', async () => {
+        await ndbPageOf(ndb('OWI', 47.5, 11.25, {frequencyKHz: 362.5}));
+
+        expect(Screen.read().rows('R')[3]).toBe('FREQ  362.5');
+    });
+});
+
 describe('NDB page contents (3-50)', () => {
     // 3-50: the identifier, the name and the position of the NDB
     it('shows the ident, the name and the position (3-50)', async () => {
@@ -79,14 +89,6 @@ describe('NDB page contents (3-50)', () => {
 
         const rows = Screen.read().rows('R');
         expect([rows[0], rows[1], rows[4], rows[5]]).toEqual([' OWI       ', 'OTTAWA     ', "N 47°30.00'", "E 11°15.00'"]);
-    });
-
-    // 3-50: the frequency in kHz after FREQ. A half kHz shows its tenth; the column layout is inferred from figure 5-66,
-    // a user NDB (the KLN 89 trainer's database has no half kHz NDB)
-    it('shows a frequency with a half kHz (3-50)', async () => {
-        await ndbPageOf(ndb('OWI', 47.5, 11.25, {frequencyKHz: 362.5}));
-
-        expect(Screen.read().rows('R')[3]).toBe('FREQ  362.5');
     });
 
     // Figures 3-153 and 3-154 show the frequency of a database NDB on a whole kHz without a decimal point or a tenth, and

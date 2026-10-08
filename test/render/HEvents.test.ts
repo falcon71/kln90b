@@ -160,14 +160,16 @@ describe('right knobs (3-13)', () => {
 // knob like any group, but the ACT page keeps its own list of sub-pages, which MainPage steps through a separate branch
 describe('right inner knob on the ACT pages (3-13)', () => {
     it('moves through the pages of the active airport and wraps', async () => {
-        const {kaaa, kbbb} = standardRoute();
+        const {kaaa} = standardRoute();
+        // A name that no abbreviation of the airport name touches (#265), placed as standardRoute() places KBBB
+        const kbbb = airport('KBBB', 48.2, 9.2, {name: 'BRAVO'});
         const unit = await bootUnit({
             facilities: [kaaa, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, kbbb]),
         });
         await settle(unit);
         await unit.panel.press('KLN90B_RightLargeKnob_Right', 3); // CTR, REF, ACT
         expect(Screen.read().status().right).toBe('ACT 1');
-        expect(Screen.read().rows('R')[1]).toBe('KBBB AIRPT ');
+        expect(Screen.read().rows('R')[1]).toBe('BRAVO      ');
 
         await unit.panel.press('KLN90B_RightSmallKnob_Right');
         expect(Screen.read().status().right).toBe('ACT 2');

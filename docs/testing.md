@@ -223,7 +223,9 @@ IAFAA, the intermediate fix IFAAA, the FAF FAFAA 5 NM north of the MAP, a step-d
 airport and an enroute fix ENRAA. Its FAF is not its IAF, so the unit can reach APR there, and the step-down fix lets a test
 check that APR does not come back past the FAF. Boot with its `facilities`, store `[enraa, kprc]` in FPL 0 with
 `savedFlightplan` and load the approach with `await unit.panel.loadProcedure('APT 8')` after `settle`; `north(nm)` gives a
-point on the final course line.
+point on the final course line. `sidStarWorld({sids, stars, rf?})` gives KPRC of that world invented SIDs and STARs
+east of it (optionally with an RF procedure the unit leaves out) and returns `{facilities, position}`, KPRC and ENRAA
+first; the APT 7 and ACT 7 tests use it.
 
 `dtWorld()` returns four waypoints half a degree of latitude apart on one meridian, 10 E: the airport KAAA, the VOR ABC,
 the intersection DEF and the airport KBBB. Each leg is about 30 NM, which is 15 minutes at 120 kt. `centerWorld()`
@@ -715,10 +717,10 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **The IAF list of APT 8 and ACT 8 is placed by the reader, not by layout.** happy-dom computes no CSS positions, so
   `Screen.read()` moves the rows of `.apt-8-iaf-list` by a fixed four cells (section 3). A change of the list's position
   in `KLN90B.scss` would not show in a test; the reader only throws when the list no longer starts in cell 4.
-- **Two editors do not invert their decimal point.** `NdbFreqEditor` and `DistanceEditor` (the NDB frequency and the INT
-  and SUP DIS field) draw the point as plain text, while `VorFreqEditor` and `RadialEditor` invert theirs. `focused()`
-  and `cursorTo` join two runs across one plain point (section 4), so a test cannot tell whether the cursor should cover
-  the point; that is Session 9b's question.
+- **The NDB frequency and DIS editors do not invert their decimal point.** `NdbFreqEditor` and `DistanceEditor` (the NDB
+  frequency and the INT and SUP DIS field) draw the point as plain text, while `VorFreqEditor` and `RadialEditor` invert
+  theirs. `focused()` and `cursorTo` join two runs across one plain point (section 4), so a test cannot tell whether the
+  cursor should cover the point; that is Session 9b's question.
 - **There is no CI.** Run `npm test` and `npx tsc --noEmit` before committing.
 
 Measured speed (a dated record): on 2026-10-03 the proof flight (`firstFlight.test.ts`) ran about 1466 simulated
@@ -846,7 +848,9 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
           and the orphans count against the user waypoint limit until power-off; a crossing without a VOR within 100 NM,
           or without a free number, is dropped silently; when the first waypoint lies in no Center the first crossing is
           dropped (`AirspacesAlongRoute.cleanup`); `getWaypointIfExistsInFpl` compares coordinates with `===`; CTR 2
-          converts the radial with the variation at the present position, NAV 2 with the VOR's own; the status line
+          converts the radial with the variation at the present position, NAV 2 with the VOR's own (the CTR 2 spec test
+          gives its VORs the area's variation, so it holds only that the radial is magnetic; which variation is right
+          for CTR 2 is open, #280 rules the VOR's own for INT, SUP and REF); the status line
           shows `msg` for one display tick after CTR 1 is selected.
         - With no waypoint of a type at all (`defaultNavdata: false`) the VOR, NDB and INT pages show the ident `0`.
         - Editing the latitude or longitude of a stored user intersection leaves REF, RAD and DIS describing the old

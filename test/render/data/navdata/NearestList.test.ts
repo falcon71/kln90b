@@ -251,12 +251,12 @@ describe('the nearest page distance refresh (characterization)', () => {
         await unit.panel.scan();
         await slowStep(unit, -1);
         expect(identRow()).toBe(' NBB   nr 2'); // precondition: the last nearest NDB, 6.0 NM south
-        // 46.92 N is 0.02 degrees (1.2 NM) north of NBB
-        unit.env.sim.set('PLANE LATITUDE', 'degrees', 46.92);
+        // 47.2 N is 0.3 degrees (18.0 NM) north of NBB. A distance of 10 NM or more keeps the row clear of #266
+        unit.env.sim.set('PLANE LATITUDE', 'degrees', 47.2);
 
         await vi.advanceTimersByTimeAsync(1500);
 
-        expect(Screen.read().rows('R')[5]).toBe('      1.2nm');
+        expect(Screen.read().rows('R')[5]).toBe('     18.0nm');
     });
 });
 
