@@ -44,4 +44,17 @@ export const SuperNav5 = {
             directTo: directTo === null ? null : text(readRows(directTo)[0]),
         };
     },
+
+    /**
+     * The focused field(s) of the Super NAV 5 left column: the text of its inverted runs, without the msg prompt (the
+     * first span of the message and range overlay, inverted while a message is unread; the range selector, which shares
+     * the overlay, counts), with no-break spaces turned back into blanks. SuperNav5.read() has no mask,
+     * so this is how a test finds out which field the cursor is on.
+     */
+    focused(container: Element | null = document.getElementById('pageContainer')): string[] {
+        if (container === null) throw new Error('SuperNav5.focused: no #pageContainer; has the unit booted?');
+        return [...container.querySelectorAll('.super-nav5-left-controls .inverted')]
+            .filter(e => e.closest('.d-none') === null && !e.matches('.super-nav5-mgs-range > span:first-child'))
+            .map(e => e.textContent!.replace(/\u00a0/g, ' '));
+    },
 };

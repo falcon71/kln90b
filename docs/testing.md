@@ -237,6 +237,18 @@ so each Center is first returned by a search whose center lies inside it, and a 
 dropped for good by the shared search session (#102). Both return fresh objects on every call; pass `centers` as
 `BootOptions.airspaces`.
 
+`legWorld()` returns `{kddd, kaaa, keee, west}`, the leg world of the NAV 3 and NAV 4 pages and the Super NAV 5
+selectors: KDDD (47.0 N, 9.0 E), KAAA 200 NM west of it on the great circle that leaves KDDD on 270 true, KEEE 30 NM
+east of KDDD, so that the leg KAAA to KDDD is not the last one (the ESA of the last leg is #183). `west(nm)` is the
+point nm NM west of KDDD on that line. Store `[kaaa, kddd, keee]` in FPL 0 with `savedFlightplan`; an eastbound
+aircraft on the first leg has KDDD active. `arcWorld()` returns
+`{abc, at, arcbg, arcen, fafaa, mapaa, kprc, facilities}`: a left DME arc of 10 NM around the VOR ABC from its 270 to
+its 180 radial (ARCBG to ARCEN), then FAFAA and the MAP MAPAA, in an RNAV approach to runway 27 of KPRC with the
+transition ARCBG. `at(bearing, nm)` is the point nm NM from ABC on a true bearing, so `at(225, 10)` lies on the arc.
+Store `[kprc]` in FPL 0 and load the approach with `unit.panel.loadProcedure('APT 8')`; the arc is the active leg
+then. Both are pure worlds with fresh objects on every call and no boot: the boot sequence that puts the aircraft on
+the leg or on the arc and shows Super NAV 5 stays in the test file that needs it.
+
 ## The EFB
 
 `FakeRouteManager` (`platform.ts`) stands in for the SDK's `FlightPlanRouteManager`, with the members the unit uses
@@ -302,6 +314,15 @@ the reader follows the screen:
   row of it from the cell where the list starts, cell 4 of the right half, while the DOM starts the second and later rows
   at the line start. The reader moves those rows right by four blank cells, so the rows read `IAF 1 IAFAA` and
   `    2 IAFAB`. It throws when the list does not start in cell 4.
+- The classes of a flashing cell follow the CSS of `KLN90B.scss`, where `.inverted` is black on green,
+  `.inverted-blink` (later) takes the background away and makes the text green, and `.blink` (later still) makes the
+  text transparent. `inverted` with `inverted-blink` is a flashing inverse cell, `F`. `inverted-blink` without
+  `inverted`, on the element or on an ancestor, is plain green text and reads as it would without the class: the status
+  line's `ent` keeps the class while an unread `msg` toggles it. `blink` hides the text, whatever else the element has,
+  so it reads `B`.
+- A half page has six rows (row 7 is the status line). The reader throws when a seventh row holds a character or a
+  non-normal cell, naming the side and the text: a creation block that stayed visible under a waypoint page once went
+  unseen that way. Blank rows past the sixth are tolerated.
 - A full page without a status line (the welcome page) owns all seven rows. The orientation and range of NAV 5 are
   positioned over the map with CSS and are read at row 5 of their half.
 - Super NAV 5 is a map with text over it, not a text grid. `Screen.read()` throws there; section 4 shows how to read it.
@@ -345,7 +366,8 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 (`test/render/pages/Nav2Page.test.ts`.)
 
 - **Advance the clock; do not call `tick()`.** The DOM changes only inside display ticks (docs/architecture.md,
-  Core 2), and a test that calls a tick method by hand skips the ordering the real unit has.
+  Core 2), and a test that calls a tick method by hand skips the ordering the real unit has. The one exception is a
+  control rendered on its own with `mount()` (below), which has no tick loop: the test ticks it.
 - `Screen.read()` (`render/screen.ts`) returns the 23×7 screen: six rows of two half pages or one full page, plus the
   status line as row 6.
     - `text()`, `row(n)`, `half('L' | 'R')`, `rows(side)` (the six rows of a half as strings), `cell(row, col)` and
@@ -376,7 +398,25 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   of building the `persistent-setting.<model>.profile_1.` key by hand.
 - **`unit.panel.type(side, text)`** types characters with the keyboard (`KLN90B_Internal_Key`), one display tick each, with
   that side's cursor on. It is the keyboard alternative to `enterIdent` (below), which turns the knobs as a pilot does
-  to fill the ident selectors of the APT, VOR, NDB, INT and SUP pages.
+  to fill the ident selectors of the APT, VOR, NDB, INT and SUP pages. It refuses everything the PC keyboard cannot
+  send: only `A` to `Z` and `0` to `9` pass (`KLN90BCore.handleKeyboardEvent`, which also maps the numpad digits), and
+  a text with any other character throws before the first key goes out. A pilot cannot type a blank, so a cell that
+  needs one (the hundreds cell of a longitude below 100 degrees, the thousands cell of an NDB frequency below 1000 kHz)
+  is entered with the knobs: the inner knob until the blank shows, the outer knob to the next cell, then the digits
+  (`SupPage.test.ts`, `NdbPage.test.ts`). A test of the raw H event presses it with
+  `unit.panel.press('KLN90B_Internal_Key:RIGHT: ')` and says in a comment that only an aircraft's H event can send
+  that character.
+- **`mount(el)`** (`render/mount.ts`) renders a display or control into a detached element, the way a page renders its
+  children, without booting a unit: `text()` and `mask()` read it as `Screen` does (the rows joined by a newline), and
+  `tick(blink = false)` runs one display tick of the control. A display that changes its text on a tick only (a value
+  set after the render) shows the new text after `tick()`. This is the cheapest stage for the format of a display
+  (`mount(new BearingDisplay(null)).text()` is `---°`); what a control does inside a page needs the booted unit.
+- **`blinkCycle(read)` and `mountedCycle(m, read)`** (`render/blink.ts`) sample a flashing cell in both phases. The
+  display blinks on every fourth display tick (`TICK_TIME_DISPLAY`, 250 ms), so a cell that flashes reads `F` on one
+  tick in four, and one read decides the result by the phase the test happens to be in. `blinkCycle(read)` advances
+  four display ticks of a booted unit, reading after each, and returns the four reads; `mountedCycle(m, read)` ticks
+  a mounted control four times, the fourth with `blink`, and returns the four reads. A test that asserts text only may
+  ignore the mask instead.
 - **SimVars the unit reads while it is built.** `bootUnit({simVars: [{name, unit, value}]})` sets them before
   `KLN90BCore.init`, after the SimVars the boot sets itself, so a test can override one of those too. The fuel computer
   reads `NUMBER OF ENGINES` only in its constructor, so a fuel test with two engines boots with it.
@@ -409,7 +449,8 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   page matters. Snapshots are text, so the diff in review is the diff of the screen.
 - Special glyphs stay as the code points the font maps them to (docs/architecture.md, UI 3). Copy them from the
   failure output rather than typing them.
-- The cursor and the blink phase change the mask. If a test is flaky on `B` or `F` cells, assert text only.
+- The cursor and the blink phase change the mask. If a test is flaky on `B` or `F` cells, assert text only, or read the
+  whole cycle with `blinkCycle`.
 - **Canvas pages** (NAV 5, Super NAV 5, APT 3 draw maps): `canvasToAscii(el)` returns the pixels as `#` and `.`. Snapshot
   it with `toMatchInlineSnapshot` as `test/render/harness/canvas.test.ts` does for a tiny canvas. For a map that is too
   large to read inline, `toMatchFileSnapshot('./__snapshots__/name.txt')` keeps it in a file. `downsampled()`
@@ -423,7 +464,10 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - `Screen` skips `<canvas>` subtrees (their fallback text). It throws on Super NAV 5, a `SevenLinePage` made of
   CSS-positioned `<pre>` blocks: use `SuperNav5.read()` (`render/superNav5.ts`), which returns
   `{left, msg, range, right, directTo}`. `right` and `directTo` are `null` while hidden (the right cursor and the pulled
-  scan knob show them).
+  scan knob show them). `SuperNav5.read()` has no mask, so `SuperNav5.focused()` returns the text of the inverted run(s)
+  of the left column, which is the field the left cursor is on (`[]` with the cursor off): the msg prompt, which is
+  inverted while a message is unread, is left out, the range selector that shares its overlay is not, and no-break
+  spaces come back as blanks.
 - **Pages that show the version** (STA 3) carry the placeholder of `kln90b/Version.ts` in tests, 18 cells wide, which
   `Screen` rightly refuses to read. Mock the module in the test file, as `selectPage.test.ts` does.
 
@@ -717,10 +761,14 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **The IAF list of APT 8 and ACT 8 is placed by the reader, not by layout.** happy-dom computes no CSS positions, so
   `Screen.read()` moves the rows of `.apt-8-iaf-list` by a fixed four cells (section 3). A change of the list's position
   in `KLN90B.scss` would not show in a test; the reader only throws when the list no longer starts in cell 4.
-- **The NDB frequency and DIS editors do not invert their decimal point.** `NdbFreqEditor` and `DistanceEditor` (the NDB
-  frequency and the INT and SUP DIS field) draw the point as plain text, while `VorFreqEditor` and `RadialEditor` invert
-  theirs. `focused()` and `cursorTo` join two runs across one plain point (section 4), so a test cannot tell whether the
-  cursor should cover the point; that is Session 9b's question.
+- **The NDB frequency and DIS editors do not invert their decimal point, which is a bug (#NEW-0-1).**
+  `NdbFreqEditor` and `DistanceEditor` (the NDB frequency and the INT and SUP DIS field) draw the point as plain text,
+  while `VorFreqEditor` and `RadialEditor` invert theirs. Figure 5-74 (5-19) shows the open DIS field as one inverse
+  block with the point inside, like the RAD field of figures 5-72 and 5-73; no figure shows the cursor in the NDB
+  frequency, so its pin extends them. `focused()` and `cursorTo` still join two runs across one plain point
+  (section 4) until the bug is fixed, and then `FrontPanel.joinAcrossPoint` can go. The mask assertion of the DIS
+  field is the pin `covers the decimal point of the DIS field` in `test/render/harness/focused.test.ts`; no snapshot
+  may hold the plain point (rule 8 of test-coverage.md).
 - **There is no CI.** Run `npm test` and `npx tsc --noEmit` before committing.
 
 Measured speed (a dated record): on 2026-10-03 the proof flight (`firstFlight.test.ts`) ran about 1466 simulated
@@ -801,10 +849,6 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       the position dead-reckons a straight line on the SET 1 track instead of following the plan (5-46, 3-19); no issue
       was filed.
 - Harness gaps and leads from Session 8 (none was built, per rule 13 of test-coverage.md):
-    - **Super NAV 5's cursor is read by local helpers.** `SuperNav5.read()` has no mask, so `SuperNav5Page.test.ts`
-      reads the focused field with its own helpers (`focusedIn`, `focusedLeft`, `focusedRight`) over the `.inverted`
-      spans (skipping the message field, and turning the no-break spaces of the field 3 selector back into blanks). A
-      `focused` field in the reader would replace them.
     - **`vitest -t` takes a regular expression.** Titles with `(`, `)`, `+`, `?` or `#` (every pin and most citations)
       need escaping in a filtered run, which matters for the mutation pass more than for the tests.
     - **Leads that were seen and not confirmed or not filed** (each needs evidence or is out of reach today):
@@ -820,6 +864,13 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
           returns `true`; neither page is an overlay, so nothing visible follows (the Super NAV 5 case is a bug, #238).
         - CAL 2's `setTemp` writes the CAL 1 temperature too; 5-11 does not say whether the pages share it, so no test
           holds it.
+- Harness extensions of Session 9b task 0 and the copies they leave (a dated record, 2026-10-08): `mount()`,
+  `blinkCycle`, `mountedCycle`, `SuperNav5.focused()`, `legWorld()`, `arcWorld()` and the keyboard guard of `type()`
+  exist (section 4). The tests written before them keep their own copies: the KDDD world in `Nav1Page.test.ts`,
+  `Nav3Page.test.ts`, `Nav4Page.test.ts`, `Nav4Vnav.test.ts` and `SuperNav1Page.test.ts` (check a copy before
+  replacing it, some differ in detail), the DME arc world in `SuperNav5DirectToSelector.test.ts`,
+  `SensorsOutSimVars.test.ts`, `WTFlightplanSync.test.ts`, `dmeArc.test.ts` and others, and the focused-field helpers
+  (`focusedIn`, `focusedLeft`, `focusedRight`) of `SuperNav5Page.test.ts`, which also read the right menu.
 - Harness gaps and leads from Session 9a (none was built beyond its task 0, per rule 13 of test-coverage.md):
     - **`airport()` has no options for frequencies, runway lighting, the private type or radar coverage.** The APT 1,
       APT 3 and APT 4 tests spread the facility or patch `runways[i].lighting`; options would replace those spreads.

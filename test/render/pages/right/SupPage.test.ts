@@ -27,6 +27,20 @@ const REF_DELAY_MS = 9000;
 const rightRows = () => Screen.read().rows('R');
 
 /**
+ * Enters an east longitude below 100 degrees into the open longitude field. The hundreds cell shows a blank only
+ * with the inner knob, because a pilot cannot type a blank: the PC keyboard sends A to Z and 0 to 9
+ * (KLN90BCore.handleKeyboardEvent, #109). So E is typed, the knob sets the blank, and the remaining digits (tens
+ * and units of the degrees, then the minutes) are typed in the cells after it.
+ */
+async function typeEastBelow100(unit: HeadlessUnit, digits: string): Promise<void> {
+    await unit.panel.type('R', 'E');
+    await unit.panel.inner('R', 1);
+    expect(rightRows()[5].slice(0, 2)).toBe('E '); // the hundreds cell shows the blank, not a dash
+    await unit.panel.outer('R', 1);
+    await unit.panel.type('R', digits);
+}
+
+/**
  * The SUP page on the right, showing USUP (the first user waypoint), once its reference VOR has been computed.
  * `magvar` is the variation of the aircraft's position, `vorVariation` the one of ABC, both in degrees east.
  */
@@ -196,7 +210,7 @@ describe('SUP page', () => {
         await unit.panel.ent();
         expect(unit.panel.focused('R').row).toBe(5);
         expect(Screen.read().status().mode).toBe('ENT LAT/LON');
-        await unit.panel.type('R', 'E 103000');
+        await typeEastBelow100(unit, '103000');
         await unit.panel.ent();
 
         expect(rightRows().slice(4)).toEqual(["N 47°06.00'", "E 10°30.00'"]);
@@ -214,7 +228,7 @@ describe('SUP page', () => {
         await unit.panel.ent();
         await unit.panel.type('R', 'N470600');
         await unit.panel.ent();
-        await unit.panel.type('R', 'E 103000');
+        await typeEastBelow100(unit, '103000');
         await unit.panel.ent();
 
         await unit.panel.outer('R', -1); // INT
@@ -497,7 +511,7 @@ describe('SUP page, changing a stored user waypoint (characterization)', () => {
     it('moves the waypoint to a typed longitude', async () => {
         const unit = await supPageWithCursorOn('E 10°30.00');
 
-        await unit.panel.type('R', 'E 103600');
+        await typeEastBelow100(unit, '103600');
         await unit.panel.ent();
 
         expect(rightRows()[5]).toBe("E 10°36.00'");

@@ -258,9 +258,21 @@ export class FrontPanel {
 
     /**
      * Types text with the keyboard (KLN90B_Internal_Key), one display tick per character. The side's cursor must be on.
-     * Types into any field, including the waypoint selectors; enterIdent turns the knobs instead.
+     * Types into any field, including the waypoint selectors; enterIdent turns the knobs instead. Only A to Z and 0 to
+     * 9 can be typed, because the PC keyboard path sends nothing else (KLN90BCore.handleKeyboardEvent, which also maps
+     * the numpad digits): a pilot cannot type a blank, a hyphen or a decimal point, so a cell that needs one is entered
+     * with the knobs. A test of the raw H event itself presses it with press('KLN90B_Internal_Key:RIGHT:x'), since only
+     * an aircraft's H event can send such a character.
      */
     public async type(side: Side, text: string): Promise<void> {
+        // Checked before the first key goes out, so that a refused text leaves the field as it was
+        for (const ch of text) {
+            if (!/^[A-Z0-9]$/.test(ch)) {
+                throw new Error(`type: '${ch}' cannot be typed on the PC keyboard `
+                    + '(KLN90BCore.handleKeyboardEvent passes only A to Z and 0 to 9); '
+                    + 'turn the knobs, or press the H event itself');
+            }
+        }
         for (const ch of text) {
             await this.press(`KLN90B_Internal_Key:${side === 'L' ? 'LEFT' : 'RIGHT'}:${ch}`);
         }
