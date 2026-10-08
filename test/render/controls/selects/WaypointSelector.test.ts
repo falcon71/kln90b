@@ -137,7 +137,8 @@ describe('waypoint selector (3-20, 3-21)', () => {
 
     // 3-20: the blank lies between 9 and A, so one click clockwise turns a blank cell into A. Checked in the KLN 89
     // trainer, 2026-10-07 (medium confidence). The selector gives 0 (#290)
-    it.fails('turns the blank fourth cell of B19 into an A clockwise (3-20, the KLN 89 trainer, #290)', async () => {
+    it.fails('turns the blank fourth cell of B19 into an A clockwise '
+        + '(3-20, checked in the KLN 89 trainer, 2026-10-07, #290)', async () => {
         const unit = await b19WithCursor();
         await unit.panel.outer('R', 3);
 
@@ -167,6 +168,22 @@ describe('waypoint selector, duplicate identifiers (C-1)', () => {
 
         await unit.panel.enterIdent('R', 'ABC');
 
+        expect(messages).toEqual(['DUP IDENT']);
+    });
+
+    // C-1 and 3-21: an identifier the autocompletion offers is the selected one, so a shared one posts DUP IDENT too.
+    // K to A on the first character of KSA offers the first ABC
+    it('posts DUP IDENT for a shared identifier the autocompletion offers (C-1, 3-21)', async () => {
+        const unit = await bootUnit(dupWorld());
+        await unit.panel.selectPage('R', 'VOR  ');
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'KSA');
+        const messages = collectStatusMessages(unit);
+        await unit.panel.outer('R', -2);
+
+        await unit.panel.inner('R', -10);
+
+        expect(identRow().slice(0, 4)).toBe(' ABC');
         expect(messages).toEqual(['DUP IDENT']);
     });
 

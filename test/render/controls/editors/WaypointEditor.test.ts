@@ -141,17 +141,18 @@ describe('waypoint editor, the first inner click (3-14, checked in the KLN 89 tr
         expect(dctIdent()).toBe('   ALF     ');
     });
 
-    // 3-14: the inner knob over an editor starts the entry, and ENT is asked for (the annunciation shows ent)
+    // 3-14: the inner knob over an editor starts the entry with the first character under the cursor (it
+    // flashes, the other cells stay inverted). The ent annunciation is shown at this point in the KLN 89 trainer
+    // (2026-10-08, its Ent prompt while an edit is open); the 90B figures show ent only for a complete identifier
+    // (figure 3-45). Only the flashing cell is asserted, not the run's text (the pin's subject)
     it('starts the entry under the cursor with the first click (3-14)', async () => {
         const unit = await blankDirectTo();
 
         await unit.panel.inner('L', 1);
         await vi.advanceTimersByTimeAsync(6000); // the status line messages of the page change
 
-        // Only the place is asserted (the run's text is the pin's subject): the cursor is on the first cell of the
-        // editor, the unit asks for ENT, and no waypoint page and no message came up
-        const {row, col} = unit.panel.focused('L');
-        expect({row, col}).toEqual({row: 2, col: 3});
+        const masks = await blinkCycle(() => Screen.read().maskRows('L')[2].slice(3, 8));
+        expect(masks.slice().sort()).toEqual(['FIIII', 'IIIII', 'IIIII', 'IIIII']);
         expect(Screen.read().status()).toEqual({left: 'CRSR', mode: 'enr-leg ent', right: 'NAV 1'});
     });
 });
@@ -317,7 +318,7 @@ describe('waypoint editor, the alternative entry (3-15)', () => {
         await unit.panel.enterIdent('R', 'KSAT');
         await unit.panel.cursor('R');
         await unit.panel.selectPage('L', 'TRI 3');
-        await vi.advanceTimersByTimeAsync(6000); // the status line messages of the page changes
+        await vi.advanceTimersByTimeAsync(6000); // the status line messages of the page change
         await unit.panel.cursor('L');
         expect(Screen.read().rows('L')[0]).toBe('     -     '); // precondition: no waypoint yet
 
@@ -331,6 +332,23 @@ describe('waypoint editor, the alternative entry (3-15)', () => {
 
         expect(unit.props.memory.triPage.tri3From!.icaoStruct.ident).toBe('KSAT');
         expect(unit.panel.focused('L')).toEqual({row: 0, col: 6, text: '     '});
+    });
+});
+
+// C-2: the Reference Waypoint page, which hosts the same editor, answers an identifier in no database with NO SUCH WPT.
+// The message is also what keeps a fix of #262 (the creation offer on DIRECT TO and FPL 0) from reaching this page
+describe('waypoint editor on the REF page (C-2)', () => {
+    it('posts NO SUCH WPT for an identifier in no database (C-2)', async () => {
+        const unit = await bootUnit(world());
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.selectPage('R', 'REF  ');
+        await unit.panel.cursor('R');
+        const messages = collectStatusMessages(unit);
+        await unit.panel.type('R', 'QQQQ');
+
+        await unit.panel.ent();
+
+        expect(messages).toEqual(['NO SUCH WPT']);
     });
 });
 
@@ -352,9 +370,9 @@ describe('waypoint editor with an unknown identifier', () => {
     });
 });
 
-// 4-3 (section 4.1.2, step 3) tells a pilot who has not left the numbered flight plan page since creating the plan to
-// turn the outer knob all the way back to reach USE?. So the 90B keeps the cursor where it was while the page is not
-// left, and shows it over USE? when the page is shown anew. The code remembers the field
+// 4-3 (section 4.1.2, step 3) sends a pilot who stayed on the page after building the plan back to USE? with the
+// outer knob. So the 90B keeps the cursor where it was while the page is not left, and shows it over USE? when the
+// page is shown anew. The code remembers the field
 // (CursorController.setCursorActive cites the same step). The KLN 89 trainer comes back on the first field (T7),
 // which is a note and not a pin: the 90B guide wins
 describe('waypoint editor on a numbered flight plan, the cursor field (4-3, section 4.1.2 step 3)', () => {
