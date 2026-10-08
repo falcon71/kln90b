@@ -148,7 +148,7 @@ describe('ACT page, the first row (4-10)', () => {
         expect(Screen.read().rows('R')[0]).toBe('› 2 ABC   V');
     });
 
-    // 4-10: S for a supplemental waypoint. The column of the letter is the subject of the #NEW-5-9 pins below, so this
+    // 4-10: S for a supplemental waypoint. The column of the letter is the subject of the #NEW-4-2 pins below, so this
     // test holds only the order: the ident, then the letter
     it('shows S for a supplemental waypoint', async () => {
         const {kaaa} = dtWorld();
@@ -196,8 +196,9 @@ describe('ACT page, the first row (4-10)', () => {
     // 4-10: the letter stands to the far right (figures 4-37 and 4-38 show A and V in the last column), and the KLN 89
     // trainer, 2026-10-07 (T25, medium confidence) puts U and I in the same fixed column for a 3-letter and a 5-letter
     // ident. The code puts the I of an intersection one blank after the ident, so a 3-letter ident leaves it in the
-    // middle of the row
-    it.fails('shows the type letter of an intersection in the last column (4-10, trainer T25, #NEW-5-9)', async () => {
+    // middle of the row. The cause is #NEW-4-2: the ident selector has five cells, and the blank cells of a short ident
+    // have index -1 and no width, so the letter moves up to the ident
+    it.fails('shows the type letter of an intersection in the last column (4-10, trainer T25, #NEW-4-2)', async () => {
         const {kaaa, abc, def, kbbb} = dtWorld();
         const unit = await bootOnAct([kaaa, abc, def, kbbb], [kaaa, abc, def, kbbb]);
         await unit.panel.scan();
@@ -208,7 +209,7 @@ describe('ACT page, the first row (4-10)', () => {
         expect(Screen.read().rows('R')[0]).toBe('  3 DEF   I');
     });
 
-    it.fails('shows the type letter of a supplemental waypoint in the last column (4-10, trainer T25, #NEW-5-9)', async () => {
+    it.fails('shows the type letter of a supplemental waypoint in the last column (4-10, trainer T25, #NEW-4-2)', async () => {
         const {kaaa} = dtWorld();
         const supa = {icaoStruct: ICAO.value('U', 'XX', '', 'SUPA')} as Facility;
         await bootOnAct([kaaa, supa], [kaaa], {
@@ -225,7 +226,7 @@ describe('ACT page, the first row (4-10)', () => {
 describe('ACT page, scanning FPL 0 (4-10)', () => {
     // 4-10, figures 4-38 and 4-39: with the knob pulled the inner knob shows the waypoints in their order in FPL 0, the
     // arrow only at the active one; pushed in, it turns the pages of the shown airport (here ACT 2 of KAAA). The column of
-    // the I is held by the #NEW-5-9 pin above
+    // the I is held by the #NEW-4-2 pin above
     it('scans the plan in order with the knob pulled and turns the airport pages with it pushed in', async () => {
         const {kaaa, abc, def, kbbb} = dtWorld();
         const unit = await bootOnAct([kaaa, abc, def, kbbb], [kaaa, abc, def, kbbb]);
