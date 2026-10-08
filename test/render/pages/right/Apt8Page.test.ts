@@ -328,7 +328,7 @@ describe('APT 8 approach list (3-49, 6-4)', () => {
     // an approach. That the message already appears when the cursor comes on, and only then, is the behavior of the KLN 89
     // trainer, which the code follows (Apt8Page.warnIfDBOutdated). The sibling below holds that the message needs the
     // expired database. The default start of the fake clock lies in the navdata cycle; 2026-07-01 is after it (sim/clock.ts)
-    it('shows OUTDATED DB once when the cursor comes on with an expired database (6-1, C-2, KLN 89 trainer)', async () => {
+    it('shows OUTDATED DB when the cursor comes on with an expired database (6-1, C-2, KLN 89 trainer)', async () => {
         const unit = await bootOnApt8({start: new Date('2026-07-01T12:00:00Z')});
         const seen = collectStatusMessages(unit);
 
@@ -336,17 +336,12 @@ describe('APT 8 approach list (3-49, 6-4)', () => {
 
         expect(seen).toEqual(['OUTDATED DB']);
         expect(Screen.read().status().mode).toBe('OUTDATED DB');
-
-        await unit.panel.cursor('R'); // turning the cursor off posts nothing
-
-        expect(seen).toEqual(['OUTDATED DB']);
     });
 
-    it('shows no status line message when the cursor comes on or goes off with a current database (6-1, C-2, KLN 89 trainer)', async () => {
+    it('shows no status line message when the cursor comes on with a current database (6-1, C-2, KLN 89 trainer)', async () => {
         const unit = await bootOnApt8();
         const seen = collectStatusMessages(unit);
 
-        await unit.panel.cursor('R');
         await unit.panel.cursor('R');
 
         expect(seen).toEqual([]);
@@ -448,13 +443,36 @@ describe('APT 8 cursor after CLR', () => {
 const clrHandled = (unit: HeadlessUnit): boolean => (unit.props.pageManager.getCurrentPage() as MainPage).onInteractionEvent(EVT_CLR);
 
 describe('APT 8 page (characterization)', () => {
+    // The code posts the message only when the cursor comes on (Apt8Page.warnIfDBOutdated)
+    it('posts no further message when the cursor goes off with an expired database', async () => {
+        const unit = await bootOnApt8({start: new Date('2026-07-01T12:00:00Z')});
+        await unit.panel.cursor('R');
+        const seen = collectStatusMessages(unit);
+
+        await unit.panel.cursor('R');
+
+        expect(seen).toEqual([]);
+    });
+
+    it('posts no message when the cursor goes off with a current database', async () => {
+        const unit = await bootOnApt8();
+        await unit.panel.cursor('R');
+        const seen = collectStatusMessages(unit);
+
+        await unit.panel.cursor('R');
+
+        expect(seen).toEqual([]);
+    });
+
     it('leaves out an approach with an RF leg and numbers the others from 1', async () => {
         await bootOnApt8({rfSecond: true});
 
         expect(rows('R').slice(0, 3)).toEqual([' KPRC IAP', ' 1 RNAV 18', ' 2 VOR-A']);
     });
 
-    it('does not handle CLR on the approach list, but handles it one step further', async () => {
+    // The return value of clear() is not visible on the screen (the main page discards it): this holds the contract of
+    // CLAUDE.md, Input, that a CLR handler reports whether it handled the key
+    it('characterizes clear(): not handled on the approach list, handled one step further', async () => {
         const unit = await bootOnApt8();
         await unit.panel.cursor('R');
         expect(clrHandled(unit)).toBe(false);

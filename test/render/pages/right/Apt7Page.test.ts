@@ -332,8 +332,7 @@ describe('APT 7 selecting a SID (6-22)', () => {
         expect(rows('R').slice(0, 3)).toEqual([' KPRC', 'SELECT SID', ' 1 DEP1']);
     });
 
-    // 6-22 step 7: LOAD IN FPL for an airport that FPL 0 lacks asks to add the SID and the airport, with the cursor on
-    // APPROVE?
+    // 6-22 step 7: LOAD IN FPL for an airport that FPL 0 lacks asks to add the SID and the airport
     it('asks to add the airport and the SID to FPL 0 when FPL 0 lacks the airport (6-22)', async () => {
         const unit = await bootOnApt7({sids: ['DEP1'], stars: false});
         await unit.panel.cursor('R');
@@ -343,8 +342,6 @@ describe('APT 7 selecting a SID (6-22)', () => {
         await unit.panel.ent(); // LOAD IN FPL
 
         expect(rows('R').slice(0, 5)).toEqual(['DEP1-SID', 'PRESS ENT', 'TO ADD KPRC', 'AND SID TO', 'FPL 0']);
-        expect(unit.panel.focused('R').row).toBe(5);
-        expect(unit.panel.focused('R').text.trim()).toBe('APPROVE?');
     });
 
     // 6-22 step 4, figure 6-35: the runways of a SID are listed with the RW prefix. The sibling is the test above, which
@@ -407,8 +404,8 @@ describe('APT 7 selecting a STAR (6-23)', () => {
         expect(rows('R').slice(0, 4)).toEqual([' KPRC', 'SELECT STAR', ' 1 ARR1', ' 2 ARR2']);
     });
 
-    // 6-23 step 7: LOAD IN FPL for an airport that FPL 0 lacks asks to add the STAR and the airport, with the cursor on
-    // APPROVE?. The sibling of the pin below, which asserts this question before CLR
+    // 6-23 step 7: LOAD IN FPL for an airport that FPL 0 lacks asks to add the STAR and the airport. The sibling of the
+    // pin below, which asserts this question before CLR
     it('asks to add the airport and the STAR to FPL 0 when FPL 0 lacks the airport (6-23)', async () => {
         const unit = await bootOnApt7({sids: [], stars: true});
         await unit.panel.cursor('R');
@@ -416,8 +413,6 @@ describe('APT 7 selecting a STAR (6-23)', () => {
         await unit.panel.ent(); // LOAD IN FPL
 
         expect(rows('R').slice(0, 5)).toEqual(['ARR1-Æ', 'PRESS ENT', 'TO ADD KPRC', 'AND STAR TO', 'FPL 0']);
-        expect(unit.panel.focused('R').row).toBe(5);
-        expect(unit.panel.focused('R').text.trim()).toBe('APPROVE?');
     });
 
     // 6-5: CLR returns to the previous step. On the question to add the airport (6-23 step 7) the previous step is the
@@ -542,7 +537,40 @@ describe('APT 7 page (characterization)', () => {
         expect(Screen.read().status().right).toBe('APT 7');
     });
 
-    it('does not handle CLR on the procedure list, but handles it one step further', async () => {
+    it('has one APT 7 page when the only STAR has an RF leg', async () => {
+        await bootOnApt7({sids: ['DEP1'], stars: false, rf: true}, 1);
+
+        expect(rows('R').slice(0, 3)).toEqual([' KPRC', 'SELECT SID', ' 1 DEP1']);
+        expect(Screen.read().status().right).toBe('APT 7');
+    });
+
+    // The cursor stands on APPROVE? in the question to add the airport: the code focuses the button; the guide's text does
+    // not state it
+    it('puts the cursor on APPROVE? in the question to add the airport and the SID', async () => {
+        const unit = await bootOnApt7({sids: ['DEP1'], stars: false});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP1: the runways
+        await unit.panel.ent(); // 09: the transitions
+        await unit.panel.ent(); // TRNAA: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+
+        expect(unit.panel.focused('R').row).toBe(5);
+        expect(unit.panel.focused('R').text.trim()).toBe('APPROVE?');
+    });
+
+    it('puts the cursor on APPROVE? in the question to add the airport and the STAR', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR1: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+
+        expect(unit.panel.focused('R').row).toBe(5);
+        expect(unit.panel.focused('R').text.trim()).toBe('APPROVE?');
+    });
+
+    // The return value of clear() is not visible on the screen (the main page discards it): this holds the contract of
+    // CLAUDE.md, Input, that a CLR handler reports whether it handled the key
+    it('characterizes clear(): not handled on the procedure list, handled one step further', async () => {
         const unit = await bootOnApt7({sids: [], stars: true});
         await unit.panel.cursor('R');
         expect((unit.props.pageManager.getCurrentPage() as MainPage).onInteractionEvent(EVT_CLR)).toBe(false);
@@ -568,8 +596,8 @@ describe('APT 7 loading a second SID (characterization)', () => {
         await unit.panel.ent(); // TRNAA: the waypoints
         await unit.panel.ent(); // LOAD IN FPL: the question
         await unit.panel.ent(); // APPROVE?
-        if (Screen.read().status().right === 'CRSR') await unit.panel.cursor('R');
         await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().status().right).toBe('APT 7'); // the load turned the cursor off
 
         expect(fpl0Legs(unit)).toEqual([
             ['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID], ['TRNAA', KLNLegType.SID],
