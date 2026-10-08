@@ -6,6 +6,7 @@ import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
 import {SuperNav5} from '../../../harness/render/superNav5';
 import {savedFlightplan} from '../../../harness/storage';
+import {standardRoute} from '../../../harness/fixtures';
 
 // A left arc around ABC from the 270 to the 180 radial through the south-west, then FAFAA and the MAP. A left arc on
 // purpose: a right arc is named wrongly after a recalculation (#104).
@@ -77,6 +78,67 @@ describe('Super NAV 5 direct-to window on a DME arc entry', () => {
         expect(courseDeg(abc, entry.wpt)).toBeCloseTo(205.05, 1);
         expect(distanceNm(abc, entry.wpt)).toBeCloseTo(10, 2);
         expect(fpl0Idents(unit)).toEqual(['D205J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+        expect(unit.errors).toEqual([]);
+    });
+});
+
+// The standard route of SuperNav5Page.test.ts: KAAA, ABC, KBBB in FPL 0, the aircraft at KAAA, ABC active; Super NAV 5
+// with the right inner knob pulled out
+async function scanOnStandardRoute() {
+    const w = standardRoute();
+    const unit = await bootUnit({
+        facilities: [w.kaaa, w.abc, w.kbbb], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
+        storage: savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]),
+    });
+    await settle(unit);
+    await unit.panel.selectPage('R', 'NAV 4');
+    await unit.panel.selectPage('L', 'NAV 5');
+    await unit.panel.inner('R', 1);
+    await unit.panel.scan();
+    await vi.advanceTimersByTimeAsync(250);
+    return unit;
+}
+
+describe('Super NAV 5 direct-to window', () => {
+    // 3-38: the window starts on the active waypoint each time the knob is pulled out: scanned to KBBB, pushed in and
+    // pulled out again, it shows ABC
+    it('starts on the active waypoint again after the knob is pushed in and pulled out (3-38)', async () => {
+        const unit = await scanOnStandardRoute();
+        await unit.panel.inner('R', 1);
+        expect(SuperNav5.read().directTo).toBe('KBBB  ');
+        await unit.panel.scan();
+        await unit.panel.scan();
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(SuperNav5.read().directTo).toBe('ABC   ');
+    });
+
+    // 6-17: CLR in the window offers MOVE ? only for the entry of a DME arc; on another waypoint the window keeps the
+    // waypoint
+    it('shows no MOVE ? for CLR on a waypoint that is not an arc entry (6-17)', async () => {
+        const unit = await scanOnStandardRoute();
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(SuperNav5.read().directTo).toBe('ABC   ');
+    });
+});
+
+describe('Super NAV 5 direct-to window (characterization)', () => {
+    // An empty FPL 0 (a fresh unit) gives a window of blanks that the knob does not change; the guide does not show
+    // the case
+    it('shows a blank window with an empty FPL 0 (characterization)', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        await unit.panel.selectPage('R', 'NAV 4');
+        await unit.panel.selectPage('L', 'NAV 5');
+        await unit.panel.inner('R', 1);
+        await unit.panel.scan();
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(SuperNav5.read().directTo).toBe('      ');
+        await unit.panel.inner('R', 1);
+        expect(SuperNav5.read().directTo).toBe('      ');
         expect(unit.errors).toEqual([]);
     });
 });
