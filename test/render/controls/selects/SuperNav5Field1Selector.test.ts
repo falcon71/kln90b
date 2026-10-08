@@ -65,6 +65,12 @@ describe('Super NAV 5 field 1', () => {
         expect(field1()).toBe('Ð-:--');
     });
 
+    // 3-36: the ETE is hours and minutes: 150 NM at 120 kt is 1:15
+    it('shows the ETE of one hour and a quarter for 150 NM at 120 kt (3-36)', async () => {
+        await superNav5OnLeg({westNm: 150, storage: {superNav5Field1: SuperNav5Field1.ETE}});
+        expect(field1()).toBe('Ð1:15');
+    });
+
     // The sibling of the pin below: 119.8 NM at 120 kt is 59.9 min (3594 s) to KDDD
     it('reaches an ETE of 59.9 minutes (3-36)', async () => {
         const unit = await superNav5OnLeg({westNm: 119.8, storage: {superNav5Field1: SuperNav5Field1.ETE}});

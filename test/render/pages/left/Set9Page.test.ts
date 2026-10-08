@@ -67,11 +67,10 @@ describe('SET 9 alert volume (3-57)', () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 9');
         await unit.panel.cursor('L'); // the tens digit of 99
-        // 9 wraps to 0: checked in the KLN 89 trainer, 2026-10-08 (3-57 does not speak of the wrap)
-        await unit.panel.inner('L', 1);
+        // The wraps of 9 to 0 below: checked in the KLN 89 trainer, 2026-10-08 (3-57 does not speak of the wrap)
+        await unit.panel.inner('L', 1); // 9 wraps to 0
         await unit.panel.outer('L', 1);
-        // 9 wraps to 0 (checked in the KLN 89 trainer, 2026-10-08), then 1, 2
-        await unit.panel.inner('L', 3);
+        await unit.panel.inner('L', 3); // 9 wraps to 0, then 1, 2
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(unit.errors).toEqual([]);

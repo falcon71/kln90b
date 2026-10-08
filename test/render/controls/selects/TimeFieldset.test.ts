@@ -45,8 +45,8 @@ describe('time fieldset', () => {
         expect(times()).toEqual([' 17:24 UTC ', ' 17:24 UTC ']);
     });
 
-    // A minute has no tens digit above 5: the tens of the minutes offer 0 to 5 (3-6, 5-14: a time of day)
-    it('offers 0 to 5 in the tens of the minutes (3-6, 5-14)', async () => {
+    // Checked in the KLN 89 trainer, 2026-10-08, T4: the tens of the minutes offer 0 to 5 (0 turned down gives 5)
+    it('offers 0 to 5 in the tens of the minutes (checked in the KLN 89 trainer, 2026-10-08, T4)', async () => {
         const unit = await onTopHour('2026-06-01T17:06:00Z');
         await unit.panel.outer('L', 1);
         const seen = [unit.panel.focused('L').text];

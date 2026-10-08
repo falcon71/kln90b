@@ -52,6 +52,28 @@ describe('temperature fieldset', () => {
         expect(Screen.read().rows('L')[1]).toBe('   005°C   ');
     });
 
+    // 5-13 (figure 5-43): the units digit alone: 25 C turned to 27 C keeps the tens and shows 81 F
+    it('takes 27 C from the units digit of 25 C and keeps the tens (5-13)', async () => {
+        const unit = await onCelsius(25, 77);
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 2);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   027°C   ', '   081°F   ']);
+        expect(storedSetting(unit, 'cal5TempC')).toBe(27);
+    });
+
+    // 5-10, 5-11: the minus in the first digit stays when a digit after it is turned: -25 C to -35 C is -31 F
+    it('keeps the minus when the tens digit of -25 C is turned to -35 C (5-10, 5-11)', async () => {
+        const unit = await onCelsius(-25, -13);
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   -35°C   ', '   -31°F   ']);
+        expect(storedSetting(unit, 'cal5TempC')).toBe(-35);
+    });
+
     // 5-10, 5-13: the sign cell turns 25 C into -25 C, which is -13 F (-25 * 9 / 5 + 32)
     it('makes 25 C negative with the sign cell: -25 C is -13 F (5-10, 5-13)', async () => {
         const unit = await onCelsius(25, 77);

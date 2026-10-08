@@ -44,6 +44,20 @@ describe('volume fieldset', () => {
         expect(storedSetting(unit, 'altAlertVolume')).toBe(53);
     });
 
+    // Checked in the KLN 89 trainer, 2026-10-08, T4: a digit at the end of its list wraps in both directions. The units
+    // digit of 37 turned up 3 clicks is 0 (30), and down one click is 9 (39)
+    it('wraps the units digit of the volume (checked in the KLN 89 trainer, 2026-10-08, T4)', async () => {
+        const unit = await bootUnit({storage: {altAlertVolume: 37}});
+        await unit.panel.selectPage('L', 'SET 9');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 3);
+        expect(Screen.read().rows('L')[4]).toBe('    30     ');
+
+        await unit.panel.inner('L', -1);
+        expect(Screen.read().rows('L')[4]).toBe('    39     ');
+    });
+
     // 3-57: 00 is the lowest volume and a valid entry
     it('takes the lowest volume 00 (3-57)', async () => {
         const unit = await bootUnit({storage: {altAlertVolume: 10}});

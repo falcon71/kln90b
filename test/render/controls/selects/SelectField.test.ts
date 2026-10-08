@@ -29,6 +29,19 @@ describe('select field', () => {
         await unit.panel.inner('L', -1);
         expect(volumeRow()).toBe('    95     ');
     });
+
+    // ENT on a field moves the cursor to the next field: the video of a real unit that CursorController.enter cites
+    // (https://www.youtube.com/shorts/9We5fcd2-VE). On a select cell ENT commits nothing of its own: the value stays.
+    it('keeps the value and moves the cursor to the next cell on ENT '
+        + '(video of a real unit, youtube.com/shorts/9We5fcd2-VE)', async () => {
+        const unit = await onVolume(37);
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(volumeRow()).toBe('    37     ');
+        expect(unit.panel.focused('L')).toEqual({row: 4, col: 5, text: '7'});
+        expect(storedSetting(unit, 'altAlertVolume')).toBe(37);
+    });
 });
 
 describe('select field (characterization)', () => {
@@ -74,17 +87,6 @@ describe('select field (characterization)', () => {
 
         expect(volumeRow()).toBe('    37     ');
         expect(unit.panel.focused('L')).toEqual({row: 4, col: 4, text: '3'});
-        expect(storedSetting(unit, 'altAlertVolume')).toBe(37);
-    });
-
-    // ENT on a select cell commits nothing of its own: the value stays and the cursor moves on to the next cell
-    it('keeps the value and moves the cursor to the next cell on ENT (characterization)', async () => {
-        const unit = await onVolume(37);
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(1000);
-
-        expect(volumeRow()).toBe('    37     ');
-        expect(unit.panel.focused('L')).toEqual({row: 4, col: 5, text: '7'});
         expect(storedSetting(unit, 'altAlertVolume')).toBe(37);
     });
 });

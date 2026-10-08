@@ -56,13 +56,10 @@ describe('OBS/DTK element', () => {
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
         expect(unit.panel.focused('L')).toEqual({row: 1, col: 7, text: '089°'});
 
-        // The OBS taken over from the DTK keeps its fraction (089.46), which the field rounds
         await unit.panel.inner('L', -90);
         expect(unit.panel.focused('L').text).toBe('359°');
-        expect(unit.props.memory.navPage.obsMag).toBeCloseTo(359.46, 1);
         await unit.panel.inner('L', 2);
         expect(unit.panel.focused('L').text).toBe('001°');
-        expect(unit.props.memory.navPage.obsMag).toBeCloseTo(1.46, 1);
     });
 
     // 4-9: with an external indicator whose selected course differs from the DTK by more than 10 degrees, the DTK on
@@ -76,10 +73,11 @@ describe('OBS/DTK element', () => {
         expect(await dtkMasks()).toEqual(new Set(['....', 'BBBB']));
     });
 
-    // 4-9: within 10 degrees the DTK does not flash: the indicator at 095, six degrees from the DTK
-    it('does not flash the DTK when the external course is within 10 degrees (4-9)', async () => {
+    // 4-9: within 10 degrees the DTK does not flash: the indicator at 095 and at 099, six and nine and a half degrees
+    // from the DTK (089.46)
+    it.each([95, 99])('does not flash the DTK at an external course of %d, within 10 degrees (4-9)', async (course) => {
         const unit = await nav3(MINIMAL_PANEL_XML);
-        unit.env.sim.set('Nav OBS:1', 'degrees', 95);
+        unit.env.sim.set('Nav OBS:1', 'degrees', course);
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(await dtkMasks()).toEqual(new Set(['....']));

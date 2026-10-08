@@ -118,6 +118,20 @@ describe('OTH fuel fieldset', () => {
         expect(seen.map(f => `${f.row},${f.col}`)).toEqual(['4,6', '4,7', '4,8', '4,9', '4,10']);
     });
 
+    // Checked in the KLN 89 trainer, 2026-10-08, T4: a digit at the end of its list wraps in both directions. The units
+    // digit of the reserve turned down one click is 9 (00009), and up one click is 0 again
+    it('wraps the units digit of the OTH 5 reserve (checked in the KLN 89 trainer, 2026-10-08, T4)', async () => {
+        const unit = await bootUnit({panelXml: FUEL_XML});
+        await unit.panel.selectPage('L', 'OTH 5');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 4);
+        await unit.panel.inner('L', -1);
+        expect(Screen.read().rows('L')[4]).toBe('RES:  00009');
+
+        await unit.panel.inner('L', 1);
+        expect(Screen.read().rows('L')[4]).toBe('RES:  00000');
+    });
+
     // 5-40: the highest digit keeps the lower ones: 00045 to 10045, units and tens first
     it('keeps the lower digits when the ten-thousands digit changes: 10045 (5-40)', async () => {
         const unit = await bootUnit({panelXml: FUEL_XML});

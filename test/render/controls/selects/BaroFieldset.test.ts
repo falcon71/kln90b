@@ -103,17 +103,21 @@ describe('barometer fieldset in millibars', () => {
         expect(baroRow()).toBe('BARO:1003MB');
         expect(unit.props.sensors.in.airdata.barometer).toBeCloseTo(29.62, 2);
     });
-
 });
 
 describe('barometer fieldset in millibars below 1000', () => {
-    // The sibling of the pin below: 29.32 inches are 993 MB, set in millibars (3-39, 5-10). The digits after the first
-    // cell read 93 and the unit MB; the setting is the one stored
-    it('reaches 993 MB with the barometer in millibars (3-39, 5-10)', async () => {
-        const unit = await onAltPage({barounit: false, barosetting: 29.32});
+    // The sibling of the pin below: 993 MB is reached with the knobs in millibars (3-39, 5-10): the first cell of 1013
+    // MB turned down to 09 (913 MB), then the tens digit turned up from 1 to 9. The digits after the first cell read 93
+    // and the unit MB; the sensors hold 993 / 33.8639 = 29.32 inches
+    it('reaches 993 MB with the knobs in millibars (3-39, 5-10)', async () => {
+        const unit = await onAltPage({barounit: false, barosetting: 29.92});
+        await unit.panel.inner('L', -1);
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 8);
+        await vi.advanceTimersByTimeAsync(1000);
 
         expect(baroRow().slice(7)).toBe('93MB');
-        expect(unit.props.sensors.in.airdata.barometer).toBe(29.32);
+        expect(unit.props.sensors.in.airdata.barometer).toBeCloseTo(29.32, 2);
     });
 
     // Checked in the KLN 89 trainer, 2026-10-08, T16: 993 MB shows with a blank in the first digit (the trainer's
