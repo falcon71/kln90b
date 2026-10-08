@@ -20,8 +20,20 @@ function runwayDesignation(heading: number): string {
     return `${String(Math.min(a, b)).padStart(2, '0')}-${String(Math.max(a, b)).padStart(2, '0')}`;
 }
 
+/**
+ * The heading of the runway's lower-numbered end, which the SDK reads as `direction` for a designation `09-27` (it
+ * takes the first named end for the heading and the second for its opposite)
+ */
+function lowerEndHeading(heading: number): number {
+    const own = Math.round(heading / 10) % 36 || 36;
+    return own > 18 ? (heading + 180) % 360 : heading;
+}
+
 export interface RunwayOptions {
-    /** Default 90 */
+    /**
+     * The heading of one end of the runway, default 90. The runway is stored with its lower-numbered end first, so a
+     * heading of 270 gives the designation 09-27 with a direction of 90.
+     */
     heading?: number;
     /** Default 5000 */
     lengthFt?: number;
@@ -51,7 +63,7 @@ function runway(lat: number, lon: number, elevationFt: number, o: RunwayOptions)
     const heading = o.heading ?? 90;
     return {
         latitude: lat, longitude: lon, elevation: UnitType.FOOT.convertTo(elevationFt, UnitType.METER),
-        direction: heading, designation: runwayDesignation(heading),
+        direction: lowerEndHeading(heading), designation: runwayDesignation(heading),
         length: UnitType.FOOT.convertTo(o.lengthFt ?? 5000, UnitType.METER), width: 30,
         surface: o.surface ?? RunwaySurfaceType.Asphalt, lighting: RunwayLightingType.Unknown,
         designatorCharPrimary: RunwayDesignator.RUNWAY_DESIGNATOR_NONE,

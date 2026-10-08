@@ -1,5 +1,6 @@
-import {Facility, FixTypeFlags} from '@microsoft/msfs-sdk';
+import {BoundaryType, Facility, FixTypeFlags} from '@microsoft/msfs-sdk';
 import {pointFrom} from './flight/geo';
+import {airspace} from './navdata/airspaces';
 import {airport, intersection, ndb, vor} from './navdata/builders';
 import {approach, Leg, withProcedures} from './navdata/procedures';
 
@@ -65,5 +66,49 @@ export function approachWorld() {
         facilities: [kprc, enraa, iafaa, ifaaa, fafaa, sdfaa, mapaa],
         /** The point nm NM north of KPRC on the final course line */
         north: (nm: number) => pointFrom(kprcBase, 0, nm),
+    };
+}
+
+/**
+ * Four waypoints half a degree of latitude apart on one meridian, 10 E: the airport KAAA (47.0 N), the VOR ABC (47.5 N),
+ * the intersection DEF (48.0 N) and the airport KBBB (48.5 N). Every leg is about 30 NM long (30.05 NM on the unit's
+ * sphere, geo.ts), so an aircraft that flies north at a ground speed of 120 kt takes 15 minutes per leg. East longitudes
+ * of 10 and more keep the coordinate rows clear of the zero of #230. Fresh objects on every call.
+ */
+export function dtWorld() {
+    return {
+        kaaa: airport('KAAA', 47.0, 10.0),
+        abc: vor('ABC', 47.5, 10.0),
+        def: intersection('DEF', 48.0, 10.0),
+        kbbb: airport('KBBB', 48.5, 10.0),
+    };
+}
+
+/**
+ * The world of the CTR pages (the Center airspaces along a route): the airports KAAA (40 N), KBBB (45 N) and KCCC (50 N)
+ * 5 degrees apart on 100 W, and three Center airspaces stacked south to north along the same meridian that share their
+ * boundaries at 42.75 N and 47.75 N. The VOR BGD lies half a degree north of the first boundary and GCK half a degree
+ * north of the second, so each is the only VOR within 100 NM of its crossing. The Centers are named after the idents
+ * KZFW, KZAB and KZDV, and each carries a frequency: OTH 2 throws without one, and selectPage may pass OTH 2.
+ *
+ * The legs of a plan through the airports should be 300 NM long, as KAAA to KBBB is: the route search splits a leg and
+ * searches circles of about 75 NM radius at 0, 75 and 225 NM along it, so a Center is first returned by a search whose
+ * center lies inside it. A Center that the shared search session first returns from outside it is dropped for good
+ * (#102), so a shorter leg shows the bug instead of the page. Fresh objects on every call, airspaces included.
+ */
+export function centerWorld() {
+    /** A box of Center airspace from latitude s to n and longitude w to e, as [lat, lon] corners */
+    const box = (s: number, n: number, w: number, e: number): [number, number][] => [[n, w], [n, e], [s, e], [s, w]];
+    return {
+        kaaa: airport('KAAA', 40.0, -100.0),
+        kbbb: airport('KBBB', 45.0, -100.0),
+        kccc: airport('KCCC', 50.0, -100.0),
+        bgd: vor('BGD', 43.25, -100.0),
+        gck: vor('GCK', 48.25, -100.0),
+        centers: [
+            airspace('KZFW TEST', BoundaryType.Center, box(38, 42.75, -102, -98), {frequencyMHz: 120.0}),
+            airspace('KZAB TEST', BoundaryType.Center, box(42.75, 47.75, -102, -98), {frequencyMHz: 121.0}),
+            airspace('KZDV TEST', BoundaryType.Center, box(47.75, 52, -102, -98), {frequencyMHz: 122.0}),
+        ],
     };
 }

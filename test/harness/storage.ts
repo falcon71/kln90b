@@ -21,8 +21,9 @@ interface SavedPosition {
 /**
  * A user waypoint as an earlier session saved it. `sup` is a user waypoint of the SUP page (type letter `U`), `int` a
  * user intersection (`W`).
- * - `apt`: an unknown elevation is saved as -1 ft and an unknown runway length as -33 ft (the unit's -10 m), with the
- *   surface `-`; give `runwayLengthFt` to get a surface of `H` (asphalt) unless `surface` says `S` (grass).
+ * - `apt`: `elevationFt` is stored in meters, rounded, as the format and the model hold it (1400 ft are saved as +00427).
+ *   An unknown elevation is saved as -1 m (the unit's own value) and an unknown runway length as -33 ft (the unit's
+ *   -10 m), with the surface `-`; give `runwayLengthFt` to get a surface of `H` (asphalt) unless `surface` says `S` (grass).
  * - `vor`: `magvar` is the whole-degree number the unit saves, as the model holds it (`VorOptions.magneticVariation`).
  */
 export type SavedUserWaypoint =
@@ -33,7 +34,8 @@ export type SavedUserWaypoint =
 
 const USER_REGION = 'XX';
 const TYPE_LETTER = {sup: 'U', int: 'W', apt: 'A', vor: 'V', ndb: 'N'};
-const UNKNOWN_ELEVATION_FT = -1;
+/** What the unit saves for an airport of unknown elevation: -1 m (Apt1Page.createAtUserPosition, `altitude: -1`) */
+const UNKNOWN_ELEVATION_M = -1;
 const UNKNOWN_RUNWAY_LENGTH_FT = -33;
 
 /** A sign, then |n| padded to the given digits: signed(-3, 2) is "-03" */
@@ -67,7 +69,9 @@ export function savedUserWaypoints(wpts: SavedUserWaypoint[]): Record<string, un
             case 'apt': {
                 const length = w.runwayLengthFt ?? UNKNOWN_RUNWAY_LENGTH_FT;
                 const surface = w.surface ?? (w.runwayLengthFt === undefined ? '-' : 'H');
-                s += signed(w.elevationFt ?? UNKNOWN_ELEVATION_FT, 5) + signed(length, 5) + surface;
+                // The format stores the elevation in meters, as the model holds it (UserWaypointPersistor.serializeApt)
+                const elevationM = w.elevationFt === undefined ? UNKNOWN_ELEVATION_M : Math.round(w.elevationFt * 0.3048);
+                s += signed(elevationM, 5) + signed(length, 5) + surface;
                 break;
             }
             case 'vor':

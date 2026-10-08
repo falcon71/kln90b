@@ -1,7 +1,9 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit} from '../../harness/boot';
+import {bootUnit, settle} from '../../harness/boot';
 import {PAGE_CYCLES, PAGE_GROUPS, Side} from '../../harness/flight/FrontPanel';
 import {Screen} from '../../harness/render/screen';
+import {savedFlightplan} from '../../harness/storage';
+import {standardRoute} from '../../harness/fixtures';
 
 // STA 3 shows the version, which the build injects into Version.ts; the source carries a placeholder 18 cells wide
 vi.mock('../../../kln90b/Version', () => ({VERSION: '2.2.0'}));
@@ -142,6 +144,27 @@ describe('FrontPanel.selectPage (harness)', () => {
             expect(shown(side)).toBe(name.trim());
         }
         expect(unit.errors).toEqual([]);
+    });
+
+    // The ACT page of an active airport has pages ACT 1 to ACT 8, so the bare group name never matches the status line
+    it('ends on whichever page of the group shows when the name is a bare group: ACT of an active airport', async () => {
+        const {kaaa, kbbb} = standardRoute();
+        const unit = await bootUnit({facilities: [kaaa, kbbb], position: {lat: 47.0, lon: 8.0}, storage: savedFlightplan(0, [kaaa, kbbb])});
+        await settle(unit);
+        const inner = vi.spyOn(unit.panel, 'inner');
+
+        await unit.panel.selectPage('R', 'ACT');
+
+        expect(Screen.read().status().right).toMatch(/^ACT[ +]\d$/);
+        expect(inner.mock.calls).toEqual([]);
+    });
+
+    it('still ends on the bare page of a group that has none when nothing is active: ACT without an active waypoint', async () => {
+        const unit = await bootUnit();
+
+        await unit.panel.selectPage('R', 'ACT');
+
+        expect(Screen.read().status().right).toBe('ACT');
     });
 
     it('takes a two-digit page with a space too', async () => {

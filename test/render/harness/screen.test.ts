@@ -1,8 +1,12 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit} from '../../harness/boot';
+import {FixTypeFlags} from '@microsoft/msfs-sdk';
+import {bootUnit, settle} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {savedFlightplan} from '../../harness/storage';
-import {standardRoute} from '../../harness/fixtures';
+import {approachWorld, standardRoute} from '../../harness/fixtures';
+import {pointFrom} from '../../harness/flight/geo';
+import {intersection} from '../../harness/navdata/builders';
+import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 
 function mount(html: string): Element {
     document.body.innerHTML = `<div id="pageContainer">${html}</div>`;
@@ -285,5 +289,61 @@ describe('Screen, the USE? overlay of a numbered flight plan', () => {
 
         await unit.panel.outer('L', 1);
         expect(unit.panel.focused('L')).toEqual({row: 0, col: 0, text: 'USE? INVRT?'});
+    });
+});
+
+// KLN90B.scss .apt-8-iaf-list: the list of APT 8 and ACT 8 is positioned (one row down, sixteen cells from the screen's
+// left edge, which is cell 4 of the right half), so a browser draws every row of it from that cell
+describe('Screen, the positioned IAF list of APT 8', () => {
+    const iafList = (rows: string) => mount(`<div><div class="left-page"><pre></pre></div><div class="right-page"><pre>R18-KPRC<br/>IAF `
+        + `<div class="apt-8-iaf-list"><div>${rows}</div></div></pre></div>${STATUS}</div>`);
+
+    it('draws the second and later rows of the list from cell 4, where the first row starts', () => {
+        iafList('<span>1 IAFAA</span><br/><span>2 IAFAB</span><br/><span>3 IAFAC</span><br/>');
+
+        expect(Screen.read().rows('R').slice(0, 4)).toEqual(['R18-KPRC   ', 'IAF 1 IAFAA', '    2 IAFAB', '    3 IAFAC']);
+    });
+
+    it('keeps the attributes of the list rows and leaves cells 0 to 3 of the shifted rows normal', () => {
+        iafList('<span>1 IAFAA</span><br/><span class="inverted">2 IAFAB</span><br/>');
+
+        expect(Screen.read().maskRows('R').slice(1, 3)).toEqual(['...........', '....IIIIIII']);
+    });
+
+    it('throws when the list does not start in cell 4', () => {
+        mount(`<div><div class="left-page"><pre></pre></div><div class="right-page"><pre>R18-KPRC<br/>IAF  `
+            + `<div class="apt-8-iaf-list"><div><span>1 IAFAA</span><br/><span>2 IAFAB</span><br/></div></div></pre></div>${STATUS}</div>`);
+
+        expect(() => Screen.read()).toThrow(/the IAF list starts in cell 5, not 4/);
+    });
+
+    /** KPRC of approachWorld() with its RNAV 18 approach given a second IAF, IAFAB, west of IAFAA */
+    function twoIafs() {
+        const w = approachWorld();
+        const at = pointFrom(w.iafaa, 270, 5);
+        const iafab = intersection('IAFAB', at.lat, at.lon);
+        const rnav18 = approach({
+            type: ApproachType.APPROACH_TYPE_RNAV, runway: '18',
+            transitions: [
+                {name: 'IAFAA', legs: [Leg.IF(w.iafaa, FixTypeFlags.IAF), Leg.TF(w.ifaaa)]},
+                {name: 'IAFAB', legs: [Leg.IF(iafab, FixTypeFlags.IAF), Leg.TF(w.ifaaa)]},
+            ],
+            final: [Leg.IF(w.ifaaa), Leg.TF(w.fafaa, FixTypeFlags.FAF), Leg.TF(w.mapaa, FixTypeFlags.MAP)],
+        });
+        const kprc = withProcedures(w.kprc, {approaches: [rnav18]});
+        return {facilities: [kprc, w.enraa, w.iafaa, iafab, w.ifaaa, w.fafaa, w.mapaa], position: w.north(40)};
+    }
+
+    it('reads both IAFs of the approach on a booted unit', async () => {
+        const unit = await bootUnit(twoIafs());
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 8');
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // RNAV 18
+
+        const rows = Screen.read().rows('R');
+        expect(rows.slice(0, 3)).toEqual(['R18-KPRC   ', 'IAF 1 IAFAA', '    2 IAFAB']);
+        // The list has no row of its own past its last IAF, and nothing follows it on the page
+        expect(rows.slice(3)).toEqual(Array(3).fill(' '.repeat(11)));
     });
 });

@@ -182,7 +182,10 @@ filters are the class and type masks of `setVorFilter`. An airport without runwa
 dropped only by the class mask. That rule is the sim developers' own, quoted to the maintainer from their code: "If
 there are no runways, the minimum runway size and surface types filters should not apply". `airport()` takes `runways`
 (an empty list is a heliport), `towered` and `airportClass`, which is derived from the runways when absent; `vor()`
-takes `vorClass`. Without these options a world is the same as before.
+takes `vorClass`. Without these options a world is the same as before. A runway's `heading` (or `runwayHeading`) is
+the heading of either end. The runway is stored the way the SDK reads it, with the lower-numbered end first and the
+heading of that end as its `direction`, so `runwayHeading: 270` gives the designation `09-27` with a direction of 90,
+and `runwayFix(apt, '27')` and `runwayFix(apt, '09')` both resolve, 27 with a course of 270.
 
 **Airspaces.** `airspace()` and `circularAirspace()` (`navdata/airspaces.ts`) build `BoundaryFacility` objects. Pass
 them as `BootOptions.airspaces`, add them to a flight with `World.addAirspace()`, or call
@@ -206,7 +209,9 @@ with the knobs.
 'ndb', ident, lat, lon, ...}` becomes the `wpt0`, `wpt1`, ... strings plus `userDataFormat: 2`. Spread it together with
 `savedFlightplan` when a test needs both. The strings are laid out by hand from the format, never produced by the
 persistor, so a test of the restore stays independent of the code that saves. The format tests of the persistor itself
-(`UserWaypointV2.test.ts`) keep their literals. A southern latitude of one degree or more does not survive the restore (#98),
+(`UserWaypointV2.test.ts`) keep their literals. An airport's `elevationFt` is stored in meters, rounded, as the format
+and the model hold it (1400 ft are `+00427`), so APT 2 of that airport shows 1400 ft; an unknown elevation is the
+unit's own -1 m. A southern latitude of one degree or more does not survive the restore (#98),
 so keep it out of setup.
 
 `standardRoute()` (`test/harness/fixtures.ts`) returns the world many tests use: KAAA, the VOR ABC and KBBB, fresh objects
@@ -219,6 +224,15 @@ airport and an enroute fix ENRAA. Its FAF is not its IAF, so the unit can reach 
 check that APR does not come back past the FAF. Boot with its `facilities`, store `[enraa, kprc]` in FPL 0 with
 `savedFlightplan` and load the approach with `await unit.panel.loadProcedure('APT 8')` after `settle`; `north(nm)` gives a
 point on the final course line.
+
+`dtWorld()` returns four waypoints half a degree of latitude apart on one meridian, 10 E: the airport KAAA, the VOR ABC,
+the intersection DEF and the airport KBBB. Each leg is about 30 NM, which is 15 minutes at 120 kt. `centerWorld()`
+returns `{kaaa, kbbb, kccc, bgd, gck, centers}` for the CTR pages: three airports 5 degrees (300 NM) apart on 100 W, the
+VORs BGD and GCK, and three Center airspaces stacked along that meridian that share their boundaries at 42.75 N and
+47.75 N. BGD is the only VOR within 100 NM of the first crossing and GCK of the second. A plan through the airports should keep its legs at
+300 NM: the route search searches circles of about 75 NM radius at 0, 75 and 225 NM along a leg, so each Center is first
+returned by a search whose center lies inside it, and a Center first returned from outside it is dropped for good by the
+shared search session (#102). Both return fresh objects on every call; pass `centers` as `BootOptions.airspaces`.
 
 ## The EFB
 
@@ -281,6 +295,10 @@ the reader follows the screen:
   `KLN90B.scss`). The reader lays the text of a `.use-invert` element over the cells it covers, so the row keeps its
   eleven cells and the cursor on `USE?` inverts four of them. An overlay with other characters than the cells below it,
   or a normal overlay over inverted cells (which would fill them green), is a rendering bug and throws.
+- The IAF list of APT 8 and ACT 8 is positioned with CSS (`.apt-8-iaf-list`, `KLN90B.scss`): the browser draws every
+  row of it from the cell where the list starts, cell 4 of the right half, while the DOM starts the second and later rows
+  at the line start. The reader moves those rows right by four blank cells, so the rows read `IAF 1 IAFAA` and
+  `    2 IAFAB`. It throws when the list does not start in cell 4.
 - A full page without a status line (the welcome page) owns all seven rows. The orientation and range of NAV 5 are
   positioned over the map with CSS and are read at row 5 of their half.
 - Super NAV 5 is a map with text over it, not a text grid. `Screen.read()` throws there; section 4 shows how to read it.
@@ -372,6 +390,13 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - **`unit.consoleErrors`** is the place to assert that the unit logged (or did not log) an error. A test that provokes a
   `console.error` and wants the test output quiet replaces `console.error` with `vi.spyOn(...).mockImplementation`
   before the boot and restores it with an `onTestFinished` registered before the boot, which runs after the teardown.
+- **`answerTimezone(standardHours, dstMonths)`** (`timezone.ts`) answers the sim's time zone call for APT 2: a zone
+  of `standardHours` from UTC that observes one hour of daylight saving time in the 0-based UTC months `dstMonths`, or
+  none. Without it the call never resolves, like a sim with nothing attached, and APT 2 shows no time zone row. The
+  answer arrives asynchronously, so advance the clock by a display tick after selecting the page.
+- **`collectStatusMessages(unit)`** (`statusLine.ts`) returns the list of the status-line messages published from now
+  on. A new bus subscriber is called at once with the last cached message (section 6); the collector drops that call, so
+  a message that was shown before is not in the list.
 - **`unit.display`** reads what the unit drives outside the screen grid: `opacity()` is the container's opacity as a
   number, and `powerWrites()` lists the writes of `L:KLN90B_POWER`.
 - **A start-up failure** is tested with `bootUnitExpectingError({platform: {createFacilityClient: () => client}})`. Build
@@ -447,7 +472,10 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       `selectPage` cannot end on Super NAV 5, and the shorter way can pass `NAV 5` on either side. Super NAV 5 (both
       sides on `NAV 5`) hides the status line that `selectPage` reads. So select the side whose way passes `NAV 5`
       first, and reach Super NAV 5 itself by selecting the page before it and turning the last click with `inner`, as
-      `test/render/harness/superNav5.test.ts` does.
+      `test/render/harness/superNav5.test.ts` does. A bare group name (`'ACT'`, `'VOR'`: three characters) ends on
+      whichever page of the group shows, because the ACT page of an active airport has pages `ACT 1` to `ACT 8` and none
+      of them is named `ACT`. APT 7 is reached backward from APT 8, so with SIDs and STARs it lands on the STAR page
+      (its last sub-page); to see the SID page select APT 6 and turn the inner knob forward.
     - `enterIdent(side, ident)` types with the knobs and does not press ENT. In an editor (FPL, DIR) a short ident is
       followed by a blank, so `KAA` stays `KAA` and does not autocomplete to `KAAA`. In a waypoint selector (the APT,
       VOR, NDB, INT and SUP pages: the focused run is one cell) it steps through the characters, and throws if the ident
@@ -457,7 +485,9 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       character already shows the wanted letter (the VNAV waypoint `ABC` of NAV 4, entering `AAA`) no click has started
       the edit, and the outer knob would leave the field, so `enterIdent` clicks once to start it. `type(side, text)` is
       the keyboard alternative that types the same characters.
-    - `focused(side)` returns the one focused field `{row, col, text}`; `cursorTo(side, 'USER POS?')` turns the outer
+    - `focused(side)` returns the one focused field `{row, col, text}`. Two runs of inverted cells that one plain `.`
+      separates are one field: the NDB frequency and DIS editors invert their digits and not their point, so the DIS
+      field of the INT page reads `___._`. Whether the real cursor covers the point is open (Session 9b); `cursorTo(side, 'USER POS?')` turns the outer
       knob until that field has the cursor, stepping over the cursor positions that focus nothing (the SUP page without
       user waypoints has one after the ident characters) and throwing with the screen after `maxClicks`. It throws at
       once when the status field of that side shows a page name, which means the cursor is off: the outer knob would
@@ -711,9 +741,10 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
   a Direct To a waypoint of FPL 0 that has a following leg) and #147 (whether there is a waypoint alert in OBS mode). The
   approach questions #162 (the GPS APR switch before the FAF) and #163 (four approach-scale cases) cannot be answered
   there, because that trainer shows neither ARM nor ACTV.
-- **CTR 1 (#161) has no pin yet.** A render test reaches it with two Center airspaces that share a boundary across a
-  full FPL 0, but only when OTH 2 is shown first: the shared airspace search session of #102 drops a Center first seen
-  from outside it, so without that step CTR 1 computes no waypoints at all. The CTR pages belong to Session 9.
+- **CTR 1 (#161) has no pin yet.** With `centerWorld()` (section 3) one computation needs no OTH 2 detour: its plan legs
+  are 300 NM, so each Center is first returned by a search from inside it. A second computation meets #102, where the
+  shared airspace search session drops a Center first seen from outside it, which is why CTR 1 still has no pin. The CTR
+  pages belong to Session 9a.
 - Harness gaps that the Session 4 contract tests worked around (each serves few tests, so none was built, per rule 13
   of test-coverage.md):
     - **SimVars before `init`.** The `simVars` boot option now exists (section 4). The electricity tests

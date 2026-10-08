@@ -229,7 +229,8 @@ export class FrontPanel {
      * of the group (PAGE_CYCLES; SET 0 is the last SET page, so it is one click backward from SET 1); a group without
      * page numbers is stepped forward. The shorter way can pass through a page that changes the screen: NAV 5 on
      * either side while the other side shows NAV 5 is Super NAV 5, which has no status line, so select the side whose
-     * way passes NAV 5 first.
+     * way passes NAV 5 first. A bare group name ("ACT", "VOR") ends on whichever page of the group shows: the ACT page of
+     * an active airport has pages ACT 1 to ACT 8 and none of them is named "ACT".
      */
     public async selectPage(side: Side, name: string): Promise<void> {
         name = name.replace(/^(.{3}) (\d\d)$/, '$1$2'); // The status line shows two-digit pages as "FPL10", not "FPL 10"
@@ -245,6 +246,8 @@ export class FrontPanel {
         if (this.shownName(side).slice(0, 3) !== groups[wantedGroup]) {
             throw new Error(`selectPage: no page group ${name.slice(0, 3)}\n${this.screen().dump()}`);
         }
+
+        if (name.trim().length === 3) return; // a bare group ("ACT", "VOR"): whichever page of the group shows
 
         const wanted = pageNumber(name);
         for (let i = 0; !sameName(this.shownName(side), name); i++) {
@@ -412,7 +415,10 @@ export class FrontPanel {
         return runs[0];
     }
 
-    /** Every run of inverted cells on a side: none at a cursor position without a field of its own */
+    /**
+     * Every run of inverted cells on a side: none at a cursor position without a field of its own. Two runs that one plain
+     * "." separates are one field (joinAcrossPoint).
+     */
     private focusedRuns(side: Side): Field[] {
         const s = this.screen();
         const [c0, c1] = side === 'L' ? [0, 11] : [12, 23];
@@ -430,6 +436,25 @@ export class FrontPanel {
                 }
             }
         }
-        return runs;
+        return this.joinAcrossPoint(s, runs);
+    }
+
+    /**
+     * Joins two runs of a row that one plain "." separates: the NDB frequency and DIS editors do not invert their point,
+     * so the digits around it are two runs of one field. Whether the real cursor covers the point is open (Session 9b).
+     */
+    private joinAcrossPoint(s: Screen, runs: Field[]): Field[] {
+        const out: Field[] = [];
+        for (const run of runs) {
+            const prev = out[out.length - 1];
+            const gap = prev === undefined ? -1 : prev.col + prev.text.length;
+            if (prev !== undefined && prev.row === run.row && run.col === gap + 1
+                && s.cell(run.row, gap).ch === '.' && s.cell(run.row, gap).attr === '.') {
+                out[out.length - 1] = {row: prev.row, col: prev.col, text: prev.text + '.' + run.text};
+            } else {
+                out.push(run);
+            }
+        }
+        return out;
     }
 }

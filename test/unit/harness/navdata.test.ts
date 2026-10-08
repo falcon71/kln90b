@@ -1,6 +1,8 @@
 import {describe, expect, it} from 'vitest';
-import {EventBus, FacilitySearchType, FacilityType, ICAO, UnitType} from '@microsoft/msfs-sdk';
+import {EventBus, FacilitySearchType, FacilityType, ICAO, RunwayUtils, UnitType} from '@microsoft/msfs-sdk';
 import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
+import {runwayFix} from '../../harness/navdata/procedures';
+import {angleDiff} from '../../harness/flight/geo';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
 import {KLNFacilityLoader, ActualFacilityClient} from '../../../kln90b/data/navdata/KLNFacilityLoader';
 import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
@@ -84,5 +86,39 @@ describe('builders', () => {
             expect(['XX', 'XY']).not.toContain(fac.region);
             expect(['XX', 'XY']).not.toContain(fac.icaoStruct.region);
         }
+    });
+
+    // The SDK reads `direction` as the heading of the first named end, so the label of the end that points to the
+    // heading must be the one a pilot expects: a runway of heading 270 is 27 to the west and 09 to the east
+    describe('runway ends', () => {
+        const ends = (heading: number) => RunwayUtils.getOneWayRunwaysFromAirport(airport('KXXX', 47, 8, {runwayHeading: heading}))
+            .map(r => [r.designation, Math.round(r.course)]);
+
+        it.each([
+            [270, 90, '09-27', [['09', 90], ['27', 270]]],
+            [360, 180, '18-36', [['18', 180], ['36', 0]]],
+            [90, 90, '09-27', [['09', 90], ['27', 270]]],
+            [180, 180, '18-36', [['18', 180], ['36', 0]]],
+            [200, 20, '02-20', [['02', 20], ['20', 200]]],
+        ])('a heading of %i is stored as direction %i of runway %s', (heading, direction, designation, oneWay) => {
+            const apt = airport('KXXX', 47, 8, {runwayHeading: heading});
+
+            expect(apt.runways).toHaveLength(1);
+            expect(apt.runways[0].direction).toBe(direction);
+            expect(apt.runways[0].designation).toBe(designation);
+            expect(ends(heading)).toEqual(oneWay);
+        });
+
+        it('resolves both ends as runway fixes, the end the heading points to with that course', () => {
+            const apt = airport('KXXX', 47, 8, {runwayHeading: 270});
+
+            const r27 = runwayFix(apt, '27');
+            const r09 = runwayFix(apt, '09');
+
+            // The threshold of 27 is the east end of the runway (an aircraft lands on it flying west), that of 09 the west end
+            expect(r27.lon).toBeGreaterThan(8);
+            expect(r09.lon).toBeLessThan(8);
+            expect(angleDiff(RunwayUtils.getOneWayRunwaysFromAirport(apt).find(r => r.designation === '27')!.course, 270)).toBeCloseTo(0, 6);
+        });
     });
 });

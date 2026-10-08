@@ -58,6 +58,31 @@ function overlay(rows: Cell[][], read: () => void): void {
 }
 
 /**
+ * The IAF list of APT 8 and ACT 8 is positioned with CSS (KLN90B.scss .apt-8-iaf-list): the browser draws each of its
+ * rows from the cell where the list starts, cell 4 of the right half, while the DOM starts its later rows at the line
+ * start.
+ */
+const IAF_LIST_CELL = 4;
+
+/**
+ * Reads the list that `read` adds to the rows, which the browser draws from `cell` in every row. The list starts in the
+ * current row, which must have reached that cell (the "IAF " in front of the list), and each later row of the list is
+ * moved right by `cell` blank cells. An empty row stays empty: the one after the list's last line break is where the
+ * page goes on, and a blank row reads the same.
+ */
+function positioned(rows: Cell[][], cell: number, read: () => void): void {
+    const first = rows.length - 1;
+    if (rows[first].length !== cell) {
+        throw new Error(`Screen: the IAF list starts in cell ${rows[first].length}, not ${cell}`);
+    }
+    read();
+    for (let r = first + 1; r < rows.length; r++) {
+        if (rows[r].length === 0) continue;
+        rows[r].unshift(...Array.from({length: cell}, (): Cell => ({ch: ' ', attr: '.'})));
+    }
+}
+
+/**
  * Text rows of an element as the font renders them: <br> and a newline inside a <pre> start a row, d-none subtrees are
  * skipped, and so is the fallback text inside a <canvas> ("ERROR" in Canvas.tsx), which a browser that supports canvas never shows. The map
  * itself is not read, and text positioned over it with CSS (the NAV 5 range) reads in DOM order, not at its row.
@@ -87,6 +112,10 @@ export function readRows(root: Element): Cell[][] {
         const pre = inPre || el.tagName === 'PRE';
         if (el.classList.contains('use-invert')) {
             overlay(rows, () => el.childNodes.forEach(c => walk(c, a, pre)));
+            return;
+        }
+        if (el.classList.contains('apt-8-iaf-list')) {
+            positioned(rows, IAF_LIST_CELL, () => el.childNodes.forEach(c => walk(c, a, pre)));
             return;
         }
         el.childNodes.forEach(c => walk(c, a, pre));
