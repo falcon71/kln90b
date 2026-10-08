@@ -59,7 +59,7 @@ describe('TRI 5 page of one waypoint (characterization)', () => {
 
 describe('TRI 5 page (5-6)', () => {
     // 5-6, step 3 and figure 5-18: the first and last waypoints of the plan, its total distance and ETE. TRI 5 needs no
-    // GPS. 60.107 NM at 150 kt is 24.04 min. The ETE cells are read by the #NEW-7-3 tests below. This test is their
+    // GPS. 60.107 NM at 150 kt is 24.04 min. The ETE cells are read by the #324 tests below. This test is their
     // sibling: it holds the plan, distance and ground speed they rely on
     it('shows FPL 0 from its first to its last waypoint, 60nm at 150kt, without a GPS fix (5-6)', async () => {
         const {kaaa, abc, kbbb} = meridianRoute();
@@ -74,7 +74,7 @@ describe('TRI 5 page (5-6)', () => {
     // 0:31): below an hour the trip pages keep the hour digit. 24.04 min; the code draws two blanks and :24. The same
     // pin as on TRI 3 (DurationDisplay.test.ts) and TRI 1: a fix that wires one page only is caught by the others.
     it.fails(
-        'shows an ETE below an hour as 0:24 (3-15, checked in the KLN 89 trainer, 2026-10-08, #NEW-7-3)',
+        'shows an ETE below an hour as 0:24 (3-15, checked in the KLN 89 trainer, 2026-10-08, #324)',
         async () => {
             const {kaaa, abc, kbbb} = meridianRoute();
             await bootTri5([kaaa, abc, kbbb], savedFlightplan(0, [kaaa, abc, kbbb]), {coldGps: true});
@@ -104,7 +104,7 @@ describe('TRI 5 page (5-6)', () => {
     });
 
     // 5-6, steps 2 and 3: the cursor comes on over the flight plan number, and the inner knob selects the plan.
-    // FPL 3 is KCCC to KDDD, half a degree north: 30.054 NM (the ETE cells are the business of the #NEW-7-3 tests)
+    // FPL 3 is KCCC to KDDD, half a degree north: 30.054 NM (the ETE cells are the business of the #324 tests)
     it('selects FPL 3 with the inner knob on the flight plan number (5-6)', async () => {
         const {kaaa, abc, kbbb} = meridianRoute();
         const kccc = airport('KCCC', 47.0, 8.0);
@@ -148,7 +148,7 @@ describe('TRI 5 ground speed with a wind that differs per leg', () => {
     // 5-6: the TAS and wind are applied to each leg of the plan, and the page gives the ETE of the plan. 30 NM at
     // 100 kt and 270 NM at 200 kt take 0.3 h + 1.35 h = 99 min (an average ground speed of 300 / 1.65 = 182 kt). The
     // page averages the two leg speeds without weighting them by distance, 150 kt, and shows 120 min. Above an hour,
-    // so that the expected form does not depend on #NEW-7-3
+    // so that the expected form does not depend on #324
     it.fails('shows the ETE of the plan as the sum of the leg times, 1:39 (5-6, #254)', async () => {
         await bootWindRoute();
         expect(Screen.read().rows('L')[2].slice(6)).toBe(' 1:39');

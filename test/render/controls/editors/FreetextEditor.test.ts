@@ -136,7 +136,7 @@ describe('free text editor on APT 5 (3-47)', () => {
     // are the blank, A to Z and 0 to 9, so no hyphen can be entered. The Turn-On page (5-28) takes no hyphen, so the
     // fix belongs to the remarks only.
     it.fails('puts a hyphen between 9 and the blank in a remark (3-47, checked in ' +
-        'the KLN 89 trainer, 2026-10-08, #NEW-1-3)', async () => {
+        'the KLN 89 trainer, 2026-10-08, #305)', async () => {
         const unit = await onRemarkLine();
         await openOnBlank(unit);
 
@@ -151,7 +151,7 @@ describe('free text editor on APT 5 (3-47)', () => {
     });
 });
 
-describe('free text editor, the first click on an empty remark line (3-47, #NEW-3-2)', () => {
+describe('free text editor, the first click on an empty remark line (3-47, #311)', () => {
     // Sibling of the pin below: the remark line is empty (eleven blanks) and the cursor is on its first cell
     it('shows an empty remark line as blanks with the cursor on its first cell (3-47)', async () => {
         const unit = await onRemarkLine();
@@ -163,7 +163,7 @@ describe('free text editor, the first click on an empty remark line (3-47, #NEW-
     // Checked in the KLN 89 trainer, 2026-10-08 (T12): the first click on an empty remark line puts an A in the first
     // cell (and dashes in the others). The code puts the blank there, so the first click selects nothing visible.
     it.fails('gives A on the first click on an empty remark line (checked in the KLN 89 trainer, ' +
-        '2026-10-08, #NEW-3-2)', async () => {
+        '2026-10-08, #311)', async () => {
         const unit = await onRemarkLine();
 
         await unit.panel.inner('R', 1);

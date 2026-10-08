@@ -202,7 +202,7 @@ describe('FlightplanList, an insertion (4-4)', () => {
         });
 });
 
-describe('FlightplanList, an insertion made with the page scrolled down (#NEW-5-4)', () => {
+describe('FlightplanList, an insertion made with the page scrolled down (#319)', () => {
     // On the leg FX2AA to FX3AA the page of FPL 0 follows the active leg while the cursor is off (4-8); with the cursor
     // on over FX1AA the page shows waypoint 1 in its top row, the blank top line off the page. The sibling of the pin
     // below holds that state and the insertion itself
@@ -222,7 +222,7 @@ describe('FlightplanList, an insertion made with the page scrolled down (#NEW-5-
     // to its top, to the blank top line (trainer T28: FPL 0 scrolled down, a waypoint inserted in the middle and
     // approved, the page stayed, checked in the KLN 89 trainer, 2026-10-08). The expected rows are the same page with
     // BUGLE as the third waypoint, the rest one position down
-    it.fails('keeps the page where it was after an insertion (checked in the KLN 89 trainer, 2026-10-08, #NEW-5-4)',
+    it.fails('keeps the page where it was after an insertion (checked in the KLN 89 trainer, 2026-10-08, #319)',
         async () => {
             const unit = await bootEightWithBugle(47.12);
 
@@ -383,7 +383,7 @@ describe('FlightplanList, the DEL question', () => {
     // that field was the one to the right in the same row; the 90B has none, so the pin takes the next waypoint, an
     // extension of T21 a. The unit keeps the question and the cursor on it
     it.fails('drops the question and moves the cursor on when the outer knob turns ' +
-        '(checked in the KLN 89 trainer, 2026-10-08, #NEW-5-2)',
+        '(checked in the KLN 89 trainer, 2026-10-08, #317)',
         async () => {
             const unit = await questionOnFx2();
 

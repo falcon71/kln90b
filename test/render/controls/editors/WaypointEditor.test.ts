@@ -55,7 +55,7 @@ async function blankDirectTo(): Promise<HeadlessUnit> {
 }
 
 /**
- * The first inner click starts the entry. What the first cell shows after it is #NEW-3-2's subject (a blank today, an
+ * The first inner click starts the entry. What the first cell shows after it is #311's subject (a blank today, an
  * A after the fix), so the knob tests do not start from it: they turn the first cell clockwise until it shows `ch`.
  */
 async function startEntryAt(unit: HeadlessUnit, ch: string): Promise<void> {
@@ -133,7 +133,7 @@ describe('waypoint editor, the knobs (3-14, 3-20)', () => {
 describe('waypoint editor, the first inner click (3-14, checked in the KLN 89 trainer, 2026-10-08)', () => {
     // The sibling below holds the setup (the same click on the same page)
     it.fails('shows an A and the first identifier that begins with A after the first click '
-        + '(3-14, checked in the KLN 89 trainer, 2026-10-08, #NEW-3-2)', async () => {
+        + '(3-14, checked in the KLN 89 trainer, 2026-10-08, #311)', async () => {
         const unit = await blankDirectTo();
 
         await unit.panel.inner('L', 1);
@@ -171,7 +171,7 @@ describe('waypoint editor, the outer knob (checked in the KLN 89 trainer, 2026-1
     // cell instead (Editor.outerRight), so the fifth click turns the first character: K to L, and the rest of the
     // identifier goes blank. Sibling: the test below, the same turns up to the fifth cell
     it.fails('keeps the cursor on the fifth character when the outer knob goes on '
-        + '(checked in the KLN 89 trainer, 2026-10-08, #NEW-1-4)', async () => {
+        + '(checked in the KLN 89 trainer, 2026-10-08, #306)', async () => {
         const unit = await k00Entered();
         await unit.panel.outer('L', 5);
 
@@ -294,7 +294,7 @@ describe('waypoint editor on FPL 0 (4-2)', () => {
     // position without a waypoint (FlightplanListItem.tsx:161 and 218), so the waypoint page stays and the next ENT
     // adds KSAT. Sibling: the test above (the same setup)
     it.fails('removes the waypoint page on CLR and leaves the blank position under the cursor, so ENT adds nothing '
-        + '(4-2, checked in the KLN 89 trainer, 2026-10-08, #NEW-3-1)', async () => {
+        + '(4-2, checked in the KLN 89 trainer, 2026-10-08, #310)', async () => {
         const unit = await ksatOnPosition2();
 
         await unit.panel.clr();

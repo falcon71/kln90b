@@ -84,7 +84,7 @@ describe('VNAV angle fieldset', () => {
     // the last cell. At 10.3 degrees the tenths cell is empty (its value is not a number), so the degree sign moves one
     // cell left and the row reads "ANGLE: 1.°": an angle that reads as one degree and a field one cell short. What the
     // unit shows instead (a cap at 9.9, dashes) is open; any of them keeps the degree sign in the last cell.
-    it.fails('keeps the degree sign in the last cell at 10.3 degrees (5-12, #NEW-4-3)', async () => {
+    it.fails('keeps the degree sign in the last cell at 10.3 degrees (5-12, #314)', async () => {
         const unit = await bootUnit({storage: {cal4GS: 60, cal4Fpm: 1000, cal4Angle: 9.35}});
         await unit.panel.selectPage('L', 'CAL 4');
         await unit.panel.cursor('L');

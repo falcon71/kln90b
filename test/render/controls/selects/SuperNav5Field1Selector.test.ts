@@ -81,7 +81,7 @@ describe('Super NAV 5 field 1', () => {
     // 3-36: the ETE is hours and minutes, so the minutes run from 00 to 59. 59.9 minutes show 0:60 today
     // (SuperNav5Field1Selector.formatEte rounds the minutes after splitting off the hours, the error of #223 in another
     // function). Whether the unit rounds or truncates is open (#223), so both forms pass.
-    it.fails('never shows 60 minutes in the ETE (3-36, #NEW-4-1)', async () => {
+    it.fails('never shows 60 minutes in the ETE (3-36, #312)', async () => {
         await superNav5OnLeg({westNm: 119.8, storage: {superNav5Field1: SuperNav5Field1.ETE}});
         expect(['Ð1:00', 'Ð0:59']).toContain(field1());
     });
@@ -103,7 +103,7 @@ describe('Super NAV 5 field 1', () => {
     // 6-8 (figures 6-14 to 6-16): 0.996 NM is a cross track of about one NM; the field shows .00NM today, a cross
     // track of zero (formatXtk formats the hundredths of 0.996, which round to 1.00, and cuts the 1). Expected:
     // 1.0NM (rounded) or .99NM (truncated).
-    it.fails('does not show 0.996 NM as .00NM (6-8, #NEW-4-2)', async () => {
+    it.fails('does not show 0.996 NM as .00NM (6-8, #313)', async () => {
         await superNav5OnLeg({westNm: 30, rightNm: 0.996, storage: {superNav5Field1: SuperNav5Field1.XTK}});
         expect(['1.0NM‹', '.99NM‹']).toContain(field1());
     });
@@ -111,7 +111,7 @@ describe('Super NAV 5 field 1', () => {
     // 6-8: just below 10 NM the tenths round up to 10.0 and the field takes seven cells (10.0NM‹), one more than the
     // six of the line (the test "is six cells wide" below holds that width). Expected: 010NM‹ (the code's own form
     // from 10 NM) or 9.9NM‹.
-    it.fails('keeps a cross track of 9.97 NM in six cells (6-8, #NEW-4-2)', async () => {
+    it.fails('keeps a cross track of 9.97 NM in six cells (6-8, #313)', async () => {
         await superNav5OnLeg({westNm: 30, rightNm: 9.97, storage: {superNav5Field1: SuperNav5Field1.XTK}});
         expect(['010NM‹', '9.9NM‹']).toContain(field1());
     });

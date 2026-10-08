@@ -161,13 +161,13 @@ describe('SimpleListItem on OTH 4 (3-47)', () => {
         });
 });
 
-describe('SimpleListItem on OTH 4, the DEL question (#NEW-5-3)', () => {
+describe('SimpleListItem on OTH 4, the DEL question (#318)', () => {
     // The 90B guide does not show the OTH 4 question; FPL and OTH 3 put the question mark in a fixed column, after the
     // ident padded to five cells, and the KLN 89 trainer does the same on its remarks list (T25, checked in the KLN 89
     // trainer, 2026-10-08: the ident stays in its column and the question mark stands in a fixed column). That is an
     // extension of the 90B's own FPL and OTH 3 text to OTH 4: the pin takes the column those two use
     it.fails('puts the question mark in the fixed column of FPL and OTH 3 ' +
-        '(checked in the KLN 89 trainer, 2026-10-08, #NEW-5-3)',
+        '(checked in the KLN 89 trainer, 2026-10-08, #318)',
         async () => {
             const unit = await oth4(['KAAA', 'KBBB']);
             await unit.panel.cursor('L');

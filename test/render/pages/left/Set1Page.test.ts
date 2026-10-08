@@ -315,7 +315,7 @@ describe('SET 1 heading with a magnetic variation', () => {
     // checked in the KLN 89 trainer, 2026-10-08: the confirmed heading comes back unchanged. Set1Page shows the GPS
     // track converted to magnetic and hands the shown number back to the GPS as a true track at CONFIRM?
     // (Set1Page.confirmPosition), so CONFIRM? alone turns the track by the variation: 080 becomes 070
-    it.fails('keeps the offered heading over CONFIRM? (3-19, checked in the KLN 89 trainer, 2026-10-08, #NEW-2-1)',
+    it.fails('keeps the offered heading over CONFIRM? (3-19, checked in the KLN 89 trainer, 2026-10-08, #309)',
         async () => {
             const unit = await onSet1Moved();
             await unit.panel.cursor('L');
@@ -326,7 +326,7 @@ describe('SET 1 heading with a magnetic variation', () => {
 
     // The same for an entered heading (checked in the KLN 89 trainer, 2026-10-08: the 270 entered there came back as
     // 270): here 270 comes back as 260
-    it.fails('keeps an entered heading over CONFIRM? (3-19, checked in the KLN 89 trainer, 2026-10-08, #NEW-2-1)',
+    it.fails('keeps an entered heading over CONFIRM? (3-19, checked in the KLN 89 trainer, 2026-10-08, #309)',
         async () => {
             const unit = await onSet1Moved();
             await unit.panel.cursor('L');

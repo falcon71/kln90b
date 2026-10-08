@@ -256,7 +256,7 @@ describe('status line, the keyboard mode (characterization)', () => {
     });
 });
 
-describe('status line after an ENT prompt (#NEW-6-1)', () => {
+describe('status line after an ENT prompt (#320)', () => {
     /**
      * MOD 2 with the ent prompt and the boot messages unread; display ticks run until the blink phase (the MSG light is
      * dark in that phase while a message is unread, 3-59), then ENT activates OBS, so the next tick shows msg again
@@ -276,7 +276,7 @@ describe('status line after an ENT prompt (#NEW-6-1)', () => {
     }
 
     // 3-16: an unread message puts the msg prompt on the status line; the ENT prompt before it does not change that
-    it('shows msg after the ENT, the boot messages unread (sibling of #NEW-6-1) (3-16)', async () => {
+    it('shows msg after the ENT, the boot messages unread (sibling of #320) (3-16)', async () => {
         await entInTheBlinkPhase();
 
         const texts = new Set([...await overTwoSeconds(prompt)].map(s => s.slice(0, 3)));
@@ -286,7 +286,7 @@ describe('status line after an ENT prompt (#NEW-6-1)', () => {
 
     // 3-16, figure 3-55: the unread message flashes the prompt in inverse video; the ENT prompt's flash must not hide
     // it
-    it.fails('flashes msg in inverse video after an ENT prompt that ended in the blink phase (3-16, #NEW-6-1)',
+    it.fails('flashes msg in inverse video after an ENT prompt that ended in the blink phase (3-16, #320)',
         async () => {
             await entInTheBlinkPhase();
 

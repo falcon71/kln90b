@@ -116,7 +116,7 @@ describe('editor data entry (3-14, 3-53, 5-17)', () => {
 
 describe('editor cells wrap (checked in the KLN 89 trainer, 2026-10-08)', () => {
     // Checked in the KLN 89 trainer, 2026-10-08 (T4): every cell wraps in both directions, from its last
-    // choice to its first and back. The latitude tens is the exception that #NEW-1-1 pins (it offers 9 today, the
+    // choice to its first and back. The latitude tens is the exception that #303 pins (it offers 9 today, the
     // trainer's cell stops at 8), so it is left out here.
     // [column, first choice, last choice]
     const WRAPPING_CELLS: [number, string, string][] = [
@@ -168,7 +168,7 @@ describe('editor open edit and the cursor button (checked in the KLN 89 trainer,
     });
 });
 
-describe('editor CLR during an open edit (checked in the KLN 89 trainer, 2026-10-08, #NEW-1-5)', () => {
+describe('editor CLR during an open edit (checked in the KLN 89 trainer, 2026-10-08, #307)', () => {
     /** The edit of the tests below: the tens of the degrees selected, the rest dashed */
     async function withOpenEdit(): Promise<HeadlessUnit> {
         const unit = await onSet1Latitude();
@@ -194,7 +194,7 @@ describe('editor CLR during an open edit (checked in the KLN 89 trainer, 2026-10
     // the field, and the ent prompt goes. The code ignores CLR (Editor.isClearAccepted is false), so the edit stays
     // open.
     it.fails('brings the old value back and closes the edit (checked in the KLN 89 ' +
-        'trainer, 2026-10-08, #NEW-1-5)', async () => {
+        'trainer, 2026-10-08, #307)', async () => {
         const unit = await withOpenEdit();
 
         await unit.panel.clr();
@@ -206,8 +206,8 @@ describe('editor CLR during an open edit (checked in the KLN 89 trainer, 2026-10
     });
 
     // Checked in the KLN 89 trainer, 2026-10-08 (T2): ENT after the CLR does nothing. Today the edit is still open, so
-    // ENT enters it (N 20°00.00'); the pin turns green with the fix of #NEW-1-5
-    it.fails('does nothing on a following ENT (checked in the KLN 89 trainer, 2026-10-08, #NEW-1-5)', async () => {
+    // ENT enters it (N 20°00.00'); the pin turns green with the fix of #307
+    it.fails('does nothing on a following ENT (checked in the KLN 89 trainer, 2026-10-08, #307)', async () => {
         const unit = await withOpenEdit();
 
         await unit.panel.clr();
@@ -219,7 +219,7 @@ describe('editor CLR during an open edit (checked in the KLN 89 trainer, 2026-10
     });
 });
 
-describe('editor outer knob at the ends of an open edit (checked in the KLN 89 trainer, 2026-10-08, #NEW-1-4)', () => {
+describe('editor outer knob at the ends of an open edit (checked in the KLN 89 trainer, 2026-10-08, #306)', () => {
     // Sibling of both pins: the edit is open with the cursor on the first cell (N selected), and six clicks of the
     // outer knob reach the last cell, the hundredths; the edit is still open and shows its dashes
     it('reaches the last cell with six clicks of the outer knob, the edit ' +
@@ -239,7 +239,7 @@ describe('editor outer knob at the ends of an open edit (checked in the KLN 89 t
     // Checked in the KLN 89 trainer, 2026-10-08 (T1): past the last cell the cursor stays on it, and the
     // edit stays open. The code wraps to the first cell.
     it.fails('stops at the last cell of an open edit (checked in the KLN 89 ' +
-        'trainer, 2026-10-08, #NEW-1-4)', async () => {
+        'trainer, 2026-10-08, #306)', async () => {
         const unit = await onSet1Latitude();
         await unit.panel.inner('L', 1);
         await unit.panel.outer('L', 6);
@@ -254,7 +254,7 @@ describe('editor outer knob at the ends of an open edit (checked in the KLN 89 t
     // Checked in the KLN 89 trainer, 2026-10-08 (T1): before the first cell the cursor stays on it too,
     // and the edit stays open. The code wraps to the last cell.
     it.fails('stops at the first cell of an open edit (checked in the KLN 89 ' +
-        'trainer, 2026-10-08, #NEW-1-4)', async () => {
+        'trainer, 2026-10-08, #306)', async () => {
         const unit = await onSet1Latitude();
         await unit.panel.inner('L', 1);
 
@@ -279,7 +279,7 @@ describe('editor keyboard entry (characterization, sim-only feature, #25)', () =
     });
 
     // After the last cell the automatic advance (KeyboardService: outerRight after every accepted key) wraps to the
-    // first cell, so the next key replaces the hemisphere. A clamp in Editor.outerRight (the fix of #NEW-1-4) changes
+    // first cell, so the next key replaces the hemisphere. A clamp in Editor.outerRight (the fix of #306) changes
     // it.
     it('wraps the cursor to the first cell after the last key, so the next key overwrites it', async () => {
         const unit = await onSet1Latitude();

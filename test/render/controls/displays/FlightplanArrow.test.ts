@@ -151,7 +151,7 @@ describe('FlightplanArrow on FPL 0 during a NAV flag', () => {
     // 4-7: the leg symbol belongs to a unit that is navigating; without usable navigation it is not drawn. The arrow
     // keeps drawing it through a NAV flag, because the flag keeps the active waypoint. Whether a plain arrow stays in
     // front of ABC is not claimed: the pin asserts only that neither end of the symbol is drawn.
-    it.fails('draws no leg symbol during a NAV flag (4-7, #NEW-7-1)', async () => {
+    it.fails('draws no leg symbol during a NAV flag (4-7, #322)', async () => {
         const unit = await onFpl0();
         unit.props.sensors.in.gps.reset();
         await vi.advanceTimersByTimeAsync(1500);

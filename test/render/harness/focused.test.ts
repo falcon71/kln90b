@@ -54,7 +54,7 @@ describe('FrontPanel.focused across a plain decimal point (harness)', () => {
     // 5-73 (RadialEditor does invert its point); DistanceEditor draws the point as plain text. The field fills the
     // cells 4 to 8 of row 3 of the right half. The test above is its sibling: it finds the same field and keeps the
     // text.
-    it.fails('covers the decimal point of the DIS field (5-19, figure 5-74, #NEW-0-1)', async () => {
+    it.fails('covers the decimal point of the DIS field (5-19, figure 5-74, #302)', async () => {
         await cursorAtDis();
 
         expect(Screen.read().maskRows('R')[3]).toBe('....IIIII..');

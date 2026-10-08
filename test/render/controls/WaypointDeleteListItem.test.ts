@@ -48,7 +48,7 @@ describe('WaypointDeleteListItem on OTH 3 (5-20)', () => {
     // After ENT the question is answered and the waypoint no longer exists, so its page leaves the right side, which
     // shows the page it showed before, as it does when the question is withdrawn (below) and as the right side does
     // after a waypoint page was approved (3-14). The unit keeps showing the deleted waypoint's page
-    it.fails('shows the right page of before the question again once the waypoint is deleted (5-20, 3-14, #NEW-5-1)',
+    it.fails('shows the right page of before the question again once the waypoint is deleted (5-20, 3-14, #316)',
         async () => {
             const unit = await oth3();
             await unit.panel.clr();
@@ -107,7 +107,7 @@ describe('WaypointDeleteListItem on OTH 3, the DEL question', () => {
     // direction of the turn; a counterclockwise click is the one that moves up (T21 a: clockwise moved on). The unit
     // ignores the knob and keeps the question
     it.fails('drops the question and moves the cursor on when the outer knob turns ' +
-        '(checked in the KLN 89 trainer, 2026-10-08, #NEW-5-2)',
+        '(checked in the KLN 89 trainer, 2026-10-08, #317)',
         async () => {
             const unit = await oth3();
             await unit.panel.clr();

@@ -49,7 +49,7 @@ describe('TRI 3 page (characterization)', () => {
         await unit.panel.selectPage('L', 'TRI 3');
         await enterRoute(unit, 'KAAA', 'KBBB');
         expect(unit.errors).toEqual([]);
-        // The ETE cells are left out: the form of an ETE below an hour on the trip pages is #NEW-7-3
+        // The ETE cells are left out: the form of an ETE below an hour on the trip pages is #324
         const rows = Screen.read().rows('L');
         expect([rows[0], rows[1], rows[2].slice(0, 5), ...rows.slice(3)]).toEqual([
             'KAAA -KBBB ',
@@ -87,7 +87,7 @@ describe('TRI 3 page (5-5)', () => {
     });
 
     // 5-5: TRI 3 needs no GPS. The distance, bearing and ground speed of figure 5-16 without a fix: 60.107 NM, true 180
-    // (variation 0), the TAS of 150 kt. The ETE (24.04 min) is read by the #NEW-7-3 pin in
+    // (variation 0), the TAS of 150 kt. The ETE (24.04 min) is read by the #324 pin in
     // controls/displays/DurationDisplay.test.ts
     it('shows distance, bearing and ground speed without a GPS fix (5-5)', async () => {
         const unit = await bootTri3([kaaa(), kbbb()], {coldGps: true});
@@ -130,7 +130,7 @@ describe('TRI 3 ETE just under two hours', () => {
     // 5-5, figures 5-12 to 5-16 (ETE 1:14, 1:43, 2:21): the ETE is hours and minutes, h:mm. 119.56 minutes is 2:00
     // rounded or 1:59 truncated, never 1:60 (the same kind as #99 and #184). The page numbers show the h:mm form only;
     // that the real unit never shows :60 was checked in the KLN 89 trainer, 2026-10-07. Above an hour, so that the
-    // expected form does not depend on #NEW-7-3
+    // expected form does not depend on #324
     it.fails('shows 119.56 minutes as 2:00 or 1:59, not 1:60 (5-5, #223)', async () => {
         const unit = await bootTri3([kaaa(), far()]);
         await enterRoute(unit, 'KAAA', 'KBBB');

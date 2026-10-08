@@ -98,7 +98,7 @@ describe('Super NAV 5 mode row (5-32)', () => {
     });
 
     // 5-32: the preconditions of the pin below, ENR and the course 050
-    it('shows ENR and the OBS course in the enroute OBS mode (sibling of #NEW-6-2) (5-32)', async () => {
+    it('shows ENR and the OBS course in the enroute OBS mode (sibling of #321) (5-32)', async () => {
         const {unit, dtk} = await enrouteObs();
 
         // The DTK of the active leg to ABC, from the geometry. The aircraft is on the leg's course (the deviation stays
@@ -110,7 +110,7 @@ describe('Super NAV 5 mode row (5-32)', () => {
     });
 
     // 5-32: ENR:274, the colon between the mode and the course, as ARM:259 has it (and the code has it for ARM)
-    it.fails('shows ENR: and the OBS course in the enroute OBS mode (5-32, #NEW-6-2)', async () => {
+    it.fails('shows ENR: and the OBS course in the enroute OBS mode (5-32, #321)', async () => {
         const {unit} = await enrouteObs();
 
         expect(SuperNav5.read().left[2]).toBe(`${ENR}:050`);

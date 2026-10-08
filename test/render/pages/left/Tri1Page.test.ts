@@ -57,7 +57,7 @@ describe('TRI 1 page (characterization)', () => {
         await enterTo(unit, 'KBBB');
         await unit.panel.cursor('L');
         expect(unit.errors).toEqual([]);
-        // The ETE cells are left out: the form of an ETE below an hour on the trip pages is #NEW-7-3
+        // The ETE cells are left out: the form of an ETE below an hour on the trip pages is #324
         const rows = Screen.read().rows('L');
         expect([rows[0], rows[1], rows[2].slice(0, 5), ...rows.slice(3)]).toEqual([
             'P.POS-KBBB ',
@@ -81,7 +81,7 @@ describe('TRI 1 page (characterization)', () => {
 describe('TRI 1 page (5-3, 5-4)', () => {
     // 5-3, figure 5-8: after the waypoint is approved the page shows distance, bearing, ground speed and ETE. 5-2: the
     // bearing is magnetic. 60.107 NM rounds to 60; true 180 with 10 degrees east variation is 170 magnetic; no wind, so
-    // the ground speed is the TAS of 150 kt. The ETE cells are read by the #NEW-7-3 tests below. This test is their
+    // the ground speed is the TAS of 150 kt. The ETE cells are read by the #324 tests below. This test is their
     // sibling: it holds the distance, bearing and ground speed they rely on (the ETE is 24.04 min)
     it('shows 60nm, the magnetic bearing 170 and 150kt to a waypoint 60 NM due south (5-3)', async () => {
         const unit = await bootTri1({magvar: 10});
@@ -96,7 +96,7 @@ describe('TRI 1 page (5-3, 5-4)', () => {
     // blanks and :24. The same pin as on TRI 3 (DurationDisplay.test.ts) and TRI 5: a fix that wires one page only is
     // caught by the others.
     it.fails(
-        'shows an ETE below an hour as 0:24 (3-15, checked in the KLN 89 trainer, 2026-10-08, #NEW-7-3)',
+        'shows an ETE below an hour as 0:24 (3-15, checked in the KLN 89 trainer, 2026-10-08, #324)',
         async () => {
             const unit = await bootTri1();
             await enterTo(unit, 'KBBB');

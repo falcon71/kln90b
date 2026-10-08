@@ -124,7 +124,7 @@ describe('barometer fieldset in millibars below 1000', () => {
     // ALT 1 turned down from 1013 MB), not with a zero. No figure of the 90B guide shows a millibar value below
     // 1000. The code shows BARO:0993MB.
     it.fails('shows 993 MB with a blank in the first digit '
-        + '(checked in the KLN 89 trainer, 2026-10-08, T16, #NEW-4-4)', async () => {
+        + '(checked in the KLN 89 trainer, 2026-10-08, T16, #315)', async () => {
         await onAltPage({barounit: false, barosetting: 29.32});
 
         expect(baroRow()).toBe('BARO: 993MB');

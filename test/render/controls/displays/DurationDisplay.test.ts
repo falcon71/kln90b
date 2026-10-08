@@ -135,7 +135,7 @@ describe('DurationDisplay on the trip pages (TRI 3)', () => {
     // (3-31, figure 3-100). 32.4 NM at 150 kt is 12.96 minutes. The code draws the NAV 1 form, two blanks and :13.
     // TRI 1 and TRI 5 use the same display and are pinned in Tri1Page.test.ts and Tri5Page.test.ts.
     it.fails(
-        'shows an ETE below an hour as 0:13 on TRI 3 (3-15, checked in the KLN 89 trainer, 2026-10-08, #NEW-7-3)',
+        'shows an ETE below an hour as 0:13 on TRI 3 (3-15, checked in the KLN 89 trainer, 2026-10-08, #324)',
         async () => {
             expect(await tri3Trip(32.4)).toEqual({distance: '  32nm 180°', ete: ' 0:13'});
         },

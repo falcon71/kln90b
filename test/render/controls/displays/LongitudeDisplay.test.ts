@@ -67,7 +67,7 @@ describe('LongitudeDisplay at the meridian of Greenwich', () => {
 
     // The KLN 89 trainer, 2026-10-08: a longitude entered as W and all zeros was kept as E 0°00.00' once confirmed. The
     // Pilot's Guide has no figure at exactly 0. The code draws W for 0 (the test is "> 0").
-    it.fails('shows E at exactly 0 degrees (checked in the KLN 89 trainer, 2026-10-08, #NEW-1-6)', () => {
+    it.fails('shows E at exactly 0 degrees (checked in the KLN 89 trainer, 2026-10-08, #308)', () => {
         expect(shown(0).slice(0, 1)).toBe('E');
     });
 });

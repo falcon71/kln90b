@@ -5,7 +5,7 @@ import {collectStatusMessages} from '../../../harness/statusLine';
 
 /**
  * BearingEditor is the heading field of SET 1 (3-18, 3-19). The host is SET 1 of a parked unit in a world without
- * magnetic variation (so the magnetic and the true track agree; the variation is the #NEW-2-1 pin in Set1Page.test.ts).
+ * magnetic variation (so the magnetic and the true track agree; the variation is the #309 pin in Set1Page.test.ts).
  * CONFIRM? hands the track to the GPS, which keeps it while the aircraft stands still (below 2 kt, as the harness
  * helper `moveAircraft` documents), so the next SET 1 page shows the committed value.
  */

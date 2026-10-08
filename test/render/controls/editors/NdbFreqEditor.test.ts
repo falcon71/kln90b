@@ -80,14 +80,14 @@ describe('NdbFreqEditor on the NDB page (5-18)', () => {
     // inside the inverse block; no figure shows the cursor in the NDB frequency, so this pin extends those figures to
     // it (the guide's rule, not a figure of this field). NdbFreqEditor draws the point as plain text
     it.fails('covers the decimal point with the cursor while the frequency is entered '
-        + '(5-18, extends figures 5-72 to 5-74, #NEW-0-1)', async () => {
+        + '(5-18, extends figures 5-72 to 5-74, #302)', async () => {
         const unit = await onFreq();
         await select350(unit);
 
         expect(Screen.read().cell(3, POINT_COL)).toEqual({ch: '.', attr: 'I'});
     });
 
-    // Sibling of the #NEW-0-1 pin: the point is in that cell, the digit in front of it is inverted, and the tenth after
+    // Sibling of the #302 pin: the point is in that cell, the digit in front of it is inverted, and the tenth after
     // it is the cursor's own cell, which flashes (inverse on three display ticks of four, flashing on the fourth)
     it('shows the point between inverted digits while the frequency is entered (5-18)', async () => {
         const unit = await onFreq();
