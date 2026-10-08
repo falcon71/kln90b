@@ -90,16 +90,41 @@ describe('waypoint page scanning speed (characterization)', () => {
         expect(identRow()).toBe(' NLA       ');
     });
 
-    it('passes one NDB per click when the clicks are half a second apart', async () => {
+    /** `clicks` clicks of the right inner knob, `gapMs` apart (a click takes one display tick, 250 ms, itself) */
+    async function clickEvery(unit: HeadlessUnit, clicks: number, gapMs: number): Promise<void> {
+        for (let i = 0; i < clicks; i++) {
+            await unit.panel.inner('R', 1);
+            await vi.advanceTimersByTimeAsync(gapMs - 250);
+        }
+    }
+
+    it('passes one NDB per click when the clicks are 400 ms apart', async () => {
         const unit = await ndbPageOnNaa();
         await vi.advanceTimersByTimeAsync(400);
 
-        for (let i = 0; i < 4; i++) {
-            await unit.panel.inner('R', 1);
-            await vi.advanceTimersByTimeAsync(250); // 500 ms from click to click
-        }
+        await clickEvery(unit, 4, 400);
 
         expect(identRow()).toBe(' NEA       ');
+    });
+
+    it('speeds up when the clicks are 325 ms apart', async () => {
+        const unit = await ndbPageOnNaa();
+        await vi.advanceTimersByTimeAsync(400);
+
+        await clickEvery(unit, 5, 325); // steps of 1, 1, 2, 3 and 5
+
+        expect(identRow()).toBe(' NMA       ');
+    });
+
+    // The speed stops at 250 waypoints per click, where the scan jumps to the first ident of the next letter in the list
+    it('jumps to the last NDB of the list with sixteen fast clicks and no error', async () => {
+        const unit = await ndbPageOnNaa();
+        await vi.advanceTimersByTimeAsync(400);
+
+        await clickEvery(unit, 16, 250);
+
+        expect(identRow()).toBe(' ZZN       ');
+        expect(unit.errors).toEqual([]);
     });
 });
 

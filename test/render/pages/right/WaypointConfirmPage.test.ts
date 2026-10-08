@@ -42,10 +42,13 @@ describe('waypoint confirmation page', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // 3-20 (the character set has a blank between 9 and A) and the KLN 89 trainer, 2026-10-07 (medium): the blank cell
-    // of a four-character ident is a cell of its own, so the type letter keeps its place after it. The blank cell has no
-    // glyph (#NEW-4-2) and the letter moves one cell left. Sibling: the test above (same setup, start of the row).
-    it.fails('keeps the type letter after the blank cell of a four-character ident on ACT (3-20, the KLN 89 trainer, #NEW-4-2)', async () => {
+    // 4-10 (figures 4-37 and 4-38: the type letter stands to the far right of the identifier) and the KLN 89 trainer,
+    // 2026-10-07 (T25, medium confidence: the letter stands in one fixed column for a three- and a five-letter ident).
+    // The identifier of an intersection has five cells, so the letter of a four-letter one keeps the column of a
+    // five-letter one: a blank cell and then the letter (an inference from the fixed column and the five cells). The
+    // cause is the blank selector cell, which has no glyph (3-20 describes that cell, it is not evidence for the column;
+    // #NEW-4-2), so the letter moves one cell left. Sibling: the test above (same setup, start of the row).
+    it.fails('keeps the type letter of a four-letter intersection in the column of a five-letter one on ACT (4-10, the KLN 89 trainer, #NEW-4-2)', async () => {
         const kaaa = airport('KAAA', 47.0, 7.9);
         const inta = intersection('INTA', 47.1, 8.0);
         const unit = await bootUnit({
@@ -62,8 +65,8 @@ describe('waypoint confirmation page', () => {
 });
 
 // Invented waypoints of every type north of the aircraft (longitudes of 10 degrees or more keep the coordinate rows
-// clear of #230); USUP is a user waypoint of the SUP type. The airport has a name that no abbreviation of 3-26 touches
-// (#NEW-1-2).
+// clear of #230); USUP is a user waypoint of the SUP type. The airport has a name that the name abbreviations do not
+// touch (#NEW-1-2).
 const world = () => ({
     facilities: [
         airport('KAAA', 47.2, 10.5, {name: 'ROTH FIELD'}), vor('ABC', 47.0, 10.6), ndb('NAA', 47.1, 10.4),
@@ -74,8 +77,8 @@ const world = () => ({
 });
 
 /**
- * TRI 3 on the left with the cursor on its first waypoint (the example of 3-14) and NAV 1 on the right, after the status
- * line messages of the page changes have gone (they show for about 5 s, 3-10)
+ * TRI 3 on the left with the cursor on its first waypoint and NAV 1 on the right, after the status line messages of the
+ * page changes have gone (they show for about 5 s)
  */
 async function tri3WithNav1(): Promise<HeadlessUnit> {
     const unit = await bootUnit(world());
