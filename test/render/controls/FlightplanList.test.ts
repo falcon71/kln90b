@@ -81,9 +81,8 @@ describe('FlightplanList, scrolling with the cursor (4-3, 4-8)', () => {
             ]);
         });
 
-    // 4-8: the last waypoint is always displayed at the bottom of FPL 0, and the cursor scrolls through the others. On
-    // each step down the plan the waypoint under the cursor is on the page and the bottom row is the last waypoint,
-    // until the cursor reaches the last waypoint itself
+    // 4-8: FPL 0 keeps its final waypoint in the bottom row while the cursor scrolls through the rest. At every step
+    // the waypoint under the cursor is on the page and the bottom row holds the final one, until the cursor reaches it
     it('keeps the last waypoint in the bottom row while the cursor scrolls down FPL 0 (4-8)', async () => {
         const unit = await fpl0OnLine12();
         await unit.panel.cursor('L');
@@ -116,8 +115,8 @@ describe('FlightplanList, scrolling with the cursor (4-3, 4-8)', () => {
             expect(unit.panel.focused('L')).toEqual({row: 5, col: 4, text: '     '});
         });
 
-    // 4-8: with the cursor off the page scrolls so that the active leg is always displayed: turning the cursor off
-    // after a manual scroll to the end brings the active leg back, from waypoint (FB01) in the top row
+    // 4-8: with the cursor off, the page follows the active leg: after a manual scroll to the end, turning the cursor
+    // off brings the leg back into view, its from waypoint (FB01) in the top row
     it('brings the active leg back when the cursor is turned off after a manual scroll (4-8)', async () => {
         const unit = await fpl0OnLine12();
         await unit.panel.cursor('L');
@@ -127,6 +126,7 @@ describe('FlightplanList, scrolling with the cursor (4-3, 4-8)', () => {
         await unit.panel.cursor('L');
 
         const rows = left();
+        expect(rows[0]).toBe('Á 2:FB01   ');
         expect(rows.filter(r => /^[ÁÀ]/.test(r))).toEqual(['Á 2:FB01   ', 'À 3:FB02   ']);
         expect(rows[5]).toBe(' 12:FB11   ');
     });
@@ -203,8 +203,9 @@ describe('FlightplanList, an insertion (4-4)', () => {
 });
 
 describe('FlightplanList, an insertion made with the page scrolled down (#NEW-5-4)', () => {
-    // On the leg FX2AA to FX3AA the active leg scrolls FPL 0 down by one line before the cursor comes on (4-8): the
-    // blank top line is off the page. The sibling of the pin below holds that state and the insertion itself
+    // On the leg FX2AA to FX3AA the page of FPL 0 follows the active leg while the cursor is off (4-8); with the cursor
+    // on over FX1AA the page shows waypoint 1 in its top row, the blank top line off the page. The sibling of the pin
+    // below holds that state and the insertion itself
     it('inserts the waypoint in front of FX3AA and renumbers the last one, the page scrolled down by the active leg ' +
         '(4-4, 4-8)',
         async () => {
@@ -268,13 +269,12 @@ describe('FlightplanList, after a deletion (characterization)', () => {
             await unit.panel.cursor('L');
             await unit.panel.cursorTo('L', 'FX2AA');
             await unit.panel.clr();
-            const row = left().findIndex(r => r === 'DEL FX2AA ?');
-            expect(row).toBeGreaterThan(-1); // Precondition: the question
+            expect(left()[2]).toBe('DEL FX2AA ?'); // Precondition: the question
 
             await unit.panel.ent();
 
             expect(idents(unit, 0)).toEqual(['FX1AA', 'FX3AA', 'FX4AA']);
-            expect(unit.panel.focused('L')).toEqual({row, col: 4, text: 'FX3AA'});
+            expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: 'FX3AA'});
         });
 });
 
@@ -379,8 +379,9 @@ describe('FlightplanList, the DEL question', () => {
     });
 
     // The outer knob on the question withdraws it and the cursor moves on to the next field (trainer T21 a, checked in
-    // the KLN 89 trainer, 2026-10-08: the row was back to the waypoint and the cursor on the next field). The unit
-    // keeps the question and the cursor on it
+    // the KLN 89 trainer, 2026-10-08: the row was back to the waypoint and the cursor on the next field). On the 89
+    // that field was the one to the right in the same row; the 90B has none, so the pin takes the next waypoint, an
+    // extension of T21 a. The unit keeps the question and the cursor on it
     it.fails('drops the question and moves the cursor on when the outer knob turns ' +
         '(checked in the KLN 89 trainer, 2026-10-08, #NEW-5-2)',
         async () => {

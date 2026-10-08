@@ -9,16 +9,21 @@ import {intersection} from '../../harness/navdata/builders';
 // DELETE FPL?, USER POS?. ENT runs its action; a hidden button is no cursor stop. The actions themselves are held by
 // the page tests (FplPage.test.ts: USE?, USE? INVRT?, LOAD FPL 0?, DELETE FPL? and its CLR; Set1Page.test.ts: CONFIRM?)
 
+/** The self-test page of a cold start, the cursor on APPROVE?; returns the row and the first cell of that button */
+async function cursorOnApprove(): Promise<{row: number, col: number}> {
+    const unit = await bootUnit({engineRunning: false});
+    await unit.panel.powerOn();
+    await vi.advanceTimersByTimeAsync(19_000); // the 17 s welcome page, then the self-test page
+    await unit.panel.cursorTo('R', 'APPROVE?');
+    const row = Screen.read().rows('R').findIndex(r => r.includes('APPROVE?'));
+    return {row, col: Screen.read().rows('R')[row].indexOf('APPROVE?')};
+}
+
 describe('Button (3-11, 4-3)', () => {
     // 3-11 (figure 3-36) and the Introduction: the cursor over APPROVE? on the self-test page flashes: over one blink
     // cycle of the unit (four display ticks) the prompt is inverse and normal in turn. The guide gives no rate
     it('flashes under the cursor: APPROVE? of the self-test page (3-11, figure 3-36)', async () => {
-        const unit = await bootUnit({engineRunning: false});
-        await unit.panel.powerOn();
-        await vi.advanceTimersByTimeAsync(19_000); // the 17 s welcome page, then the self-test page
-        await unit.panel.cursorTo('R', 'APPROVE?');
-        const row = Screen.read().rows('R').findIndex(r => r.includes('APPROVE?'));
-        const col = Screen.read().rows('R')[row].indexOf('APPROVE?');
+        const {row, col} = await cursorOnApprove();
 
         const cycle = await blinkCycle(() => Screen.read().maskRows('R')[row].slice(col, col + 8));
 
@@ -43,5 +48,17 @@ describe('Button (3-11, 4-3)', () => {
             }
 
             expect(seen).toEqual(['USE?', 'USE? INVRT?', 'FX1AA']);
+        });
+});
+
+describe('Button (characterization)', () => {
+    // The button under the cursor is inverse on three display ticks of four and normal on the fourth, the blink tick
+    it('characterization: the button under the cursor is normal on one display tick in four, inverse on the others',
+        async () => {
+            const {row, col} = await cursorOnApprove();
+
+            const cycle = await blinkCycle(() => Screen.read().maskRows('R')[row][col]);
+
+            expect(cycle.sort()).toEqual(['F', 'I', 'I', 'I']);
         });
 });

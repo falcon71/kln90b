@@ -60,7 +60,7 @@ describe('WaypointDeleteListItem on OTH 3 (5-20)', () => {
         });
 });
 
-describe('WaypointDeleteListItem on OTH 3, the DEL question (checked in the KLN 89 trainer, 2026-10-08)', () => {
+describe('WaypointDeleteListItem on OTH 3, the DEL question', () => {
     // Trainer T22 a (the 89's user waypoint list, OTH 4 there): CLR again withdrew the question, the waypoint stayed
     // and the cursor was on it
     it('a second CLR withdraws the question, keeps the waypoint and keeps the cursor on it ' +
@@ -102,18 +102,19 @@ describe('WaypointDeleteListItem on OTH 3, the DEL question (checked in the KLN 
         expect(userIdents(unit)).toEqual(['AAA', 'BBB', 'CCC']);
     });
 
-    // The outer knob on the question withdraws it and the cursor moves on (trainer T22 b: the question went and the
-    // cursor moved to another entry, checked in the KLN 89 trainer, 2026-10-08; the click here is clockwise, to the
-    // next waypoint). The unit ignores the knob and keeps the question
+    // The outer knob on the question withdraws it and the cursor moves on (trainer T22 b, checked in the KLN 89
+    // trainer, 2026-10-08: the question went and the cursor moved to the entry above). T22 b did not record the
+    // direction of the turn; a counterclockwise click is the one that moves up (T21 a: clockwise moved on). The unit
+    // ignores the knob and keeps the question
     it.fails('drops the question and moves the cursor on when the outer knob turns ' +
         '(checked in the KLN 89 trainer, 2026-10-08, #NEW-5-2)',
         async () => {
             const unit = await oth3();
             await unit.panel.clr();
 
-            await unit.panel.outer('L', 1);
+            await unit.panel.outer('L', -1);
 
-            expect(unit.panel.focused('L')).toEqual({row: 3, col: 0, text: 'CCC   I    '});
+            expect(unit.panel.focused('L')).toEqual({row: 1, col: 0, text: 'AAA   I    '});
             expect(Screen.read().rows('L')[2]).toBe('BBB   I    ');
             expect(userIdents(unit)).toEqual(['AAA', 'BBB', 'CCC']);
         });
