@@ -142,4 +142,17 @@ describe('barometer fieldset in millibars (characterization)', () => {
         expect(unit.props.sensors.in.airdata.barometer).toBeCloseTo(26.96, 2);
         expect(storedSetting(unit, 'barosetting')).toBeCloseTo(26.96, 2);
     });
+
+    // The same cell at the other end of its range: 880 MB (25.98 inches) turned down from 08 to 07 is 780 MB, which
+    // is 23.03 inches in the sensors. The cell's first entry is 07, so a list without it would wrap to 10 instead
+    it('steps the first two digits down to the first entry: 880 MB to 780 MB (characterization)', async () => {
+        const unit = await onAltPage({barounit: false, barosetting: 25.98});
+        expect(baroRow()).toBe('BARO:0880MB'); // precondition
+        await unit.panel.inner('L', -1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(baroRow()).toBe('BARO:0780MB');
+        expect(unit.props.sensors.in.airdata.barometer).toBeCloseTo(23.03, 2);
+        expect(storedSetting(unit, 'barosetting')).toBeCloseTo(23.03, 2);
+    });
 });

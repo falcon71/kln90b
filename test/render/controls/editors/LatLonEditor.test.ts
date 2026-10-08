@@ -118,21 +118,6 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // The code refuses a latitude whose degree digits are above 90 (LatitudeEditor.convertToValue) with INVALID ENT and
-    // the field keeps its value. The route to 91 is only open while the tens of the degrees offer a 9, so this retires
-    // with the fix of #303 (the tens offer 0 to 8).
-    it('refuses a latitude of 91 degrees with INVALID ENT (characterization)', async () => {
-        const unit = await coldSet1();
-        await unit.panel.outer('L', 1);
-        await select(unit, [1, 10, 2]); // N 9 1
-        await unit.panel.ent();
-        expect(Screen.read().status().mode).toBe('INVALID ENT');
-        await unit.panel.cursor('L');
-
-        expect(unit.errors).toEqual([]);
-        expect(rowsL()[2]).toBe("N 47°30.00'");
-    });
-
     // C-1, extended (as for the pins below): a latitude below 90 degrees is a valid entry, so N 89°59.99' is the
     // sibling of the pins below, the largest latitude short of the pole, and is entered
     it('takes the latitude N 89°59.99 (C-1)', async () => {
@@ -222,6 +207,23 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
 
         expect(unit.errors).toEqual([]);
         expect(Screen.read().status().mode).toBe('INVALID ENT');
+    });
+});
+
+describe('latitude editor, a latitude of 91 degrees on SET 1 (characterization)', () => {
+    // The code refuses a latitude whose degree digits are above 90 (LatitudeEditor.convertToValue) with INVALID ENT and
+    // the field keeps its value. The route to 91 is only open while the tens of the degrees offer a 9, so this retires
+    // with the fix of #303 (the tens offer 0 to 8).
+    it('refuses a latitude of 91 degrees with INVALID ENT (characterization)', async () => {
+        const unit = await coldSet1();
+        await unit.panel.outer('L', 1);
+        await select(unit, [1, 10, 2]); // N 9 1
+        await unit.panel.ent();
+        expect(Screen.read().status().mode).toBe('INVALID ENT');
+        await unit.panel.cursor('L');
+
+        expect(unit.errors).toEqual([]);
+        expect(rowsL()[2]).toBe("N 47°30.00'");
     });
 });
 

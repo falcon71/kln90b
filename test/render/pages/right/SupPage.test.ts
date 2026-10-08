@@ -35,7 +35,9 @@ const rightRows = () => Screen.read().rows('R');
 async function typeEastBelow100(unit: HeadlessUnit, digits: string): Promise<void> {
     await unit.panel.type('R', 'E');
     await unit.panel.inner('R', 1);
-    expect(rightRows()[5].slice(0, 2)).toBe('E '); // the hundreds cell shows the blank, not a dash
+    // The knob step happened: the hundreds cell is no longer the dash of the typed E. It shows a blank here, though the
+    // real unit shows a 0 (#304), so both are accepted and a fix of #304 leaves this precondition green
+    expect(['E ', 'E0']).toContain(rightRows()[5].slice(0, 2));
     await unit.panel.outer('R', 1);
     await unit.panel.type('R', digits);
 }

@@ -11,7 +11,9 @@ import {savedFlightplan} from '../../../harness/storage';
 // 24.04 min at the default TAS of 150 kt in no wind.
 const meridianRoute = () => ({kaaa: airport('KAAA', 47.0, 8.0), abc: vor('ABC', 47.5, 8.0), kbbb: airport('KBBB', 48.0, 8.0)});
 
-async function bootTri5(facilities: Facility[], storage: Record<string, unknown>, o: { coldGps?: boolean, tas?: number } = {}): Promise<HeadlessUnit> {
+async function bootTri5(
+    facilities: Facility[], storage: Record<string, unknown>, o: { coldGps?: boolean, tas?: number } = {},
+): Promise<HeadlessUnit> {
     const unit = await bootUnit({facilities, storage, coldGps: o.coldGps});
     if (!o.coldGps) {
         await settle(unit);

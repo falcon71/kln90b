@@ -116,8 +116,8 @@ describe('DurationDisplay on the trip pages (TRI 3)', () => {
         return {distance: rows[1], ete: rows[2].slice(6)};
     }
 
-    // 5-5, figures 5-12 to 5-16, and 5-6, figure 5-18 (ETE 1:08 to 3:53): from one hour on the trip ETE is h:mm. The
-    // sibling of the pin: 195 NM at 150 kt is 78 minutes
+    // 5-3, figure 5-8 (ETE 1:08), 5-5, figures 5-12 to 5-16, and 5-6, figure 5-18 (ETE up to 3:53): from one hour on
+    // the trip ETE is h:mm. The sibling of the pin: 195 NM at 150 kt is 78 minutes
     it('shows hours and minutes for an ETE above an hour (5-5, 5-6)', async () => {
         expect(await tri3Trip(195)).toEqual({distance: ' 195nm 180°', ete: ' 1:18'});
     });

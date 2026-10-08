@@ -109,8 +109,7 @@ describe('free text editor on APT 5 (3-47)', () => {
     const firstCell = () => Screen.read().rows('R')[2][0];
 
     /**
-     *  Opens the edit of the first remark cell and steps clockwise until the cell shows the blank (one round at
-     * most)
+     * Opens the edit of the first remark cell and steps clockwise until the cell shows the blank (one round at most)
      */
     async function openOnBlank(unit: HeadlessUnit): Promise<void> {
         await unit.panel.inner('R', 1);

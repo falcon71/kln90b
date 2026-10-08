@@ -140,11 +140,15 @@ async function onRoute(): Promise<HeadlessUnit> {
     return unit;
 }
 
-/** NO SUCH WPT on FPL 0: an ident the database lacks, typed into the first row and entered */
+/**
+ * NO SUCH WPT on the REF page (C-2): an ident the database lacks, typed into the waypoint field and entered. FPL 0 and
+ * DIRECT TO are not used, because #262 says they must offer to create a user waypoint instead
+ */
 async function noSuchWpt(unit: HeadlessUnit): Promise<void> {
     await unit.panel.selectPage('L', 'FPL 0');
-    await unit.panel.cursor('L');
-    await unit.panel.enterIdent('L', 'QQQQ');
+    await unit.panel.selectPage('R', 'REF  ');
+    await unit.panel.cursor('R');
+    await unit.panel.type('R', 'QQQQ');
     await unit.panel.ent(); // one display tick of 250 ms follows the ENT
 }
 

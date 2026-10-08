@@ -22,6 +22,9 @@ function route7(): Facility[] {
 // A header row is read with its column 0 sliced off: the shaft glyph there is not legible in the guide's figures.
 const idents = (unit: HeadlessUnit, fpl: number) => unit.props.memory.fplPage.flightplans[fpl].getLegs().map(l => l.wpt.icaoStruct.ident);
 const left = () => Screen.read().rows('L');
+
+/** The rows of the left half that carry the cursor: a run of inverted or flashing cells */
+const cursorRows = () => Screen.read().maskRows('L').flatMap((m, i) => /[IF]/.test(m) ? [i] : []);
 /** The left half and its mask, for the snapshots: the right half shows the empty SUP page of the boot */
 const leftDump = () => {
     const s = Screen.read();
@@ -559,11 +562,14 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
         expect(unit.panel.focused('L').text).toBe('FA29 '); // Precondition
         await unit.panel.inner('L', 1); // the insert in front of FA29
         expect(left()[5]).toBe(' 31:FA29   '); // Precondition: FA29 moved down to make room, so an insert is open
-        if (unit.panel.focused('L').text !== '     ') {
+        // The new entry is number 30. It is found by its number and not by its text (the text of the first click is
+        // #311), and it is not on the page yet while the cursor stands on the waypoint before it
+        const cursorOnEntry = () => cursorRows().length === 1 && /^\s*30:/.test(left()[cursorRows()[0]]);
+        if (!cursorOnEntry()) {
             // The cursor stays on the waypoint before the new entry (#242); one click moves it on
             await unit.panel.outer('L', 1);
         }
-        expect(unit.panel.focused('L').text).toBe('     '); // Precondition: the cursor is on the new blank entry
+        expect(cursorOnEntry()).toBe(true); // Precondition: the cursor is on the new entry
         await unit.panel.enterIdent('L', 'FA30');
         await unit.panel.ent(); // the waypoint page
         await unit.panel.ent();
@@ -636,13 +642,11 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
 });
 
 describe('inserting a waypoint with the inner knob', () => {
-    /** The rows of the left half that carry the cursor: a run of inverted or flashing cells */
-    const cursorRows = () => Screen.read().maskRows('L').flatMap((m, i) => /[IF]/.test(m) ? [i] : []);
-
-    // 4-4 (figures 4-15 and 4-16, which show FPL 0): the inner knob on a waypoint opens a blank entry in front of it,
-    // the waypoint moves down one position, and the cursor is on the new entry. The row of the new entry is looked up by its number: the
-    // page scrolls when the list is rebuilt
-    it('puts the cursor on the new blank entry when the inner knob opens an insert on FPL 0 (4-4)', async () => {
+    // 4-4 (figures 4-15 and 4-16, which show FPL 0): the inner knob on a waypoint opens an entry in front of it, the
+    // waypoint moves down one position, and the cursor is on the new entry. The row of the new entry is looked up by
+    // its number, not by its text (the first click shows a blank, which #311 says is wrong): the page scrolls when the
+    // list is rebuilt
+    it('puts the cursor on the new entry when the inner knob opens an insert on FPL 0 (4-4)', async () => {
         const unit = await bootRoute(savedFlightplan(0, route7()));
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
@@ -651,10 +655,10 @@ describe('inserting a waypoint with the inner knob', () => {
 
         await unit.panel.inner('L', 1);
 
-        const rows = left().map(r => r.slice(1));
-        expect(rows.filter(r => r === ' 2:       ')).toEqual([' 2:       ']);
-        expect(rows).toContain(' 3:ABC    ');
-        expect(cursorRows()).toEqual([rows.indexOf(' 2:       ')]);
+        const entryRows = left().flatMap((r, i) => /^\s*2:/.test(r) ? [i] : []);
+        expect(entryRows).toHaveLength(1); // exactly one entry carries the number 2
+        expect(left().map(r => r.slice(1))).toContain(' 3:ABC    ');
+        expect(cursorRows()).toEqual(entryRows);
     });
 
     /** FPL 3 holds the seven waypoints; the cursor is on ABC, waypoint 2, in row 2 (USE? INVRT?, KAAA, ABC) */
@@ -667,15 +671,17 @@ describe('inserting a waypoint with the inner knob', () => {
         return unit;
     }
 
-    // 4-4: the inner knob can insert into any plan below the 30-waypoint limit, not only into FPL 0: it opens a blank
-    // entry in front of the waypoint under the cursor and the waypoint moves down. This holds the insert of the
-    // numbered plan; the cursor on it is the pin below
-    it('opens a blank entry in front of the waypoint when the inner knob turns on a numbered plan (4-4)', async () => {
+    // 4-4: the inner knob can insert into any plan below the 30-waypoint limit, not only into FPL 0: it opens an entry
+    // in front of the waypoint under the cursor and the waypoint moves down. This holds the insert of the numbered
+    // plan, by the number of the new entry and not by its text (the first click shows a blank, which #311 says is
+    // wrong); the cursor on it is the pin below
+    it('opens an entry in front of the waypoint when the inner knob turns on a numbered plan (4-4)', async () => {
         const unit = await cursorOnAbcOfFpl3();
 
         await unit.panel.inner('L', 1);
 
-        expect(left().slice(2, 4)).toEqual(['  2:       ', '  3:ABC    ']);
+        expect(left().slice(2, 4).map(r => r.slice(0, 4))).toEqual(['  2:', '  3:']);
+        expect(left()[3]).toBe('  3:ABC    ');
     });
 
     // 4-4 puts the cursor on the entry being typed, whichever plan it is. On a numbered plan with waypoints it stays

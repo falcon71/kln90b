@@ -56,7 +56,8 @@ describe('DistanceDisplay, three cells', () => {
     });
 
     // 3-32: three cells. 9.97 NM rounds up to 10.0, four cells. Expected: 10 (rounded) or 9.9 (truncated). Pinned on
-    // NAV 3 as well. Whether the real unit shows hundredths below 1 NM is the question #231.
+    // NAV 3 as well. The sibling above holds the 0.2 below 1 NM in three cells; a fix of #231 (whether the real unit
+    // shows hundredths below 1 NM) would change that spec test, not this pin
     it.fails('keeps a cross track that rounds up to 10 NM in its three cells (3-32, #226)', () => {
         expect([' 10', '9.9']).toContain(shown(3, 9.97));
     });

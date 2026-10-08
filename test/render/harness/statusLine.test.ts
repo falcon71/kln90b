@@ -21,9 +21,10 @@ describe('collectStatusMessages (harness)', () => {
         await unit.panel.selectPage('R', 'INT  ');
         await unit.panel.selectPage('R', 'SUP  '); // posts NO SUP WPTS again, as the page is built anew
         await unit.panel.selectPage('L', 'FPL 0');
-        await unit.panel.cursor('L');
-        await unit.panel.enterIdent('L', 'QQQQ');
-        await unit.panel.ent(); // an ident that the database lacks
+        await unit.panel.selectPage('R', 'REF  ');
+        await unit.panel.cursor('R');
+        await unit.panel.type('R', 'QQQQ');
+        await unit.panel.ent(); // an ident that the database lacks (C-2; FPL 0 would offer to create it, #262)
         await unit.panel.ent(); // the cursor stays on the field, and the same message follows again
 
         expect(seen).toEqual(['NO SUP WPTS', 'NO SUCH WPT', 'NO SUCH WPT']);

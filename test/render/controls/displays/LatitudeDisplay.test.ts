@@ -54,8 +54,7 @@ describe('LatitudeDisplay', () => {
     });
 
     // 3-8, 3-32: the minutes run from 00.00 to 59.99. Just below 48° the degrees are floored and the minutes rounded on
-    // their own, so they read 60.00. Rounding or truncating are both accepted (the KLN 89 trainer never showed 60.00
-    // either, 2026-10-07). Pinned on NAV 2 as well.
+    // their own, so they read 60.00. Rounding or truncating are both accepted. Pinned on NAV 2 as well.
     it.fails('never shows 60 minutes (3-8, 3-32, #99)', () => {
         expect(["N 48°00.00'", "N 47°59.99'"]).toContain(shown(48 - 0.000001));
     });

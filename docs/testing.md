@@ -964,10 +964,11 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
     - **The 4-3 cursor tests** (the cursor field remembered while the page is not left) sit in
       `WaypointEditor.test.ts`, though their subject is `CursorController`; a move to `FplPage.test.ts` or a
       `CursorController` test file would put them with their subject.
-    - **When the bugs are fixed:** the fix of #311 in `WaypointEditor` also turns red the `FplPage.test.ts` tests that
-      use the blank first click (the issue names them); the fix of #262 must keep NO SUCH WPT on the REF page (held in
-      `WaypointEditor.test.ts`); the fix of #306 changes the keyboard's automatic advance at the last cell, a
-      characterization in `Editor.test.ts`; the tens fix of #303 retires the 91-degree characterization of
+    - **When the bugs are fixed:** the fix of #311 in `WaypointEditor` leaves the `FplPage.test.ts` insert tests green,
+      because they find the new entry by its number and cursor row and not by the blank first click; the fix of #262
+      must keep NO SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests
+      and of `test/render/harness/statusLine.test.ts`); the fix of #306 changes the keyboard's automatic advance at the
+      last cell, a characterization in `Editor.test.ts`; the tens fix of #303 retires the 91-degree characterization of
       `LatLonEditor.test.ts`; #324 needs a trip-page form of `DurationDisplay`, not a change of the shared form.
     - **Leads that were seen and not confirmed or not filed:**
         - Editors: `FreetextEditor.convertFromValue` drops a cell for a stored character outside its charset;

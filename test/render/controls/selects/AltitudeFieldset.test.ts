@@ -91,4 +91,20 @@ describe('altitude fieldset', () => {
         expect(Screen.read().status().left).toBe('CAL 1');
         expect(Screen.read().rows('L')[1]).toBe('IND:30100ft');
     });
+
+    // Characterization: the tens and units are read-only cells, so an entry changes the thousands and the hundreds at
+    // most, and the cells that are not edited keep their digits. The guide does not say how a stored altitude with a
+    // non-zero tens is treated, so this holds only what the fieldset does: 12350 ft with the hundreds turned up one
+    // click is 12450 ft, and the 50 stays
+    it('keeps the read-only tens and units when the hundreds digit changes (characterization)', async () => {
+        const unit = await bootUnit({storage: {cal12IndicatedAltitude: 12350}});
+        await unit.panel.selectPage('L', 'CAL 2');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 5); // the hundreds: the third field is the ten-thousands, then the thousands
+        expect(unit.panel.focused('L').text).toBe('3'); // precondition
+        await unit.panel.inner('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.props.userSettings.getSetting('cal12IndicatedAltitude').get()).toBe(12450);
+    });
 });

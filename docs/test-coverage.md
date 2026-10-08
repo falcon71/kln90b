@@ -855,19 +855,34 @@ commits) and the reviewers' mutation passes, whose survivors joined the fix roun
   cells other than 0.2 (#231).
 - **Keyboard:** the focus events and the click outside the instrument (`FakeCoherent` records nothing).
 - **Self-test and boot:** the self-test page hosts only the flashing `Button` test here; its values are Session 10's.
-- **Open, for the final review's fix wave** (the controller updates this list): `test/render/harness/statusLine.test.ts`
-  asserts NO SUCH WPT after an unknown FPL 0 ident and so freezes #262 (rule 8); `AltitudeFieldset.saveAlt100` zeroing
-  the read-only tens is a surviving mutation; the HPA barometer's first-cell list without `07` is a surviving
-  mutation.
 - **Review notes left as they are** (deferred minors): the harness test of `typeBelow1000`'s blank cell is not
   load-bearing (its sibling guards it); the #191 pin leaves the MSG page with ENT, where the trainer used the knob; the
   4-3 cursor tests sit in `WaypointEditor.test.ts` though their subject is `CursorController`, and the label of the CRSR
-  restore test (task 3's M-4, M-6); `LatLonEditor.test.ts:311` is 122 characters and a JSDoc of `openOnBlank` in
-  `FreetextEditor.test.ts` wraps badly; task 4's review notes M3 to M6; task 7's suggestions to name #231 in the
-  three-cell distance test, to cite 5-3 for `1:08` and to recheck the #99 trainer claim, the zero pad of the `050kt`
-  rows inferred from TRI 0, a stray blank line in `TimeDisplay.test.ts` and the `bootTri5` signature over 120
-  characters; the duplicated `expectFlashing` and `showSuperNav5` helpers (`testing.md` section 7).
+  restore test (task 3's M-4, M-6); task 4's review notes M3 to M6; task 7's note that the zero pad of the `050kt`
+  rows is inferred from TRI 0; the duplicated `expectFlashing` and `showSuperNav5` helpers (`testing.md` section 7).
 - Leads seen and not filed: `testing.md` section 7 (Session 9b's list).
+
+**Final review** (the whole-session review of the branch, 2026-10-08, then one fix wave). The review found no critical
+finding and seven important ones, all in tests:
+- Four tests froze a bug (rule 8): the status line tests of `StatusLine.test.ts` and the repeated-message test of
+  `test/render/harness/statusLine.test.ts` used NO SUCH WPT after an unknown FPL 0 ident (#262), the `SupPage.test.ts`
+  helper asserted the blank hundreds cell of the open longitude edit (#304), and three `FplPage.test.ts` tests asserted
+  the blank first click (#311).
+- One characterization (the 91-degree latitude) sat in a describe that cites pages (label mixing).
+- Two mutations survived: `AltitudeFieldset.saveAlt100` zeroing the read-only tens and units, and the HPA barometer's
+  first-cell list without `07`.
+
+The fix wave fixed all seven and the deferred minors that were cheap (the `openOnBlank` JSDoc, naming #231 in the
+three-cell distance test, citing 5-3 for `1:08`, dropping the unrecorded #99 trainer parenthetical, a stray blank line
+in `TimeDisplay.test.ts`, the `bootTri5` signature). The status line tests now use NO SUCH WPT on the REF page (C-2),
+which a fix of #262 keeps; the SupPage helper accepts the blank or a 0 in the hundreds cell; the FplPage tests find the
+new entry by its number and its cursor row; the 91-degree test moved into a characterization describe; the altitude
+test keeps a stored 12350 ft through a hundreds change, and the HPA test turns 880 MB down to 780 MB. The review's note
+that `LatLonEditor.test.ts:311` is over 120 characters was wrong (it is 120 characters, 122 bytes with the degree sign)
+and was dropped. Suite after the wave: 2637 tests passed and 350 expected failures, in 304 files (the two new tests
+are the altitude and the HPA tests); `npx tsc --noEmit` is clean and `kln90b/` is unchanged. One thing the wave
+left as it is, because it lives on GitHub: the text of #311 still names the `FplPage.test.ts` tests as ones that its fix
+turns red, which they no longer are.
 
 **Workflow notes.** The research worktrees and the task worktrees started at `origin/main` and were reset to the session
 branch first; each got a junction to the main checkout's `node_modules`, to be removed with `rmdir` before `git
@@ -897,11 +912,12 @@ The files of the area below 60 % at the start (statements, from the design) and 
 79.54. The lowest files of the area at the end are `SuperDeviationBar.tsx` (73.33), `NearestSelector.tsx` (73.52) and
 `FpmFieldset.tsx` (76.00). `kln90b/pages/right` and `kln90b/services` did not change.
 
-The suite at the start: 2122 tests passed and 279 expected failures, in 241 files. At the end: 2635 tests passed and
-350 expected failures, in 304 files. The new expected failures are pins: #99 (three), #102 (two), #109 (two), #191,
-#223 (two), #225 (two), #226 (three), #230 (two), #242, #245, #255, #256, #262, #263, #266, #276, #277, #282, #288
-(two), #290 (two), #302 (three), #303 (three), #304, #305, #306 (three), #307 (two), #308 (four), #309 (two), #310,
-#311 (two), #312, #313 (two), #314, #315, #316, #317 (two), #318, #319, #320, #321, #322, #323 (two), #324 (three).
+The suite at the start: 2122 tests passed and 279 expected failures, in 241 files. At the end (before the final
+review): 2635 tests passed and 350 expected failures, in 304 files. The new expected failures are pins: #99 (three),
+#102 (two), #109 (two), #191, #223 (two), #225 (two), #226 (three), #230 (two), #242, #245, #255, #256, #262, #263,
+#266, #276, #277, #282, #288 (two), #290 (two), #302 (three), #303 (three), #304, #305, #306 (three), #307 (two), #308
+(four), #309 (two), #310, #311 (two), #312, #313 (two), #314, #315, #316, #317 (two), #318, #319, #320, #321, #322, #323
+(two), #324 (three).
 
 ## 2026-10-08, session 9a, branch `tests-session-9-right-pages`
 

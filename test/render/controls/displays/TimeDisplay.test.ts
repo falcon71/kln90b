@@ -17,7 +17,6 @@ describe('TimeDisplay', () => {
         expect(shown(TimeStamp.createTime(9, 23))).toBe('09:23');
         expect(shown(TimeStamp.createTime(15, 23))).toBe('15:23');
     });
-
 });
 
 describe('TimeDisplay (characterization)', () => {
