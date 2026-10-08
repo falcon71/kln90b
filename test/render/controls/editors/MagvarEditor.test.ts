@@ -5,8 +5,7 @@ import {Screen} from '../../../harness/render/screen';
 /**
  * Line 6 of SET 2 (5-44): outside the primary coverage area (north of N 74) it takes a pilot-entered magnetic
  * variation, which the unit keeps in `memory.navPage.userMagvar`, east positive (as in KLNMagvar.test.ts). With a fix
-  * the
- * date and the time are read-only, so the cursor starts on the time zone, and line 6 is the next field.
+ * the date and the time are read-only, so the cursor starts on the time zone, and line 6 is the next field.
  */
 async function onSet2Magvar(): Promise<HeadlessUnit> {
     const unit = await bootUnit({position: {lat: 74.5, lon: 8.0}, magvar: 10});
@@ -30,7 +29,7 @@ async function choices(unit: HeadlessUnit, from: number, to: number, n: number):
     return [...seen].sort();
 }
 
-describe('magnetic variation editor (5-18, 5-44)', () => {
+describe('magnetic variation editor (5-44)', () => {
     // 5-44: outside the coverage area the variation is entered with the knobs; 9°E is a variation of +9
     it('enters 9°E as a variation of +9 (5-44)', async () => {
         const unit = await onSet2Magvar();

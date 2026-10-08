@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
+import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
 
 /** A key as the sim's keyboard sends it (KLN90BCore), followed by one display tick. Raw on purpose: the key event is the subject. */
 async function type(unit: HeadlessUnit, key: string): Promise<void> {
@@ -31,6 +32,15 @@ describe('keyboard input for editors (characterization, sim-only feature, #25)',
     });
 });
 
+/** The longitudes of the user waypoints in the repository (the region XX holds the user's own waypoints) */
+function storedLongitudes(unit: HeadlessUnit): number[] {
+    const lons: number[] = [];
+    KLNFacilityRepository.getRepository(unit.props.bus).forEach(fac => {
+        if (fac.icaoStruct.region === 'XX') lons.push(fac.lon);
+    });
+    return lons;
+}
+
 /** USER POS? with a latitude typed and entered, the cursor on the empty longitude editor (row 5) */
 async function onLongitude(): Promise<HeadlessUnit> {
     const unit = await bootUnit();
@@ -46,8 +56,10 @@ async function onLongitude(): Promise<HeadlessUnit> {
 
 describe('keyboard input of a longitude (3-18, #109)', () => {
     // The sibling of the pin below (3-18, 5-17: the position is entered cell by cell and approved with ENT): a
-    // longitude of 100 degrees or more has a 1 in the hundreds place, which the key matches, so it is typed and entered
-    it('types a longitude of 100 degrees or more (3-18)', async () => {
+    // longitude of 100 degrees or more has a 1 in the hundreds place, which the key matches, so it is typed and
+    // entered. The typing itself is the sim-only keyboard (#25); the page only says what the entered position looks
+    // like.
+    it('types a longitude of 100 degrees or more (3-18, sim-only keyboard, #25)', async () => {
         const unit = await onLongitude();
         for (const key of ['E', '1', '2', '0', '3', '0', '0', '0']) {
             await type(unit, key);
@@ -57,13 +69,14 @@ describe('keyboard input of a longitude (3-18, #109)', () => {
 
         expect(unit.errors).toEqual([]);
         expect(Screen.read().rows('R')[5]).toBe("E120°30.00'");
+        expect(storedLongitudes(unit)).toEqual([120.5]);
     });
 
     // Half-fixed #25: the hundreds digit of the longitude has the charset [" ", "1"], and a key is matched against the
     // whole entry, so "0" is rejected. A longitude below 100 degrees cannot be typed, and the cursor does not advance.
-    // The literal is the entered value, blank-padded as 3-18, figure 3-57 shows it (E  8°30.00'), read after ENT: the
-    // open field before ENT shows the zeros of the hundreds and tens (#NEW-1-2, #230). A fix of #109 alone leaves the
-    // zero of the tens (#230), so both have to be fixed for this pin to pass.
+    // The pin asserts what #109 decides: the stored longitude, 8.5 degrees east, and the cells of the entered row that
+    // the zero of the tens (#230) does not touch. 3-18, figure 3-57 shows the entered value with a blank in the
+    // hundreds place and its degrees right-aligned.
     it.fails('types a longitude below 100 degrees, with a 0 for the hundreds digit (3-18, #109)', async () => {
         const unit = await onLongitude();
         for (const key of ['E', '0', '0', '8', '3', '0', '0', '0']) {
@@ -73,6 +86,9 @@ describe('keyboard input of a longitude (3-18, #109)', () => {
         await unit.panel.ent();
 
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().rows('R')[5]).toBe("E  8°30.00'");
+        const row = Screen.read().rows('R')[5];
+        expect(row.slice(0, 2)).toBe('E ');
+        expect(row.slice(3)).toBe("8°30.00'");
+        expect(storedLongitudes(unit)).toEqual([8.5]);
     });
 });

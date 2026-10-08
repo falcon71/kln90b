@@ -73,8 +73,8 @@ describe('time editor (3-54)', () => {
 });
 
 describe('time editor, the hours wrap (checked in the KLN 89 trainer, 2026-10-08)', () => {
-    // T4: the hours wrap: one click counterclockwise from the 00 of the first click is 23, and one click clockwise from
-    // 23 is 00 again
+    // Checked in the KLN 89 trainer, 2026-10-08 (T4): the hours wrap: one click counterclockwise from
+    // the 00 of the first click is 23, and one click clockwise from 23 is 00 again
     it('wraps the hours from 00 to 23 and back (checked in the KLN 89 trainer, 2026-10-08)', async () => {
         const unit = await onSet2Time();
         await unit.panel.inner('L', 1);

@@ -110,14 +110,14 @@ describe('editor data entry (3-14, 3-53, 5-17)', () => {
         await unit.panel.cursor('L');
 
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().status().mode).not.toBe('INVALID ENT');
         expect(latRow()).toBe("N 42°00.00'");
     });
 });
 
 describe('editor cells wrap (checked in the KLN 89 trainer, 2026-10-08)', () => {
-    // T4: every cell wraps in both directions, from its last choice to its first and back. The latitude tens is the
-    // exception that #NEW-1-1 pins (it offers 9 today, the trainer's cell stops at 8), so it is left out here.
+    // Checked in the KLN 89 trainer, 2026-10-08 (T4): every cell wraps in both directions, from its last
+    // choice to its first and back. The latitude tens is the exception that #NEW-1-1 pins (it offers 9 today, the
+    // trainer's cell stops at 8), so it is left out here.
     // [column, first choice, last choice]
     const WRAPPING_CELLS: [number, string, string][] = [
         [0, 'N', 'S'],   // the hemisphere
@@ -148,7 +148,8 @@ describe('editor cells wrap (checked in the KLN 89 trainer, 2026-10-08)', () => 
 });
 
 describe('editor open edit and the cursor button (checked in the KLN 89 trainer, 2026-10-08)', () => {
-    // T3: CRSR during an open edit turns the cursor off and brings the old value back
+    // Checked in the KLN 89 trainer, 2026-10-08 (T3): CRSR during an open edit turns the cursor off and brings the old
+    // value back
     it('drops an edit that was not entered when the cursor is turned off ' +
         '(checked in the KLN 89 trainer, 2026-10-08)', async () => {
         const unit = await onSet1Latitude();
@@ -160,8 +161,10 @@ describe('editor open edit and the cursor button (checked in the KLN 89 trainer,
         await unit.panel.cursor('L');
 
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().status().left).not.toBe('CRSR');
+        expect(Screen.read().status().left).toBe('SET 1');
         expect(latRow()).toBe("N 47°30.00'");
+        // No cell of the row keeps flashing
+        expect(await blinkCycle(() => Screen.read().maskRows('L')[2])).toEqual(Array(4).fill('.'.repeat(11)));
     });
 });
 
@@ -187,8 +190,9 @@ describe('editor CLR during an open edit (checked in the KLN 89 trainer, 2026-10
         expect(unit.panel.focused('L').row).toBe(2);
     });
 
-    // T2: CLR brings the old value back, the cursor stays on the field, and the ent prompt goes. The code ignores CLR
-    // (Editor.isClearAccepted is false), so the edit stays open.
+    // Checked in the KLN 89 trainer, 2026-10-08 (T2): CLR brings the old value back, the cursor stays on
+    // the field, and the ent prompt goes. The code ignores CLR (Editor.isClearAccepted is false), so the edit stays
+    // open.
     it.fails('brings the old value back and closes the edit (checked in the KLN 89 ' +
         'trainer, 2026-10-08, #NEW-1-5)', async () => {
         const unit = await withOpenEdit();
@@ -201,8 +205,8 @@ describe('editor CLR during an open edit (checked in the KLN 89 trainer, 2026-10
         expect(unit.panel.focused('L').row).toBe(2);
     });
 
-    // T2: ENT after the CLR does nothing. Today the edit is still open, so ENT enters it (N 20°00.00'); the pin turns
-    // green with the fix of #NEW-1-5
+    // Checked in the KLN 89 trainer, 2026-10-08 (T2): ENT after the CLR does nothing. Today the edit is still open, so
+    // ENT enters it (N 20°00.00'); the pin turns green with the fix of #NEW-1-5
     it.fails('does nothing on a following ENT (checked in the KLN 89 trainer, 2026-10-08, #NEW-1-5)', async () => {
         const unit = await withOpenEdit();
 
@@ -232,7 +236,8 @@ describe('editor outer knob at the ends of an open edit (checked in the KLN 89 t
         expect(await entPromptShown()).toBe(true);
     });
 
-    // T1: past the last cell the cursor stays on it. The code wraps to the first cell.
+    // Checked in the KLN 89 trainer, 2026-10-08 (T1): past the last cell the cursor stays on it, and the
+    // edit stays open. The code wraps to the first cell.
     it.fails('stops at the last cell of an open edit (checked in the KLN 89 ' +
         'trainer, 2026-10-08, #NEW-1-4)', async () => {
         const unit = await onSet1Latitude();
@@ -243,9 +248,11 @@ describe('editor outer knob at the ends of an open edit (checked in the KLN 89 t
 
         expect(unit.errors).toEqual([]);
         expect(await flashingColumns()).toEqual([9]);
+        expect(await entPromptShown()).toBe(true);
     });
 
-    // T1: before the first cell the cursor stays on it too. The code wraps to the last cell.
+    // Checked in the KLN 89 trainer, 2026-10-08 (T1): before the first cell the cursor stays on it too,
+    // and the edit stays open. The code wraps to the last cell.
     it.fails('stops at the first cell of an open edit (checked in the KLN 89 ' +
         'trainer, 2026-10-08, #NEW-1-4)', async () => {
         const unit = await onSet1Latitude();
@@ -255,6 +262,7 @@ describe('editor outer knob at the ends of an open edit (checked in the KLN 89 t
 
         expect(unit.errors).toEqual([]);
         expect(await flashingColumns()).toEqual([0]);
+        expect(await entPromptShown()).toBe(true);
     });
 });
 

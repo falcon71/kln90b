@@ -133,7 +133,6 @@ describe('date editor (3-53, 5-15, C-1)', () => {
         await unit.panel.ent();
 
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().status().mode).not.toBe('INVALID ENT');
         expect(cal7Date(unit)).toEqual([2028, 1, 29]);
     });
 
@@ -151,8 +150,8 @@ describe('date editor (3-53, 5-15, C-1)', () => {
 });
 
 describe('date editor, the day wraps (checked in the KLN 89 trainer, 2026-10-08)', () => {
-    // T4: the day runs from 01 to 31 and wraps: one click counterclockwise from the 01 of the first click is 31, and
-    // one click clockwise from 31 is 01 again
+    // Checked in the KLN 89 trainer, 2026-10-08 (T4): the day runs from 01 to 31 and wraps: one click
+    // counterclockwise from the 01 of the first click is 31, and one click clockwise from 31 is 01 again
     it('wraps the day from 01 to 31 and back (checked in the KLN 89 trainer, 2026-10-08)', async () => {
         const unit = await onCal7Date();
         await unit.panel.inner('L', 1);

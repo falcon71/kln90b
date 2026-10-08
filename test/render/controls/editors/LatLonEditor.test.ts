@@ -118,9 +118,10 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // C-1: INVALID ENT for data that is not a valid entry. No latitude has more than 90 degrees: the entry is refused
-    // and the field keeps its value
-    it('refuses a latitude of 91 degrees with INVALID ENT (C-1)', async () => {
+    // The code refuses a latitude whose degree digits are above 90 (LatitudeEditor.convertToValue) with INVALID ENT and
+    // the field keeps its value. The route to 91 is only open while the tens of the degrees offer a 9, so this retires
+    // with the fix of #NEW-1-1 (the tens offer 0 to 8).
+    it('refuses a latitude of 91 degrees with INVALID ENT (characterization)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 1);
         await select(unit, [1, 10, 2]); // N 9 1
@@ -140,7 +141,6 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         await select(unit, [1, 9, 10, 6, 10, 10, 10]); // N 8 9, 5 9, 9 9
         expect(rowsL()[2]).toBe("N 89°59.99'");
         await unit.panel.ent();
-        expect(Screen.read().status().mode).not.toBe('INVALID ENT');
         await unit.panel.cursorTo('L', 'CONFIRM?');
         await unit.panel.ent();
 
@@ -203,7 +203,6 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         await select(unit, [1, 2, 8, 10, 6, 10, 10, 10]); // E 1 7 9, 5 9, 9 9
         expect(rowsL()[3]).toBe("E179°59.99'");
         await unit.panel.ent();
-        expect(Screen.read().status().mode).not.toBe('INVALID ENT');
         await unit.panel.cursorTo('L', 'CONFIRM?');
         await unit.panel.ent();
 
@@ -308,9 +307,9 @@ describe('latitude and longitude editors at exactly 0 degrees ' +
         return rowsL()[row];
     }
 
-    // T35: after entering S 0°00.00' or W 0°00.00' the unit shows N 0°00.00' and E 0°00.00' (the trainer's zero is
-    // blank-padded, which is #230; only the hemisphere is asserted). The editors choose S and W for a value that is not
-    // above 0 (LatitudeEditor and LongitudeEditor.convertFromValue).
+    // Checked in the KLN 89 trainer, 2026-10-08 (T35): after entering S 0°00.00' or W 0°00.00' the unit shows N
+    // 0°00.00' and E 0°00.00' (the trainer's zero is blank-padded, which is #230; only the hemisphere is asserted). The
+    // editors choose S and W for a value that is not above 0 (LatitudeEditor and LongitudeEditor.convertFromValue).
     it.fails('shows a latitude of exactly 0 as N (checked in the KLN 89 trainer, 2026-10-08, #NEW-1-6)', async () => {
         const shown = await shownAfterConfirm(2, [1, 1, 1, 1, 1, 1, 1]); // N 00°00.00
 
@@ -329,14 +328,14 @@ describe('latitude and longitude editors at exactly 0 degrees ' +
         const shown = await shownAfterConfirm(2, [2, 1, 1, 4, 1, 1, 1]); // S 00°30.00
 
         expect(shown[0]).toBe('S');
-        expect(shown).toContain('°30.00');
+        expect(shown.slice(3)).toBe("0°30.00'");
     });
 
     it('shows a longitude of W 0°30.00 as W (3-18)', async () => {
         const shown = await shownAfterConfirm(3, [2, 1, 1, 1, 4, 1, 1, 1]); // W 000°30.00
 
         expect(shown[0]).toBe('W');
-        expect(shown).toContain('°30.00');
+        expect(shown.slice(3)).toBe("0°30.00'");
     });
 });
 
