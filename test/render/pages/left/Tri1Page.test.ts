@@ -57,14 +57,16 @@ describe('TRI 1 page (characterization)', () => {
         await enterTo(unit, 'KBBB');
         await unit.panel.cursor('L');
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().half('L')).toMatchInlineSnapshot(`
-          "P.POS-KBBB 
-            60nm 180°
-          150kt   :24
-          FF: 00030.0
-          RES:00025.0
-          F REQ  37.0"
-        `);
+        // The ETE cells are left out: the form of an ETE below an hour on the trip pages is #NEW-7-3
+        const rows = Screen.read().rows('L');
+        expect([rows[0], rows[1], rows[2].slice(0, 5), ...rows.slice(3)]).toEqual([
+            'P.POS-KBBB ',
+            '  60nm 180°',
+            '150kt',
+            'FF: 00030.0',
+            'RES:00025.0',
+            'F REQ  37.0',
+        ]);
     });
 
     // TRI 1 measures from the present position, so without a fix the page shows dashes
@@ -79,31 +81,54 @@ describe('TRI 1 page (characterization)', () => {
 describe('TRI 1 page (5-3, 5-4)', () => {
     // 5-3, figure 5-8: after the waypoint is approved the page shows distance, bearing, ground speed and ETE. 5-2: the
     // bearing is magnetic. 60.107 NM rounds to 60; true 180 with 10 degrees east variation is 170 magnetic; no wind, so
-    // the ground speed is the TAS of 150 kt and the ETE 24.04 min
-    it('shows 60nm, the magnetic bearing 170 and 150kt for 24 minutes to a waypoint 60 NM due south (5-3)', async () => {
+    // the ground speed is the TAS of 150 kt. The ETE cells are read by the #NEW-7-3 tests below. This test is their
+    // sibling: it holds the distance, bearing and ground speed they rely on (the ETE is 24.04 min)
+    it('shows 60nm, the magnetic bearing 170 and 150kt to a waypoint 60 NM due south (5-3)', async () => {
         const unit = await bootTri1({magvar: 10});
         await enterTo(unit, 'KBBB');
         expect(distanceNm(POS, {lat: 46.0, lon: 8.0})).toBeCloseTo(60.107, 3); // The derivation of the literals
-        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['P.POS-KBBB ', '  60nm 170°', '150kt   :24']);
+        const rows = Screen.read().rows('L');
+        expect([rows[0], rows[1], rows[2].slice(0, 5)]).toEqual(['P.POS-KBBB ', '  60nm 170°', '150kt']);
+    });
+
+    // 3-15, figure 3-50 (180kt 0:13 on the trip page) and the KLN 89 trainer, 2026-10-08 (the trip page showed ETE
+    // 0:31): below an hour the trip pages keep the hour digit. 60.107 NM at 150 kt is 24.04 min. The code draws two
+    // blanks and :24. The same pin as on TRI 3 (DurationDisplay.test.ts) and TRI 5: a fix that wires one page only is
+    // caught by the others.
+    it.fails(
+        'shows an ETE below an hour as 0:24 (3-15, checked in the KLN 89 trainer, 2026-10-08, #NEW-7-3)',
+        async () => {
+            const unit = await bootTri1();
+            await enterTo(unit, 'KBBB');
+            expect(Screen.read().rows('L')[2].slice(6)).toBe(' 0:24');
+        },
+    );
+
+    // 5-3, figure 5-8 (ETE 1:08): the sibling of the pin, hours and minutes. TAS 50 kt: 60.107 NM is 72.13 min
+    it('shows an ETE of an hour or more as hours and minutes: 50 kt gives 1:12 (5-3)', async () => {
+        const unit = await bootTri1({tas: 50});
+        await enterTo(unit, 'KBBB');
+        const rows = Screen.read().rows('L');
+        expect([rows[1], rows[2]]).toEqual(['  60nm 180°', '050kt  1:12']);
     });
 
     // 5-2 and 5-3: the ground speed comes from the TAS and wind of TRI 0. TAS 200 with a wind from 180 at 20 kt on the
-    // course 180 (a headwind, no crosswind) is 180 kt; 60.107 NM at 180 kt is 20.04 min, so rounding and truncating
-    // the minutes both give :20
-    it('shows the ground speed of the TRI 0 TAS and wind: 180kt and :20 (5-3)', async () => {
+    // course 180 (a headwind, no crosswind) is 180 kt
+    it('shows the ground speed of the TRI 0 TAS and wind: 180kt (5-3)', async () => {
         const unit = await bootTri1({tas: 200, windDirTrue: 180, windSpeed: 20});
         await enterTo(unit, 'KBBB');
-        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['P.POS-KBBB ', '  60nm 180°', '180kt   :20']);
+        const rows = Screen.read().rows('L');
+        expect([rows[0], rows[1], rows[2].slice(0, 5)]).toEqual(['P.POS-KBBB ', '  60nm 180°', '180kt']);
     });
 
     // 5-3: any ground speed may be entered instead of the TAS and wind result; the ETE follows it.
-    // 60.107 NM at 120 kt is 30.05 min
-    it('recomputes the ETE from a ground speed entered with the knobs: 120 kt gives :30 (5-3)', async () => {
+    // 60.107 NM at 50 kt is 72.13 min
+    it('recomputes the ETE from a ground speed entered with the knobs: 50 kt gives 1:12 (5-3)', async () => {
         const unit = await bootTri1();
         await enterTo(unit, 'KBBB');
-        await cursorToCell(unit, 2, 1);
-        await setDigit(unit, 2); // 150 -> 120
-        expect(Screen.read().rows('L')[2]).toBe('120kt   :30');
+        await cursorToCell(unit, 2, 0);
+        await setDigit(unit, 0); // 150 -> 050
+        expect(Screen.read().rows('L')[2]).toBe('050kt  1:12');
     });
 
     // 5-4, steps 7 to 9: fuel flow and reserve entered with the knobs give the fuel required, ETE times FF plus
