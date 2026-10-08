@@ -73,7 +73,7 @@
     {
       "id": 8,
       "subject": "Task 8: issues and close-out",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** File the issues and comments of the design, replace the placeholders, update `testing.md` and write the\nsession log with rule 18, in the main checkout on the session branch.\n\n**Files:**\n- Modify: every test file with a `#NEW-` placeholder (`grep -rln \"#NEW-\" test/`)\n- Modify: `docs/testing.md` (sections 6 and 7)\n- Modify: `docs/test-coverage.md` (the Session 9b checkbox and the session log entry in section 4)\n\n**Acceptance Criteria:**\n- [ ] Each placeholder of the design's bug table that a task pinned is one GitHub issue with the `bug` label, filed after\n  a search of the open and closed issues; each body states what is wrong, the reproduction (input, observed, expected),\n  the file and line, the impact, the suggested fix, the evidence (pages paraphrased, \"checked in the KLN 89 trainer,\n  2026-10-08\"), that it was found in the headless harness and not reproduced in the sim, and the pin's test name.\n- [ ] `#NEW-6-3` filed with or without a pin as task 6 reported; the F-3 `question` issue filed without a pin.\n- [ ] Comments on #99, #102, #109, #191, #226, #242, #263 as the design lists, each naming its new pins. No issue is\n  edited or closed; an edit the design does not list needs the maintainer's explicit OK.\n- [ ] The placeholders are replaced in one commit; `grep -r \"#NEW-\" test/` finds nothing.\n- [ ] `testing.md` section 6 and 7: the limits and leads of the session (the design's \"Log only\" list, the reports'\n  leads, the harness gaps not built), no counts in prose.\n- [ ] The session log entry (section 4 of `test-coverage.md`), in the 9a format: done per task, rulings, trainer\n  results, bugs filed, fixes that could not be re-broken, the coverage at start and end, not covered (rule 18), workflow\n  notes; the checkbox ticked.\n- [ ] `npm test` green, `npx tsc --noEmit` clean, before and after the commits.\n\n**Verify:** `grep -r \"#NEW-\" test/` → no output; `npm test` → no failures; `npx tsc --noEmit` → no output.\n\nFull steps: plan section \"Task 8\" in docs/superpowers/plans/2026-10-08-session-9b-controls.md.\n\n```json:metadata\n{\"files\": [\"docs/testing.md\", \"docs/test-coverage.md\"], \"verifyCommand\": \"grep -r \\\"#NEW-\\\" test/ ; npm test && npx tsc --noEmit\", \"acceptanceCriteria\": [\"issues filed per the bug table\", \"#NEW-6-3 and the F-3 question filed\", \"comments on #99 #102 #109 #191 #226 #242 #263\", \"placeholders replaced, grep empty\", \"testing.md sections 6 and 7\", \"session log and checkbox\", \"suite green, tsc clean\"], \"modelTier\": \"frontier\"}\n```",
       "blockedBy": [
         1,
@@ -86,5 +86,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-10-08T18:00:13.133Z"
+  "lastUpdated": "2026-10-08T18:27:42.393Z"
 }
