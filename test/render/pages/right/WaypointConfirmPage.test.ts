@@ -29,8 +29,7 @@ describe('waypoint confirmation page', () => {
         insertLeg(unit, 0, kaaa);
         insertLeg(unit, 1, inta);
         await vi.advanceTimersByTimeAsync(3000);
-        // Only the start of the row: the cell of the type letter shifts with the blank cell of a short ident (#NEW-4-2)
-        expect(Screen.read().rows('R')[0].slice(0, 8)).toBe('› 2 INTA');
+        expect(Screen.read().rows('R')[0]).toBe('› 2 INTA I ');
         await unit.panel.cursor('R');
         await vi.advanceTimersByTimeAsync(9000);
         await unit.panel.enterIdent('R', 'XYZ');
