@@ -21,7 +21,7 @@ function userWaypoints(unit: HeadlessUnit): [FacilityType, string, string, numbe
 }
 
 describe('NDB page (characterization)', () => {
-    // A half kHz frequency: a whole kHz shows a tenth too, which is #NEW-3-13
+    // A half kHz frequency: a whole kHz shows a tenth too, which is #287
     it('shows a database NDB with the cursor off', async () => {
         const unit = await ndbPageOf(ndb('OWI', 47.5, 11.25, {name: 'OTTAWA', frequencyKHz: 251.5}));
 
@@ -92,7 +92,7 @@ describe('NDB page contents (3-50)', () => {
     // Figures 3-153 and 3-154 show the frequency of a database NDB on a whole kHz without a decimal point or a tenth, and
     // so did every NDB of the KLN 89 trainer (2026-10-07, medium confidence: no half kHz NDB in its database). The page
     // shows FREQ  251.0. The digits are compared without the blanks, so that the column of the whole number is open
-    it.fails('shows a database NDB on a whole kHz without tenths (3-50, figures 3-153, 3-154, the KLN 89 trainer, #NEW-3-13)', async () => {
+    it.fails('shows a database NDB on a whole kHz without tenths (3-50, figures 3-153, 3-154, the KLN 89 trainer, #287)', async () => {
         await ndbPageOf(ndb('OWI', 47.5, 11.25, {frequencyKHz: 251}));
 
         expect(Screen.read().rows('R')[3].replace(/ /g, '')).toBe('FREQ251');
@@ -158,7 +158,7 @@ describe('NDB page nearest view (3-22, 3-50)', () => {
     // 03.1nm on 3-42); the KLN 89 trainer pads with a blank (6.5nm), but its nearest page has another layout, and the
     // maintainer ruled for the 90B figures. OWI lies 7.3 NM away (haversine), the page shows 7.3nm (DistanceDisplay pads
     // with a blank)
-    it.fails('shows a distance below 10 NM with a leading zero (3-22, figure 3-154, #NEW-1-3)', async () => {
+    it.fails('shows a distance below 10 NM with a leading zero (3-22, figure 3-154, #266)', async () => {
         await nearest(47.1, 8.1);
 
         expect(Screen.read().rows('R')[5].trim()).toBe('07.3nm');
@@ -235,7 +235,7 @@ describe('user NDB (5-18)', () => {
     // 5-18, figure 5-66: an NDB frequency may be stored with the user NDB (328.0 kHz in the figure). NdbFreqEditor
     // .convertToValue adds the digits as numbers (0 + 3 + 2 + 8 = 13, so 13.0 kHz) and refuses every frequency with
     // INVALID ENT.
-    it.fails('accepts the frequency 328.0 of figure 5-66 (5-18, #NEW-3-3)', async () => {
+    it.fails('accepts the frequency 328.0 of figure 5-66 (5-18, #277)', async () => {
         const unit = await undefinedNdb();
         await unit.panel.ent();
         await unit.panel.type('R', ' 3280');

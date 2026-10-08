@@ -346,7 +346,7 @@ describe('APT 7 selecting a SID (6-22)', () => {
 
     // 6-22 step 4, figure 6-35: the runways of a SID are listed with the RW prefix. The sibling is the test above, which
     // asserts the runway question and its cursor
-    it.fails('lists the runways of a SID with the RW prefix (6-22, #NEW-2-2)', async () => {
+    it.fails('lists the runways of a SID with the RW prefix (6-22, #272)', async () => {
         const unit = await bootOnApt7({sids: ['DEP1'], stars: false});
         await unit.panel.cursor('R');
         await unit.panel.ent(); // DEP1
@@ -418,7 +418,7 @@ describe('APT 7 selecting a STAR (6-23)', () => {
     // 6-5: CLR returns to the previous step. On the question to add the airport (6-23 step 7) the previous step is the
     // list of waypoints; APT 8 does so (Apt8Page.test.ts). Checked in the KLN 89 trainer, 2026-10-07: CLR on that
     // question returns to the waypoint list
-    it.fails('returns from the question to add the airport to the waypoints with CLR (6-5, KLN 89 trainer, #NEW-2-1)', async () => {
+    it.fails('returns from the question to add the airport to the waypoints with CLR (6-5, KLN 89 trainer, #271)', async () => {
         const unit = await bootOnApt7({sids: [], stars: true});
         await unit.panel.cursor('R');
         await unit.panel.ent(); // ARR1: the waypoints
@@ -446,7 +446,7 @@ describe('APT 7 cursor after CLR', () => {
         expect(rows('R').slice(0, 4)).toEqual([' KPRC', 'SELECT STAR', ' 1 ARR1', ' 2 ARR2']);
     });
 
-    it.fails('keeps the cursor on the chosen STAR when CLR returns to the STAR list (KLN 89 trainer, #NEW-2-3)', async () => {
+    it.fails('keeps the cursor on the chosen STAR when CLR returns to the STAR list (KLN 89 trainer, #273)', async () => {
         const unit = await bootOnApt7({sids: [], stars: true});
         await unit.panel.cursor('R');
         await unit.panel.outer('R', 1);

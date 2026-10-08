@@ -120,7 +120,7 @@ describe('D/T 4 page', () => {
     // A photo of a real unit (reference-photos-index.md, 0283863.jpg; low resolution, but the row reads clearly in a crop)
     // shows the Direct To symbol in the first two cells, right before the destination ident. The code leaves the two cells
     // blank
-    it.fails('shows the Direct To symbol before a Direct To destination (photo 0283863.jpg, #NEW-5-8)', async () => {
+    it.fails('shows the Direct To symbol before a Direct To destination (photo 0283863.jpg, #298)', async () => {
         await directToOutsidePlan();
 
         expect(Screen.read().rows('R')[0]).toBe('d›KCCC  UTC');

@@ -67,8 +67,8 @@ async function qqWithApprovedRefAbc(o: { magvar?: number, vorVariation?: number 
 const userWaypoint = (unit: HeadlessUnit, ident: string) =>
     KLNFacilityRepository.getRepository(unit.props.bus).get(ICAO.value('U', 'XX', '', ident));
 
-// The DIS row (row 3) is left out: it shows the distance with a leading zero (#NEW-3-8) and NM in large letters
-// (#NEW-3-9). With no magnetic variation the RAD row shows the same value either way (#NEW-3-6).
+// The DIS row (row 3) is left out: it shows the distance with a leading zero (#282) and NM in large letters
+// (#283). With no magnetic variation the RAD row shows the same value either way (#280).
 describe('SUP page (characterization)', () => {
     it('shows a user waypoint with its reference VOR, radial and coordinates', async () => {
         await supPage();
@@ -144,7 +144,7 @@ describe('SUP page', () => {
         const rows = rightRows();
         expect(rows[1]).toBe('REF:  ABC  ');
         expect(rows[2]).toBe('RAD: 000.0°');
-        expect(rows[3].slice(5, 9)).toBe('12.0'); // the digits only: the format around them is #NEW-3-9 and #NEW-3-8
+        expect(rows[3].slice(5, 9)).toBe('12.0'); // the digits only: the format around them is #283 and #282
     });
 
     // 5-18, 5-19 (figure 5-68): an ident without a waypoint offers CREATE NEW WPT AT: with USER POS? and PRES POS?
@@ -231,7 +231,7 @@ describe('SUP page', () => {
     // distance has three digits, so that the leading digit of the distance field is typed as a digit.
     it('creates the waypoint from a reference waypoint, radial and distance (5-19)', async () => {
         const unit = await qqWithApprovedRefAbc();
-        await unit.panel.cursorTo('R', '___._'); // RAD; the cursor stays on REF today (#NEW-3-10)
+        await unit.panel.cursorTo('R', '___._'); // RAD; the cursor stays on REF today (#284)
         await unit.panel.type('R', '0900');
         await unit.panel.ent();
         expect(unit.panel.focused('R')).toEqual({row: 3, col: 16, text: '___._'}); // DIS
@@ -241,7 +241,7 @@ describe('SUP page', () => {
 
         expect(rightRows().slice(4)).toEqual(["N 46°57.76'", "E 13°25.56'"]);
         // Figure 5-75: the reference waypoint, radial and distance stay on the page. Only the numbers are read: the format
-        // around them is #NEW-3-9 and #NEW-3-8
+        // around them is #283 and #282
         expect(rightRows()[1]).toBe('REF:  ABC  ');
         expect(rightRows()[2].slice(6, 10)).toBe('90.0');
         expect(rightRows()[3].slice(4, 9)).toBe('120.0');
@@ -254,7 +254,7 @@ describe('SUP page', () => {
 
     // 5-19 step 8 (figure 5-72) and the KLN 89 trainer (2026-10-07): after the reference waypoint is approved, the page
     // returns with the cursor on RAD. Sibling: the creation test above passes the same approval.
-    it.fails('puts the cursor on RAD after the reference waypoint is approved (5-19, the KLN 89 trainer, #NEW-3-10)', async () => {
+    it.fails('puts the cursor on RAD after the reference waypoint is approved (5-19, the KLN 89 trainer, #284)', async () => {
         const unit = await qqWithApprovedRefAbc();
 
         expect(unit.panel.focused('R')).toEqual({row: 2, col: 17, text: '___._'});
@@ -280,7 +280,7 @@ describe('SUP page', () => {
     });
 
     // Checked in the KLN 89 trainer, 2026-10-07: the radial and distance change at once to those of the new reference
-    it.fails('shows the radial and distance from the entered REF waypoint (3-51, the KLN 89 trainer, #NEW-3-5)', async () => {
+    it.fails('shows the radial and distance from the entered REF waypoint (3-51, the KLN 89 trainer, #279)', async () => {
         await enterRefXyz();
 
         const rows = rightRows();
@@ -306,7 +306,7 @@ describe('SUP page', () => {
     // page and for an entry. Here ABC has a variation of 10 degrees east, the aircraft's position 4 degrees east, so only
     // the VOR's variation gives the expected value: USUP is due north of ABC, radial 350.0 (the local variation would
     // give 356.0). Sibling: 'shows the radial and distance from the nearest VOR' (no variation).
-    it.fails('shows the radial magnetic with the variation of the reference VOR (5-44, the KLN 89 trainer, #NEW-3-6)', async () => {
+    it.fails('shows the radial magnetic with the variation of the reference VOR (5-44, the KLN 89 trainer, #280)', async () => {
         await supPage({magvar: 4, vorVariation: 10});
 
         expect(rightRows()[2]).toBe('RAD: 350.0°');
@@ -315,8 +315,8 @@ describe('SUP page', () => {
     // The same for an entered radial: 350.0 magnetic with 10 degrees east at ABC is 000 true, so QQ is 100.0 NM due north
     // of ABC, 48.66369 N on the sphere the unit computes on (by hand, the textbook formula of the creation test, course
     // 000); the local variation would give another longitude. The distance has three places before the point, so that
-    // this pin still turns red when the leading distance place is fixed too (#NEW-3-8). Sibling: the creation test above.
-    it.fails('takes an entered radial as magnetic with the variation of the reference VOR (5-19, 5-44, the KLN 89 trainer, #NEW-3-6)', async () => {
+    // this pin still turns red when the leading distance place is fixed too (#282). Sibling: the creation test above.
+    it.fails('takes an entered radial as magnetic with the variation of the reference VOR (5-19, 5-44, the KLN 89 trainer, #280)', async () => {
         const unit = await qqWithApprovedRefAbc({magvar: 4, vorVariation: 10});
         await unit.panel.cursorTo('R', '___._');
         await unit.panel.type('R', '3500');
@@ -329,7 +329,7 @@ describe('SUP page', () => {
 
     // The distance is followed by nm in the small glyphs (lowercase in the font, as NAV 2 writes it): figures 3-155 to
     // 3-159 and 5-67 to 5-76, checked in the KLN 89 trainer, 2026-10-07. The page writes NM in large letters.
-    it.fails('writes nm in the small glyphs after the distance (3-51, the KLN 89 trainer, #NEW-3-9)', async () => {
+    it.fails('writes nm in the small glyphs after the distance (3-51, the KLN 89 trainer, #283)', async () => {
         await supPage();
 
         expect(rightRows()[3].slice(9)).toBe('nm');
@@ -338,7 +338,7 @@ describe('SUP page', () => {
     // Figures 5-75 and 5-76 show a distance below 100 NM with a blank in front ("DIS: 48.1"), and the KLN 89 trainer
     // (2026-10-07) shows blanks, never zeros, outside the edit field (figure 5-74 shows the zero only in the open edit
     // field). Figure 3-159 shows a distance below 10 NM as 09.1, so this pin asserts the hundreds digit only.
-    it.fails('shows a blank instead of a leading zero in front of a distance below 100 NM (5-19, the KLN 89 trainer, #NEW-3-8)', async () => {
+    it.fails('shows a blank instead of a leading zero in front of a distance below 100 NM (5-19, the KLN 89 trainer, #282)', async () => {
         await supPage();
 
         expect(rightRows()[3].slice(0, 9)).toBe('DIS: 12.0');
@@ -357,7 +357,7 @@ describe('SUP page', () => {
     });
 
     // Checked in the KLN 89 trainer, 2026-10-07 (medium confidence): the first click clockwise from a blank cell gives A
-    it.fails('turns the blank fifth character into an A clockwise (3-20, the KLN 89 trainer, #NEW-4-2)', async () => {
+    it.fails('turns the blank fifth character into an A clockwise (3-20, the KLN 89 trainer, #290)', async () => {
         const unit = await supPage();
         await unit.panel.cursor('R');
         await unit.panel.outer('R', 4);
@@ -431,18 +431,18 @@ describe('SUP page', () => {
     // C-2: the waypoint is not created, so the page still has no waypoint for QQ and offers to create it (5-18, 5-19).
     // The page shows QQ with the present position instead, and D-> then makes it the active waypoint although it is
     // in no database. Sibling: the test above (the refusal itself).
-    it.fails('still offers to create the refused waypoint (C-2, 5-19, #NEW-4-1)', async () => {
+    it.fails('still offers to create the refused waypoint (C-2, 5-19, #289)', async () => {
         await createQqWithFullDatabase();
 
         expect(rightRows().slice(0, 4)).toEqual([' QQ        ', '           ', 'CREATE NEW ', 'WPT AT:    ']);
     });
 
     // 5-19 step 12: after the radial or the distance is entered, the latitude and longitude are calculated and displayed.
-    // The page of a stored user waypoint is the same page, so a changed radial shows its new position too (#NEW-3-11 is
+    // The page of a stored user waypoint is the same page, so a changed radial shows its new position too (#285 is
     // the issue for INT and SUP). USUP is moved to the radial 270 from ABC, 12.0215 NM away (the arc of 0.2 degrees):
     // 46°59.98' N, 10°12.40' E by hand with the textbook formula of flight/geo.ts. Sibling: 'moves the waypoint to a typed
     // radial from its reference VOR' (the stored position).
-    it.fails('shows the new position after a typed radial (5-19, #NEW-3-11)', async () => {
+    it.fails('shows the new position after a typed radial (5-19, #285)', async () => {
         const unit = await supPageWithCursorOn('000.0');
 
         await unit.panel.type('R', '2700');
@@ -453,7 +453,7 @@ describe('SUP page', () => {
 
     // As above, for the distance: USUP is moved to 200.0 NM due north of ABC. Sibling: 'moves the waypoint to a typed
     // distance from its reference VOR'.
-    it.fails('shows the new position after a typed distance (5-19, #NEW-3-11)', async () => {
+    it.fails('shows the new position after a typed distance (5-19, #285)', async () => {
         const unit = await supPageWithCursorOnDis();
 
         await unit.panel.type('R', '2000');
@@ -471,7 +471,7 @@ async function supPageWithCursorOn(text: string): Promise<HeadlessUnit> {
     return unit;
 }
 
-/** The SUP page of USUP with the cursor on the distance, reached from the radial (the text of the distance field changes with #NEW-3-8) */
+/** The SUP page of USUP with the cursor on the distance, reached from the radial (the text of the distance field changes with #282) */
 async function supPageWithCursorOnDis(): Promise<HeadlessUnit> {
     const unit = await supPageWithCursorOn('000.0');
     await unit.panel.outer('R', 1);
@@ -481,7 +481,7 @@ async function supPageWithCursorOnDis(): Promise<HeadlessUnit> {
 
 // The guide does not describe changing the fields of a stored user waypoint, so these only hold what the code does. USUP
 // is 12.0 NM due north of its reference VOR ABC (47 N, 10.5 E), and the stored waypoint is read, not the page: the page
-// shows the typed value (latitude, longitude) or the old position (radial, distance, #NEW-3-11).
+// shows the typed value (latitude, longitude) or the old position (radial, distance, #285).
 describe('SUP page, changing a stored user waypoint (characterization)', () => {
     it('moves the waypoint to a typed latitude', async () => {
         const unit = await supPageWithCursorOn('N 47°12.00');

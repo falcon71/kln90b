@@ -120,7 +120,7 @@ describe('D/T 2 page', () => {
 
     // 4-12: the distances are those of D/T 1, which is blank beside FPL 0 during a Direct To to a waypoint outside the
     // plan (4-11, figure 4-44), and so are the ETAs. The code shows ---- and --:-- beside every waypoint
-    it.fails('is blank beside FPL 0 during a Direct To to a waypoint outside the plan (4-12, #NEW-5-6)', async () => {
+    it.fails('is blank beside FPL 0 during a Direct To to a waypoint outside the plan (4-12, #296)', async () => {
         await directToOutsidePlan();
 
         expect(Screen.read().rows('R')).toEqual([

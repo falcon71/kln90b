@@ -75,14 +75,14 @@ describe('FrontPanel.enterIdent (harness)', () => {
 
         // The cursor starts on the first character of each selector. The alphabetically first facility of each type (the
         // one at 47.1, 8.1) shows without any typing, so the screens below, which show the one at 48, 9, prove the typed ident.
-        // The NDB is on a half kHz, because a whole kHz shows a tenth today (#NEW-3-13)
+        // The NDB is on a half kHz, because a whole kHz shows a tenth today (#287)
         const facilities = () => [vor('ABC', 47.1, 8.1), vor('XYZ', 48.0, 9.0), ndb('NDA', 47.1, 8.1), ndb('NDB', 48.0, 9.0, {frequencyKHz: 350.5}),
             intersection('ALPHA', 47.1, 8.1), intersection('BRAVO', 48.0, 9.0)];
 
         it.each([
             ['VOR  ', 'XYZ', [' XYZ D     ', 'XYZ        ', '          H', '114.30  0°E', "N 48°00.00'"]],
             ['NDB  ', 'NDB', [' NDB       ', 'NDB        ', '           ', 'FREQ  350.5', "N 48°00.00'"]],
-            // The label after the dashes of DIS is full-size NM today (#NEW-3-9, pinned on IntPage.test.ts), so the row is
+            // The label after the dashes of DIS is full-size NM today (#283, pinned on IntPage.test.ts), so the row is
             // compared up to the dashes
             ['INT  ', 'BRAVO', [' BRAVO     ', 'REF:  _____', 'RAD: ___._°', expect.stringMatching(/^DIS:___\._/), "N 48°00.00'"]],
         ])('enters an ident on the %s page', async (page, ident, expected) => {

@@ -103,7 +103,7 @@ describe('CTR 1 page (5-25 to 5-27)', () => {
     // Figure 5-96 shows one new waypoint as 1 NEW WPT, without the plural S. KAAA to KBBB crosses one boundary. The
     // passing siblings are the test above (the page and its count for two waypoints) and the naming test below (it
     // computes this same plan and holds that it yields exactly one waypoint, BGD01)
-    it.fails('shows one computed Center waypoint as 1 NEW WPT (5-27, figure 5-96) (#NEW-6-1)', async () => {
+    it.fails('shows one computed Center waypoint as 1 NEW WPT (5-27, figure 5-96) (#300)', async () => {
         const unit = await onCtr1(w => [w.kaaa, w.kbbb]);
         await ent(unit);
 
@@ -212,7 +212,7 @@ describe('CTR 1 page, a plan modified after the insertion (5-27)', () => {
     // FW-DEN. This is the second computation in one unit, so it meets #102 by design (the sibling is the test above).
     // The pin asserts the whole recomputed state, so that a fixed #102 shows the right result and not just a result:
     // both CTR 2 pages in full (the existing waypoint without new, the new one with it, a page each), CTR 1 offering
-    // the insertion (row 0, the count, is left out: its singular case is #NEW-6-1), and ENT inserting only the new
+    // the insertion (row 0, the count, is left out: its singular case is #300), and ENT inserting only the new
     // waypoint
     it.fails('lists the existing Center waypoint without new and the new one with new (5-27, figure 5-97) (#102)', async () => {
         const unit = await extendedAfterInsertion();

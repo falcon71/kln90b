@@ -206,7 +206,7 @@ describe('APT 3 page while scanning', () => {
 
     // 3-44: an airport without runway data shows RUNWAY DATA NOT AVAILABLE on APT 3, also when the scan came from the
     // diagram of an airport with one. Continues #38.
-    it.fails('shows the note of an airport without runways after a scan from a diagram (3-44, #NEW-1-6)', async () => {
+    it.fails('shows the note of an airport without runways after a scan from a diagram (3-44, #269)', async () => {
         await scanFromDiagramToHeliport();
 
         const text = Screen.read().rows('R').join(' ').replace(/ +/g, ' ').trim();

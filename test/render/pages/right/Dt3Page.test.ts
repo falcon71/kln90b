@@ -149,14 +149,14 @@ describe('D/T 3 page, the DTK of the active waypoint', () => {
     // shows the leg DTK (5) beside the active waypoint while NAV 1 shows a bearing of 12. Off course the code shows the
     // bearing to the active waypoint. Figures 4-51 and 4-52 (one flight state) show 063 and 064 for the active waypoint,
     // which do not settle it
-    it.fails('shows the leg DTK of the active waypoint beside FPL 0 (4-12, Appendix A, #NEW-5-7)', async () => {
+    it.fails('shows the leg DTK of the active waypoint beside FPL 0 (4-12, Appendix A, #297)', async () => {
         const unit = await bootOffCourse();
 
         // 15.03 NM north and 4.07 NM east of the aircraft: 15.6 NM to ABC
         expect((await show(unit, 'FPL 0'))[2]).toBe(' 16    000°');
     });
 
-    it.fails('shows the leg DTK of the active waypoint beside another page (4-12, Appendix A, #NEW-5-7)', async () => {
+    it.fails('shows the leg DTK of the active waypoint beside another page (4-12, Appendix A, #297)', async () => {
         const unit = await bootOffCourse();
 
         expect((await show(unit, 'NAV 2'))[2]).toBe('DTK    000°');
@@ -192,7 +192,7 @@ describe('D/T 3 page, the DTK of the active waypoint', () => {
 
     // 4-12: the distances are those of D/T 1, which is blank beside FPL 0 during a Direct To to a waypoint outside the
     // plan (4-11, figure 4-44), and so are the DTKs. The code shows dashes beside every waypoint
-    it.fails('is blank beside FPL 0 during a Direct To to a waypoint outside the plan (4-12, #NEW-5-6)', async () => {
+    it.fails('is blank beside FPL 0 during a Direct To to a waypoint outside the plan (4-12, #296)', async () => {
         await directToOutsidePlan();
 
         expect(Screen.read().rows('R')).toEqual([

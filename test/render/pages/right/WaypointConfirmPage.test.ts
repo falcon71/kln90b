@@ -29,7 +29,7 @@ describe('waypoint confirmation page', () => {
         insertLeg(unit, 0, kaaa);
         insertLeg(unit, 1, inta);
         await vi.advanceTimersByTimeAsync(3000);
-        // Only the start of the row: the cell of the type letter shifts with the blank cell of a short ident (#NEW-4-2)
+        // Only the start of the row: the cell of the type letter shifts with the blank cell of a short ident (#290)
         expect(Screen.read().rows('R')[0].slice(0, 8)).toBe('› 2 INTA');
         await unit.panel.cursor('R');
         await vi.advanceTimersByTimeAsync(9000);
@@ -47,8 +47,8 @@ describe('waypoint confirmation page', () => {
     // The identifier of an intersection has five cells, so the letter of a four-letter one keeps the column of a
     // five-letter one: a blank cell and then the letter (an inference from the fixed column and the five cells). The
     // cause is the blank selector cell, which has no glyph (3-20 describes that cell, it is not evidence for the column;
-    // #NEW-4-2), so the letter moves one cell left. Sibling: the test above (same setup, start of the row).
-    it.fails('keeps the type letter of a four-letter intersection in the column of a five-letter one on ACT (4-10, the KLN 89 trainer, #NEW-4-2)', async () => {
+    // #290), so the letter moves one cell left. Sibling: the test above (same setup, start of the row).
+    it.fails('keeps the type letter of a four-letter intersection in the column of a five-letter one on ACT (4-10, the KLN 89 trainer, #290)', async () => {
         const kaaa = airport('KAAA', 47.0, 7.9);
         const inta = intersection('INTA', 47.1, 8.0);
         const unit = await bootUnit({
@@ -66,7 +66,7 @@ describe('waypoint confirmation page', () => {
 
 // Invented waypoints of every type north of the aircraft (longitudes of 10 degrees or more keep the coordinate rows
 // clear of #230); USUP is a user waypoint of the SUP type. The airport has a name that the name abbreviations do not
-// touch (#NEW-1-2).
+// touch (#265).
 const world = () => ({
     facilities: [
         airport('KAAA', 47.2, 10.5, {name: 'ROTH FIELD'}), vor('ABC', 47.0, 10.6), ndb('NAA', 47.1, 10.4),

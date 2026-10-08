@@ -173,7 +173,7 @@ describe('APT 4 page', () => {
     });
 
     // 3-45: HF frequencies (2000 kHz to 30000 kHz) are shown in kHz without a decimal point, 6547 for 6547 kHz
-    it.fails('shows an HF frequency in kHz without a decimal point (3-45, #NEW-1-4)', async () => {
+    it.fails('shows an HF frequency in kHz without a decimal point (3-45, #267)', async () => {
         const unit = await bootUnit({facilities: [withFreqs(freq(FacilityFrequencyType.Center, 6.547))]});
         await unit.panel.selectPage('R', 'APT 4');
 

@@ -110,7 +110,7 @@ describe('APT 8 putting an approach into FPL 0', () => {
     // Checked in the KLN 89 trainer, 2026-10-07: loading an approach from APT 8 while FPL 0 holds another one makes the
     // unit ask before it replaces the first. The 90B guide describes replacing only through FPL 0 (6-7), so the wording of
     // the question is unknown and is not asserted; the first approach must still be in FPL 0 after LOAD IN FPL
-    it.fails('does not replace the approach that FPL 0 already holds without asking (KLN 89 trainer, #NEW-2-4)', async () => {
+    it.fails('does not replace the approach that FPL 0 already holds without asking (KLN 89 trainer, #274)', async () => {
         const unit = await bootWithFirstApproachLoaded();
         await unit.panel.ent(); // VOR 09: the waypoints
         await unit.panel.ent(); // LOAD IN FPL
@@ -121,7 +121,7 @@ describe('APT 8 putting an approach into FPL 0', () => {
 
     // 6-7: an approach is changed through the FPL 0 header: with the left cursor on it reads CHANGE APR?, ENT opens APT 8,
     // and the approach loaded there takes the place of the one in FPL 0. The route the guide describes, which does not depend
-    // on the question of #NEW-2-4
+    // on the question of #274
     it('replaces the approach in FPL 0 when it is changed through CHANGE APR? (6-7)', async () => {
         const {w, kprc, facilities} = twoApproaches();
         const unit = await bootUnit({facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, kprc])});
@@ -427,7 +427,7 @@ describe('APT 8 cursor after CLR', () => {
         expect(rows('R').slice(0, 3)).toEqual([' KPRC IAP', ' 1 VOR-A', ' 2 RNAV 18']);
     });
 
-    it.fails('keeps the cursor on the chosen approach when CLR returns to the approach list (KLN 89 trainer, #NEW-2-3)', async () => {
+    it.fails('keeps the cursor on the chosen approach when CLR returns to the approach list (KLN 89 trainer, #273)', async () => {
         const unit = await bootOnApt8({circlingFirst: true});
         await unit.panel.cursor('R');
         await unit.panel.outer('R', 1);

@@ -32,7 +32,7 @@ async function ndbPageOnNaa(): Promise<HeadlessUnit> {
     return unit;
 }
 
-// The frequency is on a half kHz: a whole kHz shows .0 (#NEW-3-13)
+// The frequency is on a half kHz: a whole kHz shows .0 (#287)
 describe('waypoint page, shown by the NDB page (characterization)', () => {
     it('shows a waypoint with its name, frequency and position', async () => {
         const unit = await bootUnit({

@@ -113,7 +113,7 @@ describe('D/T 1 page', () => {
 
     // 4-11, figure 4-44: during a Direct To to a waypoint that is not in FPL 0, D/T 1 is blank beside FPL 0. The code
     // shows ---- and --:-- beside every waypoint (shouldDistanceBeVisible compares the leg with an active index of -1)
-    it.fails('is blank beside FPL 0 during a Direct To to a waypoint outside the plan (4-11, #NEW-5-6)', async () => {
+    it.fails('is blank beside FPL 0 during a Direct To to a waypoint outside the plan (4-11, #296)', async () => {
         await directToOutsidePlan();
 
         expect(Screen.read().rows('R')).toEqual([
@@ -158,7 +158,7 @@ describe('D/T 1 page (characterization)', () => {
         `);
     });
 
-    // Beside FPL 0 the no-fix state shows ---- and --:-- beside the waypoints, which the fix of #NEW-5-6 may blank as
+    // Beside FPL 0 the no-fix state shows ---- and --:-- beside the waypoints, which the fix of #296 may blank as
     // well (no active waypoint either way), so only the page beside NAV 2 is held here
     it('shows dashes beside NAV 2 before the GPS has a fix', async () => {
         const {kaaa, abc} = dtWorld();

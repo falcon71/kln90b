@@ -200,7 +200,7 @@ describe('VOR page nearest view (3-22, 3-49)', () => {
     // 03.1nm on 3-42), and the VOR page shares the view of the NDB page; the KLN 89 trainer pads with a blank
     // (6.5nm), but its nearest page has another layout, and the maintainer ruled for the 90B figures. ABC lies 7.3 NM away
     // (haversine); the page shows 7.3nm (DistanceDisplay pads with a blank)
-    it.fails('shows a distance below 10 NM with a leading zero (3-22, figure 3-154, #NEW-1-3)', async () => {
+    it.fails('shows a distance below 10 NM with a leading zero (3-22, figure 3-154, #266)', async () => {
         await nearestAbc(0, 47.1, 8.1);
 
         expect(Screen.read().rows('R')[5].trim()).toBe('07.3nm');
@@ -235,7 +235,7 @@ describe('VOR page with a VORTAC (3-49)', () => {
     const adm = (type: VorType) => vor('ADM', 47.2, 8.2, {type, name: 'ARDMORE'});
 
     // VorPage.tsx:70, 109 and 134 give the D to DME and VOR-DME only
-    it.fails('shows D after the ident of a VORTAC (3-49, #NEW-3-1)', async () => {
+    it.fails('shows D after the ident of a VORTAC (3-49, #275)', async () => {
         await vorPageOf(adm(VorType.VORTAC));
 
         expect(Screen.read().rows('R')[0]).toBe(' ADM D     ');
@@ -250,7 +250,7 @@ describe('VOR page with a VORTAC (3-49)', () => {
 
     // 3-14, 3-21: an entered ident selects the VOR of that ident. VorSelector.isValidResult (VorSelector.tsx:13) accepts
     // only VOR, VOR-DME, DME and Unknown, so a VORTAC counts as an unknown ident and the user VOR creation opens
-    it.fails('selects a VORTAC by its ident (3-14, 3-49, #NEW-3-2)', async () => {
+    it.fails('selects a VORTAC by its ident (3-14, 3-49, #276)', async () => {
         const unit = await vorPageOf(vor('ABC', 47.3, 8.3), adm(VorType.VORTAC));
         await unit.panel.cursor('R');
         await unit.panel.enterIdent('R', 'ADM');

@@ -111,7 +111,7 @@ describe('CTR 2 page (5-25, 5-26)', () => {
     // other plan page, offers the insertion again. The guide shows no CTR 2 page without waypoints, so the literal for
     // it is the code's own empty page (the characterization above). The passing siblings are the CTR 1 revert test
     // and the two-waypoint test above
-    it.fails('returns CTR 1 and CTR 2 to the start state when the plan page is left and selected again (5-26) (#NEW-6-2)', async () => {
+    it.fails('returns CTR 1 and CTR 2 to the start state when the plan page is left and selected again (5-26) (#301)', async () => {
         const unit = await computed();
         await unit.panel.inner('R', 1);
         expect(right()[0]).toBe(' BGD00  new'); // Precondition: CTR 2 shows the first waypoint
