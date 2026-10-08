@@ -69,3 +69,72 @@ describe('SuperNav5.read (harness)', () => {
         expect(() => SuperNav5.read()).toThrow(/Super NAV 5 is not shown/);
     });
 });
+
+describe('SuperNav5.focused (harness)', () => {
+    async function superNav5(storage: Record<string, unknown> = {}) {
+        const unit = await bootUnit({storage});
+        await unit.panel.selectPage('R', 'NAV 4'); // the right side first: its shorter way passes NAV 5
+        await unit.panel.selectPage('L', 'NAV 5');
+        await unit.panel.inner('R', 1);
+        await vi.advanceTimersByTimeAsync(250);
+        return unit;
+    }
+
+    it('is empty while the left cursor is off, although an unread message inverts the msg prompt', async () => {
+        await superNav5();
+
+        // The boot messages are unread: the prompt is the inverted span that focused() has to leave out
+        expect(SuperNav5.read().msg).toBe('msg');
+        expect(document.querySelector('.super-nav5-mgs-range .inverted')?.textContent).toBe('msg');
+        expect(SuperNav5.focused()).toEqual([]);
+    });
+
+    it('returns the range selector, which shares the overlay with the msg prompt, once the cursor is on', async () => {
+        const unit = await superNav5({superNav5MapRange: 15});
+
+        await unit.panel.cursor('L');
+
+        expect(SuperNav5.focused()).toEqual(['15  ']);
+    });
+
+    it('follows the cursor to the next field of the left column and turns no-break spaces into blanks', async () => {
+        const unit = await superNav5({superNav5MapRange: 15});
+        await unit.panel.cursor('L');
+
+        await unit.panel.outer('L', 1);
+
+        // Field 1 shows ETE; the DOM pads its text with no-break spaces (the unread msg prompt is inverted as well)
+        const raw = [...document.querySelectorAll('.super-nav5-left-controls .inverted')].map(e => e.textContent).filter(t => t !== 'msg');
+        expect(raw).toEqual(['ETE\u00a0\u00a0\u00a0']);
+        expect(SuperNav5.focused()).toEqual(['ETE   ']);
+    });
+
+    it('does not read the cursor of the right menu, which is not in the left column', async () => {
+        const unit = await superNav5();
+
+        await unit.panel.cursor('R');
+
+        // The right cursor is on a field of the menu (VOR first), inverted outside the left column
+        expect(document.querySelector('.super-nav5-right-controls .inverted')).not.toBeNull();
+        expect(SuperNav5.focused()).toEqual([]);
+    });
+
+    it('leaves out an inverted field in a d-none subtree and reads the container it is given', () => {
+        document.body.innerHTML = '<div id="other"><pre class="super-nav5-left-controls">'
+            + '<span class="d-none"><span class="inverted">HIDDEN</span></span><span class="inverted">AB\u00a0</span></pre></div>';
+
+        expect(SuperNav5.focused(document.getElementById('other'))).toEqual(['AB ']);
+    });
+
+    it('returns every inverted run of the left column, in order', () => {
+        document.body.innerHTML = '<div id="other"><pre class="super-nav5-left-controls">'
+            + '<span class="inverted">AB</span> <span class="inverted">CD\u00a0</span></pre></div>';
+
+        expect(SuperNav5.focused(document.getElementById('other'))).toEqual(['AB', 'CD ']);
+    });
+
+    it('throws without a #pageContainer', () => {
+        document.body.innerHTML = '';
+        expect(() => SuperNav5.focused()).toThrow(/no #pageContainer/);
+    });
+});

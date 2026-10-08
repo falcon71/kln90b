@@ -186,6 +186,19 @@ describe('user NDB (5-18)', () => {
         return unit;
     }
 
+    /**
+     * Enters a frequency below 1000 kHz into the open frequency field: the thousands cell shows a blank only with the
+     * inner knob, because a pilot cannot type a blank (the PC keyboard sends A to Z and 0 to 9,
+     * KLN90BCore.handleKeyboardEvent, #109). The first click opens the edit on the blank, the outer knob moves to the
+     * hundreds cell, and the digits are typed from there.
+     */
+    async function typeBelow1000(unit: HeadlessUnit, digits: string): Promise<void> {
+        await unit.panel.inner('R', 1);
+        expect(Screen.read().rows('R')[3]).toBe('FREQ  ___._'); // the thousands cell shows the blank, not a dash
+        await unit.panel.outer('R', 1);
+        await unit.panel.type('R', digits);
+    }
+
     // 5-18, figure 5-65: a user NDB that is not defined yet shows the ident and three lines of dashes: the frequency
     // after FREQ, the latitude and the longitude
     it('shows the ident and three lines of dashes for an unknown ident (5-18)', async () => {
@@ -240,7 +253,7 @@ describe('user NDB (5-18)', () => {
     it.fails('accepts the frequency 328.0 of figure 5-66 (5-18, #277)', async () => {
         const unit = await undefinedNdb();
         await unit.panel.ent();
-        await unit.panel.type('R', ' 3280');
+        await typeBelow1000(unit, '3280');
         await unit.panel.ent();
 
         expect(Screen.read().status().mode).not.toBe('INVALID ENT');
@@ -251,7 +264,7 @@ describe('user NDB (5-18)', () => {
     it('shows the typed frequency 328.0 before ENT (5-18)', async () => {
         const unit = await undefinedNdb();
         await unit.panel.ent();
-        await unit.panel.type('R', ' 3280');
+        await typeBelow1000(unit, '3280');
 
         expect(Screen.read().rows('R')[3]).toBe('FREQ  328.0');
     });

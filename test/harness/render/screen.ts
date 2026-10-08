@@ -11,9 +11,21 @@ const ROWS = 6;
 /** The border between the half pages; the real screen draws a line there */
 const SEPARATOR = '|';
 
+/**
+ * The attribute an element gives its text, by the CSS of KLN90B.scss: `.inverted` is black on green, `.inverted-blink`
+ * (later in the file) takes the green background away and makes the text green, and `.blink` (later still) makes the
+ * text transparent. So:
+ * - `blink` hides the text, whatever else the element has: `B`;
+ * - `inverted-blink` on top of `inverted` (the element itself or an ancestor) is the normal phase of a flashing field,
+ *   which the screen alternates with the inverse phase: `F`; inside a cell that reads `F` already it keeps `F`;
+ * - `inverted-blink` without `inverted` is plain green text, as normal as the cell without the class: it changes
+ *   nothing (the StatusLine's `ent` keeps the class while an unread `msg` toggles it);
+ * - `inverted` alone: `I`.
+ */
 function attrOf(el: Element, inherited: CellAttr): CellAttr {
-    if (el.classList.contains('inverted-blink')) return 'F';
+    const inverted = el.classList.contains('inverted') || inherited === 'I';
     if (el.classList.contains('blink')) return 'B';
+    if (el.classList.contains('inverted-blink') && inverted) return 'F';
     if (el.classList.contains('inverted')) return 'I';
     return inherited;
 }
@@ -154,6 +166,16 @@ function readHalf(half: Element): Cell[][] {
 }
 
 /**
+ * A half page has six rows (row 7 is the status line). Text in a later row is not on the screen, and dropping it
+ * silently hid a creation block that stayed visible under a waypoint page, so it throws; blank rows past the sixth are
+ * tolerated.
+ */
+function overflow(rows: Cell[][], side: string): void {
+    const extra = rows.slice(ROWS).find(r => r.some(c => c.ch !== ' ' || c.attr !== '.'));
+    if (extra) throw new Error(`Screen: the ${side} half has a row past the sixth: "${extra.map(c => c.ch).join('')}"`);
+}
+
+/**
  * The 23×7 character screen as the pilot sees it, plus a mask of the inverse and flashing cells. Special glyphs stay as
  * the code points the KLN90B font maps them to (docs/architecture.md, UI 3).
  */
@@ -176,6 +198,8 @@ export class Screen {
         if (left && right) {
             const l = readHalf(left);
             const r = readHalf(right);
+            overflow(l, 'left');
+            overflow(r, 'right');
             for (let i = 0; i < ROWS; i++) {
                 grid.push([...fit(l[i], HALF_WIDTH, `left row ${i}`), {ch: SEPARATOR, attr: '.'}, ...fit(r[i], HALF_WIDTH, `right row ${i}`)]);
             }

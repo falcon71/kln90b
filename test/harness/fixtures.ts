@@ -1,4 +1,4 @@
-import {BoundaryType, Facility, FixTypeFlags} from '@microsoft/msfs-sdk';
+import {BoundaryType, Facility, FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {pointFrom} from './flight/geo';
 import {airspace} from './navdata/airspaces';
 import {airport, intersection, ndb, vor} from './navdata/builders';
@@ -146,5 +146,57 @@ export function centerWorld() {
             airspace('KZAB TEST', BoundaryType.Center, box(42.75, 47.75, -102, -98), {frequencyMHz: 121.0}),
             airspace('KZDV TEST', BoundaryType.Center, box(47.75, 52, -102, -98), {frequencyMHz: 122.0}),
         ],
+    };
+}
+
+/**
+ * The leg world of the NAV 3 and NAV 4 pages and the Super NAV 5 selectors: an invented KDDD (47.0 N, 9.0 E), KAAA
+ * 200 NM west of it on the great circle that leaves KDDD on 270 true, and KEEE 30 NM east of KDDD on 090, so that the
+ * leg KAAA to KDDD is not the last one (the ESA of the last leg is #183). FPL 0 is KAAA, KDDD, KEEE (store it with
+ * savedFlightplan(0, [kaaa, kddd, keee])); an eastbound aircraft on the first leg has KDDD active. `west(nm)` is the
+ * point nm NM west of KDDD on that line. Fresh objects on every call.
+ */
+export function legWorld() {
+    const kddd = airport('KDDD', 47.0, 9.0);
+    const at = (bearing: number, nm: number) => pointFrom(kddd, bearing, nm);
+    return {
+        kddd,
+        kaaa: airport('KAAA', at(270, 200).lat, at(270, 200).lon),
+        keee: airport('KEEE', at(90, 30).lat, at(90, 30).lon),
+        west: (nm: number) => at(270, nm),
+    };
+}
+
+/**
+ * A DME arc world: the VOR ABC (47.3 N, 8.3 E, its own variation 0) with a left arc of 10 NM around it from the 270
+ * to the 180 radial through the south-west, from ARCBG to ARCEN, then FAFAA (47.1, 8.7) and the MAP MAPAA (47.0, 8.7),
+ * in an RNAV approach to runway 27 of KPRC (47.0, 8.0) with the transition ARCBG. `at(bearing, nm)` is the point nm NM
+ * from ABC on that true bearing, so `at(225, 10)` is on the arc. Store [kprc] in FPL 0 and load the approach with
+ * unit.panel.loadProcedure('APT 8'); the arc is the active leg then. Fresh objects on every call.
+ */
+export function arcWorld() {
+    const abc = vor('ABC', 47.3, 8.3);
+    const at = (bearing: number, nm: number) => pointFrom(abc, bearing, nm);
+    const arcbg = intersection('ARCBG', at(270, 10).lat, at(270, 10).lon);
+    const arcen = intersection('ARCEN', at(180, 10).lat, at(180, 10).lon);
+    const fafaa = intersection('FAFAA', 47.1, 8.7);
+    const mapaa = intersection('MAPAA', 47.0, 8.7);
+    const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
+        approaches: [approach({
+            type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+            transitions: [{
+                name: 'ARCBG', legs: [
+                    Leg.IF(arcbg, FixTypeFlags.IAF),
+                    Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: LegTurnDirection.Left}),
+                    Leg.TF(fafaa, FixTypeFlags.FAF),
+                ],
+            }],
+            final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+        })],
+    });
+    return {
+        abc, at, arcbg, arcen, fafaa, mapaa, kprc,
+        /** Every facility the world needs, for bootUnit({facilities}) */
+        facilities: [kprc, abc, arcbg, arcen, fafaa, mapaa],
     };
 }

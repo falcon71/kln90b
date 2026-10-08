@@ -28,9 +28,8 @@ describe('FrontPanel.focused across a plain decimal point (harness)', () => {
         expect(unit.panel.focused('R')).toEqual({row: 3, col: 16, text: '___._'});
     });
 
-    // With a radial entered, the next field after REF that shows ___._ is DIS (5-19 step 10: ENT on the radial moves the
-    // cursor to DIS). cursorTo walks over the radial and used to throw at DIS, where it found two runs
-    it('lets cursorTo stop at the DIS field', async () => {
+    /** The cursor on REF after a radial is entered, then cursorTo to the DIS field (see the test below) */
+    async function cursorAtDis(): Promise<HeadlessUnit> {
         const unit = await refOrd();
         await unit.panel.outer('R', 1); // RAD
         await unit.panel.type('R', '0900');
@@ -39,9 +38,26 @@ describe('FrontPanel.focused across a plain decimal point (harness)', () => {
         expect(unit.panel.focused('R')).toEqual({row: 1, col: 18, text: 'ORD  '});
 
         await unit.panel.cursorTo('R', '___._');
+        return unit;
+    }
+
+    // With a radial entered, the next field after REF that shows ___._ is DIS (5-19 step 10: ENT on the radial moves
+    // the cursor to DIS). cursorTo walks over the radial and used to throw at DIS, where it found two runs
+    it('lets cursorTo stop at the DIS field', async () => {
+        const unit = await cursorAtDis();
 
         expect(unit.panel.focused('R')).toEqual({row: 3, col: 16, text: '___._'});
-        expect(Screen.read().maskRows('R')[3]).toBe('....III.I..');
+    });
+
+    // The digits around the point are inverted, the point is not: the two runs that focused() joins. Figure 5-74 (5-19)
+    // shows the open DIS field as one inverse block with the point inside, like the RAD field of figures 5-72 and
+    // 5-73 (RadialEditor does invert its point); DistanceEditor draws the point as plain text. The field fills the
+    // cells 4 to 8 of row 3 of the right half. The test above is its sibling: it finds the same field and keeps the
+    // text.
+    it.fails('covers the decimal point of the DIS field (5-19, figure 5-74, #NEW-0-1)', async () => {
+        await cursorAtDis();
+
+        expect(Screen.read().maskRows('R')[3]).toBe('....IIIII..');
     });
 
     describe('on a screen of its own', () => {
