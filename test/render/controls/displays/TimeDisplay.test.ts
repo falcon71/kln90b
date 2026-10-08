@@ -18,13 +18,13 @@ describe('TimeDisplay', () => {
         expect(shown(TimeStamp.createTime(15, 23))).toBe('15:23');
     });
 
-    // 4-12: the same two digits for the hour after midnight
-    it('shows the hour after midnight as 00 (4-12)', () => {
-        expect(shown(TimeStamp.createTime(0, 5))).toBe('00:05');
-    });
 });
 
 describe('TimeDisplay (characterization)', () => {
+    it('characterization: the hour after midnight and a minute below 10 take a zero each', () => {
+        expect(shown(TimeStamp.createTime(0, 5))).toBe('00:05');
+    });
+
     it('characterization: the seconds are dropped, not rounded', () => {
         expect(shown(TimeStamp.create(Date.UTC(2026, 9, 8, 15, 23, 59)))).toBe('15:23');
     });

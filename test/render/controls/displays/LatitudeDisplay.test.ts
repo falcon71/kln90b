@@ -40,8 +40,7 @@ describe('LatitudeDisplay', () => {
     });
 
     // The Pilot's Guide has no figure of a degree below 10. The KLN 89 trainer (2026-10-07) showed N  8° blank-padded
-    // once confirmed, zeros only inside an open edit field; a photo of a KLN 90 (0260952.jpg) shows the same blank on
-    // NAV 2. Pinned on NAV 2 as well.
+    // once confirmed, zeros only inside an open edit field. Pinned on NAV 2 as well.
     it.fails(
         'shows a latitude below 10 degrees with a blank (checked in the KLN 89 trainer, 2026-10-07, #230)',
         () => {

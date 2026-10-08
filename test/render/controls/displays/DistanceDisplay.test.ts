@@ -11,9 +11,9 @@ function shown(length: number, distance: number | null): string {
 
 // The four cells of DIS on NAV 1 and Super NAV 1 (and RANGE on OTH 6)
 describe('DistanceDisplay, four cells', () => {
-    // 3-31, figures 3-97 and 3-100: below 100 NM the distance has a tenth (photos of real units show DIS 14.2NM and
-    // 47.1NM the same way), and 4-8, figure 4-35: below 1 NM the tenth follows a zero
-    it('shows a tenth below 100 NM, with a zero in front of it below 1 NM (3-31, 4-8)', () => {
+    // 5-7, figure 5-21 (DIS 64.8nm) and 4-7, figure 4-31 (DIS 52.4nm): below 100 NM the distance has a tenth (photos of
+    // real units show DIS 14.2NM and 47.1NM the same way), and 4-8, figure 4-35: below 1 NM the tenth follows a zero
+    it('shows a tenth below 100 NM, with a zero in front of it below 1 NM (5-7, 4-7, 4-8)', () => {
         expect(shown(4, 64.8)).toBe('64.8');
         expect(shown(4, 0.4)).toBe(' 0.4');
     });

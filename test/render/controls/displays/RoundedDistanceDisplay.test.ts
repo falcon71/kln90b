@@ -17,9 +17,9 @@ describe('RoundedDistanceDisplay', () => {
         expect(shown(Alignment.left, 163)).toBe('163 ');
     });
 
-    // 4-11, figure 4-46: with a non-plan page on the left, D/T 1 shows the distance whole and right-aligned (DIS 34NM),
+    // 4-12, figure 4-46: with a non-plan page on the left, D/T 1 shows the distance whole and right-aligned (DIS 34NM),
     // while NAV 1 beside it shows the same distance as 34.2
-    it('shows a distance of 34.2 NM as 34, right-aligned (4-11)', () => {
+    it('shows a distance of 34.2 NM as 34, right-aligned (4-12)', () => {
         expect(shown(Alignment.right, 34.2)).toBe('  34');
     });
 

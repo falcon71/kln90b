@@ -148,9 +148,9 @@ describe('FlightplanArrow on FPL 0 during a NAV flag', () => {
         expect(Screen.read().rows('L')[2].slice(2)).toBe('2:ABC    ');
     });
 
-    // 4-7: the active leg symbol is not displayed unless the unit is actually receiving navigation signals suitable for
-    // navigation. The arrow keeps drawing it through a NAV flag, because the flag keeps the active waypoint. Whether a
-    // plain arrow stays in front of ABC is not claimed: the pin asserts only that neither end of the symbol is drawn.
+    // 4-7: the leg symbol belongs to a unit that is navigating; without usable navigation it is not drawn. The arrow
+    // keeps drawing it through a NAV flag, because the flag keeps the active waypoint. Whether a plain arrow stays in
+    // front of ABC is not claimed: the pin asserts only that neither end of the symbol is drawn.
     it.fails('draws no leg symbol during a NAV flag (4-7, #NEW-7-1)', async () => {
         const unit = await onFpl0();
         unit.props.sensors.in.gps.reset();

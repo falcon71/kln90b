@@ -19,7 +19,7 @@ function cdi(deviation: number | null, toFrom: boolean, scale = 5): { text: stri
 }
 
 describe('SuperDeviationBar', () => {
-    // 3-32: Super NAV 1 shows the information of NAV 1; 3-31: on the course the bar is centered on the triangle, which
+    // 3-32: Super NAV 1 carries the NAV 1 information; 3-31: on the course the bar sits on the middle triangle, which
     // points up for TO and down for FROM
     it('draws the bar through the triangle on the course (3-31, 3-32)', () => {
         expect(cdi(0, TO).text).toBe(' Ш Ш Ш Ш Ш Ў Ш Ш Ш Ш Ш ');
@@ -33,6 +33,12 @@ describe('SuperDeviationBar', () => {
         expect(text.slice(0, 15)).toBe(' Ш Ш Ш Ш Ш Щ Ш ');
         expect('ЀЁЂЃЄЅІЇЈЉ').toContain(text[15]);
         expect(text.slice(16)).toBe(' Ш Ш Ш ');
+    });
+
+    // 3-31: the triangle points down for FROM, also with the bar away from it. Only the triangle cell (11) is read, so
+    // the test does not depend on where the bar lands (#NEW-7-2)
+    it('keeps the FROM triangle in the middle with the bar 2 NM off the course (3-31, 3-32)', () => {
+        expect(cdi(-2, FROM).text[11]).toBe('Ъ');
     });
 
     // 3-31: each dot is one NM, and 3-32: Super NAV 1 has the same information as NAV 1, whose bar sits on the second

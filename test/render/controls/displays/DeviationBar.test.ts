@@ -20,7 +20,7 @@ function cdi(deviation: number | null, toFrom: boolean, scale = 5): { text: stri
 }
 
 describe('DeviationBar', () => {
-    // 3-31: an on-course indication is the bar centered on the triangle in the middle, which points up for TO
+    // 3-31: on the course the bar sits on the middle triangle, which points up for TO
     it('draws the bar through the TO triangle on the course (3-31)', () => {
         expect(cdi(0, TO).text).toBe('ηηηηηΟηηηηη');
     });
