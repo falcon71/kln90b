@@ -709,6 +709,16 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   not seen: the SDK server makes it only in the in-game state (a `gamestate` attribute on `document.body`), and its own
   sound-end handling needs a `Name_Z` global, neither of which the harness provides (section 7). The tests report the
   end of a tone by calling `AudioGenerator.onSoundEnd` themselves, as `KLN90B.onSoundEnd` does in the sim.
+- **APT 6 cannot show real service data.** The sim's facilities carry no fuel, oxygen or fee data, so `Apt6Page` shows
+  its fixed texts (`NO FUEL`, `NO OXYGEN`, `NO FEE INFO`; `formatFuel` says the fuel fields are always empty). The APT 6
+  snapshot holds those texts, and no test can show the page with services.
+- **The IAF list of APT 8 and ACT 8 is placed by the reader, not by layout.** happy-dom computes no CSS positions, so
+  `Screen.read()` moves the rows of `.apt-8-iaf-list` by a fixed four cells (section 3). A change of the list's position
+  in `KLN90B.scss` would not show in a test; the reader only throws when the list no longer starts in cell 4.
+- **Two editors do not invert their decimal point.** `NdbFreqEditor` and `DistanceEditor` (the NDB frequency and the INT
+  and SUP DIS field) draw the point as plain text, while `VorFreqEditor` and `RadialEditor` invert theirs. `focused()`
+  and `cursorTo` join two runs across one plain point (section 4), so a test cannot tell whether the cursor should cover
+  the point; that is Session 9b's question.
 - **There is no CI.** Run `npm test` and `npx tsc --noEmit` before committing.
 
 Measured speed (a dated record): on 2026-10-03 the proof flight (`firstFlight.test.ts`) ran about 1466 simulated
@@ -742,10 +752,10 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
   a Direct To a waypoint of FPL 0 that has a following leg) and #147 (whether there is a waypoint alert in OBS mode). The
   approach questions #162 (the GPS APR switch before the FAF) and #163 (four approach-scale cases) cannot be answered
   there, because that trainer shows neither ARM nor ACTV.
-- **CTR 1 (#161) has no pin yet.** With `centerWorld()` (section 3) one computation needs no OTH 2 detour: its plan legs
-  are 300 NM, so each Center is first returned by a search from inside it. A second computation meets #102, where the
-  shared airspace search session drops a Center first seen from outside it, which is why CTR 1 still has no pin. The CTR
-  pages belong to Session 9a.
+- **CTR tests compute once per unit.** With `centerWorld()` (section 3) one computation needs no OTH 2 detour: its plan
+  legs are 300 NM, so each Center is first returned by a search from inside it. A second computation in the same unit
+  meets #102, where the shared airspace search session drops a Center first seen from outside it; the #102 pin in
+  `Ctr1Page.test.ts` is such a test on purpose, and #161 is pinned there with a single computation.
 - Harness gaps that the Session 4 contract tests worked around (each serves few tests, so none was built, per rule 13
   of test-coverage.md):
     - **SimVars before `init`.** The `simVars` boot option now exists (section 4). The electricity tests
@@ -802,12 +812,60 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
         - An XTK of exactly 0 shows `-.-` on NAV 3 (`Nav3Page.tsx:55,95` treat 0 as no value); unreachable in practice.
         - `AltitudeFieldset` shows `00000` below sea level, while a low-confidence photo of the self-test page shows a
           negative altitude (Session 10).
-        - Debug `console.log` calls in `SupPage.tsx` and `WaypointPage.tsx`, and the ` 0` in the top row of the SUP
-          page at boot (Session 9).
+        - Debug `console.log` calls in `SupPage.tsx` and `WaypointPage.tsx` (Session 9a found more, below). The ` 0` in
+          the top row of an empty SUP page is the KLN 89 trainer's behavior too and is a spec test since Session 9a.
         - `ModObsElement.innerRight` (MOD 2) and `FuelOnBoardSelect.innerRight` return `false` while `innerLeft`
           returns `true`; neither page is an overlay, so nothing visible follows (the Super NAV 5 case is a bug, #238).
         - CAL 2's `setTemp` writes the CAL 1 temperature too; 5-11 does not say whether the pages share it, so no test
           holds it.
+- Harness gaps and leads from Session 9a (none was built beyond its task 0, per rule 13 of test-coverage.md):
+    - **`airport()` has no options for frequencies, runway lighting, the private type or radar coverage.** The APT 1,
+      APT 3 and APT 4 tests spread the facility or patch `runways[i].lighting`; options would replace those spreads.
+    - **The bugs Session 9b inherits** are pinned on the right pages and keep those pins: the NDB frequency entry
+      (#277), the DIS field's leading zeros (#282) and its 360 NM limit (#288), and the blank selector cell (#290). Also
+      for 9b: whether the cursor covers the plain decimal point of `NdbFreqEditor` and `DistanceEditor` (section 6); the
+      `ent` of the status line keeps the flashing inverse of an unread `msg` (`StatusLine.tsx:111-118` removes
+      `inverted` but not `inverted-blink`); a typed blank let the keyboard enter a longitude below 100 degrees on the
+      SUP page (`E 103000`), so #109 may be narrower than it reads.
+    - **Leads that were seen and not confirmed or not filed:**
+        - Debug `console.log` calls in the constructors of the waypoint pages (`ActPage.tsx:43`, `Apt1Page.tsx:78`,
+          `Apt6Page.tsx:43`, `IntPage.tsx:71`, `NdbPage.tsx:55`, `VorPage.tsx:58`, `WaypointConfirmPage.tsx:41` and
+          others), in `WaypointPage.getScrollSpeed`, in the selection and load handlers of APT 7 and APT 8
+          (`Apt7Page.load`, `Apt8Page.load`), in `EditorField` and in `WaypointSelector`. A cleanup commit, if wanted.
+        - The code comment at `Apt8Page.tsx:352` quotes a sentence of 6-4 nearly word for word; it should be paraphrased
+          (the project keeps no manual text).
+        - INT and SUP show dashes for REF, RAD and DIS for the first seconds of every visit (`REF_CALCULATION_TIME`, a
+          deliberate debounce); the KLN 89 trainer shows them with the ident at once.
+        - The KLN 89 trainer shows a radial of 0 as `360.0`; the code shows `000.0`, which figure 5-94's zero padding
+          supports for the 90B (a characterization holds it).
+        - `Apt3ListPage.buildRunwayList` sorts the facility's shared `runways` array in place (`Apt3ListPage.tsx:126`);
+          no visible effect found.
+        - The removal loop of `NearestList.tick` splices while it iterates (`NearestList.ts:87-93`), so of two adjacent
+          removals one waits for the next search.
+        - CTR: a recomputation without insertion creates a new user waypoint with the next number (BGD00, then BGD01),
+          and the orphans count against the user waypoint limit until power-off; a crossing without a VOR within 100 NM,
+          or without a free number, is dropped silently; when the first waypoint lies in no Center the first crossing is
+          dropped (`AirspacesAlongRoute.cleanup`); `getWaypointIfExistsInFpl` compares coordinates with `===`; CTR 2
+          converts the radial with the variation at the present position, NAV 2 with the VOR's own; the status line
+          shows `msg` for one display tick after CTR 1 is selected.
+        - With no waypoint of a type at all (`defaultNavdata: false`) the VOR, NDB and INT pages show the ident `0`.
+        - Editing the latitude or longitude of a stored user intersection leaves REF, RAD and DIS describing the old
+          position until the page is left. After a USER POS? entry the SUP page shows the typed longitude, not the
+          stored one (seen only through a mutation).
+        - The right outer knob during a waypoint confirmation leaves the left editor waiting for a page that is gone.
+        - NAV 2 with the aircraft exactly on its VOR shows the ident and `°fr` without a radial and logs an invalid
+          heading (NaN).
+        - `VolatileMemory` starts the SUP ident as a `0` and four blanks, while `setFirstSupplementary` writes a `0`
+          and three; harmless.
+        - APT pages: `Apt4Page.render` does not set `requiresRedraw`; `Apt1Page` builds a dead `type` child; APT 4 shows
+          its constructor text for one display tick at power-on; APT 2 truncates half-hour time zones; the `aptPage`
+          memory writes of `PageManager.startMainPage` are redundant (APT 4 finds the airport by its ident).
+        - APT 7 decides on raw transition counts while it lists the recognized ones; an IAF number of ten or more has no
+          blank before the name (`Apt8Page.tsx:470`); the IAF list is not filtered by recognition; the cursor on
+          APPROVE? of the add question is only characterized.
+        - D/T 1 and D/T 2 beside another page hide the last-waypoint block when the active waypoint is the last one
+          (4-12 is silent). After LOAD IN FPL on ACT 8 the ACT page switches to the new active waypoint (the guide is
+          silent).
 - **The flown-through bound of `dmeArc.test.ts` does not hold the arc reversal.** With `fromDtk` reversed on arc legs,
   the monitor's bound north of the leg stays green (0.895 NM against a radius of 1.012 NM); only the circle-center
   assertion of the same test fails. A tighter bound, or a second monitor on the arc's radius, would make the flight

@@ -492,7 +492,7 @@ sections 6 and 7.
 
 ## Session 9a: pages, right side
 
-- [ ] done
+- [x] done
 
 The maintainer split the former Session 9 (right pages, then the shared controls) in two on 2026-10-07: 9a takes the
 pages, 9b the controls.
@@ -505,6 +505,13 @@ pages, 9b the controls.
 2. A bug in a shared control that a right page shows is pinned on that page; Session 9b references the same issue.
 
 **Done when:** every right page has its characterization test, and the log lists the pages without a spec test.
+
+Result (session log, section 4): every right page has a render test with a characterization, and every page except the
+self-test right page (left to Session 10) has spec tests where the Pilot's Guide, the KLN 89 trainer or a photo of a
+real unit gives the rule. ACT 7 has no test. The bugs found were filed and pinned (#264 to #269, #271 to #301), the
+macadam surface is the question #270, and #92, #161, #102 and #223 gained pins. #92, #161, #102 and #38 have comments.
+The controls' bugs pinned on right pages (#277, #282, #288, #290) are Session 9b's to reference; the leads are in
+`testing.md` section 7.
 
 ## Session 9b: controls
 
@@ -565,6 +572,285 @@ pages, 9b the controls.
 One entry per session run, newest first. Format: date, session, branch, what was done, what was left and why, the
 coverage summary for the session's area at start and end. This is a dated record and is never edited afterwards; a
 later run adds a new entry.
+
+## 2026-10-08, session 9a, branch `tests-session-9-right-pages`
+
+**Done**
+- **Design and plan:** `docs/superpowers/specs/2026-10-07-session-9a-right-pages-design.md` and
+  `docs/superpowers/plans/2026-10-08-session-9a-right-pages.md`, after a read-only research pass of six agents in
+  isolated worktrees (A: APT 1 to 4; B: APT 5 to 8; C: VOR, NDB and INT; D: SUP, the generic waypoint page and the
+  confirmation page; E: REF, ACT and D/T 1 to 4; F: CTR 1, CTR 2 and the self-test right page) and a seventh agent on
+  the KLN 89 trainer (below). Eight tasks: a harness task alone, tasks 1 to 6 in parallel worktrees, this close-out
+  last.
+- **Task 0, harness:** `Screen.read()` lays the rows of the positioned APT 8 and ACT 8 IAF list (`.apt-8-iaf-list`) four
+  cells to the right, as the screen shows them; `savedUserWaypoints` takes a user airport's elevation in feet and stores
+  meters (it stored the feet as meters before, and three literals of its own test changed); `airport()` and `runwayFix`
+  name the runway ends right for headings above 180; `selectPage` stops on the ACT page of an active airport (`ACT 1` to
+  `ACT 8`); `answerTimezone` replies to the time zone call, so APT 2 can show its zone row; the fixtures `dtWorld()` and
+  `centerWorld()` (the latter with the 300 NM rule that keeps one CTR computation clear of #102);
+  `collectStatusMessages`; `focused()` and `cursorTo` read a field whose plain decimal point splits two inverted runs.
+  Harness tests for each and `testing.md` sections 3, 4 and 7.
+- **Task 1, APT 1 to APT 4:** `Apt1Page.test.ts`, `Apt2Page.test.ts`, `Apt3Page.test.ts` and `Apt3UserPage.test.ts`
+  appended, `Apt4Page.test.ts` new: the type row and the airspace class (3-42), whole-word name abbreviations (3-26),
+  the nearest view and its rank with the cursor off (3-22, 3-24), the time zone row (Session 6's deferral), the stored
+  user airport checked in the saved data (5-17), the runway diagram and list with surfaces and approach types (3-43,
+  3-44), the frequency types (3-45). The #65 test and `Apt1Page.createIfReady` now cite 5-17 instead of 5-19 (comments
+  only), and the old `KCCC AIRPT` row became a pin. Pins #264 (two), #265 (four), #266, #267, #268, #269.
+- **Task 2, APT 5 to APT 8:** `Apt5Page.test.ts`, `Apt7Page.test.ts`, `Apt8Page.test.ts` appended, `Apt6Page.test.ts`
+  new: remarks (3-47), the services page (3-48), the SID and STAR flows with CLR one step back (6-22, 6-23, 6-5, the
+  trainer), the approach list, the IAF list read whole, OUTDATED DB (6-1, C-2, the trainer), the approach change through
+  CHANGE APR? (6-7); the unrecognized procedures and the CLR return values as characterizations. The older test that
+  asserted a silent approach replacement became the #274 pin. Pins #92 (the RMKS FULL of an 11th airport), #271, #272,
+  #273 (two), #274.
+- **Task 3, VOR, NDB and INT:** `VorPage.test.ts` and `VorUserWaypoint.test.ts` appended, `NdbPage.test.ts` new,
+  `IntPage.test.ts` appended, and the INT row of `test/render/harness/enterIdent.test.ts` no longer holds the full-size
+  `NM` (its NDB is on a half kHz now): the class and DME letters (3-49), selection by ident (3-14), the user VOR and NDB
+  creation and edits (5-18, C-1), the nearest views (3-22), the INT reference, radial and distance (3-50, 3-51, 5-19).
+  Pins #266 (VOR, NDB), #275, #276, #277, #278, #279 (two), #280 (two), #281, #282, #283, #284, #285, #286,
+  #287, #288.
+- **Task 4, SUP, the generic waypoint page and the confirmation page:** `SupPage.test.ts` and `WaypointPage.test.ts`
+  new, `WaypointConfirmPage.test.ts` appended: the empty SUP page's ` 0` (the trainer), creation by PRES POS?, USER POS?
+  and REF/RAD/DIS (5-19), USR DB FULL (C-2), the scan (3-21) and its speed (characterization), the page memory over a
+  type change (the trainer), the confirmation flow (3-14). The 8045b29 row now asserts only the start of the row, whose
+  rest was the #290 shift. Pins #279, #280 (two), #282, #283, #284, #285 (two), #289, #290 (two).
+- **Task 5, REF, ACT and D/T 1 to D/T 4:** `RefPage.test.ts`, `ActPage.test.ts`, `Dt1Page.test.ts`, `Dt2Page.test.ts`
+  and `Dt3Page.test.ts` appended, `Dt4Page.test.ts` new: the REF flow and the placement of the reference waypoint (5-21,
+  5-22, C-1), the ACT header, type letters, scan and ACT 8 (4-10, 6-4), the D/T pages beside FPL 0, a numbered plan and
+  another page (4-11 to 4-13), on `dtWorld()`. The two f95d1d7 ACT tests also cite the video the code cites. Pins #223
+  (D/T 1, D/T 4), #280, #290 (two), #291 (two), #292, #293 (two), #294, #295, #296 (three), #297 (two), #298, #299.
+- **Task 6, CTR 1, CTR 2 and the self-test right page:** `Ctr1Page.test.ts`, `Ctr2Page.test.ts` and
+  `SelfTestRightPage.test.ts`, on `centerWorld()`: the computation, naming, insertion and the 30-waypoint limit (5-25 to
+  5-27), CTR 2's pages (5-26, 5-44), the self-test right page as a characterization without the ALT row. The `Ctr1Page`
+  and `Ctr2Page` class comments cite 5-25 to 5-27 instead of 5-21. Pins #102, #161, #300, #301.
+- **Task 7, this close-out:** the issues and comments below, the placeholders replaced in one commit, `testing.md`
+  sections 6 and 7, and this log.
+
+**Rulings**
+- **The maintainer's:**
+    - The split of the former Session 9 into 9a (right pages) and 9b (controls).
+    - The trainer: one agent for all trainer questions, after the research and before the design.
+    - Nearest distances below 10 NM: the four 90B figures win over the 89 trainer, whose nearest page has another
+      layout; a bug pinned on the APT, VOR and NDB nearest views, and the issue notes the 89 (#266).
+    - The larger harness task 0.
+    - The name and city search of 3-24 to 3-26: the SDK offers no such search, so it cannot be built; out of scope, no
+      issue.
+    - 3-24, case by case: with the cursor off the shown airport stays and its rank counts up (correct, a spec test);
+      only the cursor parked on the rank is the bug (#268).
+    - The bug table, the controller's defaults and the task split of the design: approved.
+- **The controller's** (the design's defaults that the maintainer did not object to, and the ledger):
+    - bugs in controls that a right page shows are pinned on the page (#277, #282, #288, #290), and Session 9b
+      references the same issues; a bug shown on several pages is one issue naming every page, each pin carrying its
+      number;
+    - APT 6 keeps its fixed service texts in the snapshot; the self-test ALT row stays out of the snapshot (figure 3-4
+      and photos of real units disagree; Session 10 decides);
+    - the D/T 4 Direct To symbol is a pin on a photo of a real unit (#298); the HF frequency is a bug on 3-45 although
+      the sim's data may never carry one (#267); the macadam surface is a `question` without a pin (#270);
+    - the ACT type letter column: a pin if the 90B ACT figures also show a fixed column. Task 5 pinned it, and its fix
+      round found that the cause is the blank selector cell, so the pins carry #290 and no separate issue exists;
+    - log only: the debug `console.log` calls, INT's delay before REF, RAD and DIS show, the 89 showing `360.0` for a
+      radial of 0, the in-place runway sort of `Apt3ListPage`, the `NearestList` removal loop, the CTR leads and the
+      status line's `ent` (`testing.md` section 7);
+    - task 0 did not touch `enterIdent.test.ts`, which belonged to task 3, and task 3 fixed its NDB row that froze #287;
+    - tasks 1 to 6 in parallel worktrees (rule 21 over the skill's sequential default);
+    - surviving mutations joined the fix rounds even where graded Minor (the maintainer's global rule, as in Session 8),
+      and spec tests asserting beyond their citation were raised to Important as label breaches;
+    - radials below 100 stay zero-padded (`RAD: 090.0°`), because figure 5-94 pads with zeros where the 89 pads with
+      blanks; the `RAD: 000.0°` characterization row stays for the same reason;
+    - the radial pins separate the reference VOR's own variation from the local one (the trainer showed the VOR's), so
+      that a fix with the wrong variation leaves them red;
+    - a pin whose citation supports only an extension of the guide's rule says so in its comment (the #285 pins);
+    - the REF finding of task 5's review got a new placeholder rather than the retired number of the ACT column (#299).
+- **The plan's changes to the drafts:** the research placeholders `#NEW-A-n` to `#NEW-F-n` were renamed to the task
+  numbers; the draft pins of the name search and the macadam surface were dropped; four existing rows that froze a bug
+  became pins or stopped short of the bug (the `KCCC AIRPT` row, the INT `NM` of `enterIdent.test.ts`, the silent
+  approach replacement, the 8045b29 ACT row); snapshots avoid every pinned bug (names that no abbreviation touches,
+  nearest distances of 10 NM or more, no DIS row on INT and SUP, NDBs on a half kHz).
+- **Review fix rounds:** every task needed at least one; task 3 three, task 2 two. Task 0: survivors in the new harness
+  code and two overlong lines. Task 1: the stored user airport was never checked in the saved data (three survivors),
+  and two `it.each` tables listed their cases in the guide's order (now the SDK's enum order). Task 2: an OUTDATED DB
+  test cited the wrong page, the approach removal on load was unheld once the old 6-7 test became a pin, survivors; then
+  spec tests asserting beyond their citation, a survivor and a dead conditional. Task 3: the `enterIdent.test.ts` NDB
+  row froze #287, loose siblings, copied wording in comments, survivors; then two characterizations inside page-cited
+  describes and a hold that depended on #281; then the #285 pin's inference. Task 4: the ACT pin cited the selector's
+  page instead of 4-10, the entered-radial pin typed a distance the #282 fix would refuse, survivors; it also found #285
+  on SUP. Task 5: the #280 pin set both variations to the same value, INVALID REF cited C-2 instead of C-1, the
+  placement of the reference waypoint was unheld; it also found #299. Task 6: three survivors held by the #102 pin under
+  its fix, one characterization, minors.
+
+**Trainer results** (KLN 89 trainer, 2026-10-07; the maintainer started the VM; paraphrased; high confidence unless
+noted)
+- **Radials** on the intersection and user waypoint pages are magnetic with the reference VOR's own variation: the true
+  initial bearing at the VOR minus that VOR's published variation, on display and on entry. Four published intersections
+  fit within 0.05°; the bearing measured at the intersection is off by half a degree or more, the local variation by
+  several degrees (#280, #281).
+- A changed REF recomputes RAD and DIS at once (#279); after REF, ENT, ENT the cursor is on RAD (#284); REF, RAD and DIS
+  appear with the ident; distances are blank-padded with the small `nm` (#282, #283); DIS accepts 400.0 and 999.9
+  (#288).
+- The user waypoint page without user waypoints shows `0` and the creation choices without a message; the first click on
+  a blank selector cell gives `A` (medium, #290); a waypoint type's page keeps its waypoint over a change of type.
+- **Nearest:** with the cursor parked on the rank, the page follows the new nearest at rank 1 (#268); distances below 10
+  NM show without a leading zero (the 90B figures win, #266).
+- **Procedures:** CLR on the question that adds a STAR and its airport returns to the waypoint list, and CLR steps back
+  one list at a time (#271); the cursor stays on the chosen procedure after CLR (medium, by analogy, #273); runway
+  numbers align in one column; a second approach asks before it replaces the first (#274); the cursor starts on the
+  first procedure; an airport whose remark is blanked stays in the remarks list.
+- **NDB** frequencies on a whole kHz show without `.0` (medium, #287).
+- **FPL 0 and ACT:** the DTK beside the active waypoint is the leg's DTK (#297); a repeated active waypoint has no arrow
+  at its second copy (#294); ACT with nothing active shows its text and no message (#293); the type letter sits in a
+  fixed column (medium, #290); no Direct To symbol on the 89's ETA line, whose layout differs from D/T 4.
+- **Not answerable:** names with words inside words (the airports are not in the trainer's database), the APT 7 page
+  order (no airport with both SIDs and STARs). CTR and the self-test have no 89 counterpart.
+
+**Bugs found and filed** (each after a search of the open and closed issues: the titles of all 263 issues, the bodies of
+#22, #38, #39, #72, #78, #92, #102, #115, #161 and #204, and semantic searches with several wordings per area, paced
+between the filings). Each issue says it was found in the headless harness, and none was reproduced in the sim.
+- **#264:** MILTRY and PRIVAT start one cell left and touch the airspace class (3-42). Pinned twice in
+  `Apt1Page.test.ts`.
+- **#265:** airport names are abbreviated inside words and a deleted THE leaves a blank (3-26, figures 3-71, 3-84).
+  Pinned four times in `Apt1Page.test.ts`.
+- **#266:** nearest distances below 10 NM lack the leading zero (four figures; the 89 differs). Pinned in
+  `Apt1Page.test.ts`, `VorPage.test.ts` and `NdbPage.test.ts`.
+- **#267:** an HF frequency shows `006.55` instead of kHz (3-45; may be latent). Pinned in `Apt4Page.test.ts`.
+- **#268:** with the cursor parked on NR 1 the nearest page keeps the old waypoint (3-24, the trainer). Pinned in
+  `Apt1Page.test.ts`.
+- **#269:** APT 3 is blank after a scan from a diagram to an airport without runway data (3-44); continues #38. Pinned
+  in `Apt3Page.test.ts`.
+- **#271:** CLR on the APT 7 add question does nothing (6-5, the trainer). Pinned in `Apt7Page.test.ts`.
+- **#272:** the APT 7 runway list lacks `RW` (6-22, figure 6-35). Pinned in `Apt7Page.test.ts`.
+- **#273:** CLR back to the procedure or approach list turns the cursor off (the trainer, medium). Pinned in
+  `Apt7Page.test.ts` and `Apt8Page.test.ts`.
+- **#274:** a second approach from APT 8 replaces the first without a question (the trainer). Pinned in
+  `Apt8Page.test.ts`.
+- **#275:** a VORTAC shows no `D` (3-49). Pinned in `VorPage.test.ts`.
+- **#276:** a VORTAC cannot be selected by its ident (3-14, 3-49). Pinned in `VorPage.test.ts`.
+- **#277:** a user NDB frequency can never be entered (5-18, figure 5-66); a control bug for 9b. Pinned in
+  `NdbPage.test.ts`.
+- **#278:** the refused variation stays on the VOR page after IN ACT LIST (C-1). Pinned in `VorUserWaypoint.test.ts`.
+- **#279:** a REF entered on an existing INT or SUP waypoint keeps the old RAD and DIS (3-50, 3-51, the trainer). Pinned
+  twice in `IntPage.test.ts` and in `SupPage.test.ts`.
+- **#280:** RAD is true instead of magnetic with the reference VOR's variation, on INT, SUP and REF (5-44, figures, a
+  photo, the trainer). Pinned twice in `IntPage.test.ts`, twice in `SupPage.test.ts` and in `RefPage.test.ts`.
+- **#281:** INT's RAD is the final bearing at the intersection (figure 5-76, 5-19, the trainer); SUP has the same line,
+  unpinned. Pinned in `IntPage.test.ts`.
+- **#282:** DIS shows leading zeros on INT and SUP (figures, a photo, the trainer); a control bug for 9b. Pinned in
+  `IntPage.test.ts` and `SupPage.test.ts`.
+- **#283:** INT and SUP write `NM` in full-size letters (figures, the trainer). Pinned in `IntPage.test.ts` and
+  `SupPage.test.ts`.
+- **#284:** after the REF approval the cursor stays on REF (5-19, figure 5-72, the trainer). Pinned in `IntPage.test.ts`
+  and `SupPage.test.ts`.
+- **#285:** an edited RAD or DIS of a stored user waypoint leaves the old position on the page (5-19, 3-50, extended).
+  Pinned in `IntPage.test.ts` and twice in `SupPage.test.ts`.
+- **#286:** ENT on RAD or DIS of the INT page throws without a reference VOR. Pinned in `IntPage.test.ts`.
+- **#287:** a database NDB on a whole kHz shows `.0` (figures 3-153, 3-154, the trainer). Pinned in `NdbPage.test.ts`.
+- **#288:** DIS refuses 360 NM and more; the fix needs both the first cell's range and the refusal (figure 5-74, the
+  trainer); a control bug for 9b. Pinned in `IntPage.test.ts`.
+- **#289:** after USR DB FULL the refused waypoint shows as created (C-2). Pinned in `SupPage.test.ts`.
+- **#290:** a short ident's blank selector cells have no glyph, the first click gives `0`, and the ACT type letter moves
+  left (3-20, 4-10, the trainer); a control bug for 9b. Pinned in `SupPage.test.ts`, twice in `ActPage.test.ts` and in
+  `WaypointConfirmPage.test.ts`.
+- **#291:** REF never inserts into FPL 0 (5-21, figures 5-85, 5-86; hidden on numbered plans by #242). Pinned twice in
+  `RefPage.test.ts`.
+- **#292:** REF stores the bearing measured at the reference waypoint (5-22). Pinned in `RefPage.test.ts`.
+- **#293:** `NO SUP WPTS` is posted by ACT and by the REF confirmation (C-2, 5-22, the trainer). Pinned in
+  `ActPage.test.ts` and `RefPage.test.ts`.
+- **#294:** the ACT arrow marks every copy of the active waypoint (4-10, the trainer). Pinned in `ActPage.test.ts`.
+- **#295:** ACT 8 shows the APT 8 title (a photo, figure 4-39). Pinned in `ActPage.test.ts`.
+- **#296:** D/T 1 to D/T 3 show dashes beside FPL 0 during a Direct To outside the plan (4-11, 4-12, figure 4-44).
+  Pinned in `Dt1Page.test.ts`, `Dt2Page.test.ts` and `Dt3Page.test.ts`.
+- **#297:** D/T 3 shows the bearing as the active waypoint's DTK (4-12, Appendix A, the trainer). Pinned twice in
+  `Dt3Page.test.ts`.
+- **#298:** D/T 4 lacks the Direct To symbol before a Direct To destination (a photo). Pinned in `Dt4Page.test.ts`.
+- **#299:** REF accepts a waypoint whose perpendicular falls behind the first waypoint of a leg (5-21, C-1). Pinned in
+  `RefPage.test.ts`.
+- **#300:** one Center waypoint shows ` 1 NEW WPTS` (figure 5-96). Pinned in `Ctr1Page.test.ts`.
+- **#301:** CTR 1 and CTR 2 keep the computed waypoints after the plan page is left (5-26). Pinned in
+  `Ctr2Page.test.ts`.
+- **#270 (`question`):** a macadam runway shows a blank surface on APT 3; should it count as HRD?
+- **Known issues pinned:** #92 (its ten persisted slots, seen on APT 5, `Apt5Page.test.ts`), #223 (`Dt1Page.test.ts`,
+  `Dt4Page.test.ts`), #161 (`Ctr1Page.test.ts`, without the OTH 2 detour), #102 (the CTR recomputation,
+  `Ctr1Page.test.ts`).
+- **Comments:** #92 (the APT 5 pin of its second point), #161 (pinned without the OTH 2 detour, and the numbered-plan
+  case: one waypoint inserted, then `Cannot have more than 30 legs!`), #102 (the CTR pin, its fix checked against the
+  whole recomputed state, and the 300 NM rule that avoids it for one computation), #38 (the remaining effect, #269).
+
+**Fixes that could not be re-broken:** no test of an old fix was added this session. In the touched files the existing
+regression tests were kept; three changed beyond their placeholders: the #65 test cites 5-17, the two f95d1d7 ACT tests
+also cite the video the code cites, and the 8045b29 confirmation-page test asserts only the start of its ACT row (the
+rest showed #290); their proofs were not redone. Survivors that stay unheld: the column widths of the APT 7 and APT 8
+lists (equivalent mutants), the stored scan speed (it only feeds the next, capped speed), the scan list's `sync` in the
+constructor (observable only with lists beyond the cache window), the return value of `scanRight` on the confirmation
+page (the scan event does not pop pages), the nearest rank regex of the #268 sibling (held by inspection), and the APT
+page memory writes of `PageManager.startMainPage` (redundant).
+
+**The coverage of the area rose by about 23 points, which says what ran, not what is held** (section 1).
+`kln90b/pages/right` went from 67.73 % to 90.97 % of statements. What holds the pages is each test's proof against a
+break of its own (the `Proof:` lines of the task commits) and the reviewers' mutation passes, whose survivors joined the
+fix rounds.
+
+**Not covered** (rule 18; the ledger is not committed, so the list is complete here)
+- **Pages without a spec test:** the self-test right page (a characterization without the ALT row; its spec belongs to
+  Session 10, below). ACT 7 has no test at all (no SID or STAR world on ACT).
+- **The name and city search of 3-24 to 3-26:** impossible with the SDK, which offers no such search; out of scope by
+  the maintainer's decision, no issue.
+- APT: the APT 7 page order (SID first going forward) is a characterization, because the trainer had no airport with
+  both; APT 6 with real service data (none in the sim); the city row of a long city name (cut or wrapped, the trainer
+  hint was weak); the order of the comm frequencies (the trainer suggested a fixed type order; a lead); whether the sim
+  carries HF frequencies (#267).
+- INT and SUP: the tens place of a distance below 10 NM (figure 3-159 shows a zero, the trainer a blank; the #282 pins
+  hold only the hundreds place); #281 on SUP; #289 on any path but SUP's PRES POS?; #285's distance edit on INT (a
+  characterization); the INT page of a terminal waypoint.
+- REF, ACT, D/T: REF on a plan of fewer than two waypoints, and with a left page that is not a flight plan; ACT while
+  the active waypoint sequences during a scan; D/T 4 with RUN WHEN POWER IS ON (held at the unit stage by
+  `Timers.test.ts`); the flight timer through a NAV flag.
+- CTR: a second computation in one unit outside the #102 pin; the leads of `testing.md` section 7.
+- **Session 9b:** the controls' bugs pinned here (#277, #282, #288, #290) and their control tests; whether the cursor
+  covers the plain decimal point of `NdbFreqEditor` and `DistanceEditor`; the status line's `ent` after an unread `msg`;
+  the keyboard longitude below 100 degrees with a typed blank (#109).
+- **Session 10, the self-test right page:** where the cursor starts (the code agrees with 3-6 and the photos, held by
+  the characterization); the ALT format (figure 3-4 against later photos); the altitude rounded to 100 ft; the baro
+  field with an air data computer and in hPa; the date, time zone and time entry (3-5, 3-6); figure 3-6 hiding APPROVE?
+  while the date is selected; #125, #112 and #175; the beeps and pages after APPROVE? (3-7); the harness showing `msg`
+  during a cold-boot self-test where the figures show none.
+- Leads seen and not filed: `testing.md` section 7 (Session 9a's list).
+- Review notes left as they are: the #285 SUP comments could name the trainer observation; the PRES POS? spec test also
+  asserts the waypoint is not temporary, which rests on a project convention, not on the guide; the SUP "page comes
+  back" tests could name the trainer observation they rest on.
+
+**Workflow notes.** The research worktrees and the task worktrees started at `origin/main` and were reset to the session
+branch first. In the research round two agents wrote a scratch script of the same name into the shared scratchpad, and
+one run restored the other's worktree; from then on every agent used its own scratch folder. Agent worktrees lack
+`node_modules`, so each got a junction to the main checkout's; the junctions must be removed with `rmdir` before `git
+worktree remove`, or the main checkout's `node_modules` is emptied, so the cleanup waits for the maintainer's approval.
+The controller first told task 4 to undo its edit of the 8045b29 row as if it were in task 5's `ActPage.test.ts`; the
+row is in `WaypointConfirmPage.test.ts`, task 4's file. One commit was wasted, task 4 re-applied its fix with a new #290
+pin, and task 5 showed that its ACT column pins share #290's cause. Tasks 1 to 6 ran on Sonnet and merged in the order
+6, 2, 5, 1, 4, 3; reviewers ran on Opus for tasks 1, 3 and 5 and on Sonnet for the others, re-reviews on Sonnet; the
+close-out ran on Opus in the main checkout, because it needed GitHub. Inline snapshots that Vitest writes into a CRLF
+file come out LF and were normalized. The GitHub listing of all issues and the semantic search both worked this time; no
+call was refused.
+
+**Coverage at the start of the session** (identical to the end of session 8) **and at the end** (all tests green):
+
+| directory                  | % stmts start | % stmts end | % lines start | % lines end |
+|----------------------------|--------------:|------------:|--------------:|------------:|
+| all files                  |         84.84 |       90.71 |         84.78 |       90.60 |
+| `kln90b/controls`          |         87.81 |       88.91 |         87.56 |       88.68 |
+| `kln90b/controls/displays` |         90.27 |       90.27 |         90.06 |       90.06 |
+| `kln90b/controls/editors`  |         86.17 |       90.71 |         85.71 |       90.40 |
+| `kln90b/controls/selects`  |         81.72 |       82.30 |         80.49 |       81.10 |
+| `kln90b/pages/right`       |         67.73 |       90.97 |         68.45 |       91.36 |
+| `kln90b/services`          |         88.75 |       93.96 |         88.59 |       93.60 |
+
+The files of `kln90b/pages/right` below 50 % at the start (statements, from the design) and at the end: `Ctr1Page.tsx`
+33.65 and 87.50, `Apt4Page.tsx` 40.90 and 81.81, `IntPage.tsx` 44.72 and 95.65, `NdbPage.tsx` 47.76 and 82.08. The
+services rose through the CTR tests (`AirspacesAlongRoute.ts`). The lowest right pages at the end are `Apt6Page.tsx`
+(65.51, the service data the sim lacks) and `Apt5Page.tsx` (70.45).
+
+The suite at the start: 1785 tests passed and 211 expected failures, in 225 files. At the end: 2120 tests passed and 279
+expected failures, in 241 files. The new expected failures are pins: #92, #102, #161, #223 (two), #264 (two), #265
+(four), #266 (three), #267, #268, #269, #271, #272, #273 (two), #274, #275, #276, #277, #278, #279 (three), #280 (five),
+#281, #282 (two), #283 (two), #284 (two), #285 (three), #286, #287, #288, #289, #290 (four), #291 (two), #292,
+#293 (two), #294, #295, #296 (three), #297 (two), #298, #299, #300 and #301.
 
 ## 2026-10-07, session 8, branch `tests-session-8-left-pages`
 
