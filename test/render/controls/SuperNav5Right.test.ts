@@ -7,7 +7,10 @@ import {savedFlightplan, storedSetting} from '../../harness/storage';
 import {MainPage} from '../../../kln90b/pages/MainPage';
 import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
 
-/** NAV 5 on both sides. The right side first: its shorter way passes NAV 5, which is Super NAV 5 once the left shows NAV 5 */
+/**
+ * NAV 5 on both sides. The right side first: its shorter way passes NAV 5, which is Super NAV 5 once the left shows
+ * NAV 5
+ */
 async function showSuperNav5(unit: HeadlessUnit): Promise<void> {
     await unit.panel.selectPage('R', 'NAV 4');
     await unit.panel.selectPage('L', 'NAV 5');
@@ -50,8 +53,8 @@ describe('Super NAV 5 menu (3-37)', () => {
         ]).toEqual([1, true, false, 1]);
     });
 
-    // 3-34, 3-35: an orientation shows its value; with desired track up that is the DTK, here the magnetic course of the
-    // leg KAAA to ABC with no variation. Figure 3-119 shows the value before the orientation symbol
+    // 3-34, 3-35, 3-37: an orientation shows its value; with desired track up that is the DTK, here the magnetic course
+    // of the leg KAAA to ABC with no variation. Figure 3-119 shows the value before the orientation symbol
     it('shows the desired track before the DTK-up symbol (3-35, 3-37, figure 3-119)', async () => {
         const {kaaa, abc} = standardRoute();
         const unit = await onRoute({superNav5MapOrientation: 1});

@@ -8,13 +8,21 @@ import {OneTimeMessage} from '../../../kln90b/data/MessageHandler';
 /** The six text rows of the MSG page, trimmed */
 const msgRows = () => Array.from({length: 6}, (_, r) => Screen.read().row(r).trimEnd());
 
-/** The text and the mask of the msg prompt (row 6, cells 14 to 16) over 8 display ticks (two blink cycles) */
-async function promptOverTwoSeconds(): Promise<Set<string>> {
+/**
+ * The text and the mask of the msg prompt (row 6, cells 14 to 16) on 8 display ticks (two blink cycles of four), which
+ * must flash: the flashing phase on one tick in four (the blink tick), the steady phase on the other three, and on the
+ * same tick of both cycles. A set of the values over two seconds would also accept the phases swapped
+ */
+async function expectPromptFlashing(steady: string, flashing: string): Promise<void> {
     const prompt = () => {
         const s = Screen.read();
         return `${s.row(6).slice(14, 17)} ${s.mask().split('\n')[6].slice(14, 17)}`;
     };
-    return new Set([...await blinkCycle(prompt), ...await blinkCycle(prompt)]);
+    const first = await blinkCycle(prompt);
+    const cycles = [first, await blinkCycle(prompt)];
+    const expected = [steady, steady, steady, flashing].sort();
+    expect(cycles.map(c => [...c].sort())).toEqual([expected, expected]);
+    expect(cycles[1].indexOf(flashing)).toBe(cycles[0].indexOf(flashing));
 }
 
 /** KBBB 0.6 NM north of the aircraft, after the first nearest search (every 10 s), so that MSG then ENT has a target */
@@ -35,8 +43,9 @@ async function readAll(unit: HeadlessUnit): Promise<void> {
 }
 
 describe('MSG page (spec)', () => {
-    // 3-23: on the MSG page, ENT shows the waypoint page of the nearest airport on the right, and the pages come back
-    it('shows the nearest airport on APT 1 when ENT is pressed on the MSG page (3-23)', async () => {
+    // 3-23: on the MSG page, ENT shows the waypoint page of the nearest airport on the right. 3-16: leaving the MSG
+    // page returns to the pages that were in view before (the left page, NAV 2, was the one before the MSG page)
+    it('shows the nearest airport on APT 1 when ENT is pressed on the MSG page (3-23, 3-16)', async () => {
         const unit = await bootNearKbbb();
         await unit.panel.msg();
         expect(Screen.read().status().left).toBe(''); // the precondition: the MSG page is up
@@ -81,23 +90,25 @@ describe('MSG page, a message on a later page (#191)', () => {
     }
 
     // The preconditions of the pin below rest on 3-16 (newest first, two messages on the first page) and 3-23 (ENT
-    // leaves the MSG page); a one-time message that was on the screen is gone once the page was left
-    it('drops the two messages shown on the first page once read (sibling of #191) (3-16)', async () => {
-        const unit = await leaveAfterTheFirstPage();
+    // leaves the MSG page). That a one-time message that was on the screen is gone once the page was left is not in the
+    // guide: checked in the KLN 89 trainer, 2026-10-08 (T29)
+    it('drops the messages shown on the first page once read (sibling of #191) (3-16, KLN 89 trainer 2026-10-08)',
+        async () => {
+            const unit = await leaveAfterTheFirstPage();
 
-        const texts = unit.props.messageHandler.getMessages().map(m => m.message[0]);
-        expect(texts).not.toContain('THREE A');
-        expect(texts).not.toContain('TWO A');
-    });
+            const texts = unit.props.messageHandler.getMessages().map(m => m.message[0]);
+            expect(texts).not.toContain('THREE A');
+            expect(texts).not.toContain('TWO A');
+        });
 
     // 3-16: the prompt flashes while a message has not been viewed; ONE was never on the screen. Checked in the KLN 89
-    // trainer, 2026-10-08 (T29): after leaving the first of two MSG pages, the prompt kept flashing and the message of
-    // the second page was still there
+    // trainer, 2026-10-08 (T29): after leaving the first of two MSG pages (there with the outer knob, here with ENT,
+    // 3-23) the prompt kept flashing and the message of the second page was still there
     it.fails('keeps the message of the unseen second page and flashes msg (3-16, KLN 89 trainer 2026-10-08, #191)',
         async () => {
             const unit = await leaveAfterTheFirstPage();
 
             expect(unit.props.messageHandler.getMessages().map(m => m.message[0])).toEqual(['ONE A']);
-            expect(await promptOverTwoSeconds()).toEqual(new Set(['msg III', 'msg FFF']));
+            await expectPromptFlashing('msg III', 'msg FFF');
         });
 });

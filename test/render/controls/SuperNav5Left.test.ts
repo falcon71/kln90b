@@ -15,10 +15,13 @@ import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
  */
 const ENR = 'Ê', LEG = 'Ë', ARM = 'Í', APR = 'Ì';
 
-const OBS_SOURCE_OFF =
-    '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input></Instrument></PlaneHTMLConfig>';
+const OBS_SOURCE_OFF = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input>'
+    + '</Instrument></PlaneHTMLConfig>';
 
-/** NAV 5 on both sides. The right side first: its shorter way passes NAV 5, which is Super NAV 5 once the left shows NAV 5 */
+/**
+ * NAV 5 on both sides. The right side first: its shorter way passes NAV 5, which is Super NAV 5 once the left shows
+ * NAV 5
+ */
 async function showSuperNav5(unit: HeadlessUnit): Promise<void> {
     await unit.panel.selectPage('R', 'NAV 4');
     await unit.panel.selectPage('L', 'NAV 5');
@@ -40,13 +43,16 @@ async function armed(panelXml?: string): Promise<{ unit: HeadlessUnit, w: Return
     return {unit, w};
 }
 
-/** The text and the mask of the message prompt over the map (3-36) over 8 display ticks (two blink cycles) */
-async function mapPromptOverTwoSeconds(): Promise<Set<string>> {
-    const prompt = () => {
-        const row = readRows(document.querySelector('#pageContainer .super-nav5-mgs-range')!)[0];
-        return `${row.map(c => c.ch).join('')} ${row.map(c => c.attr).join('')}`;
-    };
-    return new Set([...await blinkCycle(prompt), ...await blinkCycle(prompt)]);
+/** The text and the mask of the message prompt over the map (3-36) */
+const mapPrompt = () => {
+    const row = readRows(document.querySelector('#pageContainer .super-nav5-mgs-range')!)[0];
+    return `${row.map(c => c.ch).join('')} ${row.map(c => c.attr).join('')}`;
+};
+
+/** What the prompt shows on 8 display ticks (two seconds), as two blink cycles of four reads each */
+async function mapPromptCycles(): Promise<string[][]> {
+    const first = await blinkCycle(mapPrompt);
+    return [first, await blinkCycle(mapPrompt)];
 }
 
 /** Super NAV 5 on the standard route in the enroute OBS mode (OBS selected on the first leg, no external OBS input) */
@@ -81,7 +87,8 @@ describe('Super NAV 5 mode row (5-32)', () => {
     });
 
     // 5-32: ARM:259, the selected magnetic course after a colon. The final course of approachWorld() is 180 and the
-    // variation 0; without an OBS input the course is the DTK at the moment OBS is selected (5-36)
+    // variation 0. Without an OBS input the unit picks the course that leaves the deviation unchanged (5-36); the
+    // aircraft is on the final course, so that is the DTK, 180
     it('shows ARM: and the OBS course in the approach-arm OBS mode (5-32)', async () => {
         const {unit} = await armed(OBS_SOURCE_OFF);
         await unit.panel.obsMode();
@@ -94,7 +101,9 @@ describe('Super NAV 5 mode row (5-32)', () => {
     it('shows ENR and the OBS course in the enroute OBS mode (sibling of #NEW-6-2) (5-32)', async () => {
         const {unit, dtk} = await enrouteObs();
 
-        expect(dtk).toBe(50); // the DTK of the active leg to ABC, so the course OBS takes; from the geometry
+        // The DTK of the active leg to ABC, from the geometry. The aircraft is on the leg's course (the deviation stays
+        // unchanged, 5-36), so OBS takes that course
+        expect(dtk).toBe(50);
         const mode = SuperNav5.read().left[2];
         expect(mode.startsWith(ENR)).toBe(true);
         expect(mode.endsWith('050')).toBe(true);
@@ -115,10 +124,16 @@ describe('Super NAV 5 message prompt (3-16, 3-36)', () => {
         const unit = await bootUnit(); // the boot messages are unread (testing.md section 6)
         await showSuperNav5(unit);
 
-        expect(await mapPromptOverTwoSeconds()).toEqual(new Set(['msg III', 'msg FFF']));
+        // A flashing cell shows the flashing phase on one display tick in four (the blink tick) and the steady phase on
+        // the other three, on the same tick of both cycles. A set of the values would accept the phases swapped
+        const cycles = await mapPromptCycles();
+        const expected = ['msg III', 'msg III', 'msg III', 'msg FFF'].sort();
+        expect(cycles.map(c => [...c].sort())).toEqual([expected, expected]);
+        expect(cycles[1].indexOf('msg FFF')).toBe(cycles[0].indexOf('msg FFF'));
     });
 
-    it('shows three blanks without a message (3-36)', async () => {
+    // 3-10: the three cells of the prompt are blank without a message (3-36 puts the prompt on the map)
+    it('shows three blanks without a message (3-10, 3-36)', async () => {
         const unit = await bootUnit();
         await unit.panel.msg();
         await unit.panel.msg(); // the two boot messages fit one MSG page; the second press closes it
@@ -126,6 +141,7 @@ describe('Super NAV 5 message prompt (3-16, 3-36)', () => {
         expect(unit.props.messageHandler.hasMessages()).toBe(false); // the precondition
         await showSuperNav5(unit);
 
-        expect(await mapPromptOverTwoSeconds()).toEqual(new Set(['    ...']));
+        const [first, second] = await mapPromptCycles();
+        expect(new Set([...first, ...second])).toEqual(new Set(['    ...']));
     });
 });

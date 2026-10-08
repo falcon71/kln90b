@@ -86,9 +86,27 @@ const statusRow = () => {
     return {text: s.row(6), mask: s.mask().split('\n')[6]};
 };
 
-/** What `read` returns on 8 display ticks (two seconds, two blink cycles), one entry per distinct value */
+/** What `read` returns on 8 display ticks (two seconds), as two blink cycles of four reads each */
+async function twoCycles(read: () => string): Promise<string[][]> {
+    const first = await blinkCycle(read);
+    return [first, await blinkCycle(read)];
+}
+
+/** The distinct values of two cycles, for a cell that does not flash */
 async function overTwoSeconds(read: () => string): Promise<Set<string>> {
-    return new Set([...await blinkCycle(read), ...await blinkCycle(read)]);
+    const [first, second] = await twoCycles(read);
+    return new Set([...first, ...second]);
+}
+
+/**
+ * A flashing cell shows its flashing phase on one display tick in four (the blink tick) and its steady phase on the
+ * other three, in every cycle and on the same tick of both. A set of the values over two seconds would also accept the
+ * phases swapped, or a cell stuck in one of them
+ */
+function expectFlashing(cycles: string[][], steady: string, flashing: string): void {
+    const expected = [steady, steady, steady, flashing].sort();
+    expect(cycles.map(c => [...c].sort())).toEqual([expected, expected]);
+    expect(cycles[1].indexOf(flashing)).toBe(cycles[0].indexOf(flashing));
 }
 
 /** The text and the mask of the msg/ent prompt, cells 14 to 16 of the status row */
@@ -115,7 +133,8 @@ async function onRoute(): Promise<HeadlessUnit> {
     const {kaaa, abc, kbbb} = standardRoute();
     const unit = await bootUnit({
         facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-        panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input></Instrument></PlaneHTMLConfig>',
+        panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input>'
+            + '</Instrument></PlaneHTMLConfig>',
     });
     await settle(unit);
     return unit;
@@ -130,7 +149,8 @@ async function noSuchWpt(unit: HeadlessUnit): Promise<void> {
 }
 
 describe('status line, the center segment (spec)', () => {
-    // 3-10, figure 3-37: a status line message takes the whole center segment, the mode and the prompt, in inverse video
+    // 3-10, figure 3-37: a status line message takes the whole center segment, the mode and the prompt, in inverse
+    // video
     it('shows a status line message over the mode and the prompt, in inverse video (3-10, figure 3-37)', async () => {
         const unit = await bootUnit();
         await noSuchWpt(unit);
@@ -159,7 +179,7 @@ describe('status line, the center segment (spec)', () => {
         const unit = await onRoute();
         await unit.panel.selectPage('L', 'MOD 2'); // PRESS ENT TO ACTIVATE (5-33)
 
-        expect(await overTwoSeconds(prompt)).toEqual(new Set(['ent ...', 'ent BBB']));
+        expectFlashing(await twoCycles(prompt), 'ent ...', 'ent BBB');
     });
 
     // 3-16, figure 3-55: a new message makes the msg prompt flash in inverse video. The harness reads the flashing
@@ -167,14 +187,16 @@ describe('status line, the center segment (spec)', () => {
     it('flashes msg in inverse video while a message is unread (3-16, figure 3-55)', async () => {
         await bootUnit(); // the boot messages are unread (testing.md section 6)
 
-        expect(await overTwoSeconds(prompt)).toEqual(new Set(['msg III', 'msg FFF']));
+        expectFlashing(await twoCycles(prompt), 'msg III', 'msg FFF');
     });
 
-    // 3-16: a message whose condition needs action keeps the prompt on, not flashing, once it is read. The condition is a
-    // wrong external course, as in the MSG light test above
+    // 3-16: a message whose condition needs action keeps the prompt on, not flashing, once it is read. The condition is
+    // a wrong external course, as in the MSG light test above
     it('keeps msg steady in inverse video once read while the condition stays (3-16)', async () => {
         const {kaaa, abc, kbbb} = standardRoute();
-        const unit = await bootUnit({facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb]), magvar: 4});
+        const unit = await bootUnit({
+            facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb]), magvar: 4,
+        });
         await settle(unit);
         unit.env.sim.set('Nav OBS:1', 'degrees', courseDeg(kaaa, abc) - 4 + 30);
         await vi.advanceTimersByTimeAsync(15000);
@@ -184,7 +206,8 @@ describe('status line, the center segment (spec)', () => {
         }
         await vi.advanceTimersByTimeAsync(1000);
         // The preconditions: every message was read, and the persistent one stays
-        expect(unit.props.messageHandler.getMessages().map(m => m.message.join(' '))).toEqual(['ADJ NAV IND CRS TO 046°']);
+        expect(unit.props.messageHandler.getMessages().map(m => m.message.join(' ')))
+            .toEqual(['ADJ NAV IND CRS TO 046°']);
         expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
 
         expect(await overTwoSeconds(prompt)).toEqual(new Set(['msg III']));
@@ -198,9 +221,10 @@ describe('status line, the center segment (spec)', () => {
         expect(await overTwoSeconds(prompt)).toEqual(new Set(['    ...']));
     });
 
-    // 3-11, figure 3-38 (left, one cell in) and figure 3-36 (right): with a cursor on, CRSR in inverse video replaces the
-    // page name of that side
-    it('replaces each page name with CRSR in inverse video while that cursor is on (3-11, figures 3-36, 3-38)', async () => {
+    // 3-11, figure 3-38 (left, one cell in) and figure 3-36 (right): with a cursor on, CRSR in inverse video replaces
+    // the page name of that side
+    it('replaces each page name with CRSR in inverse video while that cursor is on (3-11, figures 3-36, 3-38)',
+        async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
@@ -228,7 +252,7 @@ describe('status line, the keyboard mode (characterization)', () => {
             const {text, mask} = statusRow();
             return `${text.slice(0, 5)} ${mask.slice(0, 5)}`;
         };
-        expect(await overTwoSeconds(leftName)).toEqual(new Set([' KYBD .IIII', ' KYBD .FFFF']));
+        expectFlashing(await twoCycles(leftName), ' KYBD .IIII', ' KYBD .FFFF');
     });
 });
 
@@ -256,13 +280,16 @@ describe('status line after an ENT prompt (#NEW-6-1)', () => {
         await entInTheBlinkPhase();
 
         const texts = new Set([...await overTwoSeconds(prompt)].map(s => s.slice(0, 3)));
+        // Text only: the masks of this prompt are the pin's subject
         expect(texts).toEqual(new Set(['msg']));
     });
 
-    // 3-16, figure 3-55: the unread message flashes the prompt in inverse video; the ENT prompt's flash must not hide it
-    it.fails('flashes msg in inverse video after an ENT prompt that ended in the blink phase (3-16, #NEW-6-1)', async () => {
-        await entInTheBlinkPhase();
+    // 3-16, figure 3-55: the unread message flashes the prompt in inverse video; the ENT prompt's flash must not hide
+    // it
+    it.fails('flashes msg in inverse video after an ENT prompt that ended in the blink phase (3-16, #NEW-6-1)',
+        async () => {
+            await entInTheBlinkPhase();
 
-        expect(await overTwoSeconds(prompt)).toEqual(new Set(['msg III', 'msg FFF']));
-    });
+            expectFlashing(await twoCycles(prompt), 'msg III', 'msg FFF');
+        });
 });
