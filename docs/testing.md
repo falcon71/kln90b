@@ -761,7 +761,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **The IAF list of APT 8 and ACT 8 is placed by the reader, not by layout.** happy-dom computes no CSS positions, so
   `Screen.read()` moves the rows of `.apt-8-iaf-list` by a fixed four cells (section 3). A change of the list's position
   in `KLN90B.scss` would not show in a test; the reader only throws when the list no longer starts in cell 4.
-- **The NDB frequency and DIS editors do not invert their decimal point, which is a bug (#NEW-0-1).**
+- **The NDB frequency and DIS editors do not invert their decimal point, which is a bug (#302).**
   `NdbFreqEditor` and `DistanceEditor` (the NDB frequency and the INT and SUP DIS field) draw the point as plain text,
   while `VorFreqEditor` and `RadialEditor` invert theirs. Figure 5-74 (5-19) shows the open DIS field as one inverse
   block with the point inside, like the RAD field of figures 5-72 and 5-73; no figure shows the cursor in the NDB
@@ -769,6 +769,28 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   (section 4) until the bug is fixed, and then `FrontPanel.joinAcrossPoint` can go. The mask assertion of the DIS
   field is the pin `covers the decimal point of the DIS field` in `test/render/harness/focused.test.ts`; no snapshot
   may hold the plain point (rule 8 of test-coverage.md).
+- **A class with no visible effect is invisible to the reader.** `Screen` follows the CSS (section 3), so an
+  `inverted-blink` left on a cell without `inverted` reads as a plain cell, as it renders. A control that forgets to
+  remove the class (the cell under the cursor after the cursor is turned off, for example) passes every mask assertion
+  until another class makes the leftover visible; only the page tests that read the row next to it catch such a slip.
+- **The editor's autocompletion depends on the fake's search order.** `WaypointEditor.onCharChanged` asks the facility
+  search for one result, and `KLNFacilityLoader` sorts only what it got, so "digits before letters" (3-21) holds because
+  `MemoryFacilityClient` returns sorted results. Whether the sim returns them in that order is not known (section 7);
+  the selectors sort a hundred results themselves and do not depend on it.
+- **`FakeCoherent.on`, `off` and `trigger` are no-ops.** The keyboard tests focus the input by hand; a test cannot see
+  `FOCUS_INPUT_FIELD` or `UNFOCUS_INPUT_FIELD`, nor emit `mousePressOutsideView`, so the click outside the instrument
+  and the unfocus of `PageContainer.destroy` have no test.
+- **Some editor code cannot be reached in a booted unit.** The NDB frequency range (190 to 1750 kHz) waits behind #277,
+  which refuses every entry; the tenth of `RadialEditor.convertFromValue` is never shown on its own, because every
+  radial a page shows meets #281; the null branch of `TimeEditor.convertToValue` needs a host without a time, and SET 2
+  always has one while STA 5 cannot run (above).
+- **The flash rate is CSS.** The harness reads which display tick flashes a cell, not the animation of `.blink` and
+  `.inverted-blink` in `KLN90B.scss`; whether FLAG is shown inverse on the real unit is not settled either (figure 3-101
+  cannot show it), so the masks of the deviation bars' FLAG row are characterizations.
+- **The KLN 89 trainer lays out several fields differently.** Its longitude degrees, radial, date, hours, CAL 3 minutes
+  and CAL 7 heading are blocks of two or three digits where the 90B code has single cells. Tests take the 89's behavior
+  (a wrap, a stop, a padding) only where the 90B guide is silent and never its block layout (the maintainer's evidence
+  rule in the designs of Sessions 9a and 9b).
 - **There is no CI.** Run `npm test` and `npx tsc --noEmit` before committing.
 
 Measured speed (a dated record): on 2026-10-03 the proof flight (`firstFlight.test.ts`) ran about 1466 simulated
@@ -874,12 +896,11 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - Harness gaps and leads from Session 9a (none was built beyond its task 0, per rule 13 of test-coverage.md):
     - **`airport()` has no options for frequencies, runway lighting, the private type or radar coverage.** The APT 1,
       APT 3 and APT 4 tests spread the facility or patch `runways[i].lighting`; options would replace those spreads.
-    - **The bugs Session 9b inherits** are pinned on the right pages and keep those pins: the NDB frequency entry
-      (#277), the DIS field's leading zeros (#282) and its 360 NM limit (#288), and the blank selector cell (#290). Also
-      for 9b: whether the cursor covers the plain decimal point of `NdbFreqEditor` and `DistanceEditor` (section 6); the
-      `ent` of the status line keeps the flashing inverse of an unread `msg` (`StatusLine.tsx:111-118` removes
-      `inverted` but not `inverted-blink`); a typed blank let the keyboard enter a longitude below 100 degrees on the
-      SUP page (`E 103000`), so #109 may be narrower than it reads.
+    - **The bugs Session 9b inherited** (#277, #282, #288, #290) keep their page pins and are pinned at control level
+      too. Session 9b settled the other three leads: the plain decimal point is a bug (#302, section 6); the `ent` lead
+      was the reader's misreading of `inverted-blink` without `inverted` (section 3), and the real status line bug is
+      the reverse (#320); the typed blank came from the harness, which no longer sends what the PC keyboard cannot, so
+      #109 is as wide as it reads.
     - **Leads that were seen and not confirmed or not filed:**
         - Debug `console.log` calls in the constructors of the waypoint pages (`ActPage.tsx:43`, `Apt1Page.tsx:78`,
           `Apt6Page.tsx:43`, `IntPage.tsx:71`, `NdbPage.tsx:55`, `VorPage.tsx:58`, `WaypointConfirmPage.tsx:41` and
@@ -921,6 +942,72 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
         - D/T 1 and D/T 2 beside another page hide the last-waypoint block when the active waypoint is the last one
           (4-12 is silent). After LOAD IN FPL on ACT 8 the ACT page switches to the new active waypoint (the guide is
           silent).
+- Harness gaps and leads from Session 9b (none was built beyond its task 0, per rule 13 of test-coverage.md):
+    - **Copied helpers.** `expectFlashing` (a prompt that flashes on the same tick of each of two blink cycles) is
+      written out in `StatusLine.test.ts` and `MessagePage.test.ts` (`expectPromptFlashing`) and inline in
+      `SuperNav5Left.test.ts`; `showSuperNav5` is a local function of `SuperNav5Left.test.ts`, `SuperNav5Right.test.ts`
+      and `SuperNav5Page.test.ts`; a reader of a user waypoint from the repository is a local loop in `IntPage.test.ts`,
+      `NdbPage.test.ts`, `VorUserWaypoint.test.ts` and several editor tests. `SuperNav5.read()` still has no mask, so
+      the Super NAV 5 prompt tests read `.super-nav5-mgs-range` with `readRows`. Each is a candidate for the harness
+      once a further test needs it.
+    - **A blink phase probe.** The #320 pin finds the blink phase through `L:KLN90B_MsgLight`, which is dark on those
+      ticks only while a message is unread; a `blinkPhase()` on the unit would not need a message.
+    - **The fake's search order** (section 6): a `MemoryFacilityClient` option that returns matches in insertion order
+      would show whether the code orders the autocompletion itself. Related, also unobservable with the instant fake:
+      `WaypointEditor.onCharChanged` has no guard against a stale result (the selector has one), and
+      `WaypointEditor.convertToValue` looks for the exact ident among the first 99 results only.
+    - **A recording `FakeCoherent`** (section 6): a `trigger` that records its calls and an `emit` for the `on` handlers
+      would hold the keyboard focus and the click outside the instrument.
+    - **The glyphs of the font have no table.** `docs/architecture.md` lists the code points of the special symbols but
+      not what each one draws (the deviation bar cells, the leg arrows, the Super NAV 5 mode letters); the tests name
+      them by the code's constants or in comments.
+    - **The 4-3 cursor tests** (the cursor field remembered while the page is not left) sit in
+      `WaypointEditor.test.ts`, though their subject is `CursorController`; a move to `FplPage.test.ts` or a
+      `CursorController` test file would put them with their subject.
+    - **When the bugs are fixed:** the fix of #311 in `WaypointEditor` also turns red the `FplPage.test.ts` tests that
+      use the blank first click (the issue names them); the fix of #262 must keep NO SUCH WPT on the REF page (held in
+      `WaypointEditor.test.ts`); the fix of #306 changes the keyboard's automatic advance at the last cell, a
+      characterization in `Editor.test.ts`; the tens fix of #303 retires the 91-degree characterization of
+      `LatLonEditor.test.ts`; #324 needs a trip-page form of `DurationDisplay`, not a change of the shared form.
+    - **Leads that were seen and not confirmed or not filed:**
+        - Editors: `FreetextEditor.convertFromValue` drops a cell for a stored character outside its charset;
+          `MagvarEditor` enters 0°W as -0 and cuts a variation of 100° or more to two digits (`120` shows `12°E`, polar
+          VORs only); `ElevationEditor` has no sign, so a user airport below sea level cannot get its elevation;
+          `VorFreqEditor` takes any 10 kHz step (113.13), while VOR channels are 50 kHz apart (the guide gives no rule);
+          a user elevation is saved in whole meters, so a change of 1 ft is not observable.
+        - Selectors and fieldsets: `VorSelector` leaves out TACAN-only stations (2-1 and 2-2 name VORs only); for a
+          duplicated ident the VOR page reached by scanning and the selector can show different VORs (#105); the OBS
+          taken from the DTK keeps its fraction (089.46) while the field shows 089, and the CDI follows the fraction
+          (5-35 is silent); the inches cell of `BaroFieldset` caps at 30.99 while millibars reach 1099;
+          `OthFuelFieldset` shows a rounded value and rebuilds from one with a fraction; `MapOrientationSelector`
+          renders an undefined value for a stored HDG up without a heading input; `SuperNav5RangeSelector` builds its
+          index with `indexOf`, -1 for a stored scale outside its list; CAL 4 at 9.9° and 999 kt shows an FPM of
+          `1770` for about 17700 (the question of #257); the Super NAV 5 fields 2 and 3 round 359.5 to 360 (#263's
+          rule).
+        - Lists: figures 4-4 and 4-5 read `LOAD INVRT?` in the PDF's text layer while the first waypoint of an empty
+          plan is entered, where the code shows LOAD FPL 0? (perhaps an artifact of the figure; worth a look at the
+          printed page); the procedure header hides the arrow column while focused, and whether its text starts in
+          column 0 or 1 was not checked; `SimpleListItem.tick` toggles `inverted-blink` twice for an entered item
+          (redundant).
+          Selecting NAV 2 on the right from the boot's SUP page passes ACT, which posts NO SUP WPTS (#293), so a test
+          that reads the status line routes the right side another way.
+        - Status line, MSG page and views: `MessagePage.enter` with an empty nearest list keeps the MSG page, while the
+          comment at `MessagePage.tsx:53` reads as if the unit removes it; `AirportCoordOrNearestView.loadAirspace`
+          resolves late and writes against the airport shown at that time, so a quick scan could show the previous
+          airport's class (not reproduced); `ErrorPage.showError` writes the error text with `innerHTML`, unescaped;
+          `getAirspaces(lat, lon, 10, …)` passes 10 meters, which reads like nautical miles but works with `isInside`;
+          debug `console.log` calls in `formatAirportType` and `StatusLine.destroy` (beside 9a's list).
+        - Displays: the `targetLetterIndex == 9` branches of both deviation bars and the `activeIdx === null` branch of
+          `FlightplanArrow` are dead; `formatDuration` is exported but used only in its file; a negative OTH fuel
+          clamps to 0; single-digit temperatures keep a zero (the 89 could not answer); the Super NAV 1 FLAG row draws
+          22 cells instead of 23.
+        - The KLN 89 trainer brings the cursor back on the first field after it is turned off and on, and on the top
+          visible entry of a scrolled list; 4-3 implies that the 90B remembers the field while the page is not left,
+          which the code does and the 4-3 tests hold.
+    - **Open trainer questions** of Session 9b: duplicate idents on a waypoint page (not done); what the 90B shows on
+      the MSG page without messages (#325; the 89 shows its own text); the prompt while the MSG page shows and an
+      airport below sea level cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is the
+      question #326.
 - **The flown-through bound of `dmeArc.test.ts` does not hold the arc reversal.** With `fromDtk` reversed on arc legs,
   the monitor's bound north of the leg stays green (0.895 NM against a radius of 1.012 NM); only the circle-center
   assertion of the same test fails. A tighter bound, or a second monitor on the arc's radius, would make the flight

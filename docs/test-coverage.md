@@ -515,7 +515,7 @@ in `testing.md` section 7.
 
 ## Session 9b: controls
 
-- [ ] done
+- [x] done
 
 **Goal:** the shared controls (`kln90b/controls/`, `displays/`, `editors/`, `selects/`).
 
@@ -527,6 +527,17 @@ in `testing.md` section 7.
    issues. Session 9a's log lists the leads it left for this session.
 
 **Done when:** every editor and select type has a test, and the log lists the gaps.
+
+Result (session log, section 4): every editor, select and fieldset type has render tests (the latitude and longitude
+editors share `LatLonEditor.test.ts`, and the editor fields are tested through their editors), and every display
+source file a test file of its own on the mounted control (the maintainer's decision); `List`, `FlightplanList`,
+`WaypointDeleteListItem`, `Button`, `PageContainer`, `StatusLine`, `Blink`, `Inverted`, `MessagePage` (with the #191
+pin), `ErrorPage`, the airport and coordinate views and Super NAV 5 left and right have tests too. #40 is not cited: its
+commits touched only the scan code, and the list scrolling fixes (`9a17b5b`, #26) are held by `Oth3Page.test.ts`. The
+controls' bugs pinned on pages (#277, #282, #288, #290) keep those pins and are pinned at control level as well. The
+bugs found were filed and pinned (#302 to #324), the empty MSG page is filed without a pin (#325), the Super NAV 5
+prompt once read is the question #326, and #99, #102, #109, #191, #226, #242, #262 and #263 have comments. The gaps are
+in the log and in `testing.md` sections 6 and 7.
 
 ## Session 10: boot, power and the unit as a whole
 
@@ -572,6 +583,325 @@ in `testing.md` section 7.
 One entry per session run, newest first. Format: date, session, branch, what was done, what was left and why, the
 coverage summary for the session's area at start and end. This is a dated record and is never edited afterwards; a
 later run adds a new entry.
+
+## 2026-10-08, session 9b, branch `tests-session-9b-controls`
+
+**Done**
+- **Design and plan:** `docs/superpowers/specs/2026-10-08-session-9b-controls-design.md` and
+  `docs/superpowers/plans/2026-10-08-session-9b-controls.md`, after a read-only research pass of seven agents in
+  isolated worktrees (A: the editor base and the position, variation, date, time, free-text and surface editors; B: the
+  numeric and frequency editors; C: the waypoint editor and the selectors; D: the fieldsets and the Super NAV 5
+  selectors; E: the lists, `Button` and `PageContainer`; F: the status line, the MSG and error pages, the airport and
+  coordinate views, Super NAV 5 left and right, `Canvas`; G: the displays) and an eighth agent on the KLN 89 trainer
+  (below). Nine tasks: a harness task alone, tasks 1 to 7 in parallel worktrees, this close-out last.
+- **Task 0, harness:** `mount()` renders a display or control on its own, ticked by hand; `blinkCycle` and
+  `mountedCycle` read a flashing cell over the four display ticks of a cycle; `Screen` reads `inverted-blink` without
+  `inverted` as a plain cell and `blink` as hidden, as the CSS renders them; `Screen.read()` throws on a non-blank
+  seventh row of a half page; `SuperNav5.focused()`, `legWorld()` and `arcWorld()`; `unit.panel.type` refuses what the
+  PC keyboard cannot send (anything but A to Z and 0 to 9), so the SUP rows and the #277 pin and sibling of
+  `NdbPage.test.ts` enter their blank cells with the knobs (the #277 pin had stayed an expected failure by a throw, for
+  the wrong reason, and was re-proven by its fix); the mask line of `focused.test.ts` that held the plain decimal point
+  became the #302 pin. Harness tests for each and `testing.md` sections 3, 4, 6 and 7.
+- **Task 1, the editor base and the position, variation, date, time, free-text and surface editors:**
+  `Editor.test.ts`, `TimeEditor.test.ts`, `MagvarEditor.test.ts`, `FreetextEditor.test.ts` and
+  `RunwaySurfaceEditor.test.ts` new, `LatLonEditor.test.ts` and `DateEditor.test.ts` appended, and the #109 pin of
+  `KeyboardService.test.ts` rewritten. The base rules on the SET 1 latitude: opening an edit and the cells the cursor
+  visits (3-14, 3-53, 5-17), the wrap of each cell, the cursor button dropping an edit and ENT on a partly filled field
+  (the trainer); the hemispheres, the latitude and longitude limits (C-1, extended), the hundreds digit of the
+  longitude (3-18, 5-17), dates (5-15, C-1), times (3-54), the variation (5-44), remarks and the Turn-On text (3-47,
+  5-28), runway surfaces (5-17). Pins #99, #109, #303 (three), #304, #305, #306 (two), #307 (two), #308 (two), #311 (the
+  remark line).
+- **Task 2, the numeric and frequency editors:** `DistanceEditor.test.ts`, `RadialEditor.test.ts`,
+  `BearingEditor.test.ts`, `SpeedEditor.test.ts`, `ElevationEditor.test.ts` (with `RunwayLengthEditor`),
+  `VorFreqEditor.test.ts` and `NdbFreqEditor.test.ts` new, `Set1Page.test.ts` appended: the DIS, RAD, NDB and VOR fields
+  (5-18, 5-19, figures 5-64 to 5-74), the ground speed and heading (3-18, 3-19), elevations and runway lengths (5-17),
+  the radial's 359.9 limit (the trainer), the stored digits in their cells. Pins #109 (two), #245, #277, #282, #288
+  (two), #302 (two), #309 (two).
+- **Task 3, the waypoint editor and the selectors:** `WaypointEditor.test.ts` appended; `WaypointSelector`,
+  `AirportSelector`, `VorSelector`, `NdbSelector`, `IntersectionSelector`, `SupplementarySelector`, `NearestSelector`
+  and `CreateWaypointMessage` test files new: the knobs and autocompletion (3-14, 3-20, 3-21), the confirmation and CLR
+  (3-28, 3-29, 4-2), the Direct To cancel after CLR (the trainer), the alternative entry (3-15), the cursor field kept
+  while the page is not left (4-3), NO SUCH WPT on REF (C-2), DUP IDENT (C-1), the nearest rank (3-22, 3-24), the
+  creation block (5-16). The knob tests start from a chosen letter, so they do not hold the blank first click. Pins
+  #262, #276, #290 (two), #306, #310, #311.
+- **Task 4, the fieldsets and the Super NAV 5 selectors:** `SelectField`, `BaroFieldset`, `BearingFieldset`,
+  `FpmFieldset`, `FuelFieldset`, `SpeedFieldset`, `TempFieldset`, `TimeFieldset`, `VnavFieldsets`, `VolumeFieldset`,
+  `MapOrientationSelector`, `ObsDtkElement`, `SuperNav5Field2Selector`, `SuperNav5Field3Selector` and
+  `SuperNav5RangeSelector` test files new, `AltitudeFieldset`, `SuperNav5Field1Selector` and `SuperNav5DirectToSelector`
+  appended, on `legWorld()` and `arcWorld()`: the digit cells and their wraps, the committed values of the CAL, ALT,
+  NAV 4 and OTH pages (3-55, 5-2 to 5-14, 5-40), the OBS course and the DTK flash (4-9, the trainer observation in
+  #263), the Super NAV 5 fields, range and Direct To window (3-35 to 3-38, 6-8, 6-17, 6-18). `Set9Page.test.ts` gained a
+  trainer citation over its wrap row. Pins #255, #256, #312, #313 (two), #314, #315.
+- **Task 5, the lists, `Button` and `PageContainer`:** `List.test.ts`, `FlightplanList.test.ts`,
+  `WaypointDeleteListItem.test.ts` and `Button.test.ts` new, `PageContainer.test.ts` appended: scrolling (3-47, 4-3,
+  4-8), insertion (4-4), the first waypoint of an empty plan (4-2), deletion (4-5, 5-20), the approach header's CLR and
+  inner knob (6-7, the trainer), the DEL question and the knobs (the trainer), the flashing button (3-11) and the hidden
+  button (4-3, 4-4), the PC keyboard mode (characterizations). Pins #242, #316, #317 (two), #318, #319.
+- **Task 6, the status line, the MSG and error pages, the views, Super NAV 5 left and right:** `StatusLine.test.ts`
+  appended, `MessagePage`, `ErrorPage`, `Blink`, `Inverted`, `AirportCoordOrNearestView`, `SuperNav5Left` and
+  `SuperNav5Right` test files new: the status line's message, `ent`, `msg`, CRSR and KYBD (3-10, 3-11, 3-16), the MSG
+  page (3-16, 3-23), the error page's paths (characterizations; #118 keeps the ENT path out), the airspace row of APT 1
+  (3-42), the Super NAV 5 mode row, prompt and menu (3-35 to 3-37, 5-32). Pins #102 (two), #191, #320, #321. The search
+  for a 90B text of the empty MSG page found none, so #325 has no pin.
+- **Task 7, the displays:** a test file per display source file under `test/render/controls/displays/`
+  (`NullDashes.test.ts` stays beside them), on `mount()`: the formats of distances, bearings, durations, times,
+  coordinates, speeds, altitudes, fuel and temperatures, the deviation bars and the leg arrows (3-15, 3-31, 3-32, 4-7,
+  4-12, 5-3 to 5-7 and others). Its fix round turned the TRI 1, TRI 3 and TRI 5 rows that held the hour-less ETE of #324
+  into row comparisons without the ETE and moved the #223 and #254 pins of those files to values above an hour. Pins
+  #99 (two), #223 (two), #225 (two), #226 (three), #230 (two), #263, #266, #308 (two), #322, #323 (two), #324 (three).
+- **Task 8, this close-out:** the issues and comments below, the placeholders replaced in one commit, `testing.md`
+  sections 6 and 7, and this log.
+
+**Rulings**
+- **The maintainer's:**
+    - One test file per display source file, even where a page test already holds the format.
+    - One KLN 89 trainer round after the research and before the design.
+    - The larger harness task 0, with the keyboard guard that changes the existing tests typing a blank.
+    - The evidence rule: the 90B Pilot's Guide and its figures win, the KLN 89 trainer decides where the 90B guide is
+      silent, and a layout that exists only on the 89 (its two- and three-digit blocks) never becomes a pin.
+    - Out of scope: `Canvas` (held by the map tests), the self-test values and the boot sequence (Session 10), the
+      take-home mode.
+    - The task split, the bug table (with F-3 as a question), the issue comments, the models and the workflow:
+      approved.
+- **The controller's** (the design's defaults that the maintainer did not object to, and the ledger):
+    - one issue per shared bug, numbered by the lowest task that pins it; a control-level pin of a bug a page already
+      pins carries the page's issue number;
+    - the editor base rules live in `Editor.test.ts`, and the base characterizations of research B left
+      `DistanceEditor.test.ts` for it;
+    - characterizations the trainer confirms became spec tests citing it, and those it contradicts became pins;
+    - the cursor field kept over CRSR off and on is a spec test on 4-3 (the 90B guide implies it), not a pin, though the
+      89 comes back on the first field;
+    - #303: N 90°30' refused and no 9 in the latitude tens are pins, N 89°59.99' the sibling, E 180°30' refused a pin,
+      E 180°00' untested; the 91-degree refusal is a characterization that retires with the tens fix (the 9 it needs
+      does not exist on the real unit);
+    - the #109 longitude pin asserts what #109 alone decides (the stored longitude and the cells #230 does not touch),
+      not the literal `E  8°30.00'`, which needed both fixes;
+    - #325 is filed without a pin, because no 90B text was found; #315 and the #263 pin of `BearingDisplay` checked the
+      90B figures first (none shows millibars; the 90B pads bearings with zeros, so the pin expects `000°`, not the
+      89's `  0°`);
+    - the #102 pins of APT 1's airspace row live in `AirportCoordOrNearestView.test.ts`;
+    - the `ErrorPage` path tests that inject throws through spies are characterizations;
+    - not added: status line tests of `arm:nnn` and `apr-leg` (Sessions 5 and 8 hold the mode field) and the Super NAV
+      5 VNAV forms in the field 1 file (`Nav4Vnav.test.ts` and `Vnav.test.ts` hold them);
+    - the citations the research called weak: the CAL 6 time cells cite the trainer, the ENT on a select cell cites
+      the video the code cites, the OBS wrap across north cites the trainer observation recorded in #263;
+    - the overlaps of `NullDashes.test.ts`, of the hand-built `NavPageState` stubs of the arrow tests and of the #266
+      control pin (whose comment says that a fix in the nearest views would leave it failing) are accepted;
+    - task reviewers run the mutation pass in the task worktree (rule 24), and tasks 1 to 7 ran in parallel (rule 21);
+    - the first click on an empty remark line (the trainer gives `A`) joined the waypoint editor's first click as one
+      issue (#311), and task 1 added its pin in its fix round;
+    - the OTH 3 pin of #317 turns the knob counterclockwise and expects the entry above (the trainer did not record the
+      direction there), the FPL pin turns clockwise and expects the next waypoint;
+    - each wrap test was split: the wrap is a spec test on the trainer over a plain 0 to 9 cell, and the 90B cells'
+      own ranges (the hundreds of a radial or heading, the blank-first cells) are characterizations;
+    - the trainer ids T1 to T35 stay in the test citations, and this log lists the trainer results under those ids;
+    - the TRI 1, TRI 3 and TRI 5 rows that held the hour-less ETE were changed by task 7 (rule 8), although those files
+      were Session 8's;
+    - the unheld read-message branch of `SuperNav5Left` waits for the question #326.
+- **The plan's changes to the drafts:** the research placeholders `#NEW-A-n` to `#NEW-G-n` were renamed to the task
+  numbers, and the research G placeholder of TRI F REQ became #226; the drafts moved onto task 0's helpers; the F-3 pin
+  and its sibling were dropped for the question; the drafts that typed a blank enter that cell with the knobs; the
+  existing row of `focused.test.ts` that held the plain point became a pin.
+- **Review fix rounds:** every task needed one, and none a second. Task 0: survivors in the new harness code (the
+  `arcWorld` flags and position, a two-row mount, nested flashing, two focused runs, the eighth row). Task 1: the #109
+  literal could not be re-proven by #109's fix alone (a plan defect, ruled above), the 91-degree spec rested on the bug
+  of #303, the remark pins started from the blank first click; the round added the #311 remark pin. Task 2: a radial
+  digit survivor and the wrap labels. Task 3: the first-click sibling asserted its precondition, DUP IDENT by
+  autocompletion and NO SUCH WPT on REF were unheld, a 4-3 comment ran close to the guide's wording. Task 4: the OBS
+  fraction asserted under a trainer citation, the ENT video citation dropped, a minutes citation, survivors. Task 5: the
+  #317 direction on OTH 3, a `Button` blink-phase survivor, comments close to the wording of 4-8. Task 6: flashing
+  prompts asserted as sets, which let phase breaks survive (now per cycle), three citations. Task 7: citations and
+  wording, a FROM triangle survivor, the trip-page rows that froze #324.
+
+**Trainer results** (KLN 89 trainer, 2026-10-08; the maintainer started the VM; paraphrased; high confidence unless
+noted; the ids are the ones the test comments cite)
+- **T1:** the outer knob stops at the first and the last cell of an open edit (latitude, radial, date, an FPL 0 ident),
+  and the edit stays open (#306). On the 89's user waypoint creation page the ident behaved as a finished field
+  (medium).
+- **T2:** CLR during an open edit brings the old value back, the prompt goes, the cursor stays on the field; a following
+  ENT does nothing (#307).
+- **T3:** the cursor button during an open edit turns the cursor off with the old value back (agrees with the code).
+- **T4:** every cell and block wraps in both directions; calculator values change without ENT (agree; spec tests).
+- **T5:** ENT on a partly filled field counts the dashed cells as 0 (agrees).
+- **T6:** the first inner click of an ident entry gives `A` and the first matching ident (#311).
+- **T7:** after the cursor is turned off and on, the 89 comes back on the first field; not a pin (4-3).
+- **T8:** the open longitude edit shows the hundreds digit (`E008°`), the entered value is blank-padded
+  (`E  8°00.00'`) (#304).
+- **T9:** the latitude tens offer 0 to 8 only, so 90° cannot be entered at all (#303).
+- **T10:** a radial of 360.0 cannot be entered; the largest is 359.9 (agrees with the refusal; spec test).
+- **T11:** SET 1 gives back the offered and the entered heading unchanged after the confirmation, also with a manual
+  variation (#309); the ground speed is `005` while open and `  5kt` entered (#245).
+- **T12:** the remark charset has a hyphen between 9 and the blank (#305), and the first click on an empty remark line
+  gives `A` (#311).
+- **T13:** the variation tens offer 0 to 9; a manual variation of 0 shows a blank tens place (a note; characterization).
+- **T14:** the CAL 7 heading is one three-digit block that wraps between 359 and 000 (the wrap agrees; the layout is
+  the 89's).
+- **T15:** the CAL 3 hour wraps from 23 to 00; its minutes are one block (the layout is the 89's).
+- **T16:** 993 mB shows with a blank, ` 993mB` (#315).
+- **T17:** the seconds restart at 00 after a time entry (informative; no test).
+- **T18:** CLR during the FPL 0 confirmation returns to the blank position with the cursor on it, and the next ENT adds
+  nothing (#310).
+- **T19:** CLR during the Direct To confirmation of a typed ident, then ENT, cancels the Direct To (agrees; spec test).
+- **T20:** duplicate idents on a waypoint page: not done.
+- **T21:** on an FPL Del question the outer knob drops the question and moves the cursor on (#317); the inner knob
+  opens an entry in front of the waypoint (agrees); after ENT the cursor is on the waypoint that moved up (#242).
+- **T22:** on the user waypoint list's Del question a second CLR drops it (agrees), the outer knob drops it and moves
+  the cursor to the entry above (#317), the inner knob is ignored (agrees; medium).
+- **T23:** a scrolled list stays scrolled when the cursor is turned off (agrees; spec test); the cursor comes back on
+  the top visible entry (the 89's, as T7).
+- **T24:** the 89 shows no waypoint page during a deletion, so the page after the deletion cannot be asked there (#316
+  rests on the 90B guide, medium).
+- **T25:** the Del question's `?` stands in a fixed column (#318).
+- **T26:** CLR twice on the approach header brings CHANGE APR? back and keeps the approach (agrees).
+- **T27:** the inner knob on the approach header opens an en route entry in front of it (agrees).
+- **T28:** an insertion in a scrolled FPL 0 leaves the page where it was (medium-high, #319).
+- **T29:** with an unseen message on the second MSG page, leaving after the first page keeps the prompt flashing
+  (#191).
+- **T30:** MSG without messages shows a page with a one-line text (`No Message` on the 89) (#325, no pin).
+- **T31:** the prompt while the MSG page shows cannot be asked: the 89's MSG page covers the whole screen.
+- **T32:** the trip calculator shows an ETE below an hour as `0:31` (#324).
+- **T33:** an airport below sea level cannot be asked: the trainer's database has none.
+- **T34:** a bearing goes from 359 to 0 and never shows 360 (medium-high); the 89 pads it `  0°` (#263).
+- **T35:** a position of exactly zero shows `N` and `E` (#308).
+
+The trainer was left with the SET 1 position near its home airport, a take-home heading of 10°, its clock about eight
+minutes ahead, an expired CAL 3 alarm and the CAL 7 heading at 000°; everything else it used was removed or restored.
+
+**Bugs found and filed** (each after a search of the open and closed issues: the titles of all 301 issues, the bodies of
+#36, #109, #218, #225, #226, #242 and #263, and a semantic search, which returned nothing on this repository). Each
+issue says it was found in the headless harness, and none was reproduced in the sim.
+- **#302:** the open DIS field and the NDB frequency leave the decimal point outside the cursor (5-19, figure 5-74; the
+  NDB by extension of figures 5-72 to 5-74). Pinned in `DistanceEditor.test.ts`, `NdbFreqEditor.test.ts` and
+  `focused.test.ts`. A comment on the issue gives the mask by blink phase.
+- **#303:** N 90°30' and E 180°30' are taken, and the latitude tens offer a 9 (C-1, extended; the trainer). Pinned
+  three times in `LatLonEditor.test.ts`.
+- **#304:** the open longitude edit shows a blank hundreds digit (the trainer). Pinned in `LatLonEditor.test.ts`.
+- **#305:** a remark line cannot take a hyphen (3-47, figure 3-144, the trainer). Pinned in `FreetextEditor.test.ts`.
+- **#306:** the outer knob wraps inside an open edit (the trainer; the cell-level twin of #218). Pinned twice in
+  `Editor.test.ts` and in `WaypointEditor.test.ts`.
+- **#307:** CLR during an open edit does nothing (the trainer). Pinned twice in `Editor.test.ts`.
+- **#308:** exactly 0° shows `S` and `W` (the trainer). Pinned in `LatitudeDisplay.test.ts`, `LongitudeDisplay.test.ts`
+  and twice in `LatLonEditor.test.ts`.
+- **#309:** SET 1 CONFIRM? turns the heading by the variation (3-19, the trainer). Pinned twice in `Set1Page.test.ts`.
+- **#310:** CLR while a typed FPL 0 waypoint awaits approval does nothing, and ENT adds it (4-2, the trainer). Pinned in
+  `WaypointEditor.test.ts`.
+- **#311:** the first inner click on an empty text field gives a blank instead of `A`, on the waypoint editor and on a
+  remark line (the trainer); a fix in `WaypointEditor` alone turns red the `FplPage.test.ts` tests that use the blank
+  first click, as the issue says. Pinned in `WaypointEditor.test.ts` and `FreetextEditor.test.ts`.
+- **#312:** Super NAV 5 shows an ETE of `0:60` (3-36; references #223 and #184). Pinned in
+  `SuperNav5Field1Selector.test.ts`.
+- **#313:** the Super NAV 5 cross track shows `.00NM` at 0.996 NM and `10.0NM` in seven cells (6-8, 6-9). Pinned twice
+  in `SuperNav5Field1Selector.test.ts`.
+- **#314:** a CAL 4 angle of 10° or more renders `ANGLE: 1.°` (5-12; related to #257). Pinned in
+  `VnavFieldsets.test.ts`.
+- **#315:** a barometer setting below 1000 mB shows a leading zero (the trainer; no 90B figure shows millibars). Pinned
+  in `BaroFieldset.test.ts`.
+- **#316:** after a deletion on OTH 3 the deleted waypoint's page stays on the right (5-20, 3-14; medium). Pinned in
+  `WaypointDeleteListItem.test.ts`.
+- **#317:** the outer knob is ignored on a DEL question (the trainer). Pinned in `FlightplanList.test.ts` and
+  `WaypointDeleteListItem.test.ts`. Commit `069e537` names the placeholder `#NEW-5-2` in its subject; it means #317.
+- **#318:** the OTH 4 DEL question puts the `?` right after the ident (the trainer, extending the 90B's FPL and OTH 3
+  form). Pinned in `List.test.ts`.
+- **#319:** an insertion in a scrolled FPL 0 makes the page jump to the top (the trainer). Pinned in
+  `FlightplanList.test.ts`.
+- **#320:** after an `ent` prompt that ended in its blink phase the `msg` prompt stays hidden (3-16, figure 3-55).
+  Pinned in `StatusLine.test.ts`.
+- **#321:** Super NAV 5 shows the enroute OBS mode without its colon (5-32; medium). Pinned in `SuperNav5Left.test.ts`.
+- **#322:** FPL 0 keeps the leg symbol during a NAV flag (4-7). Pinned in `FlightplanArrow.test.ts`.
+- **#323:** the Super NAV 1 deviation bar scales 11 cells a side and misses the dots (3-31, 3-32). Pinned twice in
+  `SuperDeviationBar.test.ts`.
+- **#324:** the trip pages show an ETE below an hour as `:13` (3-15, figure 3-50, the trainer). Pinned in
+  `DurationDisplay.test.ts`, `Tri1Page.test.ts` and `Tri5Page.test.ts`.
+- **#325 (no pin):** MSG without messages shows an empty page; the 89 shows a text, and the 90B guide gives none.
+- **#326 (`question`):** should the Super NAV 5 `msg` prompt stay in inverse video once every message is read, as on
+  the status line (3-16, 3-36 by inference; the photos inconclusive)?
+- **Known issues pinned at control level:** #99 (the editors and both displays), #102 (APT 1's airspace row, twice),
+  #109 (the speed and NDB fields), #191, #223 (twice), #225 (twice), #226 (three, with TRI F REQ), #230 (twice), #242
+  (the deletion), #245, #255, #256, #262, #263 (`BearingDisplay`), #266, #276, #277, #282, #288 (twice), #290 (twice).
+- **Comments:** #99 (the editors drop a cell just below a whole degree, `N 46°0.00'` on SET 1, and the display pins),
+  #102 (the APT 1 reproduction and the two pins), #109 (the speed and NDB fields refuse a typed 0, the PC keyboard has
+  no blank, and the rewritten longitude pin), #191 (the trainer confirmed it; the pin), #226 (TRI F REQ and the display
+  pins), #242 (the cursor after a deletion, pinned), #262 (its fix must keep NO SUCH WPT on REF, and
+  `test/render/harness/statusLine.test.ts` uses the bug as its vehicle), #263 (`BearingDisplay` from 359.5, the 89
+  never shows 360, and the OBS wrap spec test).
+
+**Fixes that could not be re-broken:** no test of an old fix was added this session. In the touched files the existing
+regression tests were kept unchanged (the `8c3b2e0` flashing ident, the `eef92e8` six-cell cross track, the `1ef2a35`
+MOVE ?, the #75 keyboard mode, the #54 altitude, the #5 error page, the `10c5a3d` and #64 date tests); their proofs
+were not redone. #40 is not cited: its commits touched only the scan code, and the list fixes `9a17b5b` and #26 stay
+held by `Oth3Page.test.ts`. Survivors that stay unheld: the cursor turned off with the cell's `inverted-blink` left
+(invisible by the CSS rule, held only by the page tests); the null branch of `TimeEditor.convertToValue`; a 1 ft change
+of a user elevation (saved in whole meters); the double `inverted-blink` toggle of `SimpleListItem` and of `Button` and
+`refreshButtons` of an empty plan (equivalent); the read-message branch of `SuperNav5Left` (#326); `bearing - 0.2` in
+`BearingDisplay` (equivalent for the tested inputs); the null longitude of `LongitudeDisplay` (held only by the #224
+pin of `NullDashes.test.ts`); the `Canvas` label placement (`isLineVisible`, the label and icon bitsets), its right
+edge (likely equivalent) and the zero-length guard of `drawLine`.
+
+**The coverage of the area rose by about 3 to 8 points per directory, which says what ran, not what is held**
+(section 1). What holds the controls is each test's proof against a break of its own (the `Proof:` lines of the task
+commits) and the reviewers' mutation passes, whose survivors joined the fix rounds.
+
+**Not covered** (rule 18; the ledger is not committed, so the list is complete here)
+- **`Canvas`** (out of scope; the map tests hold it): the label placement around labels and icons and `isLineVisible`.
+- **Editors:** the NDB frequency range (behind #277); the tenth of `RadialEditor.convertFromValue` (every shown radial
+  meets #281); the null branch of `TimeEditor.convertToValue`; the seconds after a time entry (T17); the sign of an
+  elevation (`ElevationEditor` has none); the VOR frequency's 50 kHz channels (no rule in the guide); the order of the
+  autocompletion in the sim (the fake sorts); duplicate idents on a waypoint page with the trainer (T20).
+- **Status line and Super NAV 5:** `arm:nnn` and `apr-leg` on the status line (Sessions 5 and 8 hold the mode field);
+  the Super NAV 5 VNAV forms in the field 1 file (`Nav4Vnav.test.ts`, `Vnav.test.ts`); the Super NAV 5 prompt once
+  read (#326); the empty MSG page (#325, no 90B text).
+- **Displays:** the CSS flash rate; whether FLAG is inverse on the real unit (characterizations); an altitude or
+  elevation below sea level (a characterization; the trainer could not answer); `DistanceDisplay` below 1 NM with three
+  cells other than 0.2 (#231).
+- **Keyboard:** the focus events and the click outside the instrument (`FakeCoherent` records nothing).
+- **Self-test and boot:** the self-test page hosts only the flashing `Button` test here; its values are Session 10's.
+- **Open, for the final review's fix wave** (the controller updates this list): `test/render/harness/statusLine.test.ts`
+  asserts NO SUCH WPT after an unknown FPL 0 ident and so freezes #262 (rule 8); `AltitudeFieldset.saveAlt100` zeroing
+  the read-only tens is a surviving mutation; the HPA barometer's first-cell list without `07` is a surviving
+  mutation.
+- **Review notes left as they are** (deferred minors): the harness test of `typeBelow1000`'s blank cell is not
+  load-bearing (its sibling guards it); the #191 pin leaves the MSG page with ENT, where the trainer used the knob; the
+  4-3 cursor tests sit in `WaypointEditor.test.ts` though their subject is `CursorController`, and the label of the CRSR
+  restore test (task 3's M-4, M-6); `LatLonEditor.test.ts:311` is 122 characters and a JSDoc of `openOnBlank` in
+  `FreetextEditor.test.ts` wraps badly; task 4's review notes M3 to M6; task 7's suggestions to name #231 in the
+  three-cell distance test, to cite 5-3 for `1:08` and to recheck the #99 trainer claim, the zero pad of the `050kt`
+  rows inferred from TRI 0, a stray blank line in `TimeDisplay.test.ts` and the `bootTri5` signature over 120
+  characters; the duplicated `expectFlashing` and `showSuperNav5` helpers (`testing.md` section 7).
+- Leads seen and not filed: `testing.md` section 7 (Session 9b's list).
+
+**Workflow notes.** The research worktrees and the task worktrees started at `origin/main` and were reset to the session
+branch first; each got a junction to the main checkout's `node_modules`, to be removed with `rmdir` before `git
+worktree remove` once the maintainer approves the session. Each agent used its own scratch folder. Task 0 ran alone;
+tasks 1 to 7 ran in parallel on Sonnet and merged in the order 6, 5, 2, 3, 4, 1, 7; reviewers ran on Opus for tasks 1,
+3, 5 and 6 and on Sonnet for the others, re-reviews on Sonnet; the close-out ran on Opus in the main checkout, because
+it needed GitHub. The working tree is CRLF while the drafts were partly LF; the implementers normalized their files,
+and the placeholder commit kept the endings. Task 5's fix round put a placeholder into a commit subject (`069e537`),
+which cannot be amended; #317 names it. The GitHub listing of all issues worked; the semantic search returned nothing,
+as the plan expected, so the duplicate check rested on the full title list and the bodies of the close candidates. One
+filed issue (#302) needed a follow-up comment to state its mask by blink phase.
+
+**Coverage at the start of the session** (identical to the end of session 9a) **and at the end** (all tests green):
+
+| directory                  | % stmts start | % stmts end | % lines start | % lines end |
+|----------------------------|--------------:|------------:|--------------:|------------:|
+| all files                  |         90.72 |       92.29 |         90.61 |       92.24 |
+| `kln90b/controls`          |         88.91 |       94.26 |         88.68 |       94.14 |
+| `kln90b/controls/displays` |         90.27 |       93.31 |         90.06 |       93.16 |
+| `kln90b/controls/editors`  |         90.71 |       95.24 |         90.40 |       95.08 |
+| `kln90b/controls/selects`  |         82.30 |       89.92 |         81.10 |       89.24 |
+| `kln90b/pages`             |         82.52 |       82.89 |         82.31 |       82.69 |
+| `kln90b/pages/left`        |         92.30 |       92.65 |         92.36 |       92.71 |
+
+The files of the area below 60 % at the start (statements, from the design) and at the end: `Blink.tsx` 0 and 88.88,
+`SuperDeviationBar.tsx` 53.33 and 73.33, `SuperNav5Field1Selector.tsx` 54.16 and 83.33, `FuelFieldset.tsx` 59.09 and
+79.54. The lowest files of the area at the end are `SuperDeviationBar.tsx` (73.33), `NearestSelector.tsx` (73.52) and
+`FpmFieldset.tsx` (76.00). `kln90b/pages/right` and `kln90b/services` did not change.
+
+The suite at the start: 2122 tests passed and 279 expected failures, in 241 files. At the end: 2635 tests passed and
+350 expected failures, in 304 files. The new expected failures are pins: #99 (three), #102 (two), #109 (two), #191,
+#223 (two), #225 (two), #226 (three), #230 (two), #242, #245, #255, #256, #262, #263, #266, #276, #277, #282, #288
+(two), #290 (two), #302 (three), #303 (three), #304, #305, #306 (three), #307 (two), #308 (four), #309 (two), #310,
+#311 (two), #312, #313 (two), #314, #315, #316, #317 (two), #318, #319, #320, #321, #322, #323 (two), #324 (three).
 
 ## 2026-10-08, session 9a, branch `tests-session-9-right-pages`
 
