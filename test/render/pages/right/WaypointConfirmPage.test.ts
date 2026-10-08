@@ -29,7 +29,8 @@ describe('waypoint confirmation page', () => {
         insertLeg(unit, 0, kaaa);
         insertLeg(unit, 1, inta);
         await vi.advanceTimersByTimeAsync(3000);
-        expect(Screen.read().rows('R')[0]).toBe('› 2 INTA I ');
+        // Only the start of the row: the cell of the type letter shifts with the blank cell of a short ident (#NEW-4-2)
+        expect(Screen.read().rows('R')[0].slice(0, 8)).toBe('› 2 INTA');
         await unit.panel.cursor('R');
         await vi.advanceTimersByTimeAsync(9000);
         await unit.panel.enterIdent('R', 'XYZ');
@@ -39,6 +40,24 @@ describe('waypoint confirmation page', () => {
         expect(Screen.read().rows('R')[0]).toBe(plainRow0);
         expect(Screen.read().rows('R')[0]).not.toContain(' 2 ');
         expect(unit.errors).toEqual([]);
+    });
+
+    // 3-20 (the character set has a blank between 9 and A) and the KLN 89 trainer, 2026-10-07 (medium): the blank cell
+    // of a four-character ident is a cell of its own, so the type letter keeps its place after it. The blank cell has no
+    // glyph (#NEW-4-2) and the letter moves one cell left. Sibling: the test above (same setup, start of the row).
+    it.fails('keeps the type letter after the blank cell of a four-character ident on ACT (3-20, the KLN 89 trainer, #NEW-4-2)', async () => {
+        const kaaa = airport('KAAA', 47.0, 7.9);
+        const inta = intersection('INTA', 47.1, 8.0);
+        const unit = await bootUnit({
+            facilities: [kaaa, inta, vor('ABC', 47.2, 8.0)],
+            position: {lat: 47.0, lon: 8.0},
+        });
+        await unit.panel.selectPage('R', 'ACT  ');
+        insertLeg(unit, 0, kaaa);
+        insertLeg(unit, 1, inta);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(Screen.read().rows('R')[0]).toBe('› 2 INTA  I');
     });
 });
 
