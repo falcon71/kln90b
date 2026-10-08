@@ -9,6 +9,8 @@ import {approach, Leg, sid, withProcedures} from '../../../harness/navdata/proce
 import {savedFlightplan} from '../../../harness/storage';
 import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {collectStatusMessages} from '../../../harness/statusLine';
+import {EVT_CLR} from '../../../../kln90b/HEvents';
+import {MainPage} from '../../../../kln90b/pages/MainPage';
 
 const rows = (side: 'L' | 'R') => Screen.read().half(side).split('\n').map(r => r.trimEnd());
 
@@ -117,6 +119,33 @@ describe('APT 8 putting an approach into FPL 0', () => {
         expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0);
     });
 
+    // 6-7: an approach is changed through the FPL 0 header: with the left cursor on it reads CHANGE APR?, ENT opens APT 8,
+    // and the approach loaded there takes the place of the one in FPL 0. The route the guide describes, which does not depend
+    // on the question of #NEW-2-4
+    it('replaces the approach in FPL 0 when it is changed through CHANGE APR? (6-7)', async () => {
+        const {w, kprc, facilities} = twoApproaches();
+        const unit = await bootUnit({facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, kprc])});
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8'); // RNAV 18
+        expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0);
+
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'CHANGE APR?');
+        await unit.panel.ent();
+        expect(rows('R').slice(0, 2)).toEqual([' KPRC IAP', ' 1 RNAV 18']); // APT 8 is open on the approach list
+
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1); // VOR 09
+        await unit.panel.ent();
+        await unit.panel.ent(); // LOAD IN FPL
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fpl0Legs(unit)).toEqual([
+            ['ENRAA', KLNLegType.USER], ['IAFBB', KLNLegType.APP], ['FAFBB', KLNLegType.APP], ['MAPAA', KLNLegType.APP],
+            ['KPRC', KLNLegType.USER],
+        ]);
+    });
+
     // 6-5, B-3: the message after loading an approach whose waypoint is also an enroute waypoint of FPL 0
     describe('the REDUNDANT WPTS message (6-5)', () => {
         const REDUNDANT = 'REDUNDANT WPTS IN FPL EDIT ENROUTE WPTS AS NECESSARY';
@@ -222,7 +251,7 @@ describe('APT 8 loading an approach when FPL 0 has to make room', () => {
  * approach. FPL 0 stays empty and the aircraft is 40 NM north of KPRC, so APT 8 opens on KPRC (the nearest airport) and
  * the unit asks to add KPRC on LOAD IN FPL.
  */
-function iapWorld(o: { extraApproaches?: number, circlingFirst?: boolean } = {}) {
+function iapWorld(o: { extraApproaches?: number, circlingFirst?: boolean, singleIaf?: boolean, rfSecond?: boolean } = {}) {
     const w = approachWorld();
     const iafab = intersection('IAFAB', pointFrom(w.iafaa, 270, 5).lat, pointFrom(w.iafaa, 270, 5).lon);
     const rnav18 = approach({
@@ -238,12 +267,29 @@ function iapWorld(o: { extraApproaches?: number, circlingFirst?: boolean } = {})
         final: [Leg.IF(w.fafaa, FixTypeFlags.FAF), Leg.TF(w.mapaa, FixTypeFlags.MAP)],
     });
     const extra = ['B', 'C', 'D', 'E', 'F'].slice(0, o.extraApproaches ?? 0).map(circling);
-    const list = o.circlingFirst ? [circling('A'), rnav18, ...extra] : [rnav18, circling('A'), ...extra];
+    // VOR 09 with the one IAF IAFAA, listed last
+    const vor09 = approach({
+        type: ApproachType.APPROACH_TYPE_VOR, runway: '09',
+        transitions: [{name: 'IAFAA', legs: [Leg.IF(w.iafaa, FixTypeFlags.IAF), Leg.TF(w.ifaaa)]}],
+        final: [Leg.IF(w.ifaaa), Leg.TF(w.fafaa, FixTypeFlags.FAF), Leg.TF(w.mapaa, FixTypeFlags.MAP)],
+    });
+    // An approach with an RF leg is one the unit leaves out (SidStar.isApproachRecognized)
+    const withRf = approach({
+        type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+        final: [Leg.IF(w.fafaa, FixTypeFlags.FAF), Leg.RF(w.mapaa)],
+    });
+    const list = [
+        ...(o.circlingFirst ? [circling('A'), rnav18] : [rnav18]),
+        ...(o.rfSecond ? [withRf] : []),
+        ...(o.circlingFirst ? [] : [circling('A')]),
+        ...extra,
+        ...(o.singleIaf ? [vor09] : []),
+    ];
     const kprc = withProcedures(w.kprc, {approaches: list});
     return {facilities: [kprc, w.enraa, w.iafaa, iafab, w.ifaaa, w.fafaa, w.mapaa], position: w.north(40)};
 }
 
-async function bootOnApt8(o: { extraApproaches?: number, circlingFirst?: boolean, start?: Date } = {}): Promise<HeadlessUnit> {
+async function bootOnApt8(o: { extraApproaches?: number, circlingFirst?: boolean, singleIaf?: boolean, rfSecond?: boolean, start?: Date } = {}): Promise<HeadlessUnit> {
     const unit = await bootUnit({...iapWorld(o), start: o.start});
     await settle(unit);
     await unit.panel.selectPage('R', 'APT 8');
@@ -252,7 +298,8 @@ async function bootOnApt8(o: { extraApproaches?: number, circlingFirst?: boolean
 
 describe('APT 8 approach list (3-49, 6-4)', () => {
     // 3-49, figure 3-149: the airport with IAP, then the approaches numbered from 1, a circling approach as VOR-A. A
-    // photo of a real unit (KMBT, reference photo index) shows RNAV 18 the same way. There is only one APT 8 page
+    // photo of a real unit (KMBT-appch-select.jpg in the reference photos) shows RNAV 18 the same way. 3-49 also says that
+    // APT 8 never has a second page
     it('lists the approaches numbered from 1 under the airport and IAP, on one APT 8 page (3-49)', async () => {
         await bootOnApt8();
 
@@ -268,7 +315,7 @@ describe('APT 8 approach list (3-49, 6-4)', () => {
         expect(rows('R')).toEqual([' KAAA IAP', 'NO APPROACH', 'FOR THIS', 'AIRPORT', 'IN DATABASE', '']);
     });
 
-    // 6-4 step 3: the cursor comes up on the first approach of the list
+    // 6-4 step 3: the cursor starts on the first entry of the approach list
     it('puts the cursor on the first approach when it comes on (6-4)', async () => {
         const unit = await bootOnApt8();
 
@@ -277,10 +324,11 @@ describe('APT 8 approach list (3-49, 6-4)', () => {
         expect(unit.panel.focused('R')).toEqual({row: 1, col: 12, text: ' 1 RNAV 18 '});
     });
 
-    // 6-3, C-2: OUTDATED DB when an approach is selected with a database that has expired. The sibling below holds that
-    // the message needs the expired database. The default start of the fake clock lies in the navdata cycle;
-    // 2026-07-01 is after it (sim/clock.ts)
-    it('shows OUTDATED DB when the cursor comes on with an expired database (6-3, C-2)', async () => {
+    // 6-1 (the caution) and C-2 (the message list): an expired database shows OUTDATED DB when the pilot tries to select
+    // an approach. That the message already appears when the cursor comes on, and only then, is the behavior of the KLN 89
+    // trainer, which the code follows (Apt8Page.warnIfDBOutdated). The sibling below holds that the message needs the
+    // expired database. The default start of the fake clock lies in the navdata cycle; 2026-07-01 is after it (sim/clock.ts)
+    it('shows OUTDATED DB once when the cursor comes on with an expired database (6-1, C-2, KLN 89 trainer)', async () => {
         const unit = await bootOnApt8({start: new Date('2026-07-01T12:00:00Z')});
         const seen = collectStatusMessages(unit);
 
@@ -288,12 +336,17 @@ describe('APT 8 approach list (3-49, 6-4)', () => {
 
         expect(seen).toEqual(['OUTDATED DB']);
         expect(Screen.read().status().mode).toBe('OUTDATED DB');
+
+        await unit.panel.cursor('R'); // turning the cursor off posts nothing
+
+        expect(seen).toEqual(['OUTDATED DB']);
     });
 
-    it('shows no status line message when the cursor comes on with a current database (6-3, C-2)', async () => {
+    it('shows no status line message when the cursor comes on or goes off with a current database (6-1, C-2, KLN 89 trainer)', async () => {
         const unit = await bootOnApt8();
         const seen = collectStatusMessages(unit);
 
+        await unit.panel.cursor('R');
         await unit.panel.cursor('R');
 
         expect(seen).toEqual([]);
@@ -346,10 +399,27 @@ describe('APT 8 selecting an approach (6-4, 6-5)', () => {
     });
 });
 
+describe('APT 8 selecting an approach with one IAF (6-5)', () => {
+    // 6-5: CLR goes back one step. An approach with a single IAF has no IAF step, so its waypoints go straight back to the
+    // approach list
+    it('returns from the waypoints of an approach with one IAF straight to the approach list (6-5)', async () => {
+        const unit = await bootOnApt8({singleIaf: true});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 2);
+        await unit.panel.ent(); // VOR 09: the IAF is taken without a question
+        expect(rows('R')[5]).toBe('LOAD IN FPL');
+
+        await unit.panel.clr();
+
+        expect(rows('R').slice(0, 3)).toEqual([' KPRC IAP', ' 1 RNAV 18', ' 2 VOR-A']);
+    });
+});
+
 describe('APT 8 cursor after CLR', () => {
     // Checked in the KLN 89 trainer, 2026-10-07: CLR from the waypoint list of an approach returned to the approach list with
-    // the cursor on, on the approach that had been chosen. The sibling of the pin below: RNAV 18, the second entry, is
-    // chosen, and CLR from its IAF list returns to the approach list
+    // the cursor on, on the approach that had been chosen. The trainer's database has no approach with several IAFs, so the
+    // same for CLR from the IAF list is by analogy (medium confidence). The sibling of the pin below: RNAV 18, the second
+    // entry, is chosen, and CLR from its IAF list returns to the approach list
     it('returns from the IAF list of the second approach to the approach list (6-5)', async () => {
         const unit = await bootOnApt8({circlingFirst: true});
         await unit.panel.cursor('R');
@@ -374,7 +444,26 @@ describe('APT 8 cursor after CLR', () => {
     });
 });
 
+/** CLR through the main page, as the unit sees it: whether the pages handled it (CLAUDE.md, Input) */
+const clrHandled = (unit: HeadlessUnit): boolean => (unit.props.pageManager.getCurrentPage() as MainPage).onInteractionEvent(EVT_CLR);
+
 describe('APT 8 page (characterization)', () => {
+    it('leaves out an approach with an RF leg and numbers the others from 1', async () => {
+        await bootOnApt8({rfSecond: true});
+
+        expect(rows('R').slice(0, 3)).toEqual([' KPRC IAP', ' 1 RNAV 18', ' 2 VOR-A']);
+    });
+
+    it('does not handle CLR on the approach list, but handles it one step further', async () => {
+        const unit = await bootOnApt8();
+        await unit.panel.cursor('R');
+        expect(clrHandled(unit)).toBe(false);
+        expect(rows('R').slice(0, 3)).toEqual([' KPRC IAP', ' 1 RNAV 18', ' 2 VOR-A']);
+
+        await unit.panel.ent(); // RNAV 18: the IAF list
+        expect(clrHandled(unit)).toBe(true);
+    });
+
     it('scrolls a list of more than five approaches and keeps the last on the bottom line', async () => {
         const unit = await bootOnApt8({extraApproaches: 5});
         await unit.panel.cursor('R');

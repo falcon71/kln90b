@@ -139,7 +139,7 @@ describe('APT 5 remarks of an 11th airport (#92)', () => {
         return seen;
     }
 
-    // 3-47: up to 100 airports may hold remarks. The sibling of the pin below: nine airports are stored, KAAA is the tenth
+    // 3-47: the remark store has room for 100 airports. The sibling of the pin below: nine airports are stored, KAAA is the tenth
     it('accepts the remarks of a 10th airport without a status line message (3-47)', async () => {
         const unit = await bootUnit({facilities: [KAAA()], position: {lat: 47, lon: 8}, storage: storedRemarks(9)});
 
