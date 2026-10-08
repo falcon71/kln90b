@@ -373,6 +373,10 @@ describe('Screen, the inverted-blink class', () => {
         expect(maskOf('<span class="blink">A</span><span class="inverted inverted-blink blink">B</span>')).toBe('BB.........');
     });
 
+    it('reads inverted-blink inside a cell that already reads flashing as flashing', () => {
+        expect(maskOf('<span class="inverted inverted-blink"><span class="inverted-blink">A</span></span>')).toBe('F..........');
+    });
+
     it('reads the plain cell next to an inverted-blink cell as normal', () => {
         expect(maskOf('<span class="inverted-blink">A</span>B<span class="inverted">C</span>')).toBe('..I........');
     });
@@ -396,6 +400,11 @@ describe('Screen, a seventh row of a half page', () => {
     it('throws for an inverted blank in a seventh row, which the pilot would see', () => {
         mount(left(rows(7, '<span class="inverted">&nbsp;</span>')));
         expect(() => Screen.read()).toThrow(/the left half has a row past the sixth/);
+    });
+
+    it('throws when only an eighth row holds text', () => {
+        mount(left(rows(8, 'HIDDEN').replace('ROW6', '&nbsp;')));
+        expect(() => Screen.read()).toThrow('Screen: the left half has a row past the sixth: "HIDDEN"');
     });
 
     it('reads a half page whose seventh row is blank', () => {

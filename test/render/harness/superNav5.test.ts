@@ -126,6 +126,13 @@ describe('SuperNav5.focused (harness)', () => {
         expect(SuperNav5.focused(document.getElementById('other'))).toEqual(['AB ']);
     });
 
+    it('returns every inverted run of the left column, in order', () => {
+        document.body.innerHTML = '<div id="other"><pre class="super-nav5-left-controls">'
+            + '<span class="inverted">AB</span> <span class="inverted">CD\u00a0</span></pre></div>';
+
+        expect(SuperNav5.focused(document.getElementById('other'))).toEqual(['AB', 'CD ']);
+    });
+
     it('throws without a #pageContainer', () => {
         document.body.innerHTML = '';
         expect(() => SuperNav5.focused()).toThrow(/no #pageContainer/);

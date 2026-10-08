@@ -46,10 +46,10 @@ export const SuperNav5 = {
     },
 
     /**
-     * The focused field(s) of the Super NAV 5 left column: the text of its inverted runs, without the msg prompt (the
-     * first span of the message and range overlay, inverted while a message is unread; the range selector, which shares
-     * the overlay, counts), with no-break spaces turned back into blanks. SuperNav5.read() has no mask,
-     * so this is how a test finds out which field the cursor is on.
+     * The focused field(s) of the Super NAV 5 left column: the text of its inverted runs, with no-break spaces turned
+     * back into blanks. SuperNav5.read() has no mask, so this is how a test finds out which field the cursor is on.
+     * The msg prompt is left out: it is the first span of the message and range overlay and is inverted while a message
+     * is unread. The range selector shares that overlay and does count.
      */
     focused(container: Element | null = document.getElementById('pageContainer')): string[] {
         if (container === null) throw new Error('SuperNav5.focused: no #pageContainer; has the unit booted?');

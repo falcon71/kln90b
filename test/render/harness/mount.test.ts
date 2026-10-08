@@ -1,5 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
+import {FSComponent} from '@microsoft/msfs-sdk';
 import {mount} from '../../harness/render/mount';
+import {NO_CHILDREN, UiElement} from '../../../kln90b/pages/Page';
 import {BearingDisplay} from '../../../kln90b/controls/displays/BearingDisplay';
 import {Blink} from '../../../kln90b/controls/Blink';
 import {TextDisplay} from '../../../kln90b/controls/displays/TextDisplay';
@@ -39,6 +41,19 @@ describe('mount (harness)', () => {
         expect(m.mask()).toBe('II');
         m.tick(true);
         expect(m.mask()).toBe('BB');
+    });
+
+    it('joins the rows of a control with a newline in text() and in mask()', () => {
+        const twoRows: UiElement = {
+            children: NO_CHILDREN,
+            tick: () => undefined,
+            render: () => FSComponent.buildComponent('span', null, 'AB', FSComponent.buildComponent('br', null),
+                FSComponent.buildComponent('span', {class: 'inverted'} as any, 'CD')),
+        };
+        const m = mount(twoRows);
+
+        expect(m.text()).toBe('AB\nCD');
+        expect(m.mask()).toBe('..\nII');
     });
 
     it('leaves a d-none subtree out of the text, as the screen does', () => {

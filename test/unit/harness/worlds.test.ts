@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {BoundaryType, LegTurnDirection, LegType, UnitType, VorFacility} from '@microsoft/msfs-sdk';
+import {BoundaryType, FixTypeFlags, LegTurnDirection, LegType, UnitType, VorFacility} from '@microsoft/msfs-sdk';
 import {arcWorld, centerWorld, dtWorld, legWorld} from '../../harness/fixtures';
 import {courseDeg, distanceNm} from '../../harness/flight/geo';
 
@@ -127,6 +127,19 @@ describe('arcWorld (harness)', () => {
         expect([arc.originIcaoStruct.ident, arc.course, arc.theta, arc.turnDirection]).toEqual(['ABC', 270, 180, LegTurnDirection.Left]);
         expect(UnitType.METER.convertTo(arc.rho, UnitType.NMILE)).toBeCloseTo(10, 6);
         expect(a.finalLegs.map(l => [l.type, l.fixIcaoStruct.ident])).toEqual([[LegType.TF, 'MAPAA']]);
+    });
+
+    it('flags the IAF, the FAF and the MAP, and makes the approach an RNAV approach', () => {
+        const a = w.kprc.approaches[0];
+
+        expect(a.approachType).toBe(ApproachType.APPROACH_TYPE_RNAV);
+        expect(a.transitions[0].legs.map(l => l.fixTypeFlags)).toEqual([FixTypeFlags.IAF, 0, FixTypeFlags.FAF]);
+        expect(a.finalLegs.map(l => l.fixTypeFlags)).toEqual([FixTypeFlags.MAP]);
+    });
+
+    it('puts KPRC at 47.0 N, 8.0 E and gives ABC no magnetic variation of its own', () => {
+        expect([w.kprc.lat, w.kprc.lon]).toEqual([47.0, 8.0]);
+        expect(w.abc.magneticVariation).toBe(0);
     });
 
     it('lists every facility the world needs, KPRC first', () => {

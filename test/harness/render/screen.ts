@@ -17,13 +17,13 @@ const SEPARATOR = '|';
  * text transparent. So:
  * - `blink` hides the text, whatever else the element has: `B`;
  * - `inverted-blink` on top of `inverted` (the element itself or an ancestor) is the normal phase of a flashing field,
- *   which the screen alternates with the inverse phase: `F`;
+ *   which the screen alternates with the inverse phase: `F`; inside a cell that reads `F` already it keeps `F`;
  * - `inverted-blink` without `inverted` is plain green text, as normal as the cell without the class: it changes
  *   nothing (the StatusLine's `ent` keeps the class while an unread `msg` toggles it);
  * - `inverted` alone: `I`.
  */
 function attrOf(el: Element, inherited: CellAttr): CellAttr {
-    const inverted = el.classList.contains('inverted') || inherited === 'I' || inherited === 'F';
+    const inverted = el.classList.contains('inverted') || inherited === 'I';
     if (el.classList.contains('blink')) return 'B';
     if (el.classList.contains('inverted-blink') && inverted) return 'F';
     if (el.classList.contains('inverted')) return 'I';
