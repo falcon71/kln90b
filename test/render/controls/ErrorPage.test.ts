@@ -61,3 +61,47 @@ describe('error page (characterization) (#5)', () => {
         expect(isShown()).toBe(false);
     });
 });
+
+// CLAUDE.md, Architecture: exceptions in ticks and in input are caught and shown on the error page. The throws are
+// injected with a spy, because a throw the code makes on its own is a bug that a fix would remove from the test
+describe('error page, the paths that reach it (characterization)', () => {
+    it('shows an error thrown in a display tick', async () => {
+        silenceConsoleError();
+        const unit = await bootUnit();
+        // StatusLine asks for the messages on every display tick
+        vi.spyOn(unit.props.messageHandler, 'hasMessages').mockImplementation(() => {
+            throw new Error('display boom');
+        });
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(isShown()).toBe(true);
+        expect(page().querySelector('.errormessage')!.textContent!.startsWith('Error: display boom')).toBe(true);
+    });
+
+    it('shows an error thrown in a calculation tick', async () => {
+        silenceConsoleError();
+        const unit = await bootUnit();
+        // MessageHandler is one of the calculation tickables
+        vi.spyOn(unit.props.messageHandler, 'tick').mockImplementation(() => {
+            throw new Error('calc boom');
+        });
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(isShown()).toBe(true);
+        expect(page().querySelector('.errormessage')!.textContent!.startsWith('Error: calc boom')).toBe(true);
+    });
+
+    it('shows an error thrown while a knob event is handled', async () => {
+        silenceConsoleError();
+        const unit = await bootUnit();
+        vi.spyOn(unit.props.pageManager, 'onInteractionEvent').mockImplementationOnce(() => {
+            throw new Error('input boom');
+        });
+        expect(isShown()).toBe(false);
+
+        await unit.panel.inner('L', 1);
+
+        expect(isShown()).toBe(true);
+        expect(page().querySelector('.errormessage')!.textContent!.startsWith('Error: input boom')).toBe(true);
+    });
+});
