@@ -510,7 +510,7 @@ describe('stored user intersection', () => {
     const moved = () => pointFrom({lat: 47.0, lon: 11.0}, 45, distanceNm({lat: 47.0, lon: 11.0}, {lat: 47.1, lon: 11.0}));
 
     // Sibling of the pin below: the new radial moves the stored waypoint
-    it('moves the waypoint to the entered radial (5-19)', async () => {
+    it('moves the waypoint to the entered radial (characterization)', async () => {
         const unit = await radialEntered();
 
         const [w] = userWaypoints(unit);
@@ -518,8 +518,10 @@ describe('stored user intersection', () => {
         expect(w[4]).toBeCloseTo(moved().lon, 6);
     });
 
-    // 5-19 step 12: a new radial gives a new position, which the page shows (47.07066 N 11.10382 E). IntPage.setRad
-    // updates the repository but does not redraw, so the old position stays on the page
+    // The guide has no page on changing a stored user waypoint. 5-19 step 12 computes the position from REF, RAD and DIS
+    // and shows it, and 3-50 has the INT page show the position of the intersection; both are extended here to a change
+    // of RAD on a stored waypoint, which gives 47.07066 N 11.10382 E. IntPage.setRad updates the repository but does not
+    // redraw, so the old position stays on the page
     it.fails('shows the position of the entered radial (5-19, #NEW-3-11)', async () => {
         await radialEntered();
         await vi.advanceTimersByTimeAsync(2000);
