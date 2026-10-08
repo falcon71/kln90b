@@ -242,6 +242,11 @@ describe('ACT page, scanning FPL 0 (4-10)', () => {
         await vi.advanceTimersByTimeAsync(1000);
         expect(Screen.read().rows('R')[0]).toBe('  4 KBBB  A');
 
+        // One click back is one waypoint back, away from the clamp at the first waypoint
+        await unit.panel.inner('R', -1);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('R')[0].slice(0, 7)).toBe('  3 DEF');
+
         await unit.panel.inner('R', -3);
         await vi.advanceTimersByTimeAsync(1000);
         expect(Screen.read().rows('R')[0]).toBe('  1 KAAA  A');

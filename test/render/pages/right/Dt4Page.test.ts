@@ -56,6 +56,24 @@ describe('D/T 4 page', () => {
         expect(rows[4]).toBe('FLT     :10');
     }, 30_000);
 
+    // 4-13: with RUN WHEN GS > 30KT, FLT does not run below 30 kt: after ten minutes at rest TIME has moved on, FLT and
+    // DEP have not
+    it('does not count the flight time below 30 kt (4-13)', async () => {
+        const {kaaa, abc, def, kbbb} = dtWorld();
+        const unit = await bootUnit({
+            facilities: [kaaa, abc, def, kbbb], position: {lat: 47.1, lon: 10.0}, storage: savedFlightplan(0, [kaaa, abc, def, kbbb]),
+        });
+        await settle(unit);
+        await show(unit, 'FPL 0');
+
+        await vi.advanceTimersByTimeAsync(600_000);
+
+        const rows = Screen.read().rows('R');
+        expect(rows[1]).toBe('DEP   --:--');
+        expect(rows[2]).toBe('TIME  12:10');
+        expect(rows[4]).toBe('FLT     :00');
+    }, 30_000);
+
     // 4-13: the time zone changes with the right cursor and the inner knob; GST is three hours behind UTC
     it('changes the time zone with the right cursor (4-13)', async () => {
         const {kaaa, abc, def, kbbb} = dtWorld();

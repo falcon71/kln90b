@@ -4,7 +4,7 @@ import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
-import {courseDeg} from '../../../harness/flight/geo';
+import {courseDeg, distanceNm} from '../../../harness/flight/geo';
 import {collectStatusMessages} from '../../../harness/statusLine';
 
 // The world of the REF tests: a leg KAAA to KBBB due north along 10 E, a VOR TXK 0.3 degree east of the middle of the
@@ -42,11 +42,15 @@ async function enterReference(unit: HeadlessUnit, ident: string): Promise<void> 
     await vi.advanceTimersByTimeAsync(500);
 }
 
-/** FPL 2 KAAA to KBBB along 10 E across the equator, TXK 0.3 degree east of it with 10 degrees of easterly variation */
+/**
+ * FPL 2 KAAA to KBBB along 10 E across the equator, TXK 0.3 degree east of it. The area has 10 degrees of easterly
+ * variation, the station TXK its own 4 degrees east, so a conversion with the local variation cannot pass for one with
+ * the station's.
+ */
 async function bootOnEquator(): Promise<HeadlessUnit> {
     const kaaa = airport('KAAA', -0.5, 10.0);
     const kbbb = airport('KBBB', 0.5, 10.0);
-    const txk = vor('TXK', 0.0, 10.3, {magneticVariation: -10}); // 10 E as NAV 2 reads a VOR (Nav2Page.tsx:79)
+    const txk = vor('TXK', 0.0, 10.3, {magneticVariation: -4}); // 4 E as NAV 2 reads a VOR (Nav2Page.tsx:79)
     const unit = await bootUnit({
         facilities: [kaaa, kbbb, txk], position: {lat: -0.4, lon: 10.0}, magvar: 10,
         storage: savedFlightplan(2, [kaaa, kbbb]),
@@ -137,6 +141,8 @@ describe('REF page', () => {
     // only because its focus lands on the wrong entry (#242)
     it.fails('inserts the reference waypoint into FPL 0 after the approval (5-21, #NEW-5-1)', async () => {
         const unit = await bootOnRef('FPL 0');
+        expect(Screen.read().status().left).toBe('FPL 0'); // precondition: the REF page asks for the waypoint beside FPL 0
+        expect(Screen.read().rows('R')[2]).toBe('ENTER REF  ');
 
         await enterReference(unit, 'TXK');
         await unit.panel.ent();
@@ -156,9 +162,9 @@ describe('REF page', () => {
         expect(Screen.read().status().left).toBe('CRSR');
     });
 
-    // 5-21 note, figure 5-81, C-2: a waypoint from which a perpendicular reaches only the extension of a leg is not a
+    // 5-21 note, figure 5-81, C-1: a waypoint from which a perpendicular reaches only the extension of a leg is not a
     // valid reference
-    it('refuses a waypoint whose perpendicular misses every leg with INVALID REF (5-21, C-2)', async () => {
+    it('refuses a waypoint whose perpendicular misses every leg with INVALID REF (5-21, C-1)', async () => {
         const unit = await bootOnRef('FPL 2');
 
         await enterReference(unit, 'GRW');
@@ -169,8 +175,8 @@ describe('REF page', () => {
         expect(idents(unit, 2)).toEqual(['KAAA', 'KBBB']);
     });
 
-    // C-2: a waypoint is no valid reference either when no letter A to Z gives a free identifier
-    it('refuses a waypoint whose identifiers with A to Z are all taken with INVALID REF (C-2)', async () => {
+    // C-1: a waypoint is no valid reference either when no letter A to Z gives a free identifier
+    it('refuses a waypoint whose identifiers with A to Z are all taken with INVALID REF (C-1)', async () => {
         const taken = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(c => intersection('TXK' + c, 46.0, 12.0));
         const unit = await bootOnRef('FPL 2', taken);
 
@@ -199,16 +205,16 @@ describe('REF page, the radial of the reference waypoint', () => {
     // 5-22, figure 5-85, with figure 5-81 (the chart's 330 degree radial from TXK): RAD is the radial of the reference
     // waypoint from the waypoint used to create it. Radials are magnetic, with the variation of the reference VOR itself:
     // checked in the KLN 89 trainer, 2026-10-07 (T1, high confidence: the true initial bearing at the VOR minus the VOR's
-    // own variation), and 5-44. On the equator a perpendicular to a north-south leg leaves TXK due west, 270 degrees true,
-    // so with 10 degrees of easterly variation (the area and the station agree) the radial is 260.0. The SUP page shows
-    // the stored true value
+    // own variation), and 5-44. On the equator a perpendicular to a north-south leg leaves TXK due west, 270 degrees true.
+    // The area has 10 degrees of easterly variation and TXK 4, so the radial is 266.0 (a conversion with the local
+    // variation would give 260.0). The SUP page shows the stored true value
     it.fails('shows RAD as a magnetic radial with the variation of the reference VOR (5-44, trainer T1, #NEW-3-6)', async () => {
         const unit = await bootOnEquator();
 
         await enterReference(unit, 'TXK');
 
         expect(Screen.read().status().right).toBe('SUP');
-        expect(Screen.read().rows('R')[2]).toBe('RAD: 260.0°');
+        expect(Screen.read().rows('R')[2]).toBe('RAD: 266.0°');
     });
 
     // The setup sibling of the pin above: the same world shows the SUP page of the new waypoint with a RAD row (5-22,
@@ -254,6 +260,90 @@ describe('REF page, the radial of the reference waypoint', () => {
         const row = Screen.read().rows('R')[2];
         expect(row).toMatch(/^RAD: \d{3}\.\d°$/);
         expect(Math.abs(parseFloat(row.slice(5, 10)) - expected)).toBeLessThan(0.1);
+    });
+});
+
+describe('REF page, where the reference waypoint is placed', () => {
+    const rad = (d: number) => d * Math.PI / 180;
+    /** The foot of the perpendicular from a point `dLonDeg` east of a meridian at latitude `latDeg` onto that meridian: tan(foot) = tan(lat) / cos(dLon) */
+    const footLat = (latDeg: number, dLonDeg: number) => Math.atan(Math.tan(rad(latDeg)) / Math.cos(rad(dLonDeg))) * 180 / Math.PI;
+    const stored = (unit: HeadlessUnit, fpl: number, idx: number) => unit.props.memory.fplPage.flightplans[fpl].getLegs()[idx].wpt as unknown as
+        { lat: number, lon: number, reference1Distance: number };
+
+    /** FPL 2 through the given legs, the left page FPL 2, REF on the right */
+    async function bootOnPlan(legs: Facility[], facilities: Facility[]): Promise<HeadlessUnit> {
+        const unit = await bootUnit({facilities, position: {lat: 47.1, lon: 10.0}, storage: savedFlightplan(2, legs)});
+        await settle(unit);
+        await unit.panel.selectPage('L', 'FPL 2');
+        await unit.panel.selectPage('R', 'REF');
+        return unit;
+    }
+
+    // 5-21, 5-22: the reference waypoint lies where the route passes closest to the chosen waypoint, on the line that
+    // meets the leg at a right angle, and REF notes the distance from the waypoint to it (figure 5-85). TXK is 0.3 degree
+    // east of the meridian of the leg, so the foot is at latitude atan(tan(47.5) / cos(0.3)) on 10 E, a hair north of TXK
+    it('puts the reference waypoint at the foot of the perpendicular and stores its distance (5-21, 5-22)', async () => {
+        const unit = await bootOnRef('FPL 2');
+
+        await enterReference(unit, 'TXK');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        const foot = {lat: footLat(47.5, 0.3), lon: 10.0};
+        expect(idents(unit, 2)).toEqual(['KAAA', 'TXKA', 'KBBB']); // precondition
+        expect(stored(unit, 2, 1).lat).toBeCloseTo(foot.lat, 5);
+        expect(stored(unit, 2, 1).lon).toBeCloseTo(10.0, 5);
+        expect(stored(unit, 2, 1).reference1Distance).toBeCloseTo(distanceNm({lat: 47.5, lon: 10.3}, foot), 2);
+    });
+
+    // 5-21: with several legs, the reference waypoint goes to the leg that passes closest. KAAA (47.0, 10.0) to KBBB
+    // (48.0, 10.0) and on to KCCC (48.0, 11.0): TXK (47.7, 10.3) has a perpendicular to both legs, 12.1 NM from the first
+    // (0.3 degree of longitude at 47.7) and 18.0 NM from the second (0.3 degree of latitude), so the first leg wins
+    it('puts the reference waypoint on the closest of two legs that both have a perpendicular (5-21)', async () => {
+        const kaaa = airport('KAAA', 47.0, 10.0);
+        const kbbb = airport('KBBB', 48.0, 10.0);
+        const kccc = airport('KCCC', 48.0, 11.0);
+        const txk = vor('TXK', 47.7, 10.3);
+        const unit = await bootOnPlan([kaaa, kbbb, kccc], [kaaa, kbbb, kccc, txk]);
+
+        await enterReference(unit, 'TXK');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(idents(unit, 2)).toEqual(['KAAA', 'TXKA', 'KBBB', 'KCCC']);
+        expect(stored(unit, 2, 1).lat).toBeCloseTo(footLat(47.7, 0.3), 5);
+        expect(stored(unit, 2, 1).lon).toBeCloseTo(10.0, 5);
+    });
+
+    // 5-21 note, figure 5-81, C-1: the perpendicular must meet the leg itself. SGW lies south of KAAA, so its
+    // perpendicular meets only the extension of the leg behind the first waypoint. The code checks only the distance from
+    // the first waypoint, so it accepts it (#NEW-5-10)
+    function southWorld() {
+        const kaaa = airport('KAAA', 47.0, 10.0);
+        const kbbb = airport('KBBB', 48.0, 10.0);
+        return {kaaa, kbbb, txk: vor('TXK', 47.5, 10.3), sgw: vor('SGW', 46.5, 10.3)};
+    }
+
+    // The setup sibling of the pin below: the same plan accepts a waypoint beside the leg
+    it('accepts a waypoint beside the leg in the world with a waypoint south of it (5-21)', async () => {
+        const {kaaa, kbbb, txk, sgw} = southWorld();
+        const unit = await bootOnPlan([kaaa, kbbb], [kaaa, kbbb, txk, sgw]);
+
+        await enterReference(unit, 'TXK');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(idents(unit, 2)).toEqual(['KAAA', 'TXKA', 'KBBB']);
+    });
+
+    it.fails('refuses a waypoint whose perpendicular falls behind the first waypoint of the leg (5-21, C-1, #NEW-5-10)', async () => {
+        const {kaaa, kbbb, txk, sgw} = southWorld();
+        const unit = await bootOnPlan([kaaa, kbbb], [kaaa, kbbb, txk, sgw]);
+
+        await enterReference(unit, 'SGW');
+
+        expect(Screen.read().status().mode).toBe('INVALID REF');
+        expect(idents(unit, 2)).toEqual(['KAAA', 'KBBB']);
     });
 });
 
