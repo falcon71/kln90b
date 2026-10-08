@@ -72,7 +72,7 @@ describe('INT page reference VOR (3-50)', () => {
 });
 
 /** The INT page of the first intersection given, after the REF calculation (8 s, REF_CALCULATION_TIME) */
-async function intPageOf(facilities: Facility[], magvar = 0): Promise<HeadlessUnit> {
+async function intPageOf(facilities: Facility[], magvar: number | ((lat: number, lon: number) => number) = 0): Promise<HeadlessUnit> {
     const unit = await bootUnit({facilities, position: {lat: 47, lon: 8}, magvar});
     await unit.panel.selectPage('R', 'INT  ');
     await vi.advanceTimersByTimeAsync(9000);
@@ -89,6 +89,13 @@ function userWaypoints(unit: HeadlessUnit): [FacilityType, string, string, numbe
 // KENZY 6.0 NM due north of the VOR MKC (haversine)
 const kenzy = () => intersection('KENZY', 47.1, 11.0);
 const mkc = (magneticVariation = 0) => vor('MKC', 47.0, 11.0, {magneticVariation});
+
+/**
+ * Three different variations for the radial pins: 4° E at the aircraft (47 N 8 E), 5° E at the intersections (11 E) and,
+ * in the tests, 10° E for the reference VOR itself. A fix that takes the variation of the aircraft or of the place
+ * gives another radial than the VOR's own variation, so only the latter turns a pin green.
+ */
+const localVariation = (_lat: number, lon: number) => lon < 9 ? 4 : 5;
 
 describe('INT page (characterization)', () => {
     // Row 3 (DIS) is left out: its leading zeros and its label are #NEW-3-8 and #NEW-3-9
@@ -198,23 +205,23 @@ describe('INT page reference waypoint (3-50, 3-51)', () => {
 });
 
 describe('INT page radial and distance (3-50, 5-19)', () => {
-    // The radial is magnetic, with the variation published for the VOR station: in the guide's own examples the numbers
-    // fit the station declination, not the true bearing or the local variation (figure 5-76: JOT, declination 2° E, true
-    // bearing 270.1°, shown 268.1°; figure 5-67: RSW, 2° W, true 180.8°, shown 182.7°; checked against a current
-    // navigation database). The KLN 89 trainer (2026-10-07) agrees on four published intersections: the true initial
+    // The radial is magnetic, with the variation of the reference VOR itself: in the guide's own examples (figures 5-67
+    // and 5-76) the shown radial differs from the true bearing by the station's variation, not by the local one. The KLN
+    // 89 trainer (checked in the KLN 89 trainer, 2026-10-07) agrees on four published intersections: the true initial
     // bearing at the VOR minus the variation of that VOR, within 0.05°, where the local variation would be off by
     // several degrees. NAV 2 uses the station's variation for its radial too (Nav2Page.tsx:79). MKC has 10° E, the
-    // world 5° E; KENZY lies on the true 000° bearing, so the magnetic radial is 350.0°. IntPage.calculateRef shows the
+    // aircraft 4° E and the intersection 5° E; KENZY lies on the true 000° bearing, so the magnetic radial is 350.0°
+    // (356.0° with the variation of the aircraft, 355.0° with that of the intersection). IntPage.calculateRef shows the
     // true bearing.
     it.fails('shows the magnetic radial with the VOR station declination (3-50, figure 5-76, the KLN 89 trainer, #NEW-3-6)', async () => {
-        await intPageOf([kenzy(), mkc(-10)], 5);
+        await intPageOf([kenzy(), mkc(-10)], localVariation);
 
         expect(Screen.read().rows('R')[2]).toBe('RAD: 350.0°');
     });
 
     // Sibling of the pin: the reference VOR is MKC
     it('takes MKC as the reference of KENZY (3-50)', async () => {
-        await intPageOf([kenzy(), mkc(-10)], 5);
+        await intPageOf([kenzy(), mkc(-10)], localVariation);
 
         expect(Screen.read().rows('R')[1]).toBe('REF:  MKC  ');
     });
@@ -222,8 +229,8 @@ describe('INT page radial and distance (3-50, 5-19)', () => {
     // A radial is the course out of the VOR, the initial bearing at the station. QQI lies 48.1 NM out on MKC's true
     // 090° course (pointFrom, flight/geo.ts). IntPage.calculateRef takes GeoPoint.bearingFrom, the final bearing at the
     // intersection, 090.9° here; in figure 5-76 the initial bearing gives the 268.1° shown and the final one 268.4°. The
-    // KLN 89 trainer shows the initial bearing too: the bearing measured at the intersection was off by 0.4° to 0.7° on
-    // its four intersections. 5-19 says the original reference may be entered again later, which only makes sense if it
+    // KLN 89 trainer (2026-10-07) shows the initial bearing too: the bearing measured at the intersection was off by 0.4°
+    // to 0.7° on its four intersections. 5-19 says the original reference may be entered again later, which only makes sense if it
     // gives the same radial.
     it.fails('shows the radial as the bearing at the VOR (3-50, 5-19, the KLN 89 trainer, #NEW-3-7)', async () => {
         const p = pointFrom({lat: 47.0, lon: 11.0}, 90, 48.1);
@@ -233,7 +240,8 @@ describe('INT page radial and distance (3-50, 5-19)', () => {
     });
 
     // Figures 3-155, 3-158, 5-67, 5-75 and 5-76 and a photo of a real unit (the SUP page, same layout) show DIS without
-    // leading zeros (48.1, 3.7); the KLN 89 trainer pads its distances with blanks as well (` 11.0nm`, `  6.8nm`).
+    // leading zeros (48.1, 3.7); the KLN 89 trainer (2026-10-07) pads its distances with blanks as well (` 11.0nm`,
+    // `  6.8nm`).
     // KENZY lies 12.0 NM north of MKC; the page shows DIS:012.0
     it.fails('shows the distance without leading zeros (figures 3-155, 5-75, the KLN 89 trainer, #NEW-3-8)', async () => {
         await intPageOf([intersection('KENZY', 47.2, 11.0), mkc()]);
@@ -241,8 +249,8 @@ describe('INT page radial and distance (3-50, 5-19)', () => {
         expect(Screen.read().rows('R')[3].slice(0, 9)).toBe('DIS: 12.0');
     });
 
-    // The same figures and the photo show the unit in the small nm glyphs that every other distance of the code uses, as
-    // does the KLN 89 trainer; IntPage.tsx:125 writes NM in full-size letters (SupPage.tsx:117 too)
+    // The same figures show the unit in the small nm glyphs that every other distance of the code uses, as does the KLN 89
+    // trainer (2026-10-07); IntPage.tsx:125 writes NM in full-size letters (SupPage.tsx:117 too)
     it.fails('labels the distance with the small nm (figures 3-155, 5-75, the KLN 89 trainer, #NEW-3-9)', async () => {
         await intPageOf([intersection('KENZY', 47.2, 11.0), mkc()]);
 
@@ -253,13 +261,13 @@ describe('INT page radial and distance (3-50, 5-19)', () => {
     it('shows the distance of 12.0 NM (3-50)', async () => {
         await intPageOf([intersection('KENZY', 47.2, 11.0), mkc()]);
 
-        expect(Screen.read().rows('R')[3]).toContain('12.0');
+        expect(parseFloat(Screen.read().rows('R')[3].slice(4))).toBe(12.0);
     });
 });
 
 describe('user intersection (5-18, 5-19)', () => {
     /** INT page, cursor, the unknown ident INT15; ORD is a VOR at 47 N 11 E */
-    async function unknownInt(position = {lat: 47, lon: 8}, ord = vor('ORD', 47.0, 11.0), magvar = 0): Promise<HeadlessUnit> {
+    async function unknownInt(position = {lat: 47, lon: 8}, ord = vor('ORD', 47.0, 11.0), magvar: number | ((lat: number, lon: number) => number) = 0): Promise<HeadlessUnit> {
         const unit = await bootUnit({facilities: [kenzy(), ord], position, magvar});
         await unit.panel.selectPage('R', 'INT  ');
         await unit.panel.cursor('R');
@@ -268,7 +276,7 @@ describe('user intersection (5-18, 5-19)', () => {
     }
 
     /** unknownInt, then USER POS? (5-19 step 3) */
-    async function userPos(ord = vor('ORD', 47.0, 11.0), magvar = 0): Promise<HeadlessUnit> {
+    async function userPos(ord = vor('ORD', 47.0, 11.0), magvar: number | ((lat: number, lon: number) => number) = 0): Promise<HeadlessUnit> {
         const unit = await unknownInt({lat: 47, lon: 8}, ord, magvar);
         await unit.panel.cursorTo('R', 'USER POS?');
         await unit.panel.ent();
@@ -276,7 +284,7 @@ describe('user intersection (5-18, 5-19)', () => {
     }
 
     /** userPos, then the REF ORD entered and approved (5-19 steps 4 to 8) */
-    async function refOrd(ord = vor('ORD', 47.0, 11.0), magvar = 0): Promise<HeadlessUnit> {
+    async function refOrd(ord = vor('ORD', 47.0, 11.0), magvar: number | ((lat: number, lon: number) => number) = 0): Promise<HeadlessUnit> {
         const unit = await userPos(ord, magvar);
         await unit.panel.outer('R', -3);
         await unit.panel.enterIdent('R', 'ORD');
@@ -315,7 +323,8 @@ describe('user intersection (5-18, 5-19)', () => {
     });
 
     // 5-19 step 8, figure 5-72: after the approval of the reference waypoint the page returns with the cursor over the
-    // RAD dashes; the KLN 89 trainer does the same (Ref, ENT, ENT, then the cursor is on Rad). The cursor stays on REF
+    // RAD dashes; the KLN 89 trainer (2026-10-07) does the same (Ref, ENT, ENT, then the cursor is on Rad). The cursor
+    // stays on REF
     it.fails('moves the cursor to RAD after the REF approval (5-19, figure 5-72, the KLN 89 trainer, #NEW-3-10)', async () => {
         const unit = await refOrd();
 
@@ -338,6 +347,7 @@ describe('user intersection (5-18, 5-19)', () => {
         await unit.panel.type('R', '0900');
         await unit.panel.ent();
 
+        // Figure 3-158 shows a radial with its leading zero (RAD: 009.0); figure 3-159 of the SUP page shows blanks
         expect(Screen.read().rows('R')[2]).toBe('RAD: 090.0°');
         expect(unit.panel.focused('R')).toEqual({row: 3, col: 16, text: '___._'});
     });
@@ -350,16 +360,35 @@ describe('user intersection (5-18, 5-19)', () => {
         await unit.panel.cursorTo('R', '___._');
         await unit.panel.type('R', '0900');
         await unit.panel.ent();
-        await unit.panel.type('R', '0481'); // the first cell takes a 0 today; #NEW-3-8 would blank it
+        // The edit field keeps the typed 0: figure 5-74 shows DIS:048.1 while the distance is being edited, so the fix
+        // of #NEW-3-8 changes the display after ENT and leaves the first cell of the editor alone
+        await unit.panel.type('R', '0481');
         await unit.panel.ent();
 
         const p = pointFrom({lat: 47.0, lon: 11.0}, 90, 48.1);
-        expect(Screen.read().rows('R').slice(4)).toEqual(["N 46°59.64'", "E 12°10.40'"]);
+        const rows = Screen.read().rows('R');
+        // Figure 5-75 keeps REF, RAD and DIS on the page after the creation. The DIS digits are parsed, so that
+        // #NEW-3-8 and #NEW-3-9 do not matter here
+        expect(rows.slice(0, 3)).toEqual([' INT15     ', 'REF:  ORD  ', 'RAD: 090.0°']);
+        expect(parseFloat(rows[3].slice(4))).toBe(48.1);
+        expect(rows.slice(4)).toEqual(["N 46°59.64'", "E 12°10.40'"]);
         expect(Screen.read().status().right).toBe('INT');
         const [w] = userWaypoints(unit);
         expect(w.slice(0, 3)).toEqual([FacilityType.Intersection, 'XX', 'INT15']);
         expect(w[3]).toBeCloseTo(p.lat, 6);
         expect(w[4]).toBeCloseTo(p.lon, 6);
+    });
+
+    // 5-19, figure 5-75, note: REF, RAD and DIS stay on the page after the creation. ORD is also the closest VOR of the
+    // new waypoint, so the page still shows them once the REF calculation has run (8 s); the radial would read 090.9°
+    // if the creation had its REF calculated from the final bearing (#NEW-3-7)
+    it('keeps REF, RAD and DIS of the creation once the REF calculation has run (5-19)', async () => {
+        const unit = await distanceEntered('0481');
+        await vi.advanceTimersByTimeAsync(9000);
+
+        const rows = Screen.read().rows('R');
+        expect(rows.slice(0, 3)).toEqual([' INT15     ', 'REF:  ORD  ', 'RAD: 090.0°']);
+        expect(parseFloat(rows[3].slice(4))).toBe(48.1);
     });
 
     /** refOrd, then the radial 090° and the distance typed as four digits and entered; returns the unit */
@@ -397,19 +426,20 @@ describe('user intersection (5-18, 5-19)', () => {
         expect(w[4]).toBeCloseTo(p.lon, 6);
     });
 
-    /** The reference ORD has 10° E (the sim's -10), the world 5° E; the radial 080° is entered and approved, the cursor on DIS */
+    /** The reference ORD has 10° E (the sim's -10), the aircraft 4° E; the radial 080° is entered and approved, the cursor on DIS */
     async function radial080(): Promise<HeadlessUnit> {
-        const unit = await refOrd(vor('ORD', 47.0, 11.0, {magneticVariation: -10}), 5);
+        const unit = await refOrd(vor('ORD', 47.0, 11.0, {magneticVariation: -10}), localVariation);
         await unit.panel.cursorTo('R', '___._');
         await unit.panel.type('R', '0800');
         await unit.panel.ent();
         return unit;
     }
 
-    // A radial is magnetic (#NEW-3-6, the KLN 89 trainer: a waypoint made on Rad 000 from a VOR with 3° E variation lay
-    // on the true 003° course). With 10° E at ORD the entered 080° is the true 090°, and 48.1 NM out the waypoint lies
-    // where the true 090° course of the previous test puts it (pointFrom, flight/geo.ts). The entered radial is taken
-    // as the true bearing today, which puts the waypoint on the true 080° course
+    // A radial is magnetic (#NEW-3-6; checked in the KLN 89 trainer, 2026-10-07: a waypoint made on Rad 000 from a VOR
+    // with 3° E variation lay on the true 003° course). With 10° E at ORD (and 4° E at the aircraft, 5° E elsewhere) the
+    // entered 080° is the true 090°, and 48.1 NM out the waypoint lies where the true 090° course of the previous test
+    // puts it (pointFrom, flight/geo.ts). The entered radial is taken as the true bearing today, which puts the waypoint
+    // on the true 080° course; with the aircraft's variation it would lie on the true 084° course
     it.fails('creates the waypoint on the magnetic radial entered (5-19, the KLN 89 trainer, #NEW-3-6)', async () => {
         const unit = await radial080();
         await unit.panel.type('R', '0481');
@@ -426,8 +456,8 @@ describe('user intersection (5-18, 5-19)', () => {
         expect(unit.panel.focused('R')).toEqual({row: 3, col: 16, text: '___._'});
     });
 
-    // 5-18: the first method needs only the latitude and longitude. 5-19, note and figure 5-76: viewed later, the page
-    // shows the radial and distance from the VOR nearest the waypoint. INT15 is 6.0 NM north of the VOR ORD at 100° E
+    // 5-18: the first method needs only the latitude and longitude. 5-19, note and figure 5-76: once the waypoint exists,
+    // the page refers it to its closest VOR, whatever reference was used. INT15 is 6.0 NM north of the VOR ORD at 100° E
     // (the keyboard cannot type a longitude below 100°, #109)
     it('shows the nearest VOR as REF of a waypoint created from its position (5-18, 5-19)', async () => {
         const unit = await bootUnit({facilities: [kenzy(), vor('ORD', 47.0, 100.0)], position: {lat: 47, lon: 8}});
@@ -497,6 +527,44 @@ describe('stored user intersection', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(Screen.read().rows('R').slice(4)).toEqual(["N 47°04.24'", "E 11°06.23'"]);
+    });
+
+    /** The INT page of QQI after the REF calculation, the cursor on REF (the first field after the ident) */
+    async function onRef(): Promise<HeadlessUnit> {
+        const unit = await bootUnit({facilities: [mkc()], storage: storage(), position: {lat: 47, lon: 8}});
+        await unit.panel.selectPage('R', 'INT  ');
+        await vi.advanceTimersByTimeAsync(9000);
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', 'MKC');
+        return unit;
+    }
+
+    // 5-19 step 12: a new distance moves the stored waypoint on its radial. QQI lies on the 000° radial of MKC, so 12.0 NM
+    // is 0.2° of latitude (pointFrom, flight/geo.ts). The DIS field is two clicks after REF
+    it('moves the waypoint to the entered distance (5-19)', async () => {
+        const unit = await onRef();
+        await unit.panel.outer('R', 2);
+        expect(unit.panel.focused('R').row).toBe(3); // precondition: the cursor is on DIS
+        await unit.panel.type('R', '0120');
+        await unit.panel.ent();
+
+        const p = pointFrom({lat: 47.0, lon: 11.0}, 0, 12.0);
+        const [w] = userWaypoints(unit);
+        expect(w[3]).toBeCloseTo(p.lat, 6);
+        expect(w[4]).toBeCloseTo(p.lon, 6);
+    });
+
+    // The latitude of a stored user intersection is editable; the longitude stays as it was
+    it('moves the waypoint to the entered latitude (characterization)', async () => {
+        const unit = await onRef();
+        await unit.panel.outer('R', 3);
+        expect(unit.panel.focused('R').row).toBe(4); // precondition: the cursor is on the latitude
+        await unit.panel.type('R', 'N4800000');
+        await unit.panel.ent();
+
+        const [w] = userWaypoints(unit);
+        expect(w[3]).toBeCloseTo(48.0, 6);
+        expect(w[4]).toBeCloseTo(11.0, 6);
     });
 
     /** QQI with no VOR within the 100 NM of the reference search, so REF stays dashed; the cursor on RAD */

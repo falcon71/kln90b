@@ -3,6 +3,7 @@ import {FacilityType, ICAO} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {savedUserWaypoints} from '../../../harness/storage';
+import {collectStatusMessages} from '../../../harness/statusLine';
 import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
 
 /**
@@ -149,6 +150,48 @@ describe('user VOR page (5-18)', () => {
 
         expect(Screen.read().status().mode).toBe('USR DB FULL');
         expect(userWaypoints(unit).filter(([, ident]) => ident === 'QQQ')).toEqual([]);
+    });
+});
+
+describe('stored user VOR that is not the active waypoint', () => {
+    /** The stored user VOR QQV (113.90 MHz, 12° W) on the VOR page with the cursor on; nothing is active */
+    async function storedUserVor(): Promise<HeadlessUnit> {
+        const unit = await bootUnit({storage: savedUserWaypoints([{kind: 'vor', ident: 'QQV', lat: 47.5, lon: 11.25, freqMHz: 113.9, magvar: 12}])});
+        await settle(unit);
+        await unit.panel.selectPage('R', 'VOR  ');
+        await unit.panel.cursor('R');
+        expect(Screen.read().rows('R').slice(0, 4)).toEqual([' QQV       ', '           ', '          U', '113.90 12°W']); // precondition
+        return unit;
+    }
+
+    /** Leaves the page and comes back, which shows what the waypoint holds */
+    async function reselect(unit: HeadlessUnit): Promise<string[]> {
+        await unit.panel.cursor('R');
+        await unit.panel.selectPage('R', 'NDB  ');
+        await unit.panel.selectPage('R', 'VOR  ');
+        return Screen.read().rows('R').slice(3);
+    }
+
+    // C-1: only the active waypoint refuses a new variation (IN ACT LIST), so another user VOR takes it
+    it('takes a new magnetic variation (C-1)', async () => {
+        const unit = await storedUserVor();
+        const messages = collectStatusMessages(unit);
+        await unit.panel.cursorTo('R', '12°W');
+        await unit.panel.type('R', '15E');
+        await unit.panel.ent();
+
+        expect(messages).toEqual([]);
+        expect(await reselect(unit)).toEqual(['113.90 15°E', "N 47°30.00'", "E 11°15.00'"]);
+    });
+
+    // 5-18: the frequency of a user VOR can be edited
+    it('takes a new frequency (5-18)', async () => {
+        const unit = await storedUserVor();
+        await unit.panel.cursorTo('R', '113.90');
+        await unit.panel.type('R', '10850');
+        await unit.panel.ent();
+
+        expect(await reselect(unit)).toEqual(['108.50 12°W', "N 47°30.00'", "E 11°15.00'"]);
     });
 });
 

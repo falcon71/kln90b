@@ -73,12 +73,26 @@ describe('VOR page (characterization)', () => {
           ]
         `);
     });
+
+    // The half page has 11 columns: a longer name is cut at the edge
+    it('cuts a long name at the edge of the half page', async () => {
+        await vorPageOf(vor('ABC', 47.2, 8.2, {name: 'GREATER OTTAWA'}));
+
+        expect(Screen.read().rows('R')[1]).toBe('GREATER OTT');
+    });
 });
 
 describe('VOR page contents (3-49)', () => {
     // 3-49: the letter D follows the identifier of a VOR with DME
     it('shows D after the ident of a VOR-DME (3-49)', async () => {
         await vorPageOf(vor('ABC', 47.2, 8.2, {type: VorType.VORDME}));
+
+        expect(Screen.read().rows('R')[0]).toBe(' ABC D     ');
+    });
+
+    // 3-49: a DME-only station has the D too
+    it('shows D after the ident of a DME-only station (3-49)', async () => {
+        await vorPageOf(vor('ABC', 47.2, 8.2, {type: VorType.DME}));
 
         expect(Screen.read().rows('R')[0]).toBe(' ABC D     ');
     });
@@ -102,8 +116,8 @@ describe('VOR page contents (3-49)', () => {
         expect(Screen.read().rows('R')[2]).toBe(`          ${letter}`);
     });
 
-    // 3-49, figure 3-151: the frequency in MHz with two decimals, then the published magnetic variation of the VOR with
-    // its E or W. The builder's magneticVariation is the sim's: positive is west.
+    // 3-49, figure 3-151: the frequency in MHz with two decimals, then the station's own variation, E or W. The builder's
+    // magneticVariation is the sim's: positive is west.
     it('shows the frequency and a western magnetic variation (3-49)', async () => {
         await vorPageOf(vor('ABC', 47.2, 8.2, {frequencyMHz: 117.95, magneticVariation: 12}));
 
@@ -116,7 +130,7 @@ describe('VOR page contents (3-49)', () => {
         expect(Screen.read().rows('R')[3]).toBe('108.00 15°E');
     });
 
-    // 3-49: the latitude and longitude of the VOR at the bottom
+    // 3-49: the VOR's position fills the last two rows
     it('shows the position of the VOR (3-49)', async () => {
         await vorPageOf(vor('ABC', 47.5, 11.25));
 
@@ -158,8 +172,8 @@ describe('VOR page nearest view (3-22, 3-49)', () => {
         return unit;
     }
 
-    // 3-49, figure 3-152: the latitude and longitude are replaced by the bearing to and the distance of the VOR. ABC lies
-    // 27.0 NM away on a true course of 026.9° (haversine); with 5° E the magnetic bearing is 022° (5-44: magnetic).
+    // 3-49, figure 3-152: in the nearest list the position rows give the bearing to the VOR and its distance instead. ABC
+    // lies 27.0 NM away on a true course of 026.9° (haversine); with 5° E the magnetic bearing is 022° (5-44: magnetic).
     it('shows NR 1 and the magnetic bearing and distance instead of the position (3-22, 3-49)', async () => {
         await nearestAbc(5);
 
@@ -185,7 +199,7 @@ describe('VOR page nearest view (3-22, 3-49)', () => {
 
         const rows = Screen.read().rows('R');
         expect(rows[0]).toBe(' ABC D nr 1');
-        expect(rows[5]).toContain('7.3nm');
+        expect(parseFloat(rows[5].trim())).toBe(7.3);
     });
 
     // 3-22: the NR number flashes
@@ -200,11 +214,24 @@ describe('VOR page nearest view (3-22, 3-49)', () => {
         expect(masks).toContain('BBBB');
         expect(masks).toContain('....');
     });
+
+    // The guide does not give the duty cycle. The number is flashing on one display tick of four, the unit's blink phase
+    it('flashes the NR number on one display tick of four (characterization)', async () => {
+        await nearestAbc(0);
+
+        const masks: string[] = [];
+        for (let i = 0; i < 4; i++) {
+            masks.push(Screen.read().maskRows('R')[0].slice(7, 11));
+            await vi.advanceTimersByTimeAsync(250);
+        }
+        expect(masks.filter(m => m === 'BBBB')).toHaveLength(1);
+        expect(masks.filter(m => m === '....')).toHaveLength(3);
+    });
 });
 
-// The VOR page examples of the guide are VORTACs: Blue Ridge (figure 3-151) and Ardmore (figure 3-152, a VORTAC by its
-// class in a current navigation database), both shown with the D of a DME (3-49). The sim reports such a station as
-// VorType.VORTAC: the SDK's own instruments draw a VORTAC symbol for that type.
+// The VOR page examples of the guide are VORTACs: Blue Ridge (figure 3-151) and Ardmore (figure 3-152), both shown with
+// the D of a DME (3-49). The sim reports such a station as VorType.VORTAC: the SDK's own instruments draw a VORTAC
+// symbol for that type.
 describe('VOR page with a VORTAC (3-49)', () => {
     const adm = (type: VorType) => vor('ADM', 47.2, 8.2, {type, name: 'ARDMORE'});
 

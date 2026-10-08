@@ -65,7 +65,8 @@ describe('NDB page contents (3-50)', () => {
         expect([rows[0], rows[1], rows[4], rows[5]]).toEqual([' OWI       ', 'OTTAWA     ', "N 47°30.00'", "E 11°15.00'"]);
     });
 
-    // 3-50: the frequency in kHz after FREQ. A half kHz shows its tenth (figure 5-66 shows a frequency with a tenth)
+    // 3-50: the frequency in kHz after FREQ. A half kHz shows its tenth; the column layout is inferred from figure 5-66,
+    // a user NDB (the KLN 89 trainer's database has no half kHz NDB)
     it('shows a frequency with a half kHz (3-50)', async () => {
         await ndbPageOf(ndb('OWI', 47.5, 11.25, {frequencyKHz: 362.5}));
 
@@ -88,7 +89,22 @@ describe('NDB page contents (3-50)', () => {
         const rows = Screen.read().rows('R');
         expect(rows[0]).toBe(' OWI       ');
         expect(rows[3].startsWith('FREQ ')).toBe(true);
-        expect(rows[3]).toContain('251');
+        expect(parseFloat(rows[3].slice(5))).toBe(251);
+    });
+
+    // 3-21, 5-18: the cursor of a database NDB visits the ident characters only; only a user NDB has editable fields.
+    // Past the third character the cursor wraps to the first one today (#218 says the real unit stops at the end); both
+    // stay in the ident row, which is what this test holds
+    it('keeps the cursor in the ident row (3-21, 5-18)', async () => {
+        const unit = await ndbPageOf(ndb('OWI', 47.5, 11.25));
+        await unit.panel.cursor('R');
+
+        const visited: number[] = [];
+        for (let i = 0; i < 5; i++) {
+            visited.push(unit.panel.focused('R').row);
+            await unit.panel.outer('R', 1);
+        }
+        expect(visited).toEqual([0, 0, 0, 0, 0]);
     });
 
     // C-2: NO NDB WPTS when the NDB pages are selected and there is no NDB at all
@@ -138,7 +154,7 @@ describe('NDB page nearest view (3-22, 3-50)', () => {
 
         const rows = Screen.read().rows('R');
         expect(rows[0]).toBe(' OWI   nr 1');
-        expect(rows[5]).toContain('7.3nm');
+        expect(parseFloat(rows[5].trim())).toBe(7.3);
     });
 });
 
@@ -185,6 +201,19 @@ describe('user NDB (5-18)', () => {
         expect(userWaypoints(unit).map(w => w.slice(0, 5))).toEqual([[FacilityType.NDB, 'XX', 'ND1', 47.5, 100.25]]);
         expect(Screen.read().rows('R').slice(4)).toEqual(["N 47°30.00'", "E100°15.00'"]);
         expect(Screen.read().status().right).toBe('NDB');
+    });
+
+    // The frequency is optional: a user NDB made from the latitude and longitude alone shows dashes after FREQ
+    it('shows dashes for the frequency of a user NDB made without one (characterization)', async () => {
+        const unit = await undefinedNdb();
+        await unit.panel.ent();
+        await unit.panel.outer('R', 1);
+        await unit.panel.type('R', 'N4730000');
+        await unit.panel.ent();
+        await unit.panel.type('R', 'E1001500');
+        await unit.panel.ent();
+
+        expect(Screen.read().rows('R')[3]).toBe('FREQ ____._');
     });
 
     // C-1: ENT LAT/LON reminds the pilot of the position while the waypoint is created: the latitude alone does not
