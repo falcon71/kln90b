@@ -81,7 +81,9 @@ describe('FrontPanel.enterIdent (harness)', () => {
         it.each([
             ['VOR  ', 'XYZ', [' XYZ D     ', 'XYZ        ', '          H', '114.30  0°E', "N 48°00.00'"]],
             ['NDB  ', 'NDB', [' NDB       ', 'NDB        ', '           ', 'FREQ  350.0', "N 48°00.00'"]],
-            ['INT  ', 'BRAVO', [' BRAVO     ', 'REF:  _____', 'RAD: ___._°', 'DIS:___._NM', "N 48°00.00'"]],
+            // The label after the dashes of DIS is full-size NM today (#NEW-3-9, pinned on IntPage.test.ts), so the row is
+            // compared up to the dashes
+            ['INT  ', 'BRAVO', [' BRAVO     ', 'REF:  _____', 'RAD: ___._°', expect.stringMatching(/^DIS:___\._/), "N 48°00.00'"]],
         ])('enters an ident on the %s page', async (page, ident, expected) => {
             const unit = await bootUnit({facilities: facilities()});
             await unit.panel.selectPage('R', page);
