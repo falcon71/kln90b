@@ -59,6 +59,19 @@ describe('CTR 1 page (characterization)', () => {
     });
 });
 
+describe('CTR 1 page, a plan of one waypoint (characterization)', () => {
+    // The guide does not say what CTR 1 does beside a plan with a single waypoint, which has no leg to cross a Center
+    // boundary on. The code does not compute: ENT is accepted and nothing changes, the page keeps offering the
+    // computation
+    it('keeps offering the computation after ENT for a plan of one waypoint (characterization)', async () => {
+        const unit = await onCtr1(w => [w.kaaa]);
+        await ent(unit);
+
+        expect(right()).toEqual(['           ', '           ', 'PRESS ENT  ', 'TO COMPUTE ', 'CTR WPTS   ', '           ']);
+        expect(unit.errors).toEqual([]);
+    });
+});
+
 describe('CTR 1 page (5-25 to 5-27)', () => {
     // 5-25, figure 5-89: without a flight plan page on the left, CTR 1 asks for one on rows 1 to 4
     it('asks for a flight plan page on the left (5-25, figure 5-89)', async () => {
@@ -88,7 +101,8 @@ describe('CTR 1 page (5-25 to 5-27)', () => {
     });
 
     // Figure 5-96 shows one new waypoint as 1 NEW WPT, without the plural S. KAAA to KBBB crosses one boundary. The
-    // passing sibling is the test above (two waypoints)
+    // passing siblings are the test above (the page and its count for two waypoints) and the naming test below (it
+    // computes this same plan and holds that it yields exactly one waypoint, BGD01)
     it.fails('shows one computed Center waypoint as 1 NEW WPT (5-27, figure 5-96) (#NEW-6-1)', async () => {
         const unit = await onCtr1(w => [w.kaaa, w.kbbb]);
         await ent(unit);
@@ -195,7 +209,11 @@ describe('CTR 1 page, a plan modified after the insertion (5-27)', () => {
     // 5-27, figures 5-95 to 5-97: the recomputation treats the inserted Center waypoint like any other waypoint of the
     // plan. CTR 2 then lists it without the new label, and the new crossing ABQ to DEN with it. Today the shared search
     // session drops the ABQ Center, which the first computation saw: the old crossing is missing and the new one reads
-    // FW-DEN. This is the second computation in one unit, so it meets #102 by design (the sibling is the test above)
+    // FW-DEN. This is the second computation in one unit, so it meets #102 by design (the sibling is the test above).
+    // The pin asserts the whole recomputed state, so that a fixed #102 shows the right result and not just a result:
+    // both CTR 2 pages in full (the existing waypoint without new, the new one with it, a page each), CTR 1 offering
+    // the insertion (row 0, the count, is left out: its singular case is #NEW-6-1), and ENT inserting only the new
+    // waypoint
     it.fails('lists the existing Center waypoint without new and the new one with new (5-27, figure 5-97) (#102)', async () => {
         const unit = await extendedAfterInsertion();
         await ent(unit);
@@ -203,10 +221,18 @@ describe('CTR 1 page, a plan modified after the insertion (5-27)', () => {
         const first = right();
         const status = Screen.read().status().right;
         await unit.panel.inner('R', 1);
+        const second = right();
+        await unit.panel.inner('R', -1);
+        await unit.panel.inner('R', -1); // CTR 1
+        const ctr1 = right();
+        await ent(unit);
 
         expect(status).toBe('CTR+2');
-        expect(first.slice(0, 2)).toEqual([' BGD00     ', 'FW -ABQ CTR']);
-        expect(right().slice(0, 2)).toEqual([' GCK00  new', 'ABQ-DEN CTR']);
+        expect(first).toEqual([' BGD00     ', 'FW -ABQ CTR', 'BGD    180°', '     30.1nm', 'N 42°45.00\'', 'W100°00.00\'']);
+        expect(second).toEqual([' GCK00  new', 'ABQ-DEN CTR', 'GCK    180°', '     30.1nm', 'N 47°45.00\'', 'W100°00.00\'']);
+        expect(ctr1.slice(2, 5)).toEqual(['PRESS ENT  ', 'TO INSERT  ', 'INTO FPL   ']);
+        expect(idents(unit, 1)).toEqual(['KAAA', 'BGD00', 'KBBB', 'GCK00', 'KCCC']);
+        expect(unit.errors).toEqual([]);
     });
 });
 

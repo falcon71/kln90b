@@ -54,10 +54,10 @@ describe('CTR 2 page (characterization)', () => {
     });
 });
 
-describe('CTR 2 page (5-25, 5-26)', () => {
-    // 5-25: there are as many CTR 2 pages as Center waypoints. Two waypoints show CTR+2 on both pages, and a third turn
-    // of the inner knob leaves them
-    it('has a page per Center waypoint (5-25)', async () => {
+describe('CTR 2 pages beyond the last waypoint (characterization)', () => {
+    // The page tree's wrap, not a statement of the guide: a third turn of the inner knob past two waypoint pages leaves
+    // CTR 2 for CTR 1. It holds that there are exactly two waypoint pages
+    it('leaves CTR 2 after the last waypoint page (characterization)', async () => {
         const unit = await computed();
         const status: string[] = [];
         for (let i = 0; i < 3; i++) {
@@ -66,6 +66,21 @@ describe('CTR 2 page (5-25, 5-26)', () => {
         }
 
         expect(status).toEqual(['CTR+2', 'CTR+2', 'CTR 1']);
+    });
+});
+
+describe('CTR 2 page (5-25, 5-26)', () => {
+    // 5-25: there are as many CTR 2 pages as Center waypoints, so two waypoints show CTR+2 on both of their pages. The
+    // pages themselves are held by the next test
+    it('has a page per Center waypoint (5-25)', async () => {
+        const unit = await computed();
+        const status: string[] = [];
+        for (let i = 0; i < 2; i++) {
+            await unit.panel.inner('R', 1);
+            status.push(Screen.read().status().right);
+        }
+
+        expect(status).toEqual(['CTR+2', 'CTR+2']);
     });
 
     // 5-25, 5-26, figure 5-92: the waypoint and new, the from and to Centers, the nearest VOR with the radial from it,
