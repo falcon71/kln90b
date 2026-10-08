@@ -184,8 +184,8 @@ describe('stored user VOR that is not the active waypoint', () => {
         expect(await reselect(unit)).toEqual(['113.90 15°E', "N 47°30.00'", "E 11°15.00'"]);
     });
 
-    // 5-18: the frequency of a user VOR can be edited
-    it('takes a new frequency (5-18)', async () => {
+    // The frequency of a stored user VOR can be edited
+    it('takes a new frequency (characterization)', async () => {
         const unit = await storedUserVor();
         await unit.panel.cursorTo('R', '113.90');
         await unit.panel.type('R', '10850');

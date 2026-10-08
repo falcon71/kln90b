@@ -80,6 +80,19 @@ describe('VOR page (characterization)', () => {
 
         expect(Screen.read().rows('R')[1]).toBe('GREATER OTT');
     });
+
+    // The number of the nearest list is flashing on one display tick of four, the unit's blink phase
+    it('flashes the NR number on one display tick of four (characterization)', async () => {
+        await nearestAbc(0);
+
+        const masks: string[] = [];
+        for (let i = 0; i < 4; i++) {
+            masks.push(Screen.read().maskRows('R')[0].slice(7, 11));
+            await vi.advanceTimersByTimeAsync(250);
+        }
+        expect(masks.filter(m => m === 'BBBB')).toHaveLength(1);
+        expect(masks.filter(m => m === '....')).toHaveLength(3);
+    });
 });
 
 describe('VOR page contents (3-49)', () => {
@@ -161,17 +174,17 @@ describe('VOR page contents (3-49)', () => {
     });
 });
 
-describe('VOR page nearest view (3-22, 3-49)', () => {
-    /** The VOR ABC as NR 1: 3-22, the nearest list sits before the complete list, so the scan knob turned counterclockwise reaches it */
-    async function nearestAbc(magvar: number, lat = 47.4, lon = 8.3) {
-        const unit = await bootUnit({facilities: [vor('ABC', lat, lon)], position: {lat: 47, lon: 8}, magvar});
-        await unit.panel.selectPage('R', 'VOR  ');
-        await vi.advanceTimersByTimeAsync(12_000); // the nearest list searches every 10 s
-        await unit.panel.scan();
-        await unit.panel.inner('R', -1);
-        return unit;
-    }
+/** The VOR ABC as NR 1: 3-22, the nearest list sits before the complete list, so the scan knob turned counterclockwise reaches it */
+async function nearestAbc(magvar: number, lat = 47.4, lon = 8.3) {
+    const unit = await bootUnit({facilities: [vor('ABC', lat, lon)], position: {lat: 47, lon: 8}, magvar});
+    await unit.panel.selectPage('R', 'VOR  ');
+    await vi.advanceTimersByTimeAsync(12_000); // the nearest list searches every 10 s
+    await unit.panel.scan();
+    await unit.panel.inner('R', -1);
+    return unit;
+}
 
+describe('VOR page nearest view (3-22, 3-49)', () => {
     // 3-49, figure 3-152: in the nearest list the position rows give the bearing to the VOR and its distance instead. ABC
     // lies 27.0 NM away on a true course of 026.9° (haversine); with 5° E the magnetic bearing is 022° (5-44: magnetic).
     it('shows NR 1 and the magnetic bearing and distance instead of the position (3-22, 3-49)', async () => {
@@ -214,24 +227,10 @@ describe('VOR page nearest view (3-22, 3-49)', () => {
         expect(masks).toContain('BBBB');
         expect(masks).toContain('....');
     });
-
-    // The guide does not give the duty cycle. The number is flashing on one display tick of four, the unit's blink phase
-    it('flashes the NR number on one display tick of four (characterization)', async () => {
-        await nearestAbc(0);
-
-        const masks: string[] = [];
-        for (let i = 0; i < 4; i++) {
-            masks.push(Screen.read().maskRows('R')[0].slice(7, 11));
-            await vi.advanceTimersByTimeAsync(250);
-        }
-        expect(masks.filter(m => m === 'BBBB')).toHaveLength(1);
-        expect(masks.filter(m => m === '....')).toHaveLength(3);
-    });
 });
 
-// The VOR page examples of the guide are VORTACs: Blue Ridge (figure 3-151) and Ardmore (figure 3-152), both shown with
-// the D of a DME (3-49). The sim reports such a station as VorType.VORTAC: the SDK's own instruments draw a VORTAC
-// symbol for that type.
+// Blue Ridge (figure 3-151) and Ardmore (figure 3-152) are shown with the D of a DME (3-49). The sim reports a combined
+// VOR and TACAN station as VorType.VORTAC: the SDK's own instruments draw a VORTAC symbol for that type.
 describe('VOR page with a VORTAC (3-49)', () => {
     const adm = (type: VorType) => vor('ADM', 47.2, 8.2, {type, name: 'ARDMORE'});
 

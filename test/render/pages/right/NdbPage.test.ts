@@ -54,6 +54,22 @@ describe('NDB page (characterization)', () => {
 
         expect(Screen.read().rows('R')[1]).toBe('GREATER OTT');
     });
+
+    // The frequency is optional: a user NDB made from the latitude and longitude alone shows dashes after FREQ
+    it('shows dashes for the frequency of a user NDB made without one', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('R', 'NDB  ');
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'ND1');
+        await unit.panel.ent();
+        await unit.panel.outer('R', 1);
+        await unit.panel.type('R', 'N4730000');
+        await unit.panel.ent();
+        await unit.panel.type('R', 'E1001500');
+        await unit.panel.ent();
+
+        expect(Screen.read().rows('R')[3]).toBe('FREQ ____._');
+    });
 });
 
 describe('NDB page contents (3-50)', () => {
@@ -201,19 +217,6 @@ describe('user NDB (5-18)', () => {
         expect(userWaypoints(unit).map(w => w.slice(0, 5))).toEqual([[FacilityType.NDB, 'XX', 'ND1', 47.5, 100.25]]);
         expect(Screen.read().rows('R').slice(4)).toEqual(["N 47°30.00'", "E100°15.00'"]);
         expect(Screen.read().status().right).toBe('NDB');
-    });
-
-    // The frequency is optional: a user NDB made from the latitude and longitude alone shows dashes after FREQ
-    it('shows dashes for the frequency of a user NDB made without one (characterization)', async () => {
-        const unit = await undefinedNdb();
-        await unit.panel.ent();
-        await unit.panel.outer('R', 1);
-        await unit.panel.type('R', 'N4730000');
-        await unit.panel.ent();
-        await unit.panel.type('R', 'E1001500');
-        await unit.panel.ent();
-
-        expect(Screen.read().rows('R')[3]).toBe('FREQ ____._');
     });
 
     // C-1: ENT LAT/LON reminds the pilot of the position while the waypoint is created: the latitude alone does not
