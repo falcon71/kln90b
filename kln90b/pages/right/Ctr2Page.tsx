@@ -23,7 +23,7 @@ type Ctr2PageTypes = {
 }
 
 /**
- * 5-21
+ * 5-25 to 5-27
  */
 export class Ctr2Page extends SixLineHalfPage {
 

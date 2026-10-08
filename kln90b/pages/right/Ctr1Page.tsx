@@ -38,7 +38,7 @@ export interface CenterWaypoint {
 }
 
 /**
- * 5-21
+ * 5-25 to 5-27
  */
 export class Ctr1Page extends SixLineHalfPage {
 
