@@ -68,8 +68,10 @@ describe('FrontPanel.focused across a plain decimal point (harness)', () => {
             expect(() => focusedOf(`D:${inv('012')}${'<span class="blink">.</span>'}${inv('3')}NM`)).toThrow(/expected one focused field on side R, found 2/);
         });
 
+        // The second run starts exactly one cell past the end of the first, and a plain point lies in the cell between
+        // them in its own row, so only the rows keep the two runs apart
         it('does not join runs on different rows', () => {
-            expect(() => focusedOf(`D:${inv('012')}<br/>.${inv('3')}`)).toThrow(/expected one focused field on side R, found 2/);
+            expect(() => focusedOf(`D:${inv('012')}<br/>D:xyz.${inv('3')}`)).toThrow(/expected one focused field on side R, found 2/);
         });
     });
 });

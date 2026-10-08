@@ -66,9 +66,9 @@ const IAF_LIST_CELL = 4;
 
 /**
  * Reads the list that `read` adds to the rows, which the browser draws from `cell` in every row. The list starts in the
- * current row, which must have reached that cell (the "IAF " in front of the list), and each later row of the list is
- * moved right by `cell` blank cells. An empty row stays empty: the one after the list's last line break is where the
- * page goes on, and a blank row reads the same.
+ * current row, which must have reached that cell (the "IAF " in front of the list), and every later row of the list,
+ * the empty one after its last line break included, is moved right by `cell` blank cells. Nothing follows the list on
+ * the pages that have it, so nothing is misplaced by that last row.
  */
 function positioned(rows: Cell[][], cell: number, read: () => void): void {
     const first = rows.length - 1;
@@ -77,7 +77,6 @@ function positioned(rows: Cell[][], cell: number, read: () => void): void {
     }
     read();
     for (let r = first + 1; r < rows.length; r++) {
-        if (rows[r].length === 0) continue;
         rows[r].unshift(...Array.from({length: cell}, (): Cell => ({ch: ' ', attr: '.'})));
     }
 }

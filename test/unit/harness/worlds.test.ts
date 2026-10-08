@@ -48,6 +48,8 @@ describe('centerWorld (harness)', () => {
 
         expect(c.map(a => a.type)).toEqual([BoundaryType.Center, BoundaryType.Center, BoundaryType.Center]);
         expect(c.map(a => [a.bottomRight.lat, a.topLeft.lat])).toEqual([[38, 42.75], [42.75, 47.75], [47.75, 52]]);
+        // 2 degrees either side of 100 W, where the airports, the VORs and the crossings lie
+        expect(c.map(a => [a.topLeft.long, a.bottomRight.long])).toEqual([[-102, -98], [-102, -98], [-102, -98]]);
         expect(c.map(a => (a as any).frequency.freqMHz)).toEqual([120.0, 121.0, 122.0]);
     });
 

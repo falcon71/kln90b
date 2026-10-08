@@ -100,6 +100,8 @@ describe('builders', () => {
             [90, 90, '09-27', [['09', 90], ['27', 270]]],
             [180, 180, '18-36', [['18', 180], ['36', 0]]],
             [200, 20, '02-20', [['02', 20], ['20', 200]]],
+            // Headings 185 to 194 round to the end number 19, which belongs to the higher-numbered end
+            [190, 10, '01-19', [['01', 10], ['19', 190]]],
         ])('a heading of %i is stored as direction %i of runway %s', (heading, direction, designation, oneWay) => {
             const apt = airport('KXXX', 47, 8, {runwayHeading: heading});
 

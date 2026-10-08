@@ -229,10 +229,11 @@ point on the final course line.
 the intersection DEF and the airport KBBB. Each leg is about 30 NM, which is 15 minutes at 120 kt. `centerWorld()`
 returns `{kaaa, kbbb, kccc, bgd, gck, centers}` for the CTR pages: three airports 5 degrees (300 NM) apart on 100 W, the
 VORs BGD and GCK, and three Center airspaces stacked along that meridian that share their boundaries at 42.75 N and
-47.75 N. BGD is the only VOR within 100 NM of the first crossing and GCK of the second. A plan through the airports should keep its legs at
-300 NM: the route search searches circles of about 75 NM radius at 0, 75 and 225 NM along a leg, so each Center is first
-returned by a search whose center lies inside it, and a Center first returned from outside it is dropped for good by the
-shared search session (#102). Both return fresh objects on every call; pass `centers` as `BootOptions.airspaces`.
+47.75 N. BGD is the only VOR within 100 NM of the first crossing and GCK of the second. A plan through the airports
+should keep its legs at 300 NM: the route search searches circles of about 75 NM radius at 0, 75 and 225 NM along a leg,
+so each Center is first returned by a search whose center lies inside it, and a Center first returned from outside it is
+dropped for good by the shared search session (#102). Both return fresh objects on every call; pass `centers` as
+`BootOptions.airspaces`.
 
 ## The EFB
 
@@ -487,11 +488,11 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       the keyboard alternative that types the same characters.
     - `focused(side)` returns the one focused field `{row, col, text}`. Two runs of inverted cells that one plain `.`
       separates are one field: the NDB frequency and DIS editors invert their digits and not their point, so the DIS
-      field of the INT page reads `___._`. Whether the real cursor covers the point is open (Session 9b); `cursorTo(side, 'USER POS?')` turns the outer
-      knob until that field has the cursor, stepping over the cursor positions that focus nothing (the SUP page without
-      user waypoints has one after the ident characters) and throwing with the screen after `maxClicks`. It throws at
-      once when the status field of that side shows a page name, which means the cursor is off: the outer knob would
-      turn the pages and the search would end on another page.
+      field of the INT page reads `___._`. Whether the real cursor covers the point is open (Session 9b).
+      `cursorTo(side, 'USER POS?')` turns the outer knob until that field has the cursor, stepping over the cursor
+      positions that focus nothing (the SUP page without user waypoints has one after the ident characters) and throwing
+      with the screen after `maxClicks`. It throws at once when the status field of that side shows a page name, which
+      means the cursor is off: the outer knob would turn the pages and the search would end on another page.
       `appendToFpl0(idents)` enters and confirms idents on FPL 0.
     - Power: `powerOff()`, `powerOn()`, `powerCycle({offSeconds})` and `approveSelfTest()`. After boot every power-on runs
       the welcome page (17 s) and the self-test, also on an engine-running unit; `approveSelfTest` presses ENT on
