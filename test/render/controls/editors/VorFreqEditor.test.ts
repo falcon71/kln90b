@@ -63,16 +63,17 @@ describe('VorFreqEditor on the VOR page (5-18)', () => {
         expect(Screen.read().rows('R')[3].slice(0, 6)).toBe('108.50');
     });
 
-    // Figures 5-72 to 5-74 draw the cursor over the RAD and DIS fields of the same chapter with their decimal point
-    // inside the inverse block; no figure shows the cursor in the VOR frequency, so this extends those figures to it
-    it('covers the decimal point with the cursor (5-18, figures 5-72 to 5-74)', async () => {
+});
+
+describe('VorFreqEditor on the VOR page (characterization)', () => {
+    // The code draws the decimal point of the frequency inside the inverse block of the cursor, like the RAD field. No
+    // figure shows the cursor in the VOR frequency, so this holds what the code does
+    it('covers the decimal point with the cursor', async () => {
         await onFreq();
 
         expect(Screen.read().cell(3, POINT_COL)).toEqual({ch: '.', attr: 'I'});
     });
-});
 
-describe('VorFreqEditor on the VOR page (characterization)', () => {
     // The hundreds cell holds only the 1, and the tens cell offers 0 and 1
     it('keeps the 1 in the hundreds cell and offers 0 and 1 in the tens cell', async () => {
         const unit = await onFreq();

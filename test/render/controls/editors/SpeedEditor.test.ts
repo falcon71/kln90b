@@ -80,10 +80,23 @@ describe('SpeedEditor on SET 1 (3-18, 3-19)', () => {
 });
 
 describe('SpeedEditor on SET 1 (checked in the KLN 89 trainer, 2026-10-08)', () => {
-    // Checked in the KLN 89 trainer, 2026-10-08: a cell wraps past its last choice (the 89's ground speed is one block
-    // of 1 kt steps; the 90B's own cell layout is the code's). The hundreds cell offers a blank and 1 to 9: ten clicks
-    // after the opening blank come back to it
-    it('wraps the hundreds cell from 9 to the blank (checked in the KLN 89 trainer, 2026-10-08)', async () => {
+    // Checked in the KLN 89 trainer, 2026-10-08: a digit cell wraps from 9 to 0 (the units of its latitude do). The
+    // tens cell of the ground speed is such a cell: ten clicks after the opening 0 give 9, one more gives 0
+    it('wraps a digit cell from 9 to 0 (checked in the KLN 89 trainer, 2026-10-08)', async () => {
+        const unit = await onGroundspeed();
+        await unit.panel.inner('L', 1); // opens the field: the hundreds cell blank
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 10);
+        expect(unit.panel.focused('L').text).toBe(' 9_');
+        await unit.panel.inner('L', 1);
+
+        expect(unit.panel.focused('L').text).toBe(' 0_');
+    });
+});
+
+describe('SpeedEditor on SET 1 (characterization)', () => {
+    // The hundreds cell offers a blank and 1 to 9 and wraps: ten clicks after the opening blank come back to it
+    it('wraps the hundreds cell from 9 to the blank', async () => {
         const unit = await onGroundspeed();
         await unit.panel.inner('L', 1);
         await unit.panel.inner('L', 9);

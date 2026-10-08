@@ -47,20 +47,21 @@ const POINT_COL = 12 + 5 + 3;
 
 describe('RadialEditor on the INT page (5-19)', () => {
     // 5-19 step 9: the inner knob selects each digit, the outer knob moves on, to a tenth of a degree. The first click
-    // opens the field with a 0 in the hundreds cell; a digit cell starts at 0 on its first click. 045.5 at QQI's
-    // distance from MKC (pointFrom and distanceNm, flight/geo.ts)
+    // opens the field with a 0 in the hundreds cell; a digit cell starts at 0 on its first click. 234.8 at QQI's
+    // distance from MKC (pointFrom and distanceNm, flight/geo.ts); no digit of it equals the one beside it
     it('takes a radial selected with the knobs (5-19)', async () => {
         const unit = await onRad();
         await unit.panel.inner('R', 1); // opens the field: 0__._
+        await unit.panel.inner('R', 2); // 2
+        await unit.panel.outer('R', 1);
+        await unit.panel.inner('R', 4); // 3
         await unit.panel.outer('R', 1);
         await unit.panel.inner('R', 5); // 4
         await unit.panel.outer('R', 1);
-        await unit.panel.inner('R', 6); // 5
-        await unit.panel.outer('R', 1);
-        await unit.panel.inner('R', 6); // 5
+        await unit.panel.inner('R', 9); // 8
         await unit.panel.ent();
 
-        const p = pointFrom(MKC, 45.5, distanceNm(MKC, QQI));
+        const p = pointFrom(MKC, 234.8, distanceNm(MKC, QQI));
         const [lat, lon] = qqi(unit);
         expect(unit.errors).toEqual([]);
         expect(lat).toBeCloseTo(p.lat, 6);
@@ -123,17 +124,17 @@ describe('RadialEditor limits (checked in the KLN 89 trainer, 2026-10-08)', () =
         expect(qqi(unit)[1]).toBeCloseTo(p.lon, 6);
     });
 
-    // Checked in the KLN 89 trainer, 2026-10-08: every cell and block wraps past its last choice. The hundreds cell of
-    // the 90B offers 0 to 3, which the largest radial of 359.9 implies (the 89 has no such cell); four clicks after the
-    // opening 0 come back to 0
-    it('wraps the hundreds cell from 3 to 0 (checked in the KLN 89 trainer, 2026-10-08)', async () => {
+    // Checked in the KLN 89 trainer, 2026-10-08: a digit cell wraps from 9 to 0 (the units of its latitude do). The
+    // tens cell of the radial is such a cell: ten clicks after the opening 0 give 9, one more gives 0
+    it('wraps a digit cell from 9 to 0 (checked in the KLN 89 trainer, 2026-10-08)', async () => {
         const unit = await onRad();
-        await unit.panel.inner('R', 1);
-        await unit.panel.inner('R', 3);
-        expect(unit.panel.focused('R').text).toBe('3__._');
+        await unit.panel.inner('R', 1); // opens the field: 0__._
+        await unit.panel.outer('R', 1);
+        await unit.panel.inner('R', 10);
+        expect(unit.panel.focused('R').text).toBe('09_._');
         await unit.panel.inner('R', 1);
 
-        expect(unit.panel.focused('R').text).toBe('0__._');
+        expect(unit.panel.focused('R').text).toBe('00_._');
     });
 });
 
@@ -158,5 +159,16 @@ describe('RadialEditor on the INT page (characterization)', () => {
         await unit.panel.ent();
 
         expect(messages).toEqual(['INVALID ENT']);
+    });
+
+    // The hundreds cell offers 0 to 3 and wraps: three clicks after the opening 0 give 3, one more gives 0
+    it('wraps the hundreds cell from 3 to 0', async () => {
+        const unit = await onRad();
+        await unit.panel.inner('R', 1);
+        await unit.panel.inner('R', 3);
+        expect(unit.panel.focused('R').text).toBe('3__._');
+        await unit.panel.inner('R', 1);
+
+        expect(unit.panel.focused('R').text).toBe('0__._');
     });
 });

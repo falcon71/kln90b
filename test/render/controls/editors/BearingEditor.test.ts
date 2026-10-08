@@ -5,9 +5,9 @@ import {collectStatusMessages} from '../../../harness/statusLine';
 
 /**
  * BearingEditor is the heading field of SET 1 (3-18, 3-19). The host is SET 1 of a parked unit in a world without
- * magnetic variation (so the magnetic and the true track agree; the variation is the #NEW-B-2 pin in Set1Page.test.ts).
- * CONFIRM? hands the track to the GPS, which keeps it while the aircraft stands still (below 2 kt, 3-35), so the next
- * SET 1 page shows the committed value.
+ * magnetic variation (so the magnetic and the true track agree; the variation is the #NEW-2-1 pin in Set1Page.test.ts).
+ * CONFIRM? hands the track to the GPS, which keeps it while the aircraft stands still (below 2 kt, as the harness
+ * helper `moveAircraft` documents), so the next SET 1 page shows the committed value.
  */
 async function onTrack(): Promise<HeadlessUnit> {
     const unit = await bootUnit({position: {lat: 47.5, lon: 11.25}});
@@ -48,17 +48,17 @@ describe('BearingEditor on SET 1 (3-19)', () => {
 });
 
 describe('BearingEditor on SET 1 (checked in the KLN 89 trainer, 2026-10-08)', () => {
-    // Checked in the KLN 89 trainer, 2026-10-08: a cell wraps past its last choice (the 89's SET 1 heading is one block
-    // of 1° steps; the 90B's own cell layout is the code's). The hundreds cell offers 0 to 3, which the largest heading
-    // of 359 implies: four clicks after the opening 0 come back to 0
-    it('wraps the hundreds cell from 3 to 0 (checked in the KLN 89 trainer, 2026-10-08)', async () => {
+    // Checked in the KLN 89 trainer, 2026-10-08: a digit cell wraps from 9 to 0 (the units of its latitude do). The
+    // tens cell of the heading is such a cell: ten clicks after the opening 0 give 9, one more gives 0
+    it('wraps a digit cell from 9 to 0 (checked in the KLN 89 trainer, 2026-10-08)', async () => {
         const unit = await onTrack();
-        await unit.panel.inner('L', 1);
-        await unit.panel.inner('L', 3);
-        expect(unit.panel.focused('L').text).toBe('3__');
+        await unit.panel.inner('L', 1); // opens the field: 0__
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 10);
+        expect(unit.panel.focused('L').text).toBe('09_');
         await unit.panel.inner('L', 1);
 
-        expect(unit.panel.focused('L').text).toBe('0__');
+        expect(unit.panel.focused('L').text).toBe('00_');
     });
 });
 
@@ -83,5 +83,16 @@ describe('BearingEditor on SET 1 (characterization)', () => {
 
         expect(messages).toEqual([]);
         expect(unit.props.sensors.in.gps.trackTrue).toBe(359);
+    });
+
+    // The hundreds cell offers 0 to 3 and wraps: three clicks after the opening 0 give 3, one more gives 0
+    it('wraps the hundreds cell from 3 to 0', async () => {
+        const unit = await onTrack();
+        await unit.panel.inner('L', 1);
+        await unit.panel.inner('L', 3);
+        expect(unit.panel.focused('L').text).toBe('3__');
+        await unit.panel.inner('L', 1);
+
+        expect(unit.panel.focused('L').text).toBe('0__');
     });
 });

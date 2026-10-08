@@ -101,9 +101,23 @@ describe('NdbFreqEditor on the NDB page (5-18)', () => {
 });
 
 describe('NdbFreqEditor on the NDB page (checked in the KLN 89 trainer, 2026-10-08)', () => {
-    // Checked in the KLN 89 trainer, 2026-10-08: a cell wraps past its last choice. The thousands cell of the 90B
-    // offers a blank and 1 only (the 89 has no user NDB); two clicks after the opening blank come back to it
-    it('wraps the thousands cell from 1 to the blank (checked in the KLN 89 trainer, 2026-10-08)', async () => {
+    // Checked in the KLN 89 trainer, 2026-10-08: a digit cell wraps from 9 to 0 (the units of its latitude do). The
+    // hundreds cell of the frequency is such a cell: ten clicks after the opening 0 give 9, one more gives 0
+    it('wraps a digit cell from 9 to 0 (checked in the KLN 89 trainer, 2026-10-08)', async () => {
+        const unit = await onFreq();
+        await unit.panel.inner('R', 1); // opens the field: the thousands cell blank
+        await unit.panel.outer('R', 1);
+        await unit.panel.inner('R', 10);
+        expect(unit.panel.focused('R').text).toBe(' 9__._');
+        await unit.panel.inner('R', 1);
+
+        expect(unit.panel.focused('R').text).toBe(' 0__._');
+    });
+});
+
+describe('NdbFreqEditor on the NDB page (characterization)', () => {
+    // The thousands cell offers a blank and 1 only, and wraps: two clicks after the opening blank come back to it
+    it('wraps the thousands cell from 1 to the blank', async () => {
         const unit = await onFreq();
         await unit.panel.inner('R', 1); // opens the field with the blank
         await unit.panel.inner('R', 1);
