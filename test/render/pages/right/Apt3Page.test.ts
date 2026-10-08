@@ -147,20 +147,20 @@ describe('APT 3 page, runway list', () => {
         expect(Screen.read().status().right).toBe('APT 4');
     });
 
-    // 3-44: the surface abbreviations, for the sim's surfaces that have one
+    // 3-44: the surface abbreviations, for the sim's surfaces that have one (in the order of the sim's enum)
     it.each([
         ['Concrete', RunwaySurfaceType.Concrete, 'HRD'],
+        ['ShortGrass', RunwaySurfaceType.ShortGrass, 'TRF'],
+        ['Snow', RunwaySurfaceType.Snow, 'SNW'],
+        ['Ice', RunwaySurfaceType.Ice, 'ICE'],
+        ['Dirt', RunwaySurfaceType.Dirt, 'DRT'],
+        ['Gravel', RunwaySurfaceType.Gravel, 'GRV'],
+        ['SteelMats', RunwaySurfaceType.SteelMats, 'MAT'],
         ['Bituminous', RunwaySurfaceType.Bituminous, 'HRD'],
         ['Brick', RunwaySurfaceType.Brick, 'HRD'],
-        ['Tarmac', RunwaySurfaceType.Tarmac, 'HRD'],
-        ['ShortGrass', RunwaySurfaceType.ShortGrass, 'TRF'],
-        ['Gravel', RunwaySurfaceType.Gravel, 'GRV'],
         ['Sand', RunwaySurfaceType.Sand, 'SND'],
-        ['Dirt', RunwaySurfaceType.Dirt, 'DRT'],
-        ['Ice', RunwaySurfaceType.Ice, 'ICE'],
-        ['SteelMats', RunwaySurfaceType.SteelMats, 'MAT'],
         ['Shale', RunwaySurfaceType.Shale, 'SHL'],
-        ['Snow', RunwaySurfaceType.Snow, 'SNW'],
+        ['Tarmac', RunwaySurfaceType.Tarmac, 'HRD'],
     ])('abbreviates the surface %s (3-44)', async (_name, surface, abbreviation) => {
         const unit = await bootUnit({facilities: [withRunways('KAAA', [{surface}])], position: {lat: 47.0, lon: 12.0}});
         await unit.panel.selectPage('R', 'APT 3');

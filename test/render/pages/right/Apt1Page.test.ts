@@ -4,7 +4,7 @@ import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {airport, intersection, ndb, vor} from '../../../harness/navdata/builders';
 import {airspace} from '../../../harness/navdata/airspaces';
-import {savedFlightplan} from '../../../harness/storage';
+import {savedFlightplan, storedSetting} from '../../../harness/storage';
 
 describe('APT 1 page', () => {
     // 5-17: a user airport is created by entering its latitude and longitude, and the cursor goes to the latitude
@@ -185,12 +185,14 @@ describe('APT 1 page scanning from a typed ident that matches no airport (3-21)'
         expect([rows[0], rows[2], rows[3]]).toEqual([' KCZ       ', 'CREATE NEW ', 'WPT AT:    ']);
     });
 
-    // 3-26 shortens whole words only, and AIRPORT is none of them (the builder names every airport "<ident> AIRPORT").
-    // The name shows whole, cut after the eleventh cell. The code replaces PORT inside AIRPORT and shows KCCC AIRPT.
+    // 3-26: names are shortened only where they are too long for the display, and "KCCC AIRPORT" (the builder names every
+    // airport "<ident> AIRPORT") fits the two name rows. Figures 3-71 and 3-84 show a listed word inside a longer word
+    // (WESTCHESTER, NEWPORT) staying whole. So the name stays whole and continues on the second row after the eleventh
+    // cell (figure 3-85). The code replaces PORT inside AIRPORT and shows KCCC AIRPT.
     it.fails('shows the name KCCC AIRPORT with the word AIRPORT whole (3-26, #NEW-1-2)', async () => {
         const unit = await typeKc();
 
-        expect(Screen.read().rows('R')[1]).toBe('KCCC AIRPOR');
+        expect(Screen.read().rows('R').slice(1, 3)).toEqual(['KCCC AIRPOR', 'T          ']);
     });
 
     it('shows the CREATE NEW state for KCZ entered the way the pins enter it (5-16)', async () => {
@@ -439,7 +441,7 @@ describe('APT 1 page with the cursor on the nearest rank', () => {
     it('keeps the cursor on the rank while the nearest list changes (3-24)', async () => {
         const unit = await parkOnNr1ThenMove();
 
-        expect(unit.panel.focused('R').text).toMatch(/^nr \d$/);
+        expect(unit.panel.focused('R').text).toMatch(/^nr [12]$/);
         expect(unit.props.nearestLists.aptNearestList.getNearestList().map(w => w.facility.icaoStruct.ident)).toEqual(['KCCC', 'KBBB']);
     });
 
@@ -525,7 +527,13 @@ describe('APT 1 page creating a user airport', () => {
         ]);
         expect(unit.errors).toEqual([]);
 
-        // The airport is stored, not just shown: APT 1 shows the same position again after a visit to APT 2
+        // The airport is saved as a V2 user waypoint (docs/architecture.md, Core 7, laid out by hand): type A, region XX,
+        // the ident padded to eight, latitude +4730.00, longitude -10215.00, the unknown elevation -1 m, the unknown
+        // runway length -33 ft and no surface. The unit saves a moment after the change.
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(storedSetting(unit, 'wpt0')).toBe('AXX        FARM    +4730.00-10215.00-00001-00033-');
+
+        // APT 1 also shows the same position again after a visit to APT 2
         await unit.panel.inner('R', 1);
         await unit.panel.inner('R', -1);
         expect(Screen.read().rows('R')).toEqual([

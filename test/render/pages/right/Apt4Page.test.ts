@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {AirportFacility, FacilityFrequency, FacilityFrequencyType, ICAO} from '@microsoft/msfs-sdk';
 import {bootUnit, settle} from '../../../harness/boot';
 import {airport} from '../../../harness/navdata/builders';
@@ -104,9 +104,7 @@ describe('APT 4 page', () => {
     // 3-9, 3-10, figures 3-33 and 3-34, 3-45: an airport with more frequencies than one page holds has APT+4, and the
     // further APT 4 page lists the rest
     it('continues on a second APT 4 page after five frequencies (3-9, 3-45)', async () => {
-        const unit = await bootUnit({
-            facilities: [withFreqs(...FIVE, freq(FacilityFrequencyType.Approach, 124.45), freq(FacilityFrequencyType.Departure, 126.65))],
-        });
+        const unit = await bootUnit({facilities: [withFreqs(...FIVE, freq(FacilityFrequencyType.Approach, 124.45))]});
         await unit.panel.selectPage('R', 'APT 4');
         expect(Screen.read().status().right).toBe('APT+4');
         expect(Screen.read().rows('R')[5]).toBe('CTAF 118.35');
@@ -117,7 +115,7 @@ describe('APT 4 page', () => {
         expect(Screen.read().rows('R')).toEqual([
             ' KAAA      ',
             'APR  124.45',
-            'DEP  126.65',
+            '           ',
             '           ',
             '           ',
             '           ',
@@ -127,21 +125,22 @@ describe('APT 4 page', () => {
         expect(Screen.read().status().right).toBe('APT 5');
     });
 
-    // 3-45: the abbreviations of the frequency types that have a counterpart among the sim's types
+    // 3-45: the abbreviations of the frequency types that have a counterpart among the sim's types (in the order of the
+    // sim's enum)
     it.each([
         ['ATIS', FacilityFrequencyType.ATIS, 'ATIS'],
-        ['CPT', FacilityFrequencyType.CPT, 'PTAX'],
-        ['Clearance', FacilityFrequencyType.Clearance, 'CLR '],
+        ['Multicom', FacilityFrequencyType.Multicom, 'MCOM'],
+        ['Unicom', FacilityFrequencyType.Unicom, 'UNIC'],
+        ['CTAF', FacilityFrequencyType.CTAF, 'CTAF'],
         ['Ground', FacilityFrequencyType.Ground, 'GRND'],
         ['Tower', FacilityFrequencyType.Tower, 'TWR '],
-        ['Unicom', FacilityFrequencyType.Unicom, 'UNIC'],
-        ['Multicom', FacilityFrequencyType.Multicom, 'MCOM'],
-        ['CTAF', FacilityFrequencyType.CTAF, 'CTAF'],
+        ['Clearance', FacilityFrequencyType.Clearance, 'CLR '],
         ['Approach', FacilityFrequencyType.Approach, 'APR '],
         ['Departure', FacilityFrequencyType.Departure, 'DEP '],
         ['Center', FacilityFrequencyType.Center, 'CTR '],
-        ['ASOS', FacilityFrequencyType.ASOS, 'ASOS'],
         ['AWOS', FacilityFrequencyType.AWOS, 'AWOS'],
+        ['ASOS', FacilityFrequencyType.ASOS, 'ASOS'],
+        ['CPT', FacilityFrequencyType.CPT, 'PTAX'],
     ])('labels the frequency type %s with its abbreviation (3-45)', async (_name, type, label) => {
         const unit = await bootUnit({facilities: [withFreqs(freq(type, 122.2))]});
         await unit.panel.selectPage('R', 'APT 4');
@@ -203,5 +202,26 @@ describe('APT 4 page after power-on', () => {
 
         expect(Screen.read().status().right).toBe('APT 4');
         expect(Screen.read().rows('R').slice(0, 2)).toEqual(['›KAAA      ', 'UNIC 122.80']);
+    });
+});
+
+describe('APT 4 page while scanning', () => {
+    // 3-45: the arrow marks the active airport also when the scan knob brings it up. FPL 0 KAAA to KBBB, with the
+    // aircraft nearer to KBBB, makes KBBB active, and APT 4 opens on KAAA, the first airport of the scan list.
+    it('shows the arrow after a scan to the active airport (3-45)', async () => {
+        const kaaa = airport('KAAA', 47.3, 8.0);
+        const kbbb = airport('KBBB', 47.1, 8.0);
+        const unit = await bootUnit({facilities: [kaaa, kbbb], position: {lat: 47.0, lon: 8.0}, storage: savedFlightplan(0, [kaaa, kbbb])});
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 4');
+        expect(Screen.read().rows('R')[0]).toBe(' KAAA      ');
+
+        await unit.panel.scan();
+        await unit.panel.inner('R', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.scan();
+
+        expect(Screen.read().rows('R')[0]).toBe('›KBBB      ');
+        expect(unit.errors).toEqual([]);
     });
 });

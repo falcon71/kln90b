@@ -4,7 +4,7 @@ import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {airport} from '../../../harness/navdata/builders';
 import {approach} from '../../../harness/navdata/procedures';
 import {Screen} from '../../../harness/render/screen';
-import {savedUserWaypoints} from '../../../harness/storage';
+import {savedUserWaypoints, storedSetting} from '../../../harness/storage';
 import {answerTimezone} from '../../../harness/timezone';
 
 describe('APT 2 page', () => {
@@ -106,7 +106,8 @@ describe('APT 2 page of a database airport', () => {
     // approach control with radar. The labels and (R) stand on the last row, (R) at its right end (figure 3-135).
     it.each([
         ['an ILS', [ApproachType.APPROACH_TYPE_ILS, ApproachType.APPROACH_TYPE_RNAV], 'ILS'],
-        ['a non-precision approach', [ApproachType.APPROACH_TYPE_RNAV, ApproachType.APPROACH_TYPE_VOR], 'NP APR'],
+        ['a VOR approach', [ApproachType.APPROACH_TYPE_VOR], 'NP APR'],
+        ['an RNAV approach', [ApproachType.APPROACH_TYPE_RNAV], 'NP APR'],
         ['no approach', [], 'NO APR'],
     ])('names the approach type for %s (3-43)', async (_kind, types, label) => {
         answerTimezone(-6, NORTHERN_SUMMER);
@@ -164,6 +165,11 @@ describe('APT 2 page of a user airport', () => {
         await unit.panel.cursor('R');
 
         expect(Screen.read().rows('R')[3]).toBe('ELV 01250ft');
+        // The elevation is saved with the user waypoint (a V2 string laid out by hand, docs/architecture.md Core 7): type A,
+        // region XX, the ident padded to eight, latitude +4700.00, longitude +01200.00, the elevation in meters (1250 ft
+        // are 381 m), the unknown runway length -33 ft and no surface. The unit saves a moment after the change.
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(storedSetting(unit, 'wpt0')).toBe('AXX        FARM    +4700.00+01200.00+00381-00033-');
         // The elevation is kept: APT 2 shows it again after a visit to APT 1
         await unit.panel.inner('R', -1);
         await unit.panel.inner('R', 1);
