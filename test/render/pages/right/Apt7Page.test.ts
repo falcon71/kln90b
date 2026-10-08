@@ -210,3 +210,260 @@ describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
         expect(fpl0Legs(unit).slice(0, 3)).toEqual([['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID]]);
     });
 });
+
+/**
+ * KPRC of approachWorld() with invented SIDs and STARs to the east of it, and every fix the procedures use. FPL 0 stays
+ * empty and the aircraft is 40 NM north of KPRC, so the APT pages open on KPRC (the nearest airport) and the unit asks to
+ * add KPRC on LOAD IN FPL.
+ * - a SID has the runway transitions 09 and 27L, the common leg to SIDAB and the enroute transitions TRNAA and TRNAB;
+ * - ARR1 has no transition and no runway transition; ARR2 has the transitions TRNAA and TRNAB and the runways 09 and 27L.
+ */
+function sidStarWorld(o: { sids: string[], stars: boolean }) {
+    const w = approachWorld();
+    const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
+    const sidaa = intersection('SIDAA', east(8).lat, east(8).lon);
+    const sidab = intersection('SIDAB', east(20).lat, east(20).lon);
+    const trnaa = intersection('TRNAA', east(30).lat, east(30).lon);
+    const trnab = intersection('TRNAB', east(35).lat, east(35).lon);
+    const departures = o.sids.map(name => sid(name, {
+        runways: [{runway: '09', legs: [Leg.CA(90), Leg.DF(sidaa)]}, {runway: '27L', legs: [Leg.CA(270), Leg.DF(sidaa)]}],
+        common: [Leg.TF(sidab)],
+        transitions: [{name: 'TRNAA', legs: [Leg.TF(trnaa)]}, {name: 'TRNAB', legs: [Leg.TF(trnab)]}],
+    }));
+    const arrivals = o.stars ? [
+        star('ARR1', {common: [Leg.IF(trnaa), Leg.TF(sidab)]}),
+        star('ARR2', {
+            transitions: [{name: 'TRNAA', legs: [Leg.IF(trnaa)]}, {name: 'TRNAB', legs: [Leg.IF(trnab)]}],
+            common: [Leg.TF(sidab)],
+            runways: [{runway: '09', legs: [Leg.TF(sidaa)]}, {runway: '27L', legs: [Leg.TF(sidaa)]}],
+        }),
+    ] : [];
+    const kprc = withProcedures(w.kprc, {approaches: [...w.kprc.approaches], departures, arrivals});
+    return {facilities: [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.sdfaa, w.mapaa, sidaa, sidab, trnaa, trnab], position: w.north(40)};
+}
+
+/** Boots in sidStarWorld and turns the right inner knob from APT 6 the given number of clicks */
+async function bootOnApt7(o: { sids: string[], stars: boolean }, clicksFromApt6 = 1, opts: { start?: Date } = {}): Promise<HeadlessUnit> {
+    const unit = await bootUnit({...sidStarWorld(o), ...opts});
+    await settle(unit);
+    await unit.panel.selectPage('R', 'APT 6');
+    await unit.panel.inner('R', clicksFromApt6);
+    return unit;
+}
+
+describe('APT 7 procedure list (3-49, 6-21)', () => {
+    // 3-49 (figure 3-147), 6-22 (figure 6-33): the procedures are numbered in two cells, right-aligned; with more than four
+    // the last one stays on the bottom line. 6-21: an airport with SIDs only has one APT 7 page
+    it('lists the SIDs numbered from 1 and keeps the last on the bottom line, on one APT 7 page (3-49, 6-21)', async () => {
+        await bootOnApt7({sids: ['DEPA', 'DEPB', 'DEPC', 'DEPD', 'DEPE', 'DEPF', 'DEPG', 'DEPH', 'DEPI', 'DEPJ'], stars: false});
+
+        expect(rows('R')).toEqual([' KPRC', 'SELECT SID', ' 1 DEPA', ' 2 DEPB', ' 3 DEPC', '10 DEPJ']);
+        expect(Screen.read().status().right).toBe('APT 7');
+    });
+
+    // 3-49, figure 3-148: the text for an airport without SIDs and STARs
+    it('shows NO SID/STAR FOR THIS AIRPORT IN DATABASE for an airport without procedures (3-49)', async () => {
+        const unit = await bootUnit({facilities: [airport('KAAA', 47, 8)], position: {lat: 47, lon: 8}});
+        await unit.panel.selectPage('R', 'APT 7');
+
+        expect(rows('R')).toEqual([' KAAA', 'NO SID/STAR', 'FOR THIS', 'AIRPORT', 'IN DATABASE', '']);
+        expect(Screen.read().status().right).toBe('APT 7');
+    });
+
+    // 3-49, 6-21: with SIDs and STARs there are two APT 7 pages, shown as APT+7, one to select a SID and one to select a
+    // STAR. 3-49: there is only one APT 8 page, so the next click leaves APT 7
+    it('has two APT 7 pages, APT+7, for an airport with SIDs and STARs (3-49, 6-21)', async () => {
+        const unit = await bootOnApt7({sids: ['DEP1'], stars: true});
+        const first = [Screen.read().status().right, rows('R')[1]];
+        await unit.panel.inner('R', 1);
+        const second = [Screen.read().status().right, rows('R')[1]];
+        await unit.panel.inner('R', 1);
+
+        expect([first, second].sort()).toEqual([['APT+7', 'SELECT SID'], ['APT+7', 'SELECT STAR']]);
+        expect(Screen.read().status().right).toBe('APT 8');
+    });
+});
+
+describe('APT 7 selecting a SID (6-22)', () => {
+    // 6-22 steps 3 to 6, figures 6-35 to 6-37: the SID, then the runway, then the transition, then the list of its
+    // waypoints with LOAD IN FPL under the cursor. The title is the SID's name with -SID
+    it('asks for the runway, then the transition, then shows the waypoints with the cursor on LOAD IN FPL (6-22)', async () => {
+        const unit = await bootOnApt7({sids: ['DEP1'], stars: false});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP1
+
+        expect(rows('R').slice(0, 2)).toEqual(['DEP1-SID', 'RUNWAY']);
+        expect(unit.panel.focused('R').row).toBe(2);
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // the second runway, 27L
+
+        expect(rows('R')).toEqual(['DEP1-SID', 'TRANSITION', ' 1 TRNAA', ' 2 TRNAB', '', '']);
+        await unit.panel.ent(); // TRNAA
+
+        // The CA leg of the runway transition is dropped (Session H, procedures.test.ts)
+        expect(rows('R')).toEqual(['DEP1-SID', ' 1 SIDAA', ' 2 SIDAB', ' 3 TRNAA', '', 'LOAD IN FPL']);
+        expect(unit.panel.focused('R')).toEqual({row: 5, col: 12, text: 'LOAD IN FPL'});
+    });
+
+    // 6-22 step 4, figure 6-35: the runways of a SID are listed with the RW prefix. The sibling is the test above, which
+    // asserts the runway question and its cursor
+    it.fails('lists the runways of a SID with the RW prefix (6-22, #NEW-2-2)', async () => {
+        const unit = await bootOnApt7({sids: ['DEP1'], stars: false});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP1
+
+        expect(rows('R').slice(2, 4)).toEqual([' 1 RW09', ' 2 RW27L']);
+    });
+});
+
+describe('APT 7 selecting a STAR (6-23)', () => {
+    // 6-23 steps 3 to 6, figures 6-40 to 6-42: the STAR, then the transition, then the runway when the STAR needs one,
+    // then the list of its waypoints with LOAD IN FPL under the cursor
+    it('asks for the transition, then the runway, then shows the waypoints (6-23)', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // ARR2
+
+        expect(rows('R').slice(1)).toEqual(['TRANSITION', ' 1 TRNAA', ' 2 TRNAB', '', '']);
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // TRNAB
+
+        expect(rows('R')[1]).toBe('RUNWAY');
+        await unit.panel.ent(); // the first runway, 09
+
+        expect(rows('R').slice(1)).toEqual([' 1 TRNAB', ' 2 SIDAB', ' 3 SIDAA', '', 'LOAD IN FPL']);
+        expect(unit.panel.focused('R')).toEqual({row: 5, col: 12, text: 'LOAD IN FPL'});
+    });
+
+    // 6-23 step 5: a STAR that needs no runway skips that step; a STAR without transitions has nothing to ask
+    it('goes straight to the waypoints of a STAR without transitions and runways (6-23)', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR1
+
+        expect(rows('R').slice(1)).toEqual([' 1 TRNAA', ' 2 SIDAB', '', '', 'LOAD IN FPL']);
+    });
+
+    // 6-5: CLR returns to the previous step while a procedure is selected. 6-5 says it of approaches; the SID and STAR
+    // selection on APT 7 is the same sequence of steps (6-22, 6-23). Checked in the KLN 89 trainer, 2026-10-07: CLR on the
+    // waypoint list went to the runway list and CLR on the runway list to the STAR list
+    it('returns one step with each CLR: waypoints, runway, transition, STAR list (6-5, KLN 89 trainer)', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // ARR2
+        await unit.panel.ent(); // TRNAA
+        await unit.panel.ent(); // 09: the waypoints
+        expect(rows('R')[5]).toBe('LOAD IN FPL');
+
+        await unit.panel.clr();
+        expect(rows('R')[1]).toBe('RUNWAY');
+        await unit.panel.clr();
+        expect(rows('R')[1]).toBe('TRANSITION');
+        await unit.panel.clr();
+        expect(rows('R').slice(0, 4)).toEqual([' KPRC', 'SELECT STAR', ' 1 ARR1', ' 2 ARR2']);
+    });
+
+    // 6-23 step 7: LOAD IN FPL for an airport that FPL 0 lacks asks to add the STAR and the airport, with the cursor on
+    // APPROVE?. The sibling of the pin below, which asserts this question before CLR
+    it('asks to add the airport and the STAR to FPL 0 when FPL 0 lacks the airport (6-23)', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR1: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+
+        expect(rows('R').slice(0, 5)).toEqual(['ARR1-Æ', 'PRESS ENT', 'TO ADD KPRC', 'AND STAR TO', 'FPL 0']);
+        expect(unit.panel.focused('R').row).toBe(5);
+        expect(unit.panel.focused('R').text.trim()).toBe('APPROVE?');
+    });
+
+    // 6-5: CLR returns to the previous step. On the question to add the airport (6-23 step 7) the previous step is the
+    // list of waypoints; APT 8 does so (Apt8Page.test.ts). Checked in the KLN 89 trainer, 2026-10-07: CLR on that
+    // question returns to the waypoint list
+    it.fails('returns from the question to add the airport to the waypoints with CLR (6-5, KLN 89 trainer, #NEW-2-1)', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR1: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL: KPRC is not in FPL 0, so the unit asks
+
+        await unit.panel.clr();
+
+        expect(rows('R').slice(1)).toEqual([' 1 TRNAA', ' 2 SIDAB', '', '', 'LOAD IN FPL']);
+    });
+});
+
+describe('APT 7 cursor after CLR', () => {
+    // Checked in the KLN 89 trainer, 2026-10-07: CLR from the runway list returned to the STAR list with the cursor on,
+    // on the STAR that had been chosen. The sibling of the pin below: CLR from the transition list returns to the STAR list
+    it('returns from the transition list of the second STAR to the STAR list (6-5)', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // ARR2: the transitions
+        expect(rows('R').slice(0, 2)).toEqual(['ARR2-Æ', 'TRANSITION']);
+
+        await unit.panel.clr();
+
+        expect(rows('R').slice(0, 4)).toEqual([' KPRC', 'SELECT STAR', ' 1 ARR1', ' 2 ARR2']);
+    });
+
+    it.fails('keeps the cursor on the chosen STAR when CLR returns to the STAR list (KLN 89 trainer, #NEW-2-3)', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // ARR2: the transitions
+
+        await unit.panel.clr();
+
+        expect(unit.panel.focused('R')).toEqual({row: 3, col: 12, text: ' 2 ARR2   '});
+    });
+
+    // The cursor of the SID list starts on the first SID. The trainer shows it for APT 7 as 6-4 does for APT 8
+    it('puts the cursor on the first procedure when it comes on (6-4, KLN 89 trainer)', async () => {
+        const unit = await bootOnApt7({sids: ['DEP1', 'DEP2'], stars: false});
+
+        await unit.panel.cursor('R');
+
+        expect(unit.panel.focused('R')).toEqual({row: 2, col: 12, text: ' 1 DEP1   '});
+    });
+});
+
+describe('APT 7 page (characterization)', () => {
+    it('shows the STAR page with the cursor on the first STAR', async () => {
+        const unit = await bootOnApt7({sids: ['DEP1'], stars: true}, 2);
+        await unit.panel.cursor('R');
+
+        expect(Screen.read().half('R')).toMatchInlineSnapshot(`
+          " KPRC      
+          SELECT STAR
+           1 ARR1    
+           2 ARR2    
+                     
+                     "
+        `);
+        expect(unit.panel.focused('R')).toEqual({row: 2, col: 12, text: ' 1 ARR1   '});
+    });
+
+    it('turns from APT 6 to the SID page first', async () => {
+        await bootOnApt7({sids: ['DEP1'], stars: true}, 1);
+
+        expect(rows('R')[1]).toBe('SELECT SID');
+    });
+
+    it('titles the steps of a STAR with its name and the STAR glyph', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR1
+
+        expect(rows('R')[0]).toBe('ARR1-Æ');
+    });
+
+    it('shows OUTDATED DB when the cursor comes on with an expired database', async () => {
+        // The fake clock's default start lies in the navdata cycle; 2026-07-01 is after it (sim/clock.ts)
+        const unit = await bootOnApt7({sids: ['DEP1'], stars: false}, 1, {start: new Date('2026-07-01T12:00:00Z')});
+        await unit.panel.cursor('R');
+
+        expect(Screen.read().status().mode).toBe('OUTDATED DB');
+    });
+});
