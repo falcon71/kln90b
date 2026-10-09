@@ -692,11 +692,14 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   filter itself at the unit stage, as `test/unit/services/SignalOutputFilter.test.ts` does: only `Date` is faked
   (`vi.useFakeTimers({toFake: ['Date']})`), a value is set every 1000 ms and the output sampled every 62 ms.
 - **A booted engine-running unit starts with the MSG annunciator lit.** Empty storage means the last position is 0/0, so
-  `POSITION DIFFERS FROM LAST POSITION BY >2NM` posts, and the GPS clock starts an hour behind, so
-  `SYSTEM TIME UPDATED TO GPS TIME` posts. The NAV 2 snapshot shows it. Seeding a last position in `storage`
-  (`lastLatitude`, `lastLongitude`) removes only the first message; the second still posts on an engine-running boot
-  (the hour is not added back when `forceReadyToUse` skips the power-on), so no `storage` setting gives an unlit MSG
-  annunciator.
+  `POSITION DIFFERS FROM LAST POSITION BY >2NM` posts; that is a fact of the harness, and the NAV 2 screens of the
+  harness tests show its `msg`. Seeding a last position in `storage` (`lastLatitude`, `lastLongitude`) removes it. The
+  second message of such a boot, `SYSTEM TIME UPDATED TO GPS TIME`, is a bug (#328): the GPS clock starts an hour
+  behind and `forceReadyToUse` never adds the hour back, so it posts on every engine-running boot whatever `storage`
+  holds (pinned in `StartupPages.test.ts`). A test that needs a message in the live list as a guard (that the list is
+  read at all) uses `POSITION DIFFERS` with empty storage, or posts a message of its own with
+  `unit.props.messageHandler.addMessage(new OneTimeMessage([...]))` when its storage holds the position
+  (`Set1Page.test.ts`); it never relies on SYSTEM TIME UPDATED, which a fix of #328 removes.
 - **Long render tests need their own timeout.** The render stage keeps Vitest's 5 s default. A test that advances
   minutes of simulated time with every tick running can pass alone and time out while other suites load the machine,
   which makes a mutation run report a false kill. Give such a test a per-test timeout (the CAL 6 tests in
@@ -850,9 +853,9 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       and sample an LVar over display ticks with a hand-written loop (`SimVarSync.test.ts`, `StatusLine.test.ts`,
       `SelfTestLeftPage.test.ts`). A `sim.writeCount(name)` and a sampling helper would remove the pitfall.
     - **The self-test page and the `"kln90b"` planner.** The cold boot to the self-test page is now
-      `bootToSelfTest` (section 4). The older copies stay as they were written: `SelfTestLeftPage.test.ts`,
-      `SelfTestRightPage.test.ts`, `SensorsOut.test.ts`, `HEvents.test.ts`, `NavCalculator.test.ts`, `Button.test.ts` and
-      `enterIdent.test.ts`; Session 10's tasks 1 and 2 move their own files onto it. The planner is read through
+      `bootToSelfTest` (section 4), which `StartupPages.test.ts`, `SelfTestLeftPage.test.ts` and
+      `SelfTestRightPage.test.ts` use. The older copies stay as they were written: `SensorsOut.test.ts`,
+      `HEvents.test.ts`, `NavCalculator.test.ts`, `Button.test.ts` and `enterIdent.test.ts`. The planner is read through
       `FlightPlanner.getPlanner('kln90b', …)` in `WTFlightplanSync.test.ts`, `ActiveWaypoint.test.ts` and `reboot.test.ts`.
     - **Shared worlds.** The approach world now exists as a fixture (`approachWorld()` in `test/harness/fixtures.ts`,
       section 3). The older copies in `ModeController.test.ts` and `HEvents.test.ts` (IAF = FAF, #129) and the arc world
@@ -1024,6 +1027,85 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       the MSG page without messages (#325; the 89 shows its own text); the prompt while the MSG page shows and an
       airport below sea level cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is the
       question #326.
+- Harness gaps and leads from Session 10 (none was built beyond its task 0, per rule 13 of test-coverage.md):
+    - **Code notes from the startup research** (latent or possibly intended, so questions rather than bugs; the code
+      is unchanged):
+        - `TickController.setupLoops` starts new intervals without clearing the old ones. Only the dedup upstream
+          (`PowerButton` publishes a power event on a change only, `SimVarSync` dedups its enable and disable) keeps a
+          second power-on event from doubling every loop, the symptom of #24. That early return of
+          `PowerButton.refreshPowerState` (`PowerButton.ts:118`) is not run by any test.
+        - H events sent before `KLN90BCore.init()` are dropped (the Dukes fix, `7b4465d`), an early power-on included:
+          `KLN90B_Power_On` before `init()` leaves a cold-and-dark unit off. The `hEvent` topic is also dropped until
+          `hEventPublisher.startPublish()`. Whether an aircraft's early power-on should be kept is open.
+        - An `error` published on the bus before `pageManager.Init` builds the `ErrorPage` still aborts the start-up:
+          the bus caches it, `ErrorPage.showError` runs before the page is rendered and throws, `init()` rejects and the
+          unit never comes up. No path publishes one today; a `showError` deferred to `onAfterRender` would be safe.
+        - The class comment of `TickController` cites page 43 of the maintenance manual (Figure 9), which is the V2
+          manual's numbering; in V3 the figure is printed page 55 (Figure 10). Its pages 186 and 189 were not
+          confirmed.
+        - `platform.getRouteManager().then(...)` in `KLN90BCore` has no catch; a rejection is an unhandled rejection
+          (`bootFailure.test.ts` takes it), not an error-page error.
+    - **Harness extensions not built:**
+        - A boot that leaves an `ElectricitySimVar` unit dark from the start. The circuit tests of
+          `SimVarSync.test.ts` and `PowerButton.test.ts` boot powered, lose power at the first `SimVarSync` tick and
+          wait 3 s, beyond the ride-through a fix of #332 may add.
+        - A `messages(unit)` reader of the message list: a local copy in `GpsAcquisition.test.ts`,
+          `Messages.test.ts`, `PersistentMessages.test.ts`, `AirspaceAlert.test.ts`, `KLNMagvar.test.ts`,
+          `StartupPages.test.ts`, `Set1Page.test.ts` and others.
+        - A `unit.userWaypoints()` reader (ident and region): `TemporaryWaypointDeleter.test.ts`, `Ctr1Page.test.ts`
+          and the page tests listed under Session 9b.
+        - An inverse reader across a whole row: `focused('R')` reads one half and cuts `ACKNOWLEDGE?`, so
+          `StartupPages.test.ts` carries `inverseText(row)`.
+        - `unit.overlay()` and Super NAV 1 and 5 helpers: `MainPage.test.ts` has local `overlay`, `superNav1` and
+          `names` (copies of helpers in `SuperNav1Page.test.ts` and the Super NAV 5 tests), and `bootNearKbbb` is
+          copied from `MessagePage.test.ts`. `Screen.read()` throws on Super NAV 5, so the 3-36 test reads the status
+          line's DOM element.
+        - A `beforeInit(core)` boot option: the test of H events before `init()` spies on
+          `KLN90BCore.prototype.init`.
+        - The power-off helper `offFor()` is local to `BrightnessManager.test.ts`.
+    - **The KLN 89 trainer and the 90B code differ on a blank Direct page:** ENT on the 89's Direct page with a blank
+      field returns to the page before (Session 10 trainer note T1), while the 90B code stays on the DIR page. The 90B
+      guide was not checked for the case, and the #335 pin does not assert it.
+    - **When the bugs are fixed:** a fix of #336 at the `MainPage` level also turns the #238 pin red (both are the
+      overlay pop of a refused knob); a fix of #335 turns the #334 pin red as well, though #334 still needs its own fix
+      for SET 0 and Super NAV 5; a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit
+      tests raised; a fix of #328 must keep the screen warm on a forced start (`lastPowerChangeTime` also drives the
+      warm-up); the fix of #199 turns its three pins red.
+    - **Test notes from the reviews** (left as they are): `KLN90BCore.init.test.ts` cannot see whether the sample
+      panel.xml keys are parsed (a parser that ignores `Input.ElectricitySimVar` survives, because the test sets the
+      SimVar itself); `isTurnOnPage` of `WelcomePage.test.ts` reads the ORS text of the top row; the wait-cut test of
+      `selfTestBoot.test.ts` passes on any throw with the helper's message; a self-test time entry in a time zone other
+      than UTC has no test; the CTR test of `Ctr1Page.test.ts` does not hold the flight plan check of
+      `TemporaryWaypointDeleter` (its own test file does).
+    - **Leads that were seen and not confirmed or not filed:**
+        - Start-up pages: `WelcomePage` subscribes to `propsReady` in its constructor and never unsubscribes (the
+          pattern of #96); `docs/architecture.md` (UI 0) says the Turn-On page waits about 15 s, the code 17 s (the
+          tests hold 14 to 19 s), and the code comment "page 84" is the V2 maintenance manual's numbering of the
+          printed page 1011; `VFROnlyPage` renders a `<div>` where the other start-up pages use `<pre>`; figure 3-22
+          shows the VFR page's status line without a mode, the code `enr-leg ent`; `VFROnlyPage.acknowledge` taking
+          the OBS branch always is an equivalent mutant, because the OBS warning moves on by itself with the switch in
+          LEG; the coverage text on line 1 of the Database page and the cursor after ENT on the fourth Turn-On line
+          (5-28 is silent) are not asserted.
+        - Self test: `SelfTestRightPage` makes the baro read-only for `BaroSource` above 0 even without
+          `Airdata.IsInterfaced`, and the baro then never updates (an invalid panel.xml combination, #145); debug
+          `console.log` calls in its constructor, `saveDate` and `saveTime` (beside Session 9a's list); GPS WP BEARING
+          shares the conversion of #329, on which the guide says nothing; `POSITION DIFFERS` posts while the self-test
+          page shows with empty storage (fast acquisition fixes at about 17 s), and whether a real unit posts it before
+          APPROVE? is not known; the ALT row's padding and the case of `ft` (the photos zero-pad, the figures do not;
+          the tests parse the number); whether a baro change takes effect before ENT; the distance indicator's 0 KTS
+          and 0 MIN of Installation Manual 2-69.
+        - Power cycle: `Timers` saves the total time every 60 s and not at power-off, so STA 4 loses up to 59 s when
+          the sim closes; `PowerButton` counts the first cold power-on as an hour off (intended; #211 has the clock
+          half); `SimVarSync` ignores the LEG/OBS switch while disabled (read again at the resume); the Direct To and
+          the active waypoint survive a power cycle unchanged, while 3-8 only says the last waypoint's page shows; the
+          `memory.<x>Page.ident` writes of `PageManager.startMainPage` are equivalent, because `WaypointPage` uses the
+          ident only when the facility cannot be read.
+        - Overlays: a last active waypoint of a facility type `PageManager.ts:100` does not handle (a VIS fix of an
+          approach) would throw at power-on, if it can be stored at all; the right scan branches read the base right
+          page's cursor while an overlay shows (with the Super NAV 5 menu open and the knob pulled the scan goes to the
+          scan window; not probed); the overlay orders without MSG (ALT over DIR, DIR over ALT, ALT twice opens a
+          second ALT and NAV 4 pair) have no source and are not frozen; the error page lives outside the overlay stack,
+          so a knob turned while it shows reaches the page beneath, and it stays over a power cycle.
 - **The flown-through bound of `dmeArc.test.ts` does not hold the arc reversal.** With `fromDtk` reversed on arc legs,
   the monitor's bound north of the leg stays green (0.895 NM against a radius of 1.012 NM); only the circle-center
   assertion of the same test fails. A tighter bound, or a second monitor on the arc's radius, would make the flight

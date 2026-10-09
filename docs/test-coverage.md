@@ -541,7 +541,7 @@ in the log and in `testing.md` sections 6 and 7.
 
 ## Session 10: boot, power and the unit as a whole
 
-- [ ] done
+- [x] done
 
 **Goal:** the lifecycle the sim exercises on every flight.
 
@@ -559,6 +559,15 @@ in the log and in `testing.md` sections 6 and 7.
    error is published.
 
 **Done when:** each item has a test or a log line.
+
+Result (session log, section 4): each of the six items has tests. The Turn-On page, the self-test pages and their
+outputs, the pages after APPROVE? and the messages at power-on have spec tests (3-3 to 3-8, B-3, B-4, figures 3-3,
+3-4, 3-22 to 3-25, the Installation Manual, the KLN 89 trainer); the power cycle has new spec tests for D/T 4, the
+Center waypoints, the right page after the power-on and the screen warm-up; `TickController`, `Hardware`, the order of
+the calculation tickables and `KLN90BCore.init` with the sample and a minimal panel.xml are held as public contract and
+by `docs/architecture.md`; the overlays and the #56 rule have spec tests and pins. The bugs found were filed and pinned
+(#327 to #336); #199 gained a pin on the boot Database page, and #171, #192, #199 and #238 have comments. `testing.md`
+section 6 now names SYSTEM TIME UPDATED at an engine-running boot as the bug #328, and the leads are in section 7.
 
 ## Session 11: closing record and retirement
 
@@ -583,6 +592,242 @@ in the log and in `testing.md` sections 6 and 7.
 One entry per session run, newest first. Format: date, session, branch, what was done, what was left and why, the
 coverage summary for the session's area at start and end. This is a dated record and is never edited afterwards; a
 later run adds a new entry.
+
+## 2026-10-09, session 10, branch `tests-session-10-boot-power`
+
+**Done**
+- **Design and plan:** `docs/superpowers/specs/2026-10-09-session-10-boot-power-design.md` and
+  `docs/superpowers/plans/2026-10-09-session-10-boot-power.md`, after a read-only research pass of five agents in
+  isolated worktrees (A: the Turn-On page, the pages after APPROVE?, the messages at power-on; B: the self-test pages
+  and what the unit outputs during the self test; C: the power cycle and the power inputs; D: the tick loops,
+  `KLN90BCore.init`, `KLN90B.tsx`, startup robustness; E: the overlays, the input routing, `KeyboardService`) and a
+  sixth agent on the KLN 89 trainer (below). Seven tasks: a harness task alone, tasks 1 to 5 in parallel worktrees, this
+  close-out last.
+- **Task 0, harness:** `bootToSelfTest(opts)` in `test/harness/boot.ts` (a cold-and-dark boot, power on, and the clock
+  advanced until the self-test page shows APPROVE?; it throws with the screen otherwise) and `recordSounds(unit)` in
+  the new `test/harness/sounds.ts` (the sound ids requested on `sound_server_play_sound`, and `finishAll()` to report
+  their ends as `KLN90B.onSoundEnd` does). Harness tests `selfTestBoot.test.ts` and `sounds.test.ts`, and `testing.md`
+  sections 4 and 7.
+- **Task 1, the Turn-On page and the start-up pages:** `WelcomePage.test.ts` and `StartupPages.test.ts` new: the four
+  stored Turn-On lines and their programming (5-28), SELF TEST IN PROGRESS inverse (figure 3-3), the Turn-On time
+  between 14 and 19 s (3-3, maintenance manual 1011), the left cursor holding the Turn-On page (5-28, an inference the
+  comment states), the Database page current and expired (3-7, figures 3-24, 3-25), NAV 2 after ACKNOWLEDGE? (3-8), the
+  VFR only page and the OBS warning (3-7, figures 3-22, 3-23), no message on a cold start at the stored position (B-3,
+  B-4, 3-10); leaving the Turn-On page at once after the cursor goes off is a characterization. The vehicles of #328
+  (tests that used SYSTEM TIME UPDATED as their live-list guard) were moved onto POSITION DIFFERS or onto a message the
+  test posts: `Messages.test.ts`, `PersistentMessages.test.ts` (whose "exactly the two boot messages" assertion froze
+  the bug), `AirspaceAlert.test.ts`, `KLNMagvar.test.ts`, `Set1Page.test.ts`, `HEvents.test.ts` and
+  `test/render/harness/screen.test.ts`. Pins #327, #328, #199 (the boot Database page).
+- **Task 2, the self-test pages and outputs:** `SelfTestLeftPage.test.ts` and `SelfTestRightPage.test.ts` moved onto
+  `bootToSelfTest` and appended: the fixed test values and the course read from the indicator (3-4, figure 3-4), the
+  course pointer driven to 315° with a variation (3-4; the `955b535` DTK test ran with a variation of 0 only), the
+  status line of figure 3-4, the cursor walk of the right page (3-5 to 3-7), the time zone, a date and a time entered
+  before a fix (3-5, 3-6), the baro correction of ALT in 100 ft steps (3-6, the ISA formula), the air data baro (3-6),
+  the five beeps on APPROVE? and none without the altitude alert output (3-7); the left knobs doing nothing and the ALT
+  dashes without an altitude input are characterizations. Pins #329, #330, #331.
+- **Task 3, the power cycle and the power inputs:** `Dt4Page.test.ts`, `Ctr1Page.test.ts`, `BrightnessManager.test.ts`
+  and `SimVarSync.test.ts` appended, `test/render/pages/PageManager.test.ts` new: DEP and FLT over a power cycle with
+  SET 4 POWER (4-13), the Center waypoints purged at the power-off (5-26), the right page of the last active VOR, NDB,
+  intersection or user waypoint after the power-on (3-8, figure 3-26, 3-60), a brightness preset in the LVar before the
+  boot (public contract), the screen warm-up (3-3, maintenance manual PDF 97; its scaling with the off time is a
+  characterization), a loss of the aircraft power for 3 s (maintenance manual PDF 53, 54, 79). The circuit contract
+  tests of `SimVarSync.test.ts` and `PowerButton.test.ts` now wait 3 s after the circuit goes off (the vehicle of #332).
+  Pin #332.
+- **Task 4, the ticks, the composition root and startup robustness:** `TickController.test.ts` and
+  `KLN90BCore.init.test.ts` new, `Hardware.test.ts`, `KLN90B.test.ts` and `KLN90BCore.startup.test.ts` appended: the
+  display at 4 Hz with the blink on one tick in four, the calculations at 1 Hz, the signals at 16 Hz, nothing before
+  the power-on, while powered off or while disabled, the #24 guard, a throwing tickable caught with the others still
+  running (`docs/architecture.md` Core 2); the initial `L:KLN90B_RightScan` write (public contract); the order of the
+  calculation tickables; every member of `PageProps` and ten seconds without an error with the sample `cfg/panel.xml`
+  and a minimal one (Core 1, public contract); `isInteractive`; H events before `init()` ignored and the unit coming
+  up (`7b4465d`, the Dukes fix, at the core level). No pins.
+- **Task 5, the overlays and the input routing:** `MainPage.test.ts`, `DirectToPage.test.ts`, `Set0Page.test.ts` and
+  `PageContainer.test.ts` appended: the #56 rule for the other knob directions and the stack beneath a pushed page
+  (#56, 3-12, 3-55, 3-56), the knobs on Super NAV 1 (3-32, 3-12, 3-13), D-> from Super NAV 1 (3-27, 3-28, 3-32), the
+  MSG page over ALT (3-16, 3-55), the status line hidden on Super NAV 5 (3-36), the SET 0 ENT prompt (2-5, figure 2-3,
+  3-10, 3-11); the pushed right page's knobs and two keyboard tests (the power-off and Super NAV 5) are
+  characterizations. Pins #333 (four), #334, #335 (two), #336.
+- **Task 6, this close-out:** the issues and comments below, the placeholders replaced in one commit (`30e57b3`), the
+  design's #331 row corrected, `testing.md` sections 6 and 7, and this log.
+
+**Rulings**
+- **The maintainer's:**
+    - One KLN 89 trainer round after the research and before the design.
+    - SYSTEM TIME UPDATED on every engine-running boot is a bug (#328), and `testing.md` section 6 says so.
+    - A power loss under one second restarting the unit is a bug (#332); the maintenance manual's battery module is the
+      spec.
+    - The small harness task 0 (`bootToSelfTest`, the sound recorder).
+    - Figure 3-3 shows SELF TEST IN PROGRESS inverse, so that test is a spec test citing it.
+    - The evidence rule: the 90B Pilot's Guide and its figures win, the KLN 89 trainer decides where the 90B guide is
+      silent, and a behavior that exists only on the 89 (its two altitude pages, its take-home warning, its start-up
+      order, its full-screen data base page) never becomes a pin.
+    - Out of scope: take-home mode, `debugMode`, the real SDK objects of `SIM_PLATFORM`, a custom `BasePath`.
+    - The bug table, the controller's defaults, the task split, the models and the workflow: approved.
+- **The controller's** (the design's defaults that the maintainer did not object to, and the ledger):
+    - characterizations: leaving the Turn-On page as soon as the cursor goes off after its time; the self-test page's
+      left knobs (the maintenance manual describes its bench mode, another mode); the dark time's scaling with the off
+      time; the pushed right page's knob rule (the 89 has one knob pair); the two keyboard tests;
+    - the left cursor holding the Turn-On page is a spec test on an inference from 5-28, stated in its comment;
+    - log only: the ALT row's padding and case; a baro change before ENT (T9 cannot show it); the distance indicator's
+      0 KTS during the self test; the Direct To and the active waypoint over a power cycle; the 89's ALT and Direct
+      page stacking (T6); CLR on the MSG page (ignored, as on the trainer); line 1 of the Database page; the cursor
+      after ENT on the fourth Turn-On line;
+    - research D's latent findings are leads for `testing.md` section 7, not issues, and the code is not changed;
+    - a brightness preset in the LVar before the boot is public contract (`LVars.ts` documents the LVar as writable);
+    - the `PageProps` completeness test stays, because `tsc` does not catch a member passed with `!` or `as any`;
+    - one owner per overlapping draft: the right page after the power-on is task 3's, the five beeps task 2's with
+      research A's no-beep sibling;
+    - #171 is not pinned again at the render stage (the unit-stage pin holds it); the issue got a comment;
+    - a pin vehicle found in another task's file is reported by the finder and fixed by the owner; task 3 took
+      `PowerButton.test.ts`, which no task owned, and waited 3 s there;
+    - #331 cites 3-6 and T11 only: figures 3-15 to 3-17 do not show the seconds at zero, so the citation was dropped
+      from the pin (task 2's fix rounds) and from the design's bug table (this close-out); the plan's text of the item
+      keeps the old citation as the record of what task 2 was given;
+    - #336 against #238: #238 describes the overlay pop only as the mechanism and blames `ObsDtkElement.innerRight`,
+      whose fix leaves SET 0 broken, so the SET 0 case is its own issue; it references #238, both say that a fix at
+      the `MainPage` level turns both pins red, and #238 has a comment.
+
+**Trainer results** (KLN 89 trainer, 2026-10-09; the maintainer started the VM; paraphrased; high confidence unless
+noted; the ids are the ones the test comments cite)
+- **T1:** D-> on the message page shows the Direct page at once, and the message page is gone; the field holds the
+  active waypoint, or is blank with none active. ENT confirms that Direct To and returns to the page before; no
+  nearest airport is involved (#335).
+- **T2:** ALT on the message page shows the first altitude page at once; leaving the altitude pages returns to the page
+  shown before MSG (#335).
+- **T3:** the knobs on the message page close it and act on the page beneath: the outer knob gives the next or previous
+  page group, the inner knob the next or previous page (the 89's undrawn NAV 4 explained one inner click that showed
+  nothing; medium-high for the inner knob) (#333).
+- **T4:** CLR on the message page is ignored; CRSR closes it and brings back the page beneath with its cursor on (#333).
+- **T5:** with the cursor on a prompt (`Copy FPL 0?` of an empty numbered plan) the inner knob does nothing in either
+  direction; one prompt only (#336, medium).
+- **T6:** the 89's ALT and Direct page stacking differs through its two altitude pages (a note); ALT, then D->, then
+  CLR on the empty field returns to the altitude page (agrees with the code).
+- **T7:** the 89's power-on page shows for about 5 s and then waits for its take-home warning; it says nothing about
+  the 90B's Turn-On time.
+- **T8:** no message prompt appeared while the 89's Self Test page showed; it has no readable course and no status line
+  there, so the readable-course case was not observed (#330).
+- **T9:** not observable: the 89's Self Test page has no baro or altitude field.
+- **T10:** the 89's data base page is full screen with no mode or prompt, then the fuel page, then NAV 1; figure 3-24
+  shows a status line, and the 90B guide wins.
+- **T11:** opening the time entry clears it; after ENT the clock starts from the entered hour and minute with the
+  seconds at zero, and the time spent in the entry is not added (medium-high; agrees with Session 9b's T17) (#331).
+- **T12:** everything the agent changed was restored or discarded by a relaunch; the trainer is back on the take-home
+  warning of a fresh launch. This launch had an empty FPL 0.
+
+**Bugs found and filed** (each after a search of the open and closed issues: the titles of all 326 issues, the bodies
+of #56, #171, #177, #192, #199, #211 and #238, and semantic searches with several wordings per bug, paced after the
+search API's rate limit). Each issue says it was found in the headless harness, and none was reproduced in the sim.
+- **#327:** a stray `,` on the fourth row of the VFR only page (3-7, figure 3-22). Pinned in `StartupPages.test.ts`.
+- **#328:** every engine-running start posts SYSTEM TIME UPDATED TO GPS TIME and lights MSG: the GPS clock starts an
+  hour behind and `forceReadyToUse` never adds it back (B-3, B-4; related to #211). Pinned in `StartupPages.test.ts`.
+- **#329:** the self-test RMI output is 130° minus the variation (3-4, Installation Manual 2-68; `955b535` fixed the
+  DTK beside it). Pinned in `SelfTestLeftPage.test.ts`.
+- **#330:** ADJ NAV IND CRS TO 315° posts during the self test, so the page shows `enr-leg msg` (figure 3-4, T8;
+  related to #177; medium). Pinned in `SelfTestLeftPage.test.ts`. A comment corrects the sibling's title in the body.
+- **#331:** a self-test time entry keeps the running seconds (3-6, T11). Pinned in `SelfTestRightPage.test.ts`.
+- **#332:** an aircraft power loss under one second restarts the unit (maintenance manual PDF 53, 54, 79). Pinned in
+  `SimVarSync.test.ts`; the issue says that the circuit contract tests now wait 3 s.
+- **#333:** the knobs and CRSR do nothing on the MSG page (the body of closed #56, T3, T4); continues #56, which was
+  not reopened. Pinned four times in `MainPage.test.ts`.
+- **#334:** Super NAV 1, MSG, D->: the MSG page is popped instead of Super NAV 1, which covers the DIR page (3-27,
+  3-32). Pinned in `MainPage.test.ts`; a comment names #335, whose fix turns this pin red too.
+- **#335:** D-> and ALT on the MSG page open their pages hidden under it, and ENT goes to the nearest airport (3-27,
+  3-39, 3-55, T1, T2). Pinned twice in `MainPage.test.ts`.
+- **#336:** the inner knob on SET 0's UPDATE PUBLISHED DB leaves SET 0 (2-5, figure 2-3, T5; medium; references
+  #238). Pinned in `Set0Page.test.ts`.
+- **Known issue pinned again:** #199 (the boot Database page, `StartupPages.test.ts`).
+- **Comments:** #171 (the visible effect on D/T 4 in a booted unit: DEP is the time of the first fix after a cold start
+  with SET 4 POWER; the new D/T 4 spec test), #192 (the KLN 89 guide, 4-46 and 4-47, keeps a manual variation unless
+  power was off for more than 5 minutes; the 90B guide is silent, and `VolatileMemory.test.ts` holds the reset as a
+  characterization), #199 (the boot Database page pin), #238 (#336's fix turns its pin red; run both pins).
+
+**Fixes that could not be re-broken:** none. The research re-broke the regression tests the design lists as already
+held, and each failed: the Dukes fix (`7b4465d`, at the unit stage and now at the core), both halves of #50
+(`KLN90BCore.startup.test.ts`, `bootFailure.test.ts`), the #56 outer knob on a pushed left page, the display-tick
+throw on the error page; the `955b535` DTK was re-broken as true instead of magnetic and survived its own test
+(variation 0), which task 2's pointer test now holds. #75 (Escape, `PageContainer.test.ts`) and the power-cycle items
+the design lists as held (the procedures purge and #94, ENR-LEG at power-up, STA 4, #90, #176, the electricity
+contract) were checked by reading their tests, not re-broken. The OBS warning's missing `ent` was not proven by a
+break.
+
+**Review fix rounds.** Task 0: one (the option forwarding of `bootToSelfTest` was unheld, because the altitude alert
+output defaults to true). Task 1: two (the `Set1Page.test.ts` live-list guard read back without a tick, the VFR page
+text held by a whole-screen `toContain`; then a 122-character comment). Task 2: two (the #331 figures citation, a
+design defect; the #330 sibling did not hold `enr-leg`; the 100 ft step of the altitude unheld; then the comment that
+still named the figures). Task 3: two (the `PowerButton.test.ts` vehicle of #332, by the controller's ruling; then
+comments that followed the guide's sentences too closely, at 5-26, 3-8 and 3-3). Task 4: none (one survivor, below).
+Task 5: one (the SET 0 prompt cited 2-4 instead of 2-5).
+
+**Workflow notes.** The research worktrees and the task worktrees started at `origin/main` and were reset to the session
+branch first; each got a junction to the main checkout's `node_modules`, to be removed with `rmdir` before `git
+worktree remove` once the maintainer approves the session. Task 0 ran alone; tasks 1 to 5 ran in parallel on Sonnet and
+merged in the order 4, 3, 1, 2, 5; reviewers ran on Opus for tasks 2, 3 and 5 and on Sonnet for tasks 0, 1 and 4,
+re-reviews on Sonnet; the close-out ran on Opus in the main checkout, because it needed GitHub. Running the whole suite
+under each pin's temporary fix (Session 9b's lesson) found the vehicles of #328 (task 1 moved them) and of #332 (one in
+a file no task owned), and showed that #336's fix also turns the #238 pin red and #335's the #334 pin. Task 5's wrong
+citation came from the page index in the controller's local memory, whose SET 0 row reads 2-4; commit `7742107`'s
+message keeps 2-4, corrected in `9f370cf`'s. The semantic issue search hit the API's rate limit once and was paced. Two
+filed issues needed a follow-up comment: #330 (the sibling's title in its body was wrong) and #334 (it names #335,
+filed after it). The placeholder commit kept the files' CRLF endings.
+
+**Coverage at the start of the session** (identical to the end of session 9b) **and at the end** (all tests green):
+
+| directory       | % stmts start | % stmts end | % lines start | % lines end |
+|-----------------|--------------:|------------:|--------------:|------------:|
+| all files       |         92.29 |       92.82 |         92.24 |       92.78 |
+| `kln90b`        |         90.70 |       91.71 |         90.57 |       91.62 |
+| `kln90b/pages`  |         82.89 |       87.64 |         82.69 |       87.53 |
+
+The files of the area (statements at the start and at the end; branches where they moved): `KLN90B.tsx` 72.72 and
+81.81, `KLN90BPlatform.ts` 25 and 25, `KLN90BCore.ts` 87.66 and 87.66, `BrightnessManager.ts` 86 and 92 (branches
+58.33 and 83.33), `TickController.ts` 92.15 and 100 (branches 58.33 and 75), `WelcomePage.tsx` 80.43 and 82.6,
+`MainPage.tsx` 84.95 and 93.03 (branches 81.11 and 90.12), `PageManager.ts` 88.88 and 97.77, `KeyboardService.ts` 92.85
+and 92.85, `PowerButton.ts` 98.11 and 98.11, `SimVarSync.ts` 100 and 100, `Hardware.ts` 100 and 100 (branches 50 and
+50), `VFROnlyPage.tsx` 66.66 and 100. The text report leaves out a file at 100 % in every column, which is where
+`VFROnlyPage.tsx`, `AiracPage.tsx` (branches 50 at the start) and the two self-test pages (at the start too) are at the
+end (read from the HTML report). The coverage
+says what ran, not what is held (section 1); the `Proof:` lines of the task commits and the reviewers' mutation passes
+are what hold the area.
+
+The suite at the start: 2637 tests passed and 350 expected failures, in 304 files. At the end: 2732 tests passed and
+365 expected failures, in 311 files; `npx tsc --noEmit` is clean and `kln90b/` is unchanged. The new expected failures
+are pins: #199, #327, #328, #329, #330, #331, #332, #333 (four), #334, #335 (two), #336.
+
+**Not covered** (rule 18; the ledger is not committed, so the list is complete here)
+- **Out of scope:** take-home mode, `debugMode` (a constant with no panel.xml key, so `BrightnessManager.ts:76-77`
+  too), the real SDK objects of `SIM_PLATFORM` and `KLN90B.connectedCallback` (only `super`), a custom `BasePath`
+  (`FakeXhr`).
+- **Boot:** the exact Turn-On time (the tests hold 14 to 19 s); line 1 of the Database page and the column placement
+  of the start-up pages' rows (the figures are not column-exact); the cursor after ENT on the fourth Turn-On line
+  (5-28 is silent); the OBS warning's missing `ent` (not proven by a break); TEST FAIL (the code has no internal test
+  that can fail).
+- **Self test:** the ALT row's padding, the case of `ft` and the negative format; a baro change before ENT; a time or
+  date entry while the GPS is valid (#125); a time entry in a time zone other than UTC; the millibar baro on the
+  self-test page; the distance indicator's 0 KTS and 0 MIN (Installation Manual 2-69); the CRT's look and flash rate
+  (CSS).
+- **Power cycle:** the stale-read branch of `BrightnessManager.ts:44-46` (the fake resolves the write long before the
+  next read); the APT, NDB, INT and SUP pages' return to the first scan-list entry (only the VOR is characterized);
+  user settings over a power cycle (no code resets them); what the real unit keeps over a short interruption (#192);
+  the Direct To over a power cycle (no evidence); the early return of `PowerButton.refreshPowerState` when the
+  powered state does not change (`PowerButton.ts:118`, unrun), which is the dedup that keeps `setupLoops` from
+  doubling the loops.
+- **Ticks and core:** a non-Error throw in a tick (logged, not published); the redundant write of
+  `Hardware.setScanPulled`; the message latency that the order of the tickables implies (no spec); the HOME key on the
+  right side and the numpad digits of `KLN90BCore.handleKeyboardEvent`; the restart doubling of `setupLoops` (no path
+  reaches it).
+- **Overlays and input:** the overlay pop of the outer knob clockwise (unreachable: `CursorController.outer*` take every
+  turn unless a field is entered); keyboard routing to an overlay and `KeyboardService.ts:28` (only the private
+  `KLN90B_Internal_Key:` event reaches them); the focus events and the click outside the instrument (`FakeCoherent`);
+  the overlay orders without MSG; the error page under the knobs and over a power cycle (a debugging aid); an overlay
+  over a power cycle (the page object is rebuilt); CLR on the MSG page (ignored, as on the trainer).
+- **Review notes left as they are** (deferred minors): task 0's wait-cut test passes on any throw with the helper's
+  message; task 1's `isTurnOnPage` couples to the ORS text, its B1 test does not assert row 0, the video's "about
+  18 s" could not be verified, and one sibling title says "with a fix"; task 2's T8 citation is nearly empty (the 89
+  has no status line there) and the time entry outside UTC; task 3's CTR test does not hold the flight plan check of
+  `TemporaryWaypointDeleter` (its own test file does); task 4's `KLN90BCore.init.test.ts` uses the `NAV 2` literal
+  without a source and cannot see the sample keys being parsed (a parser that ignores `Input.ElectricitySimVar`
+  survives, because the test sets the SimVar itself), and `TickController.test.ts` has an unused `blink` parameter.
+- Leads seen and not filed: `testing.md` section 7 (Session 10's list).
 
 ## 2026-10-08, session 9b, branch `tests-session-9b-controls`
 
