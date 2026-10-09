@@ -50,10 +50,10 @@ async function offFor(unit: HeadlessUnit, offMs: number): Promise<void> {
 }
 
 describe('the screen warm-up at the power-on (3-3)', () => {
-    // 3-3: after the power knob is pushed in, the screen takes a few seconds to warm up, so a unit that was off for
-    // long is still dark one second later. Maintenance manual (PDF page 97): the Turn-On page is checked once the
-    // display has lit, and it times out after about 15 s, so the screen is fully lit while that page still shows
-    it('is dark one second after the power-on of a cold unit, and lit while the Turn-On page shows (3-3)', async () => {
+    // 3-3: the screen needs some seconds of warm-up once the power knob is pushed in, so a cold unit is still dark one
+    // second later. Maintenance manual (PDF 97): the Turn-On page is judged after the display has come up and stays
+    // for about 15 s, so the screen is at the knob's brightness while that page is still showing
+    it('is dark 1 s after the power-on of a cold unit, at full brightness during the Turn-On page (3-3)', async () => {
         const unit = await bootUnit();
         await offFor(unit, 30 * 60_000);
 

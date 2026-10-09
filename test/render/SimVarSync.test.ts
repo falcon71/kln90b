@@ -119,10 +119,10 @@ describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract
     });
 });
 
-// Maintenance manual, PDF pages 53 and 54 (the battery module) and 79 (its switch-over circuit): an interruption of the
-// aircraft power of less than one second is bridged by the unit's internal battery pack and the unit keeps operating;
-// the switch-over times out after about 1.5 s, after which the unit is off. The aircraft power is the ElectricitySimVar
-// of panel.xml (the power knob is a different input). The unit is brought to its main page on the circuit first
+// Maintenance manual, PDF 53 and 54 (the battery module) and 79 (its switch-over circuit): a dropout of the aircraft
+// power shorter than a second is carried by the unit's own battery and the unit goes on running; after about 1.5 s
+// the switch-over gives up and the unit is off. The aircraft power is the ElectricitySimVar of panel.xml (the power
+// knob is a different input). The unit is brought to its main page on the circuit first
 describe('aircraft power interruptions (maintenance manual)', () => {
     async function onCircuit(): Promise<HeadlessUnit> {
         const unit = await bootUnit({panelXml: CIRCUIT_XML});

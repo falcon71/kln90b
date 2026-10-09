@@ -159,8 +159,9 @@ describe('D/T 4 page (characterization)', () => {
     });
 });
 
-// 4-13: with RUN WHEN POWER IS ON on SET 4, DEP is the time the unit was switched on and FLT the time since then,
-// whatever the ground speed. Every test here stands still, so the default RUN WHEN GS > 30KT would count nothing
+// 4-13: with SET 4 on RUN WHEN POWER IS ON, the timers follow the power and ignore the ground speed: DEP holds the
+// clock time of the power-on and FLT counts from it. Every test here stands still, so the default RUN WHEN GS > 30KT
+// would count nothing
 // The departure time before the first fix of a cold start is #171, pinned at the unit stage (Timers.test.ts)
 describe('D/T 4 page with RUN WHEN POWER IS ON (4-13)', () => {
     /** hh:mm of the simulated UTC clock, read from the fake Date and not from the unit */

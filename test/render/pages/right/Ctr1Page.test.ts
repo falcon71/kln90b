@@ -276,8 +276,8 @@ describe('CTR 1 page, Center waypoints at the power-off (5-26)', () => {
         return found.sort();
     };
 
-    // 5-26: Center waypoints that are not part of a flight plan are deleted from the user waypoints when the unit is
-    // turned off. CTR 1 stores them as soon as it computes them (first ENT); without the second ENT no plan holds them
+    // 5-26: switching the unit off purges every Center waypoint that no plan holds from the user waypoint list. CTR 1
+    // stores a waypoint at the computation (first ENT), and without the second ENT no plan ever receives it
     it('deletes computed Center waypoints that were never inserted when the unit is turned off (5-26)', async () => {
         const unit = await onCtr1(w => [w.kaaa, w.kbbb, w.kccc]);
         await ent(unit);

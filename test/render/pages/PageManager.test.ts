@@ -49,9 +49,10 @@ const cases: Case[] = [
     },
 ];
 
-// 3-8, figure 3-26 (and the pre-departure walk-through of 3-60): after the power-on the left side shows NAV 2 and the
-// right side the waypoint page of the waypoint that was active when the unit was turned off. The airport case (APT 4)
-// is held at the boot in Apt4Page.test.ts; these hold the other waypoint types, over a power cycle in the same session
+// 3-8, figure 3-26 (and the pre-departure walk-through of 3-60): the first screen after the power-on pairs NAV 2 with
+// the page of whichever waypoint was active before the power-off, in the type of page that fits that waypoint. The
+// airport case (APT 4) is held at the boot in Apt4Page.test.ts; these hold the other waypoint types, over a power
+// cycle in the same session
 describe('the pages after the power-on (3-8)', () => {
     it.each(cases)('shows the page of $type that was active at the power-off (3-8)', async c => {
         const unit = await bootUnit({
