@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {Facility} from '@microsoft/msfs-sdk';
+import {Facility, FacilityType} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {centerWorld} from '../../../harness/fixtures';
 import {intersection} from '../../../harness/navdata/builders';
@@ -264,5 +264,29 @@ describe('CTR 1 page, the 30 waypoint limit (5-26)', () => {
         await ent(unit);
 
         expect(right().map(r => r.trim()).filter(r => r !== '').join(' ')).toBe('NOT ENOUGH ROOM IN FPL');
+    });
+});
+
+describe('CTR 1 page, Center waypoints at the power-off (5-26)', () => {
+    /** The user waypoints in the facility repository, as "ident region", sorted */
+    const userWaypoints = (unit: HeadlessUnit): string[] => {
+        const found: string[] = [];
+        const add = (f: Facility) => found.push(`${f.icaoStruct.ident} ${f.icaoStruct.region}`);
+        unit.props.facilityRepository.forEach(add, [FacilityType.USR]);
+        return found.sort();
+    };
+
+    // 5-26: switching the unit off purges every Center waypoint that no plan holds from the user waypoint list. CTR 1
+    // stores a waypoint at the computation (first ENT), and without the second ENT no plan ever receives it
+    it('deletes computed Center waypoints that were never inserted when the unit is turned off (5-26)', async () => {
+        const unit = await onCtr1(w => [w.kaaa, w.kbbb, w.kccc]);
+        await ent(unit);
+        expect(right()[0]).toBe(' 2 NEW WPTS'); // Precondition: computed, not inserted
+        expect(idents(unit, 1)).toEqual(['KAAA', 'KBBB', 'KCCC']);
+        expect(userWaypoints(unit).map(w => w.split(' ')[0])).toEqual(['BGD00', 'GCK00']); // Precondition: stored
+
+        await unit.panel.powerOff();
+
+        expect(userWaypoints(unit)).toEqual([]);
     });
 });

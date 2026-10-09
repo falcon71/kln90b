@@ -71,8 +71,9 @@ describe('L:KLN90B_Power reports the switch, not the powered state (public contr
         const unit = await bootUnit({
             panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ElectricitySimVar>CIRCUIT ON:1</ElectricitySimVar></Input></Instrument></PlaneHTMLConfig>',
         });
-        // CIRCUIT ON:1 stays unset (reads 0), so the first SimVarSync tick takes the electricity away
-        await vi.advanceTimersByTimeAsync(1000);
+        // CIRCUIT ON:1 stays unset (reads 0), so the first SimVarSync tick takes the electricity away;
+        // waited out for 3 s, beyond the switch-over of the battery module (maintenance manual, PDF 79; #NEW-C-1)
+        await vi.advanceTimersByTimeAsync(3000);
 
         expect(Screen.read().row(0)).toBe(' '.repeat(23));
         expect(unit.env.sim.lastWrite('L:KLN90B_Power')?.value).toBe(1);

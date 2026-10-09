@@ -76,8 +76,10 @@ describe('L:KLN90B_ObsSource (public contract)', () => {
 // test sets the circuit; it comes up through the welcome page, which fills row 0.
 describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract)', () => {
     it('powers the unit up and down with the SimVar of panel.xml', async () => {
+        // Each loss of the circuit is waited out for 3 s, beyond the switch-over of the battery module (maintenance
+        // manual, PDF 79: about 1.5 s; #NEW-C-1), so that the test holds whether or not a short loss is bridged
         const unit = await bootUnit({panelXml: CIRCUIT_XML});
-        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(3000);
         expect(Screen.read().row(0)).toBe(BLANK_ROW);
 
         unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
@@ -85,7 +87,7 @@ describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract
         expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
 
         unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
-        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(3000);
         expect(Screen.read().row(0)).toBe(BLANK_ROW);
     });
 
@@ -95,9 +97,9 @@ describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract
         await vi.advanceTimersByTimeAsync(2000);
         expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
 
-        // Circuit 2 is not powered
+        // Circuit 2 is not powered; the loss is waited out for 3 s, beyond the switch-over (see the test above)
         unit.env.sim.set('L:KLN90B_ElectricitySimVarIndex', 'number', 2);
-        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(3000);
         expect(Screen.read().row(0)).toBe(BLANK_ROW);
 
         unit.env.sim.set('CIRCUIT ON:2', 'bool', true);
@@ -114,6 +116,54 @@ describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+    });
+});
+
+// Maintenance manual, PDF 53 and 54 (the battery module) and 79 (its switch-over circuit): a dropout of the aircraft
+// power shorter than a second is carried by the unit's own battery and the unit goes on running; after about 1.5 s
+// the switch-over gives up and the unit is off. The aircraft power is the ElectricitySimVar of panel.xml (the power
+// knob is a different input). The unit is brought to its main page on the circuit first
+describe('aircraft power interruptions (maintenance manual)', () => {
+    async function onCircuit(): Promise<HeadlessUnit> {
+        const unit = await bootUnit({panelXml: CIRCUIT_XML});
+        // CIRCUIT ON:1 is unset (reads 0) at the boot: 3 s, beyond the switch-over, so that the unit is off before the
+        // circuit comes on (testing.md section 7: the boot cannot preset the circuit)
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(Screen.read().row(0)).toBe(BLANK_ROW); // Precondition: off
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        await unit.panel.approveSelfTest();
+        expect(Screen.read().status().left).toBe('NAV 2'); // Precondition: the main page
+        return unit;
+    }
+
+    // The sibling of the pin below: a loss of 3 s, beyond the switch-over, turns the unit off, and the power coming
+    // back starts it with the Turn-On page (3-3)
+    it('turns the unit off when the aircraft power is lost for 3 s (maintenance manual, PDF 53, 54, 79)', async () => {
+        const unit = await onCircuit();
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(Screen.read().text()).toBe(Array.from({length: 7}, () => BLANK_ROW).join('\n'));
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(Screen.read().row(0)).toBe(' GPS             ORS 20');
+    });
+
+    // SimVarSync passes every change of the circuit to PowerButton at once, so a loss of half a second power-cycles the
+    // unit: it restarts with the Turn-On page and the self-test
+    it.fails('rides through a 0.5 s loss of the aircraft power (maintenance manual, PDF 53) (#NEW-C-1)', async () => {
+        const unit = await onCircuit();
+        const cycles = unit.props.userSettings.getSetting('powercycles').value;
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(500);
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().status().left).toBe('NAV 2');
+        expect(unit.props.userSettings.getSetting('powercycles').value).toBe(cycles);
     });
 });
 
