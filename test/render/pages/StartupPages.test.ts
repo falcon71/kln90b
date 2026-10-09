@@ -83,12 +83,22 @@ describe('Database page (3-7)', () => {
 });
 
 describe('VFR only page (3-7)', () => {
+    /**
+     * The two texts of the page with their cells: the title on the second row, three cells in, and the button on the
+     * sixth row, five cells in (figure 3-22 is not column-exact; the cells are the code's). The other rows are the
+     * business of the #NEW-A-1 pin below
+     */
+    const expectVfrPage = () => {
+        expect([Screen.read().row(1), Screen.read().row(5)])
+            .toEqual(['   FOR VFR USE ONLY'.padEnd(23), '     ACKNOWLEDGE?'.padEnd(23)]);
+    };
+
     // 3-7 step 11, figure 3-22: a unit installed for VFR only shows FOR VFR USE ONLY after APPROVE?, with the cursor on
     // ACKNOWLEDGE?; ENT leads on to the Database page (step 12)
     it('shows FOR VFR USE ONLY after APPROVE? and goes on to the Database page with ENT (3-7)', async () => {
         const unit = await approveSelfTestPage({panelXml: panelXml(VFR_ONLY)});
 
-        expect(Screen.read().text()).toContain('FOR VFR USE ONLY');
+        expectVfrPage();
         expect(inverseText(5)).toBe('ACKNOWLEDGE?');
 
         await unit.panel.ent();
@@ -117,7 +127,7 @@ describe('VFR only page (3-7)', () => {
         unit.env.sim.set('GPS OBS ACTIVE', 'bool', true);
         await unit.panel.cursorTo('R', 'APPROVE?');
         await unit.panel.ent();
-        expect(Screen.read().text()).toContain('FOR VFR USE ONLY');
+        expectVfrPage();
 
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
