@@ -158,3 +158,37 @@ describe('D/T 4 page (characterization)', () => {
         `);
     });
 });
+
+// 4-13: with RUN WHEN POWER IS ON on SET 4, DEP is the time the unit was switched on and FLT the time since then,
+// whatever the ground speed. Every test here stands still, so the default RUN WHEN GS > 30KT would count nothing
+// The departure time before the first fix of a cold start is #171, pinned at the unit stage (Timers.test.ts)
+describe('D/T 4 page with RUN WHEN POWER IS ON (4-13)', () => {
+    /** hh:mm of the simulated UTC clock, read from the fake Date and not from the unit */
+    const utcNow = () => new Date(Date.now()).toISOString().slice(11, 16);
+
+    /** D/T 4 on the right beside NAV 2, the left page every power-on shows (3-8) */
+    async function dt4(unit: HeadlessUnit): Promise<string[]> {
+        await unit.panel.selectPage('R', 'D/T 4');
+        await vi.advanceTimersByTimeAsync(1000);
+        return Screen.read().rows('R');
+    }
+
+    // 4-13: a power cycle starts DEP and FLT anew. Switched on at 12:00 (the boot), off at 12:10 and on again at 12:12:
+    // five minutes after that DEP reads 12:12 and FLT :05, not 12:00 and :15
+    it('shows the time of the last power-on as DEP and the time since then as FLT, at rest (4-13)', async () => {
+        const unit = await bootUnit({position: {lat: 47.1, lon: 10.0}, storage: {flightTimer: true}});
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(10 * 60_000);
+
+        await unit.panel.powerCycle({offSeconds: 120});
+        const poweredOn = Date.now();
+        expect(utcNow()).toBe('12:12'); // Precondition: the power-on time
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(poweredOn + 5 * 60_000 - Date.now()); // five minutes after the power-on
+
+        const rows = await dt4(unit);
+        expect(rows[1]).toBe('DEP   12:12');
+        expect(rows[2]).toBe('TIME  12:17');
+        expect(rows[4]).toBe('FLT     :05');
+    }, 30_000);
+});
