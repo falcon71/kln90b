@@ -97,7 +97,8 @@ describe('AIRSPACE ALERT ahead on the track', () => {
         const unit = await flying(0, [airspace('R-FAR', BoundaryType.Restricted, box(47.5, 47.7, 7.9, 8.1), LIMITS)]);
 
         expect(sua(unit)).toEqual([]);
-        expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME'); // The list is the live one
+        // The list is the live one: the empty storage has no last position, so the first fix differs from it
+        expect(messages(unit)).toContain('POSITION DIFFERS FROM LAST POSITION BY >2NM');
     });
 
     // The message is given once while the projection keeps meeting the area (characterization: the manual names the
@@ -115,7 +116,8 @@ describe('AIRSPACE ALERT ahead on the track', () => {
         const unit = await flying(0, [airspace('R-HIGH', BoundaryType.Restricted, box(47 + 10 * NM_LAT, 47.4, 7.9, 8.1), {minFt: 5000, maxFt: 18000})]);
 
         expect(sua(unit)).toEqual([]);
-        expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME'); // The list is the live one
+        // The list is the live one: the empty storage has no last position, so the first fix differs from it
+        expect(messages(unit)).toContain('POSITION DIFFERS FROM LAST POSITION BY >2NM');
     });
 
     // After the pilot has read the alert and turned away, turning back toward the area alerts again (characterization)

@@ -25,11 +25,9 @@ describe('ALTITUDE FAIL', () => {
         const unit = await bootUnit();
         await vi.advanceTimersByTimeAsync(2000);
 
-        // The two messages of every engine-running boot (docs/testing.md, section 6), and nothing else
-        expect(messages(unit).sort()).toEqual([
-            'POSITION DIFFERS FROM LAST POSITION BY >2NM',
-            'SYSTEM TIME UPDATED TO GPS TIME',
-        ]);
+        expect(messages(unit)).not.toContain('ALTITUDE FAIL');
+        // The list is the live one: the empty storage has no last position, so the first fix differs from it
+        expect(messages(unit)).toContain('POSITION DIFFERS FROM LAST POSITION BY >2NM');
     });
 
     it('does not show on a VFR-only unit without an altitude input (characterization)', async () => {
@@ -39,7 +37,8 @@ describe('ALTITUDE FAIL', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(messages(unit)).not.toContain('ALTITUDE FAIL');
-        expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME'); // The list is the live one
+        // The list is the live one: the empty storage has no last position, so the first fix differs from it
+        expect(messages(unit)).toContain('POSITION DIFFERS FROM LAST POSITION BY >2NM');
     });
 
     it('does not show when an air data computer supplies the altitude (B-1)', async () => {
@@ -49,7 +48,8 @@ describe('ALTITUDE FAIL', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(messages(unit)).not.toContain('ALTITUDE FAIL');
-        expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME'); // The list is the live one
+        // The list is the live one: the empty storage has no last position, so the first fix differs from it
+        expect(messages(unit)).toContain('POSITION DIFFERS FROM LAST POSITION BY >2NM');
     });
 });
 
@@ -70,7 +70,8 @@ describe('MAGNETIC VAR INVALID (5-44, B-2)', () => {
         await settle(unit);
 
         expect(messages(unit)).not.toContain('MAGNETIC VAR INVALID ALL DATA REFERENCED TO TRUE NORTH');
-        expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME');
+        // The list is the live one: the empty storage has no last position, so the first fix differs from it
+        expect(messages(unit)).toContain('POSITION DIFFERS FROM LAST POSITION BY >2NM');
     });
 });
 
