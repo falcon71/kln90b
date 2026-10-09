@@ -224,12 +224,11 @@ async function untilClockSteps(unit: HeadlessUnit) {
 
 describe('self-test right page time entry (spec)', () => {
     // 3-6: ENT starts the clock from the entered hours and minutes, and the seconds cannot be entered. The 90B guide
-    // leaves the value of the seconds at ENT open (its figures 3-15 to 3-17 show them unchanged during the entry), so
-    // the KLN 89 trainer decides (checked in the KLN 89 trainer, 2026-10-09, T11): after ENT the entered value started
-    // at hh:mm:00 and rolled over to the next minute a minute later, the time in the entry not added. The seconds are
-    // their own cells of the time row, `12:00:19UTC`: columns 6 and 7 of the right half. The unit has no GPS time
-    // yet, so that its own clock is the time shown; the ENT is pressed just after the clock steps, so that the seconds
-    // are read before the next step, which would show 01
+    // leaves the value of the seconds at ENT open, so the KLN 89 trainer decides (checked in the KLN 89 trainer,
+    // 2026-10-09, T11): after ENT the entered value started at hh:mm:00 and rolled over to the next minute a minute
+    // later, the time in the entry not added. The seconds are their own cells of the time row, `12:00:19UTC`: columns
+    // 6 and 7 of the right half. The unit has no GPS time yet, so that its own clock is the time shown; the ENT is
+    // pressed just after the clock steps, so that the seconds are read before the next step, which would show 01
     it.fails('starts the clock with the seconds at zero when the time is entered '
         + '(3-6; checked in the KLN 89 trainer, 2026-10-09, T11) (#NEW-B-3)', async () => {
         const unit = await onSelfTestPage({storage: NO_FIX_YET});
