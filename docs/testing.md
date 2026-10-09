@@ -385,6 +385,19 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   the stored position or the clock, and cannot measure a cold or warm start. Boot with `engineRunning: false` and the
   stored position, almanac time and `fastGpsAcquisition` in `storage`, then `powerOn()`; the GPS acquires while the
   welcome and self-test pages run.
+- **`bootToSelfTest(opts)`** (`boot.ts`) boots cold and dark whatever `opts.engineRunning` says (the self-test follows
+  the welcome page only on a unit that is not force-ready), powers on, advances 19 s (the 17 s Turn-On page and two
+  seconds more) and returns the unit with the self-test page showing. It throws with `Screen.read().dump()` when the
+  right half has no `APPROVE?` row. The page stays until ENT approves it, so a test that wants more time advances the
+  clock itself. It stops there: approving, the data base page and the main page are `unit.panel.approveSelfTest()`
+  (Flight, below). The hand-written copies of this boot stay where they are (section 7).
+- **`recordSounds(unit)`** (`sounds.ts`) returns `{ids, finishAll}`. `ids` lists the sound ids the unit requested on the
+  bus topic `sound_server_play_sound` since the call, in order; install it before the action that sounds. The topic is
+  not cached, so a recorder installed later starts empty. The sim plays one tone at a time and reports its end
+  (`KLN90B.onSoundEnd`), which asks for the next, so a pattern is one id until the end is reported:
+  `finishAll()` reports the end of the playing sound until no new one is requested (at most 20 times). The unit asks
+  for sounds unless the panel.xml of the boot sets `Output.AltitudeAlertEnabled` to false (it defaults to true); a test
+  of the sounds still sets it, so that the precondition is in the test.
 - **`moveAircraft(unit, point, {groundspeedKt, trackTrue?})`** (`boot.ts`) moves the aircraft so that the GPS computes a
   track, which it takes from the last two positions once the ground speed is at least 2 kt (3-35). The helper sets
   `GROUND VELOCITY`, jumps to the point and runs one calculation tick, so the track is that of the jump from the present
@@ -836,8 +849,10 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
     - **Counting and sampling writes.** Tests count the writes of one SimVar by filtering `sim.writes` (upper-case names)
       and sample an LVar over display ticks with a hand-written loop (`SimVarSync.test.ts`, `StatusLine.test.ts`,
       `SelfTestLeftPage.test.ts`). A `sim.writeCount(name)` and a sampling helper would remove the pitfall.
-    - **The self-test page and the `"kln90b"` planner.** The cold boot to the self-test page is written out in
-      `SelfTestLeftPage.test.ts` and `SensorsOut.test.ts`, and the planner is read through
+    - **The self-test page and the `"kln90b"` planner.** The cold boot to the self-test page is now
+      `bootToSelfTest` (section 4). The older copies stay as they were written: `SelfTestLeftPage.test.ts`,
+      `SelfTestRightPage.test.ts`, `SensorsOut.test.ts`, `HEvents.test.ts`, `NavCalculator.test.ts`, `Button.test.ts` and
+      `enterIdent.test.ts`; Session 10's tasks 1 and 2 move their own files onto it. The planner is read through
       `FlightPlanner.getPlanner('kln90b', …)` in `WTFlightplanSync.test.ts`, `ActiveWaypoint.test.ts` and `reboot.test.ts`.
     - **Shared worlds.** The approach world now exists as a fixture (`approachWorld()` in `test/harness/fixtures.ts`,
       section 3). The older copies in `ModeController.test.ts` and `HEvents.test.ts` (IAF = FAF, #129) and the arc world
