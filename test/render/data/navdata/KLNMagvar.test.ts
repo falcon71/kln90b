@@ -33,7 +33,8 @@ describe('MAGNETIC VAR INVALID at the southern limit (3-1, 5-44, B-2)', () => {
         await settle(unit);
 
         expect(messages(unit)).not.toContain(MAGVAR_INVALID);
-        expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME'); // The list is the live one
+        // The list is the live one: the empty storage has no last position, so the first fix differs from it
+        expect(messages(unit)).toContain('POSITION DIFFERS FROM LAST POSITION BY >2NM');
     });
 });
 
@@ -104,7 +105,8 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
 
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_LEG);
         expect(messages(unit)).not.toContain(MAGVAR_INVALID);
-        expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME'); // The list is the live one
+        // The list is the live one: the empty storage has no last position, so the first fix differs from it
+        expect(messages(unit)).toContain('POSITION DIFFERS FROM LAST POSITION BY >2NM');
     });
 
     // The setup of the pins below, held where it passes: the unit enters OBS mode on the leg to KFAR (characterization)

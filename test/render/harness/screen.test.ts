@@ -7,6 +7,7 @@ import {approachWorld, standardRoute} from '../../harness/fixtures';
 import {pointFrom} from '../../harness/flight/geo';
 import {intersection} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
+import {OneTimeMessage} from '../../../kln90b/data/MessageHandler';
 
 function mount(html: string): Element {
     document.body.innerHTML = `<div id="pageContainer">${html}</div>`;
@@ -157,16 +158,24 @@ describe('Screen, pages with their own layout', () => {
         expect(lines[6]).toBe(' SELF TEST IN PROGRESS ');
     });
 
-    // MessagePage joins its lines with a newline inside one <pre>. The boot posts two messages (testing.md section 6)
+    // MessagePage joins its lines with a newline inside one <pre>. The messages the boot posted are read first, so that
+    // the page holds only the one the test posts
     it('reads the lines of the MSG page', async () => {
         const unit = await bootUnit();
         await unit.panel.msg();
+        for (let i = 0; i < 10 && Screen.read().status().left === ''; i++) {
+            await unit.panel.msg();
+        }
+        expect(Screen.read().status().left).not.toBe(''); // The precondition: the page closed
+        await vi.advanceTimersByTimeAsync(1000);
+        unit.props.messageHandler.addMessage(new OneTimeMessage(['SAMPLE MESSAGE', 'SECOND LINE']));
+        await unit.panel.msg();
 
         expect(Screen.read().text().split('\n')).toEqual([
-            'SYSTEM TIME UPDATED    ',
-            ' TO GPS TIME           ',
-            'POSITION DIFFERS FROM  ',
-            ' LAST POSITION BY >2NM ',
+            'SAMPLE MESSAGE'.padEnd(23),
+            ' SECOND LINE'.padEnd(23),
+            ' '.repeat(23),
+            ' '.repeat(23),
             ' '.repeat(23),
             ' '.repeat(23),
             '     |enr-leg msg|     ',

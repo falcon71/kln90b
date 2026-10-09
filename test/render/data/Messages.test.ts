@@ -79,7 +79,8 @@ describe('SET FUEL ON BOARD ON OTH 5 IF NECESSARY', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(messages(unit)).not.toContain(FUEL_TEXT);
-        expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME'); // The list is the live one
+        // The list is the live one: the empty storage has no last position, so the first fix differs from it
+        expect(messages(unit)).toContain('POSITION DIFFERS FROM LAST POSITION BY >2NM');
     });
 
     it('does not show with a fuel computer that sends the fuel on board (B-4)', async () => {
@@ -89,7 +90,8 @@ describe('SET FUEL ON BOARD ON OTH 5 IF NECESSARY', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(messages(unit)).not.toContain('SET FUEL ON BOARD ON OTH 5 IF NECESSARY');
-        expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME'); // The list is the live one
+        // The list is the live one: the empty storage has no last position, so the first fix differs from it (B-3)
+        expect(messages(unit)).toContain('POSITION DIFFERS FROM LAST POSITION BY >2NM');
     });
 
     it('shows again after a power cycle (characterization)', async () => {

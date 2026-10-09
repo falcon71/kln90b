@@ -8,6 +8,7 @@ import {Screen} from '../harness/render/screen';
 import {savedFlightplan, storedSetting} from '../harness/storage';
 import {pointFrom} from '../harness/flight/geo';
 import {NavMode} from '../../kln90b/data/VolatileMemory';
+import {OneTimeMessage} from '../../kln90b/data/MessageHandler';
 
 // Every event below is sent as a string literal, never through the EVT_ constants or the FrontPanel shortcuts, which send
 // the constants: the constants move with a renamed event, and the literals are the contract (CLAUDE.md, "Public
@@ -225,21 +226,21 @@ describe('cursor buttons (3-11)', () => {
 });
 
 describe('MSG button (3-16)', () => {
-    // 3-16: the message page shows the messages over the full width, and a second press returns to the pages in view. The
-    // booted unit always holds the two messages of testing.md section 6
+    // 3-16: the message page shows the messages over the full width, the newest first, and a second press returns to the
+    // pages in view. The booted unit, which has no stored position, holds POSITION DIFFERS; the test posts the newest
     it('shows the message page, and a second press returns to the pages in view', async () => {
         const unit = await bootUnit();
+        unit.props.messageHandler.addMessage(new OneTimeMessage(['NEWEST MESSAGE', 'SECOND LINE']));
 
         await unit.panel.press('KLN90B_MSG_Push');
 
         const screen = Screen.read();
         expect(screen.status().left).toBe('');
         expect(screen.status().right).toBe('');
-        // Two messages of two rows each. Unordered: the posting order of the two is not checked against 3-16 (newest first)
-        const messages = [[0, 1], [2, 3]].map(([a, b]) => [screen.row(a).trimEnd(), screen.row(b).trimEnd()]);
-        expect(messages).toContainEqual(['SYSTEM TIME UPDATED', ' TO GPS TIME']);
-        expect(messages).toContainEqual(['POSITION DIFFERS FROM', ' LAST POSITION BY >2NM']);
-        expect([screen.row(4).trim(), screen.row(5).trim()]).toEqual(['', '']);
+        // Messages of two rows each, the newest on the first two rows. The messages the boot posted follow it
+        const messages = [[0, 1], [2, 3], [4, 5]].map(([a, b]) => [screen.row(a).trimEnd(), screen.row(b).trimEnd()]);
+        expect(messages[0]).toEqual(['NEWEST MESSAGE', ' SECOND LINE']);
+        expect(messages.slice(1)).toContainEqual(['POSITION DIFFERS FROM', ' LAST POSITION BY >2NM']);
 
         await unit.panel.press('KLN90B_MSG_Push');
         expect(Screen.read().status().left).toBe('NAV 2');

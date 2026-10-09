@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {airport} from '../../../harness/navdata/builders';
+import {OneTimeMessage} from '../../../../kln90b/data/MessageHandler';
 
 /** An airport 0.4° south and 0.25° west of the aircraft, far enough that the two positions read differently */
 const kaaa = () => airport('KAAA', 47.1, 11.0);
@@ -191,7 +192,9 @@ describe('SET 1 CONFIRM? before the first fix (characterization)', () => {
 
         expect(unit.errors).toEqual([]);
         expect(messages(unit)).not.toContain(MESSAGE);
-        expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME'); // The list is the live one
+        // The list is the live one: a message posted now shows in it
+        unit.props.messageHandler.addMessage(new OneTimeMessage(['LIVE LIST']));
+        expect(messages(unit)).toContain('LIVE LIST');
     });
 
     // N 46°00.00' is 90 NM south of the aircraft
