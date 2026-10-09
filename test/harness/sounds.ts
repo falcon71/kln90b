@@ -26,7 +26,8 @@ export function recordSounds(unit: HeadlessUnit): SoundRecorder {
         finishAll() {
             for (let i = 0; i < 20 && ids.length > 0; i++) {
                 const before = ids.length;
-                audio.onSoundEnd({__Type: 'Name_Z', idLow: 0, idHigh: 0, str: ids[ids.length - 1]} as unknown as Name_Z);
+                const playing = {__Type: 'Name_Z', idLow: 0, idHigh: 0, str: ids[ids.length - 1]};
+                audio.onSoundEnd(playing as unknown as Name_Z);
                 if (ids.length === before) return;
             }
         },
