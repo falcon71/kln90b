@@ -162,7 +162,9 @@ subagents, relays their results and merges, but it neither implements nor review
 Sessions 1 to 3 build the regression tests, because a bug that has bitten before has a known reproduction, a known
 expected value and a built-in proof (the test fails on the old bug). Session H extended the harness, and Session 3b
 (inserted by the maintainer between Session H and Session 4) builds the regression tests for the rows Session H
-unblocked. Sessions 4 to 10 build the base coverage in order of value. Session 11 retires this document.
+unblocked. Sessions 4 to 10 build the base coverage in order of value. Session 10b (inserted by the maintainer
+between Session 10 and Session 11) settles the findings of an audit of the whole suite, and Session 11 retires this
+document.
 
 A session that was interrupted is rerun with the same number until its checkbox is ticked.
 
@@ -568,6 +570,53 @@ the calculation tickables and `KLN90BCore.init` with the sample and a minimal pa
 by `docs/architecture.md`; the overlays and the #56 rule have spec tests and pins. The bugs found were filed and pinned
 (#327 to #336); #199 gained a pin on the boot Database page, and #171, #192, #199 and #238 have comments. `testing.md`
 section 6 now names SYSTEM TIME UPDATED at an engine-running boot as the bug #328, and the leads are in section 7.
+
+## Session 10b: the audit's findings before the close-out
+
+- [ ] done
+
+Inserted by the maintainer on 2026-10-09, after an audit of the whole suite that asked five questions before the
+close-out: which components have no tests, what technical debt the tests carry, which older tests do not use a newer
+harness feature, which repeated code deserves a harness feature, and whether the plan is ready for Session 11. The
+audit is recorded in [the findings](superpowers/specs/2026-10-09-session-10b-findings.md). The session starts from it
+instead of a research pass of its own (rule 19) and confirms each item it takes, because the audit read the code and
+broke nothing. Page citations of new spec tests are still checked against the Pilot's Guide index.
+
+Done before the session, on the branch `tests-session-10b-prep`: `StartupPages.test.ts` is split into one file per
+subject (`AiracPage.test.ts`, `VFROnlyPage.test.ts`, `ObsWarningPage.test.ts`, and the messages at power-on in
+`GpsAcquisition.test.ts`), so that a test is found by the name of the file it tests. The findings list the helpers the
+split left as local copies.
+
+**Goal:** no known debt in the tests that the coverage record of Session 11 would have to carry, and a Session 11 plan
+that leaves nothing dangling.
+
+1. **Harness consolidation** (findings section 5). H1 to H3 are required, because their copies have drifted in ways that
+   can hide a wrong test: the panel.xml builder with named presets, `readMessages` and `userWaypoints(unit, type?)`. H4
+   and H5 come with them: the message list reader and the full-page reader, which replace the copies of the split. H6 to
+   H13 are the maintainer's choice in the design, and what is not built goes to `testing.md` section 7. Each helper gets
+   a harness test and a paragraph in `testing.md` section 4. The tests that carry a copy move onto it and keep their
+   assertions, and a moved test must still fail under the break recorded for it.
+2. **Stragglers** (findings section 4): a test that hand-rolls a feature the harness has moves onto it, or the copy is
+   named in `testing.md` section 7 with its reason.
+3. **Bugs without a pin** (findings section 2): pins for #93 and #95, with a passing sibling where the setup is heavy;
+   #96 is pinned with a handler count or recorded as not pinned, with the reason.
+4. **Technical debt** (findings section 3): D1 to D3 are fixed: the #103 pin gets a passing sibling, a storage reset
+   and a restored spy; the deviation of `ActiveWaypoint.test.ts` is asserted or its title changed; the #111 date
+   steps are shared. D4 to D7 as the design decides, at least a named constant for the nearest search wait.
+5. **Components without a test** (findings section 1): the `FiveSegmentPage` shell (SCAN and the ENT order) and a unit
+   table of `getKLNSurfaceString` and `getKLNLightingString`, as spec tests where the Pilot's Guide gives the rule and as
+   characterizations otherwise. `Apt3ListPageContainer` and the ENT order of `FourSegmentPage` as the design decides.
+6. **Session 11's plan** (findings section 6): add to Session 11's steps what they leave out: a trainer record for
+   the `T<n>` ids the tests cite, the rules `testing.md` cites by number in its own words, the deletion of
+   `docs/superpowers/`, the regrouping of `testing.md` section 7 by area and the exemption of the harness self-test pin
+   from step 4. Only the plan's text changes here; the work stays with Session 11.
+
+**Tasks** (rules 19 to 27): the harness task first and alone (item 1), because items 2 to 4 move tests onto it. Then
+the main tasks in parallel, batched by area so that no two tasks touch one file. Then the issues task (any bug the
+session finds; #93 and #95 exist already) and the close-out, which also carries item 6.
+
+**Done when:** every item of the findings is done, re-decided with a reason in the log, or listed in `testing.md`
+section 7, and Session 11's steps cover the findings of section 6.
 
 ## Session 11: closing record and retirement
 

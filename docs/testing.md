@@ -696,7 +696,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   harness tests show its `msg`. Seeding a last position in `storage` (`lastLatitude`, `lastLongitude`) removes it. The
   second message of such a boot, `SYSTEM TIME UPDATED TO GPS TIME`, is a bug (#328): the GPS clock starts an hour
   behind and `forceReadyToUse` never adds the hour back, so it posts on every engine-running boot whatever `storage`
-  holds (pinned in `StartupPages.test.ts`). A test that needs a message in the live list as a guard (that the list is
+  holds (pinned in `GpsAcquisition.test.ts`). A test that needs a message in the live list as a guard (that the list is
   read at all) uses `POSITION DIFFERS` with empty storage, or posts a message of its own with
   `unit.props.messageHandler.addMessage(new OneTimeMessage([...]))` when its storage holds the position
   (`Set1Page.test.ts`); it never relies on SYSTEM TIME UPDATED, which a fix of #328 removes.
@@ -852,11 +852,12 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
     - **Counting and sampling writes.** Tests count the writes of one SimVar by filtering `sim.writes` (upper-case names)
       and sample an LVar over display ticks with a hand-written loop (`SimVarSync.test.ts`, `StatusLine.test.ts`,
       `SelfTestLeftPage.test.ts`). A `sim.writeCount(name)` and a sampling helper would remove the pitfall.
-    - **The self-test page and the `"kln90b"` planner.** The cold boot to the self-test page is now
-      `bootToSelfTest` (section 4), which `StartupPages.test.ts`, `SelfTestLeftPage.test.ts` and
-      `SelfTestRightPage.test.ts` use. The older copies stay as they were written: `SensorsOut.test.ts`,
-      `HEvents.test.ts`, `NavCalculator.test.ts`, `Button.test.ts` and `enterIdent.test.ts`. The planner is read through
-      `FlightPlanner.getPlanner('kln90b', …)` in `WTFlightplanSync.test.ts`, `ActiveWaypoint.test.ts` and `reboot.test.ts`.
+    - **The self-test page and the `"kln90b"` planner.** The cold boot to the self-test page is now `bootToSelfTest`
+      (section 4), which `AiracPage.test.ts`, `VFROnlyPage.test.ts`, `ObsWarningPage.test.ts`,
+      `SelfTestLeftPage.test.ts` and `SelfTestRightPage.test.ts` use. The older copies stay as they were written:
+      `SensorsOut.test.ts`, `HEvents.test.ts`, `NavCalculator.test.ts`, `Button.test.ts` and `enterIdent.test.ts`. The
+      planner is read through `FlightPlanner.getPlanner('kln90b', …)` in `WTFlightplanSync.test.ts`,
+      `ActiveWaypoint.test.ts` and `reboot.test.ts`.
     - **Shared worlds.** The approach world now exists as a fixture (`approachWorld()` in `test/harness/fixtures.ts`,
       section 3). The older copies in `ModeController.test.ts` and `HEvents.test.ts` (IAF = FAF, #129) and the arc world
       of `SensorsOutSimVars.test.ts`, copied into `WTFlightplanSync.test.ts`, stay copied. `approachWorld()` has no
@@ -1051,11 +1052,11 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
           wait 3 s, beyond the ride-through a fix of #332 may add.
         - A `messages(unit)` reader of the message list: a local copy in `GpsAcquisition.test.ts`,
           `Messages.test.ts`, `PersistentMessages.test.ts`, `AirspaceAlert.test.ts`, `KLNMagvar.test.ts`,
-          `StartupPages.test.ts`, `Set1Page.test.ts` and others.
+          `Set1Page.test.ts` and others.
         - A `unit.userWaypoints()` reader (ident and region): `TemporaryWaypointDeleter.test.ts`, `Ctr1Page.test.ts`
           and the page tests listed under Session 9b.
         - An inverse reader across a whole row: `focused('R')` reads one half and cuts `ACKNOWLEDGE?`, so
-          `StartupPages.test.ts` carries `inverseText(row)`.
+          `AiracPage.test.ts` and `VFROnlyPage.test.ts` carry `inverseText(row)`.
         - `unit.overlay()` and Super NAV 1 and 5 helpers: `MainPage.test.ts` has local `overlay`, `superNav1` and
           `names` (copies of helpers in `SuperNav1Page.test.ts` and the Super NAV 5 tests), and `bootNearKbbb` is
           copied from `MessagePage.test.ts`. `Screen.read()` throws on Super NAV 5, so the 3-36 test reads the status

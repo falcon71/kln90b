@@ -221,6 +221,45 @@ describe('POSITION DIFFERS FROM LAST POSITION BY >2NM (B-3)', () => {
     });
 });
 
+describe('messages at power-on (B-3, B-4)', () => {
+    // B-3: POSITION DIFFERS posts only when the first fix is more than 2 NM from the position at power-off; B-4: SYSTEM
+    // TIME UPDATED only when the GPS moves the clock by more than 10 minutes. A cold-and-dark unit switched on where it
+    // was switched off, with its clock right, therefore posts neither, and the status line shows no MSG (3-10).
+    it('posts no message on a cold-and-dark start at the stored position (B-3, B-4, 3-10)', async () => {
+        const unit = await bootUnit({engineRunning: false, storage: {lastLatitude: 47, lastLongitude: 8}});
+        await unit.panel.powerOn();
+        await unit.panel.approveSelfTest();
+        await settle(unit);
+
+        expect(messages(unit)).toEqual([]);
+        expect(Screen.read().status().mode).toBe('enr-leg');
+        expect(unit.errors).toEqual([]);
+    });
+
+    // Sibling of the pin below: an engine-running boot at its stored position has a fix, shows the main page and, as
+    // B-3 says for a position within 2 NM, does not post POSITION DIFFERS
+    it('boots with the engine running at the stored position to NAV 2 with a fix and no POSITION DIFFERS '
+        + '(B-3)', async () => {
+        const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
+        await settle(unit);
+
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true);
+        expect(messages(unit)).not.toContain('POSITION DIFFERS FROM LAST POSITION BY >2NM');
+        expect(Screen.read().status().left).toBe('NAV 2');
+    });
+
+    // B-4: the clock of a unit that was running all along needs no correction of more than 10 minutes. A flight started
+    // with the engine running stands for a unit that is already on, but its clock starts one hour behind
+    // (Gps.ts subtracts the hour PowerButton assumes the unit was off, and forceReadyToUse never adds it back), so
+    // every such flight starts with SYSTEM TIME UPDATED TO GPS TIME and the MSG annunciator lit (testing.md section 6).
+    it.fails('posts no message on an engine-running start at the stored position (B-3, B-4, #328)', async () => {
+        const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
+        await settle(unit);
+
+        expect(messages(unit)).toEqual([]);
+    });
+});
+
 // Persisted user data (CLAUDE.md, public contract): the setting keys lastLatitude, lastLongitude and lastAlmanacDownload.
 // The 3-17 tests below cite the manual on the unit keeping them when the power is removed.
 describe('GPS data kept over a power-off', () => {
