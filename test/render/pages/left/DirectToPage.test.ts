@@ -1,6 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
 import {FixTypeFlags} from '@microsoft/msfs-sdk';
-import {bootUnit, moveAircraft, settle} from '../../../harness/boot';
+import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
+import {MainPage} from '../../../../kln90b/pages/MainPage';
+import {SuperNav1Page} from '../../../../kln90b/pages/left/SuperNav1Page';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
 import {savedFlightplan} from '../../../harness/storage';
@@ -278,6 +280,53 @@ describe('DIRECT TO page (spec)', () => {
         expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
         expect(aw.getActiveFplIdx()).toBe(1);
         expect(unit.errors).toEqual([]);
+    });
+});
+
+// 3-32: Super NAV 1 shows while NAV 1 is on both sides. 3-27: D-> puts the Direct To page on the left, with the active
+// waypoint when no waypoint page is on the right (rule 4). 3-28 step 7: when D-> was pressed with NAV 1 on the left,
+// the ENT that approves it brings back the pages shown before, here NAV 1 on both sides, which is Super NAV 1 again
+describe('DIRECT TO page from Super NAV 1 (3-27, 3-28, 3-32)', () => {
+    const superNav1Shown = (unit: HeadlessUnit) =>
+        (unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage() instanceof SuperNav1Page;
+
+    // What the right side shows while the active waypoint awaits its approval is the characterization above
+    it('replaces Super NAV 1 with the DIRECT TO page on the left (3-27, 3-32)', async () => {
+        const unit = await planOnFirstLeg('NAV 1', 'NAV 1');
+        expect(superNav1Shown(unit)).toBe(true); // Precondition
+
+        await unit.panel.dct();
+
+        expect(superNav1Shown(unit)).toBe(false);
+        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['DIRECT TO: ', '           ', '   ABC     ']);
+        expect(Screen.read().status().left).toBe('CRSR');
+    });
+
+    // Rule 5: without an active waypoint the identifier is blank, and no waypoint page comes up on the right
+    it('replaces Super NAV 1 with the blank DIRECT TO page when nothing is active (3-27, 3-32)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'NAV 1');
+        await unit.panel.selectPage('R', 'NAV 1');
+        expect(superNav1Shown(unit)).toBe(true); // Precondition
+
+        await unit.panel.dct();
+
+        expect(superNav1Shown(unit)).toBe(false);
+        expect(Screen.read().rows('L')[0]).toBe('DIRECT TO: ');
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 3, text: '     '});
+    });
+
+    it('returns to Super NAV 1 after the ENT that approves it (3-28, 3-32)', async () => {
+        const unit = await planOnFirstLeg('NAV 1', 'NAV 1');
+        await unit.panel.dct();
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(true);
+        expect(superNav1Shown(unit)).toBe(true);
+        expect(Screen.read().status()).toMatchObject({left: 'NAV 1', right: 'NAV 1'});
+        expect(Screen.read().row(2).startsWith('DIS ')).toBe(true); // the Super NAV 1 layout (3-32, figure 3-102)
     });
 });
 

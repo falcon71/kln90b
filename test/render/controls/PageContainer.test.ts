@@ -3,6 +3,8 @@ import {bootUnit} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {savedFlightplan} from '../../harness/storage';
 import {airport} from '../../harness/navdata/builders';
+import {MainPage} from '../../../kln90b/pages/MainPage';
+import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
 
 describe('keyboard mode (characterization, #75)', () => {
     // The test calls the key handler on the input element. It does not test how Coherent delivers the key.
@@ -108,6 +110,37 @@ describe('keyboard mode, the click and the keys (characterization)', () => {
 
         expect(unit.props.pageManager.isLeftKeyboardActive()).toBe(false);
         expect(Screen.read().status().left).toBe('CRSR');
+    });
+
+    // The input keeps the sim's keyboard while it has the focus, so a unit switched off in keyboard mode must let it
+    // go. PageContainer leaves keyboard mode on the power event; no display tick runs while the unit is off
+    it('characterization: switching the unit off leaves keyboard mode at once', async () => {
+        const unit = await emptyFpl0();
+        await click(LEFT_CRSR);
+        expect(unit.props.pageManager.isLeftKeyboardActive()).toBe(true); // Precondition
+        expect(document.activeElement).toBe(input()); // Precondition
+
+        await unit.panel.powerOff();
+
+        expect(unit.props.pageManager.isLeftKeyboardActive()).toBe(false);
+        expect(document.activeElement).not.toBe(input());
+    });
+
+    // Super NAV 5 hides the status line (MainPage.hasStatusline), so there is no CRSR field to click: the click on its
+    // cells, with the left cursor of Super NAV 5 on, does not enter keyboard mode
+    it('characterization: a click on the CRSR cells does not enter keyboard mode on Super NAV 5', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('R', 'NAV 4');
+        await unit.panel.selectPage('L', 'NAV 5');
+        await unit.panel.inner('R', 1);
+        const main = unit.props.pageManager.getCurrentPage() as MainPage;
+        expect(main.getOverlayPage()).toBeInstanceOf(SuperNav5Page); // Precondition
+        await unit.panel.cursor('L');
+        expect(main.isLeftCursorActive()).toBe(true); // Precondition
+
+        await click(LEFT_CRSR);
+
+        expect(unit.props.pageManager.isLeftKeyboardActive()).toBe(false);
     });
 
     // The keys of KLN90BCore.handleKeyboardEvent: Home and End turn the outer knob, Delete is CLR, Enter is ENT
