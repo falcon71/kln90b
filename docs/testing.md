@@ -1070,7 +1070,7 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       overlay pop of a refused knob); a fix of #335 turns the #334 pin red as well, though #334 still needs its own fix
       for SET 0 and Super NAV 5; a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit
       tests raised; a fix of #328 must keep the screen warm on a forced start (`lastPowerChangeTime` also drives the
-      warm-up); the fix of #199 turns its three pins red.
+      warm-up); the fix of #199 turns its pins red.
     - **Test notes from the reviews** (left as they are): `KLN90BCore.init.test.ts` cannot see whether the sample
       panel.xml keys are parsed (a parser that ignores `Input.ElectricitySimVar` survives, because the test sets the
       SimVar itself); `isTurnOnPage` of `WelcomePage.test.ts` reads the ORS text of the top row; the wait-cut test of

@@ -197,7 +197,7 @@ describe('the knobs on Super NAV 1 (3-32, 3-12, 3-13)', () => {
     });
 });
 
-/** The MSG page over NAV 2 and SUP, with the two messages of every booted unit (testing.md section 6) */
+/** The MSG page over NAV 2 and SUP on a booted unit, which holds POSITION DIFFERS (testing.md section 6) */
 async function msgPage(unit: HeadlessUnit): Promise<void> {
     await unit.panel.msg();
     expect(names()).toEqual(['', '']); // Precondition: the full-width MSG page (3-16, figure 3-56)
