@@ -25,6 +25,12 @@ describe('KLN90B adapter (public contract)', () => {
         expect(adapter().templateID).toBe('KLN90B');
     });
 
+    // docs/architecture.md, Core 1: the adapter declares itself interactive. The pages take mouse input of their own:
+    // the buttons of the error page and the keyboard mode's input field (PageContainer)
+    it('is interactive (docs/architecture.md Core 1)', () => {
+        expect(adapter().isInteractive).toBe(true);
+    });
+
     it('forwards the H events the sim delivers to the core', () => {
         const inst = adapter();
         const forwarded = vi.spyOn(inst.core, 'onInteractionEvent').mockImplementation(() => {});

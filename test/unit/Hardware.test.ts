@@ -13,4 +13,18 @@ describe('Hardware', () => {
         hw.setScanPulled(false);
         expect(simEnv().sim.lastWrite('L:KLN90B_RightScan')!.value).toBe(0);
     });
+
+    // Public contract: LVars.ts documents L:KLN90B_RightScan as a read-only output, false while the right inner knob is
+    // pushed in. A new unit starts with the knob in, so it overwrites a value left over from before (a reloaded
+    // gauge, a hot swap) instead of showing it to the aircraft's knob animation.
+    it('starts with the knob pushed in and writes 0 to L:KLN90B_RightScan when it is built (public contract)', () => {
+        const sim = simEnv().sim;
+        sim.reset();
+        sim.set('L:KLN90B_RightScan', 'bool', true);
+
+        const hw = new Hardware();
+
+        expect(hw.isScanPulled).toBe(false);
+        expect(sim.get('L:KLN90B_RightScan', 'bool')).toBe(0);
+    });
 });
