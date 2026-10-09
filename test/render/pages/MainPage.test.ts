@@ -211,7 +211,7 @@ async function msgPage(unit: HeadlessUnit): Promise<void> {
 // CRSR closes it as well and turns the cursor on beneath (T4). The 89 has one knob pair and no right half, so the pin
 // of the right knob applies the same rule to the right side (3-13). The pages are those of 3-12 and 3-13, from NAV 2
 // and SUP. CLR on the MSG page is ignored on the trainer and in the code: it has no test.
-describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 T4, #NEW-E-1)', () => {
+describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 T4, #333)', () => {
     // The setup sibling of the pins below: the MSG page is up over NAV 2 and SUP (3-16)
     it('shows the MSG page over NAV 2 and SUP (3-16)', async () => {
         const unit = await bootUnit();
@@ -222,7 +222,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
         expect(main.isLeftCursorActive()).toBe(false);
     });
 
-    it.fails('leaves the MSG page on the left outer knob and turns NAV 2 to CAL 1 (#56, 3-12, #NEW-E-1)', async () => {
+    it.fails('leaves the MSG page on the left outer knob and turns NAV 2 to CAL 1 (#56, 3-12, #333)', async () => {
         const unit = await bootUnit();
         await msgPage(unit);
 
@@ -232,7 +232,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
         expect(names()).toEqual(['CAL 1', 'SUP']);
     });
 
-    it.fails('leaves the MSG page on the left inner knob and turns NAV 2 to NAV 3 (#56, 3-12, #NEW-E-1)', async () => {
+    it.fails('leaves the MSG page on the left inner knob and turns NAV 2 to NAV 3 (#56, 3-12, #333)', async () => {
         const unit = await bootUnit();
         await msgPage(unit);
 
@@ -242,7 +242,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
         expect(names()).toEqual(['NAV 3', 'SUP']);
     });
 
-    it.fails('leaves the MSG page on the right outer knob and turns SUP to CTR 1 (#56, 3-13, #NEW-E-1)', async () => {
+    it.fails('leaves the MSG page on the right outer knob and turns SUP to CTR 1 (#56, 3-13, #333)', async () => {
         const unit = await bootUnit();
         await msgPage(unit);
 
@@ -272,7 +272,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
         expect(names()).toEqual(['CRSR', 'SUP']);
     });
 
-    it.fails('closes the MSG page on CRSR and turns the left cursor on beneath (T4, #NEW-E-1)', async () => {
+    it.fails('closes the MSG page on CRSR and turns the left cursor on beneath (T4, #333)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'NAV 4');
         await msgPage(unit);
@@ -293,9 +293,9 @@ async function closeMsgPage(unit: HeadlessUnit): Promise<void> {
 
 // 3-27: D-> shows the Direct To page on the left with the cursor on the identifier. 3-32: Super NAV 1 shows only while
 // NAV 1 is on both sides, which ends when the DIR page takes the left side
-describe('D-> on the MSG page over Super NAV 1 (3-27, 3-32, #NEW-E-2)', () => {
+describe('D-> on the MSG page over Super NAV 1 (3-27, 3-32, #334)', () => {
     // The setup sibling of the pin: the MSG page covers Super NAV 1, and D-> puts the DIR page on the left
-    it('puts the DIR page on the left under the full-screen pages (3-27, setup of #NEW-E-2)', async () => {
+    it('puts the DIR page on the left under the full-screen pages (3-27, setup of #334)', async () => {
         const unit = await bootUnit();
         await superNav1(unit);
         await msgPage(unit);
@@ -307,8 +307,8 @@ describe('D-> on the MSG page over Super NAV 1 (3-27, 3-32, #NEW-E-2)', () => {
     });
 
     // The code drops the top full-screen page, which is the MSG page, instead of Super NAV 1, so Super NAV 1 stays over
-    // the DIR page. Whether the MSG page should stay up is #NEW-E-3; the test closes it if it is still there
-    it.fails('shows the DIR page, not Super NAV 1, once the MSG page is gone (3-27, 3-32, #NEW-E-2)', async () => {
+    // the DIR page. Whether the MSG page should stay up is #335; the test closes it if it is still there
+    it.fails('shows the DIR page, not Super NAV 1, once the MSG page is gone (3-27, 3-32, #334)', async () => {
         const unit = await bootUnit();
         await superNav1(unit);
         await msgPage(unit);
@@ -335,10 +335,10 @@ async function bootNearKbbb(): Promise<HeadlessUnit> {
 // Checked in the KLN 89 trainer, 2026-10-09: D-> on the MSG page opens the Direct To page at once (T1), and ENT on its
 // blank field returns to the page before, with no Direct To made and no nearest airport (T1); ALT on the MSG page
 // opens the Altitude page at once (T2)
-describe('D-> and ALT on the MSG page (3-27, 3-39, 3-55, KLN 89 trainer 2026-10-09 T1 T2, #NEW-E-3)', () => {
+describe('D-> and ALT on the MSG page (3-27, 3-39, 3-55, KLN 89 trainer 2026-10-09 T1 T2, #335)', () => {
     // The setup sibling of the pins: on the MSG page, D-> and ALT are taken and their pages become the left page. It
     // says nothing about what is in view, which is the subject of the pins
-    it('takes D-> and ALT on the MSG page (3-27, 3-55, setup of #NEW-E-3)', async () => {
+    it('takes D-> and ALT on the MSG page (3-27, 3-55, setup of #335)', async () => {
         const unit = await bootUnit();
         const main = unit.props.pageManager.getCurrentPage() as MainPage;
         await msgPage(unit);
@@ -353,7 +353,7 @@ describe('D-> and ALT on the MSG page (3-27, 3-39, 3-55, KLN 89 trainer 2026-10-
     // The ENT that follows belongs to the DIR page: with the blank field it makes no Direct To and it does not show
     // the nearest airport on the right (3-23), which is what ENT on the MSG page does with KBBB in range (the sibling
     // in MessagePage.test.ts holds that). What the DIR page does with the blank field is not asserted here
-    it.fails('shows the DIRECT TO page when D-> is pressed on the MSG page (3-27, T1, #NEW-E-3)', async () => {
+    it.fails('shows the DIRECT TO page when D-> is pressed on the MSG page (3-27, T1, #335)', async () => {
         const unit = await bootNearKbbb();
         await msgPage(unit);
 
@@ -369,7 +369,7 @@ describe('D-> and ALT on the MSG page (3-27, 3-39, 3-55, KLN 89 trainer 2026-10-
         expect(overlay(unit)).toBeNull();
     });
 
-    it.fails('shows the ALT page when ALT is pressed on the MSG page (3-39, 3-55, T2, #NEW-E-3)', async () => {
+    it.fails('shows the ALT page when ALT is pressed on the MSG page (3-39, 3-55, T2, #335)', async () => {
         const unit = await bootUnit();
         await msgPage(unit);
 

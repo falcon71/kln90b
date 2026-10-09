@@ -230,7 +230,7 @@ describe('self-test right page time entry (spec)', () => {
     // 6 and 7 of the right half. The unit has no GPS time yet, so that its own clock is the time shown; the ENT is
     // pressed just after the clock steps, so that the seconds are read before the next step, which would show 01
     it.fails('starts the clock with the seconds at zero when the time is entered '
-        + '(3-6; checked in the KLN 89 trainer, 2026-10-09, T11) (#NEW-B-3)', async () => {
+        + '(3-6; checked in the KLN 89 trainer, 2026-10-09, T11) (#331)', async () => {
         const unit = await onSelfTestPage({storage: NO_FIX_YET});
         await enterTime1627(unit);
         await untilClockSteps(unit);

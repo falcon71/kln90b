@@ -97,7 +97,7 @@ describe('SET 0 page, the ENT prompt (2-5)', () => {
     // trainer has no SET 0 page; this applies the rule to the prompt of 2-5, figure 2-3. The code pops the page when
     // the field refuses the knob (the rule of #56), which leaves SET 0 for SET 1 or SET 10 and drops the update. The
     // sibling above holds the prompt with the cursor on it
-    it.fails('keeps SET 0 and the cursor on the prompt when the inner knob turns (2-5, T5, #NEW-E-4)', async () => {
+    it.fails('keeps SET 0 and the cursor on the prompt when the inner knob turns (2-5, T5, #336)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 0');
         await unit.panel.cursor('L');

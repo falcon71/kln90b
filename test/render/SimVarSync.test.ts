@@ -77,7 +77,7 @@ describe('L:KLN90B_ObsSource (public contract)', () => {
 describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract)', () => {
     it('powers the unit up and down with the SimVar of panel.xml', async () => {
         // Each loss of the circuit is waited out for 3 s, beyond the switch-over of the battery module (maintenance
-        // manual, PDF 79: about 1.5 s; #NEW-C-1), so that the test holds whether or not a short loss is bridged
+        // manual, PDF 79: about 1.5 s; #332), so that the test holds whether or not a short loss is bridged
         const unit = await bootUnit({panelXml: CIRCUIT_XML});
         await vi.advanceTimersByTimeAsync(3000);
         expect(Screen.read().row(0)).toBe(BLANK_ROW);
@@ -153,7 +153,7 @@ describe('aircraft power interruptions (maintenance manual)', () => {
 
     // SimVarSync passes every change of the circuit to PowerButton at once, so a loss of half a second power-cycles the
     // unit: it restarts with the Turn-On page and the self-test
-    it.fails('rides through a 0.5 s loss of the aircraft power (maintenance manual, PDF 53) (#NEW-C-1)', async () => {
+    it.fails('rides through a 0.5 s loss of the aircraft power (maintenance manual, PDF 53) (#332)', async () => {
         const unit = await onCircuit();
         const cycles = unit.props.userSettings.getSetting('powercycles').value;
 

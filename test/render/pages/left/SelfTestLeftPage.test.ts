@@ -225,7 +225,7 @@ describe('self-test outputs with a magnetic variation (spec)', () => {
 
     // NavCalculator sets the self-test bearing as a true bearing (130) and the output converts it to magnetic, so the
     // RMI shows 130° minus the variation: 120° here
-    it.fails('outputs an RMI bearing of 130° (3-4, Installation Manual 2-68) (#NEW-B-1)', async () => {
+    it.fails('outputs an RMI bearing of 130° (3-4, Installation Manual 2-68) (#329)', async () => {
         const unit = await selfTestWithVariation();
 
         expect(unit.env.sim.get('L:KLN90B_GPS_WP_BEARING', 'degrees')).toBeCloseTo(130, 6);
@@ -261,7 +261,7 @@ describe('self-test page status line (spec)', () => {
     // the self-test, so msg follows enr-leg. The KLN 89 trainer showed no message prompt on its self-test page (T8); it
     // has no readable course there and no status line, so this is its rule and not its readable-course case
     it.fails('shows enr-leg without msg (figure 3-4; checked in the KLN 89 trainer, 2026-10-09, T8) '
-        + '(#NEW-B-2)', async () => {
+        + '(#330)', async () => {
         await selfTestAsFigure();
 
         expect(Screen.read().status().mode).toBe('enr-leg');

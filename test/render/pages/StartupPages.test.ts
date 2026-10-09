@@ -86,7 +86,7 @@ describe('VFR only page (3-7)', () => {
     /**
      * The two texts of the page with their cells: the title on the second row, three cells in, and the button on the
      * sixth row, five cells in (figure 3-22 is not column-exact; the cells are the code's). The other rows are the
-     * business of the #NEW-A-1 pin below
+     * business of the #327 pin below
      */
     const expectVfrPage = () => {
         expect([Screen.read().row(1), Screen.read().row(5)])
@@ -109,7 +109,7 @@ describe('VFR only page (3-7)', () => {
 
     // Figure 3-22: the page shows FOR VFR USE ONLY and ACKNOWLEDGE? and nothing else. VFROnlyPage.render has a comma
     // after a <br/>, which the page shows at the start of its fourth row. The sibling above holds the page itself.
-    it.fails('shows nothing but FOR VFR USE ONLY and ACKNOWLEDGE? (3-7, #NEW-A-1)', async () => {
+    it.fails('shows nothing but FOR VFR USE ONLY and ACKNOWLEDGE? (3-7, #327)', async () => {
         await approveSelfTestPage({panelXml: panelXml(VFR_ONLY)});
 
         expect(pageRows().filter(r => r !== '')).toEqual(['FOR VFR USE ONLY', 'ACKNOWLEDGE?']);
@@ -174,7 +174,7 @@ describe('messages at power-on (B-3, B-4)', () => {
     // with the engine running stands for a unit that is already on, but its clock starts one hour behind
     // (Gps.ts subtracts the hour PowerButton assumes the unit was off, and forceReadyToUse never adds it back), so
     // every such flight starts with SYSTEM TIME UPDATED TO GPS TIME and the MSG annunciator lit (testing.md section 6).
-    it.fails('posts no message on an engine-running start at the stored position (B-3, B-4, #NEW-A-2)', async () => {
+    it.fails('posts no message on an engine-running start at the stored position (B-3, B-4, #328)', async () => {
         const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
         await settle(unit);
 
