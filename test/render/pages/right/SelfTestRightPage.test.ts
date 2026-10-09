@@ -118,7 +118,8 @@ async function enterTime1627(unit: HeadlessUnit) {
 }
 
 describe('self-test right page entries (spec)', () => {
-    // 3-5 step 7 and its list: CST is UTC - 6, seven zones after UTC. The sim clock starts at 12:00:00 UTC (DEFAULT_START)
+    // 3-5 step 7 and its list: CST is UTC - 6, seven zones after UTC. The sim clock starts at 12:00:00 UTC
+    // (DEFAULT_START)
     it('shows the time in the time zone selected with the inner knob (3-5)', async () => {
         const unit = await onSelfTestPage();
         await backTo(unit, 'UTC');
@@ -165,8 +166,8 @@ describe('self-test right page entries (spec)', () => {
 
     // 3-6 and 3-7, steps 8 to 10, figures 3-18 to 3-21: with 29.92 the encoder's 1100 ft shows as ALT 1100; 30.02
     // entered, the ALT row shows 1200. Independently: the ISA altimeter setting correction for 30.02 against 29.92 inHg
-    // is 145442 * (1 - (29.92 / 30.02) ^ 0.190263) = 92 ft, and 1192 ft shows as 1200 in the 100 ft steps of the figures
-    it('shows the altitude corrected by the baro entered, in 100 ft steps (3-6, 3-7, figures 3-18 to 3-21)', async () => {
+    // is 145442 * (1 - (29.92 / 30.02) ^ 0.190263) = 92 ft, and 1192 ft shows as 1200
+    it('shows the altitude corrected by the baro entered (3-6, 3-7, figures 3-18 to 3-21)', async () => {
         const unit = await onSelfTestPage({altitudeFt: 1100});
         expect(altitudeShown()).toBe(1100);
         await unit.panel.cursorTo('R', '29');
@@ -180,6 +181,31 @@ describe('self-test right page entries (spec)', () => {
         expect(Screen.read().rows('R')[4]).toBe('BARO:30.02"');
         expect(altitudeShown()).toBe(1200);
     });
+
+    // The figures show the altitude in steps of 100 ft. The same formula: 29.97 gives 145442 * (1 - (29.92 / 29.97) ^
+    // 0.190263) = 46 ft, so 1146 ft shows as 1100 (50 ft steps would give 1150); 30.07 gives 138 ft, so 1238 ft shows
+    // as 1200 (50 ft steps would give 1250)
+    it('rounds the corrected altitude to 100 ft: 29.97 gives 1100, 30.07 gives 1200 (3-6, 3-7, figures 3-18 to 3-21)',
+        async () => {
+            const unit = await onSelfTestPage({altitudeFt: 1100});
+            await unit.panel.cursorTo('R', '29');
+            await unit.panel.outer('R', 2); // the fourth digit
+            await unit.panel.inner('R', 5); // 2 to 7: 29.97
+            await unit.panel.ent();
+            await vi.advanceTimersByTimeAsync(2000);
+            expect(Screen.read().rows('R')[4]).toBe('BARO:29.97"'); // Precondition: the baro is in effect
+            const at2997 = altitudeShown();
+
+            await unit.panel.cursorTo('R', '29');
+            await unit.panel.inner('R', 1); // 29 to 30: 30.97
+            await unit.panel.outer('R', 1);
+            await unit.panel.inner('R', -9); // 9 to 0: 30.07
+            await unit.panel.ent();
+            await vi.advanceTimersByTimeAsync(2000);
+            expect(Screen.read().rows('R')[4]).toBe('BARO:30.07"'); // Precondition: the baro is in effect
+
+            expect([at2997, altitudeShown()]).toEqual([1100, 1200]);
+        });
 });
 
 /**
@@ -197,14 +223,15 @@ async function untilClockSteps(unit: HeadlessUnit) {
 }
 
 describe('self-test right page time entry (spec)', () => {
-    // 3-6 and figures 3-15 to 3-17: ENT starts the clock from the entered hours and minutes with the seconds at zero.
-    // The KLN 89 trainer did the same (checked in the KLN 89 trainer, 2026-10-09, T11): after ENT the entered value
-    // started at hh:mm:00 and rolled over to the next minute a minute later, the time in the entry not added. The seconds
-    // are their own cells of the time row, `12:00:19UTC`: columns 6 and 7 of the right half. The unit has no GPS time
+    // 3-6: ENT starts the clock from the entered hours and minutes, and the seconds cannot be entered. The 90B guide
+    // leaves the value of the seconds at ENT open (its figures 3-15 to 3-17 show them unchanged during the entry), so
+    // the KLN 89 trainer decides (checked in the KLN 89 trainer, 2026-10-09, T11): after ENT the entered value started
+    // at hh:mm:00 and rolled over to the next minute a minute later, the time in the entry not added. The seconds are
+    // their own cells of the time row, `12:00:19UTC`: columns 6 and 7 of the right half. The unit has no GPS time
     // yet, so that its own clock is the time shown; the ENT is pressed just after the clock steps, so that the seconds
     // are read before the next step, which would show 01
     it.fails('starts the clock with the seconds at zero when the time is entered '
-        + '(3-6, figures 3-15 to 3-17; checked in the KLN 89 trainer, 2026-10-09, T11) (#NEW-B-3)', async () => {
+        + '(3-6; checked in the KLN 89 trainer, 2026-10-09, T11) (#NEW-B-3)', async () => {
         const unit = await onSelfTestPage({storage: NO_FIX_YET});
         await enterTime1627(unit);
         await untilClockSteps(unit);
@@ -216,8 +243,8 @@ describe('self-test right page time entry (spec)', () => {
     });
 });
 
-const AIR_DATA_BARO_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><Airdata><IsInterfaced>true</IsInterfaced>'
-    + '<BaroSource>1</BaroSource></Airdata></Input></Instrument></PlaneHTMLConfig>';
+const AIR_DATA_BARO_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><Airdata>'
+    + '<IsInterfaced>true</IsInterfaced><BaroSource>1</BaroSource></Airdata></Input></Instrument></PlaneHTMLConfig>';
 const ALTIMETER_AT_30_12 = [{name: 'KOHLSMAN SETTING HG:1', unit: 'inches of mercury', value: 30.12}];
 
 describe('self-test right page with an air data baro (spec)', () => {
@@ -274,14 +301,18 @@ describe('approving the self-test page (spec)', () => {
         await unit.panel.ent();
         sounds.finishAll();
 
-        expect(Screen.read().rows('R').map(r => r.trim())).not.toContain('APPROVE?'); // Precondition: the page was approved
+        // Precondition: the page was approved
+        expect(Screen.read().rows('R').map(r => r.trim())).not.toContain('APPROVE?');
         expect(sounds.ids).toEqual([]);
     });
 });
 
+const NO_ALTIMETER_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><AltimeterInterfaced>false'
+    + '</AltimeterInterfaced></Input></Instrument></PlaneHTMLConfig>';
+
 describe('self-test right page altitude (characterization)', () => {
     it('shows dashes for the altitude without an altitude input (characterization)', async () => {
-        await onSelfTestPage({panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><AltimeterInterfaced>false</AltimeterInterfaced></Input></Instrument></PlaneHTMLConfig>'});
+        await onSelfTestPage({panelXml: NO_ALTIMETER_XML});
 
         expect(Screen.read().rows('R')[3].slice(0, 9)).toBe('ALT -----');
     });

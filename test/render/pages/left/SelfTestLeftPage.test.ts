@@ -32,7 +32,10 @@ describe('self-test page', () => {
 
 const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
 
-/** The self-test page of a cold boot. HeadingInput is on, so that the roll command does not depend on the heading input pin (#143) */
+/**
+ * The self-test page of a cold boot. HeadingInput is on, so that the roll command does not depend on the heading input
+ * pin (#143)
+ */
 function onSelfTestPage() {
     return bootToSelfTest({magvar: 0, panelXml: HEADING_INPUT_XML});
 }
@@ -180,7 +183,8 @@ describe('self-test left page knobs (characterization)', () => {
     });
 });
 
-const OBS_TARGET_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output><ObsTarget>1</ObsTarget></Output></Instrument></PlaneHTMLConfig>';
+const OBS_TARGET_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output><ObsTarget>1</ObsTarget></Output>'
+    + '</Instrument></PlaneHTMLConfig>';
 
 /**
  * The self-test page with a magnetic variation of 10° E and an HSI whose course pointer the unit drives and reads
@@ -243,12 +247,13 @@ function selfTestAsFigure() {
 // Figure 3-4: the status line of the self-test page shows no page names, enr-leg in the middle and CRSR on the right,
 // with OBS IN reading 242° against the fixed OBS OUT of 315°
 describe('self-test page status line (spec)', () => {
-    // The sibling of the pin below
-    it('shows no page name on the left and CRSR on the right with OBS IN 242° (figure 3-4)', async () => {
+    // The sibling of the pin below: the mode field starts with enr-leg (the pin asserts that nothing follows it)
+    it('shows no page name, enr-leg first and CRSR on the right with OBS IN 242° (figure 3-4)', async () => {
         await selfTestAsFigure();
 
         expect(Screen.read().rows('L')[2]).toBe('OBS IN 242°');
         expect(Screen.read().status().left).toBe('');
+        expect(Screen.read().status().mode.split(' ')[0]).toBe('enr-leg');
         expect(Screen.read().status().right).toBe('CRSR');
     });
 
