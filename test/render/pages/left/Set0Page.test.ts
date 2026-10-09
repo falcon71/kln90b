@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
+import {blinkCycle} from '../../../harness/render/blink';
 
 /** The six rows of the full page (SET 0 has no right half), without trailing blanks */
 function rows(): string[] {
@@ -70,6 +71,50 @@ describe('SET 0 page, the database update (2b9f811)', () => {
         await unit.panel.ent();
 
         expect(rows()[4]).toBe('       11 JUN 26');
+    });
+});
+
+describe('SET 0 page, the ENT prompt (2-5)', () => {
+    /** The text and the mask of the ENT/MSG cells of the status line (row 6, cells 14 to 16) */
+    const prompt = () => `${Screen.read().row(6).slice(14, 17)} ${Screen.read().mask().split('\n')[6].slice(14, 17)}`;
+
+    // 2-5, figure 2-3: with the cursor on UPDATE PUBLISHED DB the status line shows CRSR and the ENT prompt; 3-11 and
+    // 3-10: ENT flashes as plain text, not inverse, on one display tick in four (testing.md, blinkCycle)
+    it('flashes ent while the cursor is on UPDATE PUBLISHED DB (2-5, figure 2-3, 3-10, 3-11)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'SET 0');
+        await unit.panel.cursor('L');
+        expect(Screen.read().status().left).toBe('CRSR'); // Precondition
+
+        const reads = await blinkCycle(prompt);
+
+        expect(unit.errors).toEqual([]);
+        expect([...reads].sort()).toEqual(['ent ...', 'ent ...', 'ent ...', 'ent BBB']);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-09 (T5): with the cursor on a prompt (the one it showed was Copy FPL 0?
+    // on FPL 25) a click of the inner knob in either direction did nothing: the page and the prompt stayed. The
+    // trainer has no SET 0 page; this applies the rule to the prompt of 2-5, figure 2-3. The code pops the page when
+    // the field refuses the knob (the rule of #56), which leaves SET 0 for SET 1 or SET 10 and drops the update. The
+    // sibling above holds the prompt with the cursor on it
+    it.fails('keeps SET 0 and the cursor on the prompt when the inner knob turns (2-5, T5, #NEW-E-4)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'SET 0');
+        await unit.panel.cursor('L');
+        expect(rows()[3]).toBe('  UPDATE PUBLISHED DB'); // Precondition
+        expect(Screen.read().status().left).toBe('CRSR'); // Precondition
+
+        await unit.panel.inner('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(rows()[3]).toBe('  UPDATE PUBLISHED DB');
+        expect(Screen.read().status().left).toBe('CRSR');
+
+        await unit.panel.inner('L', -1);
+
+        expect(unit.errors).toEqual([]);
+        expect(rows()[3]).toBe('  UPDATE PUBLISHED DB');
+        expect(Screen.read().status().left).toBe('CRSR');
     });
 });
 
