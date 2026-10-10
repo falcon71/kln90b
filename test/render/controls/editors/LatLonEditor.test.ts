@@ -433,6 +433,40 @@ describe('latitude and longitude editors at exactly 0 degrees ' +
     });
 });
 
+describe('longitude editor, the outer knob at the ends of an open edit ' +
+    '(checked in the KLN 89 trainer, 2026-10-08, #306)', () => {
+    // The trainer check was made on a latitude, a radial, the date and an FPL 0 ident; the cell index is shared by
+    // every editor, and the eight cells of the longitude are a different length. Open edit, the cursor on the
+    // hemisphere (E, the others dashed), seven clicks reach the hundredths.
+    it('stops at the last cell: the next inner click turns the hundredths again', async () => {
+        const unit = await coldSet1();
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 1);
+        await unit.panel.outer('L', 7);
+        await unit.panel.inner('L', 1);
+        expect(rowsL()[3]).toBe("E___°__._0'");
+
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(rowsL()[3]).toBe("E___°__._1'");
+    });
+
+    it('stops at the first cell: the next inner click turns the hemisphere', async () => {
+        const unit = await coldSet1();
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 1);
+        expect(rowsL()[3]).toBe("E___°__.__'");
+
+        await unit.panel.outer('L', -1);
+        await unit.panel.inner('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(rowsL()[3]).toBe("W___°__.__'");
+    });
+});
+
 describe('longitude editor and the sim keyboard (characterization, sim-only feature, #25)', () => {
     /** A key as the PC keyboard sends it to the unit (PageContainer publishes the key code; KLN90BCore maps it) */
     const key = async (unit: HeadlessUnit, keyCode: number) => {

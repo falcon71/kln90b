@@ -220,8 +220,8 @@ describe('editor CLR during an open edit (checked in the KLN 89 trainer, 2026-10
 });
 
 describe('editor outer knob at the ends of an open edit (checked in the KLN 89 trainer, 2026-10-08, #306)', () => {
-    // Sibling of both pins: the edit is open with the cursor on the first cell (N selected), and six clicks of the
-    // outer knob reach the last cell, the hundredths; the edit is still open and shows its dashes
+    // Sibling of both tests below: the edit is open with the cursor on the first cell (N selected), and six clicks of
+    // the outer knob reach the last cell, the hundredths; the edit is still open and shows its dashes
     it('reaches the last cell with six clicks of the outer knob, the edit ' +
         'still open (checked in the KLN 89 trainer, 2026-10-08)', async () => {
         const unit = await onSet1Latitude();
@@ -236,9 +236,27 @@ describe('editor outer knob at the ends of an open edit (checked in the KLN 89 t
         expect(await entPromptShown()).toBe(true);
     });
 
+    // Siblings of the stops: the knob still moves between the cells next to the ends, in both directions
+    it('moves from the second cell back to the first, and from the last cell back to the one before ' +
+        '(checked in the KLN 89 trainer, 2026-10-08)', async () => {
+        const unit = await onSet1Latitude();
+        await unit.panel.inner('L', 1);
+        await unit.panel.outer('L', 1);
+        await unit.panel.outer('L', -1);
+        await unit.panel.inner('L', 1);
+        expect(latRow()).toBe("S __°__.__'");
+
+        await unit.panel.outer('L', 6);
+        await unit.panel.outer('L', -1);
+        await unit.panel.inner('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(latRow()).toBe("S __°__.0_'");
+    });
+
     // Checked in the KLN 89 trainer, 2026-10-08 (T1): past the last cell the cursor stays on it, and the
-    // edit stays open. The code wraps to the first cell.
-    it.fails('stops at the last cell of an open edit (checked in the KLN 89 ' +
+    // edit stays open.
+    it('stops at the last cell of an open edit (checked in the KLN 89 ' +
         'trainer, 2026-10-08, #306)', async () => {
         const unit = await onSet1Latitude();
         await unit.panel.inner('L', 1);
@@ -252,8 +270,8 @@ describe('editor outer knob at the ends of an open edit (checked in the KLN 89 t
     });
 
     // Checked in the KLN 89 trainer, 2026-10-08 (T1): before the first cell the cursor stays on it too,
-    // and the edit stays open. The code wraps to the last cell.
-    it.fails('stops at the first cell of an open edit (checked in the KLN 89 ' +
+    // and the edit stays open.
+    it('stops at the first cell of an open edit (checked in the KLN 89 ' +
         'trainer, 2026-10-08, #306)', async () => {
         const unit = await onSet1Latitude();
         await unit.panel.inner('L', 1);
@@ -278,18 +296,17 @@ describe('editor keyboard entry (characterization, sim-only feature, #25)', () =
         expect(latRow()).toBe("N 4_°__.__'");
     });
 
-    // After the last cell the automatic advance (KeyboardService: outerRight after every accepted key) wraps to the
-    // first cell, so the next key replaces the hemisphere. A clamp in Editor.outerRight (the fix of #306) changes
-    // it.
-    it('wraps the cursor to the first cell after the last key, so the next key overwrites it', async () => {
+    // After the last cell the automatic advance (KeyboardService: outerRight after every accepted key) stays on the
+    // last cell (the cursor stops there, #306), so the next key overwrites the hundredths and not the hemisphere
+    it('keeps the cursor on the last cell after the last key, so the next key overwrites it', async () => {
         const unit = await onSet1Latitude();
         await unit.panel.type('L', 'N473000'); // all seven cells
         expect(latRow()).toBe("N 47°30.00'");
 
-        await unit.panel.type('L', 'S');
+        await unit.panel.type('L', 'S5'); // S is no choice of the hundredths and is refused
 
         expect(unit.errors).toEqual([]);
-        expect(latRow()).toBe("S 47°30.00'");
+        expect(latRow()).toBe("N 47°30.05'");
     });
 });
 

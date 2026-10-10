@@ -169,3 +169,36 @@ describe('date editor (characterization)', () => {
         expect(cal7Date(unit)).toEqual([1992, 1, 28]);
     });
 });
+
+describe('date editor, the outer knob at the ends of an open edit (checked in the KLN 89 trainer, 2026-10-08, #306)', () => {
+    // The trainer check was made on a latitude, a radial, the date and an FPL 0 ident. Open edit: the day 01 selected,
+    // the month and the year dashed.
+    it('stops at the last cell: the next inner click turns the last digit of the year again', async () => {
+        const unit = await bootOnSet2();
+        await unit.panel.cursor('L');
+        await unit.panel.inner('L', 1);
+        await unit.panel.outer('L', 3);
+        await unit.panel.inner('L', 1);
+        expect(Screen.read().rows('L')[2]).toBe('  01 ___ _0');
+
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[2]).toBe('  01 ___ _1');
+    });
+
+    it('stops at the first cell: the next inner click turns the day', async () => {
+        const unit = await bootOnSet2();
+        await unit.panel.cursor('L');
+        await unit.panel.inner('L', 1);
+        expect(Screen.read().rows('L')[2]).toBe('  01 ___ __');
+
+        await unit.panel.outer('L', -1);
+        await unit.panel.inner('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[2]).toBe('  02 ___ __');
+    });
+});
+

@@ -1466,9 +1466,8 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       page); the fix of #93 turns two (Avgas and JetB; JetA1 passes today, because the SDK's generic imperial gallon
       weighs as Jet A);
     - the fix of #311 in `WaypointEditor` leaves the `FplPage.test.ts` insert tests green; the fix of #262 must keep NO
-      SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests); the fix of
-      #306 changes the keyboard's automatic advance at the last cell (a characterization in `Editor.test.ts`); #324
-      needs a trip-page form of `DurationDisplay`, not a change of the shared form;
+      SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests); #324 needs
+      a trip-page form of `DurationDisplay`, not a change of the shared form;
     - a fix of #335 turns the #334 pin red as well,
       though #334 still needs its own fix for SET 0 and Super NAV 5; a fix of #332 with a ride-through above about 1.5 s
       needs the 3 s waits of the circuit tests raised; a fix of #328 must keep the screen warm on a forced start

@@ -164,10 +164,9 @@ describe('waypoint editor, the outer knob (checked in the KLN 89 trainer, 2026-1
     }
 
     // The 90B guide is silent on the outer knob past the last character. The KLN 89 trainer (2026-10-08, T1: an FPL 0
-    // ident typed to its fifth character, two more clicks) kept the cursor on the fifth. The editor wraps to the first
-    // cell instead (Editor.outerRight), so the fifth click turns the first character: K to L, and the rest of the
-    // identifier goes blank. Sibling: the test below, the same turns up to the fifth cell
-    it.fails('keeps the cursor on the fifth character when the outer knob goes on '
+    // ident typed to its fifth character, two more clicks) kept the cursor on the fifth. Sibling: the test below, the
+    // same turns up to the fifth cell
+    it('keeps the cursor on the fifth character when the outer knob goes on '
         + '(checked in the KLN 89 trainer, 2026-10-08, #306)', async () => {
         const unit = await k00Entered();
         await unit.panel.outer('L', 5);
@@ -175,6 +174,18 @@ describe('waypoint editor, the outer knob (checked in the KLN 89 trainer, 2026-1
         await unit.panel.inner('L', 1);
 
         expect(dctIdent()).toBe('   K00 A   ');
+    });
+
+    // The same trainer check, counterclockwise: before the first character the cursor stays on it, so the next inner
+    // click turns the first character (K to L) and not the fifth
+    it('keeps the cursor on the first character when the outer knob turns back '
+        + '(checked in the KLN 89 trainer, 2026-10-08, #306)', async () => {
+        const unit = await k00Entered();
+        await unit.panel.outer('L', -1);
+
+        await unit.panel.inner('L', 1);
+
+        expect(dctIdent()).toBe('   L       ');
     });
 
     // 3-14 and 3-28: the outer knob moves the cursor over the five characters; on the fifth a click turns that cell
