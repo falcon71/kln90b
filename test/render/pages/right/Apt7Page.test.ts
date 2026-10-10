@@ -311,7 +311,7 @@ describe('APT 7 selecting a SID (6-22)', () => {
 
     // 6-22 step 4, figure 6-35: the runways of a SID are listed with the RW prefix. The sibling is the test above, which
     // asserts the runway question and its cursor
-    it.fails('lists the runways of a SID with the RW prefix (6-22, #272)', async () => {
+    it('lists the runways of a SID with the RW prefix (6-22, #272)', async () => {
         const unit = await bootOnApt7({sids: ['DEP1'], stars: false});
         await unit.panel.cursor('R');
         await unit.panel.ent(); // DEP1
@@ -338,6 +338,18 @@ describe('APT 7 selecting a STAR (6-23)', () => {
 
         expect(rows('R').slice(1)).toEqual([' 1 TRNAB', ' 2 SIDAB', ' 3 SIDAA', '', 'LOAD IN FPL']);
         expect(unit.panel.focused('R')).toEqual({row: 5, col: 12, text: 'LOAD IN FPL'});
+    });
+
+    // 6-23 step 5: the runway question of a STAR lists the runways as the one of a SID does (6-22 step 4, figure 6-35),
+    // with the RW prefix
+    it('lists the runways of a STAR with the RW prefix (6-23, 6-22)', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // ARR2
+        await unit.panel.ent(); // TRNAA: the runways
+
+        expect(rows('R').slice(0, 4)).toEqual(['ARR2-Æ', 'RUNWAY', ' 1 RW09', ' 2 RW27L']);
     });
 
     // 6-23 step 5: a STAR that needs no runway skips that step; a STAR without transitions has nothing to ask

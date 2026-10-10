@@ -690,7 +690,7 @@ class Apt7RunwayPage extends Apt7SelectorPage {
         const rwys = this.proc.runwayTransitions.filter(runwayTransition => SidStar.isProcedureRecognized(this.proc, runwayTransition, this.trans)).map((rwy, idx) => new SimpleListItem<RunwayTransition>({
             bus: this.props.bus,
             value: rwy,
-            fulltext: (idx + 1).toString().padStart(2, " ") + " " + RunwayUtils.getRunwayNameString(rwy.runwayNumber, rwy.runwayDesignation, true).padEnd(5, " "),
+            fulltext: (idx + 1).toString().padStart(2, " ") + " " + RunwayUtils.getRunwayNameString(rwy.runwayNumber, rwy.runwayDesignation, true, "RW").padEnd(5, " "),
             onEnter: (rwy) => this.selectRunway(this.proc, rwy, this.trans),
         }));
 
