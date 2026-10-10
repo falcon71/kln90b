@@ -264,9 +264,8 @@ describe('VOR page with a VORTAC (3-49)', () => {
         expect(Screen.read().rows('R')[1]).toBe('ARDMORE    ');
     });
 
-    // 3-14, 3-21: an entered ident selects the VOR of that ident. VorSelector.isValidResult (VorSelector.tsx:13) accepts
-    // only VOR, VOR-DME, DME and Unknown, so a VORTAC counts as an unknown ident and the user VOR creation opens
-    it.fails('selects a VORTAC by its ident (3-14, 3-49, #276)', async () => {
+    // 3-14, 3-21: an entered ident selects the VOR of that ident, whatever its kind
+    it('selects a VORTAC by its ident (3-14, 3-49, #276)', async () => {
         const unit = await vorPageOf(vor('ABC', 47.3, 8.3), adm(VorType.VORTAC));
         await unit.panel.cursor('R');
         await unit.panel.enterIdent('R', 'ADM');
@@ -274,7 +273,7 @@ describe('VOR page with a VORTAC (3-49)', () => {
         expect(Screen.read().rows('R')[1]).toBe('ARDMORE    ');
     });
 
-    // Sibling: the same entry selects a VOR-DME of that ident, so the pin above fails for the type alone
+    // Sibling: the same entry selects a VOR-DME of that ident
     it('selects a VOR-DME by its ident (3-14)', async () => {
         const unit = await vorPageOf(vor('ABC', 47.3, 8.3), adm(VorType.VORDME));
         await unit.panel.cursor('R');

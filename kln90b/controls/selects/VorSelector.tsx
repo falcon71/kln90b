@@ -10,6 +10,6 @@ export class VorSelector extends WaypointSelector<VorFacility> {
 
 
     protected isValidResult(facility: VorFacility): boolean {
-        return facility.type === VorType.VORDME || facility.type === VorType.DME || facility.type === VorType.VOR || facility.type === VorType.Unknown;
+        return facility.type === VorType.VORDME || facility.type === VorType.VORTAC || facility.type === VorType.DME || facility.type === VorType.VOR || facility.type === VorType.Unknown;
     }
 }
