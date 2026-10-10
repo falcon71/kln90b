@@ -1310,7 +1310,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   removals one waits for the next search.
 - **CTR computes once per unit in tests.** With `centerWorld()` one computation needs no OTH 2 detour: its legs are
   300 NM, so each Center is first returned by a search from inside it. A second computation in the same unit meets
-  #102; the #102 pin in `Ctr1Page.test.ts` is such a test on purpose, and #161 is pinned there with one computation.
+  #102; the #102 pin in `Ctr1Page.test.ts` is such a test on purpose, and the tests of the 30 waypoint limit there use one computation.
 - CTR leads: a recomputation without insertion creates a new user waypoint with the next number (BGD00, then BGD01),
   and the orphans count against the limit until power-off; a crossing without a VOR within 100 NM, or without a free
   number, is dropped silently; when the first waypoint lies in no Center the first crossing is dropped

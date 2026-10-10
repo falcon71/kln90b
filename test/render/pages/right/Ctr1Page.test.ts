@@ -3,6 +3,7 @@ import {Facility, FacilityType} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {centerWorld} from '../../../harness/fixtures';
 import {intersection} from '../../../harness/navdata/builders';
+import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 import {fplIdents, userWaypoints} from '../../../harness/readers';
@@ -241,10 +242,8 @@ describe('CTR 1 page, a plan modified after the insertion (5-27)', () => {
 const cluster = (n: number) => Array.from({length: n}, (_, i) => intersection(`FA${String(i).padStart(2, '0')}`, 40.0 + i * 0.01, -100.0));
 
 describe('CTR 1 page, the 30 waypoint limit (5-26)', () => {
-    // 5-26: the limit is 30 waypoints. 28 plus the two Center waypoints make 30, which still fits. The limit check of
-    // CTR 1 is dead code until #161 is fixed (its result is overwritten), so today this test holds only the setup and
-    // the insertion; it becomes the guard against a limit that is off by one once the check works. It is the passing
-    // sibling of the pin below
+    // 5-26: the limit is 30 waypoints. 28 plus the two Center waypoints make 30, which still fits: the guard against a
+    // limit that is off by one. It is the sibling of the test below
     it('inserts two Center waypoints into a plan of 28 waypoints (5-26)', async () => {
         const fa = cluster(26);
         const unit = await onCtr1(w => [...fa, w.kbbb, w.kccc], fa);
@@ -257,13 +256,107 @@ describe('CTR 1 page, the 30 waypoint limit (5-26)', () => {
     });
 
     // 5-26: when the Center waypoints would make the plan exceed 30 waypoints, none are offered and CTR 1 says NOT
-    // ENOUGH ROOM IN FPL. 29 plus two make 31. The guide gives the words, not the rows, so the rows are joined
-    it.fails('says NOT ENOUGH ROOM IN FPL for a plan of 29 waypoints and two crossings (5-26) (#161)', async () => {
+    // ENOUGH ROOM IN FPL. 29 plus two make 31. The guide gives the words, not the rows, so the rows are joined. ENT is
+    // then not answered, and nothing is stored or inserted
+    it('says NOT ENOUGH ROOM IN FPL for a plan of 29 waypoints and two crossings (5-26) (#161)', async () => {
         const fa = cluster(27);
         const unit = await onCtr1(w => [...fa, w.kbbb, w.kccc], fa);
         await ent(unit);
 
         expect(right().map(r => r.trim()).filter(r => r !== '').join(' ')).toBe('NOT ENOUGH ROOM IN FPL');
+        await ent(unit);
+        expect(right().map(r => r.trim()).filter(r => r !== '').join(' ')).toBe('NOT ENOUGH ROOM IN FPL');
+        expect(fplIdents(unit, 1).length).toBe(29);
+        expect(userWaypoints(unit, FacilityType.USR)).toEqual([]);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // 5-26: a plan with one slot left takes one Center waypoint (KBBB is 300 NM from FA27, so one boundary is crossed),
+    // and a plan that is exactly full takes none: the boundary of the limit on both sides
+    it('takes one Center waypoint into a plan of 29 waypoints (5-26)', async () => {
+        const fa = cluster(28);
+        const unit = await onCtr1(w => [...fa, w.kbbb], fa);
+        await ent(unit);
+        expect(right()[0]).toBe(' 1 NEW WPT '); // Precondition: computed
+        await ent(unit);
+
+        expect(fplIdents(unit, 1).length).toBe(30);
+        expect(fplIdents(unit, 1).slice(27)).toEqual(['FA27', 'BGD00', 'KBBB']);
+        expect(unit.errors).toEqual([]);
+    });
+
+    it('says NOT ENOUGH ROOM IN FPL for a full plan and one crossing (5-26, #161)', async () => {
+        const fa = cluster(29);
+        const unit = await onCtr1(w => [...fa, w.kbbb], fa);
+        await ent(unit);
+
+        expect(right().map(r => r.trim()).filter(r => r !== '').join(' ')).toBe('NOT ENOUGH ROOM IN FPL');
+        await ent(unit);
+        expect(fplIdents(unit, 1).length).toBe(30);
+        expect(fplIdents(unit, 1)[0]).toBe('FA00');
+        expect(unit.errors).toEqual([]);
+    });
+
+    // 5-26: the limit counts the waypoints that would be inserted. A Center waypoint that the plan already holds from an
+    // earlier insertion takes no new slot, so a full plan of the two inserted Center waypoints and 28 others is not
+    // refused for the crossings it already has, and ENT inserts nothing. (The second computation meets #102 and sees
+    // only one of the two crossings; every crossing it does see is an existing one, so the assertions hold either way.)
+    it('does not count a Center waypoint that the plan already holds (5-26)', async () => {
+        const fa = cluster(26);
+        const unit = await onCtr1(w => [...fa, w.kbbb, w.kccc], fa);
+        await ent(unit);
+        await ent(unit);
+        expect(fplIdents(unit, 1).length).toBe(30); // Precondition: the plan is full
+        await unit.panel.selectPage('L', 'FPL 2');
+        await unit.panel.selectPage('L', 'FPL 1');
+        await ent(unit);
+
+        const isNew = unit.props.memory.ctrPage.waypoints.map(w => w.isNew);
+        expect(isNew).toContain(false); // Precondition: the plan's own Center waypoint is found again
+        expect(isNew).not.toContain(true);
+        // The guide shows no count of 0; the form of the first row is the one the characterization above holds
+        expect(right()).toEqual([' 0 NEW WPTS', '           ', 'PRESS ENT  ', 'TO INSERT  ', 'INTO FPL   ', '           ']);
+        await ent(unit);
+        expect(right()).toEqual(['           ', '           ', 'CTR WPT    ', 'INSERTION  ', 'COMPLETE   ', '           ']);
+        expect(fplIdents(unit, 1).length).toBe(30);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The plan can grow between the computation and the insertion (on the left page, or on APT 7). The guide does not
+    // describe that. The insertion then does not fit: nothing is inserted, and CTR 1 says so, where the plan used to
+    // throw in the middle of it
+    it('characterization: says NOT ENOUGH ROOM IN FPL when the plan has grown since the computation', async () => {
+        const fa = cluster(26);
+        const unit = await onCtr1(w => [...fa, w.kbbb, w.kccc], fa);
+        await ent(unit);
+        expect(right()[0]).toBe(' 2 NEW WPTS'); // Precondition: computed, 28 plus 2 fits
+        unit.props.memory.fplPage.flightplans[1].insertLeg(0, {wpt: intersection('FB00', 41.0, -99.0), type: KLNLegType.USER});
+        await ent(unit);
+
+        expect(right().map(r => r.trim()).filter(r => r !== '').join(' ')).toBe('NOT ENOUGH ROOM IN FPL');
+        expect(fplIdents(unit, 1).length).toBe(29);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The first waypoint of a full FPL 0 that is part of the active leg: the insertion used to throw (insertLegIntoFpl)
+    // when it was offered, on the ENT path
+    it('says NOT ENOUGH ROOM IN FPL for a full FPL 0 whose first leg is active (5-26, #161)', async () => {
+        const w = centerWorld();
+        const fa = cluster(29);
+        const unit = await bootUnit({
+            facilities: [w.kaaa, w.kbbb, w.kccc, w.bgd, w.gck, ...fa], position: {lat: 39.0, lon: -100.0}, magvar: 0,
+            airspaces: w.centers, storage: savedFlightplan(0, [...fa, w.kbbb]),
+        });
+        await settle(unit);
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.selectPage('R', 'CTR 1');
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(1); // Precondition: the first leg is active
+        await ent(unit);
+
+        expect(right().map(r => r.trim()).filter(r => r !== '').join(' ')).toBe('NOT ENOUGH ROOM IN FPL');
+        await ent(unit);
+        expect(fplIdents(unit, 0).length).toBe(30);
+        expect(unit.errors).toEqual([]);
     });
 });
 
