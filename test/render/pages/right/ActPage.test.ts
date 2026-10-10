@@ -383,17 +383,35 @@ describe('ACT 8 (6-4)', () => {
 
     // A photo of a real unit (reference-photos-index.md, 2M2-appch-select.webp, high confidence) shows ACT 8 with the ACT
     // header in its first row (arrow, ident, type letter A) and the approaches from the second row; figure 4-39 shows the
-    // same header on ACT 3. The code shows the APT 8 title (the arrow, the ident and IAP) instead
-    it.fails('shows the ACT header in the first row (photo 2M2-appch-select.webp, 4-10, #295)', async () => {
+    // same header on ACT 3
+    it('shows the ACT header in the first row (photo 2M2-appch-select.webp, 4-10, #295)', async () => {
         await bootOnAct8();
 
         expect(Screen.read().rows('R')[0]).toBe('› 2 KPRC  A');
         expect(Screen.read().rows('R')[1]).toBe(' 1 RNAV 18 ');
     });
+
+    // A photo of a real unit (reference-photos-index.md, 2M2-appch-select.webp, high confidence) shows ACT 8 during a
+    // Direct To: the arrow and the ident with no number between them, and the type letter A
+    it('shows the ACT header without a number during a Direct To (photo 2M2-appch-select.webp, 4-10, #295)', async () => {
+        const w = approachWorld();
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.north(70), storage: savedFlightplan(0, [w.enraa]),
+        });
+        await settle(unit);
+        await unit.panel.directTo('KPRC', {waitMs: 2000});
+        await unit.panel.selectPage('R', 'ACT');
+        await unit.panel.inner('R', -1);
+
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(-1); // precondition: outside FPL 0
+        expect(Screen.read().status().right).toBe('ACT 8'); // precondition
+        expect(Screen.read().rows('R')[0]).toBe('›   KPRC  A');
+        expect(Screen.read().rows('R')[1]).toBe(' 1 RNAV 18 ');
+    });
 });
 
 describe('ACT 8 (characterization)', () => {
-    // The approach list under the title row; the title row itself is the subject of the #295 pin
+    // The approach list under the header row; the header row itself is held by the #295 tests above
     it('shows the approach list of the active airport', async () => {
         const unit = await bootOnAct8();
 
