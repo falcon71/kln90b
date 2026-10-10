@@ -1,14 +1,10 @@
 import {describe, expect, it} from 'vitest';
 import {BearingDisplay} from '../../../../kln90b/controls/displays/BearingDisplay';
 import {mountedCycle} from '../../../harness/render/blink';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedText} from '../../../harness/render/mount';
 
 /** The four cells of a bearing after a display tick */
-function shown(bearing: number | null): string {
-    const m = mount(new BearingDisplay(bearing));
-    m.tick();
-    return m.text();
-}
+const shown = (bearing: number | null): string => mountedText(new BearingDisplay(bearing));
 
 describe('BearingDisplay', () => {
     // 3-31, figure 3-97: BRG 303°, three digits and the degree sign

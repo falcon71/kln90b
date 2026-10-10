@@ -3,7 +3,7 @@ import {FlightplanArrow} from '../../../../kln90b/controls/displays/FlightplanAr
 import {NavPageState} from '../../../../kln90b/data/VolatileMemory';
 import {CursorController} from '../../../../kln90b/pages/CursorController';
 import {mountedCycle} from '../../../harness/render/blink';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedRead} from '../../../harness/render/mount';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {standardRoute} from '../../../harness/fixtures';
 import {savedFlightplan} from '../../../harness/storage';
@@ -24,9 +24,7 @@ function cursor(entered = false): CursorController {
 
 /** The arrow cell of the FPL 0 row of waypoint `idx` after a display tick */
 function arrow(idx: number, state: NavPageState, entered = false): { text: string, mask: string } {
-    const m = mount(new FlightplanArrow(idx, state, cursor(entered)));
-    m.tick();
-    return {text: m.text(), mask: m.mask()};
+    return mountedRead(new FlightplanArrow(idx, state, cursor(entered)));
 }
 
 /** The (text, mask) of that cell on four display ticks, the fourth the blink tick */

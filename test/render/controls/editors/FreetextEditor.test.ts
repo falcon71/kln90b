@@ -24,7 +24,7 @@ async function choices(unit: HeadlessUnit, side: 'L' | 'R', cell: () => string, 
  */
 async function onTurnOnPage(storage: Record<string, unknown> = {}): Promise<HeadlessUnit> {
     const unit = await bootUnit({engineRunning: false, storage});
-    unit.send('KLN90B_Power_On');
+    await unit.panel.powerOn();
     await vi.advanceTimersByTimeAsync(1000);
     expect(Screen.read().text().split('\n')[6]).toBe(' SELF TEST IN PROGRESS ');
     await unit.panel.cursor('L');

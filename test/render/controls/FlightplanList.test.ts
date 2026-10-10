@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {Facility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
+import {fplIdents} from '../../harness/readers';
 import {savedFlightplan} from '../../harness/storage';
 import {intersection} from '../../harness/navdata/builders';
 import {pointFrom} from '../../harness/flight/geo';
@@ -12,8 +13,6 @@ import {approachWorld} from '../../harness/fixtures';
 // behind the last waypoint. The page tests (test/render/pages/left/FplPage.test.ts) hold the prompts, the insert and
 // delete flows and the active leg; this file holds the scrolling of the list with the cursor
 
-const idents = (unit: HeadlessUnit, fpl: number) =>
-    unit.props.memory.fplPage.flightplans[fpl].getLegs().map(l => l.wpt.icaoStruct.ident);
 const left = () => Screen.read().rows('L');
 
 /** Eight intersections FX1AA to FX8AA north of the aircraft, like the waypoints of the guide's figures 4-8 to 4-11 */
@@ -58,7 +57,7 @@ describe('FlightplanList, scrolling with the cursor (4-3, 4-8)', () => {
             await unit.panel.ent(); // the waypoint page
             await unit.panel.ent(); // approved
 
-            expect(idents(unit, 4)).toEqual(['FX1AA', 'FX2AA', 'FX3AA', 'FX4AA', 'FX5AA', 'FX6AA', 'FX7AA', 'FX8AA']);
+            expect(fplIdents(unit, 4)).toEqual(['FX1AA', 'FX2AA', 'FX3AA', 'FX4AA', 'FX5AA', 'FX6AA', 'FX7AA', 'FX8AA']);
             expect(left()).toEqual([
                 '  4:FX4AA  ', '  5:FX5AA  ', '  6:FX6AA  ', '  7:FX7AA  ', '  8:FX8AA  ', '  9:       ',
             ]);
@@ -164,7 +163,7 @@ async function insertBugleBeforeFx3(unit: HeadlessUnit): Promise<string[]> {
     await unit.panel.enterIdent('L', 'BUGLE');
     await unit.panel.ent(); // the waypoint page
     await unit.panel.ent(); // approved
-    expect(idents(unit, 0)).toEqual(['FX1AA', 'FX2AA', 'BUGLE', 'FX3AA', 'FX4AA', 'FX5AA', 'FX6AA', 'FX7AA', 'FX8AA']);
+    expect(fplIdents(unit, 0)).toEqual(['FX1AA', 'FX2AA', 'BUGLE', 'FX3AA', 'FX4AA', 'FX5AA', 'FX6AA', 'FX7AA', 'FX8AA']);
     expect(Screen.read().status().left).toBe('CRSR'); // the cursor is still on
     return before;
 }
@@ -186,10 +185,7 @@ describe('FlightplanList, an insertion (4-4)', () => {
     it('shows the new waypoint 3 and the last one renumbered after the approval (4-4, figures 4-15, 4-18)',
         async () => {
             const unit = await bootEightWithBugle(46.9);
-            await unit.panel.dct();
-            await unit.panel.enterIdent('L', 'FX1AA');
-            await unit.panel.ent();
-            await unit.panel.ent();
+            await unit.panel.directTo('FX1AA', {waitMs: 0});
             await unit.panel.cursor('L'); // the cursor stays on after the Direct To (#82)
             expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(0); // Precondition
 
@@ -251,7 +247,7 @@ describe('FlightplanList, the first waypoint of an empty plan (4-2)', () => {
             await unit.panel.ent(); // the waypoint page
             await unit.panel.ent(); // approved
 
-            expect(idents(unit, 7)).toEqual(['FX1AA']);
+            expect(fplIdents(unit, 7)).toEqual(['FX1AA']);
             expect(left().slice(0, 3)).toEqual(['USE? INVRT?', '  1:FX1AA  ', '  2:       ']);
             expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: '     '});
         });
@@ -273,7 +269,7 @@ describe('FlightplanList, after a deletion (characterization)', () => {
 
             await unit.panel.ent();
 
-            expect(idents(unit, 0)).toEqual(['FX1AA', 'FX3AA', 'FX4AA']);
+            expect(fplIdents(unit, 0)).toEqual(['FX1AA', 'FX3AA', 'FX4AA']);
             expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: 'FX3AA'});
         });
 });
@@ -293,7 +289,7 @@ describe('FlightplanList, after a deletion on a numbered plan', () => {
     it('deletes the waypoint and moves the later ones up on a numbered plan (4-5)', async () => {
         const unit = await deleteFx2OfFpl4();
 
-        expect(idents(unit, 4)).toEqual(['FX1AA', 'FX3AA', 'FX4AA']);
+        expect(fplIdents(unit, 4)).toEqual(['FX1AA', 'FX3AA', 'FX4AA']);
         expect(left().slice(1, 4)).toEqual(['  1:FX1AA  ', '  2:FX3AA  ', '  3:FX4AA  ']);
     });
 
@@ -318,7 +314,7 @@ describe('FlightplanList, the approach header (checked in the KLN 89 trainer, 20
         const unit = await bootUnit({facilities: [...w.facilities, ...extra], position: w.north(40), storage});
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
-        expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']); // Precondition
+        expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']); // Precondition
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
         await unit.panel.cursorTo('L', 'CHANGE APR?');
@@ -337,7 +333,7 @@ describe('FlightplanList, the approach header (checked in the KLN 89 trainer, 20
             await unit.panel.ent(); // the waypoint page
             await unit.panel.ent(); // approved
 
-            expect(idents(unit, 0)).toEqual(['ENRAA', 'INSAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+            expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'INSAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
             expect(left().map(r => r.slice(1)).filter(r => r.includes('INSAA'))).toEqual([' 2:INSAA  ']);
         });
 
@@ -347,7 +343,7 @@ describe('FlightplanList, the approach header (checked in the KLN 89 trainer, 20
         '(6-7, checked in the KLN 89 trainer, 2026-10-08)',
         async () => {
             const unit = await onHeader();
-            const loaded = idents(unit, 0);
+            const loaded = fplIdents(unit, 0);
             await unit.panel.clr();
             expect(unit.panel.focused('L').text.trim()).toBe('DELETE APR?'); // Precondition
 
@@ -355,7 +351,7 @@ describe('FlightplanList, the approach header (checked in the KLN 89 trainer, 20
 
             expect(unit.panel.focused('L').text.trim()).toBe('CHANGE APR?');
             await unit.panel.ent(); // CHANGE APR? opens APT 8 and deletes nothing
-            expect(idents(unit, 0)).toEqual(loaded);
+            expect(fplIdents(unit, 0)).toEqual(loaded);
         });
 });
 
@@ -375,7 +371,7 @@ describe('FlightplanList, the DEL question', () => {
         const unit = await questionOnFx2();
 
         expect(unit.panel.focused('L')).toEqual({row: 2, col: 0, text: 'DEL FX2AA ?'});
-        expect(idents(unit, 4)).toEqual(['FX1AA', 'FX2AA', 'FX3AA', 'FX4AA']);
+        expect(fplIdents(unit, 4)).toEqual(['FX1AA', 'FX2AA', 'FX3AA', 'FX4AA']);
     });
 
     // The outer knob on the question withdraws it and the cursor moves on to the next field (trainer T21 a, checked in
@@ -391,7 +387,7 @@ describe('FlightplanList, the DEL question', () => {
 
             expect(left()[2]).toBe('  2:FX2AA  ');
             expect(unit.panel.focused('L')).toEqual({row: 3, col: 4, text: 'FX3AA'});
-            expect(idents(unit, 4)).toEqual(['FX1AA', 'FX2AA', 'FX3AA', 'FX4AA']);
+            expect(fplIdents(unit, 4)).toEqual(['FX1AA', 'FX2AA', 'FX3AA', 'FX4AA']);
         });
 
     // Trainer T21 b (checked in the KLN 89 trainer, 2026-10-08): the inner knob on the question: no question any more,
@@ -407,6 +403,6 @@ describe('FlightplanList, the DEL question', () => {
             const rows = left().slice(1, 4).map((r, i) => i === 1 ? r.slice(0, 4) : r);
             expect(rows).toEqual(['  1:FX1AA  ', '  2:', '  3:FX2AA  ']);
             expect(left().some(r => r.includes('DEL'))).toBe(false);
-            expect(idents(unit, 4)).toEqual(['FX1AA', 'FX2AA', 'FX3AA', 'FX4AA']);
+            expect(fplIdents(unit, 4)).toEqual(['FX1AA', 'FX2AA', 'FX3AA', 'FX4AA']);
         });
 });

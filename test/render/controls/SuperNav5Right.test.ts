@@ -1,30 +1,13 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
+import {HeadlessUnit} from '../../harness/boot';
 import {standardRoute} from '../../harness/fixtures';
 import {courseDeg} from '../../harness/flight/geo';
-import {SuperNav5} from '../../harness/render/superNav5';
-import {savedFlightplan, storedSetting} from '../../harness/storage';
-import {MainPage} from '../../../kln90b/pages/MainPage';
-import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
-
-/**
- * NAV 5 on both sides. The right side first: its shorter way passes NAV 5, which is Super NAV 5 once the left shows
- * NAV 5
- */
-async function showSuperNav5(unit: HeadlessUnit): Promise<void> {
-    await unit.panel.selectPage('R', 'NAV 4');
-    await unit.panel.selectPage('L', 'NAV 5');
-    await unit.panel.inner('R', 1);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect((unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage()).toBeInstanceOf(SuperNav5Page);
-}
+import {showSuperNav5, SuperNav5} from '../../harness/render/superNav5';
+import {storedSetting} from '../../harness/storage';
+import {bootOnStandardRoute} from '../../harness/worldBoot';
 
 async function onRoute(storage: Record<string, unknown> = {}): Promise<HeadlessUnit> {
-    const {kaaa, abc, kbbb} = standardRoute();
-    const unit = await bootUnit({
-        facilities: [kaaa, abc, kbbb], storage: {...savedFlightplan(0, [kaaa, abc, kbbb]), ...storage},
-    });
-    await settle(unit);
+    const unit = await bootOnStandardRoute({storage});
     await showSuperNav5(unit);
     return unit;
 }

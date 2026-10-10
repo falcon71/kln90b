@@ -3,6 +3,7 @@ import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {blinkCycle} from '../../../harness/render/blink';
 import {Screen} from '../../../harness/render/screen';
+import {activeIdent, fplIdents} from '../../../harness/readers';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {savedFlightplan} from '../../../harness/storage';
 
@@ -20,11 +21,7 @@ describe('waypoint editor', () => {
         expect(Screen.read().status().right).toBe('APT 1');
         expect(Screen.read().rows('L')[1].slice(0, 9)).toBe('  1:KAAA ');
         // The ident cells are inverted, and flash (inverted blink) on one display tick in four
-        const masks: string[] = [];
-        for (let i = 0; i < 4; i++) {
-            await vi.advanceTimersByTimeAsync(250);
-            masks.push(Screen.read().maskRows('L')[1].slice(4, 9));
-        }
+        const masks = await blinkCycle(() => Screen.read().maskRows('L')[1].slice(4, 9));
         expect(masks.slice().sort()).toEqual(['FFFFF', 'IIIII', 'IIIII', 'IIIII']);
     });
 });
@@ -210,9 +207,8 @@ describe('waypoint editor, the confirmation (3-14, 3-28)', () => {
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
 
-        const aw = unit.props.memory.navPage.activeWaypoint;
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('KSAT');
-        expect(aw.isDctNavigation()).toBe(true);
+        expect(activeIdent(unit)).toBe('KSAT');
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(true);
         expect(Screen.read().status().right).toBe('NAV 1');
     });
 
@@ -234,12 +230,8 @@ describe('waypoint editor, the confirmation (3-14, 3-28)', () => {
         + '(3-29, checked in the KLN 89 trainer, 2026-10-08)', async () => {
         const unit = await bootUnit(world());
         await unit.panel.selectPage('R', 'NAV 1');
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'KAAA');
-        await unit.panel.ent();
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(1000);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KAAA'); // precondition
+        await unit.panel.directTo('KAAA');
+        expect(activeIdent(unit)).toBe('KAAA'); // precondition
         await unit.panel.dct();
         await unit.panel.inner('L', 1); // 3-28 note: the knob over the shown identifier starts another entry
         await unit.panel.enterIdent('L', 'KSAT');
@@ -272,9 +264,6 @@ describe('waypoint editor on FPL 0 (4-2)', () => {
         return unit;
     }
 
-    const fpl0 = (unit: HeadlessUnit) =>
-        unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident);
-
     // 4-2 steps 7 and 8 (figures 4-6 and 4-7): the second ENT approves the waypoint page, the waypoint is in the plan,
     // and the cursor moves to the next (blank) position
     it('adds the approved waypoint to the plan and moves the cursor to the next position (4-2)', async () => {
@@ -282,7 +271,7 @@ describe('waypoint editor on FPL 0 (4-2)', () => {
 
         await unit.panel.ent();
 
-        expect(fpl0(unit)).toEqual(['KAAA', 'KSAT']);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KSAT']);
         expect(Screen.read().rows('L').slice(1, 4)).toEqual(['  1:KAAA   ', '  2:KSAT   ', '  3:       ']);
         expect(unit.panel.focused('L')).toEqual({row: 3, col: 4, text: '     '});
         expect(Screen.read().status().right).toBe('NAV 1');
@@ -303,7 +292,7 @@ describe('waypoint editor on FPL 0 (4-2)', () => {
         expect(Screen.read().rows('L').slice(1, 3)).toEqual(['  1:KAAA   ', '  2:       ']);
         expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: '     '});
         await unit.panel.ent();
-        expect(fpl0(unit)).toEqual(['KAAA']);
+        expect(fplIdents(unit)).toEqual(['KAAA']);
     });
 });
 

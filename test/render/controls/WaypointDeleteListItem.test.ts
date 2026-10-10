@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
+import {userWaypoints} from '../../harness/readers';
 import {savedUserWaypoints, storedSetting} from '../../harness/storage';
 
 // WaypointDeleteListItem (kln90b/controls/WaypointDeleteListItem.tsx) is the row of OTH 3: CLR asks DEL <ident> ? and
@@ -18,11 +19,8 @@ async function oth3(): Promise<HeadlessUnit> {
     return unit;
 }
 
-const userIdents = (unit: HeadlessUnit): string[] => {
-    const idents: string[] = [];
-    unit.props.facilityRepository.forEach(f => idents.push(f.icaoStruct.ident));
-    return idents.sort();
-};
+/** Every user waypoint of the repository, whatever its type (the intersections here are not FacilityType.USR) */
+const userIdents = (unit: HeadlessUnit): string[] => userWaypoints(unit).map(f => f.icaoStruct.ident).sort();
 
 /** The saved user waypoint slots wpt0 to wpt2: the ident of each, or the empty slot */
 const savedIdents = (unit: HeadlessUnit): string[] =>

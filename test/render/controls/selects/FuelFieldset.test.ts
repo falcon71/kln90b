@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {airport} from '../../../harness/navdata/builders';
+import {fuelComputer, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
 
 // TripFuelFieldset: a fuel amount of five digits and tenths around a fixed point (the fuel flow and reserve of TRI 1,
@@ -99,9 +100,7 @@ describe('trip fuel fieldset', () => {
     });
 });
 
-const FUEL_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><FuelComputer>'
-    + '<IsInterfaced>true</IsInterfaced>'
-    + '</FuelComputer></Input></Instrument></PlaneHTMLConfig>';
+const FUEL_XML = panelXml(fuelComputer());
 
 describe('OTH fuel fieldset', () => {
     // 5-40: the reserve on OTH 5 is five whole digits; the cursor starts on it when the fuel on board is transmitted

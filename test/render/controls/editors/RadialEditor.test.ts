@@ -5,10 +5,10 @@ import {RadialEditor} from '../../../../kln90b/controls/editors/RadialEditor';
 import {vor} from '../../../harness/navdata/builders';
 import {mount} from '../../../harness/render/mount';
 import {Screen} from '../../../harness/render/screen';
+import {userWaypoints} from '../../../harness/readers';
 import {savedUserWaypoints} from '../../../harness/storage';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {distanceNm, pointFrom} from '../../../harness/flight/geo';
-import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
 
 /**
  * RadialEditor is the RAD field of the INT and SUP pages. The host here is the INT page of QQI, a stored user
@@ -35,11 +35,8 @@ async function onRad(): Promise<HeadlessUnit> {
 
 /** QQI in the repository as [lat, lon] */
 function qqi(unit: HeadlessUnit): [number, number] {
-    let pos: [number, number] = [NaN, NaN];
-    KLNFacilityRepository.getRepository(unit.props.bus).forEach(f => {
-        if (f.icaoStruct.ident === 'QQI') pos = [f.lat, f.lon];
-    });
-    return pos;
+    const f = userWaypoints(unit).find(w => w.icaoStruct.ident === 'QQI')!;
+    return [f.lat, f.lon];
 }
 
 /** The column of the RAD field's decimal point on the whole screen: RAD: ddd.d starts at column 12 of the right half */

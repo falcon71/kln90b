@@ -19,14 +19,6 @@ async function onTrack(): Promise<HeadlessUnit> {
     return unit;
 }
 
-/** CONFIRM?, then SET 2 and back to SET 1: the page reads the GPS again */
-async function confirmAndReselect(unit: HeadlessUnit): Promise<void> {
-    await unit.panel.cursorTo('L', 'CONFIRM?');
-    await unit.panel.ent();
-    await unit.panel.selectPage('L', 'SET 2');
-    await unit.panel.selectPage('L', 'SET 1');
-}
-
 describe('BearingEditor on SET 1 (3-19)', () => {
     // 3-19 (and 5-46): a heading may be entered on SET 1 instead of the one offered. The first click opens the field
     // with a 0 in the hundreds cell; a digit cell starts at 0 on its first click. 135°
@@ -39,7 +31,7 @@ describe('BearingEditor on SET 1 (3-19)', () => {
         await unit.panel.outer('L', 1);
         await unit.panel.inner('L', 6); // 5
         await unit.panel.ent();
-        await confirmAndReselect(unit);
+        await unit.panel.confirmSet1AndReselect();
 
         expect(unit.errors).toEqual([]);
         expect(unit.props.sensors.in.gps.trackTrue).toBe(135);
@@ -79,7 +71,7 @@ describe('BearingEditor on SET 1 (characterization)', () => {
         const messages = collectStatusMessages(unit);
         await unit.panel.type('L', '359');
         await unit.panel.ent();
-        await confirmAndReselect(unit);
+        await unit.panel.confirmSet1AndReselect();
 
         expect(messages).toEqual([]);
         expect(unit.props.sensors.in.gps.trackTrue).toBe(359);
