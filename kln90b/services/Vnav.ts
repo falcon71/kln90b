@@ -1,4 +1,4 @@
-import {NavPageState} from "../data/VolatileMemory";
+import {isObsMode, NavPageState} from "../data/VolatileMemory";
 import {Sensors} from "../Sensors";
 import {CalcTickable} from "../TickController";
 import {Flightplan} from "../data/flightplan/Flightplan";
@@ -101,7 +101,7 @@ export class Vnav implements CalcTickable {
         if (active === null) {
             return false;
         }
-        if (fplIdx === -1) { //Direct to, wpt must be the active waypoint
+        if (fplIdx === -1 || isObsMode(this.navState.navmode)) { //Direct to or OBS, wpt must be the active waypoint
             return ICAO.valueEquals(wpt.icaoStruct, active.icaoStruct)
         } else {
             const isFutureWpt = this.fpl0.getLegs().filter((_, idx) => idx >= fplIdx).some(l => ICAO.valueEquals(l.wpt.icaoStruct, wpt.icaoStruct));

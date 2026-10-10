@@ -1,4 +1,4 @@
-import {FROM, NavMode, NavPageState} from "../data/VolatileMemory";
+import {FROM, isObsMode, NavMode, NavPageState} from "../data/VolatileMemory";
 import {
     AirportFacility,
     EventBus,
@@ -170,7 +170,7 @@ export class ModeController implements CalcTickable {
     }
 
     public isObsModeActive(): boolean {
-        return this.navState.navmode === NavMode.ENR_OBS || this.navState.navmode === NavMode.ARM_OBS;
+        return isObsMode(this.navState.navmode);
     }
 
     public getDtkOrObsMagnetic(): number | null {
