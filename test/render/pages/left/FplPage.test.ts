@@ -242,8 +242,7 @@ describe('FPL 0 page with an approach', () => {
     });
 
     // 6-7: approach waypoints can be neither added nor deleted, and C-1 answers INVALID ADD and INVALID DEL where the
-    // knobs try. ENT on one is not answered at all: the unit throws while it rebuilds the list. The sibling holds the
-    // setup and takes the rejection the ENT leaves; the pin holds that there is none
+    // knobs try. ENT on one used to throw while the unit rebuilt the list, so the test holds that nothing is thrown
     async function enterOnApproachWaypoint() {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
@@ -255,18 +254,27 @@ describe('FPL 0 page with an approach', () => {
         return unit;
     }
 
-    it('takes ENT on an approach waypoint and leaves the plan alone (6-7, C-1)', async () => {
-        const unit = await enterOnApproachWaypoint();
-
-        unit.takeRejections(); // the rejection of the ENT, see the pin below
-        expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
-    });
-
-    it.fails('does not throw on ENT on an approach waypoint (6-7, C-1, #243)', async () => {
+    it('does not throw on ENT on an approach waypoint (6-7, C-1, #243)', async () => {
         const unit = await enterOnApproachWaypoint();
 
         expect(unit.takeRejections()).toEqual([]);
+        expect(unit.errors).toEqual([]);
         expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
+    });
+
+    // The answer to ENT is the one of the knobs. C-1 names INVALID ADD for an attempt to add a waypoint into the approach; that ENT is such an attempt is the unit's choice
+    it('characterization: answers ENT on an approach waypoint with INVALID ADD and leaves the list as it was', async () => {
+        const unit = await bootWithApproach();
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 2);
+        const before = left();
+
+        await unit.panel.ent();
+
+        expect(Screen.read().status().mode).toBe('INVALID ADD');
+        expect(left()).toEqual(before); // no blank entry opened
+        expect(unit.panel.focused('L').text).toBe('IAFAAà');
     });
 });
 
@@ -293,6 +301,23 @@ describe('FPL 0 page with a SID', () => {
         // The rows of the three waypoints, without the column of the active leg symbol
         const rows = left().map(r => r.slice(1)).filter(r => /^ \d/.test(r));
         expect(rows).toEqual([' 1:KPRC   ', ' 2.DEPAA  ', ' 3.ENRAA  ', ' 4:       ']);
+    });
+
+    // The guard of #243 is for approach waypoints only: ENT on a waypoint of a SID still opens an entry in front of it.
+    // The ident the new entry shows is left out
+    it('characterization: ENT on a waypoint of a SID opens an entry in front of it (#243)', async () => {
+        const unit = await bootWithSid();
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 2); // CHANGE SID?, then DEPAA
+        expect(unit.panel.focused('L').text).toBe('DEPAA'); // Precondition
+        await unit.panel.ent();
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().status().mode).not.toBe('INVALID ADD');
+        expect(left().map(r => r.slice(1))).toContain(' 3.DEPAA  ');
+        expect(fplIdents(unit, 0)).toEqual(['KPRC', 'DEPAA', 'ENRAA']); // nothing is inserted before the entry is approved
     });
 });
 
