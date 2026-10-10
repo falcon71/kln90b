@@ -33,7 +33,7 @@ export class RefPage extends SixLineHalfPage {
     readonly children: UIElementChildren<RefPageTypes>;
 
 
-    readonly name: string = "REF ";
+    readonly name: string = "REF  ";
 
     private readonly refFpl: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
     private readonly refOther: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
