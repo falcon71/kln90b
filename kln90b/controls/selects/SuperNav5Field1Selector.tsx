@@ -81,7 +81,8 @@ export class SuperNav5Field1Selector extends SelectField {
         if (time === null) {
             return "-:--";
         }
-        const totalMinutes = time / 60;
+        //Round the total minutes before splitting them, 59.9 minutes would show 0:60 otherwise
+        const totalMinutes = Math.round(time / 60);
         if (totalMinutes / 60 >= 10) {
             return "-:--";
         }
