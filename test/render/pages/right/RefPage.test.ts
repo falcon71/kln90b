@@ -243,11 +243,11 @@ describe('REF page, the radial of the reference waypoint', () => {
     });
 
     // 5-22: RAD is the radial from TXK, the course measured at TXK. At 60 N a reference 2 degrees of longitude east of a
-    // north-south leg leaves TXK about 1.7 degrees north of west; the code stores the course arriving at the reference
-    // waypoint (exactly 270, the perpendicular), so RAD reads 270.0. The expectation is the great-circle course from TXK
+    // north-south leg leaves TXK about 1.7 degrees north of west, not at the exactly 270 of the perpendicular where it arrives at the
+    // reference waypoint. The expectation is the great-circle course from TXK
     // to the foot of the perpendicular (geo.ts, independent of the SDK): the foot is the vertex of the great circle
     // through TXK that crosses the meridian of the leg at right angles, latitude atan(tan(60) / cos(2))
-    it.fails('measures RAD at the waypoint used to create the reference (5-22, #292)', async () => {
+    it('measures RAD at the waypoint used to create the reference (5-22, #292)', async () => {
         const {unit, txk} = await bootAt60North();
 
         await enterReference(unit, 'TXK');

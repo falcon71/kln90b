@@ -120,7 +120,7 @@ export class RefPage extends SixLineHalfPage {
             isTemporary: false, //irrelevant, because this flag is not persisted
             userFacilityType: UserFacilityType.LAT_LONG,
             reference1IcaoStruct: wpt.icaoStruct,
-            reference1Radial: closest.point.bearingFrom(wpt),
+            reference1Radial: new GeoPoint(wpt.lat, wpt.lon).bearingTo(closest.point), //5-22 The radial is the course measured at the waypoint used
             reference1Distance: UnitType.GA_RADIAN.convertTo(closest.point.distance(wpt), UnitType.NMILE),
         };
 
