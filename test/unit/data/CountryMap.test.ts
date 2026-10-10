@@ -93,13 +93,13 @@ describe('FIRMAP', () => {
         expect(FIRMAP['ZBPE']).toBe('BEI');
     });
 
-    it('pads every other abbreviation to three cells (characterization)', () => {
-        expect(Object.entries(FIRMAP).filter(([k, v]) => v.length !== 3 && !['KZNY', 'KZWY'].includes(k))).toEqual([]);
+    it('pads every abbreviation to three cells (characterization)', () => {
+        expect(Object.entries(FIRMAP).filter(([, v]) => v.length !== 3)).toEqual([]);
         expect(FIRMAP['KZFW']).toBe('FW ');
     });
 
     // D-3 to D-6: New York is NY. The CTR 2 row is <from>-<to> CTR in 3 + 1 + 3 cells; unpadded, NY shifts the row by a cell.
-    it.fails('pads NY to three cells like FW (#170)', () => {
+    it('pads NY to three cells like FW (#170)', () => {
         expect(FIRMAP['KZNY']).toBe('NY ');
         expect(FIRMAP['KZWY']).toBe('NY ');
     });

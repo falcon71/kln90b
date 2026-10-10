@@ -87,12 +87,12 @@ export const FIRMAP: { [key: string]: string } = {
     "KZMA": "MIA", //	MIAMI
     "KZME": "MEM", //	MEMPHIS
     "KZMP": "MIN", //	MINNEAPOLIS
-    "KZNY": "NY", //	NEW YORK
+    "KZNY": "NY ", //	NEW YORK
     "KZOA": "OAK", //	OAKLAND
     "KZOB": "CLE", //	CLEVELAND
     "KZSE": "SEA", //	SEATTLE
     "KZTL": "ATL", //	ATLANTA
-    "KZWY": "NY", //	NEW YORK OCEANIC
+    "KZWY": "NY ", //	NEW YORK OCEANIC
     "LAAA": "TIR", //	TIRANA
     "LBSR": "SOF", //	SOFIA
     "LCCC": "NIC", //	NICOSIA

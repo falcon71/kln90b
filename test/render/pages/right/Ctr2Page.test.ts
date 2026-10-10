@@ -11,8 +11,10 @@ import {Screen} from '../../../harness/render/screen';
  * Center from being first returned from outside it (#102). The VORs BGD and GCK lie 0.5 degrees north of the crossings.
  * Boots with that plan as FPL 1, FPL 1 on the left, and computes the Center waypoints on CTR 1.
  */
-async function computed(o: { magvar?: number, vorMagneticVariation?: number } = {}): Promise<HeadlessUnit> {
+async function computed(o: { magvar?: number, vorMagneticVariation?: number, centerNames?: string[] } = {}): Promise<HeadlessUnit> {
     const w = centerWorld();
+    // The names of the Centers from south to north, for the abbreviations that FIRMAP pads to different widths
+    o.centerNames?.forEach((name, i) => Object.assign(w.centers[i], {name}));
     // The VORs of centerWorld() again, with the given variation (stored as the sim stores it, 10 E as -10)
     const magneticVariation = o.vorMagneticVariation ?? 0;
     const vors = [vor('BGD', w.bgd.lat, w.bgd.lon, {magneticVariation}), vor('GCK', w.gck.lat, w.gck.lon, {magneticVariation})];
@@ -55,6 +57,19 @@ describe('CTR 2 page (characterization)', () => {
           ..........."
         `);
         expect(unit.errors).toEqual([]);
+    });
+
+    // The code builds the row from two Center abbreviations of three cells each, a hyphen and CTR: eleven cells, also
+    // with the two-letter abbreviation NY
+    it('characterization: keeps the Center row at its width for the two-letter abbreviation NY, from and to', async () => {
+        const unit = await computed({centerNames: ['KZNY TEST', 'KZWY TEST', 'KZDV TEST']});
+        await unit.panel.inner('R', 1);
+        const first = right()[1];
+        await unit.panel.inner('R', 1);
+        const second = right()[1];
+
+        expect(first).toBe('NY -NY  CTR');
+        expect(second).toBe('NY -DEN CTR');
     });
 });
 
