@@ -29,7 +29,7 @@ describe('waypoint confirmation page', () => {
         insertLeg(unit, 0, kaaa);
         insertLeg(unit, 1, inta);
         await vi.advanceTimersByTimeAsync(3000);
-        // Only the start of the row: the cell of the type letter shifts with the blank cell of a short ident (#290)
+        // Only the start of the row; the column of the type letter is held by the test below (#290)
         expect(Screen.read().rows('R')[0].slice(0, 8)).toBe('› 2 INTA');
         await unit.panel.cursor('R');
         await vi.advanceTimersByTimeAsync(9000);
@@ -46,9 +46,9 @@ describe('waypoint confirmation page', () => {
     // 2026-10-07 (medium confidence: the letter stands in one fixed column for a three- and a five-letter ident).
     // The identifier of an intersection has five cells, so the letter of a four-letter one keeps the column of a
     // five-letter one: a blank cell and then the letter (an inference from the fixed column and the five cells). The
-    // cause is the blank selector cell, which has no glyph (3-20 describes that cell, it is not evidence for the column;
-    // #290), so the letter moves one cell left. Sibling: the test above (same setup, start of the row).
-    it.fails('keeps the type letter of a four-letter intersection in the column of a five-letter one on ACT (4-10, the KLN 89 trainer, #290)', async () => {
+    // blank selector cell keeps its width for that (3-20 describes that cell, it is not evidence for the column; #290).
+    // Sibling: the test above (same setup, start of the row).
+    it('keeps the type letter of a four-letter intersection in the column of a five-letter one on ACT (4-10, the KLN 89 trainer, #290)', async () => {
         const kaaa = airport('KAAA', 47.0, 7.9);
         const inta = intersection('INTA', 47.1, 8.0);
         const unit = await bootUnit({

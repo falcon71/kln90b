@@ -85,6 +85,19 @@ describe('ACT page', () => {
 
         expect(Screen.read().rows('R')[0]).toBe('› 2 ABC   N');
     });
+
+    // 4-10: the letter keeps its column for a two-letter NDB; the blank third cell of the ident selector has a width (#290)
+    it('shows the type letter of a two-letter NDB in the last column of the half page (4-10, #290)', async () => {
+        const kaaa = airport('KAAA', 47.0, 7.9);
+        const ab = ndb('AB', 47.0, 8.3);
+        const unit = await bootUnit({facilities: [kaaa, ab], position: {lat: 47.0, lon: 8.0}});
+        await unit.panel.selectPage('R', 'ACT  ');
+        insertLeg(unit, 0, kaaa);
+        insertLeg(unit, 1, ab);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(Screen.read().rows('R')[0]).toBe('› 2 AB    N');
+    });
 });
 
 // A plan along 10 E, dtWorld(): the airport KAAA, the VOR ABC, the intersection DEF and the airport KBBB, half a degree
@@ -148,8 +161,8 @@ describe('ACT page, the first row (4-10)', () => {
         expect(Screen.read().rows('R')[0]).toBe('› 2 ABC   V');
     });
 
-    // 4-10: S for a supplemental waypoint. The column of the letter is the subject of the #290 pins below, so this
-    // test holds only the order: the ident, then the letter
+    // 4-10: S for a supplemental waypoint. This test holds only the order, the ident and then the letter; the column of
+    // the letter is held by the test further down (#290)
     it('shows S for a supplemental waypoint', async () => {
         const {kaaa} = dtWorld();
         const supa = {icaoStruct: ICAO.value('U', 'XX', '', 'SUPA')} as Facility; // the stored user waypoint, for the plan
@@ -191,10 +204,8 @@ describe('ACT page, the first row (4-10)', () => {
 
     // 4-10: the letter stands to the far right (figures 4-37 and 4-38 show A and V in the last column), and the KLN 89
     // trainer, 2026-10-07 (medium confidence) puts U and I in the same fixed column for a 3-letter and a 5-letter
-    // ident. The code puts the I of an intersection one blank after the ident, so a 3-letter ident leaves it in the
-    // middle of the row. The cause is #290: the ident selector has five cells, and the blank cells of a short ident
-    // have index -1 and no width, so the letter moves up to the ident
-    it.fails('shows the type letter of an intersection in the last column (4-10, the KLN 89 trainer, 2026-10-07, #290)', async () => {
+    // ident. The ident selector has five cells, and the blank cells of a short ident keep their width (#290)
+    it('shows the type letter of an intersection in the last column (4-10, the KLN 89 trainer, 2026-10-07, #290)', async () => {
         const {kaaa, abc, def, kbbb} = dtWorld();
         const unit = await bootOnAct([kaaa, abc, def, kbbb], [kaaa, abc, def, kbbb]);
         await unit.panel.scan();
@@ -205,7 +216,7 @@ describe('ACT page, the first row (4-10)', () => {
         expect(Screen.read().rows('R')[0]).toBe('  3 DEF   I');
     });
 
-    it.fails('shows the type letter of a supplemental waypoint in the last column (4-10, the KLN 89 trainer, 2026-10-07, #290)', async () => {
+    it('shows the type letter of a supplemental waypoint in the last column (4-10, the KLN 89 trainer, 2026-10-07, #290)', async () => {
         const {kaaa} = dtWorld();
         const supa = {icaoStruct: ICAO.value('U', 'XX', '', 'SUPA')} as Facility;
         await bootOnAct([kaaa, supa], [kaaa], {
@@ -222,7 +233,7 @@ describe('ACT page, the first row (4-10)', () => {
 describe('ACT page, scanning FPL 0 (4-10)', () => {
     // 4-10, figures 4-38 and 4-39: with the knob pulled the inner knob shows the waypoints in their order in FPL 0, the
     // arrow only at the active one; pushed in, it turns the pages of the shown airport (here ACT 2 of KAAA). The column of
-    // the I is held by the #290 pin above
+    // the I is held by the #290 test above
     it('scans the plan in order with the knob pulled and turns the airport pages with it pushed in', async () => {
         const {kaaa, abc, def, kbbb} = dtWorld();
         const unit = await bootOnAct([kaaa, abc, def, kbbb], [kaaa, abc, def, kbbb]);

@@ -456,7 +456,7 @@ describe('SUP page', () => {
     });
 
     // Checked in the KLN 89 trainer, 2026-10-07 (medium confidence): the first click clockwise from a blank cell gives A
-    it.fails('turns the blank fifth character into an A clockwise (3-20, the KLN 89 trainer, #290)', async () => {
+    it('turns the blank fifth character into an A clockwise (3-20, the KLN 89 trainer, #290)', async () => {
         const unit = await supPage();
         await unit.panel.cursor('R');
         await unit.panel.outer('R', 4);
