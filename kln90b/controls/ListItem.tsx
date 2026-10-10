@@ -96,7 +96,8 @@ export class SimpleListItem<T> implements Field, ListItem {
 
         if (this.isEntered) {
             const text = this.props.deleteText ?? this.props.fulltext;
-            this.ref.instance.textContent = `DEL ${text} ?`;
+            //4-5, 5-20: the question mark stands in a fixed column after an ident of five cells, as on FPL and OTH 3
+            this.ref.instance.textContent = `DEL ${text.padEnd(5, " ")} ?`;
             if (blink) {
                 this.ref.instance.classList.add("inverted-blink");
             } else {

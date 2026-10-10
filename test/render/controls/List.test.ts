@@ -165,8 +165,8 @@ describe('SimpleListItem on OTH 4, the DEL question (#318)', () => {
     // The 90B guide does not show the OTH 4 question; FPL and OTH 3 put the question mark in a fixed column, after the
     // ident padded to five cells, and the KLN 89 trainer does the same on its remarks list (T25, checked in the KLN 89
     // trainer, 2026-10-08: the ident stays in its column and the question mark stands in a fixed column). That is an
-    // extension of the 90B's own FPL and OTH 3 text to OTH 4: the pin takes the column those two use
-    it.fails('puts the question mark in the fixed column of FPL and OTH 3 ' +
+    // extension of the 90B's own FPL and OTH 3 text to OTH 4: the test takes the column those two use
+    it('puts the question mark in the fixed column of FPL and OTH 3 ' +
         '(checked in the KLN 89 trainer, 2026-10-08, #318)',
         async () => {
             const unit = await oth4(['KAAA', 'KBBB']);
@@ -178,7 +178,18 @@ describe('SimpleListItem on OTH 4, the DEL question (#318)', () => {
             expect(listRows()[1]).toBe('DEL KBBB  ?');
         });
 
-    // The sibling of the pin: the question is there, with the ident, whatever the gap
+    // The question mark stands in the same column for an ident of three cells (4-5, 5-20 show the fixed column for
+    // idents of three and five cells; the KLN 89 trainer, T25, shows it on its remarks list)
+    it('puts the question mark in the same column for a shorter ident (4-5, 5-20, checked in the KLN 89 trainer, 2026-10-08, #318)', async () => {
+        const unit = await oth4(['ABC', 'KBBB']);
+        await unit.panel.cursor('L');
+
+        await unit.panel.clr();
+
+        expect(listRows()[0]).toBe('DEL ABC   ?');
+    });
+
+    // The question is there, with the ident, whatever the gap
     it('characterization: asks DEL, the ident and a question mark on CLR', async () => {
         const unit = await oth4(['KAAA', 'KBBB']);
         await unit.panel.cursor('L');
