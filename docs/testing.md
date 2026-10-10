@@ -884,12 +884,112 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - **The test baseline is being built session by session.** The plan, the rules for those sessions and the regression
   triage table are in [test-coverage.md](test-coverage.md). That document is temporary and its last session retires it
   into a coverage record here; until then, start a test session from it rather than from this list.
-- **Session 10b task 0 built the harness helpers** `panelXml`, the readers (`userWaypoints`, `messages`,
-  `fplIdents`, `activeIdent`, `turnStackLength`), `Screen.inverse` and `pageRows`, `readMessages`, `directTo`, `show`,
+- **Session 10b built the harness helpers** `panelXml`, the readers (`userWaypoints`, `messages`, `fplIdents`,
+  `activeIdent`, `turnStackLength`), `Screen.inverse` and `pageRows`, `readMessages`, `directTo`, `show`,
   `confirmSet1AndReselect`, `enterDate`, `showSuperNav5` and its two boots, `bootOnStandardRoute`, `bootOnDtWorld`,
   `mountedText`, `mountedRead`, `NEAREST_SEARCH_WAIT_MS`, `unit.overlay()`, `sim.writeCount` and `muteConsoleError`
-  (section 4). The copies of them that older tests still carry are moved by the main tasks of Session 10b; a copy
-  that is still there after that session has a reason in its record.
+  (section 4), and moved the tests that carried a copy onto them. What it left, a dated record (2026-10-10), by reason:
+    - **Copies that stayed because the helper changes what the test asserts or needs a world it does not build.**
+        - `readMessages` opens the page and asserts that it closed, so `MainPage.test.ts` keeps `closeMsgPage` (it
+          closes the MSG page with a Direct To page pushed over it, presses at most three times and never throws). Bare
+          `MessageHandler` readers stay where no unit exists: `messagesOf` in `Flightplanloader.test.ts` (it joins with
+          a bar, where `messages(unit)` joins with a blank), the arrays of `UserFlightplanLoaderV2.test.ts` and
+          `posted()` in `Database.test.ts`. The two `m.message[0]` reads of `MessagePage.test.ts` stay: `messageLines`
+          fits, but one of them asserts with `not.toContain` and the other sits inside a pin, so the move could not be
+          proven.
+        - `showSuperNav5` has no hook between its selects, so the status line test of `MainPage.test.ts` keeps its own
+          sequence, which asserts the status line in the middle. `selectPage` cannot be used with an overlay shown, so
+          `SuperNav.test.ts` reaches Super NAV 1 and 5 with the knobs.
+        - `activeIdent` returns undefined, where the null checks of `MainPage.test.ts`, `DirectToPage.test.ts`,
+          `WaypointEditor.test.ts` and `ActiveWaypoint.test.ts` assert `null`.
+        - `directTo` types an ident and confirms. The sequences with a prefilled ident or that stop at the confirmation
+          page stay: `DirectToObs.test.ts`, `DuplicateWaypointPage.test.ts`, `FplPage.test.ts`,
+          `VorUserWaypoint.test.ts`, `WaypointConfirmPage.test.ts`, `ActiveWaypoint.test.ts`,
+          `DuplicateWaypoints.test.ts`, `ModeControllerObs.test.ts`, `TemporaryWaypointDeleter.test.ts` and the second
+          Direct To of `WaypointEditor.test.ts`.
+        - `confirmSet1AndReselect` reselects the page, so the inline CONFIRM? and ENT sites stay where the test asserts
+          the status line between the two presses (`Set1Page.test.ts`) or reads the GPS position directly
+          (`LatLonEditor.test.ts`). `mountedText` ticks once, so the display tests that change a value after the render
+          and read before and after the tick keep `mount()`; the `mountedCycle` helpers stay.
+        - `Set0Page.test.ts` keeps its `rows()` (it trims the end only, and the assertions hold the leading blanks,
+          which `pageRows` trims) and its reader of the status row's mask; `SuperNav1Page.test.ts` keeps
+          `untrimmedRows`.
+        - `userWaypoints` is unfiltered in the tests whose user waypoints are intersections, and
+          `KeyboardService.test.ts` filters on region XX, a third meaning.
+        - The reads of idents with their types stay as pairs or triples (`fpl0Legs` of `ActPage.test.ts`,
+          `Apt7Page.test.ts` and `Apt8Page.test.ts`, the pair reads of `SidStar.test.ts`, the triples of the V1 and V2
+          flight plan loader tests, the filtered reader of `procedures.test.ts`, the `legs` read for the fix type in
+          `approachWorld.test.ts`, and `VolatileMemory.test.ts`'s `procedureLegs`), as does the SDK `identsOf(plan)` of
+          `WTFlightplanSync.test.ts`.
+        - `AirspaceAlert.test.ts` presses MSG twice with a wait between them (`readMessages` waits after the second) and
+          lays out its box edges with flat-earth offsets that are not `moveAircraft` targets;
+          `SensorsOutSimVars.test.ts` filters `sim.writes` on a literal that is already upper case; the keyed storage
+          read of `KLN90BCore.userDataConversion.test.ts`; `test/unit/harness/navdata.test.ts` has its own `abc`, `abd`
+          and `kaaa` for the `MemoryFacilityClient` tests; `ObsDtkElement.test.ts` keeps the parser default through
+          `MINIMAL_PANEL_XML`; `Apt3Page.test.ts` keeps its surface and lighting `it.each` beside the unit table.
+        - Boots whose timing or state is the subject: `GpsAcquisition.test.ts` (`powerOnCold`, the two B-2 boots and the
+          channels test measure from the power-on), the cold-GPS tests of the D/T page files, `WelcomePage.test.ts`, and
+          `hsiToFromFlags.test.ts` and `turnDirection.test.ts`, which start through `Flight.start` and already use
+          `standardRoute()`.
+        - Own worlds, not the standard route: `DirectToPage.test.ts` (its VOR ABC and KBBB sit at other coordinates and
+          the frequency is in an inline snapshot), `DirectToObs.test.ts`'s `planInObs` (a VOR with a published
+          variation), `FplPage.test.ts`'s `bootRoute` and `route7()` (seven waypoints), the BRAVO world of
+          `HEvents.test.ts` (a KBBB with another name and no ABC), the `[kaaa, abc]` worlds of `SensorsOut.test.ts`,
+          `SensorsOutSimVars.test.ts`'s `bootOnRoute` (KAAA at 47.1 N 8.3 E, no settle, the tests advance the clock
+          themselves), `Tri5Page.test.ts`'s `meridianRoute()`, the intersection worlds of `SuperNav5Page.test.ts`, the
+          obsMode boot of `power.test.ts` (a plan without KBBB, asserting the mode only) and the garbage `wpt0` of
+          `FlightplanEdit.test.ts` (the restore fails and FPL 0 stays empty, so `bootOnStandardRoute` would throw).
+    - **World copies that `approachWorld()` does not cover.** The missed approach world (IAFAA at 47.3 N 7.7 E with a
+      MAHAA hold) is written out in `FplPage.test.ts` (`rnavWorld`), `Apt7Page.test.ts` and `Apt8Page.test.ts`, and the
+      VOR 36 world of KDST (the VOR VVV as the FAF and the missed approach holding point) in `ActiveWaypoint.test.ts`
+      and `WTFlightplanSync.test.ts`. A missed approach option of `approachWorld()` would replace these and the MAP
+      worlds named under "Shared worlds" below.
+    - **The ENT order of `FourSegmentPage` is not tested**, by the maintainer's decision. The shell is the full-page
+      frame of the Database page and the OBS warning, whose pages have no cursor fields, so most of its knob switch
+      cannot be reached in a booted unit, and its ENT order (a field that waits for confirmation first, then left, then
+      right, then the page itself) is held by nothing. `TakehomePage` is out of scope (take-home mode).
+    - **The `FiveSegmentPage` tests are characterizations**: no trainer observation is recorded for the SCAN rule that
+      its code comment names. The comment on the left branch of `handleEnter` (`FiveSegmentPage.tsx:217`) says that the
+      right half has priority when it waits for confirmation, while the code serves the left half first; the test holds
+      the code's order.
+    - **Leftover `console.log` calls** in `Apt3MapPage.tsx:30` and `TemporaryWaypointDeleter.ts:27` and `:32`, beside
+      `WaypointPage.tsx:46` (listed under Session 8 below). A cleanup commit, if wanted.
+    - **panel.xml options that tests set and no assertion needs** (dropping the option leaves the tests green, as it did
+      before the move; a test that needs the option must run past the first seconds or assert something that depends on
+      it): `NO_OBS` in `DirectToObs.test.ts`, `Mod2Page.test.ts`, `Nav3Page.test.ts`, the route boot of
+      `StatusLine.test.ts` and the Leg-mode test of `ObsDtkElement.test.ts`; `AIRDATA` and `fuelComputer()` in three
+      name tests of `PageTreeController.test.ts`; `HEADING_INPUT` in `SelfTestLeftPage.test.ts`, `SensorsOut.test.ts`
+      and `RollSteeringController.test.ts` (it can bite once #143 is fixed); the `FOBTransmitted` and `IsInterfaced`
+      values of two `Messages.test.ts` tests (the parser default is the same); `WriteGPSSimVars` off in the
+      `KlnEfbLoader.test.ts` import (the import is not gated); the `FacilityType.USR` filter in `KlnEfbLoader.test.ts`
+      and `TemporaryWaypointDeleter.test.ts`, whose worlds hold supplementary user waypoints only.
+    - **Waits that no assertion needs** (a shorter wait or start leaves the tests green; the values and a comment that
+      names what the wait is for were kept): the default of `directTo` and of `show`, the waits after `showSuperNav5` in
+      `superNav5.test.ts` and `mapRecorder.test.ts`, the 2000 ms of `Nav5Page.test.ts`, the 250 ms of
+      `SuperNav5Field1Selector.test.ts`, the 31 s of `SuperNav5Left.test.ts`'s `armed()` and of `approachWorld.test.ts`,
+      the 30 s boot of `test/flight/harness/boot.test.ts`, the 25 s of `Apt1Page.test.ts`'s `dropEntry` and the 2 NM
+      start of `jump.test.ts`. Hygiene that no assertion holds: the `storage.reset()` and the spy restore of the #103
+      file, the `sim.reset()` of the first `Hardware.test.ts` test, and `muteConsoleError` in the `ErrorPage`, `SupPage`
+      and `bootFailure` tests (only the output changes; the harness test holds the helper).
+    - **Review notes left as they are:** the INT REF read-only mutant survives one test of `IntPage.test.ts`;
+      `Sensors.test.ts` does not hold the type-dependent volume of its passing tests (the #93 pins will);
+      `Screen.inverse` accepts any non-normal cell; the tick of `mountedText` and the trim of `writeCount` are unheld;
+      `NearestList.test.ts` reads the last frame of the map only; `Mod1Page.test.ts` words the 5-38 note as "offers 1
+      and 0.3 only", an inference older than the move; the spies of `superNav5.test.ts` and `frontPanelHelpers.test.ts`
+      are restored after the assertion, not in `finally`; several describes that predate the session carry no label in
+      their title (`FplPage`, `Mod1Page`, `Mod2Page`, `DirectToPage`, `AltPage`, `FlightplanList`,
+      `WaypointDeleteListItem`, `DateEditor`, `WaypointEditor`, `FuelFieldset`, `ObsDtkElement`, the Super NAV 5
+      selectors), though each of their tests cites a page, a commit or a trainer check.
+    - **A lead:** on the page of a user airport, typing the ident of a database airport on the first character switches
+      APT 3 to the diagram page of the airport that character matches, and that page has no cursor controller, so the
+      entry cannot go on. Whether the real unit keeps the cursor there is not known (not reproduced in the sim).
+    - **When the bugs are fixed:** the fix of #96 needs `PageStack` in `MainPage.tsx` to destroy the half page it
+      replaces (`setCurrentPage`, `pop`, `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone
+      leaves the pins red, and OTH 4 counts the `changed` topic of the remarks manager, not the repository sync. The fix
+      of #269 (`this.children = this.getCurrentPage().children; this.requiresRedraw = true;` in
+      `Apt3Page.changeFacility`) turns both #269 pins red, the one in `Apt3Page.test.ts` and the user airport pin of
+      `Apt3ListPageContainer.test.ts`. The fix of #95 turns two pins red (the list and the error page); the fix of #93
+      turns two (Avgas and JetB; JetA1 passes today, because the SDK's generic imperial gallon weighs as Jet A).
 - **Flights cannot test the nav-source gate or a cold start, by the maintainer's decision.** `Aircraft.writeTo` forces
   `GPS DRIVES NAV1` true on every 16 Hz step, so a flight cannot observe what the unit does when the GPS is not the
   nav source (`92fbba1` is a render test, which sets the SimVar itself). `Flight.start` waits for a fix, so it cannot
@@ -927,7 +1027,8 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
     - **The self-test page and the `"kln90b"` planner.** The cold boot to the self-test page is now `bootToSelfTest`
       (section 4), which `AiracPage.test.ts`, `VFROnlyPage.test.ts`, `ObsWarningPage.test.ts`,
       `SelfTestLeftPage.test.ts` and `SelfTestRightPage.test.ts` use. The older copies stay as they were written:
-      `SensorsOut.test.ts`, `HEvents.test.ts`, `NavCalculator.test.ts`, `Button.test.ts` and `enterIdent.test.ts`. The
+      `HEvents.test.ts`, `NavCalculator.test.ts`, `Button.test.ts` and `enterIdent.test.ts` (`SensorsOut.test.ts` uses
+      `bootToSelfTest` since Session 10b). The
       planner is read through `FlightPlanner.getPlanner('kln90b', …)` in `WTFlightplanSync.test.ts`,
       `ActiveWaypoint.test.ts` and `reboot.test.ts`.
     - **Shared worlds.** The approach world now exists as a fixture (`approachWorld()` in `test/harness/fixtures.ts`,
@@ -936,7 +1037,8 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       missed approach, so the MAP tests of `NavCalculator.test.ts` build their own approach with a missed approach leg,
       and `ModeControllerObs.test.ts` builds the IAF = FAF and the MAHP = FAF approaches it needs (#153). That MAP world
       is now also copied into `SuperNav5Page.test.ts` (AUTO near the MAP) and `DirectToPage.test.ts` (a Direct To at the
-      MAP); a missed approach option of `approachWorld()` would replace all of them.
+      MAP); a missed approach option of `approachWorld()` would replace all of them, and the missed approach and VOR 36
+      worlds named in the Session 10b item above.
     - **A `FakeXhr` mount.** `FakeXhr` serves `resources/` only at the default path, so a custom `BasePath` fails the
       boot; a mount option would let a test hold the BasePath effect.
 - Harness gaps that the Session 6 tests worked around (each serves one file, so none was built, per rule 13 of
@@ -953,7 +1055,8 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       argument would make the type `getFacilities` passes observable.
     - **`Oth3Page` subscribes to the repository sync and never unsubscribes** (`Oth3Page.tsx:36`, filed as #96 with the
       same leak on OTH 4): every visit leaves a handler that refreshes a detached page. Not seen as a user-visible
-      effect; a test that counts handlers would hold the fix.
+      effect. Session 10b pinned both pages by handler count (`Oth3Page.test.ts`, `Oth4Page.test.ts`); the fix needs
+      `PageStack` to destroy the page it replaces (see the Session 10b item).
     - **The `fields` array of the `CursorController` constructor is dead** (`CursorController.ts:62-63`, behind
       `@ts-ignore`): nothing reads it, and the field list is recomputed on every call. It looks like a cache, so do not
       rely on it.
@@ -980,10 +1083,11 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - Harness extensions of Session 9b task 0 and the copies they leave (a dated record, 2026-10-08): `mount()`,
   `blinkCycle`, `mountedCycle`, `SuperNav5.focused()`, `legWorld()`, `arcWorld()` and the keyboard guard of `type()`
   exist (section 4). The tests written before them keep their own copies: the KDDD world in `Nav1Page.test.ts`,
-  `Nav3Page.test.ts`, `Nav4Page.test.ts`, `Nav4Vnav.test.ts` and `SuperNav1Page.test.ts` (check a copy before
-  replacing it, some differ in detail), the DME arc world in `SuperNav5DirectToSelector.test.ts`,
-  `SensorsOutSimVars.test.ts`, `WTFlightplanSync.test.ts`, `dmeArc.test.ts` and others, and the focused-field helpers
-  (`focusedIn`, `focusedLeft`, `focusedRight`) of `SuperNav5Page.test.ts`, which also read the right menu.
+  `Nav3Page.test.ts`, `Nav4Page.test.ts`, `Nav4Vnav.test.ts` and `SuperNav1Page.test.ts` (check a copy before replacing
+  it, some differ in detail), the DME arc world in `SuperNav5DirectToSelector.test.ts`, `SensorsOutSimVars.test.ts`,
+  `WTFlightplanSync.test.ts`, `dmeArc.test.ts` and others (the field selector tests of Super NAV 5 use the harness
+  `superNav5OnLeg` and `superNav5OnArc` since Session 10b), and the focused-field helpers (`focusedIn`, `focusedLeft`,
+  `focusedRight`) of `SuperNav5Page.test.ts`, which also read the right menu.
 - Harness gaps and leads from Session 9a (none was built beyond its task 0, per rule 13 of test-coverage.md):
     - **`airport()` has no options for frequencies, runway lighting, the private type or radar coverage.** The APT 1,
       APT 3 and APT 4 tests spread the facility or patch `runways[i].lighting`; options would replace those spreads.

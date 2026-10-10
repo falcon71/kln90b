@@ -573,7 +573,7 @@ section 6 now names SYSTEM TIME UPDATED at an engine-running boot as the bug #32
 
 ## Session 10b: the audit's findings before the close-out
 
-- [ ] done
+- [x] done
 
 Inserted by the maintainer on 2026-10-09, after an audit of the whole suite that asked five questions before the
 close-out: which components have no tests, what technical debt the tests carry, which older tests do not use a newer
@@ -618,6 +618,17 @@ session finds; #93 and #95 exist already) and the close-out, which also carries 
 **Done when:** every item of the findings is done, re-decided with a reason in the log, or listed in `testing.md`
 section 7, and Session 11's steps cover the findings of section 6.
 
+Result (session log, section 4): items 1 to 6 are done. The harness helpers H1 to H13 are built (`panelXml` with its
+presets, the readers, `readMessages`, `directTo`, `show`, `showSuperNav5`, `bootOnStandardRoute`, `bootOnDtWorld`,
+`mountedText`, `NEAREST_SEARCH_WAIT_MS` and the small ones; `testing.md` section 4), and the tests that carried a copy
+moved onto them. The copies that stayed have their reasons in `testing.md` section 7. The pins are #93 (two), #95 (two,
+the list and the error page), #96 (OTH 3 and OTH 4, by handler count) and a second pin for #269 (the stale runway length
+of a user airport); the #103 pin got a passing sibling. D1 to D7 are done: the nearest search wait is named, every other
+long wait and the private couplings have a comment, and the `ActiveWaypoint` title asserts its deviation.
+`FiveSegmentPage`, the APT 3 string table and `Apt3ListPageContainer` have tests; the `FourSegmentPage` ENT order is in
+`testing.md` section 7. No issue was filed, because no `#NEW-` placeholder was used: the two findings of the main tasks
+that need the maintainer's word are comments on #96 and #269. Session 11's steps now cover the findings of section 6.
+
 ## Session 11: closing record and retirement
 
 - [ ] done
@@ -631,16 +642,260 @@ section 7, and Session 11's steps cover the findings of section 6.
 3. Move every open *needs harness* and *not testable* row's substance into `testing.md` section 6 or 7 as a limitation
    or a next step, without the issue-by-issue table.
 4. Make sure every `it.fails` pin references an open GitHub issue, and every bug found during the sessions has one.
-5. Remove the pointer to this document from `testing.md` section 7, delete `docs/test-coverage.md`, and commit with a
-   message that says the baseline plan is complete.
+   The harness self-test pin of `test/render/harness/rejections.test.ts` (the strict rejection collector) is not a bug
+   pin and is exempt, or it is reworded so that it does not read as one.
+5. **The trainer record.** The KLN 89 trainer observations must outlive this document. The test files cite them as
+   `T<n>`, and the ids are defined only in the trainer lists of the Session 9b and Session 10 logs (section 4), two
+   series that both run from T1 to T12; some references carry no date on their line, and some stand in pin titles. Write
+   a dated trainer record into `testing.md` that keeps the ids with their session, or rewrite the comments to say what
+   was observed and when. Resolve the references to sessions and research in the test files by that record: the
+   comments of `SidStar.test.ts` ("Session 7 task 6"), `IntPage.test.ts` ("the Session 8 ruling on #243"),
+   `LatLonEditor.test.ts` ("The lead of Session 9a"), `SupPage.test.ts` ("research items") and
+   `test/harness/flight/FrontPanel.ts` ("open (Session 9b)"). Text only: the code does not change.
+6. **The rules `testing.md` cites by number.** Restate in its own words what it takes from this document: rule 8 (a
+   snapshot never holds a visible bug), rule 13 (a harness extension needs several users; one test lists the gap
+   instead), the maintainer's evidence rule (the 90B Pilot's Guide and its figures win, the KLN 89 trainer decides where
+   the guide is silent, and behavior that exists only on the 89 never becomes a pin), and the references to "the designs
+   of Sessions 9a and 9b", "Session 10 trainer note T1" and "the startup research". Then no sentence of `testing.md`
+   points at a deleted file.
+7. **Regroup `testing.md` section 7 by area** (harness, navigation, pages, controls, boot and power), not by session.
+   Merge the duplicate electricity item (the "SimVars before `init`" item of Session 4 and the "boot that leaves an
+   `ElectricitySimVar` unit dark" item of Session 10 are one gap), and let the `Version` mock item name `Sta3Page.test.ts`
+   and `Sta4Page.test.ts` as well as `selectPage.test.ts`.
+8. **Confirm two superseded triage rows** before the table goes: the AIRAC last-day boundary and the #40 cache window of
+   the `Scanlist` tests, whose work the table handed to Session 7. The coverage record does not repeat the claim of
+   Session 7's result and log that #213 was filed without a pin; it has one now (the log stays as written, because it
+   is a dated record).
+9. Remove the pointer to this document from `testing.md` section 7, delete `docs/test-coverage.md` **and
+   `docs/superpowers/`** (the session designs, the plans with their `.tasks.json` files, the audit findings and the
+   inventory, as rule 19 says), and commit with a message that says the baseline plan is complete.
+10. **Outside the repository:** the controlling session updates its local memory notes that point at this document or
+    at the designs (`kln89-trainer-observations.md`, `session-workflow-lessons.md`, `subagent-report-files.md` and
+    `worktree-junction-removal.md`).
 
-**Done when:** this file no longer exists and `testing.md` carries the record.
+**Done when:** this file and `docs/superpowers/` no longer exist and `testing.md` carries the record.
 
 # 4. Session log
 
 One entry per session run, newest first. Format: date, session, branch, what was done, what was left and why, the
 coverage summary for the session's area at start and end. This is a dated record and is never edited afterwards; a
 later run adds a new entry.
+
+## 2026-10-10, session 10b, branch `tests-session-10b-audit`
+
+**Done**
+- **Design and plan:** `docs/superpowers/specs/2026-10-10-session-10b-audit-design.md` and
+  `docs/superpowers/plans/2026-10-10-session-10b-audit.md` (commits `77d83be`, `745c93b`), written from the audit
+  (`docs/superpowers/specs/2026-10-09-session-10b-findings.md`) without a research pass of its own (rule 19). The
+  controlling session confirmed against the code the `RunwaySurfaceType` mapping of 3-44, the subscriber count of
+  the event bus for #96, and the `FiveSegmentPage` fall-through, and a read-only inventory agent mapped every copy a
+  helper replaces to its file. Eight tasks: a harness task alone, tasks 1 to 6 in parallel worktrees, this close-out
+  last.
+- **Task 0, the harness** (alone, in the main checkout; `b4d9a05`, fix round `d33f79d`): `test/harness/panelXml.ts`
+  (`PANEL_KEYS`, `panelXml(o)` typed on the parser's dotted keys, the presets `NO_OBS`, `HEADING_INPUT`,
+  `NO_GPS_SIMVARS`, `LEG_OBS_SWITCH`, `NO_ALTIMETER`, `VFR_ONLY`, `AIRDATA`, `ALTITUDE_ALERT(enabled)` and
+  `fuelComputer(o)`); `test/harness/readers.ts` (`userWaypoints(unit, type?)`, `messages`, `messageLines`, `identsOf`,
+  `fplIdents`, `activeIdent`, `turnStackLength`); `test/harness/worldBoot.ts` (`bootOnStandardRoute`,
+  `bootOnDtWorld`); `test/harness/console.ts` (`muteConsoleError`); on `FrontPanel` `readMessages`, `directTo`, `show`,
+  `confirmSet1AndReselect` and `enterDate`; `Screen.inverse` and `pageRows`; `showSuperNav5`, `superNav5OnLeg` and
+  `superNav5OnArc` in `render/superNav5.ts`; `mountedText` and `mountedRead`; `NEAREST_SEARCH_WAIT_MS`,
+  `unit.overlay()` and a teardown that restores `Math.random`; `sim.writeCount`. Every helper has a harness test
+  (`unit/harness/panelXml.test.ts`, `render/harness/readers.test.ts`, `readMessages.test.ts`,
+  `frontPanelHelpers.test.ts`, `worldBoot.test.ts`, `consoleHelper.test.ts`, `nearestWait.test.ts` and appended
+  tests) and a paragraph in `testing.md` section 4. The parser test of `panelXml` parses every key with a non-default
+  value, so a key the parser does not read now fails there instead of leaving a test on the default.
+- **Task 1, the top-level and left A to N page tests** (`f1841a0`, `6b27cd1`; merge `7b025d4`): the page files moved
+  onto `panelXml` and its presets, `fplIdents`, `activeIdent`, `directTo`, `bootOnStandardRoute`, `show`,
+  `selectPage`/`cursorTo` and `NEAREST_SEARCH_WAIT_MS`. New `FiveSegmentPage.test.ts`, all characterization (no
+  trainer observation is recorded for the code comment): the right and left scan with the cursor on acts as the inner
+  knob, with the cursor off the scan goes to the half page, and the ENT order of the two halves, driven on the
+  self-test page.
+- **Task 2, the left page tests O to Z and #96** (`840cc90`, `0486689`; merge `cca99a9`): the same moves, plus the
+  pins of #96: a passing sibling that holds the handler count while the page shows, and an `it.fails` that counts the
+  handlers after three visits, for OTH 3 (the repository sync) and for OTH 4 (the `changed` topic of the remarks
+  manager, not the repository sync that the brief named). The temporary fix that turns both pins was the page's
+  `destroy()` plus one line in `PageStack.setCurrentPage` that destroys the replaced half page; the page's `destroy()`
+  alone leaves them red. The #111 pin of `Set2Page.test.ts` enters its date with `enterDate`.
+- **Task 3, the right page tests, the APT 3 string table and the container** (`520625a`, `13b85f8`; merge `b9b86be`):
+  the same moves on `test/render/pages/right/`, the four D/T page files on `bootOnDtWorld`. New
+  `test/unit/pages/right/Apt3ListPage.test.ts`: `getKLNSurfaceString` and `getKLNLightingString` for every SDK value but
+  macadam (#270): spec rows (3-44) for the materials the guide names, for the grass types as turf (a ruling below) and
+  for the
+  lighting codes, characterization rows for the types the guide does not name, and a completeness test that fails
+  when the SDK gains a surface. New `Apt3ListPageContainer.test.ts`: the switch between the runway list of a database
+  airport and the page of a user airport through scans (spec 3-44, 5-16, 5-17, 3-29; the page count and the create
+  offer as characterization), with a pin for the stale runway length (below).
+- **Task 4, the controls** (`26484e5`; merge `9cfebfa`): the display tests on `mountedText` and `mountedRead`, the
+  editors on `confirmSet1AndReselect`, `enterDate` and `userWaypoints`, the selects on `panelXml`, `showSuperNav5` and
+  the
+  moved `superNav5OnLeg`/`superNav5OnArc`, the status line and message page on `readMessages`. No test added, none
+  removed, no assertion changed.
+- **Task 5, the top-level render tests, data and services** (`504d1e2`, `6adc1e2`; merge `7e508bb`): the same moves;
+  D2 (the `ActiveWaypoint` "zero deviation" test asserts its deviation below 0.01 NM, proven with the aircraft
+  0.5 NM off the course); the D3 half of `PersistentMessages` on `enterDate`; the #95 pins in `NearestList.test.ts`: a
+  passing sibling, a plain test that holds the setup (a nearest search that rejects once, counted), a pin that the list
+  updates again after the rejection, and a pin that the error page shows it. `NearestList` reads `recordMap` for the
+  last
+  frame instead of a spy on `drawLabel`.
+- **Task 6, unit, flight and harness tests** (`5cf34c8`; merge `675845a`): `identsOf`, `fplIdents` and `turnStackLength`
+  replace the local readers in the unit and flight tests; the existing render and harness tests moved onto the helpers.
+    New `test/unit/Sensors.test.ts` for #93 (below); D1 (the #103 pin keeps its title and gets a passing sibling that
+  holds the restore into the repository, so a broken setup cannot hide behind the pin); D6 in the files of tasks 4 to 6
+  (a comment naming each coupling: `tickManager`, `Vnav`'s indicated altitude, `RemarksManager`'s `remarks`,
+  `Scanlist`'s `listManangerJob`, `KLNFacilityRepository.INSTANCE`, `ActiveArrow`'s `getActiveWpt`); D7 (the
+  `Hardware` reset, the `UserWaypointV2` sibling titled as such, the weak checks of `SensorsOut` and `Mod1Page`
+  explained); D4 in every task (the named wait and comments).
+- **Task 7, this close-out:** `docs/testing.md` section 7, Session 11's steps, the tick and result of Session 10b and
+  this log. No `#NEW-` placeholder exists (`grep -rn "#NEW-" test/` finds nothing), so no issue was filed and no
+  test file changed; the two comments for the maintainer to post are in the next section.
+
+**Pins and the issue work.** All pins are for open issues that exist.
+- **#93** (`Sensors.test.ts`): with `Input.FuelComputer.Unit` IMP the fuel type is ignored. The pins are Avgas and
+  JetB, not JetA1 and JetB as the brief named: the SDK's generic imperial gallon weighs as Jet A, so JetA1 passes today
+  and is a passing sibling (the reviewer confirmed). Proof: removing `targetUnit = UnitType.IMP_GALLON_FUEL` at
+  `Sensors.ts:91` turns both pins red; the full suite changed nowhere else.
+- **#95** (`NearestList.test.ts`): two pins, the list and the error page. Proof: a `try`/`finally` that resets
+  `isCalculating` turns the list pin red; a `.catch` that publishes `error` in `TickController.tickCalc` turns the error
+  page pin red; nothing else changed.
+- **#96** (`Oth3Page.test.ts`, `Oth4Page.test.ts`): described above. The fix needs `PageStack` in `MainPage.tsx` to
+  destroy the half page it replaces (`setCurrentPage`, `pop`, `parentRemoved`), besides the pages unsubscribing. A
+  comment
+  on #96 says so (drafted, to be posted with the maintainer's OK).
+- **#269** (`Apt3ListPageContainer.test.ts`): a second pin for the same cause as the closed-case pin in
+  `Apt3Page.test.ts`. After a scan from the runway diagram of a database airport to a user airport, APT 3 shows the
+  length of the database airport's first runway (` 06200' HRD` for the stored 3200 ft) until the page is left, not only
+  missing editors. Proof: the suggested fix of #269 turns both pins red; no other test changed. A comment on #269
+  says so (drafted, to be posted with the maintainer's OK). Not reproduced in the sim.
+- **#103**: a passing sibling for the pin (task 6).
+- **No issue was filed.** The suspected bugs of the reports were these two; the observation that the diagram page of
+  APT 3 has no cursor controller when a database airport's ident is typed over a user airport's (task 3) is a lead in
+  `testing.md` section 7.
+
+**Rulings**
+- **The maintainer's** (in the design and the constraints):
+    - H1 to H5 and all of H6 to H13 are built; D1 to D3, and D4 to D7 in full (D6 by a comment naming each coupling,
+      not by a production change); `FiveSegmentPage`, the APT 3 string table and `Apt3ListPageContainer` get tests; the
+      `FourSegmentPage` ENT order is not tested and goes to `testing.md` section 7; #96 is pinned with a handler count.
+    - The harness API, the task split, the proof rules and the defaults of the design.
+- **The controller's** (re-decided with a reason; the ledger is not committed, so all are listed):
+    - Task 0 ran in the main checkout on the session branch, not in a worktree, because it ran alone and rule 21
+      requires worktrees for the parallel main tasks only.
+    - Task reviewers ran the project's mutation pass in the task's worktree (rule 24), although the review template
+      says read-only; they restored the tree, checked by `git diff`.
+    - The citation of `directTo` in the plan (3-27) became 3-28: 3-27 holds the default-ident rules.
+    - Review minors that are wrong citations, order-dependent tests, a rule attributed to a document that does not
+      state it, an inference worded as the guide's words, or comments with an unheld timing entered the fix rounds as
+      Important findings (rule 24: a wrong citation is a breach), for tasks 0, 1, 2, 3 and 5.
+    - Two characterization describes that the plan titled with 3-44 were renamed, because a describe titled with a page
+      holds only spec tests (rule 7).
+    - The SDK grass types map to TRF as spec rows on 3-44: turf is a grass surface, so the guide names them. The risk
+      is four rows that a strict reader would call inference.
+    - #93 is pinned with Avgas and JetB (above).
+    - #96 for OTH 4 counts the `changed` topic, as the issue says.
+    - The characterization describe the task 5 implementer wrote for #95 froze the error page half (the unit shows
+      nothing) and was replaced by a pin.
+    - Sites that did not move (the copies of `testing.md` section 7), by the rule that a move replaces the setup and
+      never what is asserted.
+
+**Findings of the audit re-decided or settled with a reason**
+- Section 1: `FiveSegmentPage`, `getKLNSurfaceString`, `getKLNLightingString` and `Apt3ListPageContainer` have tests;
+  the
+  `FourSegmentPage` ENT order is not tested (the maintainer: low value); `TakehomePage` stays out of scope.
+- Section 2: #93, #95 and #96 are pinned; #117, #128, #214 and #325 stay filed without a pin as the logs record; #110 is
+  fixed on `master`.
+- Section 3: D1 to D3, D4, D5 (the per-test timeouts of `NearestSelector.test.ts`, `Mod2Page.test.ts` and
+  `Dt4Page.test.ts`
+  now say why), D6 and D7 are done. Waits that no assertion needs (below) keep their value with a comment that
+  names what the wait is for, because a move does not change the setup.
+- Section 4: every straggler moved, or its copy is named in `testing.md` section 7 with its reason. The `mount()`
+  sites that change a
+  value after the render, the four `CONFIRM?` plus `ENT` sites that assert the status line between the two presses,
+  the worlds with their own geometry and the pair reads (ident and type) stayed.
+- Section 5: H1 to H13 are built. `approveSelfTestPage` and `expectVfrPage` stayed as two-line locals (no third
+  user). `confirmAndReselect` is `confirmSet1AndReselect` and takes no side parameter.
+- Section 6: Session 11's steps now carry the trainer record, the session references, the rules restated, the deletion
+  of `docs/superpowers/`, the regrouping of section 7 (with the duplicate electricity item and the `Version` mock item),
+  the exemption of the `rejections.test.ts` pin, the two superseded triage rows, the #213 claim and the memory notes.
+
+**Fixes that could not be re-broken:** none. The survivors a move showed are listed under "Not covered".
+
+**Review fix rounds.** Task 0: one (13 findings, eight Important: the `readMessages`, `bootOnStandardRoute`,
+`showSuperNav5` and `bootOnDtWorld` assertions the first tests left loose, a side parameter, the `writeCount` prefix,
+the 3-27 citation, the overlay contract, and the order-dependent console helper test). Task 1: one (a citation of 5-38
+for facts on 6-1 and
+6-3; the "one place" header; a scan wrapper). Task 2: one (the route comment, a rule attributed to `CLAUDE.md`). Task
+3: one
+(two characterization describes titled with 3-44, the 5-17 citation, the hard-surface paraphrase, the APT 1 offer
+applied to
+APT 3). Task 4: none. Task 5: one (the frozen error page half of #95, `HEvents` citing 3-3 for the 17 s, a comment
+timing,
+a missing proof line). Task 6: none.
+
+**Workflow notes.** The main tasks ran in parallel worktrees on `d33f79d` (each reset its worktree branch to the session
+branch first) and merged in the order 4, 6, 2, 1, 3, 5. Task branches and worktrees stay until the maintainer approves
+the session. The scratchpad was shared by the
+parallel implementers, and two overwrote another's helper script (nothing in the repository was affected); the sandbox
+refused heredocs with apostrophes and multi-line `sed`, so edits went through the edit tool. One implementer restored a
+modified test file with `git checkout` by mistake and redid the edit, verified against the earlier patch. The working
+copies of the docs and tests are CRLF while the index is LF, so edits written as LF show only as warnings. Running the
+whole
+suite under each pin's temporary fix (the lesson of Session 9b) found no test elsewhere that uses a pinned bug as its
+vehicle; a fix of #269 turns both #269 pins red. This close-out ran in the main checkout on the session branch.
+
+**Coverage at the start of the session** (the same as at the end of Session 10; all tests green) **and at the end:**
+
+| scope           | % stmts start | % stmts end | % lines start | % lines end |
+|-----------------|--------------:|------------:|--------------:|------------:|
+| all files       |         92.82 |       93.12 |         92.78 |       93.09 |
+| `kln90b/pages`  |         87.64 |       88.63 |         87.53 |       88.54 |
+
+Branches of all files: 87.36 % at the start and 87.91 % at the end; functions: 91.94 % and 92.03 %. The files of the
+area (statements and branches at the start,
+from the audit, and at the end): `FiveSegmentPage.tsx` 77.6 and 70.6, then 89.55 and 94.11; `Apt3ListPage.tsx` 96.9 and
+97.2, then 98.43 and 100; `Apt3ListPageContainer.tsx` 81.6 and 68.8, then 86.84 and 87.5; `FourSegmentPage.tsx` 46 and
+20,
+unchanged. The coverage says what ran, not what is held (section 1); the `Proof:` lines of the task commits and the
+reviewers' mutation passes are what hold the area.
+
+The suite at the start: 2732 tests passed and 365 expected failures, in 313 files. At the end: 2858 tests passed and 372
+expected failures, in 324 files; `npx tsc --noEmit` is clean and `kln90b/` is unchanged. The new expected failures are
+pins: #93 (two), #95 (two), #96 (two) and #269 (one).
+
+**Not covered** (rule 18; the ledger is not committed, so the list is complete here)
+- **Not tested by decision:** the `FourSegmentPage` ENT order and its knob switch; take-home mode.
+- **Copies that stayed** with their reasons are in `testing.md` section 7 (the missed-approach worlds of `FplPage`,
+  `Apt7Page` and `Apt8Page`, the VOR 36 worlds of `ActiveWaypoint` and `WTFlightplanSync`, the KDDD and arc worlds, the
+  prefilled-ident Direct To sequences, the pair reads and the bare-handler message readers).
+- **Premises that no assertion needs** (a mutation of the helper's value leaves the suite green; the move was exact, so
+  these were true before it): `NO_OBS` in `DirectToObs`, `Mod2Page`, `Nav3Page`, the `StatusLine` route boot and the
+  Leg-mode test of `ObsDtkElement`; `AIRDATA` and `fuelComputer()` in three name tests of `PageTreeController`;
+  `HEADING_INPUT` in `SelfTestLeftPage`, `SensorsOut` and `RollSteeringController` (it can bite once #143 is fixed);
+  a misspelled `FOBTransmitted` or `IsInterfaced` in two `Messages` tests; the `WriteGPSSimVars` key of the
+  `KlnEfbLoader` import (the import is not gated); the type filter `FacilityType.USR` in `KlnEfbLoader` and
+  `TemporaryWaypointDeleter`; `muteConsoleError` in the `ErrorPage`, `SupPage` and `bootFailure` tests (only the output
+  changes; the harness test holds the helper); the tick of `mountedText` for the eleven display tests; the
+  `storage.reset()`
+  and the spy restore of the #103 file and the `sim.reset()` of the first `Hardware` test (hygiene).
+- **Waits that no assertion needs** (a shorter wait or start leaves the tests green; the values are kept): the default
+  1000 ms of
+  `directTo` and of `show`, the 250 ms and 1000 ms after `showSuperNav5` in `superNav5.test.ts` and
+  `mapRecorder.test.ts`,
+  the 2000 ms of `Nav5Page`, the 31 s of `SuperNav5Left` `armed()` (2 s passes) and of `approachWorld`, the 250 ms of
+  `SuperNav5Field1Selector`, the 30 s boot of `flight/harness/boot.test.ts` (1 s passes), the 25 s of `Apt1Page`'s
+  `dropEntry` (12 s and 21 s pass), and the 2 NM start of `jump.test.ts` (20 NM passes).
+- **Survivors left as they are** (review minors): the `INT REF` read-only mutant survives one test after the cursor
+  move in `IntPage`; `Sensors.test.ts` does not hold the type-dependent volume of the passing tests (the pins will);
+  `Screen.inverse` accepts any non-normal cell, and `mountedText`'s tick and the trim of `writeCount` are unheld;
+  `Mod1Page` words the 5-38 note as "offers 1 and 0.3 only", an inference carried over from the original; the spies of
+  `superNav5.test.ts` and `frontPanelHelpers.test.ts` are restored after the assertion, not in `finally`; `NearestList`
+  reads the last frame only; the `Set1Page` and `LatLonEditor` inline `CONFIRM?` sites have no reselect helper; a few
+  comment lines are longer than 120 characters (`Apt3ListPageContainer.test.ts`, four in the control tests).
+- **Describes without a label in the title** that existed before the session and were left: `FplPage` (FPL 1 to FPL 25),
+  `Mod1Page`, `Mod2Page`, `DirectToPage`, `AltPage` ("ALT page (ee0b000)"), `FlightplanList` (two),
+  `WaypointDeleteListItem`,
+  `DateEditor`, `WaypointEditor`, `FuelFieldset`, `ObsDtkElement` and the Super NAV 5 selectors. Each of their tests
+  cites a page, a commit or a trainer check.
+- Leads seen and not filed: `testing.md` section 7 (Session 10b's items).
 
 ## 2026-10-09, session 10, branch `tests-session-10-boot-power`
 
