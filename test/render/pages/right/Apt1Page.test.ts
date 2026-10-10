@@ -299,24 +299,44 @@ describe('APT 1 page of a database airport', () => {
     });
 
     // 3-42: MILTRY stands on the right side of the type row; CL B, CL C, CTA or TMA on its left
-    it.fails('puts MILTRY on the right side of the type row (3-42, #264)', async () => {
+    it('puts MILTRY on the right side of the type row (3-42, #264)', async () => {
         const unit = await bootUnit({facilities: [military()], position: POS});
 
         expect((await showApt1(unit))[3]).toBe('     MILTRY');
     });
 
     // The same rule with a Class B airspace above the airport: both words fit on the row, with a blank between them
-    it.fails('shows CL B and MILTRY apart on the type row (3-42, #264)', async () => {
+    it('shows CL B and MILTRY apart on the type row (3-42, #264)', async () => {
         const unit = await bootUnit({facilities: [military(11.9)], position: POS, altitudeFt: 0, airspaces: [classB()]});
 
         expect((await showApt1(unit))[3]).toBe('CL B MILTRY');
     });
 
-    // 3-42, the sibling of the second pin: the airspace is found and the type shows, so the pin fails on the layout only
-    it('shows CL B and MILTRY for a military airport under Class B (3-42)', async () => {
-        const unit = await bootUnit({facilities: [military(11.9)], position: POS, altitudeFt: 0, airspaces: [classB()]});
+    // 3-42: CL B, CL C, CTA and TMA all stand on the left of the type row, whatever the airport type is on the right
+    it.each([
+        ['CL B', 'TEST CLASS B', BoundaryType.ClassB],
+        ['CL C', 'TEST CLASS C', BoundaryType.ClassC],
+        ['CTA ', 'TEST CTA', BoundaryType.ClassE],
+        ['TMA ', 'TEST TMA', BoundaryType.ClassE],
+    ])('puts %s on the left and MILTRY on the right of the type row (3-42)', async (letters, name, type) => {
+        const area = airspace(name, type, [[47.2, 11.8], [47.2, 12.2], [46.8, 11.8]]);
+        const unit = await bootUnit({facilities: [military(11.9)], position: POS, altitudeFt: 0, airspaces: [area]});
 
-        expect((await showApt1(unit))[3].trim()).toMatch(/^CL B ?MILTRY$/);
+        expect((await showApt1(unit))[3]).toBe(letters + ' MILTRY');
+    });
+
+    // 3-42: the airspace letters stand on the left of the row, also when no airport type follows
+    it('puts CL B at the left of the type row of a public airport (3-42)', async () => {
+        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 11.9)], position: POS, altitudeFt: 0, airspaces: [classB()]});
+
+        expect((await showApt1(unit))[3]).toBe('CL B       ');
+    });
+
+    // Where PRIVAT stands is not specified; the code gives it the place of MILTRY, which this pins as it is
+    it('puts PRIVAT where MILTRY stands (characterization)', async () => {
+        const unit = await bootUnit({facilities: [{...airport('KAAA', 47.1, 12.0), airportPrivateType: AirportPrivateType.Private} as AirportFacility], position: POS});
+
+        expect((await showApt1(unit))[3]).toBe('     PRIVAT');
     });
 
     // 3-26: whole words are abbreviated (Fort to FT, Saint to ST, Regional to REG), and the name is cut after eleven
