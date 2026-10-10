@@ -145,12 +145,22 @@ export class Apt4Page extends WaypointPage<AirportFacility> {
     private buildFreqList() {
         const facility = unpackFacility(this.facility);
         if (facility) {
-            this.freqs = facility.frequencies.filter(f => f.type != 0).map(f => `${this.freqTypeString(f.type)} ${format(f.freqMHz, "000.00")}`);
+            this.freqs = facility.frequencies.filter(f => f.type != 0).map(f => `${this.freqTypeString(f.type)} ${this.freqString(f.freqMHz)}`);
             this.numPages = Math.max(Math.ceil(this.freqs.length / 5), 1);
         } else {
             this.freqs = [];
             this.numPages = 1;
         }
+    }
+
+    /**
+     * 3-45: HF frequencies (2000 to 30000 kHz) are shown in kHz without a decimal point, VHF frequencies in MHz
+     */
+    private freqString(freqMHz: number): string {
+        if (freqMHz <= 30) {
+            return format(Math.round(freqMHz * 1000), "0");
+        }
+        return format(freqMHz, "000.00");
     }
 
     private freqTypeString(type: FacilityFrequencyType): string {
