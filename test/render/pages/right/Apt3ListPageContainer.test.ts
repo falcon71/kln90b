@@ -61,7 +61,7 @@ const pageField = () => Screen.read().status().right;
 
 describe('Apt3ListPageContainer, the list of a database airport and the page of a user airport', () => {
     // 3-44: the runways of a database airport are listed longest first; 5-16: a user airport stores one runway, which
-    // APT 3 shows as a length and a surface. The page tells the two apart when the scan changes the airport.
+    // APT 3 shows as RWY LEN with a length and a surface (5-17, figures 5-61 and 5-62). The page tells the two apart when the scan changes the airport.
     it('shows the runway of a user airport and not the runway list after a scan from the list (3-44, 5-16)', async () => {
         const unit = await bootOnApt3();
         await unit.panel.inner('R', 1);
@@ -174,7 +174,8 @@ describe('Apt3ListPageContainer, the pages after a change of the airport (charac
 });
 
 describe('Apt3ListPageContainer, an unknown ident', () => {
-    // 5-16, figure 5-54: an ident without a match offers to create the waypoint
+    // 5-16, figure 5-54: an ident without a match offers to create the waypoint. The figure shows it on APT 1; this test
+    // applies the same offer to the APT 3 list page, which the guide does not show, so the APT 3 part is an assumption
     it('offers CREATE NEW WPT AT for an ident entered on the list page (5-16)', async () => {
         const unit = await bootOnApt3();
         await unit.panel.inner('R', 1);
