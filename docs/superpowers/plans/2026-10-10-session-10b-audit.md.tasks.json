@@ -4,13 +4,13 @@
     {
       "id": 0,
       "subject": "Task 0: Harness helpers H1 to H13",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** every helper of the design exists in `test/harness/` with a harness test proven by a break and a paragraph in\n`testing.md` section 4.\n\n**Files:**\n- Create: `test/harness/panelXml.ts`, `test/harness/readers.ts`, `test/harness/worldBoot.ts`, `test/harness/console.ts`\n- Modify: `test/harness/boot.ts` (`NEAREST_SEARCH_WAIT_MS`, `HeadlessUnit.overlay`, the random spy restored at\n  teardown, the comment on the `19_000` wait of `bootToSelfTest`), `test/harness/sim/random.ts`,\n  `test/harness/sim/FakeSim.ts` (`writeCount`), `test/harness/flight/FrontPanel.ts` (`readMessages`, `directTo`, `show`,\n  `confirmSet1AndReselect`, `enterDate`), `test/harness/render/screen.ts` (`inverse`, `pageRows`),\n  `test/harness/render/superNav5.ts` (`showSuperNav5`, `superNav5OnLeg`, `superNav5OnArc`),\n  `test/harness/render/mount.ts` (`mountedText`, `mountedRead`), `docs/testing.md` (section 4; section 7 items built)\n- Test: `test/unit/harness/panelXml.test.ts`, `test/render/harness/readers.test.ts`,\n  `test/render/harness/readMessages.test.ts`, `test/render/harness/worldBoot.test.ts`,\n  `test/render/harness/frontPanelHelpers.test.ts`, `test/render/harness/consoleHelper.test.ts`, appended:\n  `test/render/harness/screen.test.ts`, `test/render/harness/superNav5.test.ts`, `test/render/harness/mount.test.ts` (or\n  the file that tests `mount` today), `test/unit/harness/fakes.test.ts`, `test/unit/harness/teardown.test.ts`\n\n**Acceptance Criteria:**\n- [ ] Every helper below exists with the given name and signature (a detail may change if the report says why).\n- [ ] `test/unit/harness/panelXml.test.ts` parses every key of `PANEL_KEYS` with a non-default value through the real\n      `KLN90BPlaneSettingsParser` and asserts the parsed setting differs from the default; it fails when a key in\n      `PANEL_KEYS` is misspelled (proof).\n- [ ] Each helper's harness test fails under a break of the helper (one `Proof:` line each).\n- [ ] `Math.random` is restored after a boot's teardown (a harness test asserts it).\n- [ ] No test outside `test/harness/` and the harness tests changes; `npm test` and `npx tsc --noEmit` clean.\n- [ ] `docs/testing.md` section 4 has a paragraph per helper; section 7 loses only the items this task builds (the\n      `messages(unit)` reader, the `userWaypoints` reader, the inverse reader, `unit.overlay()`, `sim.writeCount`) and\n      says the copies are moved by the main tasks of Session 10b.\n\n**Verify:** `npm test` → all files pass (the new harness tests included); `npx tsc --noEmit` → no output.\n\n```json:metadata\n{\"files\": [\"test/harness/panelXml.ts\", \"test/harness/readers.ts\", \"test/harness/worldBoot.ts\", \"test/harness/console.ts\", \"test/harness/boot.ts\", \"test/harness/sim/random.ts\", \"test/harness/sim/FakeSim.ts\", \"test/harness/flight/FrontPanel.ts\", \"test/harness/render/screen.ts\", \"test/harness/render/superNav5.ts\", \"test/harness/render/mount.ts\", \"docs/testing.md\"], \"verifyCommand\": \"npm test && npx tsc --noEmit\", \"acceptanceCriteria\": [\"every helper exists with its name and signature\", \"panelXml harness test parses every PANEL_KEYS key and fails on a misspelled key\", \"each helper's harness test fails under a break\", \"Math.random restored after teardown\", \"no test outside the harness changes; npm test and tsc clean\", \"testing.md section 4 paragraph per helper; section 7 loses only the built items\"], \"modelTier\": \"standard\"}\n```"
     },
     {
       "id": 1,
       "subject": "Task 1: Pages top level, left A-N, FiveSegmentPage",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0
       ],
@@ -19,7 +19,7 @@
     {
       "id": 2,
       "subject": "Task 2: Pages left O-Z, #96 pin",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0
       ],
@@ -28,7 +28,7 @@
     {
       "id": 3,
       "subject": "Task 3: Right pages, APT 3 table and container",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0
       ],
@@ -37,7 +37,7 @@
     {
       "id": 4,
       "subject": "Task 4: Controls",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0
       ],
@@ -46,7 +46,7 @@
     {
       "id": 5,
       "subject": "Task 5: Render top, data, services, #95, D2",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0
       ],
@@ -55,7 +55,7 @@
     {
       "id": 6,
       "subject": "Task 6: Unit, flight, harness tests, #93, D1, D6, D7",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0
       ],
@@ -76,5 +76,5 @@
       "description": "**Goal:** every placeholder is a filed issue, the session log and `testing.md` section 7 are written, Session 10b is\nticked and Session 11's steps cover the findings of section 6.\n\n**Files:**\n- Modify: `docs/test-coverage.md` (section 3: tick Session 10b, a result paragraph; Session 11's steps; section 4: the\n  session log), `docs/testing.md` (section 7), any test file with a `#NEW-` placeholder (the replacement only)\n- Modify: `docs/superpowers/specs/2026-10-10-session-10b-audit-design.md` (only if bugs were filed: an issue table)\n\n**Acceptance Criteria:**\n- [ ] Every `#NEW-<task>-<n>` is searched on GitHub (open and closed, several wordings), filed with the `bug` label per\n      `CLAUDE.md` or merged into an existing issue, and replaced; `grep -rn \"#NEW-\" test/` finds nothing.\n- [ ] `testing.md` section 7 names every copy the main tasks kept with its reason (from the reports), the\n      missed-approach and VOR 36 world copies of findings section 4, and the `FourSegmentPage` ENT order; the items\n      task 0 removed stay removed.\n- [ ] Session 11's steps in `docs/test-coverage.md` gain, as text only: a dated trainer record in `testing.md` that\n      keeps the `T<n>` ids with their session (or the comments rewritten); the session references in tests resolved by\n      that record; the rules `testing.md` cites by number (rule 8, rule 13, the evidence rule) restated in its own\n      words; the deletion of `docs/superpowers/` (specs, plans, `.tasks.json`, the findings and the inventory) with\n      `test-coverage.md`; section 7 regrouped by area with the duplicate electricity item merged and the `Version` mock\n      item naming `Sta3Page` and `Sta4Page`; step 4 exempting the harness self-test pin of `rejections.test.ts`; the two\n      superseded triage rows (AIRAC last day, the #40 cache window) to confirm; the #213 claim not repeated; the\n      controlling session's memory notes updated.\n- [ ] The session log entry (section 4) states what was done per task, what was left and why, the start and end\n      numbers of `npm test` and the coverage summary, and the items of the findings re-decided with a reason.\n- [ ] `npm test`, `npx tsc --noEmit` clean.\n\n**Verify:** `grep -rn \"#NEW-\" test/` → no output; `npm test` → all files pass; `npx tsc --noEmit` → no output.\n\n```json:metadata\n{\"files\": [\"docs/test-coverage.md\", \"docs/testing.md\"], \"verifyCommand\": \"grep -rn \\\"#NEW-\\\" test/ ; npm test && npx tsc --noEmit\", \"acceptanceCriteria\": [\"no #NEW- placeholder left; bugs filed or merged\", \"testing.md section 7 names kept copies, world copies, FourSegmentPage ENT order\", \"Session 11 steps cover findings section 6\", \"session log written\", \"suite and tsc clean\"], \"modelTier\": \"standard\"}\n```"
     }
   ],
-  "lastUpdated": "2026-10-10T10:23:17.600Z"
+  "lastUpdated": "2026-10-10T11:58:24.721Z"
 }
