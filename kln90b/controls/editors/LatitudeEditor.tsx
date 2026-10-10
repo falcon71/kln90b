@@ -34,7 +34,7 @@ export class LatitudeEditor extends Editor<Latitude> {
     }
 
     protected convertFromValue(value: Latitude): Rawvalue {
-        const northSountIdx = value > 0 ? 0 : 1;
+        const northSountIdx = value >= 0 ? 0 : 1;
         value = Math.abs(value);
         const degreesString = format(value, "00", {rounding: "floor"});
 

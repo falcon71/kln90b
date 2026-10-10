@@ -21,6 +21,18 @@ describe('latitude and longitude editors', () => {
     });
 });
 
+describe('latitude and longitude editors at negative zero (checked in the KLN 89 trainer, 2026-10-08, #308)', () => {
+    // The value of an S (or W) entered with every digit 0 is -0 (the sign -1 times zero), which a user waypoint keeps
+    // when it is entered that way and which reaches the editors of SUP and INT. The trainer showed N and E for it. Only
+    // the hemisphere is asserted: the padding of the zero degrees is #230.
+    it('shows N for a latitude of -0 and E for a longitude of -0 (#308)', () => {
+        const bus = new EventBus();
+
+        expect(text(new LatitudeEditor(bus, -0, () => undefined)).slice(0, 1)).toBe('N');
+        expect(text(new LongitudeEditor(bus, -0, () => undefined)).slice(0, 1)).toBe('E');
+    });
+});
+
 describe('latitude and longitude editors without a value (5-17)', () => {
     // 5-17 step 8, figure 5-56: USER POS? shows the latitude as dashes in the cells of a hemisphere, two degree digits,
     // two minute digits and two hundredths, the longitude with three degree digits and no blank after the hemisphere
@@ -305,16 +317,29 @@ describe('latitude and longitude editors at exactly 0 degrees ' +
     }
 
     // Checked in the KLN 89 trainer, 2026-10-08 (T35): after entering S 0°00.00' or W 0°00.00' the unit shows N
-    // 0°00.00' and E 0°00.00' (the trainer's zero is blank-padded, which is #230; only the hemisphere is asserted). The
-    // editors choose S and W for a value that is not above 0 (LatitudeEditor and LongitudeEditor.convertFromValue).
-    it.fails('shows a latitude of exactly 0 as N (checked in the KLN 89 trainer, 2026-10-08, #308)', async () => {
+    // 0°00.00' and E 0°00.00' (the trainer's zero is blank-padded, which is #230; only the hemisphere is asserted).
+    it('shows a latitude of exactly 0 as N (checked in the KLN 89 trainer, 2026-10-08, #308)', async () => {
         const shown = await shownAfterConfirm(2, [1, 1, 1, 1, 1, 1, 1]); // N 00°00.00
 
         expect(shown[0]).toBe('N');
     });
 
-    it.fails('shows a longitude of exactly 0 as E (checked in the KLN 89 trainer, 2026-10-08, #308)', async () => {
+    it('shows a longitude of exactly 0 as E (checked in the KLN 89 trainer, 2026-10-08, #308)', async () => {
         const shown = await shownAfterConfirm(3, [1, 1, 1, 1, 1, 1, 1, 1]); // E 000°00.00
+
+        expect(shown[0]).toBe('E');
+    });
+
+    // The entry the trainer check made: the hemisphere S (or W) with every digit 0, entered and shown again, gives N (E).
+    // The editor's own value (-0, the southern sign times zero) is held by the direct tests above.
+    it('shows an entered S 00°00.00 as N (checked in the KLN 89 trainer, 2026-10-08, #308)', async () => {
+        const shown = await shownAfterConfirm(2, [2, 1, 1, 1, 1, 1, 1]); // S 00°00.00
+
+        expect(shown[0]).toBe('N');
+    });
+
+    it('shows an entered W 000°00.00 as E (checked in the KLN 89 trainer, 2026-10-08, #308)', async () => {
+        const shown = await shownAfterConfirm(3, [2, 1, 1, 1, 1, 1, 1, 1]); // W 000°00.00
 
         expect(shown[0]).toBe('E');
     });

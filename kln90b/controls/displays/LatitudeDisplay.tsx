@@ -30,7 +30,7 @@ export class LatitudeDisplay implements UiElement {
             return "- --°--.--'";
         }
 
-        const northSount = this.latitude > 0 ? "N" : "S";
+        const northSount = this.latitude >= 0 ? "N" : "S";
         const latitude = Math.abs(this.latitude);
         const degreesString = format(latitude, "00", {rounding: "floor"});
 

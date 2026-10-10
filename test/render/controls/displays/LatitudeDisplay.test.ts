@@ -69,9 +69,15 @@ describe('LatitudeDisplay at the equator', () => {
     });
 
     // The KLN 89 trainer, 2026-10-08: a latitude entered as S and all zeros was kept as N 0°00.00' once confirmed. The
-    // Pilot's Guide has no figure at exactly 0. The code draws S for 0 (the test is "> 0").
-    it.fails('shows N at exactly 0 degrees (checked in the KLN 89 trainer, 2026-10-08, #308)', () => {
+    // Pilot's Guide has no figure at exactly 0.
+    it('shows N at exactly 0 degrees (checked in the KLN 89 trainer, 2026-10-08, #308)', () => {
         expect(shown(0).slice(0, 1)).toBe('N');
+    });
+
+    // The same trainer check: an S entered with every digit 0 is the value -0 (the southern sign times zero), and it
+    // shows N too
+    it('shows N at negative zero (checked in the KLN 89 trainer, 2026-10-08, #308)', () => {
+        expect(shown(-0).slice(0, 1)).toBe('N');
     });
 });
 

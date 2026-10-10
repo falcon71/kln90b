@@ -35,7 +35,7 @@ export class LongitudeEditor extends Editor<Longitude> {
     }
 
     protected convertFromValue(value: Longitude): Rawvalue {
-        const eastWestIndex = value > 0 ? 0 : 1;
+        const eastWestIndex = value >= 0 ? 0 : 1;
         value = Math.abs(value);
         const degreesString = format(value, "000", {rounding: "floor"});
 

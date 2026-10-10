@@ -31,7 +31,7 @@ export class LongitudeDisplay implements UiElement {
             return "----°--.--'";
         }
 
-        const eastWest = this.longitude > 0 ? "E" : "W";
+        const eastWest = this.longitude >= 0 ? "E" : "W";
         const longitude = Math.abs(this.longitude);
         const degreesString = format(longitude, "00", {rounding: "floor"}).padStart(3, " ");
 
