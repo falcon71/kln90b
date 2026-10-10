@@ -131,7 +131,7 @@ export class Set2Page extends SixLineHalfPage {
         this.props.sensors.in.gps.timeZulu = newDate.atTimezone(UTC);
         const dbValidAfter = this.props.database.isAiracCurrent();
         if (dbValdiBefore !== dbValidAfter) {
-            this.props.messageHandler.addMessage(new OneTimeMessage(["RECYLCE POWER TO USE", "CORRECT DATA BASE DATA"]))
+            this.props.messageHandler.addMessage(new OneTimeMessage(["RECYCLE POWER TO USE", "CORRECT DATA BASE DATA"]))
         }
         this.props.bus.getPublisher<GPSEvents>().pub("timeUpdatedEvent", this.props.sensors.in.gps.timeZulu);
     }
@@ -148,7 +148,7 @@ export class Set2Page extends SixLineHalfPage {
         this.props.sensors.in.gps.timeZulu = newDate.atTimezone(UTC);
         const dbValidAfter = this.props.database.isAiracCurrent();
         if (dbValdiBefore !== dbValidAfter) {
-            this.props.messageHandler.addMessage(new OneTimeMessage(["RECYLCE POWER TO USE", "CORRECT DATA BASE DATA"]))
+            this.props.messageHandler.addMessage(new OneTimeMessage(["RECYCLE POWER TO USE", "CORRECT DATA BASE DATA"]))
         }
         this.props.bus.getPublisher<GPSEvents>().pub("timeUpdatedEvent", this.props.sensors.in.gps.timeZulu);
     }

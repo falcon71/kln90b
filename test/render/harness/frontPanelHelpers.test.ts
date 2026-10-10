@@ -74,7 +74,7 @@ describe('FrontPanel.show (harness)', () => {
 
 describe('FrontPanel.enterDate (harness)', () => {
     // 3-53: the date of SET 2 is entered cell by cell, and is read-only while the GPS has a fix, so the unit has none.
-    // 1 Jan 2027 is the entry of the #111 pin in Set2Page.test.ts
+    // 1 Jan 2027 is the entry of the #111 test in Set2Page.test.ts
     it('enters the day, the month and the two year digits of the open editor', async () => {
         const unit = await bootUnit({storage: {fastGpsAcquisition: false}, coldGps: true});
         await unit.panel.selectPage('L', 'SET 2');
