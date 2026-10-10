@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {
-    AirportFacility, ApproachProcedure, Facility, FixTypeFlags, FlightPlan, FlightPlanLeg, GeoCircle, GeoPoint, LegTurnDirection,
+    AirportFacility, ApproachProcedure, Facility, FixTypeFlags, FlightPlan, FlightPlanLeg, GeoCircle, GeoPoint, ICAO, LegTurnDirection,
     LegType, Procedure, RnavTypeFlags,
 } from '@microsoft/msfs-sdk';
 import {SidStar} from '../../../../kln90b/data/navdata/SidStar';
@@ -435,12 +435,30 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(SidStar.hasDuplicates([fplLeg(wpt)], [procLeg(vor('KPU', 47, 8))])).toBe(false);
         });
 
-        // The code compares the ICAO objects by reference; a copy of the same waypoint is not found.
-        it.fails('finds a waypoint whose ICAO is an equal copy (#130)', () => {
+        // The ICAOs are compared by value: the facility loader may hand out a copy of the same waypoint (a plan restored
+        // from storage), and the pilot is warned all the same.
+        it('finds a waypoint whose ICAO is an equal copy (#130)', () => {
             const copy = {...wpt, icaoStruct: {...wpt.icaoStruct}};
             expect(copy.icaoStruct).toEqual(wpt.icaoStruct);
             expect(copy.icaoStruct).not.toBe(wpt.icaoStruct);
             expect(SidStar.hasDuplicates([fplLeg(wpt)], [procLeg(copy)])).toBe(true);
+        });
+
+        // All four parts of the ICAO decide, so a waypoint that only shares its ident with one of the plan is no duplicate
+        it.each([
+            ['region', ICAO.value('V', 'K2', '', 'KPT')],
+            ['type', ICAO.value('N', wpt.icaoStruct.region, '', 'KPT')],
+            ['airport', ICAO.value('V', wpt.icaoStruct.region, 'KAAA', 'KPT')],
+            ['ident', ICAO.value('V', wpt.icaoStruct.region, '', 'KPU')],
+        ])('finds no duplicate when only the %s of the ICAO differs (#130)', (_part, icaoStruct) => {
+            expect(SidStar.hasDuplicates([fplLeg(wpt)], [procLeg({...wpt, icaoStruct})])).toBe(false);
+        });
+
+        // The equal copy is found wherever it stands: behind other legs of the plan and of the procedure
+        it('finds an equal copy behind other waypoints in both lists (#130)', () => {
+            const other = vor('KPV', 47, 8);
+            const copy = {...wpt, icaoStruct: {...wpt.icaoStruct}};
+            expect(SidStar.hasDuplicates([fplLeg(other), fplLeg(wpt)], [procLeg(vor('KPU', 47, 8)), procLeg(copy)])).toBe(true);
         });
     });
 

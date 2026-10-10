@@ -64,10 +64,8 @@ export class SidStar {
      */
 
     public static hasDuplicates(fplLegs: KLNFlightplanLeg[], procedureLegs: KLNFlightplanLeg[]): boolean {
-        const procedureIcaos = procedureLegs.map(leg => leg.wpt.icaoStruct);
-
         for (const fplLeg of fplLegs) {
-            if (procedureIcaos.includes(fplLeg.wpt.icaoStruct)) {
+            if (procedureLegs.some(leg => ICAO.valueEquals(leg.wpt.icaoStruct, fplLeg.wpt.icaoStruct))) {
                 return true;
             }
         }
