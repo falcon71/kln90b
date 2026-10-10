@@ -1376,7 +1376,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 
 - **The 4-3 cursor tests** (the cursor field remembered while the page is not left) sit in `WaypointEditor.test.ts`,
   though their subject is `CursorController`; they could move to `FplPage.test.ts` or a `CursorController` test file.
-- The controls' bugs that the right pages showed (#277, #282, #288, #290) are pinned on the pages and at control level.
+- The controls' bugs that the right pages showed (#277, #282, #290) are pinned on the pages and at control level.
 - **Leads** (seen and not confirmed or not filed):
     - Editors: `FreetextEditor.convertFromValue` drops a cell for a stored character outside its charset;
       `MagvarEditor` enters 0°W as -0 and cuts a variation of 100° or more to two digits (polar VORs only);

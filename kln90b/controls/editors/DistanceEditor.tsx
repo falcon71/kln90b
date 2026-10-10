@@ -7,7 +7,7 @@ export class DistanceEditor extends Editor<number> {
 
     constructor(bus: EventBus, value: number | null, enterCallback: (text: number) => void) {
         super(bus, [
-            NumberEditorField.createWithMinMax(0, 3),
+            NumberEditorField.createWithMinMax(0, 9),
             new NumberEditorField(),
             new NumberEditorField(),
             new NumberEditorField(),
@@ -31,11 +31,6 @@ export class DistanceEditor extends Editor<number> {
     }
 
     protected convertToValue(rawValue: Rawvalue): Promise<number | null> {
-        const newValue = Number(String(rawValue[0]) + String(rawValue[1]) + String(rawValue[2]) + "." + String(rawValue[3]));
-        if (newValue >= 360) {
-            return Promise.resolve(null);
-        }
-
-        return Promise.resolve(newValue);
+        return Promise.resolve(Number(String(rawValue[0]) + String(rawValue[1]) + String(rawValue[2]) + "." + String(rawValue[3])));
     }
 }

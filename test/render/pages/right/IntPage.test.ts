@@ -441,9 +441,9 @@ describe('user intersection (5-18, 5-19)', () => {
     });
 
     // Figure 5-74 shows three digits before the point of DIS, and the KLN 89 trainer (2026-10-07) accepted 400.0 (and
-    // 999.9) without a message. DistanceEditor refuses 360 and more, and its first cell takes only 0 to 3. ORD has no
+    // 999.9) without a message. The first cell of the field takes 4, and ORD has no
     // variation, so the waypoint lies 400.0 NM out on the true 090° course (pointFrom, flight/geo.ts)
-    it.fails('accepts a distance of 400.0 NM (5-19, figure 5-74, the KLN 89 trainer, #288)', async () => {
+    it('accepts a distance of 400.0 NM (5-19, figure 5-74, the KLN 89 trainer, #288)', async () => {
         const unit = await distanceEntered('4000');
 
         const p = pointFrom({lat: 47.0, lon: 11.0}, 90, 400);
@@ -453,7 +453,7 @@ describe('user intersection (5-18, 5-19)', () => {
         expect(w[4]).toBeCloseTo(p.lon, 6);
     });
 
-    // Sibling of the pin above: a distance below 360 NM is accepted and places the waypoint
+    // Sibling of the test above: a distance below 360 NM, which the field always took, places the waypoint
     it('accepts a distance of 350.0 NM (5-19, figure 5-74)', async () => {
         const unit = await distanceEntered('3500');
 

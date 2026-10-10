@@ -110,10 +110,9 @@ describe('DistanceEditor on the INT page (5-19)', () => {
         expect(qqiLat(unit)).toBeCloseTo(pointFrom(MKC, 0, 48.1).lat, 6);
     });
 
-    // Figure 5-74 has three digits before the point, and the KLN 89 trainer (2026-10-07) took 400.0 and 999.9. The
-    // hundreds cell of DistanceEditor offers 0 to 3 only (the radial's range), so four clicks after the opening 0 wrap
-    // it back to 0
-    it.fails('offers the hundreds digits up to 9 (5-19, figure 5-74, '
+    // Figure 5-74 has three digits before the point, and the KLN 89 trainer (2026-10-07) took 400.0 and 999.9, so the
+    // hundreds cell offers 0 to 9: four clicks after the opening 0 give 4
+    it('offers the hundreds digits up to 9 (5-19, figure 5-74, '
         + 'checked in the KLN 89 trainer, 2026-10-07, #288)', async () => {
         const unit = await onDis();
         await unit.panel.inner('R', 1); // opens the field with 0
@@ -131,9 +130,21 @@ describe('DistanceEditor on the INT page (5-19)', () => {
         expect(unit.panel.focused('R').text).toBe('3__._');
     });
 
-    // The KLN 89 trainer (2026-10-07) took 400.0 and 999.9 without a message; figure 5-74 allows three digits. 360.0
-    // can be typed into the cells today, and convertToValue refuses it with INVALID ENT
-    it.fails('accepts a distance of 360.0 NM (5-19, figure 5-74, '
+    // The top of the range: nine clicks after the opening 0 give 9, one more wraps to 0 (a digit cell wraps from 9 to 0,
+    // checked in the KLN 89 trainer, 2026-10-08, T4, the same test as for the radial)
+    it('wraps the hundreds digit from 9 to 0 (5-19, figure 5-74, checked in the KLN 89 trainer, 2026-10-08, T4)', async () => {
+        const unit = await onDis();
+        await unit.panel.inner('R', 1);
+        await unit.panel.inner('R', 9);
+        expect(unit.panel.focused('R').text).toBe('9__._');
+        await unit.panel.inner('R', 1);
+
+        expect(unit.panel.focused('R').text).toBe('0__._');
+    });
+
+    // The KLN 89 trainer (2026-10-07) took 400.0 and 999.9 without a message; figure 5-74 allows three digits, so 360.0,
+    // the first value the radial's limit refused, is taken
+    it('accepts a distance of 360.0 NM (5-19, figure 5-74, '
         + 'checked in the KLN 89 trainer, 2026-10-07, #288)', async () => {
         const unit = await onDis();
         const messages = collectStatusMessages(unit);
@@ -144,7 +155,7 @@ describe('DistanceEditor on the INT page (5-19)', () => {
         expect(qqiLat(unit)).toBeCloseTo(pointFrom(MKC, 0, 360).lat, 6);
     });
 
-    // Sibling of the pin: the largest distance accepted today, 359.9 NM
+    // The value below the old limit
     it('accepts a distance of 359.9 NM (5-19)', async () => {
         const unit = await onDis();
         const messages = collectStatusMessages(unit);
@@ -153,6 +164,17 @@ describe('DistanceEditor on the INT page (5-19)', () => {
 
         expect(messages).toEqual([]);
         expect(qqiLat(unit)).toBeCloseTo(pointFrom(MKC, 0, 359.9).lat, 6);
+    });
+
+    // The largest value of the field, which the KLN 89 trainer (2026-10-07) took as an edit without a message
+    it('accepts a distance of 999.9 NM (5-19, figure 5-74, checked in the KLN 89 trainer, 2026-10-07)', async () => {
+        const unit = await onDis();
+        const messages = collectStatusMessages(unit);
+        await unit.panel.type('R', '9999');
+        await unit.panel.ent();
+
+        expect(messages).toEqual([]);
+        expect(qqiLat(unit)).toBeCloseTo(pointFrom(MKC, 0, 999.9).lat, 6);
     });
 });
 
