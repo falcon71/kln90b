@@ -303,8 +303,8 @@ pages accept.
 `Screen.read()` (`render/screen.ts`) turns the DOM into the cells the pilot sees; where the DOM and the screen differ,
 the reader follows the screen:
 
-- A row may carry blank cells past the edge of its half page (the nearest selector of APT 1 and VOR); they read as
-  nothing. A visible character or an inverted cell past the edge is a rendering bug, and the reader throws (#115).
+- A row may carry blank cells past the edge of its half page (the nearest selector of APT 1, VOR and NDB); they read as
+  nothing. A visible character or an inverted cell past the edge is a rendering bug, and the reader throws.
 - With the left cursor on, the status line shows `CRSR` (or `KYBD`) one cell in, because the DOM gives that field a
   CSS margin of one cell. The reader inserts that blank, so the status line keeps its 23 cells and `CRSR` sits in
   columns 1 to 4.
@@ -836,10 +836,9 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **A bus subscription added after boot is called at once with the last cached value.** A test that subscribes to a
   topic and expects to see only new events must skip that first call (or count from a reference taken after
   subscribing).
-- **`Screen.read()` throws on a visible character, or an inverted cell, past column 11 of a half page.** That is how
-  the ACT page with an active index shows the type letter of an NDB (#115). Blank cells past the edge, such as the
-  trailing blanks of the nearest selector on APT 1 and VOR, are tolerated. A test that pins #115 reads the half page's
-  DOM with `readRows`.
+- **`Screen.read()` throws on a visible character, or an inverted cell, past column 11 of a half page.** A row
+  that pushes its type letter off the half page is a rendering bug. Blank cells past the edge, such as the trailing
+  blanks of the nearest selector on APT 1, VOR and NDB, are tolerated.
 - **A booted engine-running unit has a GPS fix at once**, in the slow acquisition mode too (the force-ready start calls
   `acquireAndUseSatellites()` in `WelcomePage`). A test that needs an invalid GPS, for example to enter the date on SET 2
   (read-only with a fix), boots with `coldGps: true`.

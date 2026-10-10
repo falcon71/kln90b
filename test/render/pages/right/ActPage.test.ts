@@ -6,7 +6,7 @@ import {approachWorld, dtWorld, sidStarWorld} from '../../../harness/fixtures';
 import {pointFrom} from '../../../harness/flight/geo';
 import {airport, intersection, ndb, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
-import {readRows, Screen} from '../../../harness/render/screen';
+import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan, savedUserWaypoints} from '../../../harness/storage';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {fplIdents} from '../../../harness/readers';
@@ -71,8 +71,10 @@ describe('ACT page', () => {
         expect(rows[4]).toBe('WAYPOINT   ');
     });
 
-    // 4-10: the type letter is on the right of the first row
-    it.fails('shows the type letter of an NDB inside the half page (#115)', async () => {
+    // 4-10: the type letter is on the right of the first row, in the last column of the half page like the A of an
+    // airport and the V of a VOR (figures 4-37 and 4-38). The nearest selector follows it, and its four blanks lie beyond
+    // the edge, where Screen.read() ignores them
+    it('shows the type letter of an NDB in the last column of the half page (4-10, #115)', async () => {
         const kaaa = airport('KAAA', 47.0, 7.9);
         const abc = ndb('ABC', 47.0, 8.3);
         const unit = await bootUnit({facilities: [kaaa, abc], position: {lat: 47.0, lon: 8.0}});
@@ -81,11 +83,7 @@ describe('ACT page', () => {
         insertLeg(unit, 1, abc);
         await vi.advanceTimersByTimeAsync(3000);
 
-        // Not Screen.read(): it refuses the type letter past the 11 columns of the half page, which is this bug (#115), so
-        // the pin reads the rows of the DOM
-        const first = readRows(document.querySelector('.right-page')!).map(r => r.map(c => c.ch).join(''))[0];
-        expect(first.length).toBeLessThanOrEqual(11);
-        expect(first.trimEnd().endsWith('N')).toBe(true);
+        expect(Screen.read().rows('R')[0]).toBe('› 2 ABC   N');
     });
 });
 

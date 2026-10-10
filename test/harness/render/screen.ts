@@ -139,7 +139,7 @@ export function readRows(root: Element): Cell[][] {
 function fit(row: Cell[] | undefined, width: number, where: string): Cell[] {
     const r = [...(row ?? [])];
     // The DOM of some pages carries trailing blanks past the edge (the nearest selector of APT 1 and VOR); the pilot sees
-    // nothing there. A visible character past the edge is a rendering bug and still throws (#115).
+    // nothing there. A visible character past the edge is a rendering bug and still throws.
     while (r.length > width && r[r.length - 1].ch === ' ' && r[r.length - 1].attr === '.') r.pop();
     if (r.length > width) {
         throw new Error(`Screen: ${where} is ${r.length} cells wide, more than ${width}: "${r.map(c => c.ch).join('')}"`);

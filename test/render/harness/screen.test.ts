@@ -96,7 +96,7 @@ describe('Screen, rows wider than the half page', () => {
         expect(Screen.read().row(0)).toBe('ABCDEFGHIJK|           ');
     });
 
-    // A character past the edge is a rendering bug, e.g. the type letter of an NDB on the ACT page (#115)
+    // A character past the edge is a rendering bug: the pilot would see it, or lose it
     it('throws when a non-blank cell is past the edge', () => {
         mount(half('ABCDEFGHIJK' + '&nbsp;'.repeat(3) + 'X'));
         expect(() => Screen.read()).toThrow(/left row 0 is 15 cells wide, more than 11/);
