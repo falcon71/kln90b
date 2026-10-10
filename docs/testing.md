@@ -1369,8 +1369,6 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - D/T 1 and D/T 2 beside another page hide the last-waypoint block when the active waypoint is the last one (4-12 is
       silent). After LOAD IN FPL on ACT 8 the ACT page switches to the new active waypoint (the guide is silent).
     - The code comment at `Apt8Page.tsx:352` quotes a sentence of 6-4 nearly word for word; it should be paraphrased.
-    - Selecting NAV 2 on the right from the boot's SUP page passes ACT, which posts NO SUP WPTS (#293), so a test that
-      reads the status line routes the right side another way.
 
 ## Controls
 

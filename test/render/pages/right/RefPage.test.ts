@@ -187,8 +187,8 @@ describe('REF page', () => {
 
     // 5-22 calls the reference waypoint a supplemental waypoint; C-2: NO SUP WPTS belongs to selecting the SUP page type
     // when there are no supplemental waypoints. The page of the new reference waypoint is a SUP page built for the
-    // confirmation, and its constructor posts the message because the SUP scan list does not hold TXKA (yet)
-    it.fails('does not post NO SUP WPTS while it shows the new reference waypoint (5-22, C-2, #293)', async () => {
+    // confirmation while the SUP scan list does not hold TXKA (yet); it must not post the message
+    it('does not post NO SUP WPTS while it shows the new reference waypoint (5-22, C-2, #293)', async () => {
         const unit = await bootOnRef('FPL 2');
         const messages = collectStatusMessages(unit);
 

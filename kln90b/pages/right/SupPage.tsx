@@ -16,7 +16,7 @@ import {LatitudeEditor} from "../../controls/editors/LatitudeEditor";
 import {LongitudeEditor} from "../../controls/editors/LongitudeEditor";
 import {SupplementarySelector} from "../../controls/selects/SupplementarySelector";
 import {WaypointEditor} from "../../controls/editors/WaypointEditor";
-import {isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
+import {isUserWaypoint, isWaypointPageProps, unpackFacility, WaypointPage} from "./WaypointPage";
 import {CreateWaypointMessage} from "../../controls/selects/CreateWaypointMessage";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {RadialEditor} from "../../controls/editors/RadialEditor";
@@ -66,7 +66,8 @@ export class SupPage extends WaypointPage<UserFacility> {
     constructor(props: PageProps) {
         super(props);
 
-        if (this.props.scanLists.supScanlist.isEmpty()) {
+        //C-2 The message belongs to selecting the SUP page type. A page built with a waypoint (or none) is the placeholder of the ACT page or the confirmation of a waypoint
+        if (!isWaypointPageProps(props) && this.props.scanLists.supScanlist.isEmpty()) {
             props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO SUP WPTS");
         }
 

@@ -280,7 +280,7 @@ describe('ACT page without an active waypoint', () => {
         return unit;
     }
 
-    // The setup sibling of the pin below: without a plan the page shows NO ACTIVE WAYPOINT, and the boot has left no
+    // The setup sibling of the test below: without a plan the page shows NO ACTIVE WAYPOINT, and the boot has left no
     // message on the status line. 4-10 does not describe the state; the source is the code's reference, a video of a real
     // unit (https://youtu.be/Q6m7_CVGPCg?t=19, cited in ActPage.tsx), as for the f95d1d7 tests above
     it('shows NO ACTIVE WAYPOINT when there is no plan (video of a real unit, youtu.be/Q6m7_CVGPCg)', async () => {
@@ -296,8 +296,8 @@ describe('ACT page without an active waypoint', () => {
 
     // C-2: NO SUP WPTS belongs to selecting the SUP page type when there are no supplemental waypoints, and the KLN 89
     // trainer, 2026-10-07: ACT with nothing active shows its text and posts no message. The ACT page builds a
-    // SupPage as the placeholder behind NO ACTIVE WAYPOINT, and its constructor posts the message
-    it.fails('does not post NO SUP WPTS (C-2, the KLN 89 trainer, 2026-10-07, #293)', async () => {
+    // SupPage as the placeholder behind NO ACTIVE WAYPOINT, which must not post it
+    it('does not post NO SUP WPTS (C-2, the KLN 89 trainer, 2026-10-07, #293)', async () => {
         const unit = await bootWithoutPlan();
         const messages = collectStatusMessages(unit);
 
