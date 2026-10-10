@@ -1,8 +1,9 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {FacilityType, ICAO} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
-import {savedUserWaypoints} from '../../../harness/storage';
+import {savedUserWaypoints, storedSetting} from '../../../harness/storage';
+import {vor} from '../../../harness/navdata/builders';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {activeIdent, userWaypoints} from '../../../harness/readers';
 
@@ -41,9 +42,7 @@ describe('user VOR (5-18)', () => {
         expect(userWaypoints(unit).map(f => [f.lat, f.lon])).toEqual([[47, 100]]);
     });
 
-    // The V1 string says VOR ('VXX    QQQ  ') but the ICAO value says U, so the repository files it under the
-    // supplementary waypoints: OTH 3 lists it as S, and the persistor saves it in the SUP format without frequency.
-    it.fails('is a VOR, not a supplementary waypoint (#173)', async () => {
+    it('is a VOR, not a supplementary waypoint (#173)', async () => {
         const unit = await createUserVor();
         expect(userTuples(unit)).toEqual([['XX', 'QQQ', FacilityType.VOR]]);
     });
@@ -56,7 +55,8 @@ describe('user VOR (5-18)', () => {
         expect(Screen.read().rows('L')[1].slice(0, 6)).toBe('QQQ   ');
     });
 
-    it.fails('is listed as V on OTH 3 (#173)', async () => {
+    // 5-20: the type letter of a user VOR on OTH 3 is V
+    it('is listed as V on OTH 3 (#173)', async () => {
         const unit = await createUserVor();
         await unit.panel.cursor('R');
         await unit.panel.selectPage('L', 'OTH 3');
@@ -107,6 +107,44 @@ describe('user VOR page (5-18)', () => {
 
         expect(unit.errors).toEqual([]);
         expect(Screen.read().rows('R').slice(2)).toEqual(['          U', '113.90 12°W', "N 47°00.00'", "E100°00.00'"]);
+    });
+
+    // Persisted user data (CLAUDE.md, "Public contract with aircraft"; the V2 format in docs/architecture.md, Core 7): a
+    // user VOR is saved in the VOR format with its frequency and magnetic variation, as the string that
+    // savedUserWaypoints lays out by hand from that format (#173)
+    it('is saved in the VOR format with its frequency and magnetic variation (#173)', async () => {
+        const unit = await unknownVor();
+        await unit.panel.ent(); // the cursor moves to the frequency
+        await unit.panel.type('R', '11390');
+        await unit.panel.ent(); // to the magnetic variation
+        await unit.panel.type('R', '12W');
+        await unit.panel.ent(); // to the latitude
+        await typePosition(unit);
+        await vi.advanceTimersByTimeAsync(10000); // the unit saves some time after the change
+
+        const expected = savedUserWaypoints([{kind: 'vor', ident: 'QQQ', lat: 47, lon: 100, freqMHz: 113.9, magvar: 12}]);
+        expect(storedSetting(unit, 'wpt0')).toBe(expected.wpt0);
+    });
+
+    // 3-21: the scan list of the VOR page holds the user VOR with the VORs of the database, in alphanumeric order. A
+    // user VOR that is filed as a SUP waypoint would be missing from it (#173)
+    it('is scanned with the VORs of the database (3-21, #173)', async () => {
+        const unit = await bootUnit({facilities: [vor('ABD', 47.2, 8.2)]});
+        await unit.panel.selectPage('R', 'VOR  ');
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'QQQ');
+        await unit.panel.ent();
+        await unit.panel.outer('R', 2); // from the frequency to the latitude
+        await typePosition(unit);
+        expect(Screen.read().rows('R')[0]).toBe(' QQQ       '); // precondition: the user VOR is shown
+        await unit.panel.scan();
+
+        await unit.panel.inner('R', -1);
+        expect(Screen.read().rows('R')[0].slice(0, 4)).toBe(' ABD');
+        await vi.advanceTimersByTimeAsync(400); // a slow turn: no speed-up (WaypointPage SPEEDSTEP)
+        await unit.panel.inner('R', 1);
+
+        expect(Screen.read().rows('R')[0]).toBe(' QQQ       ');
     });
 
     // 5-18: without an entered magnetic variation the unit computes one and stores it. The world has 13° E everywhere

@@ -220,7 +220,7 @@ export class VorPage extends WaypointPage<VorFacility> {
         // noinspection JSDeprecatedSymbols
         this.facility = {
             icao: buildIcao('V', USER_WAYPOINT, this.ident),
-            icaoStruct: buildIcaoStruct('U', USER_WAYPOINT, this.ident),
+            icaoStruct: buildIcaoStruct('V', USER_WAYPOINT, this.ident),
             name: "",
             lat: this.userVor.lat,
             lon: this.userVor.lon,
