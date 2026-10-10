@@ -15,7 +15,7 @@ import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacility
 // ABC is the only VOR near the user waypoints, 0.2 degrees (12.0 NM) south of USUP and 0.3 degrees (18.0 NM) south of
 // USUQ; the aircraft is 12.0 NM south of ABC. The variation of ABC is given in degrees east, which the sim stores
 // negated (builders.ts, Nav2Page). "C-1" and "C-2" in the titles are pages of Appendix C of the Pilot's Guide (the
-// message list), not research items.
+// message list).
 const POSITION = {lat: 46.8, lon: 10.5};
 const abc = (variationEast = 0) => vor('ABC', 47.0, 10.5, {magneticVariation: 0 - variationEast});
 const SUPS = () => savedUserWaypoints([
@@ -203,7 +203,7 @@ describe('SUP page', () => {
 
     // 5-17 step 8 (figures 5-56 to 5-58), 5-18: USER POS? puts the cursor on the dashed latitude, ENT on the latitude moves
     // it to the longitude, and ENT on the longitude creates the waypoint with the cursor off. C-1: ENT LAT/LON reminds the
-    // pilot of the missing position. The keyboard types the digits (the editors themselves are Session 9b's).
+    // pilot of the missing position. The keyboard types the digits (the editors have their own tests).
     it('creates the waypoint at a typed latitude and longitude with USER POS? (5-17, 5-18, C-1)', async () => {
         const unit = await createNewQq();
         await unit.panel.cursorTo('R', 'USER POS?');

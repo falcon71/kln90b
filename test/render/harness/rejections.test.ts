@@ -42,7 +42,8 @@ describe('unhandled rejection collector (harness)', () => {
     });
 
     // The strict check: a rejection nobody took fails the test when it ends. The sibling above holds the same setup.
-    it.fails('fails a test that leaves a rejection untaken', async () => {
+    // Not a bug pin: the failure is the behavior under test, so this it.fails names no issue and stays as it is
+    it.fails('fails a test that leaves a rejection untaken (harness self-test, not a bug pin)', async () => {
         await bootUnit();
         void Promise.reject(new Error('untaken'));
         await vi.advanceTimersByTimeAsync(250);

@@ -59,8 +59,8 @@ describe('WaypointDeleteListItem on OTH 3 (5-20)', () => {
 });
 
 describe('WaypointDeleteListItem on OTH 3, the DEL question', () => {
-    // Trainer T22 a (the 89's user waypoint list, OTH 4 there): CLR again withdrew the question, the waypoint stayed
-    // and the cursor was on it
+    // Trainer T22 a (2026-10-08; the 89's user waypoint list, OTH 4 there): CLR again withdrew the question, the
+    // waypoint stayed and the cursor was on it
     it('a second CLR withdraws the question, keeps the waypoint and keeps the cursor on it ' +
         '(checked in the KLN 89 trainer, 2026-10-08)',
         async () => {

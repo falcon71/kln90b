@@ -110,7 +110,7 @@ describe('aircraft power interruptions (maintenance manual)', () => {
     async function onCircuit(): Promise<HeadlessUnit> {
         const unit = await bootUnit({panelXml: CIRCUIT_XML});
         // CIRCUIT ON:1 is unset (reads 0) at the boot: 3 s, beyond the switch-over, so that the unit is off before the
-        // circuit comes on (testing.md section 7: the boot cannot preset the circuit)
+        // circuit comes on (testing.md section 9: the boot cannot preset the circuit)
         await vi.advanceTimersByTimeAsync(3000);
         expect(Screen.read().row(0)).toBe(BLANK_ROW); // Precondition: off
         unit.env.sim.set('CIRCUIT ON:1', 'bool', true);

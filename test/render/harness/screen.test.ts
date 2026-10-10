@@ -279,8 +279,8 @@ describe('Screen, the USE? overlay of a numbered flight plan', () => {
         expect(() => Screen.read()).toThrow(/USE\? overlay "USE\?" does not lie over its row "USE\?"/);
     });
 
-    // The rows of a numbered plan with waypoints could not be read before (testing.md section 7): selectPage, focused
-    // and Screen.read() threw on 15 cells
+    // The rows of a numbered plan with waypoints could not be read before the reader handled the USE? overlay:
+    // selectPage, focused and Screen.read() threw on 15 cells
     it('reads FPL 3 with waypoints and lets the panel find USE? and USE? INVRT? (booted unit)', async () => {
         const {kaaa, abc, kbbb} = standardRoute();
         const unit = await bootUnit({facilities: [kaaa, abc, kbbb], position: {lat: 47.0, lon: 8.0}, storage: savedFlightplan(3, [kaaa, abc, kbbb])});

@@ -273,7 +273,7 @@ describe('APT 7 selecting a SID (6-22)', () => {
         expect(rows('R')).toEqual(['DEP1-SID', 'TRANSITION', ' 1 TRNAA', ' 2 TRNAB', '', '']);
         await unit.panel.ent(); // TRNAA
 
-        // The CA leg of the runway transition is dropped (Session H, procedures.test.ts)
+        // The CA leg of the runway transition is dropped (test/render/harness/procedures.test.ts)
         expect(rows('R')).toEqual(['DEP1-SID', ' 1 SIDAA', ' 2 SIDAB', ' 3 TRNAA', '', 'LOAD IN FPL']);
         expect(unit.panel.focused('R')).toEqual({row: 5, col: 12, text: 'LOAD IN FPL'});
     });
