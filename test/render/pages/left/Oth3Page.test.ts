@@ -26,9 +26,11 @@ describe('OTH 3 page, the repository sync subscription (characterization)', () =
     });
 });
 
-// CLAUDE.md (UI): a page that is left must not stay alive. The route NAV 1 to OTH 3 and back passes only OTH 1 and
-// OTH 2, which subscribe to nothing, so the count before the first visit is the count without a handler of this page
-describe('OTH 3 page, the lifecycle of its subscription (CLAUDE.md)', () => {
+// The expectation is that of issue #96: a page that is left leaves no subscription behind (CLAUDE.md only says that pages
+// are recreated on every knob step). The route NAV 1 to OTH 3 and back passes the pages between them (the CAL, STA, SET,
+// TRI, MOD and FPL pages and OTH 1 and OTH 2), none of which subscribes to the repository sync, which is why the count
+// before the first visit is the count without a handler of this page
+describe('OTH 3 page, the lifecycle of its subscription (#96)', () => {
     it.fails('leaves no repository sync handler behind once it is left (#96)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'NAV 1');

@@ -31,10 +31,11 @@ describe('OTH 4 page, the remarks subscription (characterization)', () => {
     });
 });
 
-// CLAUDE.md (UI): a page that is left must not stay alive. The route NAV 1 to OTH 4 and back passes only OTH 1 to
-// OTH 3, which do not subscribe to the remarks, so the count before the first visit is the count without a handler of
-// this page
-describe('OTH 4 page, the lifecycle of its subscription (CLAUDE.md)', () => {
+// The expectation is that of issue #96: a page that is left leaves no subscription behind (CLAUDE.md only says that pages
+// are recreated on every knob step). The route NAV 1 to OTH 4 and back passes the pages between them (the CAL, STA, SET,
+// TRI, MOD and FPL pages and OTH 1 to OTH 3), none of which subscribes to the remarks changes, which is why the count
+// before the first visit is the count without a handler of this page
+describe('OTH 4 page, the lifecycle of its subscription (#96)', () => {
     it.fails('leaves no remarks handler behind once it is left (#96)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'NAV 1');
