@@ -89,7 +89,8 @@ function calculateSunriseSet(date: TimeStamp, coords: LatLonInterface, zenith: D
 
     const hours = Math.floor(UT);
     const minutes = (UT - hours) * 60;
-    return utcDate.withTime(hours, minutes);
+    //From the start of the day: the seconds of the date are not an input (5-15)
+    return TimeStamp.create(Date.UTC(utcDate.getYear(), utcDate.getMonth(), utcDate.getDate()) + (hours * 60 + minutes) * 60000);
 }
 
 function calcDayOfYear(date: TimeStamp) {

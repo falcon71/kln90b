@@ -121,8 +121,29 @@ describe('what the sunrise depends on', () => {
     });
 
     // 5-15: CAL 7 gives the times for a waypoint and a date. The second at which the date was taken is not an input.
-    it.fails('does not depend on the seconds of the date it is given (#165)', () => {
+    it('does not depend on the seconds of the date it is given (#165)', () => {
         expect(calculateSunrise(noonPlus59s, ORD)!.getTimestamp()).toBe(calculateSunrise(noon, ORD)!.getTimestamp());
+    });
+
+    // 5-15: the same for the sunset, for seconds, milliseconds and the last instant of the UTC day. The expected value is
+    // the time computed for the stamp at 00:00:00.000 of the same day, the reference
+    it.each([
+        ['12:00:59.000', Date.UTC(1989, 2, 3, 12, 0, 59, 0)],
+        ['12:00:00.999', Date.UTC(1989, 2, 3, 12, 0, 0, 999)],
+        ['23:59:59.999', Date.UTC(1989, 2, 3, 23, 59, 59, 999)],
+    ] as const)('gives the same sunrise and sunset for the stamp 03 MAR 1989 %s as for its start of the day (#165)', (_n, ms) => {
+        const start = TimeStamp.create(Date.UTC(1989, 2, 3));
+        const date = TimeStamp.create(ms);
+        expect(calculateSunrise(date, ORD)!.getTimestamp()).toBe(calculateSunrise(start, ORD)!.getTimestamp());
+        expect(calculateSunset(date, ORD)!.getTimestamp()).toBe(calculateSunset(start, ORD)!.getTimestamp());
+    });
+
+    // The result lies on the UTC day of the date: ORD, at 87.9 W, rises about 12:23 UTC and sets about 23:5x UTC
+    it('puts the sunrise and the sunset of ORD on the UTC day of the date', () => {
+        const rise = calculateSunrise(noon, ORD)!;
+        const set = calculateSunset(noon, ORD)!;
+        expect([rise.getYear(), rise.getMonth(), rise.getDate(), rise.getHours()]).toEqual([1989, 2, 3, 12]);
+        expect([set.getYear(), set.getMonth(), set.getDate(), set.getHours()]).toEqual([1989, 2, 3, 23]);
     });
 
     // 5-15: the date on CAL 7 is shown in the selected time zone, and the rise is for that date.
