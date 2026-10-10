@@ -50,7 +50,7 @@ export class Oth9Page extends SixLineHalfPage {
                 TAS&nbsp&nbsp&nbsp{this.children.get("tas").render()}kt<br/>
                 MACH&nbsp&nbsp&nbsp&nbsp{this.children.get("mach").render()}<br/>
                 {this.children.get("windLabel").render()} {this.children.get("windComponent").render()}kt<br/>
-                WIND&nbsp&nbsp&nbsp{this.children.get("windDir").render()}<br/>
+                WIND&nbsp&nbsp{this.children.get("windDir").render()}¥<br/>
                 &nbsp&nbsp&nbsp&nbsp&nbsp&nbsp{this.children.get("windSpeed").render()}kt
             </pre>);
         } else {
