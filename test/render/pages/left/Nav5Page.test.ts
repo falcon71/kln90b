@@ -425,7 +425,7 @@ describe('NAV 5 page map', () => {
     });
 
     // 3-34: the left cursor on NAV 5 visits two fields, the orientation and the range scale. This is the passing
-    // sibling of the pin below.
+    // sibling of the #232 test below.
     it('visits the orientation and the range scale with the cursor (3-34)', async () => {
         const {unit} = await nav5OnRoute();
         await unit.panel.cursor('L');
@@ -442,11 +442,14 @@ describe('NAV 5 page map', () => {
     });
 
     // 3-34 (figure 3-110): the cursor first lands on the range scale; the orientation is one step counterclockwise
-    it.fails('puts the cursor on the range scale first (3-34, #232)', async () => {
+    it('puts the cursor on the range scale first (3-34, #232)', async () => {
         const {unit} = await nav5OnRoute();
         await unit.panel.cursor('L');
 
         expect(unit.panel.focused('L')).toEqual({row: 5, col: 7, text: '  40'});
+
+        await unit.panel.outer('L', -1);
+        expect(unit.panel.focused('L')).toMatchObject({row: 5, col: 0});
     });
 
     // 3-35 (figures 3-110, 3-116): range scales from 1 to 1000 NM with the inner knob on the range scale; the figures
