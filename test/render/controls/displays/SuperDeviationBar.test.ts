@@ -62,15 +62,15 @@ describe('SuperDeviationBar', () => {
         expect(text.slice(0, 21)).toBe(' Ш Ш Ш Ш Ш Щ Ш Ш Ш Ш ');
     });
 
-    // The FROM half of the #225 pin, which draws both glyphs today: 0.25 NM left of the course puts the bar on the
+    // The FROM half of the #225 test: 0.25 NM left of the course puts the bar on the
     // boundary between the triangle (cell 11) and the blank right of it (cell 12)
     it('draws the whole bar next to the FROM triangle 0.25 NM left of the course (3-31, 3-32)', () => {
         expect(cdi(-0.25, FROM).text).toBe(' Ш Ш Ш Ш Ш НОШ Ш Ш Ш Ш ');
     });
 
-    // 3-31, 3-32: the same for TO. The TO case drops the second glyph (SuperDeviationBar.tsx:59, the operator
-    // precedence slip of #225). The input lands on this boundary with either the code's scale or the one of #323.
-    it.fails('draws the whole bar next to the TO triangle (3-31, 3-32, #225)', () => {
+    // 3-31, 3-32: the same for TO. Until #225 the TO case dropped the second glyph (an operator
+    // precedence slip). The input lands on this boundary with either the code's scale or the one of #323.
+    it('draws the whole bar next to the TO triangle (3-31, 3-32, #225)', () => {
         expect(cdi(-0.25, TO).text).toBe(' Ш Ш Ш Ш Ш ГОШ Ш Ш Ш Ш ');
     });
 });

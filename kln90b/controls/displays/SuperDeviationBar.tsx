@@ -56,7 +56,7 @@ export class SuperDeviationBar extends DeviationBar {
             }
         } else if (targetLetterIndex == 0 && charToReplace > 0) {
             if (charToReplace == 12) {
-                targetChar = this.to ? TO_LETTERS[9] : FROM_LETTERS[9] + targetChar;
+                targetChar = (this.to ? TO_LETTERS[9] : FROM_LETTERS[9]) + targetChar;
             } else if (charToReplace % 2 == 1) {
                 targetChar = SPACE_LETTERS[9] + targetChar;
             } else {

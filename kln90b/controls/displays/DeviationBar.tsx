@@ -69,7 +69,7 @@ export class DeviationBar implements UiElement {
             }
         } else if (targetLetterIndex == 0 && charToReplace > 0) {
             if (charToReplace == 6) {
-                targetChar = this.to ? TO_LETTERS[9] : FROM_LETTERS[9] + targetChar;
+                targetChar = (this.to ? TO_LETTERS[9] : FROM_LETTERS[9]) + targetChar;
             } else {
                 targetChar = DOT_LETTERS[9] + targetChar;
             }

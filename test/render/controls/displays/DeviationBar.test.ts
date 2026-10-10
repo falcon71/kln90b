@@ -61,16 +61,16 @@ describe('DeviationBar', () => {
         expect(cdi(null, TO).text).toBe('ηηF L A Gηη');
     });
 
-    // The FROM half of the #225 pin, which draws both glyphs today
+    // The FROM half of the #225 test
     it('draws the whole bar next to the FROM triangle 0.55 NM left of the course (3-31)', () => {
         expect(cdi(-0.55, FROM).text).toBe('ηηηηηζΑηηηη');
     });
 
     // 3-31: the bar works like a CDI needle whatever the triangle shows. 0.55 NM left of the course puts the bar
     // between the triangle and the first dot right of it, which the font draws with two glyphs: the triangle with the
-    // bar at its right edge (TO: Υ) and the dot with the bar at its left edge (Α). The TO case drops the dot glyph
-    // (DeviationBar.tsx:72, an operator precedence slip). Pinned on NAV 1 as well.
-    it.fails('draws the whole bar next to the TO triangle (3-31, #225)', () => {
+    // bar at its right edge (TO: Υ) and the dot with the bar at its left edge (Α). Until #225 the TO case dropped the dot
+    // glyph (an operator precedence slip). Also tested on NAV 1.
+    it('draws the whole bar next to the TO triangle (3-31, #225)', () => {
         expect(cdi(-0.55, TO).text).toBe('ηηηηηΥΑηηηη');
     });
 });

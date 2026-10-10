@@ -256,7 +256,7 @@ describe('NAV 1 deviation bar', () => {
         expect(Screen.read().rows('L')[1]).toBe('ηηηηηζΑηηηη');
     });
 
-    // The setup sibling of the pin: 0.55 NM left of the course, TO the active waypoint, on the 5 NM scale
+    // The setup sibling of the #225 test: 0.55 NM left of the course, TO the active waypoint, on the 5 NM scale
     it('reaches 0.55 NM left of the course flying TO (3-31)', async () => {
         const unit = await leftOfCourse(0.55);
 
@@ -270,9 +270,8 @@ describe('NAV 1 deviation bar', () => {
     // 3-31: the bar works like the needle of a CDI, the center triangle shows TO or FROM only. 0.55 NM left of the course
     // puts the bar between the triangle and the first dot right of it, which the font draws with two glyphs: the
     // triangle with the bar at its right edge (TO: Υ, FROM: ζ) and the dot with the bar at its left edge (Α). The FROM
-    // case draws both; the TO case drops the second glyph (DeviationBar.ts:72, an operator precedence slip), so half of
-    // the bar is missing.
-    it.fails('draws the whole bar next to the TO triangle (3-31, #225)', async () => {
+    // case draws both, and so does the TO case (until #225 it dropped the second glyph: an operator precedence slip).
+    it('draws the whole bar next to the TO triangle (3-31, #225)', async () => {
         await leftOfCourse(0.55);
 
         expect(Screen.read().rows('L')[1]).toBe('ηηηηηΥΑηηηη');
