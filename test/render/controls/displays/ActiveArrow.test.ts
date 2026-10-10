@@ -4,7 +4,7 @@ import {ActiveArrow} from '../../../../kln90b/controls/displays/ActiveArrow';
 import {NavPageState} from '../../../../kln90b/data/VolatileMemory';
 import {airport} from '../../../harness/navdata/builders';
 import {mountedCycle} from '../../../harness/render/blink';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedRead} from '../../../harness/render/mount';
 
 const KAAA = airport('KAAA', 47.0, 8.0);
 const KBBB = airport('KBBB', 47.5, 8.0);
@@ -16,9 +16,7 @@ function navState(active: Facility | null, waypointAlert = false): NavPageState 
 
 /** The arrow cell of a page showing `shown` (its ICAO, or null for a page without a waypoint) after a display tick */
 function arrow(shown: Facility | null, state: NavPageState): { text: string, mask: string } {
-    const m = mount(new ActiveArrow(shown?.icaoStruct ?? null, state));
-    m.tick();
-    return {text: m.text(), mask: m.mask()};
+    return mountedRead(new ActiveArrow(shown?.icaoStruct ?? null, state));
 }
 
 /** The (text, mask) of the arrow cell on four display ticks, the fourth the blink tick */
@@ -82,6 +80,9 @@ describe('ActiveArrow (characterization)', () => {
         const m = mount(new ActiveArrow(KBBB.icaoStruct, state));
         m.tick();
         expect(m.text()).toBe(' ');
+        // The state is a stub that has only what ActiveArrow reads: activeWaypoint.getActiveWpt(), which tick() calls on
+        // every display tick. The test replaces that one method to move the active waypoint after the mount, which a
+        // booted unit would do through a Direct To or a sequence (the booted behavior is held by the page tests)
         (state as unknown as {
             activeWaypoint: { getActiveWpt: () => Facility }
         }).activeWaypoint.getActiveWpt = () => KBBB;

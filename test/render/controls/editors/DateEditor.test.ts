@@ -62,21 +62,6 @@ async function onCal7Date(): Promise<HeadlessUnit> {
     return unit;
 }
 
-/**
- * Selects a date in the open editor: the first click opens the editor with day 01, the first click on the dashed month
- * gives JAN and on a dashed year digit 0, so the day d takes d clicks, the month m (1 to 12) m clicks, a year digit
- * y + 1 clicks
- */
-async function selectDate(unit: HeadlessUnit, day: number, month: number, year: [number, number]): Promise<void> {
-    await unit.panel.inner('L', day);
-    await unit.panel.outer('L', 1);
-    await unit.panel.inner('L', month);
-    await unit.panel.outer('L', 1);
-    await unit.panel.inner('L', year[0] + 1);
-    await unit.panel.outer('L', 1);
-    await unit.panel.inner('L', year[1] + 1);
-}
-
 const dateRow = () => Screen.read().rows('L')[2];
 const cal7Date = (unit: HeadlessUnit) => {
     const d = unit.props.memory.calPage.cal7DateZ!;
@@ -89,7 +74,7 @@ describe('date editor (3-53, 5-15, C-1)', () => {
     it('enters a date selected cell by cell (3-53, 5-15)', async () => {
         const unit = await onCal7Date();
 
-        await selectDate(unit, 15, 3, [2, 7]);
+        await unit.panel.enterDate('L', 15, 3, [2, 7]);
         expect(dateRow()).toBe('  15 MAR 27');
         await unit.panel.ent();
 
@@ -102,7 +87,7 @@ describe('date editor (3-53, 5-15, C-1)', () => {
     it('takes 31 DEC 87 as the last day of 2087 (5-15)', async () => {
         const unit = await onCal7Date();
 
-        await selectDate(unit, 31, 12, [8, 7]);
+        await unit.panel.enterDate('L', 31, 12, [8, 7]);
         await unit.panel.ent();
 
         expect(unit.errors).toEqual([]);
@@ -115,7 +100,7 @@ describe('date editor (3-53, 5-15, C-1)', () => {
     it('refuses 30 FEB 92 with INVALID ENT and keeps the date (C-1)', async () => {
         const unit = await onCal7Date();
 
-        await selectDate(unit, 30, 2, [9, 2]);
+        await unit.panel.enterDate('L', 30, 2, [9, 2]);
         await unit.panel.ent();
         expect(Screen.read().status().mode).toBe('INVALID ENT');
         await unit.panel.cursor('L');
@@ -129,7 +114,7 @@ describe('date editor (3-53, 5-15, C-1)', () => {
     it('takes 29 FEB 28, a leap day (C-1)', async () => {
         const unit = await onCal7Date();
 
-        await selectDate(unit, 29, 2, [2, 8]);
+        await unit.panel.enterDate('L', 29, 2, [2, 8]);
         await unit.panel.ent();
 
         expect(unit.errors).toEqual([]);
@@ -140,7 +125,7 @@ describe('date editor (3-53, 5-15, C-1)', () => {
     it('refuses 29 FEB 27 with INVALID ENT (C-1)', async () => {
         const unit = await onCal7Date();
 
-        await selectDate(unit, 29, 2, [2, 7]);
+        await unit.panel.enterDate('L', 29, 2, [2, 7]);
         await unit.panel.ent();
 
         expect(unit.errors).toEqual([]);
@@ -171,7 +156,7 @@ describe('date editor (characterization)', () => {
     // After INVALID ENT the edit stays open with what was selected, so the pilot can correct it
     it('keeps the refused date open for a correction', async () => {
         const unit = await onCal7Date();
-        await selectDate(unit, 30, 2, [9, 2]);
+        await unit.panel.enterDate('L', 30, 2, [9, 2]);
         await unit.panel.ent();
         expect(Screen.read().status().mode).toBe('INVALID ENT');
 

@@ -1,8 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
+import {HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
-import {savedFlightplan, storedSetting} from '../../../harness/storage';
-import {standardRoute} from '../../../harness/fixtures';
+import {storedSetting} from '../../../harness/storage';
+import {bootOnStandardRoute} from '../../../harness/worldBoot';
 
 // MapOrientationSelector: the NAV 5 orientation, a select whose text is the choice with the up arrow while the
 // cursor is on it and the orientation's value otherwise. Host: NAV 5 on the left (row 5, columns 0 to 3), saved as
@@ -15,12 +15,7 @@ import {standardRoute} from '../../../harness/fixtures';
  * the cursor on the orientation
  */
 async function onOrientation(): Promise<HeadlessUnit> {
-    const w = standardRoute();
-    const unit = await bootUnit({
-        facilities: [w.kaaa, w.abc, w.kbbb], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
-        storage: savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]),
-    });
-    await settle(unit);
+    const unit = await bootOnStandardRoute();
     await unit.panel.selectPage('L', 'NAV 5');
     await unit.panel.cursor('L');
     await unit.panel.cursorTo('L', 'N^');

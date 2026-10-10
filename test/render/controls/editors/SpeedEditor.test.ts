@@ -16,14 +16,6 @@ async function onGroundspeed(): Promise<HeadlessUnit> {
     return unit;
 }
 
-/** CONFIRM?, then SET 2 and back to SET 1: the page reads the GPS again */
-async function confirmAndReselect(unit: HeadlessUnit): Promise<void> {
-    await unit.panel.cursorTo('L', 'CONFIRM?');
-    await unit.panel.ent();
-    await unit.panel.selectPage('L', 'SET 2');
-    await unit.panel.selectPage('L', 'SET 1');
-}
-
 /** With the cursor on the ground speed: 120 kt selected with the knobs and entered */
 async function select120(unit: HeadlessUnit): Promise<void> {
     await unit.panel.inner('L', 1); // opens the field: the hundreds cell blank, the others dashed
@@ -41,7 +33,7 @@ describe('SpeedEditor on SET 1 (3-18, 3-19)', () => {
     it('takes a ground speed selected with the knobs (3-19)', async () => {
         const unit = await onGroundspeed();
         await select120(unit);
-        await confirmAndReselect(unit);
+        await unit.panel.confirmSet1AndReselect();
 
         expect(unit.errors).toEqual([]);
         expect(unit.props.sensors.in.gps.groundspeed).toBe(120);
@@ -73,7 +65,7 @@ describe('SpeedEditor on SET 1 (3-18, 3-19)', () => {
         await unit.panel.outer('L', 1);
         await unit.panel.inner('L', 6);
         await unit.panel.ent();
-        await confirmAndReselect(unit);
+        await unit.panel.confirmSet1AndReselect();
 
         expect(unit.props.sensors.in.gps.groundspeed).toBe(5);
     });

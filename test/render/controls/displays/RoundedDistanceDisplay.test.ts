@@ -1,13 +1,9 @@
 import {describe, expect, it} from 'vitest';
 import {Alignment, RoundedDistanceDisplay} from '../../../../kln90b/controls/displays/RoundedDistanceDisplay';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedText} from '../../../harness/render/mount';
 
 /** The four cells of a whole-NM distance after a display tick */
-function shown(alignment: Alignment, distance: number | null): string {
-    const m = mount(new RoundedDistanceDisplay(alignment, distance));
-    m.tick();
-    return m.text();
-}
+const shown = (alignment: Alignment, distance: number | null): string => mountedText(new RoundedDistanceDisplay(alignment, distance));
 
 describe('RoundedDistanceDisplay', () => {
     // 4-11, figure 4-43: beside FPL 0 the D/T 1 distances are whole NM in a column of three digits at the left of the

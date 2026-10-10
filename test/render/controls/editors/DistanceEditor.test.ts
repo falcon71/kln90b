@@ -5,11 +5,11 @@ import {DistanceEditor} from '../../../../kln90b/controls/editors/DistanceEditor
 import {vor} from '../../../harness/navdata/builders';
 import {mount} from '../../../harness/render/mount';
 import {Screen} from '../../../harness/render/screen';
+import {userWaypoints} from '../../../harness/readers';
 import {blinkCycle} from '../../../harness/render/blink';
 import {savedUserWaypoints} from '../../../harness/storage';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {pointFrom} from '../../../harness/flight/geo';
-import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
 
 /**
  * DistanceEditor is the DIS field of the INT and SUP pages. The host here is the INT page of QQI, a stored user
@@ -36,13 +36,7 @@ async function onDis(): Promise<HeadlessUnit> {
 }
 
 /** The latitude of QQI in the repository */
-function qqiLat(unit: HeadlessUnit): number {
-    let lat = NaN;
-    KLNFacilityRepository.getRepository(unit.props.bus).forEach(f => {
-        if (f.icaoStruct.ident === 'QQI') lat = f.lat;
-    });
-    return lat;
-}
+const qqiLat = (unit: HeadlessUnit): number => userWaypoints(unit).find(f => f.icaoStruct.ident === 'QQI')!.lat;
 
 /** The column of the DIS field's decimal point on the whole screen: DIS:ddd.d starts at column 12 of the right half */
 const POINT_COL = 12 + 4 + 3;

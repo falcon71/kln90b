@@ -2,6 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, MINIMAL_PANEL_XML, moveAircraft, settle} from '../../../harness/boot';
 import {blinkCycle} from '../../../harness/render/blink';
 import {legWorld} from '../../../harness/fixtures';
+import {NO_OBS, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
@@ -13,13 +14,12 @@ import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 // NAV 5 course entry and its pin #238.
 
 // The leg world: FPL 0 is KAAA, KDDD, KEEE, and the aircraft is on the leg 30 NM west of KDDD, track 090, DTK 089 there
-const OBS_SOURCE_OFF = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input>'
-    + '</Instrument></PlaneHTMLConfig>';
+const OBS_SOURCE_OFF = panelXml(NO_OBS);
 
-async function nav3(panelXml: string): Promise<HeadlessUnit> {
+async function nav3(xml: string): Promise<HeadlessUnit> {
     const {kaaa, kddd, keee, west} = legWorld();
     const unit = await bootUnit({
-        facilities: [kaaa, kddd, keee], position: west(30), panelXml, storage: savedFlightplan(0, [kaaa, kddd, keee]),
+        facilities: [kaaa, kddd, keee], position: west(30), panelXml: xml, storage: savedFlightplan(0, [kaaa, kddd, keee]),
     });
     await settle(unit);
     await unit.panel.selectPage('L', 'NAV 3');

@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {SuperDeviationBar} from '../../../../kln90b/controls/displays/SuperDeviationBar';
-import {mount} from '../../../harness/render/mount';
+import {mountedRead} from '../../../harness/render/mount';
 
 const TO = true;
 const FROM = false;
@@ -13,9 +13,7 @@ const FROM = false;
  * 4 of each run (Є, Ў, И, Т) is the bar through the middle of the cell. `deviation` is negative left of the course.
  */
 function cdi(deviation: number | null, toFrom: boolean, scale = 5): { text: string, mask: string } {
-    const m = mount(new SuperDeviationBar(deviation, toFrom, scale));
-    m.tick();
-    return {text: m.text(), mask: m.mask()};
+    return mountedRead(new SuperDeviationBar(deviation, toFrom, scale));
 }
 
 describe('SuperDeviationBar', () => {

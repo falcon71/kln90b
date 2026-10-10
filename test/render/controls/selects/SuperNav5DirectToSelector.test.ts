@@ -1,12 +1,13 @@
 import {describe, expect, it, vi} from 'vitest';
 import {FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
+import {bootUnit, moveAircraft, settle} from '../../../harness/boot';
 import {distanceNm, courseDeg, pointFrom} from '../../../harness/flight/geo';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
-import {SuperNav5} from '../../../harness/render/superNav5';
+import {showSuperNav5, SuperNav5} from '../../../harness/render/superNav5';
+import {fplIdents} from '../../../harness/readers';
 import {savedFlightplan} from '../../../harness/storage';
-import {standardRoute} from '../../../harness/fixtures';
+import {bootOnStandardRoute} from '../../../harness/worldBoot';
 
 // A left arc around ABC from the 270 to the 180 radial through the south-west, then FAFAA and the MAP. A left arc on
 // purpose: a right arc is named wrongly after a recalculation (#104).
@@ -30,8 +31,6 @@ const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
     })],
 });
 
-const fpl0Idents = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident);
-
 describe('Super NAV 5 direct-to window on a DME arc entry', () => {
     // Spec: Pilot's Guide 6-17 (on Super NAV 5, CLR on the arc's entry waypoint shows MOVE ?, and ENT moves the
     // entry to the intercept of the present track with the arc). 1ef2a35: ENT leaves the MOVE ? state. Without that the
@@ -42,7 +41,7 @@ describe('Super NAV 5 direct-to window on a DME arc entry', () => {
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
-        expect(fpl0Idents(unit)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
 
         // 15 NM out on the 200 radial, flying 010: the track meets the 10 NM circle in front of the aircraft, inside the
         // arc. A track of 330 would miss the circle and give NO INTRCPT, which hides the subject.
@@ -50,9 +49,7 @@ describe('Super NAV 5 direct-to window on a DME arc entry', () => {
         await moveAircraft(unit, start, {groundspeedKt: 0});
         await moveAircraft(unit, pointFrom(start, 10, 0.05), {groundspeedKt: 120});
 
-        await unit.panel.selectPage('R', 'NAV 4'); // the right side first: its shorter way passes NAV 5
-        await unit.panel.selectPage('L', 'NAV 5');
-        await unit.panel.inner('R', 1); // NAV 5 on both sides: Super NAV 5
+        await showSuperNav5(unit, {waitMs: 0});
         await unit.panel.scan();
         await vi.advanceTimersByTimeAsync(250);
         // The window opens on the active leg, the arc: its end ARCEN shows. The left arc ends heading east, and FAFAA
@@ -77,7 +74,7 @@ describe('Super NAV 5 direct-to window on a DME arc entry', () => {
         expect(entry.wpt.icaoStruct.ident).toBe('D205J');
         expect(courseDeg(abc, entry.wpt)).toBeCloseTo(205.05, 1);
         expect(distanceNm(abc, entry.wpt)).toBeCloseTo(10, 2);
-        expect(fpl0Idents(unit)).toEqual(['D205J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['D205J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
         expect(unit.errors).toEqual([]);
     });
 });
@@ -85,15 +82,8 @@ describe('Super NAV 5 direct-to window on a DME arc entry', () => {
 // The standard route of SuperNav5Page.test.ts: KAAA, ABC, KBBB in FPL 0, the aircraft at KAAA, ABC active; Super NAV 5
 // with the right inner knob pulled out
 async function scanOnStandardRoute() {
-    const w = standardRoute();
-    const unit = await bootUnit({
-        facilities: [w.kaaa, w.abc, w.kbbb], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
-        storage: savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]),
-    });
-    await settle(unit);
-    await unit.panel.selectPage('R', 'NAV 4');
-    await unit.panel.selectPage('L', 'NAV 5');
-    await unit.panel.inner('R', 1);
+    const unit = await bootOnStandardRoute();
+    await showSuperNav5(unit, {waitMs: 0});
     await unit.panel.scan();
     await vi.advanceTimersByTimeAsync(250);
     return unit;
@@ -130,9 +120,7 @@ describe('Super NAV 5 direct-to window (characterization)', () => {
     it('shows a blank window with an empty FPL 0 (characterization)', async () => {
         const unit = await bootUnit();
         await settle(unit);
-        await unit.panel.selectPage('R', 'NAV 4');
-        await unit.panel.selectPage('L', 'NAV 5');
-        await unit.panel.inner('R', 1);
+        await showSuperNav5(unit, {waitMs: 0});
         await unit.panel.scan();
         await vi.advanceTimersByTimeAsync(250);
 

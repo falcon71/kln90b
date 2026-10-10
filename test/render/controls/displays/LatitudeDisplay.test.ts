@@ -1,13 +1,9 @@
 import {describe, expect, it} from 'vitest';
 import {LatitudeDisplay} from '../../../../kln90b/controls/displays/LatitudeDisplay';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedText} from '../../../harness/render/mount';
 
 /** The eleven cells of a latitude in degrees (south negative) after a display tick */
-function shown(lat: number | null): string {
-    const m = mount(new LatitudeDisplay(lat));
-    m.tick();
-    return m.text();
-}
+const shown = (lat: number | null): string => mountedText(new LatitudeDisplay(lat));
 
 describe('LatitudeDisplay', () => {
     // 3-8, figure 3-27 (N 41°07.60') and 3-32, figure 3-103 (N 41°00.03'): the hemisphere letter, a blank, two digits

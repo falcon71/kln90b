@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS} from '../../../harness/boot';
 import {airport} from '../../../harness/navdata/builders';
 import {blinkCycle} from '../../../harness/render/blink';
 import {Screen} from '../../../harness/render/screen';
@@ -15,7 +15,7 @@ async function nearestKaaa(): Promise<HeadlessUnit> {
         facilities: [airport('KAAA', 47.2, 8.0), airport('KBBB', 47.6, 8.0)],
         position: {lat: 47.0, lon: 8.0},
     });
-    await vi.advanceTimersByTimeAsync(12000); // the nearest search runs every 10 s
+    await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS); // the nearest search runs every 10 s
     await unit.panel.msg();
     await unit.panel.ent();
     expect(Screen.read().rows('R')[0]).toBe(' KAAA  nr 1'); // precondition

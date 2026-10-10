@@ -1,10 +1,10 @@
 import {describe, expect, it} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
+import {userWaypoints} from '../../../harness/readers';
 import {blinkCycle} from '../../../harness/render/blink';
 import {savedUserWaypoints} from '../../../harness/storage';
 import {collectStatusMessages} from '../../../harness/statusLine';
-import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
 
 /**
  * NdbFreqEditor is the FREQ field of the NDB page, editable on a user NDB (5-18). The host here is the NDB page of QQN,
@@ -23,13 +23,8 @@ async function onFreq(): Promise<HeadlessUnit> {
 }
 
 /** The frequency of QQN in the repository */
-function qqnFreq(unit: HeadlessUnit): number {
-    let freq = NaN;
-    KLNFacilityRepository.getRepository(unit.props.bus).forEach(f => {
-        if (f.icaoStruct.ident === 'QQN') freq = (f as any).freqMHz;
-    });
-    return freq;
-}
+const qqnFreq = (unit: HeadlessUnit): number =>
+    (userWaypoints(unit).find(f => f.icaoStruct.ident === 'QQN') as any).freqMHz;
 
 /** The column of the FREQ field's decimal point on the whole screen: FREQ dddd.d starts at column 12 of the right
  * half */

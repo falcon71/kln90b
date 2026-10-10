@@ -1,13 +1,9 @@
 import {describe, expect, it} from 'vitest';
 import {DistanceDisplay} from '../../../../kln90b/controls/displays/DistanceDisplay';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedText} from '../../../harness/render/mount';
 
 /** The cells of a distance display of `length` cells after a display tick */
-function shown(length: number, distance: number | null): string {
-    const m = mount(new DistanceDisplay(length, distance));
-    m.tick();
-    return m.text();
-}
+const shown = (length: number, distance: number | null): string => mountedText(new DistanceDisplay(length, distance));
 
 // The four cells of DIS on NAV 1 and Super NAV 1 (and RANGE on OTH 6)
 describe('DistanceDisplay, four cells', () => {

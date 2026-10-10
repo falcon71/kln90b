@@ -1,9 +1,9 @@
 import {describe, expect, it} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
+import {userWaypoints} from '../../../harness/readers';
 import {savedUserWaypoints} from '../../../harness/storage';
 import {collectStatusMessages} from '../../../harness/statusLine';
-import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
 
 /**
  * VorFreqEditor is the frequency field of the VOR page, editable on a user VOR (5-18). The host here is the VOR page of
@@ -23,13 +23,8 @@ async function onFreq(): Promise<HeadlessUnit> {
 }
 
 /** The frequency of QQV in the repository */
-function qqvFreq(unit: HeadlessUnit): number {
-    let freq = NaN;
-    KLNFacilityRepository.getRepository(unit.props.bus).forEach(f => {
-        if (f.icaoStruct.ident === 'QQV') freq = (f as any).freqMHz;
-    });
-    return freq;
-}
+const qqvFreq = (unit: HeadlessUnit): number =>
+    (userWaypoints(unit).find(f => f.icaoStruct.ident === 'QQV') as any).freqMHz;
 
 /** The column of the frequency's decimal point on the whole screen: ddd.dd starts at column 12 of the right half */
 const POINT_COL = 12 + 3;

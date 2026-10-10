@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {DeviationBar} from '../../../../kln90b/controls/displays/DeviationBar';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedRead} from '../../../harness/render/mount';
 
 const TO = true;
 const FROM = false;
@@ -14,9 +14,7 @@ const FROM = false;
  * Φ to ζ the FROM triangle with the bar. Index 4 of each run (Ε, Ο, α) is the bar through the middle of the cell.
  */
 function cdi(deviation: number | null, toFrom: boolean, scale = 5): { text: string, mask: string } {
-    const m = mount(new DeviationBar(deviation, toFrom, scale));
-    m.tick();
-    return {text: m.text(), mask: m.mask()};
+    return mountedRead(new DeviationBar(deviation, toFrom, scale));
 }
 
 describe('DeviationBar', () => {

@@ -4,10 +4,10 @@ import {approachWorld, standardRoute} from '../../harness/fixtures';
 import {courseDeg} from '../../harness/flight/geo';
 import {blinkCycle} from '../../harness/render/blink';
 import {readRows} from '../../harness/render/screen';
-import {SuperNav5} from '../../harness/render/superNav5';
+import {showSuperNav5, SuperNav5} from '../../harness/render/superNav5';
 import {savedFlightplan} from '../../harness/storage';
-import {MainPage} from '../../../kln90b/pages/MainPage';
-import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
+import {NO_OBS, panelXml} from '../../harness/panelXml';
+import {bootOnStandardRoute} from '../../harness/worldBoot';
 
 /**
  * The mode glyphs of the KLN font (kln90b.ttf), read by drawing each code point: Ê is ENR, Ë is LEG, Í is ARM and Ì is
@@ -15,30 +15,17 @@ import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
  */
 const ENR = 'Ê', LEG = 'Ë', ARM = 'Í', APR = 'Ì';
 
-const OBS_SOURCE_OFF = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input>'
-    + '</Instrument></PlaneHTMLConfig>';
-
-/**
- * NAV 5 on both sides. The right side first: its shorter way passes NAV 5, which is Super NAV 5 once the left shows
- * NAV 5
- */
-async function showSuperNav5(unit: HeadlessUnit): Promise<void> {
-    await unit.panel.selectPage('R', 'NAV 4');
-    await unit.panel.selectPage('L', 'NAV 5');
-    await unit.panel.inner('R', 1);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect((unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage()).toBeInstanceOf(SuperNav5Page);
-}
-
 /** The approach of approachWorld() loaded, the aircraft 2.5 NM before the FAF and armed (6-3) */
-async function armed(panelXml?: string): Promise<{ unit: HeadlessUnit, w: ReturnType<typeof approachWorld> }> {
+async function armed(xml?: string): Promise<{ unit: HeadlessUnit, w: ReturnType<typeof approachWorld> }> {
     const w = approachWorld();
     const unit = await bootUnit({
-        facilities: w.facilities, position: w.north(7.5), panelXml,
+        facilities: w.facilities, position: w.north(7.5), panelXml: xml,
         storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
     });
     await settle(unit);
     await unit.panel.loadProcedure('APT 8');
+    // Long enough for the XTK scale to ramp to its ARM value after the unit has armed within 30 NM (30 s,
+    // ModeController.adjustXtkScaleArm), so that the approach is in its settled ARM state
     await vi.advanceTimersByTimeAsync(31_000);
     return {unit, w};
 }
@@ -57,11 +44,8 @@ async function mapPromptCycles(): Promise<string[][]> {
 
 /** Super NAV 5 on the standard route in the enroute OBS mode (OBS selected on the first leg, no external OBS input) */
 async function enrouteObs(): Promise<{ unit: HeadlessUnit, dtk: number }> {
-    const {kaaa, abc, kbbb} = standardRoute();
-    const unit = await bootUnit({
-        facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb]), panelXml: OBS_SOURCE_OFF,
-    });
-    await settle(unit);
+    const {kaaa, abc} = standardRoute();
+    const unit = await bootOnStandardRoute({panelXml: panelXml(NO_OBS)});
     await unit.panel.obsMode();
     await showSuperNav5(unit);
     return {unit, dtk: Math.round(courseDeg(kaaa, abc))};
@@ -90,7 +74,7 @@ describe('Super NAV 5 mode row (5-32)', () => {
     // variation 0. Without an OBS input the unit picks the course that leaves the deviation unchanged (5-36); the
     // aircraft is on the final course, so that is the DTK, 180
     it('shows ARM: and the OBS course in the approach-arm OBS mode (5-32)', async () => {
-        const {unit} = await armed(OBS_SOURCE_OFF);
+        const {unit} = await armed(panelXml(NO_OBS));
         await unit.panel.obsMode();
         await showSuperNav5(unit);
 
@@ -135,9 +119,7 @@ describe('Super NAV 5 message prompt (3-16, 3-36)', () => {
     // 3-10: the three cells of the prompt are blank without a message (3-36 puts the prompt on the map)
     it('shows three blanks without a message (3-10, 3-36)', async () => {
         const unit = await bootUnit();
-        await unit.panel.msg();
-        await unit.panel.msg(); // the two boot messages fit one MSG page; the second press closes it
-        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.readMessages(); // the two boot messages fit one MSG page; the second press closes it
         expect(unit.props.messageHandler.hasMessages()).toBe(false); // the precondition
         await showSuperNav5(unit);
 

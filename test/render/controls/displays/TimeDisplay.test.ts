@@ -1,14 +1,10 @@
 import {describe, expect, it} from 'vitest';
 import {TimeDisplay} from '../../../../kln90b/controls/displays/TimeDisplay';
 import {TimeStamp} from '../../../../kln90b/data/Time';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedText} from '../../../harness/render/mount';
 
 /** The five cells of a time of day after a display tick */
-function shown(time: TimeStamp | null): string {
-    const m = mount(new TimeDisplay(time));
-    m.tick();
-    return m.text();
-}
+const shown = (time: TimeStamp | null): string => mountedText(new TimeDisplay(time));
 
 describe('TimeDisplay', () => {
     // 4-12, figures 4-47 and 4-48 (ETA 09:23, 15:23) and 5-15, figure 5-49 (RISE 06:24): hours and minutes, both with
