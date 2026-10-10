@@ -2,6 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {BootOptions, bootToSelfTest, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {recordSounds} from '../../../harness/sounds';
+import {AIRDATA, ALTITUDE_ALERT, NO_ALTIMETER, panelXml} from '../../../harness/panelXml';
 
 // This is the snapshot of the page as the unit shows it after a cold boot: the clock's start date (not October, #112)
 // and the cursor on the first two digits of the baro. The altitude row (row 3) is left out of the snapshot and of its
@@ -136,13 +137,7 @@ describe('self-test right page entries (spec)', () => {
         const unit = await onSelfTestPage({storage: NO_FIX_YET});
         await backTo(unit, '01 JUN 26');
 
-        await unit.panel.inner('R', 3); // the first click opens the entry on day 01
-        await unit.panel.outer('R', 1);
-        await unit.panel.inner('R', 8); // JAN to AUG
-        await unit.panel.outer('R', 1);
-        await unit.panel.inner('R', 3); // the first click gives 0
-        await unit.panel.outer('R', 1);
-        await unit.panel.inner('R', 6);
+        await unit.panel.enterDate('R', 3, 8, [2, 5]); // 03 AUG 25
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
 
@@ -158,7 +153,7 @@ describe('self-test right page entries (spec)', () => {
         await vi.advanceTimersByTimeAsync(1000);
         expect(Screen.read().rows('R')[2].slice(0, 5)).toBe('16:27');
 
-        await vi.advanceTimersByTimeAsync(60_000);
+        await vi.advanceTimersByTimeAsync(60_000); // one minute of the entered clock
 
         expect(unit.props.sensors.in.gps.isValid()).toBe(false); // Precondition: no satellite time has replaced it
         expect(Screen.read().rows('R')[2].slice(0, 5)).toBe('16:28');
@@ -242,8 +237,7 @@ describe('self-test right page time entry (spec)', () => {
     });
 });
 
-const AIR_DATA_BARO_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><Airdata>'
-    + '<IsInterfaced>true</IsInterfaced><BaroSource>1</BaroSource></Airdata></Input></Instrument></PlaneHTMLConfig>';
+const AIR_DATA_BARO_XML = panelXml({...AIRDATA, 'Input.Airdata.BaroSource': 1});
 const ALTIMETER_AT_30_12 = [{name: 'KOHLSMAN SETTING HG:1', unit: 'inches of mercury', value: 30.12}];
 
 describe('self-test right page with an air data baro (spec)', () => {
@@ -272,8 +266,7 @@ describe('self-test right page with an air data baro (spec)', () => {
     });
 });
 
-const NO_ALTITUDE_ALERT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output><AltitudeAlertEnabled>false'
-    + '</AltitudeAlertEnabled></Output></Instrument></PlaneHTMLConfig>';
+const NO_ALTITUDE_ALERT_XML = panelXml(ALTITUDE_ALERT(false));
 
 describe('approving the self-test page (spec)', () => {
     // 3-7 step 11 and Installation Manual 2-69: five beeps on the alert audio when the self-test page is approved. The
@@ -306,8 +299,7 @@ describe('approving the self-test page (spec)', () => {
     });
 });
 
-const NO_ALTIMETER_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><AltimeterInterfaced>false'
-    + '</AltimeterInterfaced></Input></Instrument></PlaneHTMLConfig>';
+const NO_ALTIMETER_XML = panelXml(NO_ALTIMETER);
 
 describe('self-test right page altitude (characterization)', () => {
     it('shows dashes for the altitude without an altitude input (characterization)', async () => {

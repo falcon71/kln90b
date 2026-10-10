@@ -5,11 +5,11 @@ import {centerWorld} from '../../../harness/fixtures';
 import {intersection} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
+import {fplIdents, userWaypoints} from '../../../harness/readers';
 
 type CenterWorld = ReturnType<typeof centerWorld>;
 
 const right = () => Screen.read().rows('R');
-const idents = (unit: HeadlessUnit, fpl: number) => unit.props.memory.fplPage.flightplans[fpl].getLegs().map(l => l.wpt.icaoStruct.ident);
 
 /** Boots with `plan` stored as FPL 1 (and `extra` facilities), FPL 1 on the left and CTR 1 on the right */
 async function onCtr1(plan: (w: CenterWorld) => Facility[], extra: Facility[] = []) {
@@ -117,7 +117,7 @@ describe('CTR 1 page (5-25 to 5-27)', () => {
         await ent(unit);
         await ent(unit);
 
-        expect(idents(unit, 1)).toEqual(['KAAA', 'BGD00', 'KBBB', 'GCK00', 'KCCC']);
+        expect(fplIdents(unit, 1)).toEqual(['KAAA', 'BGD00', 'KBBB', 'GCK00', 'KCCC']);
         expect(Screen.read().rows('L').slice(1, 6)).toEqual(['  1:KAAA   ', '  2:BGD00  ', '  3:KBBB   ', '  4:GCK00  ', '  5:KCCC   ']);
         expect(right()).toEqual(['           ', '           ', 'CTR WPT    ', 'INSERTION  ', 'COMPLETE   ', '           ']);
         expect(unit.errors).toEqual([]);
@@ -137,7 +137,7 @@ describe('CTR 1 page (5-25 to 5-27)', () => {
         await ent(unit);
         await ent(unit);
 
-        expect(idents(unit, 0)).toEqual(['KAAA', 'BGD00', 'KBBB', 'GCK00', 'KCCC']);
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'BGD00', 'KBBB', 'GCK00', 'KCCC']);
         expect(unit.errors).toEqual([]);
     });
 
@@ -148,7 +148,7 @@ describe('CTR 1 page (5-25 to 5-27)', () => {
         await ent(unit);
         await ent(unit);
 
-        expect(idents(unit, 1)).toEqual(['KAAA', 'BGD01', 'KBBB']);
+        expect(fplIdents(unit, 1)).toEqual(['KAAA', 'BGD01', 'KBBB']);
     });
 
     // 5-26: leaving the flight plan page on the left and returning to it reverts CTR 1 to the format of figure 5-90
@@ -201,7 +201,7 @@ describe('CTR 1 page, a plan modified after the insertion (5-27)', () => {
     it('offers a new computation for the extended plan (5-26, 5-27)', async () => {
         const unit = await extendedAfterInsertion();
 
-        expect(idents(unit, 1)).toEqual(['KAAA', 'BGD00', 'KBBB', 'KCCC']);
+        expect(fplIdents(unit, 1)).toEqual(['KAAA', 'BGD00', 'KBBB', 'KCCC']);
         expect(right().slice(2, 5)).toEqual(['PRESS ENT  ', 'TO COMPUTE ', 'CTR WPTS   ']);
         expect(unit.errors).toEqual([]);
     });
@@ -231,7 +231,7 @@ describe('CTR 1 page, a plan modified after the insertion (5-27)', () => {
         expect(first).toEqual([' BGD00     ', 'FW -ABQ CTR', 'BGD    180°', '     30.1nm', 'N 42°45.00\'', 'W100°00.00\'']);
         expect(second).toEqual([' GCK00  new', 'ABQ-DEN CTR', 'GCK    180°', '     30.1nm', 'N 47°45.00\'', 'W100°00.00\'']);
         expect(ctr1.slice(2, 5)).toEqual(['PRESS ENT  ', 'TO INSERT  ', 'INTO FPL   ']);
-        expect(idents(unit, 1)).toEqual(['KAAA', 'BGD00', 'KBBB', 'GCK00', 'KCCC']);
+        expect(fplIdents(unit, 1)).toEqual(['KAAA', 'BGD00', 'KBBB', 'GCK00', 'KCCC']);
         expect(unit.errors).toEqual([]);
     });
 });
@@ -252,8 +252,8 @@ describe('CTR 1 page, the 30 waypoint limit (5-26)', () => {
         expect(right()[0]).toBe(' 2 NEW WPTS'); // Precondition: computed
         await ent(unit);
 
-        expect(idents(unit, 1).length).toBe(30);
-        expect(idents(unit, 1).slice(25)).toEqual(['FA25', 'BGD00', 'KBBB', 'GCK00', 'KCCC']);
+        expect(fplIdents(unit, 1).length).toBe(30);
+        expect(fplIdents(unit, 1).slice(25)).toEqual(['FA25', 'BGD00', 'KBBB', 'GCK00', 'KCCC']);
     });
 
     // 5-26: when the Center waypoints would make the plan exceed 30 waypoints, none are offered and CTR 1 says NOT
@@ -269,12 +269,8 @@ describe('CTR 1 page, the 30 waypoint limit (5-26)', () => {
 
 describe('CTR 1 page, Center waypoints at the power-off (5-26)', () => {
     /** The user waypoints in the facility repository, as "ident region", sorted */
-    const userWaypoints = (unit: HeadlessUnit): string[] => {
-        const found: string[] = [];
-        const add = (f: Facility) => found.push(`${f.icaoStruct.ident} ${f.icaoStruct.region}`);
-        unit.props.facilityRepository.forEach(add, [FacilityType.USR]);
-        return found.sort();
-    };
+    const centerWaypoints = (unit: HeadlessUnit): string[] =>
+        userWaypoints(unit, FacilityType.USR).map(f => `${f.icaoStruct.ident} ${f.icaoStruct.region}`).sort();
 
     // 5-26: switching the unit off purges every Center waypoint that no plan holds from the user waypoint list. CTR 1
     // stores a waypoint at the computation (first ENT), and without the second ENT no plan ever receives it
@@ -282,11 +278,11 @@ describe('CTR 1 page, Center waypoints at the power-off (5-26)', () => {
         const unit = await onCtr1(w => [w.kaaa, w.kbbb, w.kccc]);
         await ent(unit);
         expect(right()[0]).toBe(' 2 NEW WPTS'); // Precondition: computed, not inserted
-        expect(idents(unit, 1)).toEqual(['KAAA', 'KBBB', 'KCCC']);
-        expect(userWaypoints(unit).map(w => w.split(' ')[0])).toEqual(['BGD00', 'GCK00']); // Precondition: stored
+        expect(fplIdents(unit, 1)).toEqual(['KAAA', 'KBBB', 'KCCC']);
+        expect(centerWaypoints(unit).map(w => w.split(' ')[0])).toEqual(['BGD00', 'GCK00']); // Precondition: stored
 
         await unit.panel.powerOff();
 
-        expect(userWaypoints(unit)).toEqual([]);
+        expect(centerWaypoints(unit)).toEqual([]);
     });
 });

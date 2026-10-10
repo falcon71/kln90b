@@ -4,7 +4,7 @@ import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {savedUserWaypoints} from '../../../harness/storage';
 import {collectStatusMessages} from '../../../harness/statusLine';
-import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
+import {activeIdent, userWaypoints} from '../../../harness/readers';
 
 /**
  * 5-18: a user VOR is made on the VOR page by entering an unknown ident and its position. The longitude is typed as
@@ -25,30 +25,27 @@ async function createUserVor(): Promise<HeadlessUnit> {
     return unit;
 }
 
-function userWaypoints(unit: HeadlessUnit): [string, string, FacilityType][] {
-    const out: [string, string, FacilityType][] = [];
-    KLNFacilityRepository.getRepository(unit.props.bus).forEach(f => out.push([f.icaoStruct.region, f.icaoStruct.ident, ICAO.getFacilityTypeFromValue(f.icaoStruct)]));
-    return out;
+/** The user waypoints of the repository (every type) as [region, ident, type] */
+function userTuples(unit: HeadlessUnit): [string, string, FacilityType][] {
+    return userWaypoints(unit).map(f => [f.icaoStruct.region, f.icaoStruct.ident, ICAO.getFacilityTypeFromValue(f.icaoStruct)]);
 }
 
 describe('user VOR (5-18)', () => {
     it('stores the new waypoint in the user region', async () => {
         const unit = await createUserVor();
-        expect(userWaypoints(unit).map(([region, ident]) => [region, ident])).toEqual([['XX', 'QQQ']]);
+        expect(userTuples(unit).map(([region, ident]) => [region, ident])).toEqual([['XX', 'QQQ']]);
     });
 
     it('stores the typed position', async () => {
         const unit = await createUserVor();
-        const positions: [number, number][] = [];
-        KLNFacilityRepository.getRepository(unit.props.bus).forEach(f => positions.push([f.lat, f.lon]));
-        expect(positions).toEqual([[47, 100]]);
+        expect(userWaypoints(unit).map(f => [f.lat, f.lon])).toEqual([[47, 100]]);
     });
 
     // The V1 string says VOR ('VXX    QQQ  ') but the ICAO value says U, so the repository files it under the
     // supplementary waypoints: OTH 3 lists it as S, and the persistor saves it in the SUP format without frequency.
     it.fails('is a VOR, not a supplementary waypoint (#173)', async () => {
         const unit = await createUserVor();
-        expect(userWaypoints(unit)).toEqual([['XX', 'QQQ', FacilityType.VOR]]);
+        expect(userTuples(unit)).toEqual([['XX', 'QQQ', FacilityType.VOR]]);
     });
 
     // 5-20: OTH 3 lists the user waypoints with their type letter
@@ -134,7 +131,7 @@ describe('user VOR page (5-18)', () => {
         await unit.panel.ent();
 
         expect(Screen.read().status().mode).toBe('ENT LAT/LON');
-        expect(userWaypoints(unit)).toEqual([]);
+        expect(userTuples(unit)).toEqual([]);
     });
 
     // C-2: USR DB FULL when a user waypoint is to be created while the user data base holds 250
@@ -149,7 +146,7 @@ describe('user VOR page (5-18)', () => {
         await typePosition(unit);
 
         expect(Screen.read().status().mode).toBe('USR DB FULL');
-        expect(userWaypoints(unit).filter(([, ident]) => ident === 'QQQ')).toEqual([]);
+        expect(userTuples(unit).filter(([, ident]) => ident === 'QQQ')).toEqual([]);
     });
 });
 
@@ -204,7 +201,7 @@ describe('user VOR that is the active waypoint (C-1)', () => {
         await unit.panel.dct(); // 3-27 rule 3: the waypoint page on the right is the default
         await unit.panel.ent();
         await unit.panel.ent();
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('QQV'); // precondition
+        expect(activeIdent(unit)).toBe('QQV'); // precondition
         await unit.panel.selectPage('R', 'VOR  ');
         await unit.panel.cursor('R');
         await unit.panel.cursorTo('R', '12°W');

@@ -7,6 +7,7 @@ import {pointFrom} from '../../../harness/flight/geo';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, sid, withProcedures} from '../../../harness/navdata/procedures';
 import {savedFlightplan} from '../../../harness/storage';
+import {fplIdents, messages} from '../../../harness/readers';
 import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {EVT_CLR} from '../../../../kln90b/HEvents';
@@ -50,7 +51,7 @@ describe('APT 8 page after a waypoint confirmation page (80631c8)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         // The confirmation happened: ABC is in FPL 0
-        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KPRC', 'ABC']);
+        expect(fplIdents(unit)).toEqual(['KPRC', 'ABC']);
         expect(Screen.read().status().right).toBe('APT 8');
         expect(rows('R').slice(0, 2)).toEqual([' KPRC IAP', ' 1 RNAV 27']);
         expect(Screen.read().text()).not.toContain('NO APPROACH');
@@ -58,7 +59,6 @@ describe('APT 8 page after a waypoint confirmation page (80631c8)', () => {
 });
 
 const fpl0Legs = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => [l.wpt.icaoStruct.ident, l.type]);
-const messageList = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
 
 // The world of approachWorld() (KPRC at 47.0 8.0, the RNAV 18 approach, ENRAA 60 NM north)
 describe('APT 8 putting an approach into FPL 0', () => {
@@ -154,25 +154,25 @@ describe('APT 8 putting an approach into FPL 0', () => {
             const w = approachWorld();
             const unit = await bootUnit({facilities: w.facilities, position: w.north(40), storage: savedFlightplan(0, [w.ifaaa, w.kprc])});
             await settle(unit);
-            const before = messageList(unit);
+            const before = messages(unit);
             expect(before).not.toContain(REDUNDANT);
 
             await unit.panel.loadProcedure('APT 8');
 
             expect(fpl0Legs(unit).map(l => l[0])).toEqual(['IFAAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
-            expect(messageList(unit)).toEqual([...before, REDUNDANT]);
+            expect(messages(unit)).toEqual([...before, REDUNDANT]);
         });
 
         it('is not posted when the enroute waypoints are not in the approach', async () => {
             const w = approachWorld();
             const unit = await bootUnit({facilities: w.facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, w.kprc])});
             await settle(unit);
-            const before = messageList(unit);
+            const before = messages(unit);
 
             await unit.panel.loadProcedure('APT 8');
 
             expect(fpl0Legs(unit).map(l => l[0])).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
-            expect(messageList(unit)).toEqual(before);
+            expect(messages(unit)).toEqual(before);
         });
     });
 });
@@ -192,7 +192,7 @@ describe('APT 8 loading an approach into a full FPL 0 (characterization)', () =>
         // Preconditions: 27 legs, the first leg is part of the active leg (index 1), three places free for five approach legs
         expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(27);
         expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(1);
-        const before = messageList(unit);
+        const before = messages(unit);
 
         await unit.panel.loadProcedure('APT 8');
 
@@ -201,7 +201,7 @@ describe('APT 8 loading an approach into a full FPL 0 (characterization)', () =>
             ['IAFAA', KLNLegType.APP], ['IFAAA', KLNLegType.APP], ['FAFAA', KLNLegType.APP], ['KPRC', KLNLegType.USER],
         ]);
         expect(Screen.read().status().mode).toBe('FPL FULL');
-        expect(messageList(unit)).toEqual(before);
+        expect(messages(unit)).toEqual(before);
     });
 });
 

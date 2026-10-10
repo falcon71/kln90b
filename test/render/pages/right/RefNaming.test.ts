@@ -3,7 +3,7 @@ import {FacilityType} from '@microsoft/msfs-sdk';
 import {bootUnit} from '../../../harness/boot';
 import {airport, intersection} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
-import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
+import {userWaypoints} from '../../../harness/readers';
 
 // FPL 0 KAAA to KBBB runs due south along 8 E; the fix lies 0.2 deg east of the middle of the leg, so a
 // perpendicular to the leg exists (5-21).
@@ -18,9 +18,7 @@ async function createReference(ident: string): Promise<string[]> {
     await unit.panel.ent(); // the waypoint page of the reference (5-21, step 5)
     await unit.panel.ent(); // creates the reference waypoint (step 6)
     expect(unit.errors).toEqual([]);
-    const names: string[] = [];
-    KLNFacilityRepository.getRepository(unit.props.bus).forEach(f => names.push(f.icaoStruct.region + ':' + f.icaoStruct.ident), [FacilityType.USR]);
-    return names;
+    return userWaypoints(unit, FacilityType.USR).map(f => f.icaoStruct.region + ':' + f.icaoStruct.ident);
 }
 
 describe('REF waypoint names (5-22)', () => {

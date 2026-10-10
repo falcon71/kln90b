@@ -9,6 +9,7 @@ import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures
 import {readRows, Screen} from '../../../harness/render/screen';
 import {savedFlightplan, savedUserWaypoints} from '../../../harness/storage';
 import {collectStatusMessages} from '../../../harness/statusLine';
+import {fplIdents} from '../../../harness/readers';
 import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 
 describe('ACT page', () => {
@@ -183,11 +184,7 @@ describe('ACT page, the first row (4-10)', () => {
         const {kaaa, abc} = dtWorld();
         const kccc = airport('KCCC', 47.1, 10.5);
         const unit = await bootOnAct([kaaa, abc], [kaaa, abc, kccc]);
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'KCCC');
-        await unit.panel.ent(); // the APT 1 confirmation
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(2000);
+        await unit.panel.directTo('KCCC', {waitMs: 2000});
         await unit.panel.selectPage('R', 'ACT');
 
         expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(-1); // precondition: outside FPL 0
@@ -357,8 +354,7 @@ describe('ACT 8 (6-4)', () => {
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
 
-        const legs = unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident);
-        expect(legs).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
         expect(unit.errors).toEqual([]);
     });
 

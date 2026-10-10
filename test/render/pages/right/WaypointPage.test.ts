@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS} from '../../../harness/boot';
 import {intersection, ndb} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {isUserWaypoint} from '../../../../kln90b/pages/right/WaypointPage';
@@ -150,7 +150,7 @@ describe('waypoint page memory over a page change (characterization)', () => {
         const unit = await bootUnit({
             facilities: [ndb('NAA', 47.1, 10.5), ndb('NBB', 47.2, 10.5), ndb('NCC', 47.3, 10.5)], position: {lat: 47.0, lon: 10.5},
         });
-        await vi.advanceTimersByTimeAsync(12000); // the nearest search runs every 10 s
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.selectPage('R', 'NDB  ');
         await unit.panel.scan();
         await slowStep(unit, -2);
@@ -160,7 +160,7 @@ describe('waypoint page memory over a page change (characterization)', () => {
         await unit.panel.outer('R', 1); // INT
         await unit.panel.outer('R', -1); // NDB
         unit.env.sim.set('PLANE LATITUDE', 'degrees', 47.21); // NBB is 0.6 NM away now, the nearest
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
 
         expect(identRow()).toBe(' NBB   nr 1');
     });

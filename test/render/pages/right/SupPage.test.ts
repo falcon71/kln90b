@@ -1,4 +1,4 @@
-import {describe, expect, it, onTestFinished, vi} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {ICAO, UserFacility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {insertLeg} from '../../../harness/flightplan';
@@ -7,6 +7,8 @@ import {vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {savedUserWaypoints} from '../../../harness/storage';
+import {activeIdent} from '../../../harness/readers';
+import {muteConsoleError} from '../../../harness/console';
 import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
 
 // Invented facilities on the meridian 10.5 E (longitudes of 10 degrees or more keep the coordinate rows clear of #230).
@@ -281,7 +283,7 @@ describe('SUP page', () => {
     async function enterRefXyz(): Promise<HeadlessUnit> {
         const unit = await supPage({extra: [vor('XYZ', 47.5, 10.5)]});
         await unit.panel.cursor('R');
-        await unit.panel.outer('R', 5); // the ident's five cells, then REF
+        await unit.panel.cursorTo('R', 'ABC'); // the REF field, after the ident's five cells
         expect(unit.panel.focused('R')).toEqual({row: 1, col: 18, text: 'ABC  '}); // precondition
         await unit.panel.enterIdent('R', 'XYZ');
         await unit.panel.ent();
@@ -407,7 +409,7 @@ describe('SUP page', () => {
         insertLeg(unit, 0, userWaypoint(unit, 'USUP')!);
         insertLeg(unit, 1, userWaypoint(unit, 'USUQ')!);
         await settle(unit);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('USUQ'); // precondition
+        expect(activeIdent(unit)).toBe('USUQ'); // precondition
         await unit.panel.selectPage('R', 'SUP  ');
         expect(rightRows()[0]).toBe(' USUP      ');
 
@@ -421,8 +423,7 @@ describe('SUP page', () => {
     // (2-8, 5-16), and the waypoint is not created
     /** 250 user waypoints far away, the SUP page with QQ entered, and PRES POS? */
     async function createQqWithFullDatabase(): Promise<HeadlessUnit> {
-        const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined); // the page logs the refusal
-        onTestFinished(() => spy.mockRestore());
+        muteConsoleError(); // the page logs the refusal
         const full = savedUserWaypoints(Array.from({length: 250}, (_, i) => ({
             kind: 'sup' as const, ident: `S${String(i).padStart(3, '0')}`, lat: 40 + i * 0.01, lon: 20,
         })));
