@@ -314,11 +314,14 @@ describe('Vnav.formatDuration', () => {
         expect(vnav.formatDuration(null)).toBe('--:--');
     });
 
-    // The time is a fraction of seconds (distance / GS). The seconds are rounded after the minutes were cut, so 539.6 s
-    // shows 8:60. 5-8, 5-9: the countdown is minutes and seconds. Whether the real unit rounds or truncates is unknown;
-    // either way it never shows 60 seconds.
-    it.fails('never shows 60 seconds (#184)', () => {
+    // The time is a fraction of seconds (distance / GS). The seconds were rounded after the minutes were cut, so 539.6 s
+    // showed 8:60 and 59.6 s showed :60. 5-8, 5-9: the countdown is minutes and seconds. Whether the real unit rounds or
+    // truncates is unknown; either way it never shows 60 seconds.
+    it('never shows 60 seconds (#184)', () => {
         const vnav = new Vnav({} as NavPageState, {} as Sensors, {} as Flightplan);
         expect([' 8:59', ' 9:00']).toContain(vnav.formatDuration(539.6));
+        expect(['  :59', ' 1:00']).toContain(vnav.formatDuration(59.6));
+        // A fraction below a half second is dropped by rounding and by truncation alike, only a ceiling adds a second
+        expect(vnav.formatDuration(533.4)).toBe(' 8:53');
     });
 });

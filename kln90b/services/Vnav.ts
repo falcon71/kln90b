@@ -117,8 +117,10 @@ export class Vnav implements CalcTickable {
             return "--:--";
         }
 
-        const minutes = Math.floor(duration / 60);
-        const seconds = duration % 60;
+        //Round to whole seconds before splitting, 539.6 s would show 8:60 otherwise
+        const totalSeconds = Math.round(duration);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
 
         if (minutes === 0) {
             return `  :${format(seconds, "00")}`;
