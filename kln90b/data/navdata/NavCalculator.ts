@@ -240,7 +240,8 @@ export class NavCalculator implements CalcTickable {
 
 
             } else {
-                nav.waypointAlert = nav.eteToActive! <= WPT_ALERT_WITHOUT_TURN_ANTI;
+                //The turn onto the last leg is still being flown after the sequencing, the alert stays on until it ends (as above)
+                nav.waypointAlert = nav.eteToActive! <= WPT_ALERT_WITHOUT_TURN_ANTI || nav.activeWaypoint.turnStack.length > 0;
                 if (toLeg.fixType !== KLNFixType.MAP && nav.toFrom === FROM) {
                     nav.activeWaypoint.sequenceToNextWaypoint();
                     console.log("moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt());
