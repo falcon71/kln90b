@@ -85,9 +85,10 @@ describe('Apt3ListPageContainer, the list of a database airport and the page of 
         expect(rows()).toEqual(KAAA_FIRST_LIST_PAGE);
     });
 
-    // The scan from the diagram of a database airport leaves the page as it was built for the diagram, so the user page
-    // keeps the runway it was built with (the first runway of KAAA) until the page is left. The same cause as #269.
-    it.fails('shows the runway of a user airport after a scan from the diagram of a database airport (5-16, #269)', async () => {
+    // The scan from the diagram of a database airport must not leave the page as it was built for the diagram: the
+    // user page would keep the runway it was built with (the first runway of KAAA) until the page is left. The same
+    // cause as #269.
+    it('shows the runway of a user airport after a scan from the diagram of a database airport (5-16, #269)', async () => {
         const unit = await bootOnApt3();
 
         await scan(unit, 1);

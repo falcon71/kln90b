@@ -1462,8 +1462,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - the fix of #96 needs `PageStack` in `MainPage.tsx` to destroy the half page it replaces (`setCurrentPage`, `pop`,
       `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone leaves both handler counts
       unchanged, and OTH 4 counts the `changed` topic of the remarks manager;
-    - the fix of #269 (`this.children = this.getCurrentPage().children; this.requiresRedraw = true;` in
-      `Apt3Page.changeFacility`) turns both #269 pins red; the fix of #95 turns its two pins red (the list and the error
+    - the fix of #95 turns its two pins red (the list and the error
       page); the fix of #93 turns two (Avgas and JetB; JetA1 passes today, because the SDK's generic imperial gallon
       weighs as Jet A);
     - the fix of #311 in `WaypointEditor` leaves the `FplPage.test.ts` insert tests green; the fix of #262 must keep NO
