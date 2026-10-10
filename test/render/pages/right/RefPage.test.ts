@@ -315,8 +315,7 @@ describe('REF page, where the reference waypoint is placed', () => {
     });
 
     // 5-21 note, figure 5-81, C-1: the perpendicular must meet the leg itself. SGW lies south of KAAA, so its
-    // perpendicular meets only the extension of the leg behind the first waypoint. The code checks only the distance from
-    // the first waypoint, so it accepts it (#299)
+    // perpendicular meets only the extension of the leg behind the first waypoint
     function southWorld() {
         const kaaa = airport('KAAA', 47.0, 10.0);
         const kbbb = airport('KBBB', 48.0, 10.0);
@@ -335,11 +334,49 @@ describe('REF page, where the reference waypoint is placed', () => {
         expect(fplIdents(unit, 2)).toEqual(['KAAA', 'TXKA', 'KBBB']);
     });
 
-    it.fails('refuses a waypoint whose perpendicular falls behind the first waypoint of the leg (5-21, C-1, #299)', async () => {
+    it('refuses a waypoint whose perpendicular falls behind the first waypoint of the leg (5-21, C-1, #299)', async () => {
         const {kaaa, kbbb, txk, sgw} = southWorld();
         const unit = await bootOnPlan([kaaa, kbbb], [kaaa, kbbb, txk, sgw]);
 
         await enterReference(unit, 'SGW');
+
+        expect(Screen.read().status().mode).toBe('INVALID REF');
+        expect(fplIdents(unit, 2)).toEqual(['KAAA', 'KBBB']);
+    });
+});
+
+describe('REF page, the ends of the leg (5-21)', () => {
+    // 5-21, figure 5-81: the perpendicular has to meet the leg between its two waypoints. A VOR 0.3 degree east of the
+    // leg KAAA (47.0 N) to KBBB (48.0 N) on 10 E, at a latitude just inside or just outside each end; the foot of its
+    // perpendicular lies a hair north of its own latitude (about 0.001 degree), so 0.01 degree clear of an end is on
+    // the side its name says
+    async function referenceAt(lat: number): Promise<HeadlessUnit> {
+        const kaaa = airport('KAAA', 47.0, 10.0);
+        const kbbb = airport('KBBB', 48.0, 10.0);
+        const edge = vor('EDG', lat, 10.3);
+        const unit = await bootUnit({facilities: [kaaa, kbbb, edge], position: {lat: 47.1, lon: 10.0}, storage: savedFlightplan(2, [kaaa, kbbb])});
+        await settle(unit);
+        await unit.panel.selectPage('L', 'FPL 2');
+        await unit.panel.selectPage('R', 'REF');
+        await enterReference(unit, 'EDG');
+        return unit;
+    }
+
+    it.each([
+        ['just inside the first waypoint', 47.01],
+        ['just inside the last waypoint', 47.99],
+    ])('takes a waypoint whose perpendicular falls %s', async (_name, lat) => {
+        const unit = await referenceAt(lat);
+
+        expect(Screen.read().status().right).toBe('SUP');
+        expect(Screen.read().rows('R')[0].trim()).toBe('EDGA');
+    });
+
+    it.each([
+        ['just behind the first waypoint', 46.99],
+        ['just beyond the last waypoint', 48.01],
+    ])('refuses a waypoint whose perpendicular falls %s with INVALID REF', async (_name, lat) => {
+        const unit = await referenceAt(lat);
 
         expect(Screen.read().status().mode).toBe('INVALID REF');
         expect(fplIdents(unit, 2)).toEqual(['KAAA', 'KBBB']);

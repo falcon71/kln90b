@@ -155,8 +155,9 @@ export class RefPage extends SixLineHalfPage {
             const path = circle.setAsGreatCircle(from, to);
             path.closest(wpt, tempGeoPoint);
             const distFromClosest = tempGeoPoint.distance(from); //We use this to check, if closest is between from and to
+            const distClosestTo = tempGeoPoint.distance(to); //5-21 The perpendicular must meet the leg itself, not its extension behind from
             const distClosestWpt = tempGeoPoint.distance(wpt);
-            if (distFromClosest <= distFromTo && distClosestWpt < distMin) {
+            if (distFromClosest <= distFromTo && distClosestTo <= distFromTo && distClosestWpt < distMin) {
                 closestWpt.set(tempGeoPoint);
                 distMin = distClosestWpt;
                 closestIdx = i;
