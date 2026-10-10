@@ -91,6 +91,17 @@ describe('CAL 1 page (5-10)', () => {
     });
 });
 
+describe('CAL 1 barometer in millibars below 1000 (checked in the KLN 89 trainer, 2026-10-08, T16, #315)', () => {
+    // The ALT page shares the fieldset (BaroFieldset.test.ts holds the cases); CAL 1 shows the blank too
+    it('shows 993 MB with a blank in the first digit', async () => {
+        const unit = await bootUnit({storage: {barounit: false, cal12Barometer: 29.32}});
+        await unit.panel.selectPage('L', 'CAL 1');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[2]).toBe('BARO: 993MB');
+    });
+});
+
 describe('CAL 1 temperature entered sign first', () => {
     /** 9000 ft at 29.92" with TEMP 000; the sign set to -, then the last digit to 5 */
     async function signFirst() {

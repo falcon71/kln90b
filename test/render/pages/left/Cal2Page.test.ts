@@ -55,6 +55,17 @@ describe('CAL 2 page (characterization)', () => {
     });
 });
 
+describe('CAL 2 barometer in millibars below 1000 (checked in the KLN 89 trainer, 2026-10-08, T16, #315)', () => {
+    // The ALT page shares the fieldset (BaroFieldset.test.ts holds the cases); CAL 2 shows the blank too
+    it('shows 993 MB with a blank in the first digit', async () => {
+        const unit = await bootUnit({storage: {barounit: false, cal12Barometer: 29.32}});
+        await unit.panel.selectPage('L', 'CAL 2');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[3]).toBe('BARO: 993MB');
+    });
+});
+
 describe('CAL 2 page (5-11)', () => {
     // 5-11, steps 3 to 6: the cursor goes over CAS, then ALT (three digits, as on CAL 1), then BARO, then TEMP
     it('moves the cursor over CAS, ALT, BARO and TEMP (5-11)', async () => {

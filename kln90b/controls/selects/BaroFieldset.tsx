@@ -81,7 +81,15 @@ class InhgBaroFieldset implements BaroFieldset {
 }
 
 
-const HPA_BARO_100_SET = ["07", "08", "09", "10"];
+//The first two digits are one cell, in which a leading zero is a blank (checked in the KLN 89 trainer, 2026-10-08)
+const HPA_BARO_100_SET = [" 7", " 8", " 9", "10"];
+
+/**
+ * The four digits of the setting in millibars, within the range of the fieldset, with a blank for the leading zero
+ */
+function hpaString(baro: Inhg): string {
+    return format(Utils.Clamp(UnitType.IN_HG.convertTo(baro, UnitType.HPA), 700, 1099), "0000").replace(/^0/, " ");
+}
 
 
 class HpaBaroFieldset implements BaroFieldset {
@@ -90,7 +98,7 @@ class HpaBaroFieldset implements BaroFieldset {
     readonly children: UIElementChildren<BaroFieldsetTypes>;
 
     constructor(private baro: Inhg, private readonly callback: (alt: Feet) => void) {
-        const baroString = format(Utils.Clamp(UnitType.IN_HG.convertTo(baro, UnitType.HPA), 700, 1099), "0000");
+        const baroString = hpaString(baro);
 
         this.children = new UIElementChildren<BaroFieldsetTypes>({
             baro100: new SelectField(HPA_BARO_100_SET, HPA_BARO_100_SET.indexOf(baroString.substring(0, 2)), this.saveBaro100.bind(this)),
@@ -109,7 +117,7 @@ class HpaBaroFieldset implements BaroFieldset {
 
     public setBaro(baro: Inhg): void {
         this.baro = baro;
-        const baroString = format(Utils.Clamp(UnitType.IN_HG.convertTo(baro, UnitType.HPA), 700, 1099), "0000");
+        const baroString = hpaString(baro);
 
         this.children.get("baro100").value = HPA_BARO_100_SET.indexOf(baroString.substring(0, 2));
         this.children.get("baro10").value = Number(baroString.substring(2, 3));
