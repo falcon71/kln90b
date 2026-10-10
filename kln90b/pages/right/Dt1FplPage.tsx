@@ -176,7 +176,7 @@ export class Dt1FplPage extends SixLineHalfPage {
             return false;
         }
         if (fplIdx === 0) {
-            return legIdx >= actIdx;
+            return this.isAhead(legIdx, actIdx);
         } else {
             return legIdx > 0;
         }
@@ -192,8 +192,19 @@ export class Dt1FplPage extends SixLineHalfPage {
             return false;
         }
 
-        return legIdx >= actIdx;
+        return this.isAhead(legIdx, actIdx);
 
+    }
+
+    /**
+     * Without an active leg (index -1) the rows show dashes before the unit navigates (4-16, figure 4-56), but they are
+     * blank during a Direct To to a waypoint outside FPL 0 (4-11, figure 4-44)
+     */
+    private isAhead(legIdx: number, actIdx: number): boolean {
+        if (actIdx === -1 && this.props.memory.navPage.activeWaypoint.isDctNavigation()) {
+            return false;
+        }
+        return legIdx >= actIdx;
     }
 
 }

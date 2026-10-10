@@ -97,8 +97,8 @@ describe('D/T 2 page', () => {
     });
 
     // 4-12: the distances are those of D/T 1, which is blank beside FPL 0 during a Direct To to a waypoint outside the
-    // plan (4-11, figure 4-44), and so are the ETAs. The code shows ---- and --:-- beside every waypoint
-    it.fails('is blank beside FPL 0 during a Direct To to a waypoint outside the plan (4-12, #296)', async () => {
+    // plan (4-11, figure 4-44), and so are the ETAs
+    it('is blank beside FPL 0 during a Direct To to a waypoint outside the plan (4-12, #296)', async () => {
         await directToOutsidePlan();
 
         expect(Screen.read().rows('R')).toEqual([
@@ -110,9 +110,44 @@ describe('D/T 2 page', () => {
             '           ',
         ]);
     });
+
+    // 4-12: a Direct To to the first waypoint of FPL 0 makes leg 1 the active one, and every row from there on shows
+    // its distance. The aircraft at rest 6.0 NM north of KAAA: KAAA, ABC, DEF and KBBB are 6.0, 36.1, 66.1 and 96.2 NM
+    // away (0.1 degree of latitude is 6.01 NM, each further 0.5 degree 30.05 NM)
+    it('shows the distances beside FPL 0 during a Direct To to its first waypoint (4-12)', async () => {
+        const unit = await bootOnDtWorld({moving: false});
+        await unit.panel.directTo('KAAA', {waitMs: 2000});
+
+        const rows = await show(unit, 'FPL 0');
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(0);
+        expect(rows[0]).toBe('DIS     UTC');
+        expect(rows.slice(1, 5).map(r => r.slice(0, 4))).toEqual(['  6 ', ' 36 ', ' 66 ', ' 96 ']);
+    });
+
+    // 4-12: the distances are those of D/T 1, which shows dashes beside the waypoints of FPL 0 until the unit navigates
+    // (4-16, figure 4-56)
+    it('shows dashes for the distances beside FPL 0 before the unit navigates (4-12)', async () => {
+        const {kaaa, abc} = dtWorld();
+        const unit = await bootUnit({
+            facilities: [kaaa, abc], position: {lat: 47.1, lon: 10.0}, coldGps: true, storage: savedFlightplan(0, [kaaa, abc]),
+        });
+
+        const rows = await show(unit, 'FPL 0');
+        expect(rows[0]).toBe('DIS     UTC');
+        expect(rows.slice(1, 3).map(r => r.slice(0, 4))).toEqual(['----', '----']);
+    });
 });
 
 describe('D/T 2 page (characterization)', () => {
+    // The cells beside the distances of the test in 4-12 above: the aircraft at rest, so the times have no ground speed
+    // to come from. The DTK of KAAA is the Direct To course from the aircraft, 6 NM north of it, the others lie due north
+    it('characterization: shows the full rows beside FPL 0 during a Direct To to its first waypoint', async () => {
+        const unit = await bootOnDtWorld({moving: false});
+        await unit.panel.directTo('KAAA', {waitMs: 2000});
+
+        expect((await show(unit, 'FPL 0')).slice(1, 5)).toEqual(['  6   --:--', ' 36   --:--', ' 66   --:--', ' 96   --:--']);
+    });
+
     // The aircraft at rest: the distances are there, the ETAs have no ground speed to come from
     it('shows the distances and no ETAs beside FPL 0 with the aircraft at rest', async () => {
         const unit = await bootOnDtWorld({moving: false});

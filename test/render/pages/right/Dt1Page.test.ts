@@ -88,9 +88,8 @@ describe('D/T 1 page', () => {
         expect(Screen.read().rows('R')[0]).toBe('DIS     ETE');
     });
 
-    // 4-11, figure 4-44: during a Direct To to a waypoint that is not in FPL 0, D/T 1 is blank beside FPL 0. The code
-    // shows ---- and --:-- beside every waypoint (shouldDistanceBeVisible compares the leg with an active index of -1)
-    it.fails('is blank beside FPL 0 during a Direct To to a waypoint outside the plan (4-11, #296)', async () => {
+    // 4-11, figure 4-44: during a Direct To to a waypoint that is not in FPL 0, D/T 1 is blank beside FPL 0
+    it('is blank beside FPL 0 during a Direct To to a waypoint outside the plan (4-11, #296)', async () => {
         await directToOutsidePlan();
 
         expect(Screen.read().rows('R')).toEqual([
@@ -101,6 +100,32 @@ describe('D/T 1 page', () => {
             '           ',
             '           ',
         ]);
+    });
+
+    // 4-11: a Direct To to the first waypoint of FPL 0 makes leg 1 the active one, and every row from there on shows
+    // its distance. The aircraft at rest 6.0 NM north of KAAA: KAAA, ABC, DEF and KBBB are 6.0, 36.1, 66.1 and 96.2 NM
+    // away (0.1 degree of latitude is 6.01 NM, each further 0.5 degree 30.05 NM)
+    it('shows the distances beside FPL 0 during a Direct To to its first waypoint (4-11)', async () => {
+        const unit = await bootOnDtWorld({moving: false});
+        await unit.panel.directTo('KAAA', {waitMs: 2000});
+
+        const rows = await show(unit, 'FPL 0');
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(0);
+        expect(rows[0]).toBe('DIS     ETE');
+        expect(rows.slice(1, 5).map(r => r.slice(0, 4))).toEqual(['  6 ', ' 36 ', ' 66 ', ' 96 ']);
+    });
+
+    // 4-16, figure 4-56: until the unit is ready to navigate there is no active leg, and the distances beside FPL 0 are dashes. Not to be
+    // confused with a Direct To outside the plan, which shows nothing (the test above)
+    it('shows dashes beside the waypoints of FPL 0 before the unit navigates (4-16, figure 4-56)', async () => {
+        const {kaaa, abc} = dtWorld();
+        const unit = await bootUnit({
+            facilities: [kaaa, abc], position: {lat: 47.1, lon: 10.0}, coldGps: true, storage: savedFlightplan(0, [kaaa, abc]),
+        });
+
+        const rows = await show(unit, 'FPL 0');
+        expect(rows[0]).toBe('DIS     ETE');
+        expect(rows.slice(1, 3).map(r => r.slice(0, 4))).toEqual(['----', '----']);
     });
 
     // 4-11 (hours:minutes), 5-7 and the KLN 89 trainer (2026-10-07): a duration never shows 60 minutes. DEF is 119.2 NM
@@ -118,6 +143,15 @@ describe('D/T 1 page', () => {
 });
 
 describe('D/T 1 page (characterization)', () => {
+    // The cells beside the distances of the test in 4-11/4-12 above: the aircraft at rest, so the times have no ground speed
+    // to come from. The DTK of KAAA is the Direct To course from the aircraft, 6 NM north of it, the others lie due north
+    it('characterization: shows the full rows beside FPL 0 during a Direct To to its first waypoint', async () => {
+        const unit = await bootOnDtWorld({moving: false});
+        await unit.panel.directTo('KAAA', {waitMs: 2000});
+
+        expect((await show(unit, 'FPL 0')).slice(1, 5)).toEqual(['  6   --:--', ' 36   --:--', ' 66   --:--', ' 96   --:--']);
+    });
+
     // The aircraft at rest: the distances are there, the ETEs have no ground speed to come from
     it('shows the distances and no ETEs beside FPL 0 with the aircraft at rest', async () => {
         const {kaaa, abc, def, kbbb} = dtWorld();
@@ -135,8 +169,7 @@ describe('D/T 1 page (characterization)', () => {
         `);
     });
 
-    // Beside FPL 0 the no-fix state shows ---- and --:-- beside the waypoints, which the fix of #296 may blank as
-    // well (no active waypoint either way), so only the page beside NAV 2 is held here
+    // The FPL 0 case of the same state is held in the spec tests above (4-16, figure 4-56)
     it('shows dashes beside NAV 2 before the GPS has a fix', async () => {
         const {kaaa, abc} = dtWorld();
         const unit = await bootUnit({
