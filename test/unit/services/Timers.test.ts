@@ -83,9 +83,9 @@ describe('flight timer and departure time with RUN WHEN POWER IS ON', () => {
     });
 
     // 4-13: DEP is the time power was applied. The GPS advances its time in place (TimeStamp.setTimestamp) while it
-    // has no fix and in take-home mode (Gps.ts), and Timers keeps a reference to that object, so DEP runs with the
-    // clock until the GPS replaces the object at the first fix.
-    it.fails('keeps DEP when the GPS advances its time in place (#171)', () => {
+    // has no fix and in take-home mode (Gps.ts), so DEP must be a copy of that object. D/T 4 holds the cases end to
+    // end (Dt4Page.test.ts)
+    it('keeps DEP when the GPS advances its time in place (#171)', () => {
         const {gps, state, timers} = setup(FLT_TIMER_POWER);
         timers.tick();
         gps.timeZulu.setTimestamp(gps.timeZulu.getTimestamp() + 60_000);

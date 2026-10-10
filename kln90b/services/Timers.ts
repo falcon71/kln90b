@@ -24,7 +24,7 @@ export class Timers implements CalcTickable {
         if (this.flightTimerSetting.get() === FLT_TIMER_POWER || this.sensors.in.gps.groundspeed >= 30) {
             this.state.flightTimer += TICK_TIME_CALC / 1000;
             if (this.state.departureTime === null) {
-                this.state.departureTime = this.sensors.in.gps.timeZulu;
+                this.state.departureTime = this.sensors.in.gps.timeZulu.addSeconds(0); //A copy, the GPS advances its time object in place without a fix and in take-home mode
             }
         }
         this.totalTime += TICK_TIME_CALC / 1000;
