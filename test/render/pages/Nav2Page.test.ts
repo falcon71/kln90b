@@ -130,14 +130,14 @@ describe('NAV 2 page', () => {
 
     // The real unit keeps the radial in its cells for a two-letter VOR ident: the reference photo image3-2-scaled.jpeg
     // of a real unit shows a two-letter VOR with the radial in cells 5 to 8, the cells of a three-letter ident in
-    // figure 3-103 (3-32). The code writes the ident without padding, so the radial moves one cell to the left.
+    // figure 3-103 (3-32). Until #228 the code wrote the ident without padding, so the radial moved one cell to the left.
     it('shows the radial of a three-letter VOR in cells 5 to 8 (3-32)', async () => {
         await nav2At({lat: 47.0, lon: 8.0}, [vor('ABC', 47.2, 8.0)]);
 
         expect(Screen.read().rows('L')[2]).toBe('ABC  180°fr');
     });
 
-    it.fails('shows the radial of a two-letter VOR in cells 5 to 8 (3-32, #228)', async () => {
+    it('shows the radial of a two-letter VOR in cells 5 to 8 (3-32, #228)', async () => {
         await nav2At({lat: 47.0, lon: 8.0}, [vor('AB', 47.2, 8.0)]);
 
         expect(Screen.read().rows('L')[2]).toBe('AB   180°fr');
