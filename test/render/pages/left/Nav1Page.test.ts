@@ -18,7 +18,7 @@ const west = (nm: number) => pointFrom(KDDD, 270, nm);
 /**
  * Boots on the leg 5 NM further west, selects NAV 1 on the left, then holds the position `nm` west of KDDD at
  * `groundspeedKt` with the track of the leg. The page is selected first, because selectPage reads the screen, and a
- * screen that overflows its half page (the DIS pin) cannot be read.
+ * screen that overflows its half page (the DIS test of #226) cannot be read.
  */
 async function onLeg(nm: number, groundspeedKt: number, magvar = 0): Promise<HeadlessUnit> {
     const unit = await bootUnit({
@@ -122,7 +122,7 @@ describe('NAV 1 page', () => {
         expect(['ETE    1:00', 'ETE     :59']).toContain(Screen.read().rows('L')[4]);
     });
 
-    // The setup sibling of the DIS pin: 99.97 NM from KDDD
+    // The setup sibling of the DIS test of #226: 99.97 NM from KDDD
     it('reaches a distance of 99.97 NM (3-31)', async () => {
         const unit = await onLeg(99.97, 145);
 
@@ -136,7 +136,7 @@ describe('NAV 1 page', () => {
     // 3-31: DIS fills four cells, tenths below 100 NM and whole NM above (figures 3-97, 5-21). Just below 100 NM the
     // tenths round up to 100.0, five cells, which runs past the edge of the half page (Screen.read() throws on it).
     // Expected: 100 (rounded) or 99.9 (truncated), in the four cells.
-    it.fails('keeps DIS in its four cells just below 100 NM (3-31, #226)', async () => {
+    it('keeps DIS in its four cells just below 100 NM (3-31, #226)', async () => {
         await onLeg(99.97, 145);
 
         expect(['DIS   100nm', 'DIS  99.9nm']).toContain(Screen.read().rows('L')[2]);

@@ -158,7 +158,7 @@ describe('NAV 3 page on an FPL 0 leg', () => {
         expect(rows[2]).toBe('TK     080°');
     });
 
-    // The setup sibling of the pin: 9.97 NM right of the course, NAV 3 on the left
+    // The setup sibling of the #226 test: 9.97 NM right of the course, NAV 3 on the left
     it('reaches 9.97 NM right of the course (3-32)', async () => {
         const unit = await nav3OnLeg(9.97);
 
@@ -169,7 +169,7 @@ describe('NAV 3 page on an FPL 0 leg', () => {
 
     // 3-32 (figures 3-104, 3-105): the cross track has three cells. Just below 10 NM the tenths round up to 10.0, four
     // cells, which runs past the edge of the half page. Expected: 10 (rounded) or 9.9 (truncated) in the three cells.
-    it.fails('keeps the cross track in its three cells just below 10 NM (3-32, #226)', async () => {
+    it('keeps the cross track in its three cells just below 10 NM (3-32, #226)', async () => {
         await nav3OnLeg(9.97);
 
         expect(['FLY L  10nm', 'FLY L 9.9nm']).toContain(Screen.read().rows('L')[3]);

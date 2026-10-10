@@ -826,9 +826,9 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   knobs after arriving; the TRI pages read their fields from `unit.props.memory.triPage` when they are built, so a test
   seeds the memory first and selects the page after.
 - **`selectPage` throws once a row overflows**, because it reads the screen after every click, and `Screen.read()`
-  throws on a character past column 11 (below). A pin of an overflow (a distance that rounds up to its cutoff) selects
-  its page first, then moves the aircraft into the overflow, and its sibling reads the raw row with `readRows`
-  (`Nav1Page.test.ts`, `Nav3Page.test.ts`).
+  throws on a character past column 11 (below). A test of an overflow (a distance that rounded up to its cutoff, #226)
+  selects its page first, then moves the aircraft into the overflow, and a setup sibling that must see the overflowing
+  row reads the raw row with `readRows` (`Nav1Page.test.ts`, `Nav3Page.test.ts`).
 - **The fuel computer reads `NUMBER OF ENGINES` once, while it is built.** A test without the `simVars` option
   (section 4) counts no real engine and sees every fuel flow and every fuel used as 0. The pages that show them exist
   only with the matching interfaces: OTH 5 to OTH 8 with the fuel computer and OTH 9 and OTH 10 with the air data

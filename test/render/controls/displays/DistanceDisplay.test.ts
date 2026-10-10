@@ -26,14 +26,14 @@ describe('DistanceDisplay, four cells', () => {
         expect(shown(4, null)).toBe('--.-');
     });
 
-    // The setup sibling of the pin: 99.94 NM stays below the cutoff and keeps its four cells
+    // The sibling of the #226 test: 99.94 NM stays below the cutoff and keeps its four cells
     it('shows 99.9 just below 100 NM (3-31)', () => {
         expect(shown(4, 99.94)).toBe('99.9');
     });
 
     // 3-31: DIS has four cells, tenths below 100 NM and whole NM above. 99.97 NM is below the cutoff but its tenth
-    // rounds up to 100.0, five cells. Expected: 100 (rounded) or 99.9 (truncated). Pinned on NAV 1 as well.
-    it.fails('keeps a distance that rounds up to 100 NM in its four cells (3-31, #226)', () => {
+    // rounds up to 100.0, five cells. Expected: 100 (rounded) or 99.9 (truncated). Also tested on NAV 1.
+    it('keeps a distance that rounds up to 100 NM in its four cells (3-31, #226)', () => {
         expect([' 100', '99.9']).toContain(shown(4, 99.97));
     });
 });
@@ -51,10 +51,15 @@ describe('DistanceDisplay, three cells', () => {
         expect(shown(3, 12.3)).toBe(' 12');
     });
 
-    // 3-32: three cells. 9.97 NM rounds up to 10.0, four cells. Expected: 10 (rounded) or 9.9 (truncated). Pinned on
-    // NAV 3 as well. The sibling above holds the 0.2 below 1 NM in three cells; a fix of #231 (whether the real unit
-    // shows hundredths below 1 NM) would change that spec test, not this pin
-    it.fails('keeps a cross track that rounds up to 10 NM in its three cells (3-32, #226)', () => {
+    // 3-32: the sibling of the #226 test below, 9.94 NM stays below the cutoff and keeps its tenth in the three cells
+    it('shows 9.9 just below 10 NM (3-32)', () => {
+        expect(shown(3, 9.94)).toBe('9.9');
+    });
+
+    // 3-32: three cells. 9.97 NM rounds up to 10.0, four cells. Expected: 10 (rounded) or 9.9 (truncated). Also tested
+    // on NAV 3. The sibling above holds the 0.2 below 1 NM in three cells; a fix of #231 (whether the real unit
+    // shows hundredths below 1 NM) would change that spec test, not this one
+    it('keeps a cross track that rounds up to 10 NM in its three cells (3-32, #226)', () => {
         expect([' 10', '9.9']).toContain(shown(3, 9.97));
     });
 });

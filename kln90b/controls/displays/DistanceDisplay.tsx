@@ -46,7 +46,8 @@ export class DistanceDisplay implements UiElement {
         }
 
         const cutoff = 10 ** (this.length - 2);
-        if (this.distance >= cutoff) { //Number is too large for decimals
+        //Compare the rounded value, 99.97 is shown as 100.0 otherwise, one cell too long
+        if (Math.round(this.distance * 10) / 10 >= cutoff) { //Number is too large for decimals
             return format(this.distance, "00").padStart(this.length, " ");
         } else {
             return format(this.distance, "0.0").padStart(this.length, " ");

@@ -32,7 +32,8 @@ export class TripFuelDisplay implements UiElement {
 
         const actFuel = Math.min(this.fuel, 99999);
 
-        if (actFuel >= 100) { //Number is too large for decimals
+        //Compare the rounded value, 99.97 is shown as 100.0 otherwise
+        if (Math.round(actFuel * 10) / 10 >= 100) { //Number is too large for decimals
             return format(actFuel, "00").padStart(5, " ");
         } else {
             return format(actFuel, "0.0").padStart(5, " ");
