@@ -85,10 +85,10 @@ describe('MSG page, a message on a later page (#191)', () => {
         return unit;
     }
 
-    // The preconditions of the pin below rest on 3-16 (newest first, two messages on the first page) and 3-23 (ENT
+    // The preconditions of the tests below rest on 3-16 (newest first, two messages on the first page) and 3-23 (ENT
     // leaves the MSG page). That a one-time message that was on the screen is gone once the page was left is not in the
     // guide: checked in the KLN 89 trainer, 2026-10-08 (T29)
-    it('drops the messages shown on the first page once read (sibling of #191) (3-16, KLN 89 trainer 2026-10-08)',
+    it('drops the messages shown on the first page once read (3-16, KLN 89 trainer 2026-10-08)',
         async () => {
             const unit = await leaveAfterTheFirstPage();
 
@@ -100,11 +100,94 @@ describe('MSG page, a message on a later page (#191)', () => {
     // 3-16: the prompt flashes while a message has not been viewed; ONE was never on the screen. Checked in the KLN 89
     // trainer, 2026-10-08 (T29): after leaving the first of two MSG pages (there with the outer knob, here with ENT,
     // 3-23) the prompt kept flashing and the message of the second page was still there
-    it.fails('keeps the message of the unseen second page and flashes msg (3-16, KLN 89 trainer 2026-10-08, #191)',
+    it('keeps the message of the unseen second page and flashes msg (3-16, KLN 89 trainer 2026-10-08, #191)',
         async () => {
             const unit = await leaveAfterTheFirstPage();
 
             expect(unit.props.messageHandler.getMessages().map(m => m.message[0])).toEqual(['ONE A']);
             await expectPromptFlashing('msg III', 'msg FFF');
         });
+
+    // 3-16: the boundary of the test above: the second page is viewed with MSG, then the page is left. Every message was on a
+    // viewed page, so none is left and the prompt is gone
+    it('reads the message of the second page once that page was shown (3-16)', async () => {
+        const unit = await bootNearKbbb();
+        await readAll(unit);
+        for (const text of ['ONE', 'TWO', 'THREE']) {
+            unit.props.messageHandler.addMessage(new OneTimeMessage([`${text} A`, `${text} B`, `${text} C`]));
+        }
+        await unit.panel.msg();
+        await unit.panel.msg();
+        expect(msgRows()).toEqual(['ONE A', ' ONE B', ' ONE C', '', '', '']); // The second page is up
+        await unit.panel.ent();
+        expect(Screen.read().status().right).toBe('APT 1'); // ENT left the MSG page
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.props.messageHandler.getMessages()).toEqual([]);
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
+        expect(Screen.read().row(6).slice(14, 17)).toBe('   ');
+    });
+
+    // 3-16: three pages, the first two viewed: the messages of the page last viewed are read, the page after it stays
+    it('keeps only the messages of the pages that were not shown, of three pages with two viewed (3-16)', async () => {
+        const unit = await bootNearKbbb();
+        await readAll(unit);
+        for (const text of ['M1', 'M2', 'M3', 'M4', 'M5', 'M6']) {
+            unit.props.messageHandler.addMessage(new OneTimeMessage([`${text} A`, `${text} B`, `${text} C`]));
+        }
+        await unit.panel.msg();
+        await unit.panel.msg();
+        expect(msgRows()).toEqual(['M4 A', ' M4 B', ' M4 C', 'M3 A', ' M3 B', ' M3 C']); // The second page is up
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.props.messageHandler.getMessages().map(m => m.message[0])).toEqual(['M1 A', 'M2 A']);
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(true);
+    });
+
+    // 3-16: a condition message whose condition lapsed while the page was on its first page is gone from the list. Showing
+    // its page from the snapshot afterwards must not mark it read: when the condition returns, the message is a new one
+    // and the prompt flashes for it
+    it('flashes msg for a condition message whose condition returns after its page was shown from the snapshot (3-16)', async () => {
+        const unit = await bootNearKbbb();
+        await readAll(unit);
+        let valid = true;
+        const persistent = {seen: false, message: ['PERS A', 'PERS B', 'PERS C'], isConditionValid: () => valid};
+        unit.props.messageHandler.persistentMessages.push(persistent);
+        await vi.advanceTimersByTimeAsync(1000);
+        for (const text of ['TWO', 'THREE']) {
+            unit.props.messageHandler.addMessage(new OneTimeMessage([`${text} A`, `${text} B`, `${text} C`]));
+        }
+        await unit.panel.msg();
+        expect(msgRows()).toEqual(['THREE A', ' THREE B', ' THREE C', 'TWO A', ' TWO B', ' TWO C']); // The first page
+        valid = false;
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.props.messageHandler.getMessages()).not.toContain(persistent); // The precondition: it lapsed
+        await unit.panel.msg();
+        expect(msgRows()[0]).toBe('PERS A'); // The second page still shows it, from the snapshot
+        await unit.panel.msg(); // closes the page
+
+        valid = true;
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.props.messageHandler.getMessages()).toContain(persistent);
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(true);
+        await expectPromptFlashing('msg III', 'msg FFF');
+    });
+
+    // 3-16: the message that stayed unread comes back on the first page again, after the message that arrived later, and
+    // is read once that page is shown. The new messages come first (newest first)
+    it('shows a message that stayed unread again after new messages arrived, and then reads all of them (3-16)', async () => {
+        const unit = await leaveAfterTheFirstPage();
+        unit.props.messageHandler.addMessage(new OneTimeMessage(['FOUR A', 'FOUR B', 'FOUR C']));
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.props.messageHandler.getMessages().map(m => m.message[0])).toEqual(['ONE A', 'FOUR A']); // Precondition
+
+        await unit.panel.msg();
+
+        expect(msgRows()).toEqual(['FOUR A', ' FOUR B', ' FOUR C', 'ONE A', ' ONE B', ' ONE C']);
+        await unit.panel.msg(); // one page only: MSG closes the page
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.props.messageHandler.getMessages()).toEqual([]);
+    });
 });

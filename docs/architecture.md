@@ -938,7 +938,7 @@ export class Set3Page extends SixLineHalfPage {
 ### MessagePage (`controls/MessagePage.tsx`)
 
 - A `SixLinePage` overlay. It builds pages from `messageHandler.getMessages()` (newest first, at most 6 lines per page)
-  and marks them `seen`.
+  and marks the messages of a page `seen` when that page is shown, so a page the pilot never saw stays unread.
 - `msg()` goes to the next page, popping at the end. `enter()` jumps to `Apt1Page` of the nearest airport (emergency
   nearest).
 - Messages are added by services with `messageHandler.addMessage(new OneTimeMessage([...lines]))`.

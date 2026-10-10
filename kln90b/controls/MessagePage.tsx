@@ -5,6 +5,7 @@ import {CursorController, NO_CURSOR_CONTROLLER} from "../pages/CursorController"
 import {WaypointPageProps} from "../pages/right/WaypointPage";
 import {Apt1Page} from "../pages/right/Apt1Page";
 import {MainPage} from "../pages/MainPage";
+import {Message} from "../data/MessageHandler";
 
 const MAX_MESSAGE_HEIGHT = 6;
 
@@ -16,6 +17,7 @@ export class MessagePage extends SixLinePage {
     protected requiresRedraw: boolean = true;
     private readonly ref: NodeReference<HTMLPreElement> = FSComponent.createRef<HTMLPreElement>();
     private currentPage = 0;
+    private readonly pageMessages: Message[][] = []; //The messages of each page, to mark them as seen when the page shows
     private readonly pages: string[] = this.buildPages();
 
     constructor(props: PageProps) {
@@ -44,6 +46,7 @@ export class MessagePage extends SixLinePage {
             mainPage.popOverlayPage();
             return true;
         }
+        this.markSeen(this.currentPage);
         this.requiresRedraw = true;
         return true;
     }
@@ -69,19 +72,34 @@ export class MessagePage extends SixLinePage {
 
         let page = "";
         let numLines = 0;
+        let pageMessages: Message[] = [];
         for (const message of messages) {
             if (numLines + message.message.length > MAX_MESSAGE_HEIGHT) {
                 pages.push(page);
+                this.pageMessages.push(pageMessages);
                 page = "";
                 numLines = 0;
+                pageMessages = [];
             }
             page += message.message.join("\n ") + "\n"; //The space is deliberate
             numLines += message.message.length;
-            message.seen = true;
+            pageMessages.push(message);
         }
         pages.push(page);
+        this.pageMessages.push(pageMessages);
+        this.markSeen(0); //3-16: only the messages on a page the pilot has viewed count as read
         this.requiresRedraw = true;
         return pages;
+    }
+
+    private markSeen(page: number): void {
+        //A page is a snapshot: a message whose condition lapsed since is gone and must not be marked, or it would come back read
+        const active = this.props.messageHandler.getMessages();
+        for (const message of this.pageMessages[page]) {
+            if (active.includes(message)) {
+                message.seen = true;
+            }
+        }
     }
 
     private redraw() {
