@@ -401,7 +401,7 @@ async function ndbListAfterAFirstSearch(rejectFirst: boolean) {
 // rejection escapes the handler that keeps one failing tickable from stopping the others), so a rejected search leaves
 // isCalculating set and the list is never searched again (#95). The rejection is also unhandled, so the error page
 // never shows it (#95).
-describe('the nearest NDB list after a rejected search (3-22, #95)', () => {
+describe('the nearest NDB list after a rejected search (#95)', () => {
     // The sibling of the pins: the same client and the same steps without the failure, so the pins differ only in it
     it('lists an NDB that comes into range after the first search (3-22)', async () => {
         const {rejected, listed} = await ndbListAfterAFirstSearch(false);

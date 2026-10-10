@@ -80,9 +80,10 @@ describe('ActiveArrow (characterization)', () => {
         const m = mount(new ActiveArrow(KBBB.icaoStruct, state));
         m.tick();
         expect(m.text()).toBe(' ');
-        // The state is a stub that has only what ActiveArrow reads: activeWaypoint.getActiveWpt(), which tick() calls on
-        // every display tick. The test replaces that one method to move the active waypoint after the mount, which a
-        // booted unit would do through a Direct To or a sequence (the booted behavior is held by the page tests)
+        // The state is a stub that has only what ActiveArrow reads: activeWaypoint.getActiveWpt(), which tick() calls
+        // on every display tick, and waypointAlert, which tick() reads to flash the arrow. The test replaces
+        // getActiveWpt to move the active waypoint after the mount, which a booted unit would do through a Direct To
+        // or a sequence (the booted behavior is held by the page tests)
         (state as unknown as {
             activeWaypoint: { getActiveWpt: () => Facility }
         }).activeWaypoint.getActiveWpt = () => KBBB;
