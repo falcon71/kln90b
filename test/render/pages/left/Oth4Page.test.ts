@@ -17,6 +17,36 @@ async function withRemarks(idents: string[]): Promise<HeadlessUnit> {
 /** The airport idents OTH 4 lists, in the order of the rows */
 const listed = (): string[] => Screen.read().rows('L').slice(1).map(r => r.trim()).filter(r => r !== '');
 
+/** OTH 4 listens to the remarks manager's changed topic (RemarksManager.ts) */
+const remarksHandlers = (unit: HeadlessUnit) => unit.props.bus.getTopicSubscriberCount('changed');
+
+// Pages are recreated on every knob step (CLAUDE.md), so OTH 4 subscribes to the remarks changes each time it shows.
+// The sibling of the #96 pin below: the count rises while the page shows, so the pin's count is observable
+describe('OTH 4 page, the remarks subscription (characterization)', () => {
+    it('characterization: subscribes to the remarks changes while it shows (#96)', async () => {
+        const unit = await bootUnit();
+        const before = remarksHandlers(unit);
+        await unit.panel.selectPage('L', 'OTH 4');
+        expect(remarksHandlers(unit)).toBe(before + 1);
+    });
+});
+
+// CLAUDE.md (UI): a page that is left must not stay alive. The route NAV 1 to OTH 4 and back passes only OTH 1 to
+// OTH 3, which do not subscribe to the remarks, so the count before the first visit is the count without a handler of
+// this page
+describe('OTH 4 page, the lifecycle of its subscription (CLAUDE.md)', () => {
+    it.fails('leaves no remarks handler behind once it is left (#96)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'NAV 1');
+        const before = remarksHandlers(unit);
+        for (let i = 0; i < 3; i++) {
+            await unit.panel.selectPage('L', 'OTH 4');
+            await unit.panel.selectPage('L', 'NAV 1');
+        }
+        expect(remarksHandlers(unit)).toBe(before);
+    });
+});
+
 describe('OTH 4 page (characterization)', () => {
     // The unit lists the airports sorted by ident, whatever the order the remarks were saved in
     it('characterization: three airports with remarks', async () => {
@@ -94,7 +124,7 @@ describe('OTH 4 page, deleting remarks (3-47)', () => {
     it.fails('removes a deleted airport from the list when its remarks were the last saved (3-47, #252)', async () => {
         const unit = await withRemarks(['KAAA', 'KBBB', 'KCCC']);
         await unit.panel.cursor('L');
-        await unit.panel.outer('L', 2); // KCCC, the last airport saved
+        await unit.panel.cursorTo('L', 'KCCC'); // the last airport saved
 
         await unit.panel.clr();
         await unit.panel.ent();
@@ -111,7 +141,7 @@ describe('OTH 4 page, the cursor after a deletion (characterization)', () => {
     it('characterization: moves the cursor to the new last airport when the last airport is deleted', async () => {
         const unit = await withRemarks(['KCCC', 'KAAA', 'KBBB']);
         await unit.panel.cursor('L');
-        await unit.panel.outer('L', 2); // KCCC, the last row of the list KAAA, KBBB, KCCC
+        await unit.panel.cursorTo('L', 'KCCC'); // the last row of the list KAAA, KBBB, KCCC
 
         await unit.panel.clr();
         await unit.panel.ent();

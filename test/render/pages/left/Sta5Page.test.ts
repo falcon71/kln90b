@@ -3,7 +3,7 @@ import {bootUnit, moveAircraft, settle} from '../../../harness/boot';
 import {standardRoute} from '../../../harness/fixtures';
 import {distanceNm} from '../../../harness/flight/geo';
 import {Screen} from '../../../harness/render/screen';
-import {savedFlightplan} from '../../../harness/storage';
+import {bootOnStandardRoute} from '../../../harness/worldBoot';
 
 describe('STA 5 page (characterization)', () => {
     it('characterization: the defaults before a prediction on a unit with no flight plan', async () => {
@@ -30,9 +30,8 @@ describe('STA 5 page, the defaults of the RAIM prediction (6-20)', () => {
     // to the current ETA there, and the page shows COMPUTING while it calculates. The ETA is derived from geo.ts: the
     // great-circle distance to ABC, then ABC to KBBB, at 120 kt, from the present time (UTC, the default time zone)
     it('defaults to the last waypoint of FPL 0 and its ETA, and shows COMPUTING (6-20)', async () => {
-        const {kaaa, abc, kbbb} = standardRoute();
-        const unit = await bootUnit({facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb])});
-        await settle(unit);
+        const {abc, kbbb} = standardRoute();
+        const unit = await bootOnStandardRoute();
         const here = {lat: 47.01, lon: 8.02};
         await moveAircraft(unit, here, {groundspeedKt: 120, trackTrue: 50});
         const eta = new Date(Date.now() + (distanceNm(here, abc) + distanceNm(abc, kbbb)) / 120 * 3600 * 1000);

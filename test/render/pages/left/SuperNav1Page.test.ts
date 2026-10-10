@@ -1,11 +1,11 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {airport} from '../../../harness/navdata/builders';
+import {activeIdent} from '../../../harness/readers';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
 import {approachWorld} from '../../../harness/fixtures';
-import {MainPage} from '../../../../kln90b/pages/MainPage';
 import {SuperNav1Page} from '../../../../kln90b/pages/left/SuperNav1Page';
 
 // The world of Nav1Page.test.ts: KDDD, with KAAA 200 NM west of it on the great circle that leaves KDDD on 270 true
@@ -18,7 +18,7 @@ async function superNav1(unit: HeadlessUnit): Promise<void> {
     await unit.panel.selectPage('L', 'NAV 1');
     await unit.panel.selectPage('R', 'NAV 1');
     await vi.advanceTimersByTimeAsync(1000);
-    expect((unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage()).toBeInstanceOf(SuperNav1Page);
+    expect(unit.overlay()).toBeInstanceOf(SuperNav1Page);
 }
 
 /**
@@ -30,7 +30,7 @@ async function onApproach(): Promise<HeadlessUnit> {
     const unit = await bootUnit({facilities: w.facilities, position: w.north(20), storage: savedFlightplan(0, [w.enraa, w.kprc])});
     await settle(unit);
     await unit.panel.loadProcedure('APT 8');
-    expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('IAFAA'); // Precondition
+    expect(activeIdent(unit)).toBe('IAFAA'); // Precondition
     return unit;
 }
 
@@ -46,13 +46,14 @@ async function onLeg(nm: number, groundspeedKt: number, magvar = 0): Promise<Hea
     return unit;
 }
 
-const pageRows = () => [0, 1, 2, 3, 4, 5].map(i => Screen.read().row(i));
+/** The six rows of the page as they are drawn, with their blanks (Screen.pageRows trims them) */
+const untrimmedRows = () => [0, 1, 2, 3, 4, 5].map(i => Screen.read().row(i));
 
 describe('Super NAV 1 page (characterization)', () => {
     it('spreads the NAV 1 data over the whole screen on an FPL 0 leg', async () => {
         await onLeg(64.8, 145);
 
-        expect(pageRows()).toMatchInlineSnapshot(`
+        expect(untrimmedRows()).toMatchInlineSnapshot(`
           [
             "      KAAA ›KDDD       ",
             " Ш Ш Ш Ш Ш Ў Ш Ш Ш Ш Ш ",
@@ -79,7 +80,7 @@ describe('Super NAV 1 page', () => {
     it('shows DIS, ETE, GS and BRG as in the manual\'s VNAV example (3-32, 5-7)', async () => {
         await onLeg(64.8, 145);
 
-        const rows = pageRows();
+        const rows = untrimmedRows();
         expect(rows[2]).toBe('DIS  64.8nm   ETE   :27');
         expect(rows[3]).toBe('GS    145kt   BRG  089°');
     });
@@ -89,14 +90,14 @@ describe('Super NAV 1 page', () => {
     it('shows BRG magnetic (3-32, 5-44)', async () => {
         await onLeg(64.8, 145, 10);
 
-        expect(pageRows()[3]).toBe('GS    145kt   BRG  079°');
+        expect(untrimmedRows()[3]).toBe('GS    145kt   BRG  079°');
     });
 
     // 5-7, 3-32: an ETE under an hour has no hour digit and shows the minutes to the cell. 60 NM at 80 kt is 45 minutes
     it('shows an ETE of 45 minutes without an hour digit (5-7, 3-32)', async () => {
         await onLeg(60, 80);
 
-        expect(pageRows()[2]).toBe('DIS  60.0nm   ETE   :45');
+        expect(untrimmedRows()[2]).toBe('DIS  60.0nm   ETE   :45');
     });
 
     // 6-6: the waypoint suffixes (-i for the IAF) show on FPL 0, Super NAV 5 and Super NAV 1. The aircraft is on the way
@@ -132,13 +133,9 @@ async function directToKddd(): Promise<HeadlessUnit> {
         facilities: [KAAA, KDDD], position: west(30), storage: savedFlightplan(0, [KAAA, KDDD]),
     });
     await settle(unit);
-    await unit.panel.dct();
-    await unit.panel.enterIdent('L', 'KDDD');
-    await unit.panel.ent(); // the APT 1 confirmation
-    await unit.panel.ent();
-    await vi.advanceTimersByTimeAsync(1000);
+    await unit.panel.directTo('KDDD');
     await unit.panel.selectPage('L', 'NAV 1'); // NAV 1 is on the right already
     await vi.advanceTimersByTimeAsync(1000);
-    expect((unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage()).toBeInstanceOf(SuperNav1Page);
+    expect(unit.overlay()).toBeInstanceOf(SuperNav1Page);
     return unit;
 }

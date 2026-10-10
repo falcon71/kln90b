@@ -1,11 +1,11 @@
 import {describe, expect, it} from 'vitest';
 import {Facility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
-import {standardRoute} from '../../../harness/fixtures';
 import {distanceNm, pointFrom} from '../../../harness/flight/geo';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
+import {bootOnStandardRoute} from '../../../harness/worldBoot';
 
 // Two legs of half a degree of latitude each along the meridian 8 E, due north: 30.054 NM each, 60.107 NM in all,
 // 24.04 min at the default TAS of 150 kt in no wind.
@@ -27,9 +27,7 @@ async function bootTri5(
 
 describe('TRI 5 page (characterization)', () => {
     it('shows the analysis of FPL 0 with fuel flow and reserve (characterization)', async () => {
-        const {kaaa, abc, kbbb} = standardRoute();
-        const unit = await bootUnit({facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb])});
-        await settle(unit);
+        const unit = await bootOnStandardRoute();
         Object.assign(unit.props.memory.triPage, {ff: 30, reserve: 25}); // volatile memory, read when the page is built
         await unit.panel.selectPage('L', 'TRI 5');
         expect(unit.errors).toEqual([]);

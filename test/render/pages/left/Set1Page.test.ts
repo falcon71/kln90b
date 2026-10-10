@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
+import {messages} from '../../../harness/readers';
 import {Screen} from '../../../harness/render/screen';
 import {airport} from '../../../harness/navdata/builders';
 import {OneTimeMessage} from '../../../../kln90b/data/MessageHandler';
@@ -125,7 +126,7 @@ describe('SET 1 editors (characterization)', () => {
     it('keeps a track entered with the knobs after CONFIRM?', async () => {
         const unit = await onSet1();
         await unit.panel.cursor('L');
-        await unit.panel.outer('L', 4); // the track
+        await unit.panel.cursorTo('L', '000'); // the track
         await unit.panel.inner('L', 3); // the first click enters a 0, so this is a 2
         await unit.panel.outer('L', 1);
         await unit.panel.inner('L', 8); // a 7
@@ -172,7 +173,6 @@ async function enterLatitude46N(unit: HeadlessUnit): Promise<void> {
 // is compared with, which posts POSITION DIFFERS FROM LAST POSITION BY >2NM when they are more than 2 NM apart.
 describe('SET 1 CONFIRM? before the first fix (characterization)', () => {
     const MESSAGE = 'POSITION DIFFERS FROM LAST POSITION BY >2NM';
-    const messages = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
 
     /** A cold unit whose stored last position is the aircraft's, so that the boot itself posts no position message */
     async function coldOnSet1(): Promise<HeadlessUnit> {
@@ -308,14 +308,6 @@ describe('SET 1 heading with a magnetic variation', () => {
         return unit;
     }
 
-    /** CONFIRM?, then SET 2 and back to SET 1: the page reads the GPS track again */
-    async function confirmAndReselect(unit: HeadlessUnit): Promise<void> {
-        await unit.panel.cursorTo('L', 'CONFIRM?');
-        await unit.panel.ent();
-        await unit.panel.selectPage('L', 'SET 2');
-        await unit.panel.selectPage('L', 'SET 1');
-    }
-
     // 3-19: the heading field offers a heading, which the pilot may replace (5-46: the take-home mode flies it), and
     // checked in the KLN 89 trainer, 2026-10-08: the confirmed heading comes back unchanged. Set1Page shows the GPS
     // track converted to magnetic and hands the shown number back to the GPS as a true track at CONFIRM?
@@ -324,7 +316,7 @@ describe('SET 1 heading with a magnetic variation', () => {
         async () => {
             const unit = await onSet1Moved();
             await unit.panel.cursor('L');
-            await confirmAndReselect(unit);
+            await unit.panel.confirmSet1AndReselect();
 
             expect(Screen.read().rows('L')[4].slice(7)).toBe('080°');
         });
@@ -335,10 +327,10 @@ describe('SET 1 heading with a magnetic variation', () => {
         async () => {
             const unit = await onSet1Moved();
             await unit.panel.cursor('L');
-            await unit.panel.outer('L', 4); // the heading
+            await unit.panel.cursorTo('L', '080'); // the heading
             await unit.panel.type('L', '270');
             await unit.panel.ent();
-            await confirmAndReselect(unit);
+            await unit.panel.confirmSet1AndReselect();
 
             expect(Screen.read().rows('L')[4].slice(7)).toBe('270°');
         });
@@ -349,7 +341,7 @@ describe('SET 1 heading with a magnetic variation', () => {
         const unit = await onSet1Moved();
         expect(Screen.read().rows('L')[4].slice(7)).toBe('080°');
         await unit.panel.cursor('L');
-        await confirmAndReselect(unit);
+        await unit.panel.confirmSet1AndReselect();
 
         expect(unit.errors).toEqual([]);
         expect(Screen.read().status().left).toBe('SET 1');

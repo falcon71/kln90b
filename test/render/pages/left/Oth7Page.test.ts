@@ -1,20 +1,14 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {fuelComputer, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
-
-/** A fuel computer installation; unit is the panel.xml fuel unit (GAL when absent) */
-function fuelXml(unit?: string): string {
-    return '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input>'
-        + `<FuelComputer><IsInterfaced>true</IsInterfaced>${unit === undefined ? '' : `<Unit>${unit}</Unit>`}</FuelComputer>`
-        + '</Input></Instrument></PlaneHTMLConfig>';
-}
 
 /**
  * OTH 7 of a unit with the given number of engines and fuel flows in pph. The fuel computer reads the number of engines
  * when the unit is built, so the SimVar goes in through the boot.
  */
 async function oth7(engines: number, pph: number[], unitName?: string): Promise<HeadlessUnit> {
-    const unit = await bootUnit({panelXml: fuelXml(unitName), simVars: [{name: 'NUMBER OF ENGINES', unit: 'number', value: engines}]});
+    const unit = await bootUnit({panelXml: panelXml(fuelComputer({unit: unitName})), simVars: [{name: 'NUMBER OF ENGINES', unit: 'number', value: engines}]});
     pph.forEach((flow, i) => unit.env.sim.set(`ENG FUEL FLOW PPH:${i + 1}`, 'pounds per hour', flow));
     await unit.panel.selectPage('L', 'OTH 7');
     await vi.advanceTimersByTimeAsync(1500);

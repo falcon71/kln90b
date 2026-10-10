@@ -1,28 +1,21 @@
 import {describe, expect, it, vi} from 'vitest';
 import {Facility, FixTypeFlags, VorClass} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
+import {bootUnit, moveAircraft, NEAREST_SEARCH_WAIT_MS, settle} from '../../../harness/boot';
 import {airport, intersection, ndb, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
 import {canvasToAscii, downsampled} from '../../../harness/render/canvas';
-import {SuperNav5} from '../../../harness/render/superNav5';
+import {HEADING_INPUT, NO_OBS, panelXml} from '../../../harness/panelXml';
+import {activeIdent} from '../../../harness/readers';
+import {showSuperNav5, SuperNav5} from '../../../harness/render/superNav5';
 import {recordMap} from '../../../harness/render/mapRecorder';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan, storedSetting} from '../../../harness/storage';
 import {standardRoute} from '../../../harness/fixtures';
 import {courseDeg, pointFrom} from '../../../harness/flight/geo';
-import {MainPage} from '../../../../kln90b/pages/MainPage';
+import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {SuperNav5Page} from '../../../../kln90b/pages/left/SuperNav5Page';
 
-const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
-
-/** NAV 5 on both sides. The right side first: its shorter way passes NAV 5, which is Super NAV 5 once the left shows NAV 5 */
-async function showSuperNav5(unit: HeadlessUnit): Promise<void> {
-    await unit.panel.selectPage('R', 'NAV 4');
-    await unit.panel.selectPage('L', 'NAV 5');
-    await unit.panel.inner('R', 1);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect((unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage()).toBeInstanceOf(SuperNav5Page);
-}
+const HEADING_INPUT_XML = panelXml(HEADING_INPUT);
 
 /** The text of the field the cursor is on, in the left column or the right menu: the inverted span other than msg */
 function focusedIn(selector: string): string[] {
@@ -50,12 +43,10 @@ function world() {
 async function superNav5OnRoute(o: { storage?: Record<string, unknown>, panelXml?: string } = {}) {
     const w = world();
     const map = recordMap({KAAA: w.kaaa, ABC: w.abc, KBBB: w.kbbb, LOW: w.low, HIG: w.hig, AB: w.ab, KAAB: w.kaab});
-    const unit = await bootUnit({
-        facilities: w.facilities, position: {lat: w.kaaa.lat, lon: w.kaaa.lon}, panelXml: o.panelXml,
-        storage: {...savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]), ...o.storage},
+    const unit = await bootOnStandardRoute({
+        facilities: [w.low, w.hig, w.ab, w.kaab], panelXml: o.panelXml, storage: o.storage,
     });
-    await settle(unit);
-    await vi.advanceTimersByTimeAsync(12_000); // the nearest lists search every 10 s
+    await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
     await showSuperNav5(unit);
     return {unit, map, w};
 }
@@ -78,7 +69,7 @@ describe('Super NAV 5 page (characterization)', () => {
         await settle(unit);
         const course = courseDeg(w.kaaa, mid);
         await moveAircraft(unit, pointFrom(w.kaaa, course, 10), {groundspeedKt: 120, trackTrue: course});
-        await vi.advanceTimersByTimeAsync(12_000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await showSuperNav5(unit);
 
         expect(SuperNav5.read()).toMatchInlineSnapshot(`
@@ -210,8 +201,8 @@ describe('Super NAV 5 page', () => {
     it.each([
         ['without', undefined, ['N^', 'Ó^', 'Ö^']], // north up, then the DTK and TK glyphs of the map font
         ['with', HEADING_INPUT_XML, ['N^', 'Ó^', 'Ö^', 'Ú^']],
-    ] as const)('offers the menu choices %s a heading input (3-37, 3-34)', async (_name, panelXml, orientations) => {
-        const {unit} = await superNav5OnRoute({panelXml});
+    ] as const)('offers the menu choices %s a heading input (3-37, 3-34)', async (_name, xml, orientations) => {
+        const {unit} = await superNav5OnRoute({panelXml: xml});
         await unit.panel.cursor('R');
         const choices = async (n: number) => {
             const seen = new Set<string>();
@@ -283,7 +274,7 @@ describe('Super NAV 5 page', () => {
             storage: {...savedFlightplan(0, [w.kaaa, wpt]), superNav5MapRange: 10, superNav5MapOrientation: 1},
         });
         await settle(unit);
-        await vi.advanceTimersByTimeAsync(12_000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await showSuperNav5(unit);
 
         const at = (sym: string) => map.pixels.find(p => p[0] === sym)!;
@@ -382,7 +373,7 @@ describe('Super NAV 5 page', () => {
             storage: {superNav5Apt: true, superNav5MapRange: range},
         });
         await settle(unit);
-        await vi.advanceTimersByTimeAsync(12_000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await showSuperNav5(unit);
 
         const runwayNumbers = labels(map.drawn).filter(l => l !== 'KAAB');
@@ -396,10 +387,7 @@ describe('Super NAV 5 page', () => {
         const w = world();
         const unit = await bootUnit({facilities: w.facilities, position: {lat: w.kaaa.lat, lon: w.kaaa.lon}});
         await settle(unit);
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'ABC');
-        await unit.panel.ent();
-        await unit.panel.ent();
+        await unit.panel.directTo('ABC', {waitMs: 0});
         await moveAircraft(unit, pointFrom(w.abc, 180, 0.5), {groundspeedKt: 120, trackTrue: 0});
         await showSuperNav5(unit);
         expect(unit.props.memory.navPage.waypointAlert).toBe(true);
@@ -435,7 +423,7 @@ describe('Super NAV 5 AUTO scale', () => {
         });
         await settle(unit);
         await showSuperNav5(unit);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('AAAB');
+        expect(activeIdent(unit)).toBe('AAAB');
 
         expect(SuperNav5.read().range.trim()).toBe('20');
         const squares = map.pixels.filter(p => p[0] === '@'); // the three waypoints of FPL 0, in order
@@ -452,12 +440,8 @@ describe('Super NAV 5 AUTO scale', () => {
         const map = recordMap();
         const unit = await bootUnit({facilities: [dct], position: P, storage: {superNav5MapRange: 0}});
         await settle(unit);
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'AAAD');
-        await unit.panel.ent();
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(2000);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('AAAD');
+        await unit.panel.directTo('AAAD', {waitMs: 2000});
+        expect(activeIdent(unit)).toBe('AAAD');
         await showSuperNav5(unit);
 
         expect(SuperNav5.read().range.trim()).toBe('10');
@@ -478,7 +462,7 @@ describe('Super NAV 5 AUTO scale', () => {
         await settle(unit);
         await showSuperNav5(unit);
 
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('AAAB');
+        expect(activeIdent(unit)).toBe('AAAB');
         expect(unit.props.memory.navPage.activeWaypoint.getFollowingLeg()!.wpt.icaoStruct.ident).toBe('AAAC');
     });
 
@@ -535,7 +519,7 @@ describe('Super NAV 5 near the MAP', () => {
     it('flies to the MAP with the missed approach after it (6-9)', async () => {
         const {unit} = await nearMap({superNav5MapRange: 0});
         const active = unit.props.memory.navPage.activeWaypoint;
-        expect(active.getActiveWpt()!.icaoStruct.ident).toBe('MAPAA');
+        expect(activeIdent(unit)).toBe('MAPAA');
         expect(active.getFollowingLeg()!.wpt.icaoStruct.ident).toBe('MAHAA');
         expect(SuperNav5.read().left[0]).toBe(' 0.3 È');
 
@@ -547,15 +531,13 @@ describe('Super NAV 5 near the MAP', () => {
     // AUTO takes the waypoint after the active one into account even when that is the missed approach.
     it.fails('takes the 1 NM scale 0.3 NM before the MAP (6-9, figure 6-16, #235)', async () => {
         const {unit} = await nearMap({superNav5MapRange: 0});
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('MAPAA');
+        expect(activeIdent(unit)).toBe('MAPAA');
 
         expect(SuperNav5.read().range.trim()).toBe('1');
     });
 });
 
 describe('Super NAV 5 OBS course', () => {
-    const OBS_SOURCE_0 = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input></Instrument></PlaneHTMLConfig>';
-
     /**
      * The standard route with the aircraft at KAAA, in OBS mode on ABC with an OBS course of 050 (the DTK of the leg).
      * ObsSource 0: the unit has no external indicator, so the pilot enters the OBS course on the unit itself (5-34, 5-35).
@@ -563,11 +545,7 @@ describe('Super NAV 5 OBS course', () => {
      */
     async function onObsCourse() {
         const w = world();
-        const unit = await bootUnit({
-            facilities: w.facilities, position: {lat: w.kaaa.lat, lon: w.kaaa.lon}, panelXml: OBS_SOURCE_0,
-            storage: savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]),
-        });
-        await settle(unit);
+        const unit = await bootOnStandardRoute({facilities: [w.low, w.hig, w.ab, w.kaab], panelXml: panelXml(NO_OBS)});
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
         await showSuperNav5(unit);
@@ -578,15 +556,13 @@ describe('Super NAV 5 OBS course', () => {
         return unit;
     }
 
-    const overlay = (unit: HeadlessUnit) => (unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage();
-
     // 5-34, 5-35: the inner knob on the OBS course changes it by one degree. This is the passing sibling of the pin below:
     // turned left, the page stays and the course is one degree less.
     it('turns the OBS course down with the inner knob on Super NAV 5 (5-34, 5-35)', async () => {
         const unit = await onObsCourse();
         await unit.panel.inner('L', -1);
 
-        expect(overlay(unit)).toBeInstanceOf(SuperNav5Page);
+        expect(unit.overlay()).toBeInstanceOf(SuperNav5Page);
         expect(SuperNav5.read().left[5]).toBe('Ù049°');
     });
 
@@ -595,7 +571,7 @@ describe('Super NAV 5 OBS course', () => {
         const unit = await onObsCourse();
         await unit.panel.inner('L', 1);
 
-        expect(overlay(unit)).toBeInstanceOf(SuperNav5Page);
+        expect(unit.overlay()).toBeInstanceOf(SuperNav5Page);
         expect(SuperNav5.read().left[5]).toBe('Ù051°');
     });
 });

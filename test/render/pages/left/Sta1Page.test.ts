@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {GPSSatellite} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {bootToSelfTest, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {DEFAULT_START} from '../../../harness/sim/clock';
 
@@ -12,11 +12,9 @@ import {DEFAULT_START} from '../../../harness/sim/clock';
  * STA 1 is shown right after the self-test, before any satellite is acquired.
  */
 async function skySearch(): Promise<HeadlessUnit> {
-    const unit = await bootUnit({
-        engineRunning: false,
+    const unit = await bootToSelfTest({
         storage: {fastGpsAcquisition: false, lastLatitude: 0, lastLongitude: 0, lastAlmanacDownload: DEFAULT_START.getTime() - 24 * 3600 * 1000},
     });
-    await unit.panel.powerOn();
     await unit.panel.approveSelfTest();
     await unit.panel.selectPage('L', 'STA 1');
     return unit;
