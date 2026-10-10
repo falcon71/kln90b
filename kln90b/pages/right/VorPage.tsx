@@ -175,6 +175,7 @@ export class VorPage extends WaypointPage<VorFacility> {
             const activeWpt = this.props.memory.navPage.activeWaypoint.getActiveWpt();
             if (activeWpt !== null && ICAO.valueEquals(activeWpt.icaoStruct, facility.icaoStruct)) {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "IN ACT LIST");
+                this.children.get("magvar").setValue(-facility.magneticVariation); // C-1: the stored variation stays, so the field shows it again
                 return;
             }
             this.props.facilityRepository.update(facility!, fac => fac.magneticVariation = -magvar);

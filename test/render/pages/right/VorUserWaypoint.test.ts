@@ -221,9 +221,9 @@ describe('user VOR that is the active waypoint (C-1)', () => {
         expect(Screen.read().rows('R')[3]).toBe('113.90 12°W');
     });
 
-    // C-1: the change is refused (another waypoint must be made active first), yet the field keeps showing the refused
-    // 15°E until the page is selected again
-    it.fails('keeps showing the stored magnetic variation after IN ACT LIST (C-1, #278)', async () => {
+    // C-1: the change is refused (another waypoint must be made active first), so the field shows the stored variation
+    // and not the refused 15°E
+    it('keeps showing the stored magnetic variation after IN ACT LIST (C-1, #278)', async () => {
         await activeUserVor();
 
         expect(Screen.read().rows('R')[3]).toBe('113.90 12°W');
