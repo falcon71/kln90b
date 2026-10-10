@@ -45,7 +45,7 @@ export class Nav3Page extends SixLineHalfPage {
         const to = navState.activeWaypoint.getActiveWpt();
 
         this.children = new UIElementChildren<Nav3PageTypes>({
-            from: new TextDisplay(IcaoFixedLength.getIdentFromFacility(from)),
+            from: new TextDisplay(IcaoFixedLength.getFromIdentFromFacility(from)),
             activeArrow: new ActiveArrow(to?.icaoStruct ?? null, navState),
             to: new TextDisplay(IcaoFixedLength.getIdentFromFacility(to)),
             dtkLabel: new TextDisplay(this.getDtkLabel()),
@@ -86,7 +86,7 @@ export class Nav3Page extends SixLineHalfPage {
         const from = navState.activeWaypoint.getFromWpt();
         const to = navState.activeWaypoint.getActiveWpt();
 
-        this.children.get("from").text = IcaoFixedLength.getIdentFromFacility(from);
+        this.children.get("from").text = IcaoFixedLength.getFromIdentFromFacility(from);
         this.children.get("activeArrow").icao = to?.icaoStruct ?? null;
         this.children.get("to").text = IcaoFixedLength.getIdentFromFacility(to);
 

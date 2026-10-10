@@ -88,6 +88,24 @@ describe('NAV 3 page (characterization)', () => {
     });
 });
 
+describe('NAV 3 page, direct-to', () => {
+    // 3-32, figure 3-104: the leg row has the same layout as on NAV 1 (3-31, figure 3-97), so on a direct-to the Direct To
+    // symbol stands directly in front of the waypoint (#227)
+    it('draws the Direct To symbol directly in front of the waypoint (3-32, figure 3-104, #227)', async () => {
+        const unit = await bootUnit({
+            facilities: [KAAA, KDDD, KEEE], position: west(30), panelXml: OBS_SOURCE_OFF,
+            storage: savedFlightplan(0, [KAAA, KDDD, KEEE]),
+        });
+        await settle(unit);
+        await unit.panel.selectPage('L', 'NAV 3');
+        await unit.panel.directTo('KDDD');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(true);
+        expect(Screen.read().rows('L')[0]).toBe('    d›KDDD ');
+    });
+});
+
 describe('NAV 3 page on an FPL 0 leg', () => {
     // 3-32, 5-35: in OBS mode the selected course replaces DTK; the colon after OBS says it can be entered on the unit,
     // which it can without an external indicator. 5-36: switching to OBS without an external indicator keeps the

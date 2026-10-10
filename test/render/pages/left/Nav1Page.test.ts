@@ -155,7 +155,7 @@ async function directToKddd(): Promise<HeadlessUnit> {
 }
 
 describe('NAV 1 page, direct-to', () => {
-    // The setup sibling of the pin below: a direct-to KDDD, NAV 1 on the right, the arrow before KDDD in cell 5
+    // The setup sibling of the #227 test below: a direct-to KDDD, NAV 1 on the right, the arrow before KDDD in cell 5
     it('shows the active waypoint after the arrow on a direct-to (3-31)', async () => {
         const unit = await directToKddd();
 
@@ -167,9 +167,9 @@ describe('NAV 1 page, direct-to', () => {
 
     // 3-31, figure 3-97 (and the Super NAV 1 of figure 5-21): on a direct-to the leg is the Direct To symbol followed by
     // the waypoint, the symbol (the font's d plus the arrow, docs/architecture.md) directly in front of the ident; a
-    // photo of a real unit (reference-photos-index.md, the approach select page) shows it the same way. The code pads
-    // the "d" FROM ident to five cells like a waypoint ident, so the d stands in cell 0, four cells away from its arrow.
-    it.fails('draws the Direct To symbol directly in front of the waypoint (3-31, figure 3-97, #227)', async () => {
+    // photo of a real unit (reference-photos-index.md, the approach select page) shows it the same way. Until #227 the
+    // code padded the "d" FROM ident to five cells like a waypoint ident, four cells away from its arrow.
+    it('draws the Direct To symbol directly in front of the waypoint (3-31, figure 3-97, #227)', async () => {
         await directToKddd();
 
         expect(Screen.read().rows('R')[0]).toBe('    d›KDDD ');
