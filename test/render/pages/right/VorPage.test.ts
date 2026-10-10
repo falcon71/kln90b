@@ -1,8 +1,9 @@
 import {describe, expect, it, vi} from 'vitest';
 import {VorClass, VorType} from '@microsoft/msfs-sdk';
-import {bootUnit} from '../../../harness/boot';
+import {bootUnit, NEAREST_SEARCH_WAIT_MS} from '../../../harness/boot';
 import {vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
+import {blinkCycle} from '../../../harness/render/blink';
 
 /** The first two rows of the right half page: ident row and name row */
 function identAndName(): string[] {
@@ -85,11 +86,7 @@ describe('VOR page (characterization)', () => {
     it('flashes the NR number on one display tick of four (characterization)', async () => {
         await nearestAbc(0);
 
-        const masks: string[] = [];
-        for (let i = 0; i < 4; i++) {
-            masks.push(Screen.read().maskRows('R')[0].slice(7, 11));
-            await vi.advanceTimersByTimeAsync(250);
-        }
+        const masks = await blinkCycle(() => Screen.read().maskRows('R')[0].slice(7, 11));
         expect(masks.filter(m => m === 'BBBB')).toHaveLength(1);
         expect(masks.filter(m => m === '....')).toHaveLength(3);
     });
@@ -178,7 +175,7 @@ describe('VOR page contents (3-49)', () => {
 async function nearestAbc(magvar: number, lat = 47.4, lon = 8.3) {
     const unit = await bootUnit({facilities: [vor('ABC', lat, lon)], position: {lat: 47, lon: 8}, magvar});
     await unit.panel.selectPage('R', 'VOR  ');
-    await vi.advanceTimersByTimeAsync(12_000); // the nearest list searches every 10 s
+    await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
     await unit.panel.scan();
     await unit.panel.inner('R', -1);
     return unit;
@@ -219,11 +216,7 @@ describe('VOR page nearest view (3-22, 3-49)', () => {
     it('flashes the NR number (3-22)', async () => {
         await nearestAbc(0);
 
-        const masks: string[] = [];
-        for (let i = 0; i < 4; i++) {
-            masks.push(Screen.read().maskRows('R')[0].slice(7, 11));
-            await vi.advanceTimersByTimeAsync(250);
-        }
+        const masks = await blinkCycle(() => Screen.read().maskRows('R')[0].slice(7, 11));
         expect(masks).toContain('BBBB');
         expect(masks).toContain('....');
     });

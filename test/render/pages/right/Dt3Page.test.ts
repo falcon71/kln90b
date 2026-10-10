@@ -5,6 +5,7 @@ import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {dtWorld} from '../../../harness/fixtures';
 import {pointFrom} from '../../../harness/flight/geo';
 import {savedFlightplan} from '../../../harness/storage';
+import {bootOnDtWorld} from '../../../harness/worldBoot';
 import {Screen} from '../../../harness/render/screen';
 
 describe('D/T 3 page', () => {
@@ -60,21 +61,12 @@ function dtkWorld() {
 }
 
 async function bootMoving(): Promise<HeadlessUnit> {
-    const {legs} = dtkWorld();
-    const unit = await bootUnit({
-        facilities: legs, position: {lat: 47.1, lon: 10.0}, magvar: 5,
-        storage: {...savedFlightplan(0, legs), ...savedFlightplan(3, legs)},
-    });
-    await settle(unit);
-    await moveAircraft(unit, {lat: 47.1, lon: 10.0}, {groundspeedKt: 120, trackTrue: 0});
-    return unit;
+    return bootOnDtWorld({legs: dtkWorld().legs, magvar: 5});
 }
 
 async function show(unit: HeadlessUnit, left: 'FPL 0' | 'FPL 3' | 'NAV 2' | 'NAV 3'): Promise<string[]> {
     await unit.panel.selectPage('L', left);
-    await unit.panel.selectPage('R', 'D/T 3');
-    await vi.advanceTimersByTimeAsync(1000);
-    return Screen.read().rows('R');
+    return unit.panel.show('R', 'D/T 3');
 }
 
 describe('D/T 3 page, distances and magnetic DTKs', () => {
@@ -165,17 +157,9 @@ describe('D/T 3 page, the DTK of the active waypoint', () => {
     /** A Direct To KCCC, an airport outside FPL 0 */
     async function directToOutsidePlan(): Promise<HeadlessUnit> {
         const {kaaa, abc, def, kbbb} = dtWorld();
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, def, kbbb, airport('KCCC', 47.1, 10.5)], position: {lat: 47.1, lon: 10.0},
-            storage: savedFlightplan(0, [kaaa, abc, def, kbbb]),
-        });
-        await settle(unit);
-        await moveAircraft(unit, {lat: 47.1, lon: 10.0}, {groundspeedKt: 120, trackTrue: 0});
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'KCCC');
-        await unit.panel.ent(); // the APT 1 confirmation
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(2000);
+        // FPL 0 only, as this test has always stored it
+        const unit = await bootOnDtWorld({facilities: [kaaa, abc, def, kbbb, airport('KCCC', 47.1, 10.5)], fpl3: false});
+        await unit.panel.directTo('KCCC', {waitMs: 2000});
         await show(unit, 'FPL 0');
         return unit;
     }

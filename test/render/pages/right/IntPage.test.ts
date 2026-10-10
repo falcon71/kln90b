@@ -4,6 +4,7 @@ import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {intersection, vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {savedUserWaypoints} from '../../../harness/storage';
+import {userWaypoints} from '../../../harness/readers';
 import {distanceNm, pointFrom} from '../../../harness/flight/geo';
 import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
 
@@ -37,10 +38,9 @@ describe('INT page', () => {
 
 /** The INT page of INTA (47.1 N 8.0 E) once its REF calculation has run (REF_CALCULATION_TIME is 8 s); returns the REF row */
 async function refRow(unit: HeadlessUnit): Promise<string> {
-    await unit.panel.selectPage('R', 'INT  ');
-    await vi.advanceTimersByTimeAsync(9000);
-    expect(Screen.read().rows('R')[0]).toBe(' INTA      '); // precondition
-    return Screen.read().rows('R')[1];
+    const rows = await unit.panel.show('R', 'INT  ', {waitMs: 9000});
+    expect(rows[0]).toBe(' INTA      '); // precondition
+    return rows[1];
 }
 
 // 3-50: the INT page gives the position of the intersection as radial and distance from the closest VOR (NearestUtils
@@ -79,11 +79,9 @@ async function intPageOf(facilities: Facility[], magvar: number | ((lat: number,
     return unit;
 }
 
-/** The user waypoints of the repository as [type, region, ident, lat, lon] */
-function userWaypoints(unit: HeadlessUnit): [FacilityType, string, string, number, number][] {
-    const out: [FacilityType, string, string, number, number][] = [];
-    KLNFacilityRepository.getRepository(unit.props.bus).forEach(f => out.push([ICAO.getFacilityTypeFromValue(f.icaoStruct), f.icaoStruct.region, f.icaoStruct.ident, f.lat, f.lon]));
-    return out;
+/** The user waypoints of the repository (every type, not only the supplementary ones) as [type, region, ident, lat, lon] */
+function userTuples(unit: HeadlessUnit): [FacilityType, string, string, number, number][] {
+    return userWaypoints(unit).map(f => [ICAO.getFacilityTypeFromValue(f.icaoStruct), f.icaoStruct.region, f.icaoStruct.ident, f.lat, f.lon]);
 }
 
 // KENZY 6.0 NM due north of the VOR MKC (haversine)
@@ -394,7 +392,7 @@ describe('user intersection (5-18, 5-19)', () => {
         expect(parseFloat(rows[3].slice(4))).toBe(48.1);
         expect(rows.slice(4)).toEqual(["N 46°59.64'", "E 12°10.40'"]);
         expect(Screen.read().status().right).toBe('INT');
-        const [w] = userWaypoints(unit);
+        const [w] = userTuples(unit);
         expect(w.slice(0, 3)).toEqual([FacilityType.Intersection, 'XX', 'INT15']);
         expect(w[3]).toBeCloseTo(p.lat, 6);
         expect(w[4]).toBeCloseTo(p.lon, 6);
@@ -407,7 +405,7 @@ describe('user intersection (5-18, 5-19)', () => {
         const unit = await distanceEntered('4000');
 
         const p = pointFrom({lat: 47.0, lon: 11.0}, 90, 400);
-        const [w] = userWaypoints(unit);
+        const [w] = userTuples(unit);
         expect(w.slice(0, 3)).toEqual([FacilityType.Intersection, 'XX', 'INT15']);
         expect(w[3]).toBeCloseTo(p.lat, 6);
         expect(w[4]).toBeCloseTo(p.lon, 6);
@@ -418,7 +416,7 @@ describe('user intersection (5-18, 5-19)', () => {
         const unit = await distanceEntered('3500');
 
         const p = pointFrom({lat: 47.0, lon: 11.0}, 90, 350);
-        const [w] = userWaypoints(unit);
+        const [w] = userTuples(unit);
         expect(w.slice(0, 3)).toEqual([FacilityType.Intersection, 'XX', 'INT15']);
         expect(w[3]).toBeCloseTo(p.lat, 6);
         expect(w[4]).toBeCloseTo(p.lon, 6);
@@ -472,7 +470,7 @@ describe('user intersection (5-18, 5-19)', () => {
 
         expect(Screen.read().status().right).toBe('INT');
         expect(Screen.read().rows('R').slice(1, 3)).toEqual(['REF:  ORD  ', 'RAD: 000.0°']);
-        expect(userWaypoints(unit).map(w => w.slice(0, 3))).toEqual([[FacilityType.Intersection, 'XX', 'INT15']]);
+        expect(userTuples(unit).map(w => w.slice(0, 3))).toEqual([[FacilityType.Intersection, 'XX', 'INT15']]);
     });
 
     // 5-16 step 7 (5-18: the same for an intersection): PRES POS? creates the waypoint at the present position of NAV 2
@@ -483,7 +481,7 @@ describe('user intersection (5-18, 5-19)', () => {
 
         expect(Screen.read().rows('R').slice(4)).toEqual(["N 47°03.00'", "E 10°03.00'"]);
         expect(Screen.read().status().right).toBe('INT');
-        const [w] = userWaypoints(unit);
+        const [w] = userTuples(unit);
         expect(w[3]).toBeCloseTo(47.05, 6);
         expect(w[4]).toBeCloseTo(10.05, 6);
     });
@@ -513,7 +511,7 @@ describe('stored user intersection', () => {
     it('moves the waypoint to the entered radial (characterization)', async () => {
         const unit = await radialEntered();
 
-        const [w] = userWaypoints(unit);
+        const [w] = userTuples(unit);
         expect(w[3]).toBeCloseTo(moved().lat, 6);
         expect(w[4]).toBeCloseTo(moved().lon, 6);
     });
@@ -549,7 +547,7 @@ describe('stored user intersection', () => {
         await unit.panel.ent();
 
         const p = pointFrom({lat: 47.0, lon: 11.0}, 0, 12.0);
-        const [w] = userWaypoints(unit);
+        const [w] = userTuples(unit);
         expect(w[3]).toBeCloseTo(p.lat, 6);
         expect(w[4]).toBeCloseTo(p.lon, 6);
     });
@@ -562,7 +560,7 @@ describe('stored user intersection', () => {
         await unit.panel.type('R', 'N4800000');
         await unit.panel.ent();
 
-        const [w] = userWaypoints(unit);
+        const [w] = userTuples(unit);
         expect(w[3]).toBeCloseTo(48.0, 6);
         expect(w[4]).toBeCloseTo(11.0, 6);
     });
@@ -573,7 +571,7 @@ describe('stored user intersection', () => {
         await unit.panel.selectPage('R', 'INT  ');
         await vi.advanceTimersByTimeAsync(9000);
         await unit.panel.cursor('R');
-        await unit.panel.outer('R', 6); // the five ident characters, REF, then RAD
+        await unit.panel.cursorTo('R', '___._'); // RAD, after the ident characters and REF
         return unit;
     }
 

@@ -1,9 +1,9 @@
 import {describe, expect, it, vi} from 'vitest';
 import {FacilityType, ICAO} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS} from '../../../harness/boot';
 import {ndb} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
-import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
+import {userWaypoints} from '../../../harness/readers';
 
 /** The NDB page of a world whose first NDB (in ident order) is the first one given, cursor off */
 async function ndbPageOf(...facilities: ReturnType<typeof ndb>[]): Promise<HeadlessUnit> {
@@ -12,12 +12,10 @@ async function ndbPageOf(...facilities: ReturnType<typeof ndb>[]): Promise<Headl
     return unit;
 }
 
-/** The user waypoints of the repository as [type, region, ident, lat, lon, frequency] */
-function userWaypoints(unit: HeadlessUnit): [FacilityType, string, string, number, number, number][] {
-    const out: [FacilityType, string, string, number, number, number][] = [];
-    KLNFacilityRepository.getRepository(unit.props.bus).forEach(f => out.push([ICAO.getFacilityTypeFromValue(f.icaoStruct),
-        f.icaoStruct.region, f.icaoStruct.ident, f.lat, f.lon, (f as any).freqMHz]));
-    return out;
+/** The user waypoints of the repository (every type) as [type, region, ident, lat, lon, frequency] */
+function userTuples(unit: HeadlessUnit): [FacilityType, string, string, number, number, number][] {
+    return userWaypoints(unit).map(f => [ICAO.getFacilityTypeFromValue(f.icaoStruct),
+        f.icaoStruct.region, f.icaoStruct.ident, f.lat, f.lon, (f as any).freqMHz]);
 }
 
 describe('NDB page (characterization)', () => {
@@ -139,7 +137,7 @@ describe('NDB page nearest view (3-22, 3-50)', () => {
     async function nearest(lat: number, lon: number, magvar = 0) {
         const unit = await bootUnit({facilities: [ndb('OWI', lat, lon, {name: 'OTTAWA'})], position: {lat: 47, lon: 8}, magvar});
         await unit.panel.selectPage('R', 'NDB  ');
-        await vi.advanceTimersByTimeAsync(12_000); // the nearest list searches every 10 s
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.scan();
         await unit.panel.inner('R', -1);
         return unit;
@@ -229,7 +227,7 @@ describe('user NDB (5-18)', () => {
         await unit.panel.ent();
 
         expect(unit.errors).toEqual([]);
-        expect(userWaypoints(unit).map(w => w.slice(0, 5))).toEqual([[FacilityType.NDB, 'XX', 'ND1', 47.5, 100.25]]);
+        expect(userTuples(unit).map(w => w.slice(0, 5))).toEqual([[FacilityType.NDB, 'XX', 'ND1', 47.5, 100.25]]);
         expect(Screen.read().rows('R').slice(4)).toEqual(["N 47°30.00'", "E100°15.00'"]);
         expect(Screen.read().status().right).toBe('NDB');
     });
@@ -244,7 +242,7 @@ describe('user NDB (5-18)', () => {
         await unit.panel.ent();
 
         expect(Screen.read().status().mode).toBe('ENT LAT/LON');
-        expect(userWaypoints(unit)).toEqual([]);
+        expect(userTuples(unit)).toEqual([]);
     });
 
     // 5-18, figure 5-66: an NDB frequency may be stored with the user NDB (328.0 kHz in the figure). NdbFreqEditor

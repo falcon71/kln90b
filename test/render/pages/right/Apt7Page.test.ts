@@ -7,6 +7,7 @@ import {pointFrom} from '../../../harness/flight/geo';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, sid, star, withProcedures} from '../../../harness/navdata/procedures';
 import {savedFlightplan} from '../../../harness/storage';
+import {fplIdents} from '../../../harness/readers';
 import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {EVT_CLR} from '../../../../kln90b/HEvents';
@@ -50,7 +51,7 @@ describe('APT 7 page after a waypoint confirmation page (80631c8)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         // The confirmation happened: ABC is in FPL 0
-        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KPRC', 'ABC']);
+        expect(fplIdents(unit)).toEqual(['KPRC', 'ABC']);
         expect(Screen.read().status().right).toBe('APT 7');
         expect(rows('R').slice(0, 3)).toEqual([' KPRC', 'SELECT SID', ' 1 DEP1']);
         expect(Screen.read().text()).not.toContain('NO SID/STAR');

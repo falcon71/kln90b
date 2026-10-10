@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {AirportFacility, AirportPrivateType, BoundaryType, RunwayLightingType} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
+import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {airport, intersection, ndb, vor} from '../../../harness/navdata/builders';
 import {airspace} from '../../../harness/navdata/airspaces';
@@ -46,7 +46,7 @@ describe('APT 1 page on a nearest entry', () => {
     async function bootAtNearest(): Promise<HeadlessUnit> {
         const unit = await bootUnit({facilities: [kaaa, kbbb, kccc, kzzz], position: {lat: 47.19, lon: 8.0}});
         // The nearest search runs every 10 s. The booted unit has its boot messages, so MSG then ENT has an effect.
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.msg();
         await unit.panel.ent();
         // Precondition, not the claim
@@ -57,6 +57,7 @@ describe('APT 1 page on a nearest entry', () => {
     /** KBBB is removed from the list, the page still holds the object. KZZZ, 6 NM away, is the only entry then. */
     async function dropEntry(unit: HeadlessUnit): Promise<void> {
         unit.env.sim.set('PLANE LATITUDE', 'degrees', 57.0);
+        // The nearest list searches every 10 s and drops KBBB at the next search; 25 s is a generous margin
         await vi.advanceTimersByTimeAsync(25000);
     }
 
@@ -67,7 +68,7 @@ describe('APT 1 page on a nearest entry', () => {
 
         // KCCC (47.4) is the nearest now, so KBBB is the second: 0.19 degrees of latitude (11.4 NM) south, bearing 180
         unit.env.sim.set('PLANE LATITUDE', 'degrees', 47.39);
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
 
         expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 2');
         expect(Screen.read().rows('R')[4]).toBe('     180°to');
@@ -221,9 +222,7 @@ const POS = {lat: 47.0, lon: 12.0};
 
 /** Shows the first airport of the scan list on APT 1 and lets the airspace search finish */
 async function showApt1(unit: HeadlessUnit): Promise<string[]> {
-    await unit.panel.selectPage('R', 'APT 1');
-    await vi.advanceTimersByTimeAsync(2000);
-    return Screen.read().rows('R');
+    return unit.panel.show('R', 'APT 1', {waitMs: 2000});
 }
 
 const military = (lon = 12.0) => ({...airport('KAAA', 47.1, lon), airportPrivateType: AirportPrivateType.Military} as AirportFacility);
@@ -236,7 +235,7 @@ describe('APT 1 page (characterization)', () => {
     it('shows a nearest airport', async () => {
         const kaaa = airport('KAAA', 47.2, 12.0, {name: 'SPRINGFIELD MUNICIPAL'});
         const unit = await bootUnit({facilities: [kaaa], position: POS});
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.msg();
         await unit.panel.ent();
 
@@ -380,7 +379,7 @@ describe('APT 1 page in the nearest list', () => {
         const kaaa = airport('KAAA', latitude, 12.0, {name: 'SPRINGFIELD'});
         (kaaa.runways[0] as { lighting: RunwayLightingType }).lighting = RunwayLightingType.FullTime;
         const unit = await bootUnit({facilities: [kaaa], position: POS});
-        await vi.advanceTimersByTimeAsync(12000); // the nearest search runs every 10 s
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS); // the nearest search runs every 10 s
         await unit.panel.msg();
         await unit.panel.ent();
         return unit;
@@ -424,7 +423,7 @@ describe('APT 1 page with the cursor on the nearest rank', () => {
      */
     async function parkOnNr1ThenMove(): Promise<HeadlessUnit> {
         const unit = await bootUnit({facilities: [airport('KBBB', 47.2, 12.0), airport('KCCC', 47.6, 12.0)], position: {lat: 47.19, lon: 12.0}});
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.msg();
         await unit.panel.ent();
         await unit.panel.cursor('R');
@@ -432,7 +431,7 @@ describe('APT 1 page with the cursor on the nearest rank', () => {
         expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 1');
 
         unit.env.sim.set('PLANE LATITUDE', 'degrees', 47.59);
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         return unit;
     }
 
