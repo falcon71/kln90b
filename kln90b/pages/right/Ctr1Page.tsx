@@ -58,7 +58,7 @@ export class Ctr1Page extends SixLineHalfPage {
         super(props);
 
         this.children = new UIElementChildren<Ctr1PageTypes>({
-            newWpts: new TextDisplay("  "),
+            newWpts: new TextDisplay("  NEW WPTS"),
         });
 
     }
@@ -100,7 +100,7 @@ export class Ctr1Page extends SixLineHalfPage {
                     CTR WPTS
                 </pre>
                 <pre ref={this.refCalulated} className="d-none">
-                    {this.children.get("newWpts").render()} NEW WPTS<br/>
+                    {this.children.get("newWpts").render()}<br/>
                     <br/>
                     PRESS ENT<br/>
                     TO INSERT<br/>
@@ -156,7 +156,9 @@ export class Ctr1Page extends SixLineHalfPage {
                     this.refCalulated.instance.classList.remove("d-none");
                     this.refDone.instance.classList.add("d-none");
                     this.refFull.instance.classList.add("d-none");
-                    this.children.get("newWpts").text = pageState.waypoints.filter(wpt => wpt.isNew).length.toString().padStart(2, " ");
+                    //5-27, figure 5-96: the singular for one new waypoint
+                    const newCount = pageState.waypoints.filter(wpt => wpt.isNew).length;
+                    this.children.get("newWpts").text = newCount.toString().padStart(2, " ") + (newCount === 1 ? " NEW WPT " : " NEW WPTS");
                     break;
                 case CtrState.DONE:
                     this.refFpl.instance.classList.add("d-none");
