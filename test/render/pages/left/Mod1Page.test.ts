@@ -179,7 +179,7 @@ describe('MOD 1 CDI scale when the unit arms with the page in view', () => {
         await unit.panel.loadProcedure('APT 8');
         await unit.panel.selectPage('L', 'MOD 1');
         await moveAircraft(unit, w.north(25), {groundspeedKt: 120, trackTrue: 180});
-        await vi.advanceTimersByTimeAsync(40_000); // The unit arms within 30 NM and ramps the scale to 1 NM in 30 s (5-38 note)
+        await vi.advanceTimersByTimeAsync(40_000); // The unit arms within 30 NM and ramps the scale to 1 NM in 30 s (6-1, 6-3)
         await unit.panel.cursor('L');
         return unit;
     }
@@ -201,8 +201,8 @@ describe('MOD 1 CDI scale when the unit arms with the page in view', () => {
         await unit.panel.inner('L', 1);
         await vi.advanceTimersByTimeAsync(2000);
 
-        // Both ARM choices are accepted: which one a click lands on depends on the order of the choices, which 5-38
-        // does not give (it says only that 1 and 0.3 NM are offered). The pin holds that the scale stays one of them
+        // Both ARM choices are accepted: which one a click lands on depends on the order of the choices, which the
+        // guide does not give (5-38 only rules out the less sensitive scale). The pin holds that the scale stays one of them
         expect([0.3, 1]).toContain(unit.props.memory.navPage.xtkScale);
         expect(Number.isFinite(unit.env.sim.get('GPS CDI SCALING', 'meters'))).toBe(true);
     });

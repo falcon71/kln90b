@@ -1,10 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootToSelfTest, HeadlessUnit} from '../../harness/boot';
+import {bootToSelfTest} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {EnterResult} from '../../../kln90b/pages/CursorController';
 import {FiveSegmentPage} from '../../../kln90b/pages/FiveSegmentPage';
 
-// FiveSegmentPage joins a left and a right half page under one status line; the Self Test page is the one place the
+// FiveSegmentPage joins a left and a right half page under one status line; the Self Test page is one of two places the
 // unit shows it (the Take Home page is the other, TakeHomeMode). These tests drive it there. The code comments refer
 // to the KLN 89 trainer for the scan fall-through; no observation of it is recorded, and the Pilot's Guide gives no page
 // for either event, so everything here is a characterization.
@@ -19,18 +19,13 @@ async function onSelfTestPage() {
 
 const baroRow = () => Screen.read().rows('R')[4];
 
-/** Pulls SCAN, so that the right inner knob sends the scan events */
-async function pullScan(unit: HeadlessUnit): Promise<void> {
-    await unit.panel.scan();
-}
-
 describe('FiveSegmentPage scan events (characterization)', () => {
     // KLN90BCore turns the right inner knob into EVT_R_SCAN_RIGHT while SCAN is pulled. With the right cursor on, the
     // page hands the event to the cursor controller as the inner knob; the cursor starts on the first two baro digits
     it('turns the field under the right cursor with a right scan, as the right inner knob does', async () => {
         const {unit} = await onSelfTestPage();
         expect(unit.panel.focused('R').text).toBe('29'); // Precondition: the cursor is on the baro
-        await pullScan(unit);
+        await unit.panel.scan(); // SCAN pulled: the right inner knob now sends the scan events
 
         await unit.panel.inner('R', 1);
 
@@ -40,7 +35,7 @@ describe('FiveSegmentPage scan events (characterization)', () => {
 
     it('turns the field under the right cursor with a left scan, as the right inner knob does', async () => {
         const {unit} = await onSelfTestPage();
-        await pullScan(unit);
+        await unit.panel.scan(); // SCAN pulled: the right inner knob now sends the scan events
 
         await unit.panel.inner('R', -1);
 
@@ -56,7 +51,7 @@ describe('FiveSegmentPage scan events (characterization)', () => {
         expect(Screen.read().status().right).toBe(''); // Precondition: the cursor is off
         const scanRight = vi.spyOn(rPage, 'scanRight');
         const innerRight = vi.spyOn(rPage.getCursorController(), 'innerRight');
-        await pullScan(unit);
+        await unit.panel.scan(); // SCAN pulled: the right inner knob now sends the scan events
 
         await unit.panel.inner('R', 1);
 
@@ -71,7 +66,7 @@ describe('FiveSegmentPage scan events (characterization)', () => {
         await unit.panel.cursor('R');
         const scanLeft = vi.spyOn(rPage, 'scanLeft');
         const innerLeft = vi.spyOn(rPage.getCursorController(), 'innerLeft');
-        await pullScan(unit);
+        await unit.panel.scan(); // SCAN pulled: the right inner knob now sends the scan events
 
         await unit.panel.inner('R', -1);
 
