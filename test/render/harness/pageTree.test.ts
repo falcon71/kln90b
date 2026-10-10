@@ -1,11 +1,12 @@
 import {describe, expect, it} from 'vitest';
 import {bootUnit} from '../../harness/boot';
+import {AIRDATA, fuelComputer, panelXml} from '../../harness/panelXml';
 import {Screen} from '../../harness/render/screen';
 import {LEFT_PAGE_TREE} from '../../../kln90b/pages/PageTreeController';
 import {Oth5Page} from '../../../kln90b/pages/left/Oth5Page';
 
-const FUEL_COMPUTER_PANEL_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><FuelComputer><IsInterfaced>true</IsInterfaced></FuelComputer></Input></Instrument></PlaneHTMLConfig>';
-const AIRDATA_AND_FUEL_PANEL_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><Airdata><IsInterfaced>true</IsInterfaced></Airdata><FuelComputer><IsInterfaced>true</IsInterfaced></FuelComputer></Input></Instrument></PlaneHTMLConfig>';
+const FUEL_COMPUTER_PANEL_XML = panelXml(fuelComputer());
+const AIRDATA_AND_FUEL_PANEL_XML = panelXml({...AIRDATA, ...fuelComputer()});
 const OTH = 7;
 
 /**

@@ -10,6 +10,7 @@ import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, sid, star} from '../../../harness/navdata/procedures';
 import {MemoryFacilityClient} from '../../../harness/navdata/MemoryFacilityClient';
 import {EARTH_RADIUS_NM, pointFrom} from '../../../harness/flight/geo';
+import {identsOf} from '../../../harness/readers';
 
 const fix = intersection('FIXAA', 47, 8);
 
@@ -300,7 +301,6 @@ describe('SidStar conversion of procedures to KLN legs', () => {
                     {in: {gps: {coords: new GeoPoint(where.lat, where.lon)}}} as any);
     const convert = (facs: Facility[], where: { lat: number; lon: number }, apt: AirportFacility, app: ApproachProcedure) =>
         sidStar(facs, where).getKLNApproachLegList(apt, app, app.transitions[0]);
-    const idents = (legs: KLNFlightplanLeg[]) => legs.map(l => l.wpt.icaoStruct.ident);
     /** The radius in NM of the circle of a leg's arc; the circle's radius is a great-arc radian (geo.ts: EARTH_RADIUS_NM) */
     const radiusNm = (leg: KLNFlightplanLeg) => leg.arcData!.circle.radius * EARTH_RADIUS_NM;
 
@@ -335,7 +335,7 @@ describe('SidStar conversion of procedures to KLN legs', () => {
 
         it('keeps the arc and its end fix instead of the plain IF', async () => {
             const legs = await convert([abc, arcbg, ifaaa, fafaa, mapaa, kprc], at(225, 20), kprc, app);
-            expect(idents(legs)).toEqual(['D225J', 'IFAAA', 'FAFAA', 'MAPAA']);
+            expect(identsOf(legs)).toEqual(['D225J', 'IFAAA', 'FAFAA', 'MAPAA']);
             expect(legs.map(l => l.fixType)).toEqual([KLNFixType.IAF, undefined, KLNFixType.FAF, KLNFixType.MAP]);
             const entry = legs[0];
             expect(entry.arcData).toBeDefined();
@@ -358,7 +358,7 @@ describe('SidStar conversion of procedures to KLN legs', () => {
         ])('%s', async (_name, turn, from, to, aircraftRadial, entry) => {
             const {app, facs} = arcApproach(turn, from, to);
             const legs = await convert(facs, at(aircraftRadial, 20), kprc, app);
-            expect(idents(legs)).toEqual([entry, 'ARCEN', 'FAFAA', 'MAPAA']);
+            expect(identsOf(legs)).toEqual([entry, 'ARCEN', 'FAFAA', 'MAPAA']);
         });
     });
 
@@ -410,7 +410,7 @@ describe('SidStar conversion of procedures to KLN legs', () => {
                 final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
             });
             const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, app);
-            expect(idents(legs)).toEqual(['D260J', 'ARCEN', 'FAFAA', 'MAPAA']);
+            expect(identsOf(legs)).toEqual(['D260J', 'ARCEN', 'FAFAA', 'MAPAA']);
             const arc = legs[0].arcData!;
             expect((arc.entryFacility as unknown as { reference1Radial: number }).reference1Radial).toBeCloseTo(260, 0);
             expect(arc.beginRadial).toBe(270);
@@ -474,7 +474,7 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(procedure.commonLegs.find(l => l.type === LegType.CI)!.fixIcaoStruct.ident.trim()).toBe('');
 
             const legs = await convertStar();
-            const idx = idents(legs);
+            const idx = identsOf(legs);
             expect(idx).toContain('ARC2E');
             expect(idx[idx.length - 1]).toBe('FINAL');
             const secondArc = legs.find(l => l.arcData?.endFacility.icaoStruct.ident === 'ARC2E');
@@ -507,7 +507,6 @@ const sidStar = (facs: Facility[] = WORLD) =>
     new SidStar(new MemoryFacilityClient(facs) as any, {add() {}} as any, {in: {gps: {coords: new GeoPoint(FAR.lat, FAR.lon)}}} as any);
 const convertApp = (app: ApproachProcedure, iafIdx: number | null = 0, apt: AirportFacility = kprc) =>
     sidStar().getKLNApproachLegList(apt, app, iafIdx === null ? null : app.transitions[iafIdx]);
-const idents = (legs: KLNFlightplanLeg[]) => legs.map(l => l.wpt.icaoStruct.ident);
 
 describe('SidStar.formatApproachName', () => {
     const name = (type: ApproachType, runway: string, suffix?: string) =>
@@ -593,7 +592,7 @@ describe('SidStar.getKLNApproachLegList', () => {
 
     it('converts the final and the missed approach alone without a transition (characterization)', async () => {
         const legs = await convertApp(rnav27(), null);
-        expect(idents(legs)).toEqual(['IFAAA', 'FAFAA', 'MAPAA', 'MISAA', 'MAHAA']);
+        expect(identsOf(legs)).toEqual(['IFAAA', 'FAFAA', 'MAPAA', 'MISAA', 'MAHAA']);
         expect(legs[0].procedure!.transition).toBeUndefined();
     });
 });
@@ -849,7 +848,7 @@ describe('SidStar.getKLNProcedureLegList', () => {
     // followed by -SID (figures 6-35 to 6-38).
     it('lists a SID from the runway part through the common route to the transition', async () => {
         const legs = await convert(departure(), KLNLegType.SID, 0, 0);
-        expect(idents(legs)).toEqual(['DEPAA', 'COMAA', 'COMAB', 'TRNAA', 'TRNAB']);
+        expect(identsOf(legs)).toEqual(['DEPAA', 'COMAA', 'COMAB', 'TRNAA', 'TRNAB']);
         expect(legs.map(l => l.type)).toEqual(Array(5).fill(KLNLegType.SID));
         expect(legs.map(l => l.procedure!.displayName)).toEqual(Array(5).fill('PORT9-SID'));
     });
@@ -857,7 +856,7 @@ describe('SidStar.getKLNProcedureLegList', () => {
     // 6-21: some steps of the selection may not be necessary; a SID without a runway part starts at the common route.
     it('lists a SID without a runway part from the common route', async () => {
         const legs = await convert(departure(false), KLNLegType.SID, null, 0);
-        expect(idents(legs)).toEqual(['COMAA', 'COMAB', 'TRNAA', 'TRNAB']);
+        expect(identsOf(legs)).toEqual(['COMAA', 'COMAB', 'TRNAA', 'TRNAB']);
     });
 
     // 6-23: a STAR starts with its transition and runs through the common route (figure 6-42: INK, PHILS, TQA ...
@@ -865,7 +864,7 @@ describe('SidStar.getKLNProcedureLegList', () => {
     // docs/architecture.md).
     it('lists a STAR from the transition through the common route', async () => {
         const legs = await convert(arrival(), KLNLegType.STAR, null, 0);
-        expect(idents(legs)).toEqual(['TRNAB', 'TRNAA', 'COMAB', 'COMAA']);
+        expect(identsOf(legs)).toEqual(['TRNAB', 'TRNAA', 'COMAB', 'COMAA']);
         expect(legs.map(l => l.type)).toEqual(Array(4).fill(KLNLegType.STAR));
         expect(legs.map(l => l.procedure!.displayName)).toEqual(Array(4).fill('ARRV4-Æ'));
     });
@@ -873,7 +872,7 @@ describe('SidStar.getKLNProcedureLegList', () => {
     // The manual's example STAR has no runway part; the code appends it after the common route.
     it('appends the runway part of a STAR after the common route (characterization)', async () => {
         const legs = await convert(arrival(), KLNLegType.STAR, 0, 0);
-        expect(idents(legs)).toEqual(['TRNAB', 'TRNAA', 'COMAB', 'COMAA', 'RWYAA']);
+        expect(identsOf(legs)).toEqual(['TRNAB', 'TRNAA', 'COMAB', 'COMAA', 'RWYAA']);
     });
 
     // The EFB route sync answers the route request from these fields (KlnEfbSaver; CLAUDE.md "Public contract with

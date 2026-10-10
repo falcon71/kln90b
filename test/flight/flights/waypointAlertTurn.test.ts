@@ -5,6 +5,7 @@ import {standardRoute} from '../../harness/fixtures';
 import {airport} from '../../harness/navdata/builders';
 import {savedFlightplan} from '../../harness/storage';
 import {angleBetween, courseDeg, finalCourseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
+import {turnStackLength} from '../../harness/readers';
 
 /** What the WPT light did around a sequencing: at the first calculation after it, and whether the turn was still flown */
 interface AtSequencing { light: number; turnStackLength: number }
@@ -34,8 +35,6 @@ describe('waypoint alert through an anticipated turn', () => {
             aircraft: {lat: start.lat, lon: start.lon, altitudeFt: 3000, groundspeedKt: 120, trackTrue: leg1},
         });
         await flight.flyUntilActive('ABC', {timeout: 30});
-        // ActiveWaypoint replaces its turnStack array when it sequences, so read the field each time
-        const turnStackLength = () => flight.unit.props.memory.navPage.activeWaypoint.turnStack.length;
         const light = () => flight.sim.get('L:KLN90B_WptLight', 'bool');
 
         // Once on, the light never goes off again until the turn has ended
@@ -44,19 +43,19 @@ describe('waypoint alert through an anticipated turn', () => {
             if (f.nav.activeIdent === 'KCCC' || (f.nav.activeIdent === 'KBBB' && !alertOn)) return true;
             const on = light() === 1;
             if (on) alertOn = true;
-            const turnDone = f.nav.activeIdent === 'KBBB' && turnStackLength() === 0;
+            const turnDone = f.nav.activeIdent === 'KBBB' && turnStackLength(flight.unit) === 0;
             if (turnDone) alertOn = false;
-            return !alertOn || on || `light off at ${f.t.toFixed(0)} s, ${f.nav.activeIdent} active, turn stack ${turnStackLength()}`;
+            return !alertOn || on || `light off at ${f.t.toFixed(0)} s, ${f.nav.activeIdent} active, turn stack ${turnStackLength(flight.unit)}`;
         });
 
         await flight.flyUntilActive('KBBB', {timeout: 150});
         // One calculation tick after the sequencing at the midpoint of the turn: the turn is still being flown and the
         // light is on (the sequencing tick itself still computed the alert for ABC)
         await flight.fly(1);
-        expect(turnStackLength()).toBeGreaterThan(0);
+        expect(turnStackLength(flight.unit)).toBeGreaterThan(0);
         expect(light()).toBe(1);
 
-        await flight.flyUntil(() => turnStackLength() === 0, {timeout: 30, description: 'end of the turn onto KBBB'});
+        await flight.flyUntil(() => turnStackLength(flight.unit) === 0, {timeout: 30, description: 'end of the turn onto KBBB'});
         await flight.fly(1); // the light is written by the calculation tick after the turn ended
         expect(light()).toBe(0);
         // The turn ended on the next leg: the aircraft tracks it
@@ -67,7 +66,7 @@ describe('waypoint alert through an anticipated turn', () => {
         await flight.jump(nmBefore('KBBB', 3));
         await flight.flyUntil(() => flight.nav.activeIdent === 'KCCC', {timeout: 150, description: 'KCCC active'});
         await flight.fly(1);
-        atKbbbSequencing.push({light: light(), turnStackLength: turnStackLength()});
+        atKbbbSequencing.push({light: light(), turnStackLength: turnStackLength(flight.unit)});
         expect(atKbbbSequencing[0].turnStackLength).toBeGreaterThan(0); // the turn is still being flown
     });
 

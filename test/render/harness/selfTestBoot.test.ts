@@ -2,9 +2,9 @@ import {describe, expect, it, onTestFinished, vi} from 'vitest';
 import {bootToSelfTest} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {recordSounds} from '../../harness/sounds';
+import {ALTITUDE_ALERT, panelXml} from '../../harness/panelXml';
 
-const ALERT_OFF_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output>'
-    + '<AltitudeAlertEnabled>false</AltitudeAlertEnabled></Output></Instrument></PlaneHTMLConfig>';
+const ALERT_OFF_XML = panelXml(ALTITUDE_ALERT(false));
 
 describe('bootToSelfTest', () => {
     // 3-4: the self-test page shows OBS out 315° on the left, 3-7: APPROVE? waits for ENT on the right

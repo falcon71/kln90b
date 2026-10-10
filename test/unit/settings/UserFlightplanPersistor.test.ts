@@ -9,6 +9,7 @@ import {MessageHandler} from '../../../kln90b/data/MessageHandler';
 import {Flightplan, KLNLegType} from '../../../kln90b/data/flightplan/Flightplan';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
 import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
+import {identsOf} from '../../harness/readers';
 
 // Contract source: CLAUDE.md "Public contract with aircraft" (persisted user data: the V2 flight-plan strings) and
 // docs/architecture.md Core 7: `fpl{i}` stores FPL i for 0 to 25, including FPL 0, as concatenated 19 character ICAOs
@@ -74,6 +75,6 @@ describe('user flight plan persistor (V2)', () => {
 
         const plans = await p.restoreAllFlightplan();
 
-        expect(plans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['FIXA', 'MYWPT']);
+        expect(identsOf(plans[0].getLegs())).toEqual(['FIXA', 'MYWPT']);
     });
 });

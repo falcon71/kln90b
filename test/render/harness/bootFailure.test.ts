@@ -1,7 +1,8 @@
-import {onTestFinished, describe, expect, it, vi} from 'vitest';
+import {describe, expect, it} from 'vitest';
 import {bootUnit, bootUnitExpectingError} from '../../harness/boot';
 import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
+import {muteConsoleError} from '../../harness/console';
 
 /** A facility client that works, except that its nearest search sessions cannot be started */
 function clientWithoutNearestSearch(message: string): MemoryFacilityClient {
@@ -10,12 +11,6 @@ function clientWithoutNearestSearch(message: string): MemoryFacilityClient {
     return client;
 }
 
-/** The error page logs every error it shows; keep the expected one out of the test output */
-function muteConsoleError(): void {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    // Registered before the boot, so it runs after the teardown has put the spy back
-    onTestFinished(() => spy.mockRestore());
-}
 
 describe('bootUnitExpectingError (harness)', () => {
     // #50: a failure while the unit starts up is published on the error topic and shown on the error page
@@ -59,6 +54,8 @@ describe('bootUnitExpectingError (harness)', () => {
 
     // The boots above stay marked incomplete. The facility repository is a singleton that each of them created
     it('has torn the failed boots down: the next test finds no singleton and boots a normal unit', async () => {
+        // Reaches the private static INSTANCE of KLNFacilityRepository: the singleton the teardown clears (singletons.ts
+        // does the same) has no public accessor that reads it without creating it; a rename there breaks this test
         expect((KLNFacilityRepository as any).INSTANCE).toBeUndefined();
 
         const unit = await bootUnit();

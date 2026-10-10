@@ -265,6 +265,8 @@ describe('Vnav states', () => {
     it('re-arms an active descent from the present altitude when armVnav runs again (characterization)', () => {
         let ind = 7500;
         const {vnav, nav} = dct({distToActive: 31, ind: 7500, offset: 2, angle: -1.8});
+        // Reaches the private sensors of Vnav: vnavFor builds the sensors from a fixed altitude and the test changes it
+        // between the two calls, with no public seam to hand Vnav a new altitude; a rename there breaks this test
         (vnav as any).sensors.in.airdata.getIndicatedAlt = () => ind;
         vnav.armVnav();
         expect(vnav.state).toBe(VnavState.Active);

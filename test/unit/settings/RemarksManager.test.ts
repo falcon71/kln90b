@@ -138,6 +138,8 @@ describe('remarks of a 101st airport (3-47, C-2)', () => {
     /** A manager that holds the remarks of 100 airports. The slots cannot hold them (#92), so the manager's own map is filled. */
     function managerWith100Airports(): RemarksManager {
         const manager = new RemarksManager(bus, userSettings);
+        // Reaches the private remarks of RemarksManager: the public saveRemarks writes through the slots, which cannot hold
+        // 100 airports (#92), so there is no public seam to fill the map; a rename there breaks this test
         const remarks = (manager as unknown as { remarks: Record<string, [string, string, string]> }).remarks;
         for (let i = 0; i < 100; i++) {
             remarks[`K${String(i).padStart(3, '0')}`] = ['X          ', '           ', '           '];

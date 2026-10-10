@@ -3,6 +3,7 @@ import {bootUnit, moveAircraft, settle} from '../../harness/boot';
 import {approachWorld, defaultNavdata} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
 import {distanceNm} from '../../harness/flight/geo';
+import {activeIdent, fplIdents} from '../../harness/readers';
 import {KLNFixType} from '../../../kln90b/data/flightplan/Flightplan';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 
@@ -21,8 +22,7 @@ describe('approachWorld (harness)', () => {
     it('loads the approach into FPL 0 with its IAF, FAF and MAP', async () => {
         const {unit} = await loaded(20);
         const legs = unit.props.memory.fplPage.flightplans[0].getLegs();
-        expect(legs.map(l => l.wpt.icaoStruct.ident))
-            .toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
         expect(legs.map(l => l.fixType)).toEqual([
             undefined, KLNFixType.IAF, undefined, KLNFixType.FAF, undefined, KLNFixType.MAP, undefined,
         ]);
@@ -31,10 +31,12 @@ describe('approachWorld (harness)', () => {
     // The APR switch itself (6-3) is specified in ModeController.test.ts; this only shows that the world can reach it
     it('reaches APR on the final course, from ARM before the FAF', async () => {
         const {w, unit} = await loaded(7.5);   // 2.5 NM before FAFAA, inside 30 NM: armed
+        // The unit arms at once inside 30 NM; 31 s is the 30 s the CDI scale steps from 5 to 1 NM in (adjustXtkScaleArm in
+        // ModeController, 6-3) and a second more, so the unit is in the state it reaches flying toward the FAF
         await vi.advanceTimersByTimeAsync(31_000);
         const nav = unit.props.memory.navPage;
         // Preconditions: the FAF is active and the unit is armed but not yet in APR
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('FAFAA');
+        expect(activeIdent(unit)).toBe('FAFAA');
         expect(nav.navmode).toBe(NavMode.ARM_LEG);
 
         await moveAircraft(unit, w.north(6.5), {groundspeedKt: 120, trackTrue: 180});

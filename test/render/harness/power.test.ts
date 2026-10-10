@@ -1,7 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, settle} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
-import {airport, vor} from '../../harness/navdata/builders';
+import {standardRoute} from '../../harness/fixtures';
+import {LEG_OBS_SWITCH, panelXml, VFR_ONLY} from '../../harness/panelXml';
 import {savedFlightplan} from '../../harness/storage';
 import {MainPage} from '../../../kln90b/pages/MainPage';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
@@ -49,8 +50,7 @@ describe('FrontPanel power helpers (harness)', () => {
 });
 
 describe('FrontPanel.obsMode (harness)', () => {
-    const kaaa = airport('KAAA', 47.0, 8.0);
-    const abc = vor('ABC', 47.5, 8.9);
+    const {kaaa, abc} = standardRoute();
 
     it('enters ENR-OBS from MOD 2', async () => {
         const unit = await bootUnit({facilities: [kaaa, abc], storage: savedFlightplan(0, [kaaa, abc])});
@@ -66,9 +66,7 @@ describe('FrontPanel.obsMode (harness)', () => {
 describe('FrontPanel.approveSelfTest on other pages (harness)', () => {
     // An instrument that is not rated for IFR asks for its own acknowledgement after APPROVE? (SelfTestRightPage.approve)
     it('throws with the screen at the VFR only page', async () => {
-        const unit = await bootUnit({
-            panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><VFROnly>true</VFROnly></Instrument></PlaneHTMLConfig>',
-        });
+        const unit = await bootUnit({panelXml: panelXml(VFR_ONLY)});
         await unit.panel.powerCycle();
 
         await expect(unit.panel.approveSelfTest()).rejects.toThrow(/VFR only page[^]*FOR VFR USE ONLY/);
@@ -94,10 +92,7 @@ describe('FrontPanel power cycle time and the OBS warning (harness)', () => {
     // 3-7: a unit powered up with the external GPS CRS switch in OBS shows the OBS warning before the data base page. The
     // switch is a GPS OBS ACTIVE SimVar read through SimVarSync, which needs the external switch option.
     const obsUnit = async () => {
-        const unit = await bootUnit({
-            panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ExternalSwitches>'
-                + '<LegObsSwitchInstalled>true</LegObsSwitchInstalled></ExternalSwitches></Input></Instrument></PlaneHTMLConfig>',
-        });
+        const unit = await bootUnit({panelXml: panelXml(LEG_OBS_SWITCH)});
         unit.env.sim.set('GPS OBS ACTIVE', 'bool', true);
         await vi.advanceTimersByTimeAsync(2000);
         await unit.panel.powerCycle();

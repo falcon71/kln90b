@@ -3,6 +3,7 @@ import {bootUnit, settle} from '../../harness/boot';
 import {efbRoute} from '../../harness/platform';
 import {airport} from '../../harness/navdata/builders';
 import {Screen} from '../../harness/render/screen';
+import {fplIdents} from '../../harness/readers';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
 const kbbb = airport('KBBB', 47.4, 8.0);
@@ -23,7 +24,7 @@ describe('fake EFB route manager (harness)', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         const legs = unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt);
-        expect(legs.map(w => w.icaoStruct.ident)).toEqual(['KAAA', 'CUST', 'KBBB']);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'CUST', 'KBBB']);
         expect(legs[1].icaoStruct.region).toBe('XY');
         expect([legs[1].lat, legs[1].lon]).toEqual([47.5, 8.5]);
         expect(Screen.read().leftName()).toBe('FPL 0');
@@ -36,7 +37,7 @@ describe('fake EFB route manager (harness)', () => {
         unit.efb!.sync(efbRoute({enroute: [kbbb, kaaa]}));
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KBBB', 'KAAA']);
+        expect(fplIdents(unit)).toEqual(['KBBB', 'KAAA']);
     });
 
     it('records the answer to a route request, with the id of the request', async () => {

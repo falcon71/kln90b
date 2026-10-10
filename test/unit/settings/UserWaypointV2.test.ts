@@ -97,9 +97,12 @@ describe('user waypoint V2 format', () => {
         expect(storedSlot(0)).toBe('NXX        XY      +4800.00+00900.00+0345.0');
     });
 
-    it('restores a southern waypoint without throwing', () => {
+    // The setup sibling of the #98 pin below: the same slot restores without throwing, with its ident and its longitude
+    it('restores a southern waypoint without throwing, with its ident and longitude', () => {
         expect(() => restoreFrom('WXX        SOUTH   -1230.00+01015.00')).not.toThrow();
-        expect(repo.get(ICAO.value('W', 'XX', '', 'SOUTH'))).toBeDefined();
+        const wpt = repo.get(ICAO.value('W', 'XX', '', 'SOUTH'))!;
+        expect(wpt.icaoStruct.ident).toBe('SOUTH');
+        expect(wpt.lon).toBeCloseTo(10.25, 6);
     });
 
     it.fails('restores a southern latitude (#98)', () => {
