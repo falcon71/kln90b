@@ -143,12 +143,12 @@ describe('MSA.getMSAFromTo (the ESA of one leg)', () => {
 
     // 3-33: a leg along 46.5N from 5.5E to 9.5E crosses the sectors from 5E to 9E. The highest of them (from 7E) is
     // in the middle, so the end-point gap of the pin above plays no part. The service samples the leg with
-    // intermediatePoint, whose latitude collapses toward the equator (#97), so it reads sectors far south of the leg.
-    it.fails('gives the highest sector a long leg crosses (#97)', () => {
+    // intermediatePoint, whose latitude collapsed toward the equator (#97), so it read sectors far south of the leg.
+    it('gives the highest sector a long leg crosses (#97)', () => {
         expect(msa.getMSAFromTo({lat: 46.5, lon: 5.5}, {lat: 46.5, lon: 9.5})).toBe(sector(46, 7));
     });
 
-    // 3-33: the passing sibling of the pin above: the highest crossed sector is the middle one, from 7E
+    // 3-33: the geometry behind the test above: the highest crossed sector is the middle one, from 7E
     it('has its highest crossed sector in the middle of the long leg (sibling of #97, 3-33)', () => {
         const crossed = [5, 6, 7, 8, 9].map(lon => sector(46, lon));
         expect(Math.max(...crossed)).toBe(sector(46, 7));

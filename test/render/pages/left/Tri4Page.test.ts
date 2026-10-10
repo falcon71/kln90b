@@ -24,12 +24,14 @@ async function tri4(o: { coldGps?: boolean } = {}): Promise<HeadlessUnit> {
 }
 
 describe('TRI 4 page (characterization)', () => {
+    // The leg is sampled at its start (47.0N, sector 11400 ft) and 40 NM on (46.33N, the sector from 46N 8E, 15900 ft),
+    // which the msa.json grid holds; the ESA is the higher of the two.
     it('shows the ESA between the two waypoints of TRI 3 (characterization)', async () => {
         const unit = await tri4();
         expect(unit.errors).toEqual([]);
         expect(Screen.read().half('L')).toMatchInlineSnapshot(`
           "KAAA -KBBB 
-          ESA 11400ft
+          ESA 15900ft
                      
                      
                      

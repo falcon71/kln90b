@@ -711,8 +711,8 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   triangle as a vector sum (`Wind.test.ts`), the USNO almanac with its URL (`Sun.test.ts`). The code's own source never
   is: `Conversions.ts` and `Wind.ts` follow avform, and an expectation computed from avform restates the code.
 - **Pin known bugs with `it.fails('... (#NN)')`.** The test states the correct behavior, fails today, and turns red when
-  someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See `KLNNavmath.test.ts`
-  (#97), `UserWaypointV2.test.ts` (#98) and `turnDirection.test.ts` (#100).
+  someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See
+  `UserWaypointV2.test.ts` (#98) and `turnDirection.test.ts` (#100).
 - **Prove a pin by fixing the bug, and keep heavy setup out of it.** An `it.fails` test passes on *any* failure, so a
   broken precondition inside it (a boot that threw, a wrong key sequence) is invisible: the pin stays green for the
   wrong reason. Prove a pin by fixing the bug temporarily and seeing the test turn red, then restore. Where it is cheap,
@@ -990,7 +990,7 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   and height-above-airport alerts, `TemporaryWaypointDeleter`, the EFB loader and saver, `AudioGenerator` at the bus
   level and `VolatileMemory`. *Untested:* `Units.ts` (type aliases only), the full country and FIR tables (spot checks
   only), the `PLAY_INSTRUMENT_SOUND` call itself (no `Name_Z` fake), IF REQUIRED SELECT OBS in a booted unit, the VNAV
-  offset to a waypoint ahead in FPL 0, and the MSA sampling step (unobservable before #97 is fixed).
+  offset to a waypoint ahead in FPL 0, and the MSA sampling step.
 - **Settings and persistence** (`settings/`). *Spec, from the formats:* the V1 and V2 loaders and persistors, the
   conversion, the user settings and the panel.xml parser. The format bugs are pinned (#98, #101, #103, #144).
 - **The page shell** (`pages/` itself: `MainPage`, `PageManager`, `PageTreeController`, `CursorController`, the segment

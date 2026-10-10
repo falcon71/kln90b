@@ -19,28 +19,28 @@ describe('intermediatePoint', () => {
         expect(p.lon).toBeCloseTo(8, 6);
     });
 
-    // The pins below take their expectation from the harness geometry. This sibling passes today and holds that
-    // source to the literals of https://edwilliams.org/avform147.htm#Intermediate (also in issue #97), so a pin
-    // cannot stay red because the expectation is wrong.
-    it('the expectation of the pins below is the textbook midpoint and end point', () => {
+    // The tests below take their expectation from the harness geometry. This sibling holds that source to the
+    // literals of https://edwilliams.org/avform147.htm#Intermediate (also in issue #97), so the expectation cannot be
+    // wrong without it failing.
+    it('the expectation of the tests below is the textbook midpoint and end point', () => {
         expect(textbookPoint(0.5).lat).toBeCloseTo(50.5043, 3);
         expect(textbookPoint(0.5).lon).toBeCloseTo(8.9894, 3);
         expect(textbookPoint(1).lat).toBeCloseTo(51, 6);
         expect(textbookPoint(1).lon).toBeCloseTo(10, 6);
     });
 
-    // The code has two errors: the sine of (1 - f) times d instead of the sine of the product, and a z without the
-    // B term. The latitude collapses to the equator as f grows (f = 1 returns 0.0000 / 10.0000), so no point other
-    // than f = 0 is right today and every f has its own pin.
-    it.fails.each([0.25, 0.5, 0.75, 1])('returns the great-circle point at f = %s (#97)', (f) => {
+    // The code had two errors (#97): the sine of (1 - f) times d instead of the sine of the product, and a z without
+    // the B term. The latitude collapsed to the equator as f grew (f = 1 returned 0.0000 / 10.0000), so no point other
+    // than f = 0 was right and every f has its own test.
+    it.each([0.25, 0.5, 0.75, 1])('returns the great-circle point at f = %s (#97)', (f) => {
         const p = intermediatePoint(A, B, f);
         const expected = textbookPoint(f);
         expect(p.lat).toBeCloseTo(expected.lat, 3);
         expect(p.lon).toBeCloseTo(expected.lon, 3);
     });
 
-    // Once #97 is fixed this is the property the MSA sampling needs: the point is on the segment
-    it.fails('lies on the segment between the ends for f = 0.5 (#97)', () => {
+    // The property the MSA sampling needs: the point is on the segment
+    it('lies on the segment between the ends for f = 0.5 (#97)', () => {
         const p = intermediatePoint(A, B, 0.5);
         expect(distanceNm(A, p) + distanceNm(p, B)).toBeCloseTo(distanceNm(A, B), 6);
     });
