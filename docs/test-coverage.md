@@ -33,7 +33,8 @@ them it is for the convenience of the session, and `testing.md` is the authority
 **Session mechanics**
 
 1. Start on a new git branch named after the session (`tests-session-N-<topic>`), before the first edit.
-2. Treat each session as an architectural path of the brainstorming skill. Rules 19 to 27 describe how it is run.
+2. Treat each session except session 11 as an architectural path of the brainstorming skill. Rules 19 to 27 describe how
+   it is run.
 3. Run `npm test` and `npx tsc --noEmit` first. Both must be clean before any new work starts. If they are not, stop and
    report; do not fix unrelated failures as part of the session.
 4. Run the coverage report (`npm run coverage`, added by session 1) and read it for the session's area before writing
