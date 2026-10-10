@@ -7,7 +7,7 @@ import {pointFrom} from '../../../harness/flight/geo';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, sid, star, withProcedures} from '../../../harness/navdata/procedures';
 import {savedFlightplan} from '../../../harness/storage';
-import {fplIdents} from '../../../harness/readers';
+import {fplIdents, messages} from '../../../harness/readers';
 import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {EVT_CLR} from '../../../../kln90b/HEvents';
@@ -119,6 +119,75 @@ describe('APT 7 putting a procedure into FPL 0', () => {
             ['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID],
             ['ENRAA', KLNLegType.USER], ['KUUU', KLNLegType.USER],
         ]);
+    });
+});
+
+// 6-5, B-3: REDUNDANT WPTS IN FPL concerns the enroute waypoints of FPL 0 that the procedure holds again, not the legs of
+// another procedure that is loaded already. The approach APP and the STAR ARR1 of this world share the fix IAFAA.
+describe('APT 7 and APT 8 the REDUNDANT WPTS message with a STAR and an approach (6-5, B-3, #344)', () => {
+    const REDUNDANT = 'REDUNDANT WPTS IN FPL EDIT ENROUTE WPTS AS NECESSARY';
+
+    /** KPRC with its approach and the STAR ARR1, whose last leg is the IAF IAFAA of the approach */
+    function world() {
+        const w = approachWorld();
+        const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
+        const straa = intersection('STRAA', east(30).lat, east(30).lon);
+        const kprc = withProcedures(w.kprc, {approaches: [...w.kprc.approaches], arrivals: [star('ARR1', {common: [Leg.IF(straa), Leg.TF(w.iafaa)]})]});
+        return {w, straa, kprc, facilities: [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.sdfaa, w.mapaa, straa]};
+    }
+
+    /** How often the message is on the MSG list; the course advice message of the list changes with the plan */
+    const redundant = (unit: HeadlessUnit) => messages(unit).filter(m => m === REDUNDANT).length;
+
+    async function bootWith(enroute: 'enraa' | 'straa' | 'iafaa'): Promise<HeadlessUnit> {
+        const {w, straa, kprc, facilities} = world();
+        const unit = await bootUnit({
+            facilities, position: w.north(40),
+            storage: savedFlightplan(0, [{enraa: w.enraa, straa, iafaa: w.iafaa}[enroute], kprc]),
+        });
+        await settle(unit);
+        return unit;
+    }
+
+    it('is not posted when the STAR is loaded after an approach that shares its IAF', async () => {
+        const unit = await bootWith('enraa');
+        await unit.panel.loadProcedure('APT 8');
+
+        await unit.panel.loadProcedure('APT 7');
+
+        expect(fpl0Legs(unit).map(l => l[0])).toEqual(['ENRAA', 'STRAA', 'IAFAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+        expect(redundant(unit)).toBe(0);
+    });
+
+    it('is not posted when the approach is loaded after a STAR that shares its IAF', async () => {
+        const unit = await bootWith('enraa');
+        await unit.panel.loadProcedure('APT 7');
+
+        await unit.panel.loadProcedure('APT 8');
+
+        expect(fpl0Legs(unit).map(l => l[0])).toEqual(['ENRAA', 'STRAA', 'IAFAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+        expect(redundant(unit)).toBe(0);
+    });
+
+    // The sibling of the tests above: an enroute waypoint that the STAR holds again still posts the message
+    it('is posted when an enroute waypoint is also in the STAR', async () => {
+        const unit = await bootWith('straa');
+
+        await unit.panel.loadProcedure('APT 7');
+
+        expect(fpl0Legs(unit).map(l => l[0])).toEqual(['STRAA', 'STRAA', 'IAFAA', 'KPRC']);
+        expect(redundant(unit)).toBe(1);
+    });
+
+    // An enroute waypoint of the plan is redundant for the approach as well when a STAR is loaded already
+    it('is posted when an enroute waypoint is also in the approach, with a STAR loaded', async () => {
+        const unit = await bootWith('iafaa');
+        await unit.panel.loadProcedure('APT 7');
+        expect(redundant(unit)).toBe(1); // the STAR holds IAFAA, which the plan has as an enroute waypoint
+
+        await unit.panel.loadProcedure('APT 8');
+
+        expect(redundant(unit)).toBe(2);
     });
 });
 

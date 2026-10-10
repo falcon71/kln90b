@@ -216,7 +216,8 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
             }
         }
 
-        if (SidStar.hasDuplicates(fpl0Legs, legs)) {
+        // 6-5, B-3: only the enroute waypoints count, not the legs of a procedure that is already loaded
+        if (SidStar.hasDuplicates(fpl0Legs.filter(leg => leg.type === KLNLegType.USER), legs)) {
             this.props.messageHandler.addMessage(new OneTimeMessage(["REDUNDANT WPTS IN FPL", "EDIT ENROUTE WPTS", "AS NECESSARY"]));
         }
 
