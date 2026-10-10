@@ -335,7 +335,11 @@ export function getRegionOrCountry(facility: Facility) {
 export function getCountry(facility: Facility) {
     let region = facility.region;
     if (FacilityUtils.isFacilityType(facility, FacilityType.Airport)) {
-        region = facility.icaoStruct.ident.substring(0, 2);
+        const ident = facility.icaoStruct.ident;
+        if (ident.length === 4 && ident.startsWith("K")) {
+            return "USA"; // 3-15 shows the country of each entry. A four-character US airport ident is K plus the location (ICAO Doc 7910); K and a letter is no region (the US regions are K1 to K7)
+        }
+        region = ident.substring(0, 2);
     }
 
     return COUNTRYMAP.hasOwnProperty(region) ? COUNTRYMAP[region] : "   ";

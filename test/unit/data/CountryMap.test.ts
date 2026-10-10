@@ -26,9 +26,25 @@ describe('getCountry', () => {
     });
 
     // 3-15, figure 3-52: the Duplicate Waypoint page lists the US entries as USA. A US airport ident starts with K and
-    // a letter (KAAA), whose first two letters are no region, so the page shows three blanks.
-    it.fails('names a US airport USA (#168)', () => {
+    // a letter (KAAA), whose first two letters are no region
+    it('names a US airport USA (#168)', () => {
         expect(getCountry(airport('KAAA', 40, -100))).toBe('USA');
+        expect(getCountry(airport('KZZZ', 40, -100))).toBe('USA');
+    });
+
+    // The K of the US is the first letter of the four. LKPR (Czech Republic) has a K in second place, and the airports
+    // of other countries keep the country of their first two letters
+    it('does not take an airport with a K after the first letter for a US airport (#168)', () => {
+        expect(getCountry(airport('LKAA', 50, 14))).toBe('CZE');
+        expect(getCountry(airport('PAAA', 61, -150))).toBe('USA'); // Alaska has its own entry
+    });
+
+    // 3-15, figure 3-52: every entry of the Duplicate Waypoint page carries its country. US airports with a
+    // three-character ident (B19 and K00 are airports of the database in the guide's examples) get none from the first
+    // two letters of the ident
+    it.fails('names a US airport with a three-character ident USA (3-15, #342)', () => {
+        expect(getCountry(airport('B19', 40, -100))).toBe('USA');
+        expect(getCountry(airport('K00', 40, -100))).toBe('USA');
     });
 
     // D-1 to D-3 against the ICAO regions of the Caribbean: TD Dominica (DMA), TR Montserrat (MSR), TT Trinidad and
@@ -46,6 +62,12 @@ describe('getRegionOrCountry', () => {
         expect(getRegionOrCountry({...airport('KAAA', 40, -100), city: 'Wichita, Kansas'})).toBe('KS');
         expect(getRegionOrCountry({...airport('CYZZ', 50, -100), city: 'Regina, Saskatchewan'})).toBe('SK');
         expect(getRegionOrCountry({...airport('CYZZ', 46, -71), city: 'Quebec City, Quebec'})).toBe('PQ');
+    });
+
+    // 3-15 and APT 2 take the country when there is no state: a K airport whose city names no known state is in the USA
+    it('falls back to USA for a K airport whose city has no known state (#168)', () => {
+        expect(getRegionOrCountry({...airport('KAAA', 40, -100), city: 'Wichita'})).toBe('USA');
+        expect(getRegionOrCountry({...airport('KAAA', 40, -100), city: 'Wichita, Nowhere'})).toBe('USA');
     });
 
     it('falls back to the country when the second part of the city is no state (characterization)', () => {
