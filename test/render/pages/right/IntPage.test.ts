@@ -215,8 +215,8 @@ describe('INT page reference waypoint (3-50, 3-51)', () => {
 
     // 3-51, step 6, figure 3-158: after the approval the page shows the radial and distance from the new reference
     // waypoint. The KLN 89 trainer (2026-10-07) changed both at once on ENT, ENT with another REF. KENZY lies on the
-    // 180° radial of RIS (no variation at RIS); IntPage.setRef keeps MKC's radial
-    it.fails('computes the radial from the entered REF waypoint (3-51, figure 3-158, the KLN 89 trainer, #279)', async () => {
+    // 180° radial of RIS (no variation at RIS), MKC's radial is 000°
+    it('computes the radial from the entered REF waypoint (3-51, figure 3-158, the KLN 89 trainer, #279)', async () => {
         await withRefRis();
 
         expect(Screen.read().rows('R')[2]).toBe('RAD: 180.0°');
@@ -224,7 +224,7 @@ describe('INT page reference waypoint (3-50, 3-51)', () => {
 
     // The distance from the new reference: RIS lies 0.2° of latitude (12.0 NM) north of KENZY, MKC 6.0 NM south of it.
     // The digits are parsed, so that the leading zero of #282 and the label of #283 do not matter here
-    it.fails('computes the distance from the entered REF waypoint (3-51, figure 3-158, the KLN 89 trainer, #279)', async () => {
+    it('computes the distance from the entered REF waypoint (3-51, figure 3-158, the KLN 89 trainer, #279)', async () => {
         await withRefRis();
 
         expect(parseFloat(Screen.read().rows('R')[3].slice(4))).toBe(12.0);
@@ -236,6 +236,39 @@ describe('INT page reference waypoint (3-50, 3-51)', () => {
 
         expect(unit.errors).toEqual([]);
         expect(Screen.read().rows('R')[1]).toBe('REF:  RIS  ');
+    });
+
+    // CLR and ENT on the REF field hand a null reference to the page, which has no radial and distance to compute from
+    // it. A throw on input is a bug, so the page must take it; it shows nothing for the reference
+    it('takes CLR and ENT on the REF field without an error (characterization)', async () => {
+        const unit = await intPageOf([kenzy(), mkc(), vor('RIS', 47.3, 11.0)]);
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', 'MKC');
+
+        await unit.panel.clr();
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R')[1]).toBe('REF:  _____');
+    });
+
+    // 3-50, 3-51: the closest VOR is only the default. The search for it takes 8 s from the page build, and a REF entered
+    // before it ends must not be replaced when it does. RIS is entered right after the page was selected
+    it('keeps a REF entered before the search for the closest VOR ended (3-50, 3-51)', async () => {
+        const unit = await bootUnit({facilities: [kenzy(), mkc(), vor('RIS', 47.3, 11.0)], position: {lat: 47, lon: 8}});
+        await unit.panel.selectPage('R', 'INT  ');
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', '_____'); // the REF field, still dashed
+        expect(unit.panel.focused('R').row).toBe(1); // precondition
+        await unit.panel.enterIdent('R', 'RIS');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        expect(Screen.read().rows('R').slice(1, 3)).toEqual(['REF:  RIS  ', 'RAD: 180.0°']); // precondition: taken at once
+
+        await vi.advanceTimersByTimeAsync(9000);
+
+        expect(Screen.read().rows('R').slice(1, 3)).toEqual(['REF:  RIS  ', 'RAD: 180.0°']);
+        expect(parseFloat(Screen.read().rows('R')[3].slice(4))).toBe(12.0);
     });
 
     // 3-50: the entered reference is not stored and is lost when the page is left; the page shows the closest VOR again

@@ -298,12 +298,78 @@ describe('SUP page', () => {
     });
 
     // Checked in the KLN 89 trainer, 2026-10-07: the radial and distance change at once to those of the new reference
-    it.fails('shows the radial and distance from the entered REF waypoint (3-51, the KLN 89 trainer, #279)', async () => {
+    it('shows the radial and distance from the entered REF waypoint (3-51, the KLN 89 trainer, #279)', async () => {
         await enterRefXyz();
 
         const rows = rightRows();
         expect(rows[2]).toBe('RAD: 180.0°');
         expect(rows[3].slice(5, 9)).toBe('18.0');
+    });
+
+    // A distance typed after the new REF is measured from that REF on the radial the page shows (the pair of the pin
+    // above), not from the first VOR: USUP goes to 10.0 NM south of XYZ, 47.5 N minus the arc, by hand with the textbook
+    // formula of flight/geo.ts
+    it('moves the waypoint along the radial of the entered REF waypoint when a distance is typed (characterization, #279)', async () => {
+        const unit = await enterRefXyz();
+        await unit.panel.cursorTo('R', '180.0');
+        await unit.panel.outer('R', 1);
+        expect(unit.panel.focused('R').row).toBe(3); // precondition: the DIS field
+
+        await unit.panel.type('R', '0100');
+        await unit.panel.ent();
+
+        const expected = pointFrom({lat: 47.5, lon: 10.5}, 180, 10.0);
+        expect(userWaypoint(unit, 'USUP')!.lat).toBeCloseTo(expected.lat, 6);
+        expect(userWaypoint(unit, 'USUP')!.lon).toBeCloseTo(expected.lon, 6);
+    });
+
+    // 3-50, 3-51: the nearest VOR is only the default; the entered reference is what the page shows afterwards. The
+    // search for the nearest VOR takes 8 s (REF_CALCULATION_TIME) from the page build, and a REF entered before it ends
+    // must not be replaced when it does. XYZ is entered 1 s after the page was selected
+    it('keeps a REF entered before the search for the nearest VOR ended (3-50, 3-51)', async () => {
+        const unit = await bootUnit({facilities: [abc(), vor('XYZ', 47.5, 10.5)], position: POSITION, storage: SUPS()});
+        await unit.panel.selectPage('R', 'SUP  ');
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', '_____'); // the REF field, still dashed
+        expect(unit.panel.focused('R').row).toBe(1); // precondition
+        await unit.panel.enterIdent('R', 'XYZ');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        expect(rightRows().slice(1, 3)).toEqual(['REF:  XYZ  ', 'RAD: 180.0°']); // precondition: taken at once
+
+        await vi.advanceTimersByTimeAsync(REF_DELAY_MS);
+
+        expect(rightRows().slice(1, 3)).toEqual(['REF:  XYZ  ', 'RAD: 180.0°']);
+        expect(rightRows()[3].slice(5, 9)).toBe('18.0');
+    });
+
+    /** USUP (47.2 N) with the REF FAR entered and approved; FAR is 20 degrees of latitude (1200 NM) north of it */
+    async function farReferenceEntered(): Promise<HeadlessUnit> {
+        const unit = await supPage({extra: [vor('FAR', 67.2, 10.5)]});
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', 'ABC');
+        await unit.panel.enterIdent('R', 'FAR');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        return unit;
+    }
+
+    // Sibling of the pin below: the far REF is taken, with the radial due south
+    it('takes a reference 1200 NM away (characterization)', async () => {
+        const unit = await farReferenceEntered();
+
+        expect(rightRows().slice(1, 3)).toEqual(['REF:  FAR  ', 'RAD: 180.0°']);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The DIS field has four cells, so 1200 NM does not fit: the page shows `DIS:120.nm ` with a blank tenth and the unit
+    // moved one cell left (DistanceEditor.convertFromValue takes the characters of "1200.0" by position). What the real unit
+    // shows is not known, so the pin asserts the shape of the row only: three cells, the point, one cell, then nm
+    it.fails('does not garble the DIS row for a distance that does not fit the field (#341)', async () => {
+        await farReferenceEntered();
+
+        expect(rightRows()[3]).toMatch(/^DIS:[ 0-9_]{3}\.[0-9_]nm$/);
     });
 
     // 3-51, 5-19 note: the REF, radial and distance are not stored and are lost when another page is viewed; the page

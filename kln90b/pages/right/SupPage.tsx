@@ -203,7 +203,20 @@ export class SupPage extends WaypointPage<UserFacility> {
 
     private setRef(ref: Facility | null) {
         this.ref = ref;
+        this.refDebounce.clear(); //The entered reference ends the automatic search for the nearest VOR
+        const facility = unpackFacility(this.facility);
+        if (ref !== null && facility) {
+            //3-51 The page shows radial and distance from the entered reference
+            this.calculateRadialAndDistance(ref, facility);
+        }
         this.requiresRedraw = true;
+    }
+
+    private calculateRadialAndDistance(ref: Facility, facility: Facility) {
+        const refCoords = new GeoPoint(ref.lat, ref.lon);
+        const intCoords = new GeoPoint(facility.lat, facility.lon);
+        this.dis = UnitType.GA_RADIAN.convertTo(intCoords.distance(refCoords), UnitType.NMILE);
+        this.rad = intCoords.bearingFrom(refCoords);
     }
 
     private calculateRef() {
@@ -231,10 +244,7 @@ export class SupPage extends WaypointPage<UserFacility> {
             if (facility) {
                 this.ref = await this.props.nearestUtils.getNearestVor(facility.lat, facility.lon);
                 if (this.ref) {
-                    const refCoords = new GeoPoint(this.ref.lat, this.ref.lon);
-                    const intCoords = new GeoPoint(facility.lat, facility.lon);
-                    this.dis = UnitType.GA_RADIAN.convertTo(intCoords.distance(refCoords), UnitType.NMILE);
-                    this.rad = intCoords.bearingFrom(refCoords);
+                    this.calculateRadialAndDistance(this.ref, facility);
                 }
                 this.requiresRedraw = true;
             }
