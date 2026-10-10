@@ -104,7 +104,7 @@ describe('L:KLN90B_RollCommand without a heading input (public contract)', () =>
     });
 });
 
-// #100 (second comment of session 4): far left of the leg on a track parallel to it, case 1 ("on track") of
+// #100 (its comment of 2026-10-05): far left of the leg on a track parallel to it, case 1 ("on track") of
 // RollSteeringController.updateBankAngle takes any negative XTK, and its course to steer DTK - 50 x XTK passes 180 degrees
 // off the DTK beyond about 3.6 NM, so the unit banks away from the leg. HeadingInput is on, so the pin survives the
 // fix of #143.

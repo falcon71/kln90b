@@ -362,8 +362,8 @@ describe('waypoint editor with an unknown identifier', () => {
 // 4-3 (section 4.1.2, step 3) sends a pilot who stayed on the page after building the plan back to USE? with the
 // outer knob. So the 90B keeps the cursor where it was while the page is not left, and shows it over USE? when the
 // page is shown anew. The code remembers the field
-// (CursorController.setCursorActive cites the same step). The KLN 89 trainer comes back on the first field (T7),
-// which is a note and not a pin: the 90B guide wins
+// (CursorController.setCursorActive cites the same step). The KLN 89 trainer comes back on the first field
+// (2026-10-08, T7), which is a note and not a pin: the 90B guide wins
 describe('waypoint editor on a numbered flight plan, the cursor field (4-3, section 4.1.2 step 3)', () => {
     /** FPL 1 holds KAAA, KSAT and KS01, shown with the cursor off */
     async function fpl1(): Promise<HeadlessUnit> {

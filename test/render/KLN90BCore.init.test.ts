@@ -62,7 +62,7 @@ describe('the order of the calculation tickables (spec, docs/architecture.md Cor
     it('runs the calculation tickables in the documented order', async () => {
         const unit = await bootUnit();
         const p = unit.props;
-        // Coupling to a private member (D6 of the Session 10b findings): KLN90BCore keeps its TickController in the private
+        // Coupling to a private member: KLN90BCore keeps its TickController in the private
         // field tickManager and exposes no accessor. A rename of the field fails this test with a TypeError, not
         // with a wrong order
         const tickController = (unit.core as any).tickManager;

@@ -5,7 +5,7 @@ import {mount} from '../../harness/render/mount';
 
 // Introduction page I and figure 3-5: ACKNOWLEDGE? on the take-home warning page is shown in inverse video inside the
 // white border that marks flashing. Blink is the control of that field (TakehomePage). Mounted directly: the take-home
-// mode is not tested through the unit (testing.md section 7)
+// mode is not tested through the unit (testing.md section 9)
 describe('Blink (spec)', () => {
     it('flashes its text in inverse video (I, 3-3, figure 3-5)', () => {
         const m = mount(new Blink('ACKNOWLEDGE?'));

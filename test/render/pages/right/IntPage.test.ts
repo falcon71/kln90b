@@ -583,7 +583,7 @@ describe('stored user intersection', () => {
         expect(unit.panel.focused('R')).toEqual({row: 2, col: 17, text: '___._'});
     });
 
-    // A throw on ENT is never the real unit's behavior (the Session 8 ruling on #243). IntPage.setRad reads this.ref!
+    // A throw on ENT is never the real unit's behavior (testing.md section 5, as #243). IntPage.setRad reads this.ref!
     // (null without a reference VOR, and during the 8 s of the REF calculation), and the TypeError rejects the ENT
     it.fails('does not throw on ENT of a radial without a reference (#286)', async () => {
         const unit = await withoutReference();

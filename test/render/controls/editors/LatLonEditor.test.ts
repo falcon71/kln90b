@@ -343,7 +343,7 @@ describe('longitude editor and the sim keyboard (characterization, sim-only feat
         await vi.advanceTimersByTimeAsync(250);
     };
 
-    // The lead of Session 9a (a typed blank entered E 10°30.00' on SUP): only the harness's raw key event can carry a
+    // An early SUP test entered E 10°30.00' with a typed blank. Only the harness's raw key event can carry a
     // blank. The PC keyboard's space bar (key code 32) is not passed on, so #109 stands for the keyboard: the hundreds
     // place takes neither a 0 nor a blank, and a longitude below 100 degrees cannot be typed.
     it('does not pass the space bar on, so the hundreds place stays open', async () => {

@@ -512,7 +512,8 @@ export class FrontPanel {
 
     /**
      * Joins two runs of a row that one plain "." separates: the NDB frequency and DIS editors do not invert their point,
-     * so the digits around it are two runs of one field. Whether the real cursor covers the point is open (Session 9b).
+     * so the digits around it are two runs of one field. The real cursor covers the point (figure 5-74), so the plain
+     * point is a bug (#302); once it is fixed this join can go.
      */
     private joinAcrossPoint(s: Screen, runs: Field[]): Field[] {
         const out: Field[] = [];

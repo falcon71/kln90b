@@ -491,7 +491,7 @@ describe('SidStar conversion of procedures to KLN legs', () => {
     });
 });
 
-// Session 7 task 6: the conversion paths of SidStar that the tests above leave out. The worlds are invented.
+// The conversion paths of SidStar that the tests above leave out. The worlds are invented.
 const kprc = airport('KPRC', 47.0, 8.0);
 const iafaa = intersection('IAFAA', 47.4, 7.6);
 const ifaaa = intersection('IFAAA', 47.3, 7.7);

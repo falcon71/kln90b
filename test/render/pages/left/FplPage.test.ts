@@ -193,7 +193,7 @@ describe('FPL 0 page with an approach', () => {
     // 6-5: a header ABBBB-CCCC above the approach waypoints (type letter, runway, airport). 6-7: approach waypoints
     // have a blank instead of the colon after their number. 6-6 to 6-7: the IAF, FAF, MAP and missed approach holding
     // point carry a suffix (i, f, m, h); the font kln90b.ttf draws à, á, ã and â as a dash and that small letter
-    // (rendered with Skia during the research for this test)
+    // (rendered with Skia when this test was written)
     it('shows the approach header, the approach waypoints without colon and the fix suffixes (6-5 to 6-7)', async () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
