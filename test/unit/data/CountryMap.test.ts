@@ -50,9 +50,17 @@ describe('getCountry', () => {
     // D-1 to D-3 against the ICAO regions of the Caribbean: TD Dominica (DMA), TR Montserrat (MSR), TT Trinidad and
     // Tobago (TTO), TU British Virgin Islands (VGB), TV St. Vincent (VCT), TX Bermuda (BMU). BER is the ARTCC Bermuda
     // of D-3, not a country.
-    it.fails.each([
+    it.each([
         ['TD', 'DMA'], ['TR', 'MSR'], ['TT', 'TTO'], ['TU', 'VGB'], ['TV', 'VCT'], ['TX', 'BMU'],
     ])('names region %s %s (#169)', (region, country) => {
+        expect(getCountry(vor('ABC', 15, -61, {region}))).toBe(country);
+    });
+
+    // The regions next to the six above keep their countries: TA Antigua and Barbuda (ATG), TB Barbados (BRB), TG Grenada
+    // (GRD), TL St. Lucia (LCA), TQ Anguilla (AIA)
+    it.each([
+        ['TA', 'ATG'], ['TB', 'BRB'], ['TG', 'GRD'], ['TL', 'LCA'], ['TQ', 'AIA'],
+    ])('keeps region %s %s (D-1 to D-3, #169)', (region, country) => {
         expect(getCountry(vor('ABC', 15, -61, {region}))).toBe(country);
     });
 });
