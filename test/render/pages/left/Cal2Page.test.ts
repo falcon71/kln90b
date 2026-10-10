@@ -66,6 +66,24 @@ describe('CAL 2 barometer in millibars below 1000 (checked in the KLN 89 trainer
     });
 });
 
+describe('CAL 2 temperature entered sign first (5-11, #256)', () => {
+    // 5-11, step 6: the total air temperature has the same sign digit as on CAL 1; set on 000 before the last digit, the
+    // minus must stay: -5 C, not +5 C
+    it('keeps the minus when the sign is set before the last digit (5-11, #256)', async () => {
+        const unit = await bootUnit({storage: {cal2TAT: 0}});
+        await unit.panel.selectPage('L', 'CAL 2');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 9); // CAS, ALT and BARO have three cells each
+        await unit.panel.inner('L', 1); // the sign: -
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 5); // the last digit: 5
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[4]).toBe('TEMP: -05°C');
+        expect(unit.props.userSettings.getSetting('cal2TAT').get()).toBe(-5);
+    });
+});
+
 describe('CAL 2 page (5-11)', () => {
     // 5-11, steps 3 to 6: the cursor goes over CAS, then ALT (three digits, as on CAL 1), then BARO, then TEMP
     it('moves the cursor over CAS, ALT, BARO and TEMP (5-11)', async () => {

@@ -52,15 +52,23 @@ export class TempFieldset implements UiElement {
     }
 
     private saveTemp10(newTemp10: number): void {
-        const oldTemp = format(this.temp, "+00", {zeroFormat: "+00"});
-        this.temp = Number(oldTemp.substring(0, 1) + newTemp10 + oldTemp.substring(2));
+        const oldTemp = format(Math.abs(this.temp), "00");
+        this.temp = this.sign() * Number(newTemp10 + oldTemp.substring(1));
         this.callback(this.temp);
     }
 
     private saveTemp1(newTemp1: number): void {
-        const oldTemp = format(this.temp, "+00", {zeroFormat: "+00"});
-        this.temp = Number(oldTemp.substring(0, 2) + newTemp1);
+        const oldTemp = format(Math.abs(this.temp), "00");
+        this.temp = this.sign() * Number(oldTemp.substring(0, 1) + newTemp1);
         this.callback(this.temp);
+    }
+
+    /**
+     * The sign comes from the sign cell, not from the value: a minus on a value of zero (-0) would be lost by the
+     * formatting of the digits (5-10)
+     */
+    private sign(): number {
+        return this.children.get("TempSign").value === 0 ? -1 : 1;
     }
 
 }

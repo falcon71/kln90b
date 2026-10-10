@@ -132,8 +132,8 @@ describe('temperature fieldset', () => {
     });
 
     // 5-10 step 5: a minus in the first digit makes the temperature negative, whatever order the digits are set in.
-    // Set on 000, the minus is lost when the next digit is turned: -5 C is stored as +5 (and F shows 041).
-    it.fails('commits -5 C when the sign is set before the digits (5-10, #256)', async () => {
+    // Set on 000, the minus must survive the next digit: -5 C is -5 (and 23 F), not +5.
+    it('commits -5 C when the sign is set before the digits (5-10, #256)', async () => {
         const unit = await onCelsius(0, 32);
         await unit.panel.inner('L', 1);
         await unit.panel.outer('L', 2);
@@ -141,6 +141,71 @@ describe('temperature fieldset', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(storedSetting(unit, 'cal5TempC')).toBe(-5);
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   -05°C   ', '   023°F   ']);
+    });
+
+    // The same for the tens digit: the sign first, then the tens: -40 C is -40 F (-40 * 9 / 5 + 32)
+    it('commits -40 C when the sign is set before the tens digit (5-10, 5-13, #256)', async () => {
+        const unit = await onCelsius(0, 32);
+        await unit.panel.inner('L', 1);
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 4);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'cal5TempC')).toBe(-40);
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   -40°C   ', '   -40°F   ']);
+    });
+
+    // The sign cell stays the owner of the sign through further edits: with the minus set on 000, both digits are
+    // turned (-15 C) and the sign is turned back to 0, which makes it +15 C; a digit after that stays positive
+    it('keeps following the sign cell through the next digits (5-10, #256)', async () => {
+        const unit = await onCelsius(0, 32);
+        await unit.panel.inner('L', 1); // -
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 5); // -05
+        await unit.panel.outer('L', -1);
+        await unit.panel.inner('L', 1); // -15
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(storedSetting(unit, 'cal5TempC')).toBe(-15);
+
+        await unit.panel.outer('L', -1);
+        await unit.panel.inner('L', 1); // the sign: 0
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L')[1]).toBe('   015°C   ');
+        expect(storedSetting(unit, 'cal5TempC')).toBe(15);
+
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 1); // 016
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[1]).toBe('   016°C   ');
+        expect(storedSetting(unit, 'cal5TempC')).toBe(16);
+    });
+
+    // 5-10: the minus in the sign cell stays when a digit wraps (the wrap itself is the trainer's, T4): the tens digit of
+    // -95 C turned up from 9 to 0 is -05 C, not +05
+    it('keeps the minus when the tens digit wraps from 9 to 0 (5-10, checked in the KLN 89 trainer, ' +
+        '2026-10-08, T4, #256)', async () => {
+        const unit = await onCelsius(-95, -139);
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L')[1]).toBe('   -05°C   ');
+        expect(storedSetting(unit, 'cal5TempC')).toBe(-5);
+    });
+
+    // The positive side of the same edge: 05 C turned down in the tens wraps to 95 C
+    it('keeps a positive temperature positive when the tens digit wraps from 0 to 9 (5-10, checked in the ' +
+        'KLN 89 trainer, 2026-10-08, T4)', async () => {
+        const unit = await onCelsius(5, 41);
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', -1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L')[1]).toBe('   095°C   ');
+        expect(storedSetting(unit, 'cal5TempC')).toBe(95);
     });
 });
 
