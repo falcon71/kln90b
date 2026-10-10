@@ -450,7 +450,7 @@ describe('Super NAV 5 AUTO scale', () => {
         expect(Math.abs(star[2] - 2.3)).toBeLessThanOrEqual(1);
     });
 
-    // The sibling of the pin below: the active waypoint is A1, 19.5 NM north, and A2 4 NM north-east comes after it.
+    // The sibling of the test below: the active waypoint is A1, 19.5 NM north, and A2 4 NM north-east comes after it.
     // 3-36 names the waypoint after the active one; which waypoint is active depends on the leg sequencing of 4-7 and
     // 4-8, here the first leg of the plan, so that the second waypoint is active and the third follows.
     it('activates the far waypoint before the near one (3-36, 4-7, 4-8)', async () => {
@@ -467,7 +467,7 @@ describe('Super NAV 5 AUTO scale', () => {
     });
 
     // 3-36: AUTO must also show the active waypoint, 19.5 NM north, when the waypoint after it is nearer (4 NM): 20
-    it.fails('takes a scale that shows the active waypoint when the next one is nearer (3-36, #234)', async () => {
+    it('takes a scale that shows the active waypoint when the next one is nearer (3-36, #234)', async () => {
         const a0 = fix('AAAA', 180, 2), a1 = fix('AAAB', 0, 19.5), a2 = fix('AAAC', 45, 4);
         const unit = await bootUnit({
             facilities: [a0, a1, a2], position: P,
