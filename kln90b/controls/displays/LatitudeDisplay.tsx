@@ -3,6 +3,7 @@ import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
 import {Latitude} from "../../data/Units";
 import {format} from "numerable";
+import {splitDegreesMinutes} from "../../data/Coordinates";
 
 /**
  * Displays a formatted bearing/course/radial
@@ -31,10 +32,8 @@ export class LatitudeDisplay implements UiElement {
         }
 
         const northSount = this.latitude >= 0 ? "N" : "S";
-        const latitude = Math.abs(this.latitude);
-        const degreesString = format(latitude, "00", {rounding: "floor"});
-
-        const minutes = (latitude % 1) * 60;
+        const {degrees, minutes} = splitDegreesMinutes(this.latitude);
+        const degreesString = format(degrees, "00");
         const minutesString = format(minutes, "00.00");
 
         return `${northSount} ${degreesString}°${minutesString}'`;

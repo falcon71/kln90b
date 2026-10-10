@@ -277,16 +277,51 @@ describe('longitude editor, the hundreds digit', () => {
     });
 });
 
-describe('latitude editor just below a whole degree (#99)', () => {
-    // A position a few nanodegrees below 47° is 47°00.00' to the hundredth of a minute. The editors split the value
-    // like LatitudeDisplay (#99): the degrees are floored, the minutes rounded to 60.00, and the 6 is outside the
-    // choices 0 to 5 of the minutes' tens, so the cell shows nothing and the row is one cell short (N 46°0.00').
-    it.fails('shows N 47°00.00 for a position just below 47 degrees on SET 1 (3-18, #99)', async () => {
+describe('latitude and longitude editors just below a whole degree (#99)', () => {
+    // A position a few nanodegrees below 47° is 47°00.00' to the hundredth of a minute, and the editors show it so:
+    // a 60 in the minutes' tens would be outside their choices 0 to 5, and the cell would show nothing. The guide
+    // leaves open whether the unit rounds or truncates (47°59.99'), so the tests that name the carried degree hold the
+    // rounding of the code.
+    it('characterization: shows N 47°00.00 for a position just below 47 degrees on SET 1 (#99)', async () => {
         const unit = await bootUnit({position: {lat: 46.99999999716931, lon: 11.25}});
         await unit.panel.selectPage('L', 'SET 1');
 
         expect(unit.errors).toEqual([]);
         expect(Screen.read().rows('L')[2]).toBe("N 47°00.00'");
+    });
+
+    // The same for the southern hemisphere, and for the longitude with the carry into the hundreds digit
+    it('characterization: shows S 47°00.00 and E100°00.00 for positions just below them on SET 1 (#99)', async () => {
+        const unit = await bootUnit({position: {lat: -46.99999999716931, lon: 99.9999999}});
+        await unit.panel.selectPage('L', 'SET 1');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(["S 47°00.00'", "E100°00.00'"]);
+    });
+
+    it('characterization: shows W 11°00.00 for a western longitude just below 11 degrees on SET 1 (#99)', async () => {
+        const unit = await bootUnit({position: {lat: 47.5, lon: -(11 - 0.0000001)}});
+        await unit.panel.selectPage('L', 'SET 1');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(["N 47°30.00'", "W 11°00.00'"]);
+    });
+
+    // The edge of the carry (the display tests hold the rule): 59.994 minutes show as 59.99 and stay below the degree
+    it('keeps 59.994 minutes below the degree on SET 1 (3-18, #99)', async () => {
+        const unit = await bootUnit({position: {lat: 47 + 59.994 / 60, lon: 11 + 59.994 / 60}});
+        await unit.panel.selectPage('L', 'SET 1');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(["N 47°59.99'", "E 11°59.99'"]);
+    });
+
+    it('characterization: carries 59.996 minutes into the degree on SET 1 (#99)', async () => {
+        const unit = await bootUnit({position: {lat: 47 + 59.996 / 60, lon: 11 + 59.996 / 60}});
+        await unit.panel.selectPage('L', 'SET 1');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(["N 48°00.00'", "E 12°00.00'"]);
     });
 
     // The sibling: the same boot a whole minute below 47 degrees shows the position

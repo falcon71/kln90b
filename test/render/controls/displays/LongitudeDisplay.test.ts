@@ -38,14 +38,35 @@ describe('LongitudeDisplay', () => {
         },
     );
 
-    // The setup sibling of the #99 pin
+    // The setup sibling of the #99 test
     it('shows 00.00 minutes just above a whole degree (3-8, 3-32)', () => {
         expect(shown(11 + 0.000001)).toBe("E 11°00.00'");
     });
 
-    // 3-8, 3-32: the minutes run from 00.00 to 59.99; just below 11° they read 60.00. Pinned on NAV 2 as well.
-    it.fails('never shows 60 minutes (3-8, 3-32, #99)', () => {
+    // 3-8, 3-32: the minutes run from 00.00 to 59.99, so just below 11° they must not read 60.00. Checked on NAV 2 as
+    // well.
+    it('never shows 60 minutes (3-8, 3-32, #99)', () => {
         expect(["E 11°00.00'", "E 10°59.99'"]).toContain(shown(11 - 0.000001));
+        expect(["W 11°00.00'", "W 10°59.99'"]).toContain(shown(-(11 - 0.000001)));
+    });
+
+    // The test above accepts rounding or truncating. The code rounds to the hundredth of a minute, which is the value
+    // the display already showed away from a whole degree, so the carry is what this holds: 59.994 minutes stay below
+    // the degree, 59.996 minutes carry.
+    it('characterization: rounds the minutes to the hundredth before it splits them', () => {
+        expect(shown(11 + 59.994 / 60)).toBe("E 11°59.99'");
+        expect(shown(11 + 59.996 / 60)).toBe("E 12°00.00'");
+        expect(shown(-(11 + 59.994 / 60))).toBe("W 11°59.99'");
+        expect(shown(-(11 + 59.996 / 60))).toBe("W 12°00.00'");
+    });
+
+    // The carry reaches the hundreds digit (99° to 100°) and the antimeridian. The guide leaves open whether the unit
+    // rounds or truncates, so this holds the rounding of the code
+    it('characterization: carries into the next degree at 10, at 100 and at 180 degrees (#99)', () => {
+        expect(shown(10 - 0.000001)).toBe("E 10°00.00'");
+        expect(shown(100 - 0.000001)).toBe("E100°00.00'");
+        expect(shown(-(100 - 0.000001))).toBe("W100°00.00'");
+        expect(shown(180 - 0.000001)).toBe("E180°00.00'");
     });
 });
 

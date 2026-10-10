@@ -3,6 +3,7 @@ import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NorthSouthEditorField, NumberEditorField} from "./EditorField";
 import {Latitude} from "../../data/Units";
 import {format} from "numerable";
+import {splitDegreesMinutes} from "../../data/Coordinates";
 import {TickController} from "../../TickController";
 
 export class LatitudeEditor extends Editor<Latitude> {
@@ -35,11 +36,8 @@ export class LatitudeEditor extends Editor<Latitude> {
 
     protected convertFromValue(value: Latitude): Rawvalue {
         const northSountIdx = value >= 0 ? 0 : 1;
-        value = Math.abs(value);
-        const degreesString = format(value, "00", {rounding: "floor"});
-
-
-        const minutes = (value % 1) * 60;
+        const {degrees, minutes} = splitDegreesMinutes(value);
+        const degreesString = format(degrees, "00");
         const minutesString = format(minutes, "00.00");
 
         return [

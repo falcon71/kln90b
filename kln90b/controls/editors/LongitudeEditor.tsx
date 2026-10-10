@@ -3,6 +3,7 @@ import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {EastWestEditorField, NumberEditorField} from "./EditorField";
 import {Longitude} from "../../data/Units";
 import {format} from "numerable";
+import {splitDegreesMinutes} from "../../data/Coordinates";
 import {TickController} from "../../TickController";
 
 
@@ -36,11 +37,8 @@ export class LongitudeEditor extends Editor<Longitude> {
 
     protected convertFromValue(value: Longitude): Rawvalue {
         const eastWestIndex = value >= 0 ? 0 : 1;
-        value = Math.abs(value);
-        const degreesString = format(value, "000", {rounding: "floor"});
-
-
-        const minutes = (value % 1) * 60;
+        const {degrees, minutes} = splitDegreesMinutes(value);
+        const degreesString = format(degrees, "000");
         const minutesString = format(minutes, "00.00");
 
         return [

@@ -144,14 +144,14 @@ describe('NAV 2 page', () => {
     });
 });
 
-// #99: the minutes are rounded on their own after the degrees were floored, so a position just below a whole degree
-// reads 60.00 minutes. 3-8, 3-32: the minutes run from 00.00 to 59.99. Whether the real unit rounds or truncates is
-// not known, so both readings are accepted (the KLN 89 trainer never showed 60.00 minutes either, 2026-10-07).
+// #99: a position just below a whole degree must not read 60.00 minutes. 3-8, 3-32: the minutes run from 00.00 to
+// 59.99. Whether the real unit rounds or truncates is not known, so both readings are accepted (the KLN 89 trainer
+// never showed 60.00 minutes either, 2026-10-07).
 describe('NAV 2 coordinates next to a whole degree (#99)', () => {
     // 0.00006 minutes below 48 N and below 11 E (two-digit degrees, so that the blank-padding bug stays out)
     const justBelow = {lat: 48 - 0.000001, lon: 11 - 0.000001};
 
-    // The setup sibling of the pins: the GPS position is just below the whole degrees and NAV 2 shows it
+    // The setup sibling of the tests below: the GPS position is just below the whole degrees and NAV 2 shows it
     it('reads a position just below a whole degree (3-32)', async () => {
         const unit = await nav2At(justBelow);
 
@@ -164,20 +164,20 @@ describe('NAV 2 coordinates next to a whole degree (#99)', () => {
         expect(screen.rows('L')[5].startsWith('E 1')).toBe(true);
     });
 
-    // Just above a whole degree the display is right today: the passing half of the rule
+    // Just above a whole degree the minutes are 00.00, the other half of the rule
     it('shows 00.00 minutes just above a whole degree (3-8, 3-32)', async () => {
         await nav2At({lat: 48 + 0.000001, lon: 11 + 0.000001});
 
         expect(Screen.read().rows('L').slice(4)).toEqual(["N 48°00.00'", "E 11°00.00'"]);
     });
 
-    it.fails('never shows 60 minutes of latitude (3-8, 3-32, #99)', async () => {
+    it('never shows 60 minutes of latitude (3-8, 3-32, #99)', async () => {
         await nav2At(justBelow);
 
         expect(["N 48°00.00'", "N 47°59.99'"]).toContain(Screen.read().rows('L')[4]);
     });
 
-    it.fails('never shows 60 minutes of longitude (3-8, 3-32, #99)', async () => {
+    it('never shows 60 minutes of longitude (3-8, 3-32, #99)', async () => {
         await nav2At(justBelow);
 
         expect(["E 11°00.00'", "E 10°59.99'"]).toContain(Screen.read().rows('L')[5]);
