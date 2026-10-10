@@ -184,6 +184,18 @@ describe('Vnav states', () => {
         expect(vnav.advisoryAltitude).toBeNull();
     });
 
+    // 5-8 gives the time to the descent as the distance to its start at GS. The guide does not describe a ground speed
+    // of 0; the inference is that the start never comes closer then, so VNAV stays armed while the start is ahead (#229
+    // made the start at the target work at 0 kt, this is its counterpart)
+    it('stays armed at zero ground speed while the start of the descent is ahead (5-8, inferred) (#229)', () => {
+        const {vnav} = dct({distToActive: 64.8, ind: 7500, offset: 2, angle: -1.8, gs: 0});
+        vnav.armVnav();
+        vnav.tick();
+        expect(vnav.state).toBe(VnavState.Armed);
+        expect(vnav.timeToVnav).toBe(Infinity);
+        expect(vnav.advisoryAltitude).toBeNull();
+    });
+
     // 5-8 step 7: when the countdown reaches zero the advisory altitude replaces it. 31 NM to go, 29 NM to the target
     it('goes active at the start of the descent with the advisory altitude (5-8)', () => {
         const {vnav, nav} = dct({distToActive: 40, ind: 7500, offset: 2, angle: -1.8});

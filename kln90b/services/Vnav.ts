@@ -34,7 +34,7 @@ export class Vnav implements CalcTickable {
         if (this.state === VnavState.Armed) {
             const distToVnav = this.getDistanceToTarget(this.navState.nav4VnavWpt!) - this.calcDistWithAngle();
             this.timeToVnav = distToVnav / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
-            if (this.timeToVnav <= 0) {
+            if (!(this.timeToVnav > 0)) { //Also true for NaN, 0 NM at 0 kt: the descent starts where the aircraft is
                 this.state = VnavState.Active;
             }
         }
