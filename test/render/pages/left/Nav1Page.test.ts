@@ -6,6 +6,7 @@ import {MainPage} from '../../../../kln90b/pages/MainPage';
 import {Nav1Page} from '../../../../kln90b/pages/left/Nav1Page';
 import {savedFlightplan} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
+import {activeIdent} from '../../../harness/readers';
 
 // An invented world: KDDD, with KAAA 200 NM west of it on the great circle that leaves KDDD on 270 true, so every point
 // west(nm) lies on the leg KAAA to KDDD (no cross track). FPL 0 is KAAA, KDDD; KDDD is active.
@@ -27,7 +28,7 @@ async function onLeg(nm: number, groundspeedKt: number, magvar = 0): Promise<Hea
     await settle(unit);
     await unit.panel.selectPage('L', 'NAV 1');
     await moveAircraft(unit, west(nm), {groundspeedKt, trackTrue: 90});
-    expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('KDDD'); // Precondition
+    expect(activeIdent(unit)).toBe('KDDD'); // Precondition
     await vi.advanceTimersByTimeAsync(1000);
     return unit;
 }
@@ -149,11 +150,7 @@ async function directToKddd(): Promise<HeadlessUnit> {
     });
     await settle(unit);
     // The boot right page is SUP without a facility, so the DIR page opens blank
-    await unit.panel.dct();
-    await unit.panel.enterIdent('L', 'KDDD');
-    await unit.panel.ent(); // the APT 1 confirmation
-    await unit.panel.ent();
-    await vi.advanceTimersByTimeAsync(1000);
+    await unit.panel.directTo('KDDD');
     return unit;
 }
 

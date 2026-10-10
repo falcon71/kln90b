@@ -91,6 +91,7 @@ describe('Turn-On page (3-3, 5-28)', () => {
         const unit = await powerOnCold();
         await unit.panel.cursor('L');
 
+        // Far past the 17 s the Turn-On page shows on its own (TEST_TIME in WelcomePage.tsx), to show it stays
         await vi.advanceTimersByTimeAsync(60_000);
 
         expect(isTurnOnPage()).toBe(true);
@@ -105,6 +106,7 @@ describe('Turn-On page (characterization)', () => {
         + '(characterization)', async () => {
         const unit = await powerOnCold();
         await unit.panel.cursor('L');
+        // Past the 17 s the Turn-On page shows on its own (TEST_TIME in WelcomePage.tsx), with the cursor holding it
         await vi.advanceTimersByTimeAsync(30_000);
         expect(isTurnOnPage()).toBe(true);
 

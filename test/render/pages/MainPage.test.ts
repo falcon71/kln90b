@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit} from '../../harness/boot';
+import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {airport} from '../../harness/navdata/builders';
 import {MainPage} from '../../../kln90b/pages/MainPage';
@@ -46,8 +46,7 @@ describe('pushed pages close when they do not handle a knob (characterization, K
 describe('the inner knob with SCAN pulled (characterization, KLN 89 trainer, 8e9a7c4)', () => {
     it('changes the field under the cursor instead of scanning', async () => {
         const unit = await bootUnit();
-        await unit.panel.outer('R', -5);
-        await unit.panel.inner('R', 3);
+        await unit.panel.selectPage('R', 'NAV 4');
         expect(Screen.read().rightName()).toBe('NAV 4');
         await unit.panel.cursor('R');
         expect(Screen.read().half('R').split('\n')[3]).toBe('SEL:00000ft');
@@ -65,11 +64,6 @@ describe('the inner knob with SCAN pulled (characterization, KLN 89 trainer, 8e9
 function names(): string[] {
     const s = Screen.read().status();
     return [s.left, s.right];
-}
-
-/** The full-screen page MainPage shows, or null */
-function overlay(unit: HeadlessUnit) {
-    return (unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage();
 }
 
 /** The DIR page with its cursor turned off, over NAV 2 on the left */
@@ -168,7 +162,7 @@ describe('a pushed right page hands an unhandled knob to the page below (charact
 async function superNav1(unit: HeadlessUnit): Promise<void> {
     await unit.panel.selectPage('L', 'NAV 1');
     await unit.panel.selectPage('R', 'NAV 1');
-    expect(overlay(unit)).toBeInstanceOf(SuperNav1Page); // Precondition
+    expect(unit.overlay()).toBeInstanceOf(SuperNav1Page); // Precondition
     expect(names()).toEqual(['NAV 1', 'NAV 1']);
 }
 
@@ -192,7 +186,7 @@ describe('the knobs on Super NAV 1 (3-32, 3-12, 3-13)', () => {
         await unit.panel.press(evt);
 
         expect(unit.errors).toEqual([]);
-        expect(overlay(unit)).toBeNull();
+        expect(unit.overlay()).toBeNull();
         expect(names()).toEqual(pages);
     });
 });
@@ -201,7 +195,7 @@ describe('the knobs on Super NAV 1 (3-32, 3-12, 3-13)', () => {
 async function msgPage(unit: HeadlessUnit): Promise<void> {
     await unit.panel.msg();
     expect(names()).toEqual(['', '']); // Precondition: the full-width MSG page (3-16, figure 3-56)
-    expect(overlay(unit)).toBeInstanceOf(MessagePage);
+    expect(unit.overlay()).toBeInstanceOf(MessagePage);
 }
 
 // #56 (closed) names the MSG page beside the ALT and DIR pages: in the KLN 89 trainer the outer knob leaves it and
@@ -228,7 +222,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
 
         await unit.panel.outer('L', 1);
 
-        expect(overlay(unit)).toBeNull();
+        expect(unit.overlay()).toBeNull();
         expect(names()).toEqual(['CAL 1', 'SUP']);
     });
 
@@ -238,7 +232,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
 
         await unit.panel.inner('L', 1);
 
-        expect(overlay(unit)).toBeNull();
+        expect(unit.overlay()).toBeNull();
         expect(names()).toEqual(['NAV 3', 'SUP']);
     });
 
@@ -248,7 +242,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
 
         await unit.panel.outer('R', 1);
 
-        expect(overlay(unit)).toBeNull();
+        expect(unit.overlay()).toBeNull();
         expect(names()).toEqual(['NAV 2', 'CTR 1']);
     });
 
@@ -268,7 +262,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
 
         await unit.panel.cursor('L');
 
-        expect(overlay(unit)).toBeNull();
+        expect(unit.overlay()).toBeNull();
         expect(names()).toEqual(['CRSR', 'SUP']);
     });
 
@@ -279,14 +273,14 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
 
         await unit.panel.cursor('L');
 
-        expect(overlay(unit)).toBeNull();
+        expect(unit.overlay()).toBeNull();
         expect(names()).toEqual(['CRSR', 'SUP']);
     });
 });
 
 /** Presses MSG while the MSG page shows, until it closes (at most three presses) */
 async function closeMsgPage(unit: HeadlessUnit): Promise<void> {
-    for (let i = 0; i < 3 && overlay(unit) instanceof MessagePage; i++) {
+    for (let i = 0; i < 3 && unit.overlay() instanceof MessagePage; i++) {
         await unit.panel.msg();
     }
 }
@@ -316,7 +310,7 @@ describe('D-> on the MSG page over Super NAV 1 (3-27, 3-32, #334)', () => {
         await unit.panel.dct();
         await closeMsgPage(unit);
 
-        expect(overlay(unit)).not.toBeInstanceOf(SuperNav1Page);
+        expect(unit.overlay()).not.toBeInstanceOf(SuperNav1Page);
         expect(Screen.read().rows('L')[0]).toBe('DIRECT TO: ');
         expect(Screen.read().status().left).toBe('CRSR');
     });
@@ -325,7 +319,7 @@ describe('D-> on the MSG page over Super NAV 1 (3-27, 3-32, #334)', () => {
 /** KBBB 0.6 NM north of the aircraft, after the first nearest search (every 10 s): ENT on the MSG page has a target */
 async function bootNearKbbb(): Promise<HeadlessUnit> {
     const unit = await bootUnit({facilities: [airport('KBBB', 47.2, 8.0)], position: {lat: 47.19, lon: 8.0}});
-    await vi.advanceTimersByTimeAsync(12000);
+    await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
     return unit;
 }
 
@@ -366,7 +360,7 @@ describe('D-> and ALT on the MSG page (3-27, 3-39, 3-55, KLN 89 trainer 2026-10-
 
         expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()).toBeNull();
         expect(names()[1]).toBe('SUP');
-        expect(overlay(unit)).toBeNull();
+        expect(unit.overlay()).toBeNull();
     });
 
     it.fails('shows the ALT page when ALT is pressed on the MSG page (3-39, 3-55, T2, #335)', async () => {
@@ -395,11 +389,11 @@ describe('the status line on Super NAV 5 (3-36)', () => {
 
         await unit.panel.inner('R', 1);
         await vi.advanceTimersByTimeAsync(250);
-        expect(overlay(unit)).toBeInstanceOf(SuperNav5Page); // Precondition
+        expect(unit.overlay()).toBeInstanceOf(SuperNav5Page); // Precondition
         expect(statusLineElement().classList.contains('d-none')).toBe(true);
 
         await unit.panel.inner('R', -1);
-        expect(overlay(unit)).toBeNull();
+        expect(unit.overlay()).toBeNull();
         expect(statusLineElement().classList.contains('d-none')).toBe(false);
         expect(names()).toEqual(['NAV 5', 'NAV 4']);
     });
@@ -416,7 +410,7 @@ describe('the MSG page over the ALT page (3-16, 3-55)', () => {
         await unit.panel.msg();
 
         expect(unit.errors).toEqual([]);
-        expect(overlay(unit)).toBeNull();
+        expect(unit.overlay()).toBeNull();
         expect(Screen.read().rows('L')[0]).toBe(' ALTITUDE  ');
         expect(Screen.read().rows('R')[0]).toBe('VNV INACTV ');
         expect(names()).toEqual(['CRSR', 'CRSR']);

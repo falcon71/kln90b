@@ -5,6 +5,7 @@ import {bootUnit, settle} from '../../../harness/boot';
 import {airport} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
+import {activeIdent} from '../../../harness/readers';
 
 // 3-33: in Leg mode the ESA is the highest sector MSA from the present position to the active waypoint and on along
 // FPL 0 to the destination. Except for the test of the route part, all waypoints and the aircraft lie in the one sector
@@ -31,7 +32,7 @@ describe('NAV 3 ESA in Leg mode', () => {
         const kccc = airport('KCCC', 47.8, 8.8);
         const {unit, esaRow} = await nav3Esa([kaaa, kbbb, kccc], {lat: 47.3, lon: 8.3});
 
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
         expect(esaRow).toBe(`ESA ${SECTOR_47N_8E}ft`);
     });
 
@@ -46,7 +47,7 @@ describe('NAV 3 ESA in Leg mode', () => {
         expect(SECTOR_46N_8E).toBeGreaterThan(SECTOR_47N_8E);
         const {unit, esaRow} = await nav3Esa([kaaa, kbbb, kccc], {lat: 47.05, lon: 8.45});
 
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
         expect(esaRow).toBe(`ESA ${SECTOR_46N_8E}ft`);
     });
 
@@ -59,7 +60,7 @@ describe('NAV 3 ESA in Leg mode', () => {
         expect(SECTOR_46N_8E).toBeGreaterThan(SECTOR_47N_8E);
         const {unit, esaRow} = await nav3Esa([kaaa, kbbb, kccc], {lat: 46.9, lon: 8.45});
 
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
         expect(esaRow).toBe(`ESA ${SECTOR_46N_8E}ft`);
     });
 
@@ -71,7 +72,7 @@ describe('NAV 3 ESA in Leg mode', () => {
         const kbbb = airport('KBBB', 47.5, 8.5);
         const {unit, esaRow} = await nav3Esa([kaaa, kbbb], {lat: 47.3, lon: 8.3});
 
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
         expect(esaRow).toBe(`ESA ${SECTOR_47N_8E}ft`);
     });
 
