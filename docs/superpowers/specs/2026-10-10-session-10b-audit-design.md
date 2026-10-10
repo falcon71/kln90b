@@ -43,7 +43,7 @@ confirmed against the code and the documents:
 Each helper gets a harness test and a paragraph in `testing.md` section 4. Names are binding for the plan; the
 implementer may adjust a signature detail it reports.
 
-- **H1. `panelXml(opts)`** in `test/harness/boot.ts`, beside `MINIMAL_PANEL_XML`. Its keys are the parser's own dotted
+- **H1. `panelXml(opts)`** in its own file `test/harness/panelXml.ts` (`MINIMAL_PANEL_XML` stays in `boot.ts`). Its keys are the parser's own dotted
   paths (`'VFROnly'`, `'Input.ObsSource'`, `'Output.WriteGPSSimVars'`), typed as a literal union derived from a
   `PANEL_KEYS` tuple, with values of string, number or boolean, and an `extra` string for raw XML a test needs beyond
   the keys. Named presets are objects to spread: `NO_OBS` (`Input.ObsSource` 0), `HEADING_INPUT`, `NO_GPS_SIMVARS`,
@@ -92,7 +92,9 @@ Rules 20 to 22 apply. Every test file has exactly one owner, by directory:
 | 5 | `test/unit/**` (except task 2's new file), `test/flight/**`, the existing tests in `test/render/harness/` and `test/unit/harness/`, `test/flight/harness/` | moves and stragglers; the #93 pin; D1; D6; D7 |
 | 6 | issues and close-out: `docs/test-coverage.md`, `testing.md` section 7 | below |
 
-If the inventory shows that a task is too large for one context, the plan splits it by file name, not by helper.
+If the inventory shows that a task is too large for one context, the plan splits it by file name, not by helper. The
+plan splits task 1 into two tasks (left pages A to N with the top-level page files, and O to Z), so its numbering runs
+one higher from there.
 
 - **Task 0** runs alone. Tasks 1 to 5 run in parallel worktrees after it is merged. Task 6 runs last.
 - **New component tests:**
