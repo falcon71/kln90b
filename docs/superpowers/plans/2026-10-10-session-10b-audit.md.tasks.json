@@ -64,7 +64,7 @@
     {
       "id": 7,
       "subject": "Task 7: Issues and close-out",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         1,
         2,
@@ -76,5 +76,5 @@
       "description": "**Goal:** every placeholder is a filed issue, the session log and `testing.md` section 7 are written, Session 10b is\nticked and Session 11's steps cover the findings of section 6.\n\n**Files:**\n- Modify: `docs/test-coverage.md` (section 3: tick Session 10b, a result paragraph; Session 11's steps; section 4: the\n  session log), `docs/testing.md` (section 7), any test file with a `#NEW-` placeholder (the replacement only)\n- Modify: `docs/superpowers/specs/2026-10-10-session-10b-audit-design.md` (only if bugs were filed: an issue table)\n\n**Acceptance Criteria:**\n- [ ] Every `#NEW-<task>-<n>` is searched on GitHub (open and closed, several wordings), filed with the `bug` label per\n      `CLAUDE.md` or merged into an existing issue, and replaced; `grep -rn \"#NEW-\" test/` finds nothing.\n- [ ] `testing.md` section 7 names every copy the main tasks kept with its reason (from the reports), the\n      missed-approach and VOR 36 world copies of findings section 4, and the `FourSegmentPage` ENT order; the items\n      task 0 removed stay removed.\n- [ ] Session 11's steps in `docs/test-coverage.md` gain, as text only: a dated trainer record in `testing.md` that\n      keeps the `T<n>` ids with their session (or the comments rewritten); the session references in tests resolved by\n      that record; the rules `testing.md` cites by number (rule 8, rule 13, the evidence rule) restated in its own\n      words; the deletion of `docs/superpowers/` (specs, plans, `.tasks.json`, the findings and the inventory) with\n      `test-coverage.md`; section 7 regrouped by area with the duplicate electricity item merged and the `Version` mock\n      item naming `Sta3Page` and `Sta4Page`; step 4 exempting the harness self-test pin of `rejections.test.ts`; the two\n      superseded triage rows (AIRAC last day, the #40 cache window) to confirm; the #213 claim not repeated; the\n      controlling session's memory notes updated.\n- [ ] The session log entry (section 4) states what was done per task, what was left and why, the start and end\n      numbers of `npm test` and the coverage summary, and the items of the findings re-decided with a reason.\n- [ ] `npm test`, `npx tsc --noEmit` clean.\n\n**Verify:** `grep -rn \"#NEW-\" test/` → no output; `npm test` → all files pass; `npx tsc --noEmit` → no output.\n\n```json:metadata\n{\"files\": [\"docs/test-coverage.md\", \"docs/testing.md\"], \"verifyCommand\": \"grep -rn \\\"#NEW-\\\" test/ ; npm test && npx tsc --noEmit\", \"acceptanceCriteria\": [\"no #NEW- placeholder left; bugs filed or merged\", \"testing.md section 7 names kept copies, world copies, FourSegmentPage ENT order\", \"Session 11 steps cover findings section 6\", \"session log written\", \"suite and tsc clean\"], \"modelTier\": \"standard\"}\n```"
     }
   ],
-  "lastUpdated": "2026-10-10T11:58:24.721Z"
+  "lastUpdated": "2026-10-10T12:16:34.187Z"
 }
