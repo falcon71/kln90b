@@ -100,8 +100,8 @@ describe('VOR page contents (3-49)', () => {
         expect(Screen.read().rows('R')[0]).toBe(' ABC D     ');
     });
 
-    // 3-49: a DME-only station has the D too
-    it('shows D after the ident of a DME-only station (3-49)', async () => {
+    // 3-49 speaks of VORs with DME only; a station of the sim type DME (no VOR) gets the D as well, as the code does
+    it('shows D after the ident of a DME-only station (characterization)', async () => {
         await vorPageOf(vor('ABC', 47.2, 8.2, {type: VorType.DME}));
 
         expect(Screen.read().rows('R')[0]).toBe(' ABC D     ');
@@ -227,14 +227,37 @@ describe('VOR page nearest view (3-22, 3-49)', () => {
 describe('VOR page with a VORTAC (3-49)', () => {
     const adm = (type: VorType) => vor('ADM', 47.2, 8.2, {type, name: 'ARDMORE'});
 
-    // VorPage.tsx:70, 109 and 134 give the D to DME and VOR-DME only
-    it.fails('shows D after the ident of a VORTAC (3-49, #275)', async () => {
+    it('shows D after the ident of a VORTAC (3-49, #275)', async () => {
         await vorPageOf(adm(VorType.VORTAC));
 
         expect(Screen.read().rows('R')[0]).toBe(' ADM D     ');
     });
 
-    // Sibling of the pin above: the page reaches the VORTAC without typing, because it is the first VOR of the scan list
+    // 3-49: the D marks a VOR with DME, so it shows for a VOR-DME and a VORTAC and not for a plain VOR. Opening on the
+    // station and scanning onto it are two ways to reach it
+    const dmeCases: [string, VorType, string][] = [
+        ['VOR', VorType.VOR, ' ADM       '],
+        ['VOR-DME', VorType.VORDME, ' ADM D     '],
+        ['VORTAC', VorType.VORTAC, ' ADM D     '],
+    ];
+
+    it.each(dmeCases)('opens on a %s with the D as its type says (3-49)', async (_name, type, expected) => {
+        await vorPageOf(adm(type));
+
+        expect(Screen.read().rows('R')[0]).toBe(expected);
+    });
+
+    it.each(dmeCases)('scans onto a %s with the D as its type says (3-49)', async (_name, type, expected) => {
+        // ABC, a plain VOR, comes first in the list and ADM is the next one
+        const unit = await vorPageOf(vor('ABC', 47.3, 8.3, {type: VorType.VOR}), adm(type));
+        expect(Screen.read().rows('R')[0]).toBe(' ABC       '); // precondition
+        await unit.panel.scan();
+        await unit.panel.inner('R', 1);
+
+        expect(Screen.read().rows('R')[0]).toBe(expected);
+    });
+
+    // Sibling of the test above: the page reaches the VORTAC without typing, because it is the first VOR of the scan list
     it('opens on a VORTAC that is the first VOR of the list (3-49)', async () => {
         await vorPageOf(adm(VorType.VORTAC));
 
