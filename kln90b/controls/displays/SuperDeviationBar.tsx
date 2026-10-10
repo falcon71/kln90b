@@ -28,8 +28,9 @@ export class SuperDeviationBar extends DeviationBar {
         const scale = this.to ? " Ш Ш Ш Ш Ш Щ Ш Ш Ш Ш Ш " : " Ш Ш Ш Ш Ш Ъ Ш Ш Ш Ш Ш ";
         const dev = -Utils.Clamp(this.deviation! / this.xtkScale, -1, 1);
 
-        //0-22  -1:0  0:5  0.5: 7 1: 22
-        let charToReplace = (dev + 1) * 11;
+        //1-21  -1:1  0:11  0.5:16  1:21. The triangle is in cell 11 and the dots are two cells apart, so 1 NM is two cells
+        //and the full scale 10 cells each side (3-31)
+        let charToReplace = 11 + dev * 10;
         //0-9 0:4 exakt, 0.1:5, 0.2:6, 0.3:7, 0.4:8, 0.5:0, 0.6:1, 0.7:1, 0.8:2, 0.9:3
         const subdeviation = (charToReplace % 1);
         const targetLetterIndex = Math.floor(((subdeviation + 0.5) * 9) % 9);

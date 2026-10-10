@@ -24,8 +24,8 @@ describe('SuperDeviationBar', () => {
         expect(cdi(0, FROM).text).toBe(' Ш Ш Ш Ш Ш И Ш Ш Ш Ш Ш ');
     });
 
-    // The sibling of the scale pins: 2 NM left of the course puts the bar into the second dot right of the triangle
-    // (cell 15, at a position inside the cell that the pin below decides) and leaves every other cell as it is
+    // The sibling of the #323 tests: 2 NM left of the course puts the bar into the second dot right of the triangle
+    // (cell 15, at a position inside the cell that the next test decides) and leaves every other cell as it is
     it('draws the bar in the second dot right of the triangle 2 NM left of the course (3-31, 3-32)', () => {
         const {text} = cdi(-2, TO);
         expect(text.slice(0, 15)).toBe(' Ш Ш Ш Ш Ш Щ Ш ');
@@ -40,21 +40,26 @@ describe('SuperDeviationBar', () => {
     });
 
     // 3-31: each dot is one NM, and 3-32: Super NAV 1 has the same information as NAV 1, whose bar sits on the second
-    // dot 2 NM off the course. The second dot right of the triangle is cell 15. The code maps the full scale onto 11
-    // cells each side ((dev + 1) * 11) where the dots are 2 cells apart (10 cells to the outer dot), so 2 NM lands at
-    // cell 15.4.
-    it.fails('draws the bar on the second dot 2 NM off the course (3-31, 3-32, #323)', () => {
+    // dot 2 NM off the course. The second dot right of the triangle is cell 15. Until #323 the code mapped the full
+    // scale onto 11 cells each side ((dev + 1) * 11) where the dots are 2 cells apart (10 cells to the outer dot), so
+    // 2 NM landed at cell 15.4.
+    it('draws the bar on the second dot 2 NM off the course (3-31, 3-32, #323)', () => {
         expect(cdi(-2, TO).text).toBe(' Ш Ш Ш Ш Ш Щ Ш Є Ш Ш Ш ');
         expect(cdi(2, TO).text).toBe(' Ш Ш Ш Є Ш Щ Ш Ш Ш Ш Ш ');
     });
 
-    // 3-31: five NM each side, so beyond full scale the bar stops at the outer dot, cell 21; the code puts it in cell
-    // 22, the blank after the outer dot
-    it.fails('stops the bar at the outer dot beyond full scale (3-31, 3-32, #323)', () => {
+    // 3-31: five NM each side, so beyond full scale the bar stops at the outer dot, cell 21; until #323 the code put it in
+    // cell 22, the blank after the outer dot
+    it('stops the bar at the outer dot beyond full scale (3-31, 3-32, #323)', () => {
         expect(cdi(-7, TO).text).toBe(' Ш Ш Ш Ш Ш Щ Ш Ш Ш Ш Є ');
     });
 
-    // 3-31: the sibling of the scale pin. Beyond full scale the row keeps its 23 cells and the cells left of the outer
+    // 3-31: the mirror of the test above, beyond full scale right of the course the bar stops on the outer dot, cell 1
+    it('stops the bar at the outer dot right of the course beyond full scale (3-31, 3-32, #323)', () => {
+        expect(cdi(7, TO).text).toBe(' Є Ш Ш Ш Ш Щ Ш Ш Ш Ш Ш ');
+    });
+
+    // 3-31: the sibling of the #323 tests. Beyond full scale the row keeps its 23 cells and the cells left of the outer
     // dot are the scale
     it('keeps the 23 cells of the row beyond full scale (3-31, 3-32)', () => {
         const {text} = cdi(-7, TO);
