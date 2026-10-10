@@ -93,7 +93,7 @@ export class RefPage extends SixLineHalfPage {
         if (wpt === null) {
             return;
         }
-        const ident = await getUniqueIdent(wpt.icaoStruct.ident, this.props.facilityLoader);
+        const ident = await getUniqueIdent(wpt.icaoStruct.ident, this.props.facilityLoader, false); //5-22 The name always ends in a letter
         if (ident === null) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID REF");
             return;

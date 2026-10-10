@@ -5,11 +5,13 @@ import {format} from "numerable";
  * Generates a unique ident and uses alphabet letters at the end. Null if no unique ident was found
  * @param ident
  * @param facilityLoader
+ * @param allowBareIdent True if the first four characters of the ident may be used without a letter (the EFB import does so).
+ * 5-22 names a REF waypoint with a letter always, so it passes false
  */
-export async function getUniqueIdent(ident: string, facilityLoader: FacilityClient): Promise<string | null> {
+export async function getUniqueIdent(ident: string, facilityLoader: FacilityClient, allowBareIdent: boolean = true): Promise<string | null> {
     const start = ident.substring(0, 4);
     const existing = await facilityLoader.searchByIdentWithIcaoStructs(FacilitySearchType.All, start, 100);
-    const SUFFIXES = ['', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+    const SUFFIXES = [...(allowBareIdent ? [''] : []), 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
     const existingIdents = existing.map(i => i.ident);
     for (const suffix of SUFFIXES) {
         if (!existingIdents.includes(start + suffix)) {
