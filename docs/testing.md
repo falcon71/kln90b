@@ -876,9 +876,8 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **`FakeCoherent.on`, `off` and `trigger` are no-ops.** The keyboard tests focus the input by hand; a test cannot see
   `FOCUS_INPUT_FIELD` or `UNFOCUS_INPUT_FIELD`, nor emit `mousePressOutsideView`, so the click outside the instrument
   and the unfocus of `PageContainer.destroy` have no test.
-- **Some editor code cannot be reached in a booted unit.** The NDB frequency range (190 to 1750 kHz) waits behind #277,
-  which refuses every entry; the null branch of `TimeEditor.convertToValue` needs a host without a time, and SET 2
-  always has one while STA 5 cannot run (above).
+- **Some editor code cannot be reached in a booted unit.** The null branch of `TimeEditor.convertToValue` needs a host
+  without a time, and SET 2 always has one while STA 5 cannot run (above).
 - **The flash rate is CSS.** The harness reads which display tick flashes a cell, not the animation of `.blink` and
   `.inverted-blink` in `KLN90B.scss`; whether FLAG is shown inverse on the real unit is not settled either (figure 3-101
   cannot show it), so the masks of the deviation bars' FLAG row are characterizations.
@@ -1014,7 +1013,7 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   `List`, `FlightplanList`, `WaypointDeleteListItem`, `Button`, `PageContainer`, `StatusLine`, `Blink`, `Inverted`,
   `MessagePage`, `ErrorPage`, the airport and coordinate views and Super NAV 5 left and right have tests. The 89's block
   layout of some fields is never asserted (section 5). *Untested:* the label placement of `Canvas` (the map tests hold
-  it), the NDB frequency range (behind #277), the null branch of `TimeEditor.convertToValue`, the focus events and the
+  it), the null branch of `TimeEditor.convertToValue`, the focus events and the
   click outside the instrument (`FakeCoherent`), and the CSS flash rate.
 - **Boot, power and the unit as a whole** (`KLN90BCore`, `TickController`, `Hardware`, `PowerButton`,
   `BrightnessManager`, `SimVarSync`, `KeyboardService`). *Spec and contract:* the cold-and-dark start, the self-test
@@ -1373,7 +1372,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 
 - **The 4-3 cursor tests** (the cursor field remembered while the page is not left) sit in `WaypointEditor.test.ts`,
   though their subject is `CursorController`; they could move to `FplPage.test.ts` or a `CursorController` test file.
-- The controls' bugs that the right pages showed (#277, #282) are pinned on the pages and at control level.
+- The controls' bugs that the right pages showed (#282) are pinned on the pages and at control level.
 - **Leads** (seen and not confirmed or not filed):
     - Editors: `FreetextEditor.convertFromValue` drops a cell for a stored character outside its charset;
       `MagvarEditor` enters 0°W as -0 and cuts a variation of 100° or more to two digits (polar VORs only);

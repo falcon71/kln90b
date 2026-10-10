@@ -245,10 +245,8 @@ describe('user NDB (5-18)', () => {
         expect(userTuples(unit)).toEqual([]);
     });
 
-    // 5-18, figure 5-66: an NDB frequency may be stored with the user NDB (328.0 kHz in the figure). NdbFreqEditor
-    // .convertToValue adds the digits as numbers (0 + 3 + 2 + 8 = 13, so 13.0 kHz) and refuses every frequency with
-    // INVALID ENT.
-    it.fails('accepts the frequency 328.0 of figure 5-66 (5-18, #277)', async () => {
+    // 5-18, figure 5-66: a user NDB can carry a frequency (328.0 kHz in the figure)
+    it('accepts the frequency 328.0 of figure 5-66 (5-18, #277)', async () => {
         const unit = await undefinedNdb();
         await unit.panel.ent();
         await typeBelow1000(unit, '3280');
@@ -258,7 +256,24 @@ describe('user NDB (5-18)', () => {
         expect(Screen.read().rows('R')[3]).toBe('FREQ  328.0');
     });
 
-    // Sibling of the pin: the keyboard reaches the frequency field and shows the typed frequency before ENT
+    // 5-18, figure 5-66: the user NDB is created with the frequency that was entered before its position, and the page
+    // shows it
+    it('creates the user NDB with the frequency entered before the position (5-18, #277)', async () => {
+        const unit = await undefinedNdb();
+        await unit.panel.ent();
+        await typeBelow1000(unit, '3280');
+        await unit.panel.ent();
+        await unit.panel.type('R', 'N4730000');
+        await unit.panel.ent();
+        await unit.panel.type('R', 'E1001500');
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(userTuples(unit)).toEqual([[FacilityType.NDB, 'XX', 'ND1', 47.5, 100.25, 328]]);
+        expect(Screen.read().rows('R')[3]).toBe('FREQ  328.0');
+    });
+
+    // Sibling of the test above: the keyboard reaches the frequency field and shows the typed frequency before ENT
     it('shows the typed frequency 328.0 before ENT (5-18)', async () => {
         const unit = await undefinedNdb();
         await unit.panel.ent();

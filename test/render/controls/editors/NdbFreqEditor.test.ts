@@ -51,9 +51,8 @@ describe('NdbFreqEditor on the NDB page (5-18)', () => {
         expect(Screen.read().rows('R')[3]).toBe('FREQ  328.0');
     });
 
-    // 5-18: an NDB frequency may be stored with the user NDB. NdbFreqEditor.convertToValue adds the cells as numbers
-    // (0 + 3 + 5 + 0 = 8, so 8.0 kHz) and refuses every frequency with INVALID ENT
-    it.fails('takes a frequency selected with the knobs (5-18, figure 5-66, #277)', async () => {
+    // 5-18: a user NDB can carry a frequency
+    it('takes a frequency selected with the knobs (5-18, figure 5-66, #277)', async () => {
         const unit = await onFreq();
         const messages = collectStatusMessages(unit);
         await select350(unit);
@@ -63,7 +62,7 @@ describe('NdbFreqEditor on the NDB page (5-18)', () => {
         expect(qqnFreq(unit)).toBe(350);
     });
 
-    // Sibling of the #277 pin: the knobs reach every cell and show 350.0 before ENT
+    // Sibling of the test above: the knobs reach every cell and show 350.0 before ENT
     it('shows the frequency selected with the knobs before ENT (5-18)', async () => {
         const unit = await onFreq();
         await select350(unit);
@@ -120,6 +119,50 @@ describe('NdbFreqEditor on the NDB page (characterization)', () => {
         await unit.panel.inner('R', 1);
 
         expect(unit.panel.focused('R').text).toBe(' ___._');
+    });
+});
+
+// The code accepts 190.0 to 1750.0 kHz and refuses the rest with INVALID ENT; the range is the code's (the guide is not
+// at hand for it), so these tests hold what the code does at both edges and in between
+describe('NdbFreqEditor range (characterization)', () => {
+    /** Types the digits into the open field: four digits fill the cells after the blank thousands cell, five start with the 1 */
+    async function enterKhz(unit: HeadlessUnit, digits: string): Promise<void> {
+        await unit.panel.inner('R', 1); // opens the field on the blank thousands cell
+        if (digits.length === 5) {
+            await unit.panel.inner('R', 1); // the thousands cell takes 1
+        }
+        await unit.panel.outer('R', 1);
+        await unit.panel.type('R', digits.length === 5 ? digits.substring(1) : digits);
+        await unit.panel.ent();
+    }
+
+    it.each([
+        ['3285', 328.5], // a nonzero tenth: the point digit is the last cell and not added to the hundreds
+        ['1900', 190.0], // the lowest frequency
+        ['17500', 1750.0], // the highest frequency
+        ['10000', 1000.0], // the thousands cell with 1 and zeros in the others
+    ])('stores %s as %f kHz', async (digits, khz) => {
+        const unit = await onFreq();
+        const messages = collectStatusMessages(unit);
+
+        await enterKhz(unit, digits);
+
+        expect(messages).toEqual([]);
+        expect(qqnFreq(unit)).toBe(khz);
+    });
+
+    it.each([
+        ['1899'], // just below the lowest frequency, 189.9
+        ['17501'], // just above the highest frequency, 1750.1
+        ['0000'], // zero
+    ])('refuses %s with INVALID ENT and keeps the stored frequency', async (digits) => {
+        const unit = await onFreq();
+        const messages = collectStatusMessages(unit);
+
+        await enterKhz(unit, digits);
+
+        expect(messages).toEqual(['INVALID ENT']);
+        expect(qqnFreq(unit)).toBe(328.0);
     });
 });
 

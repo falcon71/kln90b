@@ -34,7 +34,7 @@ export class NdbFreqEditor extends Editor<number> {
     }
 
     protected convertToValue(rawValue: Rawvalue): Promise<number | null> {
-        const newValue = Number(rawValue[0] + rawValue[1] + rawValue[2] + rawValue[3] + "." + rawValue[4]);
+        const newValue = Number(`${rawValue[0]}${rawValue[1]}${rawValue[2]}${rawValue[3]}.${rawValue[4]}`);
         if (newValue < 190 || newValue > 1750) {
             return Promise.resolve(null);
         }
