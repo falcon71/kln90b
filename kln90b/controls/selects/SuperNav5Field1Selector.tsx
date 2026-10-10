@@ -104,9 +104,10 @@ export class SuperNav5Field1Selector extends SelectField {
         }
         const xtkDist = Math.abs(xtk);
         let xtkString;
-        if (xtkDist >= 10) {
+        //Compare the rounded values, 0.996 would be cut to .00 and 9.97 would be 10.0, one cell too long
+        if (Math.round(xtkDist * 10) / 10 >= 10) {
             xtkString = format(xtkDist, "000");
-        } else if (xtkDist >= 1) {
+        } else if (Math.round(xtkDist * 100) / 100 >= 1) {
             xtkString = format(xtkDist, "0.0");
         } else {
             xtkString = format(xtkDist, "0.00").substring(1); //doesn't work with just .00
