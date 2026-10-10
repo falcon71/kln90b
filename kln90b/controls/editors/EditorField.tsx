@@ -142,7 +142,7 @@ export class NumberEditorField extends EditorField {
 }
 
 export class MonthEditorField extends EditorField {
-    charset = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEC"];
+    charset = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 }
 
 export class NorthSouthEditorField extends EditorField {

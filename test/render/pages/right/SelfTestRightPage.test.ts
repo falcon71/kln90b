@@ -4,7 +4,7 @@ import {Screen} from '../../../harness/render/screen';
 import {recordSounds} from '../../../harness/sounds';
 import {AIRDATA, ALTITUDE_ALERT, NO_ALTIMETER, panelXml} from '../../../harness/panelXml';
 
-// This is the snapshot of the page as the unit shows it after a cold boot: the clock's start date (not October, #112)
+// This is the snapshot of the page as the unit shows it after a cold boot: the clock's start date
 // and the cursor on the first two digits of the baro. The altitude row (row 3) is left out of the snapshot and of its
 // mask: how it is formatted is open, so the tests of the row below parse the number
 describe('self-test right page (characterization)', () => {

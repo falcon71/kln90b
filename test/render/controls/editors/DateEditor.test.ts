@@ -36,8 +36,8 @@ describe('date editor on SET 2', () => {
         expect(Screen.read().maskRows('L')[2]).toBe('..IIIIIIIII');
     });
 
-    // The month is OCT in English; the field offers OKT (EditorField.tsx, MonthEditorField)
-    it.fails('names the tenth month OCT (#112)', async () => {
+    // 3-53 (the date figures use English month abbreviations, AUG and SEP among them): the tenth month is OCT
+    it('names the tenth month OCT (3-53, #112)', async () => {
         const unit = await bootOnSet2();
         await unit.panel.cursor('L');
         await unit.panel.inner('L', 1); // day 01
@@ -46,6 +46,24 @@ describe('date editor on SET 2', () => {
 
         expect(unit.errors).toEqual([]);
         expect(Screen.read().rows('L')[2]).toBe('  01 OCT __');
+    });
+
+    // The month names in the order the inner knob offers them. The Pilot's Guide shows only some of the months (3-53:
+    // AUG and SEP), so this holds the whole list as it is, which the OCT test above fixes at its tenth place
+    it('characterization: offers the English month abbreviations in calendar order', async () => {
+        const unit = await bootOnSet2();
+        await unit.panel.cursor('L');
+        await unit.panel.inner('L', 1); // day 01
+        await unit.panel.outer('L', 1);
+
+        const months: string[] = [];
+        for (let i = 0; i < 12; i++) {
+            await unit.panel.inner('L', 1); // the first click enters JAN
+            months.push(dateRow().slice(5, 8));
+        }
+
+        expect(unit.errors).toEqual([]);
+        expect(months).toEqual(['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']);
     });
 });
 
@@ -93,6 +111,18 @@ describe('date editor (3-53, 5-15, C-1)', () => {
         expect(unit.errors).toEqual([]);
         expect(dateRow()).toBe('  31 DEC 87');
         expect(cal7Date(unit)).toEqual([2087, 11, 31]);
+    });
+
+    // 3-53, 5-15: an entered date in October is kept as the tenth month (index 9) and shown with its name
+    it('enters 15 OCT 27 and keeps the tenth month (3-53, 5-15, #112)', async () => {
+        const unit = await onCal7Date();
+
+        await unit.panel.enterDate('L', 15, 10, [2, 7]);
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(dateRow()).toBe('  15 OCT 27');
+        expect(cal7Date(unit)).toEqual([2027, 9, 15]);
     });
 
     // C-1: INVALID ENT is the answer to an entry that is not valid, and the guide's example is a date of 30 FEB 92.
