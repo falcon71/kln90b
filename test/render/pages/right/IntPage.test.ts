@@ -230,7 +230,7 @@ describe('INT page reference waypoint (3-50, 3-51)', () => {
         expect(parseFloat(Screen.read().rows('R')[3].slice(4))).toBe(12.0);
     });
 
-    // Sibling of the pin: the REF field takes RIS
+    // Sibling of the two tests above: the REF field takes RIS
     it('shows the entered REF waypoint (3-51)', async () => {
         const unit = await withRefRis();
 
@@ -549,7 +549,7 @@ describe('stored user intersection', () => {
     // The expected position: the 045° radial of MKC at QQI's distance (pointFrom and distanceNm, flight/geo.ts)
     const moved = () => pointFrom({lat: 47.0, lon: 11.0}, 45, distanceNm({lat: 47.0, lon: 11.0}, {lat: 47.1, lon: 11.0}));
 
-    // Sibling of the pin below: the new radial moves the stored waypoint
+    // Sibling of the two tests below: the new radial moves the stored waypoint
     it('moves the waypoint to the entered radial (characterization)', async () => {
         const unit = await radialEntered();
 
@@ -560,13 +560,25 @@ describe('stored user intersection', () => {
 
     // The guide has no page on changing a stored user waypoint. 5-19 step 12 computes the position from REF, RAD and DIS
     // and shows it, and 3-50 has the INT page show the position of the intersection; both are extended here to a change
-    // of RAD on a stored waypoint, which gives 47.07066 N 11.10382 E. IntPage.setRad updates the repository but does not
-    // redraw, so the old position stays on the page
-    it.fails('shows the position of the entered radial (5-19, #285)', async () => {
+    // of RAD on a stored waypoint, which gives 47.07066 N 11.10382 E
+    it('shows the position of the entered radial (5-19, #285)', async () => {
         await radialEntered();
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(Screen.read().rows('R').slice(4)).toEqual(["N 47°04.24'", "E 11°06.23'"]);
+    });
+
+    // As above for a new distance: 12.0 NM due north of MKC is 0.199643 degrees (12 NM over 6378100 / 1852 NM per radian, by
+    // hand), 47°11.98'. The longitude stays. Sibling: 'moves the waypoint to the entered distance'
+    it('shows the position of the entered distance (5-19, #285)', async () => {
+        const unit = await onRef();
+        await unit.panel.outer('R', 2);
+        expect(unit.panel.focused('R').row).toBe(3); // precondition: the cursor is on DIS
+        await unit.panel.type('R', '0120');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().rows('R').slice(4)).toEqual(["N 47°11.98'", "E 11°00.00'"]);
     });
 
     /** The INT page of QQI after the REF calculation, the cursor on REF (the first field after the ident) */

@@ -257,6 +257,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
                 fac.lat = newCoords.lat;
                 fac.lon = newCoords.lon;
             });
+            this.requiresRedraw = true;
 
         } else {
             this.rad = radial;
@@ -274,6 +275,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
                 fac.lat = newCoords.lat;
                 fac.lon = newCoords.lon;
             });
+            this.requiresRedraw = true;
         } else {
             this.dis = dist;
             this.createIfReady();

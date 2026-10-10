@@ -262,6 +262,7 @@ export class SupPage extends WaypointPage<UserFacility> {
                 fac.lat = newCoords.lat;
                 fac.lon = newCoords.lon;
             });
+            this.requiresRedraw = true;
         } else {
             this.rad = radial;
             this.createIfReady();
@@ -278,6 +279,7 @@ export class SupPage extends WaypointPage<UserFacility> {
                 fac.lat = newCoords.lat;
                 fac.lon = newCoords.lon;
             });
+            this.requiresRedraw = true;
         } else {
             this.dis = dist;
             this.createIfReady();

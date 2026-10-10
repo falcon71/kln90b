@@ -536,11 +536,11 @@ describe('SUP page', () => {
     });
 
     // 5-19 step 12: after the radial or the distance is entered, the latitude and longitude are calculated and displayed.
-    // The page of a stored user waypoint is the same page, so a changed radial shows its new position too (#285 is
-    // the issue for INT and SUP). USUP is moved to the radial 270 from ABC, 12.0215 NM away (the arc of 0.2 degrees):
+    // The page of a stored user waypoint is the same page, so a changed radial shows its new position too. USUP
+    // is moved to the radial 270 from ABC, 12.0215 NM away (the arc of 0.2 degrees):
     // 46°59.98' N, 10°12.40' E by hand with the textbook formula of flight/geo.ts. Sibling: 'moves the waypoint to a typed
     // radial from its reference VOR' (the stored position).
-    it.fails('shows the new position after a typed radial (5-19, #285)', async () => {
+    it('shows the new position after a typed radial (5-19, #285)', async () => {
         const unit = await supPageWithCursorOn('000.0');
 
         await unit.panel.type('R', '2700');
@@ -551,7 +551,7 @@ describe('SUP page', () => {
 
     // As above, for the distance: USUP is moved to 200.0 NM due north of ABC. Sibling: 'moves the waypoint to a typed
     // distance from its reference VOR'.
-    it.fails('shows the new position after a typed distance (5-19, #285)', async () => {
+    it('shows the new position after a typed distance (5-19, #285)', async () => {
         const unit = await supPageWithCursorOnDis();
 
         await unit.panel.type('R', '2000');
@@ -579,7 +579,7 @@ async function supPageWithCursorOnDis(): Promise<HeadlessUnit> {
 
 // The guide does not describe changing the fields of a stored user waypoint, so these only hold what the code does. USUP
 // is 12.0 NM due north of its reference VOR ABC (47 N, 10.5 E), and the stored waypoint is read, not the page: the page
-// shows the typed value (latitude, longitude) or the old position (radial, distance, #285).
+// shows the new position, which the tests of #285 above hold.
 describe('SUP page, changing a stored user waypoint (characterization)', () => {
     it('moves the waypoint to a typed latitude', async () => {
         const unit = await supPageWithCursorOn('N 47°12.00');
