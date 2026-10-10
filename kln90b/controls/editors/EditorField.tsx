@@ -96,6 +96,16 @@ export class AlphabetEditorField extends EditorField {
 
 }
 
+/**
+ * A character of a remark on the APT 5 page (3-47): a letter, a digit, the hyphen or the blank. The hyphen follows the
+ * 9 and precedes the blank (checked in the KLN 89 trainer, 2026-10-08)
+ */
+export class RemarkEditorField extends EditorField {
+
+    charset = [' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-'];
+
+}
+
 export class NumberEditorField extends EditorField {
     charset;
 

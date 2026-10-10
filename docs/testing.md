@@ -1465,7 +1465,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - the fix of #95 turns its two pins red (the list and the error
       page); the fix of #93 turns two (Avgas and JetB; JetA1 passes today, because the SDK's generic imperial gallon
       weighs as Jet A);
-    - the fix of #311 in `WaypointEditor` leaves the `FplPage.test.ts` insert tests green; the fix of #262 must keep NO
+    - the fix of #311 in `WaypointEditor` leaves the `FplPage.test.ts` insert tests green, but its first click on an
+      empty remark line changes the click counts in the setup of `stores a remark with a hyphen and shows it again`
+      (`FreetextEditor.test.ts`); the fix of #262 must keep NO
       SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests); #324 needs
       a trip-page form of `DurationDisplay`, not a change of the shared form;
     - a fix of #335 turns the #334 pin red as well,

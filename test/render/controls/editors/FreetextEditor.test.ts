@@ -81,21 +81,21 @@ describe('free text editor on the Turn-On page (5-28)', () => {
     });
 });
 
-/** APT 5 of KAAA with the right cursor on the first remark line (row 2) */
-async function onRemarkLine(): Promise<HeadlessUnit> {
+/** APT 5 of KAAA with the right cursor on a remark line (the first one, row 2, unless `row` says another) */
+async function onRemarkLine(row = 2): Promise<HeadlessUnit> {
     const unit = await bootUnit({facilities: [airport('KAAA', 47, 8)], position: {lat: 47, lon: 8}});
     await unit.panel.selectPage('R', 'APT 5');
     await unit.panel.cursor('R');
-    for (let i = 0; i < 10 && unit.panel.focused('R').row !== 2; i++) {
+    for (let i = 0; i < 10 && unit.panel.focused('R').row !== row; i++) {
         await unit.panel.outer('R', 1);
     }
-    expect(unit.panel.focused('R').row).toBe(2);
+    expect(unit.panel.focused('R').row).toBe(row);
     return unit;
 }
 
 describe('free text editor on APT 5 (3-47)', () => {
-    // 3-47: a remark takes letters, digits, hyphens and blanks. The sibling of the pin below: the letters, the digits
-    // and the blank are offered.
+    // 3-47: a remark is made of letters, digits, the hyphen and the blank. The sibling of the hyphen tests below: the
+    // letters, the digits and the blank are offered.
     it('offers the letters, the digits and the blank in a remark (3-47)', async () => {
         const unit = await onRemarkLine();
 
@@ -105,20 +105,20 @@ describe('free text editor on APT 5 (3-47)', () => {
         expect(LETTERS_DIGITS_BLANK.filter(c => !seen.includes(c))).toEqual([]);
     });
 
-    // The first cell of the remark line, as the screen shows it
-    const firstCell = () => Screen.read().rows('R')[2][0];
+    // The first cell of a remark line (the first one unless `row` says another), as the screen shows it
+    const firstCell = (row = 2) => Screen.read().rows('R')[row][0];
 
     /**
      * Opens the edit of the first remark cell and steps clockwise until the cell shows the blank (one round at most)
      */
-    async function openOnBlank(unit: HeadlessUnit): Promise<void> {
+    async function openOnBlank(unit: HeadlessUnit, row = 2): Promise<void> {
         await unit.panel.inner('R', 1);
-        for (let i = 0; i < 40 && firstCell() !== ' '; i++) {
+        for (let i = 0; i < 40 && firstCell(row) !== ' '; i++) {
             await unit.panel.inner('R', 1);
         }
     }
 
-    // Sibling of the pin below: the blank is reachable by stepping clockwise, whatever the first click gives (3-47: the
+    // Sibling of the tests below: the blank is reachable by stepping clockwise, whatever the first click gives (3-47: the
     // blank is one of the characters of a remark)
     it('reaches the blank of a remark cell by stepping clockwise (3-47)', async () => {
         const unit = await onRemarkLine();
@@ -131,10 +131,9 @@ describe('free text editor on APT 5 (3-47)', () => {
 
     // 3-47, figure 3-144 (a remark line with a hyphen in a telephone number) and checked in the KLN 89 trainer,
     // 2026-10-08 (T12): a remark takes hyphens, and the hyphen sits between 9 and the blank, so one click
-    // counterclockwise from the blank is -, and one more is 9. The remark lines use AlphabetEditorField, whose choices
-    // are the blank, A to Z and 0 to 9, so no hyphen can be entered. The Turn-On page (5-28) takes no hyphen, so the
-    // fix belongs to the remarks only.
-    it.fails('puts a hyphen between 9 and the blank in a remark (3-47, checked in ' +
+    // counterclockwise from the blank is -, and one more is 9. The Turn-On page (5-28) takes no hyphen (its test above
+    // holds the charset), so the hyphen belongs to the remarks only.
+    it('puts a hyphen between 9 and the blank in a remark (3-47, checked in ' +
         'the KLN 89 trainer, 2026-10-08, #305)', async () => {
         const unit = await onRemarkLine();
         await openOnBlank(unit);
@@ -147,6 +146,76 @@ describe('free text editor on APT 5 (3-47)', () => {
 
         expect(unit.errors).toEqual([]);
         expect(shown).toEqual(['-', '9']);
+    });
+
+    // The same on the second and the third remark line: each line has its own editor
+    for (const [row, line] of [[3, 'second'], [4, 'third']] as const) {
+        it(`puts a hyphen between 9 and the blank on the ${line} remark line (3-47, checked in ` +
+            'the KLN 89 trainer, 2026-10-08, #305)', async () => {
+            const unit = await onRemarkLine(row);
+            await openOnBlank(unit, row);
+
+            const shown = [];
+            for (let i = 0; i < 2; i++) {
+                await unit.panel.inner('R', -1);
+                shown.push(firstCell(row));
+            }
+
+            expect(unit.errors).toEqual([]);
+            expect(shown).toEqual(['-', '9']);
+        });
+    }
+
+    // The same order clockwise (checked in the KLN 89 trainer, 2026-10-08, T12: 8 9 - blank A B): from the 9 the next
+    // click is the hyphen, then the blank, then A
+    it('goes from 9 to the hyphen, the blank and A clockwise in a remark (checked in ' +
+        'the KLN 89 trainer, 2026-10-08, #305)', async () => {
+        const unit = await onRemarkLine();
+        await openOnBlank(unit);
+        await unit.panel.inner('R', -2);
+        expect(firstCell()).toBe('9');
+
+        const shown = [];
+        for (let i = 0; i < 3; i++) {
+            await unit.panel.inner('R', 1);
+            shown.push(firstCell());
+        }
+
+        expect(unit.errors).toEqual([]);
+        expect(shown).toEqual(['-', ' ', 'A']);
+    });
+
+    // Every character a remark cell offers, over one round (40 clicks) of the inner knob. 3-47 names the characters a
+    // remark may hold but does not say that these are the only ones, so this is a characterization.
+    it('characterization: offers the letters, the digits, the hyphen and the blank in a remark', async () => {
+        const unit = await onRemarkLine();
+
+        const seen = await choices(unit, 'R', () => Screen.read().rows('R')[2][0], 40);
+
+        expect(unit.errors).toEqual([]);
+        expect(seen).toEqual([...LETTERS_DIGITS_BLANK, '-'].sort());
+    });
+
+    // 3-47, figure 3-144: a remark with a hyphen (a telephone number) is approved with ENT and kept: it is stored in
+    // the airport's slot and shown again when the page is selected anew.
+    it('stores a remark with a hyphen and shows it again (3-47)', async () => {
+        const unit = await onRemarkLine();
+        await unit.panel.inner('R', 2); // the blank, A
+        await unit.panel.outer('R', 1);
+        await unit.panel.inner('R', 1); // the blank
+        await unit.panel.inner('R', -1); // the hyphen
+        await unit.panel.outer('R', 1);
+        await unit.panel.inner('R', 29); // the blank, then the 28 choices up to the 1
+        expect(Screen.read().rows('R')[2]).toBe('A-1________');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
+        expect(storedSetting(unit, 'rmk0')).toBe('KAAA' + 'A-1        ' + ' '.repeat(22));
+        await unit.panel.cursor('R'); // turns the cursor off
+        await unit.panel.selectPage('R', 'APT 1');
+        await unit.panel.selectPage('R', 'APT 5');
+        expect(Screen.read().rows('R')[2]).toBe('A-1        ');
     });
 });
 
