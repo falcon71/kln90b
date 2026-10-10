@@ -2,20 +2,16 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {approachWorld} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
+import {AIRDATA, NO_ALTIMETER, panelXml, VFR_ONLY} from '../../harness/panelXml';
+import {messages} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
-
-/** The messages the MSG page would list, one string per message */
-const messages = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
-
-const panelXml = (input: string) =>
-    `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input>${input}</Input></Instrument></PlaneHTMLConfig>`;
 
 describe('ALTITUDE FAIL', () => {
     // B-1: the message shows when the altitude input fails. Input.AltimeterInterfaced false is a unit without the input
     // (CLAUDE.md, public contract: the panel.xml keys)
     it('shows on a unit without an altitude input (B-1)', async () => {
-        const unit = await bootUnit({panelXml: panelXml('<AltimeterInterfaced>false</AltimeterInterfaced>')});
+        const unit = await bootUnit({panelXml: panelXml(NO_ALTIMETER)});
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(messages(unit)).toContain('ALTITUDE FAIL');
@@ -31,9 +27,7 @@ describe('ALTITUDE FAIL', () => {
     });
 
     it('does not show on a VFR-only unit without an altitude input (characterization)', async () => {
-        const unit = await bootUnit({
-            panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><VFROnly>true</VFROnly><Input><AltimeterInterfaced>false</AltimeterInterfaced></Input></Instrument></PlaneHTMLConfig>',
-        });
+        const unit = await bootUnit({panelXml: panelXml({...VFR_ONLY, ...NO_ALTIMETER})});
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(messages(unit)).not.toContain('ALTITUDE FAIL');
@@ -42,9 +36,7 @@ describe('ALTITUDE FAIL', () => {
     });
 
     it('does not show when an air data computer supplies the altitude (B-1)', async () => {
-        const unit = await bootUnit({
-            panelXml: panelXml('<AltimeterInterfaced>false</AltimeterInterfaced><Airdata><IsInterfaced>true</IsInterfaced></Airdata>'),
-        });
+        const unit = await bootUnit({panelXml: panelXml({...NO_ALTIMETER, ...AIRDATA})});
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(messages(unit)).not.toContain('ALTITUDE FAIL');
@@ -111,19 +103,13 @@ describe('PRESS ALT TO SET BARO (6-8, B-3)', () => {
 });
 
 describe('DATA BASE OUT OF DATE after a date entered on SET 2 (B-2)', () => {
-    /** Enters 01 JAN 27 on SET 2, after the expiration of the data base (the steps of Set2Page.test.ts) */
+    /** Enters 01 JAN 27 on SET 2, after the expiration of the data base (the steps of enterDate, as in Set2Page.test.ts) */
     async function outOfDateBySet2() {
         // A booted unit has a fix at once, and the date is read-only with a fix
         const unit = await bootUnit({storage: {fastGpsAcquisition: false}, coldGps: true});
         await unit.panel.selectPage('L', 'SET 2');
         await unit.panel.cursor('L');
-        await unit.panel.inner('L', 1); // day 01
-        await unit.panel.outer('L', 1);
-        await unit.panel.inner('L', 1); // JAN
-        await unit.panel.outer('L', 1);
-        await unit.panel.inner('L', 3); // the first click enters a 0, so this is a 2
-        await unit.panel.outer('L', 1);
-        await unit.panel.inner('L', 8); // a 7
+        await unit.panel.enterDate('L', 1, 1, [2, 7]);
         expect(Screen.read().rows('L')[2]).toBe('  01 JAN 27');
         await unit.panel.ent();
         return unit;

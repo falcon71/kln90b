@@ -5,12 +5,14 @@ import {standardRoute} from '../../harness/fixtures';
 import {airport, intersection} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
+import {activeIdent, fplIdents} from '../../harness/readers';
+import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {crossTrackNm, pointBefore, pointFrom} from '../../harness/flight/geo';
 import {KLNFixType} from '../../../kln90b/data/flightplan/Flightplan';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 
 // The standard world of the flight tests: the final course KAAA - ABC is about 51.0 degrees
-const {kaaa, abc, kbbb} = standardRoute();
+const {kaaa, abc} = standardRoute();
 
 describe('ModeController OBS course', () => {
     // 5-34 and 5-35: in OBS the deviation is measured from the selected course through the active waypoint, and the
@@ -18,10 +20,7 @@ describe('ModeController OBS course', () => {
     // changed is in the deviation of the same calculation tick instead of one second late.
     it('uses a changed OBS course in the same calculation tick (014293d)', async () => {
         const position = pointBefore(kaaa, abc, 5);
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb], position, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-        });
-        await settle(unit);
+        const unit = await bootOnStandardRoute({position});
         const sim = unit.env.sim;
         sim.set('Nav OBS:1', 'degrees', 51); // Before entering OBS: unset it reads 0
         await unit.panel.obsMode();
@@ -116,7 +115,7 @@ describe('arming to approach active at the FAF (633fdad)', () => {
         await unit.panel.loadProcedure('APT 8');
         await vi.advanceTimersByTimeAsync(2000);
         const nav = unit.props.memory.navPage;
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('FAFAA'); // Preconditions
+        expect(activeIdent(unit)).toBe('FAFAA'); // Preconditions
         expect(nav.navmode).toBe(NavMode.ARM_LEG);
         return {unit, nav, inboundTrack};
     }
@@ -133,7 +132,7 @@ describe('arming to approach active at the FAF (633fdad)', () => {
         await flyOn(unit, inboundTrack);
 
         expect(unit.props.sensors.in.gps.trackTrue).toBeCloseTo(80, 0); // The unit has the track of the move
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('FAFAA');
+        expect(activeIdent(unit)).toBe('FAFAA');
         expect(nav.navmode).toBe(NavMode.APR_LEG);
         expect(unit.errors).toEqual([]);
     });
@@ -145,7 +144,7 @@ describe('arming to approach active at the FAF (633fdad)', () => {
         await flyOn(unit, inboundTrack);
 
         expect(unit.props.sensors.in.gps.trackTrue).toBeCloseTo(60, 0);
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('FAFAA');
+        expect(activeIdent(unit)).toBe('FAFAA');
         expect(nav.navmode).toBe(NavMode.ARM_LEG);
         expect(unit.errors).toEqual([]);
     });
@@ -216,10 +215,10 @@ describe('arming to approach active at a fix that is IAF and FAF (#129)', () => 
         const {unit} = await armedNearIafFaf();
         const nav = unit.props.memory.navPage;
 
-        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['ENRAA', 'TXOAA', 'TXOAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'TXOAA', 'TXOAA', 'MAPAA', 'KPRC']);
         expect(nav.activeWaypoint.getActiveFplIdx()).toBe(1);
         expect(nav.activeWaypoint.getActiveLeg()!.fixType).toBe(KLNFixType.IAF);
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('TXOAA');
+        expect(activeIdent(unit)).toBe('TXOAA');
         expect(nav.navmode).toBe(NavMode.ARM_LEG);
         expect(unit.errors).toEqual([]);
     });

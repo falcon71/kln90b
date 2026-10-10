@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootToSelfTest} from '../../../harness/boot';
+import {HEADING_INPUT, NO_OBS, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
 
 describe('self-test page', () => {
@@ -30,7 +31,7 @@ describe('self-test page', () => {
     });
 });
 
-const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
+const HEADING_INPUT_XML = panelXml(HEADING_INPUT);
 
 /**
  * The self-test page of a cold boot. HeadingInput is on, so that the roll command does not depend on the heading input
@@ -112,8 +113,8 @@ describe('LVar outputs after the self-test is approved (spec)', () => {
 });
 
 /** The self-test page of a cold boot with the external indicator on `obs` */
-function selfTestWithCourse(obs: number, panelXml?: string) {
-    return bootToSelfTest({magvar: 0, panelXml, simVars: [{name: 'Nav OBS:1', unit: 'degrees', value: obs}]});
+function selfTestWithCourse(obs: number, xml?: string) {
+    return bootToSelfTest({magvar: 0, panelXml: xml, simVars: [{name: 'Nav OBS:1', unit: 'degrees', value: obs}]});
 }
 
 describe('self-test left page (characterization)', () => {
@@ -139,7 +140,7 @@ describe('self-test left page (characterization)', () => {
 
     // Without a course input (ObsSource 0) OBS IN shows dashes
     it('shows OBS IN ---° when the unit reads no indicator (characterization)', async () => {
-        await selfTestWithCourse(242, '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input></Instrument></PlaneHTMLConfig>');
+        await selfTestWithCourse(242, panelXml(NO_OBS));
 
         expect(Screen.read().rows('L')[2]).toBe('OBS IN ---°');
     });
@@ -183,8 +184,7 @@ describe('self-test left page knobs (characterization)', () => {
     });
 });
 
-const OBS_TARGET_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output><ObsTarget>1</ObsTarget></Output>'
-    + '</Instrument></PlaneHTMLConfig>';
+const OBS_TARGET_XML = panelXml({'Output.ObsTarget': 1});
 
 /**
  * The self-test page with a magnetic variation of 10° E and an HSI whose course pointer the unit drives and reads

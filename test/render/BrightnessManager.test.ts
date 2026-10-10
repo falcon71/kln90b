@@ -60,6 +60,7 @@ describe('the screen warm-up at the power-on (3-3)', () => {
         await vi.advanceTimersByTimeAsync(1000);
         expect(unit.display.opacity()).toBe(0);
 
+        // 12 s after the power-on: past the warm-up, inside the 15 s the Turn-On page stays (see the comment above)
         await vi.advanceTimersByTimeAsync(11_000);
         expect(Screen.read().row(0)).toBe(' GPS             ORS 20'); // still the Turn-On page
         expect(unit.display.opacity()).toBe(1);

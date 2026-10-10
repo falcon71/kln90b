@@ -1,15 +1,13 @@
 import {describe, expect, it, vi} from 'vitest';
-import {EventBus, FSComponent, VNode} from '@microsoft/msfs-sdk';
+import {EventBus} from '@microsoft/msfs-sdk';
 import {LatitudeEditor} from '../../../../kln90b/controls/editors/LatitudeEditor';
 import {LongitudeEditor} from '../../../../kln90b/controls/editors/LongitudeEditor';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {mount} from '../../../harness/render/mount';
+import {UiElement} from '../../../../kln90b/pages/Page';
 import {Screen} from '../../../harness/render/screen';
 
-function text(editor: { render(): VNode }): string {
-    const host = document.createElement('div');
-    FSComponent.render(editor.render(), host);
-    return host.textContent ?? '';
-}
+const text = (editor: UiElement): string => mount(editor).text();
 
 describe('latitude and longitude editors', () => {
     // 3-18, figure 3-59: the position fields show the hemisphere letter
@@ -301,10 +299,7 @@ describe('latitude and longitude editors at exactly 0 degrees ' +
         await unit.panel.outer('L', row - 1);
         await select(unit, clicks);
         await unit.panel.ent();
-        await unit.panel.cursorTo('L', 'CONFIRM?');
-        await unit.panel.ent();
-        await unit.panel.selectPage('L', 'SET 2');
-        await unit.panel.selectPage('L', 'SET 1');
+        await unit.panel.confirmSet1AndReselect();
         expect(unit.errors).toEqual([]);
         return rowsL()[row];
     }

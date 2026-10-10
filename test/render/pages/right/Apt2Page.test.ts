@@ -26,9 +26,7 @@ const SOUTHERN_SUMMER = [9, 10, 11, 0, 1, 2];
 
 /** Selects APT 2 for the first airport of the scan list; the time zone answer arrives asynchronously, a display tick shows it */
 async function showApt2(unit: HeadlessUnit): Promise<string[]> {
-    await unit.panel.selectPage('R', 'APT 2');
-    await vi.advanceTimersByTimeAsync(500);
-    return Screen.read().rows('R');
+    return unit.panel.show('R', 'APT 2', {waitMs: 500});
 }
 
 /** KAAA in Springfield, Illinois, at 600 ft */

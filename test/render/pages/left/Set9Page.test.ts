@@ -1,10 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit} from '../../../harness/boot';
+import {ALTITUDE_ALERT, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
 import {storedSetting} from '../../../harness/storage';
-
-const panelXml = (alertEnabled: boolean) => '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output>'
-    + `<AltitudeAlertEnabled>${alertEnabled}</AltitudeAlertEnabled></Output></Instrument></PlaneHTMLConfig>`;
 
 describe('SET 9 page (characterization)', () => {
     it('characterization: the alert volume with the alert enabled by default', async () => {
@@ -26,7 +24,7 @@ describe('SET 9 page (characterization)', () => {
 // is disabled; cfg/panel.xml (Output.AltitudeAlertEnabled).
 describe('SET 9 page and Output.AltitudeAlertEnabled (contract)', () => {
     it('shows FEATURE DISABLED when the alert is disabled', async () => {
-        const unit = await bootUnit({panelXml: panelXml(false)});
+        const unit = await bootUnit({panelXml: panelXml(ALTITUDE_ALERT(false))});
         await unit.panel.selectPage('L', 'SET 9');
         await vi.advanceTimersByTimeAsync(1000);
 
@@ -44,7 +42,7 @@ describe('SET 9 page and Output.AltitudeAlertEnabled (contract)', () => {
     // The explicit true equals the code default (#141), so this cannot fail if the key stops being read; it bites
     // once that default is fixed to false. The volume 99 is the default of the altAlertVolume setting.
     it('shows the volume instead when the alert is enabled', async () => {
-        const unit = await bootUnit({panelXml: panelXml(true)});
+        const unit = await bootUnit({panelXml: panelXml(ALTITUDE_ALERT(true))});
         await unit.panel.selectPage('L', 'SET 9');
         await vi.advanceTimersByTimeAsync(1000);
 

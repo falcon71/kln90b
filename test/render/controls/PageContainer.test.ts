@@ -1,10 +1,11 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
+import {showSuperNav5} from '../../harness/render/superNav5';
+import {fplIdents} from '../../harness/readers';
 import {savedFlightplan} from '../../harness/storage';
 import {airport} from '../../harness/navdata/builders';
 import {MainPage} from '../../../kln90b/pages/MainPage';
-import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
 
 describe('keyboard mode (characterization, #75)', () => {
     // The test calls the key handler on the input element. It does not test how Coherent delivers the key.
@@ -130,11 +131,8 @@ describe('keyboard mode, the click and the keys (characterization)', () => {
     // cells, with the left cursor of Super NAV 5 on, does not enter keyboard mode
     it('characterization: a click on the CRSR cells does not enter keyboard mode on Super NAV 5', async () => {
         const unit = await bootUnit();
-        await unit.panel.selectPage('R', 'NAV 4');
-        await unit.panel.selectPage('L', 'NAV 5');
-        await unit.panel.inner('R', 1);
+        await showSuperNav5(unit, {waitMs: 0}); // Precondition: Super NAV 5 is the overlay
         const main = unit.props.pageManager.getCurrentPage() as MainPage;
-        expect(main.getOverlayPage()).toBeInstanceOf(SuperNav5Page); // Precondition
         await unit.panel.cursor('L');
         expect(main.isLeftCursorActive()).toBe(true); // Precondition
 
@@ -165,7 +163,6 @@ describe('keyboard mode, the click and the keys (characterization)', () => {
             expect(unit.panel.focused('L').text).toBe('DEL KAAA  ?');
             input().dispatchEvent(new KeyboardEvent('keypress', {keyCode: 13})); // Enter arrives as a keypress
             await tick();
-            const legs = unit.props.memory.fplPage.flightplans[3].getLegs();
-            expect(legs.map(l => l.wpt.icaoStruct.ident)).toEqual(['KBBB']);
+            expect(fplIdents(unit, 3)).toEqual(['KBBB']);
         });
 });

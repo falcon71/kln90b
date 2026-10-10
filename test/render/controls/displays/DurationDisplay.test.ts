@@ -3,15 +3,12 @@ import {DurationDisplay} from '../../../../kln90b/controls/displays/DurationDisp
 import {bootUnit} from '../../../harness/boot';
 import {pointFrom} from '../../../harness/flight/geo';
 import {airport} from '../../../harness/navdata/builders';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedText} from '../../../harness/render/mount';
 import {Screen} from '../../../harness/render/screen';
 
 /** The five cells of a duration given in minutes, after a display tick */
-function shown(minutes: number | null): string {
-    const m = mount(new DurationDisplay(minutes === null ? null : minutes * 60));
-    m.tick();
-    return m.text();
-}
+const shown = (minutes: number | null): string =>
+    mountedText(new DurationDisplay(minutes === null ? null : minutes * 60));
 
 describe('DurationDisplay', () => {
     // 3-31, figure 3-97 (ETE 3:34) and 4-11, figure 4-43 (1:21, 2:39): hours and minutes, the hour right-aligned in two

@@ -112,6 +112,15 @@ export class FakeSim {
         return undefined;
     }
 
+    /**
+     * How many times the instrument wrote a variable. `writes` holds the names in upper case, and this compares with the
+     * name normalized the same way, so a name in either case counts the same writes.
+     */
+    public writeCount(name: string): number {
+        const key = simVarKey(name);
+        return this.writes.filter(w => w.name === key).length;
+    }
+
     /** Marks the start of the simulation for E:SIMULATION TIME. */
     public startClock(): void {
         this.simStartMs = Date.now();

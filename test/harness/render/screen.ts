@@ -236,6 +236,17 @@ export class Screen {
         return this.grid[n].map(c => c.ch).join('');
     }
 
+    /** The characters of a row shown inverse (mask I), in order: on a full page, the field under the cursor */
+    public inverse(row: number): string {
+        const mask = this.mask().split('\n')[row];
+        return [...this.row(row)].filter((_, i) => mask[i] === 'I').join('');
+    }
+
+    /** The six text rows above the status line, each trimmed: the rows of a full page */
+    public pageRows(): string[] {
+        return this.text().split('\n').slice(0, 6).map(r => r.trim());
+    }
+
     public cell(row: number, col: number): Cell {
         return this.grid[row][col];
     }

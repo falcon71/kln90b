@@ -1,23 +1,18 @@
 import {Facility, FixTypeFlags, ICAO, ReadonlyFlightPlanRoute} from '@microsoft/msfs-sdk';
-import {describe, expect, it, onTestFinished, vi} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {efbRoute} from '../../harness/platform';
-import {airport, intersection, vor} from '../../harness/navdata/builders';
+import {airport, intersection} from '../../harness/navdata/builders';
 import {approach, Leg, sid, star, withProcedures} from '../../harness/navdata/procedures';
-import {approachWorld} from '../../harness/fixtures';
+import {approachWorld, standardRoute} from '../../harness/fixtures';
+import {muteConsoleError} from '../../harness/console';
+import {NO_GPS_SIMVARS, panelXml} from '../../harness/panelXml';
+import {fplIdents} from '../../harness/readers';
+import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {savedFlightplan, savedUserWaypoints} from '../../harness/storage';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
 const kbbb = airport('KBBB', 47.4, 8.0);
-
-const fpl0Idents = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident);
-
-/** The SDK logs the handler error with console.error; keep it out of the test output */
-function muteConsoleError(): void {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    // Registered before the boot, so it runs after the teardown has put the spy back
-    onTestFinished(() => spy.mockRestore());
-}
 
 async function bootWithRoute(): Promise<HeadlessUnit> {
     const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
@@ -32,7 +27,7 @@ async function bootWithRoute(): Promise<HeadlessUnit> {
 describe('KlnEfbSaver', () => {
     it('answers a route request with the airports of FPL 0 as departure and destination', async () => {
         const unit = await bootWithRoute();
-        expect(fpl0Idents(unit)).toEqual(['KAAA', 'CUST', 'KBBB']);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'CUST', 'KBBB']);
 
         const id = unit.efb!.request();
 
@@ -49,19 +44,19 @@ describe('KlnEfbSaver', () => {
 
         unit.efb!.request();
 
-        expect(fpl0Idents(unit)).toEqual(['KAAA', 'CUST', 'KBBB']);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'CUST', 'KBBB']);
     });
 
     // The preconditions of the two pins below, which an it.fails would hide if they broke
     it('starts from an empty FPL 0, and from one that holds only an airport after a synced route', async () => {
         const unit = await bootUnit({efb: true, facilities: [kaaa]});
         await settle(unit);
-        expect(fpl0Idents(unit)).toEqual([]);
+        expect(fplIdents(unit)).toEqual([]);
 
         unit.efb!.sync(efbRoute({departure: kaaa}));
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(fpl0Idents(unit)).toEqual(['KAAA']);
+        expect(fplIdents(unit)).toEqual(['KAAA']);
     });
 
     // toEfbRoute() reads legs[0] and then the last leg without checking that a leg is left. The SDK's SubEvent catches the
@@ -70,7 +65,7 @@ describe('KlnEfbSaver', () => {
         muteConsoleError();
         const unit = await bootUnit({efb: true});
         await settle(unit);
-        expect(fpl0Idents(unit)).toEqual([]);
+        expect(fplIdents(unit)).toEqual([]);
 
         const id = unit.efb!.request();
 
@@ -85,7 +80,7 @@ describe('KlnEfbSaver', () => {
         await settle(unit);
         unit.efb!.sync(efbRoute({departure: kaaa}));
         await vi.advanceTimersByTimeAsync(2000);
-        expect(fpl0Idents(unit)).toEqual(['KAAA']);
+        expect(fplIdents(unit)).toEqual(['KAAA']);
 
         const id = unit.efb!.request();
 
@@ -123,9 +118,8 @@ async function bootWithStarAndApproach09(): Promise<HeadlessUnit> {
 // as its ApproachIdentifier. The SDK's own avionics fill these fields the same way (GarminFlightPlanRouteUtils).
 describe('KlnEfbSaver route contents', () => {
     it('sends a database fix by its ICAO, without a position', async () => {
-        const abc = vor('ABC', 47.2, 8.1);
-        const unit = await bootUnit({facilities: [kaaa, abc, kbbb], efb: true, storage: savedFlightplan(0, [kaaa, abc, kbbb])});
-        await settle(unit);
+        const {abc} = standardRoute();
+        const unit = await bootOnStandardRoute({efb: true});
 
         const route = requestRoute(unit);
 
@@ -141,7 +135,7 @@ describe('KlnEfbSaver route contents', () => {
             storage: {...savedUserWaypoints([{kind: 'sup', ident: 'FARM', lat: 47.2, lon: 8.1}]), ...savedFlightplan(0, [kaaa, farm, kbbb])},
         });
         await settle(unit);
-        expect(fpl0Idents(unit)).toEqual(['KAAA', 'FARM', 'KBBB']); // Precondition: restored
+        expect(fplIdents(unit)).toEqual(['KAAA', 'FARM', 'KBBB']); // Precondition: restored
 
         const route = requestRoute(unit);
 
@@ -155,7 +149,7 @@ describe('KlnEfbSaver route contents', () => {
         const unit = await bootUnit({facilities: w.facilities, efb: true, position: w.north(40), storage: savedFlightplan(0, [w.enraa, w.kprc])});
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
-        expect(fpl0Idents(unit)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']); // Precondition
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']); // Precondition
 
         const route = requestRoute(unit);
 
@@ -176,7 +170,7 @@ describe('KlnEfbSaver route contents', () => {
         const unit = await bootUnit({facilities: [kprc, depaa, enraa], efb: true, storage: savedFlightplan(0, [kprc])});
         await settle(unit);
         await unit.panel.loadProcedure('APT 7');
-        expect(fpl0Idents(unit)).toEqual(['KPRC', 'DEPAA', 'ENRAA']); // Precondition
+        expect(fplIdents(unit)).toEqual(['KPRC', 'DEPAA', 'ENRAA']); // Precondition
 
         const route = requestRoute(unit);
 
@@ -189,7 +183,7 @@ describe('KlnEfbSaver route contents', () => {
     // Also the sibling of the runway pin below: the same world answers, with the approach typed
     it('sends the STAR by name and transition, with its airport as the destination', async () => {
         const unit = await bootWithStarAndApproach09();
-        expect(fpl0Idents(unit)).toEqual(['ENRAA', 'ENRAA', 'ARRAA', 'FAFAA', 'FAFAA', 'MAPAA', 'KPRC']); // Precondition
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'ENRAA', 'ARRAA', 'FAFAA', 'FAFAA', 'MAPAA', 'KPRC']); // Precondition
 
         const route = requestRoute(unit);
 
@@ -211,13 +205,12 @@ describe('KlnEfbSaver route contents', () => {
     // Output.WriteGPSSimVars false is the panel.xml option of a unit that is not the aircraft's GPS (cfg/panel.xml). Such
     // a unit leaves the EFB's route request unanswered; the import of a synced route is not gated
     it('leaves a route request unanswered with WriteGPSSimVars off (characterization)', async () => {
-        const panelXml = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output><WriteGPSSimVars>false</WriteGPSSimVars></Output></Instrument></PlaneHTMLConfig>';
-        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true, panelXml, storage: savedFlightplan(0, [kaaa, kbbb])});
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true, panelXml: panelXml(NO_GPS_SIMVARS), storage: savedFlightplan(0, [kaaa, kbbb])});
         await settle(unit);
 
         unit.efb!.request();
 
         expect(unit.efb!.replies).toEqual([]);
-        expect(fpl0Idents(unit)).toEqual(['KAAA', 'KBBB']); // Not changed either, since nothing was built (#91)
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']); // Not changed either, since nothing was built (#91)
     });
 });

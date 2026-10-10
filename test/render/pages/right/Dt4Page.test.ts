@@ -1,27 +1,24 @@
 import {describe, expect, it, vi} from 'vitest';
 import {Facility} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
+import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {airport} from '../../../harness/navdata/builders';
 import {dtWorld} from '../../../harness/fixtures';
 import {savedFlightplan} from '../../../harness/storage';
+import {bootOnDtWorld} from '../../../harness/worldBoot';
 import {Screen} from '../../../harness/render/screen';
 
 // The world of the D/T tests is dtWorld() (see Dt1Page.test.ts): along 10 E, the aircraft 0.1 degree north of KAAA at 120
 // kt due north; KBBB, the last waypoint, 84.15 NM away (42.1 min). The fake clock starts at 12:00:00 UTC (DEFAULT_START)
 // and the ground speed is above 30 kt from the first seconds, so DEP is 12:00 with the default SET 4 (RUN WHEN GS > 30KT).
 
+// FPL 0 only: D/T 4 shows the same beside FPL 0 and NAV 2 and has no FPL 3 case
 async function bootMoving(legs: Facility[], facilities: Facility[] = legs): Promise<HeadlessUnit> {
-    const unit = await bootUnit({facilities, position: {lat: 47.1, lon: 10.0}, storage: savedFlightplan(0, legs)});
-    await settle(unit);
-    await moveAircraft(unit, {lat: 47.1, lon: 10.0}, {groundspeedKt: 120, trackTrue: 0});
-    return unit;
+    return bootOnDtWorld({legs, facilities, fpl3: false});
 }
 
 async function show(unit: HeadlessUnit, left: 'FPL 0' | 'NAV 2'): Promise<string[]> {
     await unit.panel.selectPage('L', left);
-    await unit.panel.selectPage('R', 'D/T 4');
-    await vi.advanceTimersByTimeAsync(1000);
-    return Screen.read().rows('R');
+    return unit.panel.show('R', 'D/T 4');
 }
 
 describe('D/T 4 page', () => {
@@ -49,6 +46,8 @@ describe('D/T 4 page', () => {
         const unit = await bootMoving([kaaa, abc, def, kbbb]);
         await show(unit, 'FPL 0');
 
+        // Ten simulated minutes with every tick running: the 5 s default timeout is too short on a busy machine, hence
+        // the 30 s one below (docs/testing.md, Long render tests need their own timeout)
         await vi.advanceTimersByTimeAsync(600_000);
 
         const rows = Screen.read().rows('R');
@@ -60,12 +59,10 @@ describe('D/T 4 page', () => {
     // DEP have not
     it('does not count the flight time below 30 kt (4-13)', async () => {
         const {kaaa, abc, def, kbbb} = dtWorld();
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, def, kbbb], position: {lat: 47.1, lon: 10.0}, storage: savedFlightplan(0, [kaaa, abc, def, kbbb]),
-        });
-        await settle(unit);
+        const unit = await bootOnDtWorld({legs: [kaaa, abc, def, kbbb], moving: false, fpl3: false});
         await show(unit, 'FPL 0');
 
+        // Ten simulated minutes with every tick running, with the 30 s timeout below (as in the test above)
         await vi.advanceTimersByTimeAsync(600_000);
 
         const rows = Screen.read().rows('R');
@@ -96,11 +93,7 @@ describe('D/T 4 page', () => {
         const {kaaa, abc, def, kbbb} = dtWorld();
         const kccc = airport('KCCC', 47.1, 10.5);
         const unit = await bootMoving([kaaa, abc, def, kbbb], [kaaa, abc, def, kbbb, kccc]);
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'KCCC');
-        await unit.panel.ent(); // the APT 1 confirmation
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(2000);
+        await unit.panel.directTo('KCCC', {waitMs: 2000});
         await show(unit, 'FPL 0');
         return unit;
     }
@@ -168,17 +161,14 @@ describe('D/T 4 page with RUN WHEN POWER IS ON (4-13)', () => {
     const utcNow = () => new Date(Date.now()).toISOString().slice(11, 16);
 
     /** D/T 4 on the right beside NAV 2, the left page every power-on shows (3-8) */
-    async function dt4(unit: HeadlessUnit): Promise<string[]> {
-        await unit.panel.selectPage('R', 'D/T 4');
-        await vi.advanceTimersByTimeAsync(1000);
-        return Screen.read().rows('R');
-    }
+    const dt4 = (unit: HeadlessUnit): Promise<string[]> => unit.panel.show('R', 'D/T 4');
 
     // 4-13: a power cycle starts DEP and FLT anew. Switched on at 12:00 (the boot), off at 12:10 and on again at 12:12:
     // five minutes after that DEP reads 12:12 and FLT :05, not 12:00 and :15
     it('shows the time of the last power-on as DEP and the time since then as FLT, at rest (4-13)', async () => {
         const unit = await bootUnit({position: {lat: 47.1, lon: 10.0}, storage: {flightTimer: true}});
         await settle(unit);
+        // Ten simulated minutes, then the power cycle and five more below: the 30 s timeout at the end of the test
         await vi.advanceTimersByTimeAsync(10 * 60_000);
 
         await unit.panel.powerCycle({offSeconds: 120});

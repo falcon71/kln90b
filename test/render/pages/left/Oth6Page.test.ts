@@ -1,10 +1,9 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
+import {fuelComputer, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
 
-const FUEL_PANEL_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name>'
-    + '<Input><FuelComputer><IsInterfaced>true</IsInterfaced></FuelComputer></Input>'
-    + '</Instrument></PlaneHTMLConfig>';
+const FUEL_PANEL_XML = panelXml(fuelComputer());
 
 /**
  * A single with a fuel computer, OTH 6 shown. Avgas in US gallons is 6 lb per gallon (the SDK's autogas gallon, as the

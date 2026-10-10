@@ -9,6 +9,7 @@ import {UserFlightplanPersistor} from '../../../kln90b/settings/UserFlightplanPe
 import {MessageHandler} from '../../../kln90b/data/MessageHandler';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
 import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
+import {identsOf} from '../../harness/readers';
 
 // The version 1 file stored FPL 1 to 25 in fpl0 to fpl24 as 12 character ICAOs (type, region(2), airport(4), ident
 // padded to 5) and did not store FPL 0. Version 2 stores FPL n in fpln as 19 character ICAOs.
@@ -47,7 +48,7 @@ describe('user flight plan V1 format (#47)', () => {
         expect(plans.length).toBe(26);
         expect(plans.map(p => p.idx)).toEqual(Array.from({length: 26}, (_, i) => i));
         expect(plans[0].getLegs()).toEqual([]);
-        expect(plans[1].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'ABC']);
+        expect(identsOf(plans[1].getLegs())).toEqual(['KAAA', 'ABC']);
         expect(plans[1].getLegs()[1].wpt.region).toBe('K1');
 
         // The conversion at boot (KLN90BCore) saves every restored plan again; FPL 1 must land in fpl1 in the V2 layout
@@ -61,7 +62,7 @@ describe('user flight plan V1 format (#47)', () => {
         const plans = await persistor.restoreAllFlightplan();
 
         expect(plans[0].getLegs()).toEqual([]);
-        expect(plans[1].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'ABC']);
+        expect(identsOf(plans[1].getLegs())).toEqual(['KAAA', 'ABC']);
     });
 
     // Contract source: docs/architecture.md Core 7 (fpl{i-1} stores FPL i, 1 to 25). The highest plan sits in fpl24.

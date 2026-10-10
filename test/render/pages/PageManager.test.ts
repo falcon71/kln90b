@@ -4,6 +4,7 @@ import {bootUnit, settle} from '../../harness/boot';
 import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
 import {savedFlightplan, savedUserWaypoints} from '../../harness/storage';
 import {Screen} from '../../harness/render/screen';
+import {activeIdent} from '../../harness/readers';
 
 // The world: FPL 0 is KAAA, then the waypoint under test half a degree north-east of it, then KBBB. The aircraft stands
 // at KAAA, so the leg to the waypoint under test is the closest and that waypoint is active after the settle
@@ -61,7 +62,7 @@ describe('the pages after the power-on (3-8)', () => {
         });
         await settle(unit);
         // Precondition: the waypoint under test is the active one
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe(c.ident);
+        expect(activeIdent(unit)).toBe(c.ident);
 
         await unit.panel.powerCycle();
         await unit.panel.approveSelfTest();

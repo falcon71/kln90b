@@ -41,6 +41,8 @@ describe('KLN90BCore.init, sample and minimal panel.xml (spec: public contract, 
     it.each(cases)('starts and runs ten seconds with $name without an error or a console.error', async ({panelXml}) => {
         const unit = await bootUnit({panelXml, simVars: [{name: 'CIRCUIT ON:1', unit: 'bool', value: true}]});
 
+        // Ten seconds, as the title says: ten calculation ticks, and the first SimVarSync tick (above) and the first
+        // nearest search have run
         await vi.advanceTimersByTimeAsync(10_000);
 
         expect(unit.errors).toEqual([]);
@@ -60,6 +62,9 @@ describe('the order of the calculation tickables (spec, docs/architecture.md Cor
     it('runs the calculation tickables in the documented order', async () => {
         const unit = await bootUnit();
         const p = unit.props;
+        // Coupling to a private member (D6 of the Session 10b findings): KLN90BCore keeps its TickController in the private
+        // field tickManager and exposes no accessor. A rename of the field fails this test with a TypeError, not
+        // with a wrong order
         const tickController = (unit.core as any).tickManager;
 
         const name = (t: unknown): string => {

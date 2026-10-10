@@ -38,6 +38,7 @@ describe('STA 4 page, operating time and power cycles (5-31)', () => {
         await unit.panel.selectPage('L', 'STA 4');
         expect(numbers()[0]).toBe(1234);
 
+        // The 10 s still missing to the hour plus a margin of 55 s, so a minute of operation has passed
         await vi.advanceTimersByTimeAsync(65_000);
         await unit.panel.selectPage('L', 'STA 3');
         await unit.panel.selectPage('L', 'STA 4');

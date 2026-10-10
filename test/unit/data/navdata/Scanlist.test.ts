@@ -7,7 +7,11 @@ import {MemoryFacilityClient} from '../../../harness/navdata/MemoryFacilityClien
 import {airport, intersection, ndb, vor} from '../../../harness/navdata/builders';
 import {clearStatic} from '../../../harness/singletons';
 
-/** The scan list's private job: the cache is filled in the background and an error there is only a rejection. */
+/**
+ * The scan list's private job: the cache is filled in the background and an error there is only a rejection.
+ * Reaches the private listManangerJob (misspelled in Scanlist.ts) of FacilityLoaderScanlist: no public seam hands out the
+ * job's promise to wait for or to see its rejection; a rename there, or fixing the spelling, breaks this test.
+ */
 function managerJob(list: FacilityLoaderScanlist): Promise<void> | null {
     return (list as unknown as { listManangerJob: Promise<void> | null }).listManangerJob;
 }

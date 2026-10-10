@@ -1,20 +1,15 @@
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {standardRoute} from '../../harness/fixtures';
 import {airport, vor} from '../../harness/navdata/builders';
 import {Screen} from '../../harness/render/screen';
+import {AIRDATA, fuelComputer, panelXml} from '../../harness/panelXml';
+import {activeIdent} from '../../harness/readers';
 import {savedFlightplan} from '../../harness/storage';
 import {LEFT_PAGE_TREE, RIGHT_PAGE_TREE} from '../../../kln90b/pages/PageTreeController';
 
 const left = () => Screen.read().status().left;
 const right = () => Screen.read().status().right;
-
-/** Panel XML of an instrument with the given inputs interfaced */
-function panelXml(o: { airdata?: boolean; fuel?: boolean }): string {
-    const airdata = o.airdata ? '<Airdata><IsInterfaced>true</IsInterfaced></Airdata>' : '';
-    const fuel = o.fuel ? '<FuelComputer><IsInterfaced>true</IsInterfaced></FuelComputer>' : '';
-    return `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input>${airdata}${fuel}</Input></Instrument></PlaneHTMLConfig>`;
-}
 
 /** The page names the inner knob steps through on one side, from the first page of the group until the group wraps around */
 async function walk(unit: HeadlessUnit, side: 'L' | 'R', first: string): Promise<string[]> {
@@ -39,25 +34,25 @@ const oth = (n: number) => Array.from({length: n}, (_, i) => i + 1 < 10 ? `OTH $
 // the module-level tree in place, and a power cycle builds the controller again over the pruned tree (#90).
 describe('OTH pages of a unit with and without air data and fuel computer (#90)', () => {
     it('air data only: OTH 1 to OTH 6 before any power cycle (5-42)', async () => {
-        const unit = await bootUnit({panelXml: panelXml({airdata: true})});
+        const unit = await bootUnit({panelXml: panelXml(AIRDATA)});
 
         expect(await walk(unit, 'L', 'OTH 1')).toEqual(oth(6));
     });
 
     it('neither: OTH 1 to OTH 4 before any power cycle (5-42, 5-39)', async () => {
-        const unit = await bootUnit({panelXml: panelXml({})});
+        const unit = await bootUnit({panelXml: panelXml()});
 
         expect(await walk(unit, 'L', 'OTH 1')).toEqual(oth(4));
     });
 
     it('fuel computer only: OTH 1 to OTH 8 before any power cycle (5-39)', async () => {
-        const unit = await bootUnit({panelXml: panelXml({fuel: true})});
+        const unit = await bootUnit({panelXml: panelXml(fuelComputer())});
 
         expect(await walk(unit, 'L', 'OTH 1')).toEqual(oth(8));
     });
 
     it('neither: OTH 1 to OTH 4 after a power cycle (5-42, 5-39)', async () => {
-        const unit = await bootUnit({panelXml: panelXml({})});
+        const unit = await bootUnit({panelXml: panelXml()});
         await unit.panel.powerCycle();
         await unit.panel.approveSelfTest();
 
@@ -65,7 +60,7 @@ describe('OTH pages of a unit with and without air data and fuel computer (#90)'
     });
 
     it('fuel computer only: OTH 1 to OTH 8 after a power cycle (5-39)', async () => {
-        const unit = await bootUnit({panelXml: panelXml({fuel: true})});
+        const unit = await bootUnit({panelXml: panelXml(fuelComputer())});
         await unit.panel.powerCycle();
         await unit.panel.approveSelfTest();
 
@@ -73,7 +68,7 @@ describe('OTH pages of a unit with and without air data and fuel computer (#90)'
     });
 
     it('air data and fuel computer: OTH 1 to OTH 10 after a power cycle (5-42, 5-39)', async () => {
-        const unit = await bootUnit({panelXml: panelXml({airdata: true, fuel: true})});
+        const unit = await bootUnit({panelXml: panelXml({...AIRDATA, ...fuelComputer()})});
         await unit.panel.powerCycle();
         await unit.panel.approveSelfTest();
 
@@ -83,7 +78,7 @@ describe('OTH pages of a unit with and without air data and fuel computer (#90)'
     // 5-42: the air data pages stay. Today the second controller prunes the already pruned tree: splice(4, 4) takes the air data pages away instead of
     // pages that are not there
     it.fails('air data only: still OTH 1 to OTH 6 after a power cycle (#90)', async () => {
-        const unit = await bootUnit({panelXml: panelXml({airdata: true})});
+        const unit = await bootUnit({panelXml: panelXml(AIRDATA)});
         await unit.panel.powerCycle();
         await unit.panel.approveSelfTest();
 
@@ -128,12 +123,8 @@ describe('page memory of the page groups (3-12, 3-13)', () => {
         const unit = await bootUnit({facilities: [abc], position: {lat: 47.0, lon: 8.0}});
         await unit.panel.selectPage('R', 'NAV 3');
         await unit.panel.selectPage('R', 'APT 1');
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'ABC');
-        await unit.panel.ent();
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(1000);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('ABC'); // Preconditions
+        await unit.panel.directTo('ABC');
+        expect(activeIdent(unit)).toBe('ABC'); // Preconditions
         expect(right()).toBe('NAV 1');
 
         await unit.panel.inner('R', 1);
@@ -249,7 +240,7 @@ const numbered = (type: string, from: number, to: number) =>
 
 /** The name of a page built from each slot, by group */
 async function names(tree: unknown[][]): Promise<string[][]> {
-    const unit = await bootUnit({panelXml: panelXml({airdata: true, fuel: true})});
+    const unit = await bootUnit({panelXml: panelXml({...AIRDATA, ...fuelComputer()})});
     return tree.map(group => group.map(cls => (new (cls as any)(unit.props)).name as string));
 }
 

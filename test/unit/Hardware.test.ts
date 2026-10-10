@@ -5,6 +5,8 @@ import {simEnv} from '../harness/sim/install';
 describe('Hardware', () => {
     // c673dc2: L:KLN90B_RightScan showed the previous state, because the LVar was written before the field changed
     it('writes the current state of the scan switch to L:KLN90B_RightScan (c673dc2)', () => {
+        // The fake sim keeps what an earlier test wrote; lastWrite must find this test's writes
+        simEnv().sim.reset();
         const hw = new Hardware();
 
         hw.setScanPulled(true);

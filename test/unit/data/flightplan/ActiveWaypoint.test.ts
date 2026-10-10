@@ -7,6 +7,7 @@ import {KLN90BUserSettings} from '../../../../kln90b/settings/KLN90BUserSettings
 import {Sensors} from '../../../../kln90b/Sensors';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {pointFrom} from '../../../harness/flight/geo';
+import {identsOf} from '../../../harness/readers';
 
 const NM = (nm: number) => UnitType.NMILE.convertTo(nm, UnitType.GA_RADIAN);
 
@@ -143,7 +144,6 @@ describe('ActiveWaypoint.activateFpl0 on a DME arc', () => {
 });
 
 const fromHere = (p: { lat: number; lon: number }) => intersection('PPOS', p.lat, p.lon);
-const identsOf = (legs: KLNFlightplanLeg[]) => legs.map(l => l.wpt.icaoStruct.ident);
 
 describe('ActiveWaypoint direct-to flows', () => {
     // characterization: the Pilot's Guide does not say which leg a cancelled direct-to returns to; the unit takes the

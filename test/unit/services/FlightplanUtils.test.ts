@@ -8,6 +8,7 @@ import {Sensors} from '../../../kln90b/Sensors';
 import {calcDistToDestination, insertLegIntoFpl} from '../../../kln90b/services/FlightplanUtils';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {pointFrom} from '../../harness/flight/geo';
+import {identsOf} from '../../harness/readers';
 
 const user = (wpt: Facility): KLNFlightplanLeg => ({wpt, type: KLNLegType.USER});
 
@@ -132,7 +133,6 @@ function fullPlanLegs(): KLNFlightplanLeg[] {
 }
 
 const NEW = intersection('NEWWP', 48.0, 9.0);
-const identsOf = (fpl: Flightplan) => fpl.getLegs().map(l => l.wpt.icaoStruct.ident);
 
 describe('insertLegIntoFpl', () => {
     // 4-4: a waypoint may be added to a plan with fewer than 30
@@ -141,7 +141,7 @@ describe('insertLegIntoFpl', () => {
 
         insertLegIntoFpl(fpl0, navState(aw, null), 1, user(C));
 
-        expect(identsOf(fpl0)).toEqual(['KAAA', 'DEF', 'ABC']);
+        expect(identsOf(fpl0.getLegs())).toEqual(['KAAA', 'DEF', 'ABC']);
     });
 
     // 4-4: a plan of 29 takes a 30th without losing its first waypoint
@@ -151,9 +151,9 @@ describe('insertLegIntoFpl', () => {
         insertLegIntoFpl(fpl0, navState(aw, null), 29, user(NEW));
 
         expect(fpl0.getLegs()).toHaveLength(30);
-        expect(identsOf(fpl0)[0]).toBe('FIX00');
-        expect(identsOf(fpl0)[28]).toBe('FIX28');
-        expect(identsOf(fpl0)[29]).toBe('NEWWP');
+        expect(identsOf(fpl0.getLegs())[0]).toBe('FIX00');
+        expect(identsOf(fpl0.getLegs())[28]).toBe('FIX28');
+        expect(identsOf(fpl0.getLegs())[29]).toBe('NEWWP');
     });
 
     // 4-1: at most 30 waypoints. Only FPL 0 makes room (the status line message FPL FULL, C-1, names the case of the
@@ -164,7 +164,7 @@ describe('insertLegIntoFpl', () => {
 
         expect(() => insertLegIntoFpl(fpl5, navState(aw, null), 30, user(NEW))).toThrow('Cannot have more than 30 legs!');
 
-        expect(identsOf(fpl5)).not.toContain('NEWWP');
+        expect(identsOf(fpl5.getLegs())).not.toContain('NEWWP');
         expect(fpl5.getLegs()).toHaveLength(30);
     });
 
@@ -176,8 +176,8 @@ describe('insertLegIntoFpl', () => {
         insertLegIntoFpl(fpl0, navState(aw, null), 30, user(NEW));
 
         expect(fpl0.getLegs()).toHaveLength(30);
-        expect(identsOf(fpl0).slice(0, 2)).toEqual(['FIX01', 'FIX02']);
-        expect(identsOf(fpl0)[29]).toBe('NEWWP');
+        expect(identsOf(fpl0.getLegs()).slice(0, 2)).toEqual(['FIX01', 'FIX02']);
+        expect(identsOf(fpl0.getLegs())[29]).toBe('NEWWP');
     });
 
     it('drops the first leg of a full FPL 0 and inserts at the cursor position behind it (characterization)', () => {
@@ -186,7 +186,7 @@ describe('insertLegIntoFpl', () => {
         // Typed in front of the second waypoint: the plan would read FIX00, NEWWP, FIX01, and FIX00 goes
         insertLegIntoFpl(fpl0, navState(aw, null), 1, user(NEW));
 
-        expect(identsOf(fpl0).slice(0, 3)).toEqual(['NEWWP', 'FIX01', 'FIX02']);
+        expect(identsOf(fpl0.getLegs()).slice(0, 3)).toEqual(['NEWWP', 'FIX01', 'FIX02']);
         expect(fpl0.getLegs()).toHaveLength(30);
     });
 
@@ -197,8 +197,8 @@ describe('insertLegIntoFpl', () => {
 
         expect(() => insertLegIntoFpl(fpl0, navState(aw, 3), 30, user(NEW))).toThrow('First waypoint is part of the active leg');
 
-        expect(identsOf(fpl0)).not.toContain('NEWWP');
-        expect(identsOf(fpl0)[0]).toBe('FIX00');
+        expect(identsOf(fpl0.getLegs())).not.toContain('NEWWP');
+        expect(identsOf(fpl0.getLegs())[0]).toBe('FIX00');
     });
 
     it('drops the first leg once the active leg is the second one, and keeps the active waypoint (characterization)', () => {
@@ -208,7 +208,7 @@ describe('insertLegIntoFpl', () => {
 
         insertLegIntoFpl(fpl0, navState(aw, 3), 30, user(NEW));
 
-        expect(identsOf(fpl0)[0]).toBe('FIX01');
+        expect(identsOf(fpl0.getLegs())[0]).toBe('FIX01');
         expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('FIX02');
         expect(aw.getActiveFplIdx()).toBe(1);
     });
@@ -220,8 +220,8 @@ describe('insertLegIntoFpl', () => {
 
         insertLegIntoFpl(fpl0, navState(aw, 5), 30, user(NEW));
 
-        expect(identsOf(fpl0)[0]).toBe('FIX01');
-        expect(identsOf(fpl0)[29]).toBe('NEWWP');
+        expect(identsOf(fpl0.getLegs())[0]).toBe('FIX01');
+        expect(identsOf(fpl0.getLegs())[29]).toBe('NEWWP');
     });
 
     // The first waypoint itself is the to waypoint of a direct to it, which is part of the active leg
@@ -231,8 +231,8 @@ describe('insertLegIntoFpl', () => {
 
         expect(() => insertLegIntoFpl(fpl0, navState(aw, 5), 30, user(NEW))).toThrow('First waypoint is part of the active leg');
 
-        expect(identsOf(fpl0)[0]).toBe('FIX00');
-        expect(identsOf(fpl0)).not.toContain('NEWWP');
+        expect(identsOf(fpl0.getLegs())[0]).toBe('FIX00');
+        expect(identsOf(fpl0.getLegs())).not.toContain('NEWWP');
     });
 
     // 4-4: a waypoint typed over the first row goes in front of the first waypoint, so it becomes the first one. Today
@@ -242,8 +242,8 @@ describe('insertLegIntoFpl', () => {
 
         insertLegIntoFpl(fpl0, navState(aw, null), 0, user(NEW));
 
-        expect(identsOf(fpl0).slice(0, 2)).toEqual(['NEWWP', 'FIX01']);
-        expect(identsOf(fpl0)[29]).toBe('FIX29');
+        expect(identsOf(fpl0.getLegs()).slice(0, 2)).toEqual(['NEWWP', 'FIX01']);
+        expect(identsOf(fpl0.getLegs())[29]).toBe('FIX29');
     });
 });
 
@@ -264,7 +264,7 @@ describe('ActiveWaypoint after a leg is inserted in front of the active waypoint
 
         expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
         expect(aw.getActiveFplIdx()).toBe(2);
-        expect(aw.getFutureLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['ABC', 'DEF', 'GHI']);
+        expect(identsOf(aw.getFutureLegs())).toEqual(['ABC', 'DEF', 'GHI']);
     });
 
     it.fails('keeps a direct-to to a waypoint of the plan in the plan (#149)', () => {
@@ -277,6 +277,6 @@ describe('ActiveWaypoint after a leg is inserted in front of the active waypoint
         expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('DEF');
         expect(aw.isDctNavigation()).toBe(true);
         expect(aw.getActiveFplIdx()).toBe(3);
-        expect(aw.getFutureLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['DEF', 'GHI']);
+        expect(identsOf(aw.getFutureLegs())).toEqual(['DEF', 'GHI']);
     });
 });

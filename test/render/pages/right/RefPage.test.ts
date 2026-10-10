@@ -6,6 +6,7 @@ import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 import {courseDeg, distanceNm} from '../../../harness/flight/geo';
 import {collectStatusMessages} from '../../../harness/statusLine';
+import {fplIdents} from '../../../harness/readers';
 
 // The world of the REF tests: a leg KAAA to KBBB due north along 10 E, a VOR TXK 0.3 degree east of the middle of the
 // leg (a perpendicular to the leg exists, 5-21) and a VOR GRW beyond the end of the leg (only a perpendicular to the
@@ -76,8 +77,6 @@ async function bootAt60North(): Promise<{ unit: HeadlessUnit, txk: Facility }> {
     return {unit, txk};
 }
 
-const idents = (unit: HeadlessUnit, idx: number) => unit.props.memory.fplPage.flightplans[idx].getLegs().map(l => l.wpt.icaoStruct.ident);
-
 describe('REF page', () => {
     // 5-21, figure 5-82: without a flight plan page on the left, the REF page asks for one
     it('asks for a flight plan page on the left when the left page is not an FPL page (5-21)', async () => {
@@ -121,13 +120,13 @@ describe('REF page', () => {
         expect(screen.rows('R')[0].trim()).toBe('TXKA');
         expect(screen.rows('R')[1]).toBe('REF:  TXK  ');
         expect(screen.rows('L')[2]).toBe('  2:TXKA   ');
-        expect(idents(unit, 2)).toEqual(['KAAA', 'KBBB']); // not yet inserted before the approval
+        expect(fplIdents(unit, 2)).toEqual(['KAAA', 'KBBB']); // not yet inserted before the approval
 
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(500);
 
         screen = Screen.read();
-        expect(idents(unit, 2)).toEqual(['KAAA', 'TXKA', 'KBBB']);
+        expect(fplIdents(unit, 2)).toEqual(['KAAA', 'TXKA', 'KBBB']);
         expect(screen.rows('R')[2]).toBe('ENTER REF  ');
         expect(screen.rows('R')[3]).toBe('WPT:       ');
         expect(screen.status().left).toBe('FPL 2');
@@ -148,7 +147,7 @@ describe('REF page', () => {
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(500);
 
-        expect(idents(unit, 0)).toEqual(['KAAA', 'TXKA', 'KBBB']);
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'TXKA', 'KBBB']);
     });
 
     // Figure 5-85: while the reference waypoint waits for its approval, the left cursor is on over the new entry of the
@@ -172,7 +171,7 @@ describe('REF page', () => {
         const screen = Screen.read();
         expect(screen.status().mode).toBe('INVALID REF');
         expect(screen.rows('R')[2]).toBe('ENTER REF  ');
-        expect(idents(unit, 2)).toEqual(['KAAA', 'KBBB']);
+        expect(fplIdents(unit, 2)).toEqual(['KAAA', 'KBBB']);
     });
 
     // C-1: a waypoint is no valid reference either when no letter A to Z gives a free identifier
@@ -183,7 +182,7 @@ describe('REF page', () => {
         await enterReference(unit, 'TXK');
 
         expect(Screen.read().status().mode).toBe('INVALID REF');
-        expect(idents(unit, 2)).toEqual(['KAAA', 'KBBB']);
+        expect(fplIdents(unit, 2)).toEqual(['KAAA', 'KBBB']);
     });
 
     // 5-22 calls the reference waypoint a supplemental waypoint; C-2: NO SUP WPTS belongs to selecting the SUP page type
@@ -290,7 +289,7 @@ describe('REF page, where the reference waypoint is placed', () => {
         await vi.advanceTimersByTimeAsync(500);
 
         const foot = {lat: footLat(47.5, 0.3), lon: 10.0};
-        expect(idents(unit, 2)).toEqual(['KAAA', 'TXKA', 'KBBB']); // precondition
+        expect(fplIdents(unit, 2)).toEqual(['KAAA', 'TXKA', 'KBBB']); // precondition
         expect(stored(unit, 2, 1).lat).toBeCloseTo(foot.lat, 5);
         expect(stored(unit, 2, 1).lon).toBeCloseTo(10.0, 5);
         expect(stored(unit, 2, 1).reference1Distance).toBeCloseTo(distanceNm({lat: 47.5, lon: 10.3}, foot), 2);
@@ -310,7 +309,7 @@ describe('REF page, where the reference waypoint is placed', () => {
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(500);
 
-        expect(idents(unit, 2)).toEqual(['KAAA', 'TXKA', 'KBBB', 'KCCC']);
+        expect(fplIdents(unit, 2)).toEqual(['KAAA', 'TXKA', 'KBBB', 'KCCC']);
         expect(stored(unit, 2, 1).lat).toBeCloseTo(footLat(47.7, 0.3), 5);
         expect(stored(unit, 2, 1).lon).toBeCloseTo(10.0, 5);
     });
@@ -333,7 +332,7 @@ describe('REF page, where the reference waypoint is placed', () => {
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(500);
 
-        expect(idents(unit, 2)).toEqual(['KAAA', 'TXKA', 'KBBB']);
+        expect(fplIdents(unit, 2)).toEqual(['KAAA', 'TXKA', 'KBBB']);
     });
 
     it.fails('refuses a waypoint whose perpendicular falls behind the first waypoint of the leg (5-21, C-1, #299)', async () => {
@@ -343,7 +342,7 @@ describe('REF page, where the reference waypoint is placed', () => {
         await enterReference(unit, 'SGW');
 
         expect(Screen.read().status().mode).toBe('INVALID REF');
-        expect(idents(unit, 2)).toEqual(['KAAA', 'KBBB']);
+        expect(fplIdents(unit, 2)).toEqual(['KAAA', 'KBBB']);
     });
 });
 

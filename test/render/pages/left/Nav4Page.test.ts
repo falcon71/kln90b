@@ -4,6 +4,8 @@ import {airport} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
+import {NO_ALTIMETER, panelXml} from '../../../harness/panelXml';
+import {activeIdent} from '../../../harness/readers';
 import {VnavState} from '../../../../kln90b/services/Vnav';
 
 // An invented world: KDDD, KAAA 100 NM west of it and KEEE 30 NM east of it. FPL 0 is KAAA, KDDD, KEEE, and the
@@ -11,15 +13,15 @@ import {VnavState} from '../../../../kln90b/services/Vnav';
 const KDDD = airport('KDDD', 47.0, 9.0);
 const KAAA = airport('KAAA', pointFrom(KDDD, 270, 100).lat, pointFrom(KDDD, 270, 100).lon);
 const KEEE = airport('KEEE', pointFrom(KDDD, 90, 30).lat, pointFrom(KDDD, 90, 30).lon);
-const NO_ALTITUDE_INPUT = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><AltimeterInterfaced>false</AltimeterInterfaced></Input></Instrument></PlaneHTMLConfig>';
+const NO_ALTITUDE_INPUT = panelXml(NO_ALTIMETER);
 
-async function onLeg(panelXml?: string): Promise<HeadlessUnit> {
+async function onLeg(xml?: string): Promise<HeadlessUnit> {
     const unit = await bootUnit({
-        facilities: [KAAA, KDDD, KEEE], position: pointFrom(KDDD, 270, 40), altitudeFt: 7500, panelXml,
+        facilities: [KAAA, KDDD, KEEE], position: pointFrom(KDDD, 270, 40), altitudeFt: 7500, panelXml: xml,
         storage: savedFlightplan(0, [KAAA, KDDD, KEEE]),
     });
     await settle(unit);
-    expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('KDDD'); // Precondition
+    expect(activeIdent(unit)).toBe('KDDD'); // Precondition
     return unit;
 }
 

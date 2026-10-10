@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {ALTITUDE_ALERT, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
 import {storedSetting} from '../../../harness/storage';
 
@@ -129,10 +130,7 @@ describe('SET 5 height above airport alert (3-58)', () => {
     // SET 5 shows OFF and FEATURE DISABLED and cannot be changed. Also a contract test: panel.xml Output.AltitudeAlertEnabled
     // (cfg/panel.xml; the wiki page panel.xml customization).
     it('shows FEATURE DISABLED and takes no cursor when the installation disables the alert (3-57, 3-59)', async () => {
-        const unit = await bootUnit({
-            panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output>'
-                + '<AltitudeAlertEnabled>false</AltitudeAlertEnabled></Output></Instrument></PlaneHTMLConfig>',
-        });
+        const unit = await bootUnit({panelXml: panelXml(ALTITUDE_ALERT(false))});
         await unit.panel.selectPage('L', 'SET 5');
         await unit.panel.cursor('L');
 

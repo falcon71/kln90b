@@ -402,6 +402,65 @@ export class FrontPanel {
         await vi.advanceTimersByTimeAsync(1000);
     }
 
+    /**
+     * Opens the MSG page and presses MSG until it closes (3-16; the status line's left field is empty while it shows),
+     * then waits a second, so that the one-time messages read go. Returns the non-blank rows of every MSG page seen, in
+     * order, each trimmed. Throws with the screen if the page is still open after `max` presses.
+     */
+    public async readMessages(max = 10): Promise<string[]> {
+        const seen: string[] = [];
+        await this.msg();
+        for (let i = 0; this.screen().status().left === ''; i++) {
+            if (i >= max) throw new Error(`readMessages: the MSG page did not close after ${max} presses\n${this.screen().dump()}`);
+            seen.push(...this.screen().text().split('\n').slice(0, 6).map(r => r.trim()).filter(r => r !== ''));
+            await this.msg();
+        }
+        await vi.advanceTimersByTimeAsync(1000);
+        return seen;
+    }
+
+    /**
+     * A Direct To the way a pilot enters one (3-28): D->, the ident typed on the left, ENT on the waypoint page that
+     * confirms it, ENT to approve, then `waitMs` (default one second: one calculation tick).
+     */
+    public async directTo(ident: string, o: { waitMs?: number } = {}): Promise<void> {
+        await this.dct();
+        await this.enterIdent('L', ident);
+        await this.ent();
+        await this.ent();
+        await vi.advanceTimersByTimeAsync(o.waitMs ?? 1000);
+    }
+
+    /** Selects a page, waits `waitMs` (default one second) and returns the six rows of that side */
+    public async show(side: Side, name: string, o: { waitMs?: number } = {}): Promise<string[]> {
+        await this.selectPage(side, name);
+        await vi.advanceTimersByTimeAsync(o.waitMs ?? 1000);
+        return this.screen().rows(side);
+    }
+
+    /** SET 1: CONFIRM?, ENT, then SET 2 and back to SET 1, so that the page reads the GPS again */
+    public async confirmSet1AndReselect(): Promise<void> {
+        await this.cursorTo('L', 'CONFIRM?');
+        await this.ent();
+        await this.selectPage('L', 'SET 2');
+        await this.selectPage('L', 'SET 1');
+    }
+
+    /**
+     * Enters a date in the open date editor on a side: the first click opens it with day 01, the first click on the
+     * dashed month gives JAN and on a dashed year digit 0, so the day d takes d clicks, the month m (1 to 12) m clicks,
+     * a year digit y + 1 clicks. The cursor must be on the day.
+     */
+    public async enterDate(side: Side, day: number, month: number, year: [number, number]): Promise<void> {
+        await this.inner(side, day);
+        await this.outer(side, 1);
+        await this.inner(side, month);
+        await this.outer(side, 1);
+        await this.inner(side, year[0] + 1);
+        await this.outer(side, 1);
+        await this.inner(side, year[1] + 1);
+    }
+
     /** Appends waypoints to FPL 0 with waypoint confirmation (two ENTs each), then turns the cursor off. */
     public async appendToFpl0(idents: string[]): Promise<void> {
         await this.selectPage('L', 'FPL 0');

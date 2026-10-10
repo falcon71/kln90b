@@ -9,6 +9,9 @@ import {savedFlightplan, storedSetting} from '../../../harness/storage';
 import {courseDeg, LatLon, pointFrom} from '../../../harness/flight/geo';
 import {standardRoute} from '../../../harness/fixtures';
 import {recordMap} from '../../../harness/render/mapRecorder';
+import {HEADING_INPUT, panelXml} from '../../../harness/panelXml';
+import {activeIdent} from '../../../harness/readers';
+import {bootOnStandardRoute} from '../../../harness/worldBoot';
 
 const RNAV = ApproachType.APPROACH_TYPE_RNAV;
 
@@ -120,7 +123,7 @@ describe('NAV 5 page with a DME arc', () => {
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ARCEN');
+        expect(activeIdent(unit)).toBe('ARCEN');
         // Not exactly onto the VOR: the unit throws there
         await moveAircraft(unit, pointFrom(w.abc, 90, 0.5), {groundspeedKt: 0});
         await unit.panel.selectPage('L', 'NAV 5');
@@ -157,7 +160,7 @@ describe('NAV 5 page with a DME arc', () => {
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
         // Precondition: ARCEN is active, so the map draws the arc with its arrow
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ARCEN');
+        expect(activeIdent(unit)).toBe('ARCEN');
         await unit.panel.selectPage('L', 'NAV 5');
         await vi.advanceTimersByTimeAsync(2000);
 
@@ -172,26 +175,18 @@ describe('NAV 5 page with a DME arc', () => {
 async function nav5OnRoute(o: { storage?: Record<string, unknown>, panelXml?: string, magvar?: number } = {}) {
     const w = standardRoute();
     const map = recordMap({KAAA: w.kaaa, ABC: w.abc, KBBB: w.kbbb});
-    const unit = await bootUnit({
-        facilities: [w.kaaa, w.abc, w.kbbb], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
-        storage: {...savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]), ...o.storage}, panelXml: o.panelXml, magvar: o.magvar,
-    });
-    await settle(unit);
+    const unit = await bootOnStandardRoute({storage: o.storage, panelXml: o.panelXml, magvar: o.magvar});
     await unit.panel.selectPage('L', 'NAV 5');
     await vi.advanceTimersByTimeAsync(1000);
     return {unit, map, w};
 }
 
-const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
+const HEADING_INPUT_XML = panelXml(HEADING_INPUT);
 
 describe('NAV 5 page (characterization)', () => {
     it('shows FPL 0 north up at 40 NM with the aircraft 10 NM along the first leg', async () => {
         const w = standardRoute();
-        const unit = await bootUnit({
-            facilities: [w.kaaa, w.abc, w.kbbb], position: pointFrom(w.kaaa, courseDeg(w.kaaa, w.abc), 10),
-            storage: savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]),
-        });
-        await settle(unit);
+        const unit = await bootOnStandardRoute({position: pointFrom(w.kaaa, courseDeg(w.kaaa, w.abc), 10)});
         await unit.panel.selectPage('L', 'NAV 5');
         await vi.advanceTimersByTimeAsync(1000);
 
@@ -229,7 +224,7 @@ describe('NAV 5 page map', () => {
     // font). The aircraft is at KAAA, so the first leg is active and ABC is the active waypoint.
     it('draws the FPL 0 waypoints by number, the active leg as an arrow and the next leg as a line (3-34, 3-35)', async () => {
         const {unit, map} = await nav5OnRoute();
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
 
         expect(map.drawn).toEqual([
             'arrow KAAA ABC',
@@ -248,7 +243,7 @@ describe('NAV 5 page map', () => {
         const course = courseDeg(w.kaaa, w.abc);
         await moveAircraft(unit, pointFrom(w.abc, course, 0.3), {groundspeedKt: 120, trackTrue: course});
         await vi.advanceTimersByTimeAsync(1000);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
 
         expect(map.drawn.filter(d => d.startsWith('arrow') || d.startsWith('line'))).toEqual([
             'line KAAA ABC',
@@ -263,17 +258,9 @@ describe('NAV 5 page map', () => {
         const w = standardRoute();
         const xyz = vor('XYZ', 47.2, 8.0);
         const map = recordMap({KAAA: w.kaaa, ABC: w.abc, KBBB: w.kbbb, XYZ: xyz});
-        const unit = await bootUnit({
-            facilities: [w.kaaa, w.abc, w.kbbb, xyz], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
-            storage: savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]),
-        });
-        await settle(unit);
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'XYZ');
-        await unit.panel.ent();
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(2000);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('XYZ');
+        const unit = await bootOnStandardRoute({facilities: [xyz]});
+        await unit.panel.directTo('XYZ', {waitMs: 2000}); // two calculation ticks
+        expect(activeIdent(unit)).toBe('XYZ');
         await unit.panel.selectPage('L', 'NAV 5');
         await vi.advanceTimersByTimeAsync(1000);
 
@@ -293,11 +280,7 @@ describe('NAV 5 page map', () => {
         const w = standardRoute();
         const xyz = vor('XYZ', 47.2, 8.0);
         const map = recordMap({KAAA: w.kaaa, ABC: w.abc, KBBB: w.kbbb, XYZ: xyz});
-        const unit = await bootUnit({
-            facilities: [w.kaaa, w.abc, w.kbbb, xyz], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
-            storage: savedFlightplan(0, [w.kaaa, w.abc, w.kbbb]),
-        });
-        await settle(unit);
+        const unit = await bootOnStandardRoute({facilities: [xyz]});
         await unit.panel.selectPage('R', 'VOR  ');
         await unit.panel.cursor('R');
         await unit.panel.enterIdent('R', 'XYZ');

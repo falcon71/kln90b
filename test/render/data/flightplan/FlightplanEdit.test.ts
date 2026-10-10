@@ -5,6 +5,8 @@ import {standardRoute} from '../../../harness/fixtures';
 import {pointFrom} from '../../../harness/flight/geo';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan, storedSetting} from '../../../harness/storage';
+import {activeIdent, fplIdents, messages} from '../../../harness/readers';
+import {bootOnStandardRoute} from '../../../harness/worldBoot';
 
 // Pilot's Guide 4-4 (adding a waypoint), 4-5 (deleting a waypoint and a plan), C-1 (FPL FULL)
 // A full FPL 0 of 30 legs along a line north from 47N 8E, FA00 at the start and 5 NM between the legs
@@ -14,7 +16,6 @@ const FIXES = Array.from({length: 30}, (_, i) => {
     return intersection(`FA${String(i).padStart(2, '0')}`, p.lat, p.lon);
 });
 const knew = airport('KNEW', 48.0, 9.0);
-const legIdents = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident);
 
 async function bootFull(nmAlong: number) {
     const unit = await bootUnit({
@@ -60,7 +61,7 @@ describe('the flight plans of a booted unit', () => {
         const plans = unit.props.memory.fplPage.flightplans;
         expect(plans).toHaveLength(26);
         expect(plans[0].getLegs()).toEqual([]);
-        expect(unit.props.messageHandler.getMessages().map(m => m.message.join(' '))).toContain('USER DATA LOST');
+        expect(messages(unit)).toContain('USER DATA LOST');
     });
 });
 
@@ -73,7 +74,7 @@ describe('the flight plans of a booted unit after a failed plan restore', () => 
         const plans = unit.props.memory.fplPage.flightplans;
         expect(plans.map(p => p.idx)).toEqual(Array.from({length: 26}, (_, i) => i));
         expect(plans.every(p => p.getLegs().length === 0)).toBe(true);
-        expect(unit.props.messageHandler.getMessages().map(m => m.message.join(' '))).toContain('USER DATA LOST');
+        expect(messages(unit)).toContain('USER DATA LOST');
     });
 });
 
@@ -94,7 +95,7 @@ describe('adding a waypoint to a full FPL 0', () => {
         await vi.advanceTimersByTimeAsync(1500);
 
         expect(Screen.read().status().mode).toBe('FPL FULL');
-        expect(legIdents(unit)).toEqual(FIXES.map(f => f.icaoStruct.ident));
+        expect(fplIdents(unit)).toEqual(FIXES.map(f => f.icaoStruct.ident));
         expect(unit.errors).toEqual([]);
     });
 
@@ -113,12 +114,12 @@ describe('adding a waypoint to a full FPL 0', () => {
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1500);
 
-        const idents = legIdents(unit);
+        const idents = fplIdents(unit);
         expect(idents).toHaveLength(30);
         expect(idents[0]).toBe('FA01');
         expect(idents[29]).toBe('KNEW');
         // The active waypoint does not change (it moves up by one place)
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('FA21');
+        expect(activeIdent(unit)).toBe('FA21');
     });
 
     // 4-4: typed over a row, the new waypoint goes in front of the one that was there
@@ -127,7 +128,7 @@ describe('adding a waypoint to a full FPL 0', () => {
 
         await typeKnewOver(unit, 1);
 
-        expect(legIdents(unit).slice(0, 3)).toEqual(['KNEW', 'FA01', 'FA02']);
+        expect(fplIdents(unit).slice(0, 3)).toEqual(['KNEW', 'FA01', 'FA02']);
     });
 
     // characterization: the Pilot's Guide names no rule for a full plan beyond the refusal (C-1), the unit drops the
@@ -137,7 +138,7 @@ describe('adding a waypoint to a full FPL 0', () => {
 
         await typeKnewOver(unit, 1);
 
-        const idents = legIdents(unit);
+        const idents = fplIdents(unit);
         expect(idents).toHaveLength(30);
         expect(idents).not.toContain('FA00');
         expect(idents[29]).toBe('FA29');
@@ -148,18 +149,14 @@ describe('adding a waypoint to a full FPL 0', () => {
 
         await typeKnewOver(unit, 0);
 
-        expect(legIdents(unit).slice(0, 3)).toEqual(['KNEW', 'FA01', 'FA02']);
-        expect(legIdents(unit)[29]).toBe('FA29');
+        expect(fplIdents(unit).slice(0, 3)).toEqual(['KNEW', 'FA01', 'FA02']);
+        expect(fplIdents(unit)[29]).toBe('FA29');
     });
 });
 
 describe('deleting a flight plan (4-5)', () => {
     async function deleteFpl0() {
-        const {kaaa, abc, kbbb} = standardRoute();
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb], position: {lat: 47.0, lon: 8.0}, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-        });
-        await settle(unit);
+        const unit = await bootOnStandardRoute();
         expect(String(storedSetting(unit, 'fpl0'))).toHaveLength(3 * 19); // Precondition: the plan is stored
 
         await unit.panel.selectPage('L', 'FPL 0');

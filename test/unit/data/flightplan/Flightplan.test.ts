@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {EventBus, Facility} from '@microsoft/msfs-sdk';
 import {Flightplan, FlightplanEvents, KLNFlightplanLeg, KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {airport, vor} from '../../../harness/navdata/builders';
+import {identsOf} from '../../../harness/readers';
 
 // Source of the rules: Pilot's Guide 4-1 (at most 30 waypoints per plan, FPL 0 needs two) and 4-4 (a waypoint may be
 // added to a plan with fewer than 30), 4-4/4-5 (delete a waypoint, delete a plan), 6-5 and 6-23 (approaches, SIDs and
@@ -12,7 +13,6 @@ const A = airport('KAAA', 47.0, 8.0);
 const B = vor('ABC', 47.2, 8.0);
 const C = airport('KBBB', 47.4, 8.0);
 const D = vor('DEF', 47.5, 8.0);
-const idents = (fpl: Flightplan) => fpl.getLegs().map(l => l.wpt.icaoStruct.ident);
 
 function planWithEvents(idx: number, legs: KLNFlightplanLeg[]) {
     const bus = new EventBus();
@@ -27,7 +27,7 @@ describe('Flightplan insert and delete', () => {
 
         fpl.insertLeg(1, user(B));
 
-        expect(idents(fpl)).toEqual(['KAAA', 'ABC', 'KBBB']);
+        expect(identsOf(fpl.getLegs())).toEqual(['KAAA', 'ABC', 'KBBB']);
         expect(events).toEqual([fpl]);
     });
 
@@ -38,7 +38,7 @@ describe('Flightplan insert and delete', () => {
         expect(() => fpl.insertLeg(0, user(B))).toThrow('Cannot have more than 30 legs!');
 
         expect(fpl.getLegs()).toHaveLength(30);
-        expect(idents(fpl)).not.toContain('ABC');
+        expect(identsOf(fpl.getLegs())).not.toContain('ABC');
         expect(events).toEqual([]);
     });
 
@@ -48,7 +48,7 @@ describe('Flightplan insert and delete', () => {
         fpl.insertLeg(29, user(B));
 
         expect(fpl.getLegs()).toHaveLength(30);
-        expect(idents(fpl)[29]).toBe('ABC');
+        expect(identsOf(fpl.getLegs())[29]).toBe('ABC');
     });
 
     it('deletes the leg at the index, closes the gap and publishes the plan once (4-5)', () => {
@@ -56,7 +56,7 @@ describe('Flightplan insert and delete', () => {
 
         fpl.deleteLeg(1);
 
-        expect(idents(fpl)).toEqual(['KAAA', 'KBBB']);
+        expect(identsOf(fpl.getLegs())).toEqual(['KAAA', 'KBBB']);
         expect(events).toEqual([fpl]);
     });
 
@@ -75,7 +75,7 @@ describe('Flightplan insert and delete', () => {
         fpl.insertLeg(3, user(D));
 
         expect(events).toEqual([fpl, fpl]);
-        expect(idents(fpl)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEF']);
+        expect(identsOf(fpl.getLegs())).toEqual(['KAAA', 'ABC', 'KBBB', 'DEF']);
     });
 
     it('does not publish a delete inside a batch either (characterization)', () => {
@@ -97,7 +97,7 @@ describe('Flightplan procedures', () => {
         fpl.removeProcedures();
 
         expect(fpl.getLegs().map(l => l.type)).toEqual([KLNLegType.USER, KLNLegType.USER]);
-        expect(idents(fpl)).toEqual(['KAAA', 'KBBB']);
+        expect(identsOf(fpl.getLegs())).toEqual(['KAAA', 'KBBB']);
     });
 
     // characterization: the callers (APT 7/8, the procedure rows of FPL 0) rely on it, the Pilot's Guide describes no API
@@ -118,9 +118,9 @@ describe('Flightplan copies', () => {
         target.load(source);
         target.deleteLeg(0);
 
-        expect(idents(target)).toEqual(['KBBB']);
+        expect(identsOf(target.getLegs())).toEqual(['KBBB']);
         // 4-1: changes to FPL 0 do not change the numbered plan it came from. The SID is not copied (6-23)
-        expect(idents(source)).toEqual(['KAAA', 'ABC', 'KBBB']);
+        expect(identsOf(source.getLegs())).toEqual(['KAAA', 'ABC', 'KBBB']);
         expect(events).toHaveLength(2);
     });
 
@@ -130,8 +130,8 @@ describe('Flightplan copies', () => {
 
         target.loadInverted(source);
 
-        expect(idents(target)).toEqual(['KBBB', 'ABC', 'KAAA']);
-        expect(idents(source)).toEqual(['KAAA', 'ABC', 'KBBB']);
+        expect(identsOf(target.getLegs())).toEqual(['KBBB', 'ABC', 'KAAA']);
+        expect(identsOf(source.getLegs())).toEqual(['KAAA', 'ABC', 'KBBB']);
         expect(events).toEqual([target]);
     });
 
@@ -144,7 +144,7 @@ describe('Flightplan copies', () => {
         target.loadInverted(source);
 
         expect(target.getLegs().map(l => l.type)).toEqual([KLNLegType.USER, KLNLegType.SID, KLNLegType.USER]);
-        expect(idents(target)).toEqual(['KBBB', 'ABC', 'KAAA']);
+        expect(identsOf(target.getLegs())).toEqual(['KBBB', 'ABC', 'KAAA']);
     });
 
     it('delete empties the plan (4-5)', () => {

@@ -13,6 +13,9 @@ import {pointBefore, pointFrom} from '../../harness/flight/geo';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
+import {NO_GPS_SIMVARS, panelXml} from '../../harness/panelXml';
+import {activeIdent, fplIdents} from '../../harness/readers';
+import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {KLNLegType} from '../../../kln90b/data/flightplan/Flightplan';
 import {insertLegIntoFpl} from '../../../kln90b/services/FlightplanUtils';
 
@@ -25,23 +28,16 @@ import {insertLegIntoFpl} from '../../../kln90b/services/FlightplanUtils';
 /** The instrument's planner. The options only matter when the planner does not exist yet, and WTFlightplanSync made it */
 const plannerOf = (unit: HeadlessUnit): FlightPlanner => FlightPlanner.getPlanner('kln90b', unit.core.bus, {} as FlightPlannerOptions);
 const identsOf = (plan: FlightPlan): string[] => [...plan.legs()].map(l => l.leg.fixIcaoStruct.ident);
-/** The idents of the KLN's own FPL 0 */
-const klnIdents = (unit: HeadlessUnit): string[] => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident);
 
-const NO_GPS_SIMVARS_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output><WriteGPSSimVars>false</WriteGPSSimVars></Output></Instrument></PlaneHTMLConfig>';
+const NO_GPS_SIMVARS_XML = panelXml(NO_GPS_SIMVARS);
 
 describe('the "kln90b" flight planner on the standard route', () => {
-    const {kaaa, abc, kbbb} = standardRoute();
+    const {kaaa, abc} = standardRoute();
     const xray = intersection('XRAY', 47.2, 8.7);
     const position = pointBefore(kaaa, abc, 20);
 
-    async function bootOnRoute(panelXml?: string) {
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb, xray], storage: savedFlightplan(0, [kaaa, abc, kbbb]), position, magvar: 4, panelXml,
-        });
-        await settle(unit);
-        return unit;
-    }
+    // The standard route and the extra fix XRAY; the magnetic variation 4 E is on purpose
+    const bootOnRoute = (xml?: string) => bootOnStandardRoute({facilities: [xray], position, magvar: 4, panelXml: xml});
 
     it('mirrors FPL 0 with the coordinates of its waypoints and the active leg', async () => {
         const unit = await bootOnRoute();
@@ -65,7 +61,7 @@ describe('the "kln90b" flight planner on the standard route', () => {
         insertLeg(unit, 2, xray);
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(klnIdents(unit)).toEqual(['KAAA', 'ABC', 'XRAY', 'KBBB']);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'ABC', 'XRAY', 'KBBB']);
         expect(identsOf(plan)).toEqual(['KAAA', 'ABC', 'XRAY', 'KBBB']);
     });
 
@@ -132,7 +128,7 @@ describe('the "kln90b" flight planner on the standard route', () => {
         insertLegIntoFpl(fpl1, unit.props.memory.navPage, 0, {wpt: xray, type: KLNLegType.USER});
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(fpl1.getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['XRAY']); // The edit happened
+        expect(fplIdents(unit, 1)).toEqual(['XRAY']); // The edit happened
         expect(identsOf(plan)).toEqual(['KAAA', 'ABC', 'KBBB']);
     });
 
@@ -146,7 +142,7 @@ describe('the "kln90b" flight planner on the standard route', () => {
         insertLeg(unit, 2, xray);
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(klnIdents(unit)).toEqual(['KAAA', 'ABC', 'XRAY', 'KBBB']);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'ABC', 'XRAY', 'KBBB']);
         expect(identsOf(plan)).toEqual(before);
     });
 
@@ -158,14 +154,14 @@ describe('the "kln90b" flight planner on the standard route', () => {
         const aw = unit.props.memory.navPage.activeWaypoint;
 
         expect(unit.errors).toEqual([]);
-        expect(klnIdents(unit)).toEqual(['KAAA', 'ABC', 'KBBB']);
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(fplIdents(unit)).toEqual(['KAAA', 'ABC', 'KBBB']);
+        expect(activeIdent(unit)).toBe('ABC');
         expect(plannerOf(unit).hasFlightPlan(0)).toBe(true);
 
         aw.sequenceToNextWaypoint();
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
     });
 
     it.fails('leaves plan 0 empty with Output.WriteGPSSimVars off, after the boot (#142)', async () => {
@@ -220,7 +216,7 @@ describe('the "kln90b" flight planner behind a fence', () => {
 
         // The KLN itself holds the whole procedure, the planner stops at the MAP
         expect(unit.errors).toEqual([]);
-        expect(klnIdents(unit)).toEqual(['ENRAA', 'IFAAA', 'VVV', 'MAPAA', 'VVV', 'KDST']);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'IFAAA', 'VVV', 'MAPAA', 'VVV', 'KDST']);
         expect(aw.getActiveFplIdx()).toBe(2);
         expect(identsOf(plan)).toEqual(['ENRAA', 'IFAAA', 'VVV', 'MAPAA']);
         expect(plan.activeLateralLeg).toBe(2);
@@ -283,7 +279,7 @@ describe('the "kln90b" flight planner behind a fence', () => {
         const plan = plannerOf(unit).getFlightPlan(0);
 
         expect(unit.errors).toEqual([]);
-        expect(klnIdents(unit)).toEqual(['ENRWP', 'D270J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['ENRWP', 'D270J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
         expect(aw.getActiveFplIdx()).toBe(1);
         expect(identsOf(plan)).toEqual(['ENRWP', 'D270J']);
         expect(plan.activeLateralLeg).toBe(1);
@@ -297,7 +293,7 @@ describe('the "kln90b" flight planner behind a fence', () => {
         const plan = plannerOf(unit).getFlightPlan(0);
 
         expect(unit.errors).toEqual([]);
-        expect(klnIdents(unit)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
         expect(aw.getActiveFplIdx()).toBe(1);
         expect(identsOf(plan)).toEqual(['ARCEN', 'FAFAA', 'MAPAA']);
         expect(plan.activeLateralLeg).toBe(0);
@@ -318,7 +314,7 @@ describe('the "kln90b" flight planner behind a fence', () => {
         const plan = plannerOf(unit).getFlightPlan(0);
 
         expect(unit.errors).toEqual([]);
-        expect(klnIdents(unit)).toEqual(['ENRWP', 'D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['ENRWP', 'D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
         expect(aw.getActiveFplIdx()).toBe(1); // The aircraft sits on the entry D225J, so the leg to the entry is the active one
         aw.sequenceToNextWaypoint(); // ARCEN: the aircraft is on the arc
         await vi.advanceTimersByTimeAsync(1000);

@@ -7,6 +7,7 @@ import {UserFlightplanLoaderV2} from '../../../kln90b/settings/UserFlightplanLoa
 import {MessageHandler} from '../../../kln90b/data/MessageHandler';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
 import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
+import {identsOf} from '../../harness/readers';
 
 // Contract source: CLAUDE.md "Public contract with aircraft" (persisted user data: the V2 flight-plan strings) and
 // docs/architecture.md Core 7: `fpl{i}` stores FPL i for 0 to 25, including FPL 0, as concatenated 19 character ICAOs
@@ -57,7 +58,7 @@ describe('user flight plan V2 loader', () => {
             ['A', '', 'KAAA'], ['V', 'K1', 'ABC'], ['N', 'K2', 'XY'], ['W', 'K1', 'FIXA'], ['U', 'XX', 'MYWPT'],
         ]);
         expect(plans[25].idx).toBe(25);
-        expect(plans[25].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['ABC', 'KAAA']);
+        expect(identsOf(plans[25].getLegs())).toEqual(['ABC', 'KAAA']);
         expect(plans[1].getLegs()).toEqual([]);
     });
 
@@ -67,7 +68,7 @@ describe('user flight plan V2 loader', () => {
 
         const plans = await restore(messageHandler);
 
-        expect(plans[2].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'ABC']);
+        expect(identsOf(plans[2].getLegs())).toEqual(['KAAA', 'ABC']);
         expect(messageHandler.getMessages().map(m => m.message)).toEqual([['WAYPOINT GONE DELETED']]);
     });
 
@@ -78,7 +79,7 @@ describe('user flight plan V2 loader', () => {
         const plans = await restore(messageHandler);
 
         expect(plans[4].getLegs().length).toBe(30);
-        expect(plans[4].getLegs().map(l => l.wpt.icaoStruct.ident)).not.toContain('ABC');
+        expect(identsOf(plans[4].getLegs())).not.toContain('ABC');
         expect(messageHandler.getMessages().map(m => m.message)).toEqual([['WAYPOINT ABC DELETED']]);
     });
 });

@@ -229,3 +229,29 @@ describe('clock and random helpers', () => {
         expect(draw(43)[0]).not.toBe(a[0]);
     });
 });
+
+describe('FakeSim.writeCount', () => {
+    it('counts the writes of one variable, whatever the case of the name asked for', () => {
+        sim.reset();
+        SimVar.SetSimVarValue('L:Count_Me', SimVarValueType.Number, 1);
+        SimVar.SetSimVarValue('L:Count_Me', SimVarValueType.Number, 2);
+        SimVar.SetSimVarValue('L:Count_Other', SimVarValueType.Number, 1);
+        // A name that extends the counted one is another variable (NAV OBS:1 and NAV OBS:10)
+        SimVar.SetSimVarValue('L:Count_Me_Too', SimVarValueType.Number, 1);
+
+        expect(sim.writeCount('L:Count_Me')).toBe(2);
+        expect(sim.writeCount('l:count_me')).toBe(2);
+        expect(sim.writeCount('L:COUNT_OTHER')).toBe(1);
+        expect(sim.writeCount('L:Count_None')).toBe(0);
+        sim.reset();
+    });
+
+    it('does not count a value the test set, which is not a write of the instrument', () => {
+        sim.reset();
+        sim.set('L:Count_Set', 'number', 5);
+
+        expect(sim.writeCount('L:Count_Set')).toBe(0);
+        sim.reset();
+    });
+});
+

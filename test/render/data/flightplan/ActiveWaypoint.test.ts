@@ -5,6 +5,9 @@ import {standardRoute} from '../../../harness/fixtures';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
 import {savedFlightplan} from '../../../harness/storage';
+import {NO_OBS, panelXml} from '../../../harness/panelXml';
+import {activeIdent, fplIdents} from '../../../harness/readers';
+import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {Screen} from '../../../harness/render/screen';
 import {courseDeg, pointBefore, pointFrom} from '../../../harness/flight/geo';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
@@ -43,19 +46,12 @@ describe('ActiveWaypoint on FPL 0', () => {
 
     /** FPL 0 is KAAA, ABC, KBBB with ABC active; a Direct To KBBB is typed on the DIR page and confirmed */
     async function typedDirectToKbbb() {
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-        });
-        await settle(unit);
+        const unit = await bootOnStandardRoute({position: {lat: 47.1, lon: 8.0}});
         const aw = unit.props.memory.navPage.activeWaypoint;
         expect(aw.getActiveFplIdx()).toBe(1); // Precondition: ABC is active
 
         // The boot right page is SUP without a facility, so the DIR page opens blank (not prefilled with ABC)
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'KBBB');
-        await unit.panel.ent(); // APT 1 confirmation
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.directTo('KBBB');
         return unit;
     }
 
@@ -65,7 +61,7 @@ describe('ActiveWaypoint on FPL 0', () => {
         const aw = unit.props.memory.navPage.activeWaypoint;
 
         expect(unit.errors).toEqual([]);
-        expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
         expect(aw.getActiveFplIdx()).toBe(2);
         expect(aw.isDctNavigation()).toBe(true);
         // What the pilot sees: back on NAV 2 and NAV 1, flying to KBBB. The arrow and the ident are asserted without the
@@ -86,10 +82,7 @@ describe('ActiveWaypoint on FPL 0', () => {
 
     /** The same plan with a direct-to KBBB from FPL 0 (DCT on the KBBB leg), then KBBB deleted from the plan */
     async function deletedDirectToTarget() {
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-        });
-        await settle(unit);
+        const unit = await bootOnStandardRoute({position: {lat: 47.1, lon: 8.0}});
         const aw = unit.props.memory.navPage.activeWaypoint;
 
         await unit.panel.selectPage('L', 'FPL 0');
@@ -112,7 +105,7 @@ describe('ActiveWaypoint on FPL 0', () => {
         const aw = unit.props.memory.navPage.activeWaypoint;
 
         expect(unit.errors).toEqual([]);
-        expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
         expect(aw.getActiveFplIdx()).toBe(-1);
         expect(aw.isDctNavigation()).toBe(true);
         expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(2);
@@ -134,7 +127,7 @@ describe('ActiveWaypoint on FPL 0', () => {
 
 describe('OBS mode on a flight plan with the same waypoint twice (3415417, #67)', () => {
     // The default ObsSource 1 would take the course from Nav OBS:1 and never reach the fallback line of the fix
-    const OBS_SOURCE_OFF = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input></Instrument></PlaneHTMLConfig>';
+    const OBS_SOURCE_OFF = panelXml(NO_OBS);
 
     async function enterObsOnDuplicatedPlan() {
         // Five NM west of KAAA, so the bearing to KAAA is about 090
@@ -157,9 +150,10 @@ describe('OBS mode on a flight plan with the same waypoint twice (3415417, #67)'
         const nav = unit.props.memory.navPage;
 
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
-        expect(nav.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('KAAA');
+        expect(activeIdent(unit)).toBe('KAAA');
         expect(Number.isFinite(nav.obsMag)).toBe(true);
-        expect(Number.isFinite(nav.xtkToActive)).toBe(true);
+        // The aircraft stands on the OBS course, which is the bearing to the waypoint, so only rounding remains
+        expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.01);
         // Under the break the OBS course on the left half is blank (OBS:°)
         expect(Screen.read().rows('L')[3]).toMatch(/^OBS:\d{3}°/);
         expect(unit.errors).toEqual([]);
@@ -203,11 +197,11 @@ describe('sequencing after a direct-to to a waypoint of FPL 0 (748151c, #70)', (
     // 4-10: a direct-to to a waypoint of FPL 0 resumes the plan when the waypoint is reached.
     // 748151c published activeWaypointChanged before the leg data was set, which threw here after a direct-to.
     it('sequences to the next leg of FPL 0 without an error (#70)', async () => {
-        const {aw} = await directToAbc();
+        const {unit, aw} = await directToAbc();
 
         expect(() => aw.sequenceToNextWaypoint()).not.toThrow();
 
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
         expect(aw.getActiveFplIdx()).toBe(2);
         expect(aw.isDctNavigation()).toBe(false); // 4-10: the plan is resumed
     });
@@ -266,7 +260,7 @@ describe('the active leg after loading an approach with a missed approach to its
 
     it('activates the leg to the FAF, not the missed approach leg back to the VOR (#41)', async () => {
         const unit = await loadVorApproachAbeamFinal();
-        const idents = unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident);
+        const idents = fplIdents(unit);
         const aw = unit.props.memory.navPage.activeWaypoint;
 
         expect(idents).toEqual(['ENRAA', 'IFAAA', 'VVV', 'MAPAA', 'VVV', 'KDST']); // Precondition
@@ -277,6 +271,6 @@ describe('the active leg after loading an approach with a missed approach to its
         // its closest point is between its waypoints, and it wins. Without the between check the legs on the final course
         // count 0.13 NM (index 3 wins); the old rule of 42099f3 gives index 4.
         expect(aw.getActiveFplIdx()).toBe(2);
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('VVV');
+        expect(activeIdent(unit)).toBe('VVV');
     });
 });

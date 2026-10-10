@@ -1,8 +1,10 @@
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it} from 'vitest';
 import {Facility, ICAO} from '@microsoft/msfs-sdk';
-import {bootUnit, settle} from '../../../harness/boot';
+import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
+import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {standardRoute} from '../../../harness/fixtures';
 import {airport} from '../../../harness/navdata/builders';
+import {activeIdent} from '../../../harness/readers';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan, SavedUserWaypoint, savedUserWaypoints} from '../../../harness/storage';
 
@@ -10,6 +12,36 @@ import {savedFlightplan, SavedUserWaypoint, savedUserWaypoints} from '../../../h
 function userWaypoints(idents: string[]): Record<string, unknown> {
     return savedUserWaypoints(idents.map(ident => ({kind: 'int', ident, lat: 47.5, lon: -(8 + 15.5 / 60)})));
 }
+
+const syncHandlers = (unit: HeadlessUnit) => unit.props.bus.getTopicSubscriberCount(KLNFacilityRepository.SYNC_TOPIC);
+
+// Pages are recreated on every knob step (CLAUDE.md), so OTH 3 subscribes to the repository sync each time it shows.
+// The sibling of the #96 pin below: the count rises while the page shows, so the pin's count is observable
+describe('OTH 3 page, the repository sync subscription (characterization)', () => {
+    it('characterization: subscribes to the repository sync while it shows (#96)', async () => {
+        const unit = await bootUnit();
+        const before = syncHandlers(unit);
+        await unit.panel.selectPage('L', 'OTH 3');
+        expect(syncHandlers(unit)).toBe(before + 1);
+    });
+});
+
+// The expectation is that of issue #96: a page that is left leaves no subscription behind (CLAUDE.md only says that pages
+// are recreated on every knob step). The route NAV 1 to OTH 3 and back passes the pages between them (the CAL, STA, SET,
+// TRI, MOD and FPL pages and OTH 1 and OTH 2), none of which subscribes to the repository sync, which is why the count
+// before the first visit is the count without a handler of this page
+describe('OTH 3 page, the lifecycle of its subscription (#96)', () => {
+    it.fails('leaves no repository sync handler behind once it is left (#96)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'NAV 1');
+        const before = syncHandlers(unit);
+        for (let i = 0; i < 3; i++) {
+            await unit.panel.selectPage('L', 'OTH 3');
+            await unit.panel.selectPage('L', 'NAV 1');
+        }
+        expect(syncHandlers(unit)).toBe(before);
+    });
+});
 
 describe('OTH 3 page', () => {
     // The list shows five rows below the title, and the focused one must stay among them
@@ -129,7 +161,7 @@ describe('OTH 3 page, the user waypoint list (5-20)', () => {
         });
         await settle(unit);
         // The aircraft is at KAAA, so the active waypoint is KBBB and AINT is not it
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
         await unit.panel.selectPage('L', 'OTH 3');
         const first = Screen.read().rows('L').slice(1);
         await unit.panel.cursor('L');
@@ -145,7 +177,7 @@ describe('OTH 3 page, the user waypoint list (5-20)', () => {
         const unit = await bootUnit({storage: MIXED_STORAGE});
         await unit.panel.selectPage('L', 'OTH 3');
         await unit.panel.cursor('L');
-        await unit.panel.outer('L', 2); // AVOR
+        await unit.panel.cursorTo('L', 'AVOR  V   6');
 
         await unit.panel.clr();
 
@@ -157,15 +189,11 @@ describe('OTH 3 page, the user waypoint list (5-20)', () => {
     // Direct To made the active waypoint, so only the active check can refuse the deletion
     it('refuses to delete the active waypoint with ACTIVE WPT (C-1)', async () => {
         const unit = await bootUnit({storage: savedUserWaypoints(MIXED)});
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'AINT');
-        await unit.panel.ent();
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(1000);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('AINT');
+        await unit.panel.directTo('AINT');
+        expect(activeIdent(unit)).toBe('AINT');
         await unit.panel.selectPage('L', 'OTH 3');
         await unit.panel.cursor('L');
-        await unit.panel.outer('L', 4); // AINT
+        await unit.panel.cursorTo('L', 'AINT  I');
 
         await unit.panel.clr();
 
@@ -178,10 +206,10 @@ describe('OTH 3 page, the user waypoint list (5-20)', () => {
         const kaaa = airport('KAAA', 47.0, 8.0);
         const unit = await bootUnit({facilities: [kaaa], storage: {...savedUserWaypoints(MIXED), ...savedFlightplan(0, [kaaa, aint])}});
         await settle(unit);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('AINT');
+        expect(activeIdent(unit)).toBe('AINT');
         await unit.panel.selectPage('L', 'OTH 3');
         await unit.panel.cursor('L');
-        await unit.panel.outer('L', 4); // AINT
+        await unit.panel.cursorTo('L', 'AINT  I   0');
 
         await unit.panel.clr();
 
@@ -195,7 +223,7 @@ describe('OTH 3 page, the user waypoint list (5-20)', () => {
         const unit = await bootUnit({storage: MIXED_STORAGE});
         await unit.panel.selectPage('L', 'OTH 3');
         await unit.panel.cursor('L');
-        await unit.panel.outer('L', 4); // AINT
+        await unit.panel.cursorTo('L', 'AINT  I');
 
         await unit.panel.clr();
 

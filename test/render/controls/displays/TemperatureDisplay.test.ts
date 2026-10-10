@@ -1,13 +1,9 @@
 import {describe, expect, it} from 'vitest';
 import {TemperatureDisplay} from '../../../../kln90b/controls/displays/TemperatureDisplay';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedText} from '../../../harness/render/mount';
 
 /** The five cells of a temperature in °C after a display tick */
-function shown(celsius: number): string {
-    const m = mount(new TemperatureDisplay(celsius));
-    m.tick();
-    return m.text();
-}
+const shown = (celsius: number): string => mountedText(new TemperatureDisplay(celsius));
 
 describe('TemperatureDisplay', () => {
     // 5-43, figure 5-132: SAT 20°C and TAT 26°C, two digits and the degree Celsius

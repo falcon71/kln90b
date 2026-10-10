@@ -1,9 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, settle} from '../../harness/boot';
+import {bootUnit} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
-import {savedFlightplan} from '../../harness/storage';
-import {standardRoute} from '../../harness/fixtures';
+import {bootOnStandardRoute} from '../../harness/worldBoot';
 
 describe('FrontPanel.enterIdent (harness)', () => {
     describe('in an editor', () => {
@@ -23,12 +22,7 @@ describe('FrontPanel.enterIdent (harness)', () => {
         // the first character, enterIdent clicks once anyway, as a pilot would. NAV 4 shows the active waypoint ABC as
         // its VNAV waypoint, and the page has more fields after it.
         it('starts the edit when the editor already shows the first character: AAA over ABC on NAV 4', async () => {
-            const {kaaa, abc, kbbb} = standardRoute();
-            const unit = await bootUnit({
-                facilities: [kaaa, abc, kbbb, vor('AAA', 47.3, 8.3)], position: {lat: kaaa.lat, lon: kaaa.lon},
-                storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-            });
-            await settle(unit);
+            const unit = await bootOnStandardRoute({facilities: [vor('AAA', 47.3, 8.3)]});
             await unit.panel.selectPage('L', 'NAV 4');
             await unit.panel.cursor('L');
             await unit.panel.cursorTo('L', 'ABC');
@@ -202,6 +196,8 @@ describe('FrontPanel.enterIdent (harness)', () => {
         it('searches on a page with a blank status field, the left one of the self-test page', async () => {
             const unit = await bootUnit({engineRunning: false, magvar: 0});
             await unit.panel.powerOn();
+            // The Turn-On page shows for 17 s (TEST_TIME in kln90b/pages/WelcomePage.tsx); the other two seconds are the margin
+            // for the self-test page to show, as in bootToSelfTest
             await vi.advanceTimersByTimeAsync(19_000);
             expect(Screen.read().status().left).toBe('');
             expect(Screen.read().text()).toContain('APPROVE?');

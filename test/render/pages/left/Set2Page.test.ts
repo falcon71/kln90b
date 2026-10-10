@@ -1,8 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
+import {messageLines, messages} from '../../../harness/readers';
 import {Screen} from '../../../harness/render/screen';
 import {storedSetting} from '../../../harness/storage';
-import {OneTimeMessage} from '../../../../kln90b/data/MessageHandler';
 
 describe('SET 2 page', () => {
     // 3-53, 5-14: the figures of SET 2 and CAL 6 show the first zone as CORD UNIV/Z. The half page is 11 characters
@@ -20,20 +20,13 @@ describe('SET 2 page', () => {
         const unit = await bootUnit({storage: {fastGpsAcquisition: false}, coldGps: true});
         await unit.panel.selectPage('L', 'SET 2');
         await unit.panel.cursor('L');
-        await unit.panel.inner('L', 1); // day 01
-        await unit.panel.outer('L', 1);
-        await unit.panel.inner('L', 1); // JAN
-        await unit.panel.outer('L', 1);
-        await unit.panel.inner('L', 3); // the first click enters a 0, so this is a 2
-        await unit.panel.outer('L', 1);
-        await unit.panel.inner('L', 8); // a 7
+        await unit.panel.enterDate('L', 1, 1, [2, 7]); // 01 JAN 27
         expect(Screen.read().rows('L')[2]).toBe('  01 JAN 27');
         await unit.panel.ent(); // 1 Jan 2027 is after the expiration of the database
 
         expect(unit.errors).toEqual([]);
         expect(unit.props.database.isAiracCurrent()).toBe(false);
-        const messages = unit.props.messageHandler.getMessages().map(m => (m as OneTimeMessage).message);
-        expect(messages).toContainEqual(['RECYCLE POWER TO USE', 'CORRECT DATA BASE DATA']);
+        expect(messageLines(unit)).toContainEqual(['RECYCLE POWER TO USE', 'CORRECT DATA BASE DATA']);
     });
 });
 
@@ -99,7 +92,6 @@ describe('SET 2 cursor when the GPS gets its first fix (3-53)', () => {
 });
 
 const MAGVAR_INVALID = 'MAGNETIC VAR INVALID ALL DATA REFERENCED TO TRUE NORTH';
-const messages = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
 
 /** At N 74.5, tracking 090 true, with 10 W entered on SET 2 line 6 and the cursor left where ENT puts it */
 async function tenWestOutside(): Promise<HeadlessUnit> {
@@ -237,7 +229,7 @@ describe('SET 2 time zone (3-5, 3-54)', () => {
         await unit.panel.selectPage('L', 'SET 2');
         expect(unit.props.sensors.in.gps.isValid()).toBe(false);
         await unit.panel.cursor('L'); // the date
-        await unit.panel.outer('L', 2); // the time zone
+        await unit.panel.cursorTo('L', 'UTC'); // the time zone
         await unit.panel.inner('L', 8); // CDT
         await unit.panel.outer('L', -1); // the time
         await unit.panel.inner('L', 19); // the first click enters 00, so this is 18

@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {BoundaryType} from '@microsoft/msfs-sdk';
-import {bootUnit, settle} from '../../harness/boot';
+import {bootUnit, NEAREST_SEARCH_WAIT_MS, settle} from '../../harness/boot';
 import {airspace} from '../../harness/navdata/airspaces';
 import {airport} from '../../harness/navdata/builders';
 import {Screen} from '../../harness/render/screen';
@@ -20,8 +20,8 @@ describe('airspaces served by the harness', () => {
         });
         await settle(unit);
 
-        // The alert searches every 10 s
-        await vi.advanceTimersByTimeAsync(12000);
+        // The alert searches every 10 s (NEAREST_SEARCH_WAIT_MS)
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.msg();
 
         expect(messagePageText()).toContain('INSIDE SPC USE AIRSPACE\n R-TEST');
@@ -34,7 +34,7 @@ describe('airspaces served by the harness', () => {
         });
         await settle(unit);
 
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.msg();
 
         expect(messagePageText()).not.toContain('SPC USE AIRSPACE');

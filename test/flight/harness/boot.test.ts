@@ -18,6 +18,8 @@ describe('headless boot outside a test', () => {
 describe('headless boot', () => {
     it('boots to the main page with a GPS solution', async () => {
         const unit = await bootUnit({facilities: [vor('ABC', 47.2, 8.0)], position: {lat: 47, lon: 8}});
+        // Not a wait for the fix: the boot is force-ready (engineRunning defaults to true), so the fix and NAV 2 are
+        // there within a second. 30 s run 30 calculation ticks, so the error checks below see a unit that has been running
         await vi.advanceTimersByTimeAsync(30_000);
 
         const statusLine = document.querySelector('.statusline')!.textContent!.replace(/\u00a0/g, ' ');

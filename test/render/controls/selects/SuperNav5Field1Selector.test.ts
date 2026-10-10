@@ -1,39 +1,12 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
-import {legWorld} from '../../../harness/fixtures';
-import {pointFrom} from '../../../harness/flight/geo';
-import {SuperNav5} from '../../../harness/render/superNav5';
-import {savedFlightplan, storedSetting} from '../../../harness/storage';
+import {bootUnit} from '../../../harness/boot';
+import {showSuperNav5, superNav5OnLeg, SuperNav5} from '../../../harness/render/superNav5';
+import {storedSetting} from '../../../harness/storage';
 import {SuperNav5Field1} from '../../../../kln90b/settings/KLN90BUserSettings';
 
 // SuperNav5Field1Selector: the fifth line of the Super NAV 5 left column (left[4] of SuperNav5.read()): ETE, XTK or
 // VNAV, chosen with the left cursor and saved as the setting superNav5Field1. SuperNav5Page.test.ts holds the choices
 // and the cursor's visit; this file holds the formats of each choice and the commit.
-
-/**
- * Boots in the leg world on the leg to KDDD, `westNm` west of it and `rightNm` right of the course (south), moving at
- * `groundspeedKt` on track 090, and shows Super NAV 5 (NAV 5 on both sides; the right side first, its shorter way
- * passes NAV 5)
- */
-async function superNav5OnLeg(o: {
-    westNm: number, rightNm?: number, groundspeedKt?: number, storage?: Record<string, unknown>, magvar?: number,
-}): Promise<HeadlessUnit> {
-    const {kaaa, kddd, keee, west} = legWorld();
-    const start = west(o.westNm);
-    const unit = await bootUnit({
-        facilities: [kaaa, kddd, keee], position: start, magvar: o.magvar,
-        storage: {...savedFlightplan(0, [kaaa, kddd, keee]), ...o.storage},
-    });
-    await settle(unit);
-    const right = o.rightNm ?? 0;
-    const at = pointFrom(start, right >= 0 ? 180 : 0, Math.abs(right));
-    await moveAircraft(unit, at, {groundspeedKt: o.groundspeedKt ?? 120, trackTrue: 90});
-    await unit.panel.selectPage('R', 'NAV 4');
-    await unit.panel.selectPage('L', 'NAV 5');
-    await unit.panel.inner('R', 1);
-    await vi.advanceTimersByTimeAsync(1000);
-    return unit;
-}
 
 const field1 = () => SuperNav5.read().left[4];
 
@@ -129,10 +102,7 @@ describe('Super NAV 5 field 1 set to XTK without a cross track (eef92e8)', () =>
     // 6-8: the cross track field is six cells wide, the width of the other entries of the field (ETE and VNAV)
     it('is six cells wide', async () => {
         const unit = await bootUnit({storage: {superNav5Field1: SuperNav5Field1.XTK}});
-        await unit.panel.selectPage('R', 'NAV 4'); // the right side first: its shorter way passes NAV 5
-        await unit.panel.selectPage('L', 'NAV 5');
-        await unit.panel.inner('R', 1); // NAV 5 on both sides is Super NAV 5
-        await vi.advanceTimersByTimeAsync(250);
+        await showSuperNav5(unit, {waitMs: 250});
 
         const field = SuperNav5.read().left[4];
 

@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {bootUnit, settle} from '../../harness/boot';
 import {standardRoute} from '../../harness/fixtures';
 import {insertLeg} from '../../harness/flightplan';
+import {fplIdents} from '../../harness/readers';
 import {KLNLegType} from '../../../kln90b/data/flightplan/Flightplan';
 
 describe('insertLeg (harness)', () => {
@@ -15,7 +16,7 @@ describe('insertLeg (harness)', () => {
         insertLeg(unit, 1, abc);
 
         const legs = unit.props.memory.fplPage.flightplans[0].getLegs();
-        expect(legs.map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'ABC', 'KBBB']);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'ABC', 'KBBB']);
         expect(legs.map(l => l.type)).toEqual([KLNLegType.USER, KLNLegType.USER, KLNLegType.USER]);
         // The other flight plans are untouched
         expect(unit.props.memory.fplPage.flightplans[1].getLegs()).toEqual([]);

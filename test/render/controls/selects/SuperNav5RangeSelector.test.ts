@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {intersection} from '../../../harness/navdata/builders';
-import {SuperNav5} from '../../../harness/render/superNav5';
+import {showSuperNav5, SuperNav5} from '../../../harness/render/superNav5';
 import {savedFlightplan, storedSetting} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
 
@@ -25,10 +25,7 @@ async function superNav5(range: number): Promise<HeadlessUnit> {
         storage: {...savedFlightplan(0, [a0, a1, a2]), superNav5MapRange: range},
     });
     await settle(unit);
-    await unit.panel.selectPage('R', 'NAV 4');
-    await unit.panel.selectPage('L', 'NAV 5');
-    await unit.panel.inner('R', 1);
-    await vi.advanceTimersByTimeAsync(1000);
+    await showSuperNav5(unit);
     return unit;
 }
 

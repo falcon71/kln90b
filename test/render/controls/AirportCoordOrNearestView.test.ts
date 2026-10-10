@@ -16,11 +16,7 @@ const kin = () => airport('KIN', 47.1, 11.9);
 const kout = () => airport('KOUT', 46.85, 12.15);
 
 /** APT 1 on the first airport of the scan list (alphabetical), after the airspace search has finished */
-async function showApt1(unit: HeadlessUnit): Promise<string[]> {
-    await unit.panel.selectPage('R', 'APT 1');
-    await vi.advanceTimersByTimeAsync(2000);
-    return Screen.read().rows('R');
-}
+const showApt1 = (unit: HeadlessUnit): Promise<string[]> => unit.panel.show('R', 'APT 1', {waitMs: 2000});
 
 /** The next airport of the complete list with the pulled right inner knob (3-21), after its airspace search */
 async function scanToNext(unit: HeadlessUnit): Promise<string[]> {

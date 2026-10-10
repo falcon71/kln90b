@@ -4,6 +4,7 @@ import {KLNFacilityRepository} from '../../kln90b/data/navdata/KLNFacilityReposi
 import {bootUnit, HeadlessUnit, settle} from '../harness/boot';
 import {airport, ndb, vor} from '../harness/navdata/builders';
 import {Screen} from '../harness/render/screen';
+import {fplIdents} from '../harness/readers';
 import {savedFlightplan, storedSetting} from '../harness/storage';
 
 /** Boots with a file written by version 1: no userDataFormat, FPL 1 in fpl0 and 12 character ICAOs */
@@ -117,7 +118,7 @@ describe('a failed V2 restore of the user data', () => {
         // The restore ran: the waypoint is in the repository and FPL 1 holds its leg
         const good = KLNFacilityRepository.getRepository(unit.props.bus).get(ICAO.value('W', 'XX', '', 'GOOD'));
         expect(good?.icaoStruct.ident).toBe('GOOD');
-        expect(unit.props.memory.fplPage.flightplans[1].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA']);
+        expect(fplIdents(unit, 1)).toEqual(['KAAA']);
         expect(storedSetting(unit, 'fpl1')).toBe('A          KAAA    ');
     });
 

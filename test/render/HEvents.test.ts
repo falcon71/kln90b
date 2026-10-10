@@ -2,6 +2,8 @@ import {describe, expect, it, vi} from 'vitest';
 import {FixTypeFlags} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../harness/boot';
 import {standardRoute} from '../harness/fixtures';
+import {activeIdent} from '../harness/readers';
+import {bootOnStandardRoute} from '../harness/worldBoot';
 import {airport, intersection, vor} from '../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../harness/navdata/procedures';
 import {Screen} from '../harness/render/screen';
@@ -62,6 +64,8 @@ describe('every public H event (sweep)', () => {
     it.each(PUBLIC_EVENTS)('accepts %s on the self-test page without an error (sweep)', async evt => {
         const unit = await bootUnit({engineRunning: false});
         unit.send('KLN90B_Power_On');
+        // The Turn-On page shows for 17 s (TEST_TIME in kln90b/pages/WelcomePage.tsx; 3-3 for the page itself); the rest is
+        // the margin for the self-test page to show
         await vi.advanceTimersByTimeAsync(20_000);
         // The self-test is through and the unit waits for the database to be approved
         expect(Screen.read().rows('R')[5]).toBe('  APPROVE? ');
@@ -274,17 +278,12 @@ describe('ALT button (3-55, 3-56, 3-39)', () => {
 });
 
 describe('DCT, ENT and CLR buttons (3-29, 4-7, 5-37)', () => {
-    const {kaaa, abc, kbbb} = standardRoute();
-
     /** Plan KAAA, ABC, KBBB with ABC active, the right side off the SUP page of the boot (an open DCT page is blank there, #119) */
     async function planWithAbcActive() {
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-        });
-        await settle(unit);
+        const unit = await bootOnStandardRoute({position: {lat: 47.1, lon: 8.0}});
         await unit.panel.press('KLN90B_RightLargeKnob_Left', 5); // SUP, INT, NDB, VOR, APT, NAV
         expect(Screen.read().rightName().slice(0, 3)).toBe('NAV'); // Any NAV page, not a waypoint page
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(false);
         return unit;
     }
@@ -315,7 +314,7 @@ describe('DCT, ENT and CLR buttons (3-29, 4-7, 5-37)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         const nav = unit.props.memory.navPage;
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(nav.activeWaypoint.isDctNavigation()).toBe(true);
     });
 
@@ -330,7 +329,7 @@ describe('DCT, ENT and CLR buttons (3-29, 4-7, 5-37)', () => {
 
         const nav = unit.props.memory.navPage;
         expect(nav.activeWaypoint.isDctNavigation()).toBe(false);
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
     });
 });
 
@@ -422,9 +421,9 @@ describe('approach arm button (6-1, C-1)', () => {
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_LEG);
     });
 
-    // The mode field of the status line, columns 6 to 12; the MSG annunciator sits beside it (columns 14 to 16), and the
-    // booted unit keeps its boot messages unread
-    const modeField = () => Screen.read().row(6).slice(6, 13);
+    // The mode field of the status line; the MSG annunciator sits beside it (columns 14 to 16), and the booted unit
+    // keeps its boot messages unread, so the field is matched by its start
+    const modeField = () => Screen.read().status().mode;
 
     const kprc = airport('KPRC', 47.0, 8.0);
     const mapaa = intersection('MAPAA', 47.0, 8.0);
@@ -462,14 +461,14 @@ describe('approach arm button (6-1, C-1)', () => {
         const nav = unit.props.memory.navPage;
         expect(nav.navmode).toBe(NavMode.ENR_LEG);
         await vi.advanceTimersByTimeAsync(6000); // The status messages of the loaded procedure expire
-        expect(modeField()).toBe('enr-leg');
+        expect(modeField()).toMatch(/^enr-leg( |$)/);
 
         unit.send('KLN90B_ApprArm_Push');
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(nav.navmode).toBe(NavMode.ARM_LEG);
         // 5-32: the mode field of the status line
-        expect(modeField()).toBe('arm-leg');
+        expect(modeField()).toMatch(/^arm-leg( |$)/);
         expect(nav.xtkScale).toBe(5);
 
         unit.send('KLN90B_ApprArm_Push');

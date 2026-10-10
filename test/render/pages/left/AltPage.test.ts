@@ -2,6 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {storedSetting} from '../../../harness/storage';
+import {AIRDATA, ALTITUDE_ALERT, panelXml} from '../../../harness/panelXml';
 
 describe('ALT page (ee0b000)', () => {
     // 3-39: the ALT page sets the barometer with the left inner knob. Saving it in the settings is the project's own
@@ -66,8 +67,7 @@ describe('ALT page (characterization)', () => {
     // cursor starts on ALERT, because there is nothing to enter
     it('shows the baro setting of the altimeter and skips it with the cursor (characterization)', async () => {
         const unit = await bootUnit({
-            panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><Airdata><IsInterfaced>true</IsInterfaced>'
-                + '<BaroSource>1</BaroSource></Airdata></Input></Instrument></PlaneHTMLConfig>',
+            panelXml: panelXml({...AIRDATA, 'Input.Airdata.BaroSource': 1}),
         });
         unit.env.sim.set('KOHLSMAN SETTING HG:1', 'inches of mercury', 30.12);
         await vi.advanceTimersByTimeAsync(1000);
@@ -137,8 +137,7 @@ describe('ALT page (spec)', () => {
     // outer knob only steps through the baro field
     it('shows ALERT OFF and keeps the cursor off it when the installation disables altitude alerting (3-57)', async () => {
         const unit = await bootUnit({
-            panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output><AltitudeAlertEnabled>false</AltitudeAlertEnabled>'
-                + '</Output></Instrument></PlaneHTMLConfig>',
+            panelXml: panelXml(ALTITUDE_ALERT(false)),
         });
         await unit.panel.alt();
 

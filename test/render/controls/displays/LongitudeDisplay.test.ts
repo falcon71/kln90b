@@ -1,13 +1,9 @@
 import {describe, expect, it} from 'vitest';
 import {LongitudeDisplay} from '../../../../kln90b/controls/displays/LongitudeDisplay';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedText} from '../../../harness/render/mount';
 
 /** The eleven cells of a longitude in degrees (west negative) after a display tick */
-function shown(lon: number | null): string {
-    const m = mount(new LongitudeDisplay(lon));
-    m.tick();
-    return m.text();
-}
+const shown = (lon: number | null): string => mountedText(new LongitudeDisplay(lon));
 
 // The dashes of a null longitude are pinned in NullDashes.test.ts (#224), which holds the null rows of every display
 describe('LongitudeDisplay', () => {

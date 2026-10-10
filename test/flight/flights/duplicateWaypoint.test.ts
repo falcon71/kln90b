@@ -6,6 +6,7 @@ import {vor} from '../../harness/navdata/builders';
 import {standardRoute} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
 import {angleBetween, courseDeg, distanceNm, finalCourseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
+import {turnStackLength} from '../../harness/readers';
 
 /** The standard world of the proof flight: KAAA - ABC - KBBB, with the aircraft 3 NM before ABC on the first leg */
 async function flyToward(plan: (kaaa: Facility, abc: Facility, kbbb: Facility, world: World) => Facility[], storage: Record<string, unknown>) {
@@ -78,13 +79,11 @@ describe('no turn anticipation into a duplicated waypoint (#27)', () => {
     it('overflies ABC on the first leg, without a turn path, bank or cross track (#27)', async () => {
         const {flight, abc} = await flyToward((kaaa, abc, kbbb) => [kaaa, abc, abc, kbbb], {});
         const activeIdx = () => flight.unit.props.memory.navPage.activeWaypoint.getActiveFplIdx();
-        // ActiveWaypoint replaces the array when it sequences, so read the field each time
-        const turnStackLength = () => flight.unit.props.memory.navPage.activeWaypoint.turnStack.length;
         const samples: { turnStackLength: number; bank: number; xtk: number; distToAbc: number }[] = [];
         flight.monitor('approach to the first ABC', f => {
             const xtk = f.nav.xtkNm;
             if (activeIdx() === 1 && xtk !== null) {
-                samples.push({turnStackLength: turnStackLength(), bank: f.aircraft.bankDeg, xtk, distToAbc: distanceNm(f.aircraft, abc)});
+                samples.push({turnStackLength: turnStackLength(flight.unit), bank: f.aircraft.bankDeg, xtk, distToAbc: distanceNm(f.aircraft, abc)});
             }
             return true;
         });

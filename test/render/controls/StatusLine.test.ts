@@ -4,7 +4,9 @@ import {standardRoute} from '../../harness/fixtures';
 import {courseDeg} from '../../harness/flight/geo';
 import {blinkCycle} from '../../harness/render/blink';
 import {Screen} from '../../harness/render/screen';
-import {savedFlightplan} from '../../harness/storage';
+import {messages} from '../../harness/readers';
+import {NO_OBS, panelXml} from '../../harness/panelXml';
+import {bootOnStandardRoute} from '../../harness/worldBoot';
 
 /** The values L:KLN90B_MsgLight takes over 8 display ticks (250 ms each), two seconds */
 async function msgLightOverTwoSeconds(unit: HeadlessUnit): Promise<Set<number>> {
@@ -33,10 +35,7 @@ describe('L:KLN90B_MsgLight (spec)', () => {
         await settle(unit);
 
         // The boot messages: reading them all closes the MSG page
-        await unit.panel.press('KLN90B_MSG_Push');
-        await unit.panel.press('KLN90B_MSG_Push');
-        await unit.panel.press('KLN90B_MSG_Push');
-        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.readMessages();
 
         expect(await msgLightOverTwoSeconds(unit)).toEqual(new Set([0]));
     });
@@ -45,12 +44,9 @@ describe('L:KLN90B_MsgLight (spec)', () => {
     // follow the prompt. The condition is a wrong external course: ADJ NAV IND CRS TO nnn stays while Nav OBS:1 differs from
     // the DTK by more than 5 degrees (PersistentMessages.ts, active with the default Output.ObsTarget 0 and Input.ObsSource 1).
     it('is steady while a persistent message stays, and dark once its condition ends (3-16, 3-59)', async () => {
-        const {kaaa, abc, kbbb} = standardRoute();
+        const {kaaa, abc} = standardRoute();
         const magvar = 4;
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb]), magvar,
-        });
-        await settle(unit);
+        const unit = await bootOnStandardRoute({magvar});
         // On KAAA the DTK is the course of the first leg, and the unit shows it magnetic
         const dtk = courseDeg(kaaa, abc) - magvar;
         expect(Math.round(dtk)).toBe(46); // The literal of the message below follows from this, not from the unit
@@ -58,16 +54,9 @@ describe('L:KLN90B_MsgLight (spec)', () => {
         unit.env.sim.set('Nav OBS:1', 'degrees', dtk + 30);
         await vi.advanceTimersByTimeAsync(15000); // Past the 10 s in which the message shows whatever the course is
 
-        // Read every message: the MSG page marks them seen
-        await unit.panel.press('KLN90B_MSG_Push');
-        const rows = Array.from({length: 6}, (_, r) => Screen.read().row(r).trimEnd());
+        // Read every message: the MSG page marks them seen, and readMessages throws unless the page closed
         // A precondition: the setup raised the message, so the light below is held by it and not by something else
-        expect(rows).toContain('ADJ NAV IND CRS TO 046°');
-        for (let i = 0; i < 10 && Screen.read().status().left === ''; i++) {
-            await unit.panel.press('KLN90B_MSG_Push');
-        }
-        expect(Screen.read().status().left).not.toBe(''); // The page closed: every message was read
-        await vi.advanceTimersByTimeAsync(1000);
+        expect(await unit.panel.readMessages()).toContain('ADJ NAV IND CRS TO 046°');
 
         // Read, and the message stays: steady at every display tick, not flashing
         expect(await msgLightOverTwoSeconds(unit)).toEqual(new Set([1]));
@@ -115,30 +104,11 @@ const prompt = () => {
     return `${text.slice(14, 17)} ${mask.slice(14, 17)}`;
 };
 
-/** Reads the boot messages (testing.md section 6): MSG until the page closes; the one-time messages then go */
-async function readBootMessages(unit: HeadlessUnit): Promise<void> {
-    await unit.panel.msg();
-    for (let i = 0; i < 10 && Screen.read().status().left === ''; i++) {
-        await unit.panel.msg();
-    }
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(unit.props.messageHandler.hasMessages()).toBe(false); // the precondition: nothing is left
-}
-
 /**
  * The standard route in FPL 0, KAAA active, settled: MOD 2 then offers OBS with the ent prompt (5-33). Without an OBS
  * input (ObsSource 0) the unit reads no external course, so no ADJ NAV IND CRS message joins the boot messages
  */
-async function onRoute(): Promise<HeadlessUnit> {
-    const {kaaa, abc, kbbb} = standardRoute();
-    const unit = await bootUnit({
-        facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-        panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input>'
-            + '</Instrument></PlaneHTMLConfig>',
-    });
-    await settle(unit);
-    return unit;
-}
+const onRoute = (): Promise<HeadlessUnit> => bootOnStandardRoute({panelXml: panelXml(NO_OBS)});
 
 /**
  * NO SUCH WPT on the REF page (C-2): an ident the database lacks, typed into the waypoint field and entered. FPL 0 and
@@ -197,21 +167,14 @@ describe('status line, the center segment (spec)', () => {
     // 3-16: a message whose condition needs action keeps the prompt on, not flashing, once it is read. The condition is
     // a wrong external course, as in the MSG light test above
     it('keeps msg steady in inverse video once read while the condition stays (3-16)', async () => {
-        const {kaaa, abc, kbbb} = standardRoute();
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb]), magvar: 4,
-        });
-        await settle(unit);
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({magvar: 4});
         unit.env.sim.set('Nav OBS:1', 'degrees', courseDeg(kaaa, abc) - 4 + 30);
-        await vi.advanceTimersByTimeAsync(15000);
-        await unit.panel.msg();
-        for (let i = 0; i < 10 && Screen.read().status().left === ''; i++) {
-            await unit.panel.msg();
-        }
-        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(15000); // Past the 10 s in which the message shows whatever the course is
+        // readMessages throws unless the page closed; the persistent message is not removed by the reading
+        await unit.panel.readMessages();
         // The preconditions: every message was read, and the persistent one stays
-        expect(unit.props.messageHandler.getMessages().map(m => m.message.join(' ')))
-            .toEqual(['ADJ NAV IND CRS TO 046°']);
+        expect(messages(unit)).toEqual(['ADJ NAV IND CRS TO 046°']);
         expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
 
         expect(await overTwoSeconds(prompt)).toEqual(new Set(['msg III']));
@@ -220,7 +183,8 @@ describe('status line, the center segment (spec)', () => {
     // 3-10: the last three cells of the center segment are blank without a message and without ENT
     it('shows three blanks without a message and without ENT (3-10)', async () => {
         const unit = await bootUnit();
-        await readBootMessages(unit);
+        await unit.panel.readMessages(); // MSG until the page closes; the one-time messages then go
+        expect(unit.props.messageHandler.hasMessages()).toBe(false); // the precondition: nothing is left
 
         expect(await overTwoSeconds(prompt)).toEqual(new Set(['    ...']));
     });

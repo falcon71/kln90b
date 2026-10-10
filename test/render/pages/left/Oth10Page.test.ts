@@ -1,12 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {AIRDATA, fuelComputer, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
 
 /** Air data and a fuel computer, so the air data pages are OTH 9 and OTH 10 */
-const AIRDATA_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input>'
-    + '<Airdata><IsInterfaced>true</IsInterfaced></Airdata>'
-    + '<FuelComputer><IsInterfaced>true</IsInterfaced></FuelComputer>'
-    + '</Input></Instrument></PlaneHTMLConfig>';
+const AIRDATA_XML = panelXml({...AIRDATA, ...fuelComputer()});
 
 async function oth10(o: { satC: number; tatC: number; pressureAltFt: number }): Promise<HeadlessUnit> {
     const unit = await bootUnit({panelXml: AIRDATA_XML});

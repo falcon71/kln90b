@@ -5,19 +5,16 @@ import {efbRoute} from '../../harness/platform';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan, savedUserWaypoints} from '../../harness/storage';
+import {activeIdent, fplIdents, userWaypoints} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
 import {pointFrom} from '../../harness/flight/geo';
-import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
 const kbbb = airport('KBBB', 47.4, 8.0);
 
-/** The user waypoints in the facility repository, as "ident region", sorted */
-function userWaypoints(unit: HeadlessUnit): string[] {
-    const found: string[] = [];
-    KLNFacilityRepository.getRepository(unit.props.bus).forEach(f => found.push(`${f.icaoStruct.ident} ${f.icaoStruct.region}`), [FacilityType.USR]);
-    return found.sort();
-}
+/** The user waypoints (type USR) in the facility repository, as "ident region", sorted */
+const userWaypointNames = (unit: HeadlessUnit): string[] =>
+    userWaypoints(unit, FacilityType.USR).map(f => `${f.icaoStruct.ident} ${f.icaoStruct.region}`).sort();
 
 /**
  * A temporary user waypoint (region XY) as an earlier session saved it, in the V2 format (docs/architecture.md, Core 7):
@@ -38,15 +35,15 @@ describe('TemporaryWaypointDeleter', () => {
         await settle(unit);
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [{lat: 47.1, lon: 8.1}]}));
         await vi.advanceTimersByTimeAsync(2000);
-        expect(userWaypoints(unit)).toEqual(['CUST XY']); // Precondition: the lat/lon leg is a temporary waypoint
+        expect(userWaypointNames(unit)).toEqual(['CUST XY']); // Precondition: the lat/lon leg is a temporary waypoint
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb})); // FPL 0 no longer holds CUST
         await vi.advanceTimersByTimeAsync(2000);
-        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'KBBB']);
-        expect(userWaypoints(unit)).toEqual(['CUST XY']); // Not before the unit is turned off
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
+        expect(userWaypointNames(unit)).toEqual(['CUST XY']); // Not before the unit is turned off
 
         await unit.panel.powerOff();
 
-        expect(userWaypoints(unit)).toEqual([]);
+        expect(userWaypointNames(unit)).toEqual([]);
     });
 
     // 5-22 and 5-26: a reference waypoint that is part of a flight plan stays, and OTH 3 lists it with the number of that
@@ -56,12 +53,12 @@ describe('TemporaryWaypointDeleter', () => {
         await settle(unit);
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [{lat: 47.1, lon: 8.1}]}));
         await vi.advanceTimersByTimeAsync(2000);
-        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'CUST', 'KBBB']); // Precondition
+        expect(fplIdents(unit)).toEqual(['KAAA', 'CUST', 'KBBB']); // Precondition
 
         await unit.panel.powerCycle();
         await unit.panel.approveSelfTest();
 
-        expect(userWaypoints(unit)).toEqual(['CUST XY']);
+        expect(userWaypointNames(unit)).toEqual(['CUST XY']);
         await unit.panel.selectPage('L', 'OTH 3');
         expect(Screen.read().rows('L').slice(0, 2)).toEqual([' USER WPTS ', 'CUST  S   0']);
     });
@@ -74,12 +71,12 @@ describe('TemporaryWaypointDeleter', () => {
             storage: {userDataFormat: 2, wpt0: savedTemporary('TMPB', '07.00', '07.00'), ...savedFlightplan(3, [kaaa, temporaryIcao('TMPB')])},
         });
         await settle(unit);
-        expect(unit.props.memory.fplPage.flightplans[3].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'TMPB']); // Precondition
+        expect(fplIdents(unit, 3)).toEqual(['KAAA', 'TMPB']); // Precondition
 
         await unit.panel.powerCycle();
         await unit.panel.approveSelfTest();
 
-        expect(userWaypoints(unit)).toEqual(['TMPB XY']);
+        expect(userWaypointNames(unit)).toEqual(['TMPB XY']);
         await unit.panel.selectPage('L', 'OTH 3');
         expect(Screen.read().rows('L').slice(0, 2)).toEqual([' USER WPTS ', 'TMPB  S   3']);
     });
@@ -89,11 +86,11 @@ describe('TemporaryWaypointDeleter', () => {
     it('keeps a user waypoint that no flight plan holds, over a power cycle', async () => {
         const unit = await bootUnit({facilities: [kaaa], storage: savedUserWaypoints([{kind: 'sup', ident: 'FARM', lat: 47.2, lon: 8.1}])});
         await settle(unit);
-        expect(userWaypoints(unit)).toEqual(['FARM XX']); // Precondition: restored
+        expect(userWaypointNames(unit)).toEqual(['FARM XX']); // Precondition: restored
 
         await unit.panel.powerCycle();
 
-        expect(userWaypoints(unit)).toEqual(['FARM XX']);
+        expect(userWaypointNames(unit)).toEqual(['FARM XX']);
     });
 
     // The purge looks at the flight plans only. A temporary waypoint that is the direct-to target of the active
@@ -111,16 +108,15 @@ describe('TemporaryWaypointDeleter', () => {
         await vi.advanceTimersByTimeAsync(2000);
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb})); // FPL 0 no longer holds CUST
         await vi.advanceTimersByTimeAsync(2000);
-        const active = unit.props.memory.navPage.activeWaypoint;
-        expect(active.getActiveWpt()!.icaoStruct.ident).toBe('CUST'); // Precondition: CUST is still the direct-to target
-        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'KBBB']);
-        expect(userWaypoints(unit)).toEqual(['CUST XY']);
+        expect(activeIdent(unit)).toBe('CUST'); // Precondition: CUST is still the direct-to target
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
+        expect(userWaypointNames(unit)).toEqual(['CUST XY']);
 
         await unit.panel.powerCycle();
         await unit.panel.approveSelfTest();
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(userWaypoints(unit)).toEqual([]);
+        expect(userWaypointNames(unit)).toEqual([]);
     });
 
     // The sim can be left with the unit on, which is no power-off, so the unit also purges at power-on: a temporary
@@ -138,7 +134,7 @@ describe('TemporaryWaypointDeleter', () => {
         });
         await settle(unit);
 
-        expect(userWaypoints(unit)).toEqual(['TMPB XY']);
+        expect(userWaypointNames(unit)).toEqual(['TMPB XY']);
     });
 
     // The entry waypoint of a DME arc (SidStar) is a temporary waypoint in the repository while the approach is in FPL 0.
@@ -166,12 +162,12 @@ describe('TemporaryWaypointDeleter', () => {
         const unit = await bootUnit({facilities: [kprc, abc, arcbg, arcen, mapaa], position: at(190, 10), storage: savedFlightplan(0, [kprc])});
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
-        expect(userWaypoints(unit)).toEqual(['D190J XY']); // Precondition: the entry waypoint exists
+        expect(userWaypointNames(unit)).toEqual(['D190J XY']); // Precondition: the entry waypoint exists
 
         await unit.panel.powerCycle({offSeconds: 6 * 60});
         await unit.panel.approveSelfTest();
 
-        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KPRC']);
-        expect(userWaypoints(unit)).toEqual([]);
+        expect(fplIdents(unit)).toEqual(['KPRC']);
+        expect(userWaypointNames(unit)).toEqual([]);
     });
 });

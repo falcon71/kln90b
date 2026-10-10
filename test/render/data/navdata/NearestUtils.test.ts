@@ -46,10 +46,10 @@ describe('NearestUtils.getAirspaces tests the polygon, not the bounding box (133
                 airspaces: [airspace('TEST CENTER', BoundaryType.Center, TRI, {frequencyMHz: 118.55})],
             });
             await settle(unit);
-            await unit.panel.selectPage('L', 'OTH 2');
-            await vi.advanceTimersByTimeAsync(2000); // the page loads its Center in its constructor
+            // The page loads its Center in its constructor
+            const rows = await unit.panel.show('L', 'OTH 2', {waitMs: 2000});
             expect(unit.errors).toEqual([]);
-            return Screen.read().rows('L');
+            return rows;
         }
 
         // 3-52: OTH 2 names the Center for the aircraft's present position and its frequency

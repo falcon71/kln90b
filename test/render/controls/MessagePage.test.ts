@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit} from '../../harness/boot';
+import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS} from '../../harness/boot';
 import {airport} from '../../harness/navdata/builders';
 import {blinkCycle} from '../../harness/render/blink';
 import {Screen} from '../../harness/render/screen';
@@ -28,17 +28,13 @@ async function expectPromptFlashing(steady: string, flashing: string): Promise<v
 /** KBBB 0.6 NM north of the aircraft, after the first nearest search (every 10 s), so that MSG then ENT has a target */
 async function bootNearKbbb(): Promise<HeadlessUnit> {
     const unit = await bootUnit({facilities: [airport('KBBB', 47.2, 8.0)], position: {lat: 47.19, lon: 8.0}});
-    await vi.advanceTimersByTimeAsync(12000);
+    await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
     return unit;
 }
 
 /** Reads the boot messages (testing.md section 6): MSG until the page closes, then the one-time messages go */
 async function readAll(unit: HeadlessUnit): Promise<void> {
-    await unit.panel.msg();
-    for (let i = 0; i < 10 && Screen.read().status().left === ''; i++) {
-        await unit.panel.msg();
-    }
-    await vi.advanceTimersByTimeAsync(1000);
+    await unit.panel.readMessages();
     expect(unit.props.messageHandler.getMessages()).toEqual([]); // the precondition: nothing is left to read
 }
 

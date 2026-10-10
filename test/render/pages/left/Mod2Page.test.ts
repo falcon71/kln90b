@@ -4,12 +4,12 @@ import {approachWorld} from '../../../harness/fixtures';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
+import {LEG_OBS_SWITCH, NO_OBS, panelXml} from '../../../harness/panelXml';
+import {activeIdent} from '../../../harness/readers';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
-const panelXml = (input: string) => `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input>${input}</Input></Instrument></PlaneHTMLConfig>`;
 /** The unit cannot read the external indicator, so the OBS course is entered on the unit and OBS shows a colon (5-35) */
-const OBS_SOURCE_OFF = panelXml('<ObsSource>0</ObsSource>');
-const LEG_OBS_SWITCH = panelXml('<ExternalSwitches><LegObsSwitchInstalled>true</LegObsSwitchInstalled></ExternalSwitches>');
+const OBS_SOURCE_OFF = panelXml(NO_OBS);
 
 /**
  * A leg from KAAA to the VOR ABC with the aircraft on it and ABC active, boxed in by the callers below. The legs lie on
@@ -21,7 +21,7 @@ async function onLeg(from: {lat: number, lon: number}, to: {lat: number, lon: nu
     const abc = vor('ABC', to.lat, to.lon);
     const unit = await bootUnit({facilities: [kaaa, abc], position, panelXml: xml, storage: savedFlightplan(0, [kaaa, abc])});
     await settle(unit);
-    expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC'); // Precondition
+    expect(activeIdent(unit)).toBe('ABC'); // Precondition
     return unit;
 }
 
@@ -135,7 +135,7 @@ describe('MOD 2 page (spec)', () => {
     // 5-33: with an external LEG/OBS switch the MOD pages cannot change the mode. Figure 5-110: MOD 2 then shows PRESS
     // GPS CRS FOR, and the status line has no ent prompt
     it('shows PRESS GPS CRS FOR in ENR-LEG with the external switch, and ENT keeps LEG (5-33)', async () => {
-        const unit = await onEquatorLeg(LEG_OBS_SWITCH);
+        const unit = await onEquatorLeg(panelXml(LEG_OBS_SWITCH));
         await unit.panel.selectPage('L', 'MOD 2');
 
         const screen = Screen.read();
@@ -158,7 +158,7 @@ describe('MOD 2 OBS course with a driven indicator', () => {
     /** ObsTarget 1 with the indicator on 090, OBS mode, the cursor on the course. The fake acts on K:VOR1_SET only on
      * request (testing.md), so it moves Nav OBS:1 here, as the sim does */
     async function drivenIndicatorOn90() {
-        const unit = await onEquatorLeg('<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output><ObsTarget>1</ObsTarget></Output></Instrument></PlaneHTMLConfig>');
+        const unit = await onEquatorLeg(panelXml({'Output.ObsTarget': 1}));
         unit.env.sim.applyObsKeyEvents = true;
         unit.env.sim.set('Nav OBS:1', 'degrees', 90);
         await unit.panel.obsMode();
@@ -240,13 +240,13 @@ describe('MOD 2 OBS course just below north', () => {
         const obs = unit.props.memory.navPage.obsMag;
         expect(obs).toBeGreaterThanOrEqual(359.5);
         expect(obs).toBeLessThan(360);
-    }, 30_000);
+    }, 30_000); // turned90Left clicks the knob 90 times, 22.5 s of simulated time with every tick running
 
     it.fails('shows a course just below north as 000° (5-35, checked in the KLN 89 trainer, 2026-10-07, #263)', async () => {
         const unit = await turned90Left();
 
         expect(Screen.read().rows('L')[3]).toBe('OBS:000°   ');
-    }, 30_000);
+    }, 30_000); // the same 90 clicks
 });
 
 describe('MOD 2 CDI scale field with an approach armed 40 NM from the airport (#160)', () => {
