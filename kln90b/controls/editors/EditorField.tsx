@@ -141,6 +141,25 @@ export class NumberEditorField extends EditorField {
     }
 }
 
+/**
+ * The tens of the degrees of a latitude. The knob and the keyboard offer 0 to 8 (checked in the KLN 89 trainer,
+ * 2026-10-08), but the cell can show the 9 of a stored latitude of 90 degrees
+ */
+export class LatitudeTensEditorField extends NumberEditorField {
+
+    incrementChar() {
+        this.value = this.value === null || this.value >= 8 ? 0 : this.value + 1;
+    }
+
+    decrementChar() {
+        this.value = this.value === null ? 0 : this.value <= 0 ? 8 : this.value - 1;
+    }
+
+    public keyboard(key: string): boolean {
+        return key !== '9' && super.keyboard(key);
+    }
+}
+
 export class MonthEditorField extends EditorField {
     charset = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 }

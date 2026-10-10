@@ -296,6 +296,19 @@ describe('editor keyboard entry (characterization, sim-only feature, #25)', () =
         expect(latRow()).toBe("N 4_°__.__'");
     });
 
+    // Checked in the KLN 89 trainer, 2026-10-08 (T9): the tens of the latitude offer 0 to 8. The cell can show a 9 (#345),
+    // but the keyboard does not offer it: a 9 is refused and the cursor stays on the tens
+    it('refuses a 9 in the tens of the latitude degrees (checked in the KLN 89 trainer, 2026-10-08, #345)', async () => {
+        const unit = await onSet1Latitude();
+
+        await unit.panel.type('L', 'N9');
+        expect(latRow()).toBe("N __°__.__'");
+        await unit.panel.type('L', '8');
+
+        expect(unit.errors).toEqual([]);
+        expect(latRow()).toBe("N 8_°__.__'");
+    });
+
     // After the last cell the automatic advance (KeyboardService: outerRight after every accepted key) stays on the
     // last cell (the cursor stops there, #306), so the next key overwrites the hundredths and not the hemisphere
     it('keeps the cursor on the last cell after the last key, so the next key overwrites it', async () => {

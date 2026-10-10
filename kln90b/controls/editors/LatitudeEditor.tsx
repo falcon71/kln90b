@@ -1,6 +1,6 @@
 import {Editor, Rawvalue} from "./Editor";
 import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
-import {NorthSouthEditorField, NumberEditorField} from "./EditorField";
+import {LatitudeTensEditorField, NorthSouthEditorField, NumberEditorField} from "./EditorField";
 import {Latitude} from "../../data/Units";
 import {format} from "numerable";
 import {splitDegreesMinutes} from "../../data/Coordinates";
@@ -16,7 +16,7 @@ export class LatitudeEditor extends Editor<Latitude> {
     constructor(bus: EventBus, value: Latitude | null, enterCallback: (text: Latitude) => void) {
         super(bus, [
             new NorthSouthEditorField(),
-            NumberEditorField.createWithMinMax(0, 8), //The tens stop at 8, so no latitude beyond 90° can be selected (checked in the KLN 89 trainer, 2026-10-08)
+            new LatitudeTensEditorField(), //The tens stop at 8, so no latitude beyond 90° can be selected (checked in the KLN 89 trainer, 2026-10-08)
             new NumberEditorField(),
             NumberEditorField.createWithMinMax(0, 5),
             new NumberEditorField(),

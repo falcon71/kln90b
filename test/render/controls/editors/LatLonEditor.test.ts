@@ -6,6 +6,7 @@ import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {mount} from '../../../harness/render/mount';
 import {UiElement} from '../../../../kln90b/pages/Page';
 import {Screen} from '../../../harness/render/screen';
+import {intersection} from '../../../harness/navdata/builders';
 
 const text = (editor: UiElement): string => mount(editor).text();
 
@@ -21,12 +22,20 @@ describe('latitude and longitude editors', () => {
     });
 
     // 3-8, 3-32: a latitude is shown as the hemisphere, two digits of degrees and the minutes. The tens cell offers 0 to
-    // 8 (#303), so a value of 90 degrees has no choice to show its 9 and the cell stays empty (N 0°00.00').
-    it.fails('shows a latitude of 90 degrees as N 90°00.00 (3-8, 3-32, #345)', () => {
+    // 8 (#303), but it still shows the 9 of a value of 90 degrees (#345).
+    it('shows a latitude of 90 degrees as N 90°00.00 (3-8, 3-32, #345)', () => {
         const bus = new EventBus();
 
         expect(text(new LatitudeEditor(bus, 90, () => undefined))).toBe('N 90°00.00');
         expect(text(new LatitudeEditor(bus, -90, () => undefined))).toBe('S 90°00.00');
+    });
+
+    // The longitude side of the same edge: its hundreds cell offers a blank and a 1, which holds the 1 of 180 degrees
+    it('shows a longitude of 180 degrees as E180°00.00 (3-8, 3-32, #345)', () => {
+        const bus = new EventBus();
+
+        expect(text(new LongitudeEditor(bus, 180, () => undefined))).toBe('E180°00.00');
+        expect(text(new LongitudeEditor(bus, -180, () => undefined))).toBe('W180°00.00');
     });
 
     // The sibling of the pin: the largest latitude the tens cell can select shows its digits
@@ -34,6 +43,28 @@ describe('latitude and longitude editors', () => {
         const bus = new EventBus();
 
         expect(text(new LatitudeEditor(bus, 89 + 59.99 / 60, () => undefined))).toBe('N 89°59.99');
+    });
+});
+
+describe('latitude editor at the poles on the INT page (3-8, 3-32, #345)', () => {
+    // A waypoint of the navdata at exactly 90 degrees reaches the editor of the INT page with its stored value, which the
+    // tens cell (0 to 8 for the knob) must show
+    it('shows a waypoint at 90°N and one at 90°S with the 9 in the tens', async () => {
+        const unit = await bootUnit({
+            facilities: [intersection('NOPOL', 90, 0), intersection('SOPOL', -90, 180)],
+            position: {lat: 47.0, lon: 8.0},
+        });
+        const north = await unit.panel.show('R', 'INT  ', {waitMs: 1000});
+        expect(north[0]).toBe(' NOPOL     '); // precondition
+        expect(north[4]).toBe("N 90°00.00'");
+
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'SOPOL');
+        await unit.panel.ent();
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R').slice(0, 6)).toEqual([' SOPOL     ', 'REF:  _____', 'RAD: ___._°', 'DIS:___._nm', "S 90°00.00'", "E180°00.00'"]);
     });
 });
 
