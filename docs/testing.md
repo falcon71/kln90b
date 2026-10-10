@@ -985,11 +985,12 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
       entry cannot go on. Whether the real unit keeps the cursor there is not known (not reproduced in the sim).
     - **When the bugs are fixed:** the fix of #96 needs `PageStack` in `MainPage.tsx` to destroy the half page it
       replaces (`setCurrentPage`, `pop`, `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone
-      leaves the pins red, and OTH 4 counts the `changed` topic of the remarks manager, not the repository sync. The fix
-      of #269 (`this.children = this.getCurrentPage().children; this.requiresRedraw = true;` in
-      `Apt3Page.changeFacility`) turns both #269 pins red, the one in `Apt3Page.test.ts` and the user airport pin of
-      `Apt3ListPageContainer.test.ts`. The fix of #95 turns two pins red (the list and the error page); the fix of #93
-      turns two (Avgas and JetB; JetA1 passes today, because the SDK's generic imperial gallon weighs as Jet A).
+      leaves both handler counts unchanged, so the pins stay expected failures, and OTH 4 counts the `changed` topic of
+      the remarks manager, not the repository sync. The fix of #269 (`this.children = this.getCurrentPage().children;
+      this.requiresRedraw = true;` in `Apt3Page.changeFacility`) turns both #269 pins red, the one in `Apt3Page.test.ts`
+      and the user airport pin of `Apt3ListPageContainer.test.ts`. The fix of #95 turns two pins red (the list and the
+      error page); the fix of #93 turns two (Avgas and JetB; JetA1 passes today, because the SDK's generic imperial
+      gallon weighs as Jet A).
 - **Flights cannot test the nav-source gate or a cold start, by the maintainer's decision.** `Aircraft.writeTo` forces
   `GPS DRIVES NAV1` true on every 16 Hz step, so a flight cannot observe what the unit does when the GPS is not the
   nav source (`92fbba1` is a render test, which sets the SimVar itself). `Flight.start` waits for a fix, so it cannot
