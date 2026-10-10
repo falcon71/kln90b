@@ -358,54 +358,63 @@ describe('VOR classes in the nearest VOR list', () => {
 /**
  * A facility client for the nearest NDB list: it holds `facilities`, and with `rejectFirst` the first search of its NDB
  * session rejects, the way bootFailure.test.ts builds a client whose search sessions cannot be started. Every search
- * after that works.
+ * after that works. `rejectedSearches()` counts the searches it rejected, which does not depend on what the unit does
+ * with the rejection.
  */
-function clientForNdbSearch(facilities: Facility[], rejectFirst: boolean): MemoryFacilityClient {
+function clientForNdbSearch(facilities: Facility[], rejectFirst: boolean) {
     const client = new MemoryFacilityClient(facilities);
+    let rejectedSearches = 0;
     const startSession = client.startNearestSearchSessionWithIcaoStructs.bind(client);
     client.startNearestSearchSessionWithIcaoStructs = async (type: FacilitySearchType) => {
         const session = await startSession(type);
         if (type === FacilitySearchType.Ndb && rejectFirst) {
             const search = session.searchNearest.bind(session);
-            let rejected = false;
             session.searchNearest = (...args: unknown[]) => {
-                if (rejected) return search(...args);
-                rejected = true;
+                if (rejectedSearches > 0) return search(...args);
+                rejectedSearches++;
                 return Promise.reject(new Error('nearest search failed'));
             };
         }
         return session;
     };
-    return client;
+    return {client, rejectedSearches: () => rejectedSearches};
 }
 
 /**
  * Boots on a client from clientForNdbSearch, lets the first searches run (the NDB list's rejects with `rejectFirst`),
- * takes the rejections, adds an NDB 3 NM north of the aircraft and lets two more searches run. Returns the rejections
- * and the idents the nearest NDB list holds at the end.
+ * takes the rejections, adds an NDB 3 NM north of the aircraft and lets two more searches run. Returns the number of
+ * searches the client rejected and the idents the nearest NDB list holds at the end.
  */
 async function ndbListAfterAFirstSearch(rejectFirst: boolean) {
-    const client = clientForNdbSearch([], rejectFirst);
+    const {client, rejectedSearches} = clientForNdbSearch([], rejectFirst);
     const unit = await bootUnit({platform: {createFacilityClient: () => client as any}});
     await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
-    const rejected = unit.takeRejections();
+    unit.takeRejections(); // The rejected search is an unhandled rejection; the harness would fail the test for it
     client.add(ndb('NAA', 47.05, 8.0));
     await vi.advanceTimersByTimeAsync(2 * NEAREST_SEARCH_WAIT_MS);
     const listed = unit.props.nearestLists.ndbNearestList.getNearestList().map(w => w.facility.icaoStruct.ident);
-    return {unit, rejected, listed};
+    return {unit, rejected: rejectedSearches(), listed};
 }
 
 // 3-22: the nearest lists follow the aircraft, so a waypoint that comes into range is listed at a later search.
 // NearestList.tick is async and TickController.tickCalc does not await it (docs/architecture.md, Core 2: an async tick's
 // rejection escapes the handler that keeps one failing tickable from stopping the others), so a rejected search leaves
-// isCalculating set and the list is never searched again (#95).
+// isCalculating set and the list is never searched again (#95). The rejection is also unhandled, so the error page
+// never shows it (#95).
 describe('the nearest NDB list after a rejected search (3-22, #95)', () => {
-    // The sibling of the pin: the same client and the same steps without the failure, so the pin differs only in it
+    // The sibling of the pins: the same client and the same steps without the failure, so the pins differ only in it
     it('lists an NDB that comes into range after the first search (3-22)', async () => {
         const {rejected, listed} = await ndbListAfterAFirstSearch(false);
 
-        expect(rejected).toEqual([]);
+        expect(rejected).toBe(0);
         expect(listed).toEqual(['NAA']);
+    });
+
+    // The setup of the pins: the failing client does reject one search, whatever the unit does with it
+    it('the failing client rejects one NDB search (setup of the #95 pins)', async () => {
+        const {rejected} = await ndbListAfterAFirstSearch(true);
+
+        expect(rejected).toBe(1);
     });
 
     it.fails('lists an NDB that comes into range after a rejected search (3-22, #95)', async () => {
@@ -413,16 +422,12 @@ describe('the nearest NDB list after a rejected search (3-22, #95)', () => {
 
         expect(listed).toEqual(['NAA']);
     });
-});
 
-// What the failure of #95 looks like today, so that the pin above is not read as an error page bug: only the rejection
-// collector sees it, the error page stays hidden and nothing is logged
-describe('a rejected nearest search (characterization, #95)', () => {
-    it('is an unhandled rejection and does not reach the error page (characterization)', async () => {
-        const {unit, rejected} = await ndbListAfterAFirstSearch(true);
+    // The synchronous tickables show their errors on the error page (docs/architecture.md, Core 2); a failed search is
+    // as much a failure of the unit
+    it.fails('shows a failed nearest search on the error page (#95)', async () => {
+        await ndbListAfterAFirstSearch(true);
 
-        expect(rejected.map(String)).toEqual(['Error: nearest search failed']);
-        expect(document.querySelector('.errorpage')!.classList.contains('d-none')).toBe(true);
-        expect(unit.consoleErrors).toEqual([]);
+        expect(document.querySelector('.errorpage')!.classList.contains('d-none')).toBe(false);
     });
 });

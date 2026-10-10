@@ -64,7 +64,8 @@ describe('every public H event (sweep)', () => {
     it.each(PUBLIC_EVENTS)('accepts %s on the self-test page without an error (sweep)', async evt => {
         const unit = await bootUnit({engineRunning: false});
         unit.send('KLN90B_Power_On');
-        // The Turn-On page shows for 17 s (3-3); the rest is the margin for the self-test page to show
+        // The Turn-On page shows for 17 s (TEST_TIME in kln90b/pages/WelcomePage.tsx; 3-3 for the page itself); the rest is
+        // the margin for the self-test page to show
         await vi.advanceTimersByTimeAsync(20_000);
         // The self-test is through and the unit waits for the database to be approved
         expect(Screen.read().rows('R')[5]).toBe('  APPROVE? ');
