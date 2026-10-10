@@ -239,7 +239,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
                     });
                 }
                 break;
-            case 4:
+            case 3:
                 this.currentApt7Page = new Apt7PreviewPage({
                     ...this.props,
                     proc: proc,
