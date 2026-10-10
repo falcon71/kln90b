@@ -83,15 +83,15 @@ describe('CAL 4 FPM edited after an angle', () => {
         return unit;
     }
 
-    // 5-12: the sibling of the pin below. The angle gave FPM 0500, and the thousands digit then reads 1
+    // 5-12: the sibling of the test below. The angle gave FPM 0500, and the thousands digit then reads 1
     it('shows FPM 1500 after the thousands digit of 0500 is set to 1 (5-12)', async () => {
         await angleThenFpm();
         expect(Screen.read().rows('L')[3]).toBe('FPM:   1500');
     });
 
-    // 5-12: the angle is that of the rate shown. atan(1500 / 16203) = 5.289 deg, ANGLE 5.3. The FPM field keeps the
-    // rate it had before the angle was entered (800), so the digit makes it 1800 and the angle 6.3
-    it.fails('shows ANGLE 5.3 for the 1500 ft/min shown (5-12, #255)', async () => {
+    // 5-12: the angle is that of the rate shown. atan(1500 / 16203) = 5.289 deg, ANGLE 5.3. The digit builds on the
+    // rate the angle gave (500), not on the one before the angle (800)
+    it('shows ANGLE 5.3 for the 1500 ft/min shown (5-12, #255)', async () => {
         const unit = await angleThenFpm();
         expect(Screen.read().rows('L')[4]).toBe('ANGLE: 5.3°');
         expect(unit.props.userSettings.getSetting('cal4Fpm').get()).toBe(1500);

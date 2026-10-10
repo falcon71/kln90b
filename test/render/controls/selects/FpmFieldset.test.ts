@@ -60,7 +60,7 @@ describe('fpm fieldset', () => {
         expect(Screen.read().rows('L')[3]).toBe('FPM:   0900');
     });
 
-    // The sibling of the pin below: after the angle 1.8 the field shows 0500, and its thousands digit set to 1 shows
+    // The sibling of the test below: after the angle 1.8 the field shows 0500, and its thousands digit set to 1 shows
     // 1500
     it('shows 1500 after an angle entry and the thousands digit set to 1 (5-12)', async () => {
         const unit = await onFpm(FIG_5_40);
@@ -75,7 +75,7 @@ describe('fpm fieldset', () => {
 
     // 5-12: the rate the field shows is the rate the page works with. After the angle set the field to 0500, the
     // thousands digit set to 1 must commit 1500, not 1800 rebuilt from the rate before the angle.
-    it.fails('commits 1500 after an angle entry and the thousands digit set to 1 (5-12, #255)', async () => {
+    it('commits 1500 after an angle entry and the thousands digit set to 1 (5-12, #255)', async () => {
         const unit = await onFpm(FIG_5_40);
         await unit.panel.outer('L', 2);
         await unit.panel.inner('L', -1);
@@ -84,6 +84,57 @@ describe('fpm fieldset', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(storedSetting(unit, 'cal4Fpm')).toBe(1500);
+    });
+
+    // 5-12: the same for the hundreds digit, which rebuilds the rate from the thousands and the tens. From 1800 ft/min
+    // (6.3 degrees at 160 kt) the angle 2.3 gives 0700 (16203 * tan(2.3 deg) = 651, rounded to 100), and the hundreds
+    // digit turned to 3 commits 0300, not 1300: atan(300 / 16203) = 1.06 degrees, ANGLE 1.1
+    it('commits 0300 after an angle entry and the hundreds digit set to 3 (5-12, #255)', async () => {
+        const unit = await onFpm({cal4GS: 160, cal4Fpm: 1800, cal4Angle: 6.3});
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', -4); // ANGLE 2.3
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   0700', 'ANGLE: 2.3°']);
+        await unit.panel.outer('L', -1);
+        await unit.panel.inner('L', -4); // the hundreds of FPM: 7 to 3
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   0300', 'ANGLE: 1.1°']);
+        expect(storedSetting(unit, 'cal4Fpm')).toBe(300);
+    });
+
+    // 5-12: a rate of 1000 or more that an angle gave is kept whole: the angle 3.8 at 160 kt gives 1100 (16203 *
+    // tan(3.8 deg) = 1076, rounded to 100), and the hundreds digit turned to 5 commits 1500 (ANGLE 5.3), keeping the
+    // thousands
+    it('commits 1500 after an angle gave 1100 and the hundreds digit is set to 5 (5-12, #255)', async () => {
+        const unit = await onFpm(FIG_5_40);
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 1); // ANGLE 3.8
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   1100', 'ANGLE: 3.8°']);
+        await unit.panel.outer('L', -1);
+        await unit.panel.inner('L', 4); // the hundreds of FPM: 1 to 5
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   1500', 'ANGLE: 5.3°']);
+        expect(storedSetting(unit, 'cal4Fpm')).toBe(1500);
+    });
+
+    // 5-12: the rate follows every angle entry, not only the first. The angle 1.8 (0500) and then 0.8 (0200, which is
+    // 16203 * tan(0.8 deg) = 226 rounded to 100) leave the field at 0200, so the thousands digit set to 1 commits 1200
+    it('commits 1200 after two angle entries and the thousands digit set to 1 (5-12, #255)', async () => {
+        const unit = await onFpm(FIG_5_40);
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', -1); // ANGLE 1.8, FPM 0500
+        await unit.panel.inner('L', -1); // ANGLE 0.8, FPM 0200
+        expect(Screen.read().rows('L')[3]).toBe('FPM:   0200');
+        await unit.panel.outer('L', -2);
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   1200', 'ANGLE: 4.2°']);
+        expect(storedSetting(unit, 'cal4Fpm')).toBe(1200);
     });
 });
 
