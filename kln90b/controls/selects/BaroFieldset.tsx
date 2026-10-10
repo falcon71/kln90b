@@ -133,7 +133,6 @@ class HpaBaroFieldset implements BaroFieldset {
         const oldBaro = format(UnitType.IN_HG.convertTo(this.baro, UnitType.HPA), "0000");
         this.baro = UnitType.HPA.convertTo(Number(oldBaro.substring(0, 2) + newBaro10 + oldBaro.substring(3)), UnitType.IN_HG);
         this.callback(this.baro);
-        this.callback(this.baro);
     }
 
     private saveBaro1(newBaro1: number): void {
