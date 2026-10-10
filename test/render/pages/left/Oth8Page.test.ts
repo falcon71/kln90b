@@ -80,13 +80,13 @@ describe('OTH 8 page, fuel used (5-41)', () => {
     });
 
     // 5-41: the same installation as the passing test above (the sibling): the total is dashes too
-    it.fails('shows dashes for the total of a twin when the fuel used is not transmitted (5-41, #250)', async () => {
+    it('shows dashes for the total of a twin when the fuel used is not transmitted (5-41, #250)', async () => {
         await oth8(2, [102, 96], false);
 
         expect(usedOf(Screen.read().rows('L')[5], 'TOTAL')).toBe('-----');
     });
 
-    // 5-41: the single-engine layout shows the total only. 72 lb of avgas are 12 GAL; this is the sibling of the pin below
+    // 5-41: the single-engine layout shows the total only. 72 lb of avgas are 12 GAL
     it('shows the fuel used of a single as the total only (5-41)', async () => {
         await oth8(1, [72]);
 
@@ -95,9 +95,25 @@ describe('OTH 8 page, fuel used (5-41)', () => {
     });
 
     // 5-41: the same single, but the computer does not transmit the fuel used
-    it.fails('shows dashes for a single when the fuel used is not transmitted (5-41, #250)', async () => {
+    it('shows dashes for a single when the fuel used is not transmitted (5-41, #250)', async () => {
         await oth8(1, [72], false);
 
         expect(Screen.read().rows('L')[5].trim()).toBe('-----');
+    });
+});
+
+describe('OTH 8 page, no fuel used yet (characterization)', () => {
+    // The dashes of the fuel used output that is not transmitted must not swallow the zero of one that is
+    it('characterization: a twin with no fuel used yet shows 0 for each engine and the total', async () => {
+        await oth8(2, [0, 0]);
+
+        const rows = Screen.read().rows('L');
+        expect([usedOf(rows[3], 'ENG 1'), usedOf(rows[4], 'ENG 2'), usedOf(rows[5], 'TOTAL')]).toEqual(['0', '0', '0']);
+    });
+
+    it('characterization: a single with no fuel used yet shows 0', async () => {
+        await oth8(1, [0]);
+
+        expect(Screen.read().rows('L')[5].trim()).toBe('0');
     });
 });
