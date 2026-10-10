@@ -1,13 +1,13 @@
-import {describe, expect, it, onTestFinished, vi} from 'vitest';
-import {RunwaySurfaceType, VorClass, VorType} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {describe, expect, it, vi} from 'vitest';
+import {Facility, FacilitySearchType, RunwaySurfaceType, VorClass, VorType} from '@microsoft/msfs-sdk';
+import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS} from '../../../harness/boot';
+import {MemoryFacilityClient} from '../../../harness/navdata/MemoryFacilityClient';
 import {airport, ndb, vor} from '../../../harness/navdata/builders';
+import {recordMap} from '../../../harness/render/mapRecorder';
 import {Screen} from '../../../harness/render/screen';
+import {showSuperNav5} from '../../../harness/render/superNav5';
 import {storedSetting} from '../../../harness/storage';
 import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
-import {SuperNav5Page} from '../../../../kln90b/pages/left/SuperNav5Page';
-import {MainPage} from '../../../../kln90b/pages/MainPage';
-import {CoordinateCanvasDrawContext} from '../../../../kln90b/controls/Canvas';
 
 // Invented airports on the meridian of the aircraft, 0.1 degrees (6 NM) apart, one of each kind the SET 3 criteria
 // (3-22, 3-23) tell apart. The aircraft is at 47.0N 8.0E.
@@ -24,7 +24,7 @@ const kbbb = () => airport('KBBB', 47.4, 8.0);
  * has its boot messages, so MSG then ENT has an effect (as in Apt1Page.test.ts).
  */
 async function nearestRows(unit: HeadlessUnit): Promise<string[]> {
-    await vi.advanceTimersByTimeAsync(12000);
+    await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
     await unit.panel.msg();
     await unit.panel.ent();
     const rows: string[] = [];
@@ -76,20 +76,12 @@ describe('the nearest airport list', () => {
         });
 
         it('draws no heliport on Super NAV 5 (#57)', async () => {
-            const labels: string[] = [];
-            const spy = vi.spyOn(CoordinateCanvasDrawContext.prototype, 'drawLabel').mockImplementation((_facility, text) => {
-                labels.push(text);
-            });
-            onTestFinished(() => spy.mockRestore());
+            const map = recordMap();
             const unit = await bootUnit({storage: {superNav5Apt: true}, facilities: [heli(), kaaa(), kgrs(), kbbb(), kshort()], position: POSITION});
-            await vi.advanceTimersByTimeAsync(12000);
-            await unit.panel.selectPage('R', 'NAV 4'); // the right side first: its shorter way passes NAV 5, which is Super NAV 5 once the left shows NAV 5
-            await unit.panel.selectPage('L', 'NAV 5');
-            await unit.panel.inner('R', 1);
-            await vi.advanceTimersByTimeAsync(2000);
-            expect((unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage()).toBeInstanceOf(SuperNav5Page);
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+            await showSuperNav5(unit, {waitMs: 2000});
 
-            expect([...new Set(labels)]).toEqual(['KAAA', 'KGRS', 'KBBB']);
+            expect(drawnLabels(map.drawn)).toEqual(['KAAA', 'KGRS', 'KBBB']);
         });
     });
 
@@ -138,6 +130,9 @@ describe('the nearest airport list', () => {
 
 const identRow = () => Screen.read().rows('R')[0];
 
+/** The texts of the labels of a recorded map frame, in the order drawn */
+const drawnLabels = (drawn: string[]) => drawn.filter(d => d.startsWith('label ')).map(d => d.split(' ')[1]);
+
 /**
  * One slow turn of the right inner knob: more than 350 ms after the last one, so the scan does not speed up
  * (WaypointPage SPEEDSTEP), and the scan's asynchronous search has finished when it returns.
@@ -173,7 +168,7 @@ async function nearestRowsBackwards(unit: HeadlessUnit): Promise<string[]> {
 describe('the nearest list in front of the complete list (3-22)', () => {
     async function ndbPage(): Promise<HeadlessUnit> {
         const unit = await bootUnit({facilities: [ndb('NBB', 47.1, 8.0), ndb('NAA', 47.2, 8.0), ndb('NCC', 47.3, 8.0)], position: POSITION});
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.selectPage('R', 'NDB  ');
         expect(identRow()).toBe(' NAA       '); // precondition: the first waypoint of the complete list
         await unit.panel.scan();
@@ -227,10 +222,10 @@ describe('the nearest NDB list follows the aircraft (3-22)', () => {
 
     it('puts the nearer NDB first after the aircraft moved', async () => {
         const unit = await bootUnit(world());
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         // At 46.92 N NBB is 0.02 degrees (1.2 NM) away and NAA 0.13 degrees (7.8 NM)
         unit.env.sim.set('PLANE LATITUDE', 'degrees', 46.92);
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.selectPage('R', 'NDB  ');
 
         expect(await nearestRowsBackwards(unit)).toEqual([' NBB   nr 1', ' NAA   nr 2']);
@@ -247,7 +242,7 @@ describe('the nearest page distance refresh (characterization)', () => {
     it('updates the distance on a nearest page within seconds, not only at the next search', async () => {
         const unit = await bootUnit(world());
         await unit.panel.selectPage('R', 'NDB  ');
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.scan();
         await slowStep(unit, -1);
         expect(identRow()).toBe(' NBB   nr 2'); // precondition: the last nearest NDB, 6.0 NM south
@@ -268,7 +263,7 @@ describe('the nearest NDB list with a user NDB (3-22, 5-45)', () => {
         const database = Array.from({length: 9}, (_, i) => ndb(`NA${i}`, 47.05 + i * 0.05, 8.0));
         const unit = await bootUnit({facilities: database, position: POSITION});
         KLNFacilityRepository.getRepository(unit.props.bus).add(ndb('QQ', 47.01, 8.0, {region: 'XX'}));
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.selectPage('R', 'NDB  ');
 
         const rows = await nearestRowsBackwards(unit);
@@ -300,7 +295,7 @@ describe('VOR classes in the nearest VOR list', () => {
 
     async function nearestVorRows(...facilities: ReturnType<typeof vor>[]): Promise<string[]> {
         const unit = await bootUnit({facilities, position: POSITION});
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.selectPage('R', 'VOR  ');
         return nearestRowsBackwards(unit);
     }
@@ -315,20 +310,12 @@ describe('VOR classes in the nearest VOR list', () => {
 
     /** The labels Super NAV 5 draws with VOR: TLH (3 in the settings) for the given VORs; they are a few NM from the aircraft */
     async function superNav5Labels(...facilities: ReturnType<typeof vor>[]): Promise<string[]> {
-        const labels: string[] = [];
-        const spy = vi.spyOn(CoordinateCanvasDrawContext.prototype, 'drawLabel').mockImplementation((_facility, text) => {
-            labels.push(text);
-        });
-        onTestFinished(() => spy.mockRestore());
+        const map = recordMap();
         const unit = await bootUnit({storage: {superNav5Vor: 3}, facilities, position: POSITION}); // 3 = TLH
-        await vi.advanceTimersByTimeAsync(12000);
-        await unit.panel.selectPage('R', 'NAV 4'); // as above: the right side first, then NAV 5 becomes Super NAV 5
-        await unit.panel.selectPage('L', 'NAV 5');
-        await unit.panel.inner('R', 1);
-        await vi.advanceTimersByTimeAsync(2000);
-        expect((unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage()).toBeInstanceOf(SuperNav5Page);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await showSuperNav5(unit, {waitMs: 2000});
 
-        return [...new Set(labels)].sort();
+        return [...new Set(drawnLabels(map.drawn))].sort();
     }
 
     // The sibling of the Super NAV 5 pin: the same page and spy see a high altitude VOR
@@ -345,7 +332,7 @@ describe('VOR classes in the nearest VOR list', () => {
     it.fails('lists a user VOR (#206)', async () => {
         const unit = await bootUnit({facilities: [hig()], position: POSITION});
         KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.02, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.selectPage('R', 'VOR  ');
 
         expect(await nearestRowsBackwards(unit)).toEqual([' QQV   nr 1', ' HIG D nr 2']);
@@ -360,10 +347,87 @@ describe('VOR classes in the nearest VOR list', () => {
 
     it('shows the nearest low or high altitude VOR on NAV 2, not a nearer terminal VOR (3-8, 3-32)', async () => {
         const unit = await bootUnit({facilities: [trm(), hig()], position: POSITION});
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.selectPage('L', 'NAV 2');
 
         // HIG is 18.0 NM north: the aircraft is on its 180 radial
         expect(Screen.read().rows('L').slice(2, 4)).toEqual(['HIG  180°fr', '     18.0nm']);
+    });
+});
+
+/**
+ * A facility client for the nearest NDB list: it holds `facilities`, and with `rejectFirst` the first search of its NDB
+ * session rejects, the way bootFailure.test.ts builds a client whose search sessions cannot be started. Every search
+ * after that works. `rejectedSearches()` counts the searches it rejected, which does not depend on what the unit does
+ * with the rejection.
+ */
+function clientForNdbSearch(facilities: Facility[], rejectFirst: boolean) {
+    const client = new MemoryFacilityClient(facilities);
+    let rejectedSearches = 0;
+    const startSession = client.startNearestSearchSessionWithIcaoStructs.bind(client);
+    client.startNearestSearchSessionWithIcaoStructs = async (type: FacilitySearchType) => {
+        const session = await startSession(type);
+        if (type === FacilitySearchType.Ndb && rejectFirst) {
+            const search = session.searchNearest.bind(session);
+            session.searchNearest = (...args: unknown[]) => {
+                if (rejectedSearches > 0) return search(...args);
+                rejectedSearches++;
+                return Promise.reject(new Error('nearest search failed'));
+            };
+        }
+        return session;
+    };
+    return {client, rejectedSearches: () => rejectedSearches};
+}
+
+/**
+ * Boots on a client from clientForNdbSearch, lets the first searches run (the NDB list's rejects with `rejectFirst`),
+ * takes the rejections, adds an NDB 3 NM north of the aircraft and lets two more searches run. Returns the number of
+ * searches the client rejected and the idents the nearest NDB list holds at the end.
+ */
+async function ndbListAfterAFirstSearch(rejectFirst: boolean) {
+    const {client, rejectedSearches} = clientForNdbSearch([], rejectFirst);
+    const unit = await bootUnit({platform: {createFacilityClient: () => client as any}});
+    await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+    unit.takeRejections(); // The rejected search is an unhandled rejection; the harness would fail the test for it
+    client.add(ndb('NAA', 47.05, 8.0));
+    await vi.advanceTimersByTimeAsync(2 * NEAREST_SEARCH_WAIT_MS);
+    const listed = unit.props.nearestLists.ndbNearestList.getNearestList().map(w => w.facility.icaoStruct.ident);
+    return {unit, rejected: rejectedSearches(), listed};
+}
+
+// 3-22: the nearest lists follow the aircraft, so a waypoint that comes into range is listed at a later search.
+// NearestList.tick is async and TickController.tickCalc does not await it (docs/architecture.md, Core 2: an async tick's
+// rejection escapes the handler that keeps one failing tickable from stopping the others), so a rejected search leaves
+// isCalculating set and the list is never searched again (#95). The rejection is also unhandled, so the error page
+// never shows it (#95).
+describe('the nearest NDB list after a rejected search (3-22, #95)', () => {
+    // The sibling of the pins: the same client and the same steps without the failure, so the pins differ only in it
+    it('lists an NDB that comes into range after the first search (3-22)', async () => {
+        const {rejected, listed} = await ndbListAfterAFirstSearch(false);
+
+        expect(rejected).toBe(0);
+        expect(listed).toEqual(['NAA']);
+    });
+
+    // The setup of the pins: the failing client does reject one search, whatever the unit does with it
+    it('the failing client rejects one NDB search (setup of the #95 pins)', async () => {
+        const {rejected} = await ndbListAfterAFirstSearch(true);
+
+        expect(rejected).toBe(1);
+    });
+
+    it.fails('lists an NDB that comes into range after a rejected search (3-22, #95)', async () => {
+        const {listed} = await ndbListAfterAFirstSearch(true);
+
+        expect(listed).toEqual(['NAA']);
+    });
+
+    // The synchronous tickables show their errors on the error page (docs/architecture.md, Core 2); a failed search is
+    // as much a failure of the unit
+    it.fails('shows a failed nearest search on the error page (#95)', async () => {
+        await ndbListAfterAFirstSearch(true);
+
+        expect(document.querySelector('.errorpage')!.classList.contains('d-none')).toBe(false);
     });
 });

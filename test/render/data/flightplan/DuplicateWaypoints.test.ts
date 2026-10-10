@@ -2,6 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, settle} from '../../../harness/boot';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
+import {activeIdent} from '../../../harness/readers';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
@@ -42,7 +43,7 @@ describe('OBS mode on the second occurrence of a waypoint (3415417, #67)', () =>
 
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
         expect(aw.getActiveFplIdx()).toBe(3);
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(aw.getFutureLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['ABC', 'KBBB']);
         expect(unit.errors).toEqual([]);
     });

@@ -5,6 +5,8 @@ import {efbRoute} from '../../harness/platform';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {Screen} from '../../harness/render/screen';
 import {savedFlightplan, savedUserWaypoints} from '../../harness/storage';
+import {NO_GPS_SIMVARS, panelXml} from '../../harness/panelXml';
+import {fplIdents, messages, userWaypoints} from '../../harness/readers';
 import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
@@ -29,7 +31,7 @@ describe('EFB route import of lat/lon legs (34a9cb0, #15)', () => {
 
         const legs = unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt);
 
-        expect(legs.map(w => w.icaoStruct.ident)).toEqual(['KAAA', 'CUST', 'CUSTA', 'KBBB']);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'CUST', 'CUSTA', 'KBBB']);
         const given = [{lat: 47.1, lon: 8.1}, {lat: 47.2, lon: 8.2}];
         for (const [i, point] of given.entries()) {
             const wpt = legs[i + 1];
@@ -46,8 +48,7 @@ describe('EFB route import of lat/lon legs (34a9cb0, #15)', () => {
         const unit = await bootWithTwoLatLonLegs();
         const repository = KLNFacilityRepository.getRepository(unit.props.bus);
 
-        const entries: [string, string, number, number][] = [];
-        repository.forEach(fac => entries.push([fac.icaoStruct.ident, fac.icaoStruct.region, fac.lat, fac.lon]), [FacilityType.USR]);
+        const entries = userWaypoints(unit, FacilityType.USR).map(fac => [fac.icaoStruct.ident, fac.icaoStruct.region, fac.lat, fac.lon]);
 
         expect(entries.sort()).toEqual([['CUST', 'XY', 47.1, 8.1], ['CUSTA', 'XY', 47.2, 8.2]]);
         const cust = repository.get(ICAO.value('U', 'XY', '', 'CUST'));
@@ -66,8 +67,6 @@ describe('EFB route import of lat/lon legs (34a9cb0, #15)', () => {
     });
 });
 
-const fpl0Idents = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident);
-const messageTexts = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
 
 /** A route whose enroute legs are lat/lon points named by the ICAO the EFB gives them (efbRoute leaves that ICAO empty) */
 function namedLatLonRoute(points: { name: string; lat: number; lon: number }[]): FlightPlanRoute {
@@ -91,13 +90,13 @@ describe('EFB route import (KlnEfbLoader)', () => {
         const abc = vor('ABC', 47.2, 8.1);
         const unit = await bootUnit({facilities: [kaaa, abc, kbbb], efb: true});
         await settle(unit);
-        const before = messageTexts(unit).length;
+        const before = messages(unit).length;
 
         unit.efb!.sync(efbRoute({enroute: [abc, kbbb]}));
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(fpl0Idents(unit)).toEqual(['ABC', 'KBBB']);
-        expect(messageTexts(unit).slice(before).filter(m => m.includes('DELETED'))).toEqual([]);
+        expect(fplIdents(unit)).toEqual(['ABC', 'KBBB']);
+        expect(messages(unit).slice(before).filter(m => m.includes('DELETED'))).toEqual([]);
     });
 
     // The EFB may name a lat/lon point. The unit keeps the first four characters of the name and makes them unique
@@ -109,7 +108,7 @@ describe('EFB route import (KlnEfbLoader)', () => {
         unit.efb!.sync(namedLatLonRoute([{name: 'FARMS', lat: 47.1, lon: 8.1}, {name: 'FARMS', lat: 47.2, lon: 8.2}]));
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(fpl0Idents(unit)).toEqual(['FARM', 'FARMA']);
+        expect(fplIdents(unit)).toEqual(['FARM', 'FARMA']);
     });
 
     // CUST and CUSTA to CUSTZ are the 27 names the unit tries. The 28th lat/lon leg finds them all taken and is dropped
@@ -123,8 +122,8 @@ describe('EFB route import (KlnEfbLoader)', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         const suffixes = ['', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
-        expect(fpl0Idents(unit)).toEqual(['KAAA', ...suffixes.map(s => `CUST${s}`), 'KBBB']);
-        expect(messageTexts(unit)).toContain('WAYPOINT CUST DELETED');
+        expect(fplIdents(unit)).toEqual(['KAAA', ...suffixes.map(s => `CUST${s}`), 'KBBB']);
+        expect(messages(unit)).toContain('WAYPOINT CUST DELETED');
     });
 
     /** The route KAAA, a lat/lon leg, KBBB synced into a unit whose user data base holds 250 waypoints */
@@ -149,8 +148,8 @@ describe('EFB route import (KlnEfbLoader)', () => {
     it('drops the lat/lon leg and reports WAYPOINT CUST DELETED when the user data base is full (characterization)', async () => {
         const unit = await syncLatLonLegIntoFullUserDataBase();
 
-        expect(fpl0Idents(unit)).toEqual(['KAAA', 'KBBB']);
-        expect(messageTexts(unit)).toContain('WAYPOINT CUST DELETED');
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
+        expect(messages(unit)).toContain('WAYPOINT CUST DELETED');
     });
 
     // The loader keeps the first 30 waypoints of a longer route, so the destination of a route of 31 is the one reported
@@ -163,13 +162,10 @@ describe('EFB route import (KlnEfbLoader)', () => {
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: fixes}));
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(fpl0Idents(unit)).toEqual(['KAAA', ...fixes.map(f => f.icaoStruct.ident)]);
-        expect(messageTexts(unit)).toContain('WAYPOINT KBBB DELETED');
+        expect(fplIdents(unit)).toEqual(['KAAA', ...fixes.map(f => f.icaoStruct.ident)]);
+        expect(messages(unit)).toContain('WAYPOINT KBBB DELETED');
     });
 });
-
-/** FakeSim stores the names in upper case */
-const writeCount = (unit: HeadlessUnit, name: string): number => unit.env.sim.writes.filter(w => w.name === name.toUpperCase()).length;
 
 // Not gated by the power switch or by Output.WriteGPSSimVars: the loader imports whatever the EFB syncs (the saver, in
 // contrast, answers only with WriteGPSSimVars on). These pin what the unit does today
@@ -178,24 +174,23 @@ describe('EFB route import without a gate (characterization)', () => {
         const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
         await settle(unit);
         await unit.panel.powerOff();
-        expect(fpl0Idents(unit)).toEqual([]); // Precondition: nothing in FPL 0 before the sync
+        expect(fplIdents(unit)).toEqual([]); // Precondition: nothing in FPL 0 before the sync
 
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(fpl0Idents(unit)).toEqual(['KAAA', 'KBBB']);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
     });
 
     it('imports a route with WriteGPSSimVars off (characterization)', async () => {
-        const panelXml = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output><WriteGPSSimVars>false</WriteGPSSimVars></Output></Instrument></PlaneHTMLConfig>';
-        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true, panelXml});
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true, panelXml: panelXml(NO_GPS_SIMVARS)});
         await settle(unit);
-        expect(fpl0Idents(unit)).toEqual([]); // Precondition: nothing in FPL 0 before the sync
+        expect(fplIdents(unit)).toEqual([]); // Precondition: nothing in FPL 0 before the sync
 
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(fpl0Idents(unit)).toEqual(['KAAA', 'KBBB']);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
     });
 });
 
@@ -214,28 +209,28 @@ describe('EFB route import while the unit is disabled for hot swapping (public c
     // The sibling of the pin: the same route is imported with the LVar unset
     it('the sibling: imports the route with the LVar unset', async () => {
         const unit = await disabledUnit(false);
-        expect(fpl0Idents(unit)).toEqual([]); // Precondition of the pin as well: nothing in FPL 0 before the sync
+        expect(fplIdents(unit)).toEqual([]); // Precondition of the pin as well: nothing in FPL 0 before the sync
 
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(fpl0Idents(unit)).toEqual(['KAAA', 'KBBB']);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
     });
 
     // The other precondition of the pin: the LVar does disable the unit, its ticks stop (SimVarSync.test.ts)
     it('the sibling: the disabled unit has stopped its ticks', async () => {
         const unit = await disabledUnit(false);
         await vi.advanceTimersByTimeAsync(2000);
-        const before = writeCount(unit, 'GPS WP DISTANCE');
+        const before = unit.env.sim.writeCount('GPS WP DISTANCE');
         await vi.advanceTimersByTimeAsync(3000);
-        expect(writeCount(unit, 'GPS WP DISTANCE')).toBeGreaterThan(before); // The unit ticks while enabled
+        expect(unit.env.sim.writeCount('GPS WP DISTANCE')).toBeGreaterThan(before); // The unit ticks while enabled
 
         unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
         await vi.advanceTimersByTimeAsync(300);
-        const frozenAt = writeCount(unit, 'GPS WP DISTANCE');
+        const frozenAt = unit.env.sim.writeCount('GPS WP DISTANCE');
         await vi.advanceTimersByTimeAsync(5000);
 
-        expect(writeCount(unit, 'GPS WP DISTANCE')).toBe(frozenAt);
+        expect(unit.env.sim.writeCount('GPS WP DISTANCE')).toBe(frozenAt);
     });
 
     it.fails('does not import a route while the unit is disabled for hot swapping (#188)', async () => {
@@ -244,7 +239,7 @@ describe('EFB route import while the unit is disabled for hot swapping (public c
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(fpl0Idents(unit)).toEqual([]);
+        expect(fplIdents(unit)).toEqual([]);
     });
 });
 
@@ -271,8 +266,8 @@ describe('EFB round trip of a user waypoint', () => {
     it('loads the route the unit sent with its three waypoints (the setup of #187)', async () => {
         const unit = await roundTrip();
 
-        expect(fpl0Idents(unit).length).toBe(3);
-        expect([fpl0Idents(unit)[0], fpl0Idents(unit)[2]]).toEqual(['KAAA', 'KBBB']);
+        expect(fplIdents(unit).length).toBe(3);
+        expect([fplIdents(unit)[0], fplIdents(unit)[2]]).toEqual(['KAAA', 'KBBB']);
     });
 
     it.fails('loads a user waypoint that comes back from the EFB as that waypoint (#187)', async () => {
@@ -280,8 +275,6 @@ describe('EFB round trip of a user waypoint', () => {
 
         expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => ICAO.valueToStringV2(l.wpt.icaoStruct)))
             .toEqual(['A          KAAA    ', 'UXX        FARM    ', 'A          KBBB    ']);
-        const users: string[] = [];
-        KLNFacilityRepository.getRepository(unit.props.bus).forEach(f => users.push(f.icaoStruct.ident), [FacilityType.USR]);
-        expect(users).toEqual(['FARM']);
+        expect(userWaypoints(unit, FacilityType.USR).map(f => f.icaoStruct.ident)).toEqual(['FARM']);
     });
 });

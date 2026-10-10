@@ -3,6 +3,7 @@ import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {approachWorld} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
 import {Screen} from '../../harness/render/screen';
+import {activeIdent, fplIdents} from '../../harness/readers';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 
 // The world is approachWorld(): an RNAV approach to KPRC from the north with the FAF FAFAA 5 NM and a step-down fix
@@ -22,7 +23,6 @@ async function approachLoaded(nm: number) {
 }
 
 const nav = (unit: HeadlessUnit) => unit.props.memory.navPage;
-const activeIdent = (unit: HeadlessUnit) => nav(unit).activeWaypoint.getActiveWpt()?.icaoStruct.ident;
 /** The scale after `seconds` more seconds of clock */
 async function scaleAfter(unit: HeadlessUnit, seconds: number): Promise<number> {
     await vi.advanceTimersByTimeAsync(seconds * 1000);
@@ -91,7 +91,7 @@ describe('approach arm and the CDI scale ramp to 1 NM (6-1, 6-3)', () => {
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['ENRAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'KPRC']);
         expect(nav(unit).navmode).toBe(NavMode.ENR_LEG);
         expect(nav(unit).xtkScale).toBe(5);
     });
@@ -198,11 +198,7 @@ describe('approach active and the CDI scale ramp to 0.3 NM (6-3, 6-11)', () => {
     it('goes back to ARM at +-1 on a direct-to to the MAP (3-29)', async () => {
         const {unit} = await activePastFaf();
 
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'MAPAA');
-        await unit.panel.ent();
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.directTo('MAPAA');
 
         expect(nav(unit).activeWaypoint.isDctNavigation()).toBe(true);
         expect(activeIdent(unit)).toBe('MAPAA');
@@ -259,7 +255,7 @@ describe('approach active and the CDI scale ramp to 0.3 NM (6-3, 6-11)', () => {
         await flyTo(w, unit, 5 + 1);
         expect(await scaleAfter(unit, 3)).toBe(1);
         expect(nav(unit).navmode).toBe(NavMode.ARM_OBS);
-        expect(Screen.read().row(6).slice(6, 13)).toMatch(/^arm:\d\d\d$/);
+        expect(Screen.read().status().mode).toMatch(/^arm:\d\d\d( |$)/);
     });
 });
 

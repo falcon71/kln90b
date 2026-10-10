@@ -2,52 +2,35 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../harness/boot';
 import {Screen} from '../harness/render/screen';
 import {standardRoute} from '../harness/fixtures';
-import {savedFlightplan} from '../harness/storage';
+import {panelXml} from '../harness/panelXml';
+import {activeIdent} from '../harness/readers';
+import {bootOnStandardRoute} from '../harness/worldBoot';
 import {courseDeg} from '../harness/flight/geo';
 
 const BLANK_ROW = ' '.repeat(23);
 
-const xml = (inner: string) => `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name>${inner}</Instrument></PlaneHTMLConfig>`;
-const CIRCUIT_XML = xml('<Input><ElectricitySimVar>CIRCUIT ON:1</ElectricitySimVar></Input>');
-
-/** FakeSim stores the names in upper case, so a plain filter on the name would count nothing */
-const writeCount = (unit: HeadlessUnit, name: string): number => unit.env.sim.writes.filter(w => w.name === name.toUpperCase()).length;
-
-/** FPL 0 is KAAA, ABC, KBBB, the aircraft stands at KAAA and ABC is active after the settle */
-async function onRoute(magvar = 0) {
-    const {kaaa, abc, kbbb} = standardRoute();
-    const unit = await bootUnit({
-        facilities: [kaaa, abc, kbbb],
-        storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-        position: {lat: kaaa.lat, lon: kaaa.lon},
-        magvar,
-    });
-    await settle(unit);
-    return {unit, kaaa, abc, kbbb};
-}
-
-const activeIdent = (unit: HeadlessUnit) => unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident;
+const CIRCUIT_XML = panelXml({'Input.ElectricitySimVar': 'CIRCUIT ON:1'});
 
 // Public contract: the writable LVars of LVars.ts, and the wiki pages panel.xml customization ("You may change this value
 // on the fly") and Hot Swapping and Package Detection. SimVarSync reads them every 100 ms, so each write is followed by
 // 300 ms.
 describe('L:KLN90B_Disabled (public contract)', () => {
     it('freezes the outputs and resumes at one write per second on the same page and waypoint', async () => {
-        const {unit} = await onRoute();
+        const unit = await bootOnStandardRoute();
         const sim = unit.env.sim;
 
         sim.set('L:KLN90B_Disabled', 'bool', true);
         await vi.advanceTimersByTimeAsync(300);
-        const frozenAt = writeCount(unit, 'L:KLN90B_HSI_TF_FLAGS');
+        const frozenAt = unit.env.sim.writeCount('L:KLN90B_HSI_TF_FLAGS');
         await vi.advanceTimersByTimeAsync(5000);
-        expect(writeCount(unit, 'L:KLN90B_HSI_TF_FLAGS')).toBe(frozenAt);
+        expect(unit.env.sim.writeCount('L:KLN90B_HSI_TF_FLAGS')).toBe(frozenAt);
 
         sim.set('L:KLN90B_Disabled', 'bool', false);
         await vi.advanceTimersByTimeAsync(300);
-        const resumedAt = writeCount(unit, 'L:KLN90B_HSI_TF_FLAGS');
-        await vi.advanceTimersByTimeAsync(10_000);
+        const resumedAt = unit.env.sim.writeCount('L:KLN90B_HSI_TF_FLAGS');
+        await vi.advanceTimersByTimeAsync(10_000); // Ten 1 s ticks
         // A doubled tick rate after the resume (#24) would count 20
-        expect(writeCount(unit, 'L:KLN90B_HSI_TF_FLAGS') - resumedAt).toBe(10);
+        expect(unit.env.sim.writeCount('L:KLN90B_HSI_TF_FLAGS') - resumedAt).toBe(10);
 
         expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
         expect(Screen.read().status().left).toBe('NAV 2');
@@ -111,7 +94,7 @@ describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract
     // part after the first colon for the index (KLN90BPlaneSettings.ts:97-99) and SimVarSync replaces it (:31-35), so the
     // name becomes L:NaN and the unit never powers up. The sibling is the CIRCUIT ON:1 test above.
     it.fails('an LVar as the ElectricitySimVar powers the unit (#136)', async () => {
-        const unit = await bootUnit({panelXml: xml('<Input><ElectricitySimVar>L:MY_AVIONICS_BUS</ElectricitySimVar></Input>')});
+        const unit = await bootUnit({panelXml: panelXml({'Input.ElectricitySimVar': 'L:MY_AVIONICS_BUS'})});
         unit.env.sim.set('L:MY_AVIONICS_BUS', 'bool', true);
         await vi.advanceTimersByTimeAsync(2000);
 
@@ -170,7 +153,8 @@ describe('aircraft power interruptions (maintenance manual)', () => {
 // The wiki panel.xml customization: ObsTarget 1 writes the OBS course with K:VOR1_SET, 2 with K:VOR2_SET, 0 not at all
 describe('L:KLN90B_ObsTarget (public contract)', () => {
     it('starts and stops the K:VOR1_SET events at runtime', async () => {
-        const {unit, kaaa, abc} = await onRoute(4);
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({magvar: 4});
         const sim = unit.env.sim;
         const vorEvents = () => sim.keyEvents.filter(k => k.name.startsWith('K:VOR'));
         expect(vorEvents()).toEqual([]);
@@ -196,24 +180,24 @@ describe('L:KLN90B_ObsTarget (public contract)', () => {
 // keeps being written (#126).
 describe('L:KLN90B_WriteGpsSimvars (public contract)', () => {
     it('stops the GPS SimVar writes and releases GPS OVERRIDDEN, and resumes them', async () => {
-        const {unit} = await onRoute();
+        const unit = await bootOnStandardRoute();
         const sim = unit.env.sim;
         expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
 
         sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
         await vi.advanceTimersByTimeAsync(300);
         expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
-        const stoppedAt = writeCount(unit, 'GPS WP DISTANCE');
+        const stoppedAt = unit.env.sim.writeCount('GPS WP DISTANCE');
         await vi.advanceTimersByTimeAsync(5000);
-        expect(writeCount(unit, 'GPS WP DISTANCE')).toBe(stoppedAt);
+        expect(unit.env.sim.writeCount('GPS WP DISTANCE')).toBe(stoppedAt);
 
         sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
         await vi.advanceTimersByTimeAsync(300);
         expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
-        const resumedAt = writeCount(unit, 'GPS WP DISTANCE');
-        await vi.advanceTimersByTimeAsync(10_000);
+        const resumedAt = unit.env.sim.writeCount('GPS WP DISTANCE');
+        await vi.advanceTimersByTimeAsync(10_000); // Ten 1 s ticks
         // One write per calculation tick
-        expect(writeCount(unit, 'GPS WP DISTANCE') - resumedAt).toBe(10);
+        expect(unit.env.sim.writeCount('GPS WP DISTANCE') - resumedAt).toBe(10);
     });
 });
 
@@ -221,7 +205,7 @@ describe('L:KLN90B_WriteGpsSimvars (public contract)', () => {
 // Toggling WriteGpsSimvars while the unit is disabled writes GPS OVERRIDDEN again (SimVarSync.ts:53-56).
 describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
     it('the sibling: the disabled unit has released GPS OVERRIDDEN', async () => {
-        const {unit} = await onRoute();
+        const unit = await bootOnStandardRoute();
 
         unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
         await vi.advanceTimersByTimeAsync(300);
@@ -230,7 +214,7 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
     });
 
     it.fails('stays released when WriteGpsSimvars is toggled (#137)', async () => {
-        const {unit} = await onRoute();
+        const unit = await bootOnStandardRoute();
         const sim = unit.env.sim;
         sim.set('L:KLN90B_Disabled', 'bool', true);
         await vi.advanceTimersByTimeAsync(300);
@@ -249,7 +233,7 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
 // are applied and NAV 3 shows after the resume.
 describe('H events while the unit is disabled (public contract)', () => {
     it('the sibling: two clicks of the left inner knob move NAV 1 to NAV 3', async () => {
-        const {unit} = await onRoute();
+        const unit = await bootOnStandardRoute();
         await unit.panel.selectPage('L', 'NAV 1');
 
         await unit.panel.press('KLN90B_LeftSmallKnob_Right');
@@ -259,7 +243,7 @@ describe('H events while the unit is disabled (public contract)', () => {
     });
 
     it.fails('are ignored: the left page is still NAV 1 after the resume (#138)', async () => {
-        const {unit} = await onRoute();
+        const unit = await bootOnStandardRoute();
         await unit.panel.selectPage('L', 'NAV 1');
         unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
         await vi.advanceTimersByTimeAsync(300);

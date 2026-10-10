@@ -1,25 +1,19 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {standardRoute} from '../../harness/fixtures';
-import {savedFlightplan} from '../../harness/storage';
+import {HEADING_INPUT, panelXml} from '../../harness/panelXml';
+import {activeIdent} from '../../harness/readers';
+import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {angleDiff, courseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
 
-const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
+const HEADING_INPUT_XML = panelXml(HEADING_INPUT);
 
 const roll = (unit: HeadlessUnit): number => unit.env.sim.get('L:KLN90B_RollCommand', 'degrees');
 
 /** FPL 0 is KAAA, ABC, KBBB and the aircraft stands at KAAA; ABC is active after the settle */
-async function onRoute(panelXml?: string) {
-    const {kaaa, abc, kbbb} = standardRoute();
-    const unit = await bootUnit({
-        facilities: [kaaa, abc, kbbb],
-        storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-        position: {lat: kaaa.lat, lon: kaaa.lon},
-        panelXml,
-        magvar: 0,
-    });
-    await settle(unit);
-    expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('ABC');
+async function onRoute(xml?: string) {
+    const {kaaa, abc} = standardRoute();
+    const unit = await bootOnStandardRoute({panelXml: xml, magvar: 0});
     // 10 NM before ABC, on the course of the leg
     const mid = pointBefore(kaaa, abc, 10);
     return {unit, kaaa, abc, mid, dtk: courseDeg(mid, abc)};
@@ -44,7 +38,7 @@ describe('L:KLN90B_RollCommand (public contract)', () => {
 
         await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 0});
 
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(unit.env.sim.lastWrite('L:KLN90B_RollCommand')?.value).toBe(0);
     });
 
@@ -96,7 +90,7 @@ describe('L:KLN90B_RollCommand without a heading input (public contract)', () =>
         await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});
 
         expect(unit.props.planeSettings.input.headingInput).toBe(false);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe(abc.icaoStruct.ident);
+        expect(activeIdent(unit)).toBe(abc.icaoStruct.ident);
         expect(unit.props.memory.navPage.xtkToActive).toBeCloseTo(2, 1);
         expect(unit.props.sensors.in.gps.groundspeed).toBeCloseTo(120, 6);
     });
@@ -132,7 +126,7 @@ describe('L:KLN90B_RollCommand far left of the leg on a parallel track (#100)', 
         const nav = unit.props.memory.navPage;
 
         expect(unit.props.planeSettings.input.headingInput).toBe(true);
-        expect(nav.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(nav.xtkToActive).toBeCloseTo(-5, 1);
         expect(nav.desiredTrack).toBeCloseTo(dtk, 0);
         expect(unit.props.sensors.in.gps.groundspeed).toBeCloseTo(120, 6);

@@ -4,13 +4,14 @@ import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boo
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, star, withProcedures} from '../../../harness/navdata/procedures';
 import {savedFlightplan} from '../../../harness/storage';
+import {activeIdent, fplIdents, messageLines, turnStackLength} from '../../../harness/readers';
+import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {angleBetween, courseDeg, distanceNm, finalCourseDeg, pointBefore, pointFrom} from '../../../harness/flight/geo';
 import {Screen} from '../../../harness/render/screen';
 import {approachWorld, standardRoute} from '../../../harness/fixtures';
 import {KLNFixType} from '../../../../kln90b/data/flightplan/Flightplan';
 
 const fpl0 = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs();
-const idents = (unit: HeadlessUnit) => fpl0(unit).map(l => l.wpt.icaoStruct.ident);
 const activeWaypoint = (unit: HeadlessUnit) => unit.props.memory.navPage.activeWaypoint;
 
 // 3364def: when FROM and TO are the same fix the path of the leg has no center (NaN) and the guard in NavCalculator.tick
@@ -40,16 +41,16 @@ describe('a STAR whose first fix is the last enroute waypoint (#23, 3364def)', (
     it('loads the repeated fix twice and reports it on the MSG page (#23)', async () => {
         const {unit} = await loadStarFromKpt();
 
-        expect(idents(unit)).toEqual(['ENRAA', 'KPT', 'KPT', 'STARB', 'KDST']);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'KPT', 'KPT', 'STARB', 'KDST']);
         expect(activeWaypoint(unit).getActiveFplIdx()).toBe(1);
-        const messages = unit.props.messageHandler.getMessages().map(m => m.message);
+        const messages = messageLines(unit);
         expect(messages).toContainEqual(['REDUNDANT WPTS IN FPL', 'EDIT ENROUTE WPTS', 'AS NECESSARY']);
     });
 
     // The KLN 89 trainer and 3364def: the zero-length leg KPT to KPT is sequenced through without an error
     it('sequences through the repeated fix to the next fix of the STAR without an error (#23)', async () => {
         const {unit, kpt, starb} = await loadStarFromKpt();
-        expect(idents(unit)).toEqual(['ENRAA', 'KPT', 'KPT', 'STARB', 'KDST']); // Precondition
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'KPT', 'KPT', 'STARB', 'KDST']); // Precondition
         expect(activeWaypoint(unit).getActiveFplIdx()).toBe(1);
 
         await moveAircraft(unit, pointFrom(kpt, 180, 0.3), {groundspeedKt: 120});
@@ -57,7 +58,7 @@ describe('a STAR whose first fix is the last enroute waypoint (#23, 3364def)', (
 
         expect(unit.errors).toEqual([]);
         expect(activeWaypoint(unit).getActiveFplIdx()).toBe(3);
-        expect(activeWaypoint(unit).getActiveWpt()!.icaoStruct.ident).toBe('STARB');
+        expect(activeIdent(unit)).toBe('STARB');
         expect(Math.abs(unit.props.memory.navPage.desiredTrack! - courseDeg(kpt, starb))).toBeLessThan(0.5);
     });
 });
@@ -84,7 +85,7 @@ describe('an approach whose IAF and FAF are the same fix (6-10)', () => {
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
-        expect(idents(unit)).toEqual(['ENRAA', 'TXOAA', 'TXOAA', 'MAPAA', 'KPRC']); // Preconditions
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'TXOAA', 'TXOAA', 'MAPAA', 'KPRC']); // Preconditions
         expect(fpl0(unit)[1].fixType).toBe(KLNFixType.IAF);
         expect(fpl0(unit)[2].fixType).toBe(KLNFixType.FAF);
         expect(activeWaypoint(unit).getActiveFplIdx()).toBe(1);
@@ -94,26 +95,17 @@ describe('an approach whose IAF and FAF are the same fix (6-10)', () => {
 
         expect(unit.errors).toEqual([]);
         expect(activeWaypoint(unit).getActiveFplIdx()).toBe(3);
-        expect(activeWaypoint(unit).getActiveWpt()!.icaoStruct.ident).toBe('MAPAA');
+        expect(activeIdent(unit)).toBe('MAPAA');
     });
 });
 
 const nav = (unit: HeadlessUnit) => unit.props.memory.navPage;
-const activeIdent = (unit: HeadlessUnit) => nav(unit).activeWaypoint.getActiveWpt()?.icaoStruct.ident;
-/** ActiveWaypoint replaces the array, so read it fresh */
-const turnStackLength = (unit: HeadlessUnit) => nav(unit).activeWaypoint.turnStack.length;
 
 /** The standard route KAAA, ABC, KBBB as FPL 0, settled on KAAA; ABC is active */
 async function onStandardRoute(storage: Record<string, unknown> = {}) {
-    const r = standardRoute();
-    const unit = await bootUnit({
-        facilities: [r.kaaa, r.abc, r.kbbb],
-        storage: {...savedFlightplan(0, [r.kaaa, r.abc, r.kbbb]), ...storage},
-        position: {lat: r.kaaa.lat, lon: r.kaaa.lon},
-    });
-    await settle(unit);
+    const unit = await bootOnStandardRoute({storage});
     expect(activeIdent(unit)).toBe('ABC'); // Precondition
-    return {unit, ...r};
+    return {unit, ...standardRoute()};
 }
 
 // 3-32: NAV 3 tells the pilot which way to fly back to the course, "FLY L" when the aircraft is right of it. 3-31: the
@@ -234,11 +226,7 @@ describe('waypoint alert on a Direct To (3-29)', () => {
         const start = pointBefore(kaaa, abc, 5);
         const unit = await bootUnit({facilities: [kaaa, abc], position: start});
         await settle(unit);
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'ABC');
-        await unit.panel.ent();
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.directTo('ABC');
         expect(nav(unit).activeWaypoint.isDctNavigation()).toBe(true); // Preconditions
         expect(activeIdent(unit)).toBe('ABC');
         expect(nav(unit).activeWaypoint.getActiveFplIdx()).toBe(-1);
@@ -311,7 +299,7 @@ async function starWithTurnAt(flyOver: boolean) {
     await settle(unit);
     await unit.panel.loadProcedure('APT 7');
     const legs = nav(unit).activeWaypoint.fpl0.getLegs();
-    expect(legs.map(l => l.wpt.icaoStruct.ident)).toEqual(['ENRAA', 'STRAA', 'FLYOV', 'STRCC', 'KDST']); // Preconditions
+    expect(fplIdents(unit)).toEqual(['ENRAA', 'STRAA', 'FLYOV', 'STRCC', 'KDST']); // Preconditions
     expect(legs[2].flyOver === true).toBe(flyOver);
     expect(activeIdent(unit)).toBe('FLYOV');
     return {unit, straa, flyov, strcc};
@@ -467,13 +455,13 @@ describe('ground speed below 2 kt (characterization)', () => {
 
 // 3-4: during the self-test DIS is 34.5 NM and the D-bar shows half scale right, which is 2.5 NM left of course on the
 // 5 NM scale. GPS WP CROSS TRK is the negated cross track (SensorsOutSimVars.test.ts), so 2.5 NM left is +4630 m. The
-// XTK output filter overshoots after its step from zero (#158), so the outputs are read late, 30 s into the self-test
-// page, when it has settled.
+// XTK output filter overshoots after its step from zero (#158), so the outputs are read late, 30 s after the power-on
+// (well into the self-test page), when it has settled.
 describe('self-test outputs (3-4)', () => {
     it('writes DIS 34.5 NM and a half-scale right deviation', async () => {
         const unit = await bootUnit({engineRunning: false, magvar: 0});
         await unit.panel.powerOn();
-        await vi.advanceTimersByTimeAsync(30_000);
+        await vi.advanceTimersByTimeAsync(30_000); // 30 s after the power-on, well into the self-test page
         expect(Screen.read().rows('L')[0]).toBe('DIS  34.5NM'); // Precondition: still the self-test page, showing its DIS
         expect(Screen.read().rows('R')[5]).toBe('  APPROVE? ');
 
@@ -526,7 +514,7 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
         await vi.advanceTimersByTimeAsync(1500);
         expect(unit.props.sensors.in.gps.isValid()).toBe(false);
 
-        await vi.advanceTimersByTimeAsync(18_500);
+        await vi.advanceTimersByTimeAsync(18_500); // 20 s after the reset with the 1.5 s above
         expect(unit.props.sensors.in.gps.isValid()).toBe(true);
     });
 

@@ -1,9 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
 import {GPSSystemState} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, settle} from '../harness/boot';
+import {bootToSelfTest, bootUnit, HeadlessUnit, settle} from '../harness/boot';
 import {DEFAULT_START} from '../harness/sim/clock';
 import {Screen} from '../harness/render/screen';
 import {storedSetting} from '../harness/storage';
+import {messages} from '../harness/readers';
 import {TimeStamp} from '../../kln90b/data/Time';
 
 // #211: the KLN almanac check (KLNGPSSatComputer.isAlmanacValid) reads SDK fields that SDK 2.3.3 moved into
@@ -23,8 +24,6 @@ const MINUTE = 60 * 1000;
 
 /** The stored data of a unit that was last used here yesterday: position 47/8 (the boot position), almanac a day old */
 const WARM = {fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 8, lastAlmanacDownload: START - DAY};
-
-const messages = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
 
 /** A cold-and-dark unit, switched on. clockOffsetMs moves the unit's battery clock against the sim time */
 async function powerOnCold(storage: Record<string, unknown>, clockOffsetMs = 0): Promise<HeadlessUnit> {
@@ -226,8 +225,7 @@ describe('messages at power-on (B-3, B-4)', () => {
     // TIME UPDATED only when the GPS moves the clock by more than 10 minutes. A cold-and-dark unit switched on where it
     // was switched off, with its clock right, therefore posts neither, and the status line shows no MSG (3-10).
     it('posts no message on a cold-and-dark start at the stored position (B-3, B-4, 3-10)', async () => {
-        const unit = await bootUnit({engineRunning: false, storage: {lastLatitude: 47, lastLongitude: 8}});
-        await unit.panel.powerOn();
+        const unit = await bootToSelfTest({storage: {lastLatitude: 47, lastLongitude: 8}});
         await unit.panel.approveSelfTest();
         await settle(unit);
 
@@ -284,7 +282,7 @@ describe('GPS data kept over a power-off', () => {
         await settle(unit);
         unit.env.sim.set('PLANE LATITUDE', 'degrees', 47.5);
         unit.env.sim.set('PLANE LONGITUDE', 'degrees', 8.25);
-        await vi.advanceTimersByTimeAsync(62_000);
+        await vi.advanceTimersByTimeAsync(62_000); // past the periodic save of 60 s
 
         expect(storedSetting(unit, 'lastLatitude')).toBe(47.5);
         expect(storedSetting(unit, 'lastLongitude')).toBe(8.25);
@@ -410,7 +408,7 @@ describe('STA 1 page with a fix (characterization)', () => {
 describe('the system clock without a fix (3-53)', () => {
     it('runs on while the GPS searches (3-53)', async () => {
         const unit = await powerOnCold({...WARM, lastLatitude: 0, lastLongitude: 0});
-        await vi.advanceTimersByTimeAsync(60_000);
+        await vi.advanceTimersByTimeAsync(60_000); // a minute of search, still short of a fix (asserted below)
         const gps = unit.props.sensors.in.gps;
         expect(gps.isValid()).toBe(false);
 

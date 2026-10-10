@@ -5,6 +5,9 @@ import {standardRoute} from '../../harness/fixtures';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
+import {LEG_OBS_SWITCH, NO_OBS, panelXml} from '../../harness/panelXml';
+import {activeIdent, fplIdents, messageLines} from '../../harness/readers';
+import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {Screen} from '../../harness/render/screen';
 import {angleBetween, courseDeg, crossTrackNm, finalCourseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
 import {KLNFixType} from '../../../kln90b/data/flightplan/Flightplan';
@@ -12,9 +15,7 @@ import {FROM, NavMode} from '../../../kln90b/data/VolatileMemory';
 
 // The standard world: the final course KAAA - ABC is about 51.0, ABC - KBBB about 16
 const {kaaa, abc, kbbb} = standardRoute();
-const OBS_SOURCE_OFF = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input></Instrument></PlaneHTMLConfig>';
-const LEG_OBS_SWITCH = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ExternalSwitches>'
-    + '<LegObsSwitchInstalled>true</LegObsSwitchInstalled></ExternalSwitches></Input></Instrument></PlaneHTMLConfig>';
+const OBS_SOURCE_OFF = panelXml(NO_OBS);
 
 async function legMode(unit: HeadlessUnit) {
     await unit.panel.selectPage('L', 'MOD 1');
@@ -27,8 +28,7 @@ describe('LEG to OBS (5-36)', () => {
     // course is chosen so that the deviation stays the same
     it('keeps a deviation of 2 NM when the unit chooses the course', async () => {
         const position = pointFrom(pointBefore(kaaa, abc, 5), 141, 2); // 2 NM right of the leg, 5 NM before ABC
-        const unit = await bootUnit({facilities: [kaaa, abc, kbbb], position, panelXml: OBS_SOURCE_OFF, storage: savedFlightplan(0, [kaaa, abc, kbbb])});
-        await settle(unit);
+        const unit = await bootOnStandardRoute({position, panelXml: OBS_SOURCE_OFF});
         const nav = unit.props.memory.navPage;
         expect(nav.xtkToActive!).toBeCloseTo(2, 1); // Precondition, by construction
 
@@ -36,7 +36,7 @@ describe('LEG to OBS (5-36)', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC'); // 5-36 rule 1
+        expect(activeIdent(unit)).toBe('ABC'); // 5-36 rule 1
         expect(nav.xtkToActive!).toBeCloseTo(2, 1);
     });
 
@@ -95,19 +95,19 @@ describe('LEG to OBS (5-36)', () => {
 
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
-        return nav;
+        return {unit, nav};
     }
 
     it('enters OBS with EEE active for an aircraft on a long leg, 100 NM before the waypoint (the setup of #151)', async () => {
-        const nav = await longLegInObs();
+        const {unit, nav} = await longLegInObs();
 
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('EEE');
+        expect(activeIdent(unit)).toBe('EEE');
         expect(nav.activeWaypoint.isDctNavigation()).toBe(true);
     });
 
     it.fails('keeps the deviation of an aircraft on a long leg, 100 NM before the waypoint (#151)', async () => {
-        const nav = await longLegInObs();
+        const {unit, nav} = await longLegInObs();
 
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.1);
     });
@@ -127,8 +127,7 @@ describe('LEG to OBS (5-36)', () => {
 describe('OBS to LEG (5-36)', () => {
     /** Plan KAAA, ABC, KBBB; OBS mode with the external indicator on `obs`, ABC active */
     async function inObs(position: { lat: number; lon: number }, obs: number) {
-        const unit = await bootUnit({facilities: [kaaa, abc, kbbb], position, storage: savedFlightplan(0, [kaaa, abc, kbbb])});
-        await settle(unit);
+        const unit = await bootOnStandardRoute({position});
         unit.env.sim.set('Nav OBS:1', 'degrees', obs);
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
@@ -147,7 +146,7 @@ describe('OBS to LEG (5-36)', () => {
         await legMode(unit);
 
         expect(nav.navmode).toBe(NavMode.ENR_LEG);
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(nav.activeWaypoint.isDctNavigation()).toBe(true);
         expect(Math.abs(nav.desiredTrack! - 70)).toBeLessThan(0.2);
         expect(Math.abs(nav.xtkToActive! - crossTrackNm(position, abc, 70))).toBeLessThan(0.05);
@@ -165,7 +164,7 @@ describe('OBS to LEG (5-36)', () => {
         const position = pointFrom(foot, leg2Course + 90, 2);
         await moveAircraft(unit, position, {groundspeedKt: 120, trackTrue: 16});
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(nav.toFrom).toBe(FROM);
         return {unit, nav, position, foot};
     }
@@ -182,7 +181,7 @@ describe('OBS to LEG (5-36)', () => {
 
         expect(nav.navmode).toBe(NavMode.ENR_LEG);
         // The unit re-orients on FPL 0 and flies to the leg's waypoint, KBBB, today and under the fix of the pin
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
     });
 
     // 5-36 rules 1 and 2: on the FROM side the unit re-orients on FPL 0, computes the DTK for the new leg, and the
@@ -194,7 +193,7 @@ describe('OBS to LEG (5-36)', () => {
 
         await legMode(unit);
 
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
         expect(nav.activeWaypoint.isDctNavigation()).toBe(false);
         expect(nav.activeWaypoint.getFromWpt()!.icaoStruct.ident).toBe('ABC');
         expect(angleBetween(nav.desiredTrack, finalCourseDeg(abc, foot))).toBeLessThan(0.5);
@@ -231,7 +230,7 @@ describe('OBS to LEG (5-36)', () => {
         await legMode(unit);
 
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_LEG);
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
     });
 
     it.fails('keeps the second copy of a waypoint that is twice in FPL 0 active (#152)', async () => {
@@ -268,7 +267,7 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
         await unit.panel.loadProcedure('APT 8');
         await vi.advanceTimersByTimeAsync(2000);
         const aw = unit.props.memory.navPage.activeWaypoint;
-        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['ENRAA', 'TXOAA', 'TXOAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'TXOAA', 'TXOAA', 'MAPAA', 'KPRC']);
         expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.IAF);
         unit.env.sim.set('Nav OBS:1', 'degrees', 180);
         await unit.panel.obsMode();
@@ -285,7 +284,7 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
         await legMode(unit);
 
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ARM_LEG);
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('TXOAA');
+        expect(activeIdent(unit)).toBe('TXOAA');
     });
 
     // 6-11 step 5: after the course reversal at an IAF that is also the FAF, switching to LEG makes the FAF active.
@@ -326,7 +325,7 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
         await vi.advanceTimersByTimeAsync(2000);
         const aw = unit.props.memory.navPage.activeWaypoint;
         const legs = unit.props.memory.fplPage.flightplans[0].getLegs();
-        expect(legs.map(l => l.wpt.icaoStruct.ident)).toEqual(['ENRAA', 'IFAAA', 'VVV', 'MAPAA', 'VVV', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'IFAAA', 'VVV', 'MAPAA', 'VVV', 'KPRC']);
         expect(legs[2].fixType).toBe(KLNFixType.FAF);
         // The missed approach: the holding point as direct-to target, from the FPL 0 page
         await moveAircraft(unit, pointFrom(vvv, 0, 3), {groundspeedKt: 120, trackTrue: 180});
@@ -379,8 +378,8 @@ describe('OBS WPT > 200NM (B-3)', () => {
         unit.env.sim.set('Nav OBS:1', 'degrees', 90);
         if (obs) await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('FAR');
-        return unit.props.messageHandler.getMessages().map(m => m.message);
+        expect(activeIdent(unit)).toBe('FAR');
+        return messageLines(unit);
     }
 
     it('shows the message in OBS with the waypoint 210 NM away', async () => {
@@ -400,8 +399,7 @@ describe('the external GPS CRS switch (5-33)', () => {
     // 5-33: with the switch installed the mode follows the switch; 5-36 rule 1: the active waypoint stays both ways
     it('switches to OBS and back to LEG with the switch, keeping the active waypoint', async () => {
         const position = pointBefore(kaaa, abc, 5);
-        const unit = await bootUnit({facilities: [kaaa, abc, kbbb], position, panelXml: LEG_OBS_SWITCH, storage: savedFlightplan(0, [kaaa, abc, kbbb])});
-        await settle(unit);
+        const unit = await bootOnStandardRoute({position, panelXml: panelXml(LEG_OBS_SWITCH)});
         const nav = unit.props.memory.navPage;
         unit.env.sim.set('Nav OBS:1', 'degrees', 70);
         unit.env.sim.set('GPS OBS ACTIVE', 'bool', true);
@@ -413,7 +411,7 @@ describe('the external GPS CRS switch (5-33)', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(nav.navmode).toBe(NavMode.ENR_LEG);
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(Math.abs(nav.desiredTrack! - 70)).toBeLessThan(0.2); // 5-36 rule 2
     });
 });

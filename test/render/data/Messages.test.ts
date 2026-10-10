@@ -1,26 +1,18 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
+import {fuelComputer, panelXml} from '../../harness/panelXml';
+import {messages} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
 import {OneTimeMessage} from '../../../kln90b/data/MessageHandler';
 
 /** The six text rows of the MSG page, trimmed */
 const msgRows = () => Array.from({length: 6}, (_, r) => Screen.read().row(r).trimEnd());
 
-const messages = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
-
-/** Opens the MSG page and presses MSG until it closes, then lets the read one-time messages go */
+/** Reads every message off the MSG page (it throws if the page does not close), which lets the read one-time messages go */
 async function readAll(unit: HeadlessUnit) {
-    await unit.panel.msg();
-    for (let i = 0; i < 10 && Screen.read().status().left === ''; i++) {
-        await unit.panel.msg();
-    }
-    expect(Screen.read().status().left).not.toBe(''); // The page closed
-    await vi.advanceTimersByTimeAsync(1000);
+    await unit.panel.readMessages();
     expect(messages(unit)).toEqual([]); // The precondition: nothing is left to read
 }
-
-const panelXml = (input: string) =>
-    `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input>${input}</Input></Instrument></PlaneHTMLConfig>`;
 
 describe('the MSG page as the place a message is read (3-16)', () => {
     // 3-16: the newest message comes first, the rest in reverse chronological order
@@ -65,7 +57,7 @@ describe('SET FUEL ON BOARD ON OTH 5 IF NECESSARY', () => {
     // Input.FuelComputer.FOBTransmitted false is that computer (cfg/panel.xml)
     it('shows once after the start with a fuel computer that does not send the fuel on board (B-4)', async () => {
         const unit = await bootUnit({
-            panelXml: panelXml('<FuelComputer><IsInterfaced>true</IsInterfaced><FOBTransmitted>false</FOBTransmitted></FuelComputer>'),
+            panelXml: panelXml(fuelComputer({fob: false})),
         });
         await vi.advanceTimersByTimeAsync(2000);
 
@@ -74,7 +66,7 @@ describe('SET FUEL ON BOARD ON OTH 5 IF NECESSARY', () => {
 
     it('does not show without a fuel computer, whatever the fuel on board flag says (characterization)', async () => {
         const unit = await bootUnit({
-            panelXml: panelXml('<FuelComputer><IsInterfaced>false</IsInterfaced><FOBTransmitted>false</FOBTransmitted></FuelComputer>'),
+            panelXml: panelXml({'Input.FuelComputer.IsInterfaced': false, 'Input.FuelComputer.FOBTransmitted': false}),
         });
         await vi.advanceTimersByTimeAsync(2000);
 
@@ -85,7 +77,7 @@ describe('SET FUEL ON BOARD ON OTH 5 IF NECESSARY', () => {
 
     it('does not show with a fuel computer that sends the fuel on board (B-4)', async () => {
         const unit = await bootUnit({
-            panelXml: panelXml('<FuelComputer><IsInterfaced>true</IsInterfaced><FOBTransmitted>true</FOBTransmitted></FuelComputer>'),
+            panelXml: panelXml(fuelComputer({fob: true})),
         });
         await vi.advanceTimersByTimeAsync(2000);
 
@@ -96,7 +88,7 @@ describe('SET FUEL ON BOARD ON OTH 5 IF NECESSARY', () => {
 
     it('shows again after a power cycle (characterization)', async () => {
         const unit = await bootUnit({
-            panelXml: panelXml('<FuelComputer><IsInterfaced>true</IsInterfaced><FOBTransmitted>false</FOBTransmitted></FuelComputer>'),
+            panelXml: panelXml(fuelComputer({fob: false})),
         });
         await vi.advanceTimersByTimeAsync(2000);
         await readAll(unit);
