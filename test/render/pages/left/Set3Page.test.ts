@@ -54,18 +54,18 @@ describe('SET 3 page', () => {
 });
 
 describe('SET 3 page (characterization)', () => {
-    // Row 4 is left out: its label is the #247 pin below
     it('shows the default criteria with the cursor off', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 3');
 
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().rows('L').filter((_, i) => i !== 4)).toMatchInlineSnapshot(`
+        expect(Screen.read().rows('L')).toMatchInlineSnapshot(`
           [
             "NEAREST APT",
             " CRITERIA  ",
             "MIN LENGTH:",
             "      1000'",
+            "SURFACE:   ",
             "    HRD SFT",
           ]
         `);
@@ -106,9 +106,8 @@ describe('SET 3 minimum runway length (3-22)', () => {
         expect(storedSetting(unit, 'nearestAptMinRunwayLength')).toBe(5000);
     });
 
-    // Figures 3-73 to 3-75 label the surface row SURFACE: with a colon, like MIN LENGTH: above it; Set3Page.tsx renders
-    // SURFACE without one. The sibling is the characterization above, which holds the other rows of the page.
-    it.fails('labels the surface row SURFACE: (3-22, #247)', async () => {
+    // Figures 3-73 to 3-75 label the surface row SURFACE: with a colon, like MIN LENGTH: above it
+    it('labels the surface row SURFACE: (3-22, #247)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 3');
 

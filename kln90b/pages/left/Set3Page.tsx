@@ -48,7 +48,7 @@ export class Set3Page extends SixLineHalfPage {
             &nbspCRITERIA<br/>
             MIN LENGTH:<br/>
             &nbsp&nbsp&nbsp&nbsp&nbsp&nbsp{this.children.get("runwayLength").render()}'<br/>
-            SURFACE<br/>
+            SURFACE:<br/>
             {this.children.get("runwaySurface").render()}
         </pre>);
     }
