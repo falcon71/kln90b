@@ -134,7 +134,7 @@ async function distanceEntered(digits: string, extra: Facility[] = []): Promise<
 }
 
 describe('INT page (characterization)', () => {
-    // Row 3 (DIS) is left out: its leading zeros and its label are #282 and #283
+    // Row 3 (DIS) is left out: its leading zeros are #282
     it('shows a database intersection with its reference VOR, cursor off', async () => {
         const unit = await intPageOf([kenzy(), mkc()]);
 
@@ -223,7 +223,7 @@ describe('INT page reference waypoint (3-50, 3-51)', () => {
     });
 
     // The distance from the new reference: RIS lies 0.2° of latitude (12.0 NM) north of KENZY, MKC 6.0 NM south of it.
-    // The digits are parsed, so that the leading zero of #282 and the label of #283 do not matter here
+    // The digits are parsed, so that the leading zero of #282 does not matter here
     it('computes the distance from the entered REF waypoint (3-51, figure 3-158, the KLN 89 trainer, #279)', async () => {
         await withRefRis();
 
@@ -338,14 +338,14 @@ describe('INT page radial and distance (3-50, 5-19)', () => {
     });
 
     // The same figures show the unit in the small nm glyphs that every other distance of the code uses, as does the KLN 89
-    // trainer (2026-10-07); IntPage.tsx:125 writes NM in full-size letters (SupPage.tsx:117 too)
-    it.fails('labels the distance with the small nm (figures 3-155, 5-75, the KLN 89 trainer, #283)', async () => {
+    // trainer (2026-10-07). The test reads the cells after the digits.
+    it('labels the distance with the small nm (figures 3-155, 5-75, the KLN 89 trainer, #283)', async () => {
         await intPageOf([intersection('KENZY', 47.2, 11.0), mkc()]);
 
         expect(Screen.read().rows('R')[3].slice(9)).toBe('nm');
     });
 
-    // Sibling of the two pins: the distance digits are those of 12.0 NM
+    // Sibling of the pins above: the distance digits are those of 12.0 NM
     it('shows the distance of 12.0 NM (3-50)', async () => {
         await intPageOf([intersection('KENZY', 47.2, 11.0), mkc()]);
 
@@ -362,12 +362,12 @@ describe('user intersection (5-18, 5-19)', () => {
     });
 
     // 5-19 step 3, figure 5-69: USER POS? shows REF and RAD with dashes and the dashed position, the cursor on the
-    // latitude. Row 3 (DIS) is left out: #283
+    // latitude.
     it('shows the dashed fields with the cursor on the latitude after USER POS? (5-19)', async () => {
         const unit = await userPos();
 
         const rows = Screen.read().rows('R');
-        expect([rows[0], rows[1], rows[2], rows[4], rows[5]]).toEqual([' INT15     ', 'REF:  _____', 'RAD: ___._°', "_ __°__.__'", "____°__.__'"]);
+        expect(rows).toEqual([' INT15     ', 'REF:  _____', 'RAD: ___._°', 'DIS:___._nm', "_ __°__.__'", "____°__.__'"]);
         expect(unit.panel.focused('R').row).toBe(4);
     });
 
@@ -429,7 +429,7 @@ describe('user intersection (5-18, 5-19)', () => {
         const p = pointFrom({lat: 47.0, lon: 11.0}, 90, 48.1);
         const rows = Screen.read().rows('R');
         // Figure 5-75 keeps REF, RAD and DIS on the page after the creation. The DIS digits are parsed, so that
-        // #282 and #283 do not matter here
+        // #282 does not matter here
         expect(rows.slice(0, 3)).toEqual([' INT15     ', 'REF:  ORD  ', 'RAD: 090.0°']);
         expect(parseFloat(rows[3].slice(4))).toBe(48.1);
         expect(rows.slice(4)).toEqual(["N 46°59.64'", "E 12°10.40'"]);

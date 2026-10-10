@@ -85,8 +85,8 @@ async function qqWithApprovedRefAbc(o: { magvar?: number, vorVariation?: number 
 const userWaypoint = (unit: HeadlessUnit, ident: string) =>
     KLNFacilityRepository.getRepository(unit.props.bus).get(ICAO.value('U', 'XX', '', ident));
 
-// The DIS row (row 3) is left out: it shows the distance with a leading zero (#282) and NM in large letters
-// (#283). With no magnetic variation the RAD row shows the same value either way (#280).
+// The DIS row (row 3) is left out: it shows the distance with a leading zero (#282).
+// With no magnetic variation the RAD row shows the same value either way (#280).
 describe('SUP page (characterization)', () => {
     it('shows a user waypoint with its reference VOR, radial and coordinates', async () => {
         await supPage();
@@ -162,7 +162,7 @@ describe('SUP page', () => {
         const rows = rightRows();
         expect(rows[1]).toBe('REF:  ABC  ');
         expect(rows[2]).toBe('RAD: 000.0°');
-        expect(rows[3].slice(5, 9)).toBe('12.0'); // the digits only: the format around them is #283 and #282
+        expect(rows[3].slice(5, 9)).toBe('12.0'); // the digits only: the format around them is #282
     });
 
     // A radial is the course out of the VOR, the initial bearing at the station (figure 5-76; the KLN 89 trainer,
@@ -274,7 +274,7 @@ describe('SUP page', () => {
 
         expect(rightRows().slice(4)).toEqual(["N 46°57.76'", "E 13°25.56'"]);
         // Figure 5-75: the reference waypoint, radial and distance stay on the page. Only the numbers are read: the format
-        // around them is #283 and #282
+        // around them is #282
         expect(rightRows()[1]).toBe('REF:  ABC  ');
         expect(rightRows()[2].slice(6, 10)).toBe('90.0');
         expect(rightRows()[3].slice(4, 9)).toBe('120.0');
@@ -427,8 +427,8 @@ describe('SUP page', () => {
     });
 
     // The distance is followed by nm in the small glyphs (lowercase in the font, as NAV 2 writes it): figures 3-155 to
-    // 3-159 and 5-67 to 5-76, checked in the KLN 89 trainer, 2026-10-07. The page writes NM in large letters.
-    it.fails('writes nm in the small glyphs after the distance (3-51, the KLN 89 trainer, #283)', async () => {
+    // 3-159 and 5-67 to 5-76, checked in the KLN 89 trainer, 2026-10-07.
+    it('writes nm in the small glyphs after the distance (3-51, the KLN 89 trainer, #283)', async () => {
         await supPage();
 
         expect(rightRows()[3].slice(9)).toBe('nm');

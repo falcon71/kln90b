@@ -122,7 +122,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
             <div ref={this.mainRef}>
             REF:&nbsp&nbsp{this.children.get("ref").render()}<br/>
             RAD: {this.children.get("refBearing").render()}°<br/>
-            DIS:{this.children.get("refDist").render()}NM<br/>
+            DIS:{this.children.get("refDist").render()}nm<br/>
                 {this.children.get("lat").render()}'<br/>
                 {this.children.get("lon").render()}'
             </div>
