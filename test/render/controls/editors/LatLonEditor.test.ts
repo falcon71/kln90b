@@ -19,6 +19,22 @@ describe('latitude and longitude editors', () => {
         expect(text(new LongitudeEditor(bus, 18.5, () => undefined))).toBe('E 18°30.00');
         expect(text(new LongitudeEditor(bus, -18.5, () => undefined))).toBe('W 18°30.00');
     });
+
+    // 3-8, 3-32: a latitude is shown as the hemisphere, two digits of degrees and the minutes. The tens cell offers 0 to
+    // 8 (#303), so a value of 90 degrees has no choice to show its 9 and the cell stays empty (N 0°00.00').
+    it.fails('shows a latitude of 90 degrees as N 90°00.00 (3-8, 3-32, #345)', () => {
+        const bus = new EventBus();
+
+        expect(text(new LatitudeEditor(bus, 90, () => undefined))).toBe('N 90°00.00');
+        expect(text(new LatitudeEditor(bus, -90, () => undefined))).toBe('S 90°00.00');
+    });
+
+    // The sibling of the pin: the largest latitude the tens cell can select shows its digits
+    it('shows a latitude of 89°59.99 with its tens digit (3-8, 3-32)', () => {
+        const bus = new EventBus();
+
+        expect(text(new LatitudeEditor(bus, 89 + 59.99 / 60, () => undefined))).toBe('N 89°59.99');
+    });
 });
 
 describe('latitude and longitude editors at negative zero (checked in the KLN 89 trainer, 2026-10-08, #308)', () => {
@@ -128,8 +144,8 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // C-1, extended (as for the pins below): a latitude below 90 degrees is a valid entry, so N 89°59.99' is the
-    // sibling of the pins below, the largest latitude short of the pole, and is entered
+    // C-1, extended (as for the tests below): a latitude below 90 degrees is a valid entry, so N 89°59.99' is the
+    // largest latitude short of the pole, and is entered
     it('takes the latitude N 89°59.99 (C-1)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 1);
@@ -143,23 +159,10 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         expect(unit.props.sensors.in.gps.coords.lat).toBeCloseTo(89 + 59.99 / 60, 9);
     });
 
-    // C-1, extended: 90 degrees and 30 minutes are more than 90 degrees, which no latitude has. LatitudeEditor
-    // .convertToValue checks the degree digits alone (degrees > 90), so N 90°30.00' is entered as 90.5 degrees. If the
-    // fix takes the 9 out of the tens (the pin below), this entry can no longer be made and this pin retires.
-    it.fails('refuses the latitude N 90°30.00 with INVALID ENT (C-1, #303)', async () => {
-        const unit = await coldSet1();
-        await unit.panel.outer('L', 1);
-        await select(unit, [1, 10, 1, 4]); // N 9 0, 3, the rest blank
-        expect(rowsL()[2]).toBe("N 90°3_.__'");
-        await unit.panel.ent();
-
-        expect(unit.errors).toEqual([]);
-        expect(Screen.read().status().mode).toBe('INVALID ENT');
-    });
-
-    // Checked in the KLN 89 trainer, 2026-10-08 (T9): the tens of the latitude degrees offer 0 to 8, so no latitude of
-    // 90 degrees or more can be entered at all. The code offers 0 to 9.
-    it.fails('offers 0 to 8 in the tens of the latitude degrees, no 9 (checked in ' +
+    // Checked in the KLN 89 trainer, 2026-10-08 (T9): the tens of the latitude degrees offer 0 to 8 and wrap from 8 to
+    // 0 (Editor.test.ts holds the wrap), so no latitude of 90 degrees or more can be entered at all, not even
+    // N 90°00.00' (C-1: a value outside the range is INVALID ENT).
+    it('offers 0 to 8 in the tens of the latitude degrees, no 9 (checked in ' +
         'the KLN 89 trainer, 2026-10-08, #303)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 1);
@@ -191,7 +194,7 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         expect(rowsL()[2][2]).toBe('8');
     });
 
-    // C-1, extended (as for the pin below): the longitude of 179°59.99' is a valid entry and is entered
+    // C-1, extended (as for the tests below): the longitude of 179°59.99' is a valid entry and is entered
     it('takes the longitude E179°59.99 (C-1)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 2);
@@ -205,10 +208,9 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         expect(unit.props.sensors.in.gps.coords.lon).toBeCloseTo(179 + 59.99 / 60, 9);
     });
 
-    // C-1, extended: the same for the longitude, which LongitudeEditor.convertToValue checks with degrees > 180 alone.
-    // E 180°00.00' has no test: the KLN 89 trainer's longitude block stops at 179 (00 to 17 and a units digit), and
-    // that layout exists only on the 89.
-    it.fails('refuses the longitude E180°30.00 with INVALID ENT (C-1, #303)', async () => {
+    // C-1, extended: 180 degrees and 30 minutes are more than 180 degrees, which no longitude has. The whole value is
+    // compared, not the degree digits alone. The field keeps its value after the refusal.
+    it('refuses the longitude E180°30.00 with INVALID ENT (C-1, #303)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 2);
         await select(unit, [1, 2, 9, 1, 4]); // E 1 8 0, 3
@@ -217,23 +219,58 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
 
         expect(unit.errors).toEqual([]);
         expect(Screen.read().status().mode).toBe('INVALID ENT');
+        await unit.panel.cursor('L');
+        expect(rowsL()[3]).toBe("E 11°15.00'");
+    });
+
+    // The same for the western hemisphere
+    it('refuses the longitude W180°30.00 with INVALID ENT (C-1, #303)', async () => {
+        const unit = await coldSet1();
+        await unit.panel.outer('L', 2);
+        await select(unit, [2, 2, 9, 1, 4]); // W 1 8 0, 3
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().status().mode).toBe('INVALID ENT');
+    });
+
+    // The smallest excess: the hundredths of the minutes count too (E 180°00.01' is above 180 degrees)
+    it('refuses the longitude E180°00.01 with INVALID ENT (C-1, #303)', async () => {
+        const unit = await coldSet1();
+        await unit.panel.outer('L', 2);
+        await select(unit, [1, 2, 9, 1, 1, 1, 1, 2]); // E 1 8 0, 0 0, 0 1
+        expect(rowsL()[3]).toBe("E180°00.01'");
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().status().mode).toBe('INVALID ENT');
     });
 });
 
-describe('latitude editor, a latitude of 91 degrees on SET 1 (characterization)', () => {
-    // The code refuses a latitude whose degree digits are above 90 (LatitudeEditor.convertToValue) with INVALID ENT and
-    // the field keeps its value. The route to 91 is only open while the tens of the degrees offer a 9, so this retires
-    // with the fix of #303 (the tens offer 0 to 8).
-    it('refuses a latitude of 91 degrees with INVALID ENT (characterization)', async () => {
+describe('longitude editor at 180 degrees on SET 1 (characterization)', () => {
+    // The antimeridian itself is not beyond 180 degrees. Nothing in the Pilot's Guide or the KLN 89 trainer says how
+    // the real unit treats E 180°00.00' (the 89's longitude block stops at 179, a layout of the 89 alone), so this is
+    // not a claim about the real unit: the editor takes it.
+    it('characterization: takes the longitude E180°00.00', async () => {
         const unit = await coldSet1();
-        await unit.panel.outer('L', 1);
-        await select(unit, [1, 10, 2]); // N 9 1
+        await unit.panel.outer('L', 2);
+        await select(unit, [1, 2, 9, 1, 1, 1, 1, 1]); // E 1 8 0, 0 0, 0 0
         await unit.panel.ent();
-        expect(Screen.read().status().mode).toBe('INVALID ENT');
-        await unit.panel.cursor('L');
 
         expect(unit.errors).toEqual([]);
-        expect(rowsL()[2]).toBe("N 47°30.00'");
+        expect(Screen.read().status().mode).not.toBe('INVALID ENT');
+        expect(rowsL()[3]).toBe("E180°00.00'");
+    });
+
+    it('characterization: takes the longitude W180°00.00', async () => {
+        const unit = await coldSet1();
+        await unit.panel.outer('L', 2);
+        await select(unit, [2, 2, 9, 1, 1, 1, 1, 1]); // W 1 8 0, 0 0, 0 0
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().status().mode).not.toBe('INVALID ENT');
+        expect(rowsL()[3]).toBe("W180°00.00'");
     });
 });
 

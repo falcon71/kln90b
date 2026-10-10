@@ -56,10 +56,10 @@ export class LongitudeEditor extends Editor<Longitude> {
     protected convertToValue(rawValue: Rawvalue): Promise<Longitude | null> {
         const eastWest = rawValue[0] === 0 ? 1 : -1;
         const degrees = Number(String(rawValue[1]) + String(rawValue[2]) + String(rawValue[3]));
-        if (degrees > 180) {
+        const minutes = Number(String(rawValue[4]) + String(rawValue[5]) + "." + String(rawValue[6]) + String(rawValue[7]));
+        if (degrees + minutes / 60 > 180) { //C-1: a value outside the allowed range is INVALID ENT, and no longitude is beyond 180°
             return Promise.resolve(null);
         }
-        const minutes = Number(String(rawValue[4]) + String(rawValue[5]) + "." + String(rawValue[6]) + String(rawValue[7]));
 
         return Promise.resolve(eastWest * (degrees + minutes / 60));
     }

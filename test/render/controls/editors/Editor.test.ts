@@ -116,11 +116,11 @@ describe('editor data entry (3-14, 3-53, 5-17)', () => {
 
 describe('editor cells wrap (checked in the KLN 89 trainer, 2026-10-08)', () => {
     // Checked in the KLN 89 trainer, 2026-10-08 (T4): every cell wraps in both directions, from its last
-    // choice to its first and back. The latitude tens is the exception that #303 pins (it offers 9 today, the
-    // trainer's cell stops at 8), so it is left out here.
+    // choice to its first and back. The latitude tens stop at 8 (#303).
     // [column, first choice, last choice]
     const WRAPPING_CELLS: [number, string, string][] = [
         [0, 'N', 'S'],   // the hemisphere
+        [2, '0', '8'],   // the degree tens
         [3, '0', '9'],   // the degree units
         [5, '0', '5'],   // the tens of the minutes
         [6, '0', '9'],   // the units of the minutes

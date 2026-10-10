@@ -16,7 +16,7 @@ export class LatitudeEditor extends Editor<Latitude> {
     constructor(bus: EventBus, value: Latitude | null, enterCallback: (text: Latitude) => void) {
         super(bus, [
             new NorthSouthEditorField(),
-            new NumberEditorField(),
+            NumberEditorField.createWithMinMax(0, 8), //The tens stop at 8, so no latitude beyond 90° can be selected (checked in the KLN 89 trainer, 2026-10-08)
             new NumberEditorField(),
             NumberEditorField.createWithMinMax(0, 5),
             new NumberEditorField(),
@@ -54,9 +54,6 @@ export class LatitudeEditor extends Editor<Latitude> {
     protected convertToValue(rawValue: Rawvalue): Promise<Latitude | null> {
         const northSouth = rawValue[0] === 0 ? 1 : -1;
         const degrees = Number(String(rawValue[1]) + String(rawValue[2]));
-        if (degrees > 90) {
-            return Promise.resolve(null);
-        }
         const minutes = Number(String(rawValue[3]) + String(rawValue[4]) + "." + String(rawValue[5]) + String(rawValue[6]));
 
 
