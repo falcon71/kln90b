@@ -220,7 +220,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
         const refCoords = new GeoPoint(ref.lat, ref.lon);
         const intCoords = new GeoPoint(facility.lat, facility.lon);
         this.dis = UnitType.GA_RADIAN.convertTo(intCoords.distance(refCoords), UnitType.NMILE);
-        this.rad = intCoords.bearingFrom(refCoords);
+        this.rad = refCoords.bearingTo(intCoords); //5-19, figure 5-76 The radial is the initial bearing at the VOR
     }
 
     private calculateRef() {

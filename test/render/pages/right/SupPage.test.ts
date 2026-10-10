@@ -165,6 +165,21 @@ describe('SUP page', () => {
         expect(rows[3].slice(5, 9)).toBe('12.0'); // the digits only: the format around them is #283 and #282
     });
 
+    // A radial is the course out of the VOR, the initial bearing at the station (figure 5-76; the KLN 89 trainer,
+    // 2026-10-07, on the INT page). USUR lies 48.1 NM out on ABC's true 090 course (pointFrom, flight/geo.ts); the
+    // final bearing at the waypoint would show 090.9.
+    it('shows the radial as the bearing at the VOR (5-19, figure 5-76, #281)', async () => {
+        const p = pointFrom({lat: 47.0, lon: 10.5}, 90, 48.1);
+        const unit = await bootUnit({
+            facilities: [abc()], position: POSITION, storage: savedUserWaypoints([{kind: 'sup', ident: 'USUR', lat: p.lat, lon: p.lon}]),
+        });
+        await unit.panel.selectPage('R', 'SUP  ');
+        await vi.advanceTimersByTimeAsync(REF_DELAY_MS);
+        expect(rightRows().slice(0, 2)).toEqual([' USUR      ', 'REF:  ABC  ']); // precondition
+
+        expect(rightRows()[2]).toBe('RAD: 090.0°');
+    });
+
     // 5-18, 5-19 (figure 5-68): an ident without a waypoint offers CREATE NEW WPT AT: with USER POS? and PRES POS?
     it('offers to create a waypoint for an ident that has none (5-18, 5-19)', async () => {
         await createNewQq();

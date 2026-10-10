@@ -306,16 +306,25 @@ describe('INT page radial and distance (3-50, 5-19)', () => {
     });
 
     // A radial is the course out of the VOR, the initial bearing at the station. QQI lies 48.1 NM out on MKC's true
-    // 090° course (pointFrom, flight/geo.ts). IntPage.calculateRef takes GeoPoint.bearingFrom, the final bearing at the
-    // intersection, 090.9° here; in figure 5-76 the initial bearing gives the 268.1° shown and the final one 268.4°. The
+    // 090° course (pointFrom, flight/geo.ts). The final bearing at the intersection (GeoPoint.bearingFrom) would show
+    // 090.9° here; in figure 5-76 the initial bearing gives the 268.1° shown and the final one 268.4°. The
     // KLN 89 trainer (2026-10-07) shows the initial bearing too: the bearing measured at the intersection was off by 0.4°
     // to 0.7° on its four intersections. 5-19 says the original reference may be entered again later, which only makes sense if it
     // gives the same radial.
-    it.fails('shows the radial as the bearing at the VOR (3-50, 5-19, the KLN 89 trainer, #281)', async () => {
+    it('shows the radial as the bearing at the VOR (3-50, 5-19, the KLN 89 trainer, #281)', async () => {
         const p = pointFrom({lat: 47.0, lon: 11.0}, 90, 48.1);
         await intPageOf([intersection('QQI', p.lat, p.lon), mkc()]);
 
         expect(Screen.read().rows('R')[2]).toBe('RAD: 090.0°');
+    });
+
+    // The tenth of the radial: QQI lies on MKC's true 123.4 course, so the page shows 123.4 (figure 5-76 shows a radial with
+    // a tenth, 268.1)
+    it('shows the tenth of the radial (3-50, figure 5-76, #281)', async () => {
+        const p = pointFrom({lat: 47.0, lon: 11.0}, 123.4, 48.1);
+        await intPageOf([intersection('QQI', p.lat, p.lon), mkc()]);
+
+        expect(Screen.read().rows('R')[2]).toBe('RAD: 123.4°');
     });
 
     // Figures 3-155, 3-158, 5-67, 5-75 and 5-76 and a photo of a real unit (the SUP page, same layout) show DIS without

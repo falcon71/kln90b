@@ -878,8 +878,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   `FOCUS_INPUT_FIELD` or `UNFOCUS_INPUT_FIELD`, nor emit `mousePressOutsideView`, so the click outside the instrument
   and the unfocus of `PageContainer.destroy` have no test.
 - **Some editor code cannot be reached in a booted unit.** The NDB frequency range (190 to 1750 kHz) waits behind #277,
-  which refuses every entry; the tenth of `RadialEditor.convertFromValue` is never shown on its own, because every
-  radial a page shows meets #281; the null branch of `TimeEditor.convertToValue` needs a host without a time, and SET 2
+  which refuses every entry; the null branch of `TimeEditor.convertToValue` needs a host without a time, and SET 2
   always has one while STA 5 cannot run (above).
 - **The flash rate is CSS.** The harness reads which display tick flashes a cell, not the animation of `.blink` and
   `.inverted-blink` in `KLN90B.scss`; whether FLAG is shown inverse on the real unit is not settled either (figure 3-101
@@ -1016,9 +1015,8 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   `List`, `FlightplanList`, `WaypointDeleteListItem`, `Button`, `PageContainer`, `StatusLine`, `Blink`, `Inverted`,
   `MessagePage`, `ErrorPage`, the airport and coordinate views and Super NAV 5 left and right have tests. The 89's block
   layout of some fields is never asserted (section 5). *Untested:* the label placement of `Canvas` (the map tests hold
-  it), the NDB frequency range (behind #277), the tenth of `RadialEditor.convertFromValue` (every shown radial meets
-  #281), the null branch of `TimeEditor.convertToValue`, the focus events and the click outside the instrument
-  (`FakeCoherent`), and the CSS flash rate.
+  it), the NDB frequency range (behind #277), the null branch of `TimeEditor.convertToValue`, the focus events and the
+  click outside the instrument (`FakeCoherent`), and the CSS flash rate.
 - **Boot, power and the unit as a whole** (`KLN90BCore`, `TickController`, `Hardware`, `PowerButton`,
   `BrightnessManager`, `SimVarSync`, `KeyboardService`). *Spec and contract:* the cold-and-dark start, the self-test
   values and outputs, the power cycle and what it clears, the 4 Hz display with every fourth tick blinking, the 1 Hz
