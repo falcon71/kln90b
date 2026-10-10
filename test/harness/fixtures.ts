@@ -152,7 +152,7 @@ export function centerWorld() {
 /**
  * The leg world of the NAV 3 and NAV 4 pages and the Super NAV 5 selectors: an invented KDDD (47.0 N, 9.0 E), KAAA
  * 200 NM west of it on the great circle that leaves KDDD on 270 true, and KEEE 30 NM east of KDDD on 090, so that the
- * leg KAAA to KDDD is not the last one (the ESA of the last leg is #183). FPL 0 is KAAA, KDDD, KEEE (store it with
+ * leg KAAA to KDDD is not the last one (the last leg: Nav3Esa.test.ts). FPL 0 is KAAA, KDDD, KEEE (store it with
  * savedFlightplan(0, [kaaa, kddd, keee])); an eastbound aircraft on the first leg has KDDD active. `west(nm)` is the
  * point nm NM west of KDDD on that line. Fresh objects on every call.
  */

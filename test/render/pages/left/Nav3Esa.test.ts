@@ -25,7 +25,7 @@ async function nav3Esa(legs: ReturnType<typeof airport>[], position: { lat: numb
 }
 
 describe('NAV 3 ESA in Leg mode', () => {
-    // The passing sibling of the pin below: with a waypoint after the active one the ESA shows the sector value
+    // The passing sibling of the #183 test below: with a waypoint after the active one the ESA shows the sector value
     it('shows the ESA with a waypoint after the active one (3-33)', async () => {
         const kaaa = airport('KAAA', 47.1, 8.1);
         const kbbb = airport('KBBB', 47.5, 8.5);
@@ -64,10 +64,10 @@ describe('NAV 3 ESA in Leg mode', () => {
         expect(esaRow).toBe(`ESA ${SECTOR_46N_8E}ft`);
     });
 
-    // On the last leg the rest of the route is the destination alone. MSA.getMSAForRoute returns 0 for one waypoint,
-    // and Nav3Page.calculateESA takes that 0 for "no value" (`esaAlongRoute ? ... : null`), so the ESA shows dashes on
-    // every final leg, also of a two-waypoint plan. Expected: the ESA from the present position to the destination.
-    it.fails('shows the ESA on the last leg of FPL 0 (#183)', async () => {
+    // 3-33: on the last leg the ESA runs from the present position to the destination. The rest of the route is the
+    // destination alone. MSA.getMSAForRoute returns 0 for one waypoint, which Nav3Page.calculateESA took for "no value"
+    // until #183, so the ESA showed dashes on every final leg, also of a two-waypoint plan.
+    it('shows the ESA on the last leg of FPL 0 (3-33, #183)', async () => {
         const kaaa = airport('KAAA', 47.1, 8.1);
         const kbbb = airport('KBBB', 47.5, 8.5);
         const {unit, esaRow} = await nav3Esa([kaaa, kbbb], {lat: 47.3, lon: 8.3});
@@ -76,8 +76,7 @@ describe('NAV 3 ESA in Leg mode', () => {
         expect(esaRow).toBe(`ESA ${SECTOR_47N_8E}ft`);
     });
 
-    // The setup sibling of the pin: the boot lands on the last leg, the page is NAV 3, and the ESA row is the dashed one
-    // (asserted as the row's label only, so that no passing test claims the dashes are right)
+    // The setup sibling of the #183 test: the boot lands on the last leg, the page is NAV 3, and the row is the ESA row
     it('reaches the last leg of a two-waypoint FPL 0 on NAV 3 (sibling of #183, 3-33)', async () => {
         const kaaa = airport('KAAA', 47.1, 8.1);
         const kbbb = airport('KBBB', 47.5, 8.5);

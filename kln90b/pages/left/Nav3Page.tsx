@@ -125,7 +125,7 @@ export class Nav3Page extends SixLineHalfPage {
         }
 
         const esaAlongRoute = this.props.msa.getMSAForRoute(this.props.memory.navPage.activeWaypoint.getFutureLegs().map(l => l.wpt));
-        return esaAlongRoute ? Math.max(esa, esaAlongRoute) : null;
+        return esaAlongRoute !== null ? Math.max(esa, esaAlongRoute) : null; //0 is a valid value: on the last leg the rest of the route is the destination alone
     }
 
     private formatXTKDirection(xtk: number | null): string {

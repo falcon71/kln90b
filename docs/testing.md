@@ -243,7 +243,7 @@ dropped for good by the shared search session (#102). Both return fresh objects 
 
 `legWorld()` returns `{kddd, kaaa, keee, west}`, the leg world of the NAV 3 and NAV 4 pages and the Super NAV 5
 selectors: KDDD (47.0 N, 9.0 E), KAAA 200 NM west of it on the great circle that leaves KDDD on 270 true, KEEE 30 NM
-east of KDDD, so that the leg KAAA to KDDD is not the last one (the ESA of the last leg is #183). `west(nm)` is the
+east of KDDD, so that the leg KAAA to KDDD is not the last one (the last leg: `Nav3Esa.test.ts`). `west(nm)` is the
 point nm NM west of KDDD on that line. Store `[kaaa, kddd, keee]` in FPL 0 with `savedFlightplan`; an eastbound
 aircraft on the first leg has KDDD active. `arcWorld()` returns
 `{abc, at, arcbg, arcen, fafaa, mapaa, kprc, facilities}`: a left DME arc of 10 NM around the VOR ABC from its 270 to

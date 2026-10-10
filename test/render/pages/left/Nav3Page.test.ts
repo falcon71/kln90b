@@ -39,7 +39,7 @@ describe('NAV 3 page', () => {
 });
 
 // An invented world: KDDD, KAAA 200 NM west of it on the great circle that leaves KDDD on 270 true, and KEEE 30 NM east
-// of KDDD, so that the leg KAAA to KDDD is not the last one (the ESA of the last leg is #183). FPL 0 is KAAA, KDDD, KEEE.
+// of KDDD, so that the leg KAAA to KDDD is not the last one (the last leg: Nav3Esa.test.ts). FPL 0 is KAAA, KDDD, KEEE.
 const KDDD = airport('KDDD', 47.0, 9.0);
 const KAAA = airport('KAAA', pointFrom(KDDD, 270, 200).lat, pointFrom(KDDD, 270, 200).lon);
 const KEEE = airport('KEEE', pointFrom(KDDD, 90, 30).lat, pointFrom(KDDD, 90, 30).lon);
