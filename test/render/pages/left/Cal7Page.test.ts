@@ -5,8 +5,8 @@ import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
 
 // FPL 0 runs from KAAA to KBBB (42 N, 88 W); the clock starts at 12:00 UTC on 1 June 2026 (06:00 CST). The rise and
-// set times themselves are held at the unit stage (Sun.test.ts) and carry the one-minute error of #164, so the tests
-// here compare times with each other or with bounds.
+// set times themselves are held at the unit stage (Sun.test.ts), so the tests here compare times with each other or
+// with bounds.
 const CST = 7;
 const EST = 5;
 
@@ -29,7 +29,7 @@ const minutes = (row: string) => {
 };
 
 describe('CAL 7 page (characterization)', () => {
-    // RISE and SET are left out: they are a minute off (#164, pinned in Sun.test.ts)
+    // RISE and SET are left out: Sun.test.ts holds the times
     it('shows the destination of FPL 0, the date and the zone (characterization)', async () => {
         const unit = await cal7();
         expect(unit.errors).toEqual([]);

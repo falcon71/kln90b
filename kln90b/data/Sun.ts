@@ -3,13 +3,14 @@ import {Degrees} from "./Units";
 import {LatLonInterface, NavMath} from "@microsoft/msfs-sdk";
 
 
-//zenith 91 seems to fit best the examples from the manual
-export function calculateSunrise(date: TimeStamp, coords: LatLonInterface, zenith: Degrees = 91) {
+/** The standard zenith of sunrise and sunset: 90 degrees plus 50 arc minutes for the refraction and the sun's semi-diameter */
+const STANDARD_ZENITH: Degrees = 90 + 50 / 60;
+
+export function calculateSunrise(date: TimeStamp, coords: LatLonInterface, zenith: Degrees = STANDARD_ZENITH) {
     return calculateSunriseSet(date, coords, zenith, true);
 }
 
-//zenith 91 seems to fit best the examples from the manual
-export function calculateSunset(date: TimeStamp, coords: LatLonInterface, zenith: Degrees = 91) {
+export function calculateSunset(date: TimeStamp, coords: LatLonInterface, zenith: Degrees = STANDARD_ZENITH) {
     return calculateSunriseSet(date, coords, zenith, false);
 }
 
