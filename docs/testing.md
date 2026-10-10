@@ -1395,7 +1395,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       Super NAV 5 fields 2 and 3 round 359.5 to 360 (#263's rule); `AltitudeFieldset` shows `00000` below sea level,
       while a low-confidence photo of the self-test page shows a negative altitude; `ModObsElement.innerRight` (MOD 2)
       and `FuelOnBoardSelect.innerRight` return `false` while `innerLeft` returns `true` (no visible effect; the Super
-      NAV 5 case is #238).
+      NAV 5 case, #238, is fixed in `ObsDtkElement`).
     - Lists: figures 4-4 and 4-5 read `LOAD INVRT?` in the PDF's text layer while the first waypoint of an empty plan is
       entered, where the code shows LOAD FPL 0? (worth a look at the printed page); the procedure header hides the arrow
       column while focused, and whether its text starts in column 0 or 1 was not checked; `SimpleListItem.tick` toggles
@@ -1477,7 +1477,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       #306 changes the keyboard's automatic advance at the last cell (a characterization in `Editor.test.ts`); the tens
       fix of #303 retires the 91-degree characterization of `LatLonEditor.test.ts`; #324 needs a trip-page form of
       `DurationDisplay`, not a change of the shared form;
-    - a fix of #336 at the `MainPage` level also turns the #238 pin red; a fix of #335 turns the #334 pin red as well,
+    - a fix of #335 turns the #334 pin red as well,
       though #334 still needs its own fix for SET 0 and Super NAV 5; a fix of #332 with a ride-through above about 1.5 s
       needs the 3 s waits of the circuit tests raised; a fix of #328 must keep the screen warm on a forced start
       (`lastPowerChangeTime` also drives the warm-up); the fix of #199 turns its pins red; `HEADING_INPUT` in

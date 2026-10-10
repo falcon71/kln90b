@@ -11,7 +11,7 @@ import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 // can then be entered with the inner knob, one degree per click, when no external indicator supplies the course.
 // Host: NAV 3 on the left, row 1 (DTK or OBS, value in columns 7 to 10). The committed value is the navPage memory
 // obsMag. Nav3Page.test.ts holds the OBS: colon and the course entry of 5-35; SuperNav5Page.test.ts holds the Super
-// NAV 5 course entry and its pin #238.
+// NAV 5 course entry and its test of #238.
 
 // The leg world: FPL 0 is KAAA, KDDD, KEEE, and the aircraft is on the leg 30 NM west of KDDD, track 090, DTK 089 there
 const OBS_SOURCE_OFF = panelXml(NO_OBS);

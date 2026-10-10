@@ -570,7 +570,7 @@ describe('Super NAV 5 OBS course', () => {
         return unit;
     }
 
-    // 5-34, 5-35: the inner knob on the OBS course changes it by one degree. This is the passing sibling of the pin below:
+    // 5-34, 5-35: the inner knob on the OBS course changes it by one degree. This is the sibling of the test below:
     // turned left, the page stays and the course is one degree less.
     it('turns the OBS course down with the inner knob on Super NAV 5 (5-34, 5-35)', async () => {
         const unit = await onObsCourse();
@@ -581,7 +581,7 @@ describe('Super NAV 5 OBS course', () => {
     });
 
     // 5-34, 5-35: turned right, the course is one degree more and Super NAV 5 stays
-    it.fails('turns the OBS course up with the inner knob and stays on Super NAV 5 (5-34, 5-35, #238)', async () => {
+    it('turns the OBS course up with the inner knob and stays on Super NAV 5 (5-34, 5-35, #238)', async () => {
         const unit = await onObsCourse();
         await unit.panel.inner('L', 1);
 
