@@ -69,6 +69,7 @@ describe('OTH 2 page, the Center of the present position (3-52)', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         await moveAircraft(unit, {lat: 47.7, lon: 8.0}, {groundspeedKt: 150, trackTrue: 0});
+        // Two periods of the unit's 10 s searches (nearest lists, airspace alert), so any periodic reload has happened by now
         await vi.advanceTimersByTimeAsync(20_000);
 
         expect(Screen.read().rows('L').slice(0, 3)).toEqual(['BRAVO      ', 'CTR        ', '     132.85']);
