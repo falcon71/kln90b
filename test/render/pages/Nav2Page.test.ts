@@ -202,7 +202,7 @@ describe('NAV 2 before the first fix (3-8)', () => {
         ]);
     });
 
-    it.fails('shows the longitude dashes in the cells of the three degree digits (3-8, #224)', async () => {
+    it('shows the longitude dashes in the cells of the three degree digits (3-8, #224)', async () => {
         await bootUnit({coldGps: true});
         await vi.advanceTimersByTimeAsync(1000);
 

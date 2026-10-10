@@ -28,7 +28,7 @@ export class LongitudeDisplay implements UiElement {
 
     private formatLongitude(): string {
         if (this.longitude === null) {
-            return "- --°--.--'";
+            return "----°--.--'";
         }
 
         const eastWest = this.longitude > 0 ? "E" : "W";
