@@ -105,13 +105,13 @@ describe('MSA.getMSA', () => {
     });
 
     // 3-33: 180E and 180W are the same meridian, so a position on it lies in the sector from 180W (column 0) by the
-    // north-east rule above. The file has a 361st column, all 1000 ft, which the service reads for lon = 180 exactly.
-    // At 17S the two differ (Fiji). Suspected bug, low impact.
-    it.fails('gives the sector from 180W for a position on the date line at 180E (#182)', () => {
+    // north-east rule above. The file has a 361st column, all 1000 ft, which the service read for lon = 180 exactly.
+    // At 17S the two differ (Fiji).
+    it('gives the sector from 180W for a position on the date line at 180E (#182)', () => {
         expect(msa.getMSA({lat: -16.5, lon: 180})).toBe(sector(-17, -180));
     });
 
-    // 3-33: the passing sibling of the pin above: the two columns differ at 17S, and 179.5W reads column 0
+    // 3-33: the sibling of the test above: the two columns differ at 17S, and 179.5W reads column 0
     it('reads the sector from 180W just east of the date line (sibling of #182, 3-33)', () => {
         expect(sector(-17, -180)).not.toBe(GRID[-17 + 56][360]);
         expect(msa.getMSA({lat: -16.5, lon: -179.5})).toBe(sector(-17, -180));

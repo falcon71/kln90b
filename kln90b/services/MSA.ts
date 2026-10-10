@@ -17,7 +17,7 @@ export class MSA {
             return null;
         }
         const latTable = this.msaTable![Math.floor(coord.lat) + 56];
-        return latTable[Math.floor(coord.lon) + 180];
+        return latTable[(Math.floor(coord.lon) + 180) % 360]; //180E is 180W, the file's 361st column is only a filler
     }
 
     public getMSAFromTo(coord0: LatLonInterface, coord1: LatLonInterface): Feet | null {
