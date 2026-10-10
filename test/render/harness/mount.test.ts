@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {FSComponent} from '@microsoft/msfs-sdk';
-import {mount} from '../../harness/render/mount';
+import {mount, mountedRead, mountedText} from '../../harness/render/mount';
 import {NO_CHILDREN, UiElement} from '../../../kln90b/pages/Page';
 import {BearingDisplay} from '../../../kln90b/controls/displays/BearingDisplay';
 import {Blink} from '../../../kln90b/controls/Blink';
@@ -64,5 +64,31 @@ describe('mount (harness)', () => {
         expect(m.text()).toBe('120°');
         m.tick();
         expect(m.text()).toBe('');
+    });
+});
+
+describe('mountedText and mountedRead (harness)', () => {
+    // A hidden display shows its text until its first display tick takes it away, so the read is of the ticked control
+    it('mountedText reads the control after one display tick', () => {
+        const el = new BearingDisplay(120);
+        el.isVisible = false;
+
+        expect(mountedText(el)).toBe('');
+    });
+
+    it('mountedText reads the text of a control that has no tick effect', () => {
+        expect(mountedText(new TextDisplay('AB'))).toBe('AB');
+    });
+
+    // A control that turns its cell inverse on its first tick: the mask differs before and after
+    it('mountedRead returns the text and the mask after one display tick', () => {
+        const ref = FSComponent.createRef<HTMLSpanElement>();
+        const el: UiElement = {
+            children: NO_CHILDREN,
+            tick: () => ref.instance.classList.add('inverted'),
+            render: () => FSComponent.buildComponent('span', {ref} as any, 'AB'),
+        };
+
+        expect(mountedRead(el)).toEqual({text: 'AB', mask: 'II'});
     });
 });

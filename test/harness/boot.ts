@@ -4,6 +4,9 @@ import {BoundaryFacility, Facility} from '@microsoft/msfs-sdk';
 import {KLN90BCore, PropsReadyEvent} from '../../kln90b/KLN90BCore';
 import {KLN90BPlatform} from '../../kln90b/KLN90BPlatform';
 import {PageProps} from '../../kln90b/pages/Page';
+import {MainPage} from '../../kln90b/pages/MainPage';
+import {SixLinePage} from '../../kln90b/pages/FourSegmentPage';
+import {SevenLinePage} from '../../kln90b/pages/OneSegmentPage';
 import {ErrorEvent} from '../../kln90b/controls/ErrorPage';
 import {simEnv, SimEnvironment} from './sim/install';
 import {DEFAULT_NAVDATA_RANGE, startFakeClock} from './sim/clock';
@@ -15,6 +18,13 @@ import {Screen} from './render/screen';
 import {resetSingletons} from './singletons';
 import {pointFrom} from './flight/geo';
 import {defaultNavdata} from './fixtures';
+
+/**
+ * How long a test advances the clock for the nearest lists to search and show their result. The nearest lists
+ * (data/navdata/NearestList.ts, NEAREST_TICK_TIME) and the airspace alert (data/navdata/AirspaceAlert.ts,
+ * ALERT_TICK_TIME) both search every 10 s, so 12 s leaves one search and the time its result needs.
+ */
+export const NEAREST_SEARCH_WAIT_MS = 12_000;
 
 export const MINIMAL_PANEL_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name></Instrument></PlaneHTMLConfig>';
 
@@ -83,6 +93,8 @@ export interface HeadlessUnit {
     rejections: unknown[];
     /** Returns the unhandled rejections collected so far and empties the list, which marks them as expected */
     takeRejections(): unknown[];
+    /** The overlay page that is shown over the main page (MSG, DIR, ALT, Super NAV 1 and 5, SET 0), or null without one */
+    overlay(): SixLinePage | SevenLinePage | null;
     /** Probes of what the unit shows and drives outside the 23x7 screen */
     display: {
         /** The instrument container's opacity, which the brightness and the power state drive; NaN while it is unset (the unit is fully visible then, not dark) */
@@ -102,6 +114,8 @@ interface LiveState {
     completed: boolean;
     restoreConsole: () => void;
     removeRejectionListener: () => void;
+    /** Puts Math.random back after the seeded generator of seedRandom */
+    restoreRandom: () => void;
 }
 
 let live: LiveState | undefined;
@@ -136,6 +150,7 @@ export function teardown(before: (() => void)[] = []): void {
         runAll([
             ...before,
             () => state?.restoreConsole(),
+            () => state?.restoreRandom(),
             () => state?.removeRejectionListener(),
             () => vi.clearAllTimers(),
             () => vi.useRealTimers(),
@@ -185,12 +200,16 @@ function prepareBoot(opts: BootOptions): PreparedBoot {
     } catch (e) {
         throw new Error(`bootUnit: call it inside a test (it, not beforeAll or the module body); the unit is torn down when the test ends. ${e}`);
     }
-    const state: LiveState = {completed: false, restoreConsole: () => undefined, removeRejectionListener: () => undefined};
+    const state: LiveState = {
+        completed: false, restoreConsole: () => undefined, removeRejectionListener: () => undefined,
+        restoreRandom: () => undefined,
+    };
     live = state;
 
     const env = simEnv();
     startFakeClock(opts.start);
-    seedRandom(opts.seed ?? 1);
+    const randomSpy = seedRandom(opts.seed ?? 1);
+    state.restoreRandom = () => randomSpy.mockRestore();
 
     const model = opts.atcModel ?? 'KLN TEST';
     const pos = opts.position ?? {lat: 47, lon: 8};
@@ -288,6 +307,7 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
         core, props, env, navdata, errors, atcModel: model, send: evt => core.onInteractionEvent([evt]),
         panel: new FrontPanel(evt => core.onInteractionEvent([evt]), () => Screen.read()),
         consoleErrors, rejections, efb,
+        overlay: () => (props!.pageManager.getCurrentPage() as MainPage).getOverlayPage(),
         takeRejections: () => rejections.splice(0, rejections.length),
         display: {
             opacity: () => parseFloat(document.getElementById('InstrumentsContainer')!.style.opacity), // NaN while unset: Number('') would read as 0, a dark unit
@@ -304,6 +324,7 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
 export async function bootToSelfTest(opts: BootOptions = {}): Promise<HeadlessUnit> {
     const unit = await bootUnit({...opts, engineRunning: false});
     await unit.panel.powerOn();
+    // The Turn-On page shows for 17 s (3-3); the other two seconds are the margin for the self-test page to show
     await vi.advanceTimersByTimeAsync(19_000);
     const screen = Screen.read();
     if (!screen.rows('R').some(r => r.trim() === 'APPROVE?')) {

@@ -30,3 +30,17 @@ export function mount(el: UiElement): Mounted {
         tick: (blink = false) => el.tick(blink),
     };
 }
+
+/** The text of a control after one display tick: mount, tick, read */
+export function mountedText(el: UiElement): string {
+    const m = mount(el);
+    m.tick();
+    return m.text();
+}
+
+/** The text and the attributes of a control after one display tick */
+export function mountedRead(el: UiElement): { text: string, mask: string } {
+    const m = mount(el);
+    m.tick();
+    return {text: m.text(), mask: m.mask()};
+}

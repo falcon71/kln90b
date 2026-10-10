@@ -1,4 +1,10 @@
-import {Cell, readRows} from './screen';
+import {vi} from 'vitest';
+import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../boot';
+import {arcWorld, legWorld} from '../fixtures';
+import {pointFrom} from '../flight/geo';
+import {savedFlightplan} from '../storage';
+import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
+import {Cell, readRows, Screen} from './screen';
 
 export interface SuperNav5Text {
     /** The seven rows of the left column (distance, ident, mode, ground speed, fields 1 to 3) */
@@ -58,3 +64,63 @@ export const SuperNav5 = {
             .map(e => e.textContent!.replace(/\u00a0/g, ' '));
     },
 };
+
+/**
+ * Shows Super NAV 5 (NAV 5 on both sides, 3-36): the right side first, because its shorter way passes NAV 5, which is
+ * Super NAV 5 once the left shows NAV 5, then the left side, then the last click with the inner knob (Super NAV 5 hides
+ * the status line that selectPage reads). Waits `waitMs` (default one second) and throws with the screen unless the
+ * overlay is Super NAV 5, which a pending knob or a page that refused it would leave out.
+ */
+export async function showSuperNav5(unit: HeadlessUnit, o: { waitMs?: number } = {}): Promise<void> {
+    await unit.panel.selectPage('R', 'NAV 4');
+    await unit.panel.selectPage('L', 'NAV 5');
+    await unit.panel.inner('R', 1);
+    await vi.advanceTimersByTimeAsync(o.waitMs ?? 1000);
+    if (!(unit.overlay() instanceof SuperNav5Page)) {
+        let shown: string;
+        try {
+            shown = Screen.read().dump();
+        } catch (e) {
+            shown = String(e); // Screen refuses to read a Super NAV 5 that shows, which only the overlay check missed
+        }
+        throw new Error(`showSuperNav5: Super NAV 5 is not shown\n${shown}`);
+    }
+}
+
+/**
+ * Boots in the leg world on the leg to KDDD, `westNm` west of it and `rightNm` right of the course (south), moving at
+ * `groundspeedKt` on track 090, and shows Super NAV 5 (NAV 5 on both sides; the right side first, its shorter way
+ * passes NAV 5)
+ */
+export async function superNav5OnLeg(o: {
+    westNm: number, rightNm?: number, groundspeedKt?: number, storage?: Record<string, unknown>, magvar?: number,
+}): Promise<HeadlessUnit> {
+    const {kaaa, kddd, keee, west} = legWorld();
+    const start = west(o.westNm);
+    const unit = await bootUnit({
+        facilities: [kaaa, kddd, keee], position: start, magvar: o.magvar,
+        storage: {...savedFlightplan(0, [kaaa, kddd, keee]), ...o.storage},
+    });
+    await settle(unit);
+    const right = o.rightNm ?? 0;
+    const at = pointFrom(start, right >= 0 ? 180 : 0, Math.abs(right));
+    await moveAircraft(unit, at, {groundspeedKt: o.groundspeedKt ?? 120, trackTrue: 90});
+    await showSuperNav5(unit);
+    return unit;
+}
+
+/**
+ * Boots in the arc world on the 225 radial of the left arc, loads the approach (the arc is active) and shows Super
+ * NAV 5
+ */
+export async function superNav5OnArc(o: { storage?: Record<string, unknown>, magvar?: number } = {}): Promise<HeadlessUnit> {
+    const w = arcWorld();
+    const unit = await bootUnit({
+        facilities: w.facilities, position: w.at(225, 10), magvar: o.magvar,
+        storage: {...savedFlightplan(0, [w.kprc]), ...o.storage},
+    });
+    await settle(unit);
+    await unit.panel.loadProcedure('APT 8');
+    await showSuperNav5(unit);
+    return unit;
+}

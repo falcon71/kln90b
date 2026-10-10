@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, teardown} from '../../harness/boot';
 import {simEnv} from '../../harness/sim/install';
 
@@ -23,5 +23,16 @@ describe('teardown of a booted unit (harness)', () => {
         // The live marker was cleared although the teardown failed, so a boot is allowed again in this test
         const second = await bootUnit();
         expect(second.props).not.toBe(first.props);
+    });
+});
+
+describe('Math.random across a boot (harness)', () => {
+    it('is the seeded generator while the unit lives and the real one again after the teardown', async () => {
+        await bootUnit();
+        expect(vi.isMockFunction(Math.random)).toBe(true);
+
+        teardown();
+
+        expect(vi.isMockFunction(Math.random)).toBe(false);
     });
 });

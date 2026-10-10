@@ -84,8 +84,10 @@ The sim globals are installed once per test file by the setup files `test/harnes
   `simvar.getValueReg*` and `Coherent.call('setValueReg_*')`, so a replacement of the public functions would be
   overwritten. The fake therefore sits below the SDK, and the SDK's own unit conversion runs for real.
     - `sim.set(name, unit, value)` sets a value as the sim would. `sim.get(name, unit)` reads it in any unit.
-    - `sim.writes`, `sim.lastWrite(name)` and `sim.keyEvents` log what the instrument wrote. `sim.writes` stores the
-      names in upper case, so a filter over it compares with `name.toUpperCase()`; `lastWrite` does that itself.
+    - `sim.writes`, `sim.lastWrite(name)`, `sim.writeCount(name)` and `sim.keyEvents` log what the instrument wrote.
+      `sim.writes` stores the names in upper case, so a filter over it compares with `name.toUpperCase()`; `lastWrite`
+      and `writeCount` do that themselves (`writeCount('l:my_var')` counts the writes of `L:MY_VAR`). A value a test sets
+      with `sim.set` is not a write.
     - **Key events have no effect.** `sim.keyEvents` records a `K:` event, but nothing acts on it: `K:GPS_OBS_ON` does
       not set `GPS OBS ACTIVE`, and `K:VOR1_SET` does not move `Nav OBS:1`. A test asserts the event, or sets the
       SimVar the sim would set itself. The one exception is opt-in: `sim.applyObsKeyEvents = true` makes `K:VOR1_SET`
@@ -128,7 +130,8 @@ The sim globals are installed once per test file by the setup files `test/harnes
   are faked, starting at `DEFAULT_START`. Advance it with `await vi.advanceTimersByTimeAsync(ms)`. All tick loops
   of the instrument (docs/architecture.md, Core 2) run on this clock.
 - `Math.random` is replaced by a seeded generator (`sim/random.ts`, default seed 1), so the GPS clock jitter and scan
-  list job ids repeat between runs. A test that needs another jitter passes `seed`.
+  list job ids repeat between runs. A test that needs another jitter passes `seed`. The teardown puts the real
+  `Math.random` back, so a later unit test of the file sees the real generator.
 
 ## Collectors and boot failures
 
@@ -377,9 +380,16 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
     - `mask()` shows the attributes per cell: `.` normal, `I` inverted, `B` blinking, `F` flashing inverse, and
       `maskRows(side)` the mask of a half in the columns of `rows(side)`.
     - `dump()` is the text, a blank line and the mask. It is the format for snapshots and for failure messages.
+    - `inverse(row)` returns the characters of one row shown inverse, in order. On a full page (the Database page, the
+      self-test pages) that is the field under the cursor, which `focused('R')` cannot read because it looks at one
+      half and cuts `ACKNOWLEDGE?` at the middle. `pageRows()` returns the six text rows above the status line, each
+      trimmed, the rows of a full page.
 - **`settle(unit)`** (`boot.ts`) advances the clock until the GPS has a solution, then two calculation ticks more, so that
   FPL 0 has activated and the display shows it (a force-ready boot is valid at once, but FPL 0 activates only at the first
   calculation tick). It throws when there is no fix within its cap (120 s by default).
+- **`NEAREST_SEARCH_WAIT_MS`** (`boot.ts`, 12 s) is how long a test advances the clock for the nearest lists to hold
+  their result. The nearest lists and the airspace alert search every 10 s (`NearestList.ts`, `AirspaceAlert.ts`), so
+  12 s leaves one search and the time its result needs; a shorter wait reads an empty list.
 - **Time to first fix.** `bootUnit({coldGps: true})` resets the GPS after a forced acquisition, so every satellite keeps
   its ephemeris and the last known position is the present one: it acquires in about 62 s (slow) whatever the almanac,
   the stored position or the clock, and cannot measure a cold or warm start. Boot with `engineRunning: false` and the
@@ -424,6 +434,9 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   `tick(blink = false)` runs one display tick of the control. A display that changes its text on a tick only (a value
   set after the render) shows the new text after `tick()`. This is the cheapest stage for the format of a display
   (`mount(new BearingDisplay(null)).text()` is `---°`); what a control does inside a page needs the booted unit.
+  `mountedText(el)` and `mountedRead(el)` (same file) are mount, one `tick()` and the read in one call: the text, or
+  the `{text, mask}` pair. The tick matters, because a control that changes on its first tick reads differently
+  before it, so a test of the format of a control reads it through these.
 - **`blinkCycle(read)` and `mountedCycle(m, read)`** (`render/blink.ts`) sample a flashing cell in both phases. The
   display blinks on every fourth display tick (`TICK_TIME_DISPLAY`, 250 ms), so a cell that flashes reads `F` on one
   tick in four, and one read decides the result by the phase the test happens to be in. `blinkCycle(read)` advances
@@ -433,6 +446,31 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - **SimVars the unit reads while it is built.** `bootUnit({simVars: [{name, unit, value}]})` sets them before
   `KLN90BCore.init`, after the SimVars the boot sets itself, so a test can override one of those too. The fuel computer
   reads `NUMBER OF ENGINES` only in its constructor, so a fuel test with two engines boots with it.
+- **`panelXml(options)`** (`panelXml.ts`) builds the `panelXml` boot option from the keys the parser reads. A key is the
+  parser's dotted path from `PANEL_KEYS` (`panelXml({'Input.ObsSource': 0})`), and the presets spread into it: `NO_OBS`,
+  `HEADING_INPUT`, `NO_GPS_SIMVARS`, `LEG_OBS_SWITCH`, `NO_ALTIMETER`, `VFR_ONLY`, `AIRDATA`, `ALTITUDE_ALERT(enabled)` and
+  `fuelComputer({unit, type, fob, fuelUsed})`. `extra` appends raw XML for what no key covers. It removes the silent
+  default: the parser falls back to its default for a tag it does not find, so a misspelled tag in a hand-written
+  document tests the default and passes. `panelXml` throws on a key outside the list, and
+  `test/unit/harness/panelXml.test.ts` parses every key through the real parser and asserts the parsed setting differs
+  from the default, so a misspelled entry of the list fails there. The altitude alert is a function because its parser
+  default (true) is the open question #141: a test that depends on it states it.
+- **Readers of the unit's state** (`readers.ts`). `userWaypoints(unit, type?)` lists the user waypoints of the facility
+  repository in repository order, and the type is stated at the call: without it airports, VORs, NDBs and intersections
+  of the user are in too, and `FacilityType.USR` is the supplementary waypoints only, so a local loop that forgets the
+  filter reads the wrong set. `messages(unit)` lists the message list as the MSG page would, each message's lines joined
+  with a blank, and `messageLines(unit)` keeps the lines apart. `fplIdents(unit, idx = 0)`, `identsOf(legs)`,
+  `activeIdent(unit)` (undefined without an active waypoint) and `turnStackLength(unit)` read the navigation state;
+  the last reads `turnStack` through the property each time, because `ActiveWaypoint` replaces the array (section 6).
+  They read the unit's state, not the screen: use them where the state is the subject and `Screen` where the display is.
+- **`bootOnStandardRoute(opts)` and `bootOnDtWorld(opts)`** (`worldBoot.ts`) are the boots the page tests repeated.
+  `bootOnStandardRoute` stores `standardRoute()` as FPL 0, boots at KAAA unless `position` is given, settles, and
+  throws unless ABC is active: a test that moves on without the check reads a unit that has not activated the plan,
+  and its failure shows far from the cause. `facilities` are added to the route's and `storage` is merged over the
+  stored plan. `bootOnDtWorld` boots in `dtWorld()` 0.1 degree north of KAAA with `legs` (KAAA, ABC, DEF, KBBB by
+  default) stored as FPL 0, settles, and flies due north at 120 kt unless `moving` is false. It also stores the legs
+  as FPL 3, the plan the D/T pages show beside FPL 0 and FPL 3, unless `fpl3` is false, so the choice is a named
+  option and not an accident of a copy. A `facilities` option replaces the legs as the navdata, so it must contain them.
 - **Use these helpers; do not hand-roll them.** A wait-for-GPS loop, a `KLN90B_Internal_Key` loop, a
   `persistent-setting.<model>.profile_1.` key and a `gps.reset()` right after the boot are what `settle`,
   `unit.panel.type`, `storedSetting` and `bootUnit({coldGps: true})` do. A hand-rolled form stays only where it is the
@@ -444,8 +482,10 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   test when it ends, so a handler that started to throw is not missed. To pin such a failure with `it.fails`, keep the
   boot in a passing sibling (the rule above).
 - **`unit.consoleErrors`** is the place to assert that the unit logged (or did not log) an error. A test that provokes a
-  `console.error` and wants the test output quiet replaces `console.error` with `vi.spyOn(...).mockImplementation`
-  before the boot and restores it with an `onTestFinished` registered before the boot, which runs after the teardown.
+  `console.error` and wants the test output quiet calls `muteConsoleError()` (`console.ts`) before the boot. It replaces
+  `console.error` with a silent spy and restores it with an `onTestFinished` registered before the boot, which runs
+  after the teardown. Two things log with `console.error` that a test may provoke: the error page, which logs every
+  error it shows, and the SDK, which logs its own errors (a failed facility search) the same way.
 - **`answerTimezone(standardHours, dstMonths)`** (`timezone.ts`) answers the sim's time zone call for APT 2: a zone
   of `standardHours` from UTC that observes one hour of daylight saving time in the 0-based UTC months `dstMonths`, or
   none. Without it the call never resolves, like a sim with nothing attached, and APT 2 shows no time zone row. The
@@ -455,6 +495,9 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   a message that was shown before is not in the list.
 - **`unit.display`** reads what the unit drives outside the screen grid: `opacity()` is the container's opacity as a
   number, and `powerWrites()` lists the writes of `L:KLN90B_POWER`.
+- **`unit.overlay()`** is the overlay page over the main page (MSG, DIR, ALT, Super NAV 1 and 5, SET 0), or `null`. It
+  reads `MainPage.getOverlayPage()`, so a test asserts which page is on top with `toBeInstanceOf` and not through
+  text that `Screen` cannot read (Super NAV 5).
 - **A start-up failure** is tested with `bootUnitExpectingError({platform: {createFacilityClient: () => client}})`. Build
   the client from `MemoryFacilityClient` and replace only the method that should fail, so that nothing else in the boot
   breaks for a reason the test does not name (`test/render/harness/bootFailure.test.ts`).
@@ -481,6 +524,12 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   of the left column, which is the field the left cursor is on (`[]` with the cursor off): the msg prompt, which is
   inverted while a message is unread, is left out, the range selector that shares its overlay is not, and no-break
   spaces come back as blanks.
+- **`showSuperNav5(unit, {waitMs})`** (`render/superNav5.ts`) is the sequence that reaches Super NAV 5 (the right side to
+  NAV 4 first, the left side to NAV 5, the last click with `inner('R', 1)`), waits (default one second) and throws with
+  the screen unless `unit.overlay()` is the `SuperNav5Page`: a click that a page refused would otherwise leave the
+  test reading another page. `superNav5OnLeg({westNm, rightNm?, groundspeedKt?, storage?, magvar?})` boots in
+  `legWorld()` on the leg to KDDD and shows it, and `superNav5OnArc({storage?, magvar?})` boots on the arc of
+  `arcWorld()` with the approach loaded and shows it.
 - **Pages that show the version** (STA 3) carry the placeholder of `kln90b/Version.ts` in tests, 18 cells wide, which
   `Screen` rightly refuses to read. Mock the module in the test file, as `selectPage.test.ts` does.
 
@@ -553,6 +602,22 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       with the screen after `maxClicks`. It throws at once when the status field of that side shows a page name, which
       means the cursor is off: the outer knob would turn the pages and the search would end on another page.
       `appendToFpl0(idents)` enters and confirms idents on FPL 0.
+    - `readMessages(max = 10)` opens the MSG page and presses MSG until it closes (3-16: the status line's left field is
+      empty while the page shows), then waits a second so that the one-time messages that were read go. It returns the
+      non-blank rows of every MSG page seen, each trimmed and newest message first, and throws with the screen when the
+      page is still open after `max` presses. The loop is the point: a test that presses MSG a fixed number of times
+      leaves the page open, or closes it before the last message, without saying so.
+    - `directTo(ident, {waitMs})` enters a Direct To the way a pilot does (3-27): D->, the ident on the left, ENT on the
+      waypoint page, ENT to approve, then `waitMs` (default one second, one calculation tick) so that the active
+      waypoint has changed when it returns.
+    - `show(side, name, {waitMs})` selects a page, waits (default one second) and returns the six rows of that side. Use
+      it where a test reads a page that a calculation tick has to fill.
+    - `confirmSet1AndReselect()` is CONFIRM?, ENT, then SET 2 and back to SET 1, so that the page is built anew and reads
+      the GPS again, which shows what CONFIRM? committed.
+    - `enterDate(side, day, month, [tens, units])` enters a date in the open date editor with the cursor on the day: the
+      first click opens the editor with day 01, the first click on the dashed month gives JAN and on a dashed year
+      digit 0, so the day takes `day` clicks, the month `month` clicks and a year digit its value plus one. It is the
+      date sequence of the SET 2 and CAL 7 tests for either side.
     - Power: `powerOff()`, `powerOn()`, `powerCycle({offSeconds})` and `approveSelfTest()`. After boot every power-on runs
       the welcome page (17 s) and the self-test, also on an engine-running unit; `approveSelfTest` presses ENT on
       `APPROVE?` and on `ACKNOWLEDGE?`, and throws with the screen at the VFR only page or the OBS warning. A unit
@@ -818,6 +883,12 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - **The test baseline is being built session by session.** The plan, the rules for those sessions and the regression
   triage table are in [test-coverage.md](test-coverage.md). That document is temporary and its last session retires it
   into a coverage record here; until then, start a test session from it rather than from this list.
+- **Session 10b task 0 built the harness helpers** `panelXml`, the readers (`userWaypoints`, `messages`,
+  `fplIdents`, `activeIdent`, `turnStackLength`), `Screen.inverse` and `pageRows`, `readMessages`, `directTo`, `show`,
+  `confirmSet1AndReselect`, `enterDate`, `showSuperNav5` and its two boots, `bootOnStandardRoute`, `bootOnDtWorld`,
+  `mountedText`, `mountedRead`, `NEAREST_SEARCH_WAIT_MS`, `unit.overlay()`, `sim.writeCount` and `muteConsoleError`
+  (section 4). The copies of them that older tests still carry are moved by the main tasks of Session 10b; a copy
+  that is still there after that session has a reason in its record.
 - **Flights cannot test the nav-source gate or a cold start, by the maintainer's decision.** `Aircraft.writeTo` forces
   `GPS DRIVES NAV1` true on every 16 Hz step, so a flight cannot observe what the unit does when the GPS is not the
   nav source (`92fbba1` is a render test, which sets the SimVar itself). `Flight.start` waits for a fix, so it cannot
@@ -849,9 +920,9 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
     - **SimVars before `init`.** The `simVars` boot option now exists (section 4). The electricity tests
       (`SimVarSync.test.ts`, `PowerButton.test.ts`) still take the detour of a powered boot: they boot powered, lose
       power at the first `SimVarSync` tick and power up when the test sets the circuit.
-    - **Counting and sampling writes.** Tests count the writes of one SimVar by filtering `sim.writes` (upper-case names)
-      and sample an LVar over display ticks with a hand-written loop (`SimVarSync.test.ts`, `StatusLine.test.ts`,
-      `SelfTestLeftPage.test.ts`). A `sim.writeCount(name)` and a sampling helper would remove the pitfall.
+    - **Sampling an LVar.** Tests sample an LVar over display ticks with a hand-written loop (`SimVarSync.test.ts`,
+      `StatusLine.test.ts`, `SelfTestLeftPage.test.ts`). A sampling helper would remove the pitfall; the counting half
+      is `sim.writeCount(name)` (section 3).
     - **The self-test page and the `"kln90b"` planner.** The cold boot to the self-test page is now `bootToSelfTest`
       (section 4), which `AiracPage.test.ts`, `VFROnlyPage.test.ts`, `ObsWarningPage.test.ts`,
       `SelfTestLeftPage.test.ts` and `SelfTestRightPage.test.ts` use. The older copies stay as they were written:
@@ -964,11 +1035,8 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
 - Harness gaps and leads from Session 9b (none was built beyond its task 0, per rule 13 of test-coverage.md):
     - **Copied helpers.** `expectFlashing` (a prompt that flashes on the same tick of each of two blink cycles) is
       written out in `StatusLine.test.ts` and `MessagePage.test.ts` (`expectPromptFlashing`) and inline in
-      `SuperNav5Left.test.ts`; `showSuperNav5` is a local function of `SuperNav5Left.test.ts`, `SuperNav5Right.test.ts`
-      and `SuperNav5Page.test.ts`; a reader of a user waypoint from the repository is a local loop in `IntPage.test.ts`,
-      `NdbPage.test.ts`, `VorUserWaypoint.test.ts` and several editor tests. `SuperNav5.read()` still has no mask, so
-      the Super NAV 5 prompt tests read `.super-nav5-mgs-range` with `readRows`. Each is a candidate for the harness
-      once a further test needs it.
+      `SuperNav5Left.test.ts`. `SuperNav5.read()` still has no mask, so the Super NAV 5 prompt tests read
+      `.super-nav5-mgs-range` with `readRows`. Each is a candidate for the harness once a further test needs it.
     - **A blink phase probe.** The #320 pin finds the blink phase through `L:KLN90B_MsgLight`, which is dark on those
       ticks only while a message is unread; a `blinkPhase()` on the unit would not need a message.
     - **The fake's search order** (section 6): a `MemoryFacilityClient` option that returns matches in insertion order
@@ -1050,17 +1118,9 @@ seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with
         - A boot that leaves an `ElectricitySimVar` unit dark from the start. The circuit tests of
           `SimVarSync.test.ts` and `PowerButton.test.ts` boot powered, lose power at the first `SimVarSync` tick and
           wait 3 s, beyond the ride-through a fix of #332 may add.
-        - A `messages(unit)` reader of the message list: a local copy in `GpsAcquisition.test.ts`,
-          `Messages.test.ts`, `PersistentMessages.test.ts`, `AirspaceAlert.test.ts`, `KLNMagvar.test.ts`,
-          `Set1Page.test.ts` and others.
-        - A `unit.userWaypoints()` reader (ident and region): `TemporaryWaypointDeleter.test.ts`, `Ctr1Page.test.ts`
-          and the page tests listed under Session 9b.
-        - An inverse reader across a whole row: `focused('R')` reads one half and cuts `ACKNOWLEDGE?`, so
-          `AiracPage.test.ts` and `VFROnlyPage.test.ts` carry `inverseText(row)`.
-        - `unit.overlay()` and Super NAV 1 and 5 helpers: `MainPage.test.ts` has local `overlay`, `superNav1` and
-          `names` (copies of helpers in `SuperNav1Page.test.ts` and the Super NAV 5 tests), and `bootNearKbbb` is
-          copied from `MessagePage.test.ts`. `Screen.read()` throws on Super NAV 5, so the 3-36 test reads the status
-          line's DOM element.
+        - A Super NAV 1 helper: `MainPage.test.ts` has local `superNav1` and `names` (copies of helpers in
+          `SuperNav1Page.test.ts`), and `bootNearKbbb` is copied from `MessagePage.test.ts`. `Screen.read()` throws on
+          Super NAV 5, so the 3-36 test reads the status line's DOM element.
         - A `beforeInit(core)` boot option: the test of H events before `init()` spies on
           `KLN90BCore.prototype.init`.
         - The power-off helper `offFor()` is local to `BrightnessManager.test.ts`.

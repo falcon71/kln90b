@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {FixTypeFlags} from '@microsoft/msfs-sdk';
-import {bootUnit, settle} from '../../harness/boot';
+import {bootToSelfTest, bootUnit, settle} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {savedFlightplan} from '../../harness/storage';
 import {approachWorld, standardRoute} from '../../harness/fixtures';
@@ -424,5 +424,22 @@ describe('Screen, a seventh row of a half page', () => {
     it('reads a half page of exactly six rows', () => {
         mount(left(rows(6, 'ROW5')));
         expect(Screen.read().rows('L')[5]).toBe('ROW5       ');
+    });
+});
+
+describe('Screen.inverse and pageRows', () => {
+    // The Database page after APPROVE? is a full page: line 2 says the data base expires, and the cursor is on the
+    // last row (3-7; the literals of AiracPage.test.ts)
+    it('read the inverse field of a full-page row and the six trimmed rows', async () => {
+        const unit = await bootToSelfTest();
+        await unit.panel.cursorTo('R', 'APPROVE?');
+        await unit.panel.ent();
+
+        const screen = Screen.read();
+
+        expect(screen.inverse(5)).toBe('ACKNOWLEDGE?');
+        expect(screen.inverse(1)).toBe('');
+        expect(screen.pageRows()[1]).toBe('DATA BASE EXPIRES');
+        expect(screen.pageRows()).toHaveLength(6);
     });
 });

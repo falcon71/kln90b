@@ -1,6 +1,9 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit} from '../../harness/boot';
-import {SuperNav5} from '../../harness/render/superNav5';
+import {bootUnit, settle} from '../../harness/boot';
+import {standardRoute} from '../../harness/fixtures';
+import {savedFlightplan} from '../../harness/storage';
+import {showSuperNav5, SuperNav5, superNav5OnArc, superNav5OnLeg} from '../../harness/render/superNav5';
+import {activeIdent} from '../../harness/readers';
 import {SuperNav5Field1} from '../../../kln90b/settings/KLN90BUserSettings';
 import {Screen} from '../../harness/render/screen';
 import {MainPage} from '../../../kln90b/pages/MainPage';
@@ -136,5 +139,64 @@ describe('SuperNav5.focused (harness)', () => {
     it('throws without a #pageContainer', () => {
         document.body.innerHTML = '';
         expect(() => SuperNav5.focused()).toThrow(/no #pageContainer/);
+    });
+});
+
+describe('showSuperNav5 and the boots onto it (harness)', () => {
+    async function onRoute() {
+        const {kaaa, abc, kbbb} = standardRoute();
+        const unit = await bootUnit({
+            facilities: [kaaa, abc, kbbb], position: {lat: kaaa.lat, lon: kaaa.lon},
+            storage: savedFlightplan(0, [kaaa, abc, kbbb]),
+        });
+        await settle(unit);
+        return unit;
+    }
+
+    it('shows Super NAV 5 on a settled unit', async () => {
+        const unit = await onRoute();
+
+        await showSuperNav5(unit);
+
+        expect(unit.overlay()).toBeInstanceOf(SuperNav5Page);
+        expect(() => SuperNav5.read()).not.toThrow();
+    });
+
+    it('waits the given time before it looks', async () => {
+        const unit = await onRoute();
+        const wait = vi.spyOn(vi, 'advanceTimersByTimeAsync');
+
+        await showSuperNav5(unit, {waitMs: 2500});
+
+        expect(wait.mock.calls[wait.mock.calls.length - 1]).toEqual([2500]);
+        wait.mockRestore();
+    });
+
+    it('throws with the screen when the overlay is not Super NAV 5', async () => {
+        const unit = await onRoute();
+        const overlay = vi.spyOn(unit, 'overlay').mockReturnValue(null);
+
+        await expect(showSuperNav5(unit)).rejects.toThrow(/showSuperNav5/);
+        overlay.mockRestore();
+    });
+
+    // The leg world of testing.md section 3: 30 NM west of KDDD on the leg to it, KDDD active
+    it('superNav5OnLeg boots on the leg to KDDD and shows Super NAV 5', async () => {
+        const unit = await superNav5OnLeg({westNm: 30});
+
+        expect(unit.overlay()).toBeInstanceOf(SuperNav5Page);
+        expect(activeIdent(unit)).toBe('KDDD');
+        expect(unit.props.sensors.in.gps.groundspeed).toBeCloseTo(120, 0);
+        // The distance and the ident of the active waypoint: 30 NM west of KDDD
+        expect(SuperNav5.read().left.slice(0, 2)).toEqual(['30.0 È', 'KDDD']);
+    });
+
+    it('superNav5OnArc boots on the arc of the approach and shows Super NAV 5', async () => {
+        const unit = await superNav5OnArc();
+
+        expect(unit.overlay()).toBeInstanceOf(SuperNav5Page);
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs().some(l => l.arcData !== undefined)).toBe(true);
+        // The arc leg ends at ARCEN, 7.7 NM along the arc from the 225 radial (a characterization of the position)
+        expect(SuperNav5.read().left.slice(0, 2)).toEqual([' 7.7 È', 'ARCEN']);
     });
 });
