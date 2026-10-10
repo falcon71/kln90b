@@ -47,7 +47,7 @@ npm run coverage                           # all tests with V8 coverage of kln90
 - Coverage is a diagnostic: it shows code no test has run. It is not a target, because a snapshot of every page in its
   default state raises it without proving anything about the real unit. `coverage/` is gitignored.
 - A failed flight test writes its recording to `test/flight/__output__/` (gitignored); see section 4.
-- There is no linter and no CI.
+- There is no linter. CI (`.github/workflows/ci.yml`) runs the type check, `npm test` and the build on GitHub.
 
 # 3. How the harness works
 
@@ -897,7 +897,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   only because the sim overwrote one with the other (`0086363`; `FakeSim` keeps every SimVar apart); and the speed of
   scrolling through long lists (#40; the fake answers at once, while the rewritten cache window is tested). A change
   in any of them shows only in the sim.
-- **There is no CI.** Run `npm test` and `npx tsc --noEmit` before committing.
+- **CI runs only once a commit reaches GitHub.** Run `npm test` and `npx tsc --noEmit` before committing.
 
 Measured speed (a dated record): on 2026-10-03 the proof flight (`firstFlight.test.ts`) ran about 1466 simulated
 seconds in 1.0 to 1.2 s of wall time, roughly 1200 to 1450 times real time, with every tick running. The test prints a

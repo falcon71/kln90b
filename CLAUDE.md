@@ -41,8 +41,9 @@ npx vitest run --project flight   # one stage
 
 Tests live in `test/` and run with Vitest in three stages: unit (Node), render (happy-dom, reads the 23×7 screen) and
 flight (boots the whole unit headless and flies it on simulated time). See **[docs/testing.md](docs/testing.md)**. There
-is no linter and no CI; `tsc` and the build remain separate checks. Behavior changes should come with a test at the
-cheapest stage that can observe them.
+is no linter. `tsc` and the build are separate checks; the GitHub Actions workflow `.github/workflows/ci.yml` runs
+both and `npm test` on every push and pull request. Behavior changes should come with a test at the cheapest stage that
+can observe them.
 
 ## Public contract with aircraft — do not break
 
