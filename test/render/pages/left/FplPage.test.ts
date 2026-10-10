@@ -488,7 +488,7 @@ describe('FPL 1 to FPL 25 pages', () => {
     // plan and turned off first, so that the prompt has to pull it back to the top line
     it('deletes a numbered plan with CLR and ENT (4-5)', async () => {
         const unit = await bootRoute(savedFlightplan(3, route7()));
-        expect(String(storedSetting(unit, 'fpl3'))).toHaveLength(7 * 19); // Precondition of the #150 pin: the plan is stored
+        expect(String(storedSetting(unit, 'fpl3'))).toHaveLength(7 * 19); // Precondition: the plan is stored
         await unit.panel.selectPage('L', 'FPL 3');
         await unit.panel.cursor('L');
         await unit.panel.outer('L', 3);
@@ -505,9 +505,9 @@ describe('FPL 1 to FPL 25 pages', () => {
         expect(Screen.read().status().left).toBe('FPL 3');
     });
 
-    // Public contract (CLAUDE.md, persisted user data): the user's flight plans are saved. The deletion is not, as on
-    // FPL 0 (FlightplanEdit.test.ts); the test above is the sibling that holds the deletion itself
-    it.fails('saves the deleted numbered plan as empty (#150)', async () => {
+    // Public contract (CLAUDE.md, persisted user data): the user's flight plans are saved, the deletion as well (as on
+    // FPL 0, FlightplanEdit.test.ts); the test above holds the deletion itself
+    it('saves the deleted numbered plan as empty (#150)', async () => {
         const unit = await bootRoute(savedFlightplan(3, route7()));
         expect(String(storedSetting(unit, 'fpl3'))).toHaveLength(7 * 19); // Precondition: the plan is stored
         await unit.panel.selectPage('L', 'FPL 3');
