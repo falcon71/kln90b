@@ -1,11 +1,12 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../harness/boot';
+import {bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle} from '../harness/boot';
 import {Screen} from '../harness/render/screen';
 import {standardRoute} from '../harness/fixtures';
 import {savedFlightplan} from '../harness/storage';
+import {HEADING_INPUT, NO_GPS_SIMVARS, panelXml} from '../harness/panelXml';
+import {activeIdent} from '../harness/readers';
+import {bootOnStandardRoute} from '../harness/worldBoot';
 import {courseDeg, finalCourseDeg, pointBefore, pointFrom} from '../harness/flight/geo';
-
-const NO_GPS_SIMVARS_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output><WriteGPSSimVars>false</WriteGPSSimVars></Output></Instrument></PlaneHTMLConfig>';
 
 // Public contract: the LVar is documented in LVars.ts (ARINC label 275, bit 22: true when no GPS signal is acquired) and
 // listed in CLAUDE.md, "Public contract with aircraft". An unset LVar reads 0, so "written as 0" is asserted with
@@ -25,7 +26,7 @@ describe('L:KLN90B_IntegrityWarn (public contract) (#87)', () => {
         expect(gps.isValid()).toBe(false);
         expect(sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(1);
 
-        await vi.advanceTimersByTimeAsync(28_000);
+        await vi.advanceTimersByTimeAsync(28_000); // 30 s since the boot with the 2 s above
         expect(gps.isValid()).toBe(false);
         expect(sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(1);
 
@@ -77,7 +78,7 @@ describe('GPS OVERRIDDEN (public contract) (#24)', () => {
     });
 
     it('is never written when Output.WriteGPSSimVars is off', async () => {
-        const unit = await bootUnit({panelXml: NO_GPS_SIMVARS_XML});
+        const unit = await bootUnit({panelXml: panelXml(NO_GPS_SIMVARS)});
         await settle(unit);
         const sim = unit.env.sim;
 
@@ -96,7 +97,7 @@ describe('GPS OVERRIDDEN (public contract) (#24)', () => {
 // another GPS should still get the integrity flag and the bearing from the unit.
 describe('LVar outputs with Output.WriteGPSSimVars off (public contract) (#124)', () => {
     it('the gate holds the GPS SimVars back and lets the HSI flag LVar through', async () => {
-        const unit = await bootUnit({panelXml: NO_GPS_SIMVARS_XML});
+        const unit = await bootUnit({panelXml: panelXml(NO_GPS_SIMVARS)});
         await settle(unit);
         await vi.advanceTimersByTimeAsync(3000);
 
@@ -114,7 +115,7 @@ describe('LVar outputs with Output.WriteGPSSimVars off (public contract) (#124)'
     });
 
     it.fails('L:KLN90B_IntegrityWarn is still written (#124)', async () => {
-        const unit = await bootUnit({panelXml: NO_GPS_SIMVARS_XML});
+        const unit = await bootUnit({panelXml: panelXml(NO_GPS_SIMVARS)});
         await settle(unit);
         await vi.advanceTimersByTimeAsync(3000);
 
@@ -122,7 +123,7 @@ describe('LVar outputs with Output.WriteGPSSimVars off (public contract) (#124)'
     });
 
     it.fails('L:KLN90B_GPS_WP_BEARING is still written (#124)', async () => {
-        const unit = await bootUnit({panelXml: NO_GPS_SIMVARS_XML});
+        const unit = await bootUnit({panelXml: panelXml(NO_GPS_SIMVARS)});
         await settle(unit);
         await vi.advanceTimersByTimeAsync(3000);
 
@@ -142,14 +143,13 @@ describe('L:KLN90B_HSI_TF_FLAGS (public contract)', () => {
             position: pointBefore(kaaa, abc, 3),
         });
         await settle(unit);
-        const active = () => unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident;
-        expect(active()).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(1);
 
         await moveAircraft(unit, pointFrom(abc, finalCourseDeg(kaaa, abc), 3), {groundspeedKt: 0});
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(active()).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(2);
     });
 });
@@ -160,14 +160,8 @@ describe('L:KLN90B_HSI_TF_FLAGS (public contract)', () => {
 // light once at the start of the turn, not at every sample of the alert.
 describe('L:KLN90B_WptLight during the waypoint alert (public contract)', () => {
     it('is 1 at every sample while the alert is on', async () => {
-        const {kaaa, abc, kbbb} = standardRoute();
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb],
-            storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-            position: {lat: kaaa.lat, lon: kaaa.lon},
-            magvar: 0,
-        });
-        await settle(unit);
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({magvar: 0});
         // The turn starts about 0.3 NM before ABC (firstFlight.test.ts) and the alert 20 s earlier, about 0.7 NM at 120 kt,
         // so the unit is inside the alert from 0.8 NM on. A held position would sequence ABC within a few seconds, so the
         // aircraft advances 0.00833 NM, 250 ms at 120 kt, per display tick and the light is sampled at every one, so that a
@@ -192,14 +186,8 @@ describe('L:KLN90B_WptLight during the waypoint alert (public contract)', () => 
     });
 
     it('is 0 before the alert', async () => {
-        const {kaaa, abc, kbbb} = standardRoute();
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb],
-            storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-            position: {lat: kaaa.lat, lon: kaaa.lon},
-            magvar: 0,
-        });
-        await settle(unit);
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({magvar: 0});
 
         await moveAircraft(unit, pointBefore(kaaa, abc, 3), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
 
@@ -214,20 +202,12 @@ describe('L:KLN90B_WptLight during the waypoint alert (public contract)', () => 
 // stop when the unit loses power (TickController), so a switched-off unit keeps its last values. SensorsOut.reset writes
 // nothing for the LVars. Installation Manual 2-69 states that the annunciators light during the self-test (setup B).
 describe('outputs at power-off (public contract)', () => {
-    const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
     const BLANK_SCREEN = Array.from({length: 7}, () => ' '.repeat(23)).join('\n');
 
     /** Setup A: banking towards the leg, 2 NM right of the course, the leg to the left */
     async function banking() {
-        const {kaaa, abc, kbbb} = standardRoute();
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb],
-            storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-            position: {lat: kaaa.lat, lon: kaaa.lon},
-            panelXml: HEADING_INPUT_XML,
-            magvar: 0,
-        });
-        await settle(unit);
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({panelXml: panelXml(HEADING_INPUT), magvar: 0});
         const mid = pointBefore(kaaa, abc, 10);
         const dtk = courseDeg(mid, abc);
         await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});
@@ -236,11 +216,7 @@ describe('outputs at power-off (public contract)', () => {
 
     /** Setup B: the self-test page, where the annunciators are lit */
     async function onSelfTestPage() {
-        const unit = await bootUnit({engineRunning: false, magvar: 0, panelXml: HEADING_INPUT_XML});
-        await unit.panel.powerOn();
-        await vi.advanceTimersByTimeAsync(19_000);
-        expect(Screen.read().text()).toContain('APPROVE?');
-        return unit;
+        return bootToSelfTest({magvar: 0, panelXml: panelXml(HEADING_INPUT)});
     }
 
     it('sibling A: the roll command is 25 and the HSI flag 1 before the power-off, and the switch-off blanks the unit', async () => {
@@ -321,15 +297,12 @@ describe('outputs at power-off (public contract)', () => {
 // state of SensorsOutSimVars.test.ts: ABC active, 1 NM right of the first leg, moving at 120 kt, so every output has a
 // value to write.
 describe('GPS SimVars with Output.WriteGPSSimVars off (public contract) (#126)', () => {
-    async function bootMovingOnRoute(panelXml?: string): Promise<HeadlessUnit> {
-        const {kaaa, abc, kbbb} = standardRoute();
+    async function bootMovingOnRoute(xml?: string): Promise<HeadlessUnit> {
+        const {kaaa, abc} = standardRoute();
         const onLeg = pointBefore(kaaa, abc, 20);
         const legCourse = courseDeg(onLeg, abc);
         const p = pointFrom(onLeg, legCourse + 90, 1);
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb]), position: p, magvar: 4, panelXml,
-        });
-        await settle(unit);
+        const unit = await bootOnStandardRoute({position: p, magvar: 4, panelXml: xml});
         await moveAircraft(unit, p, {groundspeedKt: 120, trackTrue: (legCourse + 10) % 360});
         await vi.advanceTimersByTimeAsync(4000);
         return unit;
@@ -341,10 +314,10 @@ describe('GPS SimVars with Output.WriteGPSSimVars off (public contract) (#126)',
 
     // The two variables of #126 are excluded here, and pinned one each below, so that fixing one cannot hide the other
     it('writes no other GPS SimVar and no K:GPS key event while the unit runs', async () => {
-        const unit = await bootMovingOnRoute(NO_GPS_SIMVARS_XML);
+        const unit = await bootMovingOnRoute(panelXml(NO_GPS_SIMVARS));
 
         // Preconditions: the unit runs and has a route, so the silence is the option and not a missing state
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(unit.env.sim.lastWrite('L:KLN90B_HSI_TF_FLAGS')?.value).toBe(1);
 
         expect(writtenGpsNames(unit).filter(n => n !== 'GPS WP CROSS TRK' && n !== 'GPS COURSE TO STEER')).toEqual([]);
@@ -358,7 +331,8 @@ describe('GPS SimVars with Output.WriteGPSSimVars off (public contract) (#126)',
 
         // 1 NM right of the leg; the sign follows the SDK convention (negated), see SensorsOutSimVars.test.ts
         expect(unit.env.sim.get('GPS WP CROSS TRK', 'meters')).toBeCloseTo(-1852, -1);
-        // Only that the name is written, with a finite number; the value is the characterization below
+        // Only that the name is written, with a finite number: the value has no contract source (the code adds the
+        // variable on its own), so the characterization test below holds it
         const written = unit.env.sim.lastWrite('GPS COURSE TO STEER');
         expect(written).toBeDefined();
         expect(Number.isFinite(written!.value)).toBe(true);
@@ -376,13 +350,13 @@ describe('GPS SimVars with Output.WriteGPSSimVars off (public contract) (#126)',
     });
 
     it.fails('GPS COURSE TO STEER is not written (#126)', async () => {
-        const unit = await bootMovingOnRoute(NO_GPS_SIMVARS_XML);
+        const unit = await bootMovingOnRoute(panelXml(NO_GPS_SIMVARS));
 
         expect(unit.env.sim.lastWrite('GPS COURSE TO STEER')).toBeUndefined();
     });
 
     it.fails('GPS WP CROSS TRK is not written (#126)', async () => {
-        const unit = await bootMovingOnRoute(NO_GPS_SIMVARS_XML);
+        const unit = await bootMovingOnRoute(panelXml(NO_GPS_SIMVARS));
 
         expect(unit.env.sim.lastWrite('GPS WP CROSS TRK')).toBeUndefined();
     });

@@ -1,14 +1,8 @@
 import {describe, expect, it, onTestFinished, vi} from 'vitest';
 import {bootUnit, bootUnitExpectingError} from '../harness/boot';
+import {muteConsoleError} from '../harness/console';
 import {KLN90BCore} from '../../kln90b/KLN90BCore';
 import {EVT_ENT} from '../../kln90b/HEvents';
-
-/** The error page logs every error it shows; keep the expected one out of the test output */
-function muteConsoleError(): void {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    // Registered before the boot, so it runs after the teardown has put the spy back
-    onTestFinished(() => spy.mockRestore());
-}
 
 // The source is the fix commit, not a manual page. The harness test bootFailure.test.ts holds the catch on the
 // propsReady chain (a facility client whose nearest search rejects, which fails after init() has returned). Here the

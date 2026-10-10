@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {airport} from '../../harness/navdata/builders';
 import {savedFlightplan} from '../../harness/storage';
+import {activeIdent} from '../../harness/readers';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 
 // C-1 (INVALID VNV): in the Leg mode the NAV 4 waypoint must be the active waypoint or one ahead in the active flight
@@ -26,7 +27,7 @@ describe('Vnav waypoint in OBS mode', () => {
     it('accepts the active waypoint in OBS mode (C-1)', async () => {
         const unit = await bootInObs();
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
         expect(unit.props.vnav.isValidVnavWpt(KBBB)).toBe(true);
     });
 

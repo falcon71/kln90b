@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../harness/boot';
+import {panelXml} from '../harness/panelXml';
 import {Screen} from '../harness/render/screen';
 
 const BLANK_SCREEN = Array.from({length: 7}, () => ' '.repeat(23)).join('\n');
@@ -69,7 +70,7 @@ describe('Power_On and Power_Off H events (public contract) (#51)', () => {
 describe('L:KLN90B_Power reports the switch, not the powered state (public contract)', () => {
     it('is 1 while the unit has no electricity and shows nothing', async () => {
         const unit = await bootUnit({
-            panelXml: '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ElectricitySimVar>CIRCUIT ON:1</ElectricitySimVar></Input></Instrument></PlaneHTMLConfig>',
+            panelXml: panelXml({'Input.ElectricitySimVar': 'CIRCUIT ON:1'}),
         });
         // CIRCUIT ON:1 stays unset (reads 0), so the first SimVarSync tick takes the electricity away;
         // waited out for 3 s, beyond the switch-over of the battery module (maintenance manual, PDF 79; #332)

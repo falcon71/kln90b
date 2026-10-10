@@ -32,7 +32,10 @@ describe('keyboard input for editors (characterization, sim-only feature, #25)',
     });
 });
 
-/** The longitudes of the user waypoints in the repository (the region XX holds the user's own waypoints) */
+/**
+ * The longitudes of the user waypoints in the repository (the region XX holds the user's own waypoints). Not
+ * userWaypoints() of the harness: that one filters on the facility type, this one on the region, which is the claim
+ */
 function storedLongitudes(unit: HeadlessUnit): number[] {
     const lons: number[] = [];
     KLNFacilityRepository.getRepository(unit.props.bus).forEach(fac => {

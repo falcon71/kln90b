@@ -1,11 +1,17 @@
 import {describe, expect, it, vi} from 'vitest';
 import {BoundaryAltitudeType, BoundaryType} from '@microsoft/msfs-sdk';
-import {BootOptions, bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
+import {BootOptions, bootUnit, HeadlessUnit, moveAircraft, NEAREST_SEARCH_WAIT_MS, settle} from '../../../harness/boot';
 import {airspace, AirspaceOptions} from '../../../harness/navdata/airspaces';
 import {Screen} from '../../../harness/render/screen';
 import {approachWorld} from '../../../harness/fixtures';
 import {savedFlightplan} from '../../../harness/storage';
+import {pointFrom} from '../../../harness/flight/geo';
+import {NO_ALTIMETER, panelXml} from '../../../harness/panelXml';
+import {messages} from '../../../harness/readers';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
+
+/** One search period of the alert (AirspaceAlert.ts, ALERT_TICK_TIME): the wait for the next search */
+const ALERT_PERIOD_MS = 10_000;
 
 const square: [number, number][] = [[47.1, 7.9], [47.1, 8.1], [46.9, 8.1], [46.9, 7.9]];
 
@@ -17,7 +23,7 @@ async function messagesInside(altitudeFt: number, minFt: number, maxFt: number):
     });
     await settle(unit);
     // The alert searches every 10 s
-    await vi.advanceTimersByTimeAsync(12000);
+    await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
     await unit.panel.msg();
     return Screen.read().text();
 }
@@ -44,8 +50,6 @@ describe('SUA alert, vertical limits of an MSL airspace', () => {
     });
 });
 
-/** The messages the MSG page would list, one string per message */
-const messages = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
 const sua = (unit: HeadlessUnit) => messages(unit).filter(m => m.includes('AIRSPACE'));
 
 /** NM of longitude at 47 N, flat over these few NM */
@@ -61,7 +65,7 @@ async function flying(trackTrue: number, airspaces: ReturnType<typeof airspace>[
     await settle(unit);
     await moveAircraft(unit, {lat: 47.0, lon: 8.0}, {groundspeedKt: 120, trackTrue});
     // The alert searches every 10 s
-    await vi.advanceTimersByTimeAsync(12000);
+    await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
     return unit;
 }
 
@@ -105,7 +109,7 @@ describe('AIRSPACE ALERT ahead on the track', () => {
     // trigger, not the repetition)
     it('alerts once over two searches (characterization)', async () => {
         const unit = await flying(0, [fiveMinutes()]);
-        await vi.advanceTimersByTimeAsync(10000);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
 
         expect(sua(unit)).toHaveLength(1);
     });
@@ -127,11 +131,11 @@ describe('AIRSPACE ALERT ahead on the track', () => {
         await vi.advanceTimersByTimeAsync(1000);
         await unit.panel.msg();
         await moveAircraft(unit, {lat: 47.0, lon: 8.0}, {groundspeedKt: 120, trackTrue: 180});
-        await vi.advanceTimersByTimeAsync(10000);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
         expect(sua(unit)).toEqual([]); // Precondition: read, and away from the area
 
         await moveAircraft(unit, {lat: 47.0, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
-        await vi.advanceTimersByTimeAsync(10000);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
 
         expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-AHEAD           REST 1000ft to 18000ft']);
     });
@@ -165,8 +169,8 @@ describe('INSIDE SPC USE AIRSPACE after the alert', () => {
         const unit = await flying(0, [enter()]);
         expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-ENTER           REST 1000ft to 18000ft']); // Precondition
 
-        await moveAircraft(unit, {lat: 47 + 2 * NM_LAT, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
-        await vi.advanceTimersByTimeAsync(10000);
+        await moveAircraft(unit, pointFrom({lat: 47.0, lon: 8.0}, 0, 2), {groundspeedKt: 120, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
 
         expect(sua(unit).filter(m => m.startsWith('INSIDE'))).toEqual(['INSIDE SPC USE AIRSPACE R-ENTER           REST 1000ft to 18000ft']);
     });
@@ -176,8 +180,8 @@ describe('INSIDE SPC USE AIRSPACE after the alert', () => {
         const unit = await flying(0, [enter()]);
         expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-ENTER           REST 1000ft to 18000ft']); // Precondition
 
-        await moveAircraft(unit, {lat: 47 + 2 * NM_LAT, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
-        await vi.advanceTimersByTimeAsync(10000);
+        await moveAircraft(unit, pointFrom({lat: 47.0, lon: 8.0}, 0, 2), {groundspeedKt: 120, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
 
         expect(sua(unit).filter(m => m.startsWith('AIRSPACE ALERT'))).toEqual([]);
     });
@@ -195,7 +199,7 @@ describe('INSIDE SPC USE AIRSPACE after the alert', () => {
     // While the aircraft stays inside, the message is given once (characterization)
     it('shows INSIDE SPC USE AIRSPACE once over two searches (characterization)', async () => {
         const unit = await flying(0, [airspace('R-AROUND', BoundaryType.Restricted, box(46.9, 47.1, 7.9, 8.1), LIMITS)]);
-        await vi.advanceTimersByTimeAsync(10000);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
 
         expect(sua(unit)).toHaveLength(1);
     });
@@ -207,11 +211,11 @@ describe('INSIDE SPC USE AIRSPACE after the alert', () => {
         await vi.advanceTimersByTimeAsync(1000);
         await unit.panel.msg();
         await moveAircraft(unit, {lat: 47.3, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
-        await vi.advanceTimersByTimeAsync(10000);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
         expect(sua(unit)).toEqual([]); // Precondition: read, and outside
 
         await moveAircraft(unit, {lat: 47.0, lon: 8.0}, {groundspeedKt: 120, trackTrue: 180});
-        await vi.advanceTimersByTimeAsync(10000);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
 
         expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-AROUND          REST 1000ft to 18000ft']);
     });
@@ -225,7 +229,7 @@ describe('the vertical limits', () => {
             airspaces: [airspace('R-TEST', BoundaryType.Restricted, box(46.9, 47.1, 7.9, 8.1), o)], ...boot,
         });
         await settle(unit);
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         return sua(unit);
     }
 
@@ -269,7 +273,7 @@ describe('the vertical limits', () => {
 
     // 3-40 NOTE: without an altitude input every altitude counts as inside the area
     it('counts every altitude as inside without an altitude input (3-40)', async () => {
-        const noAltitude = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><AltimeterInterfaced>false</AltimeterInterfaced></Input></Instrument></PlaneHTMLConfig>';
+        const noAltitude = panelXml(NO_ALTIMETER);
         expect(await inside(25000, {minFt: 1000, maxFt: 5000}, {panelXml: noAltitude}))
             .toEqual(['INSIDE SPC USE AIRSPACE R-TEST            REST 1000ft to 5000ft']);
     });
@@ -283,7 +287,7 @@ describe('a long airspace name', () => {
             airspaces: [airspace('LONG RESTRICTED AREA NAME', BoundaryType.Restricted, box(46.9, 47.1, 7.9, 8.1), {minFt: 0, maxFt: 5000})],
         });
         await settle(unit);
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
 
         expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE LONG RESTRICTED A REST 0ft to 5000ft']);
     });
@@ -296,7 +300,7 @@ describe('when the unit gives no SUA message (3-39, 3-41)', () => {
             airspaces: [airspace('AREA', type, box(46.9, 47.1, 7.9, 8.1), {minFt: 0, maxFt: 5000})], ...boot,
         });
         await settle(unit);
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         return unit;
     }
 
@@ -330,7 +334,7 @@ describe('SUA alert in the approach modes (3-41)', () => {
         await settle(unit);
         if (armed) await unit.panel.loadProcedure('APT 8');
         await moveAircraft(unit, p, {groundspeedKt: 120});
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         return unit;
     }
 
@@ -367,10 +371,11 @@ describe('SUA alert in the approach active mode (3-41)', () => {
         await settle(unit);
         if (approach) {
             await unit.panel.loadProcedure('APT 8');
+            // The approach arms and FAFAA becomes active: the wait of approachWorld.test.ts before the unit reaches APR
             await vi.advanceTimersByTimeAsync(31_000);
         }
         await moveAircraft(unit, w.north(6.5), {groundspeedKt: 120, trackTrue: 180});
-        await vi.advanceTimersByTimeAsync(12000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         return unit;
     }
 

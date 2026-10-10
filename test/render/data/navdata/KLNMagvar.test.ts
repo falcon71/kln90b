@@ -2,20 +2,16 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {airport} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
-import {Screen} from '../../../harness/render/screen';
+import {NO_OBS, panelXml} from '../../../harness/panelXml';
+import {activeIdent, messages} from '../../../harness/readers';
 import {finalCourseDeg} from '../../../harness/flight/geo';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
 const MAGVAR_INVALID = 'MAGNETIC VAR INVALID ALL DATA REFERENCED TO TRUE NORTH';
 
-/** The messages the MSG page would list, one string per message */
-const messages = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
-
 /** The TK row of NAV 3 */
 async function nav3Track(unit: HeadlessUnit): Promise<string> {
-    await unit.panel.selectPage('L', 'NAV 3');
-    await vi.advanceTimersByTimeAsync(1000);
-    return Screen.read().rows('L')[2];
+    return (await unit.panel.show('L', 'NAV 3'))[2];
 }
 
 // 3-1 and 5-44: the primary coverage area, with the magnetic variation of the database, runs from N 74 to S 60. The N 74
@@ -87,7 +83,7 @@ describe('the reference of the displayed track outside the coverage area', () =>
 describe('OBS mode with the active waypoint outside the coverage area', () => {
     const kaaa = airport('KAAA', 73.0, 8.0);
     const kfar = airport('KFAR', 75.0, 8.0);
-    const OBS_SOURCE_OFF = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input></Instrument></PlaneHTMLConfig>';
+    const OBS_SOURCE_OFF = panelXml(NO_OBS);
 
     async function toKfar() {
         const unit = await bootUnit({
@@ -95,7 +91,7 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
             storage: savedFlightplan(0, [kaaa, kfar]),
         });
         await settle(unit);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KFAR');
+        expect(activeIdent(unit)).toBe('KFAR');
         return unit;
     }
 
@@ -117,7 +113,7 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
 
         const nav = unit.props.memory.navPage;
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KFAR');
+        expect(activeIdent(unit)).toBe('KFAR');
         expect(finalCourseDeg(kaaa, kfar)).toBeCloseTo(0, 5); // The leg runs due north
     });
 

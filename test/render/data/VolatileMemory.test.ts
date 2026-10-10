@@ -2,6 +2,8 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {approachWorld, standardRoute} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
+import {fplIdents} from '../../harness/readers';
+import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {Screen} from '../../harness/render/screen';
 import {vor} from '../../harness/navdata/builders';
 import {CtrState, NavMode} from '../../../kln90b/data/VolatileMemory';
@@ -27,7 +29,7 @@ describe('CAL 6 time (5-14)', () => {
         const first = utcNow();
         expect(Screen.read().rows('L')[1]).toBe(` ${first} UTC `);
 
-        await vi.advanceTimersByTimeAsync(5 * 60_000);
+        await vi.advanceTimersByTimeAsync(5 * 60_000); // Five minutes: the hh:mm of the page moves on
         await unit.panel.selectPage('L', 'NAV 2');
         await unit.panel.selectPage('L', 'CAL 6');
 
@@ -40,7 +42,7 @@ describe('CAL 6 time (5-14)', () => {
         await settle(unit);
         await unit.panel.selectPage('L', 'CAL 6');
         const first = utcNow();
-        await vi.advanceTimersByTimeAsync(5 * 60_000);
+        await vi.advanceTimersByTimeAsync(5 * 60_000); // As above: the hh:mm moves on before the cycle
         await unit.panel.selectPage('L', 'NAV 2');
 
         await cycle(unit);
@@ -54,9 +56,7 @@ describe('CAL 6 time (5-14)', () => {
 describe('the mode after a power cycle (3-3)', () => {
     // 3-3: the unit always powers up in ENR-LEG
     it('powers up in ENR-LEG after it was switched off in OBS (3-3)', async () => {
-        const {kaaa, abc, kbbb} = standardRoute();
-        const unit = await bootUnit({facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb])});
-        await settle(unit);
+        const unit = await bootOnStandardRoute();
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
@@ -93,7 +93,7 @@ describe('procedures over a power cycle (6-5, 6-23)', () => {
         await cycle(unit, 6 * 60);
 
         expect(procedureLegs(unit)).toEqual([]);
-        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['ENRAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'KPRC']);
     });
 
     // 6-5, 6-23: only more than 5 minutes off deletes the procedures
@@ -110,8 +110,7 @@ describe('procedures over a power cycle (6-5, 6-23)', () => {
 describe('VolatileMemory over a power cycle (characterization)', () => {
     it('puts the page state back to its defaults at the power-on (characterization)', async () => {
         const {kaaa, abc, kbbb} = standardRoute();
-        const unit = await bootUnit({facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb])});
-        await settle(unit);
+        const unit = await bootOnStandardRoute();
         const m = unit.props.memory;
         // Every field reset() lists, set to a value other than its default. nav4VnavWpt is a waypoint ahead in FPL 0, so
         // that Vnav.tick keeps it (it drops an invalid one itself)

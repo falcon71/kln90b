@@ -7,17 +7,23 @@ import {NavMode} from '../../kln90b/data/VolatileMemory';
 import {airport, intersection, vor} from '../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../harness/navdata/procedures';
 import {savedFlightplan} from '../harness/storage';
+import {LEG_OBS_SWITCH, panelXml} from '../harness/panelXml';
+import {activeIdent} from '../harness/readers';
+import {bootOnStandardRoute} from '../harness/worldBoot';
 
 // Invented facilities; KAAA is at non-round coordinates so that no default or stale value can match its longitude
 const kaaa = airport('KAAA', 47.1, 8.3);
 const abc = vor('ABC', 47.5, 8.9);
 const kbbb = airport('KBBB', 48.2, 9.2);
 
-/** The unit sits on KAAA with FPL 0 = KAAA, ABC, KBBB; the first calculation tick activates ABC with KAAA as FROM */
-function bootOnRoute(panelXml?: string, magvar = 0) {
+/**
+ * The unit sits on KAAA with FPL 0 = KAAA, ABC, KBBB; the first calculation tick activates ABC with KAAA as FROM. The
+ * world is the invented one above and the tests advance the clock themselves, so it is not bootOnStandardRoute
+ */
+function bootOnRoute(xml?: string, magvar = 0) {
     return bootUnit({
         facilities: [kaaa, abc, kbbb], storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-        position: {lat: kaaa.lat, lon: kaaa.lon}, magvar, panelXml,
+        position: {lat: kaaa.lat, lon: kaaa.lon}, magvar, panelXml: xml,
     });
 }
 
@@ -39,8 +45,7 @@ describe('GPS SimVars written by SensorsOut', () => {
     // (ModeController.getDtkOrObsMagnetic), not part of the sample file. 07c6e37 made the output a key event (K:VOR1_SET),
     // because the plain name wrote a SimVar that is not writable.
     describe('Output.ObsTarget (07c6e37)', () => {
-        const obsPanelXml = (target: number) =>
-            `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output><ObsTarget>${target}</ObsTarget></Output></Instrument></PlaneHTMLConfig>`;
+        const obsPanelXml = (target: number) => panelXml({'Output.ObsTarget': target});
         const vorKeyEvents = (unit: HeadlessUnit) => unit.env.sim.keyEvents.filter(k => k.name.startsWith('K:VOR'));
 
         it('sets VOR 1 to the magnetic DTK with ObsTarget 1', async () => {
@@ -165,7 +170,7 @@ describe('GPS WP TRUE BEARING on a DME arc (#21 1e1a8f5)', () => {
 
     it('is the desired track on the arc, while the RMI LVar is the bearing to the end fix', async () => {
         const unit = await loadedOnArc();
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ARCEN');
+        expect(activeIdent(unit)).toBe('ARCEN');
         const p = at(210, 10);
         await moveAircraft(unit, p, {groundspeedKt: 0});
         await vi.advanceTimersByTimeAsync(2000);
@@ -197,7 +202,7 @@ describe('GPS WP TRUE BEARING on a DME arc (#21 1e1a8f5)', () => {
         await moveAircraft(unit, p, {groundspeedKt: 0});
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(active.getActiveWpt()!.icaoStruct.ident).toBe('FAFAA');
+        expect(activeIdent(unit)).toBe('FAFAA');
         expect(angleBetween(unit.props.memory.navPage.desiredTrack, courseDeg(p, fafaa))).toBeGreaterThan(3);
         const out = outputs(unit);
         expect(out.trueBearing).toBeCloseTo(courseDeg(p, fafaa), 1);
@@ -223,13 +228,8 @@ describe('GPS SimVars for a known state', () => {
 
     const sim = (unit: HeadlessUnit) => unit.env.sim;
 
-    async function bootKnownState(panelXml?: string) {
-        const unit = await bootUnit({
-            facilities: [route.kaaa, route.abc, route.kbbb],
-            storage: savedFlightplan(0, [route.kaaa, route.abc, route.kbbb]),
-            position: p, magvar: MAGVAR, panelXml,
-        });
-        await settle(unit);
+    async function bootKnownState(xml?: string) {
+        const unit = await bootOnStandardRoute({position: p, magvar: MAGVAR, panelXml: xml});
         await moveAircraft(unit, p, {groundspeedKt: 120, trackTrue});
         await vi.advanceTimersByTimeAsync(4000); // The 16 Hz XTK filter converges on a constant input
         expect(unit.errors).toEqual([]);
@@ -352,8 +352,7 @@ describe('GPS SimVars for a known state', () => {
 
         // The switch makes GPS OBS ACTIVE read-only, so the unit leaves the key events out
         it('writes no K:GPS_OBS event with LegObsSwitchInstalled', async () => {
-            const unit = await bootKnownState('<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ExternalSwitches>'
-                + '<LegObsSwitchInstalled>true</LegObsSwitchInstalled></ExternalSwitches></Input></Instrument></PlaneHTMLConfig>');
+            const unit = await bootKnownState(panelXml(LEG_OBS_SWITCH));
             // The switch, not the unit, selects OBS: the unit follows GPS OBS ACTIVE
             unit.env.sim.set('Nav OBS:1', 'degrees', 51);
             unit.env.sim.set('GPS OBS ACTIVE', 'bool', true);
