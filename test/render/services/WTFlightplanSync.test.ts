@@ -92,6 +92,29 @@ describe('the "kln90b" flight planner on the standard route', () => {
         expect(identsOf(planner.getFlightPlan(0))).toEqual(['KAAA', 'ABC', 'KBBB']);
     });
 
+    // A direct-to to a waypoint of FPL 0 resumes the plan behind it (4-10); an edit in front of the target moves the
+    // target, and plan 0 marks it at its new index (#149)
+    it('keeps the active leg of plan 0 on a direct-to target when a leg is inserted in front of it', async () => {
+        const unit = await bootOnRoute();
+        const planner = plannerOf(unit);
+        await unit.panel.press('KLN90B_DCT_Push');
+        await unit.panel.enterIdent('L', 'ABC');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(planner.activePlanIndex).toBe(1); // Precondition: the direct-to is on plan 1
+        expect(planner.getFlightPlan(0).activeLateralLeg).toBe(1); // Precondition: ABC
+
+        insertLeg(unit, 1, xray);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(identsOf(planner.getFlightPlan(0))).toEqual(['KAAA', 'XRAY', 'ABC', 'KBBB']);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(2);
+        expect(planner.getFlightPlan(0).activeLateralLeg).toBe(2);
+        expect(planner.activePlanIndex).toBe(1);
+        expect(unit.errors).toEqual([]);
+    });
+
     // The wiki page Accessing the Flight Plan: plan 0 always matches FPL 0, the direct-to plan is only there while a
     // direct-to is flown. When the direct-to ends the planner returns to plan 0 and plan 1 is gone.
     it('returns to plan 0 and drops plan 1 when the direct-to ends', async () => {
