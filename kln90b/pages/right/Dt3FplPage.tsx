@@ -125,7 +125,7 @@ export class Dt3FplPage extends SixLineHalfPage {
                     disDtk.push({dis: null, dtkMag: null});
                 } else if (actIdx === i) {
                     distanceTotal += navState.distToActive!;
-                    disDtk.push({dis: distanceTotal, dtkMag: this.props.magvar.trueToMag(navState.bearingToActive)});
+                    disDtk.push({dis: distanceTotal, dtkMag: this.props.modeController.getDtkOrObsMagnetic()});
                 } else {
                     const prev = legs[i - 1];
                     const next = legs[i];

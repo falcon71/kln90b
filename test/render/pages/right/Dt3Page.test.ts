@@ -138,17 +138,16 @@ describe('D/T 3 page, the DTK of the active waypoint', () => {
 
     // 4-12: the DTK belongs to the leg, a great-circle course from one waypoint to the next; Appendix A draws DTK as the
     // course from the from waypoint to the to waypoint, apart from BRG. Checked in the KLN 89 trainer, 2026-10-07: 3 NM off course, FPL 0
-    // shows the leg DTK (5) beside the active waypoint while NAV 1 shows a bearing of 12. Off course the code shows the
-    // bearing to the active waypoint. Figures 4-51 and 4-52 (one flight state) show 063 and 064 for the active waypoint,
-    // which do not settle it
-    it.fails('shows the leg DTK of the active waypoint beside FPL 0 (4-12, Appendix A, #297)', async () => {
+    // shows the leg DTK (5) beside the active waypoint while NAV 1 shows a bearing of 12. Figures 4-51 and 4-52 (one
+    // flight state) show 063 and 064 for the active waypoint, which do not settle it
+    it('shows the leg DTK of the active waypoint beside FPL 0 (4-12, Appendix A, #297)', async () => {
         const unit = await bootOffCourse();
 
         // 15.03 NM north and 4.07 NM east of the aircraft: 15.6 NM to ABC
         expect((await show(unit, 'FPL 0'))[2]).toBe(' 16    000°');
     });
 
-    it.fails('shows the leg DTK of the active waypoint beside another page (4-12, Appendix A, #297)', async () => {
+    it('shows the leg DTK of the active waypoint beside another page (4-12, Appendix A, #297)', async () => {
         const unit = await bootOffCourse();
 
         expect((await show(unit, 'NAV 2'))[2]).toBe('DTK    000°');
@@ -244,6 +243,34 @@ describe('D/T 3 page (characterization)', () => {
             "           ",
           ]
         `);
+    });
+
+    // In OBS mode there is no leg: NAV 3 shows the OBS course as its DTK, and so does the active row of D/T 3. The unit
+    // enters OBS with the course it was flying (000 here), while the bearing to ABC is about 345
+    it('shows the OBS course as the DTK of the active waypoint in OBS mode', async () => {
+        const {kaaa, abc, def} = dtWorld();
+        const unit = await bootUnit({
+            facilities: [kaaa, abc, def], position: {lat: 47.25, lon: 10.1}, storage: savedFlightplan(0, [kaaa, abc, def]),
+        });
+        await settle(unit);
+        await moveAircraft(unit, {lat: 47.25, lon: 10.1}, {groundspeedKt: 120, trackTrue: 0});
+        await unit.panel.obsMode();
+
+        await unit.panel.selectPage('L', 'NAV 3');
+        expect(Screen.read().rows('L')[1]).toBe('OBS    000°'); // precondition
+        expect((await show(unit, 'FPL 0'))[2]).toBe(' 16    000°');
+        expect((await show(unit, 'NAV 2'))[2]).toBe('DTK    000°');
+    });
+
+    // The course of a Direct To runs from the point where it was started, so it stays when the aircraft moves off it
+    it('keeps the course of a Direct To as the DTK when the aircraft moves off it', async () => {
+        const unit = await bootOnDtWorld({moving: false});
+        await unit.panel.directTo('KAAA', {waitMs: 2000});
+        await moveAircraft(unit, {lat: 47.1, lon: 10.1}, {groundspeedKt: 0});
+
+        expect(unit.props.memory.navPage.bearingToActive).toBeGreaterThan(190); // precondition: the bearing is not the course
+        expect((await show(unit, 'FPL 0'))[1].slice(4)).toBe('   180°');
+        expect((await show(unit, 'NAV 2'))[2]).toBe('DTK    180°');
     });
 
     it('shows dashes beside NAV 2 before the GPS has a fix', async () => {
