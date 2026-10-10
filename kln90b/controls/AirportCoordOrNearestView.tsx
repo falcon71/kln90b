@@ -90,7 +90,7 @@ export class AirportCoordOrNearestView implements UiElement {
             longestRunwaySurface: new TextDisplay(longestRunway ? getKLNSurfaceString(longestRunway) : "   "),
             longestRunwayLighting: new TextDisplay(longestRunway ? getKLNLightingString(longestRunway) : "   "),
             bearing: new BearingDisplay(),
-            distance: new DistanceDisplay(5),
+            distance: new DistanceDisplay(5, null, true),
         });
         this.coordRef = FSComponent.createRef<HTMLDivElement>();
         this.nearestRef = FSComponent.createRef<HTMLDivElement>();

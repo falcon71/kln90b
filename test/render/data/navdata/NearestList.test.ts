@@ -246,7 +246,7 @@ describe('the nearest page distance refresh (characterization)', () => {
         await unit.panel.scan();
         await slowStep(unit, -1);
         expect(identRow()).toBe(' NBB   nr 2'); // precondition: the last nearest NDB, 6.0 NM south
-        // 47.2 N is 0.3 degrees (18.0 NM) north of NBB. A distance of 10 NM or more keeps the row clear of #266
+        // 47.2 N is 0.3 degrees (18.0 NM) north of NBB
         unit.env.sim.set('PLANE LATITUDE', 'degrees', 47.2);
 
         await vi.advanceTimersByTimeAsync(1500);

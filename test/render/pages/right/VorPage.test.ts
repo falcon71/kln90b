@@ -196,14 +196,14 @@ describe('VOR page nearest view (3-22, 3-49)', () => {
     // The nearest figures show a distance below 10 NM with its leading zero (06.5nm on 3-154, 04.1nm on 3-22 and 3-24,
     // 03.1nm on 3-42), and the VOR page shares the view of the NDB page; the KLN 89 trainer pads with a blank
     // (6.5nm), but its nearest page has another layout, and the maintainer ruled for the 90B figures. ABC lies 7.3 NM away
-    // (haversine); the page shows 7.3nm (DistanceDisplay pads with a blank)
-    it.fails('shows a distance below 10 NM with a leading zero (3-22, figure 3-154, #266)', async () => {
+    // (haversine)
+    it('shows a distance below 10 NM with a leading zero (3-22, figure 3-154, #266)', async () => {
         await nearestAbc(0, 47.1, 8.1);
 
         expect(Screen.read().rows('R')[5].trim()).toBe('07.3nm');
     });
 
-    // Sibling of the pin above: the VOR is NR 1 at 7.3 NM
+    // Sibling of the test above: the VOR is NR 1 at 7.3 NM
     it('shows a near VOR as NR 1 at 7.3 NM (3-22)', async () => {
         await nearestAbc(0, 47.1, 8.1);
 

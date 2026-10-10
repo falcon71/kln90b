@@ -16,11 +16,14 @@ export class DistanceDisplay implements UiElement {
      * Examples for length:
      * 3: 3-32 XTK nav 3 page
      * 4: 3-31 nav 1 page
+     * 5: 3-22 nearest APT, VOR and NDB pages, with a leading zero
      * 6: 3-8 NAV 2 page
      * @param length
      * @param distance
+     * @param leadingZero 3-42, figure 3-134: the nearest pages pad a distance below 10 NM with a zero (03.1nm) where the
+     * other pages pad it with a blank
      */
-    constructor(public length: number, public distance: NauticalMiles | null = null) {
+    constructor(public length: number, public distance: NauticalMiles | null = null, private readonly leadingZero: boolean = false) {
     }
 
     render(): VNode {
@@ -50,7 +53,7 @@ export class DistanceDisplay implements UiElement {
         if (Math.round(this.distance * 10) / 10 >= cutoff) { //Number is too large for decimals
             return format(this.distance, "00").padStart(this.length, " ");
         } else {
-            return format(this.distance, "0.0").padStart(this.length, " ");
+            return format(this.distance, this.leadingZero ? "00.0" : "0.0").padStart(this.length, " ");
         }
     }
 }

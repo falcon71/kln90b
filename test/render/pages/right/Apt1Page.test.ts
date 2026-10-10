@@ -421,18 +421,18 @@ describe('APT 1 page in the nearest list', () => {
     // Figures 3-71, 3-76, 3-134 and 3-154 show a nearest distance below 10 NM with a leading zero (04.1nm, 03.1nm,
     // 06.5nm). KAAA 0.068 degrees north is 4.1 NM away. (The KLN 89 trainer shows 4.0nm without the zero; the
     // maintainer ruled for the 90B figures.)
-    it.fails('shows a distance below 10 NM with a leading zero (3-22, #266)', async () => {
+    it('shows a distance below 10 NM with a leading zero (3-22, #266)', async () => {
         const unit = await bootNearest(47.068);
 
         expect(Screen.read().rows('R')[5]).toBe('     04.1nm');
     });
 
-    // 3-22, the sibling of the pin: the page shows KAAA in the nearest format at that distance
+    // 3-22, the sibling of the test above: the page shows KAAA in the nearest format at that distance
     it('shows the nearest format 4.1 NM from the airport (3-22)', async () => {
         const unit = await bootNearest(47.068);
 
         expect(Screen.read().rows('R')[0]).toBe(' KAAA  nr 1');
-        expect(Screen.read().rows('R')[5].trim()).toMatch(/^0?4\.1nm$/);
+        expect(Screen.read().rows('R')[5].trim()).toMatch(/^04\.1nm$/);
     });
 });
 

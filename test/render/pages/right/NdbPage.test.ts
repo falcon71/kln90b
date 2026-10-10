@@ -156,15 +156,14 @@ describe('NDB page nearest view (3-22, 3-50)', () => {
 
     // Figure 3-154 shows an NDB 6.5 NM away as 06.5nm, and the nearest airport figures agree (04.1nm on 3-22 and 3-24,
     // 03.1nm on 3-42); the KLN 89 trainer pads with a blank (6.5nm), but its nearest page has another layout, and the
-    // maintainer ruled for the 90B figures. OWI lies 7.3 NM away (haversine), the page shows 7.3nm (DistanceDisplay pads
-    // with a blank)
-    it.fails('shows a distance below 10 NM with a leading zero (3-22, figure 3-154, #266)', async () => {
+    // maintainer ruled for the 90B figures. OWI lies 7.3 NM away (haversine)
+    it('shows a distance below 10 NM with a leading zero (3-22, figure 3-154, #266)', async () => {
         await nearest(47.1, 8.1);
 
         expect(Screen.read().rows('R')[5].trim()).toBe('07.3nm');
     });
 
-    // Sibling of the pin: the NDB is NR 1 at 7.3 NM
+    // Sibling of the test above: the NDB is NR 1 at 7.3 NM
     it('shows a near NDB as NR 1 at 7.3 NM (3-22)', async () => {
         await nearest(47.1, 8.1);
 
