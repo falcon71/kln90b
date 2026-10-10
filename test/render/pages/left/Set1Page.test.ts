@@ -310,9 +310,9 @@ describe('SET 1 heading with a magnetic variation', () => {
 
     // 3-19: the heading field offers a heading, which the pilot may replace (5-46: the take-home mode flies it), and
     // checked in the KLN 89 trainer, 2026-10-08: the confirmed heading comes back unchanged. Set1Page shows the GPS
-    // track converted to magnetic and hands the shown number back to the GPS as a true track at CONFIRM?
-    // (Set1Page.confirmPosition), so CONFIRM? alone turns the track by the variation: 080 becomes 070
-    it.fails('keeps the offered heading over CONFIRM? (3-19, checked in the KLN 89 trainer, 2026-10-08, #309)',
+    // track converted to magnetic; until #309 it handed the shown number back to the GPS as a true track at CONFIRM?
+    // (Set1Page.confirmPosition), so CONFIRM? alone turned the track by the variation: 080 became 070
+    it('keeps the offered heading over CONFIRM? (3-19, checked in the KLN 89 trainer, 2026-10-08, #309)',
         async () => {
             const unit = await onSet1Moved();
             await unit.panel.cursor('L');
@@ -322,8 +322,8 @@ describe('SET 1 heading with a magnetic variation', () => {
         });
 
     // The same for an entered heading (checked in the KLN 89 trainer, 2026-10-08: the 270 entered there came back as
-    // 270): here 270 comes back as 260
-    it.fails('keeps an entered heading over CONFIRM? (3-19, checked in the KLN 89 trainer, 2026-10-08, #309)',
+    // 270): until #309 the 270 came back as 260
+    it('keeps an entered heading over CONFIRM? (3-19, checked in the KLN 89 trainer, 2026-10-08, #309)',
         async () => {
             const unit = await onSet1Moved();
             await unit.panel.cursor('L');
@@ -335,7 +335,7 @@ describe('SET 1 heading with a magnetic variation', () => {
             expect(Screen.read().rows('L')[4].slice(7)).toBe('270°');
         });
 
-    // Sibling of the pins: SET 1 offers the magnetic 080 before the cursor goes on, and CONFIRM? turns the cursor off
+    // Sibling of the #309 tests: SET 1 offers the magnetic 080 before the cursor goes on, and CONFIRM? turns the cursor off
     // and SET 1 comes back with a heading row
     it('comes back with the cursor off after CONFIRM? (characterization)', async () => {
         const unit = await onSet1Moved();
