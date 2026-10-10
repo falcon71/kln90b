@@ -1,20 +1,17 @@
 import {describe, expect, it} from 'vitest';
-import {GeoPoint, UnitType} from '@microsoft/msfs-sdk';
 import {Flight, minutes, nmBefore} from '../../harness/flight/Flight';
 import {World} from '../../harness/flight/World';
-import {airport, vor} from '../../harness/navdata/builders';
+import {standardRoute} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
-import {angleDiff, courseDeg, distanceNm, finalCourseDeg} from '../../harness/flight/geo';
+import {angleDiff, courseDeg, distanceNm, finalCourseDeg, pointFrom} from '../../harness/flight/geo';
 
 describe('jump', () => {
     it('moves to a point before the active waypoint and refuses to cross it', async () => {
-        const kaaa = airport('KAAA', 47.0, 8.0);
-        const abc = vor('ABC', 47.5, 8.9);
-        const kbbb = airport('KBBB', 48.2, 9.2);
+        const {kaaa, abc, kbbb} = standardRoute();
         const world = new World().add(kaaa, abc, kbbb);
         // 2 NM past KAAA on the first leg, so the closest leg (ActiveWaypoint.activateFpl0) is KAAA → ABC
         const leg1 = courseDeg(kaaa, abc);
-        const start = new GeoPoint(kaaa.lat, kaaa.lon).offset(leg1, UnitType.NMILE.convertTo(2, UnitType.GA_RADIAN));
+        const start = pointFrom(kaaa, leg1, 2);
         const flight = await Flight.start({
             world, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
             aircraft: {lat: start.lat, lon: start.lon, altitudeFt: 3000, groundspeedKt: 120, trackTrue: leg1},

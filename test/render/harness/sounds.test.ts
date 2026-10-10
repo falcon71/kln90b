@@ -1,9 +1,9 @@
 import {describe, expect, it} from 'vitest';
 import {bootToSelfTest} from '../../harness/boot';
 import {recordSounds} from '../../harness/sounds';
+import {ALTITUDE_ALERT, panelXml} from '../../harness/panelXml';
 
-const ALERT_ON_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Output>'
-    + '<AltitudeAlertEnabled>true</AltitudeAlertEnabled></Output></Instrument></PlaneHTMLConfig>';
+const ALERT_ON_XML = panelXml(ALTITUDE_ALERT(true));
 
 describe('recordSounds', () => {
     // 3-7 step 11: ENT on APPROVE? sounds five short tones, one after the other

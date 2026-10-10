@@ -1,8 +1,8 @@
 import {describe, expect, it} from 'vitest';
 import {bootUnit} from '../../harness/boot';
+import {fuelComputer, panelXml} from '../../harness/panelXml';
 
-const FUEL_COMPUTER_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><FuelComputer><IsInterfaced>true</IsInterfaced>'
-    + '</FuelComputer></Input></Instrument></PlaneHTMLConfig>';
+const FUEL_COMPUTER_XML = panelXml(fuelComputer());
 
 describe('bootUnit simVars (harness)', () => {
     // The fuel computer reads NUMBER OF ENGINES once, in its constructor (Sensors.ts), so only a value set before

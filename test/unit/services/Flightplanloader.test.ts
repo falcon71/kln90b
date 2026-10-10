@@ -7,6 +7,7 @@ import {Flightplan} from '../../../kln90b/data/flightplan/Flightplan';
 import {Flightplanloader} from '../../../kln90b/services/Flightplanloader';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
 import {vor} from '../../harness/navdata/builders';
+import {identsOf} from '../../harness/readers';
 
 // Appendix B (B-4: WAYPOINT ______ DELETED; B-3: OTHER WAYPOINTS DELETED when that message would be effective for more
 // than ten waypoints). The flight plans of the unit are cut at 30 legs (4-1), and the legs that no longer exist in
@@ -30,7 +31,6 @@ class TestLoader extends Flightplanloader {
 const known = (i: number) => ICAO.value('V', 'K1', '', `K${String(i).padStart(2, '0')}`);
 const gone = (i: number) => ICAO.value('V', 'K1', '', `GONE${i}`);
 const messagesOf = (mh: MessageHandler) => mh.getMessages().map(m => m.message.join('|'));
-const identsOf = (fpl: Flightplan) => fpl.getLegs().map(l => l.wpt.icaoStruct.ident);
 
 async function load(icaos: IcaoValue[]) {
     const mh = new MessageHandler();
@@ -52,7 +52,7 @@ describe('Flightplanloader.loadIcaos', () => {
     it('drops a missing waypoint, keeps the order of the others and reports it (B-4)', async () => {
         const {fpl, messages} = await load([known(0), gone(1), known(2), known(3)]);
 
-        expect(identsOf(fpl)).toEqual(['K00', 'K02', 'K03']);
+        expect(identsOf(fpl.getLegs())).toEqual(['K00', 'K02', 'K03']);
         expect(messages).toEqual(['WAYPOINT GONE1 DELETED']);
     });
 
@@ -60,7 +60,7 @@ describe('Flightplanloader.loadIcaos', () => {
     it('names ten deleted waypoints one by one', async () => {
         const {fpl, messages} = await load([known(0), ...Array.from({length: 10}, (_, i) => gone(i))]);
 
-        expect(identsOf(fpl)).toEqual(['K00']);
+        expect(identsOf(fpl.getLegs())).toEqual(['K00']);
         expect(messages).toEqual(Array.from({length: 10}, (_, i) => `WAYPOINT GONE${i} DELETED`));
     });
 
@@ -68,7 +68,7 @@ describe('Flightplanloader.loadIcaos', () => {
     it('adds OTHER WAYPOINTS DELETED for the eleventh deleted waypoint', async () => {
         const {fpl, messages} = await load([known(0), ...Array.from({length: 11}, (_, i) => gone(i))]);
 
-        expect(identsOf(fpl)).toEqual(['K00']);
+        expect(identsOf(fpl.getLegs())).toEqual(['K00']);
         expect(messages).toContain('OTHER WAYPOINTS DELETED');
         expect(messages.filter(m => m.startsWith('WAYPOINT '))).toHaveLength(10);
     });
@@ -86,7 +86,7 @@ describe('Flightplanloader.loadIcaos', () => {
         const icaos = [...Array.from({length: 30}, (_, i) => known(i)), known(30), known(31)];
         const {fpl, messages} = await load(icaos);
 
-        expect(identsOf(fpl)).toEqual(icaos.slice(0, 30).map(i => i.ident));
+        expect(identsOf(fpl.getLegs())).toEqual(icaos.slice(0, 30).map(i => i.ident));
         expect(messages).toEqual(['WAYPOINT K30 DELETED', 'WAYPOINT K31 DELETED']);
     });
 

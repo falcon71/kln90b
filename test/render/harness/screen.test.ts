@@ -162,12 +162,7 @@ describe('Screen, pages with their own layout', () => {
     // the page holds only the one the test posts
     it('reads the lines of the MSG page', async () => {
         const unit = await bootUnit();
-        await unit.panel.msg();
-        for (let i = 0; i < 10 && Screen.read().status().left === ''; i++) {
-            await unit.panel.msg();
-        }
-        expect(Screen.read().status().left).not.toBe(''); // The precondition: the page closed
-        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.readMessages();
         unit.props.messageHandler.addMessage(new OneTimeMessage(['SAMPLE MESSAGE', 'SECOND LINE']));
         await unit.panel.msg();
 

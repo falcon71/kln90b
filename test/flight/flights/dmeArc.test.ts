@@ -5,6 +5,7 @@ import {World} from '../../harness/flight/World';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
+import {fplIdents} from '../../harness/readers';
 import {angleBetween, angleDiff, courseDeg, crossTrackNm, distanceNm, EARTH_RADIUS_NM, pointFrom} from '../../harness/flight/geo';
 
 const RNAV = ApproachType.APPROACH_TYPE_RNAV;
@@ -57,8 +58,6 @@ async function loadedOnArc(turn: LegTurnDirection, radial: number, o: { radiusNm
     return {flight, ...w};
 }
 
-const legIdents = (flight: Flight) => flight.unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident);
-
 describe('DME arc flown', () => {
     // Spec: Pilot's Guide 6-16 to 6-18 (a DME arc is flown around its VOR in the direction of the procedure, from the
     // entry to the end fix). 15d9b35 reverses the SDK circle for right-hand arcs: an SDK GeoCircle runs
@@ -70,7 +69,7 @@ describe('DME arc flown', () => {
     ] as const)('flies a %s arc in its direction at 10 NM from the VOR to its end fix (#18)', async (_name, turn, radial, sign, entry) => {
         const {flight, abc} = await loadedOnArc(turn, radial);
         // Precondition: the unit converted the arc to its entry waypoint and made the arc's end fix active
-        expect(legIdents(flight)).toEqual([entry, 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(flight.unit)).toEqual([entry, 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
         expect(flight.nav.activeIdent).toBe('ARCEN');
 
         const loadedAt = flight.t;

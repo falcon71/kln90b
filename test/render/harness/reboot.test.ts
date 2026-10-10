@@ -1,9 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
-import {Facility, FlightPlanner, FlightPlannerOptions, ICAO} from '@microsoft/msfs-sdk';
+import {FlightPlanner, FlightPlannerOptions, ICAO} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit} from '../../harness/boot';
 import {simEnv} from '../../harness/sim/install';
 import {airport, intersection} from '../../harness/navdata/builders';
-import {savedFlightplan} from '../../harness/storage';
+import {savedFlightplan, savedUserWaypoints} from '../../harness/storage';
+import {fplIdents, userWaypoints} from '../../harness/readers';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
 const kbbb = airport('KBBB', 47.4, 8.0);
@@ -19,7 +20,10 @@ describe('one unit per test (harness)', () => {
     it('boots a unit with user data, remarks and a flight plan', async () => {
         first = await bootUnit({
             facilities: [kaaa, kbbb], position: {lat: 47.2, lon: 8.0}, magvar: 5,
-            storage: {...savedFlightplan(0, [kaaa, usra]), wpt0: 'WXX        USRA    +4730.00+00815.50'},
+            storage: {
+                ...savedFlightplan(0, [kaaa, usra]),
+                ...savedUserWaypoints([{kind: 'int', ident: 'USRA', lat: usra.lat, lon: usra.lon}]),
+            },
         });
         // Nothing in the instrument calls Coherent yet, so the test makes the call a reset has to clear
         first.env.coherent.replies.set('REBOOT_TEST_PING', () => 'pong');
@@ -31,7 +35,7 @@ describe('one unit per test (harness)', () => {
         expect(first.env.xhr.requests.map(u => u.slice(u.lastIndexOf('/') + 1))).toEqual(['gps_ephemeris.json', 'msa.json', 'gps_sbas.json']);
 
         expect(first.props.facilityRepository.get(ICAO.value('W', 'XX', '', 'USRA'))!.icaoStruct.ident).toBe('USRA');
-        expect(first.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'USRA']);
+        expect(fplIdents(first)).toEqual(['KAAA', 'USRA']);
         expect(first.props.remarksManager.getAirportsWithRemarks()).toEqual(['KAAA']);
     });
 
@@ -55,9 +59,7 @@ describe('one unit per test (harness)', () => {
         await vi.advanceTimersByTimeAsync(5_000);
 
         expect(oldTick).not.toHaveBeenCalled();
-        const userWaypoints: Facility[] = [];
-        second.props.facilityRepository.forEach(f => userWaypoints.push(f));
-        expect(userWaypoints).toEqual([]);
+        expect(userWaypoints(second)).toEqual([]);
         expect(second.props.facilityRepository).not.toBe(first.props.facilityRepository);
         expect(second.props.memory.fplPage.flightplans[0].getLegs()).toEqual([]);
         expect(second.props.remarksManager.getAirportsWithRemarks()).toEqual([]);

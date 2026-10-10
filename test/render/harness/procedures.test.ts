@@ -6,12 +6,13 @@ import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, sid, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
 import {courseDeg, distanceNm, pointFrom} from '../../harness/flight/geo';
+import {fplIdents, identsOf} from '../../harness/readers';
 import {KLNFixType, KLNLegType} from '../../../kln90b/data/flightplan/Flightplan';
 
 const RNAV = ApproachType.APPROACH_TYPE_RNAV;
 
 const fpl0 = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs();
-const idents = (unit: HeadlessUnit, type: KLNLegType) => fpl0(unit).filter(l => l.type === type).map(l => l.wpt.icaoStruct.ident);
+const idents = (unit: HeadlessUnit, type: KLNLegType) => identsOf(fpl0(unit).filter(l => l.type === type));
 const rows = (side: 'L' | 'R') => Screen.read().half(side).split('\n').map(r => r.trimEnd());
 
 /** Procedure fixes at invented positions near 47/8 */
@@ -57,7 +58,7 @@ describe('procedures through APT 8 (harness)', () => {
             ['IAFAA', KLNFixType.IAF], ['IFAAA', undefined], ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP], ['MAHAA', KLNFixType.MAHP],
         ]);
         // The CA leg and the repeated fixes are gone: each fix appears once
-        expect(fpl0(unit).map(l => l.wpt.icaoStruct.ident).sort()).toEqual(['FAFAA', 'IAFAA', 'IFAAA', 'KPRC', 'MAHAA', 'MAPAA']);
+        expect(fplIdents(unit).sort()).toEqual(['FAFAA', 'IAFAA', 'IFAAA', 'KPRC', 'MAHAA', 'MAPAA']);
         // The load switched the left side to FPL 0. The page scrolls to the active leg (the MAP, where the unit sits) at
         // the next calculation tick, which comes within one second; the screen right after ENT can still show the top
         await vi.advanceTimersByTimeAsync(1000);
@@ -112,7 +113,7 @@ describe('procedures through APT 8 (harness)', () => {
         await unit.panel.ent();
 
         const legs = fpl0(unit).filter(l => l.type === KLNLegType.APP);
-        expect(legs.map(l => l.wpt.icaoStruct.ident)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA']);
+        expect(identsOf(legs)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA']);
         const [entry, end] = legs;
         expect(entry.fixType).toBe(KLNFixType.IAF);
         expect(entry.arcData).toBeDefined();
@@ -152,7 +153,7 @@ describe('procedures through APT 8 (harness)', () => {
         await unit.panel.ent();
 
         const legs = fpl0(unit).filter(l => l.type === KLNLegType.APP);
-        expect(legs.map(l => l.wpt.icaoStruct.ident)).toEqual(['D270J', 'ARCEN', 'FAFAA', 'MAPAA']);
+        expect(identsOf(legs)).toEqual(['D270J', 'ARCEN', 'FAFAA', 'MAPAA']);
         expect(courseDeg(abc, legs[0].wpt)).toBeCloseTo(270, 1);
     });
 });
@@ -205,7 +206,7 @@ describe('procedures through APT 7 (harness)', () => {
         expect(rows('R').slice(0, 3)).toEqual(['DEP1-SID', ' 1 DEPAA', ' 2 ENRAA']);
         await unit.panel.ent(); // LOAD IN FPL; KPRC is in FPL 0 already
 
-        expect(fpl0(unit).map(l => l.wpt.icaoStruct.ident)).toEqual(['KPRC', 'DEPAA', 'ENRAA']);
+        expect(fplIdents(unit)).toEqual(['KPRC', 'DEPAA', 'ENRAA']);
         expect(idents(unit, KLNLegType.SID)).toEqual(['DEPAA', 'ENRAA']);
     });
 });

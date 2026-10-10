@@ -4,6 +4,7 @@ import {World} from '../../harness/flight/World';
 import {airport, vor} from '../../harness/navdata/builders';
 import {savedFlightplan} from '../../harness/storage';
 import {angleBetween, courseDeg, finalCourseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
+import {turnStackLength} from '../../harness/readers';
 
 describe('a turn close to 180° at a waypoint (#76)', () => {
     // Spec: the KLN 89 trainer takes the next leg at once when the turn anticipation distance exceeds the distance to
@@ -31,9 +32,7 @@ describe('a turn close to 180° at a waypoint (#76)', () => {
         for (let s = 0; s < 60; s++) {
             await flight.fly(1);
             const n = flight.nav;
-            // ActiveWaypoint replaces its turnStack array when it sequences, so read the field fresh each time
-            const turnStackLength = flight.unit.props.memory.navPage.activeWaypoint.turnStack.length;
-            samples.push({ident: n.activeIdent, dtk: n.dtkTrue, toFrom: n.toFrom, xtk: n.xtkNm, turnStackLength});
+            samples.push({ident: n.activeIdent, dtk: n.dtkTrue, toFrom: n.toFrom, xtk: n.xtkNm, turnStackLength: turnStackLength(flight.unit)});
         }
 
         // The unit sequences on the first calculation ticks, so from the sixth sample on KBBB is active, flying TO it

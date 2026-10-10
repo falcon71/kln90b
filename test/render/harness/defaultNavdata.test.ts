@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {Facility} from '@microsoft/msfs-sdk';
-import {bootUnit} from '../../harness/boot';
+import {bootUnit, NEAREST_SEARCH_WAIT_MS} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
 import {defaultNavdata} from '../../harness/fixtures';
@@ -74,7 +74,7 @@ describe('default navdata (harness)', () => {
 
         it.each([['airport', 'aptNearestList', 'KAAA'], ['VOR', 'vorNearestList', 'ABC'], ['NDB', 'ndbNearestList', 'NDA']] as const)('the nearest %s list of a test world holds only the test facility', async (_type, list, ident) => {
             const unit = await bootUnit({facilities: [airport('KAAA', 47.0, 8.0), vor('ABC', 47.0, 8.0), ndb('NDA', 47.0, 8.0)]});
-            await vi.advanceTimersByTimeAsync(12000);
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
             expect(unit.props.nearestLists[list].getNearestList().map(w => w.facility.icaoStruct.ident)).toEqual([ident]);
         });
     });
