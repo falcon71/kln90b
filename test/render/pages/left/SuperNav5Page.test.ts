@@ -14,6 +14,7 @@ import {standardRoute} from '../../../harness/fixtures';
 import {courseDeg, pointFrom} from '../../../harness/flight/geo';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {SuperNav5Page} from '../../../../kln90b/pages/left/SuperNav5Page';
+import {KLNFixType} from '../../../../kln90b/data/flightplan/Flightplan';
 
 const HEADING_INPUT_XML = panelXml(HEADING_INPUT);
 
@@ -483,10 +484,11 @@ describe('Super NAV 5 AUTO scale', () => {
 describe('Super NAV 5 near the MAP', () => {
     /**
      * RNAV 18 to KPRC: FAFAA 5 NM north of MAPAA, MAPAA on the airport, the missed approach to MAHAA 5 NM east of MAPAA.
-     * FPL 0 is ENRAA, KPRC with the approach loaded; the aircraft is 0.3 NM before the MAP on the final course and
-     * MAPAA is active. (The world of onFinal in NavCalculator.test.ts.)
+     * FPL 0 is ENRAA, KPRC with the approach loaded; the aircraft is northOfMapNm (0.3) NM before the MAP on the final
+     * course and MAPAA is active. Farther out (more than 5 NM) the FAF is active instead; without iafTransition the FAF
+     * is the first leg after ENRAA, so that it is not in the plan twice. (The world of onFinal in NavCalculator.test.ts.)
      */
-    async function nearMap(storage: Record<string, unknown>) {
+    async function nearMap(storage: Record<string, unknown>, northOfMapNm = 0.3, iafTransition = true) {
         const kprc = airport('KPRC', 47.0, 8.0);
         const mapaa = intersection('MAPAA', 47.0, 8.0);
         const fafPos = pointFrom(mapaa, 0, 5);
@@ -498,23 +500,23 @@ describe('Super NAV 5 near the MAP', () => {
         const apt = withProcedures(kprc, {
             approaches: [approach({
                 type: ApproachType.APPROACH_TYPE_RNAV, runway: '18',
-                transitions: [{name: 'FAFAA', legs: [Leg.IF(fafaa, FixTypeFlags.IAF)]}],
+                transitions: iafTransition ? [{name: 'FAFAA', legs: [Leg.IF(fafaa, FixTypeFlags.IAF)]}] : [],
                 final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
                 missed: [Leg.TF(mahaa, FixTypeFlags.MAHP)],
             })],
         });
         const unit = await bootUnit({
-            facilities: [apt, enraa, fafaa, mapaa, mahaa], position: pointFrom(mapaa, 0, 2),
+            facilities: [apt, enraa, fafaa, mapaa, mahaa], position: pointFrom(mapaa, 0, Math.max(northOfMapNm, 2)), // the leg the position is on becomes active
             storage: {...savedFlightplan(0, [enraa, apt]), ...storage},
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
-        await moveAircraft(unit, pointFrom(mapaa, 0, 0.3), {groundspeedKt: 120, trackTrue: 180});
+        await moveAircraft(unit, pointFrom(mapaa, 0, northOfMapNm), {groundspeedKt: 120, trackTrue: 180});
         await showSuperNav5(unit);
         return {unit};
     }
 
-    // The sibling of the pin below: AUTO is selected, MAPAA is active 0.3 NM ahead and the missed approach fix MAHAA
+    // The sibling of the tests below: AUTO is selected, MAPAA is active 0.3 NM ahead and the missed approach fix MAHAA
     // follows it
     it('flies to the MAP with the missed approach after it (6-9)', async () => {
         const {unit} = await nearMap({superNav5MapRange: 0});
@@ -528,12 +530,24 @@ describe('Super NAV 5 near the MAP', () => {
     });
 
     // 6-9 (figure 6-16): 0.3 NM before the MAP the map shows the 1 NM scale, which is where the airport diagram is drawn.
-    // AUTO takes the waypoint after the active one into account even when that is the missed approach.
-    it.fails('takes the 1 NM scale 0.3 NM before the MAP (6-9, figure 6-16, #235)', async () => {
+    // AUTO leaves the waypoint after the MAP, the first of the missed approach, out of the scale.
+    it('takes the 1 NM scale 0.3 NM before the MAP (6-9, figure 6-16, #235)', async () => {
         const {unit} = await nearMap({superNav5MapRange: 0});
         expect(activeIdent(unit)).toBe('MAPAA');
 
         expect(SuperNav5.read().range.trim()).toBe('1');
+    });
+
+    // 3-36: only the MAP leaves the next waypoint out. With the FAF active, 3 NM ahead, the MAP follows it, 8 NM from
+    // the aircraft, and AUTO takes the smallest scale that shows both: 10
+    it('takes the waypoint after the FAF into account in AUTO (3-36, sibling of #235)', async () => {
+        const {unit} = await nearMap({superNav5MapRange: 0}, 8, false);
+        expect(activeIdent(unit)).toBe('FAFAA');
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveLeg()!.fixType).toBe(KLNFixType.FAF);
+        expect(unit.props.memory.navPage.activeWaypoint.getFollowingLeg()!.wpt.icaoStruct.ident).toBe('MAPAA');
+        expect(SuperNav5.read().left[0]).toBe(' 3.0 È');
+
+        expect(SuperNav5.read().range.trim()).toBe('10');
     });
 });
 
