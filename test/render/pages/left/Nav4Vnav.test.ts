@@ -4,6 +4,7 @@ import {airport} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
+import {messages} from '../../../harness/readers';
 
 // 5-7 to 5-9: advisory VNAV on NAV 4, set up after the Pilot's Guide example (figures 5-21 to 5-28): 64.8 NM to the
 // destination at 7500 ft, SEL 1900 ft and an offset of 2 NM, so the VNAV target is 62.8 NM away and 5600 ft below.
@@ -35,13 +36,6 @@ async function bootAt(nm: number, opts: { angle?: number | null } = {}): Promise
     return unit;
 }
 
-/** NAV 4 on the left, one second for the page to show the latest calculation */
-async function showNav4(unit: HeadlessUnit): Promise<string[]> {
-    await unit.panel.selectPage('L', 'NAV 4');
-    await vi.advanceTimersByTimeAsync(1000);
-    return Screen.read().rows('L');
-}
-
 /** Left cursor on, outer knob to the first ANGLE digit (six steps from SEL, see the field order of Nav4Page) */
 async function cursorToAngle(unit: HeadlessUnit): Promise<void> {
     await unit.panel.cursor('L');
@@ -50,15 +44,13 @@ async function cursorToAngle(unit: HeadlessUnit): Promise<void> {
     await vi.advanceTimersByTimeAsync(1000);
 }
 
-const messages = (unit: HeadlessUnit) => unit.props.messageHandler.getMessages().map(m => m.message.join(' '));
-
 describe('NAV 4 VNAV', () => {
     // 5-7, 5-8 (figures 5-22 to 5-25): before VNAV is started the page shows VNV INACTV, IND, SEL, the active
     // waypoint with the offset, and the angle that would reach SEL at the offset point
     it('shows VNV INACTV and the angle to the target (5-7, 5-8)', async () => {
         const unit = await bootAt(64.8);
 
-        expect(await showNav4(unit)).toEqual([
+        expect(await unit.panel.show('L', 'NAV 4')).toEqual([
             'VNV INACTV ',
             '           ',
             'IND 07500ft',
@@ -72,7 +64,7 @@ describe('NAV 4 VNAV', () => {
     // advisory altitude, which at the start is the present altitude
     it('starts VNAV at the displayed angle when the cursor is over ANGLE (5-8)', async () => {
         const unit = await bootAt(64.8);
-        await showNav4(unit);
+        await unit.panel.show('L', 'NAV 4');
 
         await cursorToAngle(unit);
 
@@ -85,7 +77,7 @@ describe('NAV 4 VNAV', () => {
         const unit = await bootAt(64.8, {angle: -1.8});
         unit.props.vnav.armVnav();
 
-        expect((await showNav4(unit))[0]).toBe('VNV ARMED  ');
+        expect((await unit.panel.show('L', 'NAV 4'))[0]).toBe('VNV ARMED  ');
     });
 
     // 5-8: less than ten minutes before the start the top line counts down. 40 NM west of KDDD the target is 38 NM
@@ -94,7 +86,7 @@ describe('NAV 4 VNAV', () => {
         const unit = await bootAt(40, {angle: -1.8});
         unit.props.vnav.armVnav();
 
-        expect((await showNav4(unit))[0]).toBe('VNV IN 3:35');
+        expect((await unit.panel.show('L', 'NAV 4'))[0]).toBe('VNV IN 3:35');
     });
 
     // 5-8: the boundary lies at ten minutes. 56.3 NM west the start is 56.3 - 2 - 29.33 = 24.97 NM ahead, 620 s at 145 kt:
@@ -103,7 +95,7 @@ describe('NAV 4 VNAV', () => {
         const unit = await bootAt(56.3, {angle: -1.8});
         unit.props.vnav.armVnav();
 
-        const title = (await showNav4(unit))[0];
+        const title = (await unit.panel.show('L', 'NAV 4'))[0];
         expect(unit.props.vnav.timeToVnav).toBeCloseTo(620, -1);
         expect(title).toBe('VNV ARMED  ');
     });
@@ -113,7 +105,7 @@ describe('NAV 4 VNAV', () => {
         const unit = await bootAt(54.7, {angle: -1.8});
         unit.props.vnav.armVnav();
 
-        const title = (await showNav4(unit))[0];
+        const title = (await unit.panel.show('L', 'NAV 4'))[0];
         expect(unit.props.vnav.timeToVnav).toBeCloseTo(580, -1);
         expect(title).toBe('VNV IN 9:40');
     });
@@ -124,7 +116,7 @@ describe('NAV 4 VNAV', () => {
         const unit = await bootAt(31, {angle: -1.8});
         unit.props.vnav.armVnav();
 
-        expect((await showNav4(unit))[0]).toBe('VNV 7400ft ');
+        expect((await unit.panel.show('L', 'NAV 4'))[0]).toBe('VNV 7400ft ');
     });
 
     // 5-8 step 6, B-4: about 90 s before the descent the message prompt flashes and the MSG page holds VNV ALERT.
@@ -172,7 +164,7 @@ describe('NAV 4 VNAV', () => {
     it('posts no VNV ALERT while NAV 4 is in view (B-4)', async () => {
         const unit = await bootAt(33.75, {angle: -1.8});
         unit.props.vnav.armVnav();
-        await showNav4(unit);
+        await unit.panel.show('L', 'NAV 4');
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(unit.props.vnav.timeToVnav).toBeLessThan(90);

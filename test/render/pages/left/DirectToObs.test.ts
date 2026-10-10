@@ -2,6 +2,9 @@ import {describe, expect, it, vi} from 'vitest';
 import {Facility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {standardRoute} from '../../../harness/fixtures';
+import {NO_OBS, panelXml} from '../../../harness/panelXml';
+import {activeIdent, fplIdents} from '../../../harness/readers';
+import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
@@ -9,8 +12,6 @@ import {courseDeg, crossTrackNm, pointBefore, pointFrom} from '../../../harness/
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
 const {kaaa, abc, kbbb} = standardRoute();
-const panelXml = (input: string, output = '') =>
-    `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input>${input}</Input><Output>${output}</Output></Instrument></PlaneHTMLConfig>`;
 
 /** Plan KAAA, ABC, KBBB, ABC active, OBS mode; with `obs` the external indicator is on that course */
 async function planInObs(position: { lat: number; lon: number }, o: { obs?: number, panelXml?: string, abc?: Facility } = {}): Promise<HeadlessUnit> {
@@ -41,14 +42,14 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
     // so that the course is the unit's own and an external indicator cannot set it back
     it('makes the waypoint active and keeps the OBS course', async () => {
         const position = pointBefore(kaaa, abc, 5);
-        const unit = await planInObs(position, {panelXml: panelXml('<ObsSource>0</ObsSource>')});
+        const unit = await planInObs(position, {panelXml: panelXml(NO_OBS)});
         const nav = unit.props.memory.navPage;
         const obsBefore = nav.obsMag; // The DTK of the leg to ABC, about 051
         expect(Math.abs(obsBefore - courseDeg(position, kbbb))).toBeGreaterThan(5); // So a direct course to KBBB cannot match
 
         await directToKbbbFromFpl0(unit, true);
 
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
         expect(nav.obsMag).toBe(obsBefore);
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
     });
@@ -67,9 +68,9 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
     // 5-37 (5.9.7) step 2: the sibling of the pin below. The same flow makes KBBB active and keeps the mode, so the pin
     // fails only on the deviation
     it('the pin setup: ACTIVATE with OBS 050 makes KBBB active and keeps ENR-OBS (the setup of #154)', async () => {
-        const {nav} = await activateKbbbOnCourse50();
+        const {unit, nav} = await activateKbbbOnCourse50();
 
-        expect(nav.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
         expect(nav.obsMag).toBe(50);
     });
@@ -94,7 +95,7 @@ describe('Direct To in OBS mode (5-37)', () => {
     // 5-37 (5.9.6): the direct-to selects the OBS that leads from the present position to the waypoint when the unit
     // is not the displayed source (ObsSource 0: the unit cannot read the indicator)
     it('sets the OBS to the course from the present position and centers the deviation', async () => {
-        const unit = await planInObs(offLeg, {panelXml: panelXml('<ObsSource>0</ObsSource>'), abc: abcE});
+        const unit = await planInObs(offLeg, {panelXml: panelXml(NO_OBS), abc: abcE});
         const nav = unit.props.memory.navPage;
         await unit.panel.selectPage('R', 'CTR 1'); // So DCT pre-fills the active waypoint (3-27 rule 4)
 
@@ -121,7 +122,7 @@ describe('Direct To in OBS mode (5-37)', () => {
 
     // 5-37 (5.9.6): a driven indicator (ObsTarget 1, VOR 1) is slewed to the direct course, with no message
     it('slews a driven indicator to the direct course without a CRS message', async () => {
-        const unit = await planInObs(offLeg, {panelXml: panelXml('<ObsSource>0</ObsSource>', '<ObsTarget>1</ObsTarget>'), abc: abcE});
+        const unit = await planInObs(offLeg, {panelXml: panelXml({...NO_OBS, 'Output.ObsTarget': 1}), abc: abcE});
         await unit.panel.selectPage('R', 'CTR 1');
 
         await unit.panel.dct();
@@ -137,10 +138,7 @@ describe('Direct To in OBS mode (5-37)', () => {
 describe('the left side after a direct-to from FPL 0 (#82)', () => {
     /** FPL 0 KAAA, ABC, KBBB; the cursor on ABC, DCT, and the ENT that approves the waypoint page: the direct-to is made */
     async function directToAbcFromFpl0() {
-        const unit = await bootUnit({
-            facilities: [kaaa, abc, kbbb], position: pointBefore(kaaa, abc, 20), storage: savedFlightplan(0, [kaaa, abc, kbbb]),
-        });
-        await settle(unit);
+        const unit = await bootOnStandardRoute({position: pointBefore(kaaa, abc, 20)});
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
         await unit.panel.outer('L', 1); // ABC
@@ -157,8 +155,8 @@ describe('the left side after a direct-to from FPL 0 (#82)', () => {
 
         const aw = unit.props.memory.navPage.activeWaypoint;
         expect(aw.isDctNavigation()).toBe(true);
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
-        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['KAAA', 'ABC', 'KBBB']);
+        expect(activeIdent(unit)).toBe('ABC');
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'ABC', 'KBBB']);
         expect(planRows()).toEqual(['1:KAAA', '2:ABC ', '3:KBBB']);
     });
 

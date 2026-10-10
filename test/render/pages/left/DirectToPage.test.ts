@@ -1,12 +1,12 @@
 import {describe, expect, it, vi} from 'vitest';
 import {FixTypeFlags} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
-import {MainPage} from '../../../../kln90b/pages/MainPage';
 import {SuperNav1Page} from '../../../../kln90b/pages/left/SuperNav1Page';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
+import {activeIdent} from '../../../harness/readers';
 import {pointFrom} from '../../../harness/flight/geo';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
@@ -33,7 +33,7 @@ describe('Direct To page', () => {
         expect(unit.errors).toEqual([]);
         expect(aw.getActiveFplIdx()).toBe(3);
         expect(aw.isDctNavigation()).toBe(true);
-        expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         const screen = Screen.read();
         // The left cursor is deliberately not asserted: figure 4-42 (4-11) shows it off after the approval, and the unit
         // leaves it on (#82, pinned in DirectToObs.test.ts)
@@ -119,7 +119,7 @@ describe('Direct To page', () => {
             facilities: [kaaa, abc, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
         });
         await settle(unit);
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         return unit;
     }
 
@@ -167,7 +167,7 @@ async function planOnFirstLeg(left: string, right: string) {
     await settle(unit);
     await unit.panel.selectPage('L', left);
     await unit.panel.selectPage('R', right);
-    expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('ABC'); // Precondition
+    expect(activeIdent(unit)).toBe('ABC'); // Precondition
     return unit;
 }
 
@@ -238,7 +238,7 @@ describe('DIRECT TO page (spec)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         const aw = unit.props.memory.navPage.activeWaypoint;
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('KAAA');
+        expect(activeIdent(unit)).toBe('KAAA');
         expect(aw.isDctNavigation()).toBe(true);
         expect(Screen.read().status().left).toBe('NAV 2');
         expect(Screen.read().status().right).toBe('NAV 1');
@@ -253,7 +253,7 @@ describe('DIRECT TO page (spec)', () => {
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('KAAA');
+        expect(activeIdent(unit)).toBe('KAAA');
         expect(Screen.read().status().left).toBe('NAV 1');
         expect(Screen.read().status().right).toBe('APT 1');
     });
@@ -262,14 +262,10 @@ describe('DIRECT TO page (spec)', () => {
     // is on the first leg, so the plan resumes with ABC
     it('cancels a Direct To with D->, CLR, ENT and returns to the flight plan (3-29, 4-7)', async () => {
         const unit = await planOnFirstLeg('NAV 2', 'NAV 1');
-        await unit.panel.dct();
-        await unit.panel.enterIdent('L', 'KBBB');
-        await unit.panel.ent(); // KBBB's waypoint page
-        await unit.panel.ent(); // approved
-        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.directTo('KBBB');
         const aw = unit.props.memory.navPage.activeWaypoint;
         expect(aw.isDctNavigation()).toBe(true); // Precondition: Direct To KBBB
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('KBBB');
+        expect(activeIdent(unit)).toBe('KBBB');
 
         await unit.panel.dct();
         await unit.panel.clr();
@@ -277,7 +273,7 @@ describe('DIRECT TO page (spec)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(aw.isDctNavigation()).toBe(false);
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(aw.getActiveFplIdx()).toBe(1);
         expect(unit.errors).toEqual([]);
     });
@@ -287,8 +283,7 @@ describe('DIRECT TO page (spec)', () => {
 // waypoint when no waypoint page is on the right (rule 4). 3-28 step 7: when D-> was pressed with NAV 1 on the left,
 // the ENT that approves it brings back the pages shown before, here NAV 1 on both sides, which is Super NAV 1 again
 describe('DIRECT TO page from Super NAV 1 (3-27, 3-28, 3-32)', () => {
-    const superNav1Shown = (unit: HeadlessUnit) =>
-        (unit.props.pageManager.getCurrentPage() as MainPage).getOverlayPage() instanceof SuperNav1Page;
+    const superNav1Shown = (unit: HeadlessUnit) => unit.overlay() instanceof SuperNav1Page;
 
     // What the right side shows while the active waypoint awaits its approval is the characterization above
     it('replaces Super NAV 1 with the DIRECT TO page on the left (3-27, 3-32)', async () => {
@@ -369,7 +364,7 @@ describe('DIRECT TO page at the missed approach point (3-27)', () => {
     it('MAPAA active and the aircraft on its FROM side (3-27)', async () => {
         const unit = await pastTheMap();
 
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('MAPAA');
+        expect(activeIdent(unit)).toBe('MAPAA');
         expect(unit.props.memory.navPage.toFrom).toBe(false); // FROM
     });
 
@@ -384,7 +379,7 @@ describe('DIRECT TO page at the missed approach point (3-27)', () => {
     // 3-27 rule 4: the missed approach is offered only after the MAP; before it, the MAP itself is the suggestion
     it('offers MAPAA itself while the aircraft is on its TO side (3-27)', async () => {
         const unit = await beforeTheMap();
-        expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()!.icaoStruct.ident).toBe('MAPAA'); // Precondition
+        expect(activeIdent(unit)).toBe('MAPAA'); // Precondition
         expect(unit.props.memory.navPage.toFrom).toBe(true); // TO
 
         await unit.panel.dct();

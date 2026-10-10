@@ -1,18 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootToSelfTest} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
+import {LEG_OBS_SWITCH, panelXml, VFR_ONLY} from '../../harness/panelXml';
 
 // The OBS warning (ObsWarningPage), shown during the start-up sequence while the external GPS CRS switch is in OBS
 // (3-7). The VFR only page before it is in VFROnlyPage.test.ts, the Database page after it in AiracPage.test.ts.
-
-const VFR_ONLY = '<VFROnly>true</VFROnly>';
-const OBS_SWITCH = '<Input><ExternalSwitches><LegObsSwitchInstalled>true</LegObsSwitchInstalled></ExternalSwitches>'
-    + '</Input>';
-const panelXml = (...parts: string[]) =>
-    `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name>${parts.join('')}</Instrument></PlaneHTMLConfig>`;
-
-/** The six rows of the full-width page, trimmed */
-const pageRows = () => Screen.read().text().split('\n').slice(0, 6).map(r => r.trim());
 
 /**
  * The two texts of the VFR only page with their cells, as VFROnlyPage.test.ts holds them: the title on the second row,
@@ -30,7 +22,7 @@ describe('OBS warning (3-7)', () => {
     it('shows the OBS warning after the VFR only page, then the Database page once the switch is in LEG '
         + '(3-7)', async () => {
         const unit = await bootToSelfTest({
-            panelXml: panelXml(VFR_ONLY, OBS_SWITCH),
+            panelXml: panelXml({...VFR_ONLY, ...LEG_OBS_SWITCH}),
             storage: {lastLatitude: 47, lastLongitude: 8},
         });
         unit.env.sim.set('GPS OBS ACTIVE', 'bool', true);
@@ -45,7 +37,7 @@ describe('OBS warning (3-7)', () => {
 
         unit.env.sim.set('GPS OBS ACTIVE', 'bool', false);
         await vi.advanceTimersByTimeAsync(2000);
-        expect(pageRows()[1]).toBe('DATA BASE EXPIRES');
+        expect(Screen.read().pageRows()[1]).toBe('DATA BASE EXPIRES');
         expect(unit.errors).toEqual([]);
     });
 });

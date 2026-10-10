@@ -1,12 +1,12 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit} from '../../harness/boot';
+import {bootUnit, NEAREST_SEARCH_WAIT_MS} from '../../harness/boot';
 import {vor} from '../../harness/navdata/builders';
 import {Screen} from '../../harness/render/screen';
 
 /** Boots at `position` with the facilities given, then waits for the nearest VOR list (it searches every 10 s) */
 async function nav2At(position: { lat: number, lon: number }, facilities: ReturnType<typeof vor>[] = [], magvar = 0) {
     const unit = await bootUnit({facilities, position, magvar});
-    await vi.advanceTimersByTimeAsync(12_000);
+    await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
     return unit;
 }
 
@@ -14,7 +14,7 @@ describe('NAV 2 page (characterization)', () => {
     it('shows radial and distance from the nearest VOR and the present position', async () => {
         await bootUnit({facilities: [vor('ABC', 47.2, 8.0, {magneticVariation: 0})], position: {lat: 47.0, lon: 8.0}});
         // The nearest VOR list searches every 10 s (NEAREST_TICK_TIME in NearestList.ts)
-        await vi.advanceTimersByTimeAsync(12_000);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
 
         const screen = Screen.read();
         // Row 5, the longitude, is left out of this test and of the snapshot: it shows a degree below 10 written with a

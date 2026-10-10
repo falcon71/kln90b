@@ -1,13 +1,10 @@
 import {describe, expect, it} from 'vitest';
 import {bootToSelfTest, BootOptions, HeadlessUnit} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
+import {panelXml, VFR_ONLY} from '../../harness/panelXml';
 
 // The VFR only page (VFROnlyPage), shown after the approval of the Self Test page on a unit installed for VFR only
 // (3-7). The OBS warning that can follow it is in ObsWarningPage.test.ts, the Database page in AiracPage.test.ts.
-
-const VFR_ONLY = '<VFROnly>true</VFROnly>';
-const panelXml = (...parts: string[]) =>
-    `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name>${parts.join('')}</Instrument></PlaneHTMLConfig>`;
 
 /** Cold and dark, switched on, through the Turn-On page, then ENT on APPROVE? of the Self Test page */
 async function approveSelfTestPage(opts: BootOptions = {}): Promise<HeadlessUnit> {
@@ -15,17 +12,6 @@ async function approveSelfTestPage(opts: BootOptions = {}): Promise<HeadlessUnit
     await unit.panel.cursorTo('R', 'APPROVE?');
     await unit.panel.ent();
     return unit;
-}
-
-/** The six rows of the full-width page, trimmed */
-const pageRows = () => Screen.read().text().split('\n').slice(0, 6).map(r => r.trim());
-
-/** The characters of a full-width row that are shown inverse: the field under the cursor */
-function inverseText(row: number): string {
-    const s = Screen.read();
-    const text = s.row(row);
-    const mask = s.mask().split('\n')[row];
-    return [...text].filter((_, i) => mask[i] === 'I').join('');
 }
 
 describe('VFR only page (3-7)', () => {
@@ -45,11 +31,11 @@ describe('VFR only page (3-7)', () => {
         const unit = await approveSelfTestPage({panelXml: panelXml(VFR_ONLY)});
 
         expectVfrPage();
-        expect(inverseText(5)).toBe('ACKNOWLEDGE?');
+        expect(Screen.read().inverse(5)).toBe('ACKNOWLEDGE?');
 
         await unit.panel.ent();
 
-        expect(pageRows()[1]).toBe('DATA BASE EXPIRES');
+        expect(Screen.read().pageRows()[1]).toBe('DATA BASE EXPIRES');
         expect(unit.errors).toEqual([]);
     });
 
@@ -58,6 +44,6 @@ describe('VFR only page (3-7)', () => {
     it.fails('shows nothing but FOR VFR USE ONLY and ACKNOWLEDGE? (3-7, #327)', async () => {
         await approveSelfTestPage({panelXml: panelXml(VFR_ONLY)});
 
-        expect(pageRows().filter(r => r !== '')).toEqual(['FOR VFR USE ONLY', 'ACKNOWLEDGE?']);
+        expect(Screen.read().pageRows().filter(r => r !== '')).toEqual(['FOR VFR USE ONLY', 'ACKNOWLEDGE?']);
     });
 });

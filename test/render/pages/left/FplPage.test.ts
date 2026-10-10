@@ -1,7 +1,9 @@
-import {describe, expect, it, onTestFinished, vi} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {Facility, FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
+import {muteConsoleError} from '../../../harness/console';
+import {fplIdents} from '../../../harness/readers';
 import {savedFlightplan, storedSetting} from '../../../harness/storage';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, sid, withProcedures} from '../../../harness/navdata/procedures';
@@ -20,7 +22,6 @@ function route7(): Facility[] {
 // of the active leg symbol, U+00C1 its tail, U+00C2 the shaft drawn on a procedure header between the two, U+203A the
 // arrow of a direct-to target, and U+00E0 U+00E1 U+00E3 U+00E2 the suffixes -i, -f, -m and -h of the approach fixes.
 // A header row is read with its column 0 sliced off: the shaft glyph there is not legible in the guide's figures.
-const idents = (unit: HeadlessUnit, fpl: number) => unit.props.memory.fplPage.flightplans[fpl].getLegs().map(l => l.wpt.icaoStruct.ident);
 const left = () => Screen.read().rows('L');
 
 /** The rows of the left half that carry the cursor: a run of inverted or flashing cells */
@@ -184,7 +185,7 @@ async function bootWithApproach() {
     const unit = await bootUnit({facilities: w.facilities, position: {lat: 47.7, lon: 7.3}, storage: savedFlightplan(0, [w.enraa, w.kprc])});
     await settle(unit);
     await unit.panel.loadProcedure('APT 8');
-    expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']); // Precondition
+    expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']); // Precondition
     return unit;
 }
 
@@ -221,7 +222,7 @@ describe('FPL 0 page with an approach', () => {
         expect(Screen.read().status().mode).toBe('INVALID ADD');
         expect(left()).toEqual(before); // no blank entry opened
         expect(unit.errors).toEqual([]);
-        expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
+        expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
     });
 
     it('answers INVALID DEL to CLR on an approach waypoint and leaves the plan alone (C-1, 6-7)', async () => {
@@ -237,7 +238,7 @@ describe('FPL 0 page with an approach', () => {
         expect(Screen.read().status().mode).toBe('INVALID DEL');
         expect(left()).toEqual(before); // no DEL prompt opened
         expect(unit.errors).toEqual([]);
-        expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
+        expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
     });
 
     // 6-7: approach waypoints can be neither added nor deleted, and C-1 answers INVALID ADD and INVALID DEL where the
@@ -258,14 +259,14 @@ describe('FPL 0 page with an approach', () => {
         const unit = await enterOnApproachWaypoint();
 
         unit.takeRejections(); // the rejection of the ENT, see the pin below
-        expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
+        expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
     });
 
     it.fails('does not throw on ENT on an approach waypoint (6-7, C-1, #243)', async () => {
         const unit = await enterOnApproachWaypoint();
 
         expect(unit.takeRejections()).toEqual([]);
-        expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
+        expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
     });
 });
 
@@ -279,7 +280,7 @@ async function bootWithSid() {
     const unit = await bootUnit({facilities: [kprc, depaa, enraa], position: {lat: 47, lon: 8}, storage: savedFlightplan(0, [kprc])});
     await settle(unit);
     await unit.panel.loadProcedure('APT 7');
-    expect(idents(unit, 0)).toEqual(['KPRC', 'DEPAA', 'ENRAA']); // Precondition
+    expect(fplIdents(unit, 0)).toEqual(['KPRC', 'DEPAA', 'ENRAA']); // Precondition
     return unit;
 }
 
@@ -315,7 +316,7 @@ describe('FPL 0 page, the active leg across a procedure header', () => {
         const aw = unit.props.memory.navPage.activeWaypoint;
         expect(aw.getActiveFplIdx()).toBe(1);
         expect(aw.isDctNavigation()).toBe(false);
-        expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
         expect(Screen.read().status().left).toBe('FPL 0');
         // The active waypoint carries the head of the leg symbol, in whichever row the page puts it
         expect(left().filter(r => r.startsWith('À'))).toEqual(['À 2 IAFAAà ']);
@@ -357,14 +358,14 @@ describe('FPL 1 to FPL 25 pages', () => {
     // 4-4: ENT on USE? activates the plan in its order and shows it as FPL 0 (figure 4-12); the numbered plan stays
     it('activates the plan in its order with USE? and shows FPL 0 (4-4)', async () => {
         const unit = await bootRoute(savedFlightplan(3, route7().slice(0, 4)));
-        expect(idents(unit, 0)).toEqual([]); // Precondition: nothing active
+        expect(fplIdents(unit, 0)).toEqual([]); // Precondition: nothing active
         await unit.panel.selectPage('L', 'FPL 3');
         await unit.panel.cursor('L');
 
         await unit.panel.ent();
 
-        expect(idents(unit, 0)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEFAA']);
-        expect(idents(unit, 3)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEFAA']);
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEFAA']);
+        expect(fplIdents(unit, 3)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEFAA']);
         expect(Screen.read().status().left).toBe('FPL 0');
         expect(left().slice(1, 5).map(r => r.slice(2))).toEqual(['1:KAAA   ', '2:ABC    ', '3:KBBB   ', '4:DEFAA  ']);
     });
@@ -378,8 +379,8 @@ describe('FPL 1 to FPL 25 pages', () => {
 
         await unit.panel.ent();
 
-        expect(idents(unit, 0)).toEqual(['DEFAA', 'KBBB', 'ABC', 'KAAA']);
-        expect(idents(unit, 3)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEFAA']);
+        expect(fplIdents(unit, 0)).toEqual(['DEFAA', 'KBBB', 'ABC', 'KAAA']);
+        expect(fplIdents(unit, 3)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEFAA']);
         expect(Screen.read().status().left).toBe('FPL 0');
     });
 
@@ -396,8 +397,8 @@ describe('FPL 1 to FPL 25 pages', () => {
         await unit.panel.clr();
         await unit.panel.ent();
 
-        expect(idents(unit, 0)).toEqual(['KAAA', 'ABC', 'KBBB']);
-        expect(idents(unit, 3)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEFAA']);
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'ABC', 'KBBB']);
+        expect(fplIdents(unit, 3)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEFAA']);
     });
 
     // 4-2: an empty numbered plan shows LOAD FPL 0? and a blank first waypoint position (figure 4-2), and the cursor
@@ -423,7 +424,7 @@ describe('FPL 1 to FPL 25 pages', () => {
 
         await unit.panel.ent();
 
-        expect(idents(unit, 7)).toEqual(['KAAA', 'ABC', 'KBBB']);
+        expect(fplIdents(unit, 7)).toEqual(['KAAA', 'ABC', 'KBBB']);
         expect(left().slice(0, 4)).toEqual(['USE? INVRT?', '  1:KAAA   ', '  2:ABC    ', '  3:KBBB   ']);
         expect(Screen.read().status().left).toBe('FPL 7');
     });
@@ -439,8 +440,8 @@ describe('FPL 1 to FPL 25 pages', () => {
 
         await unit.panel.ent();
 
-        expect(idents(unit, 7)).toEqual(['ENRAA', 'KPRC']);
-        expect(idents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
+        expect(fplIdents(unit, 7)).toEqual(['ENRAA', 'KPRC']);
+        expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']);
     });
 
     // 6-23: SIDs and STARs, like approaches, exist only in FPL 0, so a stored copy keeps only the en route waypoints
@@ -453,8 +454,8 @@ describe('FPL 1 to FPL 25 pages', () => {
 
         await unit.panel.ent();
 
-        expect(idents(unit, 7)).toEqual(['KPRC']);
-        expect(idents(unit, 0)).toEqual(['KPRC', 'DEPAA', 'ENRAA']);
+        expect(fplIdents(unit, 7)).toEqual(['KPRC']);
+        expect(fplIdents(unit, 0)).toEqual(['KPRC', 'DEPAA', 'ENRAA']);
     });
 
     // 4-5: with the cursor off, CLR asks DELETE FPL? at the top of the page (figure 4-23, the cursor on); ENT clears
@@ -474,7 +475,7 @@ describe('FPL 1 to FPL 25 pages', () => {
         expect(unit.panel.focused('L')).toEqual({row: 0, col: 0, text: 'DELETE FPL?'});
 
         await unit.panel.ent();
-        expect(idents(unit, 3)).toEqual([]);
+        expect(fplIdents(unit, 3)).toEqual([]);
         expect(left().slice(0, 3)).toEqual(['LOAD FPL 0?', '  1:       ', '           ']);
         expect(Screen.read().status().left).toBe('FPL 3');
     });
@@ -501,7 +502,7 @@ describe('FPL 1 to FPL 25 pages', () => {
 
         await unit.panel.clr();
 
-        expect(idents(unit, 3)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEFAA', 'EFGAA', 'KCCC', 'GHIAA']);
+        expect(fplIdents(unit, 3)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEFAA', 'EFGAA', 'KCCC', 'GHIAA']);
         expect(left()[0]).toBe('USE? INVRT?');
         expect(Screen.read().status().left).toBe('FPL 3');
     });
@@ -513,14 +514,14 @@ describe('FPL 1 to FPL 25 pages', () => {
         const unit = await bootRoute(savedFlightplan(3, route7()));
         await unit.panel.selectPage('L', 'FPL 3');
         await unit.panel.cursor('L');
-        await unit.panel.outer('L', 4); // USE? INVRT?, KAAA, ABC, KBBB
+        await unit.panel.cursorTo('L', 'KBBB');
         expect(unit.panel.focused('L').text).toBe('KBBB '); // Precondition
 
         await unit.panel.clr();
         expect(left()[3]).toBe('DEL KBBB  ?');
 
         await unit.panel.ent();
-        expect(idents(unit, 3)).toEqual(['KAAA', 'ABC', 'DEFAA', 'EFGAA', 'KCCC', 'GHIAA']);
+        expect(fplIdents(unit, 3)).toEqual(['KAAA', 'ABC', 'DEFAA', 'EFGAA', 'KCCC', 'GHIAA']);
         expect(left().slice(3, 6)).toEqual(['  3:DEFAA  ', '  4:EFGAA  ', '  6:GHIAA  ']);
     });
 
@@ -529,14 +530,14 @@ describe('FPL 1 to FPL 25 pages', () => {
         const unit = await bootRoute(savedFlightplan(3, route7()));
         await unit.panel.selectPage('L', 'FPL 3');
         await unit.panel.cursor('L');
-        await unit.panel.outer('L', 4);
+        await unit.panel.cursorTo('L', 'KBBB');
         await unit.panel.clr();
         expect(left()[3]).toBe('DEL KBBB  ?'); // Precondition
 
         await unit.panel.clr();
 
         expect(left()[3]).toBe('  3:KBBB   ');
-        expect(idents(unit, 3)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEFAA', 'EFGAA', 'KCCC', 'GHIAA']);
+        expect(fplIdents(unit, 3)).toEqual(['KAAA', 'ABC', 'KBBB', 'DEFAA', 'EFGAA', 'KCCC', 'GHIAA']);
     });
 });
 
@@ -550,8 +551,7 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
      * the test keeps out of its output.
      */
     async function insertIntoFullFpl5() {
-        const quiet = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-        onTestFinished(() => quiet.mockRestore());
+        muteConsoleError();
         const fixes = FIXES31();
         const unit = await bootUnit({facilities: fixes, position: {lat: 46.5, lon: 8}, storage: savedFlightplan(5, fixes.slice(0, 30))});
         await settle(unit);
@@ -598,7 +598,7 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
         const unit = await insertIntoFullFpl5();
 
         expect(Screen.read().status().mode).toBe('FPL FULL');
-        expect(idents(unit, 5)).toEqual(FIXES31().slice(0, 30).map(f => f.icaoStruct.ident));
+        expect(fplIdents(unit, 5)).toEqual(FIXES31().slice(0, 30).map(f => f.icaoStruct.ident));
         expect(unit.errors).toEqual([]);
     });
 

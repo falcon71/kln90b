@@ -16,17 +16,6 @@ async function approveSelfTestPage(opts: BootOptions = {}): Promise<HeadlessUnit
     return unit;
 }
 
-/** The six rows of the full-width page, trimmed */
-const pageRows = () => Screen.read().text().split('\n').slice(0, 6).map(r => r.trim());
-
-/** The characters of a full-width row that are shown inverse: the field under the cursor */
-function inverseText(row: number): string {
-    const s = Screen.read();
-    const text = s.row(row);
-    const mask = s.mask().split('\n')[row];
-    return [...text].filter((_, i) => mask[i] === 'I').join('');
-}
-
 describe('Database page (3-7)', () => {
     // 3-7 step 12, figure 3-24: line 2 says the data base expires, line 3 gives the date, and the cursor is on
     // ACKNOWLEDGE?. The status line shows the mode, a flashing ENT and CRSR on the right (figure 3-24; 3-10 for ENT).
@@ -34,11 +23,11 @@ describe('Database page (3-7)', () => {
     it('shows the expiry of a current data base with the cursor on ACKNOWLEDGE? (3-7)', async () => {
         const unit = await approveSelfTestPage();
 
-        const rows = pageRows();
+        const rows = Screen.read().pageRows();
         expect(rows[1]).toBe('DATA BASE EXPIRES');
         expect(rows[2].startsWith('11 JUN')).toBe(true);
         expect(rows.slice(3)).toEqual(['', '', 'ACKNOWLEDGE?']);
-        expect(inverseText(5)).toBe('ACKNOWLEDGE?');
+        expect(Screen.read().inverse(5)).toBe('ACKNOWLEDGE?');
         expect(Screen.read().status()).toEqual({left: '', mode: 'enr-leg ent', right: 'CRSR'});
         expect(unit.errors).toEqual([]);
     });
@@ -48,11 +37,11 @@ describe('Database page (3-7)', () => {
     it('shows the date an expired data base expired and the warning (3-7)', async () => {
         const unit = await approveSelfTestPage({start: AFTER_CYCLE, storage: {lastLatitude: 47, lastLongitude: 8}});
 
-        const rows = pageRows();
+        const rows = Screen.read().pageRows();
         expect(rows[1]).toBe('DATA BASE EXPIRED');
         expect(rows[2].startsWith('11 JUN')).toBe(true);
         expect(rows.slice(3)).toEqual(['ALL DATA MUST BE', 'CONFIRMED BEFORE USE', 'ACKNOWLEDGE?']);
-        expect(inverseText(5)).toBe('ACKNOWLEDGE?');
+        expect(Screen.read().inverse(5)).toBe('ACKNOWLEDGE?');
         expect(unit.errors).toEqual([]);
     });
 
@@ -60,7 +49,7 @@ describe('Database page (3-7)', () => {
     it.fails('shows the expiry date with a two-digit year (3-7, #199)', async () => {
         await approveSelfTestPage();
 
-        expect(pageRows()[2]).toBe('11 JUN 26');
+        expect(Screen.read().pageRows()[2]).toBe('11 JUN 26');
     });
 
     // 3-8: ENT on ACKNOWLEDGE? ends the start-up sequence; NAV 2 is shown on the left

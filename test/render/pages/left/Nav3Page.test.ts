@@ -4,6 +4,8 @@ import {airport, vor} from '../../../harness/navdata/builders';
 import {readRows, Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
+import {NO_OBS, panelXml} from '../../../harness/panelXml';
+import {activeIdent} from '../../../harness/readers';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
 describe('NAV 3 page', () => {
@@ -26,7 +28,7 @@ describe('NAV 3 page', () => {
 
         // KAAA is the FROM waypoint and ABC the active one, followed by the duplicate and KBBB
         const activeWaypoint = unit.props.memory.navPage.activeWaypoint;
-        expect(activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('ABC');
+        expect(activeIdent(unit)).toBe('ABC');
         expect(activeWaypoint.getFutureLegs().map(l => l.wpt.icaoStruct.ident)).toEqual(['ABC', 'ABC', 'KBBB']);
 
         expect(unit.errors).toEqual([]);
@@ -43,22 +45,22 @@ const KAAA = airport('KAAA', pointFrom(KDDD, 270, 200).lat, pointFrom(KDDD, 270,
 const KEEE = airport('KEEE', pointFrom(KDDD, 90, 30).lat, pointFrom(KDDD, 90, 30).lon);
 const west = (nm: number) => pointFrom(KDDD, 270, nm);
 // Without an OBS input there is no external course: DTK does not flash for a mismatch, and OBS can be entered
-const OBS_SOURCE_OFF = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><ObsSource>0</ObsSource></Input></Instrument></PlaneHTMLConfig>';
+const OBS_SOURCE_OFF = panelXml(NO_OBS);
 
 /**
  * Boots on the leg KAAA to KDDD, 30 NM west of KDDD, selects NAV 3 on the left and holds the position `rightNm` right of
  * the course (south of it, the leg is eastbound; a negative value is left of the course) at 120 kt with the track of
  * the leg
  */
-async function nav3OnLeg(rightNm: number, panelXml = OBS_SOURCE_OFF, magvar = 0): Promise<HeadlessUnit> {
+async function nav3OnLeg(rightNm: number, xml = OBS_SOURCE_OFF, magvar = 0): Promise<HeadlessUnit> {
     const unit = await bootUnit({
-        facilities: [KAAA, KDDD, KEEE], position: west(30), panelXml, magvar,
+        facilities: [KAAA, KDDD, KEEE], position: west(30), panelXml: xml, magvar,
         storage: savedFlightplan(0, [KAAA, KDDD, KEEE]),
     });
     await settle(unit);
     await unit.panel.selectPage('L', 'NAV 3');
     await moveAircraft(unit, pointFrom(west(30), rightNm >= 0 ? 180 : 0, Math.abs(rightNm)), {groundspeedKt: 120, trackTrue: 90});
-    expect(unit.props.memory.navPage.activeWaypoint.getActiveWpt()?.icaoStruct.ident).toBe('KDDD'); // Precondition
+    expect(activeIdent(unit)).toBe('KDDD'); // Precondition
     await vi.advanceTimersByTimeAsync(1000);
     return unit;
 }

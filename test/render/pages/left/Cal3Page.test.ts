@@ -1,12 +1,12 @@
 import {describe, expect, it} from 'vitest';
 import {bootUnit, BootOptions, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
+import {HEADING_INPUT, panelXml} from '../../../harness/panelXml';
 
 // Source of the expected winds (named again at each test): the wind triangle as a vector sum, computed by hand. The
 // wind is the ground vector (GPS ground speed and track) minus the air vector (TAS along the true heading). CAL 3 takes
 // the TAS and the magnetic heading from its fields and the ground vector from the GPS.
 const POS = {lat: 47.0, lon: 8.0};
-const HEADING_INPUT_XML = '<PlaneHTMLConfig><Instrument><Name>KLN90B</Name><Input><HeadingInput>true</HeadingInput></Input></Instrument></PlaneHTMLConfig>';
 
 /**
  * Enters a TAS in whole hundreds with the knobs. The way to CAL 3 passes CAL 2, which overwrites the
@@ -75,7 +75,7 @@ describe('CAL 3 page (5-12)', () => {
     // from the input. The stored HDG of 090 would give a wind of 156 kt; the gyro heading of 000 gives the tailwind of
     // the first test
     it('leaves line three blank and takes the heading from the heading input (5-12)', async () => {
-        const unit = await bootUnit({position: POS, panelXml: HEADING_INPUT_XML, storage: {cal3HeadingMag: 90}});
+        const unit = await bootUnit({position: POS, panelXml: panelXml(HEADING_INPUT), storage: {cal3HeadingMag: 90}});
         unit.env.sim.set('PLANE HEADING DEGREES GYRO', 'degrees', 0);
         await settle(unit);
         await moveAircraft(unit, POS, {groundspeedKt: 120, trackTrue: 0});
