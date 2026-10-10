@@ -93,7 +93,7 @@ export interface HeadlessUnit {
     rejections: unknown[];
     /** Returns the unhandled rejections collected so far and empties the list, which marks them as expected */
     takeRejections(): unknown[];
-    /** The overlay page that is shown over the main page (MSG, DIR, ALT, Super NAV 1 and 5, SET 0), or null without one */
+    /** The overlay page that is shown over the main page (MSG, Super NAV 1 and 5, SET 0), or null without one. DIR and ALT are left pages, not overlays (MainPage.tsx) */
     overlay(): SixLinePage | SevenLinePage | null;
     /** Probes of what the unit shows and drives outside the 23x7 screen */
     display: {
@@ -324,7 +324,8 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
 export async function bootToSelfTest(opts: BootOptions = {}): Promise<HeadlessUnit> {
     const unit = await bootUnit({...opts, engineRunning: false});
     await unit.panel.powerOn();
-    // The Turn-On page shows for 17 s (3-3); the other two seconds are the margin for the self-test page to show
+    // The Turn-On page shows for 17 s (TEST_TIME in kln90b/pages/WelcomePage.tsx; 3-3 for the page itself); the other
+    // two seconds are the margin for the self-test page to show
     await vi.advanceTimersByTimeAsync(19_000);
     const screen = Screen.read();
     if (!screen.rows('R').some(r => r.trim() === 'APPROVE?')) {

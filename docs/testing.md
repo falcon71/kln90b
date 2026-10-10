@@ -389,7 +389,8 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   calculation tick). It throws when there is no fix within its cap (120 s by default).
 - **`NEAREST_SEARCH_WAIT_MS`** (`boot.ts`, 12 s) is how long a test advances the clock for the nearest lists to hold
   their result. The nearest lists and the airspace alert search every 10 s (`NearestList.ts`, `AirspaceAlert.ts`), so
-  12 s leaves one search and the time its result needs; a shorter wait reads an empty list.
+  12 s leaves one search and the time its result needs; a wait below one search interval reads an empty list. Its
+  harness test covers the nearest airport list.
 - **Time to first fix.** `bootUnit({coldGps: true})` resets the GPS after a forced acquisition, so every satellite keeps
   its ephemeris and the last known position is the present one: it acquires in about 62 s (slow) whatever the almanac,
   the stored position or the clock, and cannot measure a cold or warm start. Boot with `engineRunning: false` and the
@@ -469,8 +470,8 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   and its failure shows far from the cause. `facilities` are added to the route's and `storage` is merged over the
   stored plan. `bootOnDtWorld` boots in `dtWorld()` 0.1 degree north of KAAA with `legs` (KAAA, ABC, DEF, KBBB by
   default) stored as FPL 0, settles, and flies due north at 120 kt unless `moving` is false. It also stores the legs
-  as FPL 3, the plan the D/T pages show beside FPL 0 and FPL 3, unless `fpl3` is false, so the choice is a named
-  option and not an accident of a copy. A `facilities` option replaces the legs as the navdata, so it must contain them.
+  as FPL 3, because the D/T tests show the D/T page beside FPL 0 and beside FPL 3, unless `fpl3` is false, so the
+  choice is a named option and not an accident of a copy. A `facilities` option replaces the legs as the navdata, so it must contain them.
 - **Use these helpers; do not hand-roll them.** A wait-for-GPS loop, a `KLN90B_Internal_Key` loop, a
   `persistent-setting.<model>.profile_1.` key and a `gps.reset()` right after the boot are what `settle`,
   `unit.panel.type`, `storedSetting` and `bootUnit({coldGps: true})` do. A hand-rolled form stays only where it is the
@@ -495,8 +496,8 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   a message that was shown before is not in the list.
 - **`unit.display`** reads what the unit drives outside the screen grid: `opacity()` is the container's opacity as a
   number, and `powerWrites()` lists the writes of `L:KLN90B_POWER`.
-- **`unit.overlay()`** is the overlay page over the main page (MSG, DIR, ALT, Super NAV 1 and 5, SET 0), or `null`. It
-  reads `MainPage.getOverlayPage()`, so a test asserts which page is on top with `toBeInstanceOf` and not through
+- **`unit.overlay()`** is the overlay page over the main page (MSG, Super NAV 1 and 5, SET 0), or `null`; DIR and ALT
+  are left pages, not overlays. It reads `MainPage.getOverlayPage()`, so a test asserts which page is on top with `toBeInstanceOf` and not through
   text that `Screen` cannot read (Super NAV 5).
 - **A start-up failure** is tested with `bootUnitExpectingError({platform: {createFacilityClient: () => client}})`. Build
   the client from `MemoryFacilityClient` and replace only the method that should fail, so that nothing else in the boot
@@ -607,7 +608,7 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       non-blank rows of every MSG page seen, each trimmed and newest message first, and throws with the screen when the
       page is still open after `max` presses. The loop is the point: a test that presses MSG a fixed number of times
       leaves the page open, or closes it before the last message, without saying so.
-    - `directTo(ident, {waitMs})` enters a Direct To the way a pilot does (3-27): D->, the ident on the left, ENT on the
+    - `directTo(ident, {waitMs})` enters a Direct To the way a pilot does (3-28): D->, the ident on the left, ENT on the
       waypoint page, ENT to approve, then `waitMs` (default one second, one calculation tick) so that the active
       waypoint has changed when it returns.
     - `show(side, name, {waitMs})` selects a page, waits (default one second) and returns the six rows of that side. Use

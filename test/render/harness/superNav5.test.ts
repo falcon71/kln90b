@@ -8,6 +8,7 @@ import {SuperNav5Field1} from '../../../kln90b/settings/KLN90BUserSettings';
 import {Screen} from '../../harness/render/screen';
 import {MainPage} from '../../../kln90b/pages/MainPage';
 import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
+import {MessagePage} from '../../../kln90b/controls/MessagePage';
 
 describe('SuperNav5.read (harness)', () => {
     // 3-36: NAV 5 on both sides makes Super NAV 5, with field 1 set to XTK. The -.-NM- text without an active waypoint is a characterization: the guide has no figure of it
@@ -165,19 +166,34 @@ describe('showSuperNav5 and the boots onto it (harness)', () => {
     it('waits the given time before it looks', async () => {
         const unit = await onRoute();
         const wait = vi.spyOn(vi, 'advanceTimersByTimeAsync');
+        try {
+            await showSuperNav5(unit, {waitMs: 2500});
 
-        await showSuperNav5(unit, {waitMs: 2500});
-
-        expect(wait.mock.calls[wait.mock.calls.length - 1]).toEqual([2500]);
-        wait.mockRestore();
+            expect(wait.mock.calls[wait.mock.calls.length - 1]).toEqual([2500]);
+        } finally {
+            wait.mockRestore();
+        }
     });
 
-    it('throws with the screen when the overlay is not Super NAV 5', async () => {
+    it('throws with the screen when there is no overlay', async () => {
         const unit = await onRoute();
         const overlay = vi.spyOn(unit, 'overlay').mockReturnValue(null);
+        try {
+            await expect(showSuperNav5(unit)).rejects.toThrow(/showSuperNav5/);
+        } finally {
+            overlay.mockRestore();
+        }
+    });
 
-        await expect(showSuperNav5(unit)).rejects.toThrow(/showSuperNav5/);
-        overlay.mockRestore();
+    it('throws with the screen when another overlay page is on top', async () => {
+        const unit = await onRoute();
+        // The MSG page on top is an overlay, but not Super NAV 5
+        const overlay = vi.spyOn(unit, 'overlay').mockReturnValue(Object.create(MessagePage.prototype));
+        try {
+            await expect(showSuperNav5(unit)).rejects.toThrow(/showSuperNav5/);
+        } finally {
+            overlay.mockRestore();
+        }
     });
 
     // The leg world of testing.md section 3: 30 NM west of KDDD on the leg to it, KDDD active

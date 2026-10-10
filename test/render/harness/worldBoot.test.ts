@@ -23,11 +23,18 @@ describe('bootOnStandardRoute (harness)', () => {
         expect(fplIdents(unit)).toEqual(['KAAA', 'ABC', 'XYZ', 'KBBB']);
     });
 
-    it('rejects when ABC does not become the active waypoint', async () => {
+    it('rejects when no waypoint is active', async () => {
         const {kaaa} = standardRoute();
 
-        // A plan whose only waypoint is KAAA has no ABC to activate
+        // A plan whose only waypoint is KAAA has nothing to activate
         await expect(bootOnStandardRoute({storage: savedFlightplan(0, [kaaa])})).rejects.toThrow(/not ABC/);
+    });
+
+    it('rejects when another waypoint is active, and names it', async () => {
+        const {kaaa, kbbb} = standardRoute();
+
+        // A plan KAAA, KBBB has KBBB active: a waypoint, but not ABC
+        await expect(bootOnStandardRoute({storage: savedFlightplan(0, [kaaa, kbbb])})).rejects.toThrow(/is KBBB, not ABC/);
     });
 });
 
@@ -38,6 +45,10 @@ describe('bootOnDtWorld (harness)', () => {
         expect(fplIdents(unit)).toEqual(['KAAA', 'ABC', 'DEF', 'KBBB']);
         expect(fplIdents(unit, 3)).toEqual(['KAAA', 'ABC', 'DEF', 'KBBB']);
         expect(unit.props.sensors.in.gps.groundspeed).toBeCloseTo(120, 0);
+        // 0.1 degree north of KAAA (47.0 N, 10.0 E), flying due north
+        expect(unit.props.sensors.in.gps.coords.lat).toBeCloseTo(47.1, 6);
+        expect(unit.props.sensors.in.gps.coords.lon).toBeCloseTo(10.0, 6);
+        expect(unit.props.sensors.in.gps.trackTrue).toBeCloseTo(0, 1);
     });
 
     it('leaves FPL 3 empty with fpl3 false, and the aircraft standing with moving false', async () => {

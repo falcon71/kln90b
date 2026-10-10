@@ -46,7 +46,7 @@ export function panelXml(o: PanelOptions = {}): string {
     return `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name>${xml(root)}${o.extra ?? ''}</Instrument></PlaneHTMLConfig>`;
 }
 
-/** No OBS course input: the unit reads the course from L:KLN90B_ObsSource 0 (the parser default is 1) */
+/** ObsSource 0 disables the OBS course input; the value is synced to L:KLN90B_ObsSource (the parser default is 1, cfg/panel.xml) */
 export const NO_OBS = {'Input.ObsSource': 0} as const;
 export const HEADING_INPUT = {'Input.HeadingInput': true} as const;
 export const NO_GPS_SIMVARS = {'Output.WriteGPSSimVars': false} as const;

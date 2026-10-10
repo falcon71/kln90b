@@ -420,7 +420,7 @@ export class FrontPanel {
     }
 
     /**
-     * A Direct To the way a pilot enters one (3-27): D->, the ident typed on the left, ENT on the waypoint page that
+     * A Direct To the way a pilot enters one (3-28): D->, the ident typed on the left, ENT on the waypoint page that
      * confirms it, ENT to approve, then `waitMs` (default one second: one calculation tick).
      */
     public async directTo(ident: string, o: { waitMs?: number } = {}): Promise<void> {

@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
+import {bootToSelfTest, bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {airport} from '../../harness/navdata/builders';
 import {Screen} from '../../harness/render/screen';
 import {activeIdent} from '../../harness/readers';
@@ -24,7 +24,7 @@ async function lastWait(run: () => Promise<unknown>): Promise<number> {
 }
 
 describe('FrontPanel.directTo (harness)', () => {
-    // 3-27: D->, the ident, ENT on the waypoint page and ENT to approve make the waypoint the active one
+    // 3-28: D->, the ident, ENT on the waypoint page and ENT to approve make the waypoint the active one
     it('makes the waypoint active the way a pilot enters a Direct To', async () => {
         const unit = await booted({facilities: [airport('KBBB', 47.2, 8.0)]});
         expect(activeIdent(unit)).toBeUndefined();
@@ -52,6 +52,16 @@ describe('FrontPanel.show (harness)', () => {
         expect(rows).toHaveLength(6);
         expect(rows).toEqual(Screen.read().rows('L'));
         expect(Screen.read().status().left).toBe('SET 2');
+    });
+
+    it('works on the right side too', async () => {
+        const unit = await booted();
+
+        const rows = await unit.panel.show('R', 'D/T 1');
+
+        expect(rows).toEqual(Screen.read().rows('R'));
+        expect(Screen.read().status().right).toBe('D/T 1');
+        expect(Screen.read().status().left).not.toBe('D/T 1');
     });
 
     it('waits one second after the page shows, or the waitMs given', async () => {
@@ -86,8 +96,27 @@ describe('FrontPanel.enterDate (harness)', () => {
     });
 });
 
+describe('FrontPanel.enterDate on the right side (harness)', () => {
+    // 3-5 step 6: the date of the self-test page is entered with the right knobs while no satellite gives one
+    it('enters the date of the self-test page with the right knobs', async () => {
+        const unit = await bootToSelfTest({storage: {fastGpsAcquisition: false}});
+        // The cursor starts on the baro field (3-6)
+        for (let i = 0; unit.panel.focused('R').text !== '01 JUN 26'; i++) {
+            if (i >= 7) throw new Error(`no date field
+${Screen.read().dump()}`);
+            await unit.panel.outer('R', -1);
+        }
+
+        await unit.panel.enterDate('R', 3, 8, [2, 5]);
+
+        expect(Screen.read().rows('R')[1]).toBe('  03 AUG 25');
+        expect(Screen.read().rows('L')[1]).not.toContain('AUG');
+    });
+});
+
 describe('FrontPanel.confirmSet1AndReselect (harness)', () => {
-    // 3-18, 3-19: CONFIRM? hands the entered track to the GPS, which keeps it while the aircraft stands still
+    // 3-18: CONFIRM? commits the entered values. That the GPS then holds the track while the aircraft stands still is
+    // the harness simulation (moveAircraft in testing.md), not the guide
     it('confirms SET 1, leaves the cursor off and shows SET 1 again', async () => {
         const unit = await booted({position: {lat: 47.5, lon: 11.25}});
         await unit.panel.selectPage('L', 'SET 1');
