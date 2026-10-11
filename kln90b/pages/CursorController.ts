@@ -56,9 +56,11 @@ export class CursorController implements CursorHandler {
      *
      * @param children
      * @param onCursorActiveChangedListener Will be called each time the cursorActive state is changed
+     * @param enterAlwaysMoves If true, ENT also moves the cursor on when the field did not handle it. Only the self-test
+     * page does this, 3-6 and 3-7
      */
     constructor(private children: UIElementChildren<any>, private onCursorActiveChangedListener: (isActive: boolean) => void = () => {
-    }) {
+    }, private readonly enterAlwaysMoves: boolean = false) {
         // @ts-ignore
         this.fields = children.getallFlat().filter(c => isField(c) && !(c as Field).isReadonly);
     }
@@ -210,8 +212,10 @@ export class CursorController implements CursorHandler {
                 //This item no longer exists, but we still want to focus the item on the current index
                 focused.setFocused(true);
             }
-        } else {
-            this.outerRight(); //Enter always moves to the next field, see https://www.youtube.com/shorts/9We5fcd2-VE
+        } else if (result === EnterResult.Handled_Move_Focus || this.enterAlwaysMoves) {
+            //Enter moves to the next field, see https://www.youtube.com/shorts/9We5fcd2-VE
+            //A field with nothing to accept leaves the cursor where it is, checked in the KLN 89 trainer (#354)
+            this.outerRight();
         }
         return result;
     }

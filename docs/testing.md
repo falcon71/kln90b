@@ -1172,6 +1172,16 @@ its line, in the comment above it or in the title of its `describe`.
   seconds at zero (medium-high, #331).
 - **T12:** everything changed was restored by a relaunch.
 
+**2026-10-11**
+- ENT that accepts a pending entry (the value in inverse with the `Ent` prompt) moves the cursor to the next field:
+  SET 1 latitude, ground speed and heading, SET 2 date and time, the CAL 1 To ident, the user waypoint latitude.
+- ENT on a field whose value changes as the knob turns does nothing, and the cursor stays: CAL 4 Ind, CAL 1 GS, the
+  ALT 2 selected altitude, the APT 1 ident (#354). The maintainer saw the same on CAL 4.
+- ENT that accepts the last field of SET 2 (Mag Var) leaves no cursor on the page: the next outer click changes the page
+  group and the next inner click the page, as with the cursor off. The trainer still shows `*CRSR*` in the status
+  column, a defect of the trainer. Finishing a user waypoint also turns the cursor off (#218).
+- Not observable: the 89's self-test page has no baro, so its ENT over the baro digits (3-6, 3-7) cannot be checked.
+
 # 9. Next steps
 
 Gathered from the baseline sessions (2026-10-03 to 2026-10-10) and grouped by area. A harness gap is built only when

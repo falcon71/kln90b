@@ -7,9 +7,10 @@ function leftMask(n: number): string {
     return Screen.read().mask().split('\n')[n].slice(0, 11);
 }
 
-describe('cursor controller (characterization, f347a2c)', () => {
-    // ENT always moves the cursor to the next field: https://www.youtube.com/shorts/9We5fcd2-VE
-    it('moves the cursor on with ENT, also when the field does not handle ENT', async () => {
+describe('cursor controller ENT on a field with nothing to accept (#354)', () => {
+    // The digits of the CAL 1 altitude change as the knob turns, so ENT has nothing to accept. Checked in the KLN 89
+    // trainer, 2026-10-11, on CAL 4 Ind, CAL 1 GS and the ALT 2 selected altitude: nothing happens, the cursor stays
+    it('leaves the cursor on the field (checked in the KLN 89 trainer, 2026-10-11, #354)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'CAL 1');
         expect(Screen.read().leftName()).toBe('CAL 1');
@@ -19,6 +20,6 @@ describe('cursor controller (characterization, f347a2c)', () => {
         await unit.panel.ent();
 
         expect(unit.errors).toEqual([]);
-        expect(leftMask(1)).toBe('.....I.....');
+        expect(leftMask(1)).toBe('....I......');
     });
 });

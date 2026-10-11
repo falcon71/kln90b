@@ -62,7 +62,8 @@ export class SelfTestRightPage extends SixLineHalfPage {
 
         this.children.get("barometer").setReadonly(this.props.planeSettings.input.airdata.baroSource > 0);
 
-        this.cursorController = new CursorController(this.children);
+        //3-6 and 3-7: ENT steps over the baro digits to APPROVE?, although they have nothing to accept (#354)
+        this.cursorController = new CursorController(this.children, undefined, true);
         this.cursorController.setCursorActive(true);
         this.cursorController.focusIndex(3);
     }

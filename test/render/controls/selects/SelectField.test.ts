@@ -30,16 +30,15 @@ describe('select field', () => {
         expect(volumeRow()).toBe('    95     ');
     });
 
-    // ENT on a field moves the cursor to the next field: the video of a real unit that CursorController.enter cites
-    // (https://www.youtube.com/shorts/9We5fcd2-VE). On a select cell ENT commits nothing of its own: the value stays.
-    it('keeps the value and moves the cursor to the next cell on ENT '
-        + '(video of a real unit, youtube.com/shorts/9We5fcd2-VE)', async () => {
+    // A select cell commits every step at once, so ENT has nothing to accept: the value stays and so does the cursor.
+    // Checked on such fields in the KLN 89 trainer, 2026-10-11 (#354)
+    it('keeps the value and the cursor on ENT (checked in the KLN 89 trainer, 2026-10-11, #354)', async () => {
         const unit = await onVolume(37);
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(volumeRow()).toBe('    37     ');
-        expect(unit.panel.focused('L')).toEqual({row: 4, col: 5, text: '7'});
+        expect(unit.panel.focused('L')).toEqual({row: 4, col: 4, text: '3'});
         expect(storedSetting(unit, 'altAlertVolume')).toBe(37);
     });
 });

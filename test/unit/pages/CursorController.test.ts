@@ -347,12 +347,12 @@ describe('CursorController lists (characterization)', () => {
     });
 });
 
-// ENT always moves the cursor to the next field (f347a2c; https://www.youtube.com/shorts/9We5fcd2-VE, cited in the
-// code), unless the field keeps the focus. The render test of f347a2c holds the case of a field that does not handle
-// ENT.
-describe('CursorController ENT (characterization, f347a2c)', () => {
+// ENT that a field accepts moves the cursor to the next field, unless the field keeps the focus. ENT that no field
+// handles leaves the cursor where it is: checked in the KLN 89 trainer, 2026-10-11 (#354). On a field whose value
+// changes as the knob turns (CAL 1 GS, CAL 4 Ind, ALT 2) ENT has nothing to accept and nothing happens.
+describe('CursorController ENT (#354)', () => {
     it.each([
-        ['did not handle it', 'b', EnterResult.Not_Handled],
+        ['did not handle it', 'a', EnterResult.Not_Handled],
         ['handled it and is done', 'b', EnterResult.Handled_Move_Focus],
         ['handled it and keeps the focus', 'a', EnterResult.Handled_Keep_Focus],
     ])('after ENT on field a that %s, the cursor is on field %s', async (_what, expected, result) => {
@@ -390,5 +390,19 @@ describe('CursorController ENT (characterization, f347a2c)', () => {
 
         expect(await cc.enter()).toBe(EnterResult.Not_Handled);
         expect(a.events).toEqual([]);
+    });
+
+    // The self-test page is the exception: 3-6 step 9 has the pilot press ENT after the baro, whose digits change as the
+    // knob turns, and 3-7 step 11 then finds the cursor on APPROVE? or before it. The AVsoftech KLN90B trainer steps
+    // through the baro digits on ENT, edited or not (2026-10-11). A controller built for such a page moves on after
+    // every ENT that does not keep the focus
+    it('moves the cursor on after an ENT that no field handled when the page asks for it (3-6, 3-7)', async () => {
+        const all = [new FakeField('a'), new FakeField('b'), new FakeField('c')];
+        const cc = new CursorController(children({a: all[0], b: all[1], c: all[2]}), undefined, true);
+        cc.setCursorActive(true);
+
+        expect(await cc.enter()).toBe(EnterResult.Not_Handled);
+
+        expect(focused(cc, all)).toBe('b');
     });
 });
