@@ -150,7 +150,11 @@ export class DirectToPage extends SixLineHalfPage {
         const rightPage = mainPage.getRightPage();
 
         if (isWapointPage(rightPage)) {
-            return unpackFacility(rightPage.facility);
+            //An empty waypoint page, such as the SUP page after power-up, shows no waypoint and falls through to rule 4
+            const shown = unpackFacility(rightPage.facility);
+            if (shown !== null) {
+                return shown;
+            }
         }
 
         //4 current active waypoint or missed approach if MAP
