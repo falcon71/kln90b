@@ -268,12 +268,64 @@ describe('KlnEfbSaver route contents', () => {
         expect(route.approach.type).toBe('RNAV');
     });
 
-    // RunwayIdentifier.number is the SDK's runway number string, two digits for 01 to 36 (RunwayUtils.getNumberString).
-    // KlnEfbSaver writes runwayNumber.toString(), which gives 9 for runway 09
-    it.fails('sends runway 09 of an approach as 09 (#186)', async () => {
+    // RunwayIdentifier.number is the SDK's runway number string, two digits for 01 to 36 (RunwayUtils.getNumberString),
+    // so runway 9 goes out as 09 (#186)
+    it('sends runway 09 of an approach as 09 (#186)', async () => {
         const unit = await bootWithStarAndApproach09();
 
         expect(requestRoute(unit).approach.runway.number).toBe('09');
+    });
+
+    // The same number string for the runway of a SID, with the designator letter beside it: runway 03L goes out as
+    // number 03, designator L (#186)
+    it('sends runway 03L of a SID as 03 and L (#186)', async () => {
+        const depaa = intersection('DEPAA', 47.0, 8.2);
+        const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
+            departures: [sid('DEP1', {runways: [{runway: '03L', legs: [Leg.CA(30), Leg.DF(depaa)]}]})],
+        });
+        const unit = await bootUnit({facilities: [kprc, depaa], efb: true, storage: savedFlightplan(0, [kprc])});
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 7');
+        expect(fplIdents(unit)).toEqual(['KPRC', 'DEPAA']); // Precondition
+
+        const route = requestRoute(unit);
+
+        expect(route.departure).toBe('DEP1');
+        expect(route.departureRunway.number).toBe('03');
+        expect(route.departureRunway.designator).toBe('L');
+    });
+
+    // A lettered runway (the north runway, number 37 in the database) goes out as its letters, as the SDK's number
+    // string gives it (#186)
+    it('sends the north runway of a SID as N (#186)', async () => {
+        const depaa = intersection('DEPAA', 47.0, 8.2);
+        const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
+            departures: [sid('DEP1', {runways: [{runway: '37', legs: [Leg.CA(0), Leg.DF(depaa)]}]})],
+        });
+        const unit = await bootUnit({facilities: [kprc, depaa], efb: true, storage: savedFlightplan(0, [kprc])});
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 7');
+        expect(fplIdents(unit)).toEqual(['KPRC', 'DEPAA']); // Precondition
+
+        expect(requestRoute(unit).departureRunway.number).toBe('N');
+    });
+
+    // The same for the runway of a STAR: runway 05 goes out as 05 (#186)
+    it('sends runway 05 of a STAR as 05 (#186)', async () => {
+        const enraa = intersection('ENRAA', 47.0, 8.8);
+        const fafaa = intersection('FAFAA', 47.0, 8.4);
+        const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
+            arrivals: [star('ARR1', {common: [Leg.IF(enraa), Leg.TF(fafaa)], runways: [{runway: '05', legs: [Leg.TF(fafaa)]}]})],
+        });
+        const unit = await bootUnit({facilities: [kprc, enraa, fafaa], efb: true, position: {lat: 47.0, lon: 9.0}, storage: savedFlightplan(0, [kprc])});
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 7');
+
+        const route = requestRoute(unit);
+
+        expect(route.arrival).toBe('ARR1');
+        expect(route.destinationRunway.number).toBe('05');
+        expect(route.destinationRunway.designator).toBe('');
     });
 
     // Output.WriteGPSSimVars false is the panel.xml option of a unit that is not the aircraft's GPS (cfg/panel.xml). Such
