@@ -50,8 +50,8 @@ export class NavCalculator implements CalcTickable {
             nav.eteToActive = null;
             nav.distToDest = null;
             nav.eteToDest = null;
-            nav.bearingToActive = 130;
-            nav.bearingForAP = 130;
+            nav.bearingToActive = this.magvar.magToTrue(130);
+            nav.bearingForAP = this.magvar.magToTrue(130);
             nav.toFrom = FROM;
             nav.waypointAlert = true;
             nav.xtkScale = 5;
