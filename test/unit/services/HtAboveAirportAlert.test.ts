@@ -157,11 +157,38 @@ describe('HtAboveAirportAlert', () => {
     });
 
     // Without a navigation solution (GPS invalid, NavCalculator.setFlag) distToActive is null while the active waypoint
-    // stays. `null <= 5` is true in JavaScript, so the service treats an unknown position as inside the cylinder.
-    // An aircraft below the top with no position must not alert: 3-58 compares the aircraft's position with the cylinder.
-    it.fails('gives no alert without a distance to the airport (#179)', () => {
+    // stays. An aircraft below the top with no position must not alert: 3-58 compares the aircraft's position with the
+    // cylinder.
+    it('gives no alert without a distance to the airport (#179)', () => {
         const r = rig({active: airport('KHHH', 47, 8), offset: 1000});
         r.at(null, 500);
         expect(r.patterns).toEqual([]);
+    });
+
+    // A distance of 0 NM (over the airport) is a position like any other; a guard that tests the distance for
+    // truthiness instead of null would silence it
+    it('alerts directly over the airport (3-58, sibling of #179)', () => {
+        const r = rig({active: airport('KHHH', 47, 8), offset: 1000});
+        r.at(0, 500);
+        expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
+    });
+
+    // A lost position is not a position outside the cylinder: the first valid position inside it sounds the alert
+    it('sounds on the first valid position inside the cylinder after a loss of position (3-58, #179)', () => {
+        const r = rig({active: airport('KHHH', 47, 8), offset: 1000});
+        r.at(null, 500);
+        expect(r.patterns).toEqual([]);
+        r.at(3, 500);
+        expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
+    });
+
+    // characterization: a loss of position inside the cylinder after the alert has sounded does not sound it again when
+    // the position returns inside the cylinder
+    it('does not sound twice across a loss of position inside the cylinder (characterization)', () => {
+        const r = rig({active: airport('KHHH', 47, 8), offset: 1000});
+        r.at(3, 500);
+        r.at(null, 500);
+        r.at(3, 500);
+        expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
     });
 });
