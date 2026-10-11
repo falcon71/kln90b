@@ -67,8 +67,8 @@ class AdjustCourseToWithObsReadingMessage implements Message {
         if (this.lastCourse === null || Math.abs(NavMath.diffAngle(this.lastCourse, dtk)) > 5) {
             //First part: Whenever turn changes to more than 5 degress
             this.forceShow = true;
-            this.validUntil = Date.now() + 10 * 1000;
-            //The time appears to be about 30 seconds: https://youtu.be/S1lt2W95bLA?t=2244 https://youtu.be/S1lt2W95bLA?t=2574
+            this.validUntil = Date.now() + 30 * 1000;
+            //The time is about 30 seconds: https://youtu.be/S1lt2W95bLA?t=2244 https://youtu.be/S1lt2W95bLA?t=2574
         }
         this.lastCourse = dtk;
 
