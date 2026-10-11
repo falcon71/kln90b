@@ -148,8 +148,8 @@ describe('the left side after a direct-to from FPL 0 (#82)', () => {
     }
     const planRows = () => Screen.read().rows('L').slice(1, 4).map(r => r.slice(2, 8));
 
-    // 4-11 step 4: the sibling of the pin below. The direct-to is made and FPL 0 is unchanged until the second ENT
-    it('the pin setup: the direct-to to ABC is made and FPL 0 shows KAAA, ABC, KBBB (the setup of #82)', async () => {
+    // 4-11 step 4: the setup of the test below. The direct-to is made and FPL 0 is unchanged
+    it('makes the direct-to to ABC and leaves FPL 0 at KAAA, ABC, KBBB (the setup of #82)', async () => {
         const unit = await directToAbcFromFpl0();
         await vi.advanceTimersByTimeAsync(1000);
 
@@ -161,13 +161,32 @@ describe('the left side after a direct-to from FPL 0 (#82)', () => {
     });
 
     // 4-11 step 4 and figure 4-42: after the approval the left page shows FPL 0 with its page name, i.e. the cursor is
-    // off. Today the cursor stays on the selected row, so the next ENT inserts a blank waypoint ahead of it (#82)
-    it.fails('does not insert a blank waypoint at an ENT after the direct-to (#82)', async () => {
+    // off. With the cursor left on the selected row, the next ENT inserted a blank waypoint ahead of it (#82)
+    it('does not insert a blank waypoint at an ENT after the direct-to (#82)', async () => {
         const unit = await directToAbcFromFpl0();
 
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
 
+        expect(Screen.read().status().left).toBe('FPL 0');
+        expect(planRows()).toEqual(['1:KAAA', '2:ABC ', '3:KBBB']);
+    });
+
+    // 3-29 and 4-11: D->, CLR, ENT from FPL 0 with the cursor on cancels the direct-to. The left page comes back with
+    // the cursor off as after an approval, so the next ENT does not insert a blank waypoint either (#82)
+    it('turns the cursor off when the direct-to is cancelled from FPL 0 (3-29, #82)', async () => {
+        const unit = await directToAbcFromFpl0();
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'ABC');
+        await unit.panel.dct();
+        await unit.panel.clr();
+        await unit.panel.ent(); // Cancels the direct-to
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(false); // Precondition
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().status().left).toBe('FPL 0');
         expect(planRows()).toEqual(['1:KAAA', '2:ABC ', '3:KBBB']);
     });
 });

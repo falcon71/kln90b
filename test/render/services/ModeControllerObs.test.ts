@@ -214,7 +214,6 @@ describe('OBS to LEG (5-36)', () => {
         await unit.panel.outer('L', 3); // The second ABC
         await unit.panel.dct();
         await unit.panel.ent();
-        await unit.panel.cursor('L');
         expect(aw.getActiveFplIdx()).toBe(3);
         unit.env.sim.set('Nav OBS:1', 'degrees', 196);
         await unit.panel.obsMode();
@@ -334,7 +333,6 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
         await unit.panel.outer('L', 5); // The approach header row counts as a cursor position
         await unit.panel.dct();
         await unit.panel.ent();
-        await unit.panel.cursor('L');
         expect(aw.getActiveFplIdx()).toBe(4); // Precondition: the holding point copy
         unit.env.sim.set('Nav OBS:1', 'degrees', 180);
         await unit.panel.obsMode();

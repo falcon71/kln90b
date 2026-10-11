@@ -186,7 +186,6 @@ describe('FlightplanList, an insertion (4-4)', () => {
         async () => {
             const unit = await bootEightWithBugle(46.9);
             await unit.panel.directTo('FX1AA', {waitMs: 0});
-            await unit.panel.cursor('L'); // the cursor stays on after the Direct To (#82)
             expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(0); // Precondition
 
             const before = await insertBugleBeforeFx3(unit);

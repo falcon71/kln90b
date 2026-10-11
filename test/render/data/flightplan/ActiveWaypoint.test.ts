@@ -93,6 +93,8 @@ describe('ActiveWaypoint on FPL 0', () => {
         expect(aw.getActiveFplIdx()).toBe(2); // Precondition: direct to the last leg
         expect(aw.isDctNavigation()).toBe(true);
 
+        await unit.panel.cursor('L'); // 4-11 figure 4-42: the approval turns the cursor off
+        await unit.panel.cursorTo('L', 'KBBB');
         await unit.panel.clr();
         await unit.panel.ent(); // DEL KBBB ?
         await vi.advanceTimersByTimeAsync(1000);

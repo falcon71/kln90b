@@ -137,7 +137,6 @@ describe('FPL 0 page, the active leg', () => {
 
         await unit.panel.dct();
         await unit.panel.ent();
-        await unit.panel.cursor('L'); // The unit leaves the cursor on after the approval (#82); the page scrolls with it off
         await vi.advanceTimersByTimeAsync(1000);
 
         const aw = unit.props.memory.navPage.activeWaypoint;

@@ -95,6 +95,7 @@ export class DirectToPage extends SixLineHalfPage {
     private performDirectTo(waypoint: Facility | null) {
         const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
         mainPage.popLeftPage();
+        mainPage.getLeftPage().getCursorController().setCursorActive(false); //4-11 figure 4-42: the left page comes back with the cursor off
         if (waypoint === null) { //3-29 clear DCT
             this.props.memory.navPage.activeWaypoint.cancelDirectTo();
         } else {

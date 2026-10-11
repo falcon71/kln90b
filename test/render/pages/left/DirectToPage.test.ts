@@ -36,8 +36,7 @@ describe('Direct To page', () => {
         expect(aw.isDctNavigation()).toBe(true);
         expect(activeIdent(unit)).toBe('ABC');
         const screen = Screen.read();
-        // The left cursor is deliberately not asserted: figure 4-42 (4-11) shows it off after the approval, and the unit
-        // leaves it on (#82, pinned in DirectToObs.test.ts)
+        expect(screen.status().left).toBe('FPL 0'); // 4-11 figure 4-42: the approval turns the cursor off (#82)
         expect(screen.status().right).toBe('NAV 1');
         // The arrow marks the direct-to target; the first ABC (row 2) is no longer it
         expect(screen.rows('L').slice(1, 5).map(r => r.slice(0, 8))).toEqual([

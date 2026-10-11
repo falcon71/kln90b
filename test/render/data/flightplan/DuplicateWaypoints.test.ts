@@ -26,7 +26,6 @@ describe('OBS mode on the second occurrence of a waypoint (3415417, #67)', () =>
         await unit.panel.outer('L', 3); // The second ABC, by count
         await unit.panel.dct();
         await unit.panel.ent();
-        await unit.panel.cursor('L');
         await vi.advanceTimersByTimeAsync(1000);
         expect(aw.getActiveFplIdx()).toBe(3); // Precondition, the same as the #43 test
         return {unit, aw};
