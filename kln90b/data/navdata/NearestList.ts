@@ -183,6 +183,7 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
                     BitFlags.createFlag(RunwaySurfaceType.Ice),
                     BitFlags.createFlag(RunwaySurfaceType.SteelMats),
                     BitFlags.createFlag(RunwaySurfaceType.Shale),
+                    BitFlags.createFlag(RunwaySurfaceType.Snow),
 
                     BitFlags.createFlag(RunwaySurfaceType.Grass),
                     BitFlags.createFlag(RunwaySurfaceType.GrassBumpy),

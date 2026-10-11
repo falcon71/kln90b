@@ -91,6 +91,17 @@ describe('CAL 1 page (5-10)', () => {
     });
 });
 
+describe('CAL 1 barometer in millibars below 1000 (checked in the KLN 89 trainer, 2026-10-08, T16, #315)', () => {
+    // The ALT page shares the fieldset (BaroFieldset.test.ts holds the cases); CAL 1 shows the blank too
+    it('shows 993 MB with a blank in the first digit', async () => {
+        const unit = await bootUnit({storage: {barounit: false, cal12Barometer: 29.32}});
+        await unit.panel.selectPage('L', 'CAL 1');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[2]).toBe('BARO: 993MB');
+    });
+});
+
 describe('CAL 1 temperature entered sign first', () => {
     /** 9000 ft at 29.92" with TEMP 000; the sign set to -, then the last digit to 5 */
     async function signFirst() {
@@ -104,18 +115,69 @@ describe('CAL 1 temperature entered sign first', () => {
         return unit;
     }
 
-    // 5-10, step 5: the sibling of the pin below. The sign digit and the last digit are set, and the page shows the
+    // 5-10, step 5: the sibling of the test below. The sign digit and the last digit are set, and the page shows the
     // temperature as entered
     it('shows TEMP -05 after the sign and then the last digit are set (5-10)', async () => {
         await signFirst();
         expect(Screen.read().rows('L')[4]).toBe('TEMP: -05°C');
     });
 
-    // 5-10, step 5: the first digit makes the temperature negative. Set on 000, the minus is lost when the next digit is
-    // turned, so DEN is that of +5 C (9900 ft) while TEMP shows -05. Source of 8700: as for the -5 C test above
-    it.fails('shows DEN 8700ft for -5 C entered sign first (5-10, #256)', async () => {
+    // 5-10, step 5: the first digit makes the temperature negative. Set on 000, the minus must survive the next digit,
+    // so DEN is that of -5 C (8700 ft), not that of +5 C (9900 ft). Source of 8700: as for the -5 C test above
+    it('shows DEN 8700ft for -5 C entered sign first (5-10, #256)', async () => {
         const unit = await signFirst();
         expect(Screen.read().rows('L')[5]).toBe('DEN  8700ft');
         expect(unit.props.userSettings.getSetting('cal1SAT').get()).toBe(-5);
     });
 });
+
+describe('CAL 1 temperature at the ends of the field (5-10)', () => {
+    /** 9000 ft at 29.92" with TEMP 000, the cursor on the sign of TEMP */
+    async function onTemp() {
+        const unit = await bootUnit({storage: {cal12IndicatedAltitude: 9000, cal12Barometer: 29.92, cal1SAT: 0}});
+        await unit.panel.selectPage('L', 'CAL 1');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 6);
+        return unit;
+    }
+
+    // 5-10, step 5: the field holds two digits, so -99 C is the lowest and 99 C the highest. Both ends are entered from
+    // 000 with the sign first (the sign cell has two choices: 0 and -, so one click is the minus, two the plus again).
+    it('takes -99 C entered sign first (5-10, #256)', async () => {
+        const unit = await onTemp();
+        await unit.panel.inner('L', 1); // the sign: -
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 9);
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 9);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[4]).toBe('TEMP: -99°C');
+        expect(unit.props.userSettings.getSetting('cal1SAT').get()).toBe(-99);
+    });
+
+    it('takes 99 C entered digits first (5-10)', async () => {
+        const unit = await onTemp();
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 9);
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 9);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[4]).toBe('TEMP: 099°C');
+        expect(unit.props.userSettings.getSetting('cal1SAT').get()).toBe(99);
+    });
+
+    // The minus on zero changes nothing in the value: a temperature of -00 is 0 C and gives the density altitude of 0 C.
+    // Source: ICAO standard atmosphere, density altitude = pressure altitude + 120 * (OAT - ISA); ISA at 9000 ft is
+    // 15 - 9 * 1.98 = -2.82 C, so 120 * 2.82 = 338 ft more than the 9000 ft of pressure altitude is 9338, shown to
+    // 100 ft: 9300 ft
+    it('keeps the density altitude of 0 C with the minus on a value of zero (5-10)', async () => {
+        const unit = await onTemp();
+        await unit.panel.inner('L', 1); // the sign: -
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(4)).toEqual(['TEMP: -00°C', 'DEN  9300ft']);
+    });
+});
+

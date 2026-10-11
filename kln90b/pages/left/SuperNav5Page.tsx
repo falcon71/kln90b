@@ -210,10 +210,15 @@ export class SuperNav5Page extends SevenLinePage {
      * @private
      */
     private calculateAutoRange(): number {
-        const following = this.props.memory.navPage.activeWaypoint.getFollowingLeg();
-        let distance = this.props.memory.navPage.distToActive ?? 40;
+        const activeWaypoint = this.props.memory.navPage.activeWaypoint;
+        //6-9, figure 6-16: the missed approach after the MAP is not sequenced to automatically, so it does not size the scale
+        const following = activeWaypoint.getActiveLeg()?.fixType === KLNFixType.MAP ? null : activeWaypoint.getFollowingLeg();
+        const distToActive = this.props.memory.navPage.distToActive;
+        let distance = distToActive ?? 40;
         if (following !== null) {
-            distance = UnitType.GA_RADIAN.convertTo(this.props.sensors.in.gps.coords.distance(following.wpt), UnitType.NMILE);
+            //The scale shows the active waypoint and the one after it, so the farther one decides
+            const distanceToFollowing = UnitType.GA_RADIAN.convertTo(this.props.sensors.in.gps.coords.distance(following.wpt), UnitType.NMILE);
+            distance = Math.max(distToActive ?? 0, distanceToFollowing);
         }
 
         return RANGES.find((r) => r >= distance) ?? 1000;

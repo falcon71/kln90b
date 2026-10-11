@@ -33,7 +33,7 @@ export class RefPage extends SixLineHalfPage {
     readonly children: UIElementChildren<RefPageTypes>;
 
 
-    readonly name: string = "REF ";
+    readonly name: string = "REF  ";
 
     private readonly refFpl: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
     private readonly refOther: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
@@ -93,7 +93,7 @@ export class RefPage extends SixLineHalfPage {
         if (wpt === null) {
             return;
         }
-        const ident = await getUniqueIdent(wpt.icaoStruct.ident, this.props.facilityLoader);
+        const ident = await getUniqueIdent(wpt.icaoStruct.ident, this.props.facilityLoader, false); //5-22 The name always ends in a letter
         if (ident === null) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID REF");
             return;
@@ -120,7 +120,7 @@ export class RefPage extends SixLineHalfPage {
             isTemporary: false, //irrelevant, because this flag is not persisted
             userFacilityType: UserFacilityType.LAT_LONG,
             reference1IcaoStruct: wpt.icaoStruct,
-            reference1Radial: closest.point.bearingFrom(wpt),
+            reference1Radial: new GeoPoint(wpt.lat, wpt.lon).bearingTo(closest.point), //5-22 The radial is the course measured at the waypoint used
             reference1Distance: UnitType.GA_RADIAN.convertTo(closest.point.distance(wpt), UnitType.NMILE),
         };
 
@@ -155,8 +155,9 @@ export class RefPage extends SixLineHalfPage {
             const path = circle.setAsGreatCircle(from, to);
             path.closest(wpt, tempGeoPoint);
             const distFromClosest = tempGeoPoint.distance(from); //We use this to check, if closest is between from and to
+            const distClosestTo = tempGeoPoint.distance(to); //5-21 The perpendicular must meet the leg itself, not its extension behind from
             const distClosestWpt = tempGeoPoint.distance(wpt);
-            if (distFromClosest <= distFromTo && distClosestWpt < distMin) {
+            if (distFromClosest <= distFromTo && distClosestTo <= distFromTo && distClosestWpt < distMin) {
                 closestWpt.set(tempGeoPoint);
                 distMin = distClosestWpt;
                 closestIdx = i;

@@ -48,7 +48,7 @@ export class SuperNav1Page extends SixLinePage {
         const to = navState.activeWaypoint.getActiveWpt();
 
         this.children = new UIElementChildren<SuperNav1PageTypes>({
-            from: new TextDisplay(IcaoFixedLength.getIdentFromFacility(from)),
+            from: new TextDisplay(IcaoFixedLength.getFromIdentFromFacility(from)),
             activeArrow: new ActiveArrow(to?.icaoStruct ?? null, navState),
             to: new TextDisplay(this.getIdent()),
             cdi: new SuperDeviationBar(navState.xtkToActive, navState.toFrom, navState.xtkScale),
@@ -75,7 +75,7 @@ export class SuperNav1Page extends SixLinePage {
         const from = navState.activeWaypoint.getFromWpt();
         const to = navState.activeWaypoint.getActiveWpt();
 
-        this.children.get("from").text = IcaoFixedLength.getIdentFromFacility(from);
+        this.children.get("from").text = IcaoFixedLength.getFromIdentFromFacility(from);
         this.children.get("activeArrow").icao = to?.icaoStruct ?? null;
         this.children.get("to").text = this.getIdent();
 

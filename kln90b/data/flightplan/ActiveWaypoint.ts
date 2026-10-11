@@ -336,8 +336,8 @@ export class ActiveWaypoint {
             return;
         }
         if (this.isDirectTo) {
-            //Becomes a random DTO when the waypoint is deleted from the plan
-            this.fplIdx = -1;
+            //The target moved when a leg was inserted or deleted in front of it, and becomes a random DTO when it is deleted from the plan
+            this.fplIdx = legs.indexOf(this.to);
             return;
         }
 

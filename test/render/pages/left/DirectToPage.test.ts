@@ -8,6 +8,7 @@ import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 import {activeIdent} from '../../../harness/readers';
 import {pointFrom} from '../../../harness/flight/geo';
+import {MainPage} from '../../../../kln90b/pages/MainPage';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
 const abc = vor('ABC', 47.2, 8.0);
@@ -69,7 +70,7 @@ describe('Direct To page', () => {
     });
 
     it('shows a blank DIR page when there is nothing to suggest (#49)', async () => {
-        // 3-27: rule 3 (a waypoint page in view on the right), and the boot SUP page has no facility, so the ident is blank
+        // 3-27 rule 5: the boot SUP page shows no waypoint (rule 3) and no waypoint is active (rule 4), so the ident is blank
         const unit = await bootUnit();
         await unit.panel.dct();
 
@@ -124,8 +125,8 @@ describe('Direct To page', () => {
     }
 
     // 3-27 rule 4: with no rule 1 to 3 candidate, the DIRECT TO page shows the active waypoint. NAV 1 is not a waypoint
-    // page, so rule 3 does not apply; this is the sibling of the pin below and holds the setup (#119)
-    it('prefills the active waypoint on the DIRECT TO page when NAV 1 is on the right (3-27 rule 4, sibling of #119)', async () => {
+    // page, so rule 3 does not apply (#119)
+    it('prefills the active waypoint on the DIRECT TO page when NAV 1 is on the right (3-27 rule 4, #119)', async () => {
         const unit = await bootWithAbcActive();
         await unit.panel.selectPage('R', 'NAV 1');
 
@@ -136,7 +137,7 @@ describe('Direct To page', () => {
         expect(Screen.read().rows('L')[2]).toBe('   ABC     ');
     });
 
-    // 3-27: the sibling of the pin below; its setup holds and the DIRECT TO page opens
+    // 3-27: the setup of the next test holds, and the DIRECT TO page opens
     it('opens the DIRECT TO page with ABC active and the empty SUP page on the right, as after power-up (the setup of #119)', async () => {
         const unit = await bootWithAbcActive();
         expect(Screen.read().status().right).toBe('SUP');
@@ -149,9 +150,26 @@ describe('Direct To page', () => {
 
     // 3-27 rule 4, "checked in the KLN 89 trainer: the active waypoint is prefilled after power-up from a waypoint page
     // and from NAV 1". Rule 3 applies only when a waypoint is shown on the page: the empty SUP page of the boot has none,
-    // but the unit returns its null and never reaches rule 4 (#119)
-    it.fails('prefills the active waypoint on the DIRECT TO page when the right page is the empty SUP page of the boot (#119)', async () => {
+    // but the unit once returned its null and never reached rule 4 (#119)
+    it('prefills the active waypoint on the DIRECT TO page when the right page is the empty SUP page of the boot (#119)', async () => {
         const unit = await bootWithAbcActive();
+
+        await unit.panel.dct();
+
+        expect(Screen.read().rows('L')[2]).toBe('   ABC     ');
+    });
+
+    // The same for every waypoint page that shows no waypoint, not only the SUP page: without the default navdata the
+    // world has no NDB and no intersection (the plan holds an airport and a VOR only), so those pages are empty
+    it.each(['NDB', 'INT'])('prefills the active waypoint on the DIRECT TO page when the right page is the empty %s page (3-27 rule 4, #119)', async page => {
+        const unit = await bootUnit({
+            facilities: [kaaa, abc, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
+            defaultNavdata: false,
+        });
+        await settle(unit);
+        expect(activeIdent(unit)).toBe('ABC');
+        await unit.panel.selectPage('R', page);
+        expect((unit.props.pageManager.getCurrentPage() as MainPage).getRightPage()).toMatchObject({facility: null}); // the precondition: the page shows no waypoint
 
         await unit.panel.dct();
 

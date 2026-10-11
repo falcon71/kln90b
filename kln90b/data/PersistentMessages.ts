@@ -27,7 +27,7 @@ export function buildPersistentMessages(props: PageProps): Message[] {
         new IfRequiredSelectObsMessage(props.memory.navPage, props.modeController),
         new MagvarMessage(props.magvar, props.memory.navPage),
         new Obs200NMMessage(props.memory.navPage, props.modeController),
-        new PressAltToSetBaroMessage(props.memory.navPage, props.pageManager),
+        new PressAltToSetBaroMessage(props.memory.navPage, props.pageManager, props.planeSettings),
         new VnavAlertMessage(props.vnav, props.pageManager),
     ];
 
@@ -67,8 +67,8 @@ class AdjustCourseToWithObsReadingMessage implements Message {
         if (this.lastCourse === null || Math.abs(NavMath.diffAngle(this.lastCourse, dtk)) > 5) {
             //First part: Whenever turn changes to more than 5 degress
             this.forceShow = true;
-            this.validUntil = Date.now() + 10 * 1000;
-            //The time appears to be about 30 seconds: https://youtu.be/S1lt2W95bLA?t=2244 https://youtu.be/S1lt2W95bLA?t=2574
+            this.validUntil = Date.now() + 30 * 1000;
+            //The time is about 30 seconds: https://youtu.be/S1lt2W95bLA?t=2244 https://youtu.be/S1lt2W95bLA?t=2574
         }
         this.lastCourse = dtk;
 
@@ -222,10 +222,15 @@ class PressAltToSetBaroMessage implements Message {
     private altShown = true;
 
 
-    constructor(private readonly navState: NavPageState, private readonly pageManager: PageManager) {
+    constructor(private readonly navState: NavPageState, private readonly pageManager: PageManager, private readonly planeSettings: KLN90PlaneSettings) {
     }
 
     public isConditionValid(): boolean {
+        //6-8: Not displayed when an air data computer supplies the barometric pressure. The ALT page is read-only then
+        if (this.planeSettings.input.airdata.baroSource > 0) {
+            return false;
+        }
+
         const mode = this.navState.navmode;
         if (mode !== this.lastMode) {
             if (mode === NavMode.ARM_OBS || mode === NavMode.ARM_LEG) {

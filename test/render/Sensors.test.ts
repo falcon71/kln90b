@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, settle} from '../harness/boot';
+import {NO_OBS, panelXml} from '../harness/panelXml';
 
 describe('L:KLN90B_HSI_TF_FLAGS without an active waypoint (a0678fa, #29)', () => {
     // Public contract: the LVar is documented in LVars.ts (CLAUDE.md, "LVars"); the unit writes 0 when the HSI has to be
@@ -25,7 +26,7 @@ describe('external OBS course and L:KLN90B_ObsSource', () => {
         return unit;
     }
 
-    // The sibling of the pin: the setup works, the unit reads 51 and takes the switch to 0 over from the LVar.
+    // The setup of the test below: the unit reads 51 and takes the switch to 0 over from the LVar.
     // Public contract: Input.ObsSource of the panel.xml sample (cfg/panel.xml, "synced with L:KLN90B_ObsSource") and the
     // LVars.ts doc comment of LVAR_OBS_SOURCE (changes Input.ObsSource on the fly).
     it('reads the external course and takes ObsSource 0 from the LVar (#123)', async () => {
@@ -39,14 +40,44 @@ describe('external OBS course and L:KLN90B_ObsSource', () => {
     });
 
     // Public contract: L:KLN90B_ObsSource changes Input.ObsSource on the fly (LVars.ts), and the panel.xml sample says 0
-    // disables the input (cfg/panel.xml). A disabled input has no external course, so obsMag must be null; it keeps its
-    // last value today, so the stale course is forced on OBS mode and MOD 2 stays read-only.
-    it.fails('has no external course after ObsSource is switched to 0 (#123)', async () => {
+    // disables the input (cfg/panel.xml). A disabled input has no external course, so obsMag must be null and not the
+    // last course read (which would be forced on OBS mode and keep MOD 2 read-only).
+    it('has no external course after ObsSource is switched to 0 (#123)', async () => {
         const unit = await bootWithExternalCourse();
 
         unit.env.sim.set('L:KLN90B_ObsSource', 'number', 0);
         await vi.advanceTimersByTimeAsync(3000);
 
         expect(unit.props.sensors.in.obsMag).toBeNull();
+    });
+
+    // Public contract: the LVars.ts doc comment of LVAR_OBS_SOURCE; the panel.xml sample (cfg/panel.xml) says 0
+    // disables the input
+    it('has no external course with ObsSource 0 from the panel.xml', async () => {
+        const unit = await bootUnit({panelXml: panelXml(NO_OBS)});
+        await settle(unit);
+        unit.env.sim.set('Nav OBS:1', 'degrees', 51);
+        unit.env.sim.set('Nav OBS:2', 'degrees', 77);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.props.sensors.in.obsMag).toBeNull();
+    });
+
+    // The other sources keep reading: the switch to 0 must not leave the unit deaf (#123)
+    it('reads Nav OBS:2 with ObsSource 2 and takes the course of source 1 back when the LVar returns to 1', async () => {
+        const unit = await bootWithExternalCourse();
+        unit.env.sim.set('Nav OBS:2', 'degrees', 77);
+
+        unit.env.sim.set('L:KLN90B_ObsSource', 'number', 2);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.props.sensors.in.obsMag).toBe(77);
+
+        unit.env.sim.set('L:KLN90B_ObsSource', 'number', 0);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.props.sensors.in.obsMag).toBeNull();
+
+        unit.env.sim.set('L:KLN90B_ObsSource', 'number', 1);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.props.sensors.in.obsMag).toBe(51);
     });
 });

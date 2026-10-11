@@ -43,7 +43,7 @@ export class CoordOrNearestView implements UiElement {
             lat: new LatitudeEditor(bus, unpacked ? unpacked.lat : null, setLatitude),
             lon: new LongitudeEditor(bus, unpacked ? unpacked.lon : null, setLongitude),
             bearing: new BearingDisplay(),
-            distance: new DistanceDisplay(5),
+            distance: new DistanceDisplay(5, null, true),
         });
         this.coordRef = FSComponent.createRef<HTMLDivElement>();
         this.nearestRef = FSComponent.createRef<HTMLDivElement>();

@@ -192,20 +192,35 @@ describe('KLNFacilityLoader.getFacility', () => {
     });
 
     // The FacilityClient interface the SDK's FlightPathCalculator calls (WTFlightplanSync) promises null for a facility
-    // that cannot be retrieved, and getFacilities a null in its place. KLNFacilityLoader passes the rejection of the
-    // database through instead, so one unknown fix fails the whole batch. Two pins, one for each method, so that a fix
-    // of one shows; the passing siblings are the two characterizations above that answer known facilities.
-    it.fails('tryGetFacility answers null for a facility that is in neither source (#198)', async () => {
+    // that cannot be retrieved, and getFacilities a null in its place, so that one unknown fix does not fail the whole
+    // batch. The siblings above answer known facilities.
+    it('tryGetFacility answers null for a facility that is in neither source (#198)', async () => {
         const {loader} = setup([vor('ABC', 48, 9)]);
 
         await expect(loader.tryGetFacility(FacilityType.VOR, ICAO.value('V', 'K1', '', 'NONE'))).resolves.toBeNull();
     });
 
-    it.fails('getFacilities answers null in the place of a facility that is in neither source (#198)', async () => {
+    it('getFacilities answers null in the place of a facility that is in neither source (#198)', async () => {
         const beacon = ndb('NDB', 47, 8);
         const {loader} = setup([beacon]);
 
         await expect(loader.getFacilities([beacon.icaoStruct, ICAO.value('N', 'K1', '', 'NONE')])).resolves.toEqual([beacon, null]);
+    });
+
+    it('getFacilitiesOfType answers null in the place of a facility that is in neither source (#198)', async () => {
+        const beacon = ndb('NDB', 47, 8);
+        const user = ndb('USR', 47, 8, {region: 'XX'});
+        const {loader} = setup([beacon], [user]);
+
+        await expect(loader.getFacilitiesOfType(FacilityType.NDB, [ICAO.value('N', 'K1', '', 'NONE'), beacon.icaoStruct, user.icaoStruct]))
+            .resolves.toEqual([null, beacon, user]);
+    });
+
+    it('getFacilities keeps a facility of the user repository when another in the batch is unknown (#198)', async () => {
+        const user = vor('ABC', 47, 8, {region: 'XX'});
+        const {loader} = setup([], [user]);
+
+        await expect(loader.getFacilities([ICAO.value('V', 'K1', '', 'NONE'), user.icaoStruct])).resolves.toEqual([null, user]);
     });
 });
 

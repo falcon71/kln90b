@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
-import {intersection, ndb, vor} from '../../../harness/navdata/builders';
+import {airport, intersection, ndb, vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {distanceNm} from '../../../harness/flight/geo';
 
@@ -32,17 +32,16 @@ const isItem = (row: string) => /^ ?\d+ [A-Z]{3} .{3}\?$/.test(row);
 const items = (rows: string[]) => rows.filter(isItem).map(r => r.trim().replace(/ +/g, ' '));
 
 describe('DUPLICATE WAYPOINT page (characterization)', () => {
-    // Four waypoints, so that the number of visible lines does not matter; the line positions are left out, because the
-    // page has no header line (#258, pinned below)
     it('lists the waypoints with the cursor on the first (characterization)', async () => {
         await duplicatePage([abdChe, abdFra, abdDeu, abdIta]);
 
         const screen = Screen.read();
         const rows = screen.rows('L');
         const masks = screen.maskRows('L');
-        const lines = rows.map((r, i) => `${r}|${masks[i]}`).filter((l, i) => i === 0 || isItem(rows[i]));
+        const lines = rows.map((r, i) => `${r}|${masks[i]}`);
         expect(lines.join('\n')).toMatchInlineSnapshot(`
           " ABD      4|...........
+            TYPE AREA|...........
            1 VOR CHE?|IIIIIIIIIII
            2 NDB FRA?|...........
            3 VOR DEU?|...........
@@ -74,7 +73,7 @@ describe('DUPLICATE WAYPOINT page (spec)', () => {
     });
 
     // 3-15 step 3: the cursor starts on the first waypoint and the left outer knob moves it down the list to the others
-    // (figure 3-53). Whether the first one scrolls out depends on the four visible lines, which #258 pins
+    // (figure 3-53). That the first one scrolls out with the fifth is held by the layout tests below
     it('starts the cursor on the first waypoint and moves it to the fifth with the outer knob (3-15)', async () => {
         const unit = await duplicatePage();
         expect(unit.panel.focused('L').text.trim()).toBe('1 VOR CHE?');
@@ -107,7 +106,7 @@ describe('DUPLICATE WAYPOINT page (spec)', () => {
 });
 
 // 3-15, figures 3-52 and 3-53: the line below the identifier is the header TYPE AREA, and four waypoints follow in rows
-// 2 to 5. The page has no header, and its list starts in row 1 with five lines (List's default height)
+// 2 to 5
 describe('DUPLICATE WAYPOINT page layout', () => {
     it('five waypoints named ABD open the page with the count 5 (3-15)', async () => {
         await duplicatePage();
@@ -116,11 +115,51 @@ describe('DUPLICATE WAYPOINT page layout', () => {
         expect(items(Screen.read().rows('L'))[0]).toBe('1 VOR CHE?');
     });
 
-    it.fails('shows the header TYPE AREA in row 1 and four waypoints in rows 2 to 5 (3-15, checked in the KLN 89 trainer, 2026-10-07, #258)', async () => {
+    it('shows the header TYPE AREA in row 1 and four waypoints in rows 2 to 5 (3-15, checked in the KLN 89 trainer, 2026-10-07, #258)', async () => {
         await duplicatePage();
 
         const rows = Screen.read().rows('L');
         expect(rows[1].trim()).toBe('TYPE AREA');
         expect(rows.slice(2).map(r => r.trim().replace(/ +/g, ' '))).toEqual(['1 VOR CHE?', '2 NDB FRA?', '3 VOR DEU?', '4 NDB ITA?']);
+    });
+
+    // Figures 3-52 and 3-53 end the header where the lines of the list end (the question mark): the title of the area
+    // stands over the countries
+    it('ends the header over the question marks of the list (3-15, figures 3-52 and 3-53)', async () => {
+        await duplicatePage();
+
+        const rows = Screen.read().rows('L');
+        expect(rows[1]).toBe('  TYPE AREA');
+        expect(rows[2].length).toBe(rows[1].length);
+        expect(rows[1].lastIndexOf('A')).toBe(rows[2].indexOf('?'));
+    });
+
+    // 3-15, figure 3-53: after the fourth waypoint the outer knob scrolls the list, and the header stays above it
+    it('keeps the header while the outer knob scrolls the list past the fourth waypoint (3-15, figure 3-53)', async () => {
+        const unit = await duplicatePage();
+
+        await unit.panel.outer('L', 4);
+        await vi.advanceTimersByTimeAsync(500);
+
+        const rows = Screen.read().rows('L');
+        expect(rows[0].trim().split(/ +/)).toEqual(['ABD', '5']);
+        expect(rows[1].trim()).toBe('TYPE AREA');
+        expect(rows.slice(2).map(r => r.trim().replace(/ +/g, ' '))).toEqual(['2 NDB FRA?', '3 VOR DEU?', '4 NDB ITA?', '5 INT AUT?']);
+    });
+
+    // 3-15, figure 3-52: the area of a US airport is USA (figure 3-52 lists an NDB of the United States). An airport and
+    // an intersection share the ident KAAA; the intersection lies closer to the aircraft
+    it('names the area of a US airport USA (3-15, figure 3-52, #168)', async () => {
+        const unit = await bootUnit({
+            facilities: [airport('KAAA', 40.0, -100.0), intersection('KAAA', 47.5, 8.5, {region: 'LS'})],
+            position: POSITION,
+        });
+        await settle(unit);
+        await unit.panel.dct();
+        await unit.panel.enterIdent('L', 'KAAA');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(items(Screen.read().rows('L'))).toEqual(['1 INT CHE?', '2 APT USA?']);
     });
 });

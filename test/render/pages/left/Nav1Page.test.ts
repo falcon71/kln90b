@@ -18,7 +18,7 @@ const west = (nm: number) => pointFrom(KDDD, 270, nm);
 /**
  * Boots on the leg 5 NM further west, selects NAV 1 on the left, then holds the position `nm` west of KDDD at
  * `groundspeedKt` with the track of the leg. The page is selected first, because selectPage reads the screen, and a
- * screen that overflows its half page (the DIS pin) cannot be read.
+ * screen that overflows its half page (the DIS test of #226) cannot be read.
  */
 async function onLeg(nm: number, groundspeedKt: number, magvar = 0): Promise<HeadlessUnit> {
     const unit = await bootUnit({
@@ -122,7 +122,7 @@ describe('NAV 1 page', () => {
         expect(['ETE    1:00', 'ETE     :59']).toContain(Screen.read().rows('L')[4]);
     });
 
-    // The setup sibling of the DIS pin: 99.97 NM from KDDD
+    // The setup sibling of the DIS test of #226: 99.97 NM from KDDD
     it('reaches a distance of 99.97 NM (3-31)', async () => {
         const unit = await onLeg(99.97, 145);
 
@@ -136,7 +136,7 @@ describe('NAV 1 page', () => {
     // 3-31: DIS fills four cells, tenths below 100 NM and whole NM above (figures 3-97, 5-21). Just below 100 NM the
     // tenths round up to 100.0, five cells, which runs past the edge of the half page (Screen.read() throws on it).
     // Expected: 100 (rounded) or 99.9 (truncated), in the four cells.
-    it.fails('keeps DIS in its four cells just below 100 NM (3-31, #226)', async () => {
+    it('keeps DIS in its four cells just below 100 NM (3-31, #226)', async () => {
         await onLeg(99.97, 145);
 
         expect(['DIS   100nm', 'DIS  99.9nm']).toContain(Screen.read().rows('L')[2]);
@@ -155,7 +155,7 @@ async function directToKddd(): Promise<HeadlessUnit> {
 }
 
 describe('NAV 1 page, direct-to', () => {
-    // The setup sibling of the pin below: a direct-to KDDD, NAV 1 on the right, the arrow before KDDD in cell 5
+    // The setup sibling of the #227 test below: a direct-to KDDD, NAV 1 on the right, the arrow before KDDD in cell 5
     it('shows the active waypoint after the arrow on a direct-to (3-31)', async () => {
         const unit = await directToKddd();
 
@@ -167,9 +167,9 @@ describe('NAV 1 page, direct-to', () => {
 
     // 3-31, figure 3-97 (and the Super NAV 1 of figure 5-21): on a direct-to the leg is the Direct To symbol followed by
     // the waypoint, the symbol (the font's d plus the arrow, docs/architecture.md) directly in front of the ident; a
-    // photo of a real unit (reference-photos-index.md, the approach select page) shows it the same way. The code pads
-    // the "d" FROM ident to five cells like a waypoint ident, so the d stands in cell 0, four cells away from its arrow.
-    it.fails('draws the Direct To symbol directly in front of the waypoint (3-31, figure 3-97, #227)', async () => {
+    // photo of a real unit (reference-photos-index.md, the approach select page) shows it the same way. Until #227 the
+    // code padded the "d" FROM ident to five cells like a waypoint ident, four cells away from its arrow.
+    it('draws the Direct To symbol directly in front of the waypoint (3-31, figure 3-97, #227)', async () => {
         await directToKddd();
 
         expect(Screen.read().rows('R')[0]).toBe('    d›KDDD ');
@@ -256,7 +256,7 @@ describe('NAV 1 deviation bar', () => {
         expect(Screen.read().rows('L')[1]).toBe('ηηηηηζΑηηηη');
     });
 
-    // The setup sibling of the pin: 0.55 NM left of the course, TO the active waypoint, on the 5 NM scale
+    // The setup sibling of the #225 test: 0.55 NM left of the course, TO the active waypoint, on the 5 NM scale
     it('reaches 0.55 NM left of the course flying TO (3-31)', async () => {
         const unit = await leftOfCourse(0.55);
 
@@ -270,9 +270,8 @@ describe('NAV 1 deviation bar', () => {
     // 3-31: the bar works like the needle of a CDI, the center triangle shows TO or FROM only. 0.55 NM left of the course
     // puts the bar between the triangle and the first dot right of it, which the font draws with two glyphs: the
     // triangle with the bar at its right edge (TO: Υ, FROM: ζ) and the dot with the bar at its left edge (Α). The FROM
-    // case draws both; the TO case drops the second glyph (DeviationBar.ts:72, an operator precedence slip), so half of
-    // the bar is missing.
-    it.fails('draws the whole bar next to the TO triangle (3-31, #225)', async () => {
+    // case draws both, and so does the TO case (until #225 it dropped the second glyph: an operator precedence slip).
+    it('draws the whole bar next to the TO triangle (3-31, #225)', async () => {
         await leftOfCourse(0.55);
 
         expect(Screen.read().rows('L')[1]).toBe('ηηηηηΥΑηηηη');

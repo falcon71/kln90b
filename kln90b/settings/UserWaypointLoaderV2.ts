@@ -30,20 +30,15 @@ import {UserWaypointLoader} from "./UserWaypointPersistor";
 export class UserWaypointLoaderV2 implements UserWaypointLoader {
     private manager: DefaultUserSettingManager<KLN90BUserWaypointsTypes>;
 
-    private ignoreSync = false;
-
-
     constructor(bus: EventBus, private repo: KLNFacilityRepository) {
         this.manager = KLN90BUserWaypointsSettings.getManager(bus);
     }
 
     public restoreWaypoints() {
         const wpts = this.deserializeAllWpts();
-        this.ignoreSync = true;
         for (const wpt of wpts) {
             this.repo.add(wpt);
         }
-        this.ignoreSync = false;
     }
 
     private deserializeAllWpts(): Facility[] {
@@ -271,10 +266,10 @@ export class UserWaypointLoaderV2 implements UserWaypointLoader {
 
     private deserializeLat(str: string): number {
         const sign = str.substring(19, 20) == '-' ? -1 : 1;
-        const degrees = Number(str.substring(19, 22));
+        const degrees = Number(str.substring(20, 22)); //Without the sign, which is applied below
         const minutes = Number(str.substring(22, 27)) / 60;
 
-        return sign * (degrees + (degrees >= 0 ? minutes : -minutes));
+        return sign * (degrees + minutes);
     }
 
     private deserializeLon(str: string): number {
@@ -298,7 +293,7 @@ export class UserWaypointLoaderV2 implements UserWaypointLoader {
             case "S":
                 return RunwaySurfaceType.Grass;
             default:
-                throw new Error(`Unexpoected runwaySurface:${str.substring(48, 49)}`);
+                throw new Error(`Unexpected runwaySurface:${str.substring(48, 49)}`);
         }
 
     }

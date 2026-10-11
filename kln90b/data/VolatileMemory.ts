@@ -53,6 +53,13 @@ export const enum NavMode {
 
 }
 
+/**
+ * The OBS modes (ENR-OBS and ARM-OBS), in which the unit flies a course to the active waypoint and not the plan
+ */
+export function isObsMode(mode: NavMode): boolean {
+    return mode === NavMode.ENR_OBS || mode === NavMode.ARM_OBS;
+}
+
 export class NavPageState {
 
     public isSelfTestActive: boolean = false;
@@ -227,7 +234,9 @@ export class VolatileMemory {
         this.altPage.alertEnabled = false;
         this.altPage.alertWarn = 300;
 
-        this.fplPage.flightplans[0].removeProcedures();
+        if (evt.timeSincePowerChange > RESET_TIME) {
+            this.fplPage.flightplans[0].removeProcedures();
+        }
 
         this.dtPage.departureTime = null;
         this.dtPage.flightTimer = 0;

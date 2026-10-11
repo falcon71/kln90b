@@ -239,7 +239,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
                     });
                 }
                 break;
-            case 4:
+            case 3:
                 this.currentApt7Page = new Apt7PreviewPage({
                     ...this.props,
                     proc: proc,
@@ -444,7 +444,8 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             }
         }
 
-        if (SidStar.hasDuplicates(fpl0Legs, legs)) {
+        // 6-5, B-3: only the enroute waypoints count, not the legs of a procedure that is already loaded
+        if (SidStar.hasDuplicates(fpl0Legs.filter(leg => leg.type === KLNLegType.USER), legs)) {
             this.props.messageHandler.addMessage(new OneTimeMessage(["REDUNDANT WPTS IN FPL", "EDIT ENROUTE WPTS", "AS NECESSARY"]));
         }
 
@@ -690,7 +691,7 @@ class Apt7RunwayPage extends Apt7SelectorPage {
         const rwys = this.proc.runwayTransitions.filter(runwayTransition => SidStar.isProcedureRecognized(this.proc, runwayTransition, this.trans)).map((rwy, idx) => new SimpleListItem<RunwayTransition>({
             bus: this.props.bus,
             value: rwy,
-            fulltext: (idx + 1).toString().padStart(2, " ") + " " + RunwayUtils.getRunwayNameString(rwy.runwayNumber, rwy.runwayDesignation, true).padEnd(5, " "),
+            fulltext: (idx + 1).toString().padStart(2, " ") + " " + RunwayUtils.getRunwayNameString(rwy.runwayNumber, rwy.runwayDesignation, true, "RW").padEnd(5, " "),
             onEnter: (rwy) => this.selectRunway(this.proc, rwy, this.trans),
         }));
 

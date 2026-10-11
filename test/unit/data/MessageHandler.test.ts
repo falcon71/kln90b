@@ -140,3 +140,52 @@ describe('MessageHandler, persistent messages', () => {
         expect(texts(handler)).toEqual(['USER DATA LOST', 'OBS WPT > 200NM']);
     });
 });
+
+// A message describes the power-on in which it was posted (#176); the unit clears the handler at the power-off
+describe('MessageHandler.clear (#176)', () => {
+    it('drops the one-time messages, read or unread, and posts nothing by itself', () => {
+        const handler = new MessageHandler();
+        const read = new OneTimeMessage(['READ']);
+        read.seen = true;
+        handler.addMessage(read);
+        handler.addMessage(new OneTimeMessage(['UNREAD']));
+
+        handler.clear();
+        handler.tick();
+
+        expect(texts(handler)).toEqual([]);
+        expect(handler.hasMessages()).toBe(false);
+        expect(handler.hasUnreadMessages()).toBe(false);
+    });
+
+    it('lets a persistent message return unread at the next tick while its condition holds, and not otherwise (characterization)', () => {
+        const handler = new MessageHandler();
+        const holds = new Condition('HOLDS');
+        const ends = new Condition('ENDS');
+        handler.persistentMessages = [holds, ends];
+        holds.valid = true;
+        ends.valid = true;
+        handler.tick();
+        readAll(handler);
+        expect(handler.hasUnreadMessages()).toBe(false);
+
+        handler.clear();
+        expect(handler.hasMessages()).toBe(false);
+        ends.valid = false;
+        handler.tick();
+
+        expect(texts(handler)).toEqual(['HOLDS']);
+        expect(handler.hasUnreadMessages()).toBe(true);
+    });
+
+    it('keeps a message that is added after it', () => {
+        const handler = new MessageHandler();
+        handler.addMessage(new OneTimeMessage(['BEFORE']));
+
+        handler.clear();
+        handler.addMessage(new OneTimeMessage(['AFTER']));
+        handler.tick();
+
+        expect(texts(handler)).toEqual(['AFTER']);
+    });
+});

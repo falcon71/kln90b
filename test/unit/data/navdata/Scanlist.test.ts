@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {EventBus, Facility, FacilityClient, FacilitySearchType, ICAO, IcaoValue, UserFacilityType} from '@microsoft/msfs-sdk';
 import {FacilityLoaderScanlist, MAX_SCROLL_SPEED} from '../../../../kln90b/data/navdata/Scanlist';
 import {ActualFacilityClient, KLNFacilityLoader} from '../../../../kln90b/data/navdata/KLNFacilityLoader';
@@ -66,15 +66,142 @@ describe('FacilityLoaderScanlist scanning (6a6c634)', () => {
         expect(list.isEmpty()).toBe(true);
     });
 
-    // The fill job reads lastIcao again when it starts its second half, so a scan from another waypoint while the
-    // first fill still runs makes it start behind that waypoint: KAAB is never searched and the scan KAAA to KAAB is lost.
-    // In the sim this needs a scan from an ident-only ICAO (a typed ident, WaypointPage.tsx:156).
-    it.fails('keeps every waypoint when a scan starts during the first fill (#108)', async () => {
+    // The two halves of the fill start from the position the job started with, also when a scan from another waypoint
+    // sets lastIcao while the first fill still runs (in the sim: a scan from an ident-only ICAO, a typed ident,
+    // WaypointPage.tsx:156). Otherwise the stretch between the two positions is never searched, and KAAB is lost.
+    it('keeps every waypoint when a scan starts during the first fill (#108)', async () => {
         const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, airports() as unknown as FacilityClient, new EventBus());
         await list.init();
         await list.getNext(ICAO.value('A', '', '', 'KAAB'), 1);
         await managerJob(list);
         expect((await list.getNext(ICAO.value('A', '', '', 'KAAA'), 1))?.ident).toBe('KAAB');
+    });
+
+    // The same with the scan from a waypoint further on, so that more than one waypoint lies between the two positions
+    it('keeps every waypoint when a scan starts from a later waypoint during the first fill (#108)', async () => {
+        const client = new MemoryFacilityClient([airport('KAAA', 47, 8), airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8), airport('KAAD', 47.3, 8)]);
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, client as unknown as FacilityClient, new EventBus());
+        await list.init();
+        await list.getNext(ICAO.value('A', '', '', 'KAAC'), 1);
+        await managerJob(list);
+
+        const forward = [
+            (await list.getNext(ICAO.value('A', '', '', 'KAAA'), 1))?.ident,
+            (await list.getNext(ICAO.value('A', '', '', 'KAAB'), 1))?.ident,
+            (await list.getNext(ICAO.value('A', '', '', 'KAAC'), 1))?.ident,
+        ];
+        const backward = [
+            (await list.getNext(ICAO.value('A', '', '', 'KAAD'), -1))?.ident,
+            (await list.getNext(ICAO.value('A', '', '', 'KAAC'), -1))?.ident,
+            (await list.getNext(ICAO.value('A', '', '', 'KAAB'), -1))?.ident,
+        ];
+
+        expect([forward, backward]).toEqual([['KAAB', 'KAAC', 'KAAD'], ['KAAC', 'KAAB', 'KAAA']]);
+    });
+});
+
+/** A client whose searches wait to be released one by one once the gate is closed, so that a test decides when a job goes on */
+class GatedClient extends MemoryFacilityClient {
+    public gateClosed = false;
+    public readonly searched: string[] = [];
+    public readonly waiting: (() => void)[] = [];
+
+    public searchByIdentWithIcaoStructs(filter: FacilitySearchType, ident: string, maxItems?: number): Promise<IcaoValue[]> {
+        this.searched.push(ident);
+        const result = super.searchByIdentWithIcaoStructs(filter, ident, maxItems);
+        if (!this.gateClosed) {
+            return result;
+        }
+        return new Promise(resolve => this.waiting.push(() => resolve(result)));
+    }
+
+    /** Lets the oldest waiting search answer and the job behind it run up to its next search */
+    public async release(): Promise<void> {
+        this.waiting.shift()!();
+        for (let i = 0; i < 20; i++) {
+            await Promise.resolve();
+        }
+    }
+}
+
+// The job that fills the cache is cancelled by the next job: it compares its id with the id of the newest job after each
+// search. The scan list does not wait for a job when it starts the next one (a sync, a jump at the top speed).
+describe('FacilityLoaderScanlist background jobs', () => {
+    async function filledList(client: GatedClient): Promise<FacilityLoaderScanlist> {
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, client as unknown as FacilityClient, new EventBus());
+        await list.init();
+        await managerJob(list);
+        return list;
+    }
+
+    // Two jobs that overlap. The first search of the first job is answered after the second job has started: the first job
+    // must stop there and not search any further. A random id would give both jobs the same id once in ten thousand times;
+    // the stub makes it happen every time.
+    it.each([
+        ['a job id that is a fresh number each time', undefined],
+        ['the random generator returning the same number twice', 0.5],
+    ])('a job stops when a newer job has started, with %s (#117)', async (_name, random) => {
+        if (random !== undefined) {
+            vi.spyOn(Math, 'random').mockReturnValue(random);
+        }
+        try {
+            const client = new GatedClient([airport('KAAA', 47, 8), airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8)]);
+            const list = await filledList(client);
+            client.gateClosed = true;
+            client.searched.length = 0;
+
+            list.sync(ICAO.value('A', '', '', 'KAAB'));
+            expect(client.waiting).toHaveLength(1); // The first job waits for its first search
+            list.sync(ICAO.value('A', '', '', 'KAAC'));
+            expect(client.waiting).toHaveLength(2); // The second job waits for its first search
+            const searchedByBoth = client.searched.length;
+
+            await client.release(); // The answer to the first job
+
+            expect(client.searched).toHaveLength(searchedByBoth); // The first job searched no further
+            expect(client.waiting).toHaveLength(1);
+        } finally {
+            vi.restoreAllMocks();
+        }
+    });
+
+    // The same for the half of the fill towards the beginning of the list. A sync to an ICAO that is not in the cache
+    // throws the cache away, so this half searches first and the job waits there.
+    it('a job that waits in the half towards the beginning stops when a newer job has started (#117)', async () => {
+        const client = new GatedClient([airport('KAAA', 47, 8), airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8)]);
+        const list = await filledList(client);
+        client.gateClosed = true;
+        client.searched.length = 0;
+
+        list.sync(ICAO.value('A', '', '', 'KAAD'));
+        expect(client.searched).toEqual(['KAAD']); // The first job waits for its first search, in the half towards the beginning
+        list.sync(ICAO.value('A', '', '', 'KAAE'));
+        expect(client.searched).toEqual(['KAAD', 'KAAE']);
+
+        await client.release(); // The answer to the first job
+
+        expect(client.searched).toEqual(['KAAD', 'KAAE']); // The first job searched no further
+        expect(client.waiting).toHaveLength(1);
+    });
+
+    // The cancellation is not lost by the counter: the newest job, alone, runs to its end
+    it('the newest job runs to its end when an older job was cancelled (#117)', async () => {
+        const client = new GatedClient([airport('KAAA', 47, 8), airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8)]);
+        const list = await filledList(client);
+        client.gateClosed = true;
+        list.sync(ICAO.value('A', '', '', 'KAAB'));
+        list.sync(ICAO.value('A', '', '', 'KAAC'));
+        const newest = managerJob(list)!;
+
+        client.gateClosed = false;
+        while (client.waiting.length > 0) {
+            await client.release();
+        }
+        await newest;
+
+        expect(managerJob(list)).toBeNull();
+        expect((await list.getNext(ICAO.value('A', '', '', 'KAAA'), 1))?.ident).toBe('KAAB');
+        expect((await list.getNext(ICAO.value('A', '', '', 'KAAB'), 1))?.ident).toBe('KAAC');
     });
 });
 

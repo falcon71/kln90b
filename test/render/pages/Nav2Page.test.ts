@@ -130,28 +130,28 @@ describe('NAV 2 page', () => {
 
     // The real unit keeps the radial in its cells for a two-letter VOR ident: the reference photo image3-2-scaled.jpeg
     // of a real unit shows a two-letter VOR with the radial in cells 5 to 8, the cells of a three-letter ident in
-    // figure 3-103 (3-32). The code writes the ident without padding, so the radial moves one cell to the left.
+    // figure 3-103 (3-32). Until #228 the code wrote the ident without padding, so the radial moved one cell to the left.
     it('shows the radial of a three-letter VOR in cells 5 to 8 (3-32)', async () => {
         await nav2At({lat: 47.0, lon: 8.0}, [vor('ABC', 47.2, 8.0)]);
 
         expect(Screen.read().rows('L')[2]).toBe('ABC  180°fr');
     });
 
-    it.fails('shows the radial of a two-letter VOR in cells 5 to 8 (3-32, #228)', async () => {
+    it('shows the radial of a two-letter VOR in cells 5 to 8 (3-32, #228)', async () => {
         await nav2At({lat: 47.0, lon: 8.0}, [vor('AB', 47.2, 8.0)]);
 
         expect(Screen.read().rows('L')[2]).toBe('AB   180°fr');
     });
 });
 
-// #99: the minutes are rounded on their own after the degrees were floored, so a position just below a whole degree
-// reads 60.00 minutes. 3-8, 3-32: the minutes run from 00.00 to 59.99. Whether the real unit rounds or truncates is
-// not known, so both readings are accepted (the KLN 89 trainer never showed 60.00 minutes either, 2026-10-07).
+// #99: a position just below a whole degree must not read 60.00 minutes. 3-8, 3-32: the minutes run from 00.00 to
+// 59.99. Whether the real unit rounds or truncates is not known, so both readings are accepted (the KLN 89 trainer
+// never showed 60.00 minutes either, 2026-10-07).
 describe('NAV 2 coordinates next to a whole degree (#99)', () => {
     // 0.00006 minutes below 48 N and below 11 E (two-digit degrees, so that the blank-padding bug stays out)
     const justBelow = {lat: 48 - 0.000001, lon: 11 - 0.000001};
 
-    // The setup sibling of the pins: the GPS position is just below the whole degrees and NAV 2 shows it
+    // The setup sibling of the tests below: the GPS position is just below the whole degrees and NAV 2 shows it
     it('reads a position just below a whole degree (3-32)', async () => {
         const unit = await nav2At(justBelow);
 
@@ -164,20 +164,20 @@ describe('NAV 2 coordinates next to a whole degree (#99)', () => {
         expect(screen.rows('L')[5].startsWith('E 1')).toBe(true);
     });
 
-    // Just above a whole degree the display is right today: the passing half of the rule
+    // Just above a whole degree the minutes are 00.00, the other half of the rule
     it('shows 00.00 minutes just above a whole degree (3-8, 3-32)', async () => {
         await nav2At({lat: 48 + 0.000001, lon: 11 + 0.000001});
 
         expect(Screen.read().rows('L').slice(4)).toEqual(["N 48°00.00'", "E 11°00.00'"]);
     });
 
-    it.fails('never shows 60 minutes of latitude (3-8, 3-32, #99)', async () => {
+    it('never shows 60 minutes of latitude (3-8, 3-32, #99)', async () => {
         await nav2At(justBelow);
 
         expect(["N 48°00.00'", "N 47°59.99'"]).toContain(Screen.read().rows('L')[4]);
     });
 
-    it.fails('never shows 60 minutes of longitude (3-8, 3-32, #99)', async () => {
+    it('never shows 60 minutes of longitude (3-8, 3-32, #99)', async () => {
         await nav2At(justBelow);
 
         expect(["E 11°00.00'", "E 10°59.99'"]).toContain(Screen.read().rows('L')[5]);
@@ -202,7 +202,7 @@ describe('NAV 2 before the first fix (3-8)', () => {
         ]);
     });
 
-    it.fails('shows the longitude dashes in the cells of the three degree digits (3-8, #224)', async () => {
+    it('shows the longitude dashes in the cells of the three degree digits (3-8, #224)', async () => {
         await bootUnit({coldGps: true});
         await vi.advanceTimersByTimeAsync(1000);
 

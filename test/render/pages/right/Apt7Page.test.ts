@@ -7,7 +7,7 @@ import {pointFrom} from '../../../harness/flight/geo';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, sid, star, withProcedures} from '../../../harness/navdata/procedures';
 import {savedFlightplan} from '../../../harness/storage';
-import {fplIdents} from '../../../harness/readers';
+import {fplIdents, messages} from '../../../harness/readers';
 import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {EVT_CLR} from '../../../../kln90b/HEvents';
@@ -119,6 +119,75 @@ describe('APT 7 putting a procedure into FPL 0', () => {
             ['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID],
             ['ENRAA', KLNLegType.USER], ['KUUU', KLNLegType.USER],
         ]);
+    });
+});
+
+// 6-5, B-3: REDUNDANT WPTS IN FPL concerns the enroute waypoints of FPL 0 that the procedure holds again, not the legs of
+// another procedure that is loaded already. The approach APP and the STAR ARR1 of this world share the fix IAFAA.
+describe('APT 7 and APT 8 the REDUNDANT WPTS message with a STAR and an approach (6-5, B-3, #344)', () => {
+    const REDUNDANT = 'REDUNDANT WPTS IN FPL EDIT ENROUTE WPTS AS NECESSARY';
+
+    /** KPRC with its approach and the STAR ARR1, whose last leg is the IAF IAFAA of the approach */
+    function world() {
+        const w = approachWorld();
+        const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
+        const straa = intersection('STRAA', east(30).lat, east(30).lon);
+        const kprc = withProcedures(w.kprc, {approaches: [...w.kprc.approaches], arrivals: [star('ARR1', {common: [Leg.IF(straa), Leg.TF(w.iafaa)]})]});
+        return {w, straa, kprc, facilities: [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.sdfaa, w.mapaa, straa]};
+    }
+
+    /** How often the message is on the MSG list; the course advice message of the list changes with the plan */
+    const redundant = (unit: HeadlessUnit) => messages(unit).filter(m => m === REDUNDANT).length;
+
+    async function bootWith(enroute: 'enraa' | 'straa' | 'iafaa'): Promise<HeadlessUnit> {
+        const {w, straa, kprc, facilities} = world();
+        const unit = await bootUnit({
+            facilities, position: w.north(40),
+            storage: savedFlightplan(0, [{enraa: w.enraa, straa, iafaa: w.iafaa}[enroute], kprc]),
+        });
+        await settle(unit);
+        return unit;
+    }
+
+    it('is not posted when the STAR is loaded after an approach that shares its IAF', async () => {
+        const unit = await bootWith('enraa');
+        await unit.panel.loadProcedure('APT 8');
+
+        await unit.panel.loadProcedure('APT 7');
+
+        expect(fpl0Legs(unit).map(l => l[0])).toEqual(['ENRAA', 'STRAA', 'IAFAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+        expect(redundant(unit)).toBe(0);
+    });
+
+    it('is not posted when the approach is loaded after a STAR that shares its IAF', async () => {
+        const unit = await bootWith('enraa');
+        await unit.panel.loadProcedure('APT 7');
+
+        await unit.panel.loadProcedure('APT 8');
+
+        expect(fpl0Legs(unit).map(l => l[0])).toEqual(['ENRAA', 'STRAA', 'IAFAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+        expect(redundant(unit)).toBe(0);
+    });
+
+    // The sibling of the tests above: an enroute waypoint that the STAR holds again still posts the message
+    it('is posted when an enroute waypoint is also in the STAR', async () => {
+        const unit = await bootWith('straa');
+
+        await unit.panel.loadProcedure('APT 7');
+
+        expect(fpl0Legs(unit).map(l => l[0])).toEqual(['STRAA', 'STRAA', 'IAFAA', 'KPRC']);
+        expect(redundant(unit)).toBe(1);
+    });
+
+    // An enroute waypoint of the plan is redundant for the approach as well when a STAR is loaded already
+    it('is posted when an enroute waypoint is also in the approach, with a STAR loaded', async () => {
+        const unit = await bootWith('iafaa');
+        await unit.panel.loadProcedure('APT 7');
+        expect(redundant(unit)).toBe(1); // the STAR holds IAFAA, which the plan has as an enroute waypoint
+
+        await unit.panel.loadProcedure('APT 8');
+
+        expect(redundant(unit)).toBe(2);
     });
 });
 
@@ -311,7 +380,7 @@ describe('APT 7 selecting a SID (6-22)', () => {
 
     // 6-22 step 4, figure 6-35: the runways of a SID are listed with the RW prefix. The sibling is the test above, which
     // asserts the runway question and its cursor
-    it.fails('lists the runways of a SID with the RW prefix (6-22, #272)', async () => {
+    it('lists the runways of a SID with the RW prefix (6-22, #272)', async () => {
         const unit = await bootOnApt7({sids: ['DEP1'], stars: false});
         await unit.panel.cursor('R');
         await unit.panel.ent(); // DEP1
@@ -338,6 +407,18 @@ describe('APT 7 selecting a STAR (6-23)', () => {
 
         expect(rows('R').slice(1)).toEqual([' 1 TRNAB', ' 2 SIDAB', ' 3 SIDAA', '', 'LOAD IN FPL']);
         expect(unit.panel.focused('R')).toEqual({row: 5, col: 12, text: 'LOAD IN FPL'});
+    });
+
+    // 6-23 step 5: the runway question of a STAR lists the runways as the one of a SID does (6-22 step 4, figure 6-35),
+    // with the RW prefix
+    it('lists the runways of a STAR with the RW prefix (6-23, 6-22)', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // ARR2
+        await unit.panel.ent(); // TRNAA: the runways
+
+        expect(rows('R').slice(0, 4)).toEqual(['ARR2-Æ', 'RUNWAY', ' 1 RW09', ' 2 RW27L']);
     });
 
     // 6-23 step 5: a STAR that needs no runway skips that step; a STAR without transitions has nothing to ask
@@ -370,7 +451,7 @@ describe('APT 7 selecting a STAR (6-23)', () => {
     });
 
     // 6-23 step 7: LOAD IN FPL for an airport that FPL 0 lacks asks to add the STAR and the airport. The sibling of the
-    // pin below, which asserts this question before CLR
+    // test below, which asserts this question before CLR
     it('asks to add the airport and the STAR to FPL 0 when FPL 0 lacks the airport (6-23)', async () => {
         const unit = await bootOnApt7({sids: [], stars: true});
         await unit.panel.cursor('R');
@@ -383,7 +464,7 @@ describe('APT 7 selecting a STAR (6-23)', () => {
     // 6-5: CLR returns to the previous step. On the question to add the airport (6-23 step 7) the previous step is the
     // list of waypoints; APT 8 does so (Apt8Page.test.ts). Checked in the KLN 89 trainer, 2026-10-07: CLR on that
     // question returns to the waypoint list
-    it.fails('returns from the question to add the airport to the waypoints with CLR (6-5, KLN 89 trainer, #271)', async () => {
+    it('returns from the question to add the airport to the waypoints with CLR (6-5, KLN 89 trainer, #271)', async () => {
         const unit = await bootOnApt7({sids: [], stars: true});
         await unit.panel.cursor('R');
         await unit.panel.ent(); // ARR1: the waypoints
@@ -392,6 +473,79 @@ describe('APT 7 selecting a STAR (6-23)', () => {
         await unit.panel.clr();
 
         expect(rows('R').slice(1)).toEqual([' 1 TRNAA', ' 2 SIDAB', '', '', 'LOAD IN FPL']);
+    });
+
+    // 6-5: each further CLR steps back one list, from the waypoints of a STAR to the STAR list. ARR1 has neither a
+    // transition nor a runway to ask for
+    it('steps back one list with each CLR after the question to add the airport and the STAR (6-5)', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR1: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL: the question
+
+        await unit.panel.clr();
+        expect(rows('R')[5]).toBe('LOAD IN FPL');
+        await unit.panel.clr();
+
+        expect(rows('R').slice(0, 4)).toEqual([' KPRC', 'SELECT STAR', ' 1 ARR1', ' 2 ARR2']);
+    });
+
+    // 6-5, 6-22: the same on a SID, whose runway and transition lists the CLR passes on its way back
+    it('steps back from the question to add the airport and the SID through the waypoints, transitions and runways (6-5, 6-22)', async () => {
+        const unit = await bootOnApt7({sids: ['DEP1'], stars: false});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP1: the runways
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // 27L: the transitions
+        await unit.panel.ent(); // TRNAA: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL: the question
+        expect(rows('R')[1]).toBe('PRESS ENT');
+
+        await unit.panel.clr();
+        expect(rows('R')).toEqual(['DEP1-SID', ' 1 SIDAA', ' 2 SIDAB', ' 3 TRNAA', '', 'LOAD IN FPL']);
+        await unit.panel.clr();
+        expect(rows('R')).toEqual(['DEP1-SID', 'TRANSITION', ' 1 TRNAA', ' 2 TRNAB', '', '']);
+        await unit.panel.clr();
+        expect(rows('R').slice(0, 2)).toEqual(['DEP1-SID', 'RUNWAY']);
+        await unit.panel.clr();
+        expect(rows('R').slice(0, 3)).toEqual([' KPRC', 'SELECT SID', ' 1 DEP1']);
+    });
+
+    // 6-5: the steps CLR goes back through keep the runway and the transition chosen before, so choosing the transition
+    // again gives the same waypoints, with the legs of the runway 27L in front
+    it('keeps the runway and the transition when the waypoints are chosen again after CLR from the question (6-5, 6-22)', async () => {
+        const unit = await bootOnApt7({sids: ['DEP1'], stars: false});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP1: the runways
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // 27L: the transitions
+        await unit.panel.ent(); // TRNAA: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL: the question
+        await unit.panel.clr(); // the waypoints
+        await unit.panel.clr(); // the transitions
+
+        await unit.panel.ent(); // TRNAA again
+
+        expect(rows('R')).toEqual(['DEP1-SID', ' 1 SIDAA', ' 2 SIDAB', ' 3 TRNAA', '', 'LOAD IN FPL']);
+    });
+
+    // 6-5: the same for a STAR, where the step back from the waypoints is the runway list and the transition is the one
+    // that has to survive
+    it('keeps the transition and the STAR when the waypoints are chosen again after CLR from the question (6-5, 6-23)', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // ARR2: the transitions
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // TRNAB: the runways
+        await unit.panel.ent(); // 09: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL: the question
+        await unit.panel.clr(); // the waypoints
+        await unit.panel.clr(); // the runways
+
+        await unit.panel.ent(); // 09 again
+
+        expect(rows('R').slice(0, 5)).toEqual(['ARR2-Æ', ' 1 TRNAB', ' 2 SIDAB', ' 3 SIDAA', '']);
     });
 });
 

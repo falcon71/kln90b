@@ -71,9 +71,9 @@ describe('TRI 5 page (5-6)', () => {
     });
 
     // 3-15, figure 3-50 (180kt 0:13 on the trip page) and the KLN 89 trainer, 2026-10-08 (the trip page showed ETE
-    // 0:31): below an hour the trip pages keep the hour digit. 24.04 min; the code draws two blanks and :24. The same
-    // pin as on TRI 3 (DurationDisplay.test.ts) and TRI 1: a fix that wires one page only is caught by the others.
-    it.fails(
+    // 0:31): below an hour the trip pages keep the hour digit. 24.04 min. The same test as on TRI 3
+    // (DurationDisplay.test.ts) and TRI 1: a fix that wires one page only is caught by the others.
+    it(
         'shows an ETE below an hour as 0:24 (3-15, checked in the KLN 89 trainer, 2026-10-08, #324)',
         async () => {
             const {kaaa, abc, kbbb} = meridianRoute();
@@ -148,7 +148,7 @@ describe('TRI 5 ground speed with a wind that differs per leg', () => {
     // 5-6: the TAS and wind are applied to each leg of the plan, and the page gives the ETE of the plan. 30 NM at
     // 100 kt and 270 NM at 200 kt take 0.3 h + 1.35 h = 99 min (an average ground speed of 300 / 1.65 = 182 kt). The
     // page averages the two leg speeds without weighting them by distance, 150 kt, and shows 120 min. Above an hour,
-    // so that the expected form does not depend on #324
+    // where the form is the same on every page
     it.fails('shows the ETE of the plan as the sum of the leg times, 1:39 (5-6, #254)', async () => {
         await bootWindRoute();
         expect(Screen.read().rows('L')[2].slice(6)).toBe(' 1:39');

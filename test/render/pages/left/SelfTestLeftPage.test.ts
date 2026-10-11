@@ -187,19 +187,19 @@ describe('self-test left page knobs (characterization)', () => {
 const OBS_TARGET_XML = panelXml({'Output.ObsTarget': 1});
 
 /**
- * The self-test page with a magnetic variation of 10° E and an HSI whose course pointer the unit drives and reads
+ * The self-test page with a magnetic variation (default 10° E, negative is west) and an HSI whose course pointer the unit drives and reads
  * (ObsTarget 1, ObsSource 1). The fake moves the pointer on K:VOR1_SET as the sim does; the unit sends it every
  * calculation tick, so the pointer has moved when the two seconds have passed
  */
-async function selfTestWithVariation() {
+async function selfTestWithVariation(magvar = 10) {
     const unit = await bootToSelfTest({
-        magvar: 10,
+        magvar,
         panelXml: OBS_TARGET_XML,
         simVars: [{name: 'Nav OBS:1', unit: 'degrees', value: 242}],
     });
     unit.env.sim.applyObsKeyEvents = true;
     await vi.advanceTimersByTimeAsync(2000);
-    expect(unit.props.magvar.getCurrentMagvar()).toBe(10); // Precondition: the variation is in effect
+    expect(unit.props.magvar.getCurrentMagvar()).toBe(magvar); // Precondition: the variation is in effect
     return unit;
 }
 
@@ -216,19 +216,36 @@ describe('self-test outputs with a magnetic variation (spec)', () => {
         expect(Screen.read().rows('L').slice(2, 4)).toEqual(['OBS IN 315°', '   OUT 315°']);
     });
 
-    // The sibling of the pin below: the page itself shows 130°
+    // The page and the output agree: the page itself shows 130°
     it('shows RMI 130° on the page (3-4)', async () => {
         await selfTestWithVariation();
 
         expect(Screen.read().rows('L')[4]).toBe('RMI    130°');
     });
 
-    // NavCalculator sets the self-test bearing as a true bearing (130) and the output converts it to magnetic, so the
-    // RMI shows 130° minus the variation: 120° here
-    it.fails('outputs an RMI bearing of 130° (3-4, Installation Manual 2-68) (#329)', async () => {
+    // The self-test bearing is held true and the output converts it to magnetic, so a bearing that is not converted
+    // to true first comes out as 130° minus the variation, 120° here
+    it('outputs an RMI bearing of 130° (3-4, Installation Manual 2-68) (#329)', async () => {
         const unit = await selfTestWithVariation();
 
         expect(unit.env.sim.get('L:KLN90B_GPS_WP_BEARING', 'degrees')).toBeCloseTo(130, 6);
+    });
+
+    it('outputs an RMI bearing of 130° with a westerly variation too (3-4, Installation Manual 2-68) (#329)', async () => {
+        const unit = await selfTestWithVariation(-7);
+
+        expect(Screen.read().rows('L')[4]).toBe('RMI    130°');
+        expect(unit.env.sim.get('L:KLN90B_GPS_WP_BEARING', 'degrees')).toBeCloseTo(130, 6);
+    });
+
+    // Public contract: GPS WP BEARING is the magnetic bearing and GPS WP TRUE BEARING the true one of the same
+    // bearing (CLAUDE.md, GPS SimVars; Sensors.setWpBearing), so with 10° E the magnetic 130° is 140° true. The true
+    // value follows from the magnetic one, it is not shown on a page
+    it('outputs GPS WP BEARING 130° magnetic and GPS WP TRUE BEARING 140° during the self-test (#329)', async () => {
+        const unit = await selfTestWithVariation();
+
+        expect(unit.env.sim.get('GPS WP BEARING', 'degrees')).toBeCloseTo(130, 6);
+        expect(unit.env.sim.get('GPS WP TRUE BEARING', 'degrees')).toBeCloseTo(140, 6);
     });
 });
 

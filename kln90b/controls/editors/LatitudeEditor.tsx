@@ -1,8 +1,9 @@
 import {Editor, Rawvalue} from "./Editor";
 import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
-import {NorthSouthEditorField, NumberEditorField} from "./EditorField";
+import {LatitudeTensEditorField, NorthSouthEditorField, NumberEditorField} from "./EditorField";
 import {Latitude} from "../../data/Units";
 import {format} from "numerable";
+import {splitDegreesMinutes} from "../../data/Coordinates";
 import {TickController} from "../../TickController";
 
 export class LatitudeEditor extends Editor<Latitude> {
@@ -15,7 +16,7 @@ export class LatitudeEditor extends Editor<Latitude> {
     constructor(bus: EventBus, value: Latitude | null, enterCallback: (text: Latitude) => void) {
         super(bus, [
             new NorthSouthEditorField(),
-            new NumberEditorField(),
+            new LatitudeTensEditorField(), //The tens stop at 8, so no latitude beyond 90° can be selected (checked in the KLN 89 trainer, 2026-10-08)
             new NumberEditorField(),
             NumberEditorField.createWithMinMax(0, 5),
             new NumberEditorField(),
@@ -34,12 +35,9 @@ export class LatitudeEditor extends Editor<Latitude> {
     }
 
     protected convertFromValue(value: Latitude): Rawvalue {
-        const northSountIdx = value > 0 ? 0 : 1;
-        value = Math.abs(value);
-        const degreesString = format(value, "00", {rounding: "floor"});
-
-
-        const minutes = (value % 1) * 60;
+        const northSountIdx = value >= 0 ? 0 : 1;
+        const {degrees, minutes} = splitDegreesMinutes(value);
+        const degreesString = format(degrees, "00");
         const minutesString = format(minutes, "00.00");
 
         return [
@@ -56,9 +54,6 @@ export class LatitudeEditor extends Editor<Latitude> {
     protected convertToValue(rawValue: Rawvalue): Promise<Latitude | null> {
         const northSouth = rawValue[0] === 0 ? 1 : -1;
         const degrees = Number(String(rawValue[1]) + String(rawValue[2]));
-        if (degrees > 90) {
-            return Promise.resolve(null);
-        }
         const minutes = Number(String(rawValue[3]) + String(rawValue[4]) + "." + String(rawValue[5]) + String(rawValue[6]));
 
 

@@ -106,7 +106,7 @@ describe('OTH 4 page, deleting remarks (3-47)', () => {
     });
 
     // The same sequence as the test above, but the new remark is for KAAA, the airport whose remarks were just deleted
-    it.fails('lists an airport again when its remarks are saved anew while the page is shown (3-47, #252)', async () => {
+    it('lists an airport again when its remarks are saved anew while the page is shown (3-47, #252)', async () => {
         const unit = await withRemarks(['KAAA', 'KBBB']);
         await unit.panel.cursor('L');
         await unit.panel.clr();
@@ -119,10 +119,36 @@ describe('OTH 4 page, deleting remarks (3-47)', () => {
         expect(listed()).toEqual(['KAAA', 'KBBB']);
     });
 
-    // 3-47: CLR and ENT delete the remarks of the airport under the cursor, so the airport leaves the list. KCCC, the
-    // deleted one, was not the airport saved last; the sibling is the delete test above, where KCCC was saved last and
-    // KBBB (the middle one) was deleted
-    it.fails('removes a deleted airport from the list when its remarks were the last saved (3-47, #252)', async () => {
+    // 3-47: every change of the remarks while the page is shown refreshes the list: three changes for KAAA in a row, a
+    // change for another airport, and one more for KAAA
+    it('follows every change of the remarks while the page is shown, also several in a row for one airport (3-47)', async () => {
+        const unit = await withRemarks(['KBBB']);
+        expect(listed()).toEqual(['KBBB']);
+
+        unit.props.remarksManager.saveRemarks('KAAA', REMARK);
+        await vi.advanceTimersByTimeAsync(500);
+        expect(listed()).toEqual(['KAAA', 'KBBB']);
+
+        unit.props.remarksManager.deleteRemarks('KAAA');
+        await vi.advanceTimersByTimeAsync(500);
+        expect(listed()).toEqual(['KBBB']);
+
+        unit.props.remarksManager.saveRemarks('KAAA', REMARK);
+        await vi.advanceTimersByTimeAsync(500);
+        expect(listed()).toEqual(['KAAA', 'KBBB']);
+
+        unit.props.remarksManager.saveRemarks('KCCC', REMARK);
+        await vi.advanceTimersByTimeAsync(500);
+        expect(listed()).toEqual(['KAAA', 'KBBB', 'KCCC']);
+
+        unit.props.remarksManager.deleteRemarks('KAAA');
+        await vi.advanceTimersByTimeAsync(500);
+        expect(listed()).toEqual(['KBBB', 'KCCC']);
+    });
+
+    // 3-47: CLR and ENT delete the remarks of the airport under the cursor, so the airport leaves the list, also when
+    // it is the airport whose remarks were saved last (the delete test above deletes the middle one)
+    it('removes a deleted airport from the list when its remarks were the last saved (3-47, #252)', async () => {
         const unit = await withRemarks(['KAAA', 'KBBB', 'KCCC']);
         await unit.panel.cursor('L');
         await unit.panel.cursorTo('L', 'KCCC'); // the last airport saved
@@ -136,8 +162,7 @@ describe('OTH 4 page, deleting remarks (3-47)', () => {
     });
 });
 
-// The guide is silent on where the cursor goes when the last row of the list is deleted or the list becomes empty. The
-// deleted airport is never the one saved last in these setups, so that the list is redrawn at all (#252)
+// The guide is silent on where the cursor goes when the last row of the list is deleted or the list becomes empty
 describe('OTH 4 page, the cursor after a deletion (characterization)', () => {
     it('characterization: moves the cursor to the new last airport when the last airport is deleted', async () => {
         const unit = await withRemarks(['KCCC', 'KAAA', 'KBBB']);
@@ -152,11 +177,7 @@ describe('OTH 4 page, the cursor after a deletion (characterization)', () => {
     });
 
     it('characterization: turns the cursor off when the only airport is deleted', async () => {
-        const unit = await bootUnit();
-        unit.props.remarksManager.saveRemarks('KBBB', REMARK);
-        unit.props.remarksManager.saveRemarks('KAAA', REMARK);
-        unit.props.remarksManager.deleteRemarks('KAAA');
-        await unit.panel.selectPage('L', 'OTH 4');
+        const unit = await withRemarks(['KBBB']);
         await unit.panel.cursor('L');
         expect(listed()).toEqual(['KBBB']);
 

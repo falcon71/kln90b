@@ -201,13 +201,15 @@ export class FacilityLoaderScanlist implements Scanlist {
      * @private
      */
     private async startListManager(): Promise<void> {
-        const jobId = Math.floor(Math.random() * 10000);
-        this.lastManangerJobId = jobId;
+        const jobId = ++this.lastManangerJobId;
+        //getNext sets lastIcao while this job still runs. Both halves of the fill must start from the same position, or
+        //the stretch between the old and the new position is never searched
+        const lastIcao = this.lastIcao;
         let sizeBeforeCurrent = 0;
         let sizeAfterCurrent = 0;
 
-        const listIndex = this.indexOfIcaoInCache(this.lastIcao);
-        this.log(`${this.facilitySearchType}: Cache size: ${this.icaoListCache.length} ${this.cacheValidFromIdent}-${this.cacheValidToIdent}, lastIcao: ${this.lastIcao}, index: ${listIndex}`);
+        const listIndex = this.indexOfIcaoInCache(lastIcao);
+        this.log(`${this.facilitySearchType}: Cache size: ${this.icaoListCache.length} ${this.cacheValidFromIdent}-${this.cacheValidToIdent}, lastIcao: ${lastIcao}, index: ${listIndex}`);
 
         if (listIndex == -1) {
             //Happens with sync. We jumped to a random waypoint not in our list, now we need to throw everything away
@@ -222,7 +224,7 @@ export class FacilityLoaderScanlist implements Scanlist {
 
         if (sizeBeforeCurrent < TARGET_CACHE_SIZE / 2) {
             this.log(`${this.facilitySearchType}: Size towards beginning: ${sizeBeforeCurrent}, extending cache towards beginning`);
-            let ident: string | null = this.lastIcao.ident;
+            let ident: string | null = lastIcao.ident;
             while (sizeBeforeCurrent < targetSizeForExtension) {
                 if (ident === null || ident === "") { //End of the list
                     break;
@@ -253,7 +255,7 @@ export class FacilityLoaderScanlist implements Scanlist {
 
         if (sizeAfterCurrent < TARGET_CACHE_SIZE / 2) {
             this.log(`${this.facilitySearchType}: Size towards end: ${sizeAfterCurrent}, extending cache towards end`);
-            let ident: string | null = this.lastIcao.ident;
+            let ident: string | null = lastIcao.ident;
             while (sizeAfterCurrent < targetSizeForExtension) {
                 ident = this.getNextIdentForSearch(ident!, 1);
                 if (ident === null) { //End of the list

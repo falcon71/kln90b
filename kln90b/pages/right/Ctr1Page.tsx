@@ -58,7 +58,7 @@ export class Ctr1Page extends SixLineHalfPage {
         super(props);
 
         this.children = new UIElementChildren<Ctr1PageTypes>({
-            newWpts: new TextDisplay("  "),
+            newWpts: new TextDisplay("  NEW WPTS"),
         });
 
     }
@@ -100,7 +100,7 @@ export class Ctr1Page extends SixLineHalfPage {
                     CTR WPTS
                 </pre>
                 <pre ref={this.refCalulated} className="d-none">
-                    {this.children.get("newWpts").render()} NEW WPTS<br/>
+                    {this.children.get("newWpts").render()}<br/>
                     <br/>
                     PRESS ENT<br/>
                     TO INSERT<br/>
@@ -156,7 +156,9 @@ export class Ctr1Page extends SixLineHalfPage {
                     this.refCalulated.instance.classList.remove("d-none");
                     this.refDone.instance.classList.add("d-none");
                     this.refFull.instance.classList.add("d-none");
-                    this.children.get("newWpts").text = pageState.waypoints.filter(wpt => wpt.isNew).length.toString().padStart(2, " ");
+                    //5-27, figure 5-96: the singular for one new waypoint
+                    const newCount = pageState.waypoints.filter(wpt => wpt.isNew).length;
+                    this.children.get("newWpts").text = newCount.toString().padStart(2, " ") + (newCount === 1 ? " NEW WPT " : " NEW WPTS");
                     break;
                 case CtrState.DONE:
                     this.refFpl.instance.classList.add("d-none");
@@ -200,14 +202,17 @@ export class Ctr1Page extends SixLineHalfPage {
 
         console.log("intersections", intersections);
 
-        if (fplLegs.length + intersections.length > 30) {
+        //5-26 Only the new waypoints count against the limit of 30. Nothing is created when they do not fit.
+        const existing = intersections.map(intersection => this.getWaypointIfExistsInFpl(intersection));
+        if (fplLegs.length + existing.filter(wpt => wpt === null).length > 30) {
             this.props.memory.ctrPage.state = CtrState.FULL;
+            return;
         }
 
-        for (const intersection of intersections) {
-            let wpt = this.getWaypointIfExistsInFpl(intersection);
+        for (let i = 0; i < intersections.length; i++) {
+            let wpt = existing[i];
             if (wpt === null) {
-                wpt = await this.createWpt(intersection);
+                wpt = await this.createWpt(intersections[i]);
             }
             if (wpt !== null) {
                 this.props.memory.ctrPage.waypoints.push(wpt);
@@ -223,8 +228,15 @@ export class Ctr1Page extends SixLineHalfPage {
         const page = mainPage.getLeftPage() as FplPage;
 
         const fpl = this.props.memory.ctrPage.lastFpl!;
+        const newWpts = this.props.memory.ctrPage.waypoints.filter(wpt => wpt.isNew);
+        //5-26 The plan may have grown since the computation. Insert all or none, as insertLegIntoFpl throws on a full plan.
+        if (fpl.getLegs().length + newWpts.length > 30) {
+            this.props.memory.ctrPage.state = CtrState.FULL;
+            return;
+        }
+
         let inserted = 0;
-        for (const wpt of this.props.memory.ctrPage.waypoints.filter(wpt => wpt.isNew)) {
+        for (const wpt of newWpts) {
             insertLegIntoFpl(fpl, this.props.memory.navPage, wpt.idx + inserted, {wpt: wpt.wpt, type: KLNLegType.USER});
             inserted++;
         }

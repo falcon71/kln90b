@@ -20,7 +20,7 @@ async function setOffsetTo1000(unit: HeadlessUnit): Promise<void> {
 }
 
 describe('SET 5 height above airport alert offset (#89)', () => {
-    // The sibling of the pin below: the knob sequence lands on the alert ON and +1000ft, and the enable flag is stored
+    // The knob sequence lands on the alert ON and +1000ft, and the enable flag is stored
     it('turns the alert on and shows the offset +1000ft', async () => {
         const unit = await bootUnit();
 
@@ -31,13 +31,51 @@ describe('SET 5 height above airport alert offset (#89)', () => {
         expect(storedSetting(unit, 'htAboveAptEnabled')).toBe(true);
     });
 
-    it.fails('stores the offset under htAboveAptOffset and leaves the SUA buffer alone (#89)', async () => {
+    it('stores the offset under htAboveAptOffset and leaves the SUA buffer alone (#89)', async () => {
         const unit = await bootUnit();
 
         await setOffsetTo1000(unit);
 
         expect(storedSetting(unit, 'htAboveAptOffset')).toBe(1000);
         expect(storedSetting(unit, 'airspaceAlertBuffer')).toBeUndefined();
+    });
+
+    // Persisted user data (CLAUDE.md "Public contract with aircraft"): a profile written by hand with both keys. SET 5
+    // shows its own key, and a change of the offset leaves the SET 8 buffer as it was, on the page and in the store
+    it('reads the stored offset and leaves a stored SUA buffer alone (#89)', async () => {
+        const unit = await bootUnit({storage: {htAboveAptEnabled: true, htAboveAptOffset: 1200, airspaceAlertBuffer: 700}});
+        await unit.panel.selectPage('L', 'SET 5');
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L')[5]).toBe('  +1200ft  ');
+
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1);
+        await unit.panel.cursor('L');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[5]).toBe('  +1300ft  ');
+        expect(storedSetting(unit, 'htAboveAptOffset')).toBe(1300);
+        expect(storedSetting(unit, 'airspaceAlertBuffer')).toBe(700);
+        await unit.panel.selectPage('L', 'SET 8');
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L')[5]).toBe('   ±00700ft');
+    });
+
+    // Persisted user data: a profile of an earlier version, whose SET 5 wrote the SUA buffer key and never the offset
+    // key. The buffer keeps what it holds (nothing is migrated or reset); SET 5 shows the default offset of its own key
+    it('keeps a stored SUA buffer and shows the default offset for a profile without an offset key (#89)', async () => {
+        const unit = await bootUnit({storage: {htAboveAptEnabled: true, airspaceAlertBuffer: 1500}});
+        await unit.panel.selectPage('L', 'SET 5');
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L')[5]).toBe('  + 800ft  ');
+
+        await unit.panel.selectPage('L', 'SET 8');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[5]).toBe('   ±01500ft');
     });
 });
 
@@ -111,7 +149,7 @@ describe('SET 5 offset while the alert is off (characterization)', () => {
 
 describe('SET 5 height above airport alert (3-58)', () => {
     // 3-58: the offset runs from 800 ft to 2000 ft; from the default 800 ft that is twelve steps of 100 ft. The row only
-    // is asserted: the stored key is the #89 pin above.
+    // is asserted: the stored key is the #89 test above.
     it('offers offsets up to 2000 ft (3-58)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 5');

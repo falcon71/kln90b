@@ -1,11 +1,12 @@
 import {Editor, Rawvalue} from "./Editor";
 import {EventBus, FSComponent, VNode} from "@microsoft/msfs-sdk";
-import {AlphabetEditorField} from "./EditorField";
+import {AlphabetEditorField, EditorField} from "./EditorField";
 
 export class FreetextEditor extends Editor<string> {
 
-    constructor(bus: EventBus, value: string, maxLength: number, enterCallback: (text: string) => void) {
-        super(bus, Array(maxLength).fill(null).map(() => new AlphabetEditorField()), value, enterCallback);
+    constructor(bus: EventBus, value: string, maxLength: number, enterCallback: (text: string) => void,
+                createField: () => EditorField = () => new AlphabetEditorField()) {
+        super(bus, Array(maxLength).fill(null).map(createField), value, enterCallback);
     }
 
     public render(): VNode {

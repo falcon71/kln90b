@@ -138,17 +138,16 @@ describe('D/T 3 page, the DTK of the active waypoint', () => {
 
     // 4-12: the DTK belongs to the leg, a great-circle course from one waypoint to the next; Appendix A draws DTK as the
     // course from the from waypoint to the to waypoint, apart from BRG. Checked in the KLN 89 trainer, 2026-10-07: 3 NM off course, FPL 0
-    // shows the leg DTK (5) beside the active waypoint while NAV 1 shows a bearing of 12. Off course the code shows the
-    // bearing to the active waypoint. Figures 4-51 and 4-52 (one flight state) show 063 and 064 for the active waypoint,
-    // which do not settle it
-    it.fails('shows the leg DTK of the active waypoint beside FPL 0 (4-12, Appendix A, #297)', async () => {
+    // shows the leg DTK (5) beside the active waypoint while NAV 1 shows a bearing of 12. Figures 4-51 and 4-52 (one
+    // flight state) show 063 and 064 for the active waypoint, which do not settle it
+    it('shows the leg DTK of the active waypoint beside FPL 0 (4-12, Appendix A, #297)', async () => {
         const unit = await bootOffCourse();
 
         // 15.03 NM north and 4.07 NM east of the aircraft: 15.6 NM to ABC
         expect((await show(unit, 'FPL 0'))[2]).toBe(' 16    000°');
     });
 
-    it.fails('shows the leg DTK of the active waypoint beside another page (4-12, Appendix A, #297)', async () => {
+    it('shows the leg DTK of the active waypoint beside another page (4-12, Appendix A, #297)', async () => {
         const unit = await bootOffCourse();
 
         expect((await show(unit, 'NAV 2'))[2]).toBe('DTK    000°');
@@ -175,8 +174,8 @@ describe('D/T 3 page, the DTK of the active waypoint', () => {
     });
 
     // 4-12: the distances are those of D/T 1, which is blank beside FPL 0 during a Direct To to a waypoint outside the
-    // plan (4-11, figure 4-44), and so are the DTKs. The code shows dashes beside every waypoint
-    it.fails('is blank beside FPL 0 during a Direct To to a waypoint outside the plan (4-12, #296)', async () => {
+    // plan (4-11, figure 4-44), and so are the DTKs
+    it('is blank beside FPL 0 during a Direct To to a waypoint outside the plan (4-12, #296)', async () => {
         await directToOutsidePlan();
 
         expect(Screen.read().rows('R')).toEqual([
@@ -188,9 +187,44 @@ describe('D/T 3 page, the DTK of the active waypoint', () => {
             '           ',
         ]);
     });
+
+    // 4-12: a Direct To to the first waypoint of FPL 0 makes leg 1 the active one, and every row from there on shows
+    // its distance. The aircraft at rest 6.0 NM north of KAAA: KAAA, ABC, DEF and KBBB are 6.0, 36.1, 66.1 and 96.2 NM
+    // away (0.1 degree of latitude is 6.01 NM, each further 0.5 degree 30.05 NM)
+    it('shows the distances beside FPL 0 during a Direct To to its first waypoint (4-12)', async () => {
+        const unit = await bootOnDtWorld({moving: false});
+        await unit.panel.directTo('KAAA', {waitMs: 2000});
+
+        const rows = await show(unit, 'FPL 0');
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(0);
+        expect(rows[0]).toBe('DIS     DTK');
+        expect(rows.slice(1, 5).map(r => r.slice(0, 4))).toEqual(['  6 ', ' 36 ', ' 66 ', ' 96 ']);
+    });
+
+    // 4-12: the distances are those of D/T 1, which shows dashes beside the waypoints of FPL 0 until the unit navigates
+    // (4-16, figure 4-56)
+    it('shows dashes for the distances beside FPL 0 before the unit navigates (4-12)', async () => {
+        const {kaaa, abc} = dtWorld();
+        const unit = await bootUnit({
+            facilities: [kaaa, abc], position: {lat: 47.1, lon: 10.0}, coldGps: true, storage: savedFlightplan(0, [kaaa, abc]),
+        });
+
+        const rows = await show(unit, 'FPL 0');
+        expect(rows[0]).toBe('DIS     DTK');
+        expect(rows.slice(1, 3).map(r => r.slice(0, 4))).toEqual(['----', '----']);
+    });
 });
 
 describe('D/T 3 page (characterization)', () => {
+    // The cells beside the distances of the test in 4-12 above: the aircraft at rest, so the times have no ground speed
+    // to come from. The DTK of KAAA is the Direct To course from the aircraft, 6 NM north of it, the others lie due north
+    it('characterization: shows the full rows beside FPL 0 during a Direct To to its first waypoint', async () => {
+        const unit = await bootOnDtWorld({moving: false});
+        await unit.panel.directTo('KAAA', {waitMs: 2000});
+
+        expect((await show(unit, 'FPL 0')).slice(1, 5)).toEqual(['  6    180°', ' 36    000°', ' 66    000°', ' 96    000°']);
+    });
+
     // The aircraft at rest on the first leg of the plan with turns
     it('shows the distances and DTKs beside FPL 0 with the aircraft at rest', async () => {
         const {legs} = dtkWorld();
@@ -209,6 +243,34 @@ describe('D/T 3 page (characterization)', () => {
             "           ",
           ]
         `);
+    });
+
+    // In OBS mode there is no leg: NAV 3 shows the OBS course as its DTK, and so does the active row of D/T 3. The unit
+    // enters OBS with the course it was flying (000 here), while the bearing to ABC is about 345
+    it('shows the OBS course as the DTK of the active waypoint in OBS mode', async () => {
+        const {kaaa, abc, def} = dtWorld();
+        const unit = await bootUnit({
+            facilities: [kaaa, abc, def], position: {lat: 47.25, lon: 10.1}, storage: savedFlightplan(0, [kaaa, abc, def]),
+        });
+        await settle(unit);
+        await moveAircraft(unit, {lat: 47.25, lon: 10.1}, {groundspeedKt: 120, trackTrue: 0});
+        await unit.panel.obsMode();
+
+        await unit.panel.selectPage('L', 'NAV 3');
+        expect(Screen.read().rows('L')[1]).toBe('OBS    000°'); // precondition
+        expect((await show(unit, 'FPL 0'))[2]).toBe(' 16    000°');
+        expect((await show(unit, 'NAV 2'))[2]).toBe('DTK    000°');
+    });
+
+    // The course of a Direct To runs from the point where it was started, so it stays when the aircraft moves off it
+    it('keeps the course of a Direct To as the DTK when the aircraft moves off it', async () => {
+        const unit = await bootOnDtWorld({moving: false});
+        await unit.panel.directTo('KAAA', {waitMs: 2000});
+        await moveAircraft(unit, {lat: 47.1, lon: 10.1}, {groundspeedKt: 0});
+
+        expect(unit.props.memory.navPage.bearingToActive).toBeGreaterThan(190); // precondition: the bearing is not the course
+        expect((await show(unit, 'FPL 0'))[1].slice(4)).toBe('   180°');
+        expect((await show(unit, 'NAV 2'))[2]).toBe('DTK    180°');
     });
 
     it('shows dashes beside NAV 2 before the GPS has a fix', async () => {

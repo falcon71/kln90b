@@ -5,6 +5,7 @@ import {airport} from '../../../harness/navdata/builders';
 import {dtWorld} from '../../../harness/fixtures';
 import {savedFlightplan} from '../../../harness/storage';
 import {bootOnDtWorld} from '../../../harness/worldBoot';
+import {panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
 
 // The world of the D/T tests is dtWorld() (see Dt1Page.test.ts): along 10 E, the aircraft 0.1 degree north of KAAA at 120
@@ -155,7 +156,7 @@ describe('D/T 4 page (characterization)', () => {
 // 4-13: with SET 4 on RUN WHEN POWER IS ON, the timers follow the power and ignore the ground speed: DEP holds the
 // clock time of the power-on and FLT counts from it. Every test here stands still, so the default RUN WHEN GS > 30KT
 // would count nothing
-// The departure time before the first fix of a cold start is #171, pinned at the unit stage (Timers.test.ts)
+// The GPS advances its time in place without a fix and in take-home mode (#171): the cases at the end, and Timers.test.ts
 describe('D/T 4 page with RUN WHEN POWER IS ON (4-13)', () => {
     /** hh:mm of the simulated UTC clock, read from the fake Date and not from the unit */
     const utcNow = () => new Date(Date.now()).toISOString().slice(11, 16);
@@ -181,5 +182,40 @@ describe('D/T 4 page with RUN WHEN POWER IS ON (4-13)', () => {
         expect(rows[1]).toBe('DEP   12:12');
         expect(rows[2]).toBe('TIME  12:17');
         expect(rows[4]).toBe('FLT     :05');
+    }, 30_000);
+
+    /** D/T 4 beside NAV 2 after the unit has run for five minutes */
+    async function dt4AfterFiveMinutes(unit: HeadlessUnit): Promise<string[]> {
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(5 * 60_000);
+        await unit.panel.selectPage('L', 'NAV 2');
+        return dt4(unit);
+    }
+
+    // 4-13: DEP is the time power was applied. A cold start without a fix (REAL acquisition takes minutes) has the GPS
+    // advance its own clock until the first fix; DEP must not run with it
+    it('keeps the power-on time as DEP through the first fix of a cold start (4-13, #171)', async () => {
+        const unit = await bootUnit({position: {lat: 47.1, lon: 10.0}, storage: {flightTimer: true, fastGpsAcquisition: false}, coldGps: true});
+        expect(unit.props.sensors.in.gps.isValid()).toBe(false); // Precondition: no fix at the power-on
+
+        const rows = await dt4AfterFiveMinutes(unit);
+
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true); // Precondition: the first fix has come since
+        expect(utcNow()).not.toBe('12:00'); // Precondition: the clock has moved on
+        expect(rows[1]).toBe('DEP   12:00');
+        expect(rows[2]).toBe(`TIME  ${utcNow()}`);
+    }, 30_000);
+
+    // 4-13: the same in take-home mode, where the GPS has no fix at all and advances its clock all the time
+    it('keeps the power-on time as DEP in take-home mode (4-13, #171)', async () => {
+        const unit = await bootUnit({
+            position: {lat: 47.1, lon: 10.0}, storage: {flightTimer: true}, panelXml: panelXml({TakeHomeMode: true}),
+        });
+
+        const rows = await dt4AfterFiveMinutes(unit);
+
+        expect(utcNow()).not.toBe('12:00'); // Precondition: the clock has moved on
+        expect(rows[1]).toBe('DEP   12:00');
+        expect(rows[2]).toBe(`TIME  ${utcNow()}`);
     }, 30_000);
 });

@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {
-    AirportFacility, ApproachProcedure, Facility, FixTypeFlags, FlightPlan, FlightPlanLeg, GeoCircle, GeoPoint, LegTurnDirection,
+    AirportFacility, ApproachProcedure, Facility, FixTypeFlags, FlightPlan, FlightPlanLeg, GeoCircle, GeoPoint, ICAO, LegTurnDirection,
     LegType, Procedure, RnavTypeFlags,
 } from '@microsoft/msfs-sdk';
 import {SidStar} from '../../../../kln90b/data/navdata/SidStar';
@@ -269,14 +269,46 @@ describe('SidStar.recalculateArcEntryData (9ce23bf, f4f5395, 1ef2a35)', () => {
         expect(Math.abs(entry.lon - 0.14408)).toBeLessThan(1e-5);
     });
 
-    // The distance is read from the radius of the circle, and a right-hand circle is reversed (radius pi minus the
-    // arc radius, 10809.3 NM). The name then reads like a 100+ NM waypoint.
-    it.fails('names a right-hand arc entry D030J (#104)', () => {
+    // The distance is the radius of the arc, although the circle of a right-hand arc is reversed (radius pi minus the
+    // arc radius, 10809.3 NM). The name of the entry and the stored distance are those of the 10 NM arc, as for the left
+    // arc above (the same point on the 30 radial).
+    it('names a right-hand arc entry D030J and stores the distance of the arc (#104)', () => {
         const arc = arcLeg(LegTurnDirection.Right, 10, 170);
         const data = SidStar.recalculateArcEntryData(arc, sensorsAt(SOUTH_EAST.lat, SOUTH_EAST.lon, 0))!;
         const entry = data.entryFacility as unknown as { icaoStruct: { ident: string }, reference1Distance: number };
         expect(entry.icaoStruct.ident).toBe('D030J');
-        expect(entry.reference1Distance).toBeCloseTo(10, 3);
+        expect(entry.reference1Distance).toBeCloseTo(10, 6);
+    });
+
+    // The arc radius decides the name beyond the letter range as well, and the left-hand arc is the reference: the same
+    // entry of a 40 NM arc gets the same name and distance for every other turn direction. getArcEntryData reverses the
+    // circle of every arc that is not a left-hand one, so the arcs of the other directions are built reversed. The
+    // aircraft is 45 NM west of the VOR on the equator and flies east; its track meets the circle at the 270 radial first,
+    // outside the arc (the south half, radials 0 to 180), and then at the 90 radial, which is the entry.
+    describe('an arc of 40 NM (#104)', () => {
+        const entryOf = (turn: LegTurnDirection) => {
+            const circle = new GeoCircle(GeoPoint.sphericalToCartesian({lat: 0, lon: 0}, new Float64Array(3)), 40 / R);
+            if (turn !== LegTurnDirection.Left) {
+                circle.reverse();
+            }
+            const [beginRadial, endRadial] = turn === LegTurnDirection.Left ? [180, 0] : [0, 180];
+            const arc = {arcData: {beginRadial, endRadial, turnDirection: turn, vor: vor('ABC', 0, 0), endFacility: arcEnd, circle}} as unknown as KLNFlightplanLeg;
+            const data = SidStar.recalculateArcEntryData(arc, sensorsAt(0, -toDeg(45), 90))!;
+            return data.entryFacility as unknown as { icaoStruct: { ident: string }, reference1Radial: number, reference1Distance: number };
+        };
+
+        it.each([
+            ['right', LegTurnDirection.Right],
+            ['either', LegTurnDirection.Either],
+            ['none', LegTurnDirection.None],
+        ])('gives an arc of turn direction %s the same name and distance as a left-hand arc', (_name, turn) => {
+            const left = entryOf(LegTurnDirection.Left);
+            const other = entryOf(turn);
+
+            expect([left.reference1Radial, other.reference1Radial]).toEqual([expect.closeTo(90, 3), expect.closeTo(90, 3)]);
+            expect([left.reference1Distance, other.reference1Distance]).toEqual([expect.closeTo(40, 6), expect.closeTo(40, 6)]);
+            expect(other.icaoStruct.ident).toBe(left.icaoStruct.ident);
+        });
     });
 });
 
@@ -360,6 +392,26 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             const legs = await convert(facs, at(aircraftRadial, 20), kprc, app);
             expect(identsOf(legs)).toEqual([entry, 'ARCEN', 'FAFAA', 'MAPAA']);
         });
+
+        // 6-17: the entry is recalculated from the arc as the conversion built it. The aircraft is 20 NM out on the
+        // radial 225 and flies towards the VOR (track 045): its track meets the circle close to the same radial (within half
+        // a degree, the great circle bends away from the rhumb line), 10 NM from the VOR, for either direction of the arc (#104).
+        it.each([
+            ['left arc 270 to 180', LEFT, 270, 180],
+            ['right arc 180 to 270', RIGHT, 180, 270],
+        ])('recalculates the entry of a converted %s on the radial of the track (#104)', async (_name, turn, from, to) => {
+            const {app, facs} = arcApproach(turn, from, to);
+            const where = at(225, 20);
+            const legs = await convert(facs, where, kprc, app);
+            const sensors = {in: {gps: {coords: new GeoPoint(where.lat, where.lon), getTrackTrueRespectingGroundspeed: () => 45}}} as any;
+
+            const data = SidStar.recalculateArcEntryData(legs[0], sensors)!;
+
+            const entry = data.entryFacility as unknown as { icaoStruct: { ident: string }, reference1Radial: number, reference1Distance: number };
+            expect(entry.icaoStruct.ident).toBe('D225J');
+            expect(entry.reference1Radial).toBeCloseTo(225, 0);
+            expect(entry.reference1Distance).toBeCloseTo(10, 4);
+        });
     });
 
     // 6-10: the example lists a fix that is both IAF and FAF twice. 6-11: switching to LEG makes the FAF the active
@@ -435,12 +487,30 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(SidStar.hasDuplicates([fplLeg(wpt)], [procLeg(vor('KPU', 47, 8))])).toBe(false);
         });
 
-        // The code compares the ICAO objects by reference; a copy of the same waypoint is not found.
-        it.fails('finds a waypoint whose ICAO is an equal copy (#130)', () => {
+        // The ICAOs are compared by value: the facility loader may hand out a copy of the same waypoint (a plan restored
+        // from storage), and the pilot is warned all the same.
+        it('finds a waypoint whose ICAO is an equal copy (#130)', () => {
             const copy = {...wpt, icaoStruct: {...wpt.icaoStruct}};
             expect(copy.icaoStruct).toEqual(wpt.icaoStruct);
             expect(copy.icaoStruct).not.toBe(wpt.icaoStruct);
             expect(SidStar.hasDuplicates([fplLeg(wpt)], [procLeg(copy)])).toBe(true);
+        });
+
+        // All four parts of the ICAO decide, so a waypoint that only shares its ident with one of the plan is no duplicate
+        it.each([
+            ['region', ICAO.value('V', 'K2', '', 'KPT')],
+            ['type', ICAO.value('N', wpt.icaoStruct.region, '', 'KPT')],
+            ['airport', ICAO.value('V', wpt.icaoStruct.region, 'KAAA', 'KPT')],
+            ['ident', ICAO.value('V', wpt.icaoStruct.region, '', 'KPU')],
+        ])('finds no duplicate when only the %s of the ICAO differs (#130)', (_part, icaoStruct) => {
+            expect(SidStar.hasDuplicates([fplLeg(wpt)], [procLeg({...wpt, icaoStruct})])).toBe(false);
+        });
+
+        // The equal copy is found wherever it stands: behind other legs of the plan and of the procedure
+        it('finds an equal copy behind other waypoints in both lists (#130)', () => {
+            const other = vor('KPV', 47, 8);
+            const copy = {...wpt, icaoStruct: {...wpt.icaoStruct}};
+            expect(SidStar.hasDuplicates([fplLeg(other), fplLeg(wpt)], [procLeg(vor('KPU', 47, 8)), procLeg(copy)])).toBe(true);
         });
     });
 

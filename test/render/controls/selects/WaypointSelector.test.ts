@@ -112,8 +112,8 @@ describe('waypoint selector (3-20, 3-21)', () => {
         ]);
     });
 
-    // 3-20: sibling of the #290 pins: the fourth cell of a four-character identifier turns like the others (T to U;
-    // KSAU is no airport)
+    // 3-20: the fourth cell of a four-character identifier turns like the others (T to U; KSAU is no airport), and the
+    // blank cell of a shorter identifier does too, as the next tests show (#290)
     it('turns the fourth character of a four-character identifier (3-20)', async () => {
         const unit = await ksatWithCursor();
         await unit.panel.outer('R', 3);
@@ -124,9 +124,8 @@ describe('waypoint selector (3-20, 3-21)', () => {
     });
 
     // 3-20: the cursor covers every character position of the identifier; B19 has three characters, so the fourth
-    // position is a blank. The selector builds that cell without a character (WaypointSelector.tsx:44), so it has no
-    // width and shows no cursor (#290)
-    it.fails('puts the cursor on the blank fourth cell of the three-character identifier B19 '
+    // position is a blank cell that still has a width and shows the cursor (#290)
+    it('puts the cursor on the blank fourth cell of the three-character identifier B19 '
         + '(3-20, #290)', async () => {
         const unit = await b19WithCursor();
 
@@ -136,8 +135,8 @@ describe('waypoint selector (3-20, 3-21)', () => {
     });
 
     // 3-20: the blank lies between 9 and A, so one click clockwise turns a blank cell into A. Checked in the KLN 89
-    // trainer, 2026-10-07 (medium confidence). The selector gives 0 (#290)
-    it.fails('turns the blank fourth cell of B19 into an A clockwise '
+    // trainer, 2026-10-07 (medium confidence)
+    it('turns the blank fourth cell of B19 into an A clockwise '
         + '(3-20, checked in the KLN 89 trainer, 2026-10-07, #290)', async () => {
         const unit = await b19WithCursor();
         await unit.panel.outer('R', 3);

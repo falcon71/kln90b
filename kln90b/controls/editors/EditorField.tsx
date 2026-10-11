@@ -96,6 +96,16 @@ export class AlphabetEditorField extends EditorField {
 
 }
 
+/**
+ * A character of a remark on the APT 5 page (3-47): a letter, a digit, the hyphen or the blank. The hyphen follows the
+ * 9 and precedes the blank (checked in the KLN 89 trainer, 2026-10-08)
+ */
+export class RemarkEditorField extends EditorField {
+
+    charset = [' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-'];
+
+}
+
 export class NumberEditorField extends EditorField {
     charset;
 
@@ -131,8 +141,27 @@ export class NumberEditorField extends EditorField {
     }
 }
 
+/**
+ * The tens of the degrees of a latitude. The knob and the keyboard offer 0 to 8 (checked in the KLN 89 trainer,
+ * 2026-10-08), but the cell can show the 9 of a stored latitude of 90 degrees
+ */
+export class LatitudeTensEditorField extends NumberEditorField {
+
+    incrementChar() {
+        this.value = this.value === null || this.value >= 8 ? 0 : this.value + 1;
+    }
+
+    decrementChar() {
+        this.value = this.value === null ? 0 : this.value <= 0 ? 8 : this.value - 1;
+    }
+
+    public keyboard(key: string): boolean {
+        return key !== '9' && super.keyboard(key);
+    }
+}
+
 export class MonthEditorField extends EditorField {
-    charset = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEC"];
+    charset = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 }
 
 export class NorthSouthEditorField extends EditorField {

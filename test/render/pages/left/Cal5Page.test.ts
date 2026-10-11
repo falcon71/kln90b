@@ -68,7 +68,7 @@ describe('CAL 5 page (5-13)', () => {
         expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   -40°C   ', '   -40°F   ']);
     });
 
-    // 5-10, step 5: the sibling of the pin below. The sign first, then the digits, as a pilot types -40 into 000
+    // 5-10, step 5: the sibling of the test below. The sign first, then the digits, as a pilot types -40 into 000
     it('shows -40°C when the sign is set before the digits (5-10)', async () => {
         const unit = await cal5();
         await setCell(unit, 1, 3, '-');
@@ -76,13 +76,25 @@ describe('CAL 5 page (5-13)', () => {
         expect(Screen.read().rows('L')[1]).toBe('   -40°C   ');
     });
 
-    // 5-10 and 5-13: the sign digit makes the temperature negative. Set on 000, the minus is lost when the next digit is
-    // turned (TempFieldset formats -0 as +00), so the page converts +40 C instead of -40 C
-    it.fails('converts -40 C entered sign first to -40°F (5-10, 5-13, #256)', async () => {
+    // 5-10 and 5-13: the sign digit makes the temperature negative. Set on 000, the minus must survive the next digit,
+    // so the page converts -40 C and not +40 C
+    it('converts -40 C entered sign first to -40°F (5-10, 5-13, #256)', async () => {
         const unit = await cal5();
         await setCell(unit, 1, 3, '-');
         await setCell(unit, 1, 4, '4');
         expect(Screen.read().rows('L')[2]).toBe('   -40°F   ');
+    });
+
+    // 5-10 and 5-13: the same on the Fahrenheit field, which is the other TempFieldset of the page: -40 F entered
+    // sign first is -40 C. The field starts at 000 F (-17.78 C), where the sign is -0
+    it('converts -40 F entered sign first on 000 to -40°C (5-10, 5-13, #256)', async () => {
+        const unit = await bootUnit({storage: {cal5TempF: 0, cal5TempC: -17.78}});
+        await unit.panel.selectPage('L', 'CAL 5');
+        await unit.panel.cursor('L');
+        await setCell(unit, 2, 3, '-');
+        await setCell(unit, 2, 4, '4');
+        await setCell(unit, 2, 5, '0');
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   -40°C   ', '   -40°F   ']);
     });
 
     // 5-13, figure 5-44: 145 kt entered gives 145 * 1.150779 = 166.9 mph, shown as 167

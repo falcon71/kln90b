@@ -82,6 +82,10 @@ export class Apt3Page extends WaypointPage<AirportFacility> {
         if (targetPage !== this.currentPage) {
             this.setCurrentPage(targetPage);
         }
+
+        // The sub-page may stay the same object at the same index while its content changes (diagram page 0 to an
+        // airport with one page), so setCurrentPage does not take its children. The redraw is requested by the super call.
+        this.children = this.getCurrentPage().children;
     }
 
     protected redraw(): void {

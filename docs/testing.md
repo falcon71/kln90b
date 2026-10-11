@@ -130,9 +130,9 @@ The sim globals are installed once per test file by the setup files `test/harnes
 - The clock is Vitest's fake timers (`sim/clock.ts`): `setTimeout`, `setInterval`, `Date` and `requestAnimationFrame`
   are faked, starting at `DEFAULT_START`. Advance it with `await vi.advanceTimersByTimeAsync(ms)`. All tick loops
   of the instrument (docs/architecture.md, Core 2) run on this clock.
-- `Math.random` is replaced by a seeded generator (`sim/random.ts`, default seed 1), so the GPS clock jitter and scan
-  list job ids repeat between runs. A test that needs another jitter passes `seed`. The teardown puts the real
-  `Math.random` back, so a later unit test of the file sees the real generator.
+- `Math.random` is replaced by a seeded generator (`sim/random.ts`, default seed 1), so the GPS clock jitter repeats
+  between runs. A test that needs another jitter passes `seed`. The teardown puts the real `Math.random` back, so a
+  later unit test of the file sees the real generator.
 
 ## Collectors and boot failures
 
@@ -215,8 +215,7 @@ with the knobs.
 persistor, so a test of the restore stays independent of the code that saves. The format tests of the persistor itself
 (`UserWaypointV2.test.ts`) keep their literals. An airport's `elevationFt` is stored in meters, rounded, as the format
 and the model hold it (1400 ft are `+00427`), so APT 2 of that airport shows 1400 ft; an unknown elevation is the
-unit's own -1 m. A southern latitude of one degree or more does not survive the restore (#98),
-so keep it out of setup.
+unit's own -1 m.
 
 `standardRoute()` (`test/harness/fixtures.ts`) returns the world many tests use: KAAA, the VOR ABC and KBBB, fresh objects
 on every call. `insertLeg(unit, idx, fac)` (`test/harness/flightplan.ts`) puts a `USER` leg into FPL 0 at `idx`, the way the
@@ -243,7 +242,7 @@ dropped for good by the shared search session (#102). Both return fresh objects 
 
 `legWorld()` returns `{kddd, kaaa, keee, west}`, the leg world of the NAV 3 and NAV 4 pages and the Super NAV 5
 selectors: KDDD (47.0 N, 9.0 E), KAAA 200 NM west of it on the great circle that leaves KDDD on 270 true, KEEE 30 NM
-east of KDDD, so that the leg KAAA to KDDD is not the last one (the ESA of the last leg is #183). `west(nm)` is the
+east of KDDD, so that the leg KAAA to KDDD is not the last one (the last leg: `Nav3Esa.test.ts`). `west(nm)` is the
 point nm NM west of KDDD on that line. Store `[kaaa, kddd, keee]` in FPL 0 with `savedFlightplan`; an eastbound
 aircraft on the first leg has KDDD active. `arcWorld()` returns
 `{abc, at, arcbg, arcen, fafaa, mapaa, kprc, facilities}`: a left DME arc of 10 NM around the VOR ABC from its 270 to
@@ -293,8 +292,7 @@ pages accept.
   at decides the entry. The arc's radials are true bearings: keep `magvar` at 0 or account for it. The arc must not be the
   first leg that survives the conversion, which replaces the leg before the arc with the entry.
   Boot on the arc, so that the arc leg is the closest and becomes active (activation in the middle of an arc is #121).
-  A test that recalculates the entry (MOVE? on Super NAV 5) uses a left arc, because the entry of a right arc is named
-  wrongly after a recalculation (#104).
+  A test that recalculates the entry (MOVE? on Super NAV 5) can use a left or a right arc.
 - `Leg.TF(fix, FixTypeFlags.IAF)` and its siblings set the fix types. `SidStar` keeps a leg flagged IAF, FAF, MAP or MAHP
   even when its fix repeats, and drops an unflagged repeat.
 
@@ -303,8 +301,8 @@ pages accept.
 `Screen.read()` (`render/screen.ts`) turns the DOM into the cells the pilot sees; where the DOM and the screen differ,
 the reader follows the screen:
 
-- A row may carry blank cells past the edge of its half page (the nearest selector of APT 1 and VOR); they read as
-  nothing. A visible character or an inverted cell past the edge is a rendering bug, and the reader throws (#115).
+- A row may carry blank cells past the edge of its half page (the nearest selector of APT 1, VOR and NDB); they read as
+  nothing. A visible character or an inverted cell past the edge is a rendering bug, and the reader throws.
 - With the left cursor on, the status line shows `CRSR` (or `KYBD`) one cell in, because the DOM gives that field a
   CSS margin of one cell. The reader inserts that blank, so the status line keeps its 23 cells and `CRSR` sits in
   columns 1 to 4.
@@ -711,8 +709,8 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   triangle as a vector sum (`Wind.test.ts`), the USNO almanac with its URL (`Sun.test.ts`). The code's own source never
   is: `Conversions.ts` and `Wind.ts` follow avform, and an expectation computed from avform restates the code.
 - **Pin known bugs with `it.fails('... (#NN)')`.** The test states the correct behavior, fails today, and turns red when
-  someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See `KLNNavmath.test.ts`
-  (#97), `UserWaypointV2.test.ts` (#98) and `turnDirection.test.ts` (#100).
+  someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See
+  `turnDirection.test.ts` (#100) and `ActPage.test.ts` (#294).
 - **Prove a pin by fixing the bug, and keep heavy setup out of it.** An `it.fails` test passes on *any* failure, so a
   broken precondition inside it (a boot that threw, a wrong key sequence) is invisible: the pin stays green for the
   wrong reason. Prove a pin by fixing the bug temporarily and seeing the test turn red, then restore. Where it is cheap,
@@ -826,9 +824,9 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   knobs after arriving; the TRI pages read their fields from `unit.props.memory.triPage` when they are built, so a test
   seeds the memory first and selects the page after.
 - **`selectPage` throws once a row overflows**, because it reads the screen after every click, and `Screen.read()`
-  throws on a character past column 11 (below). A pin of an overflow (a distance that rounds up to its cutoff) selects
-  its page first, then moves the aircraft into the overflow, and its sibling reads the raw row with `readRows`
-  (`Nav1Page.test.ts`, `Nav3Page.test.ts`).
+  throws on a character past column 11 (below). A test of an overflow (a distance that rounded up to its cutoff, #226)
+  selects its page first, then moves the aircraft into the overflow, and a setup sibling that must see the overflowing
+  row reads the raw row with `readRows` (`Nav1Page.test.ts`, `Nav3Page.test.ts`).
 - **The fuel computer reads `NUMBER OF ENGINES` once, while it is built.** A test without the `simVars` option
   (section 4) counts no real engine and sees every fuel flow and every fuel used as 0. The pages that show them exist
   only with the matching interfaces: OTH 5 to OTH 8 with the fuel computer and OTH 9 and OTH 10 with the air data
@@ -836,10 +834,9 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **A bus subscription added after boot is called at once with the last cached value.** A test that subscribes to a
   topic and expects to see only new events must skip that first call (or count from a reference taken after
   subscribing).
-- **`Screen.read()` throws on a visible character, or an inverted cell, past column 11 of a half page.** That is how
-  the ACT page with an active index shows the type letter of an NDB (#115). Blank cells past the edge, such as the
-  trailing blanks of the nearest selector on APT 1 and VOR, are tolerated. A test that pins #115 reads the half page's
-  DOM with `readRows`.
+- **`Screen.read()` throws on a visible character, or an inverted cell, past column 11 of a half page.** A row
+  that pushes its type letter off the half page is a rendering bug. Blank cells past the edge, such as the trailing
+  blanks of the nearest selector on APT 1, VOR and NDB, are tolerated.
 - **A booted engine-running unit has a GPS fix at once**, in the slow acquisition mode too (the force-ready start calls
   `acquireAndUseSatellites()` in `WelcomePage`). A test that needs an invalid GPS, for example to enter the date on SET 2
   (read-only with a fix), boots with `coldGps: true`.
@@ -877,10 +874,8 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **`FakeCoherent.on`, `off` and `trigger` are no-ops.** The keyboard tests focus the input by hand; a test cannot see
   `FOCUS_INPUT_FIELD` or `UNFOCUS_INPUT_FIELD`, nor emit `mousePressOutsideView`, so the click outside the instrument
   and the unfocus of `PageContainer.destroy` have no test.
-- **Some editor code cannot be reached in a booted unit.** The NDB frequency range (190 to 1750 kHz) waits behind #277,
-  which refuses every entry; the tenth of `RadialEditor.convertFromValue` is never shown on its own, because every
-  radial a page shows meets #281; the null branch of `TimeEditor.convertToValue` needs a host without a time, and SET 2
-  always has one while STA 5 cannot run (above).
+- **Some editor code cannot be reached in a booted unit.** The null branch of `TimeEditor.convertToValue` needs a host
+  without a time, and SET 2 always has one while STA 5 cannot run (above).
 - **The flash rate is CSS.** The harness reads which display tick flashes a cell, not the animation of `.blink` and
   `.inverted-blink` in `KLN90B.scss`; whether FLAG is shown inverse on the real unit is not settled either (figure 3-101
   cannot show it), so the masks of the deviation bars' FLAG row are characterizations.
@@ -962,7 +957,7 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   conversion; the user setting keys are pinned. *Untested:* invalid panel.xml values (by decision; the enhancement
   #145), `TakeHomeMode`, the effect of a custom `BasePath` (needs a `FakeXhr` mount), the `Internal_*` events except
   `Internal_Key`, the 5 kt threshold of the roll command, the clamp and boot value of `L:KLN90B_Brightness`
-  (undocumented), the planner gate through the runtime LVar `L:KLN90B_WriteGpsSimvars` (#142), temporary (`XY`)
+  (undocumented), temporary (`XY`)
   waypoints round-tripped through storage, the ten-message cap of the flight plan loader and the failing V1 restore.
 - **The navigation core** (`data/flightplan/`, `NavCalculator`, `ModeController`, `KLNNavmath`, `FlightplanUtils`,
   `Flightplanloader`). *Spec* (chapters 4 to 6), with expectations from `flight/geo.ts`: DTK and XTK, sequencing at the
@@ -990,7 +985,7 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   and height-above-airport alerts, `TemporaryWaypointDeleter`, the EFB loader and saver, `AudioGenerator` at the bus
   level and `VolatileMemory`. *Untested:* `Units.ts` (type aliases only), the full country and FIR tables (spot checks
   only), the `PLAY_INSTRUMENT_SOUND` call itself (no `Name_Z` fake), IF REQUIRED SELECT OBS in a booted unit, the VNAV
-  offset to a waypoint ahead in FPL 0, and the MSA sampling step (unobservable before #97 is fixed).
+  offset to a waypoint ahead in FPL 0, and the MSA sampling step.
 - **Settings and persistence** (`settings/`). *Spec, from the formats:* the V1 and V2 loaders and persistors, the
   conversion, the user settings and the panel.xml parser. The format bugs are pinned (#98, #101, #103, #144).
 - **The page shell** (`pages/` itself: `MainPage`, `PageManager`, `PageTreeController`, `CursorController`, the segment
@@ -1016,9 +1011,8 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   `List`, `FlightplanList`, `WaypointDeleteListItem`, `Button`, `PageContainer`, `StatusLine`, `Blink`, `Inverted`,
   `MessagePage`, `ErrorPage`, the airport and coordinate views and Super NAV 5 left and right have tests. The 89's block
   layout of some fields is never asserted (section 5). *Untested:* the label placement of `Canvas` (the map tests hold
-  it), the NDB frequency range (behind #277), the tenth of `RadialEditor.convertFromValue` (every shown radial meets
-  #281), the null branch of `TimeEditor.convertToValue`, the focus events and the click outside the instrument
-  (`FakeCoherent`), and the CSS flash rate.
+  it), the null branch of `TimeEditor.convertToValue`, the focus events and the
+  click outside the instrument (`FakeCoherent`), and the CSS flash rate.
 - **Boot, power and the unit as a whole** (`KLN90BCore`, `TickController`, `Hardware`, `PowerButton`,
   `BrightnessManager`, `SimVarSync`, `KeyboardService`). *Spec and contract:* the cold-and-dark start, the self-test
   values and outputs, the power cycle and what it clears, the 4 Hz display with every fourth tick blinking, the 1 Hz
@@ -1260,7 +1254,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 - **Sampling an LVar.** Tests sample an LVar over display ticks with a hand-written loop (`SimVarSync.test.ts`,
   `StatusLine.test.ts`, `SelfTestLeftPage.test.ts`). A sampling helper would remove the pitfall; the counting half is
   `sim.writeCount(name)` (section 3).
-- **A blink phase probe.** The #320 pin finds the blink phase through `L:KLN90B_MsgLight`, which is dark on those ticks
+- **A blink phase probe.** The #320 test finds the blink phase through `L:KLN90B_MsgLight`, which is dark on those ticks
   only while a message is unread; a `blinkPhase()` on the unit would not need a message.
 - **A `beforeInit(core)` boot option.** The test of H events before `init()` spies on `KLN90BCore.prototype.init`.
 - **The `Version` mock.** STA 3 shows the placeholder of `kln90b/Version.ts`, which `Screen` refuses, so the tests that
@@ -1314,7 +1308,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   removals one waits for the next search.
 - **CTR computes once per unit in tests.** With `centerWorld()` one computation needs no OTH 2 detour: its legs are
   300 NM, so each Center is first returned by a search from inside it. A second computation in the same unit meets
-  #102; the #102 pin in `Ctr1Page.test.ts` is such a test on purpose, and #161 is pinned there with one computation.
+  #102; the #102 pin in `Ctr1Page.test.ts` is such a test on purpose, and the tests of the 30 waypoint limit there use one computation.
 - CTR leads: a recomputation without insertion creates a new user waypoint with the next number (BGD00, then BGD01),
   and the orphans count against the limit until power-off; a crossing without a VOR within 100 NM, or without a free
   number, is dropped silently; when the first waypoint lies in no Center the first crossing is dropped
@@ -1371,14 +1365,12 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - D/T 1 and D/T 2 beside another page hide the last-waypoint block when the active waypoint is the last one (4-12 is
       silent). After LOAD IN FPL on ACT 8 the ACT page switches to the new active waypoint (the guide is silent).
     - The code comment at `Apt8Page.tsx:352` quotes a sentence of 6-4 nearly word for word; it should be paraphrased.
-    - Selecting NAV 2 on the right from the boot's SUP page passes ACT, which posts NO SUP WPTS (#293), so a test that
-      reads the status line routes the right side another way.
 
 ## Controls
 
 - **The 4-3 cursor tests** (the cursor field remembered while the page is not left) sit in `WaypointEditor.test.ts`,
   though their subject is `CursorController`; they could move to `FplPage.test.ts` or a `CursorController` test file.
-- The controls' bugs that the right pages showed (#277, #282, #288, #290) are pinned on the pages and at control level.
+- The controls' bugs that the right pages showed (#282) are pinned on the pages and at control level.
 - **Leads** (seen and not confirmed or not filed):
     - Editors: `FreetextEditor.convertFromValue` drops a cell for a stored character outside its charset;
       `MagvarEditor` enters 0°W as -0 and cuts a variation of 100° or more to two digits (polar VORs only);
@@ -1395,7 +1387,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       Super NAV 5 fields 2 and 3 round 359.5 to 360 (#263's rule); `AltitudeFieldset` shows `00000` below sea level,
       while a low-confidence photo of the self-test page shows a negative altitude; `ModObsElement.innerRight` (MOD 2)
       and `FuelOnBoardSelect.innerRight` return `false` while `innerLeft` returns `true` (no visible effect; the Super
-      NAV 5 case is #238).
+      NAV 5 case, #238, is fixed in `ObsDtkElement`).
     - Lists: figures 4-4 and 4-5 read `LOAD INVRT?` in the PDF's text layer while the first waypoint of an empty plan is
       entered, where the code shows LOAD FPL 0? (worth a look at the printed page); the procedure header hides the arrow
       column while focused, and whether its text starts in column 0 or 1 was not checked; `SimpleListItem.tick` toggles
@@ -1442,9 +1434,8 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       equivalent mutant, because the OBS warning moves on by itself with the switch in LEG; the coverage text on line
       1 of the Database page and the cursor after ENT on the fourth Turn-On line (5-28 is silent) are not asserted.
     - Self test: `SelfTestRightPage` makes the baro read-only for `BaroSource` above 0 even without
-      `Airdata.IsInterfaced`, and the baro then never updates (an invalid panel.xml combination, #145); GPS WP BEARING
-      shares the conversion of #329; `POSITION DIFFERS` posts while the self-test page shows with empty storage, and
-      whether a real unit posts it before APPROVE? is not known; the ALT row's padding and the case of `ft`; whether a
+      `Airdata.IsInterfaced`, and the baro then never updates (an invalid panel.xml combination, #145); `POSITION DIFFERS`
+      posts while the self-test page shows with empty storage, and whether a real unit posts it before APPROVE? is not known; the ALT row's padding and the case of `ft`; whether a
       baro change takes effect before ENT; the distance indicator's 0 KTS and 0 MIN of Installation Manual 2-69; a time
       entry in a time zone other than UTC.
     - Power cycle: `Timers` saves the total time every 60 s and not at power-off, so STA 4 loses up to 59 s when the sim
@@ -1468,19 +1459,15 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - the fix of #96 needs `PageStack` in `MainPage.tsx` to destroy the half page it replaces (`setCurrentPage`, `pop`,
       `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone leaves both handler counts
       unchanged, and OTH 4 counts the `changed` topic of the remarks manager;
-    - the fix of #269 (`this.children = this.getCurrentPage().children; this.requiresRedraw = true;` in
-      `Apt3Page.changeFacility`) turns both #269 pins red; the fix of #95 turns its two pins red (the list and the error
-      page); the fix of #93 turns two (Avgas and JetB; JetA1 passes today, because the SDK's generic imperial gallon
-      weighs as Jet A);
-    - the fix of #311 in `WaypointEditor` leaves the `FplPage.test.ts` insert tests green; the fix of #262 must keep NO
-      SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests); the fix of
-      #306 changes the keyboard's automatic advance at the last cell (a characterization in `Editor.test.ts`); the tens
-      fix of #303 retires the 91-degree characterization of `LatLonEditor.test.ts`; #324 needs a trip-page form of
-      `DurationDisplay`, not a change of the shared form;
-    - a fix of #336 at the `MainPage` level also turns the #238 pin red; a fix of #335 turns the #334 pin red as well,
+    - the fix of #95 turns its two pins red (the list and the error page);
+    - the fix of #311 in `WaypointEditor` leaves the `FplPage.test.ts` insert tests green, but its first click on an
+      empty remark line changes the click counts in the setup of `stores a remark with a hyphen and shows it again`
+      (`FreetextEditor.test.ts`); the fix of #262 must keep NO
+      SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests);
+    - a fix of #335 turns the #334 pin red as well,
       though #334 still needs its own fix for SET 0 and Super NAV 5; a fix of #332 with a ride-through above about 1.5 s
       needs the 3 s waits of the circuit tests raised; a fix of #328 must keep the screen warm on a forced start
-      (`lastPowerChangeTime` also drives the warm-up); the fix of #199 turns its pins red; `HEADING_INPUT` in
+      (`lastPowerChangeTime` also drives the warm-up); `HEADING_INPUT` in
       `RollSteeringController.test.ts` can bite once #143 is fixed.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): #146 (the alert time on a Direct To a
   waypoint of FPL 0 that has a following leg), #147 (a waypoint alert in OBS mode), duplicate idents on a waypoint page
@@ -1510,7 +1497,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   `test/flight/harness/boot.test.ts`, the 25 s of `Apt1Page.test.ts`'s `dropEntry` and the 2 NM start of
   `jump.test.ts`.
 - **Review notes left as they are:** the INT REF read-only mutant survives one test of `IntPage.test.ts`;
-  `Sensors.test.ts` does not hold the type-dependent volume of its passing tests (the #93 pins will); `Screen.inverse`
+  `Sensors.test.ts` does not hold the type-dependent volume of its passing tests (the #93 tests do); `Screen.inverse`
   accepts any non-normal cell; the tick of `mountedText` and the trim of `writeCount` are unheld; `NearestList.test.ts`
   reads the last frame of the map only; `Mod1Page.test.ts` words the 5-38 note as "offers 1 and 0.3 only", an
   inference; the spies of `superNav5.test.ts` and `frontPanelHelpers.test.ts` are restored after the assertion, not in

@@ -94,6 +94,9 @@ export class Flightplan {
 
     public delete(): void {
         this.legs = [];
+        if (this.publishingEnabled) {
+            this.publisher.pub("flightplanChanged", this);
+        }
     }
 
     /**

@@ -278,7 +278,7 @@ describe('ALT button (3-55, 3-56, 3-39)', () => {
 });
 
 describe('DCT, ENT and CLR buttons (3-29, 4-7, 5-37)', () => {
-    /** Plan KAAA, ABC, KBBB with ABC active, the right side off the SUP page of the boot (an open DCT page is blank there, #119) */
+    /** Plan KAAA, ABC, KBBB with ABC active, the right side moved off the SUP page of the boot to a NAV page */
     async function planWithAbcActive() {
         const unit = await bootOnStandardRoute({position: {lat: 47.1, lon: 8.0}});
         await unit.panel.press('KLN90B_RightLargeKnob_Left', 5); // SUP, INT, NDB, VOR, APT, NAV

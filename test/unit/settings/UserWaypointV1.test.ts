@@ -69,9 +69,9 @@ describe('user waypoint V1 format', () => {
         expect(apt.runways[0].surface).toBe(RunwaySurfaceType.Asphalt);
     });
 
-    // The error names the character of the V2 offset (48), which is empty in a V1 slot
-    it.fails('names the unknown runway surface character in its error (#116)', () => {
-        expect(() => restoreV1('AXX    UAPT +4700.00-00830.00+01400+03200X')).toThrow('runwaySurface:X');
+    // The error names the character of the V1 slot, whatever it is
+    it.each(['X', 'h'])('names the unknown runway surface character %s in its error (#116)', (surface) => {
+        expect(() => restoreV1(`AXX    UAPT +4700.00-00830.00+01400+03200${surface}`)).toThrow(new Error(`Unexpected runwaySurface:${surface}`));
     });
 
     // Contract source for the cases below: docs/architecture.md Core 7 (V1: the 12 character ICAO, then latitude

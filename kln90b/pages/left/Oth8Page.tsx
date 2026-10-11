@@ -65,6 +65,10 @@ export class Oth8Page extends SixLineHalfPage {
     }
 
     protected redraw(): void {
+        if (!this.props.planeSettings.input.fuelComputer.fuelUsedTransmitted) {
+            return; //5-41: without the fuel used output the page keeps its dashes
+        }
+
         this.children.get("used1").fuel = this.props.sensors.in.fuelComputer.fuelUsed1;
         this.children.get("used2").fuel = this.props.sensors.in.fuelComputer.fuelUsed2;
         this.children.get("usedTotal").fuel = this.props.sensors.in.fuelComputer.fuelUsed1! + this.props.sensors.in.fuelComputer.fuelUsed2!;

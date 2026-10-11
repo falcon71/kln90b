@@ -137,9 +137,8 @@ describe('RadialEditor limits (checked in the KLN 89 trainer, 2026-10-08)', () =
 
 describe('RadialEditor on its own (5-19)', () => {
     // Figures 5-72 and 5-73: the field shows three digits, the point and the tenth. A stored radial puts each digit
-    // into its own cell; no digit of 123.4 equals the one beside it. The editor is mounted on its own, because the INT
-    // page shows the final bearing at the intersection instead of the stored radial (#281), and every radial it could
-    // show without that bug has too few distinct digits to tell the cells apart
+    // into its own cell; no digit of 123.4 equals the one beside it. The editor is mounted on its own, so that the radial
+    // is exactly the one given, whatever the INT page computes from an intersection
     it('puts each digit of a stored radial into its own cell (5-19, figures 5-72, 5-73)', () => {
         const editor = new RadialEditor(new EventBus(), 123.4, () => undefined);
 

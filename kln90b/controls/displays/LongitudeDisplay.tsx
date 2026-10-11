@@ -3,6 +3,7 @@ import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
 import {Longitude} from "../../data/Units";
 import {format} from "numerable";
+import {splitDegreesMinutes} from "../../data/Coordinates";
 
 
 /**
@@ -28,14 +29,12 @@ export class LongitudeDisplay implements UiElement {
 
     private formatLongitude(): string {
         if (this.longitude === null) {
-            return "- --°--.--'";
+            return "----°--.--'";
         }
 
-        const eastWest = this.longitude > 0 ? "E" : "W";
-        const longitude = Math.abs(this.longitude);
-        const degreesString = format(longitude, "00", {rounding: "floor"}).padStart(3, " ");
-
-        const minutes = (longitude % 1) * 60;
+        const eastWest = this.longitude >= 0 ? "E" : "W";
+        const {degrees, minutes} = splitDegreesMinutes(this.longitude);
+        const degreesString = format(degrees, "00").padStart(3, " ");
         const minutesString = format(minutes, "00.00");
 
         return `${eastWest}${degreesString}°${minutesString}'`;

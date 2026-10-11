@@ -1,10 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
-import {ICAO} from '@microsoft/msfs-sdk';
+import {FacilityType, ICAO} from '@microsoft/msfs-sdk';
 import {KLNFacilityRepository} from '../../kln90b/data/navdata/KLNFacilityRepository';
 import {bootUnit, HeadlessUnit, settle} from '../harness/boot';
 import {airport, ndb, vor} from '../harness/navdata/builders';
 import {Screen} from '../harness/render/screen';
-import {fplIdents} from '../harness/readers';
+import {fplIdents, messages, userWaypoints} from '../harness/readers';
 import {savedFlightplan, storedSetting} from '../harness/storage';
 
 /** Boots with a file written by version 1: no userDataFormat, FPL 1 in fpl0 and 12 character ICAOs */
@@ -86,7 +86,7 @@ describe('the stored last active waypoint is an ICAO V1 string', () => {
 });
 
 // Core 7: a failed restore replaces the plans by empty ones and posts USER DATA LOST. The maintainer ruled that the
-// corrupt data is then wiped once from the saved data, as the V1 conversion does, which the V2 restore does not (#144).
+// corrupt data is then wiped once from the saved data, as the V1 conversion does (#144).
 describe('a failed V2 restore of the user data', () => {
     // Written by hand: savedFlightplan sets userDataFormat 2 as well, but its strings come from the SDK. The type letter Q
     // is no facility type, so the V2 waypoint loader throws "Unsupported facility type".
@@ -122,10 +122,69 @@ describe('a failed V2 restore of the user data', () => {
         expect(storedSetting(unit, 'fpl1')).toBe('A          KAAA    ');
     });
 
-    it.fails('wipes the corrupt waypoint and the plan from the saved data (#144)', async () => {
+    it('wipes the corrupt waypoint and the plan from the saved data (#144)', async () => {
         const unit = await bootCorruptFile();
 
         expect(storedSetting(unit, 'wpt0')).toBe('');
         expect(storedSetting(unit, 'fpl1')).toBe('');
+        expect(storedSetting(unit, 'userDataFormat')).toBe(2);
+    });
+
+    // A plan that cannot be read (a number where the V2 format has a string) fails the restore of the plans, and the
+    // waypoints that were restored stay: only the plans are written over
+    it('wipes an unreadable plan, and keeps the waypoints that were restored (#144)', async () => {
+        const good = 'WXX        GOOD    +4700.00+00800.00';
+        const unit = await bootUnit({
+            facilities: [airport('KAAA', 47, 8)],
+            storage: {userDataFormat: 2, wpt0: good, fpl1: 'A          KAAA    ', fpl3: 5},
+        });
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.msg();
+        expect(Screen.read().text().split('\n').map(row => row.trimEnd())).toContain('USER DATA LOST'); // the precondition
+
+        expect(storedSetting(unit, 'wpt0')).toBe(good);
+        expect(userWaypoints(unit, FacilityType.Intersection).map(w => w.icaoStruct.ident)).toEqual(['GOOD']);
+        expect(storedSetting(unit, 'fpl1')).toBe('');
+        expect(storedSetting(unit, 'fpl3')).toBe('');
+    });
+
+    // The wipe empties every slot, not only the ones that held something
+    it('empties every stored slot, the last ones included (#144)', async () => {
+        const unit = await bootUnit({
+            facilities: [airport('KAAA', 47, 8)],
+            storage: {userDataFormat: 2, wpt0: 'QXX        BAD     +4700.00+00800.00', wpt1: 'WXX        TWO     +4700.00+00800.00', fpl25: 'A          KAAA    '},
+        });
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'wpt1')).toBe('');
+        expect(storedSetting(unit, 'fpl25')).toBe('');
+        expect(userWaypoints(unit)).toEqual([]);
+    });
+
+    // A restore that works leaves the data as it is, a plan included (the unit loses nothing by starting)
+    it('leaves valid data alone and reports nothing lost (#144)', async () => {
+        const stored = {userDataFormat: 2, wpt0: 'WXX        GOOD    +4700.00+00800.00', fpl2: 'A          KAAA    '};
+        const unit = await bootUnit({facilities: [airport('KAAA', 47, 8)], storage: stored});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'wpt0')).toBe(stored.wpt0);
+        expect(storedSetting(unit, 'fpl2')).toBe(stored.fpl2);
+        expect(messages(unit)).not.toContain('USER DATA LOST');
+    });
+});
+
+// The same wipe as the conversion of a V1 file: a V1 file that cannot be restored is written over once, in the V2 format
+describe('a failed V1 restore of the user data', () => {
+    it('wipes the corrupt data, marks the file as version 2 and reports USER DATA LOST (#144)', async () => {
+        const unit = await bootUnit({
+            facilities: [airport('KAAA', 47, 8)],
+            storage: {wpt0: 'QXX    BAD  +4700.00+00800.00', fpl0: 'A      KAAA '},
+        });
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(messages(unit)).toContain('USER DATA LOST');
+        expect(storedSetting(unit, 'userDataFormat')).toBe(2);
+        expect(storedSetting(unit, 'wpt0')).toBe('');
+        expect(storedSetting(unit, 'fpl0')).toBe('');
     });
 });

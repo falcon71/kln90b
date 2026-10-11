@@ -139,7 +139,7 @@ describe('NAV 4 VNAV started at zero ground speed', () => {
         return unit;
     }
 
-    // The setup sibling of the pin: no ground speed, the cursor over ANGLE, VNAV is no longer inactive
+    // The setup sibling of the #229 test: no ground speed, the cursor over ANGLE, VNAV is no longer inactive
     it('starts VNAV at zero ground speed (5-8)', async () => {
         const unit = await cursorOverAngle();
 
@@ -149,9 +149,9 @@ describe('NAV 4 VNAV started at zero ground speed', () => {
     });
 
     // 5-8 (figure 5-26): bringing the cursor over ANGLE starts VNAV at the displayed angle, and the top line shows the
-    // advisory altitude, at the start the present altitude. The code computes the time to the start as 0 / 0 and shows
-    // VNV INNaN: instead.
-    it.fails('shows the advisory altitude when VNAV starts at zero ground speed (5-8, #229)', async () => {
+    // advisory altitude, at the start the present altitude. Until #229 the code computed the time to the start as 0 / 0
+    // and showed VNV INNaN: instead.
+    it('shows the advisory altitude when VNAV starts at zero ground speed (5-8, #229)', async () => {
         await cursorOverAngle();
 
         expect(Screen.read().rows('L')[0]).toBe('VNV 7500ft ');

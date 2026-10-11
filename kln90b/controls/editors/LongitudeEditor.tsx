@@ -3,6 +3,7 @@ import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {EastWestEditorField, NumberEditorField} from "./EditorField";
 import {Longitude} from "../../data/Units";
 import {format} from "numerable";
+import {splitDegreesMinutes} from "../../data/Coordinates";
 import {TickController} from "../../TickController";
 
 
@@ -35,12 +36,9 @@ export class LongitudeEditor extends Editor<Longitude> {
     }
 
     protected convertFromValue(value: Longitude): Rawvalue {
-        const eastWestIndex = value > 0 ? 0 : 1;
-        value = Math.abs(value);
-        const degreesString = format(value, "000", {rounding: "floor"});
-
-
-        const minutes = (value % 1) * 60;
+        const eastWestIndex = value >= 0 ? 0 : 1;
+        const {degrees, minutes} = splitDegreesMinutes(value);
+        const degreesString = format(degrees, "000");
         const minutesString = format(minutes, "00.00");
 
         return [
@@ -58,10 +56,10 @@ export class LongitudeEditor extends Editor<Longitude> {
     protected convertToValue(rawValue: Rawvalue): Promise<Longitude | null> {
         const eastWest = rawValue[0] === 0 ? 1 : -1;
         const degrees = Number(String(rawValue[1]) + String(rawValue[2]) + String(rawValue[3]));
-        if (degrees > 180) {
+        const minutes = Number(String(rawValue[4]) + String(rawValue[5]) + "." + String(rawValue[6]) + String(rawValue[7]));
+        if (degrees + minutes / 60 > 180) { //C-1: a value outside the allowed range is INVALID ENT, and no longitude is beyond 180°
             return Promise.resolve(null);
         }
-        const minutes = Number(String(rawValue[4]) + String(rawValue[5]) + "." + String(rawValue[6]) + String(rawValue[7]));
 
         return Promise.resolve(eastWest * (degrees + minutes / 60));
     }

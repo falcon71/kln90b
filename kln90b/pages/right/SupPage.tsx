@@ -16,7 +16,7 @@ import {LatitudeEditor} from "../../controls/editors/LatitudeEditor";
 import {LongitudeEditor} from "../../controls/editors/LongitudeEditor";
 import {SupplementarySelector} from "../../controls/selects/SupplementarySelector";
 import {WaypointEditor} from "../../controls/editors/WaypointEditor";
-import {isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
+import {isUserWaypoint, isWaypointPageProps, unpackFacility, WaypointPage} from "./WaypointPage";
 import {CreateWaypointMessage} from "../../controls/selects/CreateWaypointMessage";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {RadialEditor} from "../../controls/editors/RadialEditor";
@@ -66,7 +66,8 @@ export class SupPage extends WaypointPage<UserFacility> {
     constructor(props: PageProps) {
         super(props);
 
-        if (this.props.scanLists.supScanlist.isEmpty()) {
+        //C-2 The message belongs to selecting the SUP page type. A page built with a waypoint (or none) is the placeholder of the ACT page or the confirmation of a waypoint
+        if (!isWaypointPageProps(props) && this.props.scanLists.supScanlist.isEmpty()) {
             props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO SUP WPTS");
         }
 
@@ -114,7 +115,7 @@ export class SupPage extends WaypointPage<UserFacility> {
             <div ref={this.mainRef}>
             REF:&nbsp&nbsp{this.children.get("ref").render()}<br/>
             RAD: {this.children.get("refBearing").render()}°<br/>
-            DIS:{this.children.get("refDist").render()}NM<br/>
+            DIS:{this.children.get("refDist").render()}nm<br/>
                 {this.children.get("lat").render()}'<br/>
                 {this.children.get("lon").render()}'
             </div>
@@ -203,7 +204,20 @@ export class SupPage extends WaypointPage<UserFacility> {
 
     private setRef(ref: Facility | null) {
         this.ref = ref;
+        this.refDebounce.clear(); //The entered reference ends the automatic search for the nearest VOR
+        const facility = unpackFacility(this.facility);
+        if (ref !== null && facility) {
+            //3-51 The page shows radial and distance from the entered reference
+            this.calculateRadialAndDistance(ref, facility);
+        }
         this.requiresRedraw = true;
+    }
+
+    private calculateRadialAndDistance(ref: Facility, facility: Facility) {
+        const refCoords = new GeoPoint(ref.lat, ref.lon);
+        const intCoords = new GeoPoint(facility.lat, facility.lon);
+        this.dis = UnitType.GA_RADIAN.convertTo(intCoords.distance(refCoords), UnitType.NMILE);
+        this.rad = refCoords.bearingTo(intCoords); //5-19, figure 5-76 The radial is the initial bearing at the VOR
     }
 
     private calculateRef() {
@@ -231,10 +245,7 @@ export class SupPage extends WaypointPage<UserFacility> {
             if (facility) {
                 this.ref = await this.props.nearestUtils.getNearestVor(facility.lat, facility.lon);
                 if (this.ref) {
-                    const refCoords = new GeoPoint(this.ref.lat, this.ref.lon);
-                    const intCoords = new GeoPoint(facility.lat, facility.lon);
-                    this.dis = UnitType.GA_RADIAN.convertTo(intCoords.distance(refCoords), UnitType.NMILE);
-                    this.rad = intCoords.bearingFrom(refCoords);
+                    this.calculateRadialAndDistance(this.ref, facility);
                 }
                 this.requiresRedraw = true;
             }
@@ -252,6 +263,7 @@ export class SupPage extends WaypointPage<UserFacility> {
                 fac.lat = newCoords.lat;
                 fac.lon = newCoords.lon;
             });
+            this.requiresRedraw = true;
         } else {
             this.rad = radial;
             this.createIfReady();
@@ -268,6 +280,7 @@ export class SupPage extends WaypointPage<UserFacility> {
                 fac.lat = newCoords.lat;
                 fac.lon = newCoords.lon;
             });
+            this.requiresRedraw = true;
         } else {
             this.dis = dist;
             this.createIfReady();

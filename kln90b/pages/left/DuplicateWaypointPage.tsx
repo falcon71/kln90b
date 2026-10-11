@@ -47,7 +47,7 @@ export class DuplicateWaypointPage extends SixLineHalfPage {
         this.children = new UIElementChildren<DuplicateWaypointPageTypes>({
             ident: new TextDisplay(props.ident.padEnd(5, " ")),
             count: new TextDisplay(props.waypoints.length.toString().padStart(4, " ")),
-            wptList: new List(UIElementChildren.forList(list)),
+            wptList: new List(UIElementChildren.forList(list), 4), //3-15: four waypoints are visible below the header
         });
         this.cursorController = new CursorController(this.children);
         this.cursorController.setCursorActive(true);
@@ -67,6 +67,7 @@ export class DuplicateWaypointPage extends SixLineHalfPage {
     public render(): VNode {
         return (<pre>
              &nbsp{this.children.get("ident").render()} {this.children.get("count").render()}<br/>
+            &nbsp&nbspTYPE AREA<br/>
             {this.children.get("wptList").render()}
         </pre>);
     }

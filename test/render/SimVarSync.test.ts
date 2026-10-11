@@ -54,7 +54,7 @@ describe('L:KLN90B_ObsSource (public contract)', () => {
     });
 });
 
-// The screen is asserted, not the opacity: #114 lets the opacity ramp on an unpowered unit. bootUnit cannot preset a
+// The screen is asserted, not the opacity. bootUnit cannot preset a
 // SimVar before init, so the unit boots, loses its electricity at the first SimVarSync tick and powers up again when the
 // test sets the circuit; it comes up through the welcome page, which fills row 0.
 describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract)', () => {
@@ -90,15 +90,76 @@ describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract
         expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
     });
 
-    // The wiki panel.xml customization names any boolean SimVar, with an index only after a colon. The parser takes the
-    // part after the first colon for the index (KLN90BPlaneSettings.ts:97-99) and SimVarSync replaces it (:31-35), so the
-    // name becomes L:NaN and the unit never powers up. The sibling is the CIRCUIT ON:1 test above.
-    it.fails('an LVar as the ElectricitySimVar powers the unit (#136)', async () => {
+    // The wiki panel.xml customization names any boolean SimVar, with an index only after a colon (cfg/panel.xml: "If an
+    // index is used, it is synced with L:KLN90B_ElectricitySimVarIndex"). The colon of a prefix is part of the name (#136).
+    it('an LVar as the ElectricitySimVar powers the unit (#136)', async () => {
         const unit = await bootUnit({panelXml: panelXml({'Input.ElectricitySimVar': 'L:MY_AVIONICS_BUS'})});
         unit.env.sim.set('L:MY_AVIONICS_BUS', 'bool', true);
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+        // The name is not rewritten by the sync, so the unit goes on running and follows the LVar down
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('L:MY_AVIONICS_BUS');
+        unit.env.sim.set('L:MY_AVIONICS_BUS', 'bool', false);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(Screen.read().row(0)).toBe(BLANK_ROW);
+    });
+
+    it('an A: prefix with an index powers the unit, and the index LVar switches the circuit (#136)', async () => {
+        // FakeSim keys a variable by its name as written, so the prefix is part of the variable the test sets
+        const unit = await bootUnit({panelXml: panelXml({'Input.ElectricitySimVar': 'A:CIRCUIT ON:1'})});
+        unit.env.sim.set('A:CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('A:CIRCUIT ON:1');
+
+        // Circuit 2 is not powered
+        unit.env.sim.set('L:KLN90B_ElectricitySimVarIndex', 'number', 2);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('A:CIRCUIT ON:2');
+        expect(Screen.read().row(0)).toBe(BLANK_ROW);
+
+        unit.env.sim.set('A:CIRCUIT ON:2', 'bool', true);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+    });
+
+    // A pretty-printed element ends in whitespace; the unit trims it, so the sync still finds the index
+    it('a pretty-printed value with an index powers the unit, and the index LVar switches the circuit (#136)', async () => {
+        const unit = await bootUnit({panelXml: panelXml({'Input.ElectricitySimVar': '\n    CIRCUIT ON:1\n  '})});
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('CIRCUIT ON:1');
+
+        unit.env.sim.set('L:KLN90B_ElectricitySimVarIndex', 'number', 2);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('CIRCUIT ON:2');
+        expect(Screen.read().row(0)).toBe(BLANK_ROW);
+    });
+
+    // The form without a prefix and without an index: the unit powers up with it and the sync leaves the name alone
+    it('a SimVar without prefix and index powers the unit', async () => {
+        const unit = await bootUnit({panelXml: panelXml({'Input.ElectricitySimVar': 'ELECTRICAL MAIN BUS VOLTAGE'})});
+        unit.env.sim.set('ELECTRICAL MAIN BUS VOLTAGE', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('ELECTRICAL MAIN BUS VOLTAGE');
+    });
+
+    // Only the trailing digits are the index, whatever their count
+    it('replaces only the trailing digits of the index', async () => {
+        const unit = await bootUnit({panelXml: panelXml({'Input.ElectricitySimVar': 'CIRCUIT ON:12'})});
+        unit.env.sim.set('CIRCUIT ON:12', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+
+        unit.env.sim.set('L:KLN90B_ElectricitySimVarIndex', 'number', 3);
+        await vi.advanceTimersByTimeAsync(300);
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('CIRCUIT ON:3');
     });
 });
 
@@ -176,8 +237,7 @@ describe('L:KLN90B_ObsTarget (public contract)', () => {
 });
 
 // CLAUDE.md "Public contract with aircraft" (GPS SimVars) and the Hot Swapping wiki page: with the LVar at 0 the unit
-// writes no GPS SimVars and leaves GPS OVERRIDDEN to the sim's own GPS. GPS WP CROSS TRK is no probe for "stopped", it
-// keeps being written (#126).
+// writes no GPS SimVars and leaves GPS OVERRIDDEN to the sim's own GPS.
 describe('L:KLN90B_WriteGpsSimvars (public contract)', () => {
     it('stops the GPS SimVar writes and releases GPS OVERRIDDEN, and resumes them', async () => {
         const unit = await bootOnStandardRoute();
@@ -199,10 +259,35 @@ describe('L:KLN90B_WriteGpsSimvars (public contract)', () => {
         // One write per calculation tick
         expect(unit.env.sim.writeCount('GPS WP DISTANCE') - resumedAt).toBe(10);
     });
+
+    // The 16 Hz filter tick writes GPS WP CROSS TRK and the roll steering writes GPS COURSE TO STEER; both stop with the
+    // rest (#126), while the roll command LVar, the unit's own output, keeps going
+    it('stops GPS WP CROSS TRK and GPS COURSE TO STEER too, and resumes them', async () => {
+        const unit = await bootOnStandardRoute();
+        const sim = unit.env.sim;
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(sim.writeCount('GPS WP CROSS TRK')).toBeGreaterThan(0);
+        expect(sim.writeCount('GPS COURSE TO STEER')).toBeGreaterThan(0);
+
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+        const crossTrk = sim.writeCount('GPS WP CROSS TRK');
+        const steer = sim.writeCount('GPS COURSE TO STEER');
+        const roll = sim.writeCount('L:KLN90B_RollCommand');
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(sim.writeCount('GPS WP CROSS TRK')).toBe(crossTrk);
+        expect(sim.writeCount('GPS COURSE TO STEER')).toBe(steer);
+        expect(sim.writeCount('L:KLN90B_RollCommand')).toBeGreaterThan(roll);
+
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(sim.writeCount('GPS WP CROSS TRK')).toBeGreaterThan(crossTrk);
+        expect(sim.writeCount('GPS COURSE TO STEER')).toBeGreaterThan(steer);
+    });
 });
 
-// The Hot Swapping wiki page: a disabled unit does not claim the GPS (GPS OVERRIDDEN 0, see SensorsOut.test.ts #24).
-// Toggling WriteGpsSimvars while the unit is disabled writes GPS OVERRIDDEN again (SimVarSync.ts:53-56).
+// The Hot Swapping wiki page: a disabled unit does not claim the GPS (GPS OVERRIDDEN 0, see SensorsOut.test.ts #24), and
+// toggling WriteGpsSimvars does not change that (#137).
 describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
     it('the sibling: the disabled unit has released GPS OVERRIDDEN', async () => {
         const unit = await bootOnStandardRoute();
@@ -213,7 +298,7 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
         expect(unit.env.sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
     });
 
-    it.fails('stays released when WriteGpsSimvars is toggled (#137)', async () => {
+    it('stays released when WriteGpsSimvars is toggled (#137)', async () => {
         const unit = await bootOnStandardRoute();
         const sim = unit.env.sim;
         sim.set('L:KLN90B_Disabled', 'bool', true);
@@ -221,12 +306,60 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
 
         sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
         await vi.advanceTimersByTimeAsync(300);
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
         sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
         await vi.advanceTimersByTimeAsync(300);
 
         expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
     });
+
+    it('claims the GPS again on the resume, with WriteGpsSimvars as it was toggled meanwhile', async () => {
+        const unit = await bootOnStandardRoute();
+        const sim = unit.env.sim;
+        sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
+    });
+
+    // The other order: the option goes off while the unit is disabled and stays off, so the resume leaves the GPS to
+    // the other unit
+    it('leaves the GPS released on the resume when WriteGpsSimvars was switched off meanwhile', async () => {
+        const unit = await bootOnStandardRoute();
+        const sim = unit.env.sim;
+        sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+
+        sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
+    });
+
+    // The condition is the disabled state and nothing wider: a running unit releases and claims the GPS with the LVar
+    it('still follows WriteGpsSimvars while the unit is enabled', async () => {
+        const unit = await bootOnStandardRoute();
+        const sim = unit.env.sim;
+
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
+    });
 });
+
 
 // The Hot Swapping wiki page: a disabled unit suspends and resumes where it left off, so the input meant for the unit
 // that replaced it must not reach it. KLN90BCore.onInteractionEvent has no check of L:KLN90B_Disabled, so the knob clicks

@@ -68,23 +68,27 @@ export abstract class Editor<T> implements Field {
         }
     }
 
+    /**
+     * The cursor stops at the first cell. The Pilot's Guide is silent, the KLN 89 trainer stops there (checked 2026-10-08)
+     */
     outerLeft(): boolean {
-        this.editorFields[this.cursorIndex].isFocused = false;
-        this.cursorIndex--;
-        if (this.cursorIndex < 0) {
-            this.cursorIndex = this.editorFields.length - 1;
+        if (this.cursorIndex > 0) {
+            this.editorFields[this.cursorIndex].isFocused = false;
+            this.cursorIndex--;
+            this.editorFields[this.cursorIndex].isFocused = true;
         }
-        this.editorFields[this.cursorIndex].isFocused = true;
         return true;
     }
 
+    /**
+     * The cursor stops at the last cell. The Pilot's Guide is silent, the KLN 89 trainer stops there (checked 2026-10-08)
+     */
     outerRight(): boolean {
-        this.editorFields[this.cursorIndex].isFocused = false;
-        this.cursorIndex++;
-        if (this.cursorIndex >= this.editorFields.length) {
-            this.cursorIndex = 0;
+        if (this.cursorIndex < this.editorFields.length - 1) {
+            this.editorFields[this.cursorIndex].isFocused = false;
+            this.cursorIndex++;
+            this.editorFields[this.cursorIndex].isFocused = true;
         }
-        this.editorFields[this.cursorIndex].isFocused = true;
         return true;
     }
 

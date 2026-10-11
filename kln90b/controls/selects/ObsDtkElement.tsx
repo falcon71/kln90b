@@ -44,7 +44,7 @@ export class ObsDtkElement implements Field {
 
     public innerRight(): boolean {
         this.modeController.setObs(NavMath.normalizeHeading(this.navState.obsMag + 1));
-        return false;
+        return true;
     }
 
     public isClearAccepted(): boolean {

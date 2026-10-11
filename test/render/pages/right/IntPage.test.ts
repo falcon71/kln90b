@@ -134,7 +134,7 @@ async function distanceEntered(digits: string, extra: Facility[] = []): Promise<
 }
 
 describe('INT page (characterization)', () => {
-    // Row 3 (DIS) is left out: its leading zeros and its label are #282 and #283
+    // Row 3 (DIS) is left out: its leading zeros are #282
     it('shows a database intersection with its reference VOR, cursor off', async () => {
         const unit = await intPageOf([kenzy(), mkc()]);
 
@@ -215,27 +215,60 @@ describe('INT page reference waypoint (3-50, 3-51)', () => {
 
     // 3-51, step 6, figure 3-158: after the approval the page shows the radial and distance from the new reference
     // waypoint. The KLN 89 trainer (2026-10-07) changed both at once on ENT, ENT with another REF. KENZY lies on the
-    // 180° radial of RIS (no variation at RIS); IntPage.setRef keeps MKC's radial
-    it.fails('computes the radial from the entered REF waypoint (3-51, figure 3-158, the KLN 89 trainer, #279)', async () => {
+    // 180° radial of RIS (no variation at RIS), MKC's radial is 000°
+    it('computes the radial from the entered REF waypoint (3-51, figure 3-158, the KLN 89 trainer, #279)', async () => {
         await withRefRis();
 
         expect(Screen.read().rows('R')[2]).toBe('RAD: 180.0°');
     });
 
     // The distance from the new reference: RIS lies 0.2° of latitude (12.0 NM) north of KENZY, MKC 6.0 NM south of it.
-    // The digits are parsed, so that the leading zero of #282 and the label of #283 do not matter here
-    it.fails('computes the distance from the entered REF waypoint (3-51, figure 3-158, the KLN 89 trainer, #279)', async () => {
+    // The digits are parsed, so that the leading zero of #282 does not matter here
+    it('computes the distance from the entered REF waypoint (3-51, figure 3-158, the KLN 89 trainer, #279)', async () => {
         await withRefRis();
 
         expect(parseFloat(Screen.read().rows('R')[3].slice(4))).toBe(12.0);
     });
 
-    // Sibling of the pin: the REF field takes RIS
+    // Sibling of the two tests above: the REF field takes RIS
     it('shows the entered REF waypoint (3-51)', async () => {
         const unit = await withRefRis();
 
         expect(unit.errors).toEqual([]);
         expect(Screen.read().rows('R')[1]).toBe('REF:  RIS  ');
+    });
+
+    // CLR and ENT on the REF field hand a null reference to the page, which has no radial and distance to compute from
+    // it. A throw on input is a bug, so the page must take it; it shows nothing for the reference
+    it('takes CLR and ENT on the REF field without an error (characterization)', async () => {
+        const unit = await intPageOf([kenzy(), mkc(), vor('RIS', 47.3, 11.0)]);
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', 'MKC');
+
+        await unit.panel.clr();
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R')[1]).toBe('REF:  _____');
+    });
+
+    // 3-50, 3-51: the closest VOR is only the default. The search for it takes 8 s from the page build, and a REF entered
+    // before it ends must not be replaced when it does. RIS is entered right after the page was selected
+    it('keeps a REF entered before the search for the closest VOR ended (3-50, 3-51)', async () => {
+        const unit = await bootUnit({facilities: [kenzy(), mkc(), vor('RIS', 47.3, 11.0)], position: {lat: 47, lon: 8}});
+        await unit.panel.selectPage('R', 'INT  ');
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', '_____'); // the REF field, still dashed
+        expect(unit.panel.focused('R').row).toBe(1); // precondition
+        await unit.panel.enterIdent('R', 'RIS');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        expect(Screen.read().rows('R').slice(1, 3)).toEqual(['REF:  RIS  ', 'RAD: 180.0°']); // precondition: taken at once
+
+        await vi.advanceTimersByTimeAsync(9000);
+
+        expect(Screen.read().rows('R').slice(1, 3)).toEqual(['REF:  RIS  ', 'RAD: 180.0°']);
+        expect(parseFloat(Screen.read().rows('R')[3].slice(4))).toBe(12.0);
     });
 
     // 3-50: the entered reference is not stored and is lost when the page is left; the page shows the closest VOR again
@@ -273,16 +306,25 @@ describe('INT page radial and distance (3-50, 5-19)', () => {
     });
 
     // A radial is the course out of the VOR, the initial bearing at the station. QQI lies 48.1 NM out on MKC's true
-    // 090° course (pointFrom, flight/geo.ts). IntPage.calculateRef takes GeoPoint.bearingFrom, the final bearing at the
-    // intersection, 090.9° here; in figure 5-76 the initial bearing gives the 268.1° shown and the final one 268.4°. The
+    // 090° course (pointFrom, flight/geo.ts). The final bearing at the intersection (GeoPoint.bearingFrom) would show
+    // 090.9° here; in figure 5-76 the initial bearing gives the 268.1° shown and the final one 268.4°. The
     // KLN 89 trainer (2026-10-07) shows the initial bearing too: the bearing measured at the intersection was off by 0.4°
     // to 0.7° on its four intersections. 5-19 says the original reference may be entered again later, which only makes sense if it
     // gives the same radial.
-    it.fails('shows the radial as the bearing at the VOR (3-50, 5-19, the KLN 89 trainer, #281)', async () => {
+    it('shows the radial as the bearing at the VOR (3-50, 5-19, the KLN 89 trainer, #281)', async () => {
         const p = pointFrom({lat: 47.0, lon: 11.0}, 90, 48.1);
         await intPageOf([intersection('QQI', p.lat, p.lon), mkc()]);
 
         expect(Screen.read().rows('R')[2]).toBe('RAD: 090.0°');
+    });
+
+    // The tenth of the radial: QQI lies on MKC's true 123.4 course, so the page shows 123.4 (figure 5-76 shows a radial with
+    // a tenth, 268.1)
+    it('shows the tenth of the radial (3-50, figure 5-76, #281)', async () => {
+        const p = pointFrom({lat: 47.0, lon: 11.0}, 123.4, 48.1);
+        await intPageOf([intersection('QQI', p.lat, p.lon), mkc()]);
+
+        expect(Screen.read().rows('R')[2]).toBe('RAD: 123.4°');
     });
 
     // Figures 3-155, 3-158, 5-67, 5-75 and 5-76 and a photo of a real unit (the SUP page, same layout) show DIS without
@@ -296,14 +338,14 @@ describe('INT page radial and distance (3-50, 5-19)', () => {
     });
 
     // The same figures show the unit in the small nm glyphs that every other distance of the code uses, as does the KLN 89
-    // trainer (2026-10-07); IntPage.tsx:125 writes NM in full-size letters (SupPage.tsx:117 too)
-    it.fails('labels the distance with the small nm (figures 3-155, 5-75, the KLN 89 trainer, #283)', async () => {
+    // trainer (2026-10-07). The test reads the cells after the digits.
+    it('labels the distance with the small nm (figures 3-155, 5-75, the KLN 89 trainer, #283)', async () => {
         await intPageOf([intersection('KENZY', 47.2, 11.0), mkc()]);
 
         expect(Screen.read().rows('R')[3].slice(9)).toBe('nm');
     });
 
-    // Sibling of the two pins: the distance digits are those of 12.0 NM
+    // Sibling of the pins above: the distance digits are those of 12.0 NM
     it('shows the distance of 12.0 NM (3-50)', async () => {
         await intPageOf([intersection('KENZY', 47.2, 11.0), mkc()]);
 
@@ -320,12 +362,12 @@ describe('user intersection (5-18, 5-19)', () => {
     });
 
     // 5-19 step 3, figure 5-69: USER POS? shows REF and RAD with dashes and the dashed position, the cursor on the
-    // latitude. Row 3 (DIS) is left out: #283
+    // latitude.
     it('shows the dashed fields with the cursor on the latitude after USER POS? (5-19)', async () => {
         const unit = await userPos();
 
         const rows = Screen.read().rows('R');
-        expect([rows[0], rows[1], rows[2], rows[4], rows[5]]).toEqual([' INT15     ', 'REF:  _____', 'RAD: ___._°', "_ __°__.__'", "____°__.__'"]);
+        expect(rows).toEqual([' INT15     ', 'REF:  _____', 'RAD: ___._°', 'DIS:___._nm', "_ __°__.__'", "____°__.__'"]);
         expect(unit.panel.focused('R').row).toBe(4);
     });
 
@@ -387,7 +429,7 @@ describe('user intersection (5-18, 5-19)', () => {
         const p = pointFrom({lat: 47.0, lon: 11.0}, 90, 48.1);
         const rows = Screen.read().rows('R');
         // Figure 5-75 keeps REF, RAD and DIS on the page after the creation. The DIS digits are parsed, so that
-        // #282 and #283 do not matter here
+        // #282 does not matter here
         expect(rows.slice(0, 3)).toEqual([' INT15     ', 'REF:  ORD  ', 'RAD: 090.0°']);
         expect(parseFloat(rows[3].slice(4))).toBe(48.1);
         expect(rows.slice(4)).toEqual(["N 46°59.64'", "E 12°10.40'"]);
@@ -399,9 +441,9 @@ describe('user intersection (5-18, 5-19)', () => {
     });
 
     // Figure 5-74 shows three digits before the point of DIS, and the KLN 89 trainer (2026-10-07) accepted 400.0 (and
-    // 999.9) without a message. DistanceEditor refuses 360 and more, and its first cell takes only 0 to 3. ORD has no
+    // 999.9) without a message. The first cell of the field takes 4, and ORD has no
     // variation, so the waypoint lies 400.0 NM out on the true 090° course (pointFrom, flight/geo.ts)
-    it.fails('accepts a distance of 400.0 NM (5-19, figure 5-74, the KLN 89 trainer, #288)', async () => {
+    it('accepts a distance of 400.0 NM (5-19, figure 5-74, the KLN 89 trainer, #288)', async () => {
         const unit = await distanceEntered('4000');
 
         const p = pointFrom({lat: 47.0, lon: 11.0}, 90, 400);
@@ -411,7 +453,7 @@ describe('user intersection (5-18, 5-19)', () => {
         expect(w[4]).toBeCloseTo(p.lon, 6);
     });
 
-    // Sibling of the pin above: a distance below 360 NM is accepted and places the waypoint
+    // Sibling of the test above: a distance below 360 NM, which the field always took, places the waypoint
     it('accepts a distance of 350.0 NM (5-19, figure 5-74)', async () => {
         const unit = await distanceEntered('3500');
 
@@ -507,7 +549,7 @@ describe('stored user intersection', () => {
     // The expected position: the 045° radial of MKC at QQI's distance (pointFrom and distanceNm, flight/geo.ts)
     const moved = () => pointFrom({lat: 47.0, lon: 11.0}, 45, distanceNm({lat: 47.0, lon: 11.0}, {lat: 47.1, lon: 11.0}));
 
-    // Sibling of the pin below: the new radial moves the stored waypoint
+    // Sibling of the two tests below: the new radial moves the stored waypoint
     it('moves the waypoint to the entered radial (characterization)', async () => {
         const unit = await radialEntered();
 
@@ -518,13 +560,25 @@ describe('stored user intersection', () => {
 
     // The guide has no page on changing a stored user waypoint. 5-19 step 12 computes the position from REF, RAD and DIS
     // and shows it, and 3-50 has the INT page show the position of the intersection; both are extended here to a change
-    // of RAD on a stored waypoint, which gives 47.07066 N 11.10382 E. IntPage.setRad updates the repository but does not
-    // redraw, so the old position stays on the page
-    it.fails('shows the position of the entered radial (5-19, #285)', async () => {
+    // of RAD on a stored waypoint, which gives 47.07066 N 11.10382 E
+    it('shows the position of the entered radial (5-19, #285)', async () => {
         await radialEntered();
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(Screen.read().rows('R').slice(4)).toEqual(["N 47°04.24'", "E 11°06.23'"]);
+    });
+
+    // As above for a new distance: 12.0 NM due north of MKC is 0.199643 degrees (12 NM over 6378100 / 1852 NM per radian, by
+    // hand), 47°11.98'. The longitude stays. Sibling: 'moves the waypoint to the entered distance'
+    it('shows the position of the entered distance (5-19, #285)', async () => {
+        const unit = await onRef();
+        await unit.panel.outer('R', 2);
+        expect(unit.panel.focused('R').row).toBe(3); // precondition: the cursor is on DIS
+        await unit.panel.type('R', '0120');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().rows('R').slice(4)).toEqual(["N 47°11.98'", "E 11°00.00'"]);
     });
 
     /** The INT page of QQI after the REF calculation, the cursor on REF (the first field after the ident) */

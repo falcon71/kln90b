@@ -31,7 +31,7 @@ const HARD: [string, RunwaySurfaceType][] = [
 const SOFT: [string, RunwaySurfaceType][] = [
     ['TURF', RunwaySurfaceType.HardTurf], ['GRVL', RunwaySurfaceType.Gravel], ['SAND', RunwaySurfaceType.Sand],
     ['DIRT', RunwaySurfaceType.Dirt], ['ICEE', RunwaySurfaceType.Ice], ['MATS', RunwaySurfaceType.SteelMats],
-    ['SHAL', RunwaySurfaceType.Shale],
+    ['SHAL', RunwaySurfaceType.Shale], ['SNOW', RunwaySurfaceType.Snow],
 ];
 /** One airport per surface, 0.01 degrees apart going north, each with a single 3000 ft runway */
 const world = (surfaces: [string, RunwaySurfaceType][]) =>
@@ -47,7 +47,7 @@ describe('nearest airport surfaces (3-23)', () => {
     });
 
     it('admits every listed soft surface with HRD SFT', async () => {
-        expect(await nearestAirports(world(SOFT), SURFACE_HRD_SFT)).toEqual(['TURF', 'GRVL', 'SAND', 'DIRT', 'ICEE', 'MATS', 'SHAL']);
+        expect(await nearestAirports(world(SOFT), SURFACE_HRD_SFT)).toEqual(['TURF', 'GRVL', 'SAND', 'DIRT', 'ICEE', 'MATS', 'SHAL', 'SNOW']);
     });
 
     it('admits every hard surface with HRD SFT', async () => {
@@ -64,7 +64,16 @@ describe('nearest airport surfaces (3-23)', () => {
             .toEqual([['KAAA'], ['KMIX', 'KAAA']]);
     });
 
-    it.fails('admits a snow runway with HRD SFT (#205)', async () => {
+    // The same with a snow runway as the long one: snow is soft (3-23), so HRD leaves the airport out and HRD SFT keeps it
+    it('leaves out an airport whose only long enough runway is snow with HRD', async () => {
+        const kmix = airport('KMIX', 47.01, 8.0, {runways: [{lengthFt: 800}, {lengthFt: 3000, surface: RunwaySurfaceType.Snow}]});
+        const kaaa = airport('KAAA', 47.02, 8.0);
+
+        expect([await nearestAirports([kmix, kaaa], SURFACE_HRD), await nearestAirports([kmix, kaaa], SURFACE_HRD_SFT)])
+            .toEqual([['KAAA'], ['KMIX', 'KAAA']]);
+    });
+
+    it('admits a snow runway with HRD SFT (#205)', async () => {
         expect(await nearestAirports(world([['SNOW', RunwaySurfaceType.Snow]]), SURFACE_HRD_SFT)).toEqual(['SNOW']);
     });
 });

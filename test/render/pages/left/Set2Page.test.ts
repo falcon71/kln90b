@@ -15,7 +15,7 @@ describe('SET 2 page', () => {
     });
 
     // Appendix B (B-1, B-3) lists the message as RECYCLE POWER TO USE CORRECT DATA BASE DATA
-    it.fails('spells the message about a changed database validity correctly (#111)', async () => {
+    it('spells the message about a changed database validity correctly (#111)', async () => {
         // A booted unit has a fix at once, and the date is read-only with a fix
         const unit = await bootUnit({storage: {fastGpsAcquisition: false}, coldGps: true});
         await unit.panel.selectPage('L', 'SET 2');
@@ -23,6 +23,27 @@ describe('SET 2 page', () => {
         await unit.panel.enterDate('L', 1, 1, [2, 7]); // 01 JAN 27
         expect(Screen.read().rows('L')[2]).toBe('  01 JAN 27');
         await unit.panel.ent(); // 1 Jan 2027 is after the expiration of the database
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.props.database.isAiracCurrent()).toBe(false);
+        expect(messageLines(unit)).toContainEqual(['RECYCLE POWER TO USE', 'CORRECT DATA BASE DATA']);
+    });
+
+    // Appendix B (B-3) lists the message. The same message from the other editor: the time. The last day of the harness cycle is 11 JUN 26, so the
+    // database is current at 06:00 CST on that day (12:00 UTC); 20:00 CST is 02:00 UTC of 12 JUN, after the expiration
+    it('spells the message about a changed database validity correctly when the time is entered (B-3, #111)', async () => {
+        const unit = await bootUnit({start: new Date('2026-06-11T12:00:00Z'), storage: {fastGpsAcquisition: false, timezone: 7}, coldGps: true});
+        await unit.panel.selectPage('L', 'SET 2');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1); // the time
+        expect(unit.props.database.isAiracCurrent()).toBe(true); // The precondition
+        await unit.panel.inner('L', 21); // the first click opens the entry on hour 00, so 21 clicks give 20
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1);
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1);
+        expect(Screen.read().rows('L')[3].slice(0, 5)).toBe('20:00');
+        await unit.panel.ent();
 
         expect(unit.errors).toEqual([]);
         expect(unit.props.database.isAiracCurrent()).toBe(false);

@@ -254,7 +254,7 @@ describe('page names of the tree slots (3-9, 3-12, 3-13)', () => {
         ]);
     });
 
-    // The REF group (index 1) and the ACT group (index 2) are left out here: REF is pinned below, ACT is a characterization
+    // The REF group (index 1) and the ACT group (index 2) are left out here: REF has its own test below, ACT is a characterization
     it('names the right pages CTR 1 to SUP', async () => {
         const right = await names(RIGHT_PAGE_TREE);
         expect([right[0], ...right.slice(3)]).toEqual([
@@ -263,9 +263,16 @@ describe('page names of the tree slots (3-9, 3-12, 3-13)', () => {
         ]);
     });
 
-    // RefPage.name is "REF " today. The status line pads it (StatusLine.tsx), so the screen shows the five cells anyway
-    it.fails('names the REF page with five characters (#216)', async () => {
+    // The status line pads a short name (StatusLine.tsx), so the screen shows the five cells whatever the name holds; the
+    // raw name is read by MainPage, ActPagePage and WaypointConfirmPage
+    it('names the REF page with five characters (#216)', async () => {
         expect(await names([[RIGHT_PAGE_TREE[1][0]]])).toEqual([['REF  ']]);
+    });
+
+    // The status line has five cells for the name (3-9, 3-12, 3-13), and every page of both trees fills them
+    it('gives every page of both trees a name of exactly five characters', async () => {
+        const all = (await names([...LEFT_PAGE_TREE, ...RIGHT_PAGE_TREE])).flat();
+        expect(all.filter(name => name.length !== 5)).toEqual([]);
     });
 });
 

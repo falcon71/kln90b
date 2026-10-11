@@ -34,13 +34,25 @@ describe('barometer fieldset', () => {
         expect(changes).toHaveLength(1);
     });
 
-    // BaroFieldset.tsx, HpaBaroFieldset.saveBaro10 calls the callback twice
-    it.fails('reports one change when the tens digit changes, in millibars (#113)', () => {
+    // Every digit of the millibar fieldset reports its change once (#113: the tens digit used to report it twice). The
+    // values are the new setting in inches of mercury (1 inHg is 33.8639 hPa).
+    it('characterization: reports one change when the tens digit changes, in millibars (#113)', () => {
         const changes: number[] = [];
         const fieldset = BaroFieldsetFactory.createBaroFieldSet(29.92, settingsWithUnit(BARO_UNIT_HPA), baro => changes.push(baro));
 
         digits(fieldset)[1].innerRight(); // 1013 hPa becomes 1023 hPa
 
         expect(changes).toHaveLength(1);
+        expect(changes[0]).toBeCloseTo(1023 / 33.8639, 2);
+    });
+
+    it('characterization: reports one change when the hundreds digit changes, in millibars (#113)', () => {
+        const changes: number[] = [];
+        const fieldset = BaroFieldsetFactory.createBaroFieldSet(29.92, settingsWithUnit(BARO_UNIT_HPA), baro => changes.push(baro));
+
+        digits(fieldset)[0].innerLeft(); // 1013 hPa becomes 0913 hPa
+
+        expect(changes).toHaveLength(1);
+        expect(changes[0]).toBeCloseTo(913 / 33.8639, 2);
     });
 });

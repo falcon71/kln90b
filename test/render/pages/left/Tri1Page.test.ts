@@ -57,7 +57,7 @@ describe('TRI 1 page (characterization)', () => {
         await enterTo(unit, 'KBBB');
         await unit.panel.cursor('L');
         expect(unit.errors).toEqual([]);
-        // The ETE cells are left out: the form of an ETE below an hour on the trip pages is #324
+        // The ETE cells are left out: their form below an hour has tests of its own (#324)
         const rows = Screen.read().rows('L');
         expect([rows[0], rows[1], rows[2].slice(0, 5), ...rows.slice(3)]).toEqual([
             'P.POS-KBBB ',
@@ -92,10 +92,9 @@ describe('TRI 1 page (5-3, 5-4)', () => {
     });
 
     // 3-15, figure 3-50 (180kt 0:13 on the trip page) and the KLN 89 trainer, 2026-10-08 (the trip page showed ETE
-    // 0:31): below an hour the trip pages keep the hour digit. 60.107 NM at 150 kt is 24.04 min. The code draws two
-    // blanks and :24. The same pin as on TRI 3 (DurationDisplay.test.ts) and TRI 5: a fix that wires one page only is
-    // caught by the others.
-    it.fails(
+    // 0:31): below an hour the trip pages keep the hour digit. 60.107 NM at 150 kt is 24.04 min. The same test as on
+    // TRI 3 (DurationDisplay.test.ts) and TRI 5: a fix that wires one page only is caught by the others.
+    it(
         'shows an ETE below an hour as 0:24 (3-15, checked in the KLN 89 trainer, 2026-10-08, #324)',
         async () => {
             const unit = await bootTri1();

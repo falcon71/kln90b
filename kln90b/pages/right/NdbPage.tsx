@@ -81,7 +81,7 @@ export class NdbPage extends WaypointPage<NdbFacility> {
     public render(): VNode {
         this.requiresRedraw = true;
         return (<pre>
-            {this.children.get("activeArrow").render()}{this.children.get("activeIdx").render()}{this.children.get("ndb").render()}&nbsp&nbsp&nbsp{this.children.get("nearestSelector").render()} {this.children.get("waypointType").render()}<br/>
+            {this.children.get("activeArrow").render()}{this.children.get("activeIdx").render()}{this.children.get("ndb").render()}&nbsp&nbsp&nbsp{this.children.get("waypointType").render()}{this.children.get("nearestSelector").render()}<br/>
             {this.children.get("name").render()}<br/>
             <br/>
             FREQ&nbsp{this.children.get("freq").render()}<br/>

@@ -3,13 +3,14 @@ import {Degrees} from "./Units";
 import {LatLonInterface, NavMath} from "@microsoft/msfs-sdk";
 
 
-//zenith 91 seems to fit best the examples from the manual
-export function calculateSunrise(date: TimeStamp, coords: LatLonInterface, zenith: Degrees = 91) {
+/** The standard zenith of sunrise and sunset: 90 degrees plus 50 arc minutes for the refraction and the sun's semi-diameter */
+const STANDARD_ZENITH: Degrees = 90 + 50 / 60;
+
+export function calculateSunrise(date: TimeStamp, coords: LatLonInterface, zenith: Degrees = STANDARD_ZENITH) {
     return calculateSunriseSet(date, coords, zenith, true);
 }
 
-//zenith 91 seems to fit best the examples from the manual
-export function calculateSunset(date: TimeStamp, coords: LatLonInterface, zenith: Degrees = 91) {
+export function calculateSunset(date: TimeStamp, coords: LatLonInterface, zenith: Degrees = STANDARD_ZENITH) {
     return calculateSunriseSet(date, coords, zenith, false);
 }
 
@@ -88,7 +89,8 @@ function calculateSunriseSet(date: TimeStamp, coords: LatLonInterface, zenith: D
 
     const hours = Math.floor(UT);
     const minutes = (UT - hours) * 60;
-    return utcDate.withTime(hours, minutes);
+    //From the start of the day: the seconds of the date are not an input (5-15)
+    return TimeStamp.create(Date.UTC(utcDate.getYear(), utcDate.getMonth(), utcDate.getDate()) + (hours * 60 + minutes) * 60000);
 }
 
 function calcDayOfYear(date: TimeStamp) {

@@ -42,7 +42,7 @@ describe('L:KLN90B_Brightness (public contract) (#52)', () => {
 
 /** Switches an engine-running unit off once its boot fade-in is done, keeps it off, and switches it on again */
 async function offFor(unit: HeadlessUnit, offMs: number): Promise<void> {
-    // The boot fade-in, or the previous warm-up, is done (#114: a running fade-in continues after a power-off)
+    // The boot fade-in, or the previous warm-up, is done, so that the screen is at full brightness when it goes off
     await vi.advanceTimersByTimeAsync(15_000);
     unit.send('KLN90B_Power_Off');
     await vi.advanceTimersByTimeAsync(offMs);

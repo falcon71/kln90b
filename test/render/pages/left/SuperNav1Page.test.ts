@@ -110,7 +110,7 @@ describe('Super NAV 1 page', () => {
         expect(Screen.read().row(0).split('›')[1].trimEnd()).toBe('IAFAAà');
     });
 
-    // The setup sibling of the pin: a direct-to KDDD, Super NAV 1 shown, the arrow before KDDD
+    // The setup sibling of the #227 test: a direct-to KDDD, Super NAV 1 shown, the arrow before KDDD
     it('shows the active waypoint after the arrow on a direct-to (3-32)', async () => {
         const unit = await directToKddd();
 
@@ -119,8 +119,8 @@ describe('Super NAV 1 page', () => {
     });
 
     // 3-31 (figure 3-97), 3-32 and figure 5-21: on a direct-to the Direct To symbol stands directly in front of the
-    // waypoint (the font's d plus the arrow). The code pads the d to five cells, four cells away from the arrow.
-    it.fails('draws the Direct To symbol directly in front of the waypoint (3-31, figure 3-97, 3-32, #227)', async () => {
+    // waypoint (the font's d plus the arrow). Until #227 the code padded the d to five cells, four cells away from the arrow.
+    it('draws the Direct To symbol directly in front of the waypoint (3-31, figure 3-97, 3-32, #227)', async () => {
         await directToKddd();
 
         expect(Screen.read().row(0).trimEnd()).toMatch(/d›KDDD$/);

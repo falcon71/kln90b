@@ -90,7 +90,7 @@ export class AirportCoordOrNearestView implements UiElement {
             longestRunwaySurface: new TextDisplay(longestRunway ? getKLNSurfaceString(longestRunway) : "   "),
             longestRunwayLighting: new TextDisplay(longestRunway ? getKLNLightingString(longestRunway) : "   "),
             bearing: new BearingDisplay(),
-            distance: new DistanceDisplay(5),
+            distance: new DistanceDisplay(5, null, true),
         });
         this.coordRef = FSComponent.createRef<HTMLDivElement>();
         this.nearestRef = FSComponent.createRef<HTMLDivElement>();
@@ -231,7 +231,8 @@ export class AirportCoordOrNearestView implements UiElement {
                 type = "";
         }
 
-        return airspaceString + type;
+        // 3-42: the airspace class stands on the left of the row and MILTRY or PRIVAT on its right, one blank between
+        return airspaceString.padEnd(5, " ") + type;
     }
 
     private loadAirspace() {

@@ -1,4 +1,4 @@
-import {NavPageState} from "../data/VolatileMemory";
+import {isObsMode, NavPageState} from "../data/VolatileMemory";
 import {Sensors} from "../Sensors";
 import {CalcTickable} from "../TickController";
 import {Flightplan} from "../data/flightplan/Flightplan";
@@ -34,7 +34,7 @@ export class Vnav implements CalcTickable {
         if (this.state === VnavState.Armed) {
             const distToVnav = this.getDistanceToTarget(this.navState.nav4VnavWpt!) - this.calcDistWithAngle();
             this.timeToVnav = distToVnav / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
-            if (this.timeToVnav <= 0) {
+            if (!(this.timeToVnav > 0)) { //Also true for NaN, 0 NM at 0 kt: the descent starts where the aircraft is
                 this.state = VnavState.Active;
             }
         }
@@ -101,7 +101,7 @@ export class Vnav implements CalcTickable {
         if (active === null) {
             return false;
         }
-        if (fplIdx === -1) { //Direct to, wpt must be the active waypoint
+        if (fplIdx === -1 || isObsMode(this.navState.navmode)) { //Direct to or OBS, wpt must be the active waypoint
             return ICAO.valueEquals(wpt.icaoStruct, active.icaoStruct)
         } else {
             const isFutureWpt = this.fpl0.getLegs().filter((_, idx) => idx >= fplIdx).some(l => ICAO.valueEquals(l.wpt.icaoStruct, wpt.icaoStruct));
@@ -117,8 +117,10 @@ export class Vnav implements CalcTickable {
             return "--:--";
         }
 
-        const minutes = Math.floor(duration / 60);
-        const seconds = duration % 60;
+        //Round to whole seconds before splitting, 539.6 s would show 8:60 otherwise
+        const totalSeconds = Math.round(duration);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
 
         if (minutes === 0) {
             return `  :${format(seconds, "00")}`;

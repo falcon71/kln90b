@@ -18,7 +18,7 @@ describe('VFR only page (3-7)', () => {
     /**
      * The two texts of the page with their cells: the title on the second row, three cells in, and the button on the
      * sixth row, five cells in (figure 3-22 is not column-exact; the cells are the code's). The other rows are the
-     * business of the #327 pin below
+     * business of the #327 test below
      */
     const expectVfrPage = () => {
         expect([Screen.read().row(1), Screen.read().row(5)])
@@ -39,9 +39,9 @@ describe('VFR only page (3-7)', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // Figure 3-22: the page shows FOR VFR USE ONLY and ACKNOWLEDGE? and nothing else. VFROnlyPage.render has a comma
-    // after a <br/>, which the page shows at the start of its fourth row. The sibling above holds the page itself.
-    it.fails('shows nothing but FOR VFR USE ONLY and ACKNOWLEDGE? (3-7, #327)', async () => {
+    // Figure 3-22: the page shows FOR VFR USE ONLY and ACKNOWLEDGE? and nothing else (VFROnlyPage.render once left a
+    // comma after a <br/>, which showed at the start of the fourth row). The test above holds the cells of the two texts.
+    it('shows nothing but FOR VFR USE ONLY and ACKNOWLEDGE? (3-7, #327)', async () => {
         await approveSelfTestPage({panelXml: panelXml(VFR_ONLY)});
 
         expect(Screen.read().pageRows().filter(r => r !== '')).toEqual(['FOR VFR USE ONLY', 'ACKNOWLEDGE?']);

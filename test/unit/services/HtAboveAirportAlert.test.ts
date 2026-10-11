@@ -20,7 +20,7 @@ interface Options {
     enabled?: boolean;
     /** SET 5 offset, the setting htAboveAptOffset */
     offset?: number;
-    /** SET 8 vertical buffer, the setting airspaceAlertBuffer (#89: the alert reads this one today) */
+    /** SET 8 vertical buffer, the setting airspaceAlertBuffer (not the alert's: #89) */
     suaBuffer?: number;
     installed?: boolean;
 }
@@ -123,45 +123,96 @@ describe('HtAboveAirportAlert', () => {
         expect(r.patterns).toEqual([]);
     });
 
-    // The passing sibling of the pins below, at elevation 0: 1700 ft is above an 800 ft offset and below a 2000 ft one
+    // At elevation 0: 1700 ft is above an 800 ft offset and below a 2000 ft one
     it('uses the offset when both settings agree (3-58)', () => {
         const r = rig({active: airport('KHHH', 47, 8), offset: 2000, suaBuffer: 2000});
         r.at(3, 1700);
         expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
     });
 
-    // 3-58: the offset is the SET 5 offset (htAboveAptOffset). The service reads the SET 8 buffer airspaceAlertBuffer
-    // instead, the reading half of #89 (the SET 5 pin holds the saving half).
-    it.fails('uses the SET 5 offset, not the SUA buffer (#89)', () => {
+    // 3-58: the offset is the SET 5 offset (htAboveAptOffset); the SET 8 buffer airspaceAlertBuffer is the vertical
+    // buffer of the airspace alert and plays no part (the reading half of #89, the SET 5 test holds the saving half)
+    it('uses the SET 5 offset, not the SUA buffer (#89)', () => {
         const r = rig({active: airport('KHHH', 47, 8), offset: 2000, suaBuffer: 500});
         r.at(3, 1700);
         expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
     });
 
+    // The same the other way round: a small SET 5 offset with a large SUA buffer. 1700 ft is above the 800 ft top
+    it('ignores a large SUA buffer when the SET 5 offset is small (#89)', () => {
+        const r = rig({active: airport('KHHH', 47, 8), offset: 800, suaBuffer: 2000});
+        r.at(3, 1700);
+        expect(r.patterns).toEqual([]);
+    });
+
     // 3-58: the top is the database field elevation plus the offset, in feet. AirportFacility.altitude is in meters (the
-    // builder converts like the sim data; APT 2 converts it back), but the service adds it to feet unconverted. A field
-    // at 3000 ft (914.4 m) with offset 1000 ft has its top at 4000 ft; the service uses 1914.4 ft, so an aircraft at
-    // 3900 ft, 900 ft above the field, gets no alert.
-    it.fails('adds the field elevation in feet (#178)', () => {
+    // builder converts like the sim data; APT 2 converts it back). A field at 3000 ft (914.4 m) with offset 1000 ft has
+    // its top at 4000 ft, so an aircraft at 3900 ft, 900 ft above the field, gets the alert.
+    it('adds the field elevation in feet (#178)', () => {
         const r = rig({active: airport('KHHH', 47, 8, {elevationFt: 3000}), offset: 1000});
         r.at(3, 3900);
         expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
     });
 
-    // The passing sibling of the pin above: at 1800 ft, below 1914 ft, the service alerts today, so the pin's setup
-    // reaches the comparison
-    it('alerts an aircraft below the top of a field at 3000 ft (sibling of #178, 3-58)', () => {
+    // 3-58: above the top there is no alert. The top is 4000 ft here, a value only the converted elevation reaches
+    it('gives no alert above the top of a field at 3000 ft (3-58, #178)', () => {
         const r = rig({active: airport('KHHH', 47, 8, {elevationFt: 3000}), offset: 1000});
-        r.at(3, 1800);
+        r.at(3, 4100);
+        expect(r.patterns).toEqual([]);
+    });
+
+    // 3-58: the top, to half a foot either side, at a field of 9000 ft (2743.2 m) with offset 2000 ft: 11000 ft. A
+    // conversion with a rounded factor (3.28) puts the top at 10997.7 ft, which this pair tells apart.
+    it('has its top at the field elevation in feet plus the offset, to half a foot (3-58, #178)', () => {
+        const r = rig({active: airport('KHHH', 47, 8, {elevationFt: 9000}), offset: 2000});
+        r.at(3, 11000.5);
+        expect(r.patterns).toEqual([]);
+        r.at(3, 10999.5);
+        expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
+    });
+
+    // A field below sea level has its top below the offset: elevation -200 ft, offset 800 ft, top 600 ft
+    it('adds a negative field elevation (3-58, #178)', () => {
+        const r = rig({active: airport('KHHH', 47, 8, {elevationFt: -200}), offset: 800});
+        r.at(3, 650);
+        expect(r.patterns).toEqual([]);
+        r.at(3, 550);
         expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
     });
 
     // Without a navigation solution (GPS invalid, NavCalculator.setFlag) distToActive is null while the active waypoint
-    // stays. `null <= 5` is true in JavaScript, so the service treats an unknown position as inside the cylinder.
-    // An aircraft below the top with no position must not alert: 3-58 compares the aircraft's position with the cylinder.
-    it.fails('gives no alert without a distance to the airport (#179)', () => {
+    // stays. An aircraft below the top with no position must not alert: 3-58 compares the aircraft's position with the
+    // cylinder.
+    it('gives no alert without a distance to the airport (#179)', () => {
         const r = rig({active: airport('KHHH', 47, 8), offset: 1000});
         r.at(null, 500);
         expect(r.patterns).toEqual([]);
+    });
+
+    // A distance of 0 NM (over the airport) is a position like any other; a guard that tests the distance for
+    // truthiness instead of null would silence it
+    it('alerts directly over the airport (3-58, sibling of #179)', () => {
+        const r = rig({active: airport('KHHH', 47, 8), offset: 1000});
+        r.at(0, 500);
+        expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
+    });
+
+    // A lost position is not a position outside the cylinder: the first valid position inside it sounds the alert
+    it('sounds on the first valid position inside the cylinder after a loss of position (3-58, #179)', () => {
+        const r = rig({active: airport('KHHH', 47, 8), offset: 1000});
+        r.at(null, 500);
+        expect(r.patterns).toEqual([]);
+        r.at(3, 500);
+        expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
+    });
+
+    // characterization: a loss of position inside the cylinder after the alert has sounded does not sound it again when
+    // the position returns inside the cylinder
+    it('does not sound twice across a loss of position inside the cylinder (characterization)', () => {
+        const r = rig({active: airport('KHHH', 47, 8), offset: 1000});
+        r.at(3, 500);
+        r.at(null, 500);
+        r.at(3, 500);
+        expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
     });
 });

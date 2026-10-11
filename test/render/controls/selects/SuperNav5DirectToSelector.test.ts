@@ -9,8 +9,8 @@ import {fplIdents} from '../../../harness/readers';
 import {savedFlightplan} from '../../../harness/storage';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
 
-// A left arc around ABC from the 270 to the 180 radial through the south-west, then FAFAA and the MAP. A left arc on
-// purpose: a right arc is named wrongly after a recalculation (#104).
+// A left arc around ABC from the 270 to the 180 radial through the south-west, then FAFAA and the MAP; or a right arc
+// from the 180 to the 270 radial through the same quarter, then FAFAA north of its end (#104)
 const abc = vor('ABC', 47.3, 8.3);
 const at = (bearing: number, nm: number) => pointFrom({lat: abc.lat, lon: abc.lon}, bearing, nm);
 const arcbg = intersection('ARCBG', at(270, 10).lat, at(270, 10).lon);
@@ -31,17 +31,38 @@ const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
     })],
 });
 
-describe('Super NAV 5 direct-to window on a DME arc entry', () => {
+// The right arc starts at ARCBR on the 180 radial and ends at ARCER on the 270 radial, heading north to FAFAR
+const arcbgRight = intersection('ARCBR', at(180, 10).lat, at(180, 10).lon);
+const arcenRight = intersection('ARCER', at(270, 10).lat, at(270, 10).lon);
+const fafaaRight = intersection('FAFAR', 47.6, 8.1);
+const kprcRight = withProcedures(airport('KPRC', 47.0, 8.0), {
+    approaches: [approach({
+        type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+        transitions: [{
+            name: 'ARCBR', legs: [
+                Leg.IF(arcbgRight, FixTypeFlags.IAF),
+                Leg.AF(arcenRight, abc, {radiusNm: 10, fromRadial: 180, toRadial: 270, turn: LegTurnDirection.Right}),
+                Leg.TF(fafaaRight, FixTypeFlags.FAF),
+            ],
+        }],
+        final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+    })],
+});
+
+describe.each([
+    ['a left-hand arc', kprc, [abc, arcbg, arcen, fafaa, mapaa], 'ARCEN', 'FAFAA'],
+    ['a right-hand arc (#104)', kprcRight, [abc, arcbgRight, arcenRight, fafaaRight, mapaa], 'ARCER', 'FAFAR'],
+])('Super NAV 5 direct-to window on a DME arc entry of %s', (_name, airportWithArc, arcFacilities, endIdent, fafIdent) => {
     // Spec: Pilot's Guide 6-17 (on Super NAV 5, CLR on the arc's entry waypoint shows MOVE ?, and ENT moves the
     // entry to the intercept of the present track with the arc). 1ef2a35: ENT leaves the MOVE ? state. Without that the
     // window keeps showing MOVE ? after the new entry is calculated.
     it('leaves MOVE ? after ENT and shows the new entry (1ef2a35)', async () => {
         const unit = await bootUnit({
-            facilities: [kprc, abc, arcbg, arcen, fafaa, mapaa], position: at(225, 10), storage: savedFlightplan(0, [kprc]),
+            facilities: [airportWithArc, ...arcFacilities], position: at(225, 10), storage: savedFlightplan(0, [airportWithArc]),
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
-        expect(fplIdents(unit)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['D225J', endIdent, fafIdent, 'MAPAA', 'KPRC']);
 
         // 15 NM out on the 200 radial, flying 010: the track meets the 10 NM circle in front of the aircraft, inside the
         // arc. A track of 330 would miss the circle and give NO INTRCPT, which hides the subject.
@@ -52,11 +73,11 @@ describe('Super NAV 5 direct-to window on a DME arc entry', () => {
         await showSuperNav5(unit, {waitMs: 0});
         await unit.panel.scan();
         await vi.advanceTimersByTimeAsync(250);
-        // The window opens on the active leg, the arc: its end ARCEN shows. The left arc ends heading east, and FAFAA
-        // lies east of ARCEN (a turn of a few degrees, so the anticipation does not skip ARCEN; with FAFAA west of it the
-        // turn is near 180 degrees and ARCEN is sequenced at once, #76). One step left shows the arc's entry, with the IAF
-        // symbol that SidStar gives it.
-        expect(SuperNav5.read().directTo).toBe('ARCEN ');
+        // The window opens on the active leg, the arc: its end shows. The left arc ends heading east, and FAFAA lies east
+        // of its end (a turn of a few degrees, so the anticipation does not skip it; with FAFAA west of it the turn is near
+        // 180 degrees and the end is sequenced at once, #76); the right arc ends heading north to FAFAR.
+        // One step left shows the arc's entry, with the IAF symbol that SidStar gives it.
+        expect(SuperNav5.read().directTo).toBe(endIdent.padEnd(6));
         await unit.panel.inner('R', -1);
         await vi.advanceTimersByTimeAsync(250);
         expect(SuperNav5.read().directTo).toBe('D225Jà');
@@ -74,7 +95,7 @@ describe('Super NAV 5 direct-to window on a DME arc entry', () => {
         expect(entry.wpt.icaoStruct.ident).toBe('D205J');
         expect(courseDeg(abc, entry.wpt)).toBeCloseTo(205.05, 1);
         expect(distanceNm(abc, entry.wpt)).toBeCloseTo(10, 2);
-        expect(fplIdents(unit)).toEqual(['D205J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+        expect(fplIdents(unit)).toEqual(['D205J', endIdent, fafIdent, 'MAPAA', 'KPRC']);
         expect(unit.errors).toEqual([]);
     });
 });

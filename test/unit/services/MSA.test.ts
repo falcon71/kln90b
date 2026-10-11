@@ -105,13 +105,13 @@ describe('MSA.getMSA', () => {
     });
 
     // 3-33: 180E and 180W are the same meridian, so a position on it lies in the sector from 180W (column 0) by the
-    // north-east rule above. The file has a 361st column, all 1000 ft, which the service reads for lon = 180 exactly.
-    // At 17S the two differ (Fiji). Suspected bug, low impact.
-    it.fails('gives the sector from 180W for a position on the date line at 180E (#182)', () => {
+    // north-east rule above. The file has a 361st column, all 1000 ft, which the service read for lon = 180 exactly.
+    // At 17S the two differ (Fiji).
+    it('gives the sector from 180W for a position on the date line at 180E (#182)', () => {
         expect(msa.getMSA({lat: -16.5, lon: 180})).toBe(sector(-17, -180));
     });
 
-    // 3-33: the passing sibling of the pin above: the two columns differ at 17S, and 179.5W reads column 0
+    // 3-33: the sibling of the test above: the two columns differ at 17S, and 179.5W reads column 0
     it('reads the sector from 180W just east of the date line (sibling of #182, 3-33)', () => {
         expect(sector(-17, -180)).not.toBe(GRID[-17 + 56][360]);
         expect(msa.getMSA({lat: -16.5, lon: -179.5})).toBe(sector(-17, -180));
@@ -143,12 +143,12 @@ describe('MSA.getMSAFromTo (the ESA of one leg)', () => {
 
     // 3-33: a leg along 46.5N from 5.5E to 9.5E crosses the sectors from 5E to 9E. The highest of them (from 7E) is
     // in the middle, so the end-point gap of the pin above plays no part. The service samples the leg with
-    // intermediatePoint, whose latitude collapses toward the equator (#97), so it reads sectors far south of the leg.
-    it.fails('gives the highest sector a long leg crosses (#97)', () => {
+    // intermediatePoint, whose latitude collapsed toward the equator (#97), so it read sectors far south of the leg.
+    it('gives the highest sector a long leg crosses (#97)', () => {
         expect(msa.getMSAFromTo({lat: 46.5, lon: 5.5}, {lat: 46.5, lon: 9.5})).toBe(sector(46, 7));
     });
 
-    // 3-33: the passing sibling of the pin above: the highest crossed sector is the middle one, from 7E
+    // 3-33: the geometry behind the test above: the highest crossed sector is the middle one, from 7E
     it('has its highest crossed sector in the middle of the long leg (sibling of #97, 3-33)', () => {
         const crossed = [5, 6, 7, 8, 9].map(lon => sector(46, lon));
         expect(Math.max(...crossed)).toBe(sector(46, 7));

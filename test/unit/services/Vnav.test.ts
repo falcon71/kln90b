@@ -184,6 +184,18 @@ describe('Vnav states', () => {
         expect(vnav.advisoryAltitude).toBeNull();
     });
 
+    // 5-8 gives the time to the descent as the distance to its start at GS. The guide does not describe a ground speed
+    // of 0; the inference is that the start never comes closer then, so VNAV stays armed while the start is ahead (#229
+    // made the start at the target work at 0 kt, this is its counterpart)
+    it('stays armed at zero ground speed while the start of the descent is ahead (5-8, inferred) (#229)', () => {
+        const {vnav} = dct({distToActive: 64.8, ind: 7500, offset: 2, angle: -1.8, gs: 0});
+        vnav.armVnav();
+        vnav.tick();
+        expect(vnav.state).toBe(VnavState.Armed);
+        expect(vnav.timeToVnav).toBe(Infinity);
+        expect(vnav.advisoryAltitude).toBeNull();
+    });
+
     // 5-8 step 7: when the countdown reaches zero the advisory altitude replaces it. 31 NM to go, 29 NM to the target
     it('goes active at the start of the descent with the advisory altitude (5-8)', () => {
         const {vnav, nav} = dct({distToActive: 40, ind: 7500, offset: 2, angle: -1.8});
@@ -302,11 +314,14 @@ describe('Vnav.formatDuration', () => {
         expect(vnav.formatDuration(null)).toBe('--:--');
     });
 
-    // The time is a fraction of seconds (distance / GS). The seconds are rounded after the minutes were cut, so 539.6 s
-    // shows 8:60. 5-8, 5-9: the countdown is minutes and seconds. Whether the real unit rounds or truncates is unknown;
-    // either way it never shows 60 seconds.
-    it.fails('never shows 60 seconds (#184)', () => {
+    // The time is a fraction of seconds (distance / GS). The seconds were rounded after the minutes were cut, so 539.6 s
+    // showed 8:60 and 59.6 s showed :60. 5-8, 5-9: the countdown is minutes and seconds. Whether the real unit rounds or
+    // truncates is unknown; either way it never shows 60 seconds.
+    it('never shows 60 seconds (#184)', () => {
         const vnav = new Vnav({} as NavPageState, {} as Sensors, {} as Flightplan);
         expect([' 8:59', ' 9:00']).toContain(vnav.formatDuration(539.6));
+        expect(['  :59', ' 1:00']).toContain(vnav.formatDuration(59.6));
+        // A fraction below a half second is dropped by rounding and by truncation alike, only a ceiling adds a second
+        expect(vnav.formatDuration(533.4)).toBe(' 8:53');
     });
 });

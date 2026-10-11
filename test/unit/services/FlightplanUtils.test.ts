@@ -248,7 +248,7 @@ describe('insertLegIntoFpl', () => {
 });
 
 // 4-10, 4-11: a Direct To to a waypoint of the plan resumes the plan behind it. Adding a waypoint in front of the
-// target shifts its index. A leg-mode plan follows the shift (the sibling), the direct-to does not (the pin).
+// target shifts its index. A leg-mode plan and the direct-to both follow the shift.
 // Checked in the KLN 89 trainer: the direct-to follows its target to the new index.
 describe('ActiveWaypoint after a leg is inserted in front of the active waypoint', () => {
     // On the line A to B, 10 NM from A, so the leg-mode aircraft stays on the leg when this waypoint is added
@@ -267,7 +267,7 @@ describe('ActiveWaypoint after a leg is inserted in front of the active waypoint
         expect(identsOf(aw.getFutureLegs())).toEqual(['ABC', 'DEF', 'GHI']);
     });
 
-    it.fails('keeps a direct-to to a waypoint of the plan in the plan (#149)', () => {
+    it('keeps a direct-to to a waypoint of the plan in the plan (#149)', () => {
         const {fpl0, aw} = build([A, B, C, D].map(user), pointFrom(A, 0, 3));
         aw.directToFlightplanIndex(A, 2); // Direct to C
         expect(aw.getActiveFplIdx()).toBe(2);
@@ -278,5 +278,148 @@ describe('ActiveWaypoint after a leg is inserted in front of the active waypoint
         expect(aw.isDctNavigation()).toBe(true);
         expect(aw.getActiveFplIdx()).toBe(3);
         expect(identsOf(aw.getFutureLegs())).toEqual(['DEF', 'GHI']);
+    });
+
+    // The shifts are the plain bookkeeping of the same rule: the direct-to stays on its target, wherever the edit is.
+    // KAAA, ABC, DEF, GHI; the direct-to is to DEF (index 2) or, where named, to another leg
+    describe('and the direct-to is to a waypoint of the plan (4-10, 4-11)', () => {
+        const directTo = (idx: number) => {
+            const built = build([A, B, C, D].map(user), pointFrom(A, 0, 3));
+            built.aw.directToFlightplanIndex(A, idx);
+            expect(built.aw.getActiveFplIdx()).toBe(idx); // Precondition
+            return built;
+        };
+
+        it('moves to the new index when a leg is inserted in front of the first waypoint', () => {
+            const {fpl0, aw} = directTo(2);
+
+            fpl0.insertLeg(0, user(F));
+
+            expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('DEF');
+            expect(aw.getActiveFplIdx()).toBe(3);
+            expect(identsOf(aw.getFutureLegs())).toEqual(['DEF', 'GHI']);
+        });
+
+        it('moves to the new index when a leg is inserted directly in front of it', () => {
+            const {fpl0, aw} = directTo(2);
+
+            fpl0.insertLeg(2, user(F));
+
+            expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('DEF');
+            expect(aw.getActiveFplIdx()).toBe(3);
+            expect(identsOf(aw.getFutureLegs())).toEqual(['DEF', 'GHI']);
+        });
+
+        it('stays at its index when a leg is inserted behind it, and when one is appended', () => {
+            const {fpl0, aw} = directTo(2);
+
+            fpl0.insertLeg(3, user(F));
+            fpl0.insertLeg(fpl0.getLegs().length, user(E));
+
+            expect(aw.getActiveFplIdx()).toBe(2);
+            expect(identsOf(aw.getFutureLegs())).toEqual(['DEF', 'FFFFF', 'GHI', 'EEEEE']);
+        });
+
+        it('moves up when a leg in front of it is deleted', () => {
+            const {fpl0, aw} = directTo(2);
+
+            fpl0.deleteLeg(1);
+
+            expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('DEF');
+            expect(aw.isDctNavigation()).toBe(true);
+            expect(aw.getActiveFplIdx()).toBe(1);
+            expect(identsOf(aw.getFutureLegs())).toEqual(['DEF', 'GHI']);
+        });
+
+        it('moves up when the first leg is deleted', () => {
+            const {fpl0, aw} = directTo(2);
+
+            fpl0.deleteLeg(0);
+
+            expect(aw.getActiveFplIdx()).toBe(1);
+            expect(identsOf(aw.getFutureLegs())).toEqual(['DEF', 'GHI']);
+        });
+
+        it('stays at its index when a leg behind it is deleted', () => {
+            const {fpl0, aw} = directTo(2);
+
+            fpl0.deleteLeg(3);
+
+            expect(aw.getActiveFplIdx()).toBe(2);
+            expect(identsOf(aw.getFutureLegs())).toEqual(['DEF']);
+        });
+
+        // #67: a direct-to whose target is deleted from the plan goes on as a direct-to outside the plan
+        it('becomes a direct-to outside the plan when the target itself is deleted', () => {
+            const {fpl0, aw} = directTo(2);
+
+            fpl0.deleteLeg(2);
+
+            expect(aw.isDctNavigation()).toBe(true);
+            expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('DEF');
+            expect(aw.getActiveFplIdx()).toBe(-1);
+            expect(identsOf(aw.getFutureLegs())).toEqual(['DEF']);
+        });
+
+        // A direct-to to the first waypoint has no leg in front of it: an insert in front of it moves it, and a delete
+        // behind it does not
+        it('follows a direct-to the first waypoint when a leg is inserted in front of it', () => {
+            const {fpl0, aw} = directTo(0);
+
+            fpl0.insertLeg(0, user(F));
+
+            expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('KAAA');
+            expect(aw.getActiveFplIdx()).toBe(1);
+            expect(identsOf(aw.getFutureLegs())).toEqual(['KAAA', 'ABC', 'DEF', 'GHI']);
+        });
+
+        it('stays on a direct-to the first waypoint when a later leg is deleted', () => {
+            const {fpl0, aw} = directTo(0);
+
+            fpl0.deleteLeg(2);
+
+            expect(aw.getActiveFplIdx()).toBe(0);
+            expect(identsOf(aw.getFutureLegs())).toEqual(['KAAA', 'ABC', 'GHI']);
+        });
+
+        // A direct-to the last waypoint
+        it('follows a direct-to the last waypoint when a leg is inserted or deleted in front of it', () => {
+            const {fpl0, aw} = directTo(3);
+
+            fpl0.insertLeg(1, user(F));
+            expect(aw.getActiveFplIdx()).toBe(4);
+            expect(identsOf(aw.getFutureLegs())).toEqual(['GHI']);
+
+            fpl0.deleteLeg(0);
+            fpl0.deleteLeg(0);
+            expect(aw.getActiveFplIdx()).toBe(2);
+            expect(identsOf(aw.getFutureLegs())).toEqual(['GHI']);
+        });
+
+        // The same waypoint twice in the plan: the target is the leg that was chosen, not the first one with its ident
+        it('follows the chosen leg of a waypoint that the plan holds twice', () => {
+            const {fpl0, aw} = build([A, B, C, B, D].map(user), pointFrom(A, 0, 3));
+            aw.directToFlightplanIndex(A, 3); // Direct to the second ABC
+            expect(aw.getActiveFplIdx()).toBe(3); // Precondition
+
+            fpl0.insertLeg(0, user(F));
+
+            expect(aw.getActiveFplIdx()).toBe(4);
+            expect(identsOf(aw.getFutureLegs())).toEqual(['ABC', 'GHI']);
+        });
+
+        // A full FPL 0 drops its first waypoint to make room (the unit's rule, FlightplanUtils.ts): every index behind it
+        // moves up, the direct-to target with it
+        it('characterization: moves up when a full plan drops its first waypoint to make room for an appended one', () => {
+            const {fpl0, aw} = build(fullPlanLegs(), START);
+            aw.directToFlightplanIndex(fpl0.getLegs()[0].wpt, 6);
+            expect(aw.getActiveFplIdx()).toBe(6); // Precondition
+
+            insertLegIntoFpl(fpl0, navState(aw, 5), 30, user(NEW));
+
+            expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('FIX06');
+            expect(aw.getActiveFplIdx()).toBe(5);
+            expect(aw.getFutureLegs()).toHaveLength(25);
+        });
     });
 });

@@ -6,7 +6,7 @@ import {approachWorld, dtWorld, sidStarWorld} from '../../../harness/fixtures';
 import {pointFrom} from '../../../harness/flight/geo';
 import {airport, intersection, ndb, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
-import {readRows, Screen} from '../../../harness/render/screen';
+import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan, savedUserWaypoints} from '../../../harness/storage';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {fplIdents} from '../../../harness/readers';
@@ -71,8 +71,10 @@ describe('ACT page', () => {
         expect(rows[4]).toBe('WAYPOINT   ');
     });
 
-    // 4-10: the type letter is on the right of the first row
-    it.fails('shows the type letter of an NDB inside the half page (#115)', async () => {
+    // 4-10: the type letter is on the right of the first row, in the last column of the half page like the A of an
+    // airport and the V of a VOR (figures 4-37 and 4-38). The nearest selector follows it, and its four blanks lie beyond
+    // the edge, where Screen.read() ignores them
+    it('shows the type letter of an NDB in the last column of the half page (4-10, #115)', async () => {
         const kaaa = airport('KAAA', 47.0, 7.9);
         const abc = ndb('ABC', 47.0, 8.3);
         const unit = await bootUnit({facilities: [kaaa, abc], position: {lat: 47.0, lon: 8.0}});
@@ -81,11 +83,20 @@ describe('ACT page', () => {
         insertLeg(unit, 1, abc);
         await vi.advanceTimersByTimeAsync(3000);
 
-        // Not Screen.read(): it refuses the type letter past the 11 columns of the half page, which is this bug (#115), so
-        // the pin reads the rows of the DOM
-        const first = readRows(document.querySelector('.right-page')!).map(r => r.map(c => c.ch).join(''))[0];
-        expect(first.length).toBeLessThanOrEqual(11);
-        expect(first.trimEnd().endsWith('N')).toBe(true);
+        expect(Screen.read().rows('R')[0]).toBe('› 2 ABC   N');
+    });
+
+    // 4-10: the letter keeps its column for a two-letter NDB; the blank third cell of the ident selector has a width (#290)
+    it('shows the type letter of a two-letter NDB in the last column of the half page (4-10, #290)', async () => {
+        const kaaa = airport('KAAA', 47.0, 7.9);
+        const ab = ndb('AB', 47.0, 8.3);
+        const unit = await bootUnit({facilities: [kaaa, ab], position: {lat: 47.0, lon: 8.0}});
+        await unit.panel.selectPage('R', 'ACT  ');
+        insertLeg(unit, 0, kaaa);
+        insertLeg(unit, 1, ab);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(Screen.read().rows('R')[0]).toBe('› 2 AB    N');
     });
 });
 
@@ -150,8 +161,8 @@ describe('ACT page, the first row (4-10)', () => {
         expect(Screen.read().rows('R')[0]).toBe('› 2 ABC   V');
     });
 
-    // 4-10: S for a supplemental waypoint. The column of the letter is the subject of the #290 pins below, so this
-    // test holds only the order: the ident, then the letter
+    // 4-10: S for a supplemental waypoint. This test holds only the order, the ident and then the letter; the column of
+    // the letter is held by the test further down (#290)
     it('shows S for a supplemental waypoint', async () => {
         const {kaaa} = dtWorld();
         const supa = {icaoStruct: ICAO.value('U', 'XX', '', 'SUPA')} as Facility; // the stored user waypoint, for the plan
@@ -193,10 +204,8 @@ describe('ACT page, the first row (4-10)', () => {
 
     // 4-10: the letter stands to the far right (figures 4-37 and 4-38 show A and V in the last column), and the KLN 89
     // trainer, 2026-10-07 (medium confidence) puts U and I in the same fixed column for a 3-letter and a 5-letter
-    // ident. The code puts the I of an intersection one blank after the ident, so a 3-letter ident leaves it in the
-    // middle of the row. The cause is #290: the ident selector has five cells, and the blank cells of a short ident
-    // have index -1 and no width, so the letter moves up to the ident
-    it.fails('shows the type letter of an intersection in the last column (4-10, the KLN 89 trainer, 2026-10-07, #290)', async () => {
+    // ident. The ident selector has five cells, and the blank cells of a short ident keep their width (#290)
+    it('shows the type letter of an intersection in the last column (4-10, the KLN 89 trainer, 2026-10-07, #290)', async () => {
         const {kaaa, abc, def, kbbb} = dtWorld();
         const unit = await bootOnAct([kaaa, abc, def, kbbb], [kaaa, abc, def, kbbb]);
         await unit.panel.scan();
@@ -207,7 +216,7 @@ describe('ACT page, the first row (4-10)', () => {
         expect(Screen.read().rows('R')[0]).toBe('  3 DEF   I');
     });
 
-    it.fails('shows the type letter of a supplemental waypoint in the last column (4-10, the KLN 89 trainer, 2026-10-07, #290)', async () => {
+    it('shows the type letter of a supplemental waypoint in the last column (4-10, the KLN 89 trainer, 2026-10-07, #290)', async () => {
         const {kaaa} = dtWorld();
         const supa = {icaoStruct: ICAO.value('U', 'XX', '', 'SUPA')} as Facility;
         await bootOnAct([kaaa, supa], [kaaa], {
@@ -224,7 +233,7 @@ describe('ACT page, the first row (4-10)', () => {
 describe('ACT page, scanning FPL 0 (4-10)', () => {
     // 4-10, figures 4-38 and 4-39: with the knob pulled the inner knob shows the waypoints in their order in FPL 0, the
     // arrow only at the active one; pushed in, it turns the pages of the shown airport (here ACT 2 of KAAA). The column of
-    // the I is held by the #290 pin above
+    // the I is held by the #290 test above
     it('scans the plan in order with the knob pulled and turns the airport pages with it pushed in', async () => {
         const {kaaa, abc, def, kbbb} = dtWorld();
         const unit = await bootOnAct([kaaa, abc, def, kbbb], [kaaa, abc, def, kbbb]);
@@ -280,7 +289,7 @@ describe('ACT page without an active waypoint', () => {
         return unit;
     }
 
-    // The setup sibling of the pin below: without a plan the page shows NO ACTIVE WAYPOINT, and the boot has left no
+    // The setup sibling of the test below: without a plan the page shows NO ACTIVE WAYPOINT, and the boot has left no
     // message on the status line. 4-10 does not describe the state; the source is the code's reference, a video of a real
     // unit (https://youtu.be/Q6m7_CVGPCg?t=19, cited in ActPage.tsx), as for the f95d1d7 tests above
     it('shows NO ACTIVE WAYPOINT when there is no plan (video of a real unit, youtu.be/Q6m7_CVGPCg)', async () => {
@@ -296,8 +305,8 @@ describe('ACT page without an active waypoint', () => {
 
     // C-2: NO SUP WPTS belongs to selecting the SUP page type when there are no supplemental waypoints, and the KLN 89
     // trainer, 2026-10-07: ACT with nothing active shows its text and posts no message. The ACT page builds a
-    // SupPage as the placeholder behind NO ACTIVE WAYPOINT, and its constructor posts the message
-    it.fails('does not post NO SUP WPTS (C-2, the KLN 89 trainer, 2026-10-07, #293)', async () => {
+    // SupPage as the placeholder behind NO ACTIVE WAYPOINT, which must not post it
+    it('does not post NO SUP WPTS (C-2, the KLN 89 trainer, 2026-10-07, #293)', async () => {
         const unit = await bootWithoutPlan();
         const messages = collectStatusMessages(unit);
 
@@ -383,17 +392,35 @@ describe('ACT 8 (6-4)', () => {
 
     // A photo of a real unit (reference-photos-index.md, 2M2-appch-select.webp, high confidence) shows ACT 8 with the ACT
     // header in its first row (arrow, ident, type letter A) and the approaches from the second row; figure 4-39 shows the
-    // same header on ACT 3. The code shows the APT 8 title (the arrow, the ident and IAP) instead
-    it.fails('shows the ACT header in the first row (photo 2M2-appch-select.webp, 4-10, #295)', async () => {
+    // same header on ACT 3
+    it('shows the ACT header in the first row (photo 2M2-appch-select.webp, 4-10, #295)', async () => {
         await bootOnAct8();
 
         expect(Screen.read().rows('R')[0]).toBe('› 2 KPRC  A');
         expect(Screen.read().rows('R')[1]).toBe(' 1 RNAV 18 ');
     });
+
+    // A photo of a real unit (reference-photos-index.md, 2M2-appch-select.webp, high confidence) shows ACT 8 during a
+    // Direct To: the arrow and the ident with no number between them, and the type letter A
+    it('shows the ACT header without a number during a Direct To (photo 2M2-appch-select.webp, 4-10, #295)', async () => {
+        const w = approachWorld();
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.north(70), storage: savedFlightplan(0, [w.enraa]),
+        });
+        await settle(unit);
+        await unit.panel.directTo('KPRC', {waitMs: 2000});
+        await unit.panel.selectPage('R', 'ACT');
+        await unit.panel.inner('R', -1);
+
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(-1); // precondition: outside FPL 0
+        expect(Screen.read().status().right).toBe('ACT 8'); // precondition
+        expect(Screen.read().rows('R')[0]).toBe('›   KPRC  A');
+        expect(Screen.read().rows('R')[1]).toBe(' 1 RNAV 18 ');
+    });
 });
 
 describe('ACT 8 (characterization)', () => {
-    // The approach list under the title row; the title row itself is the subject of the #295 pin
+    // The approach list under the header row; the header row itself is held by the #295 tests above
     it('shows the approach list of the active airport', async () => {
         const unit = await bootOnAct8();
 

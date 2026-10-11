@@ -28,8 +28,8 @@ describe('REF waypoint names (5-22)', () => {
     });
 
     // 5-22: a five-character ident drops its fifth character and still gets a letter (DUSTT becomes DUSTA). The
-    // generator tries the four characters without a letter first, which the EFB import wants (CUST) and REF must not.
-    it.fails('drops the fifth character and appends a letter (#172)', async () => {
+    // generator can give the four characters without a letter, which the EFB import wants (CUST) and REF must not.
+    it('drops the fifth character and appends a letter (#172)', async () => {
         expect(await createReference('ABCDE')).toEqual(['XY:ABCDA']);
     });
 });

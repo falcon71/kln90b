@@ -1,6 +1,6 @@
 import {SimVarValueType} from "@microsoft/msfs-sdk";
 import {PowerButton} from "./PowerButton";
-import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
+import {ELECTRICITY_INDEX, KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {
     LVAR_BRIGHTNESS,
     LVAR_DISABLE,
@@ -13,6 +13,7 @@ import {TickController} from "./TickController";
 import {ModeController} from "./services/ModeController";
 import {PageManager} from "./pages/PageManager";
 import {BrightnessManager} from "./BrightnessManager";
+import {WTFlightplanSync} from "./services/WTFlightplanSync";
 
 const SYNC_TICK = 100;
 
@@ -23,16 +24,15 @@ export class SimVarSync {
 
     private disabled: boolean = false;
 
-    constructor(private readonly powerButton: PowerButton, private readonly settings: KLN90PlaneSettings, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager, private readonly brightnessManager: BrightnessManager) {
+    constructor(private readonly powerButton: PowerButton, private readonly settings: KLN90PlaneSettings, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager, private readonly brightnessManager: BrightnessManager, private readonly wtFlightplanSync: WTFlightplanSync) {
         window.setInterval(this.tick.bind(this), SYNC_TICK);
     }
 
     private tick(): void {
         if (this.settings.input.electricitySimVar) {
-            if (this.settings.input.electricitySimVar.includes(":")) {
-                const split = this.settings.input.electricitySimVar.split(":");
-                split[1] = SimVar.GetSimVarValue(LVAR_ELECTRICITY_INDEX, SimVarValueType.Number);
-                this.settings.input.electricitySimVar = split.join(":");
+            if (ELECTRICITY_INDEX.test(this.settings.input.electricitySimVar)) {
+                const index = SimVar.GetSimVarValue(LVAR_ELECTRICITY_INDEX, SimVarValueType.Number);
+                this.settings.input.electricitySimVar = this.settings.input.electricitySimVar.replace(ELECTRICITY_INDEX, `:${index}`);
             }
 
             this.powerButton.setElectricityAvailable(!!SimVar.GetSimVarValue(this.settings.input.electricitySimVar, SimVarValueType.Bool));
@@ -52,7 +52,12 @@ export class SimVarSync {
         const writeGpsSimvars = !!SimVar.GetSimVarValue(LVAR_GPS_SIMVARS, SimVarValueType.Bool);
         if (writeGpsSimvars !== this.settings.output.writeGPSSimVars) {
             this.settings.output.writeGPSSimVars = writeGpsSimvars;
-            SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, writeGpsSimvars);
+            if (!this.disabled) { //A disabled unit has released the GPS for hot swapping, setDisabled claims it again
+                SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, writeGpsSimvars);
+            }
+            if (writeGpsSimvars) {
+                this.wtFlightplanSync.sync(); //The planner has not been written while the option was off
+            }
         }
         this.brightnessManager.setBrightnessExternal(SimVar.GetSimVarValue(LVAR_BRIGHTNESS, SimVarValueType.Number));
 

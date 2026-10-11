@@ -41,7 +41,7 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
         const childMap: { [key: string]: SelectField } = {};
 
         for (let i = 0; i < length; i++) {
-            childMap[`ident${i}`] = new SelectField(CHARSET, CHARSET.indexOf(ident.substring(i, i + 1)), idx => this.saveChar.bind(this)(idx, i));
+            childMap[`ident${i}`] = new SelectField(CHARSET, CHARSET.indexOf(ident.padEnd(length, " ").substring(i, i + 1)), idx => this.saveChar.bind(this)(idx, i));
         }
 
         this.children = new UIElementChildren<WaypointFieldsetTypes>(childMap);

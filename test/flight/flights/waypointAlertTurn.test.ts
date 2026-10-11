@@ -68,13 +68,18 @@ describe('waypoint alert through an anticipated turn', () => {
         await flight.fly(1);
         atKbbbSequencing.push({light: light(), turnStackLength: turnStackLength(flight.unit)});
         expect(atKbbbSequencing[0].turnStackLength).toBeGreaterThan(0); // the turn is still being flown
+
+        // 4-9: with the turn ended the alert is over, KCCC is 20 NM away
+        await flight.flyUntil(() => turnStackLength(flight.unit) === 0, {timeout: 30, description: 'end of the turn onto KCCC'});
+        await flight.fly(1);
+        expect(light()).toBe(0);
     });
 
     // The same rule at a turn onto the last leg: KCCC has no following leg, so NavCalculator takes the branch without
-    // turn anticipation, which sets the alert from the 36 s ETE alone and ignores the turn still being flown
+    // turn anticipation, which once set the alert from the 36 s ETE alone and ignored the turn still being flown
     // This judge reads what the test above recorded, so it means something only when that test ran and passed first (run
-    // alone it passes vacuously as an expected failure)
-    it.fails('stays on past the sequencing at KBBB while the turn onto the last leg is flown (#156)', () => {
+    // alone it fails)
+    it('stays on past the sequencing at KBBB while the turn onto the last leg is flown (#156)', () => {
         expect(atKbbbSequencing).toHaveLength(1);
         expect(atKbbbSequencing[0].turnStackLength).toBeGreaterThan(0);
         expect(atKbbbSequencing[0].light).toBe(1);

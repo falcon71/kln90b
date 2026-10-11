@@ -6,6 +6,7 @@ import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {mount} from '../../../harness/render/mount';
 import {UiElement} from '../../../../kln90b/pages/Page';
 import {Screen} from '../../../harness/render/screen';
+import {intersection} from '../../../harness/navdata/builders';
 
 const text = (editor: UiElement): string => mount(editor).text();
 
@@ -18,6 +19,64 @@ describe('latitude and longitude editors', () => {
         expect(text(new LatitudeEditor(bus, -47.5, () => undefined))).toBe('S 47°30.00');
         expect(text(new LongitudeEditor(bus, 18.5, () => undefined))).toBe('E 18°30.00');
         expect(text(new LongitudeEditor(bus, -18.5, () => undefined))).toBe('W 18°30.00');
+    });
+
+    // 3-8, 3-32: a latitude is shown as the hemisphere, two digits of degrees and the minutes. The tens cell offers 0 to
+    // 8 (#303), but it still shows the 9 of a value of 90 degrees (#345).
+    it('shows a latitude of 90 degrees as N 90°00.00 (3-8, 3-32, #345)', () => {
+        const bus = new EventBus();
+
+        expect(text(new LatitudeEditor(bus, 90, () => undefined))).toBe('N 90°00.00');
+        expect(text(new LatitudeEditor(bus, -90, () => undefined))).toBe('S 90°00.00');
+    });
+
+    // The longitude side of the same edge: its hundreds cell offers a blank and a 1, which holds the 1 of 180 degrees
+    it('shows a longitude of 180 degrees as E180°00.00 (3-8, 3-32, #345)', () => {
+        const bus = new EventBus();
+
+        expect(text(new LongitudeEditor(bus, 180, () => undefined))).toBe('E180°00.00');
+        expect(text(new LongitudeEditor(bus, -180, () => undefined))).toBe('W180°00.00');
+    });
+
+    // The sibling of the pin: the largest latitude the tens cell can select shows its digits
+    it('shows a latitude of 89°59.99 with its tens digit (3-8, 3-32)', () => {
+        const bus = new EventBus();
+
+        expect(text(new LatitudeEditor(bus, 89 + 59.99 / 60, () => undefined))).toBe('N 89°59.99');
+    });
+});
+
+describe('latitude editor at the poles on the INT page (3-8, 3-32, #345)', () => {
+    // A waypoint of the navdata at exactly 90 degrees reaches the editor of the INT page with its stored value, which the
+    // tens cell (0 to 8 for the knob) must show
+    it('shows a waypoint at 90°N and one at 90°S with the 9 in the tens', async () => {
+        const unit = await bootUnit({
+            facilities: [intersection('NOPOL', 90, 0), intersection('SOPOL', -90, 180)],
+            position: {lat: 47.0, lon: 8.0},
+        });
+        const north = await unit.panel.show('R', 'INT  ', {waitMs: 1000});
+        expect(north[0]).toBe(' NOPOL     '); // precondition
+        expect(north[4]).toBe("N 90°00.00'");
+
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'SOPOL');
+        await unit.panel.ent();
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R').slice(0, 6)).toEqual([' SOPOL     ', 'REF:  _____', 'RAD: ___._°', 'DIS:___._nm', "S 90°00.00'", "E180°00.00'"]);
+    });
+});
+
+describe('latitude and longitude editors at negative zero (checked in the KLN 89 trainer, 2026-10-08, #308)', () => {
+    // The value of an S (or W) entered with every digit 0 is -0 (the sign -1 times zero), which a user waypoint keeps
+    // when it is entered that way and which reaches the editors of SUP and INT. The trainer showed N and E for it. Only
+    // the hemisphere is asserted: the padding of the zero degrees is #230.
+    it('shows N for a latitude of -0 and E for a longitude of -0 (#308)', () => {
+        const bus = new EventBus();
+
+        expect(text(new LatitudeEditor(bus, -0, () => undefined)).slice(0, 1)).toBe('N');
+        expect(text(new LongitudeEditor(bus, -0, () => undefined)).slice(0, 1)).toBe('E');
     });
 });
 
@@ -116,8 +175,8 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // C-1, extended (as for the pins below): a latitude below 90 degrees is a valid entry, so N 89°59.99' is the
-    // sibling of the pins below, the largest latitude short of the pole, and is entered
+    // C-1, extended (as for the tests below): a latitude below 90 degrees is a valid entry, so N 89°59.99' is the
+    // largest latitude short of the pole, and is entered
     it('takes the latitude N 89°59.99 (C-1)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 1);
@@ -131,23 +190,10 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         expect(unit.props.sensors.in.gps.coords.lat).toBeCloseTo(89 + 59.99 / 60, 9);
     });
 
-    // C-1, extended: 90 degrees and 30 minutes are more than 90 degrees, which no latitude has. LatitudeEditor
-    // .convertToValue checks the degree digits alone (degrees > 90), so N 90°30.00' is entered as 90.5 degrees. If the
-    // fix takes the 9 out of the tens (the pin below), this entry can no longer be made and this pin retires.
-    it.fails('refuses the latitude N 90°30.00 with INVALID ENT (C-1, #303)', async () => {
-        const unit = await coldSet1();
-        await unit.panel.outer('L', 1);
-        await select(unit, [1, 10, 1, 4]); // N 9 0, 3, the rest blank
-        expect(rowsL()[2]).toBe("N 90°3_.__'");
-        await unit.panel.ent();
-
-        expect(unit.errors).toEqual([]);
-        expect(Screen.read().status().mode).toBe('INVALID ENT');
-    });
-
-    // Checked in the KLN 89 trainer, 2026-10-08 (T9): the tens of the latitude degrees offer 0 to 8, so no latitude of
-    // 90 degrees or more can be entered at all. The code offers 0 to 9.
-    it.fails('offers 0 to 8 in the tens of the latitude degrees, no 9 (checked in ' +
+    // Checked in the KLN 89 trainer, 2026-10-08 (T9): the tens of the latitude degrees offer 0 to 8 and wrap from 8 to
+    // 0 (Editor.test.ts holds the wrap), so no latitude of 90 degrees or more can be entered at all, not even
+    // N 90°00.00' (C-1: a value outside the range is INVALID ENT).
+    it('offers 0 to 8 in the tens of the latitude degrees, no 9 (checked in ' +
         'the KLN 89 trainer, 2026-10-08, #303)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 1);
@@ -179,7 +225,7 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         expect(rowsL()[2][2]).toBe('8');
     });
 
-    // C-1, extended (as for the pin below): the longitude of 179°59.99' is a valid entry and is entered
+    // C-1, extended (as for the tests below): the longitude of 179°59.99' is a valid entry and is entered
     it('takes the longitude E179°59.99 (C-1)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 2);
@@ -193,10 +239,9 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         expect(unit.props.sensors.in.gps.coords.lon).toBeCloseTo(179 + 59.99 / 60, 9);
     });
 
-    // C-1, extended: the same for the longitude, which LongitudeEditor.convertToValue checks with degrees > 180 alone.
-    // E 180°00.00' has no test: the KLN 89 trainer's longitude block stops at 179 (00 to 17 and a units digit), and
-    // that layout exists only on the 89.
-    it.fails('refuses the longitude E180°30.00 with INVALID ENT (C-1, #303)', async () => {
+    // C-1, extended: 180 degrees and 30 minutes are more than 180 degrees, which no longitude has. The whole value is
+    // compared, not the degree digits alone. The field keeps its value after the refusal.
+    it('refuses the longitude E180°30.00 with INVALID ENT (C-1, #303)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 2);
         await select(unit, [1, 2, 9, 1, 4]); // E 1 8 0, 3
@@ -205,23 +250,58 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
 
         expect(unit.errors).toEqual([]);
         expect(Screen.read().status().mode).toBe('INVALID ENT');
+        await unit.panel.cursor('L');
+        expect(rowsL()[3]).toBe("E 11°15.00'");
+    });
+
+    // The same for the western hemisphere
+    it('refuses the longitude W180°30.00 with INVALID ENT (C-1, #303)', async () => {
+        const unit = await coldSet1();
+        await unit.panel.outer('L', 2);
+        await select(unit, [2, 2, 9, 1, 4]); // W 1 8 0, 3
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().status().mode).toBe('INVALID ENT');
+    });
+
+    // The smallest excess: the hundredths of the minutes count too (E 180°00.01' is above 180 degrees)
+    it('refuses the longitude E180°00.01 with INVALID ENT (C-1, #303)', async () => {
+        const unit = await coldSet1();
+        await unit.panel.outer('L', 2);
+        await select(unit, [1, 2, 9, 1, 1, 1, 1, 2]); // E 1 8 0, 0 0, 0 1
+        expect(rowsL()[3]).toBe("E180°00.01'");
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().status().mode).toBe('INVALID ENT');
     });
 });
 
-describe('latitude editor, a latitude of 91 degrees on SET 1 (characterization)', () => {
-    // The code refuses a latitude whose degree digits are above 90 (LatitudeEditor.convertToValue) with INVALID ENT and
-    // the field keeps its value. The route to 91 is only open while the tens of the degrees offer a 9, so this retires
-    // with the fix of #303 (the tens offer 0 to 8).
-    it('refuses a latitude of 91 degrees with INVALID ENT (characterization)', async () => {
+describe('longitude editor at 180 degrees on SET 1 (characterization)', () => {
+    // The antimeridian itself is not beyond 180 degrees. Nothing in the Pilot's Guide or the KLN 89 trainer says how
+    // the real unit treats E 180°00.00' (the 89's longitude block stops at 179, a layout of the 89 alone), so this is
+    // not a claim about the real unit: the editor takes it.
+    it('characterization: takes the longitude E180°00.00', async () => {
         const unit = await coldSet1();
-        await unit.panel.outer('L', 1);
-        await select(unit, [1, 10, 2]); // N 9 1
+        await unit.panel.outer('L', 2);
+        await select(unit, [1, 2, 9, 1, 1, 1, 1, 1]); // E 1 8 0, 0 0, 0 0
         await unit.panel.ent();
-        expect(Screen.read().status().mode).toBe('INVALID ENT');
-        await unit.panel.cursor('L');
 
         expect(unit.errors).toEqual([]);
-        expect(rowsL()[2]).toBe("N 47°30.00'");
+        expect(Screen.read().status().mode).not.toBe('INVALID ENT');
+        expect(rowsL()[3]).toBe("E180°00.00'");
+    });
+
+    it('characterization: takes the longitude W180°00.00', async () => {
+        const unit = await coldSet1();
+        await unit.panel.outer('L', 2);
+        await select(unit, [2, 2, 9, 1, 1, 1, 1, 1]); // W 1 8 0, 0 0, 0 0
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().status().mode).not.toBe('INVALID ENT');
+        expect(rowsL()[3]).toBe("W180°00.00'");
     });
 });
 
@@ -265,16 +345,51 @@ describe('longitude editor, the hundreds digit', () => {
     });
 });
 
-describe('latitude editor just below a whole degree (#99)', () => {
-    // A position a few nanodegrees below 47° is 47°00.00' to the hundredth of a minute. The editors split the value
-    // like LatitudeDisplay (#99): the degrees are floored, the minutes rounded to 60.00, and the 6 is outside the
-    // choices 0 to 5 of the minutes' tens, so the cell shows nothing and the row is one cell short (N 46°0.00').
-    it.fails('shows N 47°00.00 for a position just below 47 degrees on SET 1 (3-18, #99)', async () => {
+describe('latitude and longitude editors just below a whole degree (#99)', () => {
+    // A position a few nanodegrees below 47° is 47°00.00' to the hundredth of a minute, and the editors show it so:
+    // a 60 in the minutes' tens would be outside their choices 0 to 5, and the cell would show nothing. The guide
+    // leaves open whether the unit rounds or truncates (47°59.99'), so the tests that name the carried degree hold the
+    // rounding of the code.
+    it('characterization: shows N 47°00.00 for a position just below 47 degrees on SET 1 (#99)', async () => {
         const unit = await bootUnit({position: {lat: 46.99999999716931, lon: 11.25}});
         await unit.panel.selectPage('L', 'SET 1');
 
         expect(unit.errors).toEqual([]);
         expect(Screen.read().rows('L')[2]).toBe("N 47°00.00'");
+    });
+
+    // The same for the southern hemisphere, and for the longitude with the carry into the hundreds digit
+    it('characterization: shows S 47°00.00 and E100°00.00 for positions just below them on SET 1 (#99)', async () => {
+        const unit = await bootUnit({position: {lat: -46.99999999716931, lon: 99.9999999}});
+        await unit.panel.selectPage('L', 'SET 1');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(["S 47°00.00'", "E100°00.00'"]);
+    });
+
+    it('characterization: shows W 11°00.00 for a western longitude just below 11 degrees on SET 1 (#99)', async () => {
+        const unit = await bootUnit({position: {lat: 47.5, lon: -(11 - 0.0000001)}});
+        await unit.panel.selectPage('L', 'SET 1');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(["N 47°30.00'", "W 11°00.00'"]);
+    });
+
+    // The edge of the carry (the display tests hold the rule): 59.994 minutes show as 59.99 and stay below the degree
+    it('keeps 59.994 minutes below the degree on SET 1 (3-18, #99)', async () => {
+        const unit = await bootUnit({position: {lat: 47 + 59.994 / 60, lon: 11 + 59.994 / 60}});
+        await unit.panel.selectPage('L', 'SET 1');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(["N 47°59.99'", "E 11°59.99'"]);
+    });
+
+    it('characterization: carries 59.996 minutes into the degree on SET 1 (#99)', async () => {
+        const unit = await bootUnit({position: {lat: 47 + 59.996 / 60, lon: 11 + 59.996 / 60}});
+        await unit.panel.selectPage('L', 'SET 1');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(["N 48°00.00'", "E 12°00.00'"]);
     });
 
     // The sibling: the same boot a whole minute below 47 degrees shows the position
@@ -305,16 +420,29 @@ describe('latitude and longitude editors at exactly 0 degrees ' +
     }
 
     // Checked in the KLN 89 trainer, 2026-10-08 (T35): after entering S 0°00.00' or W 0°00.00' the unit shows N
-    // 0°00.00' and E 0°00.00' (the trainer's zero is blank-padded, which is #230; only the hemisphere is asserted). The
-    // editors choose S and W for a value that is not above 0 (LatitudeEditor and LongitudeEditor.convertFromValue).
-    it.fails('shows a latitude of exactly 0 as N (checked in the KLN 89 trainer, 2026-10-08, #308)', async () => {
+    // 0°00.00' and E 0°00.00' (the trainer's zero is blank-padded, which is #230; only the hemisphere is asserted).
+    it('shows a latitude of exactly 0 as N (checked in the KLN 89 trainer, 2026-10-08, #308)', async () => {
         const shown = await shownAfterConfirm(2, [1, 1, 1, 1, 1, 1, 1]); // N 00°00.00
 
         expect(shown[0]).toBe('N');
     });
 
-    it.fails('shows a longitude of exactly 0 as E (checked in the KLN 89 trainer, 2026-10-08, #308)', async () => {
+    it('shows a longitude of exactly 0 as E (checked in the KLN 89 trainer, 2026-10-08, #308)', async () => {
         const shown = await shownAfterConfirm(3, [1, 1, 1, 1, 1, 1, 1, 1]); // E 000°00.00
+
+        expect(shown[0]).toBe('E');
+    });
+
+    // The entry the trainer check made: the hemisphere S (or W) with every digit 0, entered and shown again, gives N (E).
+    // The editor's own value (-0, the southern sign times zero) is held by the direct tests above.
+    it('shows an entered S 00°00.00 as N (checked in the KLN 89 trainer, 2026-10-08, #308)', async () => {
+        const shown = await shownAfterConfirm(2, [2, 1, 1, 1, 1, 1, 1]); // S 00°00.00
+
+        expect(shown[0]).toBe('N');
+    });
+
+    it('shows an entered W 000°00.00 as E (checked in the KLN 89 trainer, 2026-10-08, #308)', async () => {
+        const shown = await shownAfterConfirm(3, [2, 1, 1, 1, 1, 1, 1, 1]); // W 000°00.00
 
         expect(shown[0]).toBe('E');
     });
@@ -333,6 +461,40 @@ describe('latitude and longitude editors at exactly 0 degrees ' +
 
         expect(shown[0]).toBe('W');
         expect(shown.slice(3)).toBe("0°30.00'");
+    });
+});
+
+describe('longitude editor, the outer knob at the ends of an open edit ' +
+    '(checked in the KLN 89 trainer, 2026-10-08, #306)', () => {
+    // The trainer check was made on a latitude, a radial, the date and an FPL 0 ident; the cell index is shared by
+    // every editor, and the eight cells of the longitude are a different length. Open edit, the cursor on the
+    // hemisphere (E, the others dashed), seven clicks reach the hundredths.
+    it('stops at the last cell: the next inner click turns the hundredths again', async () => {
+        const unit = await coldSet1();
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 1);
+        await unit.panel.outer('L', 7);
+        await unit.panel.inner('L', 1);
+        expect(rowsL()[3]).toBe("E___°__._0'");
+
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(rowsL()[3]).toBe("E___°__._1'");
+    });
+
+    it('stops at the first cell: the next inner click turns the hemisphere', async () => {
+        const unit = await coldSet1();
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 1);
+        expect(rowsL()[3]).toBe("E___°__.__'");
+
+        await unit.panel.outer('L', -1);
+        await unit.panel.inner('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(rowsL()[3]).toBe("W___°__.__'");
     });
 });
 

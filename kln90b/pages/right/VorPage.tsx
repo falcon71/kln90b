@@ -39,6 +39,14 @@ interface UserVor {
     lon: number | null,
 }
 
+/**
+ * 3-49: the D after the ident marks a VOR with DME. The sim reports a combined VOR and TACAN station as VORTAC, which has
+ * DME as well.
+ */
+function hasDme(facility: VorFacility | null): boolean {
+    return facility?.type === VorType.DME || facility?.type === VorType.VORDME || facility?.type === VorType.VORTAC;
+}
+
 export class VorPage extends WaypointPage<VorFacility> {
 
     public readonly cursorController;
@@ -67,7 +75,7 @@ export class VorPage extends WaypointPage<VorFacility> {
             activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             vor: new VorSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
-            dme: new TextDisplay(facility?.type == VorType.DME || facility?.type == VorType.VORDME ? "D" : " "),
+            dme: new TextDisplay(hasDme(facility) ? "D" : " "),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "V"),
             nearestSelector: new NearestSelector(this.facility),
             name: new TextDisplay(this.formatName(facility)),
@@ -106,7 +114,6 @@ export class VorPage extends WaypointPage<VorFacility> {
         const facility = unpackFacility(this.facility);
 
         this.children.get("vor").setValue(this.ident);
-        this.children.get("dme").text = facility?.type == VorType.DME || facility?.type == VorType.VORDME ? "D" : " ";
         this.children.get("activeArrow").icao = unpackFacility(this.facility)?.icaoStruct ?? null;
         this.children.get("coordOrNearestView").setFacility(this.facility);
         this.userVor = {
@@ -131,7 +138,7 @@ export class VorPage extends WaypointPage<VorFacility> {
             this.children.get("freq").isReadonly = false;
             this.children.get("magvar").isReadonly = false;
         } else {
-            this.children.get("dme").text = facility.type == VorType.DME || facility.type == VorType.VORDME ? "D" : " ";
+            this.children.get("dme").text = hasDme(facility) ? "D" : " ";
             this.children.get("name").text = this.formatName(facility);
             this.children.get("class").text = this.formatClass(facility.vorClass);
             this.children.get("freq").setValue(this.formatFreq(facility));
@@ -168,6 +175,7 @@ export class VorPage extends WaypointPage<VorFacility> {
             const activeWpt = this.props.memory.navPage.activeWaypoint.getActiveWpt();
             if (activeWpt !== null && ICAO.valueEquals(activeWpt.icaoStruct, facility.icaoStruct)) {
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "IN ACT LIST");
+                this.children.get("magvar").setValue(-facility.magneticVariation); // C-1: the stored variation stays, so the field shows it again
                 return;
             }
             this.props.facilityRepository.update(facility!, fac => fac.magneticVariation = -magvar);
@@ -212,7 +220,7 @@ export class VorPage extends WaypointPage<VorFacility> {
         // noinspection JSDeprecatedSymbols
         this.facility = {
             icao: buildIcao('V', USER_WAYPOINT, this.ident),
-            icaoStruct: buildIcaoStruct('U', USER_WAYPOINT, this.ident),
+            icaoStruct: buildIcaoStruct('V', USER_WAYPOINT, this.ident),
             name: "",
             lat: this.userVor.lat,
             lon: this.userVor.lon,

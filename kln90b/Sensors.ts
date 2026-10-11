@@ -14,7 +14,7 @@ import {
 } from "@microsoft/msfs-sdk";
 import {pressureAlt2IndicatedAlt} from "./data/Conversions";
 import {Celsius, Degrees, Feet, Inhg, Knots, NauticalMiles, Seconds} from "./data/Units";
-import {PowerEvent} from "./PowerButton";
+import {PowerEvent, PowerEventData} from "./PowerButton";
 import {KLN90BUserSettings} from "./settings/KLN90BUserSettings";
 import {CalcTickable} from "./TickController";
 import {AudioGenerator} from "./services/AudioGenerator";
@@ -88,7 +88,6 @@ export class FuelComputer implements CalcTickable {
                         targetUnit = FuelComputer.IMP_GALLON_FUEL_JETB;
                         break;
                 }
-                targetUnit = UnitType.IMP_GALLON_FUEL;
                 break;
             case FuelUnit.KG:
                 targetUnit = UnitType.KILOGRAM;
@@ -225,6 +224,9 @@ export class SensorsIn implements CalcTickable {
                 case 2:
                     this.obsMag = SimVar.GetSimVarValue('Nav OBS:2', SimVarValueType.Degree);
                     break;
+                default: //0 ignores the external course, also after L:KLN90B_ObsSource switched to it at runtime
+                    this.obsMag = null;
+                    break;
             }
         } else {
             //The manual implies, that this can only be read, when the GPS is the nav source
@@ -318,6 +320,9 @@ export class SensorsOut {
      * The deviation bar signal is filtered by analog circuitry, so we set this more often
      */
     public setFilteredOutputs() {
+        if (!this.options.output.writeGPSSimVars) {
+            return;
+        }
         SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, this.xtkFilter.getCurrentValue());
     }
 
@@ -340,6 +345,13 @@ export class SensorsOut {
     }
 
     public setWpBearing(bearingForAP: number | null, bearingToActive: number | null, magvar: number) {
+        //The LVar is an output of the unit, independent of the GPS SimVars
+        if (bearingToActive === null) {
+            SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
+        } else {
+            SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingToActive, magvar), UnitType.RADIAN));
+        }
+
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
@@ -349,11 +361,6 @@ export class SensorsOut {
         } else {
             SimVar.SetSimVarValue('GPS WP BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingForAP, magvar), UnitType.RADIAN));  //This SimVar appears to be readonly??
             SimVar.SetSimVarValue('GPS WP TRUE BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(bearingForAP, UnitType.RADIAN));
-        }
-        if (bearingToActive === null) {
-            SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
-        } else {
-            SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingToActive, magvar), UnitType.RADIAN));
         }
     }
 
@@ -369,6 +376,9 @@ export class SensorsOut {
     }
 
     public setPos(pos: LatLonInterface | null, speed: Knots | null, track: Degrees | null, magvar: number, integretyWarning: boolean) {
+        //The LVar is an output of the unit, independent of the GPS SimVars
+        SimVar.SetSimVarValue(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, integretyWarning);
+
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
@@ -393,9 +403,6 @@ export class SensorsOut {
             SimVar.SetSimVarValue('GPS GROUND TRUE TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(track, UnitType.RADIAN));
             SimVar.SetSimVarValue('GPS GROUND MAGNETIC TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(track, magvar), UnitType.RADIAN));
         }
-
-        SimVar.SetSimVarValue(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, integretyWarning);
-
     }
 
     public setWPTETE(ete: Seconds | null, eta: Seconds | null) {
@@ -548,11 +555,28 @@ export class SensorsOut {
         }
 
         //The real KLN does not have this, but we do and there is a SimVar for this...
+        if (!this.options.output.writeGPSSimVars) {
+            return;
+        }
         if (desiredHeading === null) {
             SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Number, 0);
         } else {
             SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Number, UnitType.DEGREE.convertTo(desiredHeading, UnitType.RADIAN));
         }
+    }
+
+    /**
+     * The ticks that write the L:KLN90B_* outputs stop when the unit loses power, so the zero state is written once.
+     * The GPS SimVars are left alone, see the note in reset().
+     */
+    public setPoweredOff(): void {
+        SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
+        SimVar.SetSimVarValue(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, 0);
+        SimVar.SetSimVarValue(LVAR_MSG_LIGHT, SimVarValueType.Bool, false);
+        SimVar.SetSimVarValue(LVAR_WPT_LIGHT, SimVarValueType.Bool, false);
+        SimVar.SetSimVarValue(LVAR_ANNUN_TEST, SimVarValueType.Bool, false);
+        SimVar.SetSimVarValue(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, false);
+        SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
     }
 
     public setGpsOverriden(): void {
@@ -615,9 +639,12 @@ export class Sensors implements CalcTickable {
         this.in.tick();
     }
 
-    private reset() {
+    private reset(evt: PowerEventData) {
         this.in.reset();
         this.out.reset();
+        if (!evt.isPowered) {
+            this.out.setPoweredOff();
+        }
     }
 
 }

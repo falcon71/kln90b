@@ -100,8 +100,8 @@ describe('VOR page contents (3-49)', () => {
         expect(Screen.read().rows('R')[0]).toBe(' ABC D     ');
     });
 
-    // 3-49: a DME-only station has the D too
-    it('shows D after the ident of a DME-only station (3-49)', async () => {
+    // 3-49 speaks of VORs with DME only; a station of the sim type DME (no VOR) gets the D as well, as the code does
+    it('shows D after the ident of a DME-only station (characterization)', async () => {
         await vorPageOf(vor('ABC', 47.2, 8.2, {type: VorType.DME}));
 
         expect(Screen.read().rows('R')[0]).toBe(' ABC D     ');
@@ -196,14 +196,14 @@ describe('VOR page nearest view (3-22, 3-49)', () => {
     // The nearest figures show a distance below 10 NM with its leading zero (06.5nm on 3-154, 04.1nm on 3-22 and 3-24,
     // 03.1nm on 3-42), and the VOR page shares the view of the NDB page; the KLN 89 trainer pads with a blank
     // (6.5nm), but its nearest page has another layout, and the maintainer ruled for the 90B figures. ABC lies 7.3 NM away
-    // (haversine); the page shows 7.3nm (DistanceDisplay pads with a blank)
-    it.fails('shows a distance below 10 NM with a leading zero (3-22, figure 3-154, #266)', async () => {
+    // (haversine)
+    it('shows a distance below 10 NM with a leading zero (3-22, figure 3-154, #266)', async () => {
         await nearestAbc(0, 47.1, 8.1);
 
         expect(Screen.read().rows('R')[5].trim()).toBe('07.3nm');
     });
 
-    // Sibling of the pin above: the VOR is NR 1 at 7.3 NM
+    // Sibling of the test above: the VOR is NR 1 at 7.3 NM
     it('shows a near VOR as NR 1 at 7.3 NM (3-22)', async () => {
         await nearestAbc(0, 47.1, 8.1);
 
@@ -227,23 +227,45 @@ describe('VOR page nearest view (3-22, 3-49)', () => {
 describe('VOR page with a VORTAC (3-49)', () => {
     const adm = (type: VorType) => vor('ADM', 47.2, 8.2, {type, name: 'ARDMORE'});
 
-    // VorPage.tsx:70, 109 and 134 give the D to DME and VOR-DME only
-    it.fails('shows D after the ident of a VORTAC (3-49, #275)', async () => {
+    it('shows D after the ident of a VORTAC (3-49, #275)', async () => {
         await vorPageOf(adm(VorType.VORTAC));
 
         expect(Screen.read().rows('R')[0]).toBe(' ADM D     ');
     });
 
-    // Sibling of the pin above: the page reaches the VORTAC without typing, because it is the first VOR of the scan list
+    // 3-49: the D marks a VOR with DME, so it shows for a VOR-DME and a VORTAC and not for a plain VOR. Opening on the
+    // station and scanning onto it are two ways to reach it
+    const dmeCases: [string, VorType, string][] = [
+        ['VOR', VorType.VOR, ' ADM       '],
+        ['VOR-DME', VorType.VORDME, ' ADM D     '],
+        ['VORTAC', VorType.VORTAC, ' ADM D     '],
+    ];
+
+    it.each(dmeCases)('opens on a %s with the D as its type says (3-49)', async (_name, type, expected) => {
+        await vorPageOf(adm(type));
+
+        expect(Screen.read().rows('R')[0]).toBe(expected);
+    });
+
+    it.each(dmeCases)('scans onto a %s with the D as its type says (3-49)', async (_name, type, expected) => {
+        // ABC, a plain VOR, comes first in the list and ADM is the next one
+        const unit = await vorPageOf(vor('ABC', 47.3, 8.3, {type: VorType.VOR}), adm(type));
+        expect(Screen.read().rows('R')[0]).toBe(' ABC       '); // precondition
+        await unit.panel.scan();
+        await unit.panel.inner('R', 1);
+
+        expect(Screen.read().rows('R')[0]).toBe(expected);
+    });
+
+    // Sibling of the test above: the page reaches the VORTAC without typing, because it is the first VOR of the scan list
     it('opens on a VORTAC that is the first VOR of the list (3-49)', async () => {
         await vorPageOf(adm(VorType.VORTAC));
 
         expect(Screen.read().rows('R')[1]).toBe('ARDMORE    ');
     });
 
-    // 3-14, 3-21: an entered ident selects the VOR of that ident. VorSelector.isValidResult (VorSelector.tsx:13) accepts
-    // only VOR, VOR-DME, DME and Unknown, so a VORTAC counts as an unknown ident and the user VOR creation opens
-    it.fails('selects a VORTAC by its ident (3-14, 3-49, #276)', async () => {
+    // 3-14, 3-21: an entered ident selects the VOR of that ident, whatever its kind
+    it('selects a VORTAC by its ident (3-14, 3-49, #276)', async () => {
         const unit = await vorPageOf(vor('ABC', 47.3, 8.3), adm(VorType.VORTAC));
         await unit.panel.cursor('R');
         await unit.panel.enterIdent('R', 'ADM');
@@ -251,7 +273,7 @@ describe('VOR page with a VORTAC (3-49)', () => {
         expect(Screen.read().rows('R')[1]).toBe('ARDMORE    ');
     });
 
-    // Sibling: the same entry selects a VOR-DME of that ident, so the pin above fails for the type alone
+    // Sibling: the same entry selects a VOR-DME of that ident
     it('selects a VOR-DME by its ident (3-14)', async () => {
         const unit = await vorPageOf(vor('ABC', 47.3, 8.3), adm(VorType.VORDME));
         await unit.panel.cursor('R');

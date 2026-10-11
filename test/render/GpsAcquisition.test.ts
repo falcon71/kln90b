@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {GPSSystemState} from '@microsoft/msfs-sdk';
+import {GPSSatComputer, GPSSystemState} from '@microsoft/msfs-sdk';
 import {bootToSelfTest, bootUnit, HeadlessUnit, settle} from '../harness/boot';
 import {DEFAULT_START} from '../harness/sim/clock';
 import {Screen} from '../harness/render/screen';
@@ -137,10 +137,10 @@ describe('GPS time to first fix, slow acquisition', () => {
         expect(await secondsToFix(unit, 540)).toBeLessThan(540);
     }, SLOW);
 
-    // 3-17: the almanac stays current for six months, the code lets it expire after 90 days ("Manual says 6 months, but
-    // it's 90 days", Gps.ts). The almanac check has been dead since SDK 2.3.3 (#211), so this pin can turn red only
-    // together with that fix, plus almanacExpireTime at 182 days.
-    it.fails('a start with an almanac 120 days old is a warm start (3-17: six months) (#212)', async () => {
+    // 3-17: the almanac stays current for six months. The almanac check of the unit is dead since SDK 2.3.3 (#211), so
+    // this pin, which sees the almanac age only through it, turns red only together with the #211 fix (the six months
+    // are in place, #212). The test below holds the six months on their own.
+    it.fails('a start with an almanac 120 days old is a warm start (3-17: six months) (#211)', async () => {
         const unit = await powerOnCold({...WARM, lastAlmanacDownload: START - 120 * DAY});
 
         expect(await secondsToFix(unit, 300)).toBeLessThan(300);
@@ -152,6 +152,27 @@ describe('GPS time to first fix, slow acquisition', () => {
 
         expect(await secondsToFix(unit, 720)).toBeLessThan(720);
     }, SLOW);
+
+    // 3-17: a stored almanac stays usable for six months. The age limit is the SDK's part of the almanac check, which
+    // still works while the unit's own clauses (#211) do not, so it is asked directly with the sim time given. The
+    // cases stay clear of the exact day, which the guide does not give.
+    describe('the age limit of the stored almanac (3-17: six months) (#212)', () => {
+        const sdkAlmanacValid = async (ageDays: number) => {
+            const unit = await powerOnCold({...WARM, lastAlmanacDownload: START - ageDays * DAY});
+            return GPSSatComputer.prototype.isAlmanacValid.call(unit.props.sensors.in.gps.gpsSatComputer, START);
+        };
+
+        it.each([
+            [1, true],
+            [91, true],
+            [120, true],
+            [170, true],
+            [195, false],
+            [200, false],
+        ])('an almanac %d days old is valid: %s', async (ageDays, expected) => {
+            expect(await sdkAlmanacValid(ageDays)).toBe(expected);
+        }, SLOW);
+    });
 });
 
 // B-4: the message appears when the GPS corrects the system time by more than 10 minutes. The fast acquisition (the

@@ -39,7 +39,7 @@ describe('NAV 3 page', () => {
 });
 
 // An invented world: KDDD, KAAA 200 NM west of it on the great circle that leaves KDDD on 270 true, and KEEE 30 NM east
-// of KDDD, so that the leg KAAA to KDDD is not the last one (the ESA of the last leg is #183). FPL 0 is KAAA, KDDD, KEEE.
+// of KDDD, so that the leg KAAA to KDDD is not the last one (the last leg: Nav3Esa.test.ts). FPL 0 is KAAA, KDDD, KEEE.
 const KDDD = airport('KDDD', 47.0, 9.0);
 const KAAA = airport('KAAA', pointFrom(KDDD, 270, 200).lat, pointFrom(KDDD, 270, 200).lon);
 const KEEE = airport('KEEE', pointFrom(KDDD, 90, 30).lat, pointFrom(KDDD, 90, 30).lon);
@@ -85,6 +85,24 @@ describe('NAV 3 page (characterization)', () => {
         await nav3OnLeg(0.3);
 
         expect(Screen.read().rows('L')[3]).toBe('FLY L 0.3nm');
+    });
+});
+
+describe('NAV 3 page, direct-to', () => {
+    // 3-32, figure 3-104: the leg row has the same layout as on NAV 1 (3-31, figure 3-97), so on a direct-to the Direct To
+    // symbol stands directly in front of the waypoint (#227)
+    it('draws the Direct To symbol directly in front of the waypoint (3-32, figure 3-104, #227)', async () => {
+        const unit = await bootUnit({
+            facilities: [KAAA, KDDD, KEEE], position: west(30), panelXml: OBS_SOURCE_OFF,
+            storage: savedFlightplan(0, [KAAA, KDDD, KEEE]),
+        });
+        await settle(unit);
+        await unit.panel.selectPage('L', 'NAV 3');
+        await unit.panel.directTo('KDDD');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(true);
+        expect(Screen.read().rows('L')[0]).toBe('    d›KDDD ');
     });
 });
 
@@ -158,7 +176,7 @@ describe('NAV 3 page on an FPL 0 leg', () => {
         expect(rows[2]).toBe('TK     080°');
     });
 
-    // The setup sibling of the pin: 9.97 NM right of the course, NAV 3 on the left
+    // The setup sibling of the #226 test: 9.97 NM right of the course, NAV 3 on the left
     it('reaches 9.97 NM right of the course (3-32)', async () => {
         const unit = await nav3OnLeg(9.97);
 
@@ -169,7 +187,7 @@ describe('NAV 3 page on an FPL 0 leg', () => {
 
     // 3-32 (figures 3-104, 3-105): the cross track has three cells. Just below 10 NM the tenths round up to 10.0, four
     // cells, which runs past the edge of the half page. Expected: 10 (rounded) or 9.9 (truncated) in the three cells.
-    it.fails('keeps the cross track in its three cells just below 10 NM (3-32, #226)', async () => {
+    it('keeps the cross track in its three cells just below 10 NM (3-32, #226)', async () => {
         await nav3OnLeg(9.97);
 
         expect(['FLY L  10nm', 'FLY L 9.9nm']).toContain(Screen.read().rows('L')[3]);

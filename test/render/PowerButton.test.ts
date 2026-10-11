@@ -52,9 +52,8 @@ describe('Power_On and Power_Off H events (public contract) (#51)', () => {
         expect(Screen.read().row(0)).toBe(' GPS             ORS 20');
     });
 
-    // BrightnessManager.powerUp() keeps ramping after the unit was switched off, and raises the opacity of the dark unit
-    // to 1 again. The page is blank (NullPage), so the effect is small, but the instrument is no longer dark.
-    it.fails('Power_Off during the fade-in keeps the instrument dark (#114)', async () => {
+    // The warm-up and fade-in of a power-on (BrightnessManager.powerUp) must not carry on once the unit is off
+    it('Power_Off during the fade-in keeps the instrument dark (#114)', async () => {
         const unit = await bootUnit();
 
         unit.send('KLN90B_Power_Off');
@@ -62,11 +61,49 @@ describe('Power_On and Power_Off H events (public contract) (#51)', () => {
 
         expect(unit.display.opacity()).toBe(0);
     });
+
+    // The same during the warm-up of a cold unit (30 minutes off: 6 s), before the first step of the fade-in
+    it('Power_Off during the warm-up keeps the instrument dark (#114)', async () => {
+        const unit = await bootUnit();
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(30 * 60_000);
+        unit.send('KLN90B_Power_On');
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.display.opacity()).toBe(0); // the precondition: still warming up
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(15_000);
+
+        expect(unit.display.opacity()).toBe(0);
+    });
+
+    // A switch-off and a power-on during a running fade-in start one ramp, not two. Two ramps would raise the opacity
+    // twice as fast, so the property is that the opacity 2 s into the new fade-in has risen but is still below the half
+    // of the full brightness (two ramps are at about 0.95)
+    it('Power_On during a fade-in starts a fade-in of its own, and the old one ends (#114)', async () => {
+        const unit = await bootUnit();
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(30 * 60_000);
+        unit.send('KLN90B_Power_On');
+        await vi.advanceTimersByTimeAsync(7000); // 6 s of warm-up, then the fade-in is running
+        expect(unit.display.opacity()).toBeGreaterThan(0.1); // the precondition: the first ramp is in progress
+        expect(unit.display.opacity()).toBeLessThan(0.5);
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(200);
+        expect(unit.display.opacity()).toBe(0);
+        unit.send('KLN90B_Power_On');
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.display.opacity()).toBeGreaterThan(0);
+        expect(unit.display.opacity()).toBeLessThan(0.5);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.display.opacity()).toBe(1);
+    });
 });
 
 // Public contract: the doc comment of LVAR_POWER in LVars.ts says the LVar is the position of the power switch and that the
-// unit itself is still off when electricity is not available. The screen is asserted, not the opacity (#114 lets the
-// opacity ramp on an unpowered unit).
+// unit itself is still off when electricity is not available. The screen is asserted, not the opacity.
 describe('L:KLN90B_Power reports the switch, not the powered state (public contract)', () => {
     it('is 1 while the unit has no electricity and shows nothing', async () => {
         const unit = await bootUnit({

@@ -173,14 +173,46 @@ describe('APT 4 page', () => {
     });
 
     // 3-45: HF frequencies (2000 kHz to 30000 kHz) are shown in kHz without a decimal point, 6547 for 6547 kHz
-    it.fails('shows an HF frequency in kHz without a decimal point (3-45, #267)', async () => {
+    it('shows an HF frequency in kHz without a decimal point (3-45, #267)', async () => {
         const unit = await bootUnit({facilities: [withFreqs(freq(FacilityFrequencyType.Center, 6.547))]});
         await unit.panel.selectPage('R', 'APT 4');
 
         expect(Screen.read().rows('R')[1].trim()).toMatch(/^CTR +6547$/);
     });
 
-    // 3-45, the sibling of the pin: the same HF frequency is listed with its type, so the pin fails on the format only
+    // 3-45: the HF band runs from 2000 kHz to 30000 kHz inclusive, so its two ends show in kHz as well
+    it.each([
+        [2.0, 2000],
+        [2.002, 2002], // 2.002 * 1000 is 2001.9999999999998 in floating point
+        [29.999, 29999],
+        [30.0, 30000],
+    ])('shows the HF frequency of %s MHz as %s kHz (3-45)', async (freqMHz, kHz) => {
+        const unit = await bootUnit({facilities: [withFreqs(freq(FacilityFrequencyType.Center, freqMHz))]});
+        await unit.panel.selectPage('R', 'APT 4');
+
+        expect(Screen.read().rows('R')[1].trim()).toMatch(new RegExp(`^CTR +${kHz}$`));
+    });
+
+    // 3-45: a VHF frequency keeps its decimal point and its two decimals, also beside an HF frequency on the page
+    it('shows a VHF frequency in MHz beside an HF frequency (3-45)', async () => {
+        const unit = await bootUnit({facilities: [withFreqs(freq(FacilityFrequencyType.Tower, 118.35), freq(FacilityFrequencyType.Center, 6.547), freq(FacilityFrequencyType.Ground, 121.75))]});
+        await unit.panel.selectPage('R', 'APT 4');
+
+        const shown = Screen.read().rows('R').slice(1, 4).map(r => r.trim());
+        expect(shown[0]).toBe('TWR  118.35');
+        expect(shown[1]).toMatch(/^CTR +6547$/);
+        expect(shown[2]).toBe('GRND 121.75');
+    });
+
+    // The page of 3-45 gives no column for an HF value; the code starts it where a VHF frequency starts
+    it('characterization: starts an HF frequency in the column of a VHF frequency', async () => {
+        const unit = await bootUnit({facilities: [withFreqs(freq(FacilityFrequencyType.Center, 6.547))]});
+        await unit.panel.selectPage('R', 'APT 4');
+
+        expect(Screen.read().rows('R')[1].trim()).toBe('CTR  6547');
+    });
+
+    // 3-45, the sibling of the first HF test: the same HF frequency is listed with its type
     it('lists an HF frequency with its type (3-45)', async () => {
         const unit = await bootUnit({facilities: [withFreqs(freq(FacilityFrequencyType.Center, 6.547))]});
         await unit.panel.selectPage('R', 'APT 4');

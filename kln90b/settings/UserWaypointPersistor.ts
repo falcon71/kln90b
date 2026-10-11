@@ -46,10 +46,16 @@ export class UserWaypointPersistor {
     }
 
     public restoreWaypoints() {
-        if (this.userSettings.getSetting("userDataFormat").get() === 2) {
-            this.v2Loader.restoreWaypoints();
-        } else {
-            this.v1Loader.restoreWaypoints();
+        //Adding the restored waypoints to the repository fires the sync, which would rewrite the slots again and again
+        this.ignoreSync = true;
+        try {
+            if (this.userSettings.getSetting("userDataFormat").get() === 2) {
+                this.v2Loader.restoreWaypoints();
+            } else {
+                this.v1Loader.restoreWaypoints();
+            }
+        } finally {
+            this.ignoreSync = false;
         }
     }
 

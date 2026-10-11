@@ -41,6 +41,7 @@ export class FpmFieldset implements UiElement {
     }
 
     public setFpm(Fpm: Knots): void {
+        this.fpm = Fpm;
         const FpmString = format(Fpm, "0000");
         this.children.get("Fpm1000").value = Number(FpmString.substring(0, 1));
         this.children.get("Fpm100").value = Number(FpmString.substring(1, 2));

@@ -29,7 +29,7 @@ export class MessageHandler implements CalcTickable {
     //A lot of messages depent on state. All those messages are kept here
     public persistentMessages: Message[] = [];
     //The messages, that are currently presented to the user
-    private activeMessages: Message[] = []; //todo clear messages when power is off
+    private activeMessages: Message[] = [];
 
     public hasMessages(): boolean {
         return this.activeMessages.length > 0;
@@ -45,6 +45,18 @@ export class MessageHandler implements CalcTickable {
 
     public addMessage(message: Message): void {
         this.activeMessages.push(message);
+    }
+
+    /**
+     * A message describes the power-on in which it was posted, so the unit loses them all when it is switched off.
+     * The persistent messages come back at the next tick when their condition holds. That they come back unread (their
+     * seen flag is reset here) is this project's choice; the manuals do not say.
+     */
+    public clear(): void {
+        this.activeMessages = [];
+        for (const message of this.persistentMessages) {
+            message.seen = false;
+        }
     }
 
     public tick() {

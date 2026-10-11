@@ -21,6 +21,7 @@ import {AirportNearestList} from "../../data/navdata/NearestList";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {Apt8IafList, LastItemAlwaysVisibleList} from "../../controls/List";
 import {SimpleListItem} from "../../controls/ListItem";
+import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {Button} from "../../controls/Button";
 import {MainPage} from "../MainPage";
 import {Fpl0Page} from "../left/FplPage";
@@ -215,7 +216,8 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
             }
         }
 
-        if (SidStar.hasDuplicates(fpl0Legs, legs)) {
+        // 6-5, B-3: only the enroute waypoints count, not the legs of a procedure that is already loaded
+        if (SidStar.hasDuplicates(fpl0Legs.filter(leg => leg.type === KLNLegType.USER), legs)) {
             this.props.messageHandler.addMessage(new OneTimeMessage(["REDUNDANT WPTS IN FPL", "EDIT ENROUTE WPTS", "AS NECESSARY"]));
         }
 
@@ -250,7 +252,9 @@ interface Apt8IapPageProps extends PageProps {
 
 type Apt8IAPPageTypes = {
     activeArrow: ActiveArrow,
+    activeIdx: TextDisplay,
     apt: AirportSelector,
+    waypointType: TextDisplay,
 
     list: LastItemAlwaysVisibleList,
 
@@ -281,7 +285,9 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
 
         this.children = new UIElementChildren<Apt8IAPPageTypes>({
             activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
+            activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
+            waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "A"),
             list: new LastItemAlwaysVisibleList(UIElementChildren.forList([])),
             createWpt: new CreateWaypointMessage(() => Apt1Page.createAtUserPosition(props), () => Apt1Page.createAtPresentPosition(props)),
         });
@@ -296,8 +302,9 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
 
     public render(): VNode {
         this.requiresRedraw = true;
+        // 4-10: with an active waypoint the first row is the ACT header, as on ACT 7. The APT 8 page shows its title.
         return (<pre>
-            {this.children.get("activeArrow").render()}{this.children.get("apt").render()} IAP<br/>
+            {this.children.get("activeArrow").render()}{this.children.get("activeIdx").render()}{this.children.get("apt").render()}{this.activeIdx === -1 ? " IAP" : "  "}{this.children.get("waypointType").render()}<br/>
             <div ref={this.mainRef}>
                 <div ref={this.emptyRef}>
                     NO APPROACH<br/>

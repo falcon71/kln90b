@@ -60,7 +60,7 @@ export class RemarksManager {
         for (let i = 0; i < NUM_REMARKS; i++) {
             const rmk = this.manager.getSetting(`rmk${i}`).get();
             if (rmk !== "") {
-                const ident = rmk.substring(0, 4);
+                const ident = rmk.substring(0, 4).trim(); //The ident is padded with blanks to 4 characters
                 const lines = [...rmk.substring(4).match(/.{1,11}/g)!];
                 this.remarks[ident] = lines as [string, string, string];
             }
@@ -71,7 +71,7 @@ export class RemarksManager {
         let i = 0;
         for (const ident in this.remarks) {
             const joinedText = this.remarks[ident].join("");
-            this.manager.getSetting(`rmk${i}`).set(ident + joinedText);
+            this.manager.getSetting(`rmk${i}`).set(ident.padEnd(4, " ") + joinedText);
             i++;
         }
     }

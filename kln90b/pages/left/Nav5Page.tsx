@@ -43,6 +43,7 @@ export class Nav5Page extends SixLineHalfPage {
 
 
         this.cursorController = new CursorController(this.children);
+        this.cursorController.setDefaultCursorField(1); //3-34: the cursor first lands on the range scale
     }
 
 

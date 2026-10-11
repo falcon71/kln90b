@@ -64,10 +64,8 @@ export class SidStar {
      */
 
     public static hasDuplicates(fplLegs: KLNFlightplanLeg[], procedureLegs: KLNFlightplanLeg[]): boolean {
-        const procedureIcaos = procedureLegs.map(leg => leg.wpt.icaoStruct);
-
         for (const fplLeg of fplLegs) {
-            if (procedureIcaos.includes(fplLeg.wpt.icaoStruct)) {
+            if (procedureLegs.some(leg => ICAO.valueEquals(leg.wpt.icaoStruct, fplLeg.wpt.icaoStruct))) {
                 return true;
             }
         }
@@ -149,10 +147,13 @@ export class SidStar {
             .sort((a, b) => a.distance(sensors.in.gps.coords) - b.distance(sensors.in.gps.coords)) //Max two, we want the closest one in front of the plane
         ;
 
+        //getArcEntryData reverses the circle of every arc that is not a left-hand one, which turns its radius into pi minus the radius
+        const arcRadius = arcData.turnDirection == LegTurnDirection.Left ? arcData.circle.radius : Math.PI - arcData.circle.radius;
+
         for (const entryPoint of entryPoints) {
             const vorPoint = new GeoPoint(arcData.vor.lat, arcData.vor.lon);
             const radial = vorPoint.bearingTo(entryPoint);
-            const dist = UnitType.GA_RADIAN.convertTo(arcData.circle.radius, UnitType.NMILE);
+            const dist = UnitType.GA_RADIAN.convertTo(arcRadius, UnitType.NMILE);
 
             let start;
             let end;

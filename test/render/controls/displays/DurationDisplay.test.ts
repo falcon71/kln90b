@@ -57,6 +57,38 @@ describe('DurationDisplay', () => {
     });
 });
 
+// The trip form of the display (#324) is what the trip pages ask for; the other pages keep the default form
+describe('DurationDisplay, trip form', () => {
+    const trip = (minutes: number | null): string =>
+        mountedText(new DurationDisplay(minutes === null ? null : minutes * 60, true));
+
+    // 3-15, figure 3-50 (0:13) and the KLN 89 trainer, 2026-10-08 (0:31): below an hour the hour digit stays
+    it('shows 0:mm below an hour (3-15, checked in the KLN 89 trainer, 2026-10-08, #324)', () => {
+        expect(trip(12.96)).toBe(' 0:13');
+    });
+
+    // 5-3, figure 5-8 (1:08) and 5-6, figure 5-19 (3:53): from one hour on, h:mm as on the other pages
+    it('shows an hour or more as h:mm (5-3, 5-6)', () => {
+        expect(trip(60 + 8)).toBe(' 1:08');
+        expect(trip(3 * 60 + 53)).toBe(' 3:53');
+    });
+
+    it('shows dashes without a value (3-31)', () => {
+        expect(trip(null)).toBe('--:--');
+    });
+
+    it('characterization: the minutes below an hour at both ends, and dashes from 100 hours on', () => {
+        expect(trip(8 / 60)).toBe(' 0:00');
+        expect(trip(59.4)).toBe(' 0:59');
+        expect(trip(100 * 60)).toBe('--:--');
+    });
+
+    // The default form, which NAV 1, the D/T pages and OTH 6 keep
+    it('is not the default form: that one keeps the hour blank (3-31)', () => {
+        expect(shown(12.96)).toBe('  :13');
+    });
+});
+
 describe('DurationDisplay (characterization)', () => {
     it('characterization: ten hours and more fill both hour cells', () => {
         expect(shown(12 * 60 + 34)).toBe('12:34');
@@ -113,7 +145,7 @@ describe('DurationDisplay on the trip pages (TRI 3)', () => {
         return {distance: rows[1], ete: rows[2].slice(6)};
     }
 
-    // 5-3, figure 5-8 (ETE 1:08), 5-5, figures 5-12 to 5-16, and 5-6, figure 5-18 (ETE up to 3:53): from one hour on
+    // 5-3, figure 5-8 (ETE 1:08), 5-5, figures 5-12 to 5-16, and 5-6, figures 5-18 and 5-19 (ETE up to 3:53): from one hour on
     // the trip ETE is h:mm. The sibling of the pin: 195 NM at 150 kt is 78 minutes
     it('shows hours and minutes for an ETE above an hour (5-5, 5-6)', async () => {
         expect(await tri3Trip(195)).toEqual({distance: ' 195nm 180°', ete: ' 1:18'});
@@ -129,9 +161,9 @@ describe('DurationDisplay on the trip pages (TRI 3)', () => {
 
     // 3-15, figure 3-50 (180kt 0:13 on the trip page) and the KLN 89 trainer, 2026-10-08 (the trip page showed ETE 0:31
     // for 24 NM at 45 kt): below an hour the trip pages keep the hour digit and show 0:mm, where NAV 1 and D/T show :mm
-    // (3-31, figure 3-100). 32.4 NM at 150 kt is 12.96 minutes. The code draws the NAV 1 form, two blanks and :13.
-    // TRI 1 and TRI 5 use the same display and are pinned in Tri1Page.test.ts and Tri5Page.test.ts.
-    it.fails(
+    // (3-31, figure 3-100). 32.4 NM at 150 kt is 12.96 minutes. TRI 1 and TRI 5 are tested in Tri1Page.test.ts and
+    // Tri5Page.test.ts.
+    it(
         'shows an ETE below an hour as 0:13 on TRI 3 (3-15, checked in the KLN 89 trainer, 2026-10-08, #324)',
         async () => {
             expect(await tri3Trip(32.4)).toEqual({distance: '  32nm 180°', ete: ' 0:13'});

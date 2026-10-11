@@ -33,13 +33,13 @@ export class KlnEfbSaver {
 
     private toEfbRoute(): FlightPlanRoute {
         const route = FlightPlanRouteUtils.emptyRoute();
-        const legs = this.fpl0.getLegs();
-        if (FacilityUtils.isFacilityType(legs[0].wpt, FacilityType.Airport)) {
+        const legs = [...this.fpl0.getLegs()]; //A copy, because getLegs() returns the leg array of FPL 0 itself
+        if (legs.length > 0 && FacilityUtils.isFacilityType(legs[0].wpt, FacilityType.Airport)) {
             route.departureAirport = legs[0].wpt.icaoStruct;
             legs.shift();
         }
-        const lastLeg = legs[legs.length - 1];
-        if (FacilityUtils.isFacilityType(lastLeg.wpt, FacilityType.Airport)) {
+        const lastLeg = legs[legs.length - 1]; //undefined, when nothing is left
+        if (lastLeg !== undefined && FacilityUtils.isFacilityType(lastLeg.wpt, FacilityType.Airport)) {
             route.destinationAirport = lastLeg.wpt.icaoStruct;
             legs.pop();
         }
@@ -52,7 +52,7 @@ export class KlnEfbSaver {
                 case KLNLegType.STAR:
                     route.arrival = leg.procedure!.procedureName;
                     if (leg.procedure!.runwayNumber) {
-                        route.destinationRunway.number = leg.procedure!.runwayNumber.toString();
+                        route.destinationRunway.number = RunwayUtils.getNumberString(leg.procedure!.runwayNumber);
                     }
                     if (leg.procedure!.runwayDesignator) {
                         route.destinationRunway.designator = RunwayUtils.getDesignatorLetter(leg.procedure!.runwayDesignator);
@@ -64,7 +64,7 @@ export class KlnEfbSaver {
                 case KLNLegType.SID:
                     route.departure = leg.procedure!.procedureName;
                     if (leg.procedure!.runwayNumber) {
-                        route.departureRunway.number = leg.procedure!.runwayNumber.toString();
+                        route.departureRunway.number = RunwayUtils.getNumberString(leg.procedure!.runwayNumber);
                     }
                     if (leg.procedure!.runwayDesignator) {
                         route.departureRunway.designator = RunwayUtils.getDesignatorLetter(leg.procedure!.runwayDesignator);
@@ -79,7 +79,7 @@ export class KlnEfbSaver {
                         route.approach.suffix = leg.procedure!.approachSuffix;
                     }
                     if (leg.procedure!.runwayNumber) {
-                        route.approach.runway.number = leg.procedure!.runwayNumber.toString();
+                        route.approach.runway.number = RunwayUtils.getNumberString(leg.procedure!.runwayNumber);
                     }
                     if (leg.procedure!.runwayDesignator) {
                         route.approach.runway.designator = RunwayUtils.getDesignatorLetter(leg.procedure!.runwayDesignator);

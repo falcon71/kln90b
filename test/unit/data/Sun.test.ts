@@ -53,13 +53,46 @@ describe('sunrise and sunset at the standard zenith against the USNO almanac', (
     });
 });
 
+describe('the default zenith (#164)', () => {
+    // The standard zenith is the reference of the USNO rows above, so a call without a zenith has to give the call with
+    // the standard zenith to the millisecond. Northern and southern places, and a rise on the previous UTC day
+    it.each([
+        ['47 N 8 E, midsummer', 47, 8, 2024, 5, 21],
+        ['34 S 151 E, southern midsummer', -34, 151, 2024, 11, 21],
+        ['34 S 151 E, southern midwinter', -34, 151, 2024, 5, 21],
+        ['60 N 25 E, equinox', 60, 25, 2024, 2, 20],
+    ] as const)('calls sunrise and sunset without a zenith as with the standard zenith: %s', (_name, lat, lon, y, m, d) => {
+        const date = TimeStamp.createDate(y, m, d);
+        expect(calculateSunrise(date, {lat, lon})!.getTimestamp()).toBe(calculateSunrise(date, {lat, lon}, STANDARD_ZENITH)!.getTimestamp());
+        expect(calculateSunset(date, {lat, lon})!.getTimestamp()).toBe(calculateSunset(date, {lat, lon}, STANDARD_ZENITH)!.getTimestamp());
+    });
+
+    // The polar limits depend on the zenith, so they hold it at the margin. At midsummer (declination 23.44 deg) the sun
+    // is continuously up where latitude + declination - 90 deg is above the altitude -50 arc minutes of the standard
+    // rise, which is north of 65.72 N; a zenith of 91 deg would put the limit at 65.55 N. 65.65 N therefore still has a
+    // rise and a set. At midwinter the sun stays down north of 67.39 N (91 deg: 67.55 N), so 67.45 N has none
+    it('still has a rise and a set at 65.65 N at midsummer, where a zenith of 91 deg has the midnight sun', () => {
+        const pos = {lat: 65.65, lon: 20};
+        const date = TimeStamp.createDate(2024, 5, 21);
+        expect(calculateSunrise(date, pos)).not.toBeNull();
+        expect(calculateSunset(date, pos)).not.toBeNull();
+    });
+
+    it('has no rise and no set at 67.45 N at midwinter, where a zenith of 91 deg has a short day', () => {
+        const pos = {lat: 67.45, lon: 20};
+        const date = TimeStamp.createDate(2024, 11, 21);
+        expect(calculateSunrise(date, pos)).toBeNull();
+        expect(calculateSunset(date, pos)).toBeNull();
+    });
+});
+
 describe('CAL 7 figures (5-15)', () => {
     // 5-15, figures 5-50 to 5-52: the rise and set the real unit shows for KATL. The position is the airport's
     // reference point rounded to 0.01 deg, passed as coordinates. Figure 5-49 (KORD) is left out: no zenith and
     // neither truncation nor rounding reproduces both of its times.
     const ATL = {lat: 33.64, lon: -84.43};
 
-    it.fails.each([
+    it.each([
         ['03 MAR 89 CST', 2, 3, CST, '06:04', '17:35'],
         ['10 MAR 89 CST', 2, 10, CST, '05:55', '17:41'],
         ['10 MAR 89 EST', 2, 10, EST, '06:55', '18:41'],
@@ -79,7 +112,7 @@ describe('what the sunrise depends on', () => {
     const evening = TimeStamp.create(Date.UTC(1989, 2, 3, 20, 0, 0), CST);
 
     it('is given two dates 59 s apart that fall on one UTC day, and two CST stamps on one CST day', () => {
-        // the preconditions of the two pins below
+        // the preconditions of the tests below
         expect(noonPlus59s.getTimestamp() - noon.getTimestamp()).toBe(59_000);
         expect([noon.getDate(), noonPlus59s.getDate()]).toEqual([3, 3]);
         // 20:00 CST on 03 MAR is 02:00 UTC on 04 MAR
@@ -88,8 +121,29 @@ describe('what the sunrise depends on', () => {
     });
 
     // 5-15: CAL 7 gives the times for a waypoint and a date. The second at which the date was taken is not an input.
-    it.fails('does not depend on the seconds of the date it is given (#165)', () => {
+    it('does not depend on the seconds of the date it is given (#165)', () => {
         expect(calculateSunrise(noonPlus59s, ORD)!.getTimestamp()).toBe(calculateSunrise(noon, ORD)!.getTimestamp());
+    });
+
+    // 5-15: the same for the sunset, for seconds, milliseconds and the last instant of the UTC day. The expected value is
+    // the time computed for the stamp at 00:00:00.000 of the same day, the reference
+    it.each([
+        ['12:00:59.000', Date.UTC(1989, 2, 3, 12, 0, 59, 0)],
+        ['12:00:00.999', Date.UTC(1989, 2, 3, 12, 0, 0, 999)],
+        ['23:59:59.999', Date.UTC(1989, 2, 3, 23, 59, 59, 999)],
+    ] as const)('gives the same sunrise and sunset for the stamp 03 MAR 1989 %s as for its start of the day (#165)', (_n, ms) => {
+        const start = TimeStamp.create(Date.UTC(1989, 2, 3));
+        const date = TimeStamp.create(ms);
+        expect(calculateSunrise(date, ORD)!.getTimestamp()).toBe(calculateSunrise(start, ORD)!.getTimestamp());
+        expect(calculateSunset(date, ORD)!.getTimestamp()).toBe(calculateSunset(start, ORD)!.getTimestamp());
+    });
+
+    // The result lies on the UTC day of the date: ORD, at 87.9 W, rises about 12:23 UTC and sets about 23:5x UTC
+    it('puts the sunrise and the sunset of ORD on the UTC day of the date', () => {
+        const rise = calculateSunrise(noon, ORD)!;
+        const set = calculateSunset(noon, ORD)!;
+        expect([rise.getYear(), rise.getMonth(), rise.getDate(), rise.getHours()]).toEqual([1989, 2, 3, 12]);
+        expect([set.getYear(), set.getMonth(), set.getDate(), set.getHours()]).toEqual([1989, 2, 3, 23]);
     });
 
     // 5-15: the date on CAL 7 is shown in the selected time zone, and the rise is for that date.

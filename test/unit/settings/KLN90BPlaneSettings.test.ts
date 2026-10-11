@@ -180,6 +180,33 @@ describe('panel.xml parser', () => {
 
             expect(simEnv().sim.lastWrite('L:KLN90B_ElectricitySimVarIndex')).toBeUndefined();
         });
+
+        // #136: the index is a trailing colon and digits; the colon of a prefix is part of the name, which the parser keeps
+        it.each(['L:MY_AVIONICS_BUS', 'A:ELECTRICAL MAIN BUS VOLTAGE', 'CIRCUIT ON:A', 'L:MY_BUS:', 'L:BUS:1_MAIN'])('writes no electricity index for %s (#136)', name => {
+            const settings = parse(kln(`<Input><ElectricitySimVar>${name}</ElectricitySimVar></Input>`));
+
+            expect(settings.input.electricitySimVar).toBe(name);
+            expect(simEnv().sim.lastWrite('L:KLN90B_ElectricitySimVarIndex')).toBeUndefined();
+        });
+
+        // A padded or pretty-printed value is trimmed, so its index still seeds the LVar and the sync finds it
+        it.each(['CIRCUIT ON:1 ', '\nCIRCUIT ON:1\n    ', '\tCIRCUIT ON:1'])('trims the whitespace around %j and writes its index (#136)', name => {
+            const settings = parse(kln(`<Input><ElectricitySimVar>${name}</ElectricitySimVar></Input>`));
+
+            expect(settings.input.electricitySimVar).toBe('CIRCUIT ON:1');
+            expect(simEnv().sim.lastWrite('L:KLN90B_ElectricitySimVarIndex')!.value).toBe(1);
+        });
+
+        it.each([
+            ['A:CIRCUIT ON:1', 1],
+            ['L:MY_BUS:2', 2],
+            ['CIRCUIT ON:12', 12],
+        ])('writes the trailing index of %s as %i (#136)', (name, index) => {
+            const settings = parse(kln(`<Input><ElectricitySimVar>${name}</ElectricitySimVar></Input>`));
+
+            expect(settings.input.electricitySimVar).toBe(name);
+            expect(simEnv().sim.lastWrite('L:KLN90B_ElectricitySimVarIndex')!.value).toBe(index);
+        });
     });
 
     // The maintainer's ruling: false is intended, and the sample, the wiki sample and cfg/panel.xml all show false.

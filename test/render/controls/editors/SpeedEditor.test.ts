@@ -122,3 +122,34 @@ describe('SpeedEditor keyboard', () => {
         expect(unit.panel.focused('L').text).toBe(' 95');
     });
 });
+
+describe('SpeedEditor, the outer knob at the ends of an open edit (checked in the KLN 89 trainer, 2026-10-08, #306)', () => {
+    // The trainer check was made on a latitude, a radial, the date and an FPL 0 ident; the editors share the cell
+    // index, and the ground speed has three cells. Open edit: the hundreds blank, the tens and units dashed.
+    it('stops at the last cell: the next inner click turns the units again', async () => {
+        const unit = await onGroundspeed();
+        await unit.panel.inner('L', 1);
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 1);
+        expect(Screen.read().rows('L')[4].slice(0, 3)).toBe(' _0');
+
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[4].slice(0, 3)).toBe(' _1');
+    });
+
+    it('stops at the first cell: the next inner click turns the hundreds', async () => {
+        const unit = await onGroundspeed();
+        await unit.panel.inner('L', 1);
+        expect(Screen.read().rows('L')[4].slice(0, 3)).toBe(' __');
+
+        await unit.panel.outer('L', -1);
+        await unit.panel.inner('L', 1);
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[4].slice(0, 3)).toBe('1__');
+    });
+});
+

@@ -54,7 +54,7 @@ export class Tri5Page extends SixLineHalfPage {
             from: new TextDisplay(this.from),
             to: new TextDisplay(this.to),
             gs: new SpeedFieldset(this.gs ?? 0, this.setGS.bind(this)),
-            ete: new DurationDisplay(this.ete),
+            ete: new DurationDisplay(this.ete, true),
             ff: new TripFuelFieldset(this.props.memory.triPage.ff, this.setFF.bind(this)),
             res: new TripFuelFieldset(this.props.memory.triPage.reserve, this.setReserve.bind(this)),
             fReq: new TripFuelDisplay(null),

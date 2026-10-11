@@ -65,12 +65,26 @@ describe('Database expiration date', () => {
         expect(db.expirationDateString.substring(0, 6)).toBe('10 JUN');
     });
 
-    // Figure 2-4 (on 2-5) and figures 3-24 and 3-25 (3-7) show a two-digit year. 22b4532 changed the format from the two digits of the sim's
-    // range to {YYYY}. The test above is the passing sibling: the day and month are right.
-    it.fails('shows the expiry with a two-digit year (2-5, 3-7, #199)', () => {
+    // Figure 2-4 (on 2-5) and figures 3-24 and 3-25 (3-7) show a two-digit year. The test above holds the day and month.
+    it('shows the expiry with a two-digit year (2-5, 3-7, #199)', () => {
         const db = new Database(bus, sensors, handler);
 
         expect(db.expirationDateString).toBe('10 JUN 26');
+    });
+
+    // The year is the year of the expiry date, not that of the cycle number: cycle 2513 expires on 20 JAN 2026
+    it('shows the year of the expiry date for a cycle that expires in the following year (#199)', () => {
+        clearStatic(FacilityLoader, 'databaseCycleCache', false);
+        simEnv().sim.gameVars.set('FLIGHT NAVDATA DATE RANGE', 'DEC24JAN21/26');
+
+        expect(new Database(bus, sensors, handler).expirationDateString).toBe('20 JAN 26');
+    });
+
+    it('pads the year to two digits (characterization)', () => {
+        clearStatic(FacilityLoader, 'databaseCycleCache', false);
+        simEnv().sim.gameVars.set('FLIGHT NAVDATA DATE RANGE', 'MAY14JUN11/09');
+
+        expect(new Database(bus, sensors, handler).expirationDateString).toBe('10 JUN 09');
     });
 });
 

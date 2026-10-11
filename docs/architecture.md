@@ -75,7 +75,8 @@ topic and rendered by `controls/ErrorPage` as a full-screen error page with a Gi
       creates empty plans and sets `restoreSuccessFull=false`, which later produces the `USER DATA LOST` message.
     - The last active waypoint is loaded from the `activeWaypoint` setting. **That setting is stored as an ICAO V1
       string**: `ICAO.valueToStringV1` / `getFacilityTypeFromStringV1`.
-    - If `userDataFormat !== 2`, it re-persists everything in the V2 format and sets `userDataFormat=2` (see Core 7).
+    - If `userDataFormat !== 2`, or when a restore failed, it re-persists everything in the V2 format and sets
+      `userDataFormat=2` (see Core 7).
 7. Constructs `VolatileMemory`, `WTFlightplanSync`, `AirspaceAlert`, `Vnav`, `KLNMagvar`, `ModeController`, then
    `TickController` (Core 2), then `SimVarSync`,
    `MSA`, `TemporaryWaypointDeleter` and `SidStar`. The platform's route manager (in the sim
@@ -165,7 +166,7 @@ only run while the unit is powered AND enabled.**
 ## Core 3. Sensors and GPS simulation
 
 `Sensors` (`kln90b/Sensors.ts`) has `in: SensorsIn` (tick 1 Hz) and `out: SensorsOut` (writers). On `powerEvent` it
-calls `in.reset()` and `out.reset()`.
+calls `in.reset()` and `out.reset()`, and on a power-off also `out.setPoweredOff()`.
 
 `SensorsIn.tick()` reads:
 
@@ -196,7 +197,7 @@ error or noise and no RAIM ("We have pretty all messages except for failures and
     - `isAlmanacValid` additionally requires the internal clock to be within 10 minutes of sim time AND the last known
       position to be within 60 NM (both values from the install manual).
     - The computer has 8 channels. Timing: acquisition about 90 ± 30 s, ephemeris download 30 s, almanac download 12.5
-      min, almanac expiry 90 days, timeout 4 min; with `fastGpsAcquisition` all of these drop to about 1 to 10 s. It is
+      min, almanac expiry six months (3-17), timeout 4 min; with `fastGpsAcquisition` all of these drop to about 1 to 10 s. It is
       driven manually: `GPS.tick` publishes `simTime` and `gps-position` on the bus and then calls `onUpdate()`. Sync
       role is `'none'`. SBAS is disabled by the emptied `gps_sbas.json`.
 - `isValid()` means `systemState` is `SolutionAcquired` or `DiffSolutionAcquired`. There is a TODO: 3-satellite plus
@@ -256,27 +257,32 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
     - `GPS CDI SCALING`, `GPS IS ACTIVE FLIGHT PLAN`, `GPS IS ACTIVE WAY POINT`, `GPS OBS VALUE`
     - `GPS WP DESIRED TRACK`, `GPS WP TRACK ANGLE ERROR`, `GPS WP BEARING` (+TRUE), `GPS WP DISTANCE`, `GPS WP ETE`,
       `GPS WP ETA`, `GPS ETE`, `GPS ETA`
+    - `GPS COURSE TO STEER` (radians; "real KLN does not have this"; `setRollCommand` writes the roll command LVar
+      regardless)
     - `GPS MAGVAR`, `GPS POSITION LAT/LON`, `GPS GROUND SPEED`, `GPS GROUND TRUE/MAGNETIC TRACK`
     - `GPS FLIGHT PLAN WP COUNT/INDEX`, `GPS WP NEXT/PREV ID/LAT/LON`, `GPS WP PREV VALID`
     - `GPS IS APPROACH ACTIVE`, `GPS APPROACH MODE` (0 = ENR, 1 = ARM, 2 = APR, 3 = self-test)
     - Vertical outputs are forced to 0 (`GPS GSI SCALING`, `GPS HAS GLIDEPATH=false`, ...) because the KLN has no
       vertical guidance.
-- `GPS WP CROSS TRK` is written at 16 Hz from the filter by `setFilteredOutputs`. It has no `writeGPSSimVars` check of
-  its own; it is fed only through gated `setXTK`.
+- `GPS WP CROSS TRK` is written at 16 Hz from the filter by `setFilteredOutputs`, which has the `writeGPSSimVars` check
+  of its own: the filter is fed only through the gated `setXTK`.
 - The OBS mode is set through key events `K:GPS_OBS_ON/OFF`, because the `GPS OBS ACTIVE` SimVar is effectively
   read-only. This happens only when **no** external LEG/OBS switch is installed. With a switch installed, `SimVarSync`
   *reads* `GPS OBS ACTIVE` and calls `modeController.setExternalObsMode`.
 - **Not gated** by `writeGPSSimVars`:
-    - All KLN LVars, `GPS COURSE TO STEER` (radians; "real KLN does not have this"), `K:VOR{1,2}_SET` (when `obsTarget`
-      is set and the GPS drives NAV1).
+    - All KLN LVars, `K:VOR{1,2}_SET` (when `obsTarget` is set and the GPS drives NAV1).
     - Annunciators: `setMessageLight` (called from `controls/StatusLine.tsx` in the display tick, flashing while there
       are unread messages) and `setWptAlertLight` / `setAnnunTest` (from NavCalculator).
 - Other outputs:
     - `WTFlightplanSync` mirrors FPL 0 into an SDK `FlightPlanner` with id `"kln90b"` (`initSyncRole:'primary'`): plan 0
       is DF legs and plan 1 is a direct-to plan "like the Garmins". Data stops after the MAP or an arc ("Install manual:
-      We do not return data after a fence"). This happens only when `writeGPSSimVars` is set.
+      We do not return data after a fence"). This happens only when `writeGPSSimVars` is set, and `SimVarSync` calls `WTFlightplanSync.sync()` once when
+      `L:KLN90B_WriteGpsSimvars` switches it on at runtime.
     - `KlnEfbSaver` answers EFB `avionicsRouteRequested`; `KlnEfbLoader` loads `syncedAvionicsRoute` into FPL 0 (lat/lon
       legs become temporary user waypoints in region `XY`).
+- The ticks that write the L:KLN90B_* outputs stop with the power, so `SensorsOut.setPoweredOff()` writes their zero
+  state once on a power-off: `L:KLN90B_RollCommand` 0, `L:KLN90B_HSI_TF_FLAGS` 0 (flagged) and the MSG, WPT and annunciator
+  test lights false, `L:KLN90B_IntegrityWarn` 0 and `L:KLN90B_GPS_WP_BEARING` 0, whatever `writeGPSSimVars` says. A unit that is only disabled for hot swapping keeps its values, but a power-off while disabled zeroes them too.
 - `SensorsOut.reset()` has the SimVar-zeroing code commented out because of an observed **CTD** when combined with
   `L:KLN90B_Disabled` and hot-swapping. Read that comment before touching GPS SimVar resets.
 
@@ -355,8 +361,8 @@ sim.
   the magvar service").
 - Status-line feedback: `NO APPROACH`, `NO ACTV WPT`.
 
-**`RollSteeringController`** (1 Hz) is adapted from WT `LNavComputer`. It writes `L:KLN90B_RollCommand` and
-`GPS COURSE TO STEER`.
+**`RollSteeringController`** (1 Hz) is adapted from WT `LNavComputer`. It writes `L:KLN90B_RollCommand` and,
+only with `writeGPSSimVars`, `GPS COURSE TO STEER`.
 
 - Cases: on track (proportional), no intercept (45-degree intercept), or optimal-bank intercept (at most 30 degrees).
 - `adjustBankAngleForArc` and `ArcTurnController` exist but are unused.
@@ -459,20 +465,23 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - Code: `UserWaypointLoaderV2`, `UserFlightplanLoaderV2`.
 - Migration in `KLN90BCore.asyncInit`: if the format is not 2, re-persist all waypoints and plans with the V2 writers, then
   set `userDataFormat=2`. Writers (`UserWaypointPersistor.serialize*`, `UserFlightplanPersistor.persistFlightplan`) only
-  produce V2.
-- Restore errors cause empty plans and the `USER DATA LOST` message.
+  produce V2. `UserWaypointPersistor.restoreWaypoints()` suspends the repository sync while the loader adds the stored
+  waypoints, so a restore writes nothing back; the first change after it rewrites all slots from the repository.
+- Restore errors cause empty plans and the `USER DATA LOST` message. The same block then writes the empty state over
+  the stored data, so the corrupt data is lost once and the message shows once, as after a failed V1 conversion.
 - `Flightplanloader.loadIcaos` (base class) truncates to 30 legs and emits `WAYPOINT xxx DELETED` messages (at most 10,
   then `OTHER WAYPOINTS DELETED`).
 - Persist triggers: waypoints persist on any `KLNfacilityrepo_sync` Add/Remove/Update (all 250 slots are rewritten);
   flight plans persist on `flightplanChanged`.
-- Remarks (`settings/RemarksManager.ts`): stored as `ident(4 chars) + 3×11 chars`, keyed by airport ident; publishes
+- Remarks (`settings/RemarksManager.ts`): stored as `ident(blank-padded to 4 chars) + 3×11 chars`, keyed by airport ident; publishes
   `changed` (`RemarksChangedEvent`).
 - **`VolatileMemory`** (`data/VolatileMemory.ts`) is not persisted. It holds RAM state for each page group:
   `aptPage/vorPage/ndbPage/intPage/supPage` (`WaypointPageState`), `altPage`, `dtPage`, `fplPage {flightplans}`, *
   *`navPage: NavPageState`** (the hub for nav results, mode, `activeWaypoint`, `isSelfTestActive`, NAV 4 VNAV inputs,
   `userMagvar`), `triPage`, `calPage`, `ctrPage` and `othPage`.
-    - `reset()` runs on every power-on. It resets these fields, **removes procedures from FPL 0**, and re-initialises
-      the first scan-list entry per type, setting `isReady` when done; WelcomePage waits on `isReady`.
+    - `reset()` runs on every power-on. It resets these fields, **removes procedures from FPL 0 when the unit was off
+      for more than 5 minutes** (6-5; `timeSincePowerChange` of the power event), and re-initialises the first scan-list
+      entry per type, setting `isReady` when done; WelcomePage waits on `isReady`.
 - **Persistent messages** (`data/PersistentMessages.ts`) are condition-driven message objects. They are not stored; see
   Core 9.
 
@@ -512,6 +521,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       conditions.
     - `MessageHandler` (a 1 Hz tickable) keeps `activeMessages`. Each tick it drops invalid messages, adds
       `persistentMessages` whose condition becomes true, and resets their `seen` flag when the condition goes false.
+      `KLN90BCore` calls `clear()` at every power-off (also a loss of electricity): the active messages go and the
+      persistent ones return once their condition holds. They return unread, which is this project's choice and not a
+      fact from the manuals.
     - Messages are added with `messageHandler.addMessage(new OneTimeMessage(["LINE1","LINE2"]))`; each line holds at
       most about 22 to 23 characters.
 - `buildPersistentMessages(props)` creates: `AltitudeFailMessage`, `ArmGPSApproachMessage`, `DatabaseOutOfDateMessage`,
@@ -938,7 +950,7 @@ export class Set3Page extends SixLineHalfPage {
 ### MessagePage (`controls/MessagePage.tsx`)
 
 - A `SixLinePage` overlay. It builds pages from `messageHandler.getMessages()` (newest first, at most 6 lines per page)
-  and marks them `seen`.
+  and marks the messages of a page `seen` when that page is shown, so a page the pilot never saw stays unread.
 - `msg()` goes to the next page, popping at the end. `enter()` jumps to `Apt1Page` of the nearest airport (emergency
   nearest).
 - Messages are added by services with `messageHandler.addMessage(new OneTimeMessage([...lines]))`.

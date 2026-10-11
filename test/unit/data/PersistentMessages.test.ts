@@ -325,14 +325,21 @@ describe('PRESS ALT TO SET BARO (6-8, B-3)', () => {
         expect(h.tick()).toEqual(['PRESS ALT TO SET BARO']);
     });
 
-    // 6-8 (the note): with an air data computer supplying the baro the message is not shown
-    it.fails('does not show when an air data computer supplies the baro (6-8) (#174)', () => {
+    // 6-8 (the note): with an air data computer supplying the baro the message is not shown. The ALT page takes the baro
+    // from either source of the panel.xml (BaroSource 1 or 2), and the message is held back in both arming modes
+    it.each([
+        [1, 'ARM-LEG', NavMode.ARM_LEG],
+        [2, 'ARM-LEG', NavMode.ARM_LEG],
+        [1, 'ARM-OBS', NavMode.ARM_OBS],
+        [2, 'ARM-OBS', NavMode.ARM_OBS],
+    ])('does not show when an air data computer supplies the baro, source %i, %s (6-8) (#174)', (baroSource, _mode, armed) => {
         const w = quietWorld();
         w.airdataInterfaced = true;
-        w.baroSource = 1;
+        w.baroSource = baroSource;
         const h = harness(w);
         h.tick();
-        w.navmode = NavMode.ARM_LEG;
+        w.navmode = armed;
+        expect(h.tick()).toEqual([]);
         expect(h.tick()).toEqual([]);
     });
 
@@ -427,7 +434,7 @@ describe('ADJ NAV IND CRS TO nnn, a readable indicator', () => {
         w.dtkMag = 46;
         w.obsIn = 46;
         const h = harness(w);
-        h.tick(); // The first DTK opens the force window; 31 s is past it, whether it lasts 10 s or 30 s
+        h.tick(); // The first DTK opens the force window; 31 s is past its 30 s
         vi.advanceTimersByTime(31_000);
         return {w, h};
     };
@@ -459,19 +466,9 @@ describe('ADJ NAV IND CRS TO nnn, a readable indicator', () => {
         expect(h.tick()).toEqual([]);
     });
 
-    it('shows for the first 10 s after a DTK change of more than 5 degrees, even with the indicator on course (characterization)', () => {
-        const {w, h} = readable();
-        w.dtkMag = 100;
-        w.obsIn = 100;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']);
-        vi.advanceTimersByTime(9_000);
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']);
-    });
-
     // The code comment (PersistentMessages.ts, forceShow) cites two YouTube timestamps for about 30 s; the maintainer
-    // re-checked the video: https://youtu.be/S1lt2W95bLA?t=2244 and https://youtu.be/S1lt2W95bLA?t=2574. The code
-    // closes the window after 10 s.
-    it.fails('keeps ADJ NAV IND CRS TO for 30 s after a DTK change of more than 5 degrees, even on course (#177)', () => {
+    // re-checked the video: https://youtu.be/S1lt2W95bLA?t=2244 and https://youtu.be/S1lt2W95bLA?t=2574
+    it('keeps ADJ NAV IND CRS TO for 30 s after a DTK change of more than 5 degrees, even on course (#177)', () => {
         const {w, h} = readable();
         w.dtkMag = 100;
         w.obsIn = 100;
@@ -479,6 +476,33 @@ describe('ADJ NAV IND CRS TO nnn, a readable indicator', () => {
         vi.advanceTimersByTime(25_000);
         expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']);
         vi.advanceTimersByTime(6_000);
+        expect(h.tick()).toEqual([]);
+    });
+
+    // The video gives "about 30 s", not the exact edge: the code shows the message up to, and not at, 30.000 s
+    it('closes the window at 30 s, not before (characterization)', () => {
+        const {w, h} = readable();
+        w.dtkMag = 100;
+        w.obsIn = 100;
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']);
+        vi.advanceTimersByTime(29_999);
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']);
+        vi.advanceTimersByTime(1);
+        expect(h.tick()).toEqual([]);
+    });
+
+    it('starts a new 30 s window at a second DTK change of more than 5 degrees (characterization)', () => {
+        const {w, h} = readable();
+        w.dtkMag = 100;
+        w.obsIn = 100;
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']);
+        vi.advanceTimersByTime(20_000);
+        w.dtkMag = 160;
+        w.obsIn = 160;
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 160°']);
+        vi.advanceTimersByTime(29_000); // 49 s after the first change, 29 s after the second
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 160°']);
+        vi.advanceTimersByTime(1_000);
         expect(h.tick()).toEqual([]);
     });
 

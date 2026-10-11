@@ -16,16 +16,16 @@ describe('TripFuelDisplay', () => {
         expect(mountedText(new TripFuelDisplay(100))).toBe('  100');
     });
 
-    // The setup sibling of the pin: 99.94 stays below 100 and keeps its tenth
+    // The sibling of the #226 test: 99.94 stays below 100 and keeps its tenth
     it('shows 99.9 just below 100 (5-3)', () => {
         expect(mountedText(new TripFuelDisplay(99.94))).toBe(' 99.9');
     });
 
     // 5-3, 5-5: a tenth below 100, whole units from 100 on. 99.97 is below the cutoff, but its tenth rounds up to
-    // 100.0, a tenth at 100. Pinned with #226, whose distances have the same cause (the cutoff is checked before the
+    // 100.0, a tenth at 100. Same cause as the distances of #226 (the cutoff was checked before the
     // rounding); here the value still fits its five cells. Expected: 100 (rounded) or 99.9 (truncated). Shown on
     // TRI 1, TRI 3 and TRI 5 (F REQ).
-    it.fails('shows 99.97 without a tenth or as 99.9 (5-3, 5-5, #226)', () => {
+    it('shows 99.97 without a tenth or as 99.9 (5-3, 5-5, #226)', () => {
         expect(['  100', ' 99.9']).toContain(mountedText(new TripFuelDisplay(99.97)));
     });
 });

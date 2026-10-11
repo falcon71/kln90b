@@ -15,7 +15,7 @@ export class Database {
         const airac = FacilityLoader.getDatabaseCycles().current;
 
         this.expirationTimestamp = TimeStamp.create(airac.expirationTimestamp);
-        this.expirationDateString = AiracCycleFormatter.create('{expMinus({dd} {MON} {YYYY})}')(airac);
+        this.expirationDateString = AiracCycleFormatter.create('{expMinus({dd} {MON} {YY})}')(airac);
 
         console.log("airac", airac, this.expirationTimestamp);
         bus.getSubscriber<GPSEvents>().on("timeUpdatedEvent").handle(this.onGPSAcquired.bind(this));

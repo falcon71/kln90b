@@ -50,7 +50,7 @@ describe('the flight plans of a booted unit', () => {
     });
 
     // characterization: when the user waypoints cannot be restored the unit starts with 26 empty plans, even though the
-    // stored plan is fine (see #144 for the data that stays behind). USER DATA LOST is posted
+    // stored plan is fine (the failed restore then wipes the stored data too, #144). USER DATA LOST is posted
     it('are 26 empty plans when the user waypoints cannot be restored (characterization)', async () => {
         const {kaaa, abc, kbbb} = standardRoute();
         const unit = await bootUnit({
@@ -174,11 +174,25 @@ describe('deleting a flight plan (4-5)', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // Public contract (CLAUDE.md, persisted user data): the user's flight plans are saved. Flightplan.delete() does not
-    // publish flightplanChanged, so the stored plan stays and comes back at the next start.
-    it.fails('saves the deleted plan as empty (#150)', async () => {
+    // Public contract (CLAUDE.md, persisted user data): the user's flight plans are saved
+    it('saves the deleted plan as empty (#150)', async () => {
         const unit = await deleteFpl0();
 
         expect(storedSetting(unit, 'fpl0')).toBe(''); // An empty plan is the stored empty string
+    });
+
+    // Public contract (CLAUDE.md "Persisted user data", docs/architecture.md Core 7): a deleted plan is stored as the empty
+    // string, and a unit that starts from it shows an empty FPL 0, as the pilot saw it after the deletion. The test above
+    // holds that the deletion stores the empty string; this holds that the next start reads it as an empty plan
+    it('starts with an empty FPL 0 from the stored empty string of a deleted plan (#150)', async () => {
+        const {kaaa, abc, kbbb} = standardRoute();
+        const unit = await bootUnit({
+            facilities: [kaaa, abc, kbbb], position: {lat: kaaa.lat, lon: kaaa.lon}, storage: {userDataFormat: 2, fpl0: ''},
+        });
+        await settle(unit);
+
+        expect(fplIdents(unit)).toEqual([]);
+        expect(messages(unit)).not.toContain('USER DATA LOST'); // the empty string is read, not a failed restore
+        expect(unit.errors).toEqual([]);
     });
 });

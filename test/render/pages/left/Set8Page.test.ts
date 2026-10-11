@@ -103,6 +103,25 @@ describe('SET 8 airspace alert (3-41)', () => {
         expect(storedSetting(unit, 'airspaceAlertBuffer')).toBe(1000);
     });
 
+    // The buffer is its own setting, airspaceAlertBuffer: changing it leaves the SET 5 offset of the height above airport
+    // alert (htAboveAptOffset) as it was (#89)
+    it('leaves the SET 5 offset alone when the buffer changes (#89)', async () => {
+        const unit = await bootUnit({storage: {htAboveAptEnabled: true, htAboveAptOffset: 1200}});
+        await unit.panel.selectPage('L', 'SET 8');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 3); // the hundreds digit
+        await unit.panel.inner('L', 2);
+        await unit.panel.cursor('L');
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(storedSetting(unit, 'airspaceAlertBuffer')).toBe(700);
+
+        expect(storedSetting(unit, 'htAboveAptOffset')).toBe(1200);
+        await unit.panel.selectPage('L', 'SET 5');
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[5]).toBe('  +1200ft  ');
+    });
+
     // The buffer is set in steps of 100 ft: the cursor visits the ten thousands, thousands and hundreds digits (columns 4
     // to 6) and never the tens or the units (columns 7 and 8), whether the outer knob wraps at the last field or stops
     // there (#218). A click on the hundreds digit changes the buffer by 100 ft.

@@ -51,7 +51,7 @@ describe('VOR selector (3-20, 5-18)', () => {
         expect(vorIdent(unit)).toBe('KSA');
     });
 
-    // Sibling of the pin below: the same entry offers a VOR-DME named ADM. B to D is two clicks clockwise
+    // Sibling of the VORTAC test below: the same entry offers a VOR-DME named ADM. B to D is two clicks clockwise
     it('offers the VOR-DME ADM after AD (3-20)', async () => {
         const unit = await abcWithCursor(vor('ADM', 47.3, 8.3, {type: VorType.VORDME, name: 'ARDMORE'}));
         await unit.panel.outer('R', 1);
@@ -61,15 +61,39 @@ describe('VOR selector (3-20, 5-18)', () => {
         expect(vorIdent(unit)).toBe('ADM');
     });
 
-    // 3-20 and 3-49: a VORTAC is a VOR of the database (figures 3-151 and 3-152 show VORTACs on the VOR page).
-    // VorSelector.isValidResult (VorSelector.tsx:13) leaves out VorType.VORTAC, so after AD the page offers nothing and
-    // opens the user VOR creation. The same cause as #276 (a VORTAC typed in full), here through the autocompletion
-    it.fails('offers the VORTAC ADM after AD (3-20, 3-49, #276)', async () => {
+    // 3-20 and 3-49: a VORTAC is a VOR of the database (figures 3-151 and 3-152 show VORTACs on the VOR page), so the
+    // autocompletion offers it as it offers a VOR-DME (#276)
+    it('offers the VORTAC ADM after AD (3-20, 3-49, #276)', async () => {
         const unit = await abcWithCursor(vor('ADM', 47.3, 8.3, {type: VorType.VORTAC, name: 'ARDMORE'}));
         await unit.panel.outer('R', 1);
 
         await unit.panel.inner('R', 2);
 
         expect(vorIdent(unit)).toBe('ADM');
+    });
+
+    // A localizer and a VOT are VOR facilities of the sim (VorType.ILS and VorType.VOT) that the VOR ident search returns.
+    // The database list of the guide (2-1) names VORs with their DME indicator and no localizers or test transmitters,
+    // but it does not say that they are left out of the VOR page, so this holds what the code does today: nothing is
+    // offered, and a four-character localizer ident does not turn up in the three cells
+    it.each([['localizer', VorType.ILS], ['VOT', VorType.VOT]])('does not offer a %s after AD (characterization)', async (_name, type) => {
+        const unit = await abcWithCursor(vor('ADM', 47.3, 8.3, {type}));
+        await unit.panel.outer('R', 1);
+
+        await unit.panel.inner('R', 2);
+
+        expect(vorIdent(unit)).toBeUndefined();
+    });
+
+    // The selector leaves out a station of the type TACAN: the nearest list of the VOR page leaves out TACAN too,
+    // and no page of the guide shows one. What the real unit does with a TACAN-only station is not known, so
+    // this holds only what the code does today: nothing is offered and the user VOR creation opens
+    it('does not offer a TACAN station after AD (characterization)', async () => {
+        const unit = await abcWithCursor(vor('ADM', 47.3, 8.3, {type: VorType.TACAN, name: 'ARDMORE'}));
+        await unit.panel.outer('R', 1);
+
+        await unit.panel.inner('R', 2);
+
+        expect(vorIdent(unit)).toBeUndefined();
     });
 });

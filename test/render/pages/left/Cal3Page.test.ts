@@ -29,17 +29,17 @@ async function cal3(tasHundreds: number, headingMag: number, groundspeedKt: numb
 }
 
 describe('CAL 3 page (characterization)', () => {
-    // Row 4 (the wind direction) is left out: it lacks the true-north symbol, pinned below (#249)
     it('shows the wind for TAS 100 kt, heading 000 and 120 kt over the ground on track 000 (characterization)', async () => {
         const unit = await cal3(1, 0, 120, 0);
         expect(unit.errors).toEqual([]);
         const rows = Screen.read().rows('L');
-        expect(rows.filter((_, i) => i !== 4)).toMatchInlineSnapshot(`
+        expect(rows).toMatchInlineSnapshot(`
           [
             "   WIND    ",
             "TAS   100kt",
             "HDG    000°",
             "TLWND  20kt",
+            "WIND  180°¥",
             "       20kt",
           ]
         `);
@@ -90,8 +90,20 @@ describe('CAL 3 page (5-12)', () => {
     // 5-12, figures 5-37 and 5-38: the wind direction carries the true-north symbol after the degree sign, as on TRI 0.
     // A real unit with a heading input shows WIND, two blanks, the direction, the degree sign and that symbol in eleven
     // cells (reference photo 0283863.jpg)
-    it.fails('marks the wind direction as true: WIND  180°¥ (5-12, #249)', async () => {
+    it('marks the wind direction as true: WIND  180°¥ (5-12, #249)', async () => {
         await cal3(1, 0, 120, 0);
+        expect(Screen.read().rows('L')[4]).toBe('WIND  180°¥');
+    });
+
+    // The same row on the page variant with a heading input (the other render branch of the page)
+    it('marks the wind direction as true on the page with a heading input too (5-12, #249)', async () => {
+        const unit = await bootUnit({position: POS, panelXml: panelXml(HEADING_INPUT), storage: {cal3HeadingMag: 90}});
+        unit.env.sim.set('PLANE HEADING DEGREES GYRO', 'degrees', 0);
+        await settle(unit);
+        await moveAircraft(unit, POS, {groundspeedKt: 120, trackTrue: 0});
+        await unit.panel.selectPage('L', 'CAL 3');
+        await enterTasHundreds(unit, 1);
+        expect(Screen.read().rows('L')[2]).toBe('           '); // The precondition: this is the heading-input variant
         expect(Screen.read().rows('L')[4]).toBe('WIND  180°¥');
     });
 });

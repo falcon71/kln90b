@@ -87,8 +87,9 @@ export class BoundaryUtils {
         }
 
         //todo we are only calculating direct paths here and ignore the circle property. This means, we do not support any circular airspaces!
-        for (let current = 0; current < lod.length; current++) {
-            const next = (current + 1) % (lod.length - 1);
+        // The ring is closed (the last point equals the first), so the edges run from point 0 to the last point
+        for (let current = 0; current < lod.length - 1; current++) {
+            const next = current + 1;
             const lat3 = lod[current].end.lat;
             let lon3 = lod[current].end.lon;
             const lat4 = lod[next].end.lat;
@@ -118,8 +119,9 @@ export class BoundaryUtils {
         const lod = boundary.lods[0][0];
         const results: GeoPoint[] = [];
 
-        for (let current = 0; current < lod.length; current++) {
-            const next = (current + 1) % (lod.length - 1);
+        // The ring is closed (the last point equals the first), so the edges run from point 0 to the last point
+        for (let current = 0; current < lod.length - 1; current++) {
+            const next = current + 1;
             const lat3 = lod[current].end.lat;
             const lon3 = lod[current].end.lon;
             const lat4 = lod[next].end.lat;

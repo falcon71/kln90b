@@ -1,7 +1,7 @@
 import {CalcTickable} from "../TickController";
 import {NavPageState} from "../data/VolatileMemory";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
-import {Facility, FacilityType, FacilityUtils} from "@microsoft/msfs-sdk";
+import {Facility, FacilityType, FacilityUtils, UnitType} from "@microsoft/msfs-sdk";
 import {Sensors} from "../Sensors";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 import {LONG_BEEP_ID, SHORT_BEEP_ID} from "./AudioGenerator";
@@ -20,7 +20,8 @@ export class HtAboveAirportAlert implements CalcTickable {
     public tick(): void {
         const activeWpt = this.navPageState.activeWaypoint.getActiveWpt();
         const indicatedAlt = this.sensors.in.airdata.getIndicatedAlt();
-        if (!this.settings.output.altitudeAlertEnabled || indicatedAlt === null || activeWpt === null) {
+        const distToActive = this.navPageState.distToActive; //null without a navigation solution
+        if (!this.settings.output.altitudeAlertEnabled || indicatedAlt === null || activeWpt === null || distToActive === null) {
             return;
         }
 
@@ -30,10 +31,10 @@ export class HtAboveAirportAlert implements CalcTickable {
             return;
         }
 
-        const offset = this.userSettings.getSetting("airspaceAlertBuffer").get();
+        const offset = this.userSettings.getSetting("htAboveAptOffset").get();
 
 
-        if (this.navPageState.distToActive! <= 5 && indicatedAlt <= (activeWpt as any).altitude + offset) {
+        if (distToActive <= 5 && indicatedAlt <= UnitType.METER.convertTo(activeWpt.altitude, UnitType.FOOT) + offset) {
             if (this.alerted !== activeWpt) {
                 this.sensors.out.audioGenerator.beepPattern([SHORT_BEEP_ID, LONG_BEEP_ID, SHORT_BEEP_ID]);
                 this.alerted = activeWpt;

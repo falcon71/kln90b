@@ -169,6 +169,11 @@ export class FlightplanListItem implements Field, ListItem {
             this.isEntered = false;
             return Promise.resolve(EnterResult.Handled_Keep_Focus);
         } else {
+            if (this.type === KLNLegType.APP) {
+                //6-7, C-1: Approach waypoints can't be added. ENT would open an entry in front of this one, like the knobs do
+                this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID ADD");
+                return Promise.resolve(EnterResult.Handled_Keep_Focus);
+            }
             if (!this.waypointEditor.isEntered && this.wpt !== null) {
                 this.props.onCreate(this.props.wptIdx, FplWptEnterMode.ENTER);
                 return Promise.resolve(EnterResult.Handled_Keep_Focus);

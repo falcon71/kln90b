@@ -21,19 +21,24 @@ describe('DistanceDisplay, four cells', () => {
         expect(shown(4, 150.4)).toBe(' 150');
     });
 
+    // 4-8: the display adds no zero below 10 NM unless asked for (the nearest views do), so DIS keeps its blank
+    it('pads a distance below 10 NM with a blank (4-8)', () => {
+        expect(shown(4, 4.1)).toBe(' 4.1');
+    });
+
     // 3-31, figure 3-101: without navigation DIS is dashed with the decimal point in its place
     it('shows dashes around the decimal point without a value (3-31)', () => {
         expect(shown(4, null)).toBe('--.-');
     });
 
-    // The setup sibling of the pin: 99.94 NM stays below the cutoff and keeps its four cells
+    // The sibling of the #226 test: 99.94 NM stays below the cutoff and keeps its four cells
     it('shows 99.9 just below 100 NM (3-31)', () => {
         expect(shown(4, 99.94)).toBe('99.9');
     });
 
     // 3-31: DIS has four cells, tenths below 100 NM and whole NM above. 99.97 NM is below the cutoff but its tenth
-    // rounds up to 100.0, five cells. Expected: 100 (rounded) or 99.9 (truncated). Pinned on NAV 1 as well.
-    it.fails('keeps a distance that rounds up to 100 NM in its four cells (3-31, #226)', () => {
+    // rounds up to 100.0, five cells. Expected: 100 (rounded) or 99.9 (truncated). Also tested on NAV 1.
+    it('keeps a distance that rounds up to 100 NM in its four cells (3-31, #226)', () => {
         expect([' 100', '99.9']).toContain(shown(4, 99.97));
     });
 });
@@ -51,10 +56,15 @@ describe('DistanceDisplay, three cells', () => {
         expect(shown(3, 12.3)).toBe(' 12');
     });
 
-    // 3-32: three cells. 9.97 NM rounds up to 10.0, four cells. Expected: 10 (rounded) or 9.9 (truncated). Pinned on
-    // NAV 3 as well. The sibling above holds the 0.2 below 1 NM in three cells; a fix of #231 (whether the real unit
-    // shows hundredths below 1 NM) would change that spec test, not this pin
-    it.fails('keeps a cross track that rounds up to 10 NM in its three cells (3-32, #226)', () => {
+    // 3-32: the sibling of the #226 test below, 9.94 NM stays below the cutoff and keeps its tenth in the three cells
+    it('shows 9.9 just below 10 NM (3-32)', () => {
+        expect(shown(3, 9.94)).toBe('9.9');
+    });
+
+    // 3-32: three cells. 9.97 NM rounds up to 10.0, four cells. Expected: 10 (rounded) or 9.9 (truncated). Also tested
+    // on NAV 3. The sibling above holds the 0.2 below 1 NM in three cells; a fix of #231 (whether the real unit
+    // shows hundredths below 1 NM) would change that spec test, not this one
+    it('keeps a cross track that rounds up to 10 NM in its three cells (3-32, #226)', () => {
         expect([' 10', '9.9']).toContain(shown(3, 9.97));
     });
 });
@@ -67,6 +77,11 @@ describe('DistanceDisplay, six cells', () => {
         expect(shown(6, 15.2)).toBe('  15.2');
     });
 
+    // 3-8, figure 3-27: the VOR distance below 10 NM keeps its blank; the zero is the nearest views' (#266)
+    it('pads a VOR distance below 10 NM with a blank (3-8)', () => {
+        expect(shown(6, 4.1)).toBe('   4.1');
+    });
+
     // 3-8, figure 3-26: before the first fix the distance is dashed with the decimal point in its place (a photo of a
     // real unit, KLN90B 2.jpg, shows the same)
     it('shows dashes around the decimal point without a value (3-8)', () => {
@@ -74,28 +89,37 @@ describe('DistanceDisplay, six cells', () => {
     });
 });
 
-// The five cells of the distance on the nearest APT, VOR and NDB pages
+// The five cells of the distance on the nearest APT, VOR and NDB pages: the nearest views ask for the leading zero
 describe('DistanceDisplay, five cells', () => {
+    /** The five cells the nearest views build: with the leading zero */
+    const nearest = (distance: number | null): string => mountedText(new DistanceDisplay(5, distance, true));
+
     // 3-22, figure 3-72 (27.7nm on the nearest APT 1) and 3-49, figure 3-152 (32.6nm on the nearest VOR page): a
     // nearest distance of 10 NM or more has a tenth
     it('shows a nearest distance of 10 NM or more with a tenth (3-22, 3-49)', () => {
-        expect(shown(5, 27.7)).toBe(' 27.7');
-        expect(shown(5, 32.6)).toBe(' 32.6');
+        expect(nearest(27.7)).toBe(' 27.7');
+        expect(nearest(32.6)).toBe(' 32.6');
     });
 
     // Figures 3-71, 3-76, 3-134 and 3-154 show a nearest distance below 10 NM with a leading zero (04.1nm, 03.1nm,
-    // 06.5nm); the KLN 89 trainer shows none, and the maintainer ruled for the 90B figures. Pinned on APT 1, VOR and
-    // NDB as well. DistanceDisplay(5) is used by the nearest views only (CoordOrNearestView,
-    // AirportCoordOrNearestView).
-    // This pin presumes the fix lands in DistanceDisplay: a fix in the nearest views instead would leave it failing
-    // for the wrong reason, and the one who fixes #266 there removes it.
-    it.fails('shows a nearest distance below 10 NM with a leading zero (3-22, #266)', () => {
-        expect(shown(5, 4.1)).toBe(' 04.1');
+    // 06.5nm); the KLN 89 trainer shows none, and the maintainer ruled for the 90B figures. The nearest views of
+    // APT 1, VOR and NDB pass the leading zero, and the pages of #266 pin it there as well.
+    it('shows a nearest distance below 10 NM with a leading zero (3-22, #266)', () => {
+        expect(nearest(4.1)).toBe(' 04.1');
+        expect(nearest(3.1)).toBe(' 03.1');
+        expect(nearest(0.04)).toBe(' 00.0');
     });
 
-    // The sibling of the pin: the same value reaches the display and shows its tenth
-    it('shows 4.1 NM with its tenth (3-22)', () => {
-        expect(shown(5, 4.1).trim()).toMatch(/^0?4\.1$/);
+    // 3-22, the cutoff of the zero: 9.94 rounds to 9.9 and keeps it, 9.96 rounds to 10.0 and has two digits in front.
+    // The figures show tenths and a zero below 10 only; that the cutoff is the rounded value is inferred from them.
+    it('keeps the leading zero up to 9.9 NM and shows 10.0 above (3-22)', () => {
+        expect(nearest(9.94)).toBe(' 09.9');
+        expect(nearest(9.96)).toBe(' 10.0');
+        expect(nearest(10)).toBe(' 10.0');
+    });
+
+    it('characterization: the nearest display shows whole NM from 1000 NM on, the zero changes nothing there', () => {
+        expect(nearest(1234.4)).toBe(' 1234');
     });
 });
 

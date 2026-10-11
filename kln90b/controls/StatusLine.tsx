@@ -118,6 +118,7 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
                 this.msgEntRef.instance.classList.remove("inverted");
             } else if (this.props.messageHandler.hasMessages()) {
                 this.msgEntRef.instance.classList.add("inverted");
+                this.msgEntRef.instance.classList.remove("blink"); //the ent prompt may have ended in its blink phase
                 this.msgEntRef.instance.textContent = "msg";
 
                 if (this.props.messageHandler.hasUnreadMessages()) {

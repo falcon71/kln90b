@@ -22,32 +22,50 @@ describe('SET 3 page', () => {
         expect(storedSetting(unit, 'nearestAptSurface')).toBe(false); // hard surface only
     });
 
-    // Set3Page.tsx labels the second option "SFT", but it stores hard surface only: a pilot who picks "SFT" is told soft
-    // surface and gets hard surface only
-    it.fails('labels the hard surface only option HRD (#132)', async () => {
+    // 3-22, 3-23: the second option stores hard surface only and is labeled HRD. It was labeled SFT, so a pilot who
+    // picked it was told soft surface and got hard surface only.
+    it('labels the hard surface only option HRD (3-22, #132)', async () => {
         const unit = await bootUnit();
 
         await pickSecondSurfaceOption(unit);
 
-        const row = Screen.read().rows('L')[5];
-        expect(row).toContain('HRD');
-        expect(row).not.toContain('SFT');
+        expect(Screen.read().rows('L')[5].trim()).toBe('HRD');
+    });
+
+    it('characterization: right-aligns the HRD label like HRD SFT', async () => {
+        const unit = await bootUnit();
+
+        await pickSecondSurfaceOption(unit);
+
+        expect(Screen.read().rows('L')[5]).toBe('        HRD');
+    });
+
+    // 3-22: HRD SFT is the first option, so the label comes back with the inner knob turned back
+    it('labels the first surface option HRD SFT again after the second one (3-22)', async () => {
+        const unit = await bootUnit();
+        await pickSecondSurfaceOption(unit);
+
+        await unit.panel.inner('L', -1);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().rows('L')[5]).toBe('    HRD SFT');
+        expect(storedSetting(unit, 'nearestAptSurface')).toBe(true); // hard and soft surface
     });
 });
 
 describe('SET 3 page (characterization)', () => {
-    // Row 4 is left out: its label is the #247 pin below
     it('shows the default criteria with the cursor off', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 3');
 
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().rows('L').filter((_, i) => i !== 4)).toMatchInlineSnapshot(`
+        expect(Screen.read().rows('L')).toMatchInlineSnapshot(`
           [
             "NEAREST APT",
             " CRITERIA  ",
             "MIN LENGTH:",
             "      1000'",
+            "SURFACE:   ",
             "    HRD SFT",
           ]
         `);
@@ -88,9 +106,8 @@ describe('SET 3 minimum runway length (3-22)', () => {
         expect(storedSetting(unit, 'nearestAptMinRunwayLength')).toBe(5000);
     });
 
-    // Figures 3-73 to 3-75 label the surface row SURFACE: with a colon, like MIN LENGTH: above it; Set3Page.tsx renders
-    // SURFACE without one. The sibling is the characterization above, which holds the other rows of the page.
-    it.fails('labels the surface row SURFACE: (3-22, #247)', async () => {
+    // Figures 3-73 to 3-75 label the surface row SURFACE: with a colon, like MIN LENGTH: above it
+    it('labels the surface row SURFACE: (3-22, #247)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 3');
 

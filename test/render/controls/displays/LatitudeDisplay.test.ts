@@ -44,15 +44,34 @@ describe('LatitudeDisplay', () => {
         },
     );
 
-    // The setup sibling of the #99 pins: just above a whole degree the minutes are 00.00
+    // The setup sibling of the #99 test: just above a whole degree the minutes are 00.00
     it('shows 00.00 minutes just above a whole degree (3-8, 3-32)', () => {
         expect(shown(48 + 0.000001)).toBe("N 48°00.00'");
     });
 
-    // 3-8, 3-32: the minutes run from 00.00 to 59.99. Just below 48° the degrees are floored and the minutes rounded on
-    // their own, so they read 60.00. Rounding or truncating are both accepted. Pinned on NAV 2 as well.
-    it.fails('never shows 60 minutes (3-8, 3-32, #99)', () => {
+    // 3-8, 3-32: the minutes run from 00.00 to 59.99, so just below 48° they must not read 60.00. Rounding or
+    // truncating are both accepted. Checked on NAV 2 as well.
+    it('never shows 60 minutes (3-8, 3-32, #99)', () => {
         expect(["N 48°00.00'", "N 47°59.99'"]).toContain(shown(48 - 0.000001));
+        expect(["S 48°00.00'", "S 47°59.99'"]).toContain(shown(-(48 - 0.000001)));
+    });
+
+    // The test above accepts rounding or truncating. The code rounds to the hundredth of a minute, which is the value
+    // the display already showed away from a whole degree, so the carry into the degrees is what this holds: 59.994
+    // minutes stay below the degree, 59.996 minutes carry.
+    it('characterization: rounds the minutes to the hundredth before it splits them', () => {
+        expect(shown(47 + 59.994 / 60)).toBe("N 47°59.99'");
+        expect(shown(47 + 59.996 / 60)).toBe("N 48°00.00'");
+        expect(shown(-(47 + 59.994 / 60))).toBe("S 47°59.99'");
+        expect(shown(-(47 + 59.996 / 60))).toBe("S 48°00.00'");
+    });
+
+    // The carry reaches the tens of the degrees (9° to 10°) and the pole, with the two-digit degrees intact. The guide
+    // leaves open whether the unit rounds or truncates, so this holds the rounding of the code
+    it('characterization: carries into the next degree at 10 and at 90 degrees (#99)', () => {
+        expect(shown(10 - 0.000001)).toBe("N 10°00.00'");
+        expect(shown(-(10 - 0.000001))).toBe("S 10°00.00'");
+        expect(shown(90 - 0.000001)).toBe("N 90°00.00'");
     });
 });
 
@@ -69,9 +88,15 @@ describe('LatitudeDisplay at the equator', () => {
     });
 
     // The KLN 89 trainer, 2026-10-08: a latitude entered as S and all zeros was kept as N 0°00.00' once confirmed. The
-    // Pilot's Guide has no figure at exactly 0. The code draws S for 0 (the test is "> 0").
-    it.fails('shows N at exactly 0 degrees (checked in the KLN 89 trainer, 2026-10-08, #308)', () => {
+    // Pilot's Guide has no figure at exactly 0.
+    it('shows N at exactly 0 degrees (checked in the KLN 89 trainer, 2026-10-08, #308)', () => {
         expect(shown(0).slice(0, 1)).toBe('N');
+    });
+
+    // The same trainer check: an S entered with every digit 0 is the value -0 (the southern sign times zero), and it
+    // shows N too
+    it('shows N at negative zero (checked in the KLN 89 trainer, 2026-10-08, #308)', () => {
+        expect(shown(-0).slice(0, 1)).toBe('N');
     });
 });
 

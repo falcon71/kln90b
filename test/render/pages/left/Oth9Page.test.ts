@@ -81,7 +81,7 @@ describe('OTH 9 page, wind (5-43)', () => {
 
         const rows = Screen.read().rows('L');
         expect(parse(rows[3])).toEqual({label: 'HDWND', value: '17', unit: 'kt'});
-        // The direction only: the symbol after it is the pin below
+        // The direction only: the symbol after it is the next test
         expect((parse(rows[4]) as { value: string }).value).toBe('030');
         expect(rows[5].trim()).toBe('20kt');
     });
@@ -103,8 +103,15 @@ describe('OTH 9 page, wind (5-43)', () => {
     });
 
     // 5-43, the figures: the wind direction carries the true-north symbol after the degree sign, the same symbol as the
-    // wind on TRI 0 (5-2, figures 5-1 to 5-5), which Tri0Page renders as ¥. The setup is the headwind test above
-    it.fails('marks the wind direction as true with the true-north symbol (5-43, #249)', async () => {
+    // wind on TRI 0 (5-2, figures 5-1 to 5-5), which Tri0Page renders as ¥. The setup is the headwind test above. The
+    // number of blanks is not asserted here (the characterization below holds the columns)
+    it('marks the wind direction as true with the true-north symbol (5-43, #249)', async () => {
+        await windAt(83.282, 353.103);
+
+        expect(Screen.read().rows('L')[4]).toMatch(/^WIND +030°¥$/);
+    });
+
+    it('puts the wind direction and its true-north symbol in the columns of TRI 0 (characterization)', async () => {
         await windAt(83.282, 353.103);
 
         expect(Screen.read().rows('L')[4]).toBe('WIND  030°¥');

@@ -94,7 +94,7 @@ export class Dt3OtherPage extends SixLineHalfPage {
         this.children.get("activeIdx").text = activeIdx === -1 ? "  " : (activeIdx + 1).toString().padStart(2, " ");
         this.children.get("activeIdent").text = IcaoFixedLength.getIdentFromFacility(to);
         this.children.get("activeDis").distance = navState.distToActive;
-        this.children.get("activeDtk").bearing = this.props.magvar.trueToMag(navState.bearingToActive);
+        this.children.get("activeDtk").bearing = this.props.modeController.getDtkOrObsMagnetic();
 
         if (followingIdx === -1) {
             this.lastRef.instance.classList.add("d-none");

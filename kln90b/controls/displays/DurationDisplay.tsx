@@ -5,14 +5,15 @@ import {Seconds} from "../../data/Units";
 import {format} from "numerable";
 
 /**
- * Displays a duration in the format HH:MM
+ * Displays a duration in the format HH:MM. Below an hour the hours are left blank (":MM"), except in the trip form of the
+ * trip pages, which keeps the hour digit ("0:MM", 3-15, figure 3-50).
  */
 export class DurationDisplay implements UiElement {
     readonly children = NO_CHILDREN;
     public isVisible = true;
     private readonly ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
-    constructor(public time: Seconds | null = null) {
+    constructor(public time: Seconds | null = null, private readonly tripForm: boolean = false) {
     }
 
     render(): VNode {
@@ -32,11 +33,11 @@ export class DurationDisplay implements UiElement {
     }
 
     private formatTime(): string {
-        return formatDuration(this.time);
+        return formatDuration(this.time, this.tripForm);
     }
 }
 
-export function formatDuration(duration: Seconds | null): string {
+export function formatDuration(duration: Seconds | null, tripForm: boolean = false): string {
     if (duration === null) {
         return "--:--";
     }
@@ -50,7 +51,7 @@ export function formatDuration(duration: Seconds | null): string {
     const minutes = totalMinutes % 60;
 
     if (hours === 0) {
-        return `  :${format(minutes, "00")}`;
+        return `${tripForm ? " 0" : "  "}:${format(minutes, "00")}`;
     } else {
         return `${hours.toString().padStart(2, " ")}:${format(minutes, "00")}`;
     }

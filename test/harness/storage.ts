@@ -56,8 +56,6 @@ function degreesMinutes(value: number, degreeDigits: number): string {
  * waypoint, in the order given, plus `userDataFormat: 2`. The strings are laid out by hand from the format, not
  * produced by the persistor, so that a test of the restore does not depend on the code that saved. Merge it with
  * `savedFlightplan` by spreading both.
- *
- * Do not put a southern latitude of 1 degree or more into a restore test: the loader flips its sign (#98).
  */
 export function savedUserWaypoints(wpts: SavedUserWaypoint[]): Record<string, unknown> {
     const storage: Record<string, unknown> = {userDataFormat: 2};

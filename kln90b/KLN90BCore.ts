@@ -30,7 +30,7 @@ import {
 } from '@microsoft/msfs-sdk';
 
 import {KLN90BPlatform} from "./KLN90BPlatform";
-import {PowerButton} from "./PowerButton";
+import {PowerButton, PowerEvent} from "./PowerButton";
 import {KLN90BSettingSaveManager} from "./settings/KLN90BUserSettingsSaverManager";
 import {PageProps} from "./pages/Page";
 import {PageManager} from "./pages/PageManager";
@@ -153,6 +153,12 @@ export class KLN90BCore {
         this.settingSaveManager.startAutoSave(saveKey);
 
         this.hEventPublisher = new HEventPublisher(this.bus);
+
+        this.bus.getSubscriber<PowerEvent>().on("powerEvent").handle(evt => {
+            if (!evt.isPowered) {
+                this.messageHandler.clear();
+            }
+        });
 
         this.keyboardEventSub = this.bus.getSubscriber<KeyboardEvent>().on("keyboardevent").handle(this.handleKeyboardEvent.bind(this));
 
@@ -298,8 +304,8 @@ export class KLN90BCore {
         }
 
         const userDataFormat = this.userSettings.getSetting("userDataFormat");
-        if (userDataFormat.get() !== 2) {
-            //Convert to V2
+        if (userDataFormat.get() !== 2 || !restoreSuccessFull) {
+            //Convert to V2, or write the empty state over data that could not be restored, so that it is lost once
             this.userWaypointPersistor.persistAllWaypoints();
             for (const plan of flightplans) {
                 this.userFlightplanPersistor.persistFlightplan(plan);
@@ -340,7 +346,7 @@ export class KLN90BCore {
                 new SignalOutputFillterTick(sensors),
             ]);
 
-        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager, brightnessManager);
+        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager, brightnessManager, this.wtFlightplanSync);
 
         const msa = new MSA();
 

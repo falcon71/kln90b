@@ -44,19 +44,28 @@ describe('Super NAV 5 field 1', () => {
         expect(field1()).toBe('Ð1:15');
     });
 
-    // The sibling of the pin below: 119.8 NM at 120 kt is 59.9 min (3594 s) to KDDD
+    // The sibling of the test below: 119.8 NM at 120 kt is 59.9 min (3594 s) to KDDD
     it('reaches an ETE of 59.9 minutes (3-36)', async () => {
         const unit = await superNav5OnLeg({westNm: 119.8, storage: {superNav5Field1: SuperNav5Field1.ETE}});
         expect(unit.props.memory.navPage.eteToActive!).toBeCloseTo(3594, 0);
-        expect(field1().startsWith('Ð0:')).toBe(true);
+        expect(field1().startsWith('Ð')).toBe(true);
     });
 
-    // 3-36: the ETE is hours and minutes, so the minutes run from 00 to 59. 59.9 minutes show 0:60 today
-    // (SuperNav5Field1Selector.formatEte rounds the minutes after splitting off the hours, the error of #223 in another
+    // 3-36: the ETE is hours and minutes, so the minutes run from 00 to 59. 59.9 minutes showed 0:60 once
+    // (SuperNav5Field1Selector.formatEte rounded the minutes after splitting off the hours, the error of #223 in another
     // function). Whether the unit rounds or truncates is open (#223), so both forms pass.
-    it.fails('never shows 60 minutes in the ETE (3-36, #312)', async () => {
+    it('never shows 60 minutes in the ETE (3-36, #312)', async () => {
         await superNav5OnLeg({westNm: 119.8, storage: {superNav5Field1: SuperNav5Field1.ETE}});
         expect(['Ð1:00', 'Ð0:59']).toContain(field1());
+    });
+
+    // 3-36: the ETE field takes h:mm of four characters, so an ETE of 10 hours or more is dashes. The limit applies to
+    // the time as shown: 599.7 minutes (1199.4 NM at 120 kt) are 10:00 rounded, five characters, so they show the
+    // dashes; 599.4 minutes (1198.8 NM) are 9:59
+    it.each([[1199.4, 'Ð-:--'], [1198.8, 'Ð9:59']])('applies the 10 hour limit of the ETE to the rounded time at %f NM (3-36)', async (nm, expected) => {
+        const unit = await superNav5OnLeg({westNm: nm, storage: {superNav5Field1: SuperNav5Field1.ETE}});
+        expect(unit.props.memory.navPage.eteToActive!).toBeCloseTo(nm / 120 * 3600, 0);
+        expect(field1()).toBe(expected);
     });
 
     // 6-8, 6-9 (figures 6-14 to 6-16): below 1 NM the cross track shows hundredths without the leading zero, then NM
@@ -66,27 +75,34 @@ describe('Super NAV 5 field 1', () => {
         expect(field1().slice(0, 5)).toBe('.32NM');
     });
 
-    // The sibling of the pins below: 0.996 NM and 9.97 NM right of the course are reached
-    it.each([0.996, 9.97])('reaches %f NM right of the course (6-8)', async (nm) => {
+    // The sibling of the tests below: 0.994, 0.996, 9.94 and 9.97 NM right of the course are reached
+    it.each([0.994, 0.996, 9.94, 9.97])('reaches %f NM right of the course (6-8)', async (nm) => {
         const unit = await superNav5OnLeg({westNm: 30, rightNm: nm, storage: {superNav5Field1: SuperNav5Field1.XTK}});
         expect(unit.props.memory.navPage.xtkToActive!).toBeCloseTo(nm, 2);
         expect(field1().endsWith('NM‹')).toBe(true);
     });
 
-    // 6-8 (figures 6-14 to 6-16): 0.996 NM is a cross track of about one NM; the field shows .00NM today, a cross
-    // track of zero (formatXtk formats the hundredths of 0.996, which round to 1.00, and cuts the 1). Expected:
+    // 6-8 (figures 6-14 to 6-16): 0.996 NM is a cross track of about one NM; the field showed .00NM once, a cross
+    // track of zero (formatXtk formatted the hundredths of 0.996, which round to 1.00, and cut the 1). Expected:
     // 1.0NM (rounded) or .99NM (truncated).
-    it.fails('does not show 0.996 NM as .00NM (6-8, #313)', async () => {
+    it('does not show 0.996 NM as .00NM (6-8, #313)', async () => {
         await superNav5OnLeg({westNm: 30, rightNm: 0.996, storage: {superNav5Field1: SuperNav5Field1.XTK}});
         expect(['1.0NM‹', '.99NM‹']).toContain(field1());
     });
 
-    // 6-8: just below 10 NM the tenths round up to 10.0 and the field takes seven cells (10.0NM‹), one more than the
+    // 6-8: just below 10 NM the tenths rounded up to 10.0 and the field took seven cells (10.0NM‹), one more than the
     // six of the line (the test "is six cells wide" below holds that width). Expected: 010NM‹ (the code's own form
     // from 10 NM) or 9.9NM‹.
-    it.fails('keeps a cross track of 9.97 NM in six cells (6-8, #313)', async () => {
+    it('keeps a cross track of 9.97 NM in six cells (6-8, #313)', async () => {
         await superNav5OnLeg({westNm: 30, rightNm: 9.97, storage: {superNav5Field1: SuperNav5Field1.XTK}});
         expect(['010NM‹', '9.9NM‹']).toContain(field1());
+    });
+
+    // 6-8: just under the rounding points the low form holds: 0.994 NM is .99NM (rounded and truncated agree) and
+    // 9.94 NM is 9.9NM, so neither cutoff is applied to a value rounded more coarsely than its own digits
+    it.each([[0.994, '.99NM‹'], [9.94, '9.9NM‹']])('keeps the form below the cutoff for %f NM (6-8)', async (nm, expected) => {
+        await superNav5OnLeg({westNm: 30, rightNm: nm, storage: {superNav5Field1: SuperNav5Field1.XTK}});
+        expect(field1()).toBe(expected);
     });
 
     // 5-9 step 5: without a VNAV problem the line shows V OFF

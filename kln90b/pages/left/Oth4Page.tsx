@@ -33,7 +33,7 @@ export class Oth4Page extends SixLineHalfPage {
         });
         this.cursorController = new CursorController(this.children);
 
-        this.props.bus.getSubscriber<RemarksChangedEvent>().on("changed").whenChanged().handle(this.refreshList.bind(this));
+        this.props.bus.getSubscriber<RemarksChangedEvent>().on("changed").handle(this.refreshList.bind(this));
     }
 
     public render(): VNode {
