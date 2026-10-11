@@ -424,21 +424,21 @@ describe('NAV 5 page map', () => {
         expect(seen).toEqual([...choices, 'N^  ']);
     });
 
-    // 3-34: the left cursor on NAV 5 visits two fields, the orientation and the range scale. This is the passing
-    // sibling of the #232 test below.
+    // 3-34: the left cursor on NAV 5 visits two fields, the range scale and the orientation counterclockwise from it,
+    // and stops at the orientation (4-3, #218). This is the sibling of the #232 test below.
     it('visits the orientation and the range scale with the cursor (3-34)', async () => {
         const {unit} = await nav5OnRoute();
         await unit.panel.cursor('L');
         expect(Screen.read().status().left).toBe('CRSR');
 
         const seen = [unit.panel.focused('L')];
-        await unit.panel.outer('L', 1);
+        await unit.panel.outer('L', -1);
         seen.push(unit.panel.focused('L'));
-        await unit.panel.outer('L', 1);
+        await unit.panel.outer('L', -1);
         seen.push(unit.panel.focused('L'));
 
         expect(new Set(seen.slice(0, 2).map(f => `${f.row},${f.col},${f.text}`))).toEqual(new Set(['5,0,N^  ', '5,7,  40']));
-        expect(seen[2]).toEqual(seen[0]);
+        expect(seen[2]).toEqual(seen[1]);
     });
 
     // 3-34 (figure 3-110): the cursor first lands on the range scale; the orientation is one step counterclockwise

@@ -50,7 +50,8 @@ describe('CAL 1 page (characterization)', () => {
 });
 
 describe('CAL 1 page (5-10)', () => {
-    // 5-10, steps 3 to 5: the cursor goes over IND (to the nearest hundred feet, so three digits), then BARO, then TEMP
+    // 5-10, steps 3 to 5: the cursor goes over IND (to the nearest hundred feet, so three digits), then BARO, then TEMP,
+    // and stops there (4-3, #218)
     it('moves the cursor over three IND digits, then BARO, then TEMP (5-10)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'CAL 1');
@@ -60,7 +61,7 @@ describe('CAL 1 page (5-10)', () => {
             rows.push(unit.panel.focused('L').row);
             await unit.panel.outer('L', 1);
         }
-        expect(rows).toEqual([1, 1, 1, 2, 2, 2, 4, 4, 4, 1]);
+        expect(rows).toEqual([1, 1, 1, 2, 2, 2, 4, 4, 4, 4]);
     });
 
     // 5-10, step 5: the first digit of TEMP is 0 above zero and - below. Source of DEN: the ICAO standard atmosphere,

@@ -32,7 +32,6 @@ export class SuperNav5Left implements UiElement {
         const rangeSetting = this.props.userSettings.getSetting("superNav5MapRange");
 
         this.children = new UIElementChildren<SuperNav5LeftTypes>({
-            range: SuperNav5RangeSelector.build(rangeSetting, this.props.memory.navPage),
             distance: new DistanceDisplay(4, this.props.memory.navPage.distToActive),
             ident: new TextDisplay(this.getIdent()),
             mode: new TextDisplay(this.getModeString()),
@@ -40,6 +39,8 @@ export class SuperNav5Left implements UiElement {
             field1: SuperNav5Field1Selector.build(this.props.userSettings.getSetting("superNav5Field1"), this.props.memory.navPage, this.props.vnav),
             field2: SuperNav5Field2Selector.build(this.props.userSettings.getSetting("superNav5Field2"), this.props.memory.navPage, this.props.sensors, this.props.planeSettings, this.props.modeController, this.props.magvar),
             field3: SuperNav5Field3Selector.build(this.props.userSettings.getSetting("superNav5Field3"), this.props.memory.navPage, this.props.sensors, this.props.magvar, this.props.memory.fplPage.flightplans[0]),
+            //3-36: The map scale at the bottom is the last field, counterclockwise from it are the three lines above
+            range: SuperNav5RangeSelector.build(rangeSetting, this.props.memory.navPage),
         });
     }
 

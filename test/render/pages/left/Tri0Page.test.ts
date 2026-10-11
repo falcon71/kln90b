@@ -32,7 +32,7 @@ describe('TRI 0 page (characterization)', () => {
 
 describe('TRI 0 page (5-2)', () => {
     // 5-2, steps 3 to 7: the cursor goes over the TAS digits, then the first two digits of the wind direction as one
-    // field, then its last digit, then the wind speed digits
+    // field, then its last digit, then the wind speed digits, and stops on the last one (4-3, #218)
     it('moves the cursor over the TAS digits, the wind direction in two parts and the wind speed digits (5-2)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'TRI 0');
@@ -42,7 +42,7 @@ describe('TRI 0 page (5-2)', () => {
             '3,6 1', '3,7 5', '3,8 0', // TAS 150
             '4,6 00', '4,8 0', // wind direction 000
             '5,6 0', '5,7 0', '5,8 0', // wind speed 000
-            '3,6 1', // and around again
+            '5,8 0', // and stays there
         ]);
     });
 

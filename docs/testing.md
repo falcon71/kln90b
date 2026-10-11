@@ -599,8 +599,9 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       field of the INT page reads `___._`. The real cursor covers the point, so the plain point is a bug (#302,
       section 6).
       `cursorTo(side, 'USER POS?')` turns the outer knob until that field has the cursor, stepping over the cursor
-      positions that focus nothing (the SUP page without user waypoints has one after the ident characters) and throwing
-      with the screen after `maxClicks`. It throws at once when the status field of that side shows a page name, which
+      positions that focus nothing (the SUP page without user waypoints has one after the ident characters). It turns
+      clockwise and, once the cursor stops at the last field, counterclockwise, and throws with the screen after
+      `maxClicks` or when the cursor stops at both ends. It throws at once when the status field of that side shows a page name, which
       means the cursor is off: the outer knob would turn the pages and the search would end on another page.
       `appendToFpl0(idents)` enters and confirms idents on FPL 0.
     - `readMessages(max = 10)` opens the MSG page and presses MSG until it closes (3-16: the status line's left field is
@@ -992,7 +993,7 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   pages, the overlays and the start-up pages). *Spec:* the Turn-On, self-test, Database, VFR-only and OBS warning pages
   and what follows APPROVE?, the overlays and the rule that a pushed page that does not handle a knob is popped (#56,
   from the KLN 89 trainer), the distinct slot classes, group sizes, group memory and five-character page names of the
-  page trees, and the cursor stopping at both ends (the code wraps: pinned as #218). *Characterization only:* the
+  page trees, and the cursor stopping at both ends (#218). *Characterization only:* the
   `FiveSegmentPage` SCAN and ENT order. *Untested:* the `FourSegmentPage` ENT order (by decision) and `TakehomePage`.
 - **The left pages** (`pages/left/`). Every page has a render test and a characterization snapshot, in tree order from
   NAV 1 to the self-test page, with spec tests where the Pilot's Guide or the KLN 89 trainer gives the rule. *Without a
@@ -1178,8 +1179,9 @@ its line, in the comment above it or in the title of its `describe`.
 - ENT on a field whose value changes as the knob turns does nothing, and the cursor stays: CAL 4 Ind, CAL 1 GS, the
   ALT 2 selected altitude, the APT 1 ident (#354). The maintainer saw the same on CAL 4.
 - ENT that accepts the last field of SET 2 (Mag Var) leaves no cursor on the page: the next outer click changes the page
-  group and the next inner click the page, as with the cursor off. The trainer still shows `*CRSR*` in the status
-  column, a defect of the trainer. Finishing a user waypoint also turns the cursor off (#218).
+  group and the next inner click the page, as with the cursor off, while the status column still shows `*CRSR*`.
+  Finishing a user waypoint turns the cursor off. The 90B guide decides for the last field of a page: the pilot turns
+  the cursor off with CRSR after ENT (5-17, 3-47), so the cursor stays on (#218).
 - Not observable: the 89's self-test page has no baro, so its ENT over the baro digits (3-6, 3-7) cannot be checked.
 
 # 9. Next steps

@@ -50,6 +50,7 @@ export enum EnterResult {
 export class CursorController implements CursorHandler {
     public cursorActive: boolean = false;
     public cursorField: number = 0;
+    private defaultFieldIsLast: boolean = false;
 
 
     /**
@@ -100,6 +101,18 @@ export class CursorController implements CursorHandler {
             return;
         }
         this.cursorField = defaultField;
+        this.defaultFieldIsLast = false;
+    }
+
+    /**
+     * The cursor will start on the last field the next time it is activated, however many fields the page has by then.
+     * Has no effect if the cursor is already active.
+     */
+    public setDefaultCursorFieldToLast(): void {
+        if (this.cursorActive) {
+            return;
+        }
+        this.defaultFieldIsLast = true;
     }
 
     public toggleCursor(): boolean {
@@ -122,6 +135,10 @@ export class CursorController implements CursorHandler {
         }
         if (active) {
             this.cursorActive = active;
+            if (this.defaultFieldIsLast) {
+                this.cursorField = fields.length - 1;
+                this.defaultFieldIsLast = false;
+            }
             this.cursorField = Math.min(this.cursorField, fields.length); //4.1.2 This sounds like, the last cursorposition is remembered
             this.getCurrentFocusedField()!.setFocused(true);
         } else {
@@ -141,12 +158,12 @@ export class CursorController implements CursorHandler {
         }
 
         const fields = this.getFields();
+        if (this.cursorField >= fields.length - 1) {
+            return true; //4-3: The cursor stops at the last field, it does not wrap. Checked in the KLN 89 trainer (#218)
+        }
 
         this.getCurrentFocusedField()!.setFocused(false);
         this.cursorField++;
-        if (this.cursorField >= fields.length) {
-            this.cursorField = 0;
-        }
         this.getCurrentFocusedField()!.setFocused(true);
         return true;
     }
@@ -159,12 +176,12 @@ export class CursorController implements CursorHandler {
             return this.getCurrentFocusedField()!.outerLeft();
         }
 
-        const fields = this.getFields();
+        if (this.cursorField <= 0) {
+            return true; //4-3: The cursor stops at the first field, it does not wrap. Checked in the KLN 89 trainer (#218)
+        }
+
         this.getCurrentFocusedField()!.setFocused(false);
         this.cursorField--;
-        if (this.cursorField < 0) {
-            this.cursorField = fields.length - 1;
-        }
         this.getCurrentFocusedField()!.setFocused(true);
         return true;
     }
@@ -215,6 +232,7 @@ export class CursorController implements CursorHandler {
         } else if (result === EnterResult.Handled_Move_Focus || this.enterAlwaysMoves) {
             //Enter moves to the next field, see https://www.youtube.com/shorts/9We5fcd2-VE
             //A field with nothing to accept leaves the cursor where it is, checked in the KLN 89 trainer (#354)
+            //On the last field the cursor stays, the pilot turns it off with CRSR (5-17 steps 9 and 10, 3-47) (#218)
             this.outerRight();
         }
         return result;

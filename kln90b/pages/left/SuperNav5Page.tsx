@@ -71,6 +71,7 @@ export class SuperNav5Page extends SevenLinePage {
         });
 
         this.lCursorController = new CursorController(this.children.get("left").children);
+        this.lCursorController.setDefaultCursorFieldToLast(); //3-36: The cursor first lands on the map scale
         this.rCursorController.refreshChildren(this.children.get("right").children);
     }
 

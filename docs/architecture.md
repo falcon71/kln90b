@@ -731,7 +731,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - ENT returns `Promise<EnterResult>` (`pages/CursorController.ts`), one of:
     - `Not_Handled`
     - `Handled_Keep_Focus` (stay on the field, e.g. invalid input or deleting a list item)
-    - `Handled_Move_Focus` (the CursorController then calls `outerRight()` to advance to the next field)
+    - `Handled_Move_Focus` (the CursorController then calls `outerRight()` to advance to the next field; on the last
+      field the cursor stays, because the outer knob stops at both ends of a page, 4-3, #218)
 - The CursorController leaves the cursor where it is after `Not_Handled`: a field whose value changes as the knob turns
   has nothing to accept (#354). Only the self-test page builds its controller to move on after every ENT (3-6, 3-7).
 - The top level ignores the result. Inside MainPage, "not handled" is meaningful.

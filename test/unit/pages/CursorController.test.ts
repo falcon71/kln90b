@@ -147,9 +147,9 @@ describe('CursorController on a page without data entry (3-11)', () => {
 
 // 4-3 tells the pilot to turn the left outer knob all the way counterclockwise to reach USE? on the FPL page, which only
 // makes sense when the cursor stops at the first field. Checked in the KLN 89 trainer (2026-10-07) on FPL 0 and SET 2:
-// turned further, the cursor stays on the first field counterclockwise and on the last field clockwise, and never wraps.
-// The code wraps both ways (CursorController.ts, outerLeft and outerRight). The trainer's first field is its mode field
-// in the status column, which the 90B does not have, so only the ends of the page's own fields are asserted.
+// turned further, the cursor stays on the first field counterclockwise and on the last field clockwise, and never wraps
+// (#218). The trainer's first field is its mode field in the status column, which the 90B does not have, so only the
+// ends of the page's own fields are asserted.
 describe('CursorController outer knob at the ends of the page (4-3, checked in the KLN 89 trainer, 2026-10-07)', () => {
     // The sibling of the pins: inside the list the knob steps one field at a time in both directions
     it('steps from field to field clockwise and counterclockwise inside the list', () => {
@@ -161,7 +161,7 @@ describe('CursorController outer knob at the ends of the page (4-3, checked in t
         expect(walk(cc, all, 2, -1)).toEqual(['c', 'b', 'a']);
     });
 
-    it.fails('stays on the last field when turned further clockwise (4-3, #218)', () => {
+    it('stays on the last field when turned further clockwise (4-3, #218)', () => {
         const all = [new FakeField('a'), new FakeField('b'), new FakeField('c')];
         const cc = new CursorController(children({a: all[0], b: all[1], c: all[2]}));
         cc.setCursorActive(true);
@@ -174,7 +174,7 @@ describe('CursorController outer knob at the ends of the page (4-3, checked in t
         expect(focused(cc, all)).toBe('c');
     });
 
-    it.fails('stays on the first field when turned further counterclockwise (4-3, #218)', () => {
+    it('stays on the first field when turned further counterclockwise (4-3, #218)', () => {
         const all = [new FakeField('a'), new FakeField('b'), new FakeField('c')];
         const cc = new CursorController(children({a: all[0], b: all[1], c: all[2]}));
         cc.setCursorActive(true);
@@ -183,6 +183,22 @@ describe('CursorController outer knob at the ends of the page (4-3, checked in t
         cc.outerLeft();
 
         expect(focused(cc, all)).toBe('a');
+    });
+});
+
+describe('CursorController default field', () => {
+    // 3-36: on Super NAV 5 the cursor first lands on the map scale, the last field, however many fields the lines above
+    // it hold by then
+    it('starts on the last field when the page asks for it, counted when the cursor comes on', () => {
+        const all = [new FakeField('a'), new FakeField('b'), new FakeField('c')];
+        all[2].isReadonly = true;
+        const cc = new CursorController(children({a: all[0], b: all[1], c: all[2]}));
+        cc.setDefaultCursorFieldToLast();
+        all[2].isReadonly = false;
+
+        cc.setCursorActive(true);
+
+        expect(focused(cc, all)).toBe('c');
     });
 });
 
@@ -382,6 +398,53 @@ describe('CursorController ENT (#354)', () => {
         await cc.enter();
 
         expect(focused(cc, all)).toBe('a');
+    });
+
+    // 5-17 steps 9 and 10 and 3-47: after ENT on the last field of a page (the APT 3 runway surface, the third remark
+    // line of APT 5) the pilot turns the cursor off with CRSR, so ENT leaves it on that field. It never wraps to the
+    // first field (#218)
+    it('keeps the cursor on the last field after ENT (5-17, 3-47, #218)', async () => {
+        const all = [new FakeField('a'), new FakeField('b'), new FakeField('c')];
+        const cc = new CursorController(children({a: all[0], b: all[1], c: all[2]}));
+        cc.setCursorActive(true);
+        cc.focusIndex(2);
+        all[2].enterResult = EnterResult.Handled_Move_Focus;
+
+        expect(await cc.enter()).toBe(EnterResult.Handled_Move_Focus);
+
+        expect(cc.cursorActive).toBe(true);
+        expect(focused(cc, all)).toBe('c');
+    });
+
+    // Sibling of the test above: on the field before the last one ENT moves on and the cursor stays on
+    it('moves to the last field after ENT on the field before it (#218)', async () => {
+        const all = [new FakeField('a'), new FakeField('b'), new FakeField('c')];
+        const cc = new CursorController(children({a: all[0], b: all[1], c: all[2]}));
+        cc.setCursorActive(true);
+        cc.focusIndex(1);
+        all[1].enterResult = EnterResult.Handled_Move_Focus;
+
+        await cc.enter();
+
+        expect(cc.cursorActive).toBe(true);
+        expect(focused(cc, all)).toBe('c');
+    });
+
+    // A page that turns the cursor off itself while it handles ENT (SET 1 CONFIRM?, a finished user waypoint) keeps it
+    // off; the controller does not turn it on again or move it
+    it('keeps the cursor off when the field turned it off while it handled ENT', async () => {
+        const all = [new FakeField('a'), new FakeField('b')];
+        const cc = new CursorController(children({a: all[0], b: all[1]}));
+        cc.setCursorActive(true);
+        all[0].enter = () => {
+            cc.setCursorActive(false);
+            return Promise.resolve(EnterResult.Handled_Move_Focus);
+        };
+
+        await cc.enter();
+
+        expect(cc.cursorActive).toBe(false);
+        expect(focused(cc, all)).toBe('-');
     });
 
     it('does nothing with ENT while the cursor is off', async () => {

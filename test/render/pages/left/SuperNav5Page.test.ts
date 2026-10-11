@@ -126,8 +126,8 @@ describe('Super NAV 5 page (characterization)', () => {
 
 describe('Super NAV 5 page', () => {
     // 3-36: the left cursor first lands on the map scale at the bottom left of the map; turning the left outer knob
-    // counterclockwise moves it up over the three lines the pilot can configure. Distance, ident, mode and ground speed
-    // are not fields.
+    // counterclockwise moves it up over the three lines the pilot can configure, and it stops at the top one (4-3,
+    // #218). Distance, ident, mode and ground speed are not fields.
     it('visits the map scale and the three configurable lines with the left cursor (3-36)', async () => {
         const {unit} = await superNav5OnRoute();
         await unit.panel.cursor('L');
@@ -138,7 +138,7 @@ describe('Super NAV 5 page', () => {
             seen.push(focusedLeft());
         }
 
-        expect(seen).toEqual([['40  '], [' TK   '], ['DTK   '], ['ETE   '], ['40  ']]);
+        expect(seen).toEqual([['40  '], [' TK   '], ['DTK   '], ['ETE   '], ['ETE   ']]);
         expect(SuperNav5.read().left[0]).toBe('47.5 È');
     });
 
@@ -177,7 +177,8 @@ describe('Super NAV 5 page', () => {
     });
 
     // 3-37: the right cursor opens the menu with the cursor on the VOR selection; the right outer knob moves it over
-    // NDB, APT and the orientation on the bottom line; the right cursor again removes the menu
+    // NDB, APT and the orientation on the bottom line, where it stops (4-3, #218); the right cursor again removes the
+    // menu
     it('opens the menu on the VOR selection and closes it with the right cursor (3-37)', async () => {
         // Every field shows a different value, so that the order of the visit is visible: VOR: LH, NDB: ON, APT: OFF
         const {unit} = await superNav5OnRoute({storage: {superNav5Vor: 2, superNav5Ndb: true}});
@@ -189,7 +190,7 @@ describe('Super NAV 5 page', () => {
             await unit.panel.outer('R', 1);
             seen.push(focusedRight());
         }
-        expect(seen).toEqual([[' LH'], [' ON'], ['OFF'], [' N^'], [' LH']]);
+        expect(seen).toEqual([[' LH'], [' ON'], ['OFF'], [' N^'], [' N^']]);
         // The fourth row, the orientation, is left to the characterization above
         expect(SuperNav5.read().right!.slice(0, 3)).toEqual(['ÜVOR: LH', 'ÝNDB: ON', 'ŸAPT:OFF']);
 

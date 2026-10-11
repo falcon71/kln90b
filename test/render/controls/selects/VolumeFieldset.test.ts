@@ -8,7 +8,7 @@ import {storedSetting} from '../../../harness/storage';
 // ENT); Set9Page.test.ts holds the page with the alert disabled.
 
 describe('volume fieldset', () => {
-    // 3-57 (figure 3-181): the two digits are two cursor positions; the outer knob comes back to the tens
+    // 3-57 (figure 3-181): the two digits are two cursor positions; the outer knob stops on the units (4-3, #218)
     it('visits the tens and the units of the volume (3-57)', async () => {
         const unit = await bootUnit({storage: {altAlertVolume: 37}});
         await unit.panel.selectPage('L', 'SET 9');
@@ -19,7 +19,7 @@ describe('volume fieldset', () => {
             seen.push(unit.panel.focused('L'));
         }
 
-        expect(seen).toEqual([{row: 4, col: 4, text: '3'}, {row: 4, col: 5, text: '7'}, {row: 4, col: 4, text: '3'}]);
+        expect(seen).toEqual([{row: 4, col: 4, text: '3'}, {row: 4, col: 5, text: '7'}, {row: 4, col: 5, text: '7'}]);
     });
 
     // 3-57: a volume between 00 and 99, digit by digit: 37 to 52, the units first so that a tens digit that overwrote
@@ -30,7 +30,7 @@ describe('volume fieldset', () => {
         await unit.panel.cursor('L');
         await unit.panel.outer('L', 1);
         await unit.panel.inner('L', -5);
-        await unit.panel.outer('L', 1);
+        await unit.panel.outer('L', -1);
         await unit.panel.inner('L', 2);
         await vi.advanceTimersByTimeAsync(1000);
 

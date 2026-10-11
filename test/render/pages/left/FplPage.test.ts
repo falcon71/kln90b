@@ -603,9 +603,12 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
     /** The rows of the page after each of a number of outer clicks, the first ones being the current rows */
     async function walkRows(unit: HeadlessUnit, clicks: number): Promise<string[]> {
         const seen = [...left()];
-        for (let i = 0; i < clicks; i++) {
-            await unit.panel.outer('L', 1);
-            seen.push(...left());
+        // Both ways: the cursor stops at the ends of the page (4-3, #218)
+        for (const dir of [-1, 1] as const) {
+            for (let i = 0; i < clicks; i++) {
+                await unit.panel.outer('L', dir);
+                seen.push(...left());
+            }
         }
         return seen;
     }
@@ -627,8 +630,8 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
     });
 
     // The refused waypoint stays on the page as a row until the page is left: the entry that held it is not removed
-    // from the list. The sibling above holds that the plan itself is unchanged. The cursor is walked over the page: it
-    // wraps today (#218), so the walk does not depend on where the cursor stands
+    // from the list. The sibling above holds that the plan itself is unchanged. The cursor is walked over the whole page,
+    // to the top and back to the end, so the walk does not depend on where the cursor stands
     it.fails('does not show the refused waypoint after FPL FULL (4-4, C-1, #240)', async () => {
         const unit = await insertIntoFullFpl5();
 

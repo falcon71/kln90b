@@ -109,8 +109,7 @@ describe('NDB page contents (3-50)', () => {
     });
 
     // 3-21, 5-18: the cursor of a database NDB visits the ident characters only; only a user NDB has editable fields.
-    // Past the third character the cursor wraps to the first one today (#218 says the real unit stops at the end); both
-    // stay in the ident row, which is what this test holds
+    // Past the third character the cursor stops (4-3, #218); it stays in the ident row
     it('keeps the cursor in the ident row (3-21, 5-18)', async () => {
         const unit = await ndbPageOf(ndb('OWI', 47.5, 11.25));
         await unit.panel.cursor('R');

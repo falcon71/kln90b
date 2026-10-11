@@ -361,8 +361,9 @@ export class FrontPanel {
 
     /**
      * Turns the outer knob until the focused field shows the text, e.g. 'USER POS?'. A cursor position without a focused
-     * field (the SUP page without user waypoints has one between the ident characters and the next field) is stepped over. Throws
-     * with the screen if the field does not come within maxClicks.
+     * field (the SUP page without user waypoints has one between the ident characters and the next field) is stepped over. The
+     * search turns clockwise and, once the cursor stops at the last field (4-3, #218), counterclockwise. Throws with the
+     * screen if the field does not come within maxClicks or the cursor stops at both ends.
      */
     public async cursorTo(side: Side, text: string, maxClicks = 20): Promise<void> {
         // A page name in the status field means the cursor is off: the outer knob would turn the pages, and the search
@@ -371,12 +372,18 @@ export class FrontPanel {
         if (status !== '' && status !== 'CRSR' && status !== 'KYBD') {
             throw new Error(`cursorTo: the ${side} cursor is off (the status line shows ${status}); turn it on first\n${this.screen().dump()}`);
         }
+        let dir: 1 | -1 = 1;
         for (let i = 0; ; i++) {
             const runs = this.focusedRuns(side);
             if (runs.length > 1) this.focused(side); // throws with the screen
             if (runs.length === 1 && runs[0].text.trim() === text) return;
             if (i >= maxClicks) throw new Error(`cursorTo: no field "${text}" within ${maxClicks} clicks\n${this.screen().dump()}`);
-            await this.outer(side, 1);
+            await this.outer(side, dir);
+            if (JSON.stringify(this.focusedRuns(side)) === JSON.stringify(runs)) {
+                // The cursor stopped at an end of the page
+                if (dir === -1) throw new Error(`cursorTo: no field "${text}" on the page\n${this.screen().dump()}`);
+                dir = -1;
+            }
         }
     }
 

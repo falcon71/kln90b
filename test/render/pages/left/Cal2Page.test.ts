@@ -85,7 +85,8 @@ describe('CAL 2 temperature entered sign first (5-11, #256)', () => {
 });
 
 describe('CAL 2 page (5-11)', () => {
-    // 5-11, steps 3 to 6: the cursor goes over CAS, then ALT (three digits, as on CAL 1), then BARO, then TEMP
+    // 5-11, steps 3 to 6: the cursor goes over CAS, then ALT (three digits, as on CAL 1), then BARO, then TEMP, and
+    // stops there (4-3, #218)
     it('moves the cursor over CAS, ALT, BARO and TEMP (5-11)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'CAL 2');
@@ -95,7 +96,7 @@ describe('CAL 2 page (5-11)', () => {
             rows.push(unit.panel.focused('L').row);
             await unit.panel.outer('L', 1);
         }
-        expect(rows).toEqual([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 1]);
+        expect(rows).toEqual([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4]);
     });
 
     // 5-11, step 5: an altimeter setting made on CAL 1 is already displayed on CAL 2

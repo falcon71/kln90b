@@ -68,9 +68,12 @@ describe('create waypoint message (characterization)', () => {
         await unit.panel.inner('R', -1);
         const texts = new Set<string>();
 
-        for (let i = 0; i < 8; i++) {
-            await unit.panel.outer('R', 1);
-            texts.add(unit.panel.focused('R').text);
+        // Both ways: the cursor stops at the ends of the page (4-3, #218)
+        for (const dir of [-1, 1] as const) {
+            for (let i = 0; i < 8; i++) {
+                await unit.panel.outer('R', dir);
+                texts.add(unit.panel.focused('R').text);
+            }
         }
 
         expect([...texts].sort()).toEqual(['A', 'B']);

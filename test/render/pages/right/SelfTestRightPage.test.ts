@@ -47,7 +47,7 @@ function altitudeShown(): number {
 /**
  * Turns the right outer knob counterclockwise until the field showing `text` has the cursor. The date, time and time
  * zone lie before the cursor's start, so the entry tests do not depend on where it starts (that is the cursor tests'
- * subject) nor on a wrap from APPROVE? to the date (#218)
+ * subject); the cursor stops at the date (4-3, #218)
  */
 async function backTo(unit: HeadlessUnit, text: string) {
     for (let i = 0; unit.panel.focused('R').text !== text; i++) {
@@ -270,9 +270,12 @@ describe('self-test right page with an air data baro (spec)', () => {
         const unit = await onSelfTestPage({panelXml: AIR_DATA_BARO_XML, simVars: ALTIMETER_AT_30_12});
 
         const texts = new Set([unit.panel.focused('R').text]);
-        for (let i = 0; i < 6; i++) {
-            await unit.panel.outer('R', 1);
-            texts.add(unit.panel.focused('R').text);
+        // Both ways: the cursor stops at the ends of the page (4-3, #218)
+        for (const dir of [-1, 1] as const) {
+            for (let i = 0; i < 6; i++) {
+                await unit.panel.outer('R', dir);
+                texts.add(unit.panel.focused('R').text);
+            }
         }
 
         expect(texts).toEqual(new Set(['01 JUN 26', '12:00', 'UTC', 'APPROVE?']));

@@ -90,7 +90,7 @@ describe('SuperNav5.focused (harness)', () => {
         const unit = await superNav5({superNav5MapRange: 15});
         await unit.panel.cursor('L');
 
-        await unit.panel.outer('L', 1);
+        await unit.panel.outer('L', -3); // from the map scale up over the three lines to field 1 (3-36)
 
         // Field 1 shows ETE; the DOM pads its text with no-break spaces (the unread msg prompt is inverted as well)
         const raw = [...document.querySelectorAll('.super-nav5-left-controls .inverted')].map(e => e.textContent).filter(t => t !== 'msg');
