@@ -293,7 +293,7 @@ export class UserWaypointLoaderV2 implements UserWaypointLoader {
             case "S":
                 return RunwaySurfaceType.Grass;
             default:
-                throw new Error(`Unexpoected runwaySurface:${str.substring(48, 49)}`);
+                throw new Error(`Unexpected runwaySurface:${str.substring(48, 49)}`);
         }
 
     }

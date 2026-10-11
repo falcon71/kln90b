@@ -4,6 +4,7 @@ import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRep
 import {KLN90BUserWaypointsSettings} from '../../../kln90b/settings/KLN90BUserWaypoints';
 import {KLN90BUserSettings} from '../../../kln90b/settings/KLN90BUserSettings';
 import {UserWaypointPersistor} from '../../../kln90b/settings/UserWaypointPersistor';
+import {UserWaypointLoaderV2} from '../../../kln90b/settings/UserWaypointLoaderV2';
 import {airport} from '../../harness/navdata/builders';
 
 const bus = new EventBus();
@@ -59,6 +60,13 @@ describe('user waypoint V2 format', () => {
         expect(apt.altitude).toBe(1400);
         expect(UnitType.METER.convertTo(apt.runways[0].length, UnitType.FOOT)).toBeCloseTo(3200, 3);
         expect(apt.runways[0].surface).toBe(RunwaySurfaceType.Asphalt);
+    });
+
+    // Contract source: the V2 airport slot of docs/architecture.md Core 7. The error of an unknown surface names the character (#116)
+    it('names the unknown runway surface character in its error (#116)', () => {
+        wptSettings.getSetting('wpt0').set('AXX        KAAA    +4700.00-00830.00+01400+03200X');
+
+        expect(() => new UserWaypointLoaderV2(bus, repo).restoreWaypoints()).toThrow(new Error('Unexpected runwaySurface:X'));
     });
 
     // f745fb3, b14db79: an airport without a runway length has -10 m in the model and the stored number is negative
