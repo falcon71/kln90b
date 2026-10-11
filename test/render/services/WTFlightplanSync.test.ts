@@ -169,10 +169,10 @@ describe('the "kln90b" flight planner on the standard route', () => {
         expect(identsOf(plan)).toEqual(before);
     });
 
-    // The planner is filled with WriteGPSSimVars off: the active-waypoint path of WTFlightplanSync is not gated
-    // (#142). The wiki lists the planner with the options that WriteGPSSimVars gates; the maintainer ruled "Gate both".
-    // The sibling holds the setup: the boot, the route and a working sequence.
-    it('the unit with Output.WriteGPSSimVars off has the route and sequences (setup of the #142 pins)', async () => {
+    // The planner stays untouched with WriteGPSSimVars off, on the edit path and on the active-waypoint path of
+    // WTFlightplanSync (#142). The wiki lists the planner with the options that WriteGPSSimVars gates; the maintainer ruled
+    // "Gate both". The first test holds the setup: the boot, the route and a working sequence.
+    it('the unit with Output.WriteGPSSimVars off has the route and sequences (setup of the #142 tests)', async () => {
         const unit = await bootOnRoute(NO_GPS_SIMVARS_XML);
         const aw = unit.props.memory.navPage.activeWaypoint;
 
@@ -187,18 +187,109 @@ describe('the "kln90b" flight planner on the standard route', () => {
         expect(activeIdent(unit)).toBe('KBBB');
     });
 
-    it.fails('leaves plan 0 empty with Output.WriteGPSSimVars off, after the boot (#142)', async () => {
+    it('leaves plan 0 empty with Output.WriteGPSSimVars off, after the boot (#142)', async () => {
         const unit = await bootOnRoute(NO_GPS_SIMVARS_XML);
 
         expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
     });
 
-    it.fails('leaves plan 0 empty with Output.WriteGPSSimVars off, after a sequence (#142)', async () => {
+    it('leaves plan 0 empty with Output.WriteGPSSimVars off, after a sequence (#142)', async () => {
         const unit = await bootOnRoute(NO_GPS_SIMVARS_XML);
         unit.props.memory.navPage.activeWaypoint.sequenceToNextWaypoint();
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
+    });
+
+    // The direct-to plan goes through the same sync
+    it('creates no direct-to plan with Output.WriteGPSSimVars off', async () => {
+        const unit = await bootOnRoute(NO_GPS_SIMVARS_XML);
+        const planner = plannerOf(unit);
+
+        await unit.panel.press('KLN90B_DCT_Push');
+        await unit.panel.enterIdent('L', 'XRAY');
+        await unit.panel.ent(); // INT confirmation
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(true); // The unit flies it
+        expect(planner.hasFlightPlan(1)).toBe(false);
+        expect(planner.activePlanIndex).toBe(0);
+        expect(identsOf(planner.getFlightPlan(0))).toEqual([]);
+    });
+
+    // L:KLN90B_WriteGpsSimvars switches the option at runtime (LVars.ts): the sync stops with it and starts again at once
+    it('stops mirroring the active leg when L:KLN90B_WriteGpsSimvars goes to 0, and goes on when it returns to 1', async () => {
+        const unit = await bootOnRoute();
+        const aw = unit.props.memory.navPage.activeWaypoint;
+        const plan = plannerOf(unit).getFlightPlan(0);
+        expect(plan.activeLateralLeg).toBe(1); // Precondition: ABC, mirrored
+
+        unit.env.sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+        aw.sequenceToNextWaypoint();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(activeIdent(unit)).toBe('KBBB');
+        expect(plan.activeLateralLeg).toBe(1); // Not rewritten
+
+        unit.env.sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        expect(plan.activeLateralLeg).toBe(2); // KBBB, mirrored at the switch, without another change
+        insertLeg(unit, 3, xray); // Behind the active KBBB
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(identsOf(plan)).toEqual(['KAAA', 'ABC', 'KBBB', 'XRAY']);
+        expect(plan.activeLateralLeg).toBe(2); // KBBB, mirrored again
+    });
+
+    // The planner is filled at the switch, not at the next change (the unit booted with the option off, so nothing wrote
+    // it before)
+    it('mirrors FPL 0 at once when L:KLN90B_WriteGpsSimvars goes from 0 to 1', async () => {
+        const unit = await bootOnRoute(NO_GPS_SIMVARS_XML);
+        const planner = plannerOf(unit);
+        expect(identsOf(planner.getFlightPlan(0))).toEqual([]); // Precondition: nothing mirrored with the option off
+
+        unit.env.sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        const plan = planner.getFlightPlan(0);
+        expect(identsOf(plan)).toEqual(['KAAA', 'ABC', 'KBBB']);
+        expect(plan.activeLateralLeg).toBe(1); // ABC is the active waypoint
+        expect(planner.hasFlightPlan(1)).toBe(false);
+    });
+
+    it('mirrors a direct-to on plan 1 as well when L:KLN90B_WriteGpsSimvars goes from 0 to 1', async () => {
+        const unit = await bootOnRoute(NO_GPS_SIMVARS_XML);
+        const planner = plannerOf(unit);
+        await unit.panel.press('KLN90B_DCT_Push');
+        await unit.panel.enterIdent('L', 'XRAY');
+        await unit.panel.ent(); // INT confirmation
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(true); // Precondition
+        expect(planner.hasFlightPlan(1)).toBe(false);
+
+        unit.env.sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(planner.activePlanIndex).toBe(1);
+        expect(identsOf(planner.getFlightPlan(1))).toEqual(['', 'XRAY']);
+        expect(identsOf(planner.getFlightPlan(0))).toEqual(['KAAA', 'ABC', 'KBBB']);
+    });
+
+    // Only the edge to 1 syncs: switching off, or a level of 1, writes nothing
+    it('does not rewrite the planner while the LVar stays at 1, nor when it goes to 0', async () => {
+        const unit = await bootOnRoute();
+        const planner = plannerOf(unit);
+        const plan = planner.getFlightPlan(0);
+        const spy = vi.spyOn(planner, 'getFlightPlan');
+
+        await vi.advanceTimersByTimeAsync(2000); // The level stays at 1
+        expect(spy).not.toHaveBeenCalled();
+
+        unit.env.sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(spy).not.toHaveBeenCalled();
+        expect(identsOf(plan)).toEqual(['KAAA', 'ABC', 'KBBB']);
     });
 });
 

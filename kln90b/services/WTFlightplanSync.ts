@@ -55,7 +55,19 @@ export class WTFlightplanSync {
         this.syncToWTFlightplan(klnPlan, this.activeWaypoint.getActiveFplIdx());
     }
 
+    /**
+     * Mirrors FPL 0 right away. L:KLN90B_WriteGpsSimvars switches the option on at runtime, and the planner would stay
+     * empty or stale until the next change otherwise.
+     */
+    public sync() {
+        this.syncToWTFlightplan(this.activeWaypoint.fpl0, this.activeWaypoint.getActiveFplIdx());
+    }
+
     private activeIdxChanged(activeIdx: number) {
+        if (!this.planeSettings.output.writeGPSSimVars) {
+            return;
+        }
+
         this.syncToWTFlightplan(this.activeWaypoint.fpl0, activeIdx);
     }
 

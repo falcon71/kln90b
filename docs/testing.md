@@ -959,7 +959,7 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   conversion; the user setting keys are pinned. *Untested:* invalid panel.xml values (by decision; the enhancement
   #145), `TakeHomeMode`, the effect of a custom `BasePath` (needs a `FakeXhr` mount), the `Internal_*` events except
   `Internal_Key`, the 5 kt threshold of the roll command, the clamp and boot value of `L:KLN90B_Brightness`
-  (undocumented), the planner gate through the runtime LVar `L:KLN90B_WriteGpsSimvars` (#142), temporary (`XY`)
+  (undocumented), temporary (`XY`)
   waypoints round-tripped through storage, the ten-message cap of the flight plan loader and the failing V1 restore.
 - **The navigation core** (`data/flightplan/`, `NavCalculator`, `ModeController`, `KLNNavmath`, `FlightplanUtils`,
   `Flightplanloader`). *Spec* (chapters 4 to 6), with expectations from `flight/geo.ts`: DTK and XTK, sequencing at the

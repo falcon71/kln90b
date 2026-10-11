@@ -340,7 +340,7 @@ export class KLN90BCore {
                 new SignalOutputFillterTick(sensors),
             ]);
 
-        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager, brightnessManager);
+        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager, brightnessManager, this.wtFlightplanSync);
 
         const msa = new MSA();
 

@@ -275,7 +275,8 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
 - Other outputs:
     - `WTFlightplanSync` mirrors FPL 0 into an SDK `FlightPlanner` with id `"kln90b"` (`initSyncRole:'primary'`): plan 0
       is DF legs and plan 1 is a direct-to plan "like the Garmins". Data stops after the MAP or an arc ("Install manual:
-      We do not return data after a fence"). This happens only when `writeGPSSimVars` is set.
+      We do not return data after a fence"). This happens only when `writeGPSSimVars` is set, and `SimVarSync` calls `WTFlightplanSync.sync()` once when
+      `L:KLN90B_WriteGpsSimvars` switches it on at runtime.
     - `KlnEfbSaver` answers EFB `avionicsRouteRequested`; `KlnEfbLoader` loads `syncedAvionicsRoute` into FPL 0 (lat/lon
       legs become temporary user waypoints in region `XY`).
 - The ticks that write the L:KLN90B_* outputs stop with the power, so `SensorsOut.setPoweredOff()` writes their zero
