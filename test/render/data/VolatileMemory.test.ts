@@ -5,7 +5,9 @@ import {savedFlightplan} from '../../harness/storage';
 import {fplIdents} from '../../harness/readers';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {Screen} from '../../harness/render/screen';
-import {vor} from '../../harness/navdata/builders';
+import {intersection, vor} from '../../harness/navdata/builders';
+import {Leg, star, withProcedures} from '../../harness/navdata/procedures';
+import {pointFrom} from '../../harness/flight/geo';
 import {CtrState, NavMode} from '../../../kln90b/data/VolatileMemory';
 import {TimeStamp} from '../../../kln90b/data/Time';
 import {CenterWaypoint} from '../../../kln90b/pages/right/Ctr1Page';
@@ -84,8 +86,7 @@ describe('procedures over a power cycle (6-5, 6-23)', () => {
     const procedureLegs = (unit: HeadlessUnit) =>
         unit.props.memory.fplPage.flightplans[0].getLegs().filter(l => l.procedure !== undefined).map(l => l.wpt.icaoStruct.ident);
 
-    // 6-5: the approach is deleted when the unit was off for more than 5 minutes. Also the sibling of the #94 pin: the
-    // approach was loaded before the cycle
+    // 6-5: the approach is deleted when the unit was off for more than 5 minutes
     it('deletes the approach after 6 minutes off (6-5)', async () => {
         const unit = await approachLoaded();
         expect(procedureLegs(unit)).toContain('FAFAA');
@@ -97,14 +98,85 @@ describe('procedures over a power cycle (6-5, 6-23)', () => {
     });
 
     // 6-5, 6-23: only more than 5 minutes off deletes the procedures
-    it.fails('keeps the approach over a power cycle of 1 minute (6-5) (#94)', async () => {
+    it('keeps the approach over a power cycle of 1 minute (6-5) (#94)', async () => {
         const unit = await approachLoaded();
         const before = procedureLegs(unit);
+        expect(before).toContain('FAFAA'); // the precondition: there is something to keep
 
         await cycle(unit, 60);
 
         expect(procedureLegs(unit)).toEqual(before);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
     });
+
+    // The limit is "more than 5 minutes" (6-5): just under it keeps the approach and just over it deletes it
+    it('keeps the approach just under 5 minutes off (6-5) (#94)', async () => {
+        const unit = await approachLoaded();
+        const before = procedureLegs(unit);
+        expect(before).toContain('FAFAA'); // the precondition: there is something to keep
+
+        await cycle(unit, 299);
+
+        expect(procedureLegs(unit)).toEqual(before);
+    }, 20_000);
+
+    it('deletes the approach just over 5 minutes off (6-5) (#94)', async () => {
+        const unit = await approachLoaded();
+        expect(procedureLegs(unit)).toContain('FAFAA');
+
+        await cycle(unit, 301);
+
+        expect(procedureLegs(unit)).toEqual([]);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'KPRC']);
+    }, 20_000);
+
+    // 6-5: "more than 5 minutes", so exactly 5 minutes keeps the procedures. The time off reaches the memory as
+    // timeSincePowerChange of the power event (PowerButton); the whole-second cycles above cannot hit the millisecond
+    it('keeps the approach at exactly 5 minutes off and deletes it a millisecond later (6-5) (#94)', async () => {
+        const unit = await approachLoaded();
+        const before = procedureLegs(unit);
+
+        unit.props.memory.reset({isPowered: true, timeSincePowerChange: 300_000});
+        expect(procedureLegs(unit)).toEqual(before);
+
+        unit.props.memory.reset({isPowered: true, timeSincePowerChange: 300_001});
+        expect(procedureLegs(unit)).toEqual([]);
+    });
+
+    // A power-off does not delete anything: the procedures go, if at all, at the next power-on
+    it('keeps the approach while the unit is off (6-5) (#94)', async () => {
+        const unit = await approachLoaded();
+        const before = procedureLegs(unit);
+
+        unit.props.memory.reset({isPowered: false, timeSincePowerChange: 10 * 60_000});
+
+        expect(procedureLegs(unit)).toEqual(before);
+    });
+
+    // 6-23: the same rule holds for a STAR (and a SID, which the same call removes)
+    it('keeps a STAR and the approach after 1 minute off and deletes both after 6 minutes (6-5, 6-23) (#94)', async () => {
+        const w = approachWorld();
+        const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
+        const straa = intersection('STRAA', east(30).lat, east(30).lon);
+        const strab = intersection('STRAB', east(12).lat, east(12).lon);
+        const kprc = withProcedures(w.kprc, {approaches: [...w.kprc.approaches], arrivals: [star('ARR1', {common: [Leg.IF(straa), Leg.TF(strab)]})]});
+        const unit = await bootUnit({
+            facilities: [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.sdfaa, w.mapaa, straa, strab], position: w.north(40),
+            storage: {...savedFlightplan(0, [w.enraa, kprc]), turnAnticipation: false},
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        await unit.panel.loadProcedure('APT 7');
+        const before = procedureLegs(unit);
+        expect(before).toEqual(['STRAA', 'STRAB', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA']); // the precondition
+
+        await cycle(unit, 60);
+        expect(procedureLegs(unit)).toEqual(before);
+
+        await cycle(unit, 6 * 60);
+        expect(procedureLegs(unit)).toEqual([]);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'KPRC']);
+    }, 20_000);
 });
 
 describe('VolatileMemory over a power cycle (characterization)', () => {

@@ -234,7 +234,9 @@ export class VolatileMemory {
         this.altPage.alertEnabled = false;
         this.altPage.alertWarn = 300;
 
-        this.fplPage.flightplans[0].removeProcedures();
+        if (evt.timeSincePowerChange > RESET_TIME) {
+            this.fplPage.flightplans[0].removeProcedures();
+        }
 
         this.dtPage.departureTime = null;
         this.dtPage.flightTimer = 0;

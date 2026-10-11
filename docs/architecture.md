@@ -476,8 +476,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   `aptPage/vorPage/ndbPage/intPage/supPage` (`WaypointPageState`), `altPage`, `dtPage`, `fplPage {flightplans}`, *
   *`navPage: NavPageState`** (the hub for nav results, mode, `activeWaypoint`, `isSelfTestActive`, NAV 4 VNAV inputs,
   `userMagvar`), `triPage`, `calPage`, `ctrPage` and `othPage`.
-    - `reset()` runs on every power-on. It resets these fields, **removes procedures from FPL 0**, and re-initialises
-      the first scan-list entry per type, setting `isReady` when done; WelcomePage waits on `isReady`.
+    - `reset()` runs on every power-on. It resets these fields, **removes procedures from FPL 0 when the unit was off
+      for more than 5 minutes** (6-5; `timeSincePowerChange` of the power event), and re-initialises the first scan-list
+      entry per type, setting `isReady` when done; WelcomePage waits on `isReady`.
 - **Persistent messages** (`data/PersistentMessages.ts`) are condition-driven message objects. They are not stored; see
   Core 9.
 
