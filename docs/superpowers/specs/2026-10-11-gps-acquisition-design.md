@@ -87,7 +87,8 @@ data and its own clock.
    - The SDK collects the almanac from it (`almanacDownloadTime`, 12.5 minutes, kept as it is).
    - When the almanac is complete, the unit's clock is set from the satellite (GPS time; the week rollover of #63
      applies as today) and the model continues with ACQ (step 2), with the inhibits cleared and the SDK last-known
-     position set to the present position.
+     position chosen as in step 2: the stored position when it is within 100 NM of the present one, else the present
+     position.
 2. Otherwise → **ACQ.**
    - A prediction context (`GPSSatComputer.createPredictionContext()`, public SDK API) is set to the *stored* position
      and the *unit's* clock, as it is, also when the clock is off by whole eras (the SDK reduces the time to the time of
@@ -100,6 +101,10 @@ data and its own clock.
    - The SDK last-known position is set so that the SDK's own 100 NM rule does not override the KLN decision: the
      stored position when it is within 100 NM of the present one (then the SDK's 2 NM hot-start rule works on it),
      otherwise the present position.
+   - In the second case the SDK's 2 NM rule would hold for the present position and make every satellite with a
+     current ephemeris hot, although the unit searches from a stored position far away. For that power-on the model
+     sets the SDK's `acquisitionTimeWithEphemeris` to the warm draw of the timing below, and the end of the model puts
+     the hot value back: a start beyond 100 NM is warm, as a start 50 NM away is.
    - The SDK then acquires whatever is really in view within the allowed set. At 829 NM most of the predicted set
      overlaps the real sky, so the start stays ACQ, as in the video.
 3. **Give-up.** If ACQ has no fix after `T_GIVE_UP` (5 minutes, the install manual's longest ACQ, 2-66), the unit
@@ -117,7 +122,7 @@ drives it from `powerChanged` and `tick`.
 
 **Timing.**
 - **Hot.** The SDK's `acquisitionTimeWithEphemeris` is tuned so that a hot start has its fix before the self-test ends
-  (about 10 s).
+  (about 10 s). It applies only within 2 NM of the stored position (step 2).
 - **Warm (the per-power-on factor).** A warm start's time is spread by one random factor drawn per power-on, which
   sets the SDK's `acquisitionTime` for that power-on. It stands for the effects common to all channels: oscillator
   warm-up and the phase of the 30 s data frame. The per-satellite randomness alone cannot spread the fourth-fastest
@@ -152,7 +157,9 @@ hours is a hot start too.
 ## 3. The clock (#328, the clock half of #211)
 
 - **#328.** The GPS keeps its own battery clock and no longer reads `PowerButton`'s assumed hour.
-  - It records `Date.now()` at construction and at every power-off, and adds the real off time at power-on.
+  - It records `E:ABSOLUTE TIME` at construction and at every power-off, and adds the off time in sim time at
+    power-on. The clock follows the sim's world time, as the satellites do; a sim pause has no real-world counterpart,
+    and wall-clock time would put the clock off by the length of a pause before the power-on.
   - The constructor no longer subtracts the hour, and `powerChanged` no longer reads `timeSincePowerChange`.
   - `PowerButton` is unchanged, because `BrightnessManager` and `VolatileMemory` rely on its assumed hour.
   - A cold-and-dark start still advances the clock by the time the unit sat unpowered, and an engine-running start
@@ -173,7 +180,7 @@ hours is a hot start too.
 |---|---|---|
 | ACQ, before the first fix | the predicted set, with the SNR of the main computer's satellite of that PRN (`00` until acquired) | predicted for the stored position and the unit's clock, constant, as in the video |
 | Navigating | the main computer's channels | the true elevation, `90 − zenith` (no `Math.abs`) |
-| Almanac search or sky search, a satellite with no orbit data yet | the main computer's channels | `--°` (the receiver cannot know where it is; unknown values are dashes) |
+| No fix outside ACQ (almanac search, sky search, or Idle after a lost solution), a satellite with no current orbit data | the main computer's channels | `--°` (the receiver cannot know where it is; unknown values are dashes) |
 
 **States (#215):**
 - **INIT.** The receiver initializes after power-on, before it first assigns channels. INIT also covers the almanac
