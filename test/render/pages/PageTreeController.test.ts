@@ -30,8 +30,8 @@ const oth = (n: number) => Array.from({length: n}, (_, i) => i + 1 < 10 ? `OTH $
 
 // The OTH group has the air data pages (OTH 9 and 10 of the full group, named after the pages that remain: 5 and 6
 // without a fuel computer) only for a unit with an air data input, and the fuel computer pages (OTH 5 to 8) only for a
-// unit with a fuel computer. 5-42 describes the air data pages, 5-39 the fuel computer pages. PageTreeController prunes
-// the module-level tree in place, and a power cycle builds the controller again over the pruned tree (#90).
+// unit with a fuel computer. 5-42 describes the air data pages, 5-39 the fuel computer pages. A power cycle builds the
+// controller again; it once pruned the module-level tree in place, so the second build pruned an already pruned tree (#90).
 describe('OTH pages of a unit with and without air data and fuel computer (#90)', () => {
     it('air data only: OTH 1 to OTH 6 before any power cycle (5-42)', async () => {
         const unit = await bootUnit({panelXml: panelXml(AIRDATA)});
@@ -75,9 +75,9 @@ describe('OTH pages of a unit with and without air data and fuel computer (#90)'
         expect(await walk(unit, 'L', 'OTH 1')).toEqual(oth(10));
     });
 
-    // 5-42: the air data pages stay. Today the second controller prunes the already pruned tree: splice(4, 4) takes the air data pages away instead of
-    // pages that are not there
-    it.fails('air data only: still OTH 1 to OTH 6 after a power cycle (#90)', async () => {
+    // 5-42: the air data pages stay. The in-place pruning took them away here: the second build removed the fuel computer
+    // pages by index from a tree that no longer had them
+    it('air data only: still OTH 1 to OTH 6 after a power cycle (#90)', async () => {
         const unit = await bootUnit({panelXml: panelXml(AIRDATA)});
         await unit.panel.powerCycle();
         await unit.panel.approveSelfTest();

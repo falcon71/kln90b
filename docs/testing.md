@@ -116,9 +116,7 @@ The sim globals are installed once per test file by the setup files `test/harnes
   `bootUnit`, and a file may hold several such tests. The unit is torn down when the test ends:
     - its timers stop;
     - the sim fakes are reset in place (`FakeSim` keeps its registration ids, because SDK objects cache them);
-    - the singletons listed in `test/harness/singletons.ts` are cleared. That list includes the module-level
-      `LEFT_PAGE_TREE`, which `PageTreeController` prunes in place on every `MainPage` (#90): the teardown puts it back
-      from a snapshot taken at load, so a later boot in the same file still has the fuel computer pages;
+    - the singletons listed in `test/harness/singletons.ts` are cleared;
     - the DOM is emptied.
 
   The teardown (`runAll` in `boot.ts`) runs every step even when one throws, then rethrows the first error, so one
@@ -1479,8 +1477,6 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 
 - **Flip the pins when the bugs are fixed:** remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each
   of which names its issue. Fixes that touch other tests:
-    - the real fix of #90 (a copy of the page tree per controller) also changes `test/render/harness/pageTree.test.ts`,
-      which asserts the in-place pruning;
     - the fix of #96 needs `PageStack` in `MainPage.tsx` to destroy the half page it replaces (`setCurrentPage`, `pop`,
       `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone leaves both handler counts
       unchanged, and OTH 4 counts the `changed` topic of the remarks manager;
