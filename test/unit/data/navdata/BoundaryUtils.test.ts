@@ -112,17 +112,23 @@ describe('BoundaryUtils.intersects on hand-computed paths (characterization)', (
     ])('%s', (_name, lat1, lon1, lat2, lon2, expected) => {
         expect(BoundaryUtils.intersects(U, lat1, lon1, lat2, lon2)).toBe(expected);
     });
+
+    // The first edge of the TRIANGLE is the sloping one, the last edge the south one (47 N)
+    it.each([
+        ['a path across only the first edge of the ring', 47.5, 8.2, 47.5, 8.8, true],
+        ['a path across only the last edge of the ring', 46.5, 8.95, 47.2, 8.95, true],
+        ['a path that ends short of the last edge', 46.5, 8.95, 46.9, 8.95, false],
+    ])('%s (#208)', (_name, lat1, lon1, lat2, lon2, expected) => {
+        expect(BoundaryUtils.intersects(TRIANGLE, lat1, lon1, lat2, lon2)).toBe(expected);
+    });
 });
 
 describe('BoundaryUtils.getIntersections on hand-computed paths (characterization)', () => {
     // The meridian 8.5 E enters the triangle through its sloping edge at 47.5 N and leaves through the south edge at 47 N.
     // Both points are on the meridian, so the longitude is exact, and the plane puts the crossing with the south edge at
-    // 47 N. The rounding to 0.001 degree only absorbs float noise. The points are compared as a set: the pin below holds
-    // that each comes once.
-    const crossings = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-        const points = BoundaryUtils.getIntersections(TRIANGLE, lat1, lon1, lat2, lon2).map(p => [Math.round(p.lat * 1000) / 1000, Math.round(p.lon * 1000) / 1000]);
-        return [...new Set(points.map(p => p.join(' ')))].sort();
-    };
+    // 47 N. The rounding to 0.001 degree only absorbs float noise.
+    const crossings = (lat1: number, lon1: number, lat2: number, lon2: number) => BoundaryUtils.getIntersections(TRIANGLE, lat1, lon1, lat2, lon2)
+        .map(p => `${Math.round(p.lat * 1000) / 1000} ${Math.round(p.lon * 1000) / 1000}`).sort();
 
     it('returns the two crossing points of a path through the triangle', () => {
         expect(crossings(48, 8.5, 46.5, 8.5)).toEqual(['47 8.5', '47.5 8.5']);
@@ -137,11 +143,15 @@ describe('BoundaryUtils.getIntersections on hand-computed paths (characterizatio
         expect(crossings(47.5, 8.7, 47.5, 9.5)).toEqual(['47.5 9']);
     });
 
-    // The loop visits the first edge of the closed ring twice (BoundaryUtils.ts:121-122, next = (current + 1) % (length - 1)),
-    // so a path across the first edge, here the sloping one, gets that point twice. CTR 1 drops the copy (cleanup in
-    // AirspacesAlongRoute skips crossings within 1 NM), so nothing shows on the screen today.
-    it.fails('returns each crossing point once (#208)', () => {
+    // The sloping edge is the first edge of the closed ring and the south edge its last: each gives its crossing point
+    // exactly once, and a path across only one of them still finds it.
+    it('returns each crossing point once, also for the first edge of the ring (#208)', () => {
         expect(BoundaryUtils.getIntersections(TRIANGLE, 48, 8.5, 46.5, 8.5)).toHaveLength(2);
+        expect(crossings(47.5, 8.2, 47.5, 8.8)).toEqual(['47.5 8.5']);
+    });
+
+    it('returns the crossing point of a path that crosses only the last edge of the ring (#208)', () => {
+        expect(crossings(46.5, 8.95, 47.2, 8.95)).toEqual(['47 8.95']);
     });
 
     it('returns no point for a path beside the triangle', () => {
