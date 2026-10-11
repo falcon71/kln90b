@@ -152,7 +152,7 @@ export class AirspaceAlert implements CalcTickable {
         }
 
         // noinspection RedundantIfStatementJS
-        if (airspace.maxAltType === BoundaryAltitudeType.MSL && indicatedAltitude > UnitType.METER.convertTo(airspace.minAlt, UnitType.FOOT) + this.altBuffer.get()) {
+        if (airspace.maxAltType === BoundaryAltitudeType.MSL && indicatedAltitude > UnitType.METER.convertTo(airspace.maxAlt, UnitType.FOOT) + this.altBuffer.get()) {
             return false;
         }
 

@@ -11,8 +11,7 @@ const messagePageText = () => Screen.read().text();
 const around = (lat: number, lon: number, d: number): [number, number][] => [[lat + d, lon - d], [lat + d, lon + d], [lat - d, lon + d], [lat - d, lon - d]];
 
 describe('airspaces served by the harness', () => {
-    // 3-39, 3-40: the message INSIDE SPC USE AIRSPACE. The aircraft is on the ground at 0 ft, the floor of the area, so
-    // the vertical check holds whichever way it compares the ceiling (see the pin #127 in AirspaceAlert.test.ts).
+    // 3-39, 3-40: the message INSIDE SPC USE AIRSPACE. The aircraft is on the ground at 0 ft, the floor of the area.
     it('shows the SUA message for an aircraft inside a restricted area', async () => {
         const unit = await bootUnit({
             position: {lat: 47.0, lon: 8.0}, altitudeFt: 0,

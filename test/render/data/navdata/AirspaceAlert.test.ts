@@ -43,10 +43,20 @@ describe('SUA alert, vertical limits of an MSL airspace', () => {
         expect(await messagesInside(8000, 1000, 5000)).not.toContain('SPC USE AIRSPACE');
     });
 
-    // AirspaceAlert.isVerticallyInsideAirspace compares the aircraft's altitude with minAlt in the ceiling check
-    // (AirspaceAlert.ts:155), so every aircraft above the floor plus the buffer counts as outside.
-    it.fails('alerts between the floor and the ceiling (#127)', async () => {
+    it('alerts between the floor and the ceiling (#127)', async () => {
         expect(await messagesInside(3000, 1000, 5000)).toContain('INSIDE SPC USE AIRSPACE');
+    });
+
+    // 3-41: the default buffer of 500 ft stretches the area up as well as down. The ceiling is 5000 ft: 4900 ft is inside,
+    // 5400 ft is inside the buffer and 5600 ft is beyond it.
+    it.each([
+        [4900, true],
+        [5400, true],
+        [5600, false],
+    ])('alerts at %i ft near a ceiling of 5000 ft with the default buffer: %s (3-41, #127)', async (altitudeFt, alerts) => {
+        const text = await messagesInside(altitudeFt, 1000, 5000);
+
+        expect(text.includes('INSIDE SPC USE AIRSPACE')).toBe(alerts);
     });
 });
 
@@ -69,8 +79,8 @@ async function flying(trackTrue: number, airspaces: ReturnType<typeof airspace>[
     return unit;
 }
 
-// Figure 3-125's vertical limits, 1000 to 18000 ft MSL. The aircraft flies at 1200 ft, within the floor and the
-// default buffer of 500 ft, so the ceiling check of #127 (it compares with the floor plus the buffer) passes as well.
+// Figure 3-125's vertical limits, 1000 to 18000 ft MSL. The aircraft flies at 1200 ft, between the floor and the
+// ceiling.
 const LIMITS: AirspaceOptions = {minFt: 1000, maxFt: 18000};
 
 describe('AIRSPACE ALERT ahead on the track', () => {
@@ -112,6 +122,21 @@ describe('AIRSPACE ALERT ahead on the track', () => {
         await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
 
         expect(sua(unit)).toHaveLength(1);
+    });
+
+    // 3-39, 3-40: the alert is three-dimensional, and the 10 minute projection checks the altitude like the alert inside
+    // the area does (#127). The same area 5 minutes ahead, with the aircraft at 3000 ft, well above the floor plus the
+    // buffer and below the ceiling, alerts; with the aircraft above the ceiling and the buffer (3-41) it does not
+    it('alerts 5 minutes before an area ahead that the aircraft is below the ceiling of (3-39, 3-40, #127)', async () => {
+        const unit = await flying(0, [fiveMinutes()], {altitudeFt: 3000});
+
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-AHEAD           REST 1000ft to 18000ft']);
+    });
+
+    it('does not alert for an area ahead that the aircraft is above the ceiling and buffer of (3-39, 3-40, 3-41, #127)', async () => {
+        const unit = await flying(0, [fiveMinutes()], {altitudeFt: 18600});
+
+        expect(sua(unit)).toEqual([]);
     });
 
     // 3-39: the alert is three-dimensional. The same area 5 minutes ahead, but from 5000 ft up: the aircraft at 1200 ft
@@ -233,8 +258,8 @@ describe('the vertical limits', () => {
         return sua(unit);
     }
 
-    // 3-41: the manual's example. A buffer of 1000 ft stretches an area from 5000 to 12000 ft down to 4000 ft. (Up to
-    // 13000 ft as well, which #127 breaks; the ceiling side is pinned above.)
+    // 3-41: the manual's example. A buffer of 1000 ft stretches an area from 5000 to 12000 ft down to 4000 ft, and up to
+    // 13000 ft (#127)
     it('alerts 900 ft below the floor with a buffer of 1000 ft (3-41)', async () => {
         expect(await inside(4100, {minFt: 5000, maxFt: 12000}, {storage: {airspaceAlertBuffer: 1000}}))
             .toEqual(['INSIDE SPC USE AIRSPACE R-TEST            REST 5000ft to 12000ft']);
@@ -242,6 +267,25 @@ describe('the vertical limits', () => {
 
     it('does not alert 1100 ft below the floor with a buffer of 1000 ft (3-41)', async () => {
         expect(await inside(3900, {minFt: 5000, maxFt: 12000}, {storage: {airspaceAlertBuffer: 1000}})).toEqual([]);
+    });
+
+    it('alerts 900 ft above the ceiling with a buffer of 1000 ft (3-41, #127)', async () => {
+        expect(await inside(12900, {minFt: 5000, maxFt: 12000}, {storage: {airspaceAlertBuffer: 1000}}))
+            .toEqual(['INSIDE SPC USE AIRSPACE R-TEST            REST 5000ft to 12000ft']);
+    });
+
+    it('does not alert 1100 ft above the ceiling with a buffer of 1000 ft (3-41, #127)', async () => {
+        expect(await inside(13100, {minFt: 5000, maxFt: 12000}, {storage: {airspaceAlertBuffer: 1000}})).toEqual([]);
+    });
+
+    // 3-41: the same margins at the floor of 1000 ft with the default buffer of 500 ft: 550 ft is inside the buffer, 450 ft
+    // is beyond it
+    it.each([
+        [550, true],
+        [450, false],
+    ])('alerts at %i ft near a floor of 1000 ft with the default buffer: %s (3-41)', async (altitudeFt, alerts) => {
+        expect(await inside(altitudeFt, {minFt: 1000, maxFt: 5000}))
+            .toEqual(alerts ? ['INSIDE SPC USE AIRSPACE R-TEST            REST 1000ft to 5000ft'] : []);
     });
 
     // 3-41: the default buffer of the SET 8 page is 500 ft (KLN90BUserSettings), so 300 ft below the floor is inside it
