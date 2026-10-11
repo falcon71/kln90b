@@ -1256,7 +1256,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 - **Sampling an LVar.** Tests sample an LVar over display ticks with a hand-written loop (`SimVarSync.test.ts`,
   `StatusLine.test.ts`, `SelfTestLeftPage.test.ts`). A sampling helper would remove the pitfall; the counting half is
   `sim.writeCount(name)` (section 3).
-- **A blink phase probe.** The #320 pin finds the blink phase through `L:KLN90B_MsgLight`, which is dark on those ticks
+- **A blink phase probe.** The #320 test finds the blink phase through `L:KLN90B_MsgLight`, which is dark on those ticks
   only while a message is unread; a `blinkPhase()` on the unit would not need a message.
 - **A `beforeInit(core)` boot option.** The test of H events before `init()` spies on `KLN90BCore.prototype.init`.
 - **The `Version` mock.** STA 3 shows the placeholder of `kln90b/Version.ts`, which `Screen` refuses, so the tests that

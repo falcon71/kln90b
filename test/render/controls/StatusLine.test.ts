@@ -5,7 +5,7 @@ import {courseDeg} from '../../harness/flight/geo';
 import {blinkCycle} from '../../harness/render/blink';
 import {Screen} from '../../harness/render/screen';
 import {messages} from '../../harness/readers';
-import {NO_OBS, panelXml} from '../../harness/panelXml';
+import {NO_ALTIMETER, NO_OBS, panelXml} from '../../harness/panelXml';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 
 /** The values L:KLN90B_MsgLight takes over 8 display ticks (250 ms each), two seconds */
@@ -244,20 +244,41 @@ describe('status line after an ENT prompt (#320)', () => {
     }
 
     // 3-16: an unread message puts the msg prompt on the status line; the ENT prompt before it does not change that
-    it('shows msg after the ENT, the boot messages unread (sibling of #320) (3-16)', async () => {
+    it('shows msg after the ENT, the boot messages unread (3-16, #320)', async () => {
         await entInTheBlinkPhase();
 
         const texts = new Set([...await overTwoSeconds(prompt)].map(s => s.slice(0, 3)));
-        // Text only: the masks of this prompt are the pin's subject
+        // Text only: the masks of this prompt are the subject of the tests below
         expect(texts).toEqual(new Set(['msg']));
     });
 
     // 3-16, figure 3-55: the unread message flashes the prompt in inverse video; the ENT prompt's flash must not hide
     // it
-    it.fails('flashes msg in inverse video after an ENT prompt that ended in the blink phase (3-16, #320)',
+    it('flashes msg in inverse video after an ENT prompt that ended in the blink phase (3-16, #320)',
         async () => {
             await entInTheBlinkPhase();
 
             expectFlashing(await twoCycles(prompt), 'msg III', 'msg FFF');
+        });
+
+    // 3-16: a read message that stays keeps the prompt steady; the ENT prompt's blink must not hide that one either
+    it('keeps a read msg steady and visible after an ENT prompt that ended in the blink phase (3-16, #320)',
+        async () => {
+            // ALTITUDE FAIL stays after it is read (B-1) and does not depend on the mode
+            const unit = await bootOnStandardRoute({panelXml: panelXml({...NO_OBS, ...NO_ALTIMETER})});
+            await unit.panel.readMessages();
+            expect(messages(unit)).toEqual(['ALTITUDE FAIL']);
+            expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
+            await unit.panel.selectPage('L', 'MOD 2');
+            for (let i = 0; i < 4 && prompt() !== 'ent BBB'; i++) {
+                await vi.advanceTimersByTimeAsync(250);
+            }
+            expect(prompt()).toBe('ent BBB'); // the preconditions: the prompt is ent, in its blink phase
+            await unit.panel.ent();
+            // OBS is on and the read message stays
+            expect(Screen.read().status().mode).toMatch(/^enr:[0-9]{3} msg$/);
+            expect(messages(unit)).toEqual(['ALTITUDE FAIL']);
+
+            expect(await overTwoSeconds(prompt)).toEqual(new Set(['msg III']));
         });
 });
