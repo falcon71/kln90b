@@ -131,6 +131,9 @@ change what they mean; add new ones instead:
 - Commit messages are `fixes #NN <description>` or `references #NN <description>` for GitHub issues, and plain
   sentences otherwise. A commit that fixes an issue always says `fixes #NN`, because GitHub then closes the issue
   when the maintainer pushes. **Never close an issue manually**, neither through the API nor with a comment.
+- **One commit per issue.** When a session fixes several issues, each fix is its own `fixes #NN` commit, with its test
+  and its doc changes in the same commit, so that every fix can be reviewed and reverted on its own. Do not bundle two
+  issues into one commit, and do not spread one fix over several.
 
 ## Bugs go to GitHub issues
 
