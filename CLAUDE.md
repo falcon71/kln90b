@@ -83,8 +83,9 @@ change what they mean; add new ones instead:
   emulates the slow CRT.
 - **GPS** (`Gps.ts`) wraps the SDK `GPSSatComputer`. It models hot, warm and almanac-search starts from the stored
   position, almanac, ephemeris and clock (`GpsSearch.ts`), and the GPS week rollover.
-  Once there is a fix it uses the exact sim position; there is no noise and no RAIM. The wrapper reaches into private
-  SDK internals, so recheck it after SDK upgrades.
+  Once there is a fix it uses the exact sim position; there is no noise. STA 5 predicts RAIM through an SDK prediction
+  context, but no RAIM integrity monitoring or failure is modeled. The wrapper reaches into private SDK internals, so
+  recheck it after SDK upgrades.
 - **Navigation** uses the project's own model, deliberately *not* the SDK flight plan or LNAV.
     - `data/flightplan/`: 26 flight plans (FPL 0 is active) of at most 30 legs, and `ActiveWaypoint` with its turn
       stack.

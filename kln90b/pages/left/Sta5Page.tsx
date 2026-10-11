@@ -1,12 +1,7 @@
 import {
-    ClockEvents,
     DebounceTimer,
-    EventBus,
     Facility,
     FSComponent,
-    GNSSEvents,
-    GPSSatComputer,
-    GPSSystemState,
     UserSetting,
     VNode,
 } from '@microsoft/msfs-sdk';
@@ -115,50 +110,22 @@ export class Sta5Page extends SixLineHalfPage {
 
         this.children.get("result").text = " COMPUTING";
 
-        const tempBus = new EventBus();
-        const clockPublisher = tempBus.getPublisher<ClockEvents>();
-        const gnssPublisher = tempBus.getPublisher<GNSSEvents>();
+        const wpt = this.wpt;
+        const prediction = this.props.sensors.in.gps.raimPrediction;
 
-        const gps = new GPSSatComputer(
-            1,
-            tempBus,
-            `coui://${this.props.planeSettings.basePath}/Assets/gps_ephemeris.json`,
-            `coui://${this.props.planeSettings.basePath}/Assets/gps_sbas.json`,
-            5000,
-            [],
-            'primary',
-        );
-
-
-        clockPublisher.pub('simTime', this.etaZulu.getTimestamp());
-        gnssPublisher.pub('gps-position', new LatLongAlt(this.wpt.lat, this.wpt.lon, 0));
-
-        gps.init();
-
-        this.refDebounce.schedule(async () => { //init needs some time to load the json, but we need to simulate the calculation time anyway
+        this.refDebounce.schedule(async () => { //we need to simulate the calculation time anyway
+            await prediction.awaitInit();
             let result = "";
             for (let timeOffset = -15; timeOffset <= 15; timeOffset += 5) {
-                gps.reset();
-                const timestamp = actualTimeStamp + (timeOffset * 60 * 1000);
-                clockPublisher.pub('simTime', timestamp);
-                gps.acquireAndUseSatellites();
+                //6-19, 6-20: the satellite geometry at the destination at the ETA and around it (#214)
+                prediction.setPosition(wpt.lat, wpt.lon, 0, actualTimeStamp + timeOffset * 60 * 1000).predict();
+                const isRaimAvailable = prediction.getDops()[0] >= 0; //A position solution exists
 
-                console.log(timeOffset, gps.state);
-
-                const isRaimAvailable = gps.state === GPSSystemState.SolutionAcquired || gps.state === GPSSystemState.DiffSolutionAcquired;
-
-                if (isRaimAvailable) {
-                    result += "è";
-                } else {
-                    result += "é";
-                }
+                result += isRaimAvailable ? "è" : "é";
             }
 
             this.children.get("result").text = "  " + result;
         }, RAIM_CALCULATION_TIME);
-
-
     }
-
 
 }

@@ -193,7 +193,9 @@ and `GENERAL ENG FUEL USED SINCE START:n`, and converts them to the configured u
   setting `barosetting`.
 
 `GPS` (`kln90b/Gps.ts`) **simulates acquisition, then reads the true sim position once valid.** There is no position
-error or noise and no RAIM ("We have pretty all messages except for failures and RAIM problems").
+error or noise and no RAIM ("We have pretty all messages except for failures and RAIM problems"). STA 5 predicts
+the satellite geometry at the destination and ETA with `gps.raimPrediction`, a long-lived SDK prediction context of the
+main computer; RAIM failures are still not modeled.
 
 - It wraps the SDK `GPSSatComputer` in `KLNGPSSatComputer` (`// @ts-ignore extends`). That class keeps every reach
   into **private SDK internals through `as any`**, so it may break on SDK upgrades:
@@ -630,7 +632,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `StatusLineMessageEvents.statusLineMessage` and `KeyboardEvent.keyboardevent` (`controls/StatusLine.tsx`)
     - `RemarksChangedEvent.changed` (`RemarksManager.ts`)
     - `KLNfacilityrepo_sync`
-    - SDK topics: `hEvent`, `simTime`, `gps-position`
+    - SDK topic: `hEvent`
 - **Units:** `data/Units.ts` has type aliases only (`Feet`, `NauticalMiles`, `Degrees`, `Knots`, `Seconds`, ...), for
   documentation. Internals use NM, knots and degrees (true unless the name says Mag). `GeoPoint.distance` returns GA
   radians, so convert with `UnitType.GA_RADIAN.convertTo(x, UnitType.NMILE)`. SimVar writes convert to meters, radians

@@ -809,10 +809,11 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
     - the EFB route: `FakeRouteManager` copies the members of `FlightPlanRouteManager` that `KlnEfbLoader` and
       `KlnEfbSaver` use (`syncedAvionicsRoute`, `avionicsRouteRequested`, `replyToAvionicsRouteRequest`), and `efbRoute`
       builds routes with `FlightPlanRouteUtils.emptyRoute()` and `emptyEnrouteLeg()`.
-- **STA 5 cannot be tested as it is.** `Sta5Page` builds its own `GPSSatComputer` with the sync role `'primary'`, and
-  that computer never finishes `init()` in the harness: the `SharedGlobal` a primary creates never resolves, so the
-  page shows `Searching` at every offset. A probe with the role `'none'` runs, which is also the suggested fix of the
-  prediction bug #214; whether the primary role works in the sim is part of that issue's sim check.
+- **STA 5 predicts through `gps.raimPrediction`**, a prediction context of the main computer, and the harness tests it
+  (#214). The page used to build its own `GPSSatComputer` with the sync role `'primary'`, which never finishes `init()`
+  in the harness (its `SharedGlobal` never resolves). The DOP of a fresh context reads 0, which the page counts as
+  available, so a test that reads only the bars cannot see whether `predict()` ran; the call test spies on both
+  `setPosition` and `predict`.
 - **TypeScript 6 no longer includes `@types` automatically.** Harness files that use Node APIs carry
   `/// <reference types="node" />`. The directive makes the Node types available to the whole `tsc` program, because the
   `include` of the root `tsconfig.json` compiles `kln90b/` and `test/` together; it does not keep Node APIs out of the
@@ -883,7 +884,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   `FOCUS_INPUT_FIELD` or `UNFOCUS_INPUT_FIELD`, nor emit `mousePressOutsideView`, so the click outside the instrument
   and the unfocus of `PageContainer.destroy` have no test.
 - **Some editor code cannot be reached in a booted unit.** The null branch of `TimeEditor.convertToValue` needs a host
-  without a time, and SET 2 always has one while STA 5 cannot run (above).
+  without a time, and SET 2 always has one.
 - **The flash rate is CSS.** The harness reads which display tick flashes a cell, not the animation of `.blink` and
   `.inverted-blink` in `KLN90B.scss`; whether FLAG is shown inverse on the real unit is not settled either (figure 3-101
   cannot show it), so the masks of the deviation bars' FLAG row are characterizations.
@@ -1003,13 +1004,12 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   page trees, and the cursor stopping at both ends (#218). *Characterization only:* the
   `FiveSegmentPage` SCAN and ENT order. *Untested:* the `FourSegmentPage` ENT order (by decision) and `TakehomePage`.
 - **The left pages** (`pages/left/`). Every page has a render test and a characterization snapshot, in tree order from
-  NAV 1 to the self-test page, with spec tests where the Pilot's Guide or the KLN 89 trainer gives the rule. *Without a
-  spec test:* OTH 1 (the sim has no FSS data), SET 10 (the page is the project's own, #46), STA 2 and STA 3; STA 5
-  shows only its defaults before a prediction (#214). Super NAV 5 is read through `SuperNav5.read()`, and the NAV 5 and
-  Super NAV 5 maps through the map recorder and file snapshots. *Untested:* weather, terrain and SUA on the maps (no
-  code path), the ESA along the route (needs a non-flat MSA grid), take-home on SET 1 and the TRI pages, and SET 1
-  CONFIRM? for a faster first fix (the start model does not restart on a position entered during a search;
-  architecture.md Core 3).
+  NAV 1 to the self-test page, with spec tests where the Pilot's Guide or the KLN 89 trainer gives the rule. *Without
+  a spec test:* OTH 1 (the sim has no FSS data), SET 10 (the page is the project's own, #46), STA 2 and STA 3. Super
+  NAV 5 is read through `SuperNav5.read()`, and the NAV 5 and Super NAV 5 maps through the map recorder and file
+  snapshots. *Untested:* weather, terrain and SUA on the maps (no code path), the ESA along the route (needs a
+  non-flat MSA grid), take-home on SET 1 and the TRI pages, and SET 1 CONFIRM? for a faster first fix (the start
+  model does not restart on a position entered during a search; architecture.md Core 3).
 - **The right pages** (`pages/right/`). Every page has a render test with a characterization and spec tests where the
   guide, the trainer or a photo of a real unit gives the rule; ACT 7 has characterizations only, and the APT 7 page
   order is a characterization (the trainer had no airport with both SIDs and STARs). *Untested:* the name and city
@@ -1036,9 +1036,8 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
 - **Every pin names an open issue**, checked against GitHub on 2026-10-10 (all closed issues are #88 or older; the
   only pins that name #56 also name the open #333). Bugs filed without a pin, each because no test can observe it
   cheaply or the fix is pending: #117 (scan list job ids can collide; random), #128 (the nearest VOR filter of
-  repository VORs), #214 (the STA 5 prediction; the harness cannot run the page) and #325 (the empty MSG page; no 90B
-  text). #110 is fixed on `master` and closes when that commit reaches GitHub. The questions and enhancements the
-  sessions filed carry their labels on GitHub and have no pins.
+  repository VORs) and #325 (the empty MSG page; no 90B text). #110 is fixed on `master` and closes when that commit
+  reaches GitHub. The questions and enhancements the sessions filed carry their labels on GitHub and have no pins.
 - **The regression triage** covered every closed issue and every bug-fix commit on `master` up to 2026-10-03, and every
   fix that could be observed has a test that failed under the original bug. Three were *not provable*: #20 (closed
   without a fix of its own, and its symptom is an autopilot turn in the sim), part (d) of `7fd640e` (the canvas is

@@ -2,6 +2,7 @@ import {
     EventBus,
     GeoPoint,
     GPSSatComputer,
+    GPSPredictionContext,
     GPSSatComputerOptions,
     GPSSatellite,
     GPSSystemState,
@@ -124,6 +125,8 @@ export class GPS {
     public timeZulu: TimeStamp;
     public gpsSatComputer: KLNGPSSatComputer;
     public readonly search: GpsSearch;
+    /** STA 5 predicts the satellite geometry at the destination and ETA through this context (6-20, #214) */
+    public readonly raimPrediction: GPSPredictionContext;
     /** The simulator's UNIX time of the last tick, for what the receiver reads from its satellites (STA 1) */
     public simTimeUnix: number = 0;
     private lastCoords: GeoPoint;
@@ -167,6 +170,7 @@ export class GPS {
         //The model needs the REAL timings the computer was built with: after a switch from FAST it stays off until the next session
         this.search = new GpsSearch(this.gpsSatComputer, () => fastGPS || this.userSettings.getSetting("fastGpsAcquisition").get());
         this.gpsSatComputer.search = this.search;
+        this.raimPrediction = this.gpsSatComputer.createPredictionContext(); //STA 5 (6-20): one context for the life of the unit; pages are rebuilt on every knob step
         this.gpsSatComputer.onForcedAcquisition = () => this.acceptForcedSolution();
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.powerChanged.bind(this));
 
