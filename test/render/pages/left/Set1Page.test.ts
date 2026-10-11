@@ -169,7 +169,7 @@ async function enterLatitude46N(unit: HeadlessUnit): Promise<void> {
 }
 
 // The harness cannot measure what the real unit uses the confirmed position for, the satellite search: a cold GPS
-// acquires in about 62 s whatever the position (testing.md section 4). What it can see is the position the first fix
+// acquires in about 70 s whatever the position (testing.md section 4). What it can see is the position the first fix
 // is compared with, which posts POSITION DIFFERS FROM LAST POSITION BY >2NM when they are more than 2 NM apart.
 describe('SET 1 CONFIRM? before the first fix (characterization)', () => {
     const MESSAGE = 'POSITION DIFFERS FROM LAST POSITION BY >2NM';

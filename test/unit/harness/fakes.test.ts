@@ -130,6 +130,7 @@ describe('FakeSim through the SDK SimVar functions', () => {
         fresh.set('PLANE ALTITUDE', 'feet', 1000);
         fresh.gameVars.set('SOME GAME VAR', 1);
         fresh.errors.push('stale error');
+        fresh.absoluteTimeOffsetMs = 60_000;
         vi.useFakeTimers({toFake: ['Date']});
         vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
         fresh.startClock();
@@ -145,6 +146,7 @@ describe('FakeSim through the SDK SimVar functions', () => {
         expect(fresh.has('L:RESET_TEST')).toBe(false);
         // The simulation time counts from the epoch again until the next startClock
         expect(fresh.get('E:SIMULATION TIME', 'seconds')).toBe(Date.parse('2026-06-01T12:00:00Z') / 1000);
+        expect(fresh.absoluteTimeOffsetMs).toBe(0);
 
         // An SDK object holds the old ids and never registers again. A new name must not take one of them, and the old
         // ids must still reach their variables. Re-registering the old names would pass even after a full wipe,
@@ -163,6 +165,19 @@ describe('FakeSim through the SDK SimVar functions', () => {
         vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
         // 2026-06-01T12:00:00Z is 1780315200 s after 1970; E:ABSOLUTE TIME adds the 62135596800 s from year 1
         expect(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds)).toBe(1780315200 + 62135596800);
+    });
+
+    it('moves E:ABSOLUTE TIME by absoluteTimeOffsetMs, and E:SIMULATION TIME not', () => {
+        vi.useFakeTimers({toFake: ['Date']});
+        vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
+        sim.startClock();
+        sim.absoluteTimeOffsetMs = -90_000;
+        try {
+            expect(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds)).toBe(1780315200 + 62135596800 - 90);
+            expect(SimVar.GetSimVarValue('E:SIMULATION TIME', SimVarValueType.Seconds)).toBe(0);
+        } finally {
+            sim.absoluteTimeOffsetMs = 0;
+        }
     });
 });
 

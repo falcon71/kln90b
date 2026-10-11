@@ -26,6 +26,7 @@ const DEFAULTS: Record<string, unknown> = {
     lastLatitude: 0,
     lastLongitude: 0,
     lastAlmanacDownload: 0,
+    lastEphemeris: '',
     nearestAptSurface: true,
     nearestAptMinRunwayLength: 1000,
     activeWaypoint: '',

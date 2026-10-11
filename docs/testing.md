@@ -72,8 +72,8 @@ manager. The sim uses `SIM_PLATFORM`; tests use `FakePlatform` (`test/harness/pl
 
 By default the engine is running, so the unit skips the welcome and self-test pages (`isForceReadyToUse`). Pass
 `engineRunning: false` to see the cold-and-dark start. Pass `coldGps: true` for an engine-running boot whose GPS has no
-fix yet (the boot resets the GPS after `propsReady`); it acquires on its own, fast or slow per the `fastGpsAcquisition`
-setting, and `settle` waits for it.
+fix yet (the boot resets the GPS after `propsReady` and erases the cached ephemeris); it acquires on its own, fast or
+slow per the `fastGpsAcquisition` setting, and `settle` waits for it.
 
 ## The global fakes
 
@@ -94,6 +94,9 @@ The sim globals are installed once per test file by the setup files `test/harnes
       SimVar the sim would set itself. The one exception is opt-in: `sim.applyObsKeyEvents = true` makes `K:VOR1_SET`
       and `K:VOR2_SET` set `Nav OBS:1` and `Nav OBS:2` to their value in degrees, as the sim does, for a test of an
       indicator the unit drives (`ObsTarget`). `reset()` turns it off, so it lasts one test.
+    - `E:ABSOLUTE TIME` and `E:SIMULATION TIME` follow the fake clock, so real and sim time run together.
+      `sim.absoluteTimeOffsetMs` moves `E:ABSOLUTE TIME` against it: a negative offset while the clock advances is a sim
+      pause, a positive one a jump of the sim time (the #328 clock tests). `reset()` sets it back to 0.
     - `sim.unsetReads` lists variables the instrument read that nobody set, which helps when wiring a new input.
     - The SDK swallows exceptions inside `GetSimVarValue`, so unit-conversion problems would vanish. `FakeSim` collects
       them in `sim.errors`, and the flight driver turns them into a failure.
@@ -390,11 +393,13 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   their result. The nearest lists and the airspace alert search every 10 s (`NearestList.ts`, `AirspaceAlert.ts`), so
   12 s leaves one search and the time its result needs; a wait below one search interval reads an empty list. Its
   harness test covers the nearest airport list.
-- **Time to first fix.** `bootUnit({coldGps: true})` resets the GPS after a forced acquisition, so every satellite keeps
-  its ephemeris and the last known position is the present one: it acquires in about 62 s (slow) whatever the almanac,
-  the stored position or the clock, and cannot measure a cold or warm start. Boot with `engineRunning: false` and the
-  stored position, almanac time and `fastGpsAcquisition` in `storage`, then `powerOn()`; the GPS acquires while the
-  welcome and self-test pages run.
+- **Time to first fix.** `bootUnit({coldGps: true})` resets the GPS after a forced acquisition and erases the cached
+  ephemeris, without a power-on, so the start model (`GpsSearch.ts`) does not run: it acquires in about 70 s (slow;
+  `IDLE_ACQUISITION` plus 30 s of ephemeris) whatever the almanac, the stored position or the clock, and cannot measure
+  a hot, warm or cold start. For hot, warm, ACQ-give-up and almanac-search starts boot with `engineRunning: false` and
+  the stored position, almanac time, `lastEphemeris` and `fastGpsAcquisition` in `storage`, then `powerOn()`; the GPS
+  acquires while the welcome and self-test pages run. A warm start's time is drawn per power-on, so pass `seed` for
+  the spread (`powerOnCold` in `GpsAcquisition.test.ts`).
 - **`bootToSelfTest(opts)`** (`boot.ts`) boots cold and dark whatever `opts.engineRunning` says (the self-test follows
   the welcome page only on a unit that is not force-ready), powers on, advances 19 s (the 17 s Turn-On page and two
   seconds more) and returns the unit with the self-test page showing. It throws with `Screen.read().dump()` when the
@@ -774,13 +779,11 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   (`vi.useFakeTimers({toFake: ['Date']})`), a value is set every 1000 ms and the output sampled every 62 ms.
 - **A booted engine-running unit starts with the MSG annunciator lit.** Empty storage means the last position is 0/0, so
   `POSITION DIFFERS FROM LAST POSITION BY >2NM` posts; that is a fact of the harness, and the NAV 2 screens of the
-  harness tests show its `msg`. Seeding a last position in `storage` (`lastLatitude`, `lastLongitude`) removes it. The
-  second message of such a boot, `SYSTEM TIME UPDATED TO GPS TIME`, is a bug (#328): the GPS clock starts an hour
-  behind and `forceReadyToUse` never adds the hour back, so it posts on every engine-running boot whatever `storage`
-  holds (pinned in `GpsAcquisition.test.ts`). A test that needs a message in the live list as a guard (that the list is
-  read at all) uses `POSITION DIFFERS` with empty storage, or posts a message of its own with
+  harness tests show its `msg`. Seeding a last position in `storage` (`lastLatitude`, `lastLongitude`) removes it. A
+  test that needs a message in the live list as a guard (that the list is read at all) uses `POSITION DIFFERS` with
+  empty storage, or posts a message of its own with
   `unit.props.messageHandler.addMessage(new OneTimeMessage([...]))` when its storage holds the position
-  (`Set1Page.test.ts`); it never relies on SYSTEM TIME UPDATED, which a fix of #328 removes.
+  (`Set1Page.test.ts`).
 - **Long render tests need their own timeout.** The render stage keeps Vitest's 5 s default. A test that advances
   minutes of simulated time with every tick running can pass alone and time out while other suites load the machine,
   which makes a mutation run report a false kill. Give such a test a per-test timeout (the CAL 6 tests in
@@ -790,9 +793,12 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **SDK upgrades may require updating the fakes.** `FakeSim` mirrors the native layer the SDK builds on, and
   `KLNGPSSatComputer` reaches into private SDK internals (docs/architecture.md, Core 3); recheck both, and run the whole
   suite, after upgrading `@microsoft/msfs-sdk`. `KLNGPSSatComputer` (`Gps.ts`) reads `activeSimulationContext.channels`
-  and the computer's own private `lastAlamanacTime`. It also reads `this.simTime` and `this.distanceFromLastKnownPos`
-  through `as any`: both were fields of the computer until SDK 2.3.3 moved them to `activeSimulationContext.time` and
-  `activeSimulationContext.distanceFromLastKnownPos`, which no type error reports (#211; three pins hold it). After an
+  and the computer's own private `lastAlamanacTime`, sets the private `satelliteTimingOptions` (the per-power-on
+  acquisition time of the start model) and writes the satellites' private `data.lastEphemerisTime` (the persisted
+  ephemeris), all through `as any`, which no type error reports. The SDK's `simTime` and `distanceFromLastKnownPos` are
+  no longer read. The start model uses only public API besides: `createPredictionContext`, `setSatelliteInhibit`,
+  `syncLastKnownPosition`, `eraseLastKnownPosition`; the harness's `coldGps` uses `eraseCachedEphemeris`.
+  `GpsAcquisition.test.ts` holds these fields. After an
   upgrade run `test/render/GpsAcquisition.test.ts` first. The harness also relies on these SDK
   internals, and after an upgrade a change in one of them shows up as a confusing harness error, not as a named check:
     - the boundary search: `NearestLodBoundarySearchSession` builds its `LodBoundary` objects in a throttled queue on
@@ -803,10 +809,11 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
     - the EFB route: `FakeRouteManager` copies the members of `FlightPlanRouteManager` that `KlnEfbLoader` and
       `KlnEfbSaver` use (`syncedAvionicsRoute`, `avionicsRouteRequested`, `replyToAvionicsRouteRequest`), and `efbRoute`
       builds routes with `FlightPlanRouteUtils.emptyRoute()` and `emptyEnrouteLeg()`.
-- **STA 5 cannot be tested as it is.** `Sta5Page` builds its own `GPSSatComputer` with the sync role `'primary'`, and
-  that computer never finishes `init()` in the harness: the `SharedGlobal` a primary creates never resolves, so the
-  page shows `Searching` at every offset. A probe with the role `'none'` runs, which is also the suggested fix of the
-  prediction bug #214; whether the primary role works in the sim is part of that issue's sim check.
+- **STA 5 predicts through `gps.raimPrediction`**, a prediction context of the main computer, and the harness tests it
+  (#214). The page used to build its own `GPSSatComputer` with the sync role `'primary'`, which never finishes `init()`
+  in the harness (its `SharedGlobal` never resolves). The DOP of a fresh context reads 0, which the page counts as
+  available, so a test that reads only the bars cannot see whether `predict()` ran; the call test spies on both
+  `setPosition` and `predict`.
 - **TypeScript 6 no longer includes `@types` automatically.** Harness files that use Node APIs carry
   `/// <reference types="node" />`. The directive makes the Node types available to the whole `tsc` program, because the
   `include` of the root `tsconfig.json` compiles `kln90b/` and `test/` together; it does not keep Node APIs out of the
@@ -877,7 +884,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   `FOCUS_INPUT_FIELD` or `UNFOCUS_INPUT_FIELD`, nor emit `mousePressOutsideView`, so the click outside the instrument
   and the unfocus of `PageContainer.destroy` have no test.
 - **Some editor code cannot be reached in a booted unit.** The null branch of `TimeEditor.convertToValue` needs a host
-  without a time, and SET 2 always has one while STA 5 cannot run (above).
+  without a time, and SET 2 always has one.
 - **The flash rate is CSS.** The harness reads which display tick flashes a cell, not the animation of `.blink` and
   `.inverted-blink` in `KLN90B.scss`; whether FLAG is shown inverse on the real unit is not settled either (figure 3-101
   cannot show it), so the masks of the deviation bars' FLAG row are characterizations.
@@ -997,12 +1004,12 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   page trees, and the cursor stopping at both ends (#218). *Characterization only:* the
   `FiveSegmentPage` SCAN and ENT order. *Untested:* the `FourSegmentPage` ENT order (by decision) and `TakehomePage`.
 - **The left pages** (`pages/left/`). Every page has a render test and a characterization snapshot, in tree order from
-  NAV 1 to the self-test page, with spec tests where the Pilot's Guide or the KLN 89 trainer gives the rule. *Without a
-  spec test:* OTH 1 (the sim has no FSS data), SET 10 (the page is the project's own, #46), STA 2 and STA 3; STA 5
-  shows only its defaults before a prediction (#214). Super NAV 5 is read through `SuperNav5.read()`, and the NAV 5 and
-  Super NAV 5 maps through the map recorder and file snapshots. *Untested:* weather, terrain and SUA on the maps (no
-  code path), the ESA along the route (needs a non-flat MSA grid), take-home on SET 1 and the TRI pages, and SET 1
-  CONFIRM? for a faster first fix (the harness acquisition ignores the position).
+  NAV 1 to the self-test page, with spec tests where the Pilot's Guide or the KLN 89 trainer gives the rule. *Without
+  a spec test:* OTH 1 (the sim has no FSS data), SET 10 (the page is the project's own, #46), STA 2 and STA 3. Super
+  NAV 5 is read through `SuperNav5.read()`, and the NAV 5 and Super NAV 5 maps through the map recorder and file
+  snapshots. *Untested:* weather, terrain and SUA on the maps (no code path), the ESA along the route (needs a
+  non-flat MSA grid), and take-home on SET 1 and the TRI pages. The restart of the GPS search by a corrected position, date
+  or time (SET 1 CONFIRM?, SET 2, the self-test page) is tested in `GpsAcquisition.test.ts` (architecture.md Core 3).
 - **The right pages** (`pages/right/`). Every page has a render test with a characterization and spec tests where the
   guide, the trainer or a photo of a real unit gives the rule; ACT 7 has characterizations only, and the APT 7 page
   order is a characterization (the trainer had no airport with both SIDs and STARs). *Untested:* the name and city
@@ -1029,10 +1036,8 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
 - **Every pin names an open issue**, checked against GitHub on 2026-10-10 (all closed issues are #88 or older; the
   only pins that name #56 also name the open #333). Bugs filed without a pin, each because no test can observe it
   cheaply or the fix is pending: #117 (scan list job ids can collide; random), #128 (the nearest VOR filter of
-  repository VORs), #214 (the STA 5 prediction; the harness cannot run the page) and #325 (the empty MSG page; no 90B
-  text). #110 is fixed on `master` and closes when that commit reaches GitHub. #213 was first filed without a pin and
-  has one since (`Sta1Page.test.ts`). The questions and enhancements the sessions filed carry their labels on GitHub
-  and have no pins.
+  repository VORs) and #325 (the empty MSG page; no 90B text). #110 is fixed on `master` and closes when that commit
+  reaches GitHub. The questions and enhancements the sessions filed carry their labels on GitHub and have no pins.
 - **The regression triage** covered every closed issue and every bug-fix commit on `master` up to 2026-10-03, and every
   fix that could be observed has a test that failed under the original bug. Three were *not provable*: #20 (closed
   without a fix of its own, and its symptom is an autopilot turn in the sim), part (d) of `7fd640e` (the canvas is
@@ -1464,7 +1469,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       baro change takes effect before ENT; the distance indicator's 0 KTS and 0 MIN of Installation Manual 2-69; a time
       entry in a time zone other than UTC.
     - Power cycle: `Timers` saves the total time every 60 s and not at power-off, so STA 4 loses up to 59 s when the sim
-      closes; `PowerButton` counts the first cold power-on as an hour off (intended; #211 has the clock half);
+      closes; `PowerButton` counts the first cold power-on as an hour off (intended);
       `SimVarSync` ignores the LEG/OBS switch while disabled (read again at the resume); the Direct To and the active
       waypoint survive a power cycle unchanged, while 3-8 only says the last waypoint's page shows; the
       `memory.<x>Page.ident` writes of `PageManager.startMainPage` are equivalent, because `WaypointPage` uses the ident
@@ -1489,8 +1494,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests);
     - a fix of #335 turns the #334 pin red as well,
       though #334 still needs its own fix for SET 0 and Super NAV 5; a fix of #332 with a ride-through above about 1.5 s
-      needs the 3 s waits of the circuit tests raised; a fix of #328 must keep the screen warm on a forced start
-      (`lastPowerChangeTime` also drives the warm-up); `HEADING_INPUT` in
+      needs the 3 s waits of the circuit tests raised; `HEADING_INPUT` in
       `RollSteeringController.test.ts` can bite once #143 is fixed.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): #146 (the alert time on a Direct To a
   waypoint of FPL 0 that has a following leg), #147 (a waypoint alert in OBS mode), duplicate idents on a waypoint page

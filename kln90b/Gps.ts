@@ -1,14 +1,11 @@
 import {
-    ClockEvents,
     EventBus,
     GeoPoint,
-    GNSSEvents,
     GPSSatComputer,
-    GPSSatComputerEvents,
+    GPSPredictionContext,
     GPSSatComputerOptions,
     GPSSatellite,
     GPSSystemState,
-    Publisher,
     SimVarValueType,
     SubscribableSet,
     UnitType,
@@ -19,13 +16,20 @@ import {KLN90BUserSettings} from "./settings/KLN90BUserSettings";
 import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {MessageHandler, OneTimeMessage} from "./data/MessageHandler";
 import {PowerEvent, PowerEventData} from "./PowerButton";
-import {HOURS_TO_SECONDS} from "./data/navdata/NavCalculator";
 import {TICK_TIME_CALC} from "./TickController";
+import {GPS_ERA_DURATION, GpsSearch, HOT_ACQUISITION, HOT_ACQUISITION_RANGE, IDLE_ACQUISITION, SearchMode, WARM_ACQUISITION_RANGE} from "./GpsSearch";
 
 const SAVE_INTERVALL = 60000;
 const MIN_GROUND_SPEED_FOR_TRACK = 2; //3-35
 const GPS_EPOCH = 315964800000; //Jan 6 1980
-const GPS_ERA_DURATION = 1024 * 60 * 60 * 24 * 7 * 1000;
+
+/** "prn:time,prn:time" (setting lastEphemeris) */
+function parseEphemeris(saved: string): [number, number][] {
+    return saved === "" ? [] : saved.split(",")
+        .map(e => e.split(":").map(Number) as [number, number])
+        .filter(([prn, time]) => Number.isFinite(prn) && Number.isFinite(time));
+}
+
 export interface GPSEvents {
     timeUpdatedEvent: TimeStamp; //This is fired if either the time was manually updated by the other or when the time was changed by more than 10 minutes
 }
@@ -34,30 +38,75 @@ export interface GPSEvents {
  * Note: We have emptied the gps_sbas.json, as WAAS satellites might be added with the default implementation, even though enabledSBASGroups is empty
  */
 // @ts-ignore
-class KLNGPSSatComputer extends GPSSatComputer {
+export class KLNGPSSatComputer extends GPSSatComputer {
 
     public internalTime: number = 0;
+    public search: GpsSearch | undefined = undefined; //Set by GPS after construction
+    /** Called after a forced acquisition, which the unit accepts at once (#215) */
+    public onForcedAcquisition: (() => void) | undefined = undefined;
 
     constructor(index: number, bus: EventBus, ephemerisFile: string, sbasFile: string, updateInterval: number, enabledSBASGroups: Iterable<string> | SubscribableSet<string>, syncRole: "primary" | "replica" | "none", options: Readonly<GPSSatComputerOptions>) {
         super(index, bus, ephemerisFile, sbasFile, updateInterval, enabledSBASGroups, syncRole, options);
     }
 
     /**
-     * The alamanc is very important for the KLN 90B. If the position or time is off, it takes a long time to search for
-     * the satellites. We mimic this behavour here
+     * The almanac is very important for the KLN 90B. If the position or time is off, it takes a long time to search for
+     * the satellites. The start model (GpsSearch) decides whether the receiver may use its almanac (#62)
      *
      * @param simTime
      */
     public isAlmanacValid(simTime?: number): boolean {
-        const anythis = (this as any); //Yeah, we're cheating
-
-        if (simTime === undefined) {
-            simTime = anythis.simTime as number;
+        switch (this.search?.mode ?? SearchMode.Idle) {
+            case SearchMode.Acquisition:
+                return true; //The start model has decided (#62)
+            case SearchMode.AlmanacSearch:
+            case SearchMode.SkySearch:
+                return false;
+            default:
+                return super.isAlmanacValid(simTime);
         }
+    }
 
-        return Math.abs(this.internalTime - simTime) < 10 * 60 * 1000 //The KLN cannot find the satellites from the almanac, if the internal clock is off by more than 10 minutes (10 Minutes are mentioned in the install manual)
-            && anythis.distanceFromLastKnownPos < 0.0174221163 // 60 nautical miles, mentioned in the Install manual
-            && super.isAlmanacValid(simTime);  //Actual validity
+    /** The forced acquisition of an engine-running start or of SET 10 FAST ends the start model */
+    public acquireAndUseSatellites(): void {
+        this.search?.end();
+        super.acquireAndUseSatellites();
+        this.onForcedAcquisition?.();
+    }
+
+    /** The time the receiver last completed an almanac, sim time. Private in the SDK */
+    public getLastAlmanacTime(): number | undefined {
+        return (this as any).lastAlamanacTime;
+    }
+
+    /** Sets the SDK's acquisition time without ephemeris. Its timing options are private; the satellites share the object */
+    public setAcquisitionTime(mean: number, range: number): void {
+        const options = (this as any).satelliteTimingOptions;
+        if (options === undefined) {
+            throw new Error("GPSSatComputer.satelliteTimingOptions moved: recheck Gps.ts after the SDK upgrade");
+        }
+        options.acquisitionTime = mean;
+        options.acquisitionTimeRange = range;
+    }
+
+    /** Sets the SDK's acquisition time with a current ephemeris, the hot start of its 2 NM rule (#62). The same private options */
+    public setAcquisitionTimeWithEphemeris(mean: number, range: number): void {
+        const options = (this as any).satelliteTimingOptions;
+        if (options === undefined) {
+            throw new Error("GPSSatComputer.satelliteTimingOptions moved: recheck Gps.ts after the SDK upgrade");
+        }
+        options.acquisitionTimeWithEphemeris = mean;
+        options.acquisitionTimeRangeWithEphemeris = range;
+    }
+
+    /** Puts a stored ephemeris back into the receiver (#62). The time is private satellite data in the SDK */
+    public restoreEphemeris(entries: [number, number][]): void {
+        for (const [prn, time] of entries) {
+            const sat = this.getSatellites().find(s => s.prn === prn);
+            if (sat !== undefined) {
+                (sat as any).data.lastEphemerisTime = time;
+            }
+        }
     }
 
     /**
@@ -75,26 +124,33 @@ export class GPS {
     public groundspeed: Knots = 0;
     public timeZulu: TimeStamp;
     public gpsSatComputer: KLNGPSSatComputer;
+    public readonly search: GpsSearch;
+    /** STA 5 predicts the satellite geometry at the destination and ETA through this context (6-20, #214) */
+    public readonly raimPrediction: GPSPredictionContext;
+    /** The simulator's UNIX time of the last tick, for what the receiver reads from its satellites (STA 1) */
+    public simTimeUnix: number = 0;
     private lastCoords: GeoPoint;
     private intSaveCount = 0;
     private readonly takeHomeMode: boolean;
-    private clockPublisher: Publisher<ClockEvents>;
-    private gnssPublisher: Publisher<GNSSEvents>;
     private gpsStartTime: number = 0;
+    private solutionAccepted = false; //5-29: the unit accepts the receiver's solution one calculation tick after it appears (TRAN)
+    private inTransition = false;
+    private lastPowerOffTime: number = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds); //Sim time (s) of construction or the last power-off. The battery clock runs on while the unit is off (3-53)
 
     constructor(private bus: EventBus, private userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, private readonly messageHandler: MessageHandler) {
         const fastGPS = this.userSettings.getSetting("fastGpsAcquisition").get();
 
         const gpsOptions: GPSSatComputerOptions = {
             channelCount: 8,
-            timingOptions: { //3-17
+            timingOptions: { //3-17, #62
                 almanacExpireTime: 182 * 24 * 60 * 60 * 1000, //Six months
-                acquisitionTime: fastGPS ? 10 * 1000 : 1.5 * 60 * 1000, //Up to two minutes -> 90 +- 30 seconds -> + 30 seconds to download ephemeris
-                acquisitionTimeRange: fastGPS ? 1000 : 60 * 1000,
-                acquisitionTimeWithEphemeris: fastGPS ? 10 * 1000 : 60 * 1000,
-                acquisitionTimeRangeWithEphemeris: fastGPS ? 1000 : 60 * 1000,
-                acquisitionTimeout: fastGPS ? 1000 : 4 * 60 * 1000, //4 + 2 -> this puts us close to the 6 minutes the manual mentions. With a second miss, we are at 8+2, that's the value from the manual
-                ephemerisDownloadTime: fastGPS ? 1000 : 30000, //30 Seconds
+                ephemerisExpireTime: 2 * 60 * 60 * 1000,
+                acquisitionTime: fastGPS ? 10 * 1000 : IDLE_ACQUISITION, //GpsSearch sets it per power-on
+                acquisitionTimeRange: fastGPS ? 1000 : WARM_ACQUISITION_RANGE,
+                acquisitionTimeWithEphemeris: fastGPS ? 10 * 1000 : HOT_ACQUISITION, //#62: a power cycle with a current ephemeris has its fix in 0:17, self-test included
+                acquisitionTimeRangeWithEphemeris: fastGPS ? 1000 : HOT_ACQUISITION_RANGE,
+                acquisitionTimeout: fastGPS ? 1000 : 4 * 60 * 1000,
+                ephemerisDownloadTime: fastGPS ? 1000 : 30000, //30 Seconds, one data frame
                 almanacDownloadTime: fastGPS ? 1000 : 750000, //12.5 minutes
             },
         };
@@ -109,18 +165,18 @@ export class GPS {
             'none',
             gpsOptions,
         );
-        bus.getSubscriber<GPSSatComputerEvents>().on('gps_system_state_changed_1').handle(state => {
-            const valid = state === GPSSystemState.SolutionAcquired || state === GPSSystemState.DiffSolutionAcquired;
-            if (valid) {
-                this.gpsAcquired();
-            }
-        });
+        //Before the power event subscription, so that powerChanged always finds the search. PowerButton publishes no power
+        //event before Sensors exists, so powerChanged never runs before the end of this constructor
+        //The model needs the REAL timings the computer was built with: after a switch from FAST it stays off until the next session
+        this.search = new GpsSearch(this.gpsSatComputer, () => fastGPS || this.userSettings.getSetting("fastGpsAcquisition").get());
+        this.gpsSatComputer.search = this.search;
+        this.raimPrediction = this.gpsSatComputer.createPredictionContext(); //STA 5 (6-20): one context for the life of the unit; pages are rebuilt on every knob step
+        this.gpsSatComputer.onForcedAcquisition = () => this.acceptForcedSolution();
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.powerChanged.bind(this));
 
-        this.clockPublisher = bus.getPublisher<ClockEvents>();
-        this.gnssPublisher = bus.getPublisher<GNSSEvents>();
-
         this.gpsSatComputer.init();
+        const savedEphemeris = parseEphemeris(userSettings.getSetting("lastEphemeris").get());
+        this.gpsSatComputer.awaitInit().then(() => this.gpsSatComputer.restoreEphemeris(savedEphemeris));
 
         this.coords = new GeoPoint(
             userSettings.getSetting("lastLatitude").get(),
@@ -139,17 +195,16 @@ export class GPS {
 
         //We assume that the internal clock kept the time fairly accurate since it has last been running
         const timeRandom = Math.random() * 5 - 2.5;
-        //We subtract an hour, because the PowerButton assumes the device has been off for one our. Will be added back in powerChanged
-        const unixTime = this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) + timeRandom - HOURS_TO_SECONDS);
+        const unixTime = this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) + timeRandom);
         this.timeZulu = this.unixToTimestamp(unixTime);
         this.gpsSatComputer.internalTime = unixTime;
     }
 
     tick() {
         const actualUnixTime = this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds));
+        this.simTimeUnix = actualUnixTime;
         const lat = SimVar.GetSimVarValue('PLANE LATITUDE', SimVarValueType.Degree);
         const lon = SimVar.GetSimVarValue('PLANE LONGITUDE', SimVarValueType.Degree);
-        const alt = SimVar.GetSimVarValue('PLANE ALTITUDE', SimVarValueType.Meters);
 
         if (this.takeHomeMode) {
             const distance = this.groundspeed / 60 / 60 / 1000 * TICK_TIME_CALC;
@@ -164,9 +219,21 @@ export class GPS {
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + TICK_TIME_CALC);
             this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp();
         } else {
-            this.clockPublisher.pub('simTime', actualUnixTime);
-            this.gnssPublisher.pub('gps-position', new LatLongAlt(lat, lon, alt));
+            this.search.tick(actualUnixTime, {lat, lon}, this.gpsSatComputer.internalTime);
             this.gpsSatComputer.onUpdate();
+
+            if (!this.hasSdkSolution()) {
+                this.solutionAccepted = false;
+                this.inTransition = false;
+            } else if (!this.solutionAccepted) {
+                if (this.inTransition) {
+                    this.solutionAccepted = true;
+                    this.inTransition = false;
+                    this.gpsAcquired();
+                } else {
+                    this.inTransition = true;
+                }
+            }
 
             if (this.isValid()) {
                 this.lastCoords = this.coords;
@@ -214,10 +281,28 @@ export class GPS {
         return this.groundspeed >= MIN_GROUND_SPEED_FOR_TRACK ? this.trackTrue : null;
     }
 
-    public isValid(): boolean {
-        //todo this is not entirely correct. GPSSatComputer assumes navigation is only possible with 4 sats. 5-29 states that navigation may be possible with 3 sats when an altitude input is used in the solution
+    private hasSdkSolution(): boolean {
         const state = this.gpsSatComputer.systemState.get();
         return state === GPSSystemState.SolutionAcquired || state === GPSSystemState.DiffSolutionAcquired;
+    }
+
+    public isValid(): boolean {
+        //todo this is not entirely correct. GPSSatComputer assumes navigation is only possible with 4 sats. 5-29 states that navigation may be possible with 3 sats when an altitude input is used in the solution
+        return this.solutionAccepted && this.hasSdkSolution();
+    }
+
+    /** 5-29: enough satellites are tracked, but the unit has not accepted the position yet */
+    public isTransition(): boolean {
+        return this.inTransition;
+    }
+
+    /** The forced acquisition of an engine-running start or SET 10 FAST is accepted at once, without TRAN */
+    public acceptForcedSolution(): void {
+        if (this.hasSdkSolution() && !this.solutionAccepted) {
+            this.solutionAccepted = true;
+            this.inTransition = false;
+            this.gpsAcquired();
+        }
     }
 
 
@@ -228,10 +313,26 @@ export class GPS {
         //we still keep all old values
     }
 
+    /**
+     * 3-5, 3-17..3-19: the pilot entered the date, the time or the position while the unit searches. The receiver starts
+     * its search again from the corrected values (#357). With a fix the satellites supply both, and nothing changes
+     */
+    public reinitializeSearch(): void {
+        if (this.isValid() || this.takeHomeMode) {
+            return;
+        }
+        this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp();
+        this.search.start(this.coords);
+    }
+
     public savePosition(): void {
         this.userSettings.getSetting("lastLatitude").set(this.coords.lat);
         this.userSettings.getSetting("lastLongitude").set(this.coords.lon);
-        this.userSettings.getSetting("lastAlmanacDownload").set((this.gpsSatComputer as any).lastAlamanacTime ?? 0);
+        this.userSettings.getSetting("lastAlmanacDownload").set(this.gpsSatComputer.getLastAlmanacTime() ?? 0);
+        this.userSettings.getSetting("lastEphemeris").set(this.gpsSatComputer.getSatellites()
+            .filter(s => s.lastEphemerisTime !== undefined)
+            .map(s => `${s.prn}:${s.lastEphemerisTime}`)
+            .join(","));
     }
 
     private unixToTimestamp(unix: number): TimeStamp {
@@ -243,6 +344,7 @@ export class GPS {
     }
 
     private gpsAcquired() {
+        this.search.end(); //The first fix ends the start model (#62)
         const timeNow = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
         console.log(`gpsAcquired in ${timeNow - this.gpsStartTime} seconds`);
         const actualUnixTime = this.absoluteTimeToUNIXTime(timeNow);
@@ -268,9 +370,19 @@ export class GPS {
 
     private powerChanged(evt: PowerEventData) {
         if (evt.isPowered) {
-            //Ticks are not running, when we are powered off
-            this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + evt.timeSincePowerChange);
+            //Ticks are not running, when we are powered off. The battery clock counts the off time itself:
+            //PowerButton's timeSincePowerChange is shaped for the CRT warm-up and is about 0 on a forced start (#328).
+            //It counts sim time: the clock follows the sim's world time, as the satellites do, and a sim pause has no
+            //real-world counterpart
+            this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + (SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) - this.lastPowerOffTime) * 1000);
+            this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp(); //The receiver reads it on the first update, before tick refreshes it (#211)
+            this.search.start(this.coords); //The receiver starts from the position stored at power-off (#62)
             this.gpsStartTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
+        } else {
+            this.lastPowerOffTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
+            this.solutionAccepted = false;
+            this.inTransition = false;
+            this.search.end();
         }
     }
 

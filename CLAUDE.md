@@ -81,10 +81,11 @@ change what they mean; add new ones instead:
   hot-swap-disabled.
   **DOM changes happen only inside display ticks** (`tick(blink)`/`redraw()`); input handlers only change state. This
   emulates the slow CRT.
-- **GPS** (`Gps.ts`) wraps the SDK `GPSSatComputer` to model acquisition time, almanac validity and the GPS week
-  rollover.
-  Once there is a fix it uses the exact sim position; there is no noise and no RAIM. The wrapper reaches into private
-  SDK internals, so recheck it after SDK upgrades.
+- **GPS** (`Gps.ts`) wraps the SDK `GPSSatComputer`. It models hot, warm and almanac-search starts from the stored
+  position, almanac, ephemeris and clock (`GpsSearch.ts`), and the GPS week rollover.
+  Once there is a fix it uses the exact sim position; there is no noise. STA 5 predicts RAIM through an SDK prediction
+  context, but no RAIM integrity monitoring or failure is modeled. The wrapper reaches into private SDK internals, so
+  recheck it after SDK upgrades.
 - **Navigation** uses the project's own model, deliberately *not* the SDK flight plan or LNAV.
     - `data/flightplan/`: 26 flight plans (FPL 0 is active) of at most 30 legs, and `ActiveWaypoint` with its turn
       stack.
@@ -131,6 +132,9 @@ change what they mean; add new ones instead:
 - Commit messages are `fixes #NN <description>` or `references #NN <description>` for GitHub issues, and plain
   sentences otherwise. A commit that fixes an issue always says `fixes #NN`, because GitHub then closes the issue
   when the maintainer pushes. **Never close an issue manually**, neither through the API nor with a comment.
+- **One commit per issue.** When a session fixes several issues, each fix is its own `fixes #NN` commit, with its test
+  and its doc changes in the same commit, so that every fix can be reviewed and reverted on its own. Do not bundle two
+  issues into one commit, and do not spread one fix over several.
 
 ## Bugs go to GitHub issues
 

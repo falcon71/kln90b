@@ -126,6 +126,7 @@ export class SelfTestRightPage extends SixLineHalfPage {
         const newDate = oldDate.withDate(date.getYear(), date.getMonth(), date.getDate());
 
         this.props.sensors.in.gps.timeZulu = newDate.atTimezone(UTC);
+        this.props.sensors.in.gps.reinitializeSearch(); //3-5, 3-17: the date entered during a search speeds it up (#357)
     }
 
     private saveTime(date: TimeStamp): void {
@@ -137,6 +138,7 @@ export class SelfTestRightPage extends SixLineHalfPage {
         const newDate = oldDate.withTime(date.getHours(), date.getMinutes());
 
         this.props.sensors.in.gps.timeZulu = newDate.atTimezone(UTC);
+        this.props.sensors.in.gps.reinitializeSearch(); //3-5, 3-17: the time entered during a search speeds it up (#357)
     }
 
     private approve(): void {
