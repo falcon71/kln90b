@@ -266,10 +266,10 @@ export class UserWaypointLoaderV2 implements UserWaypointLoader {
 
     private deserializeLat(str: string): number {
         const sign = str.substring(19, 20) == '-' ? -1 : 1;
-        const degrees = Number(str.substring(19, 22));
+        const degrees = Number(str.substring(20, 22)); //Without the sign, which is applied below
         const minutes = Number(str.substring(22, 27)) / 60;
 
-        return sign * (degrees + (degrees >= 0 ? minutes : -minutes));
+        return sign * (degrees + minutes);
     }
 
     private deserializeLon(str: string): number {

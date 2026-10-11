@@ -215,8 +215,7 @@ with the knobs.
 persistor, so a test of the restore stays independent of the code that saves. The format tests of the persistor itself
 (`UserWaypointV2.test.ts`) keep their literals. An airport's `elevationFt` is stored in meters, rounded, as the format
 and the model hold it (1400 ft are `+00427`), so APT 2 of that airport shows 1400 ft; an unknown elevation is the
-unit's own -1 m. A southern latitude of one degree or more does not survive the restore (#98),
-so keep it out of setup.
+unit's own -1 m.
 
 `standardRoute()` (`test/harness/fixtures.ts`) returns the world many tests use: KAAA, the VOR ABC and KBBB, fresh objects
 on every call. `insertLeg(unit, idx, fac)` (`test/harness/flightplan.ts`) puts a `USER` leg into FPL 0 at `idx`, the way the
@@ -712,7 +711,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   is: `Conversions.ts` and `Wind.ts` follow avform, and an expectation computed from avform restates the code.
 - **Pin known bugs with `it.fails('... (#NN)')`.** The test states the correct behavior, fails today, and turns red when
   someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See
-  `UserWaypointV2.test.ts` (#98) and `turnDirection.test.ts` (#100).
+  `turnDirection.test.ts` (#100) and `ActPage.test.ts` (#294).
 - **Prove a pin by fixing the bug, and keep heavy setup out of it.** An `it.fails` test passes on *any* failure, so a
   broken precondition inside it (a boot that threw, a wrong key sequence) is invisible: the pin stays green for the
   wrong reason. Prove a pin by fixing the bug temporarily and seeing the test turn red, then restore. Where it is cheap,

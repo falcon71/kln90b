@@ -1,7 +1,7 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {AirportFacility, ICAO, NdbFacility, RunwaySurfaceType, UnitType, VorFacility} from '@microsoft/msfs-sdk';
 import {bootUnit, settle} from '../../harness/boot';
-import {savedUserWaypoints} from '../../harness/storage';
+import {savedUserWaypoints, storedSetting} from '../../harness/storage';
 import {Screen} from '../../harness/render/screen';
 
 describe('savedUserWaypoints (harness)', () => {
@@ -89,6 +89,29 @@ describe('savedUserWaypoints (harness)', () => {
         const westVor = repo.get(ICAO.value('V', 'XX', '', 'XYZ')) as VorFacility;
         expect(westVor.freqMHz).toBeCloseTo(108.05, 6);
         expect(westVor.magneticVariation).toBe(-3);
+    });
+
+    // The hemisphere signs: a southern latitude is stored with its sign and restored south (#98), and the restore leaves
+    // the stored strings as they are (#103). The strings are laid out by hand
+    it('restores a southern waypoint in the south and leaves its stored string alone', async () => {
+        const unit = await bootUnit({
+            storage: savedUserWaypoints([
+                {kind: 'int', ident: 'USOUTH', lat: -12.5, lon: 10.25},
+                {kind: 'vor', ident: 'SVOR', lat: -33.75, lon: -70.5, freqMHz: 114.3, magvar: -3},
+            ]),
+        });
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(2000); // the unit saves a moment after a change
+
+        expect(storedSetting(unit, 'wpt0')).toBe('WXX        USOUTH  -1230.00+01015.00');
+        expect(storedSetting(unit, 'wpt1')).toBe('VXX        SVOR    -3345.00-07030.00+114.30-03');
+        const repo = unit.props.facilityRepository;
+        const south = repo.get(ICAO.value('W', 'XX', '', 'USOUTH'))!;
+        expect(south.lat).toBeCloseTo(-12.5, 6);
+        expect(south.lon).toBeCloseTo(10.25, 6);
+        const vor = repo.get(ICAO.value('V', 'XX', '', 'SVOR')) as VorFacility;
+        expect(vor.lat).toBeCloseTo(-33.75, 6);
+        expect(vor.lon).toBeCloseTo(-70.5, 6);
     });
 
     // APT 2 of a user airport rounds the stored altitude (meters) back to feet in steps of 10 (Apt2UserPage.formatElevation):

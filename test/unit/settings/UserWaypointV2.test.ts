@@ -90,7 +90,8 @@ describe('user waypoint V2 format', () => {
         expect(ndb.freqMHz).toBeCloseTo(345, 6);
     });
 
-    // The setup sibling of the #98 pin below: the same slot restores without throwing, with its ident and its longitude
+    // The setup of the southern latitude tests below: the same slot restores without throwing, with its ident and its
+    // longitude
     it('restores a southern waypoint without throwing, with its ident and longitude', () => {
         expect(() => restoreFrom('WXX        SOUTH   -1230.00+01015.00')).not.toThrow();
         const wpt = repo.get(ICAO.value('W', 'XX', '', 'SOUTH'))!;
@@ -98,10 +99,73 @@ describe('user waypoint V2 format', () => {
         expect(wpt.lon).toBeCloseTo(10.25, 6);
     });
 
-    it.fails('restores a southern latitude (#98)', () => {
+    it('restores a southern latitude (#98)', () => {
         restoreFrom('WXX        SOUTH   -1230.00+01015.00');
         const wpt = repo.get(ICAO.value('W', 'XX', '', 'SOUTH'))!;
         expect(wpt.lat).toBeCloseTo(-12.5, 6);
+    });
+
+    // The latitude field is a sign, two digits of degrees and the minutes with two decimals (docs/architecture.md, Core 7).
+    // Strings written by hand; the expected degrees are the digits worked out by hand, including a latitude of exactly
+    // one degree, the digits just below the next whole degree and the pole
+    it.each([
+        ['+1230.00', 12.5],
+        ['-1230.00', -12.5],
+        ['-0100.00', -1],
+        ['+0100.00', 1],
+        ['-0059.99', -(59.99 / 60)],  // below one degree south: degrees 00
+        ['-1259.99', -(12 + 59.99 / 60)],  // just below 13 degrees south
+        ['+1259.99', 12 + 59.99 / 60],
+        ['-3345.50', -(33 + 45.5 / 60)],
+        ['-8959.99', -(89 + 59.99 / 60)],
+        ['-9000.00', -90],
+        ['+9000.00', 90],
+        ['-0000.00', 0],
+        ['+0000.00', 0],
+        ['-0000.01', -(0.01 / 60)],
+    ])('restores the latitude %s as %f degrees, longitude and ident untouched (#98)', (field, expected) => {
+        restoreFrom(`WXX        LATTEST ${field}-07030.25`);
+
+        const wpt = repo.get(ICAO.value('W', 'XX', '', 'LATTEST'))!;
+        expect(wpt.lat).toBeCloseTo(expected, 9);
+        expect(wpt.lon).toBeCloseTo(-(70 + 30.25 / 60), 9);
+    });
+
+    // Every kind of waypoint reads its latitude with the same method, an airport's runway included
+    it('restores a southern latitude of a VOR, an NDB, a supplementary waypoint and an airport with its runway (#98)', () => {
+        restoreFrom(
+            'VXX        VORS    -2315.00+04630.00+114.30-02',
+            'NXX        NDBS    -2315.00+04630.00+0345.0',
+            'UXX        SUPS    -2315.00+04630.00',
+            'AXX        APTS    -2315.00+04630.00+00800+03200H',
+        );
+
+        const expectedLat = -(23 + 15 / 60);
+        const lon = 46.5;
+        for (const [type, ident] of [['V', 'VORS'], ['N', 'NDBS'], ['U', 'SUPS'], ['A', 'APTS']]) {
+            const wpt = repo.get(ICAO.value(type, 'XX', '', ident))!;
+            expect(wpt.lat, ident).toBeCloseTo(expectedLat, 9);
+            expect(wpt.lon, ident).toBeCloseTo(lon, 9);
+        }
+        const apt = repo.get(ICAO.value('A', 'XX', '', 'APTS')) as AirportFacility;
+        expect(apt.runways[0].latitude).toBeCloseTo(expectedLat, 9);
+        expect(apt.runways[0].longitude).toBeCloseTo(lon, 9);
+    });
+
+    // The writer has always been right: a southern latitude is stored with its sign, and restoring the stored string
+    // returns the position, so a waypoint survives any number of restarts
+    it('stores a southern latitude with its sign and restores the stored string to the same position (#98)', () => {
+        repo.add({
+            icao: '', icaoStruct: ICAO.value('W', 'XX', '', 'ROUND'), name: '', lat: -(33 + 45.5 / 60), lon: -(70 + 30.25 / 60), region: 'XX', city: '', routes: [],
+        } as unknown as Facility);
+        expect(storedSlot(0)).toBe('WXX        ROUND   -3345.50-07030.25');
+
+        removeAll();
+        restoreFrom('WXX        ROUND   -3345.50-07030.25');
+        const wpt = repo.get(ICAO.value('W', 'XX', '', 'ROUND'))!;
+        expect(wpt.lat).toBeCloseTo(-(33 + 45.5 / 60), 9);
+        expect(wpt.lon).toBeCloseTo(-(70 + 30.25 / 60), 9);
+        expect(storedSlot(0)).toBe('WXX        ROUND   -3345.50-07030.25'); // and a restore leaves the slot alone (#103)
     });
 
     // 6677fae: the V2 restore flipped the sign of western longitudes of one degree and more
@@ -133,7 +197,7 @@ describe('user waypoint V2 format', () => {
         expect(wpt.lon).toBeCloseTo(-0.9058333, 6);
     });
 
-    // Not a pin: #98 only hits southern latitudes of 1 degree and more
+    // A latitude between 0 and -1 degrees keeps its sign too: the degrees part truncates to zero
     it('keeps the sign of a latitude south of the equator by less than one degree (#36)', () => {
         repo.add({
             icao: '', icaoStruct: ICAO.value('W', 'XX', '', 'SZERO'), name: '', lat: -0.5, lon: 8, region: 'XX', city: '', routes: [],
