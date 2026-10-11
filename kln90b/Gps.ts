@@ -1,14 +1,11 @@
 import {
-    ClockEvents,
     EventBus,
     GeoPoint,
-    GNSSEvents,
     GPSSatComputer,
     GPSSatComputerEvents,
     GPSSatComputerOptions,
     GPSSatellite,
     GPSSystemState,
-    Publisher,
     SimVarValueType,
     SubscribableSet,
     UnitType,
@@ -48,14 +45,19 @@ class KLNGPSSatComputer extends GPSSatComputer {
      * @param simTime
      */
     public isAlmanacValid(simTime?: number): boolean {
-        const anythis = (this as any); //Yeah, we're cheating
+        //Yeah, we're cheating: since SDK 2.3.3 the receiver's time and position live in its simulation context (#211)
+        const context = (this as any).activeSimulationContext;
 
         if (simTime === undefined) {
-            simTime = anythis.simTime as number;
+            simTime = context.time as number;
         }
 
+        //The context computes its own distanceFromLastKnownPos only after this check has been read, so we compute it here
+        const lastKnownPosition = context.lastKnownPosition as GeoPoint;
+        const distanceFromLastKnownPos = lastKnownPosition.isValid() ? (context.position as GeoPoint).distance(lastKnownPosition) : Infinity;
+
         return Math.abs(this.internalTime - simTime) < 10 * 60 * 1000 //The KLN cannot find the satellites from the almanac, if the internal clock is off by more than 10 minutes (10 Minutes are mentioned in the install manual)
-            && anythis.distanceFromLastKnownPos < 0.0174221163 // 60 nautical miles, mentioned in the Install manual
+            && distanceFromLastKnownPos < 0.0174221163 // 60 nautical miles, mentioned in the Install manual
             && super.isAlmanacValid(simTime);  //Actual validity
     }
 
@@ -77,8 +79,6 @@ export class GPS {
     private lastCoords: GeoPoint;
     private intSaveCount = 0;
     private readonly takeHomeMode: boolean;
-    private clockPublisher: Publisher<ClockEvents>;
-    private gnssPublisher: Publisher<GNSSEvents>;
     private gpsStartTime: number = 0;
     private lastPowerOffTime: number = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds); //Sim time (s) of construction or the last power-off. The battery clock runs on while the unit is off (3-53)
 
@@ -117,9 +117,6 @@ export class GPS {
         });
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.powerChanged.bind(this));
 
-        this.clockPublisher = bus.getPublisher<ClockEvents>();
-        this.gnssPublisher = bus.getPublisher<GNSSEvents>();
-
         this.gpsSatComputer.init();
 
         this.coords = new GeoPoint(
@@ -148,7 +145,6 @@ export class GPS {
         const actualUnixTime = this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds));
         const lat = SimVar.GetSimVarValue('PLANE LATITUDE', SimVarValueType.Degree);
         const lon = SimVar.GetSimVarValue('PLANE LONGITUDE', SimVarValueType.Degree);
-        const alt = SimVar.GetSimVarValue('PLANE ALTITUDE', SimVarValueType.Meters);
 
         if (this.takeHomeMode) {
             const distance = this.groundspeed / 60 / 60 / 1000 * TICK_TIME_CALC;
@@ -163,8 +159,6 @@ export class GPS {
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + TICK_TIME_CALC);
             this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp();
         } else {
-            this.clockPublisher.pub('simTime', actualUnixTime);
-            this.gnssPublisher.pub('gps-position', new LatLongAlt(lat, lon, alt));
             this.gpsSatComputer.onUpdate();
 
             if (this.isValid()) {
@@ -272,6 +266,7 @@ export class GPS {
             //It counts sim time: the clock follows the sim's world time, as the satellites do, and a sim pause has no
             //real-world counterpart
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + (SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) - this.lastPowerOffTime) * 1000);
+            this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp(); //The receiver reads it on the first update, before tick refreshes it (#211)
             this.gpsStartTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
         } else {
             this.lastPowerOffTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);

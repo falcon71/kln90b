@@ -7,12 +7,11 @@ import {storedSetting} from '../harness/storage';
 import {messages} from '../harness/readers';
 import {TimeStamp} from '../../kln90b/data/Time';
 
-// #211: the KLN almanac check (KLNGPSSatComputer.isAlmanacValid) reads SDK fields that SDK 2.3.3 moved into
-// activeSimulationContext, so it is always false; with that fixed, the first calculation tick after power-on still sees
-// the clock one hour behind (powerChanged advances timeZulu, not internalTime). Both make every slow cold-and-dark start
-// a sky search of about 6 minutes. The three pins of #211 turn red with both fixes: read activeSimulationContext.time
-// and compute the distance from activeSimulationContext.position and lastKnownPosition (the context's own distance field
-// is set after the first read), and set gpsSatComputer.internalTime in powerChanged after the off time is added.
+// #211: the KLN almanac check (KLNGPSSatComputer.isAlmanacValid) reads the receiver's time and position from
+// activeSimulationContext, where SDK 2.3.3 keeps them, and computes the distance from the last known position itself,
+// as the context sets its own distance field only after the first read. The receiver's clock (internalTime) is set in
+// powerChanged after the off time is added to timeZulu, as the first update after power-on reads it before any tick.
+// Without either, every slow cold-and-dark start would be a sky search of about 6 minutes.
 //
 // The acquisition tests simulate several minutes each: they carry their own timeout, as the 5 s default fails when the
 // machine is busy (testing.md).
@@ -48,7 +47,7 @@ describe('GPS time to first fix, slow acquisition', () => {
     // 3-17: with a current almanac and the right time, date and position the first fix usually comes in under 2 minutes;
     // 3-8: a unit that is not NAV ready within 5 minutes needs the initialization of 3.6 (install manual 2-66: not more
     // than 5 minutes, typically 2)
-    it.fails('a warm start is NAV ready within 5 minutes of power-on (#211)', async () => {
+    it('a warm start is NAV ready within 5 minutes of power-on (#211)', async () => {
         const unit = await powerOnCold(WARM);
 
         expect(await secondsToFix(unit, 300)).toBeLessThan(300);
@@ -62,7 +61,7 @@ describe('GPS time to first fix, slow acquisition', () => {
     }, SLOW);
 
     // Install manual 2-66: with the position within 60 NM and the time within 10 minutes, STA 1 shows ACQ
-    it.fails('a warm start shows ACQ on STA 1 right after the self-test (#211)', async () => {
+    it('a warm start shows ACQ on STA 1 right after the self-test (#211)', async () => {
         const unit = await powerOnCold(WARM);
         await unit.panel.approveSelfTest();
         await unit.panel.selectPage('L', 'STA 1');
@@ -80,10 +79,9 @@ describe('GPS time to first fix, slow acquisition', () => {
         expect(Screen.read().rows('L')[0]).toBe('STATE  INIT');
     }, SLOW);
 
-    // 3-17: the receiver's own view of the almanac. The tripwire for the SDK internals isAlmanacValid reads. Whoever
-    // removes the .fails of the three pins confirms that the warm start is ACQ, not merely fast: a faster sky search also
-    // turns the 5 minute pin red
-    it.fails('a warm start considers its almanac valid (#211)', async () => {
+    // 3-17: the receiver's own view of the almanac, asked directly. This is the tripwire that the unit's almanac check
+    // (Gps.ts isAlmanacValid, reading activeSimulationContext) reports the almanac of a warm start as valid
+    it('a warm start considers its almanac valid (#211)', async () => {
         const unit = await powerOnCold(WARM);
         await vi.advanceTimersByTimeAsync(5000);
 
@@ -109,10 +107,26 @@ describe('GPS time to first fix, slow acquisition', () => {
         expect(await secondsToFix(unit, 540)).toBeLessThan(540);
     }, SLOW);
 
+    // 3-53, 3-17: the battery clock runs on while the unit is off, and the receiver's own clock (internalTime) is set from
+    // it at power-on (#211). The receiver reads internalTime on its first update, before any tick refreshes it, so a stale
+    // value would make the almanac check fail at the first update. The first update after a power cycle only resets the
+    // channels, so the 5-minute bound below holds neither the clock nor the almanac fields; the assertion on internalTime
+    // holds the clock, and the four #211 pins hold the almanac fields. The battery clock keeps the sim time, as the
+    // clock tests below
+    it('a power cycle of 3 hours at the same place sets the receiver clock and is NAV ready within 5 minutes (3-17, #211)', async () => {
+        const unit = await powerOnCold(WARM);
+        expect(await secondsToFix(unit, 720)).toBeLessThan(720);
+        await unit.panel.powerOff();
+        await vi.advanceTimersByTimeAsync(3 * 60 * MINUTE);
+        await unit.panel.powerOn();
+
+        expect(Math.abs(unit.props.sensors.in.gps.gpsSatComputer.internalTime - Date.now())).toBeLessThan(3500);
+        expect(await secondsToFix(unit, 300)).toBeLessThan(300);
+    }, SLOW);
+
     // Install manual 2-66: only a position within 60 NM of the stored one is a warm start, so 80 NM is a sky search (3-5,
     // 3-17: usually about six minutes, at most 12). The SDK accepts the position up to 100 NM, so this is the KLN's own 60
-    // NM clause (Gps.ts isAlmanacValid). Today the whole almanac check is dead (#211) and every start is a sky search,
-    // so only a check that is always valid breaks this case; once #211 is fixed it also holds the 60 NM clause
+    // NM clause (Gps.ts isAlmanacValid), so this case holds that clause (#211)
     it('a start 80 NM from the stored position is not NAV ready within 3 minutes, and is within 12 (install manual 2-66, 3-5, 3-17)', async () => {
         const unit = await powerOnCold({...WARM, lastLatitude: 47 + 80 / 60});
 
@@ -137,10 +151,9 @@ describe('GPS time to first fix, slow acquisition', () => {
         expect(await secondsToFix(unit, 540)).toBeLessThan(540);
     }, SLOW);
 
-    // 3-17: the almanac stays current for six months. The almanac check of the unit is dead since SDK 2.3.3 (#211), so
-    // this pin, which sees the almanac age only through it, turns red only together with the #211 fix (the six months
-    // are in place, #212). The test below holds the six months on their own.
-    it.fails('a start with an almanac 120 days old is a warm start (3-17: six months) (#211)', async () => {
+    // 3-17: the almanac stays current for six months. This pin sees the almanac age through the unit's almanac check
+    // (#211); the test below holds the loose bound of the six months on its own.
+    it('a start with an almanac 120 days old is a warm start (3-17: six months) (#211)', async () => {
         const unit = await powerOnCold({...WARM, lastAlmanacDownload: START - 120 * DAY});
 
         expect(await secondsToFix(unit, 300)).toBeLessThan(300);
@@ -153,8 +166,8 @@ describe('GPS time to first fix, slow acquisition', () => {
         expect(await secondsToFix(unit, 720)).toBeLessThan(720);
     }, SLOW);
 
-    // 3-17: a stored almanac stays usable for six months. The age limit is the SDK's part of the almanac check, which
-    // still works while the unit's own clauses (#211) do not, so it is asked directly with the sim time given. The
+    // 3-17: a stored almanac stays usable for six months. The age limit is the SDK's part of the almanac check, so it
+    // is asked directly with the sim time given. The
     // cases stay clear of the exact day, which the guide does not give.
     describe('the age limit of the stored almanac (3-17: six months) (#212)', () => {
         const sdkAlmanacValid = async (ageDays: number) => {

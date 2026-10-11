@@ -106,7 +106,7 @@ export class Sta1Page extends SixLineHalfPage {
             this.children.get("line3").text = this.drawSat(sats[7]);
             if (this.props.planeSettings.debugMode) {
                 this.children.get("line4").text = "ALM:" + (this.props.sensors.in.gps.gpsSatComputer.isAlmanacValid() ? "Y" : "N") + " " + Math.round((this.props.sensors.in.gps.gpsSatComputer as any).almanacProgress * 100);
-                const ttf = Math.max(...sats.map(sat => (sat as any).timeToAcquire / 1000).filter(ttf => !Number.isNaN(ttf)));
+                const ttf = Math.max(...sats.map(sat => (sat as any).data.timeToAcquire / 1000).filter(ttf => !Number.isNaN(ttf)));
                 this.children.get("line5").text = `TTF:${Math.round(ttf)}`;
             } else {
                 this.children.get("line4").text = "";

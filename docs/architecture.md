@@ -195,13 +195,13 @@ and `GENERAL ENG FUEL USED SINCE START:n`, and converts them to the configured u
 error or noise and no RAIM ("We have pretty all messages except for failures and RAIM problems").
 
 - It wraps the SDK `GPSSatComputer` in `KLNGPSSatComputer` (`// @ts-ignore extends`). That class accesses **private SDK
-  internals through `as any`** (`simTime`, `distanceFromLastKnownPos`, `activeSimulationContext.channels`,
-  `lastAlamanacTime`), so it may break on SDK upgrades.
+  internals through `as any`** (`activeSimulationContext.time`, `.position`, `.lastKnownPosition` and
+  `.channels`, `lastAlamanacTime`), so it may break on SDK upgrades.
     - `isAlmanacValid` additionally requires the internal clock to be within 10 minutes of sim time AND the last known
       position to be within 60 NM (both values from the install manual).
     - The computer has 8 channels. Timing: acquisition about 90 ± 30 s, ephemeris download 30 s, almanac download 12.5
       min, almanac expiry six months (3-17), timeout 4 min; with `fastGpsAcquisition` all of these drop to about 1 to 10 s. It is
-      driven manually: `GPS.tick` publishes `simTime` and `gps-position` on the bus and then calls `onUpdate()`. Sync
+      driven manually: the computer reads the sim time and position SimVars itself, and `GPS.tick` calls `onUpdate()`. Sync
       role is `'none'`. SBAS is disabled by the emptied `gps_sbas.json`.
 - `isValid()` means `systemState` is `SolutionAcquired` or `DiffSolutionAcquired`. There is a TODO: 3-satellite plus
   altitude aiding is not modelled.

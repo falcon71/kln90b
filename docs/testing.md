@@ -791,9 +791,9 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **SDK upgrades may require updating the fakes.** `FakeSim` mirrors the native layer the SDK builds on, and
   `KLNGPSSatComputer` reaches into private SDK internals (docs/architecture.md, Core 3); recheck both, and run the whole
   suite, after upgrading `@microsoft/msfs-sdk`. `KLNGPSSatComputer` (`Gps.ts`) reads `activeSimulationContext.channels`
-  and the computer's own private `lastAlamanacTime`. It also reads `this.simTime` and `this.distanceFromLastKnownPos`
-  through `as any`: both were fields of the computer until SDK 2.3.3 moved them to `activeSimulationContext.time` and
-  `activeSimulationContext.distanceFromLastKnownPos`, which no type error reports (#211; three pins hold it). After an
+  and the computer's own private `lastAlamanacTime`. Its almanac check also reads
+  `activeSimulationContext.time`, `.position` and `.lastKnownPosition` through `as any`, which no type error reports;
+  `GpsAcquisition.test.ts` holds these fields. After an
   upgrade run `test/render/GpsAcquisition.test.ts` first. The harness also relies on these SDK
   internals, and after an upgrade a change in one of them shows up as a confusing harness error, not as a named check:
     - the boundary search: `NearestLodBoundarySearchSession` builds its `LodBoundary` objects in a throttled queue on
@@ -1465,7 +1465,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       baro change takes effect before ENT; the distance indicator's 0 KTS and 0 MIN of Installation Manual 2-69; a time
       entry in a time zone other than UTC.
     - Power cycle: `Timers` saves the total time every 60 s and not at power-off, so STA 4 loses up to 59 s when the sim
-      closes; `PowerButton` counts the first cold power-on as an hour off (intended; #211 has the clock half);
+      closes; `PowerButton` counts the first cold power-on as an hour off (intended);
       `SimVarSync` ignores the LEG/OBS switch while disabled (read again at the resume); the Direct To and the active
       waypoint survive a power cycle unchanged, while 3-8 only says the last waypoint's page shows; the
       `memory.<x>Page.ident` writes of `PageManager.startMainPage` are equivalent, because `WaypointPage` uses the ident
