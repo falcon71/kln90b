@@ -408,7 +408,8 @@ export class KLNFacilityLoader implements FacilityClient {
         if (repo) {
             return Promise.resolve(repo);
         }
-        return this.actualFacilityLoader.getFacility(type, icao);
+        // The database rejects for an ICAO it does not know, but the FacilityClient interface answers null.
+        return this.actualFacilityLoader.getFacility(type, icao).catch(() => null);
     }
 
     /** @inheritDoc */
