@@ -31,7 +31,7 @@ export class HtAboveAirportAlert implements CalcTickable {
             return;
         }
 
-        const offset = this.userSettings.getSetting("airspaceAlertBuffer").get();
+        const offset = this.userSettings.getSetting("htAboveAptOffset").get();
 
 
         if (distToActive <= 5 && indicatedAlt <= UnitType.METER.convertTo(activeWpt.altitude, UnitType.FOOT) + offset) {

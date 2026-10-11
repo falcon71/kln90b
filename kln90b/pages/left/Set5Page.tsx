@@ -94,6 +94,6 @@ export class Set5Page extends SixLineHalfPage {
     }
 
     private saveHtAlertOffset(offset: number): void {
-        this.props.userSettings.getSetting("airspaceAlertBuffer").set((offset + 8) * 100);
+        this.props.userSettings.getSetting("htAboveAptOffset").set((offset + 8) * 100);
     }
 }
