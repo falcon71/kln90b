@@ -139,20 +139,37 @@ describe('HtAboveAirportAlert', () => {
     });
 
     // 3-58: the top is the database field elevation plus the offset, in feet. AirportFacility.altitude is in meters (the
-    // builder converts like the sim data; APT 2 converts it back), but the service adds it to feet unconverted. A field
-    // at 3000 ft (914.4 m) with offset 1000 ft has its top at 4000 ft; the service uses 1914.4 ft, so an aircraft at
-    // 3900 ft, 900 ft above the field, gets no alert.
-    it.fails('adds the field elevation in feet (#178)', () => {
+    // builder converts like the sim data; APT 2 converts it back). A field at 3000 ft (914.4 m) with offset 1000 ft has
+    // its top at 4000 ft, so an aircraft at 3900 ft, 900 ft above the field, gets the alert.
+    it('adds the field elevation in feet (#178)', () => {
         const r = rig({active: airport('KHHH', 47, 8, {elevationFt: 3000}), offset: 1000});
         r.at(3, 3900);
         expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
     });
 
-    // The passing sibling of the pin above: at 1800 ft, below 1914 ft, the service alerts today, so the pin's setup
-    // reaches the comparison
-    it('alerts an aircraft below the top of a field at 3000 ft (sibling of #178, 3-58)', () => {
+    // 3-58: above the top there is no alert. The top is 4000 ft here, a value only the converted elevation reaches
+    it('gives no alert above the top of a field at 3000 ft (3-58, #178)', () => {
         const r = rig({active: airport('KHHH', 47, 8, {elevationFt: 3000}), offset: 1000});
-        r.at(3, 1800);
+        r.at(3, 4100);
+        expect(r.patterns).toEqual([]);
+    });
+
+    // 3-58: the top, to half a foot either side, at a field of 9000 ft (2743.2 m) with offset 2000 ft: 11000 ft. A
+    // conversion with a rounded factor (3.28) puts the top at 10997.7 ft, which this pair tells apart.
+    it('has its top at the field elevation in feet plus the offset, to half a foot (3-58, #178)', () => {
+        const r = rig({active: airport('KHHH', 47, 8, {elevationFt: 9000}), offset: 2000});
+        r.at(3, 11000.5);
+        expect(r.patterns).toEqual([]);
+        r.at(3, 10999.5);
+        expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
+    });
+
+    // A field below sea level has its top below the offset: elevation -200 ft, offset 800 ft, top 600 ft
+    it('adds a negative field elevation (3-58, #178)', () => {
+        const r = rig({active: airport('KHHH', 47, 8, {elevationFt: -200}), offset: 800});
+        r.at(3, 650);
+        expect(r.patterns).toEqual([]);
+        r.at(3, 550);
         expect(r.patterns).toEqual([SHORT_LONG_SHORT]);
     });
 

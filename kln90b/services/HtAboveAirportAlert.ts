@@ -1,7 +1,7 @@
 import {CalcTickable} from "../TickController";
 import {NavPageState} from "../data/VolatileMemory";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
-import {Facility, FacilityType, FacilityUtils} from "@microsoft/msfs-sdk";
+import {Facility, FacilityType, FacilityUtils, UnitType} from "@microsoft/msfs-sdk";
 import {Sensors} from "../Sensors";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 import {LONG_BEEP_ID, SHORT_BEEP_ID} from "./AudioGenerator";
@@ -34,7 +34,7 @@ export class HtAboveAirportAlert implements CalcTickable {
         const offset = this.userSettings.getSetting("airspaceAlertBuffer").get();
 
 
-        if (distToActive <= 5 && indicatedAlt <= (activeWpt as any).altitude + offset) {
+        if (distToActive <= 5 && indicatedAlt <= UnitType.METER.convertTo(activeWpt.altitude, UnitType.FOOT) + offset) {
             if (this.alerted !== activeWpt) {
                 this.sensors.out.audioGenerator.beepPattern([SHORT_BEEP_ID, LONG_BEEP_ID, SHORT_BEEP_ID]);
                 this.alerted = activeWpt;
