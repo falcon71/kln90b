@@ -224,6 +224,9 @@ export class SensorsIn implements CalcTickable {
                 case 2:
                     this.obsMag = SimVar.GetSimVarValue('Nav OBS:2', SimVarValueType.Degree);
                     break;
+                default: //0 ignores the external course, also after L:KLN90B_ObsSource switched to it at runtime
+                    this.obsMag = null;
+                    break;
             }
         } else {
             //The manual implies, that this can only be read, when the GPS is the nav source
