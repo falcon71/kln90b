@@ -39,8 +39,12 @@ reference library.
   - The almanac stays current for six months.
   - 5-29, 5-30: the STA 1 states are INIT, ACQ, TRAN, NAV, NAV A, NAV D, DEGRD and FAILR, and the elevation
     ranges from 5° to 90°.
-- **Pilot's Guide, ORS 01:** its STA 1 list (6-29) also has `SRCH`. ORS 20 dropped it, and the project follows
-  ORS 20.
+- **Pilot's Guide, ORS 01** (a scan; the maintainer supplied the pages):
+  - Its STA 1 list (6-29) also has `SRCH`. ORS 20 dropped it, and the project follows ORS 20.
+  - The page after it (6-30) explains the search: an almanac six months old or more sends the receiver into the
+    search-the-sky state. One received satellite is enough to collect a new almanac, and the search takes 20
+    minutes. ORS 20 dropped that sentence and gives 6 typical, 12 at most instead (3-17). The observed 21:36 on newer
+    receiver software (host 01515-0047) agrees with ORS 01, so ORS 01's 20 minutes win.
 - **Install manual 2-66:** for the checkout, enter a position within 60 NM and a time within 10 minutes. STA 1 should
   then show ACQ and a fix within 5 minutes, typically 2. A search of the sky can take up to 15 minutes.
 
@@ -54,8 +58,11 @@ reference library.
     ephemeris.
   - Cold: no usable prediction; the receiver searches the sky blindly. Contemporary 8-channel receivers (Trimble
     SVeeEight) search eight satellites at a time and move on after a timeout, as the SDK's sky search does.
-- **A wrong clock is worse than no almanac.** The receiver confidently searches satellites, and Doppler shifts, that
-  are not there, and it falls back to a blind search only after it gives up.
+- **A confidently wrong prediction costs time.** With a wrong clock or position the receiver searches satellites, and
+  Doppler shifts, that are not there, and it falls back to a blind search only after it gives up.
+- **The wrong date is an expired almanac.** The unit judges the almanac's age by its own clock. A clock decades off
+  makes a current almanac look decades old, so the 21:36 start was a search of the sky for a new almanac (ORS 01:
+  20 minutes), not a wrong-prediction case.
 
 The KLN 89 trainer runs in take-home mode only and does not simulate the receiver. It gave nothing for this work.
 
@@ -64,9 +71,16 @@ The KLN 89 trainer runs in take-home mode only and does not simulate the receive
 **What the unit believes decides how it searches.** At every power-on the unit picks a start mode from its stored
 data and its own clock.
 
-1. **The almanac is not current** (true age six months or more) → **sky search** right away.
-   - Use the true age, not the age by the unit's clock. A clock 39 years off did not make the real unit treat its
-     almanac as expired; otherwise that start would have been the manual's 6-minute almanac collection, not 21:36.
+1. **The almanac is not current by the unit's own clock** (six months or more between the stored almanac time and
+   the unit's clock) → **almanac search** (ORS 01 6-30). This covers both a really old almanac and a clock that is far
+   off, such as the wrong date.
+   - The SDK runs its PRN-order blind search until the first satellite is acquired.
+   - All other satellites are then inhibited. One satellite is enough to collect the almanac, and the unit does not
+     navigate on a blind fix.
+   - The SDK collects the almanac from it (`almanacDownloadTime`, 12.5 minutes, kept as it is).
+   - When the almanac is complete, the unit's clock is set from the satellite (GPS time; the week rollover of #63
+     applies as today) and the model continues with ACQ (step 2), with the inhibits cleared and the SDK last-known
+     position set to the present position.
 2. Otherwise → **ACQ.**
    - A prediction context (`GPSSatComputer.createPredictionContext()`, public SDK API) is set to the *stored* position
      and the *unit's* clock. Its channel assignment gives the eight satellites the unit believes are best (the
@@ -80,14 +94,18 @@ data and its own clock.
      otherwise the present position.
    - The SDK then acquires whatever is really in view within the allowed set. At 829 NM most of the predicted set
      overlaps the real sky, so the start stays ACQ, as in the video.
-3. **Give-up.** If ACQ has no fix after `T_GIVE_UP`, the unit switches to **sky search**: all inhibits are cleared, the
-   SDK last-known position is erased and the KLN almanac check reports invalid, so the SDK runs its PRN-order blind
-   search.
+3. **Give-up.** If ACQ has no fix after `T_GIVE_UP` (5 minutes, the install manual's longest ACQ, 2-66), the unit
+   switches to a **sky search**: all inhibits are cleared, the SDK last-known position is erased and the KLN almanac
+   check reports invalid, so the SDK runs its PRN-order blind search. The almanac is current, so no almanac collection
+   follows; the first blind fix is used. Give-up plus sky search stays within the 12 minutes of 3-17 for a wrong time
+   or position.
 4. **First fix.** The model ends: the inhibits are cleared and the SDK runs normally until the next power-on.
 
-`KLNGPSSatComputer.isAlmanacValid` returns the decision of the model (ACQ: true; sky search: false) combined with the SDK
-age check. A new unit `kln90b/GpsSearch.ts` holds the model, the prediction context and the give-up timer; `Gps.ts`
-stays the façade and drives it from `powerChanged` and `tick`.
+`KLNGPSSatComputer.isAlmanacValid` returns the decision of the model (ACQ: true; almanac search and sky search: false).
+The almanac age check moves into the model, by the unit's clock (`internalTime`) as the original check did.
+
+A new unit `kln90b/GpsSearch.ts` holds the model, the prediction context and the timers; `Gps.ts` stays the façade and
+drives it from `powerChanged` and `tick`.
 
 **Timing.**
 - **Hot.** The SDK's `acquisitionTimeWithEphemeris` is tuned so that a hot start has its fix before the self-test ends
@@ -96,8 +114,10 @@ stays the façade and drives it from `powerChanged` and `tick`.
   sets the SDK's `acquisitionTime` for that power-on. It stands for the effects common to all channels: oscillator
   warm-up and the phase of the 30 s data frame. The per-satellite randomness alone cannot spread the fourth-fastest
   of eight satellites from 0:32 to 1:47. Ephemeris collection stays 30 s.
-- **Give-up and the sky search.** `T_GIVE_UP` (about 15 minutes) is chosen with the sky-search timing so that the
-  wrong-clock case lands near the observed 21:36. A direct sky search stays at about 6 minutes, at most 12 (3-17).
+- **Almanac search.** Blind search for one satellite, plus 12.5 minutes of almanac, plus a warm ACQ, lands near the
+  20 minutes of ORS 01 and the observed 21:36.
+- **Give-up and the sky search.** 5 minutes of ACQ, plus the blind search of today (about 6 minutes), stays within 12
+  (3-17).
 - The exact numbers are tuning, held by the tests in section 7.
 
 **Ephemeris memory.** The SDK keeps each satellite's ephemeris time over our power cycles within a sim session. Across
@@ -141,19 +161,20 @@ hours is a hot start too.
 |---|---|---|
 | ACQ, before the first fix | the predicted set, with the SNR of the main computer's satellite of that PRN (`00` until acquired) | predicted for the stored position and the unit's clock, constant, as in the video |
 | Navigating | the main computer's channels | the true elevation, `90 − zenith` (no `Math.abs`) |
-| Sky search, a satellite with no orbit data yet | | `--°` (the receiver cannot know where it is; unknown values are dashes) |
+| Almanac search or sky search, a satellite with no orbit data yet | the main computer's channels | `--°` (the receiver cannot know where it is; unknown values are dashes) |
 
 **States (#215):**
-- **INIT.** The receiver initializes after power-on, before it first assigns channels. INIT also covers the sky
-  search: ORS 20 has no state of its own for it (the maintainer's decision; ORS 01's `SRCH` was dropped).
+- **INIT.** The receiver initializes after power-on, before it first assigns channels. INIT also covers the almanac
+  search and the sky search: ORS 20 has no state of its own for them (the maintainer's decision; ORS 01's `SRCH` was
+  dropped).
 - **ACQ.** The ACQ mode of the start model, until the solution.
 - **TRAN.** For one calculation tick between the SDK's first solution and the unit accepting the position: `isValid()`
   turns true one tick after the SDK solution. The video shows about half a second of TRAN.
 - **NAV, NAV A, NAV D:**
   - NAV A stays as today: whenever there is an altitude, whatever the satellite count. The video shows NAV A with
     eight satellites in use, which answers point 3 of #215.
-  - NAV D keeps today's case (a satellite still collecting ephemeris). It also shows while the unit collects a fresh
-    almanac after a start with an expired one (5-30: NAV D = collecting ephemeris and almanac; 3-17).
+  - NAV D keeps today's case (a satellite still collecting ephemeris). An expired almanac is collected before the first
+    fix (ORS 01 6-30), so NAV D needs no almanac case.
 - DEGRD and FAILR stay unmodeled (no failures, no RAIM).
 
 ## 5. STA 5 RAIM prediction (#214)
@@ -198,8 +219,9 @@ the result is random.
   | Warm | fix between 30 s and 2 min across seeds, with some seeds under 45 s and some over 90 s |
   | 829 NM from the stored position | STA 1 shows ACQ; fix within 5 minutes (install manual 2-66; the video gives 2:22) |
   | 80 NM | a warm start. The current 80 NM sky-search test changes: 60 NM is checkout advice, not a rule of the unit (the video) |
-  | Clock 15 minutes off, clock years off, position on another continent | fix between 15 and 25 minutes. The current 15-minute test changes |
-  | Expired almanac | not within 3 minutes, within 12 (3-17) |
+  | Clock 15 minutes off, position on another continent (almanac current) | ACQ gives up: not within 5 minutes, within 12 (3-17). The current 15-minute test keeps its 12-minute bound and gains the 5-minute floor |
+  | Expired almanac (200 days), clock years off (the wrong date) | almanac search: not within 15 minutes, within 25 (ORS 01 6-30: 20 minutes; observed 21:36). The current 200-day test changes from "within 12" |
+  | Almanac search | only one channel is in use while the almanac is collected |
   | Persisted ephemeris | a reboot within 2 hours at the same place and time is a hot start; after more than 2 hours it is warm |
 
   Plus tripwires for the new private SDK reaches.
@@ -209,10 +231,9 @@ the result is random.
   - a sky search shows `--°` for satellites without data;
   - navigating shows the true elevation.
 - **#215:**
-  - INIT during a sky search (the existing characterization stays);
+  - INIT during an almanac search and a sky search (the existing characterization stays);
   - ACQ on a warm start (the #211 pin);
   - TRAN for one tick;
-  - NAV D while collecting the almanac;
   - the NAV A snapshot stays.
 - **#214:**
   - STA 5 computes in the harness;
