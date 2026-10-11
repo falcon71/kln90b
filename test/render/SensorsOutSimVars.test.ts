@@ -7,7 +7,7 @@ import {NavMode} from '../../kln90b/data/VolatileMemory';
 import {airport, intersection, vor} from '../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../harness/navdata/procedures';
 import {savedFlightplan} from '../harness/storage';
-import {LEG_OBS_SWITCH, panelXml} from '../harness/panelXml';
+import {LEG_OBS_SWITCH, NO_GPS_SIMVARS, panelXml} from '../harness/panelXml';
 import {activeIdent} from '../harness/readers';
 import {bootOnStandardRoute} from '../harness/worldBoot';
 
@@ -149,12 +149,12 @@ describe('GPS WP TRUE BEARING on a DME arc (#21 1e1a8f5)', () => {
     });
 
     /** Booted on the arc and loaded, so FPL 0 is D225J ARCEN FAFAA MAPAA KPRC with ARCEN active */
-    async function loadedOnArc() {
+    async function loadedOnArc(xml?: string) {
         // 4 degrees east variation, so that a true and a magnetic output cannot be mistaken for each other. The arc's
         // radials and all positions are true, and magnetic = true - 4.
         const unit = await bootUnit({
             facilities: [kprc, arcAbc, arcbg, arcen, fafaa, mapaa], position: at(225, 10), storage: savedFlightplan(0, [kprc]),
-            magvar: MAGVAR,
+            magvar: MAGVAR, panelXml: xml,
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
@@ -188,6 +188,20 @@ describe('GPS WP TRUE BEARING on a DME arc (#21 1e1a8f5)', () => {
             expect(unit.env.sim.lastWrite(name)!.unit).toBe('radians');
         }
         expect(unit.errors).toEqual([]);
+    });
+
+    // #124: with Output.WriteGPSSimVars off the RMI LVar is still the bearing to the end fix, not the autopilot's tangent
+    // (the two differ only on an arc), and the autopilot SimVars stay with the other GPS
+    it('writes the RMI LVar as the bearing to the end fix with Output.WriteGPSSimVars off (#124)', async () => {
+        const unit = await loadedOnArc(panelXml(NO_GPS_SIMVARS));
+        expect(activeIdent(unit)).toBe('ARCEN');
+        const p = at(210, 10);
+        await moveAircraft(unit, p, {groundspeedKt: 0});
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(norm360(unit.env.sim.get('L:KLN90B_GPS_WP_BEARING', 'degrees'))).toBeCloseTo(courseDeg(p, arcen) - MAGVAR, 1);
+        expect(unit.env.sim.lastWrite('GPS WP TRUE BEARING')).toBeUndefined();
+        expect(unit.env.sim.lastWrite('GPS WP BEARING')).toBeUndefined();
     });
 
     // The unchanged half of the contract: on a great-circle leg the bearing to the waypoint is written, which the break

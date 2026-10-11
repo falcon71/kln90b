@@ -91,10 +91,9 @@ describe('GPS OVERRIDDEN (public contract) (#24)', () => {
     });
 });
 
-// Bug #124: SensorsOut.setPos (Sensors.ts:371-373) and setWpBearing (342-345) return before the LVar write
-// when Output.WriteGPSSimVars is off, unlike the other L:KLN90B_* outputs. CLAUDE.md lists the LVars and the GPS SimVars as
-// separate contracts, and LVars.ts documents the LVars as outputs of the unit, so an aircraft that leaves the GPS SimVars to
-// another GPS should still get the integrity flag and the bearing from the unit.
+// Public contract: CLAUDE.md lists the LVars and the GPS SimVars as separate contracts, and LVars.ts documents the LVars as
+// outputs of the unit, so an aircraft that leaves the GPS SimVars to another GPS (Output.WriteGPSSimVars off) still gets
+// the integrity flag and the bearing from the unit, as it does the other L:KLN90B_* outputs.
 describe('LVar outputs with Output.WriteGPSSimVars off (public contract) (#124)', () => {
     it('the gate holds the GPS SimVars back and lets the HSI flag LVar through', async () => {
         const unit = await bootUnit({panelXml: panelXml(NO_GPS_SIMVARS)});
@@ -114,7 +113,7 @@ describe('LVar outputs with Output.WriteGPSSimVars off (public contract) (#124)'
         expect(unit.env.sim.lastWrite('L:KLN90B_GPS_WP_BEARING')?.value).toBe(0);
     });
 
-    it.fails('L:KLN90B_IntegrityWarn is still written (#124)', async () => {
+    it('L:KLN90B_IntegrityWarn is still written (#124)', async () => {
         const unit = await bootUnit({panelXml: panelXml(NO_GPS_SIMVARS)});
         await settle(unit);
         await vi.advanceTimersByTimeAsync(3000);
@@ -122,12 +121,49 @@ describe('LVar outputs with Output.WriteGPSSimVars off (public contract) (#124)'
         expect(unit.env.sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(0);
     });
 
-    it.fails('L:KLN90B_GPS_WP_BEARING is still written (#124)', async () => {
+    it('L:KLN90B_GPS_WP_BEARING is still written (#124)', async () => {
         const unit = await bootUnit({panelXml: panelXml(NO_GPS_SIMVARS)});
         await settle(unit);
         await vi.advanceTimersByTimeAsync(3000);
 
         expect(unit.env.sim.lastWrite('L:KLN90B_GPS_WP_BEARING')?.value).toBe(0);
+    });
+
+    it('L:KLN90B_IntegrityWarn is 1 while the GPS has no fix and 0 once it has one', async () => {
+        const unit = await bootUnit({
+            coldGps: true,
+            panelXml: panelXml(NO_GPS_SIMVARS),
+            storage: {fastGpsAcquisition: false, lastLatitude: 47.0, lastLongitude: 8.0},
+            position: {lat: 47.0, lon: 8.0},
+        });
+        const sim = unit.env.sim;
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(unit.props.sensors.in.gps.isValid()).toBe(false);
+        expect(sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(1);
+
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true);
+        expect(sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(0);
+        expect(sim.lastWrite('GPS MAGVAR')).toBeUndefined();
+    });
+
+    // Appendix A of the manual is the RMI bearing (LVars.ts): the magnetic bearing to the active waypoint, in radians. The
+    // aircraft is 1 NM right of the first leg, so the bearing to ABC differs from the leg's course.
+    it('L:KLN90B_GPS_WP_BEARING is the magnetic bearing to the active waypoint in radians', async () => {
+        const {kaaa, abc} = standardRoute();
+        const onLeg = pointBefore(kaaa, abc, 20);
+        const p = pointFrom(onLeg, courseDeg(onLeg, abc) + 90, 1);
+        const unit = await bootOnStandardRoute({position: p, magvar: 4, panelXml: panelXml(NO_GPS_SIMVARS)});
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(activeIdent(unit)).toBe('ABC');
+        const expected = (courseDeg(p, abc) - 4) * Math.PI / 180; // magnetic = true - 4 degrees east
+        expect(unit.env.sim.lastWrite('L:KLN90B_GPS_WP_BEARING')!.unit).toBe('radians');
+        expect(unit.env.sim.lastWrite('L:KLN90B_GPS_WP_BEARING')!.value).toBeCloseTo(expected, 4);
+        // The GPS SimVar of the same quantity stays with the other GPS
+        expect(unit.env.sim.lastWrite('GPS WP BEARING')).toBeUndefined();
+        expect(unit.env.sim.lastWrite('GPS WP TRUE BEARING')).toBeUndefined();
     });
 });
 

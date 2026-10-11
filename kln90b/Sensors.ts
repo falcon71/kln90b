@@ -342,6 +342,13 @@ export class SensorsOut {
     }
 
     public setWpBearing(bearingForAP: number | null, bearingToActive: number | null, magvar: number) {
+        //The LVar is an output of the unit, independent of the GPS SimVars
+        if (bearingToActive === null) {
+            SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
+        } else {
+            SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingToActive, magvar), UnitType.RADIAN));
+        }
+
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
@@ -351,11 +358,6 @@ export class SensorsOut {
         } else {
             SimVar.SetSimVarValue('GPS WP BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingForAP, magvar), UnitType.RADIAN));  //This SimVar appears to be readonly??
             SimVar.SetSimVarValue('GPS WP TRUE BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(bearingForAP, UnitType.RADIAN));
-        }
-        if (bearingToActive === null) {
-            SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
-        } else {
-            SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingToActive, magvar), UnitType.RADIAN));
         }
     }
 
@@ -371,6 +373,9 @@ export class SensorsOut {
     }
 
     public setPos(pos: LatLonInterface | null, speed: Knots | null, track: Degrees | null, magvar: number, integretyWarning: boolean) {
+        //The LVar is an output of the unit, independent of the GPS SimVars
+        SimVar.SetSimVarValue(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, integretyWarning);
+
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
@@ -395,9 +400,6 @@ export class SensorsOut {
             SimVar.SetSimVarValue('GPS GROUND TRUE TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(track, UnitType.RADIAN));
             SimVar.SetSimVarValue('GPS GROUND MAGNETIC TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(track, magvar), UnitType.RADIAN));
         }
-
-        SimVar.SetSimVarValue(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, integretyWarning);
-
     }
 
     public setWPTETE(ete: Seconds | null, eta: Seconds | null) {
