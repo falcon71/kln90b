@@ -1008,8 +1008,8 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   a spec test:* OTH 1 (the sim has no FSS data), SET 10 (the page is the project's own, #46), STA 2 and STA 3. Super
   NAV 5 is read through `SuperNav5.read()`, and the NAV 5 and Super NAV 5 maps through the map recorder and file
   snapshots. *Untested:* weather, terrain and SUA on the maps (no code path), the ESA along the route (needs a
-  non-flat MSA grid), take-home on SET 1 and the TRI pages, and SET 1 CONFIRM? for a faster first fix (the start
-  model does not restart on a position entered during a search; architecture.md Core 3).
+  non-flat MSA grid), and take-home on SET 1 and the TRI pages. The restart of the GPS search by a corrected position, date
+  or time (SET 1 CONFIRM?, SET 2, the self-test page) is tested in `GpsAcquisition.test.ts` (architecture.md Core 3).
 - **The right pages** (`pages/right/`). Every page has a render test with a characterization and spec tests where the
   guide, the trainer or a photo of a real unit gives the rule; ACT 7 has characterizations only, and the APT 7 page
   order is a characterization (the trainer had no airport with both SIDs and STARs). *Untested:* the name and city

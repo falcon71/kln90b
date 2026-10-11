@@ -234,10 +234,14 @@ main computer; RAIM failures are still not modeled.
       was built FAST (the SDK timings are fixed at construction).
     - `KLNGPSSatComputer.isAlmanacValid` reports the decision: ACQ true, almanac and sky search false, Idle the SDK's
       own check.
-    - **Not modeled: SET 1 and SET 2 during a search.** The mode is fixed at power-on. A time corrected on SET 2 or a
-      position confirmed on SET 1 while the unit searches does not restart the model with a new prediction, although
-      3-17 to 3-19 give updating them as the remedy for a slow start; the unit waits for the give-up instead.
-      `Set1Page` still calls `syncLastKnownPosition`, which only moves the SDK's last known position.
+    - **Corrections during a search** (3-5, 3-17..3-19, #357). The Pilot's Guide gives the entry of the date and time
+      or of the position as the remedy for a slow start. `GPS.reinitializeSearch()` copies the clock into
+      `gpsSatComputer.internalTime` and calls `search.start(coords)` again, so the decision is made anew from the
+      corrected values on the next tick. It is called by `SelfTestRightPage` (`saveDate`, `saveTime`), `Set2Page`
+      (`saveDate`, `saveTime`) and `Set1Page.confirmPosition`, after the page has written the value. It does nothing
+      with a fix (the satellites supply both) and in take-home. FAST has no start model, so only the SDK's last known
+      position moves there (`Set1Page` still calls `syncLastKnownPosition`). The model restarts at once: whether the
+      real unit restarts at once or at its next search cycle is not documented.
     - **STA 1** (`Sta1Page`, #213) shows what the unit knows, not the true sky. During ACQ without a fix it lists
       `search.predictedSatellites()` with the predicted elevation, constant through the acquisition. Otherwise it lists
       the channels; the elevation is the true one with a fix or once the satellite's orbit data is current

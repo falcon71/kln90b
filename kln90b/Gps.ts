@@ -313,6 +313,18 @@ export class GPS {
         //we still keep all old values
     }
 
+    /**
+     * 3-5, 3-17..3-19: the pilot entered the date, the time or the position while the unit searches. The receiver starts
+     * its search again from the corrected values (#357). With a fix the satellites supply both, and nothing changes
+     */
+    public reinitializeSearch(): void {
+        if (this.isValid() || this.takeHomeMode) {
+            return;
+        }
+        this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp();
+        this.search.start(this.coords);
+    }
+
     public savePosition(): void {
         this.userSettings.getSetting("lastLatitude").set(this.coords.lat);
         this.userSettings.getSetting("lastLongitude").set(this.coords.lon);

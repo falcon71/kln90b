@@ -129,6 +129,7 @@ export class Set2Page extends SixLineHalfPage {
         const newDate = oldDate.withDate(date.getYear(), date.getMonth(), date.getDate());
 
         this.props.sensors.in.gps.timeZulu = newDate.atTimezone(UTC);
+        this.props.sensors.in.gps.reinitializeSearch(); //3-17, 3-53: the date corrected during a search speeds it up (#357)
         const dbValidAfter = this.props.database.isAiracCurrent();
         if (dbValdiBefore !== dbValidAfter) {
             this.props.messageHandler.addMessage(new OneTimeMessage(["RECYCLE POWER TO USE", "CORRECT DATA BASE DATA"]))
@@ -146,6 +147,7 @@ export class Set2Page extends SixLineHalfPage {
         const newDate = oldDate.withTime(date.getHours(), date.getMinutes());
 
         this.props.sensors.in.gps.timeZulu = newDate.atTimezone(UTC);
+        this.props.sensors.in.gps.reinitializeSearch(); //3-17, 3-53: the time corrected during a search speeds it up (#357)
         const dbValidAfter = this.props.database.isAiracCurrent();
         if (dbValdiBefore !== dbValidAfter) {
             this.props.messageHandler.addMessage(new OneTimeMessage(["RECYCLE POWER TO USE", "CORRECT DATA BASE DATA"]))

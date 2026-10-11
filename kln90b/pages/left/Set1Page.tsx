@@ -101,6 +101,7 @@ export class Set1Page extends SixLineHalfPage {
         gps.groundspeed = this.groundspeed;
         gps.trackTrue = this.props.magvar.magToTrue(this.track); //The page shows and edits the magnetic track, 3-19
         gps.gpsSatComputer.syncLastKnownPosition(gps.coords);
+        gps.reinitializeSearch(); //3-17..3-19: the position corrected during a search speeds it up (#357)
         this.cursorController.setCursorActive(false);
     }
 

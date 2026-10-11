@@ -6,7 +6,7 @@ import {Screen} from '../harness/render/screen';
 import {storedSetting} from '../harness/storage';
 import {messages} from '../harness/readers';
 import {TimeStamp} from '../../kln90b/data/Time';
-import {GPS_ERA_DURATION} from '../../kln90b/GpsSearch';
+import {GPS_ERA_DURATION, SearchMode} from '../../kln90b/GpsSearch';
 
 // #62: at every power-on the start model (kln90b/GpsSearch.ts) picks the search from the stored position, the almanac,
 // the ephemeris and the unit's own clock: hot, warm ACQ, ACQ that gives up and searches the sky, or an almanac search.
@@ -388,6 +388,127 @@ describe('GPS time to first fix, slow acquisition', () => {
             expect(await sdkAlmanacValid(ageDays)).toBe(expected);
         }, SLOW);
     });
+});
+
+/** Advances until the self-test page shows, the time of the welcome page */
+async function untilSelfTestPage(unit: HeadlessUnit): Promise<void> {
+    for (let i = 0; !Screen.read().text().includes('APPROVE?'); i++) {
+        if (i >= 60) throw new Error(`untilSelfTestPage: no self-test page within 60 s\n${Screen.read().dump()}`);
+        await vi.advanceTimersByTimeAsync(1000);
+    }
+}
+
+describe('correcting the position or the time during a search (3-5, 3-17, #357)', () => {
+    // 3-17..3-19: the remedy for a slow start is the entry of the position on SET 1 and CONFIRM?. The unit stored the
+    // antipode, so it predicts satellites that are not there; it searches them for 5 minutes before it searches the sky.
+    // With the position corrected the search starts again from the right one, and the fix is a warm one. Both the
+    // latitude and the longitude are entered, N 47 and E 8 (the aircraft sits at 47/8)
+    it('has its fix within 150 s of a CONFIRM? on SET 1 with the position of the aircraft (3-17..3-19, #357)', async () => {
+        const unit = await powerOnCold({...WARM, ...ANTIPODE});
+        const gps = unit.props.sensors.in.gps;
+        const poweredOn = Date.now();
+        await untilSelfTestPage(unit);
+        await unit.panel.approveSelfTest();
+        await unit.panel.selectPage('L', 'SET 1');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1); // the latitude
+        await unit.panel.inner('L', 1); // enters the editor: N, the other digits blank
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 5); // the first click enters a 0, so this is a 4
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 8); // a 7
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1); // a 0
+        await unit.panel.ent();
+        // ENT leaves the cursor on the longitude
+        await unit.panel.inner('L', 1); // enters the editor: E, the other digits blank
+        await unit.panel.outer('L', 2); // past the hundreds digit, which stays blank
+        await unit.panel.inner('L', 1); // a 0
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 9); // an 8
+        await unit.panel.ent();
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(["N 47°00.00'", "E 08°00.00'"]); // Precondition: the entry took
+        expect(gps.isValid()).toBe(false); // Precondition: the search runs
+        await unit.panel.cursorTo('L', 'CONFIRM?');
+        await unit.panel.ent();
+        expect(unit.errors).toEqual([]);
+
+        const seconds = await secondsToFix(unit, 300);
+
+        expect(seconds).toBeLessThan(150);
+        expect(Date.now() - poweredOn).toBeLessThan(5 * MINUTE);
+    }, VERY_SLOW);
+
+    // 3-5..3-7: the date entered on the self-test page, before the page is approved. A clock 30 years behind makes the
+    // almanac look expired, which is the 20-minute almanac search; the date corrected, the almanac is current again. The
+    // offset is a whole number of days, so that the time of day stays right
+    it('has its fix within 150 s of the approval when the date is entered on the self-test page (3-5, #357)', async () => {
+        const unit = await powerOnCold(WARM, -30 * 365 * DAY);
+        const gps = unit.props.sensors.in.gps;
+        await untilSelfTestPage(unit);
+        await unit.panel.cursorToTop('R'); // the date
+        const sim = new Date(Date.now()); // The date of the sim: the clock of the unit is the one that is wrong
+        const year = sim.getUTCFullYear() % 100;
+        await unit.panel.enterDate('R', sim.getUTCDate(), sim.getUTCMonth() + 1, [Math.floor(year / 10), year % 10]);
+        await unit.panel.ent();
+        const month = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][sim.getUTCMonth()];
+        expect(Screen.read().rows('R')[1]).toBe(`  ${String(sim.getUTCDate()).padStart(2, '0')} ${month} ${String(year).padStart(2, '0')}`); // Precondition: the entry took
+        expect(gps.isValid()).toBe(false); // Precondition: the search runs
+        await unit.panel.approveSelfTest();
+
+        const seconds = await secondsToFix(unit, 300);
+
+        expect(seconds).toBeLessThan(150);
+    }, VERY_SLOW);
+
+    // 3-53, 3-17: the clock 15 minutes behind is a wrong time, which the unit finds out only at the give-up after 5
+    // minutes and then searches the sky. The time corrected on SET 2 restarts the search with the right prediction
+    it('has its fix within 150 s of the time entered on SET 2 (3-17, 3-53, #357)', async () => {
+        const unit = await powerOnCold(WARM, -15 * MINUTE);
+        const gps = unit.props.sensors.in.gps;
+        await untilSelfTestPage(unit);
+        await unit.panel.approveSelfTest();
+        await unit.panel.selectPage('L', 'SET 2');
+        await unit.panel.cursor('L');
+        // The time zone of the page is UTC, so the sim's UTC time is the correct time to enter
+        const sim = new Date(Date.now());
+        expect(sim.getTime() - gps.timeZulu.getTimestamp()).toBeGreaterThan(10 * MINUTE); // Precondition: the unit's clock is wrong
+        const [hours, minutes] = [sim.getUTCHours(), sim.getUTCMinutes()];
+        await unit.panel.outer('L', 1); // the time
+        await unit.panel.inner('L', hours + 1); // the first click opens the entry on hour 00
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', Math.floor(minutes / 10) + 1); // the first click gives a 0
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', minutes % 10 + 1);
+        // Precondition: the entry took, and is the time of the sim at the start of the entry
+        expect(Screen.read().rows('L')[3].slice(0, 5)).toBe(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`);
+        await unit.panel.ent();
+        expect(gps.isValid()).toBe(false); // Precondition: the search runs
+        expect(unit.errors).toEqual([]);
+
+        const seconds = await secondsToFix(unit, 300);
+
+        expect(seconds).toBeLessThan(150);
+    }, VERY_SLOW);
+
+    // The satellites supply the position and the time once there is a fix, so SET 1 does not start a search then
+    it('does not restart the search on a CONFIRM? on SET 1 with a fix (#357)', async () => {
+        const unit = await powerOnCold(WARM);
+        const gps = unit.props.sensors.in.gps;
+        await secondsToFix(unit, 300);
+        expect(gps.isValid()).toBe(true); // Precondition
+        await unit.panel.approveSelfTest();
+        await unit.panel.selectPage('L', 'SET 1');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'CONFIRM?');
+        await unit.panel.ent();
+
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(unit.errors).toEqual([]);
+        expect(gps.search.mode).toBe(SearchMode.Idle);
+        expect(gps.isValid()).toBe(true);
+    }, SLOW);
 });
 
 // B-4: the message appears when the GPS corrects the system time by more than 10 minutes. The fast acquisition (the
