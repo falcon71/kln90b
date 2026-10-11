@@ -234,9 +234,11 @@ describe('L:KLN90B_WptLight during the waypoint alert (public contract)', () => 
 
 // Public contract: LVars.ts and the wiki pages Autopilot, CDI/HSI and External Annunciators describe the L:KLN90B_*
 // outputs. The basis is the maintainer's ruling "power-off only": the outputs go to zero when the unit is switched off,
-// while a hot-swap Disabled stays a freeze (61f6b61) and is not pinned here. The outputs are written by ticks, and ticks
-// stop when the unit loses power (TickController), so a switched-off unit keeps its last values. SensorsOut.reset writes
-// nothing for the LVars. Installation Manual 2-69 states that the annunciators light during the self-test (setup B).
+// while a hot-swap Disabled stays a deliberate freeze (61f6b61). The outputs are written by ticks, and ticks stop when the
+// unit loses power (TickController), so SensorsOut.setPoweredOff writes the zero state once on the power event. The
+// outputs it zeroes are the roll command, the HSI flag (0 is flagged), the MSG, WPT and annunciator test lights, the
+// integrity warning and the RMI bearing (the maintainer wants a switched-off unit to go silent); the switch positions (L:KLN90B_Power, L:KLN90B_RightScan) are not outputs of the unit. Installation Manual 2-69 states that
+// the annunciators light during the self-test (setup B).
 describe('outputs at power-off (public contract)', () => {
     const BLANK_SCREEN = Array.from({length: 7}, () => ' '.repeat(23)).join('\n');
 
@@ -281,7 +283,7 @@ describe('outputs at power-off (public contract)', () => {
         expect(Screen.read().text()).toBe(BLANK_SCREEN);
     });
 
-    it.fails('the roll command is 0 (#135)', async () => {
+    it('the roll command is 0 (#135)', async () => {
         const unit = await banking();
 
         unit.send('KLN90B_Power_Off');
@@ -290,7 +292,7 @@ describe('outputs at power-off (public contract)', () => {
         expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBe(0);
     });
 
-    it.fails('the HSI flag is 0, flagged (#135)', async () => {
+    it('the HSI flag is 0, flagged (#135)', async () => {
         const unit = await banking();
 
         unit.send('KLN90B_Power_Off');
@@ -299,7 +301,7 @@ describe('outputs at power-off (public contract)', () => {
         expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(0);
     });
 
-    it.fails('the MSG light is 0 (#135)', async () => {
+    it('the MSG light is 0 (#135)', async () => {
         const unit = await onSelfTestPage();
 
         unit.send('KLN90B_Power_Off');
@@ -308,7 +310,7 @@ describe('outputs at power-off (public contract)', () => {
         expect(unit.env.sim.get('L:KLN90B_MsgLight', 'bool')).toBe(0);
     });
 
-    it.fails('the WPT light is 0 (#135)', async () => {
+    it('the WPT light is 0 (#135)', async () => {
         const unit = await onSelfTestPage();
 
         unit.send('KLN90B_Power_Off');
@@ -317,13 +319,150 @@ describe('outputs at power-off (public contract)', () => {
         expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(0);
     });
 
-    it.fails('the annunciator test is 0 (#135)', async () => {
+    it('the annunciator test is 0 (#135)', async () => {
         const unit = await onSelfTestPage();
 
         unit.send('KLN90B_Power_Off');
         await vi.advanceTimersByTimeAsync(3000);
 
         expect(unit.env.sim.get('L:KLN90B_AnnunTest', 'bool')).toBe(0);
+    });
+
+    /** The names of the GPS SimVars written since the snapshot of the write count */
+    const gpsWritesSince = (unit: HeadlessUnit, count: number) =>
+        [...new Set(unit.env.sim.writes.slice(count).map(w => w.name.toUpperCase()).filter(n => n.startsWith('GPS ')))];
+
+    it('writes the zero state also with Output.WriteGPSSimVars off', async () => {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({panelXml: panelXml({...HEADING_INPUT, ...NO_GPS_SIMVARS}), magvar: 0});
+        const mid = pointBefore(kaaa, abc, 10);
+        const dtk = courseDeg(mid, abc);
+        await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});
+        expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBeCloseTo(25, 6);
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBe(0);
+        expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(0);
+    });
+
+    it('leaves the GPS SimVars alone: only GPS OVERRIDDEN is asserted again', async () => {
+        const unit = await banking();
+        const written = unit.env.sim.writes.length;
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(gpsWritesSince(unit, written)).toEqual(['GPS OVERRIDDEN']);
+    });
+
+    it('zeroes the outputs when the aircraft power is lost, not only at the power switch', async () => {
+        const unit = await bootToSelfTest({
+            magvar: 0, panelXml: panelXml({...HEADING_INPUT, 'Input.ElectricitySimVar': 'CIRCUIT ON:1'}),
+            simVars: [{name: 'CIRCUIT ON:1', unit: 'bool', value: 1}],
+        });
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.env.sim.get('L:KLN90B_MsgLight', 'bool')).toBe(1);
+        expect(unit.env.sim.get('L:KLN90B_AnnunTest', 'bool')).toBe(1);
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(Screen.read().text()).toBe(BLANK_SCREEN);
+        expect(unit.env.sim.get('L:KLN90B_MsgLight', 'bool')).toBe(0);
+        expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(0);
+        expect(unit.env.sim.get('L:KLN90B_AnnunTest', 'bool')).toBe(0);
+    });
+
+    it('writes the outputs again when the unit is switched back on', async () => {
+        const unit = await onSelfTestPage();
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.env.sim.get('L:KLN90B_AnnunTest', 'bool')).toBe(0);
+        unit.send('KLN90B_Power_On');
+        await vi.advanceTimersByTimeAsync(19_000); // the Turn-On page, then the self-test page
+
+        expect(unit.env.sim.get('L:KLN90B_MsgLight', 'bool')).toBe(1);
+        expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(1);
+        expect(unit.env.sim.get('L:KLN90B_AnnunTest', 'bool')).toBe(1);
+    });
+
+    // Hot swapping (wiki page Hot Swapping and Package Detection) freezes the outputs; only the power takes them to zero
+    it('keeps the outputs of a unit that is only disabled for hot swapping', async () => {
+        const unit = await banking();
+
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBeCloseTo(25, 6);
+        expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(1);
+    });
+
+    // The freeze exists so that the unit resumes where it left off; a unit that is off has nothing to resume (maintainer)
+    it('zeroes the outputs of a unit that is switched off while it is disabled for hot swapping', async () => {
+        const unit = await banking();
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBeCloseTo(25, 6); // Precondition: frozen
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBe(0);
+        expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(0);
+        expect(unit.env.sim.get('L:KLN90B_GPS_WP_BEARING', 'radians')).toBe(0);
+    });
+
+    it('sibling C: the RMI bearing is the bearing to ABC (magvar 0) and the integrity warning 0 before the power-off', async () => {
+        const unit = await banking();
+        const {kaaa, abc} = standardRoute();
+        const mid = pointBefore(kaaa, abc, 10);
+        const aircraft = pointFrom(mid, courseDeg(mid, abc) + 90, 2); // The position of banking()
+
+        expect(unit.env.sim.get('L:KLN90B_GPS_WP_BEARING', 'degrees')).toBeCloseTo(courseDeg(aircraft, abc), 2);
+        expect(unit.env.sim.get('L:KLN90B_IntegrityWarn', 'bool')).toBe(0);
+    });
+
+    it('the RMI bearing is 0', async () => {
+        const unit = await banking();
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.env.sim.get('L:KLN90B_GPS_WP_BEARING', 'radians')).toBe(0);
+    });
+
+    // The warning is 1 while the GPS has no fix (#87); the dark unit drives nothing, so it is 0
+    it('the integrity warning is 0', async () => {
+        const unit = await bootUnit({
+            coldGps: true,
+            storage: {fastGpsAcquisition: false, lastLatitude: 47.0, lastLongitude: 8.0},
+            position: {lat: 47.0, lon: 8.0},
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(unit.env.sim.get('L:KLN90B_IntegrityWarn', 'bool')).toBe(1); // Precondition: no fix yet
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.env.sim.get('L:KLN90B_IntegrityWarn', 'bool')).toBe(0);
+    });
+
+    it('zeroes the RMI bearing and the integrity warning also with Output.WriteGPSSimVars off', async () => {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({panelXml: panelXml({...HEADING_INPUT, ...NO_GPS_SIMVARS}), magvar: 0});
+        const mid = pointBefore(kaaa, abc, 10);
+        const dtk = courseDeg(mid, abc);
+        await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});
+        expect(unit.env.sim.get('L:KLN90B_GPS_WP_BEARING', 'degrees')).toBeCloseTo(courseDeg(pointFrom(mid, dtk + 90, 2), abc), 2); // Precondition
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.env.sim.get('L:KLN90B_GPS_WP_BEARING', 'radians')).toBe(0);
+        expect(unit.env.sim.get('L:KLN90B_IntegrityWarn', 'bool')).toBe(0);
     });
 });
 

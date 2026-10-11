@@ -165,7 +165,7 @@ only run while the unit is powered AND enabled.**
 ## Core 3. Sensors and GPS simulation
 
 `Sensors` (`kln90b/Sensors.ts`) has `in: SensorsIn` (tick 1 Hz) and `out: SensorsOut` (writers). On `powerEvent` it
-calls `in.reset()` and `out.reset()`.
+calls `in.reset()` and `out.reset()`, and on a power-off also `out.setPoweredOff()`.
 
 `SensorsIn.tick()` reads:
 
@@ -278,6 +278,9 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
       We do not return data after a fence"). This happens only when `writeGPSSimVars` is set.
     - `KlnEfbSaver` answers EFB `avionicsRouteRequested`; `KlnEfbLoader` loads `syncedAvionicsRoute` into FPL 0 (lat/lon
       legs become temporary user waypoints in region `XY`).
+- The ticks that write the L:KLN90B_* outputs stop with the power, so `SensorsOut.setPoweredOff()` writes their zero
+  state once on a power-off: `L:KLN90B_RollCommand` 0, `L:KLN90B_HSI_TF_FLAGS` 0 (flagged) and the MSG, WPT and annunciator
+  test lights false, `L:KLN90B_IntegrityWarn` 0 and `L:KLN90B_GPS_WP_BEARING` 0, whatever `writeGPSSimVars` says. A unit that is only disabled for hot swapping keeps its values, but a power-off while disabled zeroes them too.
 - `SensorsOut.reset()` has the SimVar-zeroing code commented out because of an observed **CTD** when combined with
   `L:KLN90B_Disabled` and hot-swapping. Read that comment before touching GPS SimVar resets.
 

@@ -14,7 +14,7 @@ import {
 } from "@microsoft/msfs-sdk";
 import {pressureAlt2IndicatedAlt} from "./data/Conversions";
 import {Celsius, Degrees, Feet, Inhg, Knots, NauticalMiles, Seconds} from "./data/Units";
-import {PowerEvent} from "./PowerButton";
+import {PowerEvent, PowerEventData} from "./PowerButton";
 import {KLN90BUserSettings} from "./settings/KLN90BUserSettings";
 import {CalcTickable} from "./TickController";
 import {AudioGenerator} from "./services/AudioGenerator";
@@ -565,6 +565,20 @@ export class SensorsOut {
         }
     }
 
+    /**
+     * The ticks that write the L:KLN90B_* outputs stop when the unit loses power, so the zero state is written once.
+     * The GPS SimVars are left alone, see the note in reset().
+     */
+    public setPoweredOff(): void {
+        SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
+        SimVar.SetSimVarValue(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, 0);
+        SimVar.SetSimVarValue(LVAR_MSG_LIGHT, SimVarValueType.Bool, false);
+        SimVar.SetSimVarValue(LVAR_WPT_LIGHT, SimVarValueType.Bool, false);
+        SimVar.SetSimVarValue(LVAR_ANNUN_TEST, SimVarValueType.Bool, false);
+        SimVar.SetSimVarValue(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, false);
+        SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
+    }
+
     public setGpsOverriden(): void {
         if (!this.options.output.writeGPSSimVars) {
             return;
@@ -625,9 +639,12 @@ export class Sensors implements CalcTickable {
         this.in.tick();
     }
 
-    private reset() {
+    private reset(evt: PowerEventData) {
         this.in.reset();
         this.out.reset();
+        if (!evt.isPowered) {
+            this.out.setPoweredOff();
+        }
     }
 
 }
