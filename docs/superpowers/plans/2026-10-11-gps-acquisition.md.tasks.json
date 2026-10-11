@@ -4,13 +4,13 @@
     {
       "id": 1,
       "subject": "Task 1: Fix #328, the GPS battery clock",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** The GPS clock starts at the sim time and advances by the real time the unit was off, measured by `GPS` itself,\nso that an engine-running start no longer begins an hour behind.\n\n**Files:**\n- Modify: `kln90b/Gps.ts` (constructor around lines 140-145, `powerChanged` around lines 269-275, imports)\n- Test: `test/render/GpsAcquisition.test.ts` (describe `messages at power-on (B-3, B-4)` and `the system clock without a fix (3-53)`)\n- Docs: `docs/architecture.md` (Core 1 power-event subscribers, Core 3 \"Internal clock\"), `docs/testing.md` section 6 (the #328 note on engine-running boots)\n\n**Acceptance Criteria:**\n- [ ] `posts no message on an engine-running start at the stored position (B-3, B-4, #328)` passes without `.fails`.\n- [ ] A new test: a cold-and-dark unit left unpowered for 30 minutes and then switched on has `timeZulu` within 3.5 s of `Date.now()`.\n- [ ] `Gps.ts` no longer reads `timeSincePowerChange` and no longer subtracts an hour; `PowerButton.ts` is unchanged.\n- [ ] `npx tsc --noEmit` clean, `npm test` green.\n\n**Verify:** `npx vitest run test/render/GpsAcquisition.test.ts` → all pass; then `npm test` → all pass.\n\nFull steps: docs/superpowers/plans/2026-10-11-gps-acquisition.md, Task 1. Spec: docs/superpowers/specs/2026-10-11-gps-acquisition-design.md\n\n```json:metadata\n{\"files\":[\"kln90b/Gps.ts\",\"test/render/GpsAcquisition.test.ts\",\"docs/architecture.md\",\"docs/testing.md\"],\"verifyCommand\":\"npx vitest run test/render/GpsAcquisition.test.ts\",\"acceptanceCriteria\":[\"`posts no message on an engine-running start at the stored position (B-3, B-4, #328)` passes without `.fails`.\",\"A new test: a cold-and-dark unit left unpowered for 30 minutes and then switched on has `timeZulu` within 3.5 s of `Date.now()`.\",\"`Gps.ts` no longer reads `timeSincePowerChange` and no longer subtracts an hour; `PowerButton.ts` is unchanged.\",\"`npx tsc --noEmit` clean, `npm test` green.\"],\"modelTier\":\"standard\"}\n```"
     },
     {
       "id": 2,
       "subject": "Task 2: Fix #211, the almanac check reads the moved SDK fiel",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         1
       ],
@@ -19,7 +19,7 @@
     {
       "id": 3,
       "subject": "Task 3: Fix #62, the start model",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         2
       ],
@@ -28,7 +28,7 @@
     {
       "id": 4,
       "subject": "Task 4: Fix #213, the STA 1 elevation column",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         3
       ],
@@ -37,7 +37,7 @@
     {
       "id": 5,
       "subject": "Task 5: Fix #215, the STA 1 receiver states",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         4
       ],
@@ -46,12 +46,12 @@
     {
       "id": 6,
       "subject": "Task 6: Fix #214, STA 5 RAIM prediction",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         5
       ],
       "description": "**Goal:** STA 5 predicts at the destination and the ETA. It uses one long-lived prediction context of the main\ncomputer instead of a second `GPSSatComputer`, which ignores time and place since SDK 2.3.3 and never initializes in\nthe harness.\n\n**Files:**\n- Modify: `kln90b/Gps.ts` (`public readonly raimPrediction`)\n- Modify: `kln90b/pages/left/Sta5Page.tsx` (`calculateRaim`, imports)\n- Test: `test/render/pages/left/Sta5Page.test.ts`\n- Docs: `docs/testing.md` section 6 (the \"STA 5 cannot be tested\" bullet), `docs/architecture.md` if it mentions STA 5\n\n**Acceptance Criteria:**\n- [ ] A new test (standard route, destination KBBB): after the COMPUTING delay, row 4 of the left page shows seven availability bars `'  èèèèèèè  '`.\n- [ ] A new test: the prediction runs at KBBB's latitude and longitude, for the seven times ETA −15 to +15 minutes in steps of 5, with the middle one at the ETA's hh:mm.\n- [ ] A new test: the prediction context gives a different PDOP at 47/8 and at −47/−172 for the same time.\n- [ ] `Sta5Page.tsx` no longer constructs a `GPSSatComputer` or an `EventBus`.\n- [ ] `npx tsc --noEmit` clean, `npm test` green.\n\n**Verify:** `npx vitest run test/render/pages/left/Sta5Page.test.ts` → all pass; `npm test` → all pass.\n\nFull steps: docs/superpowers/plans/2026-10-11-gps-acquisition.md, Task 6. Spec: docs/superpowers/specs/2026-10-11-gps-acquisition-design.md\n\n```json:metadata\n{\"files\":[\"kln90b/Gps.ts\",\"kln90b/pages/left/Sta5Page.tsx\",\"test/render/pages/left/Sta5Page.test.ts\",\"docs/testing.md\",\"docs/architecture.md\"],\"verifyCommand\":\"npx vitest run test/render/pages/left/Sta5Page.test.ts\",\"acceptanceCriteria\":[\"A new test (standard route, destination KBBB): after the COMPUTING delay, row 4 of the left page shows seven availability bars `'  èèèèèèè  '`.\",\"A new test: the prediction runs at KBBB's latitude and longitude, for the seven times ETA −15 to +15 minutes in steps of 5, with the middle one at the ETA's hh:mm.\",\"A new test: the prediction context gives a different PDOP at 47/8 and at −47/−172 for the same time.\",\"`Sta5Page.tsx` no longer constructs a `GPSSatComputer` or an `EventBus`.\",\"`npx tsc --noEmit` clean, `npm test` green.\"],\"modelTier\":\"standard\"}\n```"
     }
   ],
-  "lastUpdated": "2026-10-11T18:19:00.119Z"
+  "lastUpdated": "2026-10-11T19:34:49.571Z"
 }
