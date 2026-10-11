@@ -130,9 +130,9 @@ The sim globals are installed once per test file by the setup files `test/harnes
 - The clock is Vitest's fake timers (`sim/clock.ts`): `setTimeout`, `setInterval`, `Date` and `requestAnimationFrame`
   are faked, starting at `DEFAULT_START`. Advance it with `await vi.advanceTimersByTimeAsync(ms)`. All tick loops
   of the instrument (docs/architecture.md, Core 2) run on this clock.
-- `Math.random` is replaced by a seeded generator (`sim/random.ts`, default seed 1), so the GPS clock jitter and scan
-  list job ids repeat between runs. A test that needs another jitter passes `seed`. The teardown puts the real
-  `Math.random` back, so a later unit test of the file sees the real generator.
+- `Math.random` is replaced by a seeded generator (`sim/random.ts`, default seed 1), so the GPS clock jitter repeats
+  between runs. A test that needs another jitter passes `seed`. The teardown puts the real `Math.random` back, so a
+  later unit test of the file sees the real generator.
 
 ## Collectors and boot failures
 

@@ -201,8 +201,7 @@ export class FacilityLoaderScanlist implements Scanlist {
      * @private
      */
     private async startListManager(): Promise<void> {
-        const jobId = Math.floor(Math.random() * 10000);
-        this.lastManangerJobId = jobId;
+        const jobId = ++this.lastManangerJobId;
         let sizeBeforeCurrent = 0;
         let sizeAfterCurrent = 0;
 
