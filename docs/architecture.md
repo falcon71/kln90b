@@ -75,7 +75,8 @@ topic and rendered by `controls/ErrorPage` as a full-screen error page with a Gi
       creates empty plans and sets `restoreSuccessFull=false`, which later produces the `USER DATA LOST` message.
     - The last active waypoint is loaded from the `activeWaypoint` setting. **That setting is stored as an ICAO V1
       string**: `ICAO.valueToStringV1` / `getFacilityTypeFromStringV1`.
-    - If `userDataFormat !== 2`, it re-persists everything in the V2 format and sets `userDataFormat=2` (see Core 7).
+    - If `userDataFormat !== 2`, or when a restore failed, it re-persists everything in the V2 format and sets
+      `userDataFormat=2` (see Core 7).
 7. Constructs `VolatileMemory`, `WTFlightplanSync`, `AirspaceAlert`, `Vnav`, `KLNMagvar`, `ModeController`, then
    `TickController` (Core 2), then `SimVarSync`,
    `MSA`, `TemporaryWaypointDeleter` and `SidStar`. The platform's route manager (in the sim
@@ -465,7 +466,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - Migration in `KLN90BCore.asyncInit`: if the format is not 2, re-persist all waypoints and plans with the V2 writers, then
   set `userDataFormat=2`. Writers (`UserWaypointPersistor.serialize*`, `UserFlightplanPersistor.persistFlightplan`) only
   produce V2.
-- Restore errors cause empty plans and the `USER DATA LOST` message.
+- Restore errors cause empty plans and the `USER DATA LOST` message. The same block then writes the empty state over
+  the stored data, so the corrupt data is lost once and the message shows once, as after a failed V1 conversion.
 - `Flightplanloader.loadIcaos` (base class) truncates to 30 legs and emits `WAYPOINT xxx DELETED` messages (at most 10,
   then `OTHER WAYPOINTS DELETED`).
 - Persist triggers: waypoints persist on any `KLNfacilityrepo_sync` Add/Remove/Update (all 250 slots are rewritten);

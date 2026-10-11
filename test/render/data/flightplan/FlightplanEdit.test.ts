@@ -50,7 +50,7 @@ describe('the flight plans of a booted unit', () => {
     });
 
     // characterization: when the user waypoints cannot be restored the unit starts with 26 empty plans, even though the
-    // stored plan is fine (see #144 for the data that stays behind). USER DATA LOST is posted
+    // stored plan is fine (the failed restore then wipes the stored data too, #144). USER DATA LOST is posted
     it('are 26 empty plans when the user waypoints cannot be restored (characterization)', async () => {
         const {kaaa, abc, kbbb} = standardRoute();
         const unit = await bootUnit({

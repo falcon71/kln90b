@@ -304,8 +304,8 @@ export class KLN90BCore {
         }
 
         const userDataFormat = this.userSettings.getSetting("userDataFormat");
-        if (userDataFormat.get() !== 2) {
-            //Convert to V2
+        if (userDataFormat.get() !== 2 || !restoreSuccessFull) {
+            //Convert to V2, or write the empty state over data that could not be restored, so that it is lost once
             this.userWaypointPersistor.persistAllWaypoints();
             for (const plan of flightplans) {
                 this.userFlightplanPersistor.persistFlightplan(plan);
