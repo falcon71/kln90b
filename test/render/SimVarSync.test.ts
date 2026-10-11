@@ -90,15 +90,76 @@ describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract
         expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
     });
 
-    // The wiki panel.xml customization names any boolean SimVar, with an index only after a colon. The parser takes the
-    // part after the first colon for the index (KLN90BPlaneSettings.ts:97-99) and SimVarSync replaces it (:31-35), so the
-    // name becomes L:NaN and the unit never powers up. The sibling is the CIRCUIT ON:1 test above.
-    it.fails('an LVar as the ElectricitySimVar powers the unit (#136)', async () => {
+    // The wiki panel.xml customization names any boolean SimVar, with an index only after a colon (cfg/panel.xml: "If an
+    // index is used, it is synced with L:KLN90B_ElectricitySimVarIndex"). The colon of a prefix is part of the name (#136).
+    it('an LVar as the ElectricitySimVar powers the unit (#136)', async () => {
         const unit = await bootUnit({panelXml: panelXml({'Input.ElectricitySimVar': 'L:MY_AVIONICS_BUS'})});
         unit.env.sim.set('L:MY_AVIONICS_BUS', 'bool', true);
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+        // The name is not rewritten by the sync, so the unit goes on running and follows the LVar down
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('L:MY_AVIONICS_BUS');
+        unit.env.sim.set('L:MY_AVIONICS_BUS', 'bool', false);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(Screen.read().row(0)).toBe(BLANK_ROW);
+    });
+
+    it('an A: prefix with an index powers the unit, and the index LVar switches the circuit (#136)', async () => {
+        // FakeSim keys a variable by its name as written, so the prefix is part of the variable the test sets
+        const unit = await bootUnit({panelXml: panelXml({'Input.ElectricitySimVar': 'A:CIRCUIT ON:1'})});
+        unit.env.sim.set('A:CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('A:CIRCUIT ON:1');
+
+        // Circuit 2 is not powered
+        unit.env.sim.set('L:KLN90B_ElectricitySimVarIndex', 'number', 2);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('A:CIRCUIT ON:2');
+        expect(Screen.read().row(0)).toBe(BLANK_ROW);
+
+        unit.env.sim.set('A:CIRCUIT ON:2', 'bool', true);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+    });
+
+    // A pretty-printed element ends in whitespace; the unit trims it, so the sync still finds the index
+    it('a pretty-printed value with an index powers the unit, and the index LVar switches the circuit (#136)', async () => {
+        const unit = await bootUnit({panelXml: panelXml({'Input.ElectricitySimVar': '\n    CIRCUIT ON:1\n  '})});
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('CIRCUIT ON:1');
+
+        unit.env.sim.set('L:KLN90B_ElectricitySimVarIndex', 'number', 2);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('CIRCUIT ON:2');
+        expect(Screen.read().row(0)).toBe(BLANK_ROW);
+    });
+
+    // The form without a prefix and without an index: the unit powers up with it and the sync leaves the name alone
+    it('a SimVar without prefix and index powers the unit', async () => {
+        const unit = await bootUnit({panelXml: panelXml({'Input.ElectricitySimVar': 'ELECTRICAL MAIN BUS VOLTAGE'})});
+        unit.env.sim.set('ELECTRICAL MAIN BUS VOLTAGE', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('ELECTRICAL MAIN BUS VOLTAGE');
+    });
+
+    // Only the trailing digits are the index, whatever their count
+    it('replaces only the trailing digits of the index', async () => {
+        const unit = await bootUnit({panelXml: panelXml({'Input.ElectricitySimVar': 'CIRCUIT ON:12'})});
+        unit.env.sim.set('CIRCUIT ON:12', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(Screen.read().row(0)).not.toBe(BLANK_ROW);
+
+        unit.env.sim.set('L:KLN90B_ElectricitySimVarIndex', 'number', 3);
+        await vi.advanceTimersByTimeAsync(300);
+        expect(unit.props.planeSettings.input.electricitySimVar).toBe('CIRCUIT ON:3');
     });
 });
 

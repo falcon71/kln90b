@@ -1,6 +1,6 @@
 import {SimVarValueType} from "@microsoft/msfs-sdk";
 import {PowerButton} from "./PowerButton";
-import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
+import {ELECTRICITY_INDEX, KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {
     LVAR_BRIGHTNESS,
     LVAR_DISABLE,
@@ -29,10 +29,9 @@ export class SimVarSync {
 
     private tick(): void {
         if (this.settings.input.electricitySimVar) {
-            if (this.settings.input.electricitySimVar.includes(":")) {
-                const split = this.settings.input.electricitySimVar.split(":");
-                split[1] = SimVar.GetSimVarValue(LVAR_ELECTRICITY_INDEX, SimVarValueType.Number);
-                this.settings.input.electricitySimVar = split.join(":");
+            if (ELECTRICITY_INDEX.test(this.settings.input.electricitySimVar)) {
+                const index = SimVar.GetSimVarValue(LVAR_ELECTRICITY_INDEX, SimVarValueType.Number);
+                this.settings.input.electricitySimVar = this.settings.input.electricitySimVar.replace(ELECTRICITY_INDEX, `:${index}`);
             }
 
             this.powerButton.setElectricityAvailable(!!SimVar.GetSimVarValue(this.settings.input.electricitySimVar, SimVarValueType.Bool));

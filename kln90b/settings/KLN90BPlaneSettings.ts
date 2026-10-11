@@ -1,6 +1,12 @@
 import {SimVarValueType} from "@microsoft/msfs-sdk";
 import {LVAR_ELECTRICITY_INDEX, LVAR_GPS_SIMVARS, LVAR_OBS_SOURCE, LVAR_OBS_TARGET} from "../LVars";
 
+/**
+ * The index of Input.ElectricitySimVar is only a trailing colon and digits ("CIRCUIT ON:1"). Any other colon belongs to the
+ * name: the prefix of an LVar or an A: variable ("L:MY_AVIONICS_BUS").
+ */
+export const ELECTRICITY_INDEX = /:(\d+)$/;
+
 export const enum FuelUnit {
     GAL = "GAL",
     IMP = "IMP",
@@ -64,7 +70,7 @@ export class KLN90BPlaneSettingsParser {
                 altimeterInterfaced: this.getOption(instrumentsTag, "Input.AltimeterInterfaced", true),
                 obsSource: this.getOption(instrumentsTag, "Input.ObsSource", 1),
                 headingInput: this.getOption(instrumentsTag, "Input.HeadingInput", false),
-                electricitySimVar: this.getOption(instrumentsTag, "Input.ElectricitySimVar", ""),
+                electricitySimVar: this.getOption(instrumentsTag, "Input.ElectricitySimVar", "").trim(), //A pretty-printed element ends in whitespace, which would hide the index
                 airdata: {
                     isInterfaced: this.getOption(instrumentsTag, "Input.Airdata.IsInterfaced", false),
                     baroSource: this.getOption(instrumentsTag, "Input.Airdata.BaroSource", 0),
@@ -94,8 +100,9 @@ export class KLN90BPlaneSettingsParser {
         SimVar.SetSimVarValue(LVAR_OBS_SOURCE, SimVarValueType.Number, options.input.obsSource);
         SimVar.SetSimVarValue(LVAR_OBS_TARGET, SimVarValueType.Number, options.output.obsTarget);
         SimVar.SetSimVarValue(LVAR_GPS_SIMVARS, SimVarValueType.Bool, options.output.writeGPSSimVars);
-        if (options.input.electricitySimVar.includes(":")) {
-            SimVar.SetSimVarValue(LVAR_ELECTRICITY_INDEX, SimVarValueType.Number, Number(options.input.electricitySimVar.split(":")[1]));
+        const electricityIndex = ELECTRICITY_INDEX.exec(options.input.electricitySimVar);
+        if (electricityIndex !== null) {
+            SimVar.SetSimVarValue(LVAR_ELECTRICITY_INDEX, SimVarValueType.Number, Number(electricityIndex[1]));
         }
 
         return options;
