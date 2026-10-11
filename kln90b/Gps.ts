@@ -2,7 +2,6 @@ import {
     EventBus,
     GeoPoint,
     GPSSatComputer,
-    GPSSatComputerEvents,
     GPSSatComputerOptions,
     GPSSatellite,
     GPSSystemState,
@@ -42,6 +41,8 @@ export class KLNGPSSatComputer extends GPSSatComputer {
 
     public internalTime: number = 0;
     public search: GpsSearch | undefined = undefined; //Set by GPS after construction
+    /** Called after a forced acquisition, which the unit accepts at once (#215) */
+    public onForcedAcquisition: (() => void) | undefined = undefined;
 
     constructor(index: number, bus: EventBus, ephemerisFile: string, sbasFile: string, updateInterval: number, enabledSBASGroups: Iterable<string> | SubscribableSet<string>, syncRole: "primary" | "replica" | "none", options: Readonly<GPSSatComputerOptions>) {
         super(index, bus, ephemerisFile, sbasFile, updateInterval, enabledSBASGroups, syncRole, options);
@@ -69,6 +70,7 @@ export class KLNGPSSatComputer extends GPSSatComputer {
     public acquireAndUseSatellites(): void {
         this.search?.end();
         super.acquireAndUseSatellites();
+        this.onForcedAcquisition?.();
     }
 
     /** The time the receiver last completed an almanac, sim time. Private in the SDK */
@@ -128,6 +130,8 @@ export class GPS {
     private intSaveCount = 0;
     private readonly takeHomeMode: boolean;
     private gpsStartTime: number = 0;
+    private solutionAccepted = false; //5-29: the unit accepts the receiver's solution one calculation tick after it appears (TRAN)
+    private inTransition = false;
     private lastPowerOffTime: number = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds); //Sim time (s) of construction or the last power-off. The battery clock runs on while the unit is off (3-53)
 
     constructor(private bus: EventBus, private userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, private readonly messageHandler: MessageHandler) {
@@ -163,12 +167,7 @@ export class GPS {
         //The model needs the REAL timings the computer was built with: after a switch from FAST it stays off until the next session
         this.search = new GpsSearch(this.gpsSatComputer, () => fastGPS || this.userSettings.getSetting("fastGpsAcquisition").get());
         this.gpsSatComputer.search = this.search;
-        bus.getSubscriber<GPSSatComputerEvents>().on('gps_system_state_changed_1').handle(state => {
-            const valid = state === GPSSystemState.SolutionAcquired || state === GPSSystemState.DiffSolutionAcquired;
-            if (valid) {
-                this.gpsAcquired();
-            }
-        });
+        this.gpsSatComputer.onForcedAcquisition = () => this.acceptForcedSolution();
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.powerChanged.bind(this));
 
         this.gpsSatComputer.init();
@@ -219,6 +218,19 @@ export class GPS {
             this.search.tick(actualUnixTime, {lat, lon}, this.gpsSatComputer.internalTime);
             this.gpsSatComputer.onUpdate();
 
+            if (!this.hasSdkSolution()) {
+                this.solutionAccepted = false;
+                this.inTransition = false;
+            } else if (!this.solutionAccepted) {
+                if (this.inTransition) {
+                    this.solutionAccepted = true;
+                    this.inTransition = false;
+                    this.gpsAcquired();
+                } else {
+                    this.inTransition = true;
+                }
+            }
+
             if (this.isValid()) {
                 this.lastCoords = this.coords;
                 this.coords = new GeoPoint(
@@ -265,10 +277,28 @@ export class GPS {
         return this.groundspeed >= MIN_GROUND_SPEED_FOR_TRACK ? this.trackTrue : null;
     }
 
-    public isValid(): boolean {
-        //todo this is not entirely correct. GPSSatComputer assumes navigation is only possible with 4 sats. 5-29 states that navigation may be possible with 3 sats when an altitude input is used in the solution
+    private hasSdkSolution(): boolean {
         const state = this.gpsSatComputer.systemState.get();
         return state === GPSSystemState.SolutionAcquired || state === GPSSystemState.DiffSolutionAcquired;
+    }
+
+    public isValid(): boolean {
+        //todo this is not entirely correct. GPSSatComputer assumes navigation is only possible with 4 sats. 5-29 states that navigation may be possible with 3 sats when an altitude input is used in the solution
+        return this.solutionAccepted && this.hasSdkSolution();
+    }
+
+    /** 5-29: enough satellites are tracked, but the unit has not accepted the position yet */
+    public isTransition(): boolean {
+        return this.inTransition;
+    }
+
+    /** The forced acquisition of an engine-running start or SET 10 FAST is accepted at once, without TRAN */
+    public acceptForcedSolution(): void {
+        if (this.hasSdkSolution() && !this.solutionAccepted) {
+            this.solutionAccepted = true;
+            this.inTransition = false;
+            this.gpsAcquired();
+        }
     }
 
 
@@ -334,6 +364,8 @@ export class GPS {
             this.gpsStartTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
         } else {
             this.lastPowerOffTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
+            this.solutionAccepted = false;
+            this.inTransition = false;
             this.search.end();
         }
     }

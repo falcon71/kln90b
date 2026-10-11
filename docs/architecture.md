@@ -252,8 +252,14 @@ error or noise and no RAIM ("We have pretty all messages except for failures and
   ephemeris download 30 s (one data frame) and expiry 2 h, acquisition with a current ephemeris 9 ± 3 s (a hot start
   has its fix before the 17 s self-test ends), almanac download 12.5 min, almanac expiry six months (3-17), timeout
   4 min. With `fastGpsAcquisition` all of these drop to about 1 to 10 s.
-- `isValid()` means `systemState` is `SolutionAcquired` or `DiffSolutionAcquired`. There is a TODO: 3-satellite plus
-  altitude aiding is not modelled.
+- `isValid()` is true one calculation tick after the receiver's first solution (`systemState` is `SolutionAcquired` or
+  `DiffSolutionAcquired`), and stays true while that holds. The tick in between is TRAN (`isTransition()`, 5-29, #215).
+  A forced acquisition (engine-running start, SET 10 FAST) is accepted at once, without TRAN
+  (`acceptForcedSolution`, called by `KLNGPSSatComputer.acquireAndUseSatellites`). `gpsAcquired()` runs on acceptance.
+  There is a TODO: 3-satellite plus altitude aiding is not modeled.
+- **STA 1 state line** (`Sta1Page.stateText`, #215): NAV D, NAV A (whenever there is an altitude) or NAV when valid;
+  TRAN in the transition tick; ACQ during the start model's acquisition, even when nothing can be acquired; INIT during
+  the almanac and sky searches and before the first channel assignment.
 - When valid, `coords` come from `PLANE LATITUDE/LONGITUDE` and `groundspeed` from `GROUND VELOCITY`.
     - `trackTrue` is the bearing between successive 1 Hz fixes, computed only when GS >= 2 kt (
       `MIN_GROUND_SPEED_FOR_TRACK`, 3-35). `getTrackTrueRespectingGroundspeed()` returns null below that.
@@ -624,7 +630,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `StatusLineMessageEvents.statusLineMessage` and `KeyboardEvent.keyboardevent` (`controls/StatusLine.tsx`)
     - `RemarksChangedEvent.changed` (`RemarksManager.ts`)
     - `KLNfacilityrepo_sync`
-    - SDK topics: `hEvent`, `gps_system_state_changed_1`, `simTime`, `gps-position`
+    - SDK topics: `hEvent`, `simTime`, `gps-position`
 - **Units:** `data/Units.ts` has type aliases only (`Feet`, `NauticalMiles`, `Degrees`, `Knots`, `Seconds`, ...), for
   documentation. Internals use NM, knots and degrees (true unless the name says Mag). `GeoPoint.distance` returns GA
   radians, so convert with `UnitType.GA_RADIAN.convertTo(x, UnitType.NMILE)`. SimVar writes convert to meters, radians

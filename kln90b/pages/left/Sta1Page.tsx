@@ -86,27 +86,7 @@ export class Sta1Page extends SixLineHalfPage {
         const rows = this.getRows();
 
         if(this.currentPage === 0){
-            let state: string;
-            switch (this.props.sensors.in.gps.gpsSatComputer.state) {
-                case GPSSystemState.Searching:
-                    state = " INIT";
-                    break;
-                case GPSSystemState.Acquiring:
-                    state = "  ACQ";
-                    break;
-                case GPSSystemState.SolutionAcquired:
-                case GPSSystemState.DiffSolutionAcquired:
-                    const dataCollection = rows.some(r => r.state === GPSSatelliteState.Acquired);
-                    if(dataCollection){
-                        state = "NAV D";
-                    }else if (this.props.sensors.in.airdata.pressureAltitude === null) {
-                        state = "  NAV";
-                    } else {
-                        state = "NAV A";
-                    }
-                    break;
-            }
-            this.children.get("line0").text = `STATE ${state}`;
+            this.children.get("line0").text = `STATE ${this.stateText(rows)}`;
             this.children.get("line1").text = " SV SNR ELE";
             this.children.get("line2").text = this.drawSat(rows[0]);
             this.children.get("line3").text = this.drawSat(rows[1]);
@@ -128,6 +108,27 @@ export class Sta1Page extends SixLineHalfPage {
                 this.children.get("line5").text = "";
             }
         }
+    }
+
+    private stateText(rows: SatRow[]): string {
+        const gps = this.props.sensors.in.gps;
+        if (gps.isValid()) {
+            if (rows.some(r => r.state === GPSSatelliteState.Acquired)) {
+                return "NAV D";
+            }
+            return this.props.sensors.in.airdata.pressureAltitude === null ? "  NAV" : "NAV A";
+        }
+        if (gps.isTransition()) {
+            return " TRAN";
+        }
+        switch (gps.search.mode) {
+            case SearchMode.Acquisition:
+                return "  ACQ";
+            case SearchMode.AlmanacSearch:
+            case SearchMode.SkySearch:
+                return " INIT"; //ORS 20 has no state of its own for a search of the sky (ORS 01 had SRCH)
+        }
+        return gps.gpsSatComputer.state === GPSSystemState.Acquiring ? "  ACQ" : " INIT";
     }
 
     private getRows(): SatRow[] {

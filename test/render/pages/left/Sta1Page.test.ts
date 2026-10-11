@@ -1,11 +1,13 @@
 import {describe, expect, it, vi} from 'vitest';
-import {GPSSatellite} from '@microsoft/msfs-sdk';
+import {GPSSatellite, GPSSystemState} from '@microsoft/msfs-sdk';
 import {bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {DEFAULT_START} from '../../../harness/sim/clock';
 
-// The STA 1 snapshot of a unit with a fix is in GpsAcquisition.test.ts (describe 'STA 1 page with a fix'), with the
-// INIT state of an almanac search; the receiver states are the question #215
+// The STA 1 snapshot of a unit with a fix is in GpsAcquisition.test.ts (describe 'STA 1 page with a fix'); the INIT
+// state of an almanac search is below. The decisions of #215: INIT covers the almanac and the sky searches (ORS 20 has
+// no state of its own for them), ACQ is the start model's acquisition even when nothing can be acquired, NAV A shows
+// whenever there is an altitude
 
 /**
  * A cold-and-dark unit with slow acquisition and an almanac 200 days old, powered on: an almanac search, a blind search
@@ -156,5 +158,33 @@ describe('STA 1 page, tracked satellites with orbit data below the horizon', () 
 
         expect(shown.map(([prn]) => prn)).toEqual(below);
         expect(shown.map(([, ele]) => ele)).toEqual(below.map(() => '--'));
+    }, 60_000);
+});
+
+
+// 5-29, 5-30: the transition state means enough satellites are tracked but no position is produced yet. A real-unit video
+// shows it for about half a second between ACQ and NAV A; the unit accepts the position one calculation tick after the
+// receiver has its solution (#215)
+describe('STA 1 receiver states (5-29)', () => {
+    it('shows TRAN on the tick of the first solution, NAV one second later (5-29, #215)', async () => {
+        const unit = await bootToSelfTest({
+            storage: {fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 8, lastAlmanacDownload: DEFAULT_START.getTime() - 24 * 3600 * 1000},
+        });
+        await unit.panel.approveSelfTest();
+        await unit.panel.selectPage('L', 'STA 1');
+        const gps = unit.props.sensors.in.gps;
+        const sdkSolution = () => gps.gpsSatComputer.state === GPSSystemState.SolutionAcquired;
+        for (let i = 0; i < 600 && !sdkSolution(); i++) {
+            await vi.advanceTimersByTimeAsync(250);
+        }
+        expect(sdkSolution()).toBe(true);
+        await vi.advanceTimersByTimeAsync(250); //one display tick
+
+        expect(gps.isValid()).toBe(false);
+        expect(Screen.read().rows('L')[0]).toBe('STATE  TRAN');
+
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(gps.isValid()).toBe(true);
+        expect(Screen.read().rows('L')[0]).toMatch(/^STATE (  NAV|NAV A|NAV D)$/);
     }, 60_000);
 });

@@ -607,6 +607,25 @@ describe('fast GPS acquisition (characterization)', () => {
     });
 });
 
+// 5-29: a forced acquisition (the engine-running start in WelcomePage, SET 10 FAST) calls acquireAndUseSatellites()
+// on the receiver; the unit accepts that solution at once, without the TRAN tick of a searched one (#215)
+describe('forced acquisition (5-29, #215)', () => {
+    it('is valid at once and not in transition, without a further calculation tick (#215)', async () => {
+        const unit = await bootUnit({coldGps: true});
+        const gps = unit.props.sensors.in.gps;
+        expect(gps.isValid()).toBe(false);
+        expect(gps.isTransition()).toBe(false);
+
+        // Synchronous, the same call as WelcomePage and SET 10 make: no timer has run since, so no calculation tick can
+        // have accepted the solution in the meantime; only acceptForcedSolution can
+        gps.gpsSatComputer.acquireAndUseSatellites();
+
+        expect(gps.gpsSatComputer.state).toBe(GPSSystemState.SolutionAcquired);
+        expect(gps.isValid()).toBe(true);
+        expect(gps.isTransition()).toBe(false);
+    });
+});
+
 // B-2: DATA BASE OUT OF DATE appears when a date from the GPS overrides a pilot-entered date and the data base is then
 // out of date. The fake clock starts after the end of the navdata cycle (MAY15JUN12/26, sim/clock.ts); the unit's own
 // clock is set back into the cycle before the power-on, as a pilot would on the self-test page
@@ -656,7 +675,7 @@ describe('GPS receiver channels (5-29)', () => {
 // characterization: the STA 1 pages of a unit with a fix, from the ephemeris in resources/ at the fake clock's start.
 // They read the SDK satellites through private fields (channels, state, signal strength, zenith angle), so an SDK
 // upgrade that changes them shows here
-// the receiver states are a question: #215
+// NAV A shows whenever there is an altitude, as on a real unit with all eight satellites in use (decided in #215)
 describe('STA 1 page with a fix (characterization)', () => {
     it('characterization: both STA 1 pages after an engine-running boot', async () => {
         const unit = await bootUnit();
@@ -685,6 +704,20 @@ describe('STA 1 page with a fix (characterization)', () => {
           ]
         `);
     });
+});
+
+// 5-29: the start model searches the satellites it predicts even when its clock is too far off to acquire them; the
+// receiver is in its acquisition state, not initializing (#215)
+describe('STA 1 state during an acquisition that cannot succeed (5-29)', () => {
+    it('shows ACQ right after the self-test with the clock 15 minutes behind (5-29, #215)', async () => {
+        const unit = await powerOnCold(WARM, -15 * MINUTE);
+        await vi.advanceTimersByTimeAsync(19_000); //the Turn-On page, as bootToSelfTest
+        await unit.panel.approveSelfTest();
+        await unit.panel.selectPage('L', 'STA 1');
+
+        expect(unit.props.sensors.in.gps.isValid()).toBe(false);
+        expect(Screen.read().rows('L')[0]).toBe('STATE   ACQ');
+    }, 60_000);
 });
 
 // 3-53: the internal battery clock keeps the time while no satellite supplies it
