@@ -1,13 +1,12 @@
-import {Facility, FixTypeFlags, ICAO, ReadonlyFlightPlanRoute} from '@microsoft/msfs-sdk';
+import {Facility, FixTypeFlags, FlightPlanRouteUtils, ICAO, ReadonlyFlightPlanRoute} from '@microsoft/msfs-sdk';
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {efbRoute} from '../../harness/platform';
 import {airport, intersection} from '../../harness/navdata/builders';
 import {approach, Leg, sid, star, withProcedures} from '../../harness/navdata/procedures';
 import {approachWorld, standardRoute} from '../../harness/fixtures';
-import {muteConsoleError} from '../../harness/console';
 import {NO_GPS_SIMVARS, panelXml} from '../../harness/panelXml';
-import {fplIdents} from '../../harness/readers';
+import {activeIdent, fplIdents, turnStackLength} from '../../harness/readers';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {savedFlightplan, savedUserWaypoints} from '../../harness/storage';
 
@@ -38,8 +37,8 @@ describe('KlnEfbSaver', () => {
         expect(route.enroute.map(leg => [leg.lat, leg.lon])).toEqual([[47.5, 8.5]]);
     });
 
-    // toEfbRoute() takes the airports off the array getLegs() returns, which is the internal leg array of FPL 0
-    it.fails('a route request leaves FPL 0 unchanged (#91)', async () => {
+    // Building the route must not take the airports off the leg array of FPL 0 (#91)
+    it('a route request leaves FPL 0 unchanged (#91)', async () => {
         const unit = await bootWithRoute();
 
         unit.efb!.request();
@@ -47,7 +46,77 @@ describe('KlnEfbSaver', () => {
         expect(fplIdents(unit)).toEqual(['KAAA', 'CUST', 'KBBB']);
     });
 
-    // The preconditions of the two pins below, which an it.fails would hide if they broke
+    // The answer does not depend on how often the EFB asks: the second request gets the same route as the first
+    it('answers a second route request with the same route as the first (#91)', async () => {
+        const unit = await bootWithRoute();
+
+        unit.efb!.request();
+        unit.efb!.request();
+
+        const [first, second] = unit.efb!.replies;
+        expect(unit.efb!.replies.length).toBe(2);
+        expect(second.route).toEqual(first.route);
+        expect(first.route.departureAirport.ident).toBe('KAAA');
+        expect(first.route.destinationAirport.ident).toBe('KBBB');
+    });
+
+    // The whole state of FPL 0 survives a request: the legs themselves (the same objects in the same order), the active
+    // waypoint, the turn stack and the loaded procedures, and nothing is published about FPL 0, so the planner sync and
+    // the persistence see no change (#91)
+    it('a route request leaves the legs, the active waypoint and the procedures of FPL 0 as they were (#91)', async () => {
+        const unit = await bootWithStarAndApproach09();
+        const fpl0 = unit.props.memory.fplPage.flightplans[0];
+        const legsBefore = [...fpl0.getLegs()];
+        const typesBefore = legsBefore.map(l => l.type);
+        const activeBefore = activeIdent(unit);
+        const stackBefore = turnStackLength(unit);
+        expect(legsBefore.length).toBe(7); // Precondition: ENRAA, the STAR, the approach and KPRC
+        expect(new Set(typesBefore).size).toBeGreaterThan(1); // Precondition: procedure legs and user legs
+        // A new bus subscriber is called at once with the last cached event, which is not a change made by the request
+        const changes: unknown[] = [];
+        let subscribed = false;
+        unit.props.bus.getSubscriber<any>().on('flightplanChanged').handle((fpl: unknown) => subscribed && changes.push(fpl));
+        subscribed = true;
+
+        unit.efb!.request();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(changes).toEqual([]);
+        expect(fpl0.getLegs().length).toBe(legsBefore.length);
+        fpl0.getLegs().forEach((leg, i) => expect(leg).toBe(legsBefore[i]));
+        expect(fpl0.getLegs().map(l => l.type)).toEqual(typesBefore);
+        expect(activeIdent(unit)).toBe(activeBefore);
+        expect(turnStackLength(unit)).toBe(stackBefore);
+    });
+
+    // The first leg is no airport: it stays in the enroute part, and only the destination is taken off
+    it('answers a plan that starts with a VOR and ends with an airport, and leaves FPL 0 unchanged (#91)', async () => {
+        const {abc, kbbb} = standardRoute();
+        const unit = await bootUnit({efb: true, facilities: [abc, kbbb], storage: savedFlightplan(0, [abc, kbbb])});
+        await settle(unit);
+
+        const route = requestRoute(unit);
+
+        expect(ICAO.isValueEmpty(route.departureAirport)).toBe(true);
+        expect(route.destinationAirport.ident).toBe('KBBB');
+        expect(route.enroute.map(l => l.fixIcao.ident)).toEqual(['ABC']);
+        expect(fplIdents(unit)).toEqual(['ABC', 'KBBB']);
+    });
+
+    // A plan of two airports has no enroute leg; both are taken for the route and both stay in FPL 0
+    it('answers a plan of two airports and leaves FPL 0 unchanged (#91)', async () => {
+        const unit = await bootUnit({efb: true, facilities: [kaaa, kbbb], storage: savedFlightplan(0, [kaaa, kbbb])});
+        await settle(unit);
+
+        const route = requestRoute(unit);
+
+        expect(route.departureAirport.ident).toBe('KAAA');
+        expect(route.destinationAirport.ident).toBe('KBBB');
+        expect(route.enroute).toEqual([]);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
+    });
+
+    // The preconditions of the two tests below: an empty FPL 0, and one that holds only an airport after a synced route
     it('starts from an empty FPL 0, and from one that holds only an airport after a synced route', async () => {
         const unit = await bootUnit({efb: true, facilities: [kaaa]});
         await settle(unit);
@@ -59,10 +128,8 @@ describe('KlnEfbSaver', () => {
         expect(fplIdents(unit)).toEqual(['KAAA']);
     });
 
-    // toEfbRoute() reads legs[0] and then the last leg without checking that a leg is left. The SDK's SubEvent catches the
-    // TypeError and logs it with console.error, so nothing is thrown at the EFB and it never gets an answer
-    it.fails('a route request with an empty FPL 0 is answered with an empty route (#91)', async () => {
-        muteConsoleError();
+    // The route of an empty plan is the SDK's empty route, as the SDK's own avionics answer a plan without legs
+    it('a route request with an empty FPL 0 is answered with an empty route (#91)', async () => {
         const unit = await bootUnit({efb: true});
         await settle(unit);
         expect(fplIdents(unit)).toEqual([]);
@@ -70,12 +137,13 @@ describe('KlnEfbSaver', () => {
         const id = unit.efb!.request();
 
         expect(unit.efb!.replies.map(r => r.requestId)).toEqual([id]);
-        expect(ICAO.isValueEmpty(unit.efb!.replies[0].route.departureAirport)).toBe(true);
-        expect(ICAO.isValueEmpty(unit.efb!.replies[0].route.destinationAirport)).toBe(true);
+        expect(unit.efb!.replies[0].route).toEqual(FlightPlanRouteUtils.emptyRoute());
+        expect(unit.errors).toEqual([]);
+        expect(unit.consoleErrors).toEqual([]);
     });
 
-    it.fails('a route request with only an airport in FPL 0 is answered (#91)', async () => {
-        muteConsoleError();
+    // A plan with a single airport: the airport is the departure, and there is nothing left for a destination
+    it('a route request with only an airport in FPL 0 is answered (#91)', async () => {
         const unit = await bootUnit({efb: true, facilities: [kaaa]});
         await settle(unit);
         unit.efb!.sync(efbRoute({departure: kaaa}));
@@ -85,10 +153,16 @@ describe('KlnEfbSaver', () => {
         const id = unit.efb!.request();
 
         expect(unit.efb!.replies.map(r => r.requestId)).toEqual([id]);
+        const route = unit.efb!.replies[0].route;
+        expect(route.departureAirport.ident).toBe('KAAA');
+        expect(ICAO.isValueEmpty(route.destinationAirport)).toBe(true);
+        expect(route.enroute).toEqual([]);
+        expect(fplIdents(unit)).toEqual(['KAAA']);
+        expect(unit.consoleErrors).toEqual([]);
     });
 });
 
-/** Asks for the route and returns the one answer; the request changes FPL 0 (#91), so read the plan before */
+/** Asks for the route and returns the one answer */
 function requestRoute(unit: HeadlessUnit): ReadonlyFlightPlanRoute {
     const id = unit.efb!.request();
     expect(unit.efb!.replies.map(r => r.requestId)).toEqual([id]);
@@ -211,6 +285,6 @@ describe('KlnEfbSaver route contents', () => {
         unit.efb!.request();
 
         expect(unit.efb!.replies).toEqual([]);
-        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']); // Not changed either, since nothing was built (#91)
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']); // Not changed either, since nothing was built
     });
 });

@@ -33,13 +33,13 @@ export class KlnEfbSaver {
 
     private toEfbRoute(): FlightPlanRoute {
         const route = FlightPlanRouteUtils.emptyRoute();
-        const legs = this.fpl0.getLegs();
-        if (FacilityUtils.isFacilityType(legs[0].wpt, FacilityType.Airport)) {
+        const legs = [...this.fpl0.getLegs()]; //A copy, because getLegs() returns the leg array of FPL 0 itself
+        if (legs.length > 0 && FacilityUtils.isFacilityType(legs[0].wpt, FacilityType.Airport)) {
             route.departureAirport = legs[0].wpt.icaoStruct;
             legs.shift();
         }
-        const lastLeg = legs[legs.length - 1];
-        if (FacilityUtils.isFacilityType(lastLeg.wpt, FacilityType.Airport)) {
+        const lastLeg = legs[legs.length - 1]; //undefined, when nothing is left
+        if (lastLeg !== undefined && FacilityUtils.isFacilityType(lastLeg.wpt, FacilityType.Airport)) {
             route.destinationAirport = lastLeg.wpt.icaoStruct;
             legs.pop();
         }
