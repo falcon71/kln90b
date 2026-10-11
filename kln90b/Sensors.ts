@@ -320,6 +320,9 @@ export class SensorsOut {
      * The deviation bar signal is filtered by analog circuitry, so we set this more often
      */
     public setFilteredOutputs() {
+        if (!this.options.output.writeGPSSimVars) {
+            return;
+        }
         SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, this.xtkFilter.getCurrentValue());
     }
 
@@ -552,6 +555,9 @@ export class SensorsOut {
         }
 
         //The real KLN does not have this, but we do and there is a SimVar for this...
+        if (!this.options.output.writeGPSSimVars) {
+            return;
+        }
         if (desiredHeading === null) {
             SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Number, 0);
         } else {

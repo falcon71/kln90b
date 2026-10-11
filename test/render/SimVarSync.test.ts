@@ -176,8 +176,7 @@ describe('L:KLN90B_ObsTarget (public contract)', () => {
 });
 
 // CLAUDE.md "Public contract with aircraft" (GPS SimVars) and the Hot Swapping wiki page: with the LVar at 0 the unit
-// writes no GPS SimVars and leaves GPS OVERRIDDEN to the sim's own GPS. GPS WP CROSS TRK is no probe for "stopped", it
-// keeps being written (#126).
+// writes no GPS SimVars and leaves GPS OVERRIDDEN to the sim's own GPS.
 describe('L:KLN90B_WriteGpsSimvars (public contract)', () => {
     it('stops the GPS SimVar writes and releases GPS OVERRIDDEN, and resumes them', async () => {
         const unit = await bootOnStandardRoute();
@@ -198,6 +197,31 @@ describe('L:KLN90B_WriteGpsSimvars (public contract)', () => {
         await vi.advanceTimersByTimeAsync(10_000); // Ten 1 s ticks
         // One write per calculation tick
         expect(unit.env.sim.writeCount('GPS WP DISTANCE') - resumedAt).toBe(10);
+    });
+
+    // The 16 Hz filter tick writes GPS WP CROSS TRK and the roll steering writes GPS COURSE TO STEER; both stop with the
+    // rest (#126), while the roll command LVar, the unit's own output, keeps going
+    it('stops GPS WP CROSS TRK and GPS COURSE TO STEER too, and resumes them', async () => {
+        const unit = await bootOnStandardRoute();
+        const sim = unit.env.sim;
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(sim.writeCount('GPS WP CROSS TRK')).toBeGreaterThan(0);
+        expect(sim.writeCount('GPS COURSE TO STEER')).toBeGreaterThan(0);
+
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+        const crossTrk = sim.writeCount('GPS WP CROSS TRK');
+        const steer = sim.writeCount('GPS COURSE TO STEER');
+        const roll = sim.writeCount('L:KLN90B_RollCommand');
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(sim.writeCount('GPS WP CROSS TRK')).toBe(crossTrk);
+        expect(sim.writeCount('GPS COURSE TO STEER')).toBe(steer);
+        expect(sim.writeCount('L:KLN90B_RollCommand')).toBeGreaterThan(roll);
+
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(sim.writeCount('GPS WP CROSS TRK')).toBeGreaterThan(crossTrk);
+        expect(sim.writeCount('GPS COURSE TO STEER')).toBeGreaterThan(steer);
     });
 });
 

@@ -256,19 +256,20 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
     - `GPS CDI SCALING`, `GPS IS ACTIVE FLIGHT PLAN`, `GPS IS ACTIVE WAY POINT`, `GPS OBS VALUE`
     - `GPS WP DESIRED TRACK`, `GPS WP TRACK ANGLE ERROR`, `GPS WP BEARING` (+TRUE), `GPS WP DISTANCE`, `GPS WP ETE`,
       `GPS WP ETA`, `GPS ETE`, `GPS ETA`
+    - `GPS COURSE TO STEER` (radians; "real KLN does not have this"; `setRollCommand` writes the roll command LVar
+      regardless)
     - `GPS MAGVAR`, `GPS POSITION LAT/LON`, `GPS GROUND SPEED`, `GPS GROUND TRUE/MAGNETIC TRACK`
     - `GPS FLIGHT PLAN WP COUNT/INDEX`, `GPS WP NEXT/PREV ID/LAT/LON`, `GPS WP PREV VALID`
     - `GPS IS APPROACH ACTIVE`, `GPS APPROACH MODE` (0 = ENR, 1 = ARM, 2 = APR, 3 = self-test)
     - Vertical outputs are forced to 0 (`GPS GSI SCALING`, `GPS HAS GLIDEPATH=false`, ...) because the KLN has no
       vertical guidance.
-- `GPS WP CROSS TRK` is written at 16 Hz from the filter by `setFilteredOutputs`. It has no `writeGPSSimVars` check of
-  its own; it is fed only through gated `setXTK`.
+- `GPS WP CROSS TRK` is written at 16 Hz from the filter by `setFilteredOutputs`, which has the `writeGPSSimVars` check
+  of its own: the filter is fed only through the gated `setXTK`.
 - The OBS mode is set through key events `K:GPS_OBS_ON/OFF`, because the `GPS OBS ACTIVE` SimVar is effectively
   read-only. This happens only when **no** external LEG/OBS switch is installed. With a switch installed, `SimVarSync`
   *reads* `GPS OBS ACTIVE` and calls `modeController.setExternalObsMode`.
 - **Not gated** by `writeGPSSimVars`:
-    - All KLN LVars, `GPS COURSE TO STEER` (radians; "real KLN does not have this"), `K:VOR{1,2}_SET` (when `obsTarget`
-      is set and the GPS drives NAV1).
+    - All KLN LVars, `K:VOR{1,2}_SET` (when `obsTarget` is set and the GPS drives NAV1).
     - Annunciators: `setMessageLight` (called from `controls/StatusLine.tsx` in the display tick, flashing while there
       are unread messages) and `setWptAlertLight` / `setAnnunTest` (from NavCalculator).
 - Other outputs:
@@ -355,8 +356,8 @@ sim.
   the magvar service").
 - Status-line feedback: `NO APPROACH`, `NO ACTV WPT`.
 
-**`RollSteeringController`** (1 Hz) is adapted from WT `LNavComputer`. It writes `L:KLN90B_RollCommand` and
-`GPS COURSE TO STEER`.
+**`RollSteeringController`** (1 Hz) is adapted from WT `LNavComputer`. It writes `L:KLN90B_RollCommand` and,
+only with `writeGPSSimVars`, `GPS COURSE TO STEER`.
 
 - Cases: on track (proportional), no intercept (45-degree intercept), or optimal-bank intercept (at most 30 degrees).
 - `adjustBankAngleForArc` and `ArcTurnController` exist but are unused.

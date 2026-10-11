@@ -348,15 +348,14 @@ describe('GPS SimVars with Output.WriteGPSSimVars off (public contract) (#126)',
     const writtenGpsNames = (unit: HeadlessUnit) =>
         [...new Set(unit.env.sim.writes.map(w => w.name.toUpperCase()).filter(n => n.startsWith('GPS ')))].sort();
 
-    // The two variables of #126 are excluded here, and pinned one each below, so that fixing one cannot hide the other
-    it('writes no other GPS SimVar and no K:GPS key event while the unit runs', async () => {
+    it('writes no GPS SimVar and no K:GPS key event while the unit runs', async () => {
         const unit = await bootMovingOnRoute(panelXml(NO_GPS_SIMVARS));
 
         // Preconditions: the unit runs and has a route, so the silence is the option and not a missing state
         expect(activeIdent(unit)).toBe('ABC');
         expect(unit.env.sim.lastWrite('L:KLN90B_HSI_TF_FLAGS')?.value).toBe(1);
 
-        expect(writtenGpsNames(unit).filter(n => n !== 'GPS WP CROSS TRK' && n !== 'GPS COURSE TO STEER')).toEqual([]);
+        expect(writtenGpsNames(unit)).toEqual([]);
         expect(unit.env.sim.keyEvents.filter(k => k.name.startsWith('K:GPS'))).toEqual([]);
     });
 
@@ -385,15 +384,25 @@ describe('GPS SimVars with Output.WriteGPSSimVars off (public contract) (#126)',
         expect(cts).toBeCloseTo((legCourse - 45) * Math.PI / 180, 2);
     });
 
-    it.fails('GPS COURSE TO STEER is not written (#126)', async () => {
+    it('GPS COURSE TO STEER is not written (#126)', async () => {
         const unit = await bootMovingOnRoute(panelXml(NO_GPS_SIMVARS));
 
         expect(unit.env.sim.lastWrite('GPS COURSE TO STEER')).toBeUndefined();
     });
 
-    it.fails('GPS WP CROSS TRK is not written (#126)', async () => {
+    it('GPS WP CROSS TRK is not written (#126)', async () => {
         const unit = await bootMovingOnRoute(panelXml(NO_GPS_SIMVARS));
 
         expect(unit.env.sim.lastWrite('GPS WP CROSS TRK')).toBeUndefined();
+    });
+
+    it('L:KLN90B_RollCommand is still written, as an output of the unit', async () => {
+        const unit = await bootMovingOnRoute(panelXml(NO_GPS_SIMVARS));
+
+        // 1 NM right of the leg and on a track 10 degrees to the right of it, so the command is the full left bank (25
+        // degrees, as in the power-off tests)
+        const written = unit.env.sim.lastWrite('L:KLN90B_RollCommand');
+        expect(written).toBeDefined();
+        expect(written!.value).toBeCloseTo(25, 6);
     });
 });
