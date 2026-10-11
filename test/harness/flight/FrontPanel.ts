@@ -360,15 +360,23 @@ export class FrontPanel {
     }
 
     /**
+     * The cursor runs and the rows of one side: unchanged after an outer click means the cursor stopped at an end of the
+     * page. The runs alone are not enough: a list that scrolls under a cursor row can show the same ident again
+     */
+    private cursorState(side: Side): string {
+        return JSON.stringify([this.focusedRuns(side), this.screen().rows(side)]);
+    }
+
+    /**
      * Turns the outer knob counterclockwise until the cursor stops at the first field of the page (4-3, #218). The cursor
      * comes on at the page's start field, on a scrolled list at the top visible entry (#355), so a test that needs the
      * top of a list goes there first. Throws with the screen if the cursor does not stop within maxClicks.
      */
     public async cursorToTop(side: Side, maxClicks = 40): Promise<void> {
         for (let i = 0; i < maxClicks; i++) {
-            const runs = JSON.stringify(this.focusedRuns(side));
+            const before = this.cursorState(side);
             await this.outer(side, -1);
-            if (JSON.stringify(this.focusedRuns(side)) === runs) {
+            if (this.cursorState(side) === before) {
                 return;
             }
         }
@@ -394,8 +402,9 @@ export class FrontPanel {
             if (runs.length > 1) this.focused(side); // throws with the screen
             if (runs.length === 1 && runs[0].text.trim() === text) return;
             if (i >= maxClicks) throw new Error(`cursorTo: no field "${text}" within ${maxClicks} clicks\n${this.screen().dump()}`);
+            const before = this.cursorState(side);
             await this.outer(side, dir);
-            if (JSON.stringify(this.focusedRuns(side)) === JSON.stringify(runs)) {
+            if (this.cursorState(side) === before) {
                 // The cursor stopped at an end of the page
                 if (dir === -1) throw new Error(`cursorTo: no field "${text}" on the page\n${this.screen().dump()}`);
                 dir = -1;

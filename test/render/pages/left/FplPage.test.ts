@@ -509,6 +509,57 @@ describe('FPL 1 to FPL 25 pages', () => {
         expect(Screen.read().status().left).toBe('FPL 3');
     });
 
+    // 4-6 step 2, figure 4-26: on an empty numbered plan the cursor comes on over the blank first waypoint position, also
+    // when the plan was emptied on this page by DELETE FPL? (#356)
+    it('turns the cursor on over the blank first waypoint after the plan was deleted on the page (4-6, #356)', async () => {
+        const unit = await bootRoute(savedFlightplan(3, route7()));
+        await unit.panel.selectPage('L', 'FPL 3');
+        await unit.panel.clr();
+        await unit.panel.ent();
+        expect(fplIdents(unit, 3)).toEqual([]); // Precondition: the plan is empty, the page was not left
+
+        await unit.panel.cursor('L');
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('L')).toEqual({row: 1, col: 4, text: '     '});
+    });
+
+    // 4-3 step 3: on a plan with waypoints the cursor comes on over USE?, also when the plan was built on this page from
+    // empty and the page was not left: the blank first waypoint is no longer the start. Checked in the KLN 89 trainer,
+    // 2026-10-11: USE? whether the page was left or not, as long as the header is on the page (#356)
+    it('turns the cursor on over USE? after a plan was built on the page from empty (4-3, #356)', async () => {
+        const unit = await bootRoute({});
+        await unit.panel.selectPage('L', 'FPL 7');
+        await unit.panel.cursor('L'); // the blank first waypoint
+        await unit.panel.enterIdent('L', 'KAAA');
+        await unit.panel.ent(); // the waypoint page
+        await unit.panel.ent();
+        await unit.panel.enterIdent('L', 'ABC');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        expect(fplIdents(unit, 7)).toEqual(['KAAA', 'ABC']); // Precondition
+        await unit.panel.cursor('L');
+
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L')).toEqual({row: 0, col: 0, text: 'USE?'});
+    });
+
+    // 4-6: LOAD FPL 0? copies FPL 0 and turns the cursor off; on again, it comes on over USE? (checked in the KLN 89
+    // trainer, 2026-10-11, #356)
+    it('turns the cursor on over USE? after LOAD FPL 0? on the page (4-6, #356)', async () => {
+        const unit = await bootRoute(savedFlightplan(0, route7().slice(0, 3)));
+        await unit.panel.selectPage('L', 'FPL 7');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', -1);
+        await unit.panel.ent(); // LOAD FPL 0?
+        expect(Screen.read().status().left).toBe('FPL 7'); // Precondition: the copy turned the cursor off
+
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L')).toEqual({row: 0, col: 0, text: 'USE?'});
+    });
+
     // Public contract (CLAUDE.md, persisted user data): the user's flight plans are saved, the deletion as well (as on
     // FPL 0, FlightplanEdit.test.ts); the test above holds the deletion itself
     it('saves the deleted numbered plan as empty (#150)', async () => {

@@ -138,9 +138,6 @@ export class CursorController implements CursorHandler {
     public setDefaultCursorField(defaultField: number): void {
         this.startField = defaultField;
         this.startFieldIsLast = false;
-        if (!this.cursorActive) {
-            this.cursorField = defaultField;
-        }
     }
 
     /**
@@ -188,12 +185,10 @@ export class CursorController implements CursorHandler {
             }
             this.focusAt(Math.min(start, fields.length - 1), fields);
         } else {
-            //Not getCurrentFocusedField, which would move the cursor (#217)
-            const index = this.focusedField === null ? -1 : fields.indexOf(this.focusedField);
-            if (index !== -1) {
-                //A field before the cursor may have changed since: the position follows the field
-                this.cursorField = index;
-                this.focusedField!.setFocused(false);
+            //The field the cursor is on, even if a field before it changed since. Not getCurrentFocusedField, which would
+            //move the cursor (#217)
+            if (this.focusedField !== null && fields.includes(this.focusedField)) {
+                this.focusedField.setFocused(false);
             } else {
                 fields[this.cursorField]?.setFocused(false);
                 if (this.focusedField?.isReadonly) {

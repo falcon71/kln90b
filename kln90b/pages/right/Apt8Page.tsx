@@ -461,6 +461,7 @@ class Apt8IAFPage extends Apt8SelectorPage {
         });
 
         this.cursorController = new CursorController(this.children);
+        this.cursorController.setStartFieldProvider(() => this.children.get("list").topVisibleField()); //T23: the top visible entry of a scrolled list (#355)
         this.cursorController.setCursorActive(true);
     }
 
@@ -517,6 +518,7 @@ class Apt8PreviewPage extends Apt8SelectorPage {
         });
 
         this.cursorController = new CursorController(this.children);
+        this.cursorController.setStartFieldProvider(() => this.children.get("list").topVisibleField()); //T23: the top visible entry of a scrolled list (#355)
         this.cursorController.setCursorActive(true);
         this.cursorController.focusIndex(props.legs.length); //LOAD IN FPL is preselected: https://youtu.be/idv2Hh6PQnw?t=487
     }

@@ -428,8 +428,7 @@ describe('waypoint editor on a numbered flight plan, the cursor field (4-3, sect
         expect(unit.panel.focused('L')).toEqual({row: 0, col: 4, text: top.slice(4, 9)});
     });
 
-    // 4-3, step 3: once the page has been left, the cursor is over USE? again (the sibling of the test above, which
-    // holds that the remembered position is a property of staying on the page)
+    // 4-3, step 3: once the page has been left, the cursor is over USE? again, also when it was on a waypoint before
     it('shows the cursor over USE? again when the page was left and shown anew (4-3)', async () => {
         const unit = await fpl1();
         await unit.panel.cursor('L');

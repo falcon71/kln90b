@@ -482,6 +482,22 @@ describe('APT 8 page (characterization)', () => {
         expect(clrHandled(unit)).toBe(true);
     });
 
+    // 6-4: the cursor comes up on the first approach of the list, also after it was left on another one and turned off
+    // and on (the unit does not remember the field, checked in the KLN 89 trainer, 2026-10-11, #355)
+    it('puts the cursor on the first approach again when it is turned off and on (6-4, #355)', async () => {
+        const unit = await bootOnApt8({extraApproaches: 5});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 2);
+        expect(unit.panel.focused('R').text).toContain('VOR-B'); // Precondition: the list is not scrolled
+        expect(Screen.read().rows('R')[1]).toContain('RNAV 18');
+
+        await unit.panel.cursor('R');
+        await unit.panel.cursor('R');
+
+        expect(unit.panel.focused('R').row).toBe(1);
+        expect(unit.panel.focused('R').text).toContain('RNAV 18');
+    });
+
     // A scrolled list stays scrolled while the cursor is off, and the cursor comes back on its top visible entry
     // (checked in the KLN 89 trainer, 2026-10-08, T23, #355)
     it('puts the cursor on the top visible approach of the scrolled list when it is turned off and on (#355)', async () => {

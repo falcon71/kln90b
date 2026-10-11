@@ -1189,6 +1189,12 @@ its line, in the comment above it or in the title of its `describe`.
 - The maintainer: neither trainer remembers the cursor field. Turned off and on, the cursor starts on the page's first
   field; the AVsoftech trainer starts its self-test page on the baro and on the date after the cursor is turned off and
   on, and its Super NAV 5 always on the map scale (#355).
+- Numbered flight plans (#356): CRSR puts the cursor on the first field on the page. That is the blank first waypoint
+  of an empty plan, also right after `Delete FPL?` (CRSR skips `Copy FPL 0?`), and `Use?` on a plan with waypoints,
+  whether the page was left or not, and also after a plan was built on the page from empty. Copying FPL 0 into a
+  plan turns the cursor off. The 89 keeps its header on the top line while the rows below scroll, so it cannot show the
+  case 4-3 describes. The unreliable AVsoftech trainer, whose header scrolls off as on the 90B, put the cursor on the
+  top visible waypoint of a long plan built on the page.
 
 # 9. Next steps
 
@@ -1386,7 +1392,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 
 ## Controls
 
-- **The 4-3 cursor tests** (the cursor field remembered while the page is not left) sit in `WaypointEditor.test.ts`,
+- **The 4-3 cursor tests** (where the cursor comes on over a numbered plan, #355) sit in `WaypointEditor.test.ts`,
   though their subject is `CursorController`; they could move to `FplPage.test.ts` or a `CursorController` test file.
 - The controls' bugs that the right pages showed (#282) are pinned on the pages and at control level.
 - **Leads** (seen and not confirmed or not filed):

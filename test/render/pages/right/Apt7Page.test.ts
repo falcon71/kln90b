@@ -296,6 +296,20 @@ async function bootOnApt7(o: { sids: string[], stars: boolean, rf?: boolean }, c
 describe('APT 7 procedure list (3-49, 6-21)', () => {
     // A scrolled list stays scrolled while the cursor is off, and the cursor comes back on its top visible entry
     // (checked in the KLN 89 trainer, 2026-10-08, T23, #355)
+    it('puts the cursor on the first procedure again when it is turned off and on (#355)', async () => {
+        const unit = await bootOnApt7({sids: ['DEPA', 'DEPB', 'DEPC', 'DEPD', 'DEPE', 'DEPF', 'DEPG', 'DEPH', 'DEPI', 'DEPJ'], stars: false});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 2);
+        expect(unit.panel.focused('R').text).toContain('DEPC'); // Precondition: the list is not scrolled
+        expect(Screen.read().rows('R')[2]).toContain('DEPA');
+
+        await unit.panel.cursor('R');
+        await unit.panel.cursor('R');
+
+        expect(unit.panel.focused('R').row).toBe(2);
+        expect(unit.panel.focused('R').text).toContain('DEPA');
+    });
+
     it('puts the cursor on the top visible procedure of the scrolled list when it is turned off and on (#355)', async () => {
         const unit = await bootOnApt7({sids: ['DEPA', 'DEPB', 'DEPC', 'DEPD', 'DEPE', 'DEPF', 'DEPG', 'DEPH', 'DEPI', 'DEPJ'], stars: false});
         await unit.panel.cursor('R');
