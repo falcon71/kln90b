@@ -63,16 +63,30 @@ describe('AudioGenerator', () => {
         expect(played).toEqual(['kln_short_beep', 'kln_long_beep', 'kln_short_beep']);
     });
 
-    // The order of an asymmetric pattern. No caller passes one today (the only pattern, 3-58, is a palindrome), so this
-    // states the method's own documentation ("Plays the pattern of beeps") rather than a manual page. doBeep takes the
-    // tones from the end of the array (pop), so [short, long] plays long first.
-    it.fails('plays an asymmetric pattern in the given order (#180)', () => {
+    // characterization: the order of an asymmetric pattern. No caller passes one today (the only pattern, 3-58, is a
+    // palindrome) and no manual page shows a tone order, so this pins the method's own contract: the tones play in the
+    // order they are given
+    it('plays an asymmetric pattern in the given order (characterization, #180)', () => {
         const {audio, played, end} = generator();
 
         audio.beepPattern([SHORT_BEEP_ID, LONG_BEEP_ID]);
         end(played[0]);
+        end(played[1]);
 
         expect(played).toEqual(['kln_short_beep', 'kln_long_beep']);
+    });
+
+    // characterization: a pattern of three different tones, so that a swap of any two positions changes the order played.
+    // The third id is arbitrary: the generator passes every id on to the sound server
+    it('plays three different tones in the given order (characterization, #180)', () => {
+        const {audio, played, end} = generator();
+
+        audio.beepPattern([LONG_BEEP_ID, SHORT_BEEP_ID, 'kln_test_beep']);
+        end(played[0]);
+        end(played[1]);
+        end(played[2]);
+
+        expect(played).toEqual(['kln_long_beep', 'kln_short_beep', 'kln_test_beep']);
     });
 
     // 3-57: the installation can disable altitude alerting and the height above airport alert. Output.AltitudeAlertEnabled

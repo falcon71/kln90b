@@ -56,7 +56,7 @@ export class AudioGenerator {
     }
 
     private doBeep() {
-        const beep = this.beeps.pop();
+        const beep = this.beeps.shift();
         if (beep) {
             this.soundController.playSound(beep);
         }
