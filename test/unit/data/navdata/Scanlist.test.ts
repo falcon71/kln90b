@@ -66,15 +66,37 @@ describe('FacilityLoaderScanlist scanning (6a6c634)', () => {
         expect(list.isEmpty()).toBe(true);
     });
 
-    // The fill job reads lastIcao again when it starts its second half, so a scan from another waypoint while the
-    // first fill still runs makes it start behind that waypoint: KAAB is never searched and the scan KAAA to KAAB is lost.
-    // In the sim this needs a scan from an ident-only ICAO (a typed ident, WaypointPage.tsx:156).
-    it.fails('keeps every waypoint when a scan starts during the first fill (#108)', async () => {
+    // The two halves of the fill start from the position the job started with, also when a scan from another waypoint
+    // sets lastIcao while the first fill still runs (in the sim: a scan from an ident-only ICAO, a typed ident,
+    // WaypointPage.tsx:156). Otherwise the stretch between the two positions is never searched, and KAAB is lost.
+    it('keeps every waypoint when a scan starts during the first fill (#108)', async () => {
         const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, airports() as unknown as FacilityClient, new EventBus());
         await list.init();
         await list.getNext(ICAO.value('A', '', '', 'KAAB'), 1);
         await managerJob(list);
         expect((await list.getNext(ICAO.value('A', '', '', 'KAAA'), 1))?.ident).toBe('KAAB');
+    });
+
+    // The same with the scan from a waypoint further on, so that more than one waypoint lies between the two positions
+    it('keeps every waypoint when a scan starts from a later waypoint during the first fill (#108)', async () => {
+        const client = new MemoryFacilityClient([airport('KAAA', 47, 8), airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8), airport('KAAD', 47.3, 8)]);
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, client as unknown as FacilityClient, new EventBus());
+        await list.init();
+        await list.getNext(ICAO.value('A', '', '', 'KAAC'), 1);
+        await managerJob(list);
+
+        const forward = [
+            (await list.getNext(ICAO.value('A', '', '', 'KAAA'), 1))?.ident,
+            (await list.getNext(ICAO.value('A', '', '', 'KAAB'), 1))?.ident,
+            (await list.getNext(ICAO.value('A', '', '', 'KAAC'), 1))?.ident,
+        ];
+        const backward = [
+            (await list.getNext(ICAO.value('A', '', '', 'KAAD'), -1))?.ident,
+            (await list.getNext(ICAO.value('A', '', '', 'KAAC'), -1))?.ident,
+            (await list.getNext(ICAO.value('A', '', '', 'KAAB'), -1))?.ident,
+        ];
+
+        expect([forward, backward]).toEqual([['KAAB', 'KAAC', 'KAAD'], ['KAAC', 'KAAB', 'KAAA']]);
     });
 });
 
