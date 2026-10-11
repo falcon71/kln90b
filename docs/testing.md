@@ -292,8 +292,7 @@ pages accept.
   at decides the entry. The arc's radials are true bearings: keep `magvar` at 0 or account for it. The arc must not be the
   first leg that survives the conversion, which replaces the leg before the arc with the entry.
   Boot on the arc, so that the arc leg is the closest and becomes active (activation in the middle of an arc is #121).
-  A test that recalculates the entry (MOVE? on Super NAV 5) uses a left arc, because the entry of a right arc is named
-  wrongly after a recalculation (#104).
+  A test that recalculates the entry (MOVE? on Super NAV 5) can use a left or a right arc.
 - `Leg.TF(fix, FixTypeFlags.IAF)` and its siblings set the fix types. `SidStar` keeps a leg flagged IAF, FAF, MAP or MAHP
   even when its fix repeats, and drops an unflagged repeat.
 
