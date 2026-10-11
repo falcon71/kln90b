@@ -88,7 +88,6 @@ export class FuelComputer implements CalcTickable {
                         targetUnit = FuelComputer.IMP_GALLON_FUEL_JETB;
                         break;
                 }
-                targetUnit = UnitType.IMP_GALLON_FUEL;
                 break;
             case FuelUnit.KG:
                 targetUnit = UnitType.KILOGRAM;

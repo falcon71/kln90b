@@ -42,21 +42,30 @@ describe('FuelComputer fob in the fuel unit of panel.xml', () => {
         expect(fobFor('L', type)).toBeCloseTo(gallons * LITERS_PER_US_GALLON, 1);
     });
 
-    const imperialGallonsMatchUsGallons = (type: string) => {
+    // Pounds per US gallon of each fuel type, the nominal densities as commonly published for aviation fuel: avgas
+    // 6.0, Jet A 6.7, Jet B 6.5 (about 0.78 kg/L). Avgas and Jet A are also the values of the SDK's fuel units, but the
+    // test does not read them from there. These are not a manual source; the volume is the pounds on board divided by them
+    const POUNDS_PER_US_GALLON = {Avgas: 6.0, JetA1: 6.7, JetB: 6.5};
+
+    it.each(TYPES)('reads %s in US gallons as the pounds on board divided by its weight per gallon', type => {
+        expect(fobFor('GAL', type)).toBeCloseTo(POUNDS_ON_BOARD / POUNDS_PER_US_GALLON[type], 1);
+    });
+
+    // #93: the type chooses the weight of an imperial gallon too, so each type reads its own volume
+    it.each(TYPES)('reads %s in imperial gallons as the pounds on board divided by its weight per imperial gallon (#93)', type => {
+        const poundsPerImperialGallon = POUNDS_PER_US_GALLON[type] * US_GALLONS_PER_IMP_GALLON;
+        expect(fobFor('IMP', type)).toBeCloseTo(POUNDS_ON_BOARD / poundsPerImperialGallon, 1);
+    });
+
+    it.each(TYPES)('reads %s in imperial gallons as the US gallons divided by 1.20095042 (#93)', type => {
         const usGallons = fobFor('GAL', type);
         expect(usGallons).toBeGreaterThan(0);
 
         expect(fobFor('IMP', type) * US_GALLONS_PER_IMP_GALLON).toBeCloseTo(usGallons, 1);
-    };
-
-    // The IMP case overwrites the unit it chose for the fuel type with the generic imperial gallon (Sensors.ts, the
-    // line after the inner switch), so the type has no effect with IMP. The generic fuel weighs as Jet A, so JetA1 is
-    // right today by coincidence and holds this test in place; the pins below are the types it weighs wrong
-    it('reads JetA1 in imperial gallons as the US gallons divided by 1.20095042', () => {
-        imperialGallonsMatchUsGallons('JetA1');
     });
 
-    it.fails.each(['Avgas', 'JetB'])('reads %s in imperial gallons as the US gallons divided by 1.20095042 (#93)', type => {
-        imperialGallonsMatchUsGallons(type);
+    it('reads a different imperial volume for each fuel type (#93)', () => {
+        const volumes = TYPES.map(type => fobFor('IMP', type));
+        expect(new Set(volumes.map(v => v.toFixed(1))).size).toBe(TYPES.length);
     });
 });

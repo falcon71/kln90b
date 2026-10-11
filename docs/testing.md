@@ -1462,9 +1462,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - the fix of #96 needs `PageStack` in `MainPage.tsx` to destroy the half page it replaces (`setCurrentPage`, `pop`,
       `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone leaves both handler counts
       unchanged, and OTH 4 counts the `changed` topic of the remarks manager;
-    - the fix of #95 turns its two pins red (the list and the error
-      page); the fix of #93 turns two (Avgas and JetB; JetA1 passes today, because the SDK's generic imperial gallon
-      weighs as Jet A);
+    - the fix of #95 turns its two pins red (the list and the error page);
     - the fix of #311 in `WaypointEditor` leaves the `FplPage.test.ts` insert tests green, but its first click on an
       empty remark line changes the click counts in the setup of `stores a remark with a hyphen and shows it again`
       (`FreetextEditor.test.ts`); the fix of #262 must keep NO
@@ -1502,7 +1500,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   `test/flight/harness/boot.test.ts`, the 25 s of `Apt1Page.test.ts`'s `dropEntry` and the 2 NM start of
   `jump.test.ts`.
 - **Review notes left as they are:** the INT REF read-only mutant survives one test of `IntPage.test.ts`;
-  `Sensors.test.ts` does not hold the type-dependent volume of its passing tests (the #93 pins will); `Screen.inverse`
+  `Sensors.test.ts` does not hold the type-dependent volume of its passing tests (the #93 tests do); `Screen.inverse`
   accepts any non-normal cell; the tick of `mountedText` and the trim of `writeCount` are unheld; `NearestList.test.ts`
   reads the last frame of the map only; `Mod1Page.test.ts` words the 5-38 note as "offers 1 and 0.3 only", an
   inference; the spies of `superNav5.test.ts` and `frontPanelHelpers.test.ts` are restored after the assertion, not in
