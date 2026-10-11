@@ -139,7 +139,7 @@ describe('SET 0 page, CLR during the update', () => {
         return unit;
     }
 
-    // The sibling of the pin below: one CLR on the expiry page goes back to UPDATE PUBLISHED DB, cursor on
+    // One CLR on the expiry page goes back one step to UPDATE PUBLISHED DB, cursor on; the tests below end the update
     it('goes back from the expiry to UPDATE PUBLISHED DB with one CLR (characterization)', async () => {
         const unit = await oneClrFromExpiry();
 
@@ -156,9 +156,10 @@ describe('SET 0 page, CLR during the update', () => {
     });
 
     // 2-5 (the NOTE after step 7): during steps 5 to 7, CLR pressed repeatedly ends the update and brings back the
-    // starting SET 0 page of figure 2-2, which has no cursor (ON GROUND ONLY). Set0Page.clear returns false at the first
-    // step, so the page stays on UPDATE PUBLISHED DB with the cursor on. The KEY row is not asserted.
-    it.fails('ends the update on the starting page after repeated CLR (2-5, #246)', async () => {
+    // starting SET 0 page of figure 2-2, which has no cursor (ON GROUND ONLY). Whether each CLR steps back one step or
+    // the first goes straight to figure 2-2 is not settled, so the test asserts only the end state. The KEY row is not
+    // asserted.
+    it('ends the update on the starting page after repeated CLR (2-5, #246)', async () => {
         const unit = await oneClrFromExpiry();
         await unit.panel.clr();
         await unit.panel.clr();
@@ -171,5 +172,45 @@ describe('SET 0 page, CLR during the update', () => {
             '   O N   G R O U N D',
             '        O N L Y',
         ]);
+    });
+
+    // The page that CLR brings back is the starting page again: a further CLR changes nothing, and CRSR and ENT start the
+    // update over (state that must survive the way back)
+    it('keeps the starting page on a further CLR and starts the update over with CRSR and ENT (2-5, #246)', async () => {
+        const unit = await oneClrFromExpiry();
+        await unit.panel.clr();
+        await unit.panel.clr();
+        expect(Screen.read().status().left).toBe('SET 0'); // Precondition
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().status().left).toBe('SET 0');
+        expect(rows().slice(0, 4)).toEqual([
+            '      U P D A T E',
+            '   D A T A   B A S E',
+            '   O N   G R O U N D',
+            '        O N L Y',
+        ]);
+
+        await unit.panel.cursor('L');
+        expect(rows()[3]).toBe('  UPDATE PUBLISHED DB');
+        expect(Screen.read().status().left).toBe('CRSR');
+        await unit.panel.ent();
+
+        expect(rows()[5]).toBe('     U P D A T E ?');
+    });
+
+    // A CLR on the starting page that has no cursor, here with an update never begun, changes nothing
+    it('does not take a CLR on the starting page that has no cursor (2-5, #246)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'SET 0');
+        expect(Screen.read().status().left).toBe('SET 0'); // Precondition
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().status().left).toBe('SET 0');
+        expect(rows()[2]).toBe('   O N   G R O U N D');
     });
 });

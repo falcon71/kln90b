@@ -86,6 +86,11 @@ export class Set0Page extends SixLinePage {
 
     public clear(): boolean {
         if (this.step === 0) {
+            // 2-5, the note after step 7: repeated CLR ends the update and brings back the starting page, which has no cursor
+            if (this.lCursorController.cursorActive) {
+                this.lCursorController.setCursorActive(false);
+                return true;
+            }
             return false;
         }
 
