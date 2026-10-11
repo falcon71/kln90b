@@ -113,7 +113,7 @@ describe('remarks of an airport with a three-character ident (#140)', () => {
     // 3-47: remarks belong to an airport. The ident-length premise is not from 3-47: the stored format holds the ident in a
     // 4-cell field (docs/architecture.md Core 7), and real airport databases carry 3-character idents, so a shorter ident
     // has to survive the save and the load.
-    it.fails('restores the remarks of an airport with a three-character ident after a reload (#140)', () => {
+    it('restores the remarks of an airport with a three-character ident after a reload (#140)', () => {
         const manager = new RemarksManager(bus, userSettings);
         manager.saveRemarks('ABC', ['LINE ONE   ', 'LINE TWO   ', 'LINE THREE ']);
 
@@ -123,7 +123,33 @@ describe('remarks of an airport with a three-character ident (#140)', () => {
         expect(reloaded.getRemarks('ABC')).toEqual(['LINE ONE   ', 'LINE TWO   ', 'LINE THREE ']);
     });
 
-    // The sibling: the live manager keeps the three-character airport, so the pin fails on the reload and not before
+    // The stored ident is padded with blanks to 4 characters, so that the three lines start at character 4 as they do for
+    // a four-character ident (docs/architecture.md Core 7). The four-character idents are stored as before.
+    it.each([
+        ['ABC', 'ABC '],
+        ['AB', 'AB  '],
+        ['A', 'A   '],
+        ['ABCD', 'ABCD'],
+    ])('stores the ident %s as %j in front of the three lines (#140)', (ident, stored) => {
+        new RemarksManager(bus, userSettings).saveRemarks(ident, ['LINE ONE   ', 'LINE TWO   ', 'LINE THREE ']);
+
+        expect(slot(0)).toBe(`${stored}LINE ONE   LINE TWO   LINE THREE `);
+    });
+
+    it.each([
+        ['ABC', 'ABC '],
+        ['AB', 'AB  '],
+        ['ABCD', 'ABCD'],
+    ])('loads the ident %s from a slot that holds %j in front of the three lines (#140)', (ident, stored) => {
+        setSlot(0, `${stored}LINE ONE   LINE TWO   LINE THREE `);
+
+        const manager = new RemarksManager(bus, userSettings);
+
+        expect(manager.getAirportsWithRemarks()).toEqual([ident]);
+        expect(manager.getRemarks(ident)).toEqual(['LINE ONE   ', 'LINE TWO   ', 'LINE THREE ']);
+    });
+
+    // The live manager keeps the three-character airport, whatever the slots hold, so a failure of the reload tests above is not about this
     it('keeps the remarks of a three-character airport in the manager that saved them', () => {
         const manager = new RemarksManager(bus, userSettings);
 

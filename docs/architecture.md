@@ -473,7 +473,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   then `OTHER WAYPOINTS DELETED`).
 - Persist triggers: waypoints persist on any `KLNfacilityrepo_sync` Add/Remove/Update (all 250 slots are rewritten);
   flight plans persist on `flightplanChanged`.
-- Remarks (`settings/RemarksManager.ts`): stored as `ident(4 chars) + 3×11 chars`, keyed by airport ident; publishes
+- Remarks (`settings/RemarksManager.ts`): stored as `ident(blank-padded to 4 chars) + 3×11 chars`, keyed by airport ident; publishes
   `changed` (`RemarksChangedEvent`).
 - **`VolatileMemory`** (`data/VolatileMemory.ts`) is not persisted. It holds RAM state for each page group:
   `aptPage/vorPage/ndbPage/intPage/supPage` (`WaypointPageState`), `altPage`, `dtPage`, `fplPage {flightplans}`, *
