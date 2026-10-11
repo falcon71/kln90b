@@ -286,8 +286,8 @@ describe('L:KLN90B_WriteGpsSimvars (public contract)', () => {
     });
 });
 
-// The Hot Swapping wiki page: a disabled unit does not claim the GPS (GPS OVERRIDDEN 0, see SensorsOut.test.ts #24).
-// Toggling WriteGpsSimvars while the unit is disabled writes GPS OVERRIDDEN again (SimVarSync.ts:53-56).
+// The Hot Swapping wiki page: a disabled unit does not claim the GPS (GPS OVERRIDDEN 0, see SensorsOut.test.ts #24), and
+// toggling WriteGpsSimvars does not change that (#137).
 describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
     it('the sibling: the disabled unit has released GPS OVERRIDDEN', async () => {
         const unit = await bootOnStandardRoute();
@@ -298,7 +298,7 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
         expect(unit.env.sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
     });
 
-    it.fails('stays released when WriteGpsSimvars is toggled (#137)', async () => {
+    it('stays released when WriteGpsSimvars is toggled (#137)', async () => {
         const unit = await bootOnStandardRoute();
         const sim = unit.env.sim;
         sim.set('L:KLN90B_Disabled', 'bool', true);
@@ -306,12 +306,60 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
 
         sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
         await vi.advanceTimersByTimeAsync(300);
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
         sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
         await vi.advanceTimersByTimeAsync(300);
 
         expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
     });
+
+    it('claims the GPS again on the resume, with WriteGpsSimvars as it was toggled meanwhile', async () => {
+        const unit = await bootOnStandardRoute();
+        const sim = unit.env.sim;
+        sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
+    });
+
+    // The other order: the option goes off while the unit is disabled and stays off, so the resume leaves the GPS to
+    // the other unit
+    it('leaves the GPS released on the resume when WriteGpsSimvars was switched off meanwhile', async () => {
+        const unit = await bootOnStandardRoute();
+        const sim = unit.env.sim;
+        sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+
+        sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
+    });
+
+    // The condition is the disabled state and nothing wider: a running unit releases and claims the GPS with the LVar
+    it('still follows WriteGpsSimvars while the unit is enabled', async () => {
+        const unit = await bootOnStandardRoute();
+        const sim = unit.env.sim;
+
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
+        sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
+    });
 });
+
 
 // The Hot Swapping wiki page: a disabled unit suspends and resumes where it left off, so the input meant for the unit
 // that replaced it must not reach it. KLN90BCore.onInteractionEvent has no check of L:KLN90B_Disabled, so the knob clicks

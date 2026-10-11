@@ -51,7 +51,9 @@ export class SimVarSync {
         const writeGpsSimvars = !!SimVar.GetSimVarValue(LVAR_GPS_SIMVARS, SimVarValueType.Bool);
         if (writeGpsSimvars !== this.settings.output.writeGPSSimVars) {
             this.settings.output.writeGPSSimVars = writeGpsSimvars;
-            SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, writeGpsSimvars);
+            if (!this.disabled) { //A disabled unit has released the GPS for hot swapping, setDisabled claims it again
+                SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, writeGpsSimvars);
+            }
         }
         this.brightnessManager.setBrightnessExternal(SimVar.GetSimVarValue(LVAR_BRIGHTNESS, SimVarValueType.Number));
 
