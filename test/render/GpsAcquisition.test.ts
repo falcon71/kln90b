@@ -268,10 +268,9 @@ describe('messages at power-on (B-3, B-4)', () => {
     });
 
     // B-4: the clock of a unit that was running all along needs no correction of more than 10 minutes. A flight started
-    // with the engine running stands for a unit that is already on, but its clock starts one hour behind
-    // (Gps.ts subtracts the hour PowerButton assumes the unit was off, and forceReadyToUse never adds it back), so
-    // every such flight starts with SYSTEM TIME UPDATED TO GPS TIME and the MSG annunciator lit (testing.md section 6).
-    it.fails('posts no message on an engine-running start at the stored position (B-3, B-4, #328)', async () => {
+    // with the engine running stands for a unit that is already on, and its clock is right: the GPS measures the off
+    // time itself and no longer depends on the hour PowerButton assumes (#328)
+    it('posts no message on an engine-running start at the stored position (B-3, B-4, #328)', async () => {
         const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
         await settle(unit);
 
@@ -436,4 +435,35 @@ describe('the system clock without a fix (3-53)', () => {
         // The tolerance: the unit's clock starts up to 2.5 s off (Gps.ts constructor) and lags by up to one 1 s tick
         expect(Math.abs(gps.timeZulu.getTimestamp() - Date.now())).toBeLessThan(3500);
     });
+
+    // 3-53: the internal battery clock runs while the unit is off. A cold-and-dark unit that stays unpowered for half an
+    // hour is right when it is switched on (#328: the GPS measures the off time itself, PowerButton's assumed hour is
+    // for the CRT warm-up)
+    it('keeps the time over 30 minutes unpowered before the first power-on (3-53, #328)', async () => {
+        const unit = await bootUnit({engineRunning: false, storage: {lastLatitude: 47, lastLongitude: 8}});
+        await vi.advanceTimersByTimeAsync(30 * MINUTE);
+        await unit.panel.powerOn();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        // The tolerance: the unit's clock starts up to 2.5 s off (Gps.ts constructor) and lags by up to one 1 s tick
+        expect(Math.abs(unit.props.sensors.in.gps.timeZulu.getTimestamp() - Date.now())).toBeLessThan(3500);
+    }, SLOW);
+
+    // #328: the battery clock counts the off time in sim time, as the satellites move in sim time. A sim paused for half
+    // an hour before the power-on (real time runs, sim time stands) and a sim time moved on by half an hour (sim time
+    // runs, real time stands) both leave the clock right. The harness runs both times together; absoluteTimeOffsetMs
+    // separates them
+    it.each([
+        ['paused for 30 minutes', -30 * MINUTE, 30 * MINUTE],
+        ['moved on by 30 minutes', 30 * MINUTE, 0],
+    ])('keeps the sim time over a sim %s before the first power-on (3-53, #328)', async (_, offsetMs, realMs) => {
+        const unit = await bootUnit({engineRunning: false, storage: {lastLatitude: 47, lastLongitude: 8}});
+        unit.env.sim.absoluteTimeOffsetMs = offsetMs;
+        await vi.advanceTimersByTimeAsync(realMs);
+        await unit.panel.powerOn();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        // The tolerance as above
+        expect(Math.abs(unit.props.sensors.in.gps.timeZulu.getTimestamp() - (Date.now() + offsetMs))).toBeLessThan(3500);
+    }, SLOW);
 });

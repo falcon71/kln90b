@@ -106,7 +106,10 @@ arrives.
     - `TickController` starts and stops its loops.
     - `BrightnessManager` simulates CRT warm-up from the off time: `TIME_UNTIL_COLD` / `TIME_TO_WARM`, then a ramp.
     - `Sensors.reset()`, which saves the position and resets the sat computer.
-    - `GPS.powerChanged`, which advances the internal clock by the off time.
+    - `GPS.powerChanged`, which advances the internal clock by the off time it measures itself in sim time
+      (`E:ABSOLUTE TIME` at construction or the last power-off, `lastPowerOffTime`), not by `timeSincePowerChange`: that
+      value is shaped for the CRT warm-up and is about 0 on a forced start (#328). The clock follows the sim's world
+      time, as the satellites do, so a sim pause before the power-on does not put it off.
     - `VolatileMemory.reset()`, which runs on power-on only (see Core 7).
     - `TemporaryWaypointDeleter`.
 - Welcome and self-test flow (lives in pages, summarised here for wiring): `WelcomePage.tick` waits `TEST_TIME=17000`
@@ -211,8 +214,11 @@ error or noise and no RAIM ("We have pretty all messages except for failures and
   `SYSTEM TIME UPDATED TO GPS TIME` and publishes **`timeUpdatedEvent`**; `Database` listens and posts the AIRAC-expired
   message.
 - Internal clock `timeZulu` (`data/Time.ts TimeStamp`):
-    - At construction it is set from `E:ABSOLUTE TIME` plus a random ±2.5 s, minus one hour. `PowerButton` assumes one
-      hour off, and the hour is added back on power-on.
+    - At construction it is set from `E:ABSOLUTE TIME` plus a random ±2.5 s. No hour is subtracted, and the hour
+      `PowerButton` assumes for the CRT warm-up is not used.
+    - While the unit is off it runs on in sim time: at power-on the `E:ABSOLUTE TIME` elapsed since construction or the
+      last power-off is added (#328). A sim pause has no real-world counterpart, so wall-clock time would put the clock
+      off by the length of the pause.
     - **Deliberately emulates the GPS week-number rollover** (`calculateGPSTime`, 1024-week eras).
 - `TakeHomeMode` (panel.xml option): the unit dead-reckons from its last track and speed instead of reading the sim, and
   shows the take-home page instead of the self-test.

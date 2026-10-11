@@ -19,7 +19,6 @@ import {KLN90BUserSettings} from "./settings/KLN90BUserSettings";
 import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {MessageHandler, OneTimeMessage} from "./data/MessageHandler";
 import {PowerEvent, PowerEventData} from "./PowerButton";
-import {HOURS_TO_SECONDS} from "./data/navdata/NavCalculator";
 import {TICK_TIME_CALC} from "./TickController";
 
 const SAVE_INTERVALL = 60000;
@@ -81,6 +80,7 @@ export class GPS {
     private clockPublisher: Publisher<ClockEvents>;
     private gnssPublisher: Publisher<GNSSEvents>;
     private gpsStartTime: number = 0;
+    private lastPowerOffTime: number = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds); //Sim time (s) of construction or the last power-off. The battery clock runs on while the unit is off (3-53)
 
     constructor(private bus: EventBus, private userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, private readonly messageHandler: MessageHandler) {
         const fastGPS = this.userSettings.getSetting("fastGpsAcquisition").get();
@@ -139,8 +139,7 @@ export class GPS {
 
         //We assume that the internal clock kept the time fairly accurate since it has last been running
         const timeRandom = Math.random() * 5 - 2.5;
-        //We subtract an hour, because the PowerButton assumes the device has been off for one our. Will be added back in powerChanged
-        const unixTime = this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) + timeRandom - HOURS_TO_SECONDS);
+        const unixTime = this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) + timeRandom);
         this.timeZulu = this.unixToTimestamp(unixTime);
         this.gpsSatComputer.internalTime = unixTime;
     }
@@ -268,9 +267,14 @@ export class GPS {
 
     private powerChanged(evt: PowerEventData) {
         if (evt.isPowered) {
-            //Ticks are not running, when we are powered off
-            this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + evt.timeSincePowerChange);
+            //Ticks are not running, when we are powered off. The battery clock counts the off time itself:
+            //PowerButton's timeSincePowerChange is shaped for the CRT warm-up and is about 0 on a forced start (#328).
+            //It counts sim time: the clock follows the sim's world time, as the satellites do, and a sim pause has no
+            //real-world counterpart
+            this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + (SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) - this.lastPowerOffTime) * 1000);
             this.gpsStartTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
+        } else {
+            this.lastPowerOffTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
         }
     }
 

@@ -53,6 +53,11 @@ export class FakeSim {
      * off again.
      */
     public applyObsKeyEvents = false;
+    /**
+     * Moves E:ABSOLUTE TIME against the fake clock, in ms. The harness runs real and sim time together; a negative offset
+     * added while the clock advances is a sim pause, a positive one a jump of the sim time. reset() sets it back to 0
+     */
+    public absoluteTimeOffsetMs = 0;
     private readonly values = new Map<string, Stored>();
     private readonly registrations: Registration[] = [];
     private readonly registrationIds = new Map<string, number>();
@@ -68,6 +73,7 @@ export class FakeSim {
         this.values.clear();
         this.simStartMs = 0;
         this.applyObsKeyEvents = false;
+        this.absoluteTimeOffsetMs = 0;
     }
 
     /** Sets a value as the sim or the aircraft model would. */
@@ -175,7 +181,7 @@ export class FakeSim {
 
     private derived(key: string, unit: string): number | undefined {
         if (key === 'E:ABSOLUTE TIME') {
-            return convertUnit(Date.now() / 1000 + ABSOLUTE_TIME_OFFSET_S, 'seconds', unit);
+            return convertUnit((Date.now() + this.absoluteTimeOffsetMs) / 1000 + ABSOLUTE_TIME_OFFSET_S, 'seconds', unit);
         }
         if (key === 'E:SIMULATION TIME') {
             return convertUnit((Date.now() - this.simStartMs) / 1000, 'seconds', unit);

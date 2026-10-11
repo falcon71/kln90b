@@ -22,8 +22,8 @@ describe('FrontPanel.readMessages (harness)', () => {
 
         const seen = await unit.panel.readMessages();
 
-        // The boot's own message (SYSTEM TIME UPDATED, #328) is older and follows these on the second page; it is not relied on
-        expect(seen.slice(0, 8)).toEqual(['FOUR A', 'FOUR B', 'THREE A', 'THREE B', 'TWO A', 'TWO B', 'ONE A', 'ONE B']);
+        // The boot at its stored position posts no message of its own (#328), so `seen` holds only the test's messages
+        expect(seen).toEqual(['FOUR A', 'FOUR B', 'THREE A', 'THREE B', 'TWO A', 'TWO B', 'ONE A', 'ONE B']);
         expect(unit.props.messageHandler.getMessages()).toEqual([]);
         expect(Screen.read().status().left).not.toBe('');
     });

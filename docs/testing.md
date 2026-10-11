@@ -94,6 +94,9 @@ The sim globals are installed once per test file by the setup files `test/harnes
       SimVar the sim would set itself. The one exception is opt-in: `sim.applyObsKeyEvents = true` makes `K:VOR1_SET`
       and `K:VOR2_SET` set `Nav OBS:1` and `Nav OBS:2` to their value in degrees, as the sim does, for a test of an
       indicator the unit drives (`ObsTarget`). `reset()` turns it off, so it lasts one test.
+    - `E:ABSOLUTE TIME` and `E:SIMULATION TIME` follow the fake clock, so real and sim time run together.
+      `sim.absoluteTimeOffsetMs` moves `E:ABSOLUTE TIME` against it: a negative offset while the clock advances is a sim
+      pause, a positive one a jump of the sim time (the #328 clock tests). `reset()` sets it back to 0.
     - `sim.unsetReads` lists variables the instrument read that nobody set, which helps when wiring a new input.
     - The SDK swallows exceptions inside `GetSimVarValue`, so unit-conversion problems would vanish. `FakeSim` collects
       them in `sim.errors`, and the flight driver turns them into a failure.
@@ -774,13 +777,11 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   (`vi.useFakeTimers({toFake: ['Date']})`), a value is set every 1000 ms and the output sampled every 62 ms.
 - **A booted engine-running unit starts with the MSG annunciator lit.** Empty storage means the last position is 0/0, so
   `POSITION DIFFERS FROM LAST POSITION BY >2NM` posts; that is a fact of the harness, and the NAV 2 screens of the
-  harness tests show its `msg`. Seeding a last position in `storage` (`lastLatitude`, `lastLongitude`) removes it. The
-  second message of such a boot, `SYSTEM TIME UPDATED TO GPS TIME`, is a bug (#328): the GPS clock starts an hour
-  behind and `forceReadyToUse` never adds the hour back, so it posts on every engine-running boot whatever `storage`
-  holds (pinned in `GpsAcquisition.test.ts`). A test that needs a message in the live list as a guard (that the list is
-  read at all) uses `POSITION DIFFERS` with empty storage, or posts a message of its own with
+  harness tests show its `msg`. Seeding a last position in `storage` (`lastLatitude`, `lastLongitude`) removes it. A
+  test that needs a message in the live list as a guard (that the list is read at all) uses `POSITION DIFFERS` with
+  empty storage, or posts a message of its own with
   `unit.props.messageHandler.addMessage(new OneTimeMessage([...]))` when its storage holds the position
-  (`Set1Page.test.ts`); it never relies on SYSTEM TIME UPDATED, which a fix of #328 removes.
+  (`Set1Page.test.ts`).
 - **Long render tests need their own timeout.** The render stage keeps Vitest's 5 s default. A test that advances
   minutes of simulated time with every tick running can pass alone and time out while other suites load the machine,
   which makes a mutation run report a false kill. Give such a test a per-test timeout (the CAL 6 tests in
@@ -1489,8 +1490,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests);
     - a fix of #335 turns the #334 pin red as well,
       though #334 still needs its own fix for SET 0 and Super NAV 5; a fix of #332 with a ride-through above about 1.5 s
-      needs the 3 s waits of the circuit tests raised; a fix of #328 must keep the screen warm on a forced start
-      (`lastPowerChangeTime` also drives the warm-up); `HEADING_INPUT` in
+      needs the 3 s waits of the circuit tests raised; `HEADING_INPUT` in
       `RollSteeringController.test.ts` can bite once #143 is fixed.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): #146 (the alert time on a Direct To a
   waypoint of FPL 0 that has a following leg), #147 (a waypoint alert in OBS mode), duplicate idents on a waypoint page
