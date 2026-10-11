@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {approachWorld, standardRoute} from '../../harness/fixtures';
+import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {savedFlightplan} from '../../harness/storage';
 import {fplIdents} from '../../harness/readers';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
@@ -76,6 +77,7 @@ describe('procedures over a power cycle (6-5, 6-23)', () => {
         const w = approachWorld();
         const unit = await bootUnit({
             facilities: w.facilities, position: w.north(40),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
         });
         await settle(unit);
@@ -162,6 +164,7 @@ describe('procedures over a power cycle (6-5, 6-23)', () => {
         const kprc = withProcedures(w.kprc, {approaches: [...w.kprc.approaches], arrivals: [star('ARR1', {common: [Leg.IF(straa), Leg.TF(strab)]})]});
         const unit = await bootUnit({
             facilities: [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.sdfaa, w.mapaa, straa, strab], position: w.north(40),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [w.enraa, kprc]), turnAnticipation: false},
         });
         await settle(unit);

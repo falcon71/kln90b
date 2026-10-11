@@ -550,6 +550,7 @@ class EditableFlightplan {
                 mainPage.setRightPage(page);
                 break;
             case KLNLegType.APP:
+                //Approach legs come only from APT 8 and ACT 8, so the unit has APT 8 in its tree here (3-49, #133)
                 mainPage.setRightPage(new Apt8Page(this.props));
                 break;
             default:

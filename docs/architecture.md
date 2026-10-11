@@ -680,10 +680,12 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - Plane-setting pruning happens in the constructor (`buildTree`), which filters a copy of the tree by page class.
   Without airdata it removes OTH 9/10; without a fuel computer it removes OTH 5-8. The module-level arrays are never
   changed, because every power-on, ACT visit and waypoint confirmation builds a new controller over them (#90).
+  Without `Input.ExternalSwitches.AppArmSwitchInstalled` it removes APT 8 from the right tree, and so also ACT 8 (3-49,
+  #133).
 - `CustomPageTreeController` / `isCustomPageTreeController(page)` (`"pageTreeController" in page`). `ActPagePage` and
   `WaypointConfirmPage` own a private `PageTreeController(RIGHT_PAGE_TREE, innerPage, ...)`, so the right inner knob
-  browses APT 1-8 etc. *of that waypoint* instead of the main tree. They copy `name`/`numPages` from the inner page in
-  `pageChanged`.
+  browses APT 1-8 (APT 1-7 without the approach arm switch) etc. *of that waypoint* instead of the main tree. They copy
+  `name`/`numPages` from the inner page in `pageChanged`.
 
 ### Naming conventions
 

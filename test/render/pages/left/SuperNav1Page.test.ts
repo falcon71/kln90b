@@ -3,6 +3,7 @@ import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boo
 import {airport} from '../../../harness/navdata/builders';
 import {activeIdent} from '../../../harness/readers';
 import {Screen} from '../../../harness/render/screen';
+import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {savedFlightplan} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
 import {approachWorld} from '../../../harness/fixtures';
@@ -27,7 +28,10 @@ async function superNav1(unit: HeadlessUnit): Promise<void> {
  */
 async function onApproach(): Promise<HeadlessUnit> {
     const w = approachWorld();
-    const unit = await bootUnit({facilities: w.facilities, position: w.north(20), storage: savedFlightplan(0, [w.enraa, w.kprc])});
+    const unit = await bootUnit({
+        facilities: w.facilities, position: w.north(20), storage: savedFlightplan(0, [w.enraa, w.kprc]),
+        panelXml: panelXml(APR_ARM_SWITCH),
+    });
     await settle(unit);
     await unit.panel.loadProcedure('APT 8');
     expect(activeIdent(unit)).toBe('IAFAA'); // Precondition

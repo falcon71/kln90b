@@ -6,7 +6,7 @@ import {Screen} from '../../../harness/render/screen';
 import {approachWorld} from '../../../harness/fixtures';
 import {savedFlightplan} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
-import {NO_ALTIMETER, panelXml} from '../../../harness/panelXml';
+import {APR_ARM_SWITCH, NO_ALTIMETER, panelXml} from '../../../harness/panelXml';
 import {messages} from '../../../harness/readers';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
@@ -373,6 +373,7 @@ describe('SUA alert in the approach modes (3-41)', () => {
         const unit = await bootUnit({
             facilities: w.facilities, position: w.north(40),
             airspaces: [airspace('R-APR', BoundaryType.Restricted, box(p.lat - 0.05, p.lat + 0.05, p.lon - 0.1, p.lon + 0.1), {minFt: 0, maxFt: 5000})],
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
         });
         await settle(unit);
@@ -410,6 +411,7 @@ describe('SUA alert in the approach active mode (3-41)', () => {
         const w = approachWorld();
         const unit = await bootUnit({
             facilities: w.facilities, position: w.north(7.5), airspaces: [area(w)],
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
         });
         await settle(unit);

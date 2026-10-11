@@ -51,6 +51,8 @@ export const NO_OBS = {'Input.ObsSource': 0} as const;
 export const HEADING_INPUT = {'Input.HeadingInput': true} as const;
 export const NO_GPS_SIMVARS = {'Output.WriteGPSSimVars': false} as const;
 export const LEG_OBS_SWITCH = {'Input.ExternalSwitches.LegObsSwitchInstalled': true} as const;
+/** The approach arm switch of an installation approved for approaches, which has APT 8 (3-49, #133) */
+export const APR_ARM_SWITCH = {'Input.ExternalSwitches.AppArmSwitchInstalled': true} as const;
 export const NO_ALTIMETER = {'Input.AltimeterInterfaced': false} as const;
 export const VFR_ONLY = {'VFROnly': true} as const;
 export const AIRDATA = {'Input.Airdata.IsInterfaced': true} as const;

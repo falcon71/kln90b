@@ -5,7 +5,7 @@ import {standardRoute} from '../../../harness/fixtures';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
 import {savedFlightplan} from '../../../harness/storage';
-import {NO_OBS, panelXml} from '../../../harness/panelXml';
+import {APR_ARM_SWITCH, NO_OBS, panelXml} from '../../../harness/panelXml';
 import {activeIdent, fplIdents} from '../../../harness/readers';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {Screen} from '../../../harness/render/screen';
@@ -253,6 +253,7 @@ describe('the active leg after loading an approach with a missed approach to its
         const position = pointFrom(pointFrom(vvv, 210, 2), 120, 1);
         const unit = await bootUnit({
             facilities: [apt, vvv, ifaaa, enraa, mapaa], position, storage: savedFlightplan(0, [enraa, apt]),
+            panelXml: panelXml(APR_ARM_SWITCH),
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');

@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {FixTypeFlags} from '@microsoft/msfs-sdk';
 import {bootToSelfTest, bootUnit, settle} from '../../harness/boot';
+import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {Screen} from '../../harness/render/screen';
 import {savedFlightplan} from '../../harness/storage';
 import {approachWorld, standardRoute} from '../../harness/fixtures';
@@ -339,7 +340,7 @@ describe('Screen, the positioned IAF list of APT 8', () => {
     }
 
     it('reads both IAFs of the approach on a booted unit', async () => {
-        const unit = await bootUnit(twoIafs());
+        const unit = await bootUnit({...twoIafs(), panelXml: panelXml(APR_ARM_SWITCH)});
         await settle(unit);
         await unit.panel.selectPage('R', 'APT 8');
         await unit.panel.cursor('R');

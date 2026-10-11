@@ -58,7 +58,7 @@ describe('page tree slots (structure)', () => {
             1, // ACT
             4, // D/T 1-4
             5, // NAV 1-5
-            8, // APT 1-8
+            8, // APT 1-8 (a controller leaves out APT 8 without the approach arm switch, 3-49)
             1, // VOR
             1, // NDB
             1, // INT

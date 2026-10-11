@@ -4,7 +4,7 @@ import {approachWorld} from '../../../harness/fixtures';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
-import {LEG_OBS_SWITCH, NO_OBS, panelXml} from '../../../harness/panelXml';
+import {APR_ARM_SWITCH, LEG_OBS_SWITCH, NO_OBS, panelXml} from '../../../harness/panelXml';
 import {activeIdent} from '../../../harness/readers';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
@@ -255,6 +255,7 @@ describe('MOD 2 CDI scale field with an approach armed 40 NM from the airport (#
         const w = approachWorld();
         const unit = await bootUnit({
             facilities: w.facilities, position: w.north(40),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
         });
         await settle(unit);

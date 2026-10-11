@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, moveAircraft, settle} from '../../harness/boot';
 import {approachWorld, defaultNavdata} from '../../harness/fixtures';
+import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {savedFlightplan} from '../../harness/storage';
 import {distanceNm} from '../../harness/flight/geo';
 import {activeIdent, fplIdents} from '../../harness/readers';
@@ -12,6 +13,7 @@ describe('approachWorld (harness)', () => {
         const w = approachWorld();
         const unit = await bootUnit({
             facilities: w.facilities, position: w.north(nmNorth),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
         });
         await settle(unit);

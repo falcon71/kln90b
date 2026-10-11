@@ -5,7 +5,7 @@ import {standardRoute} from '../../harness/fixtures';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
-import {LEG_OBS_SWITCH, NO_OBS, panelXml} from '../../harness/panelXml';
+import {APR_ARM_SWITCH, LEG_OBS_SWITCH, NO_OBS, panelXml} from '../../harness/panelXml';
 import {activeIdent, fplIdents, messageLines} from '../../harness/readers';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {Screen} from '../../harness/render/screen';
@@ -260,6 +260,7 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
         });
         const unit = await bootUnit({
             facilities: [apt, enraa, txo, mapaa], position: pointFrom(txo, 0, 6),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [enraa, apt]), turnAnticipation: false},
         });
         await settle(unit);
@@ -317,6 +318,7 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
         });
         const unit = await bootUnit({
             facilities: [apt, enr2, ifaaa, vvv, mapaa], position: pointFrom(ifaaa, 0, 5),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [enr2, apt]), turnAnticipation: false},
         });
         await settle(unit);

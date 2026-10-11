@@ -148,6 +148,10 @@ export class PageTreeController {
             if (!props.planeSettings.input.fuelComputer.isInterfaced) {
                 removed.push(Oth5Page, Oth6Page, Oth7Page, Oth8Page); //5-39 fuel computer pages
             }
+        } else if (tree === RIGHT_PAGE_TREE && !props.planeSettings.input.externalSwitches.appArmSwitchInstalled) {
+            //3-49: no APT 8 (and so no ACT 8) unless the unit is installed for non-precision approaches. Installation manual
+            //2-6 and figure 2-17 sheet 8: only an approach installation has the approach arm switch on pin 30
+            removed.push(Apt8Page);
         }
         return (tree as Function[][]).map(group => group.filter(page => !removed.includes(page)));
     }

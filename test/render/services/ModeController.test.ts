@@ -4,6 +4,7 @@ import {bootUnit, moveAircraft, settle} from '../../harness/boot';
 import {standardRoute} from '../../harness/fixtures';
 import {airport, intersection} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
+import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {savedFlightplan} from '../../harness/storage';
 import {activeIdent, fplIdents} from '../../harness/readers';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
@@ -109,6 +110,7 @@ describe('arming to approach active at the FAF (633fdad)', () => {
         });
         const unit = await bootUnit({
             facilities: [apt, iafaa, ifaaa, fafaa, mapaa], position: pointFrom(fafaa, inboundTrack + 180, 1.6),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [apt]), turnAnticipation: false},
         });
         await settle(unit);
@@ -202,6 +204,7 @@ describe('arming to approach active at a fix that is IAF and FAF (#129)', () => 
         });
         const unit = await bootUnit({
             facilities: [apt, enraa, txo, mapaa], position: pointFrom(txo, 0, 1.6),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [enraa, apt]), turnAnticipation: false},
         });
         await settle(unit);

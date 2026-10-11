@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, settle} from '../../harness/boot';
 import {PAGE_CYCLES, PAGE_GROUPS, Side} from '../../harness/flight/FrontPanel';
+import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {Screen} from '../../harness/render/screen';
 import {savedFlightplan} from '../../harness/storage';
 import {standardRoute} from '../../harness/fixtures';
@@ -12,7 +13,10 @@ vi.mock('../../../kln90b/Version', () => ({VERSION: '2.2.0'}));
 const range = (prefix: string, from: number, to: number): string[] =>
     Array.from({length: to - from + 1}, (_, i) => `${prefix}${from + i < 10 ? ' ' : ''}${from + i}`);
 
-/** Every page the unit has in the tree of a side. OTH 5 to OTH 10 are pruned unless fuel computer and air data are interfaced. */
+/**
+ * Every page the unit has in the tree of a side. OTH 5 to OTH 10 are pruned unless fuel computer and air data are interfaced,
+ * and APT 8 unless the approach arm switch is installed (3-49, #133).
+ */
 const LEFT_PAGES = [
     ...range('TRI', 0, 6), ...range('MOD', 1, 2), ...range('FPL', 0, 25), ...range('NAV', 1, 5), ...range('CAL', 1, 7),
     ...range('STA', 1, 5), ...range('SET', 1, 10), 'SET 0', ...range('OTH', 1, 4),
@@ -115,7 +119,7 @@ describe('FrontPanel.selectPage (harness)', () => {
         it.each(Object.keys(PAGE_CYCLES).flatMap(group => (['L', 'R'] as Side[])
             .filter(side => PAGE_GROUPS[side].includes(group)).map(side => [side, group])) as [Side, string][])(
             'is the order of the inner knob on the %s side in the %s group', async (side, group) => {
-                const unit = await bootUnit();
+                const unit = await bootUnit({panelXml: panelXml(APR_ARM_SWITCH)});
                 const cycle = PAGE_CYCLES[group];
                 await unit.panel.selectPage(side, `${group} ${cycle[0]}`);
                 const seen = [cycle[0]];
@@ -137,7 +141,7 @@ describe('FrontPanel.selectPage (harness)', () => {
     // The booted pages are NAV 2 on the left and SUP on the right. Each page is reached from the one before it, forward
     // through the list and then back, so that both directions of both knobs are used
     it.each([['L', LEFT_PAGES], ['R', RIGHT_PAGES]] as [Side, string[]][])('reaches every page of the %s tree', async (side, pages) => {
-        const unit = await bootUnit();
+        const unit = await bootUnit({panelXml: panelXml(APR_ARM_SWITCH)});
 
         for (const name of [...pages, ...pages.slice().reverse()]) {
             await unit.panel.selectPage(side, name);

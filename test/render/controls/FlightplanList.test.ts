@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {Facility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
+import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {Screen} from '../../harness/render/screen';
 import {fplIdents} from '../../harness/readers';
 import {savedFlightplan} from '../../harness/storage';
@@ -322,7 +323,10 @@ describe('FlightplanList, the approach header (checked in the KLN 89 trainer, 20
     async function onHeader(extra: Facility[] = []): Promise<HeadlessUnit> {
         const w = approachWorld();
         const storage = savedFlightplan(0, [w.enraa, w.kprc]);
-        const unit = await bootUnit({facilities: [...w.facilities, ...extra], position: w.north(40), storage});
+        const unit = await bootUnit({
+            facilities: [...w.facilities, ...extra], position: w.north(40), storage,
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
         expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']); // Precondition

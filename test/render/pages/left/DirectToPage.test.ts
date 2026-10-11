@@ -4,6 +4,7 @@ import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boo
 import {SuperNav1Page} from '../../../../kln90b/pages/left/SuperNav1Page';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
+import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 import {activeIdent} from '../../../harness/readers';
@@ -366,6 +367,7 @@ describe('DIRECT TO page at the missed approach point (3-27)', () => {
         });
         const unit = await bootUnit({
             facilities: [apt, enraa, fafaa, mapaa, mahaa], position: pointFrom(mapaa, 0, 2),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [enraa, apt]), turnAnticipation: false},
         });
         await settle(unit);

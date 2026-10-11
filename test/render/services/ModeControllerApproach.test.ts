@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {approachWorld} from '../../harness/fixtures';
+import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {savedFlightplan} from '../../harness/storage';
 import {Screen} from '../../harness/render/screen';
 import {activeIdent, fplIdents} from '../../harness/readers';
@@ -15,6 +16,7 @@ async function approachLoaded(nm: number) {
     const w = approachWorld();
     const unit = await bootUnit({
         facilities: w.facilities, position: w.north(nm),
+        panelXml: panelXml(APR_ARM_SWITCH),
         storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
     });
     await settle(unit);
