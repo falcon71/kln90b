@@ -51,7 +51,16 @@
         5
       ],
       "description": "**Goal:** STA 5 predicts at the destination and the ETA. It uses one long-lived prediction context of the main\ncomputer instead of a second `GPSSatComputer`, which ignores time and place since SDK 2.3.3 and never initializes in\nthe harness.\n\n**Files:**\n- Modify: `kln90b/Gps.ts` (`public readonly raimPrediction`)\n- Modify: `kln90b/pages/left/Sta5Page.tsx` (`calculateRaim`, imports)\n- Test: `test/render/pages/left/Sta5Page.test.ts`\n- Docs: `docs/testing.md` section 6 (the \"STA 5 cannot be tested\" bullet), `docs/architecture.md` if it mentions STA 5\n\n**Acceptance Criteria:**\n- [ ] A new test (standard route, destination KBBB): after the COMPUTING delay, row 4 of the left page shows seven availability bars `'  èèèèèèè  '`.\n- [ ] A new test: the prediction runs at KBBB's latitude and longitude, for the seven times ETA −15 to +15 minutes in steps of 5, with the middle one at the ETA's hh:mm.\n- [ ] A new test: the prediction context gives a different PDOP at 47/8 and at −47/−172 for the same time.\n- [ ] `Sta5Page.tsx` no longer constructs a `GPSSatComputer` or an `EventBus`.\n- [ ] `npx tsc --noEmit` clean, `npm test` green.\n\n**Verify:** `npx vitest run test/render/pages/left/Sta5Page.test.ts` → all pass; `npm test` → all pass.\n\nFull steps: docs/superpowers/plans/2026-10-11-gps-acquisition.md, Task 6. Spec: docs/superpowers/specs/2026-10-11-gps-acquisition-design.md\n\n```json:metadata\n{\"files\":[\"kln90b/Gps.ts\",\"kln90b/pages/left/Sta5Page.tsx\",\"test/render/pages/left/Sta5Page.test.ts\",\"docs/testing.md\",\"docs/architecture.md\"],\"verifyCommand\":\"npx vitest run test/render/pages/left/Sta5Page.test.ts\",\"acceptanceCriteria\":[\"A new test (standard route, destination KBBB): after the COMPUTING delay, row 4 of the left page shows seven availability bars `'  èèèèèèè  '`.\",\"A new test: the prediction runs at KBBB's latitude and longitude, for the seven times ETA −15 to +15 minutes in steps of 5, with the middle one at the ETA's hh:mm.\",\"A new test: the prediction context gives a different PDOP at 47/8 and at −47/−172 for the same time.\",\"`Sta5Page.tsx` no longer constructs a `GPSSatComputer` or an `EventBus`.\",\"`npx tsc --noEmit` clean, `npm test` green.\"],\"modelTier\":\"standard\"}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: Fix #357, re-initialize the search",
+      "status": "completed",
+      "blockedBy": [
+        6
+      ],
+      "description": "See plan Task 7"
     }
   ],
-  "lastUpdated": "2026-10-11T19:34:49.571Z"
+  "lastUpdated": "2026-10-11T20:17:18.850Z"
 }
