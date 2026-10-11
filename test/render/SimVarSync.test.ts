@@ -54,7 +54,7 @@ describe('L:KLN90B_ObsSource (public contract)', () => {
     });
 });
 
-// The screen is asserted, not the opacity: #114 lets the opacity ramp on an unpowered unit. bootUnit cannot preset a
+// The screen is asserted, not the opacity. bootUnit cannot preset a
 // SimVar before init, so the unit boots, loses its electricity at the first SimVarSync tick and powers up again when the
 // test sets the circuit; it comes up through the welcome page, which fills row 0.
 describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract)', () => {

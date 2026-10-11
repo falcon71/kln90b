@@ -16,6 +16,7 @@ export class BrightnessManager {
     private possibleBrightness = 0; //Depends on power
     private container: HTMLElement;
     private simVarWritten: boolean = false;
+    private powerGeneration = 0; //Counts the power events, so that the ramp of an earlier power-on can tell it was overtaken
 
     constructor(bus: EventBus, private readonly planeSetting: KLN90PlaneSettings) {
         this.container = document.getElementById('InstrumentsContainer')!;
@@ -71,6 +72,7 @@ export class BrightnessManager {
     }
 
     private powerChanged(evt: PowerEventData) {
+        this.powerGeneration++;
         if (evt.isPowered) {
             if (this.planeSetting.debugMode) {
                 this.possibleBrightness = 1;
@@ -87,11 +89,15 @@ export class BrightnessManager {
     }
 
     private async powerUp(timePoweredOff: number) {
+        const generation = this.powerGeneration;
         const warmUpTime = Math.min(timePoweredOff / TIME_UNTIL_COLD * TIME_TO_WARM, TIME_TO_WARM);
         await Wait.awaitDelay(warmUpTime);
         const brightnessIncrease = 1 / TIME_TO_REACH_FULL_BRIGHTNESS * BRIGHTNESS_TICKRATE;
         while (this.possibleBrightness < 1) {
             await Wait.awaitDelay(BRIGHTNESS_TICKRATE);
+            if (generation !== this.powerGeneration) {
+                return; //Switched off, or on again with a ramp of its own, while this one was waiting
+            }
 
             this.possibleBrightness = Math.min(this.possibleBrightness + brightnessIncrease, 1);
             this.refreshElement();
