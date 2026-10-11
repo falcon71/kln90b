@@ -236,6 +236,10 @@ error or noise and no RAIM ("We have pretty all messages except for failures and
       position confirmed on SET 1 while the unit searches does not restart the model with a new prediction, although
       3-17 to 3-19 give updating them as the remedy for a slow start; the unit waits for the give-up instead.
       `Set1Page` still calls `syncLastKnownPosition`, which only moves the SDK's last known position.
+    - **STA 1** (`Sta1Page`, #213) shows what the unit knows, not the true sky. During ACQ without a fix it lists
+      `search.predictedSatellites()` with the predicted elevation, constant through the acquisition. Otherwise it lists
+      the channels; the elevation is the true one with a fix or once the satellite's orbit data is current
+      (`GPS.simTimeUnix`), else `--`. A satellite below the horizon has no elevation and shows `--`.
     - Public SDK API used: `createPredictionContext`, `setSatelliteInhibit`, `syncLastKnownPosition` (the stored
       position within 100 NM of the present one, so the SDK's 2 NM hot-start rule works on it; else the present
       position), `eraseLastKnownPosition`, `eraseCachedEphemeris` (the harness's `coldGps`).

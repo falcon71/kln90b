@@ -1,6 +1,6 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {GPSSatellite} from '@microsoft/msfs-sdk';
-import {bootToSelfTest, HeadlessUnit} from '../../../harness/boot';
+import {bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {DEFAULT_START} from '../../../harness/sim/clock';
 
@@ -69,10 +69,9 @@ describe('STA 1 page during an almanac search', () => {
     });
 
     // 5-30: the elevation column ranges from 5 to 90 degrees above the horizon; a satellite below the horizon has no
-    // elevation of 5 degrees or more (today the page mirrors it: |90 - zenith|). A fix that printed a negative number
-    // would make the row wider than the half page, Screen.read() would throw, and an it.fails swallows that: the pin
-    // would stay green for the wrong reason, so the fix must show dashes (or a clamp) below 5 degrees
-    it.fails('shows no elevation of 5 degrees or more for a satellite below the horizon (5-30, #213)', async () => {
+    // elevation of 5 degrees or more (the page used to mirror it: |90 - zenith|). Satellites without orbit data show
+    // dashes
+    it('shows no elevation of 5 degrees or more for a satellite below the horizon (5-30, #213)', async () => {
         const unit = await almanacSearch();
         const below = belowHorizon(unit);
 
@@ -80,4 +79,82 @@ describe('STA 1 page during an almanac search', () => {
 
         expect(shown.filter(([, ele]) => /^\d\d$/.test(ele) && Number(ele) >= 5)).toEqual([]);
     });
+
+    // #213: during the almanac search the receiver cannot know where a satellite it searches blindly stands; unknown
+    // values are dashes
+    it('shows dashes for the elevation of satellites without orbit data during an almanac search (#213)', async () => {
+        const unit = await almanacSearch();
+        const sats = unit.props.sensors.in.gps.gpsSatComputer.getChannels().filter(s => s !== null) as GPSSatellite[];
+        const withoutData = sats.filter(s => s.lastEphemerisTime === undefined).map(s => s.prn);
+        expect(withoutData.length).toBeGreaterThan(0);
+
+        const shown = (await satelliteRows(unit)).map(prnAndEle).filter(([prn]) => withoutData.includes(prn));
+
+        expect(shown.map(([, ele]) => ele)).toEqual(withoutData.map(() => '--'));
+    });
+});
+
+// A real-unit video: started 829 NM from its stored position, STA 1 showed ACQ with the satellites the almanac predicts
+// for the stored position and their predicted elevations, constant through the acquisition; not yet received ones with
+// a * and SNR 00 (#213)
+describe('STA 1 page during ACQ', () => {
+    const STORED_LAT = 47 + 829 / 60;
+
+    async function acquisition(): Promise<HeadlessUnit> {
+        const unit = await bootToSelfTest({
+            storage: {fastGpsAcquisition: false, lastLatitude: STORED_LAT, lastLongitude: 8, lastAlmanacDownload: DEFAULT_START.getTime() - 24 * 3600 * 1000},
+        });
+        await unit.panel.approveSelfTest();
+        await unit.panel.selectPage('L', 'STA 1');
+        return unit;
+    }
+
+    it('shows the predicted elevations, unchanged 30 s later, not the true ones (#213)', async () => {
+        const unit = await acquisition();
+        const gps = unit.props.sensors.in.gps;
+        expect(gps.isValid()).toBe(false);
+        const predicted = new Map(gps.search.predictedSatellites().map(p =>
+            [p.prn, Math.round(90 - p.position.get()[0] * 180 / Math.PI)]));
+
+        const first = (await satelliteRows(unit)).map(prnAndEle);
+        await vi.advanceTimersByTimeAsync(30_000);
+        const later = (await satelliteRows(unit)).map(prnAndEle);
+
+        expect(first.map(([prn]) => prn)).toEqual([...predicted.keys()].sort((a, b) => a - b));
+        for (const [prn, ele] of first) {
+            expect(Math.abs(Number(ele) - predicted.get(prn)!)).toBeLessThanOrEqual(1);
+        }
+        expect(later).toEqual(first);
+        const truth = (prn: number) => {
+            const sat = gps.gpsSatComputer.getSatellites().find(s => s.prn === prn)!;
+            return 90 - sat.position.get()[0] * 180 / Math.PI;
+        };
+        expect(first.some(([prn, ele]) => Math.abs(Number(ele) - truth(prn)) >= 3)).toBe(true);
+    }, 60_000);
+});
+
+// #213: the guard itself. Right after the aircraft jumps to the other side of the earth the tracked satellites are all
+// below the horizon but still have current orbit data (the SDK drops them only later). They have no elevation and show
+// dashes, not the mirrored angle
+describe('STA 1 page, tracked satellites with orbit data below the horizon', () => {
+    it('shows dashes for a tracked satellite below the horizon that has current orbit data (5-30, #213)', async () => {
+        const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+        const channels = () => gps.gpsSatComputer.getChannels().filter(s => s !== null) as GPSSatellite[];
+        expect(channels().length).toBeGreaterThan(0);
+
+        await moveAircraft(unit, {lat: -47, lon: -172}, {groundspeedKt: 0});
+        await unit.panel.selectPage('L', 'STA 1');
+
+        const below = channels()
+            .filter(s => s.position.get()[0] > Math.PI / 2 && s.isCachedEphemerisValid(gps.simTimeUnix))
+            .map(s => s.prn).sort((a, b) => a - b);
+        expect(below.length).toBeGreaterThan(0);
+
+        const shown = (await satelliteRows(unit)).map(prnAndEle).filter(([prn]) => below.includes(prn));
+
+        expect(shown.map(([prn]) => prn)).toEqual(below);
+        expect(shown.map(([, ele]) => ele)).toEqual(below.map(() => '--'));
+    }, 60_000);
 });

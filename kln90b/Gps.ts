@@ -122,6 +122,8 @@ export class GPS {
     public timeZulu: TimeStamp;
     public gpsSatComputer: KLNGPSSatComputer;
     public readonly search: GpsSearch;
+    /** The simulator's UNIX time of the last tick, for what the receiver reads from its satellites (STA 1) */
+    public simTimeUnix: number = 0;
     private lastCoords: GeoPoint;
     private intSaveCount = 0;
     private readonly takeHomeMode: boolean;
@@ -197,6 +199,7 @@ export class GPS {
 
     tick() {
         const actualUnixTime = this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds));
+        this.simTimeUnix = actualUnixTime;
         const lat = SimVar.GetSimVarValue('PLANE LATITUDE', SimVarValueType.Degree);
         const lon = SimVar.GetSimVarValue('PLANE LONGITUDE', SimVarValueType.Degree);
 

@@ -1037,9 +1037,8 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   only pins that name #56 also name the open #333). Bugs filed without a pin, each because no test can observe it
   cheaply or the fix is pending: #117 (scan list job ids can collide; random), #128 (the nearest VOR filter of
   repository VORs), #214 (the STA 5 prediction; the harness cannot run the page) and #325 (the empty MSG page; no 90B
-  text). #110 is fixed on `master` and closes when that commit reaches GitHub. #213 was first filed without a pin and
-  has one since (`Sta1Page.test.ts`). The questions and enhancements the sessions filed carry their labels on GitHub
-  and have no pins.
+  text). #110 is fixed on `master` and closes when that commit reaches GitHub. The questions and enhancements the
+  sessions filed carry their labels on GitHub and have no pins.
 - **The regression triage** covered every closed issue and every bug-fix commit on `master` up to 2026-10-03, and every
   fix that could be observed has a test that failed under the original bug. Three were *not provable*: #20 (closed
   without a fix of its own, and its symptom is an autopilot turn in the sim), part (d) of `7fd640e` (the canvas is
