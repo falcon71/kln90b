@@ -19,7 +19,7 @@ async function approveSelfTestPage(opts: BootOptions = {}): Promise<HeadlessUnit
 describe('Database page (3-7)', () => {
     // 3-7 step 12, figure 3-24: line 2 says the data base expires, line 3 gives the date, and the cursor is on
     // ACKNOWLEDGE?. The status line shows the mode, a flashing ENT and CRSR on the right (figure 3-24; 3-10 for ENT).
-    // Line 1 (the coverage area) and the year of line 3 (#199) are not asserted here.
+    // Line 1 (the coverage area) and the year of line 3 are not asserted here.
     it('shows the expiry of a current data base with the cursor on ACKNOWLEDGE? (3-7)', async () => {
         const unit = await approveSelfTestPage();
 
@@ -45,9 +45,15 @@ describe('Database page (3-7)', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // 3-7, figures 3-24 and 3-25: the date has a two-digit year. The sibling above holds the day and month.
-    it.fails('shows the expiry date with a two-digit year (3-7, #199)', async () => {
+    // 3-7, figures 3-24 and 3-25: the date has a two-digit year. The siblings above hold the day and month.
+    it('shows the expiry date with a two-digit year (3-7, #199)', async () => {
         await approveSelfTestPage();
+
+        expect(Screen.read().pageRows()[2]).toBe('11 JUN 26');
+    });
+
+    it('shows the date an expired data base expired with a two-digit year (3-7, #199)', async () => {
+        await approveSelfTestPage({start: AFTER_CYCLE, storage: {lastLatitude: 47, lastLongitude: 8}});
 
         expect(Screen.read().pageRows()[2]).toBe('11 JUN 26');
     });

@@ -1468,7 +1468,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - a fix of #335 turns the #334 pin red as well,
       though #334 still needs its own fix for SET 0 and Super NAV 5; a fix of #332 with a ride-through above about 1.5 s
       needs the 3 s waits of the circuit tests raised; a fix of #328 must keep the screen warm on a forced start
-      (`lastPowerChangeTime` also drives the warm-up); the fix of #199 turns its pins red; `HEADING_INPUT` in
+      (`lastPowerChangeTime` also drives the warm-up); `HEADING_INPUT` in
       `RollSteeringController.test.ts` can bite once #143 is fixed.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): #146 (the alert time on a Direct To a
   waypoint of FPL 0 that has a following leg), #147 (a waypoint alert in OBS mode), duplicate idents on a waypoint page
