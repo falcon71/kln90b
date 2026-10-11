@@ -325,14 +325,21 @@ describe('PRESS ALT TO SET BARO (6-8, B-3)', () => {
         expect(h.tick()).toEqual(['PRESS ALT TO SET BARO']);
     });
 
-    // 6-8 (the note): with an air data computer supplying the baro the message is not shown
-    it.fails('does not show when an air data computer supplies the baro (6-8) (#174)', () => {
+    // 6-8 (the note): with an air data computer supplying the baro the message is not shown. The ALT page takes the baro
+    // from either source of the panel.xml (BaroSource 1 or 2), and the message is held back in both arming modes
+    it.each([
+        [1, 'ARM-LEG', NavMode.ARM_LEG],
+        [2, 'ARM-LEG', NavMode.ARM_LEG],
+        [1, 'ARM-OBS', NavMode.ARM_OBS],
+        [2, 'ARM-OBS', NavMode.ARM_OBS],
+    ])('does not show when an air data computer supplies the baro, source %i, %s (6-8) (#174)', (baroSource, _mode, armed) => {
         const w = quietWorld();
         w.airdataInterfaced = true;
-        w.baroSource = 1;
+        w.baroSource = baroSource;
         const h = harness(w);
         h.tick();
-        w.navmode = NavMode.ARM_LEG;
+        w.navmode = armed;
+        expect(h.tick()).toEqual([]);
         expect(h.tick()).toEqual([]);
     });
 
