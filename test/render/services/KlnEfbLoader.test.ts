@@ -198,18 +198,18 @@ describe('EFB route import without a gate (characterization)', () => {
 // set the device is disabled completely, so that another unit can take over. The EFB sync must not change its flight plan
 describe('EFB route import while the unit is disabled for hot swapping (public contract)', () => {
     /** The unit is booted and settled, with SimVarSync having read the LVar */
-    async function disabledUnit(disabled: boolean): Promise<HeadlessUnit> {
-        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
+    async function disabledUnit(disabled: boolean, storage?: Record<string, unknown>): Promise<HeadlessUnit> {
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true, storage});
         await settle(unit);
         unit.env.sim.set('L:KLN90B_Disabled', 'bool', disabled);
         await vi.advanceTimersByTimeAsync(300);
         return unit;
     }
 
-    // The sibling of the pin: the same route is imported with the LVar unset
-    it('the sibling: imports the route with the LVar unset', async () => {
+    // The same route is imported with the LVar unset
+    it('imports the route with the LVar unset', async () => {
         const unit = await disabledUnit(false);
-        expect(fplIdents(unit)).toEqual([]); // Precondition of the pin as well: nothing in FPL 0 before the sync
+        expect(fplIdents(unit)).toEqual([]); // Precondition of the disabled test as well: nothing in FPL 0 before the sync
 
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
         await vi.advanceTimersByTimeAsync(2000);
@@ -217,8 +217,8 @@ describe('EFB route import while the unit is disabled for hot swapping (public c
         expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
     });
 
-    // The other precondition of the pin: the LVar does disable the unit, its ticks stop (SimVarSync.test.ts)
-    it('the sibling: the disabled unit has stopped its ticks', async () => {
+    // The other precondition: the LVar does disable the unit, its ticks stop (SimVarSync.test.ts)
+    it('the disabled unit has stopped its ticks', async () => {
         const unit = await disabledUnit(false);
         await vi.advanceTimersByTimeAsync(2000);
         const before = unit.env.sim.writeCount('GPS WP DISTANCE');
@@ -233,13 +233,86 @@ describe('EFB route import while the unit is disabled for hot swapping (public c
         expect(unit.env.sim.writeCount('GPS WP DISTANCE')).toBe(frozenAt);
     });
 
-    it.fails('does not import a route while the unit is disabled for hot swapping (#188)', async () => {
+    it('does not import a route while the unit is disabled for hot swapping (#188)', async () => {
         const unit = await disabledUnit(true);
 
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(fplIdents(unit)).toEqual([]);
+    });
+
+    // A flight plan that the disabled unit holds stays as it is, whatever the other GPS syncs: a different route and the
+    // end of the synced route (null, which would empty FPL 0)
+    it('leaves the flight plan of the disabled unit as it was (#188)', async () => {
+        const unit = await disabledUnit(true, savedFlightplan(0, [kaaa, kbbb]));
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']); // Precondition: restored
+
+        unit.efb!.sync(efbRoute({departure: kbbb, destination: kaaa}));
+        await vi.advanceTimersByTimeAsync(2000);
+        unit.efb!.sync(null);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
+    });
+
+    // The temporary waypoints of a lat/lon leg are made while the route loads, so a dropped route leaves none
+    it('adds no temporary waypoint for a route with a lat/lon leg while disabled (#188)', async () => {
+        const unit = await disabledUnit(true);
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [{lat: 47.2, lon: 8.1}]}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(userWaypoints(unit)).toEqual([]);
+        expect(fplIdents(unit)).toEqual([]);
+    });
+
+    // Public contract (CLAUDE.md "Public contract with aircraft"; the Hot Swapping wiki page): a disabled unit has no side
+    // effects, so the route that arrives while it is disabled is dropped, not parsed. The SDK keeps the last synced route
+    // in a Subject, but the loader does not read it again when the unit resumes
+    it('does not import the dropped route when the unit resumes (public contract)', async () => {
+        const unit = await disabledUnit(true);
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(fplIdents(unit)).toEqual([]);
+    });
+
+    // The disabled unit resumes where it left off (Hot Swapping wiki page): a dropped route does not switch the left page
+    // to FPL 0, as an imported route does. The unit is on SET 5 before it is disabled
+    it('resumes on the page it was on after a dropped route (public contract, #188)', async () => {
+        const unit = await disabledUnit(false);
+        await unit.panel.selectPage('L', 'SET 5');
+        await vi.advanceTimersByTimeAsync(1000);
+        const rowsBefore = Screen.read().rows('L');
+        expect(Screen.read().status().left).toBe('SET 5'); // Precondition: not on the flight plan page
+
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
+        await vi.advanceTimersByTimeAsync(2000);
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(Screen.read().status().left).toBe('SET 5');
+        expect(Screen.read().rows('L')).toEqual(rowsBefore);
+    });
+
+    // After the resume the next synced route is imported again: the disabled state does not stick
+    it('imports a route synced after the unit resumed (#188)', async () => {
+        const unit = await disabledUnit(true);
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
+        await vi.advanceTimersByTimeAsync(2000);
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+
+        unit.efb!.sync(efbRoute({departure: kbbb, destination: kaaa}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KBBB', 'KAAA']);
     });
 });
 

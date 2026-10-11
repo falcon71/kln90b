@@ -7,6 +7,7 @@ import {
     ICAO,
     IcaoValue,
     ReadonlyFlightPlanRoute,
+    SimVarValueType,
     UserFacility,
     UserFacilityType,
 } from "@microsoft/msfs-sdk";
@@ -20,6 +21,7 @@ import {getUniqueIdent} from "../data/navdata/UniqueIdentGenerator";
 import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "../data/navdata/IcaoBuilder";
 import {StatusLineMessageEvents} from "../controls/StatusLine";
 import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
+import {LVAR_DISABLE} from "../LVars";
 
 /**
  * Imports routes from the EFB into the KLN
@@ -32,6 +34,12 @@ export class KlnEfbLoader extends Flightplanloader {
     }
 
     private async loadRoute(route: ReadonlyFlightPlanRoute | null): Promise<void> {
+        if (SimVar.GetSimVarValue(LVAR_DISABLE, SimVarValueType.Bool)) {
+            //A route that is synced for the GPS that replaced the KLN must not change the FPL 0 of the suspended KLN. The route is dropped, not loaded on resume
+            console.log("Ignoring route, because the unit is disabled for hot swapping");
+            return;
+        }
+
         console.log("Loading route", route);
 
         const fpl = await this.doLoad(route);
