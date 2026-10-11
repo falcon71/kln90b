@@ -206,10 +206,29 @@ hours is a hot start too.
   `awaitInit()`. It reads "available" as a PDOP of 0 or more, the criterion of today.
 - The COMPUTING delay stays.
 
+## 5a. Correcting the position or the time during a search (#357)
+
+Added after the final review, at the maintainer's request.
+- **The remedy.** The Pilot's Guide gives the pilot a remedy for a slow time to first fix: enter the date and time on
+  the self-test page (3-5 to 3-7) or on SET 2, and the position on SET 1 (3-17 to 3-19). The unit then reaches NAV ready
+  much faster.
+- **The gap.** The start model decides at power-on, before the pilot can enter anything, so these entries change
+  nothing today.
+- **The fix.** Each of these entries, made while the unit has no fix, re-initializes the search:
+  - The page writes the new value as today: `timeZulu`, or `coords` plus the SDK last-known position.
+  - It then calls a new `GPS.reinitializeSearch()`.
+  - That method copies the clock into `gpsSatComputer.internalTime` and restarts the start model from the present
+    `coords`, through `search.start(...)`. The restart judges the almanac again by the corrected clock and predicts
+    again from the entered position and the corrected time.
+- **With a fix** the entries do not touch the search. SET 2's time fields are read-only then anyway (3-53).
+- **FAST** has no start model, so nothing changes there.
+- **Not documented:** whether the real unit restarts at once or at its next search cycle. The guide says only that the
+  fix comes much faster. The model restarts at once.
+
 ## 6. Commits and docs
 
 **Commits.** One commit per issue (CLAUDE.md), each with its tests and doc changes, in this order: #328 → #211 → #62 →
-#213 → #215 → #214. Each removes the `.fails` of its own pins, and only those.
+#213 → #215 → #214 → #357. Each removes the `.fails` of its own pins, and only those.
 
 **Docs:**
 - `docs/architecture.md` Core 3 (the GPS paragraph and the private SDK internals) and Core 1 (the power-event

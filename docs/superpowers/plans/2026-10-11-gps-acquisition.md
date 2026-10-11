@@ -1405,3 +1405,67 @@ git commit -m "fixes #214 predict RAIM on STA 5 at the destination and ETA throu
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
+
+---
+
+### Task 7: Fix #357, correcting the position or the time during a search
+
+**Goal:** An entry of the date or time (self-test page, SET 2) or of the position (SET 1 CONFIRM?), made while the unit has no fix, re-initializes the start model with the corrected values. The search then speeds up as 3-5 and 3-17..3-19 promise. Spec section 5a.
+
+**Files:**
+- Modify: `kln90b/Gps.ts` (new public `reinitializeSearch()`)
+- Modify: `kln90b/pages/right/SelfTestRightPage.tsx` (`saveDate`, `saveTime`), `kln90b/pages/left/Set2Page.tsx` (`saveDate`, `saveTime`), `kln90b/pages/left/Set1Page.tsx` (`confirmPosition`)
+- Test: `test/render/GpsAcquisition.test.ts`
+- Docs: `docs/architecture.md` Core 3 (replace the "Not modeled: SET 1 and SET 2 during a search" bullet), `docs/testing.md` if it mentions the gap
+- Also (separate fixup of the #62 commit): the 150 NM warm test bound in `test/render/GpsAcquisition.test.ts`
+
+**Acceptance Criteria:**
+- [ ] SET 1: stored position at the antipode (−47/−172), aircraft at 47/8, almanac a day old, REAL; power on, approve the self-test, enter 47/8 on SET 1 and CONFIRM?: the fix comes within 150 s of the CONFIRM? (warm), and within 5 minutes of power-on.
+- [ ] Self-test page: the clock set 39 years back before power-on; enter the correct date on the self-test page before approving: the fix comes within 150 s of the approval (warm), not after the 20-minute almanac search.
+- [ ] SET 2: the clock 15 minutes behind, almanac current; after the self-test, correct the time on SET 2: the fix comes within 150 s of the entry, well before the 5-minute give-up plus the sky search.
+- [ ] With a fix, an SET 1 CONFIRM? does not restart the search: `gps.search.mode` stays `Idle` and `gps.isValid()` stays true.
+- [ ] Each of the three new tests fails when its page's `reinitializeSearch()` call is removed (hand mutation, restored).
+- [ ] The 150 NM warm test of #62 asserts "no fix before the self-test ends" (`>= 17` s) instead of `>= 30` s, as a fixup of the #62 commit; the branch still has exactly one commit per issue.
+- [ ] `npx tsc --noEmit` clean, `npm test` green.
+
+**Verify:** `npx vitest run test/render/GpsAcquisition.test.ts` → all pass; `npm test` → all pass.
+
+**Steps:**
+
+- [ ] **Step 1: Tests first.** In `test/render/GpsAcquisition.test.ts`, add a describe `correcting the position or the time during a search (3-5, 3-17, #357)` with the four tests of the acceptance criteria.
+  - Build the units like `powerOnCold`. The clock offset goes before power-on, as that helper does.
+  - Then advance 19 s and call `unit.panel.approveSelfTest()`. For the self-test date case, enter the date with the self-test page's editors before approving; read `test/render/pages/left/SelfTestLeftPage.test.ts`, or the existing self-test tests, for how they enter a date. Find them with `grep -rn "approveSelfTest\|SelfTestRightPage" test`.
+  - Enter positions and times through the front panel the way the existing `Set1Page.test.ts` and `Set2Page.test.ts` do. Read those files first; reuse their helpers.
+  - Measure the time from the entry with `secondsToFix`. Use the `VERY_SLOW` timeout where a failure would run long.
+  - Run them and confirm they fail as expected:
+    - SET 1: no fix within 150 s of the CONFIRM? (the 5-minute give-up comes later).
+    - Self-test date: the almanac search.
+    - SET 2: the give-up plus the sky search.
+- [ ] **Step 2: Implement `GPS.reinitializeSearch()`** in `kln90b/Gps.ts`, next to `reset()`:
+  ```ts
+      /**
+       * 3-5, 3-17..3-19: the pilot entered the date, the time or the position while the unit searches. The receiver starts
+       * its search again from the corrected values (#357). With a fix the satellites supply both, and nothing changes
+       */
+      public reinitializeSearch(): void {
+          if (this.isValid() || this.takeHomeMode) {
+              return;
+          }
+          this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp();
+          this.search.start(this.coords);
+      }
+  ```
+  Use the actual field names of `Gps.ts` (for example the take-home flag), and keep the comment style of the file.
+- [ ] **Step 3: Call it.** After the existing writes:
+  - `SelfTestRightPage.saveDate` and `saveTime`;
+  - `Set2Page.saveDate` and `saveTime`;
+  - `Set1Page.confirmPosition`, after `syncLastKnownPosition`. Keep that call: FAST has no start model and still needs it.
+
+  Each call is `this.props.sensors.in.gps.reinitializeSearch();` with a short comment citing the page (3-5, 3-17..3-19, #357).
+- [ ] **Step 4: Run** the new tests and the whole `GpsAcquisition.test.ts`, `Set1Page.test.ts`, `Set2Page.test.ts` and the self-test tests. Then do the hand mutation of each call (acceptance criterion 5) and restore.
+- [ ] **Step 5: Docs.** In `docs/architecture.md` Core 3, replace the "Not modeled: SET 1 and SET 2 during a search" bullet with a description of `reinitializeSearch` and its three callers. Check `docs/testing.md` for the gap (`grep -n "SET 1\|357\|during a search" docs/testing.md`) and update it.
+- [ ] **Step 6: Commit** `fixes #357 restart the GPS search when the pilot enters the date, the time or the position before the first fix`. Stage by name; never stage `.tasks.json` or `.superpowers/`. Use the trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- [ ] **Step 7: The #62 test bound.** In the 150 NM warm test (`… 150 NM from the stored position with an ephemeris 30 minutes old is a warm start`), change `toBeGreaterThanOrEqual(30)` to `toBeGreaterThanOrEqual(17)` and adjust its comment. With a current ephemeris no 30 s collection applies; the property is "no fix before the self-test ends".
+  - Commit it with `git commit --fixup=<the fixes #62 commit>`, then run `git rebase --autosquash --exec "npx tsc --noEmit" <master merge-base>` (git 2.45 needs no `-i`).
+  - If a conflict comes up, resolve it so each commit keeps only its own change. If the rebase becomes unworkable, `git rebase --abort` and report.
+- [ ] **Step 8: Full check** on the final HEAD: `npx tsc --noEmit`, `npm test`, `npm run build`.
