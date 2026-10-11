@@ -6,6 +6,7 @@ import {approachWorld, dtWorld, sidStarWorld} from '../../../harness/fixtures';
 import {pointFrom} from '../../../harness/flight/geo';
 import {airport, intersection, ndb, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
+import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan, savedUserWaypoints} from '../../../harness/storage';
 import {collectStatusMessages} from '../../../harness/statusLine';
@@ -323,6 +324,7 @@ async function bootOnAct8(): Promise<HeadlessUnit> {
     const w = approachWorld();
     const unit = await bootUnit({
         facilities: w.facilities, position: w.north(70), storage: savedFlightplan(0, [w.enraa, w.kprc]),
+        panelXml: panelXml(APR_ARM_SWITCH),
     });
     await settle(unit);
     await unit.panel.selectPage('R', 'ACT');
@@ -371,7 +373,7 @@ describe('ACT 8 (6-4)', () => {
     // name of the approach, the IAFs numbered from the fifth cell on
     it('lists the IAFs of the approach after ENT on it', async () => {
         const w = twoIafs();
-        const unit = await bootUnit(w);
+        const unit = await bootUnit({...w, panelXml: panelXml(APR_ARM_SWITCH)});
         await settle(unit);
         await unit.panel.selectPage('R', 'ACT');
         await unit.panel.inner('R', -1);
@@ -406,6 +408,7 @@ describe('ACT 8 (6-4)', () => {
         const w = approachWorld();
         const unit = await bootUnit({
             facilities: w.facilities, position: w.north(70), storage: savedFlightplan(0, [w.enraa]),
+            panelXml: panelXml(APR_ARM_SWITCH),
         });
         await settle(unit);
         await unit.panel.directTo('KPRC', {waitMs: 2000});
@@ -442,7 +445,11 @@ describe('ACT 8 (characterization)', () => {
 async function bootOnActWithSidStar(): Promise<HeadlessUnit> {
     const w = sidStarWorld({sids: ['DEP1'], stars: true});
     const [kprc, enraa] = w.facilities;
-    const unit = await bootUnit({facilities: w.facilities, position: w.position, storage: savedFlightplan(0, [enraa, kprc])});
+    const unit = await bootUnit({
+        facilities: w.facilities, position: w.position, storage: savedFlightplan(0, [enraa, kprc]),
+        // The inner knob passes ACT 8, which needs the approach arm switch (3-49, #133)
+        panelXml: panelXml(APR_ARM_SWITCH),
+    });
     await settle(unit);
     await unit.panel.selectPage('R', 'ACT');
     expect(Screen.read().rows('R')[0]).toBe('› 2 KPRC  A'); // precondition: the ACT page of the active KPRC

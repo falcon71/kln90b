@@ -2,6 +2,7 @@ import {vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../boot';
 import {arcWorld, legWorld} from '../fixtures';
 import {pointFrom} from '../flight/geo';
+import {APR_ARM_SWITCH, panelXml} from '../panelXml';
 import {savedFlightplan} from '../storage';
 import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
 import {Cell, readRows, Screen} from './screen';
@@ -117,6 +118,7 @@ export async function superNav5OnArc(o: { storage?: Record<string, unknown>, mag
     const w = arcWorld();
     const unit = await bootUnit({
         facilities: w.facilities, position: w.at(225, 10), magvar: o.magvar,
+        panelXml: panelXml(APR_ARM_SWITCH),
         storage: {...savedFlightplan(0, [w.kprc]), ...o.storage},
     });
     await settle(unit);

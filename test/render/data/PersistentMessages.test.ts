@@ -2,7 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {approachWorld} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
-import {AIRDATA, NO_ALTIMETER, panelXml, VFR_ONLY} from '../../harness/panelXml';
+import {AIRDATA, APR_ARM_SWITCH, NO_ALTIMETER, panelXml, VFR_ONLY} from '../../harness/panelXml';
 import {messages} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
@@ -72,6 +72,7 @@ describe('PRESS ALT TO SET BARO (6-8, B-3)', () => {
         const w = approachWorld();
         const unit = await bootUnit({
             facilities: w.facilities, position: w.north(40),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
         });
         await settle(unit);

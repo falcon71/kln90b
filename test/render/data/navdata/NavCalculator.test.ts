@@ -3,6 +3,7 @@ import {Facility, FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, star, withProcedures} from '../../../harness/navdata/procedures';
+import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {savedFlightplan} from '../../../harness/storage';
 import {activeIdent, fplIdents, messageLines, turnStackLength} from '../../../harness/readers';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
@@ -82,6 +83,7 @@ describe('an approach whose IAF and FAF are the same fix (6-10)', () => {
         });
         const unit = await bootUnit({
             facilities: [apt, enraa, txo, mapaa], position: pointFrom(txo, 0, 1.6), storage: savedFlightplan(0, [enraa, apt]),
+            panelXml: panelXml(APR_ARM_SWITCH),
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
@@ -189,7 +191,10 @@ describe('DIS on a DME arc (6-18)', () => {
         });
         // On the arc at the 260 radial, 80° before its end: the arc is 13.96 NM, the chord 2 * 10 * sin(40°) = 12.86 NM
         const p = at(260, 10);
-        const unit = await bootUnit({facilities: [kprc, abc, arcbg, arcen, fafaa, mapaa], position: p, storage: savedFlightplan(0, [kprc])});
+        const unit = await bootUnit({
+            facilities: [kprc, abc, arcbg, arcen, fafaa, mapaa], position: p, storage: savedFlightplan(0, [kprc]),
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
         await unit.panel.selectPage('L', 'NAV 1');
@@ -358,6 +363,7 @@ async function onFinal(storage: Record<string, unknown>) {
     });
     const unit = await bootUnit({
         facilities: [apt, enraa, fafaa, mapaa, mahaa], position: pointFrom(mapaa, 0, 2),
+        panelXml: panelXml(APR_ARM_SWITCH),
         storage: {...savedFlightplan(0, [enraa, apt]), ...storage},
     });
     await settle(unit);
@@ -488,7 +494,10 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
     /** The approach of approachWorld() loaded, 2 NM before the MAP: the unit is in ARM */
     async function armedOnApproach() {
         const w = approachWorld();
-        const unit = await bootUnit({facilities: w.facilities, position: w.north(2), storage: savedFlightplan(0, [w.enraa, w.kprc])});
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.north(2), storage: savedFlightplan(0, [w.enraa, w.kprc]),
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
         expect(activeIdent(unit)).toBe('MAPAA'); // Preconditions

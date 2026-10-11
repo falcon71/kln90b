@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
+import {BootOptions, bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
+import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
 import {approachWorld, sidStarWorld} from '../../../harness/fixtures';
 import {pointFrom} from '../../../harness/flight/geo';
@@ -71,6 +72,7 @@ describe('APT 7 putting a procedure into FPL 0', () => {
         const kprc = withProcedures(w.kprc, {approaches: [...w.kprc.approaches], arrivals: [star('ARR1', {common: [Leg.IF(straa), Leg.TF(strab)]})]});
         const unit = await bootUnit({
             facilities: [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.sdfaa, w.mapaa, straa, strab], position: w.north(40),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: savedFlightplan(0, [w.enraa, kprc]),
         });
         await settle(unit);
@@ -143,6 +145,7 @@ describe('APT 7 and APT 8 the REDUNDANT WPTS message with a STAR and an approach
         const {w, straa, kprc, facilities} = world();
         const unit = await bootUnit({
             facilities, position: w.north(40),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: savedFlightplan(0, [{enraa: w.enraa, straa, iafaa: w.iafaa}[enroute], kprc]),
         });
         await settle(unit);
@@ -285,7 +288,7 @@ describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
 });
 
 /** Boots in sidStarWorld and turns the right inner knob from APT 6 the given number of clicks */
-async function bootOnApt7(o: { sids: string[], stars: boolean, rf?: boolean }, clicksFromApt6 = 1, opts: { start?: Date } = {}): Promise<HeadlessUnit> {
+async function bootOnApt7(o: { sids: string[], stars: boolean, rf?: boolean }, clicksFromApt6 = 1, opts: Partial<BootOptions> = {}): Promise<HeadlessUnit> {
     const unit = await bootUnit({...sidStarWorld(o), ...opts});
     await settle(unit);
     await unit.panel.selectPage('R', 'APT 6');
@@ -348,7 +351,7 @@ describe('APT 7 procedure list (3-49, 6-21)', () => {
     // 3-49, 6-21: with SIDs and STARs there are two APT 7 pages, shown as APT+7, one to select a SID and one to select a
     // STAR. 3-49: APT 8 has just one page, so the next click leaves APT 7
     it('has two APT 7 pages, APT+7, for an airport with SIDs and STARs (3-49, 6-21)', async () => {
-        const unit = await bootOnApt7({sids: ['DEP1'], stars: true});
+        const unit = await bootOnApt7({sids: ['DEP1'], stars: true}, 1, {panelXml: panelXml(APR_ARM_SWITCH)});
         const first = [Screen.read().status().right, rows('R')[1]];
         await unit.panel.inner('R', 1);
         const second = [Screen.read().status().right, rows('R')[1]];

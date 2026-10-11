@@ -9,7 +9,7 @@ import {savedFlightplan, storedSetting} from '../../../harness/storage';
 import {courseDeg, LatLon, pointFrom} from '../../../harness/flight/geo';
 import {standardRoute} from '../../../harness/fixtures';
 import {recordMap} from '../../../harness/render/mapRecorder';
-import {HEADING_INPUT, panelXml} from '../../../harness/panelXml';
+import {APR_ARM_SWITCH, HEADING_INPUT, panelXml} from '../../../harness/panelXml';
 import {activeIdent} from '../../../harness/readers';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
 
@@ -119,6 +119,7 @@ describe('NAV 5 page with a DME arc', () => {
         const w = arcApproach(turn);
         const unit = await bootUnit({
             facilities: w.facilities, position: w.at(225, 10),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [w.kprc]), nav5MapOrientation: 0, nav5MapRange: 25},
         });
         await settle(unit);
@@ -155,6 +156,7 @@ describe('NAV 5 page with a DME arc', () => {
         });
         const unit = await bootUnit({
             facilities: w.facilities, position: w.at(225, 10),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [w.kprc]), nav5MapRange: 10},
         });
         await settle(unit);

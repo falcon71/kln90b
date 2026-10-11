@@ -13,7 +13,7 @@ import {pointBefore, pointFrom} from '../../harness/flight/geo';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
-import {NO_GPS_SIMVARS, panelXml} from '../../harness/panelXml';
+import {APR_ARM_SWITCH, NO_GPS_SIMVARS, panelXml} from '../../harness/panelXml';
 import {activeIdent, fplIdents} from '../../harness/readers';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {KLNLegType} from '../../../kln90b/data/flightplan/Flightplan';
@@ -315,6 +315,7 @@ describe('the "kln90b" flight planner behind a fence', () => {
         });
         const unit = await bootUnit({
             facilities: [apt, vvv, ifaaa, enraa, mapaa], position: pointFrom(vvv, 200, 3), storage: savedFlightplan(0, [enraa, apt]),
+            panelXml: panelXml(APR_ARM_SWITCH),
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
@@ -379,6 +380,7 @@ describe('the "kln90b" flight planner behind a fence', () => {
         const unit = await bootUnit({
             facilities: [kprc, arcAbc, arcbg, arcen, fafaa, mapaa, enrwp], position: positionOf, storage: savedFlightplan(0, fpl0),
             magvar: 0,
+            panelXml: panelXml(APR_ARM_SWITCH),
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');

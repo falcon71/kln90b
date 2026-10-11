@@ -6,6 +6,7 @@ import {activeIdent} from '../harness/readers';
 import {bootOnStandardRoute} from '../harness/worldBoot';
 import {airport, intersection, vor} from '../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../harness/navdata/procedures';
+import {APR_ARM_SWITCH, panelXml} from '../harness/panelXml';
 import {Screen} from '../harness/render/screen';
 import {savedFlightplan, storedSetting} from '../harness/storage';
 import {pointFrom} from '../harness/flight/geo';
@@ -170,6 +171,7 @@ describe('right inner knob on the ACT pages (3-13)', () => {
         const kbbb = airport('KBBB', 48.2, 9.2, {name: 'BRAVO'});
         const unit = await bootUnit({
             facilities: [kaaa, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, kbbb]),
+            panelXml: panelXml(APR_ARM_SWITCH),
         });
         await settle(unit);
         await unit.panel.press('KLN90B_RightLargeKnob_Right', 3); // CTR, REF, ACT
@@ -447,6 +449,7 @@ describe('approach arm button (6-1, C-1)', () => {
         });
         const unit = await bootUnit({
             facilities: [apt, enraa, fafaa, mapaa], position,
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [enraa, apt]), turnAnticipation: false},
         });
         await settle(unit);

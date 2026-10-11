@@ -6,6 +6,7 @@ import {approachWorld} from '../../../harness/fixtures';
 import {pointFrom} from '../../../harness/flight/geo';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, sid, withProcedures} from '../../../harness/navdata/procedures';
+import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {savedFlightplan} from '../../../harness/storage';
 import {fplIdents, messages} from '../../../harness/readers';
 import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
@@ -41,6 +42,7 @@ describe('APT 8 page after a waypoint confirmation page (80631c8)', () => {
         const unit = await bootUnit({
             facilities: [kprc, iafaa, ifaaa, fafaa, mapaa, mahaa, depaa, enraa, abc],
             position: {lat: 47, lon: 8},
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: savedFlightplan(0, [kprc]),
         });
         await settle(unit);
@@ -80,7 +82,10 @@ describe('APT 8 putting an approach into FPL 0', () => {
     /** FPL 0 holds RNAV 18 (loaded from APT 8); then the cursor is on and the second entry, VOR 09, is chosen */
     async function bootWithFirstApproachLoaded() {
         const {w, kprc, facilities} = twoApproaches();
-        const unit = await bootUnit({facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, kprc])});
+        const unit = await bootUnit({
+            facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, kprc]),
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8'); // the first entry, RNAV 18
         await unit.panel.cursor('R');
@@ -124,7 +129,10 @@ describe('APT 8 putting an approach into FPL 0', () => {
     // on the question of #274
     it('replaces the approach in FPL 0 when it is changed through CHANGE APR? (6-7)', async () => {
         const {w, kprc, facilities} = twoApproaches();
-        const unit = await bootUnit({facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, kprc])});
+        const unit = await bootUnit({
+            facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, kprc]),
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8'); // RNAV 18
         expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0);
@@ -152,7 +160,10 @@ describe('APT 8 putting an approach into FPL 0', () => {
 
         it('is posted when an enroute waypoint is also in the approach', async () => {
             const w = approachWorld();
-            const unit = await bootUnit({facilities: w.facilities, position: w.north(40), storage: savedFlightplan(0, [w.ifaaa, w.kprc])});
+            const unit = await bootUnit({
+                facilities: w.facilities, position: w.north(40), storage: savedFlightplan(0, [w.ifaaa, w.kprc]),
+                panelXml: panelXml(APR_ARM_SWITCH),
+            });
             await settle(unit);
             const before = messages(unit);
             expect(before).not.toContain(REDUNDANT);
@@ -165,7 +176,10 @@ describe('APT 8 putting an approach into FPL 0', () => {
 
         it('is not posted when the enroute waypoints are not in the approach', async () => {
             const w = approachWorld();
-            const unit = await bootUnit({facilities: w.facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, w.kprc])});
+            const unit = await bootUnit({
+                facilities: w.facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, w.kprc]),
+                panelXml: panelXml(APR_ARM_SWITCH),
+            });
             await settle(unit);
             const before = messages(unit);
 
@@ -186,6 +200,7 @@ describe('APT 8 loading an approach into a full FPL 0 (characterization)', () =>
         const fillers = Array.from({length: 26}, (_, i) => intersection(`FIL${String.fromCharCode(65 + i)}`, 46.5, 7.0 + 0.02 * i));
         const unit = await bootUnit({
             facilities: [...w.facilities, ...fillers], position: {lat: 46.5, lon: 6.9}, // before the first filler: it is the active leg
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: savedFlightplan(0, [...fillers, w.kprc]),
         });
         await settle(unit);
@@ -214,6 +229,7 @@ describe('APT 8 loading an approach when FPL 0 has to make room', () => {
         const fillers = Array.from({length: 26}, (_, i) => intersection(`FIL${String.fromCharCode(65 + i)}`, 46.5, 7.0 + 0.02 * i));
         const unit = await bootUnit({
             facilities: [...w.facilities, ...fillers], position: {lat: 46.5, lon: 7.12},
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: savedFlightplan(0, [...fillers, w.kprc]),
         });
         await settle(unit);
@@ -290,7 +306,7 @@ function iapWorld(o: { extraApproaches?: number, circlingFirst?: boolean, single
 }
 
 async function bootOnApt8(o: { extraApproaches?: number, circlingFirst?: boolean, singleIaf?: boolean, rfSecond?: boolean, start?: Date } = {}): Promise<HeadlessUnit> {
-    const unit = await bootUnit({...iapWorld(o), start: o.start});
+    const unit = await bootUnit({...iapWorld(o), start: o.start, panelXml: panelXml(APR_ARM_SWITCH)});
     await settle(unit);
     await unit.panel.selectPage('R', 'APT 8');
     return unit;
@@ -309,7 +325,10 @@ describe('APT 8 approach list (3-49, 6-4)', () => {
 
     // 3-49, figure 3-150: the text for an airport without approaches (the figure misspells APPROACH)
     it('shows NO APPROACH FOR THIS AIRPORT IN DATABASE for an airport without approaches (3-49)', async () => {
-        const unit = await bootUnit({facilities: [airport('KAAA', 47, 8)], position: {lat: 47, lon: 8}});
+        const unit = await bootUnit({
+            facilities: [airport('KAAA', 47, 8)], position: {lat: 47, lon: 8},
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
         await unit.panel.selectPage('R', 'APT 8');
 
         expect(rows('R')).toEqual([' KAAA IAP', 'NO APPROACH', 'FOR THIS', 'AIRPORT', 'IN DATABASE', '']);
@@ -518,7 +537,10 @@ describe('APT 8 page (characterization)', () => {
     // more than the four rows above LOAD IN FPL
     it('puts the cursor on the top visible waypoint of a scrolled approach when it is turned off and on (#355)', async () => {
         const w = approachWorld();
-        const unit = await bootUnit({facilities: w.facilities, position: w.north(40)});
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.north(40),
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
         await settle(unit);
         await unit.panel.selectPage('R', 'APT 8');
         await unit.panel.cursor('R');

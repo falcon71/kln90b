@@ -116,9 +116,7 @@ The sim globals are installed once per test file by the setup files `test/harnes
   `bootUnit`, and a file may hold several such tests. The unit is torn down when the test ends:
     - its timers stop;
     - the sim fakes are reset in place (`FakeSim` keeps its registration ids, because SDK objects cache them);
-    - the singletons listed in `test/harness/singletons.ts` are cleared. That list includes the module-level
-      `LEFT_PAGE_TREE`, which `PageTreeController` prunes in place on every `MainPage` (#90): the teardown puts it back
-      from a snapshot taken at load, so a later boot in the same file still has the fuel computer pages;
+    - the singletons listed in `test/harness/singletons.ts` are cleared;
     - the DOM is emptied.
 
   The teardown (`runAll` in `boot.ts`) runs every step even when one throws, then rethrows the first error, so one
@@ -224,7 +222,7 @@ FPL page does after a waypoint confirmation, which is far faster than typing it 
 `approachWorld()` (same file) returns an RNAV approach to KPRC from the north with fresh objects on every call: the IAF
 IAFAA, the intermediate fix IFAAA, the FAF FAFAA 5 NM north of the MAP, a step-down fix SDFAA between the FAF and the MAP, the MAP MAPAA at the
 airport and an enroute fix ENRAA. Its FAF is not its IAF, so the unit can reach APR there, and the step-down fix lets a test
-check that APR does not come back past the FAF. Boot with its `facilities`, store `[enraa, kprc]` in FPL 0 with
+check that APR does not come back past the FAF. Boot with its `facilities` and `panelXml(APR_ARM_SWITCH)`, store `[enraa, kprc]` in FPL 0 with
 `savedFlightplan` and load the approach with `await unit.panel.loadProcedure('APT 8')` after `settle`; `north(nm)` gives a
 point on the final course line. `sidStarWorld({sids, stars, rf?})` gives KPRC of that world invented SIDs and STARs
 east of it (optionally with an RF procedure the unit leaves out) and returns `{facilities, position}`, KPRC and ENRAA
@@ -248,8 +246,8 @@ aircraft on the first leg has KDDD active. `arcWorld()` returns
 `{abc, at, arcbg, arcen, fafaa, mapaa, kprc, facilities}`: a left DME arc of 10 NM around the VOR ABC from its 270 to
 its 180 radial (ARCBG to ARCEN), then FAFAA and the MAP MAPAA, in an RNAV approach to runway 27 of KPRC with the
 transition ARCBG. `at(bearing, nm)` is the point nm NM from ABC on a true bearing, so `at(225, 10)` lies on the arc.
-Store `[kprc]` in FPL 0 and load the approach with `unit.panel.loadProcedure('APT 8')`; the arc is the active leg
-then. Both are pure worlds with fresh objects on every call and no boot: the boot sequence that puts the aircraft on
+Boot with `panelXml(APR_ARM_SWITCH)`, store `[kprc]` in FPL 0 and load the approach with
+`unit.panel.loadProcedure('APT 8')`; the arc is the active leg then. Both are pure worlds with fresh objects on every call and no boot: the boot sequence that puts the aircraft on
 the leg or on the arc and shows Super NAV 5 stays in the test file that needs it.
 
 ## The EFB
@@ -283,6 +281,8 @@ pages accept.
 - **`unit.panel.loadProcedure('APT 8')`** loads the first procedure of APT 7 or APT 8 into FPL 0 the way a pilot does:
   select the page, cursor, ENT on the first entry (a single transition is taken without a question), ENT on LOAD IN
   FPL, cursor off, then one second of clock, because FPL 0 scrolls to the active leg only at the next calculation tick.
+  APT 8 (and ACT 8) exists only on a unit with the approach arm switch (3-49, #133), so a test that reaches it boots
+  with `panelXml(APR_ARM_SWITCH)`; the harness default panel.xml has no switch, as the parser default.
   The APT pages open on the first airport of the scan list, so with more than one airport pass
   `{ident: 'KPRC'}`: the helper first enters that ident on APT 1. A test that needs another entry or a transition
   question does the sequence by hand (`selectPage`, `cursor`, `ent`). `test/render/harness/procedures.test.ts` does
@@ -448,7 +448,7 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   reads `NUMBER OF ENGINES` only in its constructor, so a fuel test with two engines boots with it.
 - **`panelXml(options)`** (`panelXml.ts`) builds the `panelXml` boot option from the keys the parser reads. A key is the
   parser's dotted path from `PANEL_KEYS` (`panelXml({'Input.ObsSource': 0})`), and the presets spread into it: `NO_OBS`,
-  `HEADING_INPUT`, `NO_GPS_SIMVARS`, `LEG_OBS_SWITCH`, `NO_ALTIMETER`, `VFR_ONLY`, `AIRDATA`, `ALTITUDE_ALERT(enabled)` and
+  `HEADING_INPUT`, `NO_GPS_SIMVARS`, `LEG_OBS_SWITCH`, `APR_ARM_SWITCH`, `NO_ALTIMETER`, `VFR_ONLY`, `AIRDATA`, `ALTITUDE_ALERT(enabled)` and
   `fuelComputer({unit, type, fob, fuelUsed})`. `extra` appends raw XML for what no key covers. It removes the silent
   default: the parser falls back to its default for a tag it does not find, so a misspelled tag in a hand-written
   document tests the default and passes. `panelXml` throws on a key outside the list, and
@@ -583,7 +583,7 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       first, and reach Super NAV 5 itself by selecting the page before it and turning the last click with `inner`, as
       `test/render/harness/superNav5.test.ts` does. A bare group name (`'ACT'`, `'VOR'`: three characters) ends on
       whichever page of the group shows, because the ACT page of an active airport has pages `ACT 1` to `ACT 8` and none
-      of them is named `ACT`. APT 7 is reached backward from APT 8, so with SIDs and STARs it lands on the STAR page
+      of them is named `ACT`. APT 7 is reached backward, so with SIDs and STARs it lands on the STAR page
       (its last sub-page); to see the SID page select APT 6 and turn the inner knob forward.
     - `enterIdent(side, ident)` types with the knobs and does not press ENT. In an editor (FPL, DIR) a short ident is
       followed by a blank, so `KAA` stays `KAA` and does not autocomplete to `KAAA`. In a waypoint selector (the APT,
@@ -1479,8 +1479,6 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 
 - **Flip the pins when the bugs are fixed:** remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each
   of which names its issue. Fixes that touch other tests:
-    - the real fix of #90 (a copy of the page tree per controller) also changes `test/render/harness/pageTree.test.ts`,
-      which asserts the in-place pruning;
     - the fix of #96 needs `PageStack` in `MainPage.tsx` to destroy the half page it replaces (`setCurrentPage`, `pop`,
       `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone leaves both handler counts
       unchanged, and OTH 4 counts the `changed` topic of the remarks manager;

@@ -3,7 +3,7 @@ import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {standardRoute} from '../../harness/fixtures';
 import {airport, vor} from '../../harness/navdata/builders';
 import {Screen} from '../../harness/render/screen';
-import {AIRDATA, fuelComputer, panelXml} from '../../harness/panelXml';
+import {AIRDATA, APR_ARM_SWITCH, fuelComputer, panelXml, VFR_ONLY} from '../../harness/panelXml';
 import {activeIdent} from '../../harness/readers';
 import {savedFlightplan} from '../../harness/storage';
 import {LEFT_PAGE_TREE, RIGHT_PAGE_TREE} from '../../../kln90b/pages/PageTreeController';
@@ -14,6 +14,14 @@ const right = () => Screen.read().status().right;
 /** The page names the inner knob steps through on one side, from the first page of the group until the group wraps around */
 async function walk(unit: HeadlessUnit, side: 'L' | 'R', first: string): Promise<string[]> {
     await unit.panel.selectPage(side, first);
+    return walkInner(unit, side);
+}
+
+/** OTH 1 to OTH n as the status line shows them: the two-digit page is OTH10, without the blank */
+const oth = (n: number) => Array.from({length: n}, (_, i) => i + 1 < 10 ? `OTH ${i + 1}` : `OTH${i + 1}`);
+
+/** The page names the inner knob steps through from the page shown until the group wraps around */
+async function walkInner(unit: HeadlessUnit, side: 'L' | 'R'): Promise<string[]> {
     const read = () => Screen.read().status()[side === 'L' ? 'left' : 'right'];
     const names = [read()];
     for (let i = 0; i < 40; i++) {
@@ -22,16 +30,28 @@ async function walk(unit: HeadlessUnit, side: 'L' | 'R', first: string): Promise
         if (n === names[0]) return names;
         if (n !== names[names.length - 1]) names.push(n);
     }
-    throw new Error(`walk: the inner knob did not come back to ${names[0]}: ${names.join(', ')}`);
+    throw new Error(`walkInner: the inner knob did not come back to ${names[0]}: ${names.join(', ')}`);
 }
 
-/** OTH 1 to OTH n as the status line shows them: the two-digit page is OTH10, without the blank */
-const oth = (n: number) => Array.from({length: n}, (_, i) => i + 1 < 10 ? `OTH ${i + 1}` : `OTH${i + 1}`);
+const APT_WITHOUT_APT8 = ['APT 1', 'APT 2', 'APT+3', 'APT 4', 'APT 5', 'APT 6', 'APT 7'];
+const APT_WITH_APT8 = [...APT_WITHOUT_APT8, 'APT 8'];
+const ACT_WITHOUT_ACT8 = ['ACT 1', 'ACT 2', 'ACT+3', 'ACT 4', 'ACT 5', 'ACT 6', 'ACT 7'];
+const ACT_WITH_ACT8 = [...ACT_WITHOUT_ACT8, 'ACT 8'];
+
+/** FPL 0 from KAAA to KBBB with KBBB active */
+async function bootWithActiveAirport(xml?: string): Promise<HeadlessUnit> {
+    const {kaaa, kbbb} = standardRoute();
+    const unit = await bootUnit({
+        facilities: [kaaa, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, kbbb]), panelXml: xml,
+    });
+    await settle(unit);
+    return unit;
+}
 
 // The OTH group has the air data pages (OTH 9 and 10 of the full group, named after the pages that remain: 5 and 6
 // without a fuel computer) only for a unit with an air data input, and the fuel computer pages (OTH 5 to 8) only for a
-// unit with a fuel computer. 5-42 describes the air data pages, 5-39 the fuel computer pages. PageTreeController prunes
-// the module-level tree in place, and a power cycle builds the controller again over the pruned tree (#90).
+// unit with a fuel computer. 5-42 describes the air data pages, 5-39 the fuel computer pages. A power cycle builds the
+// controller again; it once pruned the module-level tree in place, so the second build pruned an already pruned tree (#90).
 describe('OTH pages of a unit with and without air data and fuel computer (#90)', () => {
     it('air data only: OTH 1 to OTH 6 before any power cycle (5-42)', async () => {
         const unit = await bootUnit({panelXml: panelXml(AIRDATA)});
@@ -75,9 +95,9 @@ describe('OTH pages of a unit with and without air data and fuel computer (#90)'
         expect(await walk(unit, 'L', 'OTH 1')).toEqual(oth(10));
     });
 
-    // 5-42: the air data pages stay. Today the second controller prunes the already pruned tree: splice(4, 4) takes the air data pages away instead of
-    // pages that are not there
-    it.fails('air data only: still OTH 1 to OTH 6 after a power cycle (#90)', async () => {
+    // 5-42: the air data pages stay. The in-place pruning took them away here: the second build removed the fuel computer
+    // pages by index from a tree that no longer had them
+    it('air data only: still OTH 1 to OTH 6 after a power cycle (#90)', async () => {
         const unit = await bootUnit({panelXml: panelXml(AIRDATA)});
         await unit.panel.powerCycle();
         await unit.panel.approveSelfTest();
@@ -86,6 +106,71 @@ describe('OTH pages of a unit with and without air data and fuel computer (#90)'
     });
 });
 
+
+// 3-49: the APT 8 page is not shown on a unit that is not installed for non-precision approaches. The installation manual
+// (2-6, figure 2-17 sheet 8) ties that installation to the approach arm switch on pin 30: an IFR en route and a VFR only
+// unit strap the pin instead, so neither has the switch (#133).
+describe('APT 8 and the approach arm switch (3-49, #133)', () => {
+    const aaa = airport('KAAA', 47.1, 8.0);
+
+    it('has APT 1 to APT 8 with the approach arm switch', async () => {
+        const unit = await bootUnit({facilities: [aaa], panelXml: panelXml(APR_ARM_SWITCH)});
+
+        expect(await walk(unit, 'R', 'APT 1')).toEqual(APT_WITH_APT8);
+    });
+
+    it('has APT 1 to APT 7 without the approach arm switch (3-49)', async () => {
+        const unit = await bootUnit({facilities: [aaa]});
+
+        expect(await walk(unit, 'R', 'APT 1')).toEqual(APT_WITHOUT_APT8);
+    });
+
+    it('has APT 1 to APT 7 on a VFR only unit, which has no switch (3-49)', async () => {
+        const unit = await bootUnit({facilities: [aaa], panelXml: panelXml(VFR_ONLY)});
+
+        expect(await walk(unit, 'R', 'APT 1')).toEqual(APT_WITHOUT_APT8);
+    });
+
+    // ActPagePage builds its own controller over the same tree, so ACT 8 follows APT 8; 6-4 loads approaches from both
+    it('has ACT 8 for an active airport with the approach arm switch (6-4)', async () => {
+        const unit = await bootWithActiveAirport(panelXml(APR_ARM_SWITCH));
+        await unit.panel.outer('R', 3); // CTR, REF, ACT
+
+        expect(await walkInner(unit, 'R')).toEqual(ACT_WITH_ACT8);
+    });
+
+    it('has no ACT 8 for an active airport without the approach arm switch (3-49, 6-4)', async () => {
+        const unit = await bootWithActiveAirport();
+        await unit.panel.outer('R', 3); // CTR, REF, ACT
+
+        expect(await walkInner(unit, 'R')).toEqual(ACT_WITHOUT_ACT8);
+    });
+
+    // Every ACT visit and every power-on builds a controller over the module-level tree; none of them may take a
+    // further APT page away
+    it('still has APT 1 to APT 7 after ACT visits and a power cycle without the switch', async () => {
+        const unit = await bootWithActiveAirport();
+        for (let i = 0; i < 2; i++) {
+            await unit.panel.selectPage('R', 'APT 1');
+            await unit.panel.outer('R', -3); // NAV, D/T, ACT
+            expect(right()).toBe('ACT 1'); // Precondition: an ACT visit
+        }
+        await unit.panel.powerCycle();
+        await unit.panel.approveSelfTest();
+
+        expect(await walk(unit, 'R', 'APT 1')).toEqual(APT_WITHOUT_APT8);
+    });
+});
+
+// A real VFR only unit cannot have the switch: its pin 30 is strapped (installation manual 2-6, figure 2-17 sheet 8).
+// The code decides APT 8 by the switch alone, so a panel.xml that sets both has APT 8; #145 asks to reject that panel.xml
+describe('APT 8 of a panel.xml with VFR only and the approach arm switch (characterization)', () => {
+    it('has APT 1 to APT 8', async () => {
+        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 8.0)], panelXml: panelXml({...VFR_ONLY, ...APR_ARM_SWITCH})});
+
+        expect(await walk(unit, 'R', 'APT 1')).toEqual(APT_WITH_APT8);
+    });
+});
 
 // 3-12: when the outer knob lands on a page type, the unit shows the page of that type the pilot looked at most recently
 // (the manual's example is a CAL page); the right side works the same way (3-13)
@@ -157,15 +242,6 @@ describe('page memory of the page the unit starts on (characterization)', () => 
 // the page last viewed). The manual does not say it; 4-10 only says the page of the active waypoint is shown first.
 // ActPagePage builds its own page tree on every visit, which is what the unit does.
 describe('page memory of the ACT group (checked in the KLN 89 trainer, 2026-10-07)', () => {
-    async function bootWithActiveAirport(): Promise<HeadlessUnit> {
-        const {kaaa, kbbb} = standardRoute();
-        const unit = await bootUnit({
-            facilities: [kaaa, kbbb], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, kbbb]),
-        });
-        await settle(unit);
-        return unit;
-    }
-
     it('comes back to ACT 1 after the pages of the active airport were turned to ACT 3', async () => {
         const unit = await bootWithActiveAirport();
         await unit.panel.outer('R', 3); // CTR, REF, ACT

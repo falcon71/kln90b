@@ -6,7 +6,7 @@ import {blinkCycle} from '../../harness/render/blink';
 import {readRows} from '../../harness/render/screen';
 import {showSuperNav5, SuperNav5} from '../../harness/render/superNav5';
 import {savedFlightplan} from '../../harness/storage';
-import {NO_OBS, panelXml} from '../../harness/panelXml';
+import {APR_ARM_SWITCH, NO_OBS, panelXml, PanelOptions} from '../../harness/panelXml';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 
 /**
@@ -16,10 +16,10 @@ import {bootOnStandardRoute} from '../../harness/worldBoot';
 const ENR = 'Ê', LEG = 'Ë', ARM = 'Í', APR = 'Ì';
 
 /** The approach of approachWorld() loaded, the aircraft 2.5 NM before the FAF and armed (6-3) */
-async function armed(xml?: string): Promise<{ unit: HeadlessUnit, w: ReturnType<typeof approachWorld> }> {
+async function armed(keys: PanelOptions = {}): Promise<{ unit: HeadlessUnit, w: ReturnType<typeof approachWorld> }> {
     const w = approachWorld();
     const unit = await bootUnit({
-        facilities: w.facilities, position: w.north(7.5), panelXml: xml,
+        facilities: w.facilities, position: w.north(7.5), panelXml: panelXml({...APR_ARM_SWITCH, ...keys}),
         storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
     });
     await settle(unit);
@@ -74,7 +74,7 @@ describe('Super NAV 5 mode row (5-32)', () => {
     // variation 0. Without an OBS input the unit picks the course that leaves the deviation unchanged (5-36); the
     // aircraft is on the final course, so that is the DTK, 180
     it('shows ARM: and the OBS course in the approach-arm OBS mode (5-32)', async () => {
-        const {unit} = await armed(panelXml(NO_OBS));
+        const {unit} = await armed(NO_OBS);
         await unit.panel.obsMode();
         await showSuperNav5(unit);
 

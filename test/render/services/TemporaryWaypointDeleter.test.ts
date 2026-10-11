@@ -4,6 +4,7 @@ import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {efbRoute} from '../../harness/platform';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
+import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {savedFlightplan, savedUserWaypoints} from '../../harness/storage';
 import {activeIdent, fplIdents, userWaypoints} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
@@ -159,7 +160,10 @@ describe('TemporaryWaypointDeleter', () => {
                 final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
             })],
         });
-        const unit = await bootUnit({facilities: [kprc, abc, arcbg, arcen, mapaa], position: at(190, 10), storage: savedFlightplan(0, [kprc])});
+        const unit = await bootUnit({
+            facilities: [kprc, abc, arcbg, arcen, mapaa], position: at(190, 10), storage: savedFlightplan(0, [kprc]),
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
         expect(userWaypointNames(unit)).toEqual(['D190J XY']); // Precondition: the entry waypoint exists

@@ -1,9 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
 import {Facility, FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
+import {bootUnit, BootOptions, HeadlessUnit, settle} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, sid, withProcedures} from '../../harness/navdata/procedures';
+import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {savedFlightplan} from '../../harness/storage';
 import {courseDeg, distanceNm, pointFrom} from '../../harness/flight/geo';
 import {fplIdents, identsOf} from '../../harness/readers';
@@ -32,13 +33,17 @@ const rnav27 = () => approach({
     missed: [Leg.CA(270), Leg.DF(mahaa), Leg.HM(mahaa, 90, LegTurnDirection.Right, FixTypeFlags.MAHP)],
 });
 
-const bootWith = (kprc: Facility, others: Facility[], position = {lat: 47, lon: 8}) =>
-    bootUnit({facilities: [kprc, ...others], position, storage: savedFlightplan(0, [kprc])});
+const bootWith = (kprc: Facility, others: Facility[], position = {lat: 47, lon: 8}, o: BootOptions = {}) =>
+    bootUnit({facilities: [kprc, ...others], position, storage: savedFlightplan(0, [kprc]), ...o});
+
+/** bootWith for a test that reaches APT 8, which needs the approach arm switch (3-49, #133) */
+const bootWithApt8 = (kprc: Facility, others: Facility[], position?: { lat: number; lon: number }) =>
+    bootWith(kprc, others, position, {panelXml: panelXml(APR_ARM_SWITCH)});
 
 describe('procedures through APT 8 (harness)', () => {
     it('loads an RNAV approach with its IAF, FAF, MAP and MAHP', async () => {
         const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {approaches: [rnav27()]});
-        const unit = await bootWith(kprc, [iafaa, ifaaa, fafaa, mapaa, mahaa]);
+        const unit = await bootWithApt8(kprc, [iafaa, ifaaa, fafaa, mapaa, mahaa]);
         await settle(unit);
 
         await unit.panel.selectPage('R', 'APT 8');
@@ -72,7 +77,7 @@ describe('procedures through APT 8 (harness)', () => {
     // The unit above sits at the MAP, so FPL 0 has scrolled to the later legs; here it sits at the IAF
     it('shows the IAF suffix on FPL 0', async () => {
         const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {approaches: [rnav27()]});
-        const unit = await bootWith(kprc, [iafaa, ifaaa, fafaa, mapaa, mahaa], {lat: iafaa.lat, lon: iafaa.lon});
+        const unit = await bootWithApt8(kprc, [iafaa, ifaaa, fafaa, mapaa, mahaa], {lat: iafaa.lat, lon: iafaa.lon});
         await settle(unit);
 
         await unit.panel.selectPage('R', 'APT 8');
@@ -104,7 +109,7 @@ describe('procedures through APT 8 (harness)', () => {
         });
         // 20 NM out on the 225 radial, which is on the arc from the 270 to the 180 radial
         const pos = at(225, 20);
-        const unit = await bootWith(kprc, [abc, arcbg, arcen, fafaa, mapaa], {lat: pos.lat, lon: pos.lon});
+        const unit = await bootWithApt8(kprc, [abc, arcbg, arcen, fafaa, mapaa], {lat: pos.lat, lon: pos.lon});
         await settle(unit);
 
         await unit.panel.selectPage('R', 'APT 8');
@@ -144,7 +149,7 @@ describe('procedures through APT 8 (harness)', () => {
             })],
         });
         const pos = at(45, 20);
-        const unit = await bootWith(kprc, [abc, arcbg, arcen, fafaa, mapaa], {lat: pos.lat, lon: pos.lon});
+        const unit = await bootWithApt8(kprc, [abc, arcbg, arcen, fafaa, mapaa], {lat: pos.lat, lon: pos.lon});
         await settle(unit);
 
         await unit.panel.selectPage('R', 'APT 8');
@@ -161,7 +166,7 @@ describe('procedures through APT 8 (harness)', () => {
 describe('FrontPanel.loadProcedure (harness)', () => {
     it('loads the first approach of APT 8 into FPL 0 and turns the cursor off', async () => {
         const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {approaches: [rnav27()]});
-        const unit = await bootWith(kprc, [iafaa, ifaaa, fafaa, mapaa, mahaa]);
+        const unit = await bootWithApt8(kprc, [iafaa, ifaaa, fafaa, mapaa, mahaa]);
         await settle(unit);
 
         await unit.panel.loadProcedure('APT 8');
@@ -178,7 +183,7 @@ describe('FrontPanel.loadProcedure (harness)', () => {
         // KAAB is the nearer one, so the APT pages open on it, and it has no approach
         const kaab = airport('KAAB', 47.0, 8.0);
         const kprc = withProcedures(airport('KPRC', 47.2, 8.0), {approaches: [rnav27()]});
-        const unit = await bootWith(kprc, [kaab, iafaa, ifaaa, fafaa, mapaa, mahaa]);
+        const unit = await bootWithApt8(kprc, [kaab, iafaa, ifaaa, fafaa, mapaa, mahaa]);
         await settle(unit);
         await unit.panel.selectPage('R', 'APT 8');
         expect(rows('R').slice(0, 2)).toEqual([' KAAB IAP', 'NO APPROACH']);
@@ -232,7 +237,7 @@ describe('the missing-fix check of bootUnit (harness)', () => {
     it('lets a boot with every fix present through', async () => {
         const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {approaches: [rnav27()]});
 
-        const unit = await bootUnit({facilities: [kprc, iafaa, ifaaa, fafaa, mapaa, mahaa]});
+        const unit = await bootUnit({facilities: [kprc, iafaa, ifaaa, fafaa, mapaa, mahaa], panelXml: panelXml(APR_ARM_SWITCH)});
         await settle(unit);
 
         expect(unit.navdata.missingProcedureFixes()).toEqual([]);

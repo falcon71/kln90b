@@ -15,7 +15,8 @@ function slots(tree: readonly (readonly unknown[])[]): [number, number, Slot][] 
 // PageTreeController.getPageIndices finds the slot of a page with instanceof and takes the first match. A class that
 // fills two slots, or a slot class that extends the class of another slot of the same tree, makes the knobs land on the
 // wrong slot (CLAUDE.md, "A tree slot is identified by instanceof, so every slot needs a distinct class"). The test runs
-// in the unit stage, where nothing boots, so the trees are as the module declares them (a boot prunes the OTH group).
+// in the unit stage; the trees are as the module declares them in any stage, because every controller filters its own
+// copy (#90).
 describe('page tree slots (structure)', () => {
     it.each([['left', LEFT_PAGE_TREE], ['right', RIGHT_PAGE_TREE]] as [string, unknown[][]][])(
         'every slot of the %s tree has its own class, and no slot class extends another', (_side, tree) => {
@@ -34,8 +35,8 @@ describe('page tree slots (structure)', () => {
         });
 
     // 3-12: the left page types and their page numbers, without the SET group (below). OTH has its full 10 pages here:
-    // 1 to 4 plus the fuel computer and air data pages that a boot prunes without those interfaces (the footnote of the
-    // table)
+    // 1 to 4 plus the fuel computer and air data pages that a controller leaves out without those interfaces (the
+    // footnote of the table)
     it('has the left page groups of the manual with their number of pages (3-12)', () => {
         expect(LEFT_PAGE_TREE.filter((_group, i) => i !== SET_GROUP).map(group => group.length)).toEqual([
             7, // TRI 0-6
@@ -57,7 +58,7 @@ describe('page tree slots (structure)', () => {
             1, // ACT
             4, // D/T 1-4
             5, // NAV 1-5
-            8, // APT 1-8
+            8, // APT 1-8 (a controller leaves out APT 8 without the approach arm switch, 3-49)
             1, // VOR
             1, // NDB
             1, // INT

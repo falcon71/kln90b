@@ -4,6 +4,7 @@ import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {muteConsoleError} from '../../../harness/console';
 import {fplIdents} from '../../../harness/readers';
+import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {savedFlightplan, storedSetting} from '../../../harness/storage';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, sid, withProcedures} from '../../../harness/navdata/procedures';
@@ -181,7 +182,10 @@ function rnavWorld() {
 /** FPL 0 is ENRAA, KPRC with RNAV 27 loaded; the aircraft is beyond ENRAA, on the leg ENRAA to IAFAA */
 async function bootWithApproach() {
     const w = rnavWorld();
-    const unit = await bootUnit({facilities: w.facilities, position: {lat: 47.7, lon: 7.3}, storage: savedFlightplan(0, [w.enraa, w.kprc])});
+    const unit = await bootUnit({
+        facilities: w.facilities, position: {lat: 47.7, lon: 7.3}, storage: savedFlightplan(0, [w.enraa, w.kprc]),
+        panelXml: panelXml(APR_ARM_SWITCH),
+    });
     await settle(unit);
     await unit.panel.loadProcedure('APT 8');
     expect(fplIdents(unit, 0)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA', 'MAHAA', 'KPRC']); // Precondition
@@ -352,7 +356,10 @@ describe('FPL 0 page with a SID', () => {
 describe('FPL 0 page, the active leg across a procedure header', () => {
     async function bootOnTheFirstApproachLeg() {
         const w = approachWorld();
-        const unit = await bootUnit({facilities: w.facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, w.kprc])});
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, w.kprc]),
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
         await unit.panel.selectPage('L', 'FPL 0');

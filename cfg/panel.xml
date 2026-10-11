@@ -20,7 +20,7 @@
             </FuelComputer>
             <ExternalSwitches>
                 <LegObsSwitchInstalled>false</LegObsSwitchInstalled> <!-- true, when an external switch is installed, that toggles between LEG/OBS mode. Recommended for approaches. -->
-                <AppArmSwitchInstalled>false</AppArmSwitchInstalled> <!-- true, when an external switch is installed, that arms approach mode. Required for approach approval. -->
+                <AppArmSwitchInstalled>false</AppArmSwitchInstalled> <!-- true, when an external switch is installed, that arms approach mode. Required for approach approval. Without it, the unit has no APT 8 page and cannot load approaches. -->
             </ExternalSwitches>
         </Input>
         <Output>

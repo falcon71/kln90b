@@ -4,7 +4,7 @@ import {bootUnit, moveAircraft, NEAREST_SEARCH_WAIT_MS, settle} from '../../../h
 import {airport, intersection, ndb, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
 import {canvasToAscii, downsampled} from '../../../harness/render/canvas';
-import {HEADING_INPUT, NO_OBS, panelXml} from '../../../harness/panelXml';
+import {APR_ARM_SWITCH, HEADING_INPUT, NO_OBS, panelXml} from '../../../harness/panelXml';
 import {activeIdent} from '../../../harness/readers';
 import {showSuperNav5, SuperNav5} from '../../../harness/render/superNav5';
 import {recordMap} from '../../../harness/render/mapRecorder';
@@ -522,6 +522,7 @@ describe('Super NAV 5 near the MAP', () => {
         });
         const unit = await bootUnit({
             facilities: [apt, enraa, fafaa, mapaa, mahaa], position: pointFrom(mapaa, 0, Math.max(northOfMapNm, 2)), // the leg the position is on becomes active
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [enraa, apt]), ...storage},
         });
         await settle(unit);

@@ -124,25 +124,36 @@ export const RIGHT_PAGE_TREE = [
  * This class handles navigation in the page tree
  */
 export class PageTreeController {
-    private readonly subPageIndices = this.tree.map(() => 0);
+    private readonly tree: Function[][];
+    private readonly subPageIndices: number[];
     private pageIndex: number = 0;
 
-    constructor(private readonly tree: (typeof LEFT_PAGE_TREE | typeof RIGHT_PAGE_TREE), public currentPage: SixLineHalfPage, public props: PageProps, private readonly onPageChanged: (newpage: SixLineHalfPage) => void) {
-        if (tree.length === 8) { //left tree
-            if (!this.props.planeSettings.input.airdata.isInterfaced) {
-                this.tree[7].splice(8, 2); //Removes airdata pages
-            }
-            if (!this.props.planeSettings.input.fuelComputer.isInterfaced) {
-                this.tree[7].splice(4, 4); //Removes fuel computer pages
-            }
-        } else {
-            if (!this.props.planeSettings.vfrOnly) { //Not sure what the conditions are exactly. Maybe altitude input, CRS output and indicators?
-                this.tree[5].splice(7, 0); //3-49 Removes APT 8 page
-            }
-        }
-
+    constructor(tree: (typeof LEFT_PAGE_TREE | typeof RIGHT_PAGE_TREE), public currentPage: SixLineHalfPage, public props: PageProps, private readonly onPageChanged: (newpage: SixLineHalfPage) => void) {
+        this.tree = PageTreeController.buildTree(tree, props);
+        this.subPageIndices = this.tree.map(() => 0);
 
         [this.pageIndex, this.subPageIndices[this.pageIndex]] = this.getPageIndices(currentPage);
+    }
+
+    /**
+     * Returns a copy of the tree with only the pages this installation has. The module-level trees are shared by every
+     * controller (each power-on, every ACT visit and every waypoint confirmation builds one), so they are never changed.
+     */
+    private static buildTree(tree: (typeof LEFT_PAGE_TREE | typeof RIGHT_PAGE_TREE), props: PageProps): Function[][] {
+        const removed: Function[] = [];
+        if (tree === LEFT_PAGE_TREE) {
+            if (!props.planeSettings.input.airdata.isInterfaced) {
+                removed.push(Oth9Page, Oth10Page); //5-42 airdata pages
+            }
+            if (!props.planeSettings.input.fuelComputer.isInterfaced) {
+                removed.push(Oth5Page, Oth6Page, Oth7Page, Oth8Page); //5-39 fuel computer pages
+            }
+        } else if (tree === RIGHT_PAGE_TREE && !props.planeSettings.input.externalSwitches.appArmSwitchInstalled) {
+            //3-49: no APT 8 (and so no ACT 8) unless the unit is installed for non-precision approaches. Installation manual
+            //2-6 and figure 2-17 sheet 8: only an approach installation has the approach arm switch on pin 30
+            removed.push(Apt8Page);
+        }
+        return (tree as Function[][]).map(group => group.filter(page => !removed.includes(page)));
     }
 
     public setPage(page: SixLineHalfPage) {

@@ -4,7 +4,7 @@ import {approachWorld, standardRoute} from '../../../harness/fixtures';
 import {pointBefore} from '../../../harness/flight/geo';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
-import {LEG_OBS_SWITCH, panelXml} from '../../../harness/panelXml';
+import {APR_ARM_SWITCH, LEG_OBS_SWITCH, panelXml} from '../../../harness/panelXml';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
@@ -13,6 +13,7 @@ async function approachLoaded40(): Promise<HeadlessUnit> {
     const w = approachWorld();
     const unit = await bootUnit({
         facilities: w.facilities, position: w.north(40),
+        panelXml: panelXml(APR_ARM_SWITCH),
         storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
     });
     await settle(unit);
@@ -123,6 +124,7 @@ describe('MOD 1 page (spec)', () => {
         const w = approachWorld();
         const unit = await bootUnit({
             facilities: w.facilities, position: w.north(10),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
         });
         await settle(unit);
@@ -173,6 +175,7 @@ describe('MOD 1 CDI scale when the unit arms with the page in view', () => {
         const w = approachWorld();
         const unit = await bootUnit({
             facilities: w.facilities, position: w.north(40),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
         });
         await settle(unit);

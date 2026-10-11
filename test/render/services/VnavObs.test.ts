@@ -4,6 +4,7 @@ import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {airport, intersection} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {pointFrom} from '../../harness/flight/geo';
+import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {savedFlightplan} from '../../harness/storage';
 import {activeIdent} from '../../harness/readers';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
@@ -76,6 +77,7 @@ describe('Vnav waypoint in the armed approach modes (C-1)', () => {
         });
         const unit = await bootUnit({
             facilities: [apt, enraa, txo, mapaa], position: pointFrom(txo, 0, 6),
+            panelXml: panelXml(APR_ARM_SWITCH),
             storage: {...savedFlightplan(0, [enraa, apt]), turnAnticipation: false},
         });
         await settle(unit);

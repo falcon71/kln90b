@@ -677,17 +677,15 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - The tree position is found with `instanceof` (`getPageIndices`). Every slot must therefore be a *distinct class*. That
   is why `Fpl0Page...Fpl25Page` are trivial subclasses of `FplPage({page:n})`, and why NAV 4 is split into
   `Nav4LeftPage`/`Nav4RightPage` (they differ in `getPageSide()`). Nav1/2/3/5 are the same classes in both trees.
-- Plane-setting pruning happens in the constructor through `splice` with hard-coded indices. Without airdata it removes
-  OTH 9/10; without a fuel computer it removes OTH 5-8. **Gotchas:**
-    - The indices must change if you insert pages into OTH.
-    - It mutates the module-level const arrays and runs again for every new `MainPage` (each power-on), so repeated
-      pruning is possible. Example: airdata interfaced but no fuel computer — the second construction's `splice(4,4)`
-      would remove OTH 9/10.
-    - The APT 8 line `tree[5].splice(7, 0)` removes nothing (deleteCount 0).
+- Plane-setting pruning happens in the constructor (`buildTree`), which filters a copy of the tree by page class.
+  Without airdata it removes OTH 9/10; without a fuel computer it removes OTH 5-8. The module-level arrays are never
+  changed, because every power-on, ACT visit and waypoint confirmation builds a new controller over them (#90).
+  Without `Input.ExternalSwitches.AppArmSwitchInstalled` it removes APT 8 from the right tree, and so also ACT 8 (3-49,
+  #133).
 - `CustomPageTreeController` / `isCustomPageTreeController(page)` (`"pageTreeController" in page`). `ActPagePage` and
   `WaypointConfirmPage` own a private `PageTreeController(RIGHT_PAGE_TREE, innerPage, ...)`, so the right inner knob
-  browses APT 1-8 etc. *of that waypoint* instead of the main tree. They copy `name`/`numPages` from the inner page in
-  `pageChanged`.
+  browses APT 1-8 (APT 1-7 without the approach arm switch) etc. *of that waypoint* instead of the main tree. They copy
+  `name`/`numPages` from the inner page in `pageChanged`.
 
 ### Naming conventions
 

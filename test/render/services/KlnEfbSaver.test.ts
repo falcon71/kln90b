@@ -5,7 +5,7 @@ import {efbRoute} from '../../harness/platform';
 import {airport, intersection} from '../../harness/navdata/builders';
 import {approach, Leg, sid, star, withProcedures} from '../../harness/navdata/procedures';
 import {approachWorld, standardRoute} from '../../harness/fixtures';
-import {NO_GPS_SIMVARS, panelXml} from '../../harness/panelXml';
+import {APR_ARM_SWITCH, NO_GPS_SIMVARS, panelXml} from '../../harness/panelXml';
 import {activeIdent, fplIdents, turnStackLength} from '../../harness/readers';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {savedFlightplan, savedUserWaypoints} from '../../harness/storage';
@@ -179,7 +179,10 @@ async function bootWithStarAndApproach09(): Promise<HeadlessUnit> {
         arrivals: [star('ARR1', {transitions: [{name: 'ENRAA', legs: [Leg.IF(enraa), Leg.TF(arraa)]}], common: [Leg.TF(fafaa)]})],
         approaches: [approach({type: ApproachType.APPROACH_TYPE_RNAV, runway: '09', final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)]})],
     });
-    const unit = await bootUnit({facilities: [kprc, enraa, arraa, fafaa, mapaa], efb: true, position: {lat: 47.0, lon: 9.0}, storage: savedFlightplan(0, [enraa, kprc])});
+    const unit = await bootUnit({
+        facilities: [kprc, enraa, arraa, fafaa, mapaa], efb: true, position: {lat: 47.0, lon: 9.0}, storage: savedFlightplan(0, [enraa, kprc]),
+        panelXml: panelXml(APR_ARM_SWITCH),
+    });
     await settle(unit);
     await unit.panel.loadProcedure('APT 7');
     await unit.panel.loadProcedure('APT 8');
@@ -220,7 +223,10 @@ describe('KlnEfbSaver route contents', () => {
 
     it('sends the approach by type, runway and transition, with its airport as the destination', async () => {
         const w = approachWorld();
-        const unit = await bootUnit({facilities: w.facilities, efb: true, position: w.north(40), storage: savedFlightplan(0, [w.enraa, w.kprc])});
+        const unit = await bootUnit({
+            facilities: w.facilities, efb: true, position: w.north(40), storage: savedFlightplan(0, [w.enraa, w.kprc]),
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
         expect(fplIdents(unit)).toEqual(['ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']); // Precondition

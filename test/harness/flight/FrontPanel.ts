@@ -21,8 +21,10 @@ export const PAGE_GROUPS: Record<Side, string[]> = {
  * The page numbers of a group in the order the inner knob walks them, which wraps (PageTreeController.moveSubpage: past
  * the last page the knob comes back to the first). The SET group ends with SET 0. OTH is missing because its length
  * depends on the interfaces the unit has (OTH 5 to OTH 10 are pruned without them), so its pages are walked forward or
- * backward by their numbers without the wrap. A group without page numbers has a single page. The harness test of
- * selectPage walks the real trees and checks this table against them.
+ * backward by their numbers without the wrap. A group without page numbers has a single page. APT has APT 8 only on a
+ * unit with the approach arm switch (3-49, #133); without it the knob wraps after APT 7, and selectPage still finds every
+ * other APT page. The harness test of selectPage walks the real trees of a unit with the switch and checks this table
+ * against them.
  */
 export const PAGE_CYCLES: Record<string, number[]> = {
     TRI: range(0, 6),
@@ -251,7 +253,10 @@ export class FrontPanel {
 
         const wanted = pageNumber(name);
         for (let i = 0; !sameName(this.shownName(side), name); i++) {
-            if (i > 30) throw new Error(`selectPage: no page ${name}\n${this.screen().dump()}`);
+            if (i > 30) {
+                const hint = name.trim().endsWith(' 8') ? ' (APT 8 and ACT 8 need panelXml(APR_ARM_SWITCH))' : '';
+                throw new Error(`selectPage: no page ${name}${hint}\n${this.screen().dump()}`);
+            }
             await this.inner(side, pageDirection(groups[wantedGroup], pageNumber(this.shownName(side)), wanted));
         }
     }

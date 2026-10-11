@@ -6,6 +6,7 @@ import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
 import {showSuperNav5, SuperNav5} from '../../../harness/render/superNav5';
 import {fplIdents} from '../../../harness/readers';
+import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {savedFlightplan} from '../../../harness/storage';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
 
@@ -59,6 +60,7 @@ describe.each([
     it('leaves MOVE ? after ENT and shows the new entry (1ef2a35)', async () => {
         const unit = await bootUnit({
             facilities: [airportWithArc, ...arcFacilities], position: at(225, 10), storage: savedFlightplan(0, [airportWithArc]),
+            panelXml: panelXml(APR_ARM_SWITCH),
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');

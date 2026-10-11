@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {FixTypeFlags} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
+import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {Screen} from '../../harness/render/screen';
 import {blinkCycle} from '../../harness/render/blink';
 import {savedUserWaypoints} from '../../harness/storage';
@@ -121,7 +122,7 @@ describe('LastItemAlwaysVisibleList on APT 8 (characterization)', () => {
         });
         const kprc = withProcedures(w.kprc, {approaches: ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map(circling)});
         const facilities = [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.mapaa];
-        const unit = await bootUnit({facilities, position: w.north(40)});
+        const unit = await bootUnit({facilities, position: w.north(40), panelXml: panelXml(APR_ARM_SWITCH)});
         await settle(unit);
         await unit.panel.selectPage('R', 'APT 8');
         await unit.panel.cursor('R');
