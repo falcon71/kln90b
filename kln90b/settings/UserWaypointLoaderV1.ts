@@ -30,20 +30,15 @@ import {UserWaypointLoader} from "./UserWaypointPersistor";
 export class UserWaypointLoaderV1 implements UserWaypointLoader {
     private manager: DefaultUserSettingManager<KLN90BUserWaypointsTypes>;
 
-    private ignoreSync = false;
-
-
     constructor(bus: EventBus, private repo: KLNFacilityRepository) {
         this.manager = KLN90BUserWaypointsSettings.getManager(bus);
     }
 
     public restoreWaypoints() {
         const wpts = this.deserializeAllWpts();
-        this.ignoreSync = true;
         for (const wpt of wpts) {
             this.repo.add(wpt);
         }
-        this.ignoreSync = false;
     }
 
     private deserializeAllWpts(): Facility[] {

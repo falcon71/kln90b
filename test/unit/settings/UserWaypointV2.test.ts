@@ -4,7 +4,6 @@ import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRep
 import {KLN90BUserWaypointsSettings} from '../../../kln90b/settings/KLN90BUserWaypoints';
 import {KLN90BUserSettings} from '../../../kln90b/settings/KLN90BUserSettings';
 import {UserWaypointPersistor} from '../../../kln90b/settings/UserWaypointPersistor';
-import {UserWaypointLoaderV2} from '../../../kln90b/settings/UserWaypointLoaderV2';
 import {airport} from '../../harness/navdata/builders';
 
 const bus = new EventBus();
@@ -12,7 +11,7 @@ const userSettings = new KLN90BUserSettings(bus);
 userSettings.getSetting('userDataFormat').set(2);
 const repo = KLNFacilityRepository.getRepository(bus);
 // Persists every repository change into the wpt0..wpt249 settings, as in the instrument
-new UserWaypointPersistor(bus, repo, userSettings);
+const persistor = new UserWaypointPersistor(bus, repo, userSettings);
 const wptSettings = KLN90BUserWaypointsSettings.getManager(bus);
 
 function storedSlot(i: number): string {
@@ -21,7 +20,7 @@ function storedSlot(i: number): string {
 
 function restoreFrom(...serialized: string[]): void {
     serialized.forEach((s, i) => wptSettings.getSetting(`wpt${i}`).set(s));
-    new UserWaypointLoaderV2(bus, repo).restoreWaypoints();
+    persistor.restoreWaypoints(); //The restore of the instrument; the format of userSettings is 2, so the V2 loader runs
 }
 
 function removeAll(): void {
@@ -60,9 +59,6 @@ describe('user waypoint V2 format', () => {
         expect(apt.altitude).toBe(1400);
         expect(UnitType.METER.convertTo(apt.runways[0].length, UnitType.FOOT)).toBeCloseTo(3200, 3);
         expect(apt.runways[0].surface).toBe(RunwaySurfaceType.Asphalt);
-        // Restoring re-persists through the repository sync, so the slot must hold the identical string again. That is the
-        // bug of #103, not a feature: once it is fixed, this assertion holds nothing (restoreFrom sets the slot itself)
-        expect(storedSlot(0)).toBe('AXX        KAAA    +4700.00-00830.00+01400+03200H');
     });
 
     // f745fb3, b14db79: an airport without a runway length has -10 m in the model and the stored number is negative
@@ -92,9 +88,6 @@ describe('user waypoint V2 format', () => {
         const ndb = repo.get(ICAO.value('N', 'XX', '', 'XY')) as NdbFacility;
         expect(ICAO.getFacilityTypeFromValue(ndb.icaoStruct)).toBe(FacilityType.NDB);
         expect(ndb.freqMHz).toBeCloseTo(345, 6);
-        // Restoring re-persists through the repository sync, so the slot must hold the identical string again. That is the
-        // bug of #103, not a feature: once it is fixed, this assertion holds nothing (restoreFrom sets the slot itself)
-        expect(storedSlot(0)).toBe('NXX        XY      +4800.00+00900.00+0345.0');
     });
 
     // The setup sibling of the #98 pin below: the same slot restores without throwing, with its ident and its longitude
@@ -222,7 +215,7 @@ describe('user waypoint V2 format', () => {
     // docs/architecture.md Core 7: wpt0 to wpt249 are restored
     it('restores the last slot, wpt249', () => {
         wptSettings.getSetting('wpt249').set('UXX        MYWPT   +4730.00+00815.00');
-        new UserWaypointLoaderV2(bus, repo).restoreWaypoints();
+        persistor.restoreWaypoints();
         const wpt = repo.get(ICAO.value('U', 'XX', '', 'MYWPT')) as UserFacility;
         expect(wpt.lat).toBeCloseTo(47.5, 6);
         expect(wpt.lon).toBeCloseTo(8.25, 6);

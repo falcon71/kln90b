@@ -28,15 +28,15 @@ describe('user waypoint persistor restore', () => {
     });
 
     /**
-     * Stores a user VOR in wpt0 and a supplementary waypoint in wpt1 (format 2), builds the save manager with load and
-     * autosave and the persistor, and restores. Returns the spy on SetStoredData that was installed just before the
-     * restore, so it counts only the writes of the restore.
+     * Stores a user VOR in wpt0 and a supplementary waypoint in wpt1 (format 2, or the same two in format 1 for
+     * `format` 1), builds the save manager with load and autosave and the persistor, and restores. Returns the spy on
+     * SetStoredData that was installed just before the restore, so it counts only the writes of the restore.
      */
-    function restoreFromStorage() {
+    function restoreFromStorage(format: 1 | 2 = 2) {
         const data = simEnv().storage.data;
-        data.set(K + 'userDataFormat', '2');
-        data.set(K + 'wpt0', JSON.stringify('VXX        ABC     +4730.00+00854.00+114.30+02'));
-        data.set(K + 'wpt1', JSON.stringify('WXX        USRA    +4730.00-00815.50'));
+        data.set(K + 'userDataFormat', String(format));
+        data.set(K + 'wpt0', JSON.stringify(format === 2 ? 'VXX        ABC     +4730.00+00854.00+114.30+02' : 'VXX    ABC  +4730.00+00854.00+114.30+02'));
+        data.set(K + 'wpt1', JSON.stringify(format === 2 ? 'WXX        USRA    +4730.00-00815.50' : 'WXX    USRA +4730.00-00815.50'));
 
         if (setup === undefined) {
             const userSettings = new KLN90BUserSettings(bus);
@@ -68,13 +68,53 @@ describe('user waypoint persistor restore', () => {
         expect(usra.lon).toBeCloseTo(-(8 + 15.5 / 60), 6);
     });
 
-    // 1781156 ("Do not write user waypoints while importing them") was undone by 933479d: the persistor still sets
-    // ignoreSync, but the delegation to the loaders moved it out of the persistor's reach, so every restored waypoint
-    // rewrites all slots in the saved data. A crash during a restore would lose waypoints.
-    it.fails('does not write storage while restoring (1781156) (#103)', () => {
+    // 1781156 ("Do not write user waypoints while importing them"): the sync that adding a restored waypoint fires must
+    // not rewrite all slots in the saved data, because a crash during a restore would lose waypoints (#103)
+    it('does not write storage while restoring (1781156) (#103)', () => {
         const spy = restoreFromStorage();
 
         expect(spy).not.toHaveBeenCalled();
+        expect(repo.get(ICAO.value('V', 'XX', '', 'ABC'))).toBeDefined(); // the restore itself ran
+    });
+
+    it('does not write storage while restoring a version 1 file either (#103)', () => {
+        const spy = restoreFromStorage(1);
+
+        expect(spy).not.toHaveBeenCalled();
+        expect(repo.get(ICAO.value('V', 'XX', '', 'ABC'))).toBeDefined();
+        expect(repo.get(ICAO.value('W', 'XX', '', 'USRA'))).toBeDefined();
+    });
+
+    // The restore only suspends the sync: the first change after it persists as before, so the slots are written
+    // whole from the repository
+    it('writes the slots again for a change after the restore (#103)', () => {
+        restoreFromStorage();
+        const slot = (i: number) => KLN90BUserWaypointsSettings.getManager(bus).getSetting(`wpt${i}`).get();
+
+        repo.add({
+            icao: '', icaoStruct: ICAO.value('U', 'XX', '', 'NEWWP'), name: '', lat: 47, lon: 8, region: 'XX', city: '',
+            isTemporary: false, userFacilityType: UserFacilityType.LAT_LONG,
+        } as unknown as UserFacility);
+
+        expect([slot(0), slot(1), slot(2)]).toEqual([
+            'VXX        ABC     +4730.00+00854.00+114.30+02',
+            'WXX        USRA    +4730.00-00815.50',
+            'UXX        NEWWP   +4700.00+00800.00',
+        ]);
+    });
+
+    // A restore that throws must not leave the sync suspended for good (the try/finally of the persistor)
+    it('writes the slots again for a change after a restore that failed (#103)', () => {
+        restoreFromStorage();
+        simEnv().storage.data.set(K + 'wpt2', JSON.stringify('QXX        BAD     +4700.00+00800.00'));
+        setup!.saveManager.load('KLN TEST.profile_1');
+        expect(() => setup!.persistor.restoreWaypoints()).toThrow();
+
+        const slot1 = KLN90BUserWaypointsSettings.getManager(bus).getSetting('wpt1');
+        expect(slot1.get()).toBe('WXX        USRA    +4730.00-00815.50'); // the precondition: the slot still holds USRA
+        repo.remove(ICAO.value('W', 'XX', '', 'USRA'));
+
+        expect(slot1.get()).toBe('');
     });
 });
 

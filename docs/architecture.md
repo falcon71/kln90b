@@ -465,7 +465,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - Code: `UserWaypointLoaderV2`, `UserFlightplanLoaderV2`.
 - Migration in `KLN90BCore.asyncInit`: if the format is not 2, re-persist all waypoints and plans with the V2 writers, then
   set `userDataFormat=2`. Writers (`UserWaypointPersistor.serialize*`, `UserFlightplanPersistor.persistFlightplan`) only
-  produce V2.
+  produce V2. `UserWaypointPersistor.restoreWaypoints()` suspends the repository sync while the loader adds the stored
+  waypoints, so a restore writes nothing back; the first change after it rewrites all slots from the repository.
 - Restore errors cause empty plans and the `USER DATA LOST` message. The same block then writes the empty state over
   the stored data, so the corrupt data is lost once and the message shows once, as after a failed V1 conversion.
 - `Flightplanloader.loadIcaos` (base class) truncates to 30 legs and emits `WAYPOINT xxx DELETED` messages (at most 10,
