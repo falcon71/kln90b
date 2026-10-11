@@ -28,7 +28,7 @@ export class VFROnlyPage extends SixLinePage {
         return (<div>
             <br/>
             <span>   FOR VFR USE ONLY</span><br/>
-            <br/>,
+            <br/>
             <br/>
             <br/>
             <span>     {this.children.get("ack").render()}</span>
