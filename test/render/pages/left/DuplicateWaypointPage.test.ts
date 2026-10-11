@@ -147,6 +147,21 @@ describe('DUPLICATE WAYPOINT page layout', () => {
         expect(rows.slice(2).map(r => r.trim().replace(/ +/g, ' '))).toEqual(['2 NDB FRA?', '3 VOR DEU?', '4 NDB ITA?', '5 INT AUT?']);
     });
 
+    // A scrolled list stays scrolled while the cursor is off, and the cursor comes back on its top visible entry
+    // (checked in the KLN 89 trainer, 2026-10-08, T23, #355)
+    it('puts the cursor on the top visible waypoint of the scrolled list when it is turned off and on (#355)', async () => {
+        const unit = await duplicatePage();
+        await unit.panel.outer('L', 4);
+        await unit.panel.cursor('L');
+        expect(Screen.read().rows('L')[2].trim().replace(/ +/g, ' ')).toBe('2 NDB FRA?'); // Precondition: still scrolled
+
+        await unit.panel.cursor('L');
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('L').row).toBe(2);
+        expect(unit.panel.focused('L').text).toContain('FRA');
+    });
+
     // 3-15, figure 3-52: the area of a US airport is USA (figure 3-52 lists an NDB of the United States). An airport and
     // an intersection share the ident KAAA; the intersection lies closer to the aircraft
     it('names the area of a US airport USA (3-15, figure 3-52, #168)', async () => {

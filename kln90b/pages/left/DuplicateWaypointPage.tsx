@@ -50,6 +50,7 @@ export class DuplicateWaypointPage extends SixLineHalfPage {
             wptList: new List(UIElementChildren.forList(list), 4), //3-15: four waypoints are visible below the header
         });
         this.cursorController = new CursorController(this.children);
+        this.cursorController.setStartFieldProvider(() => this.children.get("wptList").topVisibleField()); //T23: the top visible entry of a scrolled list (#355)
         this.cursorController.setCursorActive(true);
     }
 

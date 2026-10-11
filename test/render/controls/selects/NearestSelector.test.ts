@@ -64,10 +64,13 @@ describe('nearest rank (characterization)', () => {
         await unit.panel.enterIdent('R', 'KBBB');
         const cols = new Set<number>();
 
-        for (let i = 0; i < 8; i++) {
-            await unit.panel.outer('R', 1);
-            const {row, col} = unit.panel.focused('R');
-            if (row === 0) cols.add(col);
+        // Both ways: the cursor stops at the ends of the page (4-3, #218)
+        for (const dir of [-1, 1] as const) {
+            for (let i = 0; i < 8; i++) {
+                await unit.panel.outer('R', dir);
+                const {row, col} = unit.panel.focused('R');
+                if (row === 0) cols.add(col);
+            }
         }
 
         expect([...cols].sort((a, b) => a - b)).toEqual([13, 14, 15, 16]);

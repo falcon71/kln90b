@@ -47,7 +47,7 @@ function altitudeShown(): number {
 /**
  * Turns the right outer knob counterclockwise until the field showing `text` has the cursor. The date, time and time
  * zone lie before the cursor's start, so the entry tests do not depend on where it starts (that is the cursor tests'
- * subject) nor on a wrap from APPROVE? to the date (#218)
+ * subject); the cursor stops at the date (4-3, #218)
  */
 async function backTo(unit: HeadlessUnit, text: string) {
     for (let i = 0; unit.panel.focused('R').text !== text; i++) {
@@ -66,6 +66,19 @@ describe('self-test right page cursor (spec)', () => {
 
         expect(unit.panel.focused('R')).toEqual({row: 4, col: 17, text: '29'});
         expect(Screen.read().status().right).toBe('CRSR');
+    });
+
+    // The baro is where the page puts the cursor when it shows; turned off and on, the cursor starts on the first field,
+    // the date. The unit does not remember the field (checked in the KLN 89 trainer, 2026-10-11, #355)
+    it('puts the cursor on the date when it is turned off and on (#355)', async () => {
+        const unit = await onSelfTestPage();
+        expect(unit.panel.focused('R').text).toBe('29'); // Precondition
+
+        await unit.panel.cursor('R');
+        await unit.panel.cursor('R');
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('R')).toEqual({row: 1, col: 14, text: '01 JUN 26'});
     });
 
     // 3-5 step 6: counterclockwise from the baro the cursor reaches the whole date field. 3-5 step 7 and 3-6: the time
@@ -99,6 +112,45 @@ describe('self-test right page cursor (spec)', () => {
             fields.push(unit.panel.focused('R'));
         }
 
+        expect(fields).toEqual([
+            {row: 4, col: 20, text: '9'},
+            {row: 4, col: 21, text: '2'},
+            {row: 5, col: 14, text: 'APPROVE?'},
+        ]);
+    });
+});
+
+describe('self-test right page ENT on the baro (3-6, 3-7, #354)', () => {
+    // 3-6 step 9 has the pilot press ENT once the baro is set, and 3-7 step 11 then finds the cursor on APPROVE? or before
+    // it. The baro digits change as the knob turns, so ENT has nothing to accept, yet on this page it moves the cursor
+    // on. Elsewhere such an ENT leaves the cursor where it is (#354)
+    it('moves the cursor from the last baro position to APPROVE? with ENT (3-6, 3-7)', async () => {
+        const unit = await onSelfTestPage();
+        await unit.panel.cursorTo('R', '29');
+        await unit.panel.outer('R', 2); // the fourth digit, the last baro position
+        expect(unit.panel.focused('R')).toEqual({row: 4, col: 21, text: '2'}); // Precondition
+
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('R')).toEqual({row: 5, col: 14, text: 'APPROVE?'});
+    });
+});
+
+describe('self-test right page ENT on the baro (characterization)', () => {
+    // The guide does not say where ENT on the first two baro positions puts the cursor; the code moves it on to the next
+    // position, as ENT does elsewhere after an entry
+    it('steps over the three baro positions to APPROVE? with ENT (characterization)', async () => {
+        const unit = await onSelfTestPage();
+        await unit.panel.cursorTo('R', '29');
+
+        const fields = [];
+        for (let i = 0; i < 3; i++) {
+            await unit.panel.ent();
+            fields.push(unit.panel.focused('R'));
+        }
+
+        expect(unit.errors).toEqual([]);
         expect(fields).toEqual([
             {row: 4, col: 20, text: '9'},
             {row: 4, col: 21, text: '2'},
@@ -246,9 +298,12 @@ describe('self-test right page with an air data baro (spec)', () => {
         const unit = await onSelfTestPage({panelXml: AIR_DATA_BARO_XML, simVars: ALTIMETER_AT_30_12});
 
         const texts = new Set([unit.panel.focused('R').text]);
-        for (let i = 0; i < 6; i++) {
-            await unit.panel.outer('R', 1);
-            texts.add(unit.panel.focused('R').text);
+        // Both ways: the cursor stops at the ends of the page (4-3, #218)
+        for (const dir of [-1, 1] as const) {
+            for (let i = 0; i < 6; i++) {
+                await unit.panel.outer('R', dir);
+                texts.add(unit.panel.focused('R').text);
+            }
         }
 
         expect(texts).toEqual(new Set(['01 JUN 26', '12:00', 'UTC', 'APPROVE?']));

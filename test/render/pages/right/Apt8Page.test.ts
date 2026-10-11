@@ -482,6 +482,61 @@ describe('APT 8 page (characterization)', () => {
         expect(clrHandled(unit)).toBe(true);
     });
 
+    // 6-4: the cursor comes up on the first approach of the list, also after it was left on another one and turned off
+    // and on (the unit does not remember the field, checked in the KLN 89 trainer, 2026-10-11, #355)
+    it('puts the cursor on the first approach again when it is turned off and on (6-4, #355)', async () => {
+        const unit = await bootOnApt8({extraApproaches: 5});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 2);
+        expect(unit.panel.focused('R').text).toContain('VOR-B'); // Precondition: the list is not scrolled
+        expect(Screen.read().rows('R')[1]).toContain('RNAV 18');
+
+        await unit.panel.cursor('R');
+        await unit.panel.cursor('R');
+
+        expect(unit.panel.focused('R').row).toBe(1);
+        expect(unit.panel.focused('R').text).toContain('RNAV 18');
+    });
+
+    // A scrolled list stays scrolled while the cursor is off, and the cursor comes back on its top visible entry
+    // (checked in the KLN 89 trainer, 2026-10-08, T23, #355)
+    it('puts the cursor on the top visible approach of the scrolled list when it is turned off and on (#355)', async () => {
+        const unit = await bootOnApt8({extraApproaches: 5});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 5);
+        await unit.panel.cursor('R');
+        expect(Screen.read().rows('R')[1]).toContain('VOR-B'); // Precondition: still scrolled, RNAV 18 off the page
+
+        await unit.panel.cursor('R');
+
+        expect(unit.panel.focused('R').row).toBe(1);
+        expect(unit.panel.focused('R').text).toContain('VOR-B');
+    });
+
+    // The waypoint list of an approach scrolls as well: turned off and on, the cursor comes back on its top visible
+    // waypoint (checked in the KLN 89 trainer, 2026-10-08, T23, #355). RNAV 18 of approachWorld has five waypoints, one
+    // more than the four rows above LOAD IN FPL
+    it('puts the cursor on the top visible waypoint of a scrolled approach when it is turned off and on (#355)', async () => {
+        const w = approachWorld();
+        const unit = await bootUnit({facilities: w.facilities, position: w.north(40)});
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 8');
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // RNAV 18, its only IAF is taken without a question
+        expect(unit.panel.focused('R').text).toBe('LOAD IN FPL'); // Precondition: the waypoint list
+        await unit.panel.outer('R', -2); // the last waypoint, then the one before it, which scrolls the list
+        await unit.panel.cursor('R');
+        const top = Screen.read().rows('R')[1];
+        expect(top).not.toContain('IAFAA'); // Precondition: still scrolled, the first waypoint off the page
+
+        await unit.panel.cursor('R');
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('R').row).toBe(1);
+        expect(unit.panel.focused('R').text.trim()).toMatch(/^[2-4] (IFAAA|FAFAA|SDFAA)/); // a waypoint after the first
+        expect(top).toContain(unit.panel.focused('R').text.trim());
+    });
+
     it('scrolls a list of more than five approaches and keeps the last on the bottom line', async () => {
         const unit = await bootOnApt8({extraApproaches: 5});
         await unit.panel.cursor('R');

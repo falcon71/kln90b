@@ -123,8 +123,8 @@ describe('SET 8 airspace alert (3-41)', () => {
     });
 
     // The buffer is set in steps of 100 ft: the cursor visits the ten thousands, thousands and hundreds digits (columns 4
-    // to 6) and never the tens or the units (columns 7 and 8), whether the outer knob wraps at the last field or stops
-    // there (#218). A click on the hundreds digit changes the buffer by 100 ft.
+    // to 6) and never the tens or the units (columns 7 and 8): the outer knob stops on the hundreds (4-3, #218). A click
+    // on the hundreds digit changes the buffer by 100 ft.
     it('steps the buffer by 100 ft and never puts the cursor on the tens or the units (3-41)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 8');
@@ -143,6 +143,7 @@ describe('SET 8 airspace alert (3-41)', () => {
         for (let i = 0; i < 5; i++) await step();
 
         expect(visited.slice(0, 3)).toEqual(['5:4', '5:5', '5:6']);
+        expect(visited.slice(3)).toEqual(['5:6', '5:6', '5:6', '5:6', '5:6']);
         expect(visited.filter(v => v === '5:7' || v === '5:8')).toEqual([]);
     });
 });

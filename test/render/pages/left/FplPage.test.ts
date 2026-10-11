@@ -189,6 +189,26 @@ async function bootWithApproach() {
 }
 
 describe('FPL 0 page with an approach', () => {
+    // Characterization: after a Direct To to the IAF the page follows the active waypoint with the approach header in its
+    // top row (the from waypoint scrolled off, #239). The cursor comes on at that top visible entry (T23, #355), the
+    // header, which then reads CHANGE APR? and asks for ENT (6-7). The guide does not show this case
+    it('characterization: turns the cursor on at the approach header in the top row, which reads CHANGE APR?', async () => {
+        const unit = await bootWithApproach();
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'IAFAAà', 40);
+        await unit.panel.dct();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(Screen.read().status().left).toBe('FPL 0'); // Precondition: the cursor is off
+        expect(left().slice(0, 2).map(r => r.slice(1))).toEqual(['R27-KPRC  ', ' 2 IAFAAà ']); // Precondition
+
+        await unit.panel.cursor('L');
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('L')).toEqual({row: 0, col: 0, text: 'CHANGE APR?'});
+        expect(Screen.read().status().mode).toBe('enr-leg ent');
+    });
     // 6-5: a header ABBBB-CCCC above the approach waypoints (type letter, runway, airport). 6-7: approach waypoints
     // have a blank instead of the colon after their number. 6-6 to 6-7: the IAF, FAF, MAP and missed approach holding
     // point carry a suffix (i, f, m, h); the font kln90b.ttf draws à, á, ã and â as a dash and that small letter
@@ -196,7 +216,8 @@ describe('FPL 0 page with an approach', () => {
     it('shows the approach header, the approach waypoints without colon and the fix suffixes (6-5 to 6-7)', async () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
-        await unit.panel.cursor('L'); // on ENRAA, the first waypoint: the page shows the top of the plan
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // on ENRAA, the first waypoint: the page shows the top of the plan (#355)
 
         expect(left().map(r => r.slice(1))).toEqual([' 1:ENRAA  ', 'R27-KPRC  ', ' 2 IAFAAà ', ' 3 IFAAA  ', ' 4 FAFAAá ', ' 7:KPRC   ']);
 
@@ -212,6 +233,7 @@ describe('FPL 0 page with an approach', () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // the cursor comes on at the top visible entry (#355)
         await unit.panel.outer('L', 2);
         expect(unit.panel.focused('L').text).toBe('IAFAAà'); // Precondition
         const before = left();
@@ -228,6 +250,7 @@ describe('FPL 0 page with an approach', () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // the cursor comes on at the top visible entry (#355)
         await unit.panel.outer('L', 2);
         expect(unit.panel.focused('L').text).toBe('IAFAAà'); // Precondition
         const before = left();
@@ -246,6 +269,7 @@ describe('FPL 0 page with an approach', () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // the cursor comes on at the top visible entry (#355)
         await unit.panel.outer('L', 2);
         expect(unit.panel.focused('L').text).toBe('IAFAAà'); // Precondition: an approach waypoint under the cursor
         expect(left().map(r => r.slice(1))).toContain(' 2 IAFAAà ');
@@ -266,6 +290,7 @@ describe('FPL 0 page with an approach', () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // the cursor comes on at the top visible entry (#355)
         await unit.panel.outer('L', 2);
         const before = left();
 
@@ -437,6 +462,21 @@ describe('FPL 1 to FPL 25 pages', () => {
         expect(unit.panel.focused('L')).toEqual({row: 1, col: 4, text: '     '});
     });
 
+    // The blank first waypoint is the start every time the cursor comes on, also after it was left on LOAD FPL 0? and
+    // turned off (checked in the KLN 89 trainer, 2026-10-11, #355, #356)
+    it('turns the cursor on over the blank first waypoint again after it was turned off on LOAD FPL 0? (4-2, #356)', async () => {
+        const unit = await bootRoute({});
+        await unit.panel.selectPage('L', 'FPL 7');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', -1);
+        expect(unit.panel.focused('L').text).toBe('LOAD FPL 0?'); // Precondition
+
+        await unit.panel.cursor('L');
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L')).toEqual({row: 1, col: 4, text: '     '});
+    });
+
     // 4-6: one step counterclockwise from the blank first waypoint is LOAD FPL 0?; ENT copies FPL 0 into the numbered
     // plan, which then shows USE? INVRT? and the waypoints with the cursor off (figure 4-28)
     it('stores FPL 0 in an empty numbered plan with LOAD FPL 0? (4-6)', async () => {
@@ -502,6 +542,57 @@ describe('FPL 1 to FPL 25 pages', () => {
         expect(fplIdents(unit, 3)).toEqual([]);
         expect(left().slice(0, 3)).toEqual(['LOAD FPL 0?', '  1:       ', '           ']);
         expect(Screen.read().status().left).toBe('FPL 3');
+    });
+
+    // 4-6 step 2, figure 4-26: on an empty numbered plan the cursor comes on over the blank first waypoint position, also
+    // when the plan was emptied on this page by DELETE FPL? (#356)
+    it('turns the cursor on over the blank first waypoint after the plan was deleted on the page (4-6, #356)', async () => {
+        const unit = await bootRoute(savedFlightplan(3, route7()));
+        await unit.panel.selectPage('L', 'FPL 3');
+        await unit.panel.clr();
+        await unit.panel.ent();
+        expect(fplIdents(unit, 3)).toEqual([]); // Precondition: the plan is empty, the page was not left
+
+        await unit.panel.cursor('L');
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('L')).toEqual({row: 1, col: 4, text: '     '});
+    });
+
+    // 4-3 step 3: on a plan with waypoints the cursor comes on over USE?, also when the plan was built on this page from
+    // empty and the page was not left: the blank first waypoint is no longer the start. Checked in the KLN 89 trainer,
+    // 2026-10-11: USE? whether the page was left or not, as long as the header is on the page (#356)
+    it('turns the cursor on over USE? after a plan was built on the page from empty (4-3, #356)', async () => {
+        const unit = await bootRoute({});
+        await unit.panel.selectPage('L', 'FPL 7');
+        await unit.panel.cursor('L'); // the blank first waypoint
+        await unit.panel.enterIdent('L', 'KAAA');
+        await unit.panel.ent(); // the waypoint page
+        await unit.panel.ent();
+        await unit.panel.enterIdent('L', 'ABC');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        expect(fplIdents(unit, 7)).toEqual(['KAAA', 'ABC']); // Precondition
+        await unit.panel.cursor('L');
+
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L')).toEqual({row: 0, col: 0, text: 'USE?'});
+    });
+
+    // 4-6: LOAD FPL 0? copies FPL 0 and turns the cursor off; on again, it comes on over USE? (checked in the KLN 89
+    // trainer, 2026-10-11, #356)
+    it('turns the cursor on over USE? after LOAD FPL 0? on the page (4-6, #356)', async () => {
+        const unit = await bootRoute(savedFlightplan(0, route7().slice(0, 3)));
+        await unit.panel.selectPage('L', 'FPL 7');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', -1);
+        await unit.panel.ent(); // LOAD FPL 0?
+        expect(Screen.read().status().left).toBe('FPL 7'); // Precondition: the copy turned the cursor off
+
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L')).toEqual({row: 0, col: 0, text: 'USE?'});
     });
 
     // Public contract (CLAUDE.md, persisted user data): the user's flight plans are saved, the deletion as well (as on
@@ -603,9 +694,12 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
     /** The rows of the page after each of a number of outer clicks, the first ones being the current rows */
     async function walkRows(unit: HeadlessUnit, clicks: number): Promise<string[]> {
         const seen = [...left()];
-        for (let i = 0; i < clicks; i++) {
-            await unit.panel.outer('L', 1);
-            seen.push(...left());
+        // Both ways: the cursor stops at the ends of the page (4-3, #218)
+        for (const dir of [-1, 1] as const) {
+            for (let i = 0; i < clicks; i++) {
+                await unit.panel.outer('L', dir);
+                seen.push(...left());
+            }
         }
         return seen;
     }
@@ -627,8 +721,8 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
     });
 
     // The refused waypoint stays on the page as a row until the page is left: the entry that held it is not removed
-    // from the list. The sibling above holds that the plan itself is unchanged. The cursor is walked over the page: it
-    // wraps today (#218), so the walk does not depend on where the cursor stands
+    // from the list. The sibling above holds that the plan itself is unchanged. The cursor is walked over the whole page,
+    // to the top and back to the end, so the walk does not depend on where the cursor stands
     it.fails('does not show the refused waypoint after FPL FULL (4-4, C-1, #240)', async () => {
         const unit = await insertIntoFullFpl5();
 

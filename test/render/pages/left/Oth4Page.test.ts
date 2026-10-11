@@ -17,6 +17,24 @@ async function withRemarks(idents: string[]): Promise<HeadlessUnit> {
 /** The airport idents OTH 4 lists, in the order of the rows */
 const listed = (): string[] => Screen.read().rows('L').slice(1).map(r => r.trim()).filter(r => r !== '');
 
+describe('OTH 4 page cursor (#355)', () => {
+    // A scrolled list stays scrolled while the cursor is off, and the cursor comes back on its top visible entry
+    // (checked in the KLN 89 trainer, 2026-10-08, T23, #355)
+    it('puts the cursor on the top visible airport of the scrolled list when it is turned off and on (#355)', async () => {
+        const unit = await withRemarks(['KAAA', 'KBBB', 'KCCC', 'KDDD', 'KEEE', 'KFFF', 'KGGG']);
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 5);
+        await unit.panel.cursor('L');
+        const top = listed()[0];
+        expect(top).not.toBe('KAAA'); // Precondition: still scrolled, the first airport off the page
+
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L').row).toBe(1);
+        expect(unit.panel.focused('L').text.trim()).toBe(top);
+    });
+});
+
 /** OTH 4 listens to the remarks manager's changed topic (RemarksManager.ts) */
 const remarksHandlers = (unit: HeadlessUnit) => unit.props.bus.getTopicSubscriberCount('changed');
 

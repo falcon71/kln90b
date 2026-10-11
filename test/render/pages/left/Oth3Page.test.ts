@@ -44,6 +44,22 @@ describe('OTH 3 page, the lifecycle of its subscription (#96)', () => {
 });
 
 describe('OTH 3 page', () => {
+    // A scrolled list stays scrolled while the cursor is off, and the cursor comes back on its top visible entry
+    // (checked in the KLN 89 trainer, 2026-10-08, T23, #355)
+    it('puts the cursor on the top visible waypoint of the scrolled list when it is turned off and on (#355)', async () => {
+        const unit = await bootUnit({storage: userWaypoints(['AAA', 'BBB', 'CCC', 'DDD', 'EEE', 'FFF', 'GGG'])});
+        await unit.panel.selectPage('L', 'OTH 3');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 5);
+        await unit.panel.cursor('L');
+        expect(Screen.read().rows('L')[1]).toBe('BBB   I    '); // Precondition: still scrolled, AAA off the page
+
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L')).toMatchObject({row: 1, col: 0});
+        expect(unit.panel.focused('L').text.trim()).toBe('BBB   I');
+    });
+
     // The list shows five rows below the title, and the focused one must stay among them
     it('scrolls the list to keep the focused row visible (characterization) (9a17b5b)', async () => {
         const unit = await bootUnit({storage: userWaypoints(['AAA', 'BBB', 'CCC', 'DDD', 'EEE', 'FFF', 'GGG'])});

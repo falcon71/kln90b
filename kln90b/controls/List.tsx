@@ -2,6 +2,7 @@ import {FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {UiElement, UIElementChildren} from '../pages/Page';
 import {TickController} from "../TickController";
 import {isListItem} from "./ListItem";
+import {Field, isField} from "../pages/CursorController";
 
 
 export class List implements UiElement {
@@ -19,6 +20,25 @@ export class List implements UiElement {
         this.children = children;
         this.scrollIdx = 0;
         this.redraw();
+    }
+
+    /**
+     * The first field of the top visible row while the list is scrolled, null while it is not. The cursor comes back on
+     * it when it is turned on, checked in the KLN 89 trainer (2026-10-08, T23, #355). It also fits 4-3: a pilot who
+     * built a long plan finds the cursor below USE? and turns the outer knob back to it
+     */
+    public topVisibleField(): Field | null {
+        if (this.scrollIdx === 0) {
+            return null;
+        }
+        const rows = this.children.getall();
+        for (let i = this.scrollIdx; i < rows.length; i++) {
+            const field = [rows[i], ...rows[i].children.getallFlat()].find(el => isField(el) && !el.isReadonly);
+            if (field !== undefined) {
+                return field as Field;
+            }
+        }
+        return null;
     }
 
     public render(): VNode {

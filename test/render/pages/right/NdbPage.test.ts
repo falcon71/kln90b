@@ -59,7 +59,7 @@ describe('NDB page (characterization)', () => {
         await unit.panel.selectPage('R', 'NDB  ');
         await unit.panel.cursor('R');
         await unit.panel.enterIdent('R', 'ND1');
-        await unit.panel.ent();
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
         await unit.panel.outer('R', 1);
         await unit.panel.type('R', 'N4730000');
         await unit.panel.ent();
@@ -109,8 +109,7 @@ describe('NDB page contents (3-50)', () => {
     });
 
     // 3-21, 5-18: the cursor of a database NDB visits the ident characters only; only a user NDB has editable fields.
-    // Past the third character the cursor wraps to the first one today (#218 says the real unit stops at the end); both
-    // stay in the ident row, which is what this test holds
+    // Past the third character the cursor stops (4-3, #218); it stays in the ident row
     it('keeps the cursor in the ident row (3-21, 5-18)', async () => {
         const unit = await ndbPageOf(ndb('OWI', 47.5, 11.25));
         await unit.panel.cursor('R');
@@ -204,11 +203,12 @@ describe('user NDB (5-18)', () => {
         expect(Screen.read().rows('R')).toEqual([' ND1       ', '           ', '           ', 'FREQ ____._', "_ __°__.__'", "____°__.__'"]);
     });
 
-    // 5-18, figure 5-65: ENT on the ident of an unknown NDB puts the cursor over the frequency dashes (the field reads
-    // across its decimal point, which the editor does not invert)
+    // 5-18, figure 5-65: from the ident of an unknown NDB the outer knob puts the cursor over the frequency dashes (the
+    // field reads across its decimal point, which the editor does not invert). 5-16 and 5-17 move on from the ident
+    // with the outer knob; ENT has nothing to accept on the ident (#354)
     it('puts the cursor on the frequency after the ident of an unknown NDB (5-18)', async () => {
         const unit = await undefinedNdb();
-        await unit.panel.ent();
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
 
         expect(unit.panel.focused('R')).toEqual({row: 3, col: 17, text: '____._'});
     });
@@ -218,7 +218,7 @@ describe('user NDB (5-18)', () => {
     // type a leading zero there (#109).
     it('creates the user NDB from the latitude and longitude (5-18)', async () => {
         const unit = await undefinedNdb();
-        await unit.panel.ent();
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
         await unit.panel.outer('R', 1); // from the frequency to the latitude
         await unit.panel.type('R', 'N4730000');
         await unit.panel.ent();
@@ -235,7 +235,7 @@ describe('user NDB (5-18)', () => {
     // complete it
     it('shows ENT LAT/LON after the latitude alone (C-1)', async () => {
         const unit = await undefinedNdb();
-        await unit.panel.ent();
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
         await unit.panel.outer('R', 1);
         await unit.panel.type('R', 'N4730000');
         await unit.panel.ent();
@@ -247,7 +247,7 @@ describe('user NDB (5-18)', () => {
     // 5-18, figure 5-66: a user NDB can carry a frequency (328.0 kHz in the figure)
     it('accepts the frequency 328.0 of figure 5-66 (5-18, #277)', async () => {
         const unit = await undefinedNdb();
-        await unit.panel.ent();
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
         await typeBelow1000(unit, '3280');
         await unit.panel.ent();
 
@@ -259,7 +259,7 @@ describe('user NDB (5-18)', () => {
     // shows it
     it('creates the user NDB with the frequency entered before the position (5-18, #277)', async () => {
         const unit = await undefinedNdb();
-        await unit.panel.ent();
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
         await typeBelow1000(unit, '3280');
         await unit.panel.ent();
         await unit.panel.type('R', 'N4730000');
@@ -275,7 +275,7 @@ describe('user NDB (5-18)', () => {
     // Sibling of the test above: the keyboard reaches the frequency field and shows the typed frequency before ENT
     it('shows the typed frequency 328.0 before ENT (5-18)', async () => {
         const unit = await undefinedNdb();
-        await unit.panel.ent();
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
         await typeBelow1000(unit, '3280');
 
         expect(Screen.read().rows('R')[3]).toBe('FREQ  328.0');

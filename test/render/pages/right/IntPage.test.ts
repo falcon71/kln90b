@@ -186,8 +186,8 @@ describe('INT page (characterization)', () => {
 
 describe('INT page reference waypoint (3-50, 3-51)', () => {
     // 3-50, step 3, figure 3-156: from the identifier the outer knob moves the cursor to the REF identifier. RAD, DIS and
-    // the position of a database intersection cannot be changed, so the click after REF does not reach them: today it
-    // wraps to the ident (row 0), and with #218 fixed it would stay on REF (row 1)
+    // the position of a database intersection cannot be changed, so the click after REF does not reach them: the cursor
+    // stays on REF (row 1), the last field (4-3, #218)
     it('moves the cursor from the fifth ident character to REF and no further (3-50)', async () => {
         const unit = await intPageOf([kenzy(), mkc()]);
         await unit.panel.cursor('R');
@@ -199,7 +199,7 @@ describe('INT page reference waypoint (3-50, 3-51)', () => {
             if (i === 4) expect(unit.panel.focused('R')).toEqual({row: 1, col: 18, text: 'MKC  '});
         }
         expect(visited).toEqual([0, 0, 0, 0, 0, 1]);
-        expect([0, 1]).toContain(unit.panel.focused('R').row);
+        expect(unit.panel.focused('R')).toEqual({row: 1, col: 18, text: 'MKC  '});
     });
 
     /** The INT page of KENZY with the REF RIS (12.0 NM due north of KENZY) entered and approved (3-50 steps 2 to 6) */

@@ -731,7 +731,10 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - ENT returns `Promise<EnterResult>` (`pages/CursorController.ts`), one of:
     - `Not_Handled`
     - `Handled_Keep_Focus` (stay on the field, e.g. invalid input or deleting a list item)
-    - `Handled_Move_Focus` (the CursorController then calls `outerRight()` to advance to the next field)
+    - `Handled_Move_Focus` (the CursorController then calls `outerRight()` to advance to the next field; on the last
+      field the cursor stays, because the outer knob stops at both ends of a page, 4-3, #218)
+- The CursorController leaves the cursor where it is after `Not_Handled`: a field whose value changes as the knob turns
+  has nothing to accept (#354). Only the self-test page builds its controller to move on after every ENT (3-6, 3-7).
 - The top level ignores the result. Inside MainPage, "not handled" is meaningful.
 
 ### MainPage dispatch rules (`MainPage.onInteractionEvent`)
@@ -762,8 +765,10 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   Toggling `isReadonly` (or `setVisible` on a `Button`) therefore adds or removes a field live.
 - **Cursor order = depth-first insertion order of the children map.** Declaring children in a different order changes
   the CRSR sequence. Nested sub-page children (e.g. `Apt2Page.dbPage/userPage`) are included.
-- `toggleCursor()` returns false when there are no fields. `setCursorActive` remembers the last `cursorField` (comment "
-  4.1.2"). `setDefaultCursorField(n)` and `focusIndex(i)` are available.
+- `toggleCursor()` returns false when there are no fields. The cursor does not remember where it was: each time it
+  comes on, `setCursorActive` starts it on the page's start field (`setDefaultCursorField(n)`,
+  `setDefaultCursorFieldToLast()`), or on the field `setStartFieldProvider` names, which the list pages use for the top
+  visible entry of a scrolled list (`List.topVisibleField`, #355). `focusIndex(i)` moves a cursor that is on.
 - With the cursor on:
     - outer knob moves between fields, unless the focused field `isEntered`, in which case the field receives the outer
       knob (moving within an editor);

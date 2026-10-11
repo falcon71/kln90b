@@ -136,7 +136,7 @@ describe('SET 5 offset while the alert is off (characterization)', () => {
         await unit.panel.inner('L', 1); // ON
         await unit.panel.outer('L', 1);
         expect(unit.panel.focused('L').text.trim()).toBe('8'); // the offset field holds the hundreds of feet
-        await unit.panel.outer('L', 1);
+        await unit.panel.outer('L', -1);
         expect(at()).toEqual(enable);
         await unit.panel.inner('L', 1); // OFF
 

@@ -139,6 +139,21 @@ describe('FrontPanel.enterIdent (harness)', () => {
             expect(unit.panel.focused('R')).toEqual({row: 4, col: 12, text: 'USER POS?'});
         });
 
+        // The cursor stops at the last field (4-3, #218), so a field before the cursor is found by turning back
+        it('turns counterclockwise once the cursor stops at the last field', async () => {
+            const unit = await bootUnit({facilities: [airport('KAAA', 47.0, 8.0)]});
+            await unit.panel.selectPage('R', 'APT 1');
+            await unit.panel.cursor('R');
+            await unit.panel.enterIdent('R', 'KZZZ');
+            await unit.panel.cursorTo('R', 'PRES POS?');
+            await unit.panel.outer('R', 1);
+            expect(unit.panel.focused('R').text).toBe('PRES POS?'); // Precondition: the last field
+
+            await unit.panel.cursorTo('R', 'USER POS?');
+
+            expect(unit.panel.focused('R')).toEqual({row: 4, col: 12, text: 'USER POS?'});
+        });
+
         // The cursor of the SUP page without user waypoints has a position between the ident characters and the next
         // field that focuses nothing (the cells of no field are inverted there). The INT page has none any more: the
         // default navdata (fixtures.ts) gives it an entry, and only an empty list stores the 4-character placeholder
@@ -190,7 +205,7 @@ describe('FrontPanel.enterIdent (harness)', () => {
         });
 
         // The self-test page shows no page name in its left status field, so a blank is not a cursor that is off: the
-        // search runs and ends at the cap, on that page
+        // search runs on that page and ends where the cursor stops at both ends of it (4-3, #218)
         it('searches on a page with a blank status field, the left one of the self-test page', async () => {
             const unit = await bootUnit({engineRunning: false, magvar: 0});
             await unit.panel.powerOn();
@@ -200,7 +215,7 @@ describe('FrontPanel.enterIdent (harness)', () => {
             expect(Screen.read().status().left).toBe('');
             expect(Screen.read().text()).toContain('APPROVE?');
 
-            await expect(unit.panel.cursorTo('L', 'NO SUCH FIELD', 2)).rejects.toThrow(/no field "NO SUCH FIELD" within 2 clicks/);
+            await expect(unit.panel.cursorTo('L', 'NO SUCH FIELD', 2)).rejects.toThrow(/no field "NO SUCH FIELD" on the page/);
         });
 
         it('throws with the screen when the field is not within the clicks', async () => {

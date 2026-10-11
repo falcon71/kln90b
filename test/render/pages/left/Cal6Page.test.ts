@@ -64,7 +64,7 @@ describe('CAL 6 page (5-14)', () => {
         await unit.panel.inner('L', 5); // UTC -> ... -> EST
         expect(Screen.read().rows('L').slice(1)).toEqual([' 11:56 CST ', 'CENTRAL STD', '           ', ' 12:56 EST ', 'EASTERN STD']);
 
-        await unit.panel.outer('L', 1); // around to the top hour
+        await unit.panel.outer('L', -7); // back to the top hour
         await unit.panel.inner('L', 1); // the top hour, 11 -> 12
         expect(Screen.read().rows('L')[1]).toBe(' 12:56 CST ');
         expect(Screen.read().rows('L')[4]).toBe(' 13:56 EST ');

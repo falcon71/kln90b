@@ -8,6 +8,7 @@ import {Screen} from '../../../harness/render/screen';
 
 /** Moves the cursor to the cell at row, col (from the first field, turning right) and sets the digit there */
 async function setCell(unit: HeadlessUnit, row: number, col: number, value: string): Promise<void> {
+    await unit.panel.outer('L', -12); // back to the first field, where the cursor stops (4-3, #218)
     for (let i = 0; i < 12; i++) {
         const f = unit.panel.focused('L');
         if (f.row === row && f.col === col) {

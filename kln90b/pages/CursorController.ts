@@ -50,25 +50,68 @@ export enum EnterResult {
 export class CursorController implements CursorHandler {
     public cursorActive: boolean = false;
     public cursorField: number = 0;
+    /**
+     * Where the cursor starts each time it is turned on. The unit does not remember where it was, checked in the KLN 89
+     * trainer (#355)
+     */
+    private startField: number = 0;
+    private startFieldIsLast: boolean = false;
+    private startFieldProvider: () => Field | null = () => null;
+    /**
+     * The field this controller focused last. It can turn read-only under the cursor (#217)
+     */
+    private focusedField: Field | null = null;
 
 
     /**
      *
      * @param children
      * @param onCursorActiveChangedListener Will be called each time the cursorActive state is changed
+     * @param enterAlwaysMoves If true, ENT also moves the cursor on when the field did not handle it. Only the self-test
+     * page does this, 3-6 and 3-7
      */
     constructor(private children: UIElementChildren<any>, private onCursorActiveChangedListener: (isActive: boolean) => void = () => {
-    }) {
+    }, private readonly enterAlwaysMoves: boolean = false) {
         // @ts-ignore
         this.fields = children.getallFlat().filter(c => isField(c) && !(c as Field).isReadonly);
     }
 
     public getCurrentFocusedField(): Field | null {
-        if (this.cursorActive) {
-            return this.getFields()[this.cursorField];
-        } else {
+        if (!this.cursorActive) {
             return null;
         }
+        const fields = this.getFields();
+        if (fields[this.cursorField] !== this.focusedField) {
+            //Fields can turn read-only while the cursor is on: the date and time at the first fix (3-53), the magnetic
+            //variation inside the area (5-44) (#217)
+            const index = this.focusedField === null ? -1 : fields.indexOf(this.focusedField);
+            if (index !== -1) {
+                //A field before the cursor changed, the cursor stays on its field
+                this.cursorField = index;
+            } else {
+                //The field under the cursor is gone, the cursor moves to the field at its position or the last one left.
+                //Only a field that is still on the page loses the focus: a list replaces its items, and turning off a
+                //replaced flight plan item aborts the insert it holds (FlightplanListItem.setFocused)
+                if (this.focusedField?.isReadonly) {
+                    this.focusedField.setFocused(false);
+                }
+                this.focusedField = null;
+                if (fields.length === 0) {
+                    //Not setCursorActive(false), it asks for the focused field again
+                    this.cursorActive = false;
+                    this.onCursorActiveChangedListener(false);
+                    return null;
+                }
+                this.focusAt(Math.min(this.cursorField, fields.length - 1), fields);
+            }
+        }
+        return fields[this.cursorField];
+    }
+
+    private focusAt(index: number, fields: Field[] = this.getFields()): void {
+        this.cursorField = index;
+        this.focusedField = fields[index];
+        this.focusedField.setFocused(true);
     }
 
     /**
@@ -89,15 +132,28 @@ export class CursorController implements CursorHandler {
     }
 
     /**
-     * Sets the default field that will be selected the next time the cursor is activated.
-     * Has no effect if the cursor is already active.
+     * Sets the field the cursor starts on each time it is activated. A cursor that is already active stays where it is.
      * @param defaultField
      */
     public setDefaultCursorField(defaultField: number): void {
-        if (this.cursorActive) {
-            return;
-        }
-        this.cursorField = defaultField;
+        this.startField = defaultField;
+        this.startFieldIsLast = false;
+    }
+
+    /**
+     * The cursor starts on the last field each time it is activated, however many fields the page has by then.
+     * A cursor that is already active stays where it is.
+     */
+    public setDefaultCursorFieldToLast(): void {
+        this.startFieldIsLast = true;
+    }
+
+    /**
+     * Names the field the cursor starts on when it is activated, overriding the start field when it returns a field.
+     * A scrolled list returns its top visible entry, checked in the KLN 89 trainer (2026-10-08, T23, #355)
+     */
+    public setStartFieldProvider(provider: () => Field | null): void {
+        this.startFieldProvider = provider;
     }
 
     public toggleCursor(): boolean {
@@ -120,50 +176,65 @@ export class CursorController implements CursorHandler {
         }
         if (active) {
             this.cursorActive = active;
-            this.cursorField = Math.min(this.cursorField, fields.length); //4.1.2 This sounds like, the last cursorposition is remembered
-            this.getCurrentFocusedField()!.setFocused(true);
+            //The cursor does not come back where it was, it starts on the start field every time (#355)
+            const provided = this.startFieldProvider();
+            const providedIndex = provided === null ? -1 : fields.indexOf(provided);
+            let start = this.startFieldIsLast ? fields.length - 1 : this.startField;
+            if (providedIndex !== -1) {
+                start = providedIndex;
+            }
+            this.focusAt(Math.min(start, fields.length - 1), fields);
         } else {
-            //The order is important!
-            this.getCurrentFocusedField()?.setFocused(false);
+            //The field the cursor is on, even if a field before it changed since. Not getCurrentFocusedField, which would
+            //move the cursor (#217)
+            if (this.focusedField !== null && fields.includes(this.focusedField)) {
+                this.focusedField.setFocused(false);
+            } else {
+                fields[this.cursorField]?.setFocused(false);
+                if (this.focusedField?.isReadonly) {
+                    this.focusedField.setFocused(false);
+                }
+            }
+            this.focusedField = null;
             this.cursorActive = active;
         }
         this.onCursorActiveChangedListener(active);
     }
 
     public outerRight(): boolean {
-        if (!this.cursorActive) {
+        const field = this.getCurrentFocusedField();
+        if (field === null) {
             return false;
         }
-        if (this.getCurrentFocusedField()?.isEntered) {
-            return this.getCurrentFocusedField()!.outerRight();
+        if (field.isEntered) {
+            return field.outerRight();
         }
 
         const fields = this.getFields();
-
-        this.getCurrentFocusedField()!.setFocused(false);
-        this.cursorField++;
-        if (this.cursorField >= fields.length) {
-            this.cursorField = 0;
+        if (this.cursorField >= fields.length - 1) {
+            return true; //4-3: The cursor stops at the last field, it does not wrap. Checked in the KLN 89 trainer (#218)
         }
-        this.getCurrentFocusedField()!.setFocused(true);
+
+        field.setFocused(false);
+        this.focusAt(this.cursorField + 1, fields);
         return true;
     }
 
     public outerLeft(): boolean {
-        if (!this.cursorActive) {
+        const field = this.getCurrentFocusedField();
+        if (field === null) {
             return false;
         }
-        if (this.getCurrentFocusedField()?.isEntered) {
-            return this.getCurrentFocusedField()!.outerLeft();
+        if (field.isEntered) {
+            return field.outerLeft();
         }
 
-        const fields = this.getFields();
-        this.getCurrentFocusedField()!.setFocused(false);
-        this.cursorField--;
-        if (this.cursorField < 0) {
-            this.cursorField = fields.length - 1;
+        if (this.cursorField <= 0) {
+            return true; //4-3: The cursor stops at the first field, it does not wrap. Checked in the KLN 89 trainer (#218)
         }
-        this.getCurrentFocusedField()!.setFocused(true);
+
+        field.setFocused(false);
+        this.focusAt(this.cursorField - 1);
         return true;
     }
 
@@ -172,56 +243,51 @@ export class CursorController implements CursorHandler {
             throw new Error("Cursor is not active, cannot set index");
         }
         this.getCurrentFocusedField()?.setFocused(false);
-        this.cursorField = index;
-        this.getCurrentFocusedField()!.setFocused(true);
+        this.focusAt(index);
     }
 
     public innerRight(): boolean {
-        if (!this.cursorActive) {
-            return false;
-        }
-        return this.getCurrentFocusedField()!.innerRight();
+        return this.getCurrentFocusedField()?.innerRight() ?? false;
     }
 
     public innerLeft(): boolean {
-        if (!this.cursorActive) {
-            return false;
-        }
-        return this.getCurrentFocusedField()!.innerLeft();
+        return this.getCurrentFocusedField()?.innerLeft() ?? false;
     }
 
     public isEnterAccepted() {
-        if (!this.cursorActive) {
-            return false;
-        }
-        return this.getCurrentFocusedField()!.isEnterAccepted();
+        return this.getCurrentFocusedField()?.isEnterAccepted() ?? false;
     }
 
     public async enter(): Promise<EnterResult> {
-        if (!this.cursorActive) {
+        const field = this.getCurrentFocusedField();
+        if (field === null) {
             return EnterResult.Not_Handled;
         }
-        const result = await this.getCurrentFocusedField()!.enter();
+        const result = await field.enter();
 
         if (result == EnterResult.Handled_Keep_Focus) {
             const focused = this.getCurrentFocusedField();
             if (this.cursorActive && focused && !focused.isFocused) {
                 //Happens when enter was pressed to delete an item (e.g. OTH 3 page)
                 //This item no longer exists, but we still want to focus the item on the current index
-                focused.setFocused(true);
+                this.focusAt(this.cursorField);
             }
-        } else {
-            this.outerRight(); //Enter always moves to the next field, see https://www.youtube.com/shorts/9We5fcd2-VE
+        } else if (result === EnterResult.Handled_Move_Focus || this.enterAlwaysMoves) {
+            //Enter moves to the next field, see https://www.youtube.com/shorts/9We5fcd2-VE
+            //A field with nothing to accept leaves the cursor where it is, checked in the KLN 89 trainer (#354)
+            //On the last field the cursor stays, the pilot turns it off with CRSR (5-17 steps 9 and 10, 3-47) (#218)
+            this.outerRight();
         }
         return result;
     }
 
     public clear(): boolean {
-        if (!this.cursorActive) {
+        const field = this.getCurrentFocusedField();
+        if (field === null) {
             return false;
         }
-        if (this.getCurrentFocusedField()!.isClearAccepted()) {
-            return this.getCurrentFocusedField()!.clear();
+        if (field.isClearAccepted()) {
+            return field.clear();
         }
 
         return false;
@@ -233,10 +299,7 @@ export class CursorController implements CursorHandler {
     }
 
     public keyboard(key: string): boolean {
-        if (!this.cursorActive) {
-            return false;
-        }
-        return this.getCurrentFocusedField()!.keyboard(key);
+        return this.getCurrentFocusedField()?.keyboard(key) ?? false;
     }
 }
 

@@ -16,7 +16,7 @@ async function createUserVor(): Promise<HeadlessUnit> {
     await unit.panel.selectPage('R', 'VOR  ');
     await unit.panel.cursor('R');
     await unit.panel.enterIdent('R', 'QQQ');
-    await unit.panel.ent();
+    await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
     await unit.panel.outer('R', 2); // from the frequency to the latitude
     await unit.panel.type('R', 'N4700000');
     await unit.panel.ent(); // the cursor moves on to the longitude
@@ -94,7 +94,7 @@ describe('user VOR page (5-18)', () => {
     // page shows the waypoint with the cursor off; selecting the page again shows what was stored
     it('stores the entered frequency and magnetic variation (5-18)', async () => {
         const unit = await unknownVor();
-        await unit.panel.ent(); // the cursor moves to the frequency
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
         await unit.panel.type('R', '11390');
         await unit.panel.ent(); // to the magnetic variation
         await unit.panel.type('R', '12W');
@@ -114,7 +114,7 @@ describe('user VOR page (5-18)', () => {
     // savedUserWaypoints lays out by hand from that format (#173)
     it('is saved in the VOR format with its frequency and magnetic variation (#173)', async () => {
         const unit = await unknownVor();
-        await unit.panel.ent(); // the cursor moves to the frequency
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
         await unit.panel.type('R', '11390');
         await unit.panel.ent(); // to the magnetic variation
         await unit.panel.type('R', '12W');
@@ -133,7 +133,7 @@ describe('user VOR page (5-18)', () => {
         await unit.panel.selectPage('R', 'VOR  ');
         await unit.panel.cursor('R');
         await unit.panel.enterIdent('R', 'QQQ');
-        await unit.panel.ent();
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
         await unit.panel.outer('R', 2); // from the frequency to the latitude
         await typePosition(unit);
         expect(Screen.read().rows('R')[0]).toBe(' QQQ       '); // precondition: the user VOR is shown
@@ -150,7 +150,7 @@ describe('user VOR page (5-18)', () => {
     // 5-18: without an entered magnetic variation the unit computes one and stores it. The world has 13° E everywhere
     it('computes the magnetic variation when none is entered (5-18)', async () => {
         const unit = await unknownVor(13);
-        await unit.panel.ent();
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
         await unit.panel.outer('R', 2); // from the frequency to the latitude
         await typePosition(unit);
 
@@ -164,7 +164,7 @@ describe('user VOR page (5-18)', () => {
     // complete it
     it('shows ENT LAT/LON after the frequency alone (C-1)', async () => {
         const unit = await unknownVor();
-        await unit.panel.ent();
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
         await unit.panel.type('R', '11390');
         await unit.panel.ent();
 
@@ -179,7 +179,7 @@ describe('user VOR page (5-18)', () => {
         await unit.panel.selectPage('R', 'VOR  ');
         await unit.panel.cursor('R');
         await unit.panel.enterIdent('R', 'QQQ');
-        await unit.panel.ent();
+        await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)
         await unit.panel.outer('R', 2);
         await typePosition(unit);
 

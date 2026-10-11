@@ -32,6 +32,7 @@ export class Oth4Page extends SixLineHalfPage {
             rmksList: new List(UIElementChildren.forList(list)),
         });
         this.cursorController = new CursorController(this.children);
+        this.cursorController.setStartFieldProvider(() => this.children.get("rmksList").topVisibleField());
 
         this.props.bus.getSubscriber<RemarksChangedEvent>().on("changed").handle(this.refreshList.bind(this));
     }

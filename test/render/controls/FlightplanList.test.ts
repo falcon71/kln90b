@@ -85,7 +85,7 @@ describe('FlightplanList, scrolling with the cursor (4-3, 4-8)', () => {
     it('keeps the last waypoint in the bottom row while the cursor scrolls down FPL 0 (4-8)', async () => {
         const unit = await fpl0OnLine12();
         await unit.panel.cursor('L');
-        await unit.panel.cursorTo('L', 'FB00'); // wherever the cursor comes on
+        await unit.panel.cursorTo('L', 'FB00', 40); // wherever the cursor comes on
 
         const steps: string[] = [];
         for (let i = 0; i < 11; i++) {
@@ -114,6 +114,17 @@ describe('FlightplanList, scrolling with the cursor (4-3, 4-8)', () => {
             expect(unit.panel.focused('L')).toEqual({row: 5, col: 4, text: '     '});
         });
 
+    // With the cursor off FPL 0 follows the active leg (4-8), its from waypoint FB01 in the top row; the cursor comes on
+    // at that top visible entry, as on any scrolled list (checked in the KLN 89 trainer, 2026-10-08, T23, #355)
+    it('turns the cursor on at the top visible waypoint while the page follows the active leg (4-8, #355)', async () => {
+        const unit = await fpl0OnLine12();
+        expect(left()[0]).toBe('Á 2:FB01   '); // Precondition: scrolled by the active leg, FB00 off the page
+
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L')).toEqual({row: 0, col: 4, text: 'FB01 '});
+    });
+
     // 4-8: with the cursor off, the page follows the active leg: after a manual scroll to the end, turning the cursor
     // off brings the leg back into view, its from waypoint (FB01) in the top row
     it('brings the active leg back when the cursor is turned off after a manual scroll (4-8)', async () => {
@@ -138,7 +149,7 @@ describe('FlightplanList, the cursor row while the page scrolls (characterizatio
         async () => {
             const unit = await fpl0OnLine12();
             await unit.panel.cursor('L');
-            await unit.panel.cursorTo('L', 'FB00');
+            await unit.panel.cursorTo('L', 'FB00', 40);
 
             const rows: number[] = [];
             for (let i = 0; i < 11; i++) {
@@ -158,6 +169,7 @@ describe('FlightplanList, the cursor row while the page scrolls (characterizatio
 async function insertBugleBeforeFx3(unit: HeadlessUnit): Promise<string[]> {
     await unit.panel.selectPage('L', 'FPL 0');
     await unit.panel.cursor('L');
+    await unit.panel.cursorToTop('L'); // over FX1AA: the cursor comes on at the top visible entry (#355)
     await unit.panel.cursorTo('L', 'FX3AA');
     const before = left();
     await unit.panel.enterIdent('L', 'BUGLE');

@@ -417,6 +417,9 @@ class EditableFlightplan {
 
         let numActiveFields = this.firstLine.refreshButtons();
         listItems.push(this.firstLine);
+        //4-2, 4-6: an empty numbered plan starts on its blank first waypoint, after LOAD FPL 0?, a filled one on USE? (4-3).
+        //Taken from the plan as it is now, it changes on the page (#356)
+        this.cursorController.setDefaultCursorField(this.flightplan.idx > 0 && this.flightplan.getLegs().length === 0 ? 1 : 0);
 
         let enterMethod = () => {
         };

@@ -599,9 +599,11 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       field of the INT page reads `___._`. The real cursor covers the point, so the plain point is a bug (#302,
       section 6).
       `cursorTo(side, 'USER POS?')` turns the outer knob until that field has the cursor, stepping over the cursor
-      positions that focus nothing (the SUP page without user waypoints has one after the ident characters) and throwing
-      with the screen after `maxClicks`. It throws at once when the status field of that side shows a page name, which
-      means the cursor is off: the outer knob would turn the pages and the search would end on another page.
+      positions that focus nothing (the SUP page without user waypoints has one after the ident characters). It turns
+      clockwise and, once the cursor stops at the last field, counterclockwise, and throws with the screen after
+      `maxClicks` or when the cursor stops at both ends. It throws at once when the status field of that side shows a
+      page name, which means the cursor is off: the outer knob would turn the pages and the search would end on another
+      page.
       `appendToFpl0(idents)` enters and confirms idents on FPL 0.
     - `readMessages(max = 10)` opens the MSG page and presses MSG until it closes (3-16: the status line's left field is
       empty while the page shows), then waits a second so that the one-time messages that were read go. It returns the
@@ -992,7 +994,7 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   pages, the overlays and the start-up pages). *Spec:* the Turn-On, self-test, Database, VFR-only and OBS warning pages
   and what follows APPROVE?, the overlays and the rule that a pushed page that does not handle a knob is popped (#56,
   from the KLN 89 trainer), the distinct slot classes, group sizes, group memory and five-character page names of the
-  page trees, and the cursor stopping at both ends (the code wraps: pinned as #218). *Characterization only:* the
+  page trees, and the cursor stopping at both ends (#218). *Characterization only:* the
   `FiveSegmentPage` SCAN and ENT order. *Untested:* the `FourSegmentPage` ENT order (by decision) and `TakehomePage`.
 - **The left pages** (`pages/left/`). Every page has a render test and a characterization snapshot, in tree order from
   NAV 1 to the self-test page, with spec tests where the Pilot's Guide or the KLN 89 trainer gives the rule. *Without a
@@ -1171,6 +1173,28 @@ its line, in the comment above it or in the title of its `describe`.
 - **T11:** opening the time entry clears it; after ENT the clock starts from the entered hour and minute with the
   seconds at zero (medium-high, #331).
 - **T12:** everything changed was restored by a relaunch.
+
+**2026-10-11**
+- ENT that accepts a pending entry (the value in inverse with the `Ent` prompt) moves the cursor to the next field:
+  SET 1 latitude, ground speed and heading, SET 2 date and time, the CAL 1 To ident, the user waypoint latitude.
+- ENT on a field whose value changes as the knob turns does nothing, and the cursor stays: CAL 4 Ind, CAL 1 GS, the
+  ALT 2 selected altitude, the APT 1 ident (#354). The maintainer saw the same on CAL 4.
+- ENT that accepts the last field of SET 2 (Mag Var) leaves no cursor on the page: the next outer click changes the page
+  group and the next inner click the page, as with the cursor off, while the status column still shows `*CRSR*`.
+  Finishing a user waypoint turns the cursor off. The 90B guide decides for the last field of a page: the pilot turns
+  the cursor off with CRSR after ENT (5-17, 3-47), so the cursor stays on (#218).
+- Not observable: the 89's self-test page has no baro, so its ENT over the baro digits (3-6, 3-7) cannot be checked.
+- The third-party AVsoftech KLN 90B trainer, which is unreliable: ENT on each self-test baro digit moved the cursor on
+  to the next one and from the last to APPROVE?, whether the digit was changed or not.
+- The maintainer: neither trainer remembers the cursor field. Turned off and on, the cursor starts on the page's first
+  field; the AVsoftech trainer starts its self-test page on the baro and on the date after the cursor is turned off and
+  on, and its Super NAV 5 always on the map scale (#355).
+- Numbered flight plans (#356): CRSR puts the cursor on the first field on the page. That is the blank first waypoint
+  of an empty plan, also right after `Delete FPL?` (CRSR skips `Copy FPL 0?`), and `Use?` on a plan with waypoints,
+  whether the page was left or not, and also after a plan was built on the page from empty. Copying FPL 0 into a
+  plan turns the cursor off. The 89 keeps its header on the top line while the rows below scroll, so it cannot show the
+  case 4-3 describes. The unreliable AVsoftech trainer, whose header scrolls off as on the 90B, put the cursor on the
+  top visible waypoint of a long plan built on the page.
 
 # 9. Next steps
 
@@ -1368,7 +1392,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 
 ## Controls
 
-- **The 4-3 cursor tests** (the cursor field remembered while the page is not left) sit in `WaypointEditor.test.ts`,
+- **The 4-3 cursor tests** (where the cursor comes on over a numbered plan, #355) sit in `WaypointEditor.test.ts`,
   though their subject is `CursorController`; they could move to `FplPage.test.ts` or a `CursorController` test file.
 - The controls' bugs that the right pages showed (#282) are pinned on the pages and at control level.
 - **Leads** (seen and not confirmed or not filed):
@@ -1402,8 +1426,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       0; single-digit temperatures keep a zero (the trainer could not answer); the Super NAV 1 FLAG row draws 22 cells
       instead of 23.
     - The trainer brings the cursor back on the first field after it is turned off and on, and on the top visible entry
-      of a scrolled list (section 8, 2026-10-08, T7 and T23); 4-3 implies that the 90B remembers the field, which the
-      code does and the 4-3 tests hold.
+      of a scrolled list (section 8, 2026-10-08, T7 and T23; 2026-10-11). The code does the same (#355): a page's start
+      field holds every time the cursor comes on, and the list pages start on the top visible entry while scrolled,
+      which also explains why 4-3 sends a pilot back to USE? after building a long plan.
 
 ## Boot, power and the unit as a whole
 

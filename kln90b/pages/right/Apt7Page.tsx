@@ -536,6 +536,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
         }
 
         this.cursorController = new CursorController(this.children, this.warnIfDBOutdated.bind(this));
+        this.cursorController.setStartFieldProvider(() => this.children.get("list").topVisibleField());
 
     }
     public render(): VNode {
@@ -676,6 +677,7 @@ class Apt7RunwayPage extends Apt7SelectorPage {
         });
 
         this.cursorController = new CursorController(this.children);
+        this.cursorController.setStartFieldProvider(() => this.children.get("list").topVisibleField()); //T23: the top visible entry of a scrolled list (#355)
         this.cursorController.setCursorActive(true);
     }
 
@@ -734,6 +736,7 @@ class Apt7TransitionPage extends Apt7SelectorPage {
         });
 
         this.cursorController = new CursorController(this.children);
+        this.cursorController.setStartFieldProvider(() => this.children.get("list").topVisibleField()); //T23: the top visible entry of a scrolled list (#355)
         this.cursorController.setCursorActive(true);
     }
 
@@ -797,6 +800,7 @@ class Apt7PreviewPage extends Apt7SelectorPage {
         });
 
         this.cursorController = new CursorController(this.children);
+        this.cursorController.setStartFieldProvider(() => this.children.get("list").topVisibleField()); //T23: the top visible entry of a scrolled list (#355)
         this.cursorController.setCursorActive(true);
         this.cursorController.focusIndex(props.legs.length); //LOAD IN FPL is preselected: https://youtu.be/idv2Hh6PQnw?t=487
     }
