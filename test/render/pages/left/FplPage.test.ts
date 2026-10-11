@@ -189,6 +189,26 @@ async function bootWithApproach() {
 }
 
 describe('FPL 0 page with an approach', () => {
+    // Characterization: after a Direct To to the IAF the page follows the active waypoint with the approach header in its
+    // top row (the from waypoint scrolled off, #239). The cursor comes on at that top visible entry (T23, #355), the
+    // header, which then reads CHANGE APR? and asks for ENT (6-7). The guide does not show this case
+    it('characterization: turns the cursor on at the approach header in the top row, which reads CHANGE APR?', async () => {
+        const unit = await bootWithApproach();
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'IAFAAà', 40);
+        await unit.panel.dct();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(Screen.read().status().left).toBe('FPL 0'); // Precondition: the cursor is off
+        expect(left().slice(0, 2).map(r => r.slice(1))).toEqual(['R27-KPRC  ', ' 2 IAFAAà ']); // Precondition
+
+        await unit.panel.cursor('L');
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('L')).toEqual({row: 0, col: 0, text: 'CHANGE APR?'});
+        expect(Screen.read().status().mode).toBe('enr-leg ent');
+    });
     // 6-5: a header ABBBB-CCCC above the approach waypoints (type letter, runway, airport). 6-7: approach waypoints
     // have a blank instead of the colon after their number. 6-6 to 6-7: the IAF, FAF, MAP and missed approach holding
     // point carry a suffix (i, f, m, h); the font kln90b.ttf draws à, á, ã and â as a dash and that small letter
@@ -437,6 +457,21 @@ describe('FPL 1 to FPL 25 pages', () => {
         await unit.panel.selectPage('L', 'FPL 7');
         expect(left()).toEqual(['LOAD FPL 0?', '  1:       ', '           ', '           ', '           ', '           ']);
 
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L')).toEqual({row: 1, col: 4, text: '     '});
+    });
+
+    // The blank first waypoint is the start every time the cursor comes on, also after it was left on LOAD FPL 0? and
+    // turned off (checked in the KLN 89 trainer, 2026-10-11, #355, #356)
+    it('turns the cursor on over the blank first waypoint again after it was turned off on LOAD FPL 0? (4-2, #356)', async () => {
+        const unit = await bootRoute({});
+        await unit.panel.selectPage('L', 'FPL 7');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', -1);
+        expect(unit.panel.focused('L').text).toBe('LOAD FPL 0?'); // Precondition
+
+        await unit.panel.cursor('L');
         await unit.panel.cursor('L');
 
         expect(unit.panel.focused('L')).toEqual({row: 1, col: 4, text: '     '});

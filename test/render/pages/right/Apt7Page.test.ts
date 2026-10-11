@@ -294,8 +294,8 @@ async function bootOnApt7(o: { sids: string[], stars: boolean, rf?: boolean }, c
 }
 
 describe('APT 7 procedure list (3-49, 6-21)', () => {
-    // A scrolled list stays scrolled while the cursor is off, and the cursor comes back on its top visible entry
-    // (checked in the KLN 89 trainer, 2026-10-08, T23, #355)
+    // The cursor comes on at the first procedure of the list, also after it was left on another one and turned off and
+    // on (the unit does not remember the field, checked in the KLN 89 trainer, 2026-10-11, #355)
     it('puts the cursor on the first procedure again when it is turned off and on (#355)', async () => {
         const unit = await bootOnApt7({sids: ['DEPA', 'DEPB', 'DEPC', 'DEPD', 'DEPE', 'DEPF', 'DEPG', 'DEPH', 'DEPI', 'DEPJ'], stars: false});
         await unit.panel.cursor('R');
@@ -310,6 +310,8 @@ describe('APT 7 procedure list (3-49, 6-21)', () => {
         expect(unit.panel.focused('R').text).toContain('DEPA');
     });
 
+    // A scrolled list stays scrolled while the cursor is off, and the cursor comes back on its top visible entry
+    // (checked in the KLN 89 trainer, 2026-10-08, T23, #355)
     it('puts the cursor on the top visible procedure of the scrolled list when it is turned off and on (#355)', async () => {
         const unit = await bootOnApt7({sids: ['DEPA', 'DEPB', 'DEPC', 'DEPD', 'DEPE', 'DEPF', 'DEPG', 'DEPH', 'DEPI', 'DEPJ'], stars: false});
         await unit.panel.cursor('R');
