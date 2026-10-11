@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
-import {fuelComputer, panelXml} from '../../harness/panelXml';
+import {fuelComputer, NO_ALTIMETER, panelXml} from '../../harness/panelXml';
+import {airport} from '../../harness/navdata/builders';
 import {messages} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
 import {OneTimeMessage} from '../../../kln90b/data/MessageHandler';
@@ -103,9 +104,9 @@ describe('SET FUEL ON BOARD ON OTH 5 IF NECESSARY', () => {
 });
 
 describe('messages over a power cycle', () => {
-    // MessageHandler.ts:32 carries "todo clear messages when power is off". Today an unread message posted before the
-    // power-off is still on the MSG page after the power-on. The maintainer ruled it a bug: clear at the power-off
-    it.fails('does not keep an unread message of the previous power-on (#176)', async () => {
+    // A message describes the power-on in which it was posted. The maintainer ruled that the unit loses its messages at
+    // the power-off (#176)
+    it('does not keep an unread message of the previous power-on (#176)', async () => {
         const unit = await bootUnit();
         await settle(unit);
         unit.props.messageHandler.addMessage(new OneTimeMessage(['BEFORE THE CYCLE']));
@@ -117,8 +118,8 @@ describe('messages over a power cycle', () => {
         expect(messages(unit)).not.toContain('BEFORE THE CYCLE');
     });
 
-    // The sibling of the pin: the cycle itself completes, and the message is there before it
-    it('holds the message before the cycle (sibling of #176) (characterization)', async () => {
+    // The setup of the tests above: the cycle itself completes, and the message is there before it
+    it('holds the message before the cycle (#176) (characterization)', async () => {
         const unit = await bootUnit();
         await settle(unit);
         unit.props.messageHandler.addMessage(new OneTimeMessage(['BEFORE THE CYCLE']));
@@ -129,5 +130,75 @@ describe('messages over a power cycle', () => {
         await unit.panel.approveSelfTest();
 
         expect(unit.errors).toEqual([]);
+    });
+});
+
+describe('messages at the power-off (#176)', () => {
+    it('are gone while the unit is off, with the annunciator', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        unit.props.messageHandler.addMessage(new OneTimeMessage(['BEFORE THE POWER-OFF']));
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(messages(unit)).toContain('BEFORE THE POWER-OFF'); // the precondition: the list holds it
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.messageHandler.hasMessages()).toBe(false);
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
+    });
+
+    it('are gone after the electricity went away and came back', async () => {
+        const unit = await bootUnit({panelXml: panelXml({'Input.ElectricitySimVar': 'CIRCUIT ON:1'})});
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        await unit.panel.approveSelfTest();
+        unit.props.messageHandler.addMessage(new OneTimeMessage(['BEFORE THE LOSS']));
+        expect(messages(unit)).toContain('BEFORE THE LOSS'); // the precondition: the list holds it
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(3000); // beyond the ride-through a fix of #332 may add
+        expect(unit.props.messageHandler.hasMessages()).toBe(false);
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        await unit.panel.approveSelfTest();
+
+        expect(messages(unit)).not.toContain('BEFORE THE LOSS');
+    });
+
+    // This project's choice, not a fact from the manuals: a persistent message (ALTITUDE FAIL without an altitude
+    // input) whose condition holds again after the power-on is a new message again, even when it had been read before
+    // the power-off
+    it('bring a persistent message back unread when its condition holds again (characterization)', async () => {
+        const unit = await bootUnit({panelXml: panelXml(NO_ALTIMETER)});
+        await settle(unit);
+        await unit.panel.readMessages(); // the persistent message stays after it is read
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(messages(unit)).toEqual(['ALTITUDE FAIL']); // the precondition: persistent and read
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
+
+        await unit.panel.powerCycle();
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(messages(unit)).toContain('ALTITUDE FAIL');
+        expect(unit.props.messageHandler.getMessages().find(m => m.message[0] === 'ALTITUDE FAIL')!.seen).toBe(false);
+    });
+
+    // A message posted before the first power-on (the restore of the user data runs while the unit starts) belongs to
+    // that power-on, so only a power-off removes it, not the power-on itself
+    it('leave a message posted at the start-up alone when the unit is switched on', async () => {
+        const unit = await bootUnit({
+            engineRunning: false,
+            facilities: [airport('KAAA', 47, 8)],
+            // The type letter Q is no facility type, so the restore fails and the unit posts USER DATA LOST (#144)
+            storage: {userDataFormat: 2, wpt0: 'QXX        BAD     +4700.00+00800.00', fpl1: 'A          KAAA    '},
+        });
+        await unit.panel.powerOn();
+        await vi.advanceTimersByTimeAsync(19_000);
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(messages(unit)).toContain('USER DATA LOST');
     });
 });

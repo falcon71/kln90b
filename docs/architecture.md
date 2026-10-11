@@ -517,6 +517,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       conditions.
     - `MessageHandler` (a 1 Hz tickable) keeps `activeMessages`. Each tick it drops invalid messages, adds
       `persistentMessages` whose condition becomes true, and resets their `seen` flag when the condition goes false.
+      `KLN90BCore` calls `clear()` at every power-off (also a loss of electricity): the active messages go and the
+      persistent ones return once their condition holds. They return unread, which is this project's choice and not a
+      fact from the manuals.
     - Messages are added with `messageHandler.addMessage(new OneTimeMessage(["LINE1","LINE2"]))`; each line holds at
       most about 22 to 23 characters.
 - `buildPersistentMessages(props)` creates: `AltitudeFailMessage`, `ArmGPSApproachMessage`, `DatabaseOutOfDateMessage`,

@@ -30,7 +30,7 @@ import {
 } from '@microsoft/msfs-sdk';
 
 import {KLN90BPlatform} from "./KLN90BPlatform";
-import {PowerButton} from "./PowerButton";
+import {PowerButton, PowerEvent} from "./PowerButton";
 import {KLN90BSettingSaveManager} from "./settings/KLN90BUserSettingsSaverManager";
 import {PageProps} from "./pages/Page";
 import {PageManager} from "./pages/PageManager";
@@ -153,6 +153,12 @@ export class KLN90BCore {
         this.settingSaveManager.startAutoSave(saveKey);
 
         this.hEventPublisher = new HEventPublisher(this.bus);
+
+        this.bus.getSubscriber<PowerEvent>().on("powerEvent").handle(evt => {
+            if (!evt.isPowered) {
+                this.messageHandler.clear();
+            }
+        });
 
         this.keyboardEventSub = this.bus.getSubscriber<KeyboardEvent>().on("keyboardevent").handle(this.handleKeyboardEvent.bind(this));
 
