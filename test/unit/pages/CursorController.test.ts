@@ -268,9 +268,9 @@ describe('CursorController cursor on and off (characterization)', () => {
 });
 
 // 3-53: the date and time cannot be set while satellites provide them, so on SET 2 they turn read-only at the first fix.
-// A cursor turned on afterwards must land on a field that is still there; it throws today (Math.min against
-// fields.length instead of fields.length - 1, CursorController.ts:123). The passing sibling is the cursor memory test
-// above (the same flow without a field turning read-only); the render pins on SET 2 are in Set2Page.test.ts.
+// A cursor turned on afterwards lands on a field that is still there, and a cursor that is on moves off a field that
+// turns read-only under it. The sibling is the cursor memory test above (the same flow without a field turning
+// read-only); the render tests on SET 2 are in Set2Page.test.ts.
 describe('CursorController when fields turn read-only (3-53, #217)', () => {
     it('comes back on the last field when the field it was on has turned read-only (#217)', () => {
         const all = [new FakeField('date'), new FakeField('time'), new FakeField('zone')];
@@ -312,6 +312,53 @@ describe('CursorController when fields turn read-only (3-53, #217)', () => {
         expect(focused(cc, all)).toBe('time');
         cc.outerRight();
         expect(focused(cc, all)).toBe('zone');
+    });
+
+    // The same, but the cursor is turned off before anything asks for the focused field: only the field the cursor was on
+    // loses the focus, and the cursor comes back on it
+    it('turns the cursor off and on again on its field when a field before it has turned read-only (#217)', () => {
+        const all = [new FakeField('date'), new FakeField('time'), new FakeField('zone')];
+        const cc = new CursorController(children({date: all[0], time: all[1], zone: all[2]}));
+        cc.setCursorActive(true);
+        cc.outerRight();
+        all[0].isReadonly = true;
+
+        cc.setCursorActive(false);
+        expect(focused(cc, all)).toBe('-');
+        cc.setCursorActive(true);
+
+        expect(focused(cc, all)).toBe('time');
+    });
+
+    // The field under the cursor turns read-only and the cursor is turned off before anything asks for the focused field:
+    // the field no longer shows the cursor
+    it('takes the cursor off a field that has turned read-only when the cursor is turned off (#217)', () => {
+        const all = [new FakeField('date'), new FakeField('time'), new FakeField('zone')];
+        const cc = new CursorController(children({date: all[0], time: all[1], zone: all[2]}));
+        cc.setCursorActive(true);
+        cc.outerRight();
+        all[1].isReadonly = true;
+
+        cc.setCursorActive(false);
+
+        expect(all.filter(f => f.isFocused)).toEqual([]);
+    });
+
+    // A list replaces its items (refreshChildren). The replaced item is not told that it lost the focus: a replaced
+    // flight plan item would abort the insert it holds (FlightplanListItem.setFocused). The new item at the position
+    // takes the cursor
+    it('does not unfocus an item that a list has replaced, and focuses the new one (#217)', () => {
+        const old = new FakeField('old');
+        const cc = new CursorController(children({old}));
+        cc.setCursorActive(true);
+        const fresh = new FakeField('new');
+
+        cc.refreshChildren(children({fresh}));
+        cc.isEnterAccepted(); // what the status line asks on every display tick (StatusLine.tick)
+
+        expect(old.isFocused).toBe(true);
+        expect(fresh.isFocused).toBe(true);
+        expect(cc.getCurrentFocusedField()).toBe(fresh);
     });
 
     // Every field turns read-only: the cursor turns off, once, and nothing throws
@@ -500,9 +547,8 @@ describe('CursorController ENT (#354)', () => {
     });
 
     // The self-test page is the exception: 3-6 step 9 has the pilot press ENT after the baro, whose digits change as the
-    // knob turns, and 3-7 step 11 then finds the cursor on APPROVE? or before it. The AVsoftech KLN90B trainer steps
-    // through the baro digits on ENT, edited or not (2026-10-11). A controller built for such a page moves on after
-    // every ENT that does not keep the focus
+    // knob turns, and 3-7 step 11 then finds the cursor on APPROVE? or before it. A controller built for such a page
+    // moves on after every ENT that does not keep the focus
     it('moves the cursor on after an ENT that no field handled when the page asks for it (3-6, 3-7)', async () => {
         const all = [new FakeField('a'), new FakeField('b'), new FakeField('c')];
         const cc = new CursorController(children({a: all[0], b: all[1], c: all[2]}), undefined, true);

@@ -84,7 +84,8 @@ export class CursorController implements CursorHandler {
                 this.cursorField = index;
             } else {
                 //The field under the cursor is gone, the cursor moves to the field at its position or the last one left.
-                //A list replaces its items, only a field that is still on the page loses the focus
+                //Only a field that is still on the page loses the focus: a list replaces its items, and turning off a
+                //replaced flight plan item aborts the insert it holds (FlightplanListItem.setFocused)
                 if (this.focusedField?.isReadonly) {
                     this.focusedField.setFocused(false);
                 }
@@ -174,10 +175,17 @@ export class CursorController implements CursorHandler {
             }
             this.focusAt(Math.min(this.cursorField, fields.length - 1), fields); //4.1.2 This sounds like, the last cursorposition is remembered
         } else {
-            //The field at the cursor, if it is still there. Not getCurrentFocusedField, which would move the cursor (#217)
-            fields[this.cursorField]?.setFocused(false);
-            if (this.focusedField?.isReadonly) {
-                this.focusedField.setFocused(false);
+            //Not getCurrentFocusedField, which would move the cursor (#217)
+            const index = this.focusedField === null ? -1 : fields.indexOf(this.focusedField);
+            if (index !== -1) {
+                //A field before the cursor may have changed since: the position follows the field
+                this.cursorField = index;
+                this.focusedField!.setFocused(false);
+            } else {
+                fields[this.cursorField]?.setFocused(false);
+                if (this.focusedField?.isReadonly) {
+                    this.focusedField.setFocused(false);
+                }
             }
             this.focusedField = null;
             this.cursorActive = active;

@@ -108,11 +108,26 @@ describe('self-test right page cursor (spec)', () => {
 });
 
 describe('self-test right page ENT on the baro (3-6, 3-7, #354)', () => {
-    // 3-6 step 9 has the pilot press ENT after the baro, and 3-7 step 11 finds the cursor on APPROVE? or before it. The
-    // baro digits change as the knob turns, so ENT has nothing to accept, yet on this page it moves the cursor on: the
-    // AVsoftech KLN90B trainer steps through the baro digits on ENT, edited or not (2026-10-11). Elsewhere such an ENT
-    // leaves the cursor where it is (#354)
-    it('steps over the three baro positions to APPROVE? with ENT (3-6, 3-7)', async () => {
+    // 3-6 step 9 has the pilot press ENT once the baro is set, and 3-7 step 11 then finds the cursor on APPROVE? or before
+    // it. The baro digits change as the knob turns, so ENT has nothing to accept, yet on this page it moves the cursor
+    // on. Elsewhere such an ENT leaves the cursor where it is (#354)
+    it('moves the cursor from the last baro position to APPROVE? with ENT (3-6, 3-7)', async () => {
+        const unit = await onSelfTestPage();
+        await unit.panel.cursorTo('R', '29');
+        await unit.panel.outer('R', 2); // the fourth digit, the last baro position
+        expect(unit.panel.focused('R')).toEqual({row: 4, col: 21, text: '2'}); // Precondition
+
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('R')).toEqual({row: 5, col: 14, text: 'APPROVE?'});
+    });
+});
+
+describe('self-test right page ENT on the baro (characterization)', () => {
+    // The guide does not say where ENT on the first two baro positions puts the cursor; the code moves it on to the next
+    // position, as ENT does elsewhere after an entry
+    it('steps over the three baro positions to APPROVE? with ENT (characterization)', async () => {
         const unit = await onSelfTestPage();
         await unit.panel.cursorTo('R', '29');
 

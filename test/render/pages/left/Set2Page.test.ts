@@ -110,6 +110,23 @@ describe('SET 2 cursor when the GPS gets its first fix (3-53)', () => {
         expect(dateTimeMask()).toEqual(ON_ZONE); // only the time zone shows the cursor, the time no longer does
     });
 
+    // Outside the variation area line 6 is a field after the time zone. The date and time before the zone turn
+    // read-only at the fix, and the cursor stays on the zone; it does not move on to line 6 at the zone's old position
+    it('keeps the cursor on the time zone when the date and time before it turn read-only (5-44, #217)', async () => {
+        const unit = await bootUnit({coldGps: true, position: {lat: 74.5, lon: 8.0}});
+        await unit.panel.selectPage('L', 'SET 2');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 2);
+        expect(unit.panel.focused('L').text).toBe('UTC'); // Precondition
+        expect(Screen.read().rows('L')[5]).toBe('MAG V   0°E'); // Precondition: line 6 is a field after the zone
+
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('L')).toEqual({row: 3, col: 8, text: 'UTC'});
+    });
+
     // Sibling of the test above with the cursor on the date, the first field: the time zone moves up to its position, and
     // the date no longer shows the cursor
     it('moves the cursor to the time zone when the fix comes while the cursor is on the date (#217)', async () => {

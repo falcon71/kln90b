@@ -601,8 +601,9 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       `cursorTo(side, 'USER POS?')` turns the outer knob until that field has the cursor, stepping over the cursor
       positions that focus nothing (the SUP page without user waypoints has one after the ident characters). It turns
       clockwise and, once the cursor stops at the last field, counterclockwise, and throws with the screen after
-      `maxClicks` or when the cursor stops at both ends. It throws at once when the status field of that side shows a page name, which
-      means the cursor is off: the outer knob would turn the pages and the search would end on another page.
+      `maxClicks` or when the cursor stops at both ends. It throws at once when the status field of that side shows a
+      page name, which means the cursor is off: the outer knob would turn the pages and the search would end on another
+      page.
       `appendToFpl0(idents)` enters and confirms idents on FPL 0.
     - `readMessages(max = 10)` opens the MSG page and presses MSG until it closes (3-16: the status line's left field is
       empty while the page shows), then waits a second so that the one-time messages that were read go. It returns the
@@ -1183,6 +1184,8 @@ its line, in the comment above it or in the title of its `describe`.
   Finishing a user waypoint turns the cursor off. The 90B guide decides for the last field of a page: the pilot turns
   the cursor off with CRSR after ENT (5-17, 3-47), so the cursor stays on (#218).
 - Not observable: the 89's self-test page has no baro, so its ENT over the baro digits (3-6, 3-7) cannot be checked.
+- The third-party AVsoftech KLN 90B trainer, which is unreliable: ENT on each self-test baro digit moved the cursor on
+  to the next one and from the last to APPROVE?, whether the digit was changed or not.
 
 # 9. Next steps
 
