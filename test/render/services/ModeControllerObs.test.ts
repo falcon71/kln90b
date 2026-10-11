@@ -330,6 +330,7 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
         await moveAircraft(unit, pointFrom(vvv, 0, 3), {groundspeedKt: 120, trackTrue: 180});
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // the first waypoint: the cursor comes on at the top visible entry (#355)
         await unit.panel.outer('L', 5); // The approach header row counts as a cursor position
         await unit.panel.dct();
         await unit.panel.ent();

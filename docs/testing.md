@@ -1186,6 +1186,9 @@ its line, in the comment above it or in the title of its `describe`.
 - Not observable: the 89's self-test page has no baro, so its ENT over the baro digits (3-6, 3-7) cannot be checked.
 - The third-party AVsoftech KLN 90B trainer, which is unreliable: ENT on each self-test baro digit moved the cursor on
   to the next one and from the last to APPROVE?, whether the digit was changed or not.
+- The maintainer: neither trainer remembers the cursor field. Turned off and on, the cursor starts on the page's first
+  field; the AVsoftech trainer starts its self-test page on the baro and on the date after the cursor is turned off and
+  on, and its Super NAV 5 always on the map scale (#355).
 
 # 9. Next steps
 
@@ -1417,8 +1420,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       0; single-digit temperatures keep a zero (the trainer could not answer); the Super NAV 1 FLAG row draws 22 cells
       instead of 23.
     - The trainer brings the cursor back on the first field after it is turned off and on, and on the top visible entry
-      of a scrolled list (section 8, 2026-10-08, T7 and T23); 4-3 implies that the 90B remembers the field, which the
-      code does and the 4-3 tests hold.
+      of a scrolled list (section 8, 2026-10-08, T7 and T23; 2026-10-11). The code does the same (#355): a page's start
+      field holds every time the cursor comes on, and the list pages start on the top visible entry while scrolled,
+      which also explains why 4-3 sends a pilot back to USE? after building a long plan.
 
 ## Boot, power and the unit as a whole
 

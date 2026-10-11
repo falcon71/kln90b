@@ -370,11 +370,10 @@ describe('waypoint editor with an unknown identifier', () => {
     });
 });
 
-// 4-3 (section 4.1.2, step 3) sends a pilot who stayed on the page after building the plan back to USE? with the
-// outer knob. So the 90B keeps the cursor where it was while the page is not left, and shows it over USE? when the
-// page is shown anew. The code remembers the field
-// (CursorController.setCursorActive cites the same step). The KLN 89 trainer comes back on the first field
-// (2026-10-08, T7), which is a note and not a pin: the 90B guide wins
+// 4-3 (section 4.1.2, step 3): the cursor comes on over USE?, and a pilot who stayed on the page after building the
+// plan turns the outer knob back to USE?. The unit does not remember the cursor field: the KLN 89 trainer comes back on
+// the first field (2026-10-08, T7; 2026-10-11), and on the top visible entry of a scrolled list (2026-10-08, T23). A
+// plan long enough to scroll leaves USE? out of view, which is why step 3 sends the pilot back to it (#355)
 describe('waypoint editor on a numbered flight plan, the cursor field (4-3, section 4.1.2 step 3)', () => {
     /** FPL 1 holds KAAA, KSAT and KS01, shown with the cursor off */
     async function fpl1(): Promise<HeadlessUnit> {
@@ -396,9 +395,9 @@ describe('waypoint editor on a numbered flight plan, the cursor field (4-3, sect
         expect(unit.panel.focused('L')).toEqual({row: 0, col: 0, text: 'USE?'});
     });
 
-    // 4-3, step 3: the cursor is where it was left while the page has not been left, so a pilot who has just created
-    // the plan has to turn the outer knob back to USE?. The cursor is on the second position when it goes off
-    it('puts the cursor back on the position it was left on when it is turned off and on (4-3)', async () => {
+    // The cursor does not come back where it was left: on a plan that does not scroll it comes on over USE? again
+    // (checked in the KLN 89 trainer, 2026-10-11, #355)
+    it('shows the cursor over USE? again when it is turned off and on (4-3, #355)', async () => {
         const unit = await fpl1();
         await unit.panel.cursor('L');
         await unit.panel.outer('L', 3);
@@ -408,7 +407,25 @@ describe('waypoint editor on a numbered flight plan, the cursor field (4-3, sect
         expect(Screen.read().status().left).toBe('FPL 1'); // precondition: the cursor is off
         await unit.panel.cursor('L');
 
-        expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: 'KSAT '});
+        expect(unit.panel.focused('L')).toEqual({row: 0, col: 0, text: 'USE?'});
+    });
+
+    // A long plan stays scrolled while the cursor is off, and the cursor comes back on the top visible waypoint, below
+    // USE? (4-3, step 3; checked in the KLN 89 trainer, 2026-10-08, T23, #355)
+    it('puts the cursor on the top visible waypoint of a scrolled plan when it is turned off and on (4-3, #355)', async () => {
+        const legs = Array.from({length: 8}, (_, i) => airport(`KS0${i}`, 47.5 - i * 0.1, 8.0));
+        const unit = await bootUnit({...world(), facilities: [...world().facilities, ...legs], storage: savedFlightplan(1, legs)});
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.selectPage('L', 'FPL 1');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'KS07');
+        await unit.panel.cursor('L');
+        const top = Screen.read().rows('L')[0];
+        expect(top).toMatch(/^\s+\d:KS0\d/); // precondition: the plan stays scrolled, a waypoint in the top row
+
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L')).toEqual({row: 0, col: 4, text: top.slice(4, 9)});
     });
 
     // 4-3, step 3: once the page has been left, the cursor is over USE? again (the sibling of the test above, which

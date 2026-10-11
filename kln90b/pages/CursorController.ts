@@ -50,7 +50,13 @@ export enum EnterResult {
 export class CursorController implements CursorHandler {
     public cursorActive: boolean = false;
     public cursorField: number = 0;
-    private defaultFieldIsLast: boolean = false;
+    /**
+     * Where the cursor starts each time it is turned on. The unit does not remember where it was, checked in the KLN 89
+     * trainer (#355)
+     */
+    private startField: number = 0;
+    private startFieldIsLast: boolean = false;
+    private startFieldProvider: () => Field | null = () => null;
     /**
      * The field this controller focused last. It can turn read-only under the cursor (#217)
      */
@@ -126,27 +132,31 @@ export class CursorController implements CursorHandler {
     }
 
     /**
-     * Sets the default field that will be selected the next time the cursor is activated.
-     * Has no effect if the cursor is already active.
+     * Sets the field the cursor starts on each time it is activated. A cursor that is already active stays where it is.
      * @param defaultField
      */
     public setDefaultCursorField(defaultField: number): void {
-        if (this.cursorActive) {
-            return;
+        this.startField = defaultField;
+        this.startFieldIsLast = false;
+        if (!this.cursorActive) {
+            this.cursorField = defaultField;
         }
-        this.cursorField = defaultField;
-        this.defaultFieldIsLast = false;
     }
 
     /**
-     * The cursor will start on the last field the next time it is activated, however many fields the page has by then.
-     * Has no effect if the cursor is already active.
+     * The cursor starts on the last field each time it is activated, however many fields the page has by then.
+     * A cursor that is already active stays where it is.
      */
     public setDefaultCursorFieldToLast(): void {
-        if (this.cursorActive) {
-            return;
-        }
-        this.defaultFieldIsLast = true;
+        this.startFieldIsLast = true;
+    }
+
+    /**
+     * Names the field the cursor starts on when it is activated, overriding the start field when it returns a field.
+     * A scrolled list returns its top visible entry, checked in the KLN 89 trainer (2026-10-08, T23, #355)
+     */
+    public setStartFieldProvider(provider: () => Field | null): void {
+        this.startFieldProvider = provider;
     }
 
     public toggleCursor(): boolean {
@@ -169,11 +179,14 @@ export class CursorController implements CursorHandler {
         }
         if (active) {
             this.cursorActive = active;
-            if (this.defaultFieldIsLast) {
-                this.cursorField = fields.length - 1;
-                this.defaultFieldIsLast = false;
+            //The cursor does not come back where it was, it starts on the start field every time (#355)
+            const provided = this.startFieldProvider();
+            const providedIndex = provided === null ? -1 : fields.indexOf(provided);
+            let start = this.startFieldIsLast ? fields.length - 1 : this.startField;
+            if (providedIndex !== -1) {
+                start = providedIndex;
             }
-            this.focusAt(Math.min(this.cursorField, fields.length - 1), fields); //4.1.2 This sounds like, the last cursorposition is remembered
+            this.focusAt(Math.min(start, fields.length - 1), fields);
         } else {
             //Not getCurrentFocusedField, which would move the cursor (#217)
             const index = this.focusedField === null ? -1 : fields.indexOf(this.focusedField);

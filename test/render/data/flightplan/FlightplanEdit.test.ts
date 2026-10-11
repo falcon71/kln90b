@@ -29,7 +29,8 @@ async function bootFull(nmAlong: number) {
 async function typeKnewOver(unit: HeadlessUnit, rowsDown: number) {
     await unit.panel.selectPage('L', 'FPL 0');
     await unit.panel.cursor('L');
-    expect(unit.panel.focused('L').text.trim()).toBe('FA00'); // The cursor starts on the first waypoint
+    await unit.panel.cursorToTop('L'); // the cursor comes on at the top visible entry (#355)
+    expect(unit.panel.focused('L').text.trim()).toBe('FA00'); // The first waypoint
     if (rowsDown > 0) {
         await unit.panel.outer('L', rowsDown);
     }

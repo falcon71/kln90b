@@ -196,7 +196,8 @@ describe('FPL 0 page with an approach', () => {
     it('shows the approach header, the approach waypoints without colon and the fix suffixes (6-5 to 6-7)', async () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
-        await unit.panel.cursor('L'); // on ENRAA, the first waypoint: the page shows the top of the plan
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // on ENRAA, the first waypoint: the page shows the top of the plan (#355)
 
         expect(left().map(r => r.slice(1))).toEqual([' 1:ENRAA  ', 'R27-KPRC  ', ' 2 IAFAAà ', ' 3 IFAAA  ', ' 4 FAFAAá ', ' 7:KPRC   ']);
 
@@ -212,6 +213,7 @@ describe('FPL 0 page with an approach', () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // the cursor comes on at the top visible entry (#355)
         await unit.panel.outer('L', 2);
         expect(unit.panel.focused('L').text).toBe('IAFAAà'); // Precondition
         const before = left();
@@ -228,6 +230,7 @@ describe('FPL 0 page with an approach', () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // the cursor comes on at the top visible entry (#355)
         await unit.panel.outer('L', 2);
         expect(unit.panel.focused('L').text).toBe('IAFAAà'); // Precondition
         const before = left();
@@ -246,6 +249,7 @@ describe('FPL 0 page with an approach', () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // the cursor comes on at the top visible entry (#355)
         await unit.panel.outer('L', 2);
         expect(unit.panel.focused('L').text).toBe('IAFAAà'); // Precondition: an approach waypoint under the cursor
         expect(left().map(r => r.slice(1))).toContain(' 2 IAFAAà ');
@@ -266,6 +270,7 @@ describe('FPL 0 page with an approach', () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // the cursor comes on at the top visible entry (#355)
         await unit.panel.outer('L', 2);
         const before = left();
 

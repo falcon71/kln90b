@@ -424,6 +424,20 @@ describe('NAV 5 page map', () => {
         expect(seen).toEqual([...choices, 'N^  ']);
     });
 
+    // 3-34: the cursor first lands on the range scale, also after it was left on the orientation and turned off and on
+    // (the unit does not remember the field, checked in the KLN 89 trainer, 2026-10-11, #355)
+    it('puts the cursor on the range scale again when it is turned off and on (3-34, #355)', async () => {
+        const {unit} = await nav5OnRoute();
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', -1);
+        expect(unit.panel.focused('L')).toMatchObject({row: 5, col: 0}); // Precondition: the orientation
+
+        await unit.panel.cursor('L');
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L')).toEqual({row: 5, col: 7, text: '  40'});
+    });
+
     // 3-34: the left cursor on NAV 5 visits two fields, the range scale and the orientation counterclockwise from it,
     // and stops at the orientation (4-3, #218). This is the sibling of the #232 test below.
     it('visits the orientation and the range scale with the cursor (3-34)', async () => {

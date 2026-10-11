@@ -48,10 +48,11 @@ export abstract class FplPage extends SixLineHalfPage {
         });
 
         if (this.fplIdx > 0 && this.flightplan.getLegs().length === 0) {
-            this.cursorController.cursorField = 1; //first wpt
+            this.cursorController.setDefaultCursorField(1); //first wpt
         }
 
         this.cursorController.refreshChildren(this.children);
+        this.cursorController.setStartFieldProvider(() => this.children.get("wptList").topVisibleField());
     }
 
 

@@ -125,6 +125,20 @@ describe('Super NAV 5 page (characterization)', () => {
 });
 
 describe('Super NAV 5 page', () => {
+    // 3-36: the left cursor lands on the map scale every time it is turned on, also after it was left on a line above
+    // (the unit does not remember the field, checked in the KLN 89 trainer, 2026-10-11, #355)
+    it('puts the left cursor on the map scale again when it is turned off and on (3-36, #355)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', -3);
+        expect(focusedLeft()).toEqual(['ETE   ']); // Precondition: the top line
+
+        await unit.panel.cursor('L');
+        await unit.panel.cursor('L');
+
+        expect(focusedLeft()).toEqual(['40  ']);
+    });
+
     // 3-36: the left cursor first lands on the map scale at the bottom left of the map; turning the left outer knob
     // counterclockwise moves it up over the three lines the pilot can configure, and it stops at the top one (4-3,
     // #218). Distance, ident, mode and ground speed are not fields.

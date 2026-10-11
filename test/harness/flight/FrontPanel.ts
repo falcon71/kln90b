@@ -360,6 +360,22 @@ export class FrontPanel {
     }
 
     /**
+     * Turns the outer knob counterclockwise until the cursor stops at the first field of the page (4-3, #218). The cursor
+     * comes on at the page's start field, on a scrolled list at the top visible entry (#355), so a test that needs the
+     * top of a list goes there first. Throws with the screen if the cursor does not stop within maxClicks.
+     */
+    public async cursorToTop(side: Side, maxClicks = 40): Promise<void> {
+        for (let i = 0; i < maxClicks; i++) {
+            const runs = JSON.stringify(this.focusedRuns(side));
+            await this.outer(side, -1);
+            if (JSON.stringify(this.focusedRuns(side)) === runs) {
+                return;
+            }
+        }
+        throw new Error(`cursorToTop: the cursor did not stop within ${maxClicks} clicks\n${this.screen().dump()}`);
+    }
+
+    /**
      * Turns the outer knob until the focused field shows the text, e.g. 'USER POS?'. A cursor position without a focused
      * field (the SUP page without user waypoints has one between the ident characters and the next field) is stepped over. The
      * search turns clockwise and, once the cursor stops at the last field (4-3, #218), counterclockwise. Throws with the

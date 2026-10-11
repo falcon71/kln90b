@@ -536,6 +536,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
         }
 
         this.cursorController = new CursorController(this.children, this.warnIfDBOutdated.bind(this));
+        this.cursorController.setStartFieldProvider(() => this.children.get("list").topVisibleField());
 
     }
     public render(): VNode {

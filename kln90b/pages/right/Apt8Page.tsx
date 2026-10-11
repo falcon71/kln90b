@@ -297,6 +297,7 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
         }
 
         this.cursorController = new CursorController(this.children, this.warnIfDBOutdated.bind(this));
+        this.cursorController.setStartFieldProvider(() => this.children.get("list").topVisibleField());
     }
 
 

@@ -168,8 +168,8 @@ describe('latitude and longitude entered on SET 1 (3-18, 5-17)', () => {
         await unit.panel.outer('L', 1);
         expect(await choices(unit, 2, 0, 4)).toEqual(['N', 'S']);
         await unit.panel.cursor('L'); // drops the edit
-        await unit.panel.cursor('L'); // the cursor comes back on the latitude
-        await unit.panel.outer('L', 1);
+        await unit.panel.cursor('L'); // the cursor comes back on the first field, WPT (#355)
+        await unit.panel.outer('L', 2);
 
         expect(await choices(unit, 3, 0, 4)).toEqual(['E', 'W']);
         expect(unit.errors).toEqual([]);

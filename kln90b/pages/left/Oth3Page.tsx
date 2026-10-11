@@ -31,6 +31,7 @@ export class Oth3Page extends SixLineHalfPage {
             wptList: new List(UIElementChildren.forList(this.buildList())),
         });
         this.cursorController = new CursorController(this.children);
+        this.cursorController.setStartFieldProvider(() => this.children.get("wptList").topVisibleField());
 
 
         this.props.bus.getSubscriber<any>().on(KLNFacilityRepository.SYNC_TOPIC).handle(this.refreshList.bind(this));

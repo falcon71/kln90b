@@ -68,6 +68,19 @@ describe('self-test right page cursor (spec)', () => {
         expect(Screen.read().status().right).toBe('CRSR');
     });
 
+    // The baro is where the page puts the cursor when it shows; turned off and on, the cursor starts on the first field,
+    // the date. The unit does not remember the field (checked in the KLN 89 trainer, 2026-10-11, #355)
+    it('puts the cursor on the date when it is turned off and on (#355)', async () => {
+        const unit = await onSelfTestPage();
+        expect(unit.panel.focused('R').text).toBe('29'); // Precondition
+
+        await unit.panel.cursor('R');
+        await unit.panel.cursor('R');
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('R')).toEqual({row: 1, col: 14, text: '01 JUN 26'});
+    });
+
     // 3-5 step 6: counterclockwise from the baro the cursor reaches the whole date field. 3-5 step 7 and 3-6: the time
     // zone follows the time field, which covers the hours and the minutes only (the seconds cannot be entered)
     it('steps back from the baro over the time zone and the time to the date (3-5, 3-6)', async () => {

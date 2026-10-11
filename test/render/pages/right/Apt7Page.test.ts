@@ -294,6 +294,23 @@ async function bootOnApt7(o: { sids: string[], stars: boolean, rf?: boolean }, c
 }
 
 describe('APT 7 procedure list (3-49, 6-21)', () => {
+    // A scrolled list stays scrolled while the cursor is off, and the cursor comes back on its top visible entry
+    // (checked in the KLN 89 trainer, 2026-10-08, T23, #355)
+    it('puts the cursor on the top visible procedure of the scrolled list when it is turned off and on (#355)', async () => {
+        const unit = await bootOnApt7({sids: ['DEPA', 'DEPB', 'DEPC', 'DEPD', 'DEPE', 'DEPF', 'DEPG', 'DEPH', 'DEPI', 'DEPJ'], stars: false});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 6); // down the list, which scrolls
+        await unit.panel.cursor('R');
+        const top = Screen.read().rows('R')[2]; // the top row of the list, below SELECT SID
+        expect(top).not.toContain('DEPA'); // Precondition: still scrolled, the first SID off the page
+
+        await unit.panel.cursor('R');
+
+        expect(unit.panel.focused('R').row).toBe(2);
+        expect(top).toContain(unit.panel.focused('R').text.trim());
+        expect(unit.panel.focused('R').text).toMatch(/DEP[B-J]/);
+    });
+
     // 3-49 (figure 3-147), 6-22 (figure 6-33): the procedures are numbered in two cells, right-aligned; with more than four
     // the last one stays on the bottom line. 6-21: an airport with SIDs only has one APT 7 page
     it('lists the SIDs numbered from 1 and keeps the last on the bottom line, on one APT 7 page (3-49, 6-21)', async () => {

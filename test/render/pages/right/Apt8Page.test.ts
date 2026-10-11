@@ -482,6 +482,21 @@ describe('APT 8 page (characterization)', () => {
         expect(clrHandled(unit)).toBe(true);
     });
 
+    // A scrolled list stays scrolled while the cursor is off, and the cursor comes back on its top visible entry
+    // (checked in the KLN 89 trainer, 2026-10-08, T23, #355)
+    it('puts the cursor on the top visible approach of the scrolled list when it is turned off and on (#355)', async () => {
+        const unit = await bootOnApt8({extraApproaches: 5});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 5);
+        await unit.panel.cursor('R');
+        expect(Screen.read().rows('R')[1]).toContain('VOR-B'); // Precondition: still scrolled, RNAV 18 off the page
+
+        await unit.panel.cursor('R');
+
+        expect(unit.panel.focused('R').row).toBe(1);
+        expect(unit.panel.focused('R').text).toContain('VOR-B');
+    });
+
     it('scrolls a list of more than five approaches and keeps the last on the bottom line', async () => {
         const unit = await bootOnApt8({extraApproaches: 5});
         await unit.panel.cursor('R');
