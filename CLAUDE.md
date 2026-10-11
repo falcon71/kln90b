@@ -81,8 +81,8 @@ change what they mean; add new ones instead:
   hot-swap-disabled.
   **DOM changes happen only inside display ticks** (`tick(blink)`/`redraw()`); input handlers only change state. This
   emulates the slow CRT.
-- **GPS** (`Gps.ts`) wraps the SDK `GPSSatComputer` to model acquisition time, almanac validity and the GPS week
-  rollover.
+- **GPS** (`Gps.ts`) wraps the SDK `GPSSatComputer`. It models hot, warm and almanac-search starts from the stored
+  position, almanac, ephemeris and clock (`GpsSearch.ts`), and the GPS week rollover.
   Once there is a fix it uses the exact sim position; there is no noise and no RAIM. The wrapper reaches into private
   SDK internals, so recheck it after SDK upgrades.
 - **Navigation** uses the project's own model, deliberately *not* the SDK flight plan or LNAV.

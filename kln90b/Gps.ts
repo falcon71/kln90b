@@ -17,11 +17,19 @@ import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {MessageHandler, OneTimeMessage} from "./data/MessageHandler";
 import {PowerEvent, PowerEventData} from "./PowerButton";
 import {TICK_TIME_CALC} from "./TickController";
+import {GPS_ERA_DURATION, GpsSearch, HOT_ACQUISITION, HOT_ACQUISITION_RANGE, IDLE_ACQUISITION, SearchMode, WARM_ACQUISITION_RANGE} from "./GpsSearch";
 
 const SAVE_INTERVALL = 60000;
 const MIN_GROUND_SPEED_FOR_TRACK = 2; //3-35
 const GPS_EPOCH = 315964800000; //Jan 6 1980
-const GPS_ERA_DURATION = 1024 * 60 * 60 * 24 * 7 * 1000;
+
+/** "prn:time,prn:time" (setting lastEphemeris) */
+function parseEphemeris(saved: string): [number, number][] {
+    return saved === "" ? [] : saved.split(",")
+        .map(e => e.split(":").map(Number) as [number, number])
+        .filter(([prn, time]) => Number.isFinite(prn) && Number.isFinite(time));
+}
+
 export interface GPSEvents {
     timeUpdatedEvent: TimeStamp; //This is fired if either the time was manually updated by the other or when the time was changed by more than 10 minutes
 }
@@ -30,35 +38,72 @@ export interface GPSEvents {
  * Note: We have emptied the gps_sbas.json, as WAAS satellites might be added with the default implementation, even though enabledSBASGroups is empty
  */
 // @ts-ignore
-class KLNGPSSatComputer extends GPSSatComputer {
+export class KLNGPSSatComputer extends GPSSatComputer {
 
     public internalTime: number = 0;
+    public search: GpsSearch | undefined = undefined; //Set by GPS after construction
 
     constructor(index: number, bus: EventBus, ephemerisFile: string, sbasFile: string, updateInterval: number, enabledSBASGroups: Iterable<string> | SubscribableSet<string>, syncRole: "primary" | "replica" | "none", options: Readonly<GPSSatComputerOptions>) {
         super(index, bus, ephemerisFile, sbasFile, updateInterval, enabledSBASGroups, syncRole, options);
     }
 
     /**
-     * The alamanc is very important for the KLN 90B. If the position or time is off, it takes a long time to search for
-     * the satellites. We mimic this behavour here
+     * The almanac is very important for the KLN 90B. If the position or time is off, it takes a long time to search for
+     * the satellites. The start model (GpsSearch) decides whether the receiver may use its almanac (#62)
      *
      * @param simTime
      */
     public isAlmanacValid(simTime?: number): boolean {
-        //Yeah, we're cheating: since SDK 2.3.3 the receiver's time and position live in its simulation context (#211)
-        const context = (this as any).activeSimulationContext;
-
-        if (simTime === undefined) {
-            simTime = context.time as number;
+        switch (this.search?.mode ?? SearchMode.Idle) {
+            case SearchMode.Acquisition:
+                return true; //The start model has decided (#62)
+            case SearchMode.AlmanacSearch:
+            case SearchMode.SkySearch:
+                return false;
+            default:
+                return super.isAlmanacValid(simTime);
         }
+    }
 
-        //The context computes its own distanceFromLastKnownPos only after this check has been read, so we compute it here
-        const lastKnownPosition = context.lastKnownPosition as GeoPoint;
-        const distanceFromLastKnownPos = lastKnownPosition.isValid() ? (context.position as GeoPoint).distance(lastKnownPosition) : Infinity;
+    /** The forced acquisition of an engine-running start or of SET 10 FAST ends the start model */
+    public acquireAndUseSatellites(): void {
+        this.search?.end();
+        super.acquireAndUseSatellites();
+    }
 
-        return Math.abs(this.internalTime - simTime) < 10 * 60 * 1000 //The KLN cannot find the satellites from the almanac, if the internal clock is off by more than 10 minutes (10 Minutes are mentioned in the install manual)
-            && distanceFromLastKnownPos < 0.0174221163 // 60 nautical miles, mentioned in the Install manual
-            && super.isAlmanacValid(simTime);  //Actual validity
+    /** The time the receiver last completed an almanac, sim time. Private in the SDK */
+    public getLastAlmanacTime(): number | undefined {
+        return (this as any).lastAlamanacTime;
+    }
+
+    /** Sets the SDK's acquisition time without ephemeris. Its timing options are private; the satellites share the object */
+    public setAcquisitionTime(mean: number, range: number): void {
+        const options = (this as any).satelliteTimingOptions;
+        if (options === undefined) {
+            throw new Error("GPSSatComputer.satelliteTimingOptions moved: recheck Gps.ts after the SDK upgrade");
+        }
+        options.acquisitionTime = mean;
+        options.acquisitionTimeRange = range;
+    }
+
+    /** Sets the SDK's acquisition time with a current ephemeris, the hot start of its 2 NM rule (#62). The same private options */
+    public setAcquisitionTimeWithEphemeris(mean: number, range: number): void {
+        const options = (this as any).satelliteTimingOptions;
+        if (options === undefined) {
+            throw new Error("GPSSatComputer.satelliteTimingOptions moved: recheck Gps.ts after the SDK upgrade");
+        }
+        options.acquisitionTimeWithEphemeris = mean;
+        options.acquisitionTimeRangeWithEphemeris = range;
+    }
+
+    /** Puts a stored ephemeris back into the receiver (#62). The time is private satellite data in the SDK */
+    public restoreEphemeris(entries: [number, number][]): void {
+        for (const [prn, time] of entries) {
+            const sat = this.getSatellites().find(s => s.prn === prn);
+            if (sat !== undefined) {
+                (sat as any).data.lastEphemerisTime = time;
+            }
+        }
     }
 
     /**
@@ -76,6 +121,7 @@ export class GPS {
     public groundspeed: Knots = 0;
     public timeZulu: TimeStamp;
     public gpsSatComputer: KLNGPSSatComputer;
+    public readonly search: GpsSearch;
     private lastCoords: GeoPoint;
     private intSaveCount = 0;
     private readonly takeHomeMode: boolean;
@@ -87,14 +133,15 @@ export class GPS {
 
         const gpsOptions: GPSSatComputerOptions = {
             channelCount: 8,
-            timingOptions: { //3-17
+            timingOptions: { //3-17, #62
                 almanacExpireTime: 182 * 24 * 60 * 60 * 1000, //Six months
-                acquisitionTime: fastGPS ? 10 * 1000 : 1.5 * 60 * 1000, //Up to two minutes -> 90 +- 30 seconds -> + 30 seconds to download ephemeris
-                acquisitionTimeRange: fastGPS ? 1000 : 60 * 1000,
-                acquisitionTimeWithEphemeris: fastGPS ? 10 * 1000 : 60 * 1000,
-                acquisitionTimeRangeWithEphemeris: fastGPS ? 1000 : 60 * 1000,
-                acquisitionTimeout: fastGPS ? 1000 : 4 * 60 * 1000, //4 + 2 -> this puts us close to the 6 minutes the manual mentions. With a second miss, we are at 8+2, that's the value from the manual
-                ephemerisDownloadTime: fastGPS ? 1000 : 30000, //30 Seconds
+                ephemerisExpireTime: 2 * 60 * 60 * 1000,
+                acquisitionTime: fastGPS ? 10 * 1000 : IDLE_ACQUISITION, //GpsSearch sets it per power-on
+                acquisitionTimeRange: fastGPS ? 1000 : WARM_ACQUISITION_RANGE,
+                acquisitionTimeWithEphemeris: fastGPS ? 10 * 1000 : HOT_ACQUISITION, //#62: a power cycle with a current ephemeris has its fix in 0:17, self-test included
+                acquisitionTimeRangeWithEphemeris: fastGPS ? 1000 : HOT_ACQUISITION_RANGE,
+                acquisitionTimeout: fastGPS ? 1000 : 4 * 60 * 1000,
+                ephemerisDownloadTime: fastGPS ? 1000 : 30000, //30 Seconds, one data frame
                 almanacDownloadTime: fastGPS ? 1000 : 750000, //12.5 minutes
             },
         };
@@ -109,6 +156,11 @@ export class GPS {
             'none',
             gpsOptions,
         );
+        //Before the power event subscription, so that powerChanged always finds the search. PowerButton publishes no power
+        //event before Sensors exists, so powerChanged never runs before the end of this constructor
+        //The model needs the REAL timings the computer was built with: after a switch from FAST it stays off until the next session
+        this.search = new GpsSearch(this.gpsSatComputer, () => fastGPS || this.userSettings.getSetting("fastGpsAcquisition").get());
+        this.gpsSatComputer.search = this.search;
         bus.getSubscriber<GPSSatComputerEvents>().on('gps_system_state_changed_1').handle(state => {
             const valid = state === GPSSystemState.SolutionAcquired || state === GPSSystemState.DiffSolutionAcquired;
             if (valid) {
@@ -118,6 +170,8 @@ export class GPS {
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.powerChanged.bind(this));
 
         this.gpsSatComputer.init();
+        const savedEphemeris = parseEphemeris(userSettings.getSetting("lastEphemeris").get());
+        this.gpsSatComputer.awaitInit().then(() => this.gpsSatComputer.restoreEphemeris(savedEphemeris));
 
         this.coords = new GeoPoint(
             userSettings.getSetting("lastLatitude").get(),
@@ -159,6 +213,7 @@ export class GPS {
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + TICK_TIME_CALC);
             this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp();
         } else {
+            this.search.tick(actualUnixTime, {lat, lon}, this.gpsSatComputer.internalTime);
             this.gpsSatComputer.onUpdate();
 
             if (this.isValid()) {
@@ -224,7 +279,11 @@ export class GPS {
     public savePosition(): void {
         this.userSettings.getSetting("lastLatitude").set(this.coords.lat);
         this.userSettings.getSetting("lastLongitude").set(this.coords.lon);
-        this.userSettings.getSetting("lastAlmanacDownload").set((this.gpsSatComputer as any).lastAlamanacTime ?? 0);
+        this.userSettings.getSetting("lastAlmanacDownload").set(this.gpsSatComputer.getLastAlmanacTime() ?? 0);
+        this.userSettings.getSetting("lastEphemeris").set(this.gpsSatComputer.getSatellites()
+            .filter(s => s.lastEphemerisTime !== undefined)
+            .map(s => `${s.prn}:${s.lastEphemerisTime}`)
+            .join(","));
     }
 
     private unixToTimestamp(unix: number): TimeStamp {
@@ -236,6 +295,7 @@ export class GPS {
     }
 
     private gpsAcquired() {
+        this.search.end(); //The first fix ends the start model (#62)
         const timeNow = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
         console.log(`gpsAcquired in ${timeNow - this.gpsStartTime} seconds`);
         const actualUnixTime = this.absoluteTimeToUNIXTime(timeNow);
@@ -267,9 +327,11 @@ export class GPS {
             //real-world counterpart
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + (SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) - this.lastPowerOffTime) * 1000);
             this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp(); //The receiver reads it on the first update, before tick refreshes it (#211)
+            this.search.start(this.coords); //The receiver starts from the position stored at power-off (#62)
             this.gpsStartTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
         } else {
             this.lastPowerOffTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
+            this.search.end();
         }
     }
 

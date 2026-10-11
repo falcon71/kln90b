@@ -1,21 +1,22 @@
 import {describe, expect, it, vi} from 'vitest';
-import {GPSSatComputer, GPSSystemState} from '@microsoft/msfs-sdk';
+import {GPSSatComputer, GPSSatelliteState, GPSSystemState} from '@microsoft/msfs-sdk';
 import {bootToSelfTest, bootUnit, HeadlessUnit, settle} from '../harness/boot';
 import {DEFAULT_START} from '../harness/sim/clock';
 import {Screen} from '../harness/render/screen';
 import {storedSetting} from '../harness/storage';
 import {messages} from '../harness/readers';
 import {TimeStamp} from '../../kln90b/data/Time';
+import {GPS_ERA_DURATION} from '../../kln90b/GpsSearch';
 
-// #211: the KLN almanac check (KLNGPSSatComputer.isAlmanacValid) reads the receiver's time and position from
-// activeSimulationContext, where SDK 2.3.3 keeps them, and computes the distance from the last known position itself,
-// as the context sets its own distance field only after the first read. The receiver's clock (internalTime) is set in
-// powerChanged after the off time is added to timeZulu, as the first update after power-on reads it before any tick.
-// Without either, every slow cold-and-dark start would be a sky search of about 6 minutes.
+// #62: at every power-on the start model (kln90b/GpsSearch.ts) picks the search from the stored position, the almanac,
+// the ephemeris and the unit's own clock: hot, warm ACQ, ACQ that gives up and searches the sky, or an almanac search.
+// The KLN almanac check (KLNGPSSatComputer.isAlmanacValid) reports its decision. The receiver's clock (internalTime) is
+// set in powerChanged after the off time is added to timeZulu (#211), as the model reads it on the first tick.
 //
 // The acquisition tests simulate several minutes each: they carry their own timeout, as the 5 s default fails when the
 // machine is busy (testing.md).
 const SLOW = 60_000;
+const VERY_SLOW = 240_000;
 
 const START = DEFAULT_START.getTime();
 const DAY = 24 * 60 * 60 * 1000;
@@ -24,9 +25,19 @@ const MINUTE = 60 * 1000;
 /** The stored data of a unit that was last used here yesterday: position 47/8 (the boot position), almanac a day old */
 const WARM = {fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 8, lastAlmanacDownload: START - DAY};
 
+/** Seeds whose warm start lands at the ends of the observed spread (found by the probe of the plan, Task 3 Step 6) */
+const FAST_WARM_SEED = 15;
+const SLOW_WARM_SEED = 4;
+
+/** The antipode of the boot position 47/8: no satellite is in view from both */
+const ANTIPODE = {lastLatitude: -47, lastLongitude: -172};
+/** The satellites in view at 47/8 at the fake clock's start (the STA 1 snapshot below) */
+const IN_VIEW = [1, 8, 10, 14, 16, 21, 23, 27];
+const ephemeris = (time: number) => IN_VIEW.map(prn => `${prn}:${time}`).join(',');
+
 /** A cold-and-dark unit, switched on. clockOffsetMs moves the unit's battery clock against the sim time */
-async function powerOnCold(storage: Record<string, unknown>, clockOffsetMs = 0): Promise<HeadlessUnit> {
-    const unit = await bootUnit({engineRunning: false, storage});
+async function powerOnCold(storage: Record<string, unknown>, clockOffsetMs = 0, seed = 1): Promise<HeadlessUnit> {
+    const unit = await bootUnit({engineRunning: false, storage, seed});
     const gps = unit.props.sensors.in.gps;
     gps.timeZulu = TimeStamp.create(gps.timeZulu.getTimestamp() + clockOffsetMs);
     await unit.panel.powerOn();
@@ -69,18 +80,8 @@ describe('GPS time to first fix, slow acquisition', () => {
         expect(Screen.read().rows('L')[0]).toBe('STATE   ACQ');
     }, SLOW);
 
-    // The sibling of the pin above: the same key sequence, on a start where INIT is right today and after the fix.
-    // the receiver states are a question: #215
-    it('characterization: a start 3000 NM from the stored position shows INIT on STA 1 right after the self-test', async () => {
-        const unit = await powerOnCold({...WARM, lastLatitude: 0, lastLongitude: 0});
-        await unit.panel.approveSelfTest();
-        await unit.panel.selectPage('L', 'STA 1');
-
-        expect(Screen.read().rows('L')[0]).toBe('STATE  INIT');
-    }, SLOW);
-
     // 3-17: the receiver's own view of the almanac, asked directly. This is the tripwire that the unit's almanac check
-    // (Gps.ts isAlmanacValid, reading activeSimulationContext) reports the almanac of a warm start as valid
+    // (Gps.ts isAlmanacValid, the decision of the start model) reports the almanac of a warm start as valid
     it('a warm start considers its almanac valid (#211)', async () => {
         const unit = await powerOnCold(WARM);
         await vi.advanceTimersByTimeAsync(5000);
@@ -94,17 +95,6 @@ describe('GPS time to first fix, slow acquisition', () => {
         await vi.advanceTimersByTimeAsync(5000);
 
         expect(unit.props.sensors.in.gps.gpsSatComputer.isAlmanacValid()).toBe(false);
-    }, SLOW);
-
-    // 3-5, 3-17: without the right position the unit searches the whole sky: usually about six minutes, at most 12. The
-    // lower bound is three minutes, between the 2 minutes of a warm start (3-17) and the six of a cold one (3-5). At this
-    // distance the SDK's own 100 NM rule on the last known position decides, whatever the KLN's almanac check says: the
-    // case holds the SDK rule, and the 80 NM case below holds the KLN's own 60 NM clause
-    it('a start 3000 NM from the stored position is not NAV ready within 3 minutes, and is within 12 (3-5, 3-17)', async () => {
-        const unit = await powerOnCold({...WARM, lastLatitude: 0, lastLongitude: 0});
-
-        expect(await secondsToFix(unit, 180)).toBe(180);
-        expect(await secondsToFix(unit, 540)).toBeLessThan(540);
     }, SLOW);
 
     // 3-53, 3-17: the battery clock runs on while the unit is off, and the receiver's own clock (internalTime) is set from
@@ -124,33 +114,6 @@ describe('GPS time to first fix, slow acquisition', () => {
         expect(await secondsToFix(unit, 300)).toBeLessThan(300);
     }, SLOW);
 
-    // Install manual 2-66: only a position within 60 NM of the stored one is a warm start, so 80 NM is a sky search (3-5,
-    // 3-17: usually about six minutes, at most 12). The SDK accepts the position up to 100 NM, so this is the KLN's own 60
-    // NM clause (Gps.ts isAlmanacValid), so this case holds that clause (#211)
-    it('a start 80 NM from the stored position is not NAV ready within 3 minutes, and is within 12 (install manual 2-66, 3-5, 3-17)', async () => {
-        const unit = await powerOnCold({...WARM, lastLatitude: 47 + 80 / 60});
-
-        expect(await secondsToFix(unit, 180)).toBe(180);
-        expect(await secondsToFix(unit, 540)).toBeLessThan(540);
-    }, SLOW);
-
-    // 3-17: an almanac older than six months must be collected again, usually about 6 minutes, at most 12
-    it('a start with an almanac 200 days old is not NAV ready within 3 minutes, and is within 12 (3-17)', async () => {
-        const unit = await powerOnCold({...WARM, lastAlmanacDownload: START - 200 * DAY});
-
-        expect(await secondsToFix(unit, 180)).toBe(180);
-        expect(await secondsToFix(unit, 540)).toBeLessThan(540);
-    }, SLOW);
-
-    // Install manual 2-66: the time must be within 10 minutes for the fast search; otherwise 3-5: about six minutes, and
-    // 3-17: at most 12 (the 15 minutes of 2-66 for the sky search are the looser bound of the installation)
-    it('a start with the clock 15 minutes behind is not NAV ready within 3 minutes, and is within 12 (install manual 2-66, 3-17)', async () => {
-        const unit = await powerOnCold(WARM, -15 * MINUTE);
-
-        expect(await secondsToFix(unit, 180)).toBe(180);
-        expect(await secondsToFix(unit, 540)).toBeLessThan(540);
-    }, SLOW);
-
     // 3-17: the almanac stays current for six months. This pin sees the almanac age through the unit's almanac check
     // (#211); the test below holds the loose bound of the six months on its own.
     it('a start with an almanac 120 days old is a warm start (3-17: six months) (#211)', async () => {
@@ -164,6 +127,245 @@ describe('GPS time to first fix, slow acquisition', () => {
         const unit = await powerOnCold({...WARM, lastAlmanacDownload: START - 120 * DAY});
 
         expect(await secondsToFix(unit, 720)).toBeLessThan(720);
+    }, SLOW);
+
+    // #62, a real unit: a power cycle with a current ephemeris has its fix in 0:17, power-on self-test included. The
+    // self-test page lasts 17 s (WelcomePage TEST_TIME). The SDK keeps the ephemeris over a power cycle in one session
+    it.each([1, 2, 3, 4, 5])('seed %d: a power cycle with a current ephemeris has its fix before the self-test ends (#62)', async seed => {
+        const unit = await powerOnCold(WARM, 0, seed);
+        expect(await secondsToFix(unit, 300)).toBeLessThan(300);
+        await unit.panel.powerOff();
+        await vi.advanceTimersByTimeAsync(10 * MINUTE);
+        await unit.panel.powerOn();
+
+        expect(await secondsToFix(unit, 30)).toBeLessThan(17);
+    }, SLOW);
+
+    // #62: the receiver keeps its ephemeris in battery memory, so a new session within the ephemeris' life is hot too
+    it('a boot with an ephemeris 30 minutes old in memory has its fix before the self-test ends (#62)', async () => {
+        const unit = await powerOnCold({...WARM, lastEphemeris: ephemeris(START - 30 * MINUTE)});
+
+        expect(await secondsToFix(unit, 30)).toBeLessThan(17);
+    }, SLOW);
+
+    // #62: the SDK's 2 NM hot rule must work on the stored position. A start far from it is warm even with a current
+    // ephemeris, as a start 50 NM away is: the receiver searches where it believes it is, not where it is (spec
+    // section 2). The model points the SDK's last known position at the present one beyond 100 NM, so it holds the hot
+    // timing back itself
+    it('a boot 150 NM from the stored position with an ephemeris 30 minutes old is a warm start (#62)', async () => {
+        const unit = await powerOnCold({...WARM, lastLatitude: 47 + 150 / 60, lastEphemeris: ephemeris(START - 30 * MINUTE)});
+
+        const seconds = await secondsToFix(unit, 300);
+
+        expect(seconds).toBeGreaterThanOrEqual(17); // A hot start has its fix before the self-test ends (17 s); a warm one comes after it
+        expect(seconds).toBeLessThan(300);
+    }, SLOW);
+
+    // The sibling: the hot timing held back for that start comes back. The next power-on, at the position stored at the
+    // power-off, is hot again
+    it('a power cycle after a start 150 NM from the stored position has its fix before the self-test ends (#62)', async () => {
+        const unit = await powerOnCold({...WARM, lastLatitude: 47 + 150 / 60, lastEphemeris: ephemeris(START - 30 * MINUTE)});
+        expect(await secondsToFix(unit, 300)).toBeLessThan(300);
+        await unit.panel.powerOff();
+        await vi.advanceTimersByTimeAsync(10 * MINUTE);
+        await unit.panel.powerOn();
+
+        expect(await secondsToFix(unit, 30)).toBeLessThan(17);
+    }, SLOW);
+
+    // The sibling: an ephemeris 3 hours old has expired (SDK: 2 hours), so the start is warm
+    it('a boot with an ephemeris 3 hours old in memory is a warm start (#62)', async () => {
+        const unit = await powerOnCold({...WARM, lastEphemeris: ephemeris(START - 180 * MINUTE)});
+
+        const seconds = await secondsToFix(unit, 300);
+
+        expect(seconds).toBeGreaterThanOrEqual(30);
+        expect(seconds).toBeLessThanOrEqual(120);
+    }, SLOW);
+
+    // #62, a real unit with a current almanac, the time right and the aircraft not moved: 1:25, 0:32, 1:47. The
+    // ephemeris must be collected (at least about 18 s of a 30 s frame), so nothing is faster than about 30 s
+    it.each([1, 2, 3, 4, 5, 6, 7, 8])('seed %d: a warm start has its fix 30 s to 2 minutes after power-on (#62)', async seed => {
+        const unit = await powerOnCold(WARM, 0, seed);
+        const seconds = await secondsToFix(unit, 300);
+
+        expect(seconds).toBeGreaterThanOrEqual(30);
+        expect(seconds).toBeLessThanOrEqual(120);
+    }, SLOW);
+
+    // #62: the observed warm starts spread from 0:32 to 1:47 under the same conditions; the spread is real
+    it(`seed ${FAST_WARM_SEED}: a warm start can be as fast as 45 s (#62: 0:32)`, async () => {
+        const unit = await powerOnCold(WARM, 0, FAST_WARM_SEED);
+
+        expect(await secondsToFix(unit, 300)).toBeLessThan(45);
+    }, SLOW);
+
+    it(`seed ${SLOW_WARM_SEED}: a warm start can take over 90 s (#62: 1:47)`, async () => {
+        const unit = await powerOnCold(WARM, 0, SLOW_WARM_SEED);
+
+        expect(await secondsToFix(unit, 300)).toBeGreaterThan(90);
+    }, SLOW);
+
+    // A real-unit video: started 829 NM from its stored position, the unit searched the satellites predicted for the
+    // stored position (ACQ), most of which were in view, and had its fix in 2:22 (install manual 2-66: ACQ within 5
+    // minutes). The 60 NM of 2-66 is checkout advice, not a rule of the unit
+    it('a start 829 NM from the stored position is NAV ready within 5 minutes (install manual 2-66, #62)', async () => {
+        const unit = await powerOnCold({...WARM, lastLatitude: 47 + 829 / 60});
+
+        expect(await secondsToFix(unit, 300)).toBeLessThan(300);
+    }, SLOW);
+
+    // #62: in ACQ the receiver searches only the satellites it predicts for the stored position (at 47/8 those in view);
+    // the first fix ends the start model, and from then on the receiver may track any satellite (spec section 2, step 4)
+    it('searches only the predicted satellites until the first fix of a warm start, then lifts the inhibits (#62)', async () => {
+        const unit = await powerOnCold(WARM);
+        const computer = unit.props.sensors.in.gps.gpsSatComputer;
+        const allowed = () => computer.getSatellites().map(s => s.prn)
+            .filter(prn => !computer.inhibitedSatellitePrnCodes.get().has(prn))
+            .sort((a, b) => a - b);
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(allowed()).toEqual(IN_VIEW);
+
+        expect(await secondsToFix(unit, 300)).toBeLessThan(300);
+        expect(computer.inhibitedSatellitePrnCodes.get().size).toBe(0);
+    }, SLOW);
+
+    it('a start 80 NM from the stored position is NAV ready within 5 minutes (install manual 2-66, #62)', async () => {
+        const unit = await powerOnCold({...WARM, lastLatitude: 47 + 80 / 60});
+
+        expect(await secondsToFix(unit, 300)).toBeLessThan(300);
+    }, SLOW);
+
+    // 3-17: with a wrong time or position the unit looks for any satellite, up to 12 minutes. It first searches the
+    // satellites it predicts, gives up when they are not there, then searches the sky
+    it('a start with the clock 15 minutes behind is not NAV ready within 5 minutes, and is within 12 (install manual 2-66, 3-17)', async () => {
+        const unit = await powerOnCold(WARM, -15 * MINUTE);
+
+        expect(await secondsToFix(unit, 300)).toBe(300);
+        expect(await secondsToFix(unit, 420)).toBeLessThan(420);
+    }, SLOW);
+
+    it('a start at the antipode of the stored position is not NAV ready within 5 minutes, and is within 12 (3-17)', async () => {
+        const unit = await powerOnCold({...WARM, ...ANTIPODE});
+
+        expect(await secondsToFix(unit, 300)).toBe(300);
+        expect(await secondsToFix(unit, 420)).toBeLessThan(420);
+    }, SLOW);
+
+    // ORS 01 6-30: an almanac six months old or more makes the receiver search the sky and collect a new almanac from
+    // one satellite, 20 minutes; a real unit with a wrong date took 21:36 (#62). The age counts by the unit's own clock.
+    // The bounds are 20 minutes give or take 3
+    it('a start with an almanac 200 days old is not NAV ready within 17 minutes, and is within 23 (ORS 01 6-30, #62)', async () => {
+        const unit = await powerOnCold({...WARM, lastAlmanacDownload: START - 200 * DAY});
+
+        expect(await secondsToFix(unit, 1020)).toBe(1020);
+        expect(await secondsToFix(unit, 360)).toBeLessThan(360);
+    }, VERY_SLOW);
+
+    // 30 years in whole days is about 9 years from the nearest multiple of the 1024-week era the receiver cannot tell apart
+    it('a start with the clock 30 years behind is not NAV ready within 17 minutes, and is within 23 (ORS 01 6-30, #62)', async () => {
+        const unit = await powerOnCold(WARM, -30 * 365 * DAY);
+
+        expect(await secondsToFix(unit, 1020)).toBe(1020);
+        expect(await secondsToFix(unit, 360)).toBeLessThan(360);
+    }, VERY_SLOW);
+
+    // The satellites broadcast the GPS week only modulo 1024 weeks, and so does the receiver's clock: it cannot tell eras
+    // apart, and only the host resolves the era for the date it shows (#63). A real unit whose date had come out two eras
+    // back found the satellites in 17 s at every later power-on (hot, self-test included); the wrong date could be
+    // corrected only before the next fix, and a few hours of waiting for the ephemeris to expire gave a longer (warm)
+    // window for that (#62)
+    describe('a clock exactly 1024 weeks off, as after a GPS week rollover (#62, #63)', () => {
+        const oldEra = () => Date.now() - GPS_ERA_DURATION;
+
+        it('a start with the clock exactly 1024 weeks behind is a warm start, and the date stays in the old era (#62, #63)', async () => {
+            const unit = await powerOnCold(WARM, -GPS_ERA_DURATION);
+            const seconds = await secondsToFix(unit, 300);
+
+            expect(seconds).toBeGreaterThanOrEqual(30);
+            expect(seconds).toBeLessThanOrEqual(120);
+            expect(Math.abs(unit.props.sensors.in.gps.timeZulu.getTimestamp() - oldEra())).toBeLessThan(10_000);
+        }, SLOW);
+
+        // The wrap is not an era check: 100 days short of one era is 100 days ahead modulo the era. The almanac is then
+        // current but the clock is off, so ACQ gives up and the sky search finds a satellite (3-17: not within 5 minutes,
+        // within 12); it is not the 20-minute almanac search that a plain difference of the clocks would start
+        it('a start with the clock 100 days short of 1024 weeks behind is a wrong clock, not an expired almanac (3-17, #62)', async () => {
+            const unit = await powerOnCold(WARM, -(GPS_ERA_DURATION - 100 * DAY));
+
+            expect(await secondsToFix(unit, 300)).toBe(300);
+            expect(await secondsToFix(unit, 420)).toBeLessThan(420);
+        }, SLOW);
+
+        it('after a rollover a power cycle with a current ephemeris is hot, and the date stays in the old era (#62, #63)', async () => {
+            const unit = await powerOnCold(WARM, -GPS_ERA_DURATION);
+            expect(await secondsToFix(unit, 300)).toBeLessThan(300);
+            await unit.panel.powerOff();
+            await vi.advanceTimersByTimeAsync(10 * MINUTE);
+            await unit.panel.powerOn();
+
+            expect(await secondsToFix(unit, 30)).toBeLessThan(17);
+            expect(Math.abs(unit.props.sensors.in.gps.timeZulu.getTimestamp() - oldEra())).toBeLessThan(10_000);
+        }, SLOW);
+
+        it('after a rollover a power cycle of 3 hours is a warm start, a longer window to correct the date (#62, #63)', async () => {
+            const unit = await powerOnCold(WARM, -GPS_ERA_DURATION);
+            expect(await secondsToFix(unit, 300)).toBeLessThan(300);
+            await unit.panel.powerOff();
+            await vi.advanceTimersByTimeAsync(3 * 60 * MINUTE);
+            await unit.panel.powerOn();
+
+            const seconds = await secondsToFix(unit, 300);
+
+            expect(seconds).toBeGreaterThanOrEqual(30);
+            expect(seconds).toBeLessThanOrEqual(120);
+            expect(Math.abs(unit.props.sensors.in.gps.timeZulu.getTimestamp() - oldEra())).toBeLessThan(10_000);
+        }, SLOW);
+    });
+
+    // ORS 01 6-30: one satellite is enough to collect the almanac; the unit does not navigate while it collects. After 10
+    // minutes the first satellite is found (GpsSearch ALMANAC_SEARCH_ACQUISITION, at most 7.5 minutes) and the 12.5
+    // minutes of almanac are not yet over
+    it('collects the almanac from one satellite during an almanac search (ORS 01 6-30)', async () => {
+        const unit = await powerOnCold({...WARM, lastAlmanacDownload: START - 200 * DAY});
+        await vi.advanceTimersByTimeAsync(10 * MINUTE);
+        const gps = unit.props.sensors.in.gps;
+        const assigned = gps.gpsSatComputer.getChannels().filter(c => c !== null);
+
+        expect(assigned).toHaveLength(1);
+        expect([GPSSatelliteState.Acquired, GPSSatelliteState.DataCollected, GPSSatelliteState.InUse]).toContain(assigned[0]!.state.get());
+        expect(gps.isValid()).toBe(false);
+    }, SLOW);
+
+    // A satellite can be lost while the almanac is collected from it (it sets, or the signal drops). The search then
+    // resumes the blind search and collects the almanac from the next satellite found: a new almanac search, held to the
+    // same 23 minutes as the one above. The test inhibits the satellite to lose it; the recovery lifts every inhibit
+    it('resumes the search when it loses the satellite it collects the almanac from (ORS 01 6-30, #62)', async () => {
+        const unit = await powerOnCold({...WARM, lastAlmanacDownload: START - 200 * DAY});
+        const computer = unit.props.sensors.in.gps.gpsSatComputer;
+        const COLLECTING = [GPSSatelliteState.Acquired, GPSSatelliteState.DataCollected, GPSSatelliteState.InUse];
+        const kept = () => {
+            const assigned = computer.getChannels().filter(c => c !== null);
+            return assigned.length === 1 && COLLECTING.includes(assigned[0]!.state.get()) ? assigned[0]! : null;
+        };
+        for (let s = 0; s < 10 * 60 && kept() === null; s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        const lost = kept();
+        expect(lost).not.toBeNull();
+
+        computer.setSatelliteInhibit(lost!.prn, true);
+
+        expect(await secondsToFix(unit, 1380)).toBeLessThan(1380);
+    }, VERY_SLOW);
+
+    // INIT covers the almanac search: ORS 20 (5-29) has no state of its own for it (ORS 01 had SRCH)
+    it('shows INIT on STA 1 right after the self-test during an almanac search (5-29)', async () => {
+        const unit = await powerOnCold({...WARM, lastAlmanacDownload: START - 200 * DAY});
+        await unit.panel.approveSelfTest();
+        await unit.panel.selectPage('L', 'STA 1');
+
+        expect(Screen.read().rows('L')[0]).toBe('STATE  INIT');
     }, SLOW);
 
     // 3-17: a stored almanac stays usable for six months. The age limit is the SDK's part of the almanac check, so it
@@ -334,6 +536,43 @@ describe('GPS data kept over a power-off', () => {
         expect(saved).toBeGreaterThanOrEqual(START);
         expect(saved).toBeLessThan(START + 10_000);
     });
+
+    // #62: the receiver keeps the ephemeris in battery memory; the forced acquisition of an engine-running boot collects
+    // it for the satellites in view
+    it('saves the ephemeris of the satellites in view at power-off (#62)', async () => {
+        const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
+        await settle(unit);
+
+        await unit.panel.powerOff();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const saved = String(storedSetting(unit, 'lastEphemeris')).split(',').map(e => e.split(':').map(Number));
+        expect(saved.map(([prn]) => prn)).toEqual(IN_VIEW);
+        for (const [, time] of saved) {
+            expect(time).toBeGreaterThanOrEqual(START);
+            expect(time).toBeLessThan(START + 60_000);
+        }
+    });
+
+    // The tripwire for the private SDK field the restore writes (satellite data.lastEphemerisTime, read back through the
+    // public getter)
+    it('restores the saved ephemeris into the receiver at boot (#62)', async () => {
+        const unit = await bootUnit({engineRunning: false, storage: {...WARM, lastEphemeris: `8:${START - MINUTE}`}});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const sat = unit.props.sensors.in.gps.gpsSatComputer.getSatellites().find(s => s.prn === 8)!;
+        expect(sat.lastEphemerisTime).toBe(START - MINUTE);
+    });
+
+    // The sibling: an entry that is not a number pair is skipped, and the entries around it are still restored
+    it('skips a damaged entry of the saved ephemeris at boot (#62)', async () => {
+        const unit = await bootUnit({engineRunning: false, storage: {...WARM, lastEphemeris: `8:x,10:${START - MINUTE}`}});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const sats = unit.props.sensors.in.gps.gpsSatComputer.getSatellites();
+        expect(sats.find(s => s.prn === 8)!.lastEphemerisTime).toBeUndefined();
+        expect(sats.find(s => s.prn === 10)!.lastEphemerisTime).toBe(START - MINUTE);
+    });
 });
 
 // characterization: the FAST acquisition of SET 10 is a simulator convenience, not in the Pilot's Guide (#46)
@@ -342,6 +581,17 @@ describe('fast GPS acquisition (characterization)', () => {
         const unit = await powerOnCold({lastLatitude: 47, lastLongitude: 8});
 
         expect(await secondsToFix(unit, 30)).toBeLessThan(30);
+    });
+
+    // The receiver keeps the timings it was built with for the session, so a unit built FAST stays out of the start
+    // model after SET 10 is switched to REAL: no satellite is inhibited at the next power-on (#62)
+    it('characterization: a unit built FAST runs no start model after a switch to REAL', async () => {
+        const unit = await bootUnit({engineRunning: false, storage: {lastLatitude: 47, lastLongitude: 8}});
+        unit.props.userSettings.getSetting('fastGpsAcquisition').set(false);
+        await unit.panel.powerOn();
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(unit.props.sensors.in.gps.gpsSatComputer.inhibitedSatellitePrnCodes.get().size).toBe(0);
     });
 
     it('characterization: choosing FAST on SET 10 while the slow search runs gives a fix within 2 s', async () => {
@@ -440,7 +690,7 @@ describe('STA 1 page with a fix (characterization)', () => {
 // 3-53: the internal battery clock keeps the time while no satellite supplies it
 describe('the system clock without a fix (3-53)', () => {
     it('runs on while the GPS searches (3-53)', async () => {
-        const unit = await powerOnCold({...WARM, lastLatitude: 0, lastLongitude: 0});
+        const unit = await powerOnCold({...WARM, lastAlmanacDownload: START - 200 * DAY});
         await vi.advanceTimersByTimeAsync(60_000); // a minute of search, still short of a fix (asserted below)
         const gps = unit.props.sensors.in.gps;
         expect(gps.isValid()).toBe(false);

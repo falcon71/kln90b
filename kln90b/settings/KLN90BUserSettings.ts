@@ -61,6 +61,7 @@ export type KLN90BUserSettingsTypes = {
     lastLatitude: number;
     lastLongitude: number;
     lastAlmanacDownload: number;
+    lastEphemeris: string;
     nearestAptSurface: boolean;
     nearestAptMinRunwayLength: number;
     activeWaypoint: string;
@@ -158,6 +159,10 @@ export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSett
             {
                 name: "lastAlmanacDownload",
                 defaultValue: 0,
+            },
+            {
+                name: "lastEphemeris", //"prn:time,prn:time": the ephemeris in the receiver's memory, by satellite (#62)
+                defaultValue: "",
             },
             {
                 name: "nearestAptSurface",

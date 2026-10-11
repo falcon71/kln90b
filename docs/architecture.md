@@ -109,7 +109,8 @@ arrives.
     - `GPS.powerChanged`, which advances the internal clock by the off time it measures itself in sim time
       (`E:ABSOLUTE TIME` at construction or the last power-off, `lastPowerOffTime`), not by `timeSincePowerChange`: that
       value is shaped for the CRT warm-up and is about 0 on a forced start (#328). The clock follows the sim's world
-      time, as the satellites do, so a sim pause before the power-on does not put it off.
+      time, as the satellites do, so a sim pause before the power-on does not put it off. At power-on it then starts
+      the start model (`search.start`, Core 3); at power-off it ends it.
     - `VolatileMemory.reset()`, which runs on power-on only (see Core 7).
     - `TemporaryWaypointDeleter`.
 - Welcome and self-test flow (lives in pages, summarised here for wiring): `WelcomePage.tick` waits `TEST_TIME=17000`
@@ -194,22 +195,68 @@ and `GENERAL ENG FUEL USED SINCE START:n`, and converts them to the configured u
 `GPS` (`kln90b/Gps.ts`) **simulates acquisition, then reads the true sim position once valid.** There is no position
 error or noise and no RAIM ("We have pretty all messages except for failures and RAIM problems").
 
-- It wraps the SDK `GPSSatComputer` in `KLNGPSSatComputer` (`// @ts-ignore extends`). That class accesses **private SDK
-  internals through `as any`** (`activeSimulationContext.time`, `.position`, `.lastKnownPosition` and
-  `.channels`, `lastAlamanacTime`), so it may break on SDK upgrades.
-    - `isAlmanacValid` additionally requires the internal clock to be within 10 minutes of sim time AND the last known
-      position to be within 60 NM (both values from the install manual).
-    - The computer has 8 channels. Timing: acquisition about 90 ± 30 s, ephemeris download 30 s, almanac download 12.5
-      min, almanac expiry six months (3-17), timeout 4 min; with `fastGpsAcquisition` all of these drop to about 1 to 10 s. It is
-      driven manually: the computer reads the sim time and position SimVars itself, and `GPS.tick` calls `onUpdate()`. Sync
-      role is `'none'`. SBAS is disabled by the emptied `gps_sbas.json`.
+- It wraps the SDK `GPSSatComputer` in `KLNGPSSatComputer` (`// @ts-ignore extends`). That class keeps every reach
+  into **private SDK internals through `as any`**, so it may break on SDK upgrades:
+    - `activeSimulationContext.channels` (STA 1). Since SDK 2.3.3 the receiver's time, position and last known position
+      live in `activeSimulationContext` too; the unit no longer reads them (#211, replaced by the start model).
+    - `lastAlamanacTime` (`getLastAlmanacTime()`, for the start model and the saved `lastAlmanacDownload`).
+    - `satelliteTimingOptions` (`setAcquisitionTime()` and `setAcquisitionTimeWithEphemeris()`: the object is shared
+      by all satellites, so the start model sets the acquisition times per power-on). Both throw if the SDK moves it.
+    - The satellites' `data.lastEphemerisTime` (`restoreEphemeris()`, the persisted ephemeris; read back through the
+      public `lastEphemerisTime` getter).
+    - The SDK's `simTime` and `distanceFromLastKnownPos` are no longer read.
+- **The start model** (`kln90b/GpsSearch.ts`, #62): what the unit believes decides how it searches. `GPS.powerChanged`
+  calls `search.start(coords)` at power-on; on the next tick, once its prediction context is ready, it picks a mode
+  from the stored position, the almanac age and the unit's own clock (`internalTime`). `GPS.tick` calls `search.tick()`
+  before every `onUpdate()`, so inhibits and timings apply before the channel assignment.
+    - **The clock is compared modulo the era**: the receiver keeps GPS time as the week modulo 1024 and the time of
+      week, so `receiverTimeDifference` wraps every comparison of the unit's clock (almanac age, 10-minute tolerance)
+      into ±512 weeks. The SDK's orbit propagation reduces the time to the week itself, so the prediction needs no
+      mapping. A date that is off by whole eras, as after the rollover of #63, therefore still starts hot or warm.
+    - **Acquisition (ACQ)**: the almanac is less than six months old by the unit's clock. A prediction context, set to
+      the stored position and the unit's clock, gives the satellites the unit believes are up (5° mask, 5-30); every
+      other satellite is inhibited. With the clock more than 10 minutes off (install manual 2-66) nothing may be
+      acquired. A random acquisition time drawn per power-on (`WARM_ACQUISITION_MIN` to `_MAX`, 2 to 75 s) spreads the
+      warm starts.
+    - **Sky search**: ACQ has no fix after `GIVE_UP_TIME` (5 min, install manual 2-66). Inhibits are lifted, the last
+      known position is erased and the almanac check reports invalid, so the SDK runs its blind search in PRN order
+      (`BLIND_ACQUISITION`, 90 ± 30 s per satellite).
+    - **Almanac search**: the almanac is six months old or more by the unit's clock, which also covers a clock that is
+      years off (ORS 01 6-30). Blind search until one satellite is acquired (`ALMANAC_SEARCH_ACQUISITION`, 390 ± 60 s,
+      calibrated so that the whole search lands near ORS 01's 20 minutes and the observed 21:36); all others are then
+      inhibited while the SDK collects the almanac from it (12.5 min). Then ACQ with the right time. If the kept
+      satellite is lost first, the inhibits are lifted and the blind search resumes.
+    - **Idle**: the first fix (`gpsAcquired`), a forced acquisition (`acquireAndUseSatellites`: engine-running start,
+      SET 10 FAST) and power-off end the model: inhibits are lifted and the acquisition time returns to
+      `IDLE_ACQUISITION` (40 s). With `fastGpsAcquisition` the model never starts, nor in a session whose computer
+      was built FAST (the SDK timings are fixed at construction).
+    - `KLNGPSSatComputer.isAlmanacValid` reports the decision: ACQ true, almanac and sky search false, Idle the SDK's
+      own check.
+    - **Not modeled: SET 1 and SET 2 during a search.** The mode is fixed at power-on. A time corrected on SET 2 or a
+      position confirmed on SET 1 while the unit searches does not restart the model with a new prediction, although
+      3-17 to 3-19 give updating them as the remedy for a slow start; the unit waits for the give-up instead.
+      `Set1Page` still calls `syncLastKnownPosition`, which only moves the SDK's last known position.
+    - Public SDK API used: `createPredictionContext`, `setSatelliteInhibit`, `syncLastKnownPosition` (the stored
+      position within 100 NM of the present one, so the SDK's 2 NM hot-start rule works on it; else the present
+      position), `eraseLastKnownPosition`, `eraseCachedEphemeris` (the harness's `coldGps`).
+    - Beyond 100 NM the SDK's last known position is the present one, so its 2 NM rule would make every satellite with
+      a current ephemeris hot. For that power-on the model sets the acquisition time with ephemeris to the warm draw
+      (`setAcquisitionTimeWithEphemeris`), and `end()` puts back `HOT_ACQUISITION`: a start far from the stored
+      position is warm, as one 50 NM away is.
+- The computer has 8 channels and is driven manually: the computer reads the sim time and position SimVars itself, and
+  `GPS.tick` calls `onUpdate()`. Sync role is `'none'`. SBAS is disabled by the emptied `gps_sbas.json`. Timing (#62):
+  ephemeris download 30 s (one data frame) and expiry 2 h, acquisition with a current ephemeris 9 ± 3 s (a hot start
+  has its fix before the 17 s self-test ends), almanac download 12.5 min, almanac expiry six months (3-17), timeout
+  4 min. With `fastGpsAcquisition` all of these drop to about 1 to 10 s.
 - `isValid()` means `systemState` is `SolutionAcquired` or `DiffSolutionAcquired`. There is a TODO: 3-satellite plus
   altitude aiding is not modelled.
 - When valid, `coords` come from `PLANE LATITUDE/LONGITUDE` and `groundspeed` from `GROUND VELOCITY`.
     - `trackTrue` is the bearing between successive 1 Hz fixes, computed only when GS >= 2 kt (
       `MIN_GROUND_SPEED_FOR_TRACK`, 3-35). `getTrackTrueRespectingGroundspeed()` returns null below that.
     - When invalid, the last values are frozen (4-13).
-- Last position and almanac time persist in the settings `lastLatitude`, `lastLongitude` and `lastAlmanacDownload`.
+- Last position, almanac time and ephemeris persist in the settings `lastLatitude`, `lastLongitude`,
+  `lastAlmanacDownload` and `lastEphemeris` (`"prn:time,prn:time"`, restored into the SDK satellites at boot, so a new
+  session within the 2 h of the ephemeris is a hot start).
 - `gpsAcquired()` can post `POSITION DIFFERS FROM LAST POSITION BY >2NM`. If the time error is over 10 minutes it posts
   `SYSTEM TIME UPDATED TO GPS TIME` and publishes **`timeUpdatedEvent`**; `Database` listens and posts the AIRAC-expired
   message.
@@ -448,7 +495,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 `"<ATC MODEL>.profile_1"`. `KLN90BSettingSaveManager` concatenates four managers:
 
 - `KLN90BUserSettings`: about 55 typed keys. These include `welcome1..4`, `powercycles`, `totalTime`, `timezone`, baro,
-  `lastLatitude/Longitude`, `lastAlmanacDownload`, `activeWaypoint` (ICAO **V1** string), alert settings,
+  `lastLatitude/Longitude`, `lastAlmanacDownload`, `lastEphemeris`, `activeWaypoint` (ICAO **V1** string), alert settings,
   `turnAnticipation`, the NAV 5 and Super NAV 5 layout, CAL page inputs, `fastGpsAcquisition` and `userDataFormat`.
 - `KLN90BUserWaypointsSettings`: `wpt0..wpt249` (`MAX_USER_WAYPOINTS=250`).
 - `KLN90BUserFlightplansSettings`: `fpl0..fpl25` (`NUM_FLIGHTPLANS=25`, inclusive loop).

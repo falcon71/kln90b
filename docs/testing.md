@@ -72,8 +72,8 @@ manager. The sim uses `SIM_PLATFORM`; tests use `FakePlatform` (`test/harness/pl
 
 By default the engine is running, so the unit skips the welcome and self-test pages (`isForceReadyToUse`). Pass
 `engineRunning: false` to see the cold-and-dark start. Pass `coldGps: true` for an engine-running boot whose GPS has no
-fix yet (the boot resets the GPS after `propsReady`); it acquires on its own, fast or slow per the `fastGpsAcquisition`
-setting, and `settle` waits for it.
+fix yet (the boot resets the GPS after `propsReady` and erases the cached ephemeris); it acquires on its own, fast or
+slow per the `fastGpsAcquisition` setting, and `settle` waits for it.
 
 ## The global fakes
 
@@ -393,11 +393,13 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   their result. The nearest lists and the airspace alert search every 10 s (`NearestList.ts`, `AirspaceAlert.ts`), so
   12 s leaves one search and the time its result needs; a wait below one search interval reads an empty list. Its
   harness test covers the nearest airport list.
-- **Time to first fix.** `bootUnit({coldGps: true})` resets the GPS after a forced acquisition, so every satellite keeps
-  its ephemeris and the last known position is the present one: it acquires in about 62 s (slow) whatever the almanac,
-  the stored position or the clock, and cannot measure a cold or warm start. Boot with `engineRunning: false` and the
-  stored position, almanac time and `fastGpsAcquisition` in `storage`, then `powerOn()`; the GPS acquires while the
-  welcome and self-test pages run.
+- **Time to first fix.** `bootUnit({coldGps: true})` resets the GPS after a forced acquisition and erases the cached
+  ephemeris, without a power-on, so the start model (`GpsSearch.ts`) does not run: it acquires in about 70 s (slow;
+  `IDLE_ACQUISITION` plus 30 s of ephemeris) whatever the almanac, the stored position or the clock, and cannot measure
+  a hot, warm or cold start. For hot, warm, ACQ-give-up and almanac-search starts boot with `engineRunning: false` and
+  the stored position, almanac time, `lastEphemeris` and `fastGpsAcquisition` in `storage`, then `powerOn()`; the GPS
+  acquires while the welcome and self-test pages run. A warm start's time is drawn per power-on, so pass `seed` for
+  the spread (`powerOnCold` in `GpsAcquisition.test.ts`).
 - **`bootToSelfTest(opts)`** (`boot.ts`) boots cold and dark whatever `opts.engineRunning` says (the self-test follows
   the welcome page only on a unit that is not force-ready), powers on, advances 19 s (the 17 s Turn-On page and two
   seconds more) and returns the unit with the self-test page showing. It throws with `Screen.read().dump()` when the
@@ -791,8 +793,11 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **SDK upgrades may require updating the fakes.** `FakeSim` mirrors the native layer the SDK builds on, and
   `KLNGPSSatComputer` reaches into private SDK internals (docs/architecture.md, Core 3); recheck both, and run the whole
   suite, after upgrading `@microsoft/msfs-sdk`. `KLNGPSSatComputer` (`Gps.ts`) reads `activeSimulationContext.channels`
-  and the computer's own private `lastAlamanacTime`. Its almanac check also reads
-  `activeSimulationContext.time`, `.position` and `.lastKnownPosition` through `as any`, which no type error reports;
+  and the computer's own private `lastAlamanacTime`, sets the private `satelliteTimingOptions` (the per-power-on
+  acquisition time of the start model) and writes the satellites' private `data.lastEphemerisTime` (the persisted
+  ephemeris), all through `as any`, which no type error reports. The SDK's `simTime` and `distanceFromLastKnownPos` are
+  no longer read. The start model uses only public API besides: `createPredictionContext`, `setSatelliteInhibit`,
+  `syncLastKnownPosition`, `eraseLastKnownPosition`; the harness's `coldGps` uses `eraseCachedEphemeris`.
   `GpsAcquisition.test.ts` holds these fields. After an
   upgrade run `test/render/GpsAcquisition.test.ts` first. The harness also relies on these SDK
   internals, and after an upgrade a change in one of them shows up as a confusing harness error, not as a named check:
@@ -1003,7 +1008,8 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   shows only its defaults before a prediction (#214). Super NAV 5 is read through `SuperNav5.read()`, and the NAV 5 and
   Super NAV 5 maps through the map recorder and file snapshots. *Untested:* weather, terrain and SUA on the maps (no
   code path), the ESA along the route (needs a non-flat MSA grid), take-home on SET 1 and the TRI pages, and SET 1
-  CONFIRM? for a faster first fix (the harness acquisition ignores the position).
+  CONFIRM? for a faster first fix (the start model does not restart on a position entered during a search;
+  architecture.md Core 3).
 - **The right pages** (`pages/right/`). Every page has a render test with a characterization and spec tests where the
   guide, the trainer or a photo of a real unit gives the rule; ACT 7 has characterizations only, and the APT 7 page
   order is a characterization (the trainer had no airport with both SIDs and STARs). *Untested:* the name and city

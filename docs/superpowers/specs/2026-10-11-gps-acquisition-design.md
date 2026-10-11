@@ -15,6 +15,9 @@ reference library.
 - **Wrong date.** Right after the self-test, before the first fix, the owner set the date on SET 2 to a wrong
   year, then cycled the power. The unit took 21:36 to find itself. It then showed `20 MAY 86` (the week
   rollover, #63) and navigated normally.
+- **After the rollover.** After the unit had resolved the date to `20 MAY 86` (two eras back, #63), every later power
+  cycle still found the satellites in 17 s, self-test included. The wrong date could be fixed only by entering the right
+  date before the next fix, and waiting some hours for the ephemeris to expire gave a longer (warm) window for that.
 - **SET 2 after a fix.** Once a satellite supplies the time, SET 2 edits snap back to GPS time (3-53, already
   modeled).
 
@@ -60,9 +63,12 @@ reference library.
     SVeeEight) search eight satellites at a time and move on after a timeout, as the SDK's sky search does.
 - **A confidently wrong prediction costs time.** With a wrong clock or position the receiver searches satellites, and
   Doppler shifts, that are not there, and it falls back to a blind search only after it gives up.
-- **The wrong date is an expired almanac.** The unit judges the almanac's age by its own clock. A clock decades off
-  makes a current almanac look decades old, so the 21:36 start was a search of the sky for a new almanac (ORS 01:
+- **The wrong date is an expired almanac.** The unit judges the almanac's age by its own clock. A clock years off
+  makes a current almanac look years old, so the 21:36 start was a search of the sky for a new almanac (ORS 01:
   20 minutes), not a wrong-prediction case.
+- **The receiver cannot tell GPS eras apart.** The satellites broadcast the GPS week only modulo 1024, and the
+  receiver's clock keeps time the same way. A clock off by whole eras, which is what the date is after a rollover
+  (#63), looks right to the receiver: the almanac is current and the clock matches, so power cycles stay hot or warm.
 
 The KLN 89 trainer runs in take-home mode only and does not simulate the receiver. It gave nothing for this work.
 
@@ -72,8 +78,9 @@ The KLN 89 trainer runs in take-home mode only and does not simulate the receive
 data and its own clock.
 
 1. **The almanac is not current by the unit's own clock** (six months or more between the stored almanac time and
-   the unit's clock) → **almanac search** (ORS 01 6-30). This covers both a really old almanac and a clock that is far
-   off, such as the wrong date.
+   the unit's clock, both taken modulo the 1024-week GPS era, as the receiver keeps them) → **almanac search**
+   (ORS 01 6-30). This covers both a really old almanac and a clock that is far off, such as a wrong date; a clock off
+   by whole eras, as after a rollover (#63), is not far off to the receiver.
    - The SDK runs its PRN-order blind search until the first satellite is acquired.
    - All other satellites are then inhibited. One satellite is enough to collect the almanac, and the unit does not
      navigate on a blind fix.
@@ -83,10 +90,11 @@ data and its own clock.
      position set to the present position.
 2. Otherwise → **ACQ.**
    - A prediction context (`GPSSatComputer.createPredictionContext()`, public SDK API) is set to the *stored* position
-     and the *unit's* clock. Its channel assignment gives the eight satellites the unit believes are best (the
-     predicted set). The prediction uses a 5° elevation mask (5-30).
-   - If the unit's clock is more than 10 minutes from the sim time, the Doppler predictions are wrong and nothing can
-     be acquired in ACQ: the allowed set is empty. The 10 minutes come from install manual 2-66.
+     and the *unit's* clock, as it is, also when the clock is off by whole eras (the SDK reduces the time to the time of
+     week before it propagates the orbits, so the same satellites are predicted). Its channel assignment gives the eight
+     satellites the unit believes are best (the predicted set). The prediction uses a 5° elevation mask (5-30).
+   - If the unit's clock is more than 10 minutes from the sim time (modulo the era), the Doppler predictions are wrong
+     and nothing can be acquired in ACQ: the allowed set is empty. The 10 minutes come from install manual 2-66.
    - Otherwise the allowed set is the predicted set.
    - Every satellite outside the allowed set is inhibited on the main computer (`setSatelliteInhibit`, public).
    - The SDK last-known position is set so that the SDK's own 100 NM rule does not override the KLN decision: the
@@ -115,7 +123,11 @@ drives it from `powerChanged` and `tick`.
   warm-up and the phase of the 30 s data frame. The per-satellite randomness alone cannot spread the fourth-fastest
   of eight satellites from 0:32 to 1:47. Ephemeris collection stays 30 s.
 - **Almanac search.** Blind search for one satellite, plus 12.5 minutes of almanac, plus a warm ACQ, lands near the
-  20 minutes of ORS 01 and the observed 21:36.
+  20 minutes of ORS 01 and the observed 21:36. The blind search for that first satellite has its own acquisition time
+  (`ALMANAC_SEARCH_ACQUISITION`, 390 ± 60 s), because the sky search's 90 ± 30 s would land the whole search near 15
+  minutes. A receiver that does not trust its clock searches with no Doppler or time aid. The sky search keeps its own
+  value, as it is already near its 12-minute bound. If the satellite is lost before the almanac is complete, the blind
+  search resumes and the next satellite found is kept.
 - **Give-up and the sky search.** 5 minutes of ACQ, plus the blind search of today (about 6 minutes), stays within 12
   (3-17).
 - The exact numbers are tuning, held by the tests in section 7.
@@ -220,7 +232,8 @@ the result is random.
   | 829 NM from the stored position | STA 1 shows ACQ; fix within 5 minutes (install manual 2-66; the video gives 2:22) |
   | 80 NM | a warm start. The current 80 NM sky-search test changes: 60 NM is checkout advice, not a rule of the unit (the video) |
   | Clock 15 minutes off, position on another continent (almanac current) | ACQ gives up: not within 5 minutes, within 12 (3-17). The current 15-minute test keeps its 12-minute bound and gains the 5-minute floor |
-  | Expired almanac (200 days), clock years off (the wrong date) | almanac search: not within 15 minutes, within 25 (ORS 01 6-30: 20 minutes; observed 21:36). The current 200-day test changes from "within 12" |
+  | Expired almanac (200 days), clock years off (the wrong date; 30 years, about 9 years from a whole era) | almanac search: not within 17 minutes, within 23 (ORS 01 6-30: 20 minutes; observed 21:36). The current 200-day test changes from "within 12" |
+  | Clock exactly 1024 weeks off (after a rollover) | a warm start (30 s to 2 min) with the date staying in the old era; a power cycle with a current ephemeris is hot, one after 3 hours is warm (#63) |
   | Almanac search | only one channel is in use while the almanac is collected |
   | Persisted ephemeris | a reboot within 2 hours at the same place and time is a hot start; after more than 2 hours it is warm |
 

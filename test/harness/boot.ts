@@ -55,8 +55,10 @@ export interface BootOptions {
     seed?: number;
     atcModel?: string;
     /**
-     * An engine-running boot whose GPS has no fix yet: gps.reset() after propsReady. It acquires again on its own, fast
-     * or slow per the fastGpsAcquisition setting. Replaces the hand-written reset in tests of the invalid-GPS state.
+     * An engine-running boot whose GPS has no fix yet: gps.reset() after propsReady, and the cached ephemeris erased. It
+     * acquires again on its own, fast or slow per the fastGpsAcquisition setting. Slow, it is a warm search without
+     * ephemeris of about 70 s (GpsSearch IDLE_ACQUISITION plus 30 s of ephemeris); the 120 s cap of settle keeps a
+     * margin. Replaces the hand-written reset in tests of the invalid-GPS state.
      */
     coldGps?: boolean;
     /** Magnetic variation in degrees east; a number for the whole world. Default 0 */
@@ -302,7 +304,10 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
         throw new Error(`bootUnit: propsReady did not fire within 30 s. Errors: ${errors.map(String).join('; ')}`);
     }
     state.completed = true;
-    if (opts.coldGps) props.sensors.in.gps.reset();
+    if (opts.coldGps) {
+        props.sensors.in.gps.reset();
+        props.sensors.in.gps.gpsSatComputer.eraseCachedEphemeris(); //Without it the ephemeris of the forced acquisition makes it a hot start of about 10 s
+    }
     return {
         core, props, env, navdata, errors, atcModel: model, send: evt => core.onInteractionEvent([evt]),
         panel: new FrontPanel(evt => core.onInteractionEvent([evt]), () => Screen.read()),
