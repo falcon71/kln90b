@@ -197,7 +197,7 @@ error or noise and no RAIM ("We have pretty all messages except for failures and
     - `isAlmanacValid` additionally requires the internal clock to be within 10 minutes of sim time AND the last known
       position to be within 60 NM (both values from the install manual).
     - The computer has 8 channels. Timing: acquisition about 90 ± 30 s, ephemeris download 30 s, almanac download 12.5
-      min, almanac expiry 90 days, timeout 4 min; with `fastGpsAcquisition` all of these drop to about 1 to 10 s. It is
+      min, almanac expiry six months (3-17), timeout 4 min; with `fastGpsAcquisition` all of these drop to about 1 to 10 s. It is
       driven manually: `GPS.tick` publishes `simTime` and `gps-position` on the bus and then calls `onUpdate()`. Sync
       role is `'none'`. SBAS is disabled by the emptied `gps_sbas.json`.
 - `isValid()` means `systemState` is `SolutionAcquired` or `DiffSolutionAcquired`. There is a TODO: 3-satellite plus

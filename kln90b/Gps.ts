@@ -88,7 +88,7 @@ export class GPS {
         const gpsOptions: GPSSatComputerOptions = {
             channelCount: 8,
             timingOptions: { //3-17
-                almanacExpireTime: 90 * 24 * 60 * 60 * 1000, //Manual says 6 months, but it's 90 days
+                almanacExpireTime: 182 * 24 * 60 * 60 * 1000, //Six months
                 acquisitionTime: fastGPS ? 10 * 1000 : 1.5 * 60 * 1000, //Up to two minutes -> 90 +- 30 seconds -> + 30 seconds to download ephemeris
                 acquisitionTimeRange: fastGPS ? 1000 : 60 * 1000,
                 acquisitionTimeWithEphemeris: fastGPS ? 10 * 1000 : 60 * 1000,
