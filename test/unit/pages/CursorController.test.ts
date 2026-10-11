@@ -272,7 +272,7 @@ describe('CursorController cursor on and off (characterization)', () => {
 // fields.length instead of fields.length - 1, CursorController.ts:123). The passing sibling is the cursor memory test
 // above (the same flow without a field turning read-only); the render pins on SET 2 are in Set2Page.test.ts.
 describe('CursorController when fields turn read-only (3-53, #217)', () => {
-    it.fails('comes back on the last field when the field it was on has turned read-only (#217)', () => {
+    it('comes back on the last field when the field it was on has turned read-only (#217)', () => {
         const all = [new FakeField('date'), new FakeField('time'), new FakeField('zone')];
         const cc = new CursorController(children({date: all[0], time: all[1], zone: all[2]}));
         cc.setCursorActive(true);
@@ -286,9 +286,53 @@ describe('CursorController when fields turn read-only (3-53, #217)', () => {
         expect(focused(cc, all)).toBe('zone');
     });
 
-    // The same, with the cursor on: the focused field turns read-only under it. Every later call on the focused field
-    // throws today
-    it.fails('moves on to a field that is still there when the focused field turns read-only (#217)', () => {
+    // With the cursor on the first field, which turns read-only: the next field moves up to its position and takes the
+    // cursor; the field that turned read-only no longer shows it
+    it('moves the cursor to the field that takes the position of a field turned read-only (#217)', () => {
+        const all = [new FakeField('date'), new FakeField('time'), new FakeField('zone')];
+        const cc = new CursorController(children({date: all[0], time: all[1], zone: all[2]}));
+        cc.setCursorActive(true);
+        all[0].isReadonly = true;
+
+        cc.isEnterAccepted(); // what the status line asks on every display tick (StatusLine.tick)
+
+        expect(focused(cc, all)).toBe('time');
+    });
+
+    // A field before the cursor turns read-only: the cursor stays on its own field, which is now one position up
+    it('keeps the cursor on its field when a field before it turns read-only (#217)', () => {
+        const all = [new FakeField('date'), new FakeField('time'), new FakeField('zone')];
+        const cc = new CursorController(children({date: all[0], time: all[1], zone: all[2]}));
+        cc.setCursorActive(true);
+        cc.outerRight();
+        all[0].isReadonly = true;
+
+        cc.isEnterAccepted(); // what the status line asks on every display tick (StatusLine.tick)
+
+        expect(focused(cc, all)).toBe('time');
+        cc.outerRight();
+        expect(focused(cc, all)).toBe('zone');
+    });
+
+    // Every field turns read-only: the cursor turns off, once, and nothing throws
+    it('turns the cursor off when every field has turned read-only (#217)', () => {
+        const all = [new FakeField('date'), new FakeField('time')];
+        const changes: boolean[] = [];
+        const cc = new CursorController(children({date: all[0], time: all[1]}), active => changes.push(active));
+        cc.setCursorActive(true);
+        all[0].isReadonly = true;
+        all[1].isReadonly = true;
+
+        expect(cc.isEnterAccepted()).toBe(false);
+
+        expect(cc.cursorActive).toBe(false);
+        expect(changes).toEqual([true, false]);
+        expect(all.filter(f => f.isFocused)).toEqual([]);
+    });
+
+    // The same, with the cursor on: the focused field turns read-only under it, and the cursor moves to the last field
+    // that is left
+    it('moves on to a field that is still there when the focused field turns read-only (#217)', () => {
         const all = [new FakeField('date'), new FakeField('time'), new FakeField('zone')];
         const cc = new CursorController(children({date: all[0], time: all[1], zone: all[2]}));
         cc.setCursorActive(true);

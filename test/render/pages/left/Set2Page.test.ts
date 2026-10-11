@@ -81,9 +81,8 @@ describe('SET 2 cursor when the GPS gets its first fix (3-53)', () => {
         expect(dateTimeMask()).toEqual(ON_ZONE);
     });
 
-    // CursorController.setCursorActive clamps the remembered field to fields.length instead of fields.length - 1
-    // (CursorController.ts:123), so the cursor comes on at a field that is gone and throws
-    it.fails('turns the cursor on at the time zone when it was on the time before the fix (#217)', async () => {
+    // The cursor was on the time, which is gone after the fix: it comes on at the time zone, the field that is left
+    it('turns the cursor on at the time zone when it was on the time before the fix (#217)', async () => {
         const unit = await bootUnit({coldGps: true});
         await unit.panel.selectPage('L', 'SET 2');
         await unit.panel.cursor('L');
@@ -97,9 +96,8 @@ describe('SET 2 cursor when the GPS gets its first fix (3-53)', () => {
         expect(dateTimeMask()).toEqual(ON_ZONE);
     });
 
-    // Nothing moves the cursor when the focused field turns read-only under it, so every display tick asks a field that is
-    // gone whether it takes ENT, and throws
-    it.fails('stays usable when the fix comes while the cursor is on the time (#217)', async () => {
+    // The time turns read-only under the cursor at the fix: the cursor moves to the time zone, the field that is left
+    it('stays usable when the fix comes while the cursor is on the time (#217)', async () => {
         const unit = await bootUnit({coldGps: true});
         await unit.panel.selectPage('L', 'SET 2');
         await unit.panel.cursor('L');
@@ -109,12 +107,28 @@ describe('SET 2 cursor when the GPS gets its first fix (3-53)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(unit.errors).toEqual([]);
+        expect(dateTimeMask()).toEqual(ON_ZONE); // only the time zone shows the cursor, the time no longer does
+    });
+
+    // Sibling of the test above with the cursor on the date, the first field: the time zone moves up to its position, and
+    // the date no longer shows the cursor
+    it('moves the cursor to the time zone when the fix comes while the cursor is on the date (#217)', async () => {
+        const unit = await bootUnit({coldGps: true});
+        await unit.panel.selectPage('L', 'SET 2');
+        await unit.panel.cursor('L');
+        expect(dateTimeMask()).toEqual(ON_DATE); // Precondition
+
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
+        expect(dateTimeMask()).toEqual(ON_ZONE);
     });
 });
 
 const MAGVAR_INVALID = 'MAGNETIC VAR INVALID ALL DATA REFERENCED TO TRUE NORTH';
 
-/** At N 74.5, tracking 090 true, with 10 W entered on SET 2 line 6 and the cursor left where ENT puts it */
+/** At N 74.5, tracking 090 true, with 10 W entered on SET 2 line 6 and the cursor left on it, the last field */
 async function tenWestOutside(): Promise<HeadlessUnit> {
     const unit = await bootUnit({position: {lat: 74.5, lon: 8.0}, magvar: 10});
     await settle(unit);
@@ -176,17 +190,16 @@ describe('SET 2 magnetic variation (5-44)', () => {
         expect(Screen.read().rows('L')[5]).toBe('           ');
     });
 
-    // The same cause as the #217 pins of the first-fix describe above, on another field: nothing moves the cursor off
-    // line 6 when it turns read-only inside the area, so every display tick asks a field that is gone whether it takes
-    // ENT, and throws
-    it.fails('stays usable when the aircraft enters the area with the cursor on line 6 (5-44, #217)', async () => {
+    // The same cause as the first-fix tests above, on another field: line 6 turns read-only inside the area (5-44), and
+    // the cursor moves to the field that is left
+    it('stays usable when the aircraft enters the area with the cursor on line 6 (5-44, #217)', async () => {
         const unit = await tenWestOutside();
-        await unit.panel.outer('L', 1); // ENT moved the cursor to the time zone; back to line 6
-        expect(unit.panel.focused('L')).toEqual({row: 5, col: 7, text: '10°W'});
+        expect(unit.panel.focused('L')).toEqual({row: 5, col: 7, text: '10°W'}); // Precondition: ENT left it on line 6
         await moveAircraft(unit, {lat: 73.5, lon: 8.0}, {groundspeedKt: 120, trackTrue: 180});
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(unit.errors).toEqual([]);
+        expect(dateTimeMask()).toEqual(ON_ZONE); // the time zone, the only field left
     });
 });
 
