@@ -1211,6 +1211,10 @@ its line, in the comment above it or in the title of its `describe`.
   reaches all three. A typed radial or distance is accepted (the value shows, the `Ent` prompt goes, the cursor moves
   on, no message; the message is medium confidence) but the waypoint does not move, and after leaving the page Rad and
   Dis are dashes again (#286).
+- ALT and the message page, run by the maintainer: ALT showed the first altitude page, MSG the message page, ALT the
+  second altitude page, MSG again, ALT closed the altitude pages, MSG again, ALT showed the first altitude page once
+  more. So ALT on the message page acts on the altitude page cycle beneath it, which the 90B, with its single ALT
+  page, has as a toggle (#335).
 
 # 9. Next steps
 
@@ -1370,7 +1374,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   `@ts-ignore`): the field list is recomputed on every call. It looks like a cache, so do not rely on it.
 - **A blank Direct page:** ENT on the 89's Direct page with a blank field returns to the page before (section 8,
   2026-10-09, T1), while the 90B code stays on the DIR page. The 90B guide was not checked for the case, and the #335
-  pin does not assert it.
+  tests do not assert it.
 - **Left page leads** (seen and not confirmed or not filed):
     - FPL 0 shows an empty top row when the active waypoint is the first one, and after a list rebuild with the cursor
       on; the guide's figures do not show the case (a trainer question). `DirectToPage.test.ts` reads rows 1 to 5
@@ -1500,10 +1504,8 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       empty remark line changes the click counts in the setup of `stores a remark with a hyphen and shows it again`
       (`FreetextEditor.test.ts`); the fix of #262 must keep NO
       SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests);
-    - a fix of #335 turns the #334 pin red as well,
-      though #334 still needs its own fix for SET 0 and Super NAV 5; a fix of #332 with a ride-through above about 1.5 s
-      needs the 3 s waits of the circuit tests raised; `HEADING_INPUT` in
-      `RollSteeringController.test.ts` can bite once #143 is fixed.
+    - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised;
+      `HEADING_INPUT` in `RollSteeringController.test.ts` can bite once #143 is fixed.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): #146 (the alert time on a Direct To a
   waypoint of FPL 0 that has a following leg), #147 (a waypoint alert in OBS mode), duplicate idents on a waypoint page
   (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 cannot be answered there, because

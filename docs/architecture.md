@@ -826,8 +826,10 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   then right (`left.clear() || right.clear()`). When both sides hold an open entry the left goes first. `FiveSegmentPage`
   does the same for its two halves (#307).
 - `EVT_MSG` → push `MessagePage`, or call `MessagePage.msg()` to page through. It pops itself after the last page.
-- `EVT_DCT` → push `DirectToPage` left, or `directToPressed()` if it is already shown (toggles ACTIVATE in OBS).
-- `EVT_ALT` → toggle `AltPage` left, plus `Nav4RightPage` right with its cursor forced active.
+- `EVT_DCT` → close the MSG page first if it is shown (#335), then push `DirectToPage` left, or `directToPressed()` if
+  it is already shown (toggles ACTIVATE in OBS).
+- `EVT_ALT` → close the MSG page first if it is shown (#335), then toggle `AltPage` left, plus `Nav4RightPage` right
+  with its cursor forced active.
 - `EVT_APPR_ARM` → `modeController.armApproachPressed()`.
 
 ### CursorController (`pages/CursorController.ts`)

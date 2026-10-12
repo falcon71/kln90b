@@ -572,6 +572,11 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     return true;
                 }
             case EVT_DCT:
+                if (this.isMessagePageShown()) {
+                    //3-27 (3-39, 3-55 for ALT) and the KLN 89 trainer, 2026-10-09 (T1, T2): the key closes the MSG page
+                    //and its page shows at once (#335)
+                    this.popOverlayPage();
+                }
                 leftPage = this.getLeftPage();
                 if (leftPage instanceof DirectToPage) {
                     leftPage.directToPressed();
@@ -580,6 +585,11 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                 }
                 return true;
             case EVT_ALT:
+                if (this.isMessagePageShown()) {
+                    //3-27 (3-39, 3-55 for ALT) and the KLN 89 trainer, 2026-10-09 (T1, T2): the key closes the MSG page
+                    //and its page shows at once (#335)
+                    this.popOverlayPage();
+                }
                 leftPage = this.getLeftPage();
                 if (leftPage instanceof AltPage) {
                     this.popLeftPage();
