@@ -446,7 +446,9 @@ describe('APT 8 cursor after CLR', () => {
         expect(rows('R').slice(0, 3)).toEqual([' KPRC IAP', ' 1 VOR-A', ' 2 RNAV 18']);
     });
 
-    it.fails('keeps the cursor on the chosen approach when CLR returns to the approach list (KLN 89 trainer, #273)', async () => {
+    // Checked in the KLN 89 trainer, 2026-10-07 (medium): CLR from the waypoint list returned to the approach list with
+    // the cursor on the approach chosen there; the same for the IAF list is by analogy
+    it('keeps the cursor on the chosen approach when CLR returns to the approach list (KLN 89 trainer, #273)', async () => {
         const unit = await bootOnApt8({circlingFirst: true});
         await unit.panel.cursor('R');
         await unit.panel.outer('R', 1);
@@ -456,12 +458,60 @@ describe('APT 8 cursor after CLR', () => {
 
         expect(unit.panel.focused('R')).toEqual({row: 2, col: 12, text: ' 2 RNAV 18 '});
     });
+
+    // Checked in the KLN 89 trainer, 2026-10-07 (medium): CLR from the waypoint list of an approach returned to the
+    // approach list with the cursor on that approach. VOR-A has no IAF, so its waypoint list comes straight after the
+    // approach list
+    it('keeps the cursor on the chosen approach when CLR returns from the waypoint list of an approach without an IAF choice (KLN 89 trainer, 2026-10-07, #273)', async () => {
+        const unit = await bootOnApt8();
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // VOR-A: no IAF question
+        expect(rows('R')[5]).toBe('LOAD IN FPL'); // Precondition: the waypoint list shows
+
+        await unit.panel.clr();
+
+        expect(rows('R').slice(0, 3)).toEqual([' KPRC IAP', ' 1 RNAV 18', ' 2 VOR-A']);
+        expect(unit.panel.focused('R')).toEqual({row: 2, col: 12, text: ' 2 VOR-A   '});
+    });
+
+    // 6-5: CLR goes back one step. That the cursor then stands on the IAF chosen there is by analogy with the approach
+    // list (KLN 89 trainer, 2026-10-07): the trainer's database has no approach with several IAFs, so it was not observed
+    it('keeps the cursor on the chosen IAF when CLR returns to the IAF list (6-5, by analogy with the KLN 89 trainer, #273)', async () => {
+        const unit = await bootOnApt8({circlingFirst: true});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // RNAV 18: the IAFs
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // IAFAB: the waypoints
+        expect(rows('R')[1]).toBe(' 1 IAFABà'); // Precondition: the waypoint list shows
+
+        await unit.panel.clr();
+
+        expect(rows('R').slice(0, 3)).toEqual(['R18-KPRC', 'IAF 1 IAFAA', '    2 IAFAB']);
+        expect(unit.panel.focused('R')).toEqual({row: 2, col: 16, text: '2 IAFAB'});
+    });
 });
 
 /** CLR through the main page, as the unit sees it: whether the pages handled it (CLAUDE.md, Input) */
 const clrHandled = (unit: HeadlessUnit): boolean => (unit.props.pageManager.getCurrentPage() as MainPage).onInteractionEvent(EVT_CLR);
 
 describe('APT 8 page (characterization)', () => {
+    // The code posts the message only when the cursor comes on by CRSR. A CLR that returns to the approach list puts the
+    // cursor on again, but it was on before, so a step back is not a new CRSR press (#273)
+    it('posts no further OUTDATED DB when CLR returns to the approach list with an expired database', async () => {
+        const unit = await bootOnApt8({circlingFirst: true, start: new Date('2026-07-01T12:00:00Z')});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // RNAV 18: the IAFs
+        const seen = collectStatusMessages(unit);
+
+        await unit.panel.clr();
+
+        expect(unit.panel.focused('R')).toEqual({row: 2, col: 12, text: ' 2 RNAV 18 '}); // Precondition: the list is back with the cursor
+        expect(seen).toEqual([]);
+    });
+
     // The code posts the message only when the cursor comes on (Apt8Page.warnIfDBOutdated)
     it('posts no further message when the cursor goes off with an expired database', async () => {
         const unit = await bootOnApt8({start: new Date('2026-07-01T12:00:00Z')});

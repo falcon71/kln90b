@@ -1404,11 +1404,11 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       constructor text for one display tick at power-on; APT 2 truncates half-hour time zones; the `aptPage` memory
       writes of `PageManager.startMainPage` are redundant.
     - APT 7 decides on raw transition counts while it lists the recognized ones; an IAF number of ten or more has no
-      blank before the name (`Apt8Page.tsx:470`); the IAF list is not filtered by recognition; the cursor on APPROVE? of
+      blank before the name (`Apt8Page.tsx:514`); the IAF list is not filtered by recognition; the cursor on APPROVE? of
       the add question is only characterized.
     - D/T 1 and D/T 2 beside another page hide the last-waypoint block when the active waypoint is the last one (4-12 is
       silent). After LOAD IN FPL on ACT 8 the ACT page switches to the new active waypoint (the guide is silent).
-    - The code comment at `Apt8Page.tsx:352` quotes a sentence of 6-4 nearly word for word; it should be paraphrased.
+    - The code comment at `Apt8Page.tsx:373` quotes a sentence of 6-4 nearly word for word; it should be paraphrased.
 
 ## Controls
 

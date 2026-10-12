@@ -83,22 +83,27 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
         if (this.currentApt8Page instanceof Apt8IAPPage) {
             return false;
         } else if (this.currentApt8Page instanceof Apt8IAFPage) {
+            //The list gets the entry chosen there before, so that the cursor comes back on it (#273)
             this.currentApt8Page = new Apt8IAPPage({
                 ...this.props,
                 selectApproach: this.selectApproach.bind(this),
+                selected: this.currentApt8Page.app,
             });
         } else if (this.currentApt8Page instanceof Apt8PreviewPage) {
             const app = this.currentApt8Page.app;
+            const iaf = this.currentApt8Page.iaf;
             if (app.transitions.length <= 1) {
                 this.currentApt8Page = new Apt8IAPPage({
                     ...this.props,
                     selectApproach: this.selectApproach.bind(this),
+                    selected: app,
                 });
             } else {
                 this.currentApt8Page = new Apt8IAFPage({
                     ...this.props,
                     app: app,
                     selectIaf: this.selectIaf.bind(this),
+                    selected: iaf,
                 });
             }
         } else if (this.currentApt8Page instanceof Apt8AddPage) {
@@ -248,6 +253,8 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
 
 interface Apt8IapPageProps extends PageProps {
     selectApproach: (app: ApproachProcedure) => void,
+    /** The approach chosen on this list before, when CLR comes back to it: the cursor comes on there (#273) */
+    selected?: ApproachProcedure | null,
 }
 
 type Apt8IAPPageTypes = {
@@ -275,10 +282,13 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
     protected readonly emptyRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
     protected readonly listRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
     private readonly selectApproach: (app: ApproachProcedure) => void;
+    private pendingSelected: ApproachProcedure | null;
+    private suppressDbWarning: boolean = false;
 
     constructor(props: Apt8IapPageProps) {
         super(props);
         this.selectApproach = props.selectApproach;
+        this.pendingSelected = props.selected ?? null;
 
         const facility = unpackFacility(this.facility);
 
@@ -326,7 +336,8 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
         // Based on the KLN 89 trainer
         // It is shown every time the cursor is activated (even for airports without procedures),
         // but procedures can still be selected
-        if (cursorActive && !this.props.database.isAiracCurrent()) {
+        // A CLR step back puts the cursor on again, but it was on before, so it is not a new CRSR press (#273)
+        if (cursorActive && !this.suppressDbWarning && !this.props.database.isAiracCurrent()) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "OUTDATED DB");
         }
     }
@@ -337,6 +348,7 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
 
     protected redraw(): void {
         const facility = unpackFacility(this.facility);
+        let selectedItem: SimpleListItem<ApproachProcedure> | null = null;
         if (facility === null) {
             this.mainRef.instance.classList.add("d-none");
             this.children.get("createWpt").setVisible(true);
@@ -344,7 +356,8 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
         } else {
             this.mainRef.instance.classList.remove("d-none");
             this.children.get("createWpt").setVisible(false);
-            const approaches = facility.approaches.filter(app => SidStar.isApproachRecognized(app)).map((app, idx) => new SimpleListItem<ApproachProcedure>({
+            const recognized = facility.approaches.filter(app => SidStar.isApproachRecognized(app));
+            const approaches = recognized.map((app, idx) => new SimpleListItem<ApproachProcedure>({
                 bus: this.props.bus,
                 value: app,
                 fulltext: (idx + 1).toString().padStart(2, " ") + " " + this.formatApproachName(app),
@@ -361,10 +374,24 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
                 this.emptyRef.instance.classList.add("d-none");
                 this.listRef.instance.classList.remove("d-none");
                 this.children.get("list").refresh(UIElementChildren.forList(approaches));
+                selectedItem = this.pendingSelected === null ? null : approaches[recognized.indexOf(this.pendingSelected)] ?? null;
             }
         }
 
         this.cursorController.refreshChildren(this.children);
+
+        if (this.pendingSelected !== null) {
+            if (selectedItem !== null) {
+                //CLR back to this list keeps the cursor on, on the approach chosen before. Checked in the KLN 89
+                //trainer, 2026-10-07 (medium) (#273). The fields exist only now, so the focus is set by the field and
+                //not by an index
+                this.suppressDbWarning = true;
+                this.cursorController.setCursorActive(true);
+                this.suppressDbWarning = false;
+                this.cursorController.focusField(selectedItem);
+            }
+            this.pendingSelected = null;
+        }
     }
 
     protected getMemory(): WaypointPageState<AirportFacility> {
@@ -436,6 +463,8 @@ abstract class Apt8SelectorPage extends WaypointPage<AirportFacility> {
 interface Apt8IafPageProps extends PageProps {
     app: ApproachProcedure,
     selectIaf: (app: ApproachProcedure, iaf: ApproachTransition) => void,
+    /** The IAF chosen on this list before, when CLR comes back to it: the cursor comes on there (#273) */
+    selected?: ApproachTransition | null,
 }
 
 
@@ -450,6 +479,7 @@ class Apt8IAFPage extends Apt8SelectorPage {
 
     public readonly app: ApproachProcedure;
     private readonly selectIaf: (app: ApproachProcedure, iaf: ApproachTransition) => void;
+    private selectedItem: SimpleListItem<ApproachTransition> | null = null;
 
     constructor(props: Apt8IafPageProps) {
         super(props);
@@ -457,12 +487,17 @@ class Apt8IAFPage extends Apt8SelectorPage {
         this.selectIaf = props.selectIaf;
 
         this.children = new UIElementChildren<Apt8IAFPageTypes>({
-            list: new Apt8IafList(this.buildList()),
+            list: new Apt8IafList(this.buildList(props.selected ?? null)),
         });
 
         this.cursorController = new CursorController(this.children);
         this.cursorController.setStartFieldProvider(() => this.children.get("list").topVisibleField()); //T23: the top visible entry of a scrolled list (#355)
         this.cursorController.setCursorActive(true);
+        if (this.selectedItem !== null) {
+            //CLR back to this list keeps the cursor on the entry chosen before, checked in the KLN 89 trainer (2026-10-07,
+            //medium; this list by analogy) (#273)
+            this.cursorController.focusField(this.selectedItem);
+        }
     }
 
     public render(): VNode {
@@ -472,13 +507,14 @@ class Apt8IAFPage extends Apt8SelectorPage {
         </pre>);
     }
 
-    private buildList(): UIElementChildren<any> {
+    private buildList(selected: ApproachTransition | null): UIElementChildren<any> {
         const iafs = this.app.transitions.map((iaf, idx) => new SimpleListItem<ApproachTransition>({
             bus: this.props.bus,
             value: iaf,
             fulltext: (idx + 1).toString().padEnd(2, " ") + iaf.name.padEnd(5, " "),
             onEnter: (iaf) => this.selectIaf(this.app, iaf),
         }));
+        this.selectedItem = selected === null ? null : iafs[this.app.transitions.indexOf(selected)] ?? null;
 
         return UIElementChildren.forList(iafs);
     }
