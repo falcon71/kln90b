@@ -199,13 +199,11 @@ async function msgPage(unit: HeadlessUnit): Promise<void> {
     expect(unit.overlay()).toBeInstanceOf(MessagePage);
 }
 
-// #56 (closed) names the MSG page beside the ALT and DIR pages: in the KLN 89 trainer the outer knob leaves it and
-// turns to the next page, and the inner knob turns the pages of the page shown before it. Its fix (14972b6) covers the
-// pushed half pages only; on the MSG page the knobs do nothing. Checked in the KLN 89 trainer, 2026-10-09 (T3): on the
-// MSG page a click of the outer or the inner knob, either direction, closes it and the knob acts on the page beneath.
-// CRSR closes it as well and turns the cursor on beneath (T4). The 89 has one knob pair and no right half, so the pin
-// of the right knob applies the same rule to the right side (3-13). The pages are those of 3-12 and 3-13, from NAV 2
-// and SUP. CLR on the MSG page is ignored on the trainer and in the code: it has no test.
+// The knobs and CRSR close the MSG page and act on the page beneath, and CLR on it is ignored. Checked in the KLN 89
+// trainer, 2026-10-09 (T3): on the MSG page a click of the outer or the inner knob, either direction, closes it and the
+// knob acts on the page beneath. CRSR closes it as well and turns the cursor on beneath (T4), and CLR on it does nothing
+// (T4). The 89 has one knob pair and no right half, so the right knob's rule is the code's choice by analogy with T3, see
+// the characterization after this describe. The left page order is that of 3-12, starting from NAV 2.
 describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 T4, #333)', () => {
     // The setup sibling of the pins below: the MSG page is up over NAV 2 and SUP (3-16)
     it('shows the MSG page over NAV 2 and SUP (3-16)', async () => {
@@ -217,7 +215,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
         expect(main.isLeftCursorActive()).toBe(false);
     });
 
-    it.fails('leaves the MSG page on the left outer knob and turns NAV 2 to CAL 1 (#56, 3-12, #333)', async () => {
+    it('leaves the MSG page on the left outer knob and turns NAV 2 to CAL 1 (#56, 3-12, #333)', async () => {
         const unit = await bootUnit();
         await msgPage(unit);
 
@@ -227,7 +225,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
         expect(names()).toEqual(['CAL 1', 'SUP']);
     });
 
-    it.fails('leaves the MSG page on the left inner knob and turns NAV 2 to NAV 3 (#56, 3-12, #333)', async () => {
+    it('leaves the MSG page on the left inner knob and turns NAV 2 to NAV 3 (#56, 3-12, #333)', async () => {
         const unit = await bootUnit();
         await msgPage(unit);
 
@@ -237,14 +235,26 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
         expect(names()).toEqual(['NAV 3', 'SUP']);
     });
 
-    it.fails('leaves the MSG page on the right outer knob and turns SUP to CTR 1 (#56, 3-13, #333)', async () => {
+    // Counterclockwise: the outer knob gives the previous page group, FPL before NAV (3-12), and the inner knob the
+    // previous page of the group (T3)
+    it('leaves the MSG page on the left outer knob counterclockwise and turns NAV 2 to FPL 0 (#56, 3-12, T3, #333)', async () => {
         const unit = await bootUnit();
         await msgPage(unit);
 
-        await unit.panel.outer('R', 1);
+        await unit.panel.outer('L', -1);
 
         expect(unit.overlay()).toBeNull();
-        expect(names()).toEqual(['NAV 2', 'CTR 1']);
+        expect(names()).toEqual(['FPL 0', 'SUP']);
+    });
+
+    it('leaves the MSG page on the left inner knob counterclockwise and turns NAV 2 to NAV 1 (#56, 3-12, T3, #333)', async () => {
+        const unit = await bootUnit();
+        await msgPage(unit);
+
+        await unit.panel.inner('L', -1);
+
+        expect(unit.overlay()).toBeNull();
+        expect(names()).toEqual(['NAV 1', 'SUP']);
     });
 
     // NAV 2 has no cursor field, so the pin and its siblings use NAV 4 on the left (5-7 step 3: cursor on SEL)
@@ -267,7 +277,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
         expect(names()).toEqual(['CRSR', 'SUP']);
     });
 
-    it.fails('closes the MSG page on CRSR and turns the left cursor on beneath (T4, #333)', async () => {
+    it('closes the MSG page on CRSR and turns the left cursor on beneath (T4, #333)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'NAV 4');
         await msgPage(unit);
@@ -276,6 +286,31 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
 
         expect(unit.overlay()).toBeNull();
         expect(names()).toEqual(['CRSR', 'SUP']);
+    });
+
+    // T4: CLR on the MSG page is ignored, so the page stays up and no error shows
+    it('ignores CLR on the MSG page (checked in the KLN 89 trainer, 2026-10-09, T4)', async () => {
+        const unit = await bootUnit();
+        await msgPage(unit);
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.overlay()).toBeInstanceOf(MessagePage);
+    });
+});
+
+describe('the MSG page and a right knob (characterization)', () => {
+    // SUP to CTR 1 is the right page order of 3-13, which is only where the turn lands. The MSG page closing on a RIGHT
+    // knob is the code's choice by analogy with T3 (the KLN 89 has one knob pair); no source shows it
+    it('characterization: leaves the MSG page on the right outer knob and turns SUP to CTR 1 (#333)', async () => {
+        const unit = await bootUnit();
+        await msgPage(unit);
+
+        await unit.panel.outer('R', 1);
+
+        expect(unit.overlay()).toBeNull();
+        expect(names()).toEqual(['NAV 2', 'CTR 1']);
     });
 });
 

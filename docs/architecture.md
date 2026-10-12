@@ -806,7 +806,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 
 ### MainPage dispatch rules (`MainPage.onInteractionEvent`)
 
-- **Order of precedence for knobs:** overlay page → cursor-active page → tree navigation.
+- **Order of precedence for knobs:** overlay page → cursor-active page → tree navigation. The MSG page is the
+  exception: the knobs and CRSR close it first and act on the page beneath, and CLR on it is ignored (#333).
 - Outer knob with cursor off: on the base page → `treeController.movePage(±1)`. On a pushed page (DCT, confirm, ...) → *
   *pop it and re-dispatch the same event** (KLN 89 trainer behaviour). The same holds for overlays when their cursor
   controller returns false.

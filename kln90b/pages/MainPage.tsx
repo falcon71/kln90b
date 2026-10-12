@@ -134,6 +134,13 @@ class OverlayStack {
 }
 
 
+/** The keys that close the MSG page and then act on the page beneath (#333) */
+const MSG_CLOSING_EVENTS = [
+    EVT_L_OUTER_LEFT, EVT_L_OUTER_RIGHT, EVT_R_OUTER_LEFT, EVT_R_OUTER_RIGHT,
+    EVT_L_INNER_LEFT, EVT_L_INNER_RIGHT, EVT_R_INNER_LEFT, EVT_R_INNER_RIGHT,
+    EVT_L_CURSOR, EVT_R_CURSOR,
+];
+
 /**
  * This is the primary page, that will be shown after all the startup screens. The outer and inner knobs
  * can be used to switch between indiviual pages, called SixLineHalfPage here.
@@ -302,6 +309,13 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
     onInteractionEvent(evt: string): boolean {
         let leftPage: SixLineHalfPage;
         let rightPage: SixLineHalfPage;
+
+        if (this.isMessagePageShown() && MSG_CLOSING_EVENTS.includes(evt)) {
+            //#56, the KLN 89 trainer, 2026-10-09 (T3, T4): the knobs and CRSR close the MSG page and act on the page
+            //beneath; CLR on it is ignored (#333)
+            this.popOverlayPage();
+            return this.onInteractionEvent(evt);
+        }
 
         if (this.overlayPageStack.isShown()) {
             KeyboardService.routeKeyboardEvent(evt, this.getOverlayPage()!.lCursorController, this.getOverlayPage()!.rCursorController);
