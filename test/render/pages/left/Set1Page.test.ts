@@ -59,7 +59,7 @@ describe('SET 1 initialization (3-18)', () => {
 
     // 3-18, figures 3-59 and 3-60: the first ENT shows the waypoint page on the right and leaves the position alone; the
     // second ENT confirms the waypoint, and the position rows take its latitude and longitude. KAAA is at 47.1 N 11.0 E,
-    // which is N 47°06.00' and E 11°00.00' (0.1° is 6.00'). The sibling of the #248 pin below.
+    // which is N 47°06.00' and E 11°00.00' (0.1° is 6.00'). The sibling of the #248 test below.
     it('takes the position of a confirmed waypoint (3-18)', async () => {
         const unit = await onSet1();
         await unit.panel.cursor('L');
@@ -74,9 +74,9 @@ describe('SET 1 initialization (3-18)', () => {
         expect(Screen.read().rows('L').slice(1, 4)).toEqual(['WPT: KAAA  ', "N 47°06.00'", "E 11°00.00'"]);
     });
 
-    // 3-18 step 8 and the KLN 89 trainer (2026-10-07): once the waypoint is confirmed the cursor goes straight to
-    // CONFIRM?, over the latitude and the longitude. Set1Page.setWpt leaves it on the latitude.
-    it.fails('moves the cursor to CONFIRM? once the waypoint is confirmed (3-18, checked in the KLN 89 trainer, 2026-10-07, #248)', async () => {
+    // 3-18 step 8 and the KLN 89 trainer (2026-10-07, 2026-10-12): once the waypoint is confirmed the cursor goes
+    // straight to CONFIRM?, the last field. The cursor's move after the approval leaves it there (#248).
+    it('moves the cursor to CONFIRM? once the waypoint is confirmed (3-18, checked in the KLN 89 trainer, 2026-10-07, #248)', async () => {
         const unit = await onSet1();
         await unit.panel.cursor('L');
         await unit.panel.enterIdent('L', 'KAAA');

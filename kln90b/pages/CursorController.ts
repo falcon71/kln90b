@@ -246,6 +246,16 @@ export class CursorController implements CursorHandler {
         this.focusAt(index);
     }
 
+    /**
+     * Puts the cursor on the given field, when it is one of the cursor's fields
+     */
+    public focusField(field: Field): void {
+        const index = this.getFields().indexOf(field);
+        if (index !== -1) {
+            this.focusIndex(index);
+        }
+    }
+
     public innerRight(): boolean {
         return this.getCurrentFocusedField()?.innerRight() ?? false;
     }
