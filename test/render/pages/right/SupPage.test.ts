@@ -264,7 +264,7 @@ describe('SUP page', () => {
     // distance has three digits, so that the leading digit of the distance field is typed as a digit.
     it('creates the waypoint from a reference waypoint, radial and distance (5-19)', async () => {
         const unit = await qqWithApprovedRefAbc();
-        await unit.panel.cursorTo('R', '___._'); // RAD; the cursor stays on REF today (#284)
+        await unit.panel.cursorTo('R', '___._'); // RAD; the cursor is there already after the approval (#284)
         await unit.panel.type('R', '0900');
         await unit.panel.ent();
         expect(unit.panel.focused('R')).toEqual({row: 3, col: 16, text: '___._'}); // DIS
@@ -287,7 +287,7 @@ describe('SUP page', () => {
 
     // 5-19 step 8 (figure 5-72) and the KLN 89 trainer (2026-10-07): after the reference waypoint is approved, the page
     // returns with the cursor on RAD. Sibling: the creation test above passes the same approval.
-    it.fails('puts the cursor on RAD after the reference waypoint is approved (5-19, the KLN 89 trainer, #284)', async () => {
+    it('puts the cursor on RAD after the reference waypoint is approved (5-19, the KLN 89 trainer, #284)', async () => {
         const unit = await qqWithApprovedRefAbc();
 
         expect(unit.panel.focused('R')).toEqual({row: 2, col: 17, text: '___._'});

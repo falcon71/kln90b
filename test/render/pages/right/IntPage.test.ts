@@ -384,9 +384,8 @@ describe('user intersection (5-18, 5-19)', () => {
     });
 
     // 5-19 step 8, figure 5-72: after the approval of the reference waypoint the page returns with the cursor over the
-    // RAD dashes; the KLN 89 trainer (2026-10-07) does the same (Ref, ENT, ENT, then the cursor is on Rad). The cursor
-    // stays on REF
-    it.fails('moves the cursor to RAD after the REF approval (5-19, figure 5-72, the KLN 89 trainer, #284)', async () => {
+    // RAD dashes; the KLN 89 trainer (2026-10-07) does the same (Ref, ENT, ENT, then the cursor is on Rad)
+    it('moves the cursor to RAD after the REF approval (5-19, figure 5-72, the KLN 89 trainer, #284)', async () => {
         const unit = await refOrd();
 
         expect(unit.panel.focused('R').row).toBe(2);
@@ -400,8 +399,8 @@ describe('user intersection (5-18, 5-19)', () => {
         expect(Screen.read().rows('R').slice(0, 2)).toEqual([' INT15     ', 'REF:  ORD  ']);
     });
 
-    // 5-19 step 10: ENT on the radial moves the cursor to DIS. The cursor is on REF after the approval today
-    // (#284), so the test turns the knob to the dashes of RAD, the first match going clockwise
+    // 5-19 step 10: ENT on the radial moves the cursor to DIS. The cursor is on RAD after the approval (5-19 step 8),
+    // so cursorTo finds the dashes of RAD at once
     it('moves the cursor to DIS after the radial (5-19)', async () => {
         const unit = await refOrd();
         await unit.panel.cursorTo('R', '___._');

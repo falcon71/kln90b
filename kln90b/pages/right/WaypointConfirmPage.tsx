@@ -100,7 +100,20 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
             return Promise.resolve(EnterResult.Not_Handled);
         }
 
-        return Promise.resolve(props.callingEditor.currentValueConfirmed());
+        const editor = props.callingEditor;
+        const result = editor.currentValueConfirmed(); //This pops this page
+        if (result === EnterResult.Handled_Move_Focus) {
+            //5-19 step 8 and the KLN 89 trainer (2026-10-07): the cursor moves on after the approval, as CursorController
+            //does on the left (#284). The check keeps the move correct if a left editor ever reaches this page while the
+            //right page has several fields. Today the REF to FPL flow lands on REF, which has a single field, so the move
+            //would change nothing there
+            const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
+            const cursorController = mainPage.getRightPage().getCursorController();
+            if (cursorController.getCurrentFocusedField() === editor) {
+                cursorController.outerRight();
+            }
+        }
+        return Promise.resolve(result);
     }
 
     public getScanlist(): Scanlist {

@@ -1051,7 +1051,8 @@ export class Set3Page extends SixLineHalfPage {
    own page tree (see section 1). It has no scan.
 6. The status line shows flashing `ent`. A second ENT → `currentValueConfirmed()` pops the confirm page and calls
    `enterCallback(facility)`. ENT on the right side reaches `WaypointConfirmPage.enter()`, which delegates to
-   `callingEditor`.
+   `callingEditor` and, when that editor is the right page's focused field (the REF field of SUP or INT), moves the
+   right cursor on to the next field (#284).
 7. Turning the inner knob or typing while waiting → `cancelAwaitingConfirmation()` (3-28). Outer knob is blocked while
    waiting. CLR → `confirmValue(null)`, which clears. An editor with `clearBlanks: false` (the SET 1 ident) closes the
    edit instead and keeps the old value (#244).
