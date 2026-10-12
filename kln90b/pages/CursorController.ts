@@ -293,6 +293,14 @@ export class CursorController implements CursorHandler {
         return false;
     }
 
+    /**
+     * True while the field under the cursor holds an open entry: an edit, a DEL question or a waypoint waiting for
+     * approval. Such a side takes CLR before the other side (#307)
+     */
+    public hasEnteredField(): boolean {
+        return this.getCurrentFocusedField()?.isEntered ?? false;
+    }
+
     private getFields(): Field[] {
         // @ts-ignore
         return this.children.getallFlat().filter(c => isField(c) && !(c as Field).isReadonly);

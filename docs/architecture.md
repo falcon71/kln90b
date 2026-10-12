@@ -818,7 +818,13 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     1. If left `isEnterAccepted()` → left.enter; else if right accepts → right.enter.
     2. Otherwise try left.enter, then right.enter.
     3. Overlays → `overlay.enter()`.
-- `EVT_CLR` → `left.clear() || right.clear()` (or the overlay's).
+- `EVT_CLR` → the overlay's `clear()` if an overlay is shown. Otherwise the half pages: like ENT, a side whose focused
+  field `isEntered` (an open edit, a DEL question, a waypoint awaiting approval) takes CLR first
+  (`CursorController.hasEnteredField()`), so an open edit on the right is not overtaken by the left page answering CLR
+  (FPL with its cursor off asks DELETE FPL?). That priority applies only to the half pages, never to an overlay. It goes
+  to the right page only when the right side holds an open entry and the left does not; otherwise the order is left,
+  then right (`left.clear() || right.clear()`). When both sides hold an open entry the left goes first. `FiveSegmentPage`
+  does the same for its two halves (#307).
 - `EVT_MSG` → push `MessagePage`, or call `MessagePage.msg()` to page through. It pops itself after the last page.
 - `EVT_DCT` → push `DirectToPage` left, or `directToPressed()` if it is already shown (toggles ACTIVATE in OBS).
 - `EVT_ALT` → toggle `AltPage` left, plus `Nav4RightPage` right with its cursor forced active.

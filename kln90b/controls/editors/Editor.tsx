@@ -140,12 +140,20 @@ export abstract class Editor<T> implements Field {
 
     }
 
+    /**
+     * CLR during an open edit brings the old value back and closes the edit; the cursor stays on the field. Checked in
+     * the KLN 89 trainer, 2026-10-08 (#307)
+     */
     clear(): boolean {
+        if (this.isEntered) {
+            this.setEntered(false);
+            return true;
+        }
         return false;
     }
 
     isClearAccepted(): boolean {
-        return false;
+        return this.isEntered;
     }
 
     protected onCharChanged(): Promise<void> {

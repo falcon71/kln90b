@@ -1,5 +1,7 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
+import {vor} from '../../../harness/navdata/builders';
+import {savedFlightplan, savedUserWaypoints} from '../../../harness/storage';
 import {blinkCycle} from '../../../harness/render/blink';
 import {Screen} from '../../../harness/render/screen';
 
@@ -191,9 +193,8 @@ describe('editor CLR during an open edit (checked in the KLN 89 trainer, 2026-10
     });
 
     // Checked in the KLN 89 trainer, 2026-10-08 (T2): CLR brings the old value back, the cursor stays on
-    // the field, and the ent prompt goes. The code ignores CLR (Editor.isClearAccepted is false), so the edit stays
-    // open.
-    it.fails('brings the old value back and closes the edit (checked in the KLN 89 ' +
+    // the field, and the ent prompt goes
+    it('brings the old value back and closes the edit (checked in the KLN 89 ' +
         'trainer, 2026-10-08, #307)', async () => {
         const unit = await withOpenEdit();
 
@@ -205,9 +206,9 @@ describe('editor CLR during an open edit (checked in the KLN 89 trainer, 2026-10
         expect(unit.panel.focused('L').row).toBe(2);
     });
 
-    // Checked in the KLN 89 trainer, 2026-10-08 (T2): ENT after the CLR does nothing. Today the edit is still open, so
-    // ENT enters it (N 20°00.00'); the pin turns green with the fix of #307
-    it.fails('does nothing on a following ENT (checked in the KLN 89 trainer, 2026-10-08, #307)', async () => {
+    // Checked in the KLN 89 trainer, 2026-10-08 (T2): ENT after the CLR does nothing, the edit is closed and the old
+    // value stays
+    it('does nothing on a following ENT (checked in the KLN 89 trainer, 2026-10-08, #307)', async () => {
         const unit = await withOpenEdit();
 
         await unit.panel.clr();
@@ -216,6 +217,61 @@ describe('editor CLR during an open edit (checked in the KLN 89 trainer, 2026-10
 
         expect(unit.errors).toEqual([]);
         expect(latRow()).toBe("N 47°30.00'");
+    });
+});
+
+// #307: CLR goes first to a side whose field is entered, as ENT goes first to the side that accepts it. FPL 0 with
+// the cursor off would otherwise answer CLR with DELETE FPL? while the pilot closes the edit on the right.
+describe('editor CLR with the other side answering CLR (#307)', () => {
+    /**
+     * FPL 0 holds MKC and shows on the left with its cursor off, so it answers CLR with DELETE FPL? (4-5). On the right
+     * the INT page of QQI, a stored user intersection 6.0 NM north of MKC, after the REF calculation took MKC
+     * (IntPage.test.ts, "stored user intersection"), with the right cursor on RAD
+     */
+    async function fpl0AndQqiRad(): Promise<HeadlessUnit> {
+        const mkc = vor('MKC', 47.0, 11.0);
+        const unit = await bootUnit({
+            facilities: [mkc],
+            storage: {
+                ...savedUserWaypoints([{kind: 'int', ident: 'QQI', lat: 47.1, lon: 11.0}]),
+                ...savedFlightplan(0, [mkc]),
+            },
+            position: {lat: 47, lon: 8},
+        });
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.selectPage('R', 'INT  ');
+        await vi.advanceTimersByTimeAsync(9000); // the REF calculation
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', 'MKC');
+        await unit.panel.cursorTo('R', '000.0'); // RAD of QQI, due north of MKC
+        return unit;
+    }
+
+    // The sibling of the test below: without an open entry on the right, CLR goes to FPL 0, which asks DELETE FPL?
+    // with its cursor off (4-5)
+    it('asks DELETE FPL? on CLR when the right side has no open entry (4-5)', async () => {
+        const unit = await fpl0AndQqiRad();
+
+        await unit.panel.clr();
+
+        expect(Screen.read().rows('L').some(r => r.includes('DELETE FPL'))).toBe(true);
+    });
+
+    // That the old value comes back is what the KLN 89 trainer showed (2026-10-08, T2). The order of the two sides is
+    // the unit's design: the KLN 89 has one knob pair, so it was never observed there. CLR goes first to the side with
+    // the open entry, as ENT goes first to the side that accepts it
+    it('closes an open RAD edit on the right while FPL 0 is on the left with its cursor off ' +
+        '(characterization, #307)', async () => {
+        const unit = await fpl0AndQqiRad();
+        await unit.panel.inner('R', 1); // opens the edit
+        expect(await entPromptShown()).toBe(true); // Precondition: the edit is open
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R')[2]).toBe('RAD: 000.0°');
+        expect(Screen.read().rows('L').some(r => r.includes('DELETE'))).toBe(false);
+        expect(await entPromptShown()).toBe(false);
     });
 });
 

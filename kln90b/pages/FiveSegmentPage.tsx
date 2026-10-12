@@ -157,6 +157,10 @@ export class FiveSegmentPage extends DisplayComponent<FivePageProps> implements 
                 reportErrors(this.handleEnter(), this.props.bus);
                 return true;
             case EVT_CLR:
+                //#307: a side with an open entry takes CLR first, as in MainPage
+                if (!this.props.lPage.getCursorController().hasEnteredField() && this.props.rPage.getCursorController().hasEnteredField()) {
+                    return this.props.rPage.clear() || this.props.lPage.clear();
+                }
                 return this.props.lPage.clear() || this.props.rPage.clear();
         }
         return false;

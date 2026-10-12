@@ -1355,7 +1355,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   cold-and-dark unit in take-home never gets a fix and that the position dead-reckons a straight line on the SET 1 track
   instead of following the plan (5-46, 3-19); no issue was filed.
 - **The `FiveSegmentPage` tests are characterizations**: no trainer check is recorded for the SCAN rule its code comment
-  names. The comment on the left branch of `handleEnter` (`FiveSegmentPage.tsx:217`) says the right half has priority
+  names. The comment on the left branch of `handleEnter` (`FiveSegmentPage.tsx:222`) says the right half has priority
   when it waits for confirmation, while the code serves the left half first; the test holds the code's order.
 - **The `fields` array of the `CursorController` constructor is dead** (`CursorController.ts:62-63`, behind
   `@ts-ignore`): the field list is recomputed on every call. It looks like a cache, so do not rely on it.

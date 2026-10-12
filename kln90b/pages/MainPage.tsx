@@ -543,6 +543,11 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                 if (this.overlayPageStack.isShown()) {
                     return this.getOverlayPage()!.clear();
                 }
+                //#307: as with ENT, a side with an open entry takes CLR first, so a page that answers CLR on the
+                //other side (FPL with its cursor off asks DELETE FPL?, 4-5) does not take it away
+                if (!this.getLeftPage().getCursorController().hasEnteredField() && this.getRightPage().getCursorController().hasEnteredField()) {
+                    return this.getRightPage().clear() || this.getLeftPage().clear();
+                }
                 return this.getLeftPage().clear() || this.getRightPage().clear();
             case EVT_MSG:
                 if (this.getOverlayPage() instanceof MessagePage) {
