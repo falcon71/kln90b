@@ -143,3 +143,36 @@ describe('WaypointDeleteListItem on OTH 3 (characterization)', () => {
             expect(userIdents(unit)).toEqual(['AAA', 'BBB', 'CCC']);
         });
 });
+
+// #358: a right knob turned while the question is open closes the waypoint page (it has no cursor, so the knob goes
+// to the page beneath, #56) and moves the right side on. Withdrawing the question afterwards must not pop the right
+// side again. The right side's page after the knob is the next page group after SUP (code behavior); withdrawing the
+// question leaves it there (characterization: the guide does not describe this sequence)
+describe('WaypointDeleteListItem on OTH 3, a right knob during the question (characterization, #358)', () => {
+    it('withdraws the question on CRSR after a right knob without an error (characterization, #358)', async () => {
+        const unit = await oth3();
+        await unit.panel.clr();
+        await unit.panel.outer('R', 1);
+        expect(Screen.read().status().right).toBe('CTR 1'); // Precondition: the waypoint page is gone
+
+        await unit.panel.cursor('L');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[2]).toBe('BBB   I    ');
+        expect(Screen.read().status()).toMatchObject({left: 'OTH 3', right: 'CTR 1'});
+        expect(userIdents(unit)).toEqual(['AAA', 'BBB', 'CCC']);
+    });
+
+    it('withdraws the question on a second CLR after a right knob without an error (characterization, #358)', async () => {
+        const unit = await oth3();
+        await unit.panel.clr();
+        await unit.panel.outer('R', 1);
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 0, text: 'BBB   I    '});
+        expect(Screen.read().status().right).toBe('CTR 1');
+        expect(userIdents(unit)).toEqual(['AAA', 'BBB', 'CCC']);
+    });
+});

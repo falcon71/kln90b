@@ -8,14 +8,18 @@ import {SixLineHalfPage} from "../pages/FiveSegmentPage";
 
 
 export class WaypointDeleteListItem extends SimpleListItem<Facility> {
+    /**
+     * The waypoint page this item's question pushed on the right, while the question is open
+     */
+    private pushedPage: SixLineHalfPage | null = null;
+
     public constructor(props: ListItemProps<Facility> & PageProps, private parent: SixLineHalfPage) {
         super(props);
     }
 
     public setFocused(focused: boolean) {
         if (this.isEntered) {
-            const mainPage = this.getPageProps().pageManager.getCurrentPage() as MainPage;
-            mainPage.popRightPage();
+            this.popPushedPage();
         }
         super.setFocused(focused);
     }
@@ -25,8 +29,7 @@ export class WaypointDeleteListItem extends SimpleListItem<Facility> {
             return false;
         }
         if (this.isEntered) { //4-5 delete can be cancelled by pressing clear again
-            const mainPage = this.getPageProps().pageManager.getCurrentPage() as MainPage;
-            mainPage.popRightPage();
+            this.popPushedPage();
             this.isEntered = false;
             return true;
         }
@@ -43,10 +46,22 @@ export class WaypointDeleteListItem extends SimpleListItem<Facility> {
             facility: this.props.value,
             callingEditor: null,
         }, this.parent); //We are the left page, that means we get priority and we will see the enter from the list
-
+        const mainPage = this.getPageProps().pageManager.getCurrentPage() as MainPage;
+        this.pushedPage = mainPage.getRightPage();
 
         this.isEntered = true;
         return true;
+    }
+
+    /**
+     * Pops the waypoint page of the question, unless a right knob has already closed it (#358)
+     */
+    private popPushedPage(): void {
+        const mainPage = this.getPageProps().pageManager.getCurrentPage() as MainPage;
+        if (this.pushedPage !== null && mainPage.getRightPage() === this.pushedPage) {
+            mainPage.popRightPage();
+        }
+        this.pushedPage = null;
     }
 
     private getPageProps(): PageProps {
