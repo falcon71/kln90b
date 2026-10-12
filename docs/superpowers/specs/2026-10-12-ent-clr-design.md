@@ -1,6 +1,6 @@
 # ENT and CLR: design
 
-Date: 2026-10-12. Issues: #118, #244, #248, #273, #284, #286, #307, #310, #316, #317, #333, #334, #335, #358.
+Date: 2026-10-12. Issues: #118, #244, #248, #273, #284, #286, #307, #310, #316, #317, #333, #334, #335, #358, #359.
 Branch: `ent-clr`.
 
 The session started from the ENT and CLR issues the maintainer named (#118, #244, #273, #286, #307, #310, #316,
@@ -156,10 +156,29 @@ list from the waypoint list, the STAR list from the runway list); the pins cover
 analogy. A cursor activated inside `redraw()` lands one field early (noted in the issue), so the focus is set once the
 page's fields exist. The plan checks whether `ActPage` shows these pages in the ACT tree.
 
+## 6b. CLR on a right-side waypoint awaiting approval (#359)
+
+Found by the final whole-branch review and added to the session at the maintainer's request. While a waypoint editor
+of a right page (REF on INT, SUP and REF, the VNAV waypoint of the right NAV 4) waits for the approval of its waypoint
+page, the right page is the `WaypointConfirmPage`. It has no cursor and no CLR of its own, so the #307 priority cannot
+see the open entry and CLR goes to the left page; with FPL 0 on the left and its cursor off, CLR asks `DELETE FPL?`.
+
+**Design.** `SixLineHalfPage` gets `hasOpenEntry()`, by default its cursor controller's `hasEnteredField()`, and the
+CLR priority of `MainPage` (and of the `FiveSegmentPage` container) asks the pages instead of their controllers.
+`WaypointConfirmPage` answers `hasOpenEntry()` with true when its calling editor belongs to a right-side page (the
+parent the confirmation was shown for is not the current left page), and its `clear()` then hands CLR to that editor,
+whose own CLR applies (the default blanking CLR: the waypoint page goes, the field blanks and waits for ENT, as on
+DIRECT TO, 3-29, and on FPL, #310). A left-side editor awaiting approval keeps its CLR as before (the left side holds
+the entered field); the REF to FPL confirmation, whose calling editor is on the left with the left cursor off, keeps
+its current CLR (that flow is #291's).
+
+The behavior on the real unit is not recorded for REF; 4-2 step 7 (CLR on a wrong identifier's waypoint page) covers
+the FPL case, so the tests are characterizations that state the analogy.
+
 ## 7. Testing
 
 - One `fixes #NN` commit per issue, with its tests and doc changes, in this order: #118; #307, #244, #248, #310, #286,
-  #284; #358, #316, #317; #334, #335, #333; #273. Every commit keeps `npx tsc --noEmit`, `npm run build` and `npm test`
+  #284; #358, #316, #317; #334, #335, #333; #273; #359. Every commit keeps `npx tsc --noEmit`, `npm run build` and `npm test`
   green.
 - Each fix turns its `it.fails` pin into `it`; the issue number stays in the name.
 - New tests: an ENT error reaches the `error` topic and no rejection is left (#118, for the half pages and an
