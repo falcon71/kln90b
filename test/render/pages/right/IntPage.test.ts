@@ -3,7 +3,7 @@ import {Facility, FacilityType, ICAO, VorClass, VorType} from '@microsoft/msfs-s
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {intersection, vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
-import {savedUserWaypoints} from '../../../harness/storage';
+import {savedFlightplan, savedUserWaypoints} from '../../../harness/storage';
 import {userWaypoints} from '../../../harness/readers';
 import {distanceNm, pointFrom} from '../../../harness/flight/geo';
 import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
@@ -702,5 +702,58 @@ describe('stored user intersection without a reference VOR (#286)', () => {
         expect(unit.errors).toEqual([]);
         expect(Screen.read().rows('R')[3].slice(5, 9)).toBe('10.0'); // the digits only: the format around them is #282
         expect(userTuples(unit)).toEqual(before);
+    });
+});
+
+
+// #359: CLR while the waypoint page of a reference waypoint awaits the approval. 4-2 step 7 has CLR reject the waypoint
+// page of a wrong identifier on FPL, and the REF case follows it by analogy. The field then shows the editor's own CLR
+// result: blank, waiting for ENT, as on DIRECT TO.
+describe('INT page CLR while the reference waypoint awaits approval (#359)', () => {
+    /**
+     * INT15 on the right with USER POS? and REF ORD entered, the waypoint page of ORD awaiting the approval. ORD is
+     * stored in FPL 0 and the left shows FPL 0 with its cursor off (CLR would ask DELETE FPL?, 4-5), or the left page
+     * stays on its default, which does not answer CLR
+     */
+    async function refOrdAwaiting(leftFpl0: boolean): Promise<HeadlessUnit> {
+        const ord = vor('ORD', 47.0, 11.0);
+        const unit = await bootUnit({
+            facilities: [kenzy(), ord],
+            storage: savedFlightplan(0, [ord]),
+            position: {lat: 47, lon: 8},
+        });
+        if (leftFpl0) {
+            await unit.panel.selectPage('L', 'FPL 0');
+        }
+        await unit.panel.selectPage('R', 'INT  ');
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'INT15');
+        await unit.panel.cursorTo('R', 'USER POS?');
+        await unit.panel.ent();
+        await unit.panel.outer('R', -3);
+        await unit.panel.enterIdent('R', 'ORD');
+        await unit.panel.ent(); // the waypoint page of ORD
+        expect(Screen.read().status().right).toBe('VOR'); // precondition: the page awaits the approval
+        return unit;
+    }
+
+    it('characterization: CLR rejects a reference waypoint awaiting approval, not the left page (#359)', async () => {
+        const unit = await refOrdAwaiting(true);
+        expect(Screen.read().rows('L').some(r => r.includes('ORD'))).toBe(true); // precondition: FPL 0 holds ORD
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R').slice(0, 2)).toEqual([' INT15     ', 'REF:  _____']); // the INT page again, REF blank and waiting for ENT
+        expect(Screen.read().rows('L').some(r => r.includes('DELETE'))).toBe(false);
+    });
+
+    it('characterization: CLR rejects a reference waypoint awaiting approval with a left page that ignores CLR (#359)', async () => {
+        const unit = await refOrdAwaiting(false);
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R').slice(0, 2)).toEqual([' INT15     ', 'REF:  _____']); // the INT page again, REF blank and waiting for ENT
     });
 });

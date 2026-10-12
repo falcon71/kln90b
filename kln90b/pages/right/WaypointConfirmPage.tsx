@@ -34,7 +34,7 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
 
     private readonly ref: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
 
-    private constructor(props: WaypointConfirmProps) {
+    private constructor(props: WaypointConfirmProps, private readonly parent: SixLineHalfPage) {
         super(props);
 
 
@@ -82,7 +82,7 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
             delete props.idx; //Just to make sure, this does not get interpreted as ActiveWaypointPageProps
         }
 
-        mainPage.pushRightPage(new WaypointConfirmPage(props), parent);
+        mainPage.pushRightPage(new WaypointConfirmPage(props, parent), parent);
     }
 
     public render(): VNode {
@@ -114,6 +114,27 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
             }
         }
         return Promise.resolve(result);
+    }
+
+    /**
+     * A right-side editor waits for this approval: CLR rejects it through the editor's own CLR (4-2 step 7 by analogy;
+     * #359). A left-side editor has the left cursor on its field and takes CLR there; the REF to FPL confirmation
+     * (#291) keeps its CLR
+     */
+    public hasOpenEntry(): boolean {
+        const props = this.props as WaypointConfirmProps;
+        if (props.callingEditor == null) {
+            return false;
+        }
+        const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
+        return this.parent !== mainPage.getLeftPage();
+    }
+
+    clear(): boolean {
+        if (!this.hasOpenEntry()) {
+            return false;
+        }
+        return (this.props as WaypointConfirmProps).callingEditor!.clear();
     }
 
     public getScanlist(): Scanlist {

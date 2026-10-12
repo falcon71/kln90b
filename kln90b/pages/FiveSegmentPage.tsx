@@ -56,6 +56,14 @@ export abstract class SixLineHalfPage extends DisplayComponent<PageProps> implem
         return this.getCursorController().clear();
     }
 
+    /**
+     * True while this page holds an open entry (an edit, a DEL question, a waypoint awaiting approval): it takes CLR
+     * before the other side (#307, #359)
+     */
+    public hasOpenEntry(): boolean {
+        return this.getCursorController().hasEnteredField();
+    }
+
     public setCurrentPage(page: number): void {
         this.currentPage = Utils.Clamp(page, 0, this.numPages - 1);
         this.requiresRedraw = true;
@@ -158,7 +166,7 @@ export class FiveSegmentPage extends DisplayComponent<FivePageProps> implements 
                 return true;
             case EVT_CLR:
                 //#307: a side with an open entry takes CLR first, as in MainPage
-                if (!this.props.lPage.getCursorController().hasEnteredField() && this.props.rPage.getCursorController().hasEnteredField()) {
+                if (!this.props.lPage.hasOpenEntry() && this.props.rPage.hasOpenEntry()) {
                     return this.props.rPage.clear() || this.props.lPage.clear();
                 }
                 return this.props.lPage.clear() || this.props.rPage.clear();

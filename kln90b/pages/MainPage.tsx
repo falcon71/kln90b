@@ -574,7 +574,7 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                 }
                 //#307: as with ENT, a side with an open entry takes CLR first, so a page that answers CLR on the
                 //other side (FPL with its cursor off asks DELETE FPL?, 4-5) does not take it away
-                if (!this.getLeftPage().getCursorController().hasEnteredField() && this.getRightPage().getCursorController().hasEnteredField()) {
+                if (!this.getLeftPage().hasOpenEntry() && this.getRightPage().hasOpenEntry()) {
                     return this.getRightPage().clear() || this.getLeftPage().clear();
                 }
                 return this.getLeftPage().clear() || this.getRightPage().clear();

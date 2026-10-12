@@ -819,10 +819,12 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     1. If left `isEnterAccepted()` → left.enter; else if right accepts → right.enter.
     2. Otherwise try left.enter, then right.enter.
     3. Overlays → `overlay.enter()`.
-- `EVT_CLR` → the overlay's `clear()` if an overlay is shown. Otherwise the half pages: like ENT, a side whose focused
-  field `isEntered` (an open edit, a DEL question, a waypoint awaiting approval) takes CLR first
-  (`CursorController.hasEnteredField()`), so an open edit on the right is not overtaken by the left page answering CLR
-  (FPL with its cursor off asks DELETE FPL?). That priority applies only to the half pages, never to an overlay. It goes
+- `EVT_CLR` → the overlay's `clear()` if an overlay is shown. Otherwise the half pages: like ENT, a side that holds an
+  open entry (`SixLineHalfPage.hasOpenEntry()`: by default a focused field that `isEntered`, that is an open edit or a
+  DEL question) takes CLR first. A `WaypointConfirmPage` shown for an editor on the right side counts as an open entry
+  too, because the right page has no cursor of its own while it waits for the approval (#359); the confirmation of a
+  left-side editor does not, since the left cursor sits on that editor. So an open edit on the right is not overtaken
+  by the left page answering CLR (FPL with its cursor off asks DELETE FPL?). That priority applies only to the half pages, never to an overlay. It goes
   to the right page only when the right side holds an open entry and the left does not; otherwise the order is left,
   then right (`left.clear() || right.clear()`). When both sides hold an open entry the left goes first. `FiveSegmentPage`
   does the same for its two halves (#307).
@@ -1059,8 +1061,11 @@ export class Set3Page extends SixLineHalfPage {
    `callingEditor` and, when that editor is the right page's focused field (the REF field of SUP or INT), moves the
    right cursor on to the next field (#284).
 7. Turning the inner knob or typing while waiting → `cancelAwaitingConfirmation()` (3-28). Outer knob is blocked while
-   waiting. CLR → `confirmValue(null)`, which clears. An editor with `clearBlanks: false` (the SET 1 ident) closes the
-   edit instead and keeps the old value (#244).
+   waiting. CLR → `confirmValue(null)`, which clears. When the editor is on the right side (REF of INT/SUP, the VNAV
+   waypoint of NAV 4) the right page is the confirm page, which has no cursor: `WaypointConfirmPage.hasOpenEntry()`
+   makes it take CLR first and `clear()` hands the key to the editor (#359). The REF to FPL confirmation keeps its
+   CLR on the left (#291). An editor with `clearBlanks: false` (the SET 1 ident) closes the edit instead and keeps
+   the old value (#244).
 8. Alternate method (3-15): ENT on a non-entered editor while a waypoint page is shown on the right adopts that
    waypoint.
 9. `confirmCurrentValue()` starts confirmation directly. Used by `DirectToPage` (pre-filled from: the FPL 0 cursor
