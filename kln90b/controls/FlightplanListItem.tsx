@@ -159,27 +159,36 @@ export class FlightplanListItem implements Field, ListItem {
     }
 
     isClearAccepted(): boolean {
-        return this.wpt !== null;
+        //4-2 step 7: a typed waypoint waiting for approval can be rejected with CLR, also on a blank position (#310)
+        return this.wpt !== null || this.waypointEditor.isEntered;
     }
 
-    enter(): Promise<EnterResult> {
+    async enter(): Promise<EnterResult> {
         if (this.isDeleting) {
             this.props.onDelete(this.props.wptIdx);
             this.isDeleting = false;
             this.isEntered = false;
-            return Promise.resolve(EnterResult.Handled_Keep_Focus);
+            return EnterResult.Handled_Keep_Focus;
         } else {
             if (this.type === KLNLegType.APP) {
                 //6-7, C-1: Approach waypoints can't be added. ENT would open an entry in front of this one, like the knobs do
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID ADD");
-                return Promise.resolve(EnterResult.Handled_Keep_Focus);
+                return EnterResult.Handled_Keep_Focus;
             }
             if (!this.waypointEditor.isEntered && this.wpt !== null) {
                 this.props.onCreate(this.props.wptIdx, FplWptEnterMode.ENTER);
-                return Promise.resolve(EnterResult.Handled_Keep_Focus);
+                return EnterResult.Handled_Keep_Focus;
             }
-            const handled = this.waypointEditor.enter();
+            const wasBlank = this.wpt === null;
+            const handled = await this.waypointEditor.enter();
             this.isEntered = this.waypointEditor.isEntered;
+            //The first ENT on a typed ident also leaves wpt null, but the editor still waits for the approval
+            //(isEntered); only the confirmed blank ends the insert
+            if (wasBlank && this.wpt === null && !this.waypointEditor.isEntered && handled === EnterResult.Handled_Move_Focus) {
+                //The blank was confirmed: the insert ends and its row goes. The cursor stays at its index, which is
+                //the waypoint the insert was in front of, or the blank position at the end (#310)
+                return EnterResult.Handled_Keep_Focus;
+            }
             return handled;
         }
     }
@@ -221,7 +230,13 @@ export class FlightplanListItem implements Field, ListItem {
 
     clear(): boolean {
         if (this.wpt === null) {
-            return false;
+            if (!this.waypointEditor.isEntered) {
+                return false;
+            }
+            //4-2 step 7: the waypoint page goes and the position is blank again (#310)
+            const handled = this.waypointEditor.clear();
+            this.isEntered = this.waypointEditor.isEntered;
+            return handled;
         }
         if (this.type === KLNLegType.APP) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID DEL");

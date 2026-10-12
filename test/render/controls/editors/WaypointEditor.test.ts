@@ -290,10 +290,8 @@ describe('waypoint editor on FPL 0 (4-2)', () => {
 
     // 4-2 step 7: if the wrong identifier was entered, CLR (while its waypoint page is shown) and begin again. Checked
     // in the KLN 89 trainer, 2026-10-08 (T18): CLR took the waypoint page away, left the blank position under the
-    // cursor with no typed identifier, and the next ENT added nothing. FlightplanListItem.clear refuses CLR on a
-    // position without a waypoint (FlightplanListItem.tsx:161 and 218), so the waypoint page stays and the next ENT
-    // adds KSAT. Sibling: the test above (the same setup)
-    it.fails('removes the waypoint page on CLR and leaves the blank position under the cursor, so ENT adds nothing '
+    // cursor with no typed identifier, and the next ENT added nothing. Sibling: the test above (the same setup)
+    it('removes the waypoint page on CLR and leaves the blank position under the cursor, so ENT adds nothing '
         + '(4-2, checked in the KLN 89 trainer, 2026-10-08, #310)', async () => {
         const unit = await ksatOnPosition2();
 
@@ -303,6 +301,56 @@ describe('waypoint editor on FPL 0 (4-2)', () => {
         expect(Screen.read().rows('L').slice(1, 3)).toEqual(['  1:KAAA   ', '  2:       ']);
         expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: '     '});
         await unit.panel.ent();
+        expect(fplIdents(unit)).toEqual(['KAAA']);
+    });
+});
+
+describe('waypoint editor on FPL 0, CLR on a blank position (characterization)', () => {
+    // 4-2 step 7 has CLR reject the typed identifier of a waypoint page. What follows is the code's behavior, not shown
+    // by the manual: on an insert in front of a waypoint the ENT that confirms the blank ends the insert, the row goes,
+    // nothing is added, and the cursor rests on the waypoint the insert was in front of (#310). The trainer check T18
+    // (docs/testing.md section 8) records only that CLR during the FPL 0 confirmation returns to the blank position
+    // with the cursor on it. That position at the end of FPL 0 is the setup of the #310 test in the describe above
+    // ('removes the waypoint page on CLR ...'), not of this one.
+    it('characterization: ends an insert in the middle on CLR and ENT, with the cursor on the following waypoint (#310)', async () => {
+        const unit = await bootUnit({...world(), storage: savedFlightplan(0, [kaaa(), airport('KSAT', 47.5, 8.0)])});
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'KSAT');
+        await unit.panel.inner('L', 1); // opens a blank position in front of KSAT
+        await unit.panel.enterIdent('L', 'AMID');
+        await unit.panel.ent();
+        expect(Screen.read().status().right).toBe('APT 1'); // Precondition: AMID awaits approval
+
+        await unit.panel.clr();
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KSAT']);
+        expect(unit.panel.focused('L').text).toBe('KSAT ');
+        expect(Screen.read().status().right).toBe('NAV 1');
+    });
+
+    // CLR is accepted on a blank position while an identifier is typed and not yet entered: the editor's default CLR
+    // blanks the typed text and waits for ENT, as on the DIRECT TO page. The blank row reads like the #310 test above.
+    // Before #310 CLR was ignored here
+    it('characterization: CLR while typing on a blank position blanks the ident, and ENT then adds nothing (#310)', async () => {
+        const unit = await bootUnit({...world(), storage: savedFlightplan(0, [kaaa()])});
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1);
+        await unit.panel.enterIdent('L', 'KSAT');
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[2]).toBe('  2:       ');
+
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
         expect(fplIdents(unit)).toEqual(['KAAA']);
     });
 });
