@@ -159,17 +159,15 @@ describe('SidStar.getArcEntryName (#28 063a836)', () => {
         expect(getArcEntryName('ABC', 45, dist)).toBe(name);
     });
 
-    // 6-6: the identifier has five characters, as every waypoint name in the unit. Beyond 26 NM the distance no longer
-    // fits a letter (the old letter-only form gave "undefined"), so only the shape is asserted here; the form is the pin below.
-    it.each([27, 30])('names an arc entry %i NM from the VOR with five letters or digits', dist => {
-        expect(getArcEntryName('ABC', 45, dist)).toMatch(/^[A-Z0-9]{5}$/);
-    });
-
     // 6-6: DME arcs beyond 26 NM have waypoints named with the first two letters of the DME ident and the three-digit
-    // radial. The code uses the along-radial form of the same page instead (ident plus distance).
-    it.fails('names an arc entry beyond 26 NM with two letters of the DME ident and the radial (#107)', () => {
-        expect(getArcEntryName('ABC', 45, 27)).toBe('AB045');
-        expect(getArcEntryName('ABC', 45, 30)).toBe('AB045');
+    // radial.
+    it.each([
+        ['ABC', 45, 27, 'AB045'],
+        ['ABC', 45, 80, 'AB045'],
+        ['ABC', 270, 30, 'AB270'],
+        ['ABC', 5, 120, 'AB005'],
+    ])('names the arc entry of %s radial %i at %i NM beyond 26 NM', (navaid, radial, dist, name) => {
+        expect(getArcEntryName(navaid, radial, dist)).toBe(name);
     });
 });
 

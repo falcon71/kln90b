@@ -281,7 +281,7 @@ export class SidStar {
     }
 
     /**
-     * 6-16
+     * 6-6, 6-16
      * @param navaid
      * @param radial
      * @param dist
@@ -292,10 +292,8 @@ export class SidStar {
             const ALPHABET = [' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
             return `D${format(radial, "000")}${ALPHABET[rounded]}`;
-        } else if (rounded <= 99) { // https://www.jeppesen.com/download/navdata/navdata_info1.pdf
-            return `${navaid}${format(rounded, "00")}`;
-        } else {
-            return `${format(rounded - 100, "00")}${navaid}`;
+        } else { // 6-6: beyond 26 NM the first two letters of the DME ident and the radial
+            return `${navaid.substring(0, 2)}${format(radial, "000")}`;
         }
 
     }
