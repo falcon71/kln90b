@@ -43,10 +43,10 @@ describe('WaypointDeleteListItem on OTH 3 (5-20)', () => {
         expect(savedIdents(unit)).toEqual(['AAA', 'CCC', '']);
     });
 
-    // After ENT the question is answered and the waypoint no longer exists, so its page leaves the right side, which
-    // shows the page it showed before, as it does when the question is withdrawn (below) and as the right side does
-    // after a waypoint page was approved (3-14). The unit keeps showing the deleted waypoint's page
-    it.fails('shows the right page of before the question again once the waypoint is deleted (5-20, 3-14, #316)',
+    // 5-20 steps 3 and 4 cover the question and the deletion. That the right side goes back to the page it showed
+    // before the question is by analogy to 3-14 (approving a typed waypoint's page returns the right side to its
+    // page), not something 5-20 shows. Confidence: medium (#316)
+    it('shows the right page of before the question again once the waypoint is deleted (5-20, 3-14, #316)',
         async () => {
             const unit = await oth3();
             await unit.panel.clr();

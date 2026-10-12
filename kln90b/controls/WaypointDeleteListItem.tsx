@@ -5,6 +5,7 @@ import {ListItemProps, SimpleListItem} from "./ListItem";
 import {MainPage} from "../pages/MainPage";
 import {WaypointConfirmPage} from "../pages/right/WaypointConfirmPage";
 import {SixLineHalfPage} from "../pages/FiveSegmentPage";
+import {EnterResult} from "../pages/CursorController";
 
 
 export class WaypointDeleteListItem extends SimpleListItem<Facility> {
@@ -22,6 +23,14 @@ export class WaypointDeleteListItem extends SimpleListItem<Facility> {
             this.popPushedPage();
         }
         super.setFocused(focused);
+    }
+
+    enter(): Promise<EnterResult> {
+        if (this.isEntered) {
+            //5-20 steps 3 and 4 cover the deletion; the right page's return is by analogy to 3-14 (medium, #316)
+            this.popPushedPage();
+        }
+        return super.enter();
     }
 
     clear(): boolean {
