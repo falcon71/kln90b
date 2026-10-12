@@ -965,8 +965,8 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   an empty document gives the defaults; the GPS SimVars are written with `WriteGPSSimVars` and not without it, against
   independent geometry; the `"kln90b"` planner mirrors FPL 0; the EFB route is loaded and answered; the V1 and V2
   waypoint and flight plan strings are hand-laid literals, through the loaders, the persistors and the V1 to V2
-  conversion; the user setting keys are pinned. *Untested:* invalid panel.xml values (by decision; the enhancement
-  #145), `TakeHomeMode`, the effect of a custom `BasePath` (needs a `FakeXhr` mount), the `Internal_*` events except
+  conversion; the user setting keys are pinned. Invalid panel.xml values fall back to the default with one recorded line each,
+  and the panel.xml error page lists them (#145). *Untested:* `TakeHomeMode`, the effect of a custom `BasePath` (needs a `FakeXhr` mount), the `Internal_*` events except
   `Internal_Key`, the 5 kt threshold of the roll command, the clamp and boot value of `L:KLN90B_Brightness`
   (undocumented), temporary (`XY`)
   waypoints round-tripped through storage, the ten-message cap of the flight plan loader and the failing V1 restore.

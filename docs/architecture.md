@@ -60,8 +60,9 @@ topic and rendered by `controls/ErrorPage` as a full-screen error page with a Gi
 1. `KLN90BPlaneSettingsParser().parsePlaneSettings(this.xmlConfig)`. "The xml is not available before init!"
 2. `forceReadyToUse = !!SimVar 'ENG COMBUSTION:1'`. If an engine is running, this is a non-cold-and-dark start, so the
    unit skips the welcome and self-test pages.
-3. `pageManager.Init(bus, userSettings)` creates the `PageContainer` and shows the `NullPage`. It then constructs
-   `BrightnessManager` and `PowerButton`.
+3. `pageManager.Init(bus, userSettings)` creates the `PageContainer` and shows the `NullPage`. If the parser recorded
+   invalid panel.xml values, they are published now as `panelXmlErrors`, because the page that shows them did not
+   exist before. It then constructs `BrightnessManager` and `PowerButton`.
    From here on, the WelcomePage can be shown while everything else initialises.
 4. Constructs `AudioGenerator`, then `Sensors` (which builds `GPS` and the `KLNGPSSatComputer`), then calls
    `hEventPublisher.startPublish()`.
@@ -558,9 +559,14 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 
 `settings/KLN90BPlaneSettings.ts`, `KLN90BPlaneSettingsParser.parsePlaneSettings(xmlConfig)`:
 
-- It finds the `<Instrument>` whose `<Name>` is `KLN90B` and reads dotted paths with
-  `getOption(tag, "Input.Airdata.IsInterfaced", default)`. Values are coerced by the type of the default; booleans
-  compare equal to `'true'`.
+- It finds the `<Instrument>` whose `<Name>` is `KLN90B` and reads dotted paths with `getBoolean`, `getChoice` or
+  `getString(tag, "Input.Airdata.IsInterfaced", default)`. A boolean must be exactly `true` or `false`, and a choice key
+  (`ObsSource`, `ObsTarget`, `BaroSource`, `Unit`, `Type`) one of its documented values, both after trimming the
+  whitespace around them. `BasePath` and `ElectricitySimVar` are free text.
+- An invalid value is never used (#145): the key gets its default, and the parser records one line in `problems`. So
+  does `AppArmSwitchInstalled=true` on a `VFROnly` unit, which cannot have the switch (Installation Manual 2-6); the
+  switch falls back to false. `KLN90BCore` publishes the lines as `panelXmlErrors`, and `controls/PanelXmlErrorPage`
+  shows them to the aircraft developer; OK closes it and the unit runs on. The runtime override LVars are not checked.
 - Keys and defaults:
     - `TakeHomeMode` = false
     - `BasePath` = `html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B`, used for asset URLs
@@ -633,6 +639,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `ActiveWaypointChangedEvents.activeWaypointChanged` (`ActiveWaypoint.ts`)
     - `GPSEvents.timeUpdatedEvent` (`Gps.ts`)
     - `ErrorEvent.error` (`controls/ErrorPage.tsx`)
+    - `PanelXmlErrorEvent.panelXmlErrors` (`controls/PanelXmlErrorPage.tsx`)
     - `StatusLineMessageEvents.statusLineMessage` and `KeyboardEvent.keyboardevent` (`controls/StatusLine.tsx`)
     - `RemarksChangedEvent.changed` (`RemarksManager.ts`)
     - `KLNfacilityrepo_sync`
@@ -664,8 +671,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   with `FSComponent.render` into `document.getElementById('InstrumentsContainer')`. That element comes from
   `resources/html_ui/.../KLN90B/KLN90B.html`: `#Mainframe > #Electricity > #InstrumentsContainer`.
 - `PageContainer` is permanent. It holds `#pageContainer.glow` (where the current Page goes), a transparent full-screen
-  `<input class="keyboard">` (keyboard mode), and an `ErrorPage`. `ErrorPage` shows any `ErrorEvent` published on the
-  bus.
+  `<input class="keyboard">` (keyboard mode), a `PanelXmlErrorPage` and an `ErrorPage`. `ErrorPage` shows any
+  `ErrorEvent` published on the bus, and `PanelXmlErrorPage` the invalid panel.xml values (Core 8). The error page comes
+  later in the DOM, so an exception shows on top.
 - `PageManager.setCurrentPage(Type, props)` → `PageContainer.setCurrentPage`. This destroys the old Page, runs
   `FSComponent.buildComponent`, then `rerenderCurrentPage()` sets `innerHTML=""` and renders again.
 - Startup sequence. Each step is a full Page:
@@ -936,7 +944,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       `StatusLine`). Half pages are never destroyed; they are just dropped.
     - Half pages that subscribe to the bus (`Oth3Page`, `Oth4Page`) never unsubscribe. Each recreation adds a
       subscription, so this is a likely leak; avoid copying it.
-    - No `onAfterRender` is used, except in `ErrorPage`.
+    - No `onAfterRender` is used, except in `ErrorPage` and `PanelXmlErrorPage`.
 
 ### Element catalogue (`controls/`)
 
@@ -981,7 +989,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       flashing → ENT confirms; CLR again cancels (4-5).
     - `WaypointDeleteListItem`.
     - `FlightplanList`/`FlightplanListItem`/`EditableFlightplan` (FPL pages).
-    - `Canvas`, `StatusLine`, `MessagePage`, `ErrorPage`, `PageContainer`, `CoordOrNearestView`,
+    - `Canvas`, `StatusLine`, `MessagePage`, `ErrorPage`, `PanelXmlErrorPage`, `PageContainer`, `CoordOrNearestView`,
       `AirportCoordOrNearestView`, `SuperNav5Left/Right`.
 
 ### How a page declares fields (canonical shape; see `pages/left/Set3Page.tsx`, `pages/left/Nav2Page.tsx`)
@@ -1123,7 +1131,8 @@ export class Set3Page extends SixLineHalfPage {
   `.nav-5-bottom-controls`, `.apt-8-iaf-list`, `.offset-left-cursor`, `.use-invert` (negative-margin overlay trick for
   FPL "USE? INVRT?" in `FlightplanList.UseInvertButton`).
 - State classes: `.inverted`, `.inverted-blink`, `.blink`, `.d-none`.
-- `.keyboard` (invisible full-screen input). `.errorpage` styles the JS error overlay.
+- `.keyboard` (invisible full-screen input). `.errorpage` styles the JS error overlay, and the panel.xml error overlay
+  `.panelxmlerrorpage` shares its look.
 - Note: `.inverted-blink` and `.blink` must be declared after `.inverted` so they override it. The order is meaningful.
 
 ## UI 6. Conventions and gotchas

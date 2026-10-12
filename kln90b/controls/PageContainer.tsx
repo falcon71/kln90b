@@ -15,6 +15,7 @@ import {KeyboardEvent} from "./StatusLine";
 import {PowerEvent} from "../PowerButton";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 import {ErrorPage} from "./ErrorPage";
+import {PanelXmlErrorPage} from "./PanelXmlErrorPage";
 import KEY_ENTER = KeyCode.KEY_ENTER;
 import KEY_ESCAPE = KeyCode.KEY_ESCAPE;
 
@@ -60,6 +61,7 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
         return (<div>
             <div id="pageContainer" ref={this.containerRef} class="glow"></div>
             <input class="keyboard" ref={this.keyboardRef}></input>
+            <PanelXmlErrorPage bus={this.props.bus}></PanelXmlErrorPage>
             <ErrorPage bus={this.props.bus}></ErrorPage>
         </div>);
     }
