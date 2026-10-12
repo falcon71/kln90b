@@ -264,7 +264,7 @@ describe('SUP page', () => {
     // distance has three digits, so that the leading digit of the distance field is typed as a digit.
     it('creates the waypoint from a reference waypoint, radial and distance (5-19)', async () => {
         const unit = await qqWithApprovedRefAbc();
-        await unit.panel.cursorTo('R', '___._'); // RAD; the cursor stays on REF today (#284)
+        await unit.panel.cursorTo('R', '___._'); // RAD; the cursor is there already after the approval (#284)
         await unit.panel.type('R', '0900');
         await unit.panel.ent();
         expect(unit.panel.focused('R')).toEqual({row: 3, col: 16, text: '___._'}); // DIS
@@ -287,7 +287,7 @@ describe('SUP page', () => {
 
     // 5-19 step 8 (figure 5-72) and the KLN 89 trainer (2026-10-07): after the reference waypoint is approved, the page
     // returns with the cursor on RAD. Sibling: the creation test above passes the same approval.
-    it.fails('puts the cursor on RAD after the reference waypoint is approved (5-19, the KLN 89 trainer, #284)', async () => {
+    it('puts the cursor on RAD after the reference waypoint is approved (5-19, the KLN 89 trainer, #284)', async () => {
         const unit = await qqWithApprovedRefAbc();
 
         expect(unit.panel.focused('R')).toEqual({row: 2, col: 17, text: '___._'});
@@ -626,5 +626,52 @@ describe('SUP page, changing a stored user waypoint (characterization)', () => {
 
         expect(userWaypoint(unit, 'USUP')!.lat).toBeCloseTo(50.32738, 5);
         expect(userWaypoint(unit, 'USUP')!.lon).toBeCloseTo(10.5, 9);
+    });
+});
+
+describe('SUP page without a reference VOR (#286)', () => {
+    // Checked in the KLN 89 trainer, 2026-10-12 (USR 2 of a user waypoint far from any VOR): a radial typed without a
+    // reference is shown and the cursor moves on, but the waypoint does not move (#286)
+    it('shows a radial entered without a reference and moves nothing (checked in the KLN 89 trainer, 2026-10-12, #286)', async () => {
+        const unit = await bootUnit({
+            position: POSITION, storage: savedUserWaypoints([{kind: 'sup', ident: 'USUR', lat: 47.0, lon: 11.0}]),
+        }); // no VOR in the world, so REF stays dashed
+        await unit.panel.selectPage('R', 'SUP  ');
+        await vi.advanceTimersByTimeAsync(REF_DELAY_MS);
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', '___._'); // RAD
+
+        await unit.panel.type('R', '0900');
+        await unit.panel.ent();
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.errors).toEqual([]);
+        expect(rightRows()[2]).toBe('RAD: 090.0°');
+        expect(unit.panel.focused('R').row).toBe(3); // DIS
+        expect(userWaypoint(unit, 'USUR')!.lat).toBeCloseTo(47.0, 9);
+        expect(userWaypoint(unit, 'USUR')!.lon).toBeCloseTo(11.0, 9);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-12 (USR 2 of a user waypoint far from any VOR): a distance typed without a
+    // reference is shown and the waypoint does not move (#286)
+    it('shows a distance entered without a reference and moves nothing (checked in the KLN 89 trainer, 2026-10-12, #286)', async () => {
+        const unit = await bootUnit({
+            position: POSITION, storage: savedUserWaypoints([{kind: 'sup', ident: 'USUR', lat: 47.0, lon: 11.0}]),
+        }); // no VOR in the world, so REF stays dashed
+        await unit.panel.selectPage('R', 'SUP  ');
+        await vi.advanceTimersByTimeAsync(REF_DELAY_MS);
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', '___._'); // RAD
+        await unit.panel.outer('R', 1);
+        expect(unit.panel.focused('R').row).toBe(3); // precondition: the DIS field
+
+        await unit.panel.type('R', '0100');
+        await unit.panel.ent();
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.errors).toEqual([]);
+        expect(rightRows()[3].slice(5, 9)).toBe('10.0'); // the digits only: the format around them is #282
+        expect(userWaypoint(unit, 'USUR')!.lat).toBeCloseTo(47.0, 9);
+        expect(userWaypoint(unit, 'USUR')!.lon).toBeCloseTo(11.0, 9);
     });
 });

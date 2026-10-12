@@ -16,6 +16,7 @@ import {
     EVT_R_SCAN_RIGHT,
 } from "../HEvents";
 import {StatusLine} from "../controls/StatusLine";
+import {reportErrors} from "../controls/ErrorPage";
 import {CursorController, EnterResult} from "./CursorController";
 import {Page, PageProps, UiElement, UIElementChildren} from "./Page";
 import {KeyboardService} from "../services/KeyboardService";
@@ -53,6 +54,14 @@ export abstract class SixLineHalfPage extends DisplayComponent<PageProps> implem
 
     clear(): boolean {
         return this.getCursorController().clear();
+    }
+
+    /**
+     * True while this page holds an open entry (an edit, a DEL question, a waypoint awaiting approval): it takes CLR
+     * before the other side (#307, #359)
+     */
+    public hasOpenEntry(): boolean {
+        return this.getCursorController().hasEnteredField();
     }
 
     public setCurrentPage(page: number): void {
@@ -153,9 +162,13 @@ export class FiveSegmentPage extends DisplayComponent<FivePageProps> implements 
             case EVT_R_INNER_RIGHT:
                 return this.props.rPage.getCursorController().innerRight();
             case EVT_ENT:
-                this.handleEnter();
+                reportErrors(this.handleEnter(), this.props.bus);
                 return true;
             case EVT_CLR:
+                //#307: a side with an open entry takes CLR first, as in MainPage
+                if (!this.props.lPage.hasOpenEntry() && this.props.rPage.hasOpenEntry()) {
+                    return this.props.rPage.clear() || this.props.lPage.clear();
+                }
                 return this.props.lPage.clear() || this.props.rPage.clear();
         }
         return false;

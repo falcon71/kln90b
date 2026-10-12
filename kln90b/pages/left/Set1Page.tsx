@@ -47,6 +47,7 @@ export class Set1Page extends SixLineHalfPage {
                 ...this.props,
                 enterCallback: this.setWpt.bind(this),
                 parent: this,
+                clearBlanks: false, // Checked in the KLN 89 trainer, 2026-10-12: CLR keeps the ident (#244)
             }),
             lat: new LatitudeEditor(this.props.bus, this.lat, this.setLat.bind(this)),
             lon: new LongitudeEditor(this.props.bus, this.lon, this.setLon.bind(this)),
@@ -70,10 +71,18 @@ export class Set1Page extends SixLineHalfPage {
     }
 
     private setWpt(waypoint: Facility | null) {
-        this.lat = waypoint!.lat;
-        this.lon = waypoint!.lon;
+        if (waypoint === null) {
+            return; //SET 1 does not blank its ident (#244), but no waypoint must not move the position either
+        }
+        this.lat = waypoint.lat;
+        this.lon = waypoint.lon;
         this.children.get("lat").setValue(this.lat);
         this.children.get("lon").setValue(this.lon);
+        //3-18 step 8 and the KLN 89 trainer (2026-10-07, 2026-10-12): the cursor goes straight to CONFIRM?. It is the
+        //last field, so the move CursorController.enter makes after the approval leaves it there (#248)
+        if (this.cursorController.cursorActive) {
+            this.cursorController.focusField(this.children.get("confirm"));
+        }
     }
 
     private setLat(lat: Latitude | null) {

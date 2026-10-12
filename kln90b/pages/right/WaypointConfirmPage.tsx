@@ -34,7 +34,7 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
 
     private readonly ref: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
 
-    private constructor(props: WaypointConfirmProps) {
+    private constructor(props: WaypointConfirmProps, private readonly parent: SixLineHalfPage) {
         super(props);
 
 
@@ -82,7 +82,7 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
             delete props.idx; //Just to make sure, this does not get interpreted as ActiveWaypointPageProps
         }
 
-        mainPage.pushRightPage(new WaypointConfirmPage(props), parent);
+        mainPage.pushRightPage(new WaypointConfirmPage(props, parent), parent);
     }
 
     public render(): VNode {
@@ -100,7 +100,41 @@ export class WaypointConfirmPage extends WaypointPage<Facility> {
             return Promise.resolve(EnterResult.Not_Handled);
         }
 
-        return Promise.resolve(props.callingEditor.currentValueConfirmed());
+        const editor = props.callingEditor;
+        const result = editor.currentValueConfirmed(); //This pops this page
+        if (result === EnterResult.Handled_Move_Focus) {
+            //5-19 step 8 and the KLN 89 trainer (2026-10-07): the cursor moves on after the approval, as CursorController
+            //does on the left (#284). The check keeps the move correct if a left editor ever reaches this page while the
+            //right page has several fields. Today the REF to FPL flow lands on REF, which has a single field, so the move
+            //would change nothing there
+            const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
+            const cursorController = mainPage.getRightPage().getCursorController();
+            if (cursorController.getCurrentFocusedField() === editor) {
+                cursorController.outerRight();
+            }
+        }
+        return Promise.resolve(result);
+    }
+
+    /**
+     * A right-side editor waits for this approval: CLR rejects it through the editor's own CLR (4-2 step 7 by analogy;
+     * #359). A left-side editor has the left cursor on its field and takes CLR there; the REF to FPL confirmation
+     * (#291) keeps its CLR
+     */
+    public hasOpenEntry(): boolean {
+        const props = this.props as WaypointConfirmProps;
+        if (props.callingEditor == null) {
+            return false;
+        }
+        const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
+        return this.parent !== mainPage.getLeftPage();
+    }
+
+    clear(): boolean {
+        if (!this.hasOpenEntry()) {
+            return false;
+        }
+        return (this.props as WaypointConfirmProps).callingEditor!.clear();
     }
 
     public getScanlist(): Scanlist {

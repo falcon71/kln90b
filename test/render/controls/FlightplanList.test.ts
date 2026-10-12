@@ -391,9 +391,9 @@ describe('FlightplanList, the DEL question', () => {
 
     // The outer knob on the question withdraws it and the cursor moves on to the next field (trainer T21 a, checked in
     // the KLN 89 trainer, 2026-10-08: the row was back to the waypoint and the cursor on the next field). On the 89
-    // that field was the one to the right in the same row; the 90B has none, so the pin takes the next waypoint, an
-    // extension of T21 a. The unit keeps the question and the cursor on it
-    it.fails('drops the question and moves the cursor on when the outer knob turns ' +
+    // that field was the one to the right in the same row; the 90B has none, so the test takes the next waypoint, an
+    // extension of T21 a
+    it('drops the question and moves the cursor on when the outer knob turns ' +
         '(checked in the KLN 89 trainer, 2026-10-08, #317)',
         async () => {
             const unit = await questionOnFx2();

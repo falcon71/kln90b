@@ -22,6 +22,7 @@ import {
 import {FivePageProps, SixLineHalfPage} from "./FiveSegmentPage";
 import {NO_CHILDREN, Page, PageSide} from "./Page";
 import {StatusLine} from "../controls/StatusLine";
+import {reportErrors} from "../controls/ErrorPage";
 import {EnterResult} from "./CursorController";
 import {MessagePage} from "../controls/MessagePage";
 import {DirectToPage} from "./left/DirectToPage";
@@ -98,6 +99,16 @@ class OverlayStack {
         return this.stack.pop()!;
     }
 
+    /**
+     * Removes the page of that type wherever it lies: a super page ends while the MSG page may lie above it (#334)
+     */
+    public remove(type: typeof SuperNav1Page | typeof SuperNav5Page | typeof Set0Page): void {
+        const idx = this.stack.findIndex(page => page instanceof type);
+        if (idx !== -1) {
+            this.stack.splice(idx, 1);
+        }
+    }
+
     public getCurrentPage(): SixLinePage | SevenLinePage | null {
         if (this.stack.length === 0) {
             return null;
@@ -122,6 +133,13 @@ class OverlayStack {
     }
 }
 
+
+/** The keys that close the MSG page and then act on the page beneath (#333) */
+const MSG_CLOSING_EVENTS = [
+    EVT_L_OUTER_LEFT, EVT_L_OUTER_RIGHT, EVT_R_OUTER_LEFT, EVT_R_OUTER_RIGHT,
+    EVT_L_INNER_LEFT, EVT_L_INNER_RIGHT, EVT_R_INNER_LEFT, EVT_R_INNER_RIGHT,
+    EVT_L_CURSOR, EVT_R_CURSOR,
+];
 
 /**
  * This is the primary page, that will be shown after all the startup screens. The outer and inner knobs
@@ -283,9 +301,21 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         return oldPage;
     }
 
+    private removeOverlayPage(type: typeof SuperNav1Page | typeof SuperNav5Page | typeof Set0Page): void {
+        this.overlayPageStack.remove(type);
+        this.rerenderOverlayPage = true;
+    }
+
     onInteractionEvent(evt: string): boolean {
         let leftPage: SixLineHalfPage;
         let rightPage: SixLineHalfPage;
+
+        if (this.isMessagePageShown() && MSG_CLOSING_EVENTS.includes(evt)) {
+            //#56, the KLN 89 trainer, 2026-10-09 (T3, T4): the knobs and CRSR close the MSG page and act on the page
+            //beneath; CLR on it is ignored (#333)
+            this.popOverlayPage();
+            return this.onInteractionEvent(evt);
+        }
 
         if (this.overlayPageStack.isShown()) {
             KeyboardService.routeKeyboardEvent(evt, this.getOverlayPage()!.lCursorController, this.getOverlayPage()!.rCursorController);
@@ -536,12 +566,16 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                 if (this.overlayPageStack.isShown()) {
                     return this.getOverlayPage()!.enter();
                 }
-                // noinspection JSIgnoredPromiseFromCall
-                this.handleEnter();
+                reportErrors(this.handleEnter(), this.props.bus);
                 return true;
             case EVT_CLR:
                 if (this.overlayPageStack.isShown()) {
                     return this.getOverlayPage()!.clear();
+                }
+                //#307: as with ENT, a side with an open entry takes CLR first, so a page that answers CLR on the
+                //other side (FPL with its cursor off asks DELETE FPL?, 4-5) does not take it away
+                if (!this.getLeftPage().hasOpenEntry() && this.getRightPage().hasOpenEntry()) {
+                    return this.getRightPage().clear() || this.getLeftPage().clear();
                 }
                 return this.getLeftPage().clear() || this.getRightPage().clear();
             case EVT_MSG:
@@ -552,6 +586,11 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     return true;
                 }
             case EVT_DCT:
+                if (this.isMessagePageShown()) {
+                    //3-27 (3-39, 3-55 for ALT) and the KLN 89 trainer, 2026-10-09 (T1, T2): the key closes the MSG page
+                    //and its page shows at once (#335)
+                    this.popOverlayPage();
+                }
                 leftPage = this.getLeftPage();
                 if (leftPage instanceof DirectToPage) {
                     leftPage.directToPressed();
@@ -560,6 +599,11 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                 }
                 return true;
             case EVT_ALT:
+                if (this.isMessagePageShown()) {
+                    //3-27 (3-39, 3-55 for ALT) and the KLN 89 trainer, 2026-10-09 (T1, T2): the key closes the MSG page
+                    //and its page shows at once (#335)
+                    this.popOverlayPage();
+                }
                 leftPage = this.getLeftPage();
                 if (leftPage instanceof AltPage) {
                     this.popLeftPage();
@@ -680,14 +724,14 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         if (showSuperNav1 && !superNav1Shown) {
             this.pushOverlayPage(new SuperNav1Page(this.props));
         } else if (!showSuperNav1 && superNav1Shown) {
-            this.popOverlayPage();
+            this.removeOverlayPage(SuperNav1Page);
         }
         const showSuperNav5 = this.getLeftPage() instanceof Nav5Page && this.getRightPage() instanceof Nav5Page;
         const superNav5Shown = this.overlayPageStack.contains(SuperNav5Page);
         if (showSuperNav5 && !superNav5Shown) {
             this.pushOverlayPage(new SuperNav5Page(this.props));
         } else if (!showSuperNav5 && superNav5Shown) {
-            this.popOverlayPage();
+            this.removeOverlayPage(SuperNav5Page);
         }
 
         const showSet0 = this.getLeftPage() instanceof Set0DummyPage;
@@ -695,7 +739,7 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         if (showSet0 && !set0Shown) {
             this.pushOverlayPage(new Set0Page(this.props));
         } else if (!showSet0 && set0Shown) {
-            this.popOverlayPage();
+            this.removeOverlayPage(Set0Page);
         }
 
 

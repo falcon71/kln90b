@@ -7,7 +7,7 @@ import {Screen} from '../../harness/render/screen';
 // NdbFreqEditor and DistanceEditor draw their decimal point as plain text and invert only the digits around it, so the
 // focused field of the INT page's DIS row is two runs of inverted cells with one plain "." between them
 describe('FrontPanel.focused across a plain decimal point (harness)', () => {
-    /** INT page of the new user intersection INT15 with REF ORD approved (5-19 steps 3 to 8), the cursor at the REF row */
+    /** INT page of the new user intersection INT15 with REF ORD approved (5-19 steps 3 to 8), the cursor on RAD (5-19 step 8, #284) */
     async function refOrd(): Promise<HeadlessUnit> {
         const unit = await bootUnit({facilities: [intersection('KENZY', 47.2, 11.0), vor('ORD', 47.0, 11.0)], position: {lat: 47, lon: 8}});
         await unit.panel.selectPage('R', 'INT  ');
@@ -24,14 +24,13 @@ describe('FrontPanel.focused across a plain decimal point (harness)', () => {
 
     it('reads the DIS field as one field', async () => {
         const unit = await refOrd();
-        await unit.panel.outer('R', 2); // RAD, DIS
+        await unit.panel.outer('R', 1); // DIS
         expect(unit.panel.focused('R')).toEqual({row: 3, col: 16, text: '___._'});
     });
 
-    /** The cursor on REF after a radial is entered, then cursorTo to the DIS field (see the test below) */
+    /** The cursor on RAD after refOrd(), a radial is entered, then cursorTo to the DIS field (see the test below) */
     async function cursorAtDis(): Promise<HeadlessUnit> {
         const unit = await refOrd();
-        await unit.panel.outer('R', 1); // RAD
         await unit.panel.type('R', '0900');
         await unit.panel.ent(); // the cursor moves to DIS
         await unit.panel.outer('R', -2); // REF

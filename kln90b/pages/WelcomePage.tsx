@@ -8,6 +8,7 @@ import {FourSegmentPage} from "./FourSegmentPage";
 import {FiveSegmentPage} from "./FiveSegmentPage";
 import {SelfTestLeftPage} from "./left/SelfTestLeftPage";
 import {FreetextEditor} from "../controls/editors/FreetextEditor";
+import {reportErrors} from "../controls/ErrorPage";
 import {SelfTestRightPage} from "./right/SelfTestRightPage";
 import {
     EVT_ENT,
@@ -96,7 +97,7 @@ export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> 
             case EVT_L_INNER_RIGHT:
                 return this.lCursorController.innerRight();
             case EVT_ENT:
-                this.lCursorController.enter();
+                reportErrors(this.lCursorController.enter(), this.props.bus);
                 return true;
         }
 

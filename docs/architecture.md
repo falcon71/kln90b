@@ -806,7 +806,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 
 ### MainPage dispatch rules (`MainPage.onInteractionEvent`)
 
-- **Order of precedence for knobs:** overlay page → cursor-active page → tree navigation.
+- **Order of precedence for knobs:** overlay page → cursor-active page → tree navigation. The MSG page is the
+  exception: the knobs and CRSR close it first and act on the page beneath, and CLR on it is ignored (#333).
 - Outer knob with cursor off: on the base page → `treeController.movePage(±1)`. On a pushed page (DCT, confirm, ...) → *
   *pop it and re-dispatch the same event** (KLN 89 trainer behaviour). The same holds for overlays when their cursor
   controller returns false.
@@ -818,10 +819,20 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     1. If left `isEnterAccepted()` → left.enter; else if right accepts → right.enter.
     2. Otherwise try left.enter, then right.enter.
     3. Overlays → `overlay.enter()`.
-- `EVT_CLR` → `left.clear() || right.clear()` (or the overlay's).
+- `EVT_CLR` → the overlay's `clear()` if an overlay is shown. Otherwise the half pages: like ENT, a side that holds an
+  open entry (`SixLineHalfPage.hasOpenEntry()`: by default a focused field that `isEntered`, that is an open edit or a
+  DEL question) takes CLR first. A `WaypointConfirmPage` shown for an editor on the right side counts as an open entry
+  too, because the right page has no cursor of its own while it waits for the approval (#359); the confirmation of a
+  left-side editor does not, since the left cursor sits on that editor. So an open edit on the right is not overtaken
+  by the left page answering CLR (FPL with its cursor off asks DELETE FPL?). That priority applies only to the half pages, never to an overlay. It goes
+  to the right page only when the right side holds an open entry and the left does not; otherwise the order is left,
+  then right (`left.clear() || right.clear()`). When both sides hold an open entry the left goes first. `FiveSegmentPage`
+  does the same for its two halves (#307).
 - `EVT_MSG` → push `MessagePage`, or call `MessagePage.msg()` to page through. It pops itself after the last page.
-- `EVT_DCT` → push `DirectToPage` left, or `directToPressed()` if it is already shown (toggles ACTIVATE in OBS).
-- `EVT_ALT` → toggle `AltPage` left, plus `Nav4RightPage` right with its cursor forced active.
+- `EVT_DCT` → close the MSG page first if it is shown (#335), then push `DirectToPage` left, or `directToPressed()` if
+  it is already shown (toggles ACTIVATE in OBS).
+- `EVT_ALT` → close the MSG page first if it is shown (#335), then toggle `AltPage` left, plus `Nav4RightPage` right
+  with its cursor forced active.
 - `EVT_APPR_ARM` → `modeController.armApproachPressed()`.
 
 ### CursorController (`pages/CursorController.ts`)
@@ -838,7 +849,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   visible entry of a scrolled list (`List.topVisibleField`, #355). `focusIndex(i)` moves a cursor that is on.
 - With the cursor on:
     - outer knob moves between fields, unless the focused field `isEntered`, in which case the field receives the outer
-      knob (moving within an editor);
+      knob (moving within an editor). An entered field that refuses the knob (a DEL question) is unfocused, which
+      withdraws its question, and the cursor moves on; at the first or last field the question goes and the cursor stays
+      (#317);
     - inner knob → `field.innerLeft/Right()`;
     - `enter()` → `field.enter()`;
     - `clear()` only if `field.isClearAccepted()`.
@@ -1045,9 +1058,14 @@ export class Set3Page extends SixLineHalfPage {
    own page tree (see section 1). It has no scan.
 6. The status line shows flashing `ent`. A second ENT → `currentValueConfirmed()` pops the confirm page and calls
    `enterCallback(facility)`. ENT on the right side reaches `WaypointConfirmPage.enter()`, which delegates to
-   `callingEditor`.
+   `callingEditor` and, when that editor is the right page's focused field (the REF field of SUP or INT), moves the
+   right cursor on to the next field (#284).
 7. Turning the inner knob or typing while waiting → `cancelAwaitingConfirmation()` (3-28). Outer knob is blocked while
-   waiting. CLR → `confirmValue(null)`, which clears.
+   waiting. CLR → `confirmValue(null)`, which clears. When the editor is on the right side (REF of INT/SUP, the VNAV
+   waypoint of NAV 4) the right page is the confirm page, which has no cursor: `WaypointConfirmPage.hasOpenEntry()`
+   makes it take CLR first and `clear()` hands the key to the editor (#359). The REF to FPL confirmation keeps its
+   CLR on the left (#291). An editor with `clearBlanks: false` (the SET 1 ident) closes the edit instead and keeps
+   the old value (#244).
 8. Alternate method (3-15): ENT on a non-entered editor while a waypoint page is shown on the right adopts that
    waypoint.
 9. `confirmCurrentValue()` starts confirmation directly. Used by `DirectToPage` (pre-filled from: the FPL 0 cursor

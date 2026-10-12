@@ -43,10 +43,10 @@ describe('WaypointDeleteListItem on OTH 3 (5-20)', () => {
         expect(savedIdents(unit)).toEqual(['AAA', 'CCC', '']);
     });
 
-    // After ENT the question is answered and the waypoint no longer exists, so its page leaves the right side, which
-    // shows the page it showed before, as it does when the question is withdrawn (below) and as the right side does
-    // after a waypoint page was approved (3-14). The unit keeps showing the deleted waypoint's page
-    it.fails('shows the right page of before the question again once the waypoint is deleted (5-20, 3-14, #316)',
+    // 5-20 steps 3 and 4 cover the question and the deletion. That the right side goes back to the page it showed
+    // before the question is by analogy to 3-14 (approving a typed waypoint's page returns the right side to its
+    // page), not something 5-20 shows. Confidence: medium (#316)
+    it('shows the right page of before the question again once the waypoint is deleted (5-20, 3-14, #316)',
         async () => {
             const unit = await oth3();
             await unit.panel.clr();
@@ -102,9 +102,8 @@ describe('WaypointDeleteListItem on OTH 3, the DEL question', () => {
 
     // The outer knob on the question withdraws it and the cursor moves on (trainer T22 b, checked in the KLN 89
     // trainer, 2026-10-08: the question went and the cursor moved to the entry above). T22 b did not record the
-    // direction of the turn; a counterclockwise click is the one that moves up (T21 a: clockwise moved on). The unit
-    // ignores the knob and keeps the question
-    it.fails('drops the question and moves the cursor on when the outer knob turns ' +
+    // direction of the turn; a counterclockwise click is the one that moves up (T21 a: clockwise moved on)
+    it('drops the question and moves the cursor on when the outer knob turns ' +
         '(checked in the KLN 89 trainer, 2026-10-08, #317)',
         async () => {
             const unit = await oth3();
@@ -114,6 +113,43 @@ describe('WaypointDeleteListItem on OTH 3, the DEL question', () => {
 
             expect(unit.panel.focused('L')).toEqual({row: 1, col: 0, text: 'AAA   I    '});
             expect(Screen.read().rows('L')[2]).toBe('BBB   I    ');
+            expect(userIdents(unit)).toEqual(['AAA', 'BBB', 'CCC']);
+        });
+
+    // The outer knob withdraws the question (trainer T22 b, checked in the KLN 89 trainer, 2026-10-08); on the last
+    // entry the cursor cannot move on and stays, as the cursor stops at the last field (#218, which the trainer
+    // showed)
+    it('drops the question and keeps the cursor on the last entry when the outer knob turns ' +
+        '(checked in the KLN 89 trainer, 2026-10-08, #317)',
+        async () => {
+            const unit = await oth3();
+            await unit.panel.outer('L', 1); // CCC, the last entry
+            await unit.panel.clr();
+            expect(unit.panel.focused('L').text).toBe('DEL CCC   ?'); // Precondition
+
+            await unit.panel.outer('L', 1);
+
+            expect(unit.errors).toEqual([]);
+            expect(unit.panel.focused('L')).toEqual({row: 3, col: 0, text: 'CCC   I    '});
+            expect(Screen.read().status().right).toBe('SUP');
+            expect(userIdents(unit)).toEqual(['AAA', 'BBB', 'CCC']);
+        });
+
+    // The same on the first entry: the outer knob turned counterclockwise withdraws the question and the cursor stays,
+    // as it stops at the first field (#218, which the trainer showed)
+    it('drops the question and keeps the cursor on the first entry when the outer knob turns ' +
+        '(checked in the KLN 89 trainer, 2026-10-08, #317)',
+        async () => {
+            const unit = await oth3();
+            await unit.panel.outer('L', -1); // AAA, the first entry
+            await unit.panel.clr();
+            expect(unit.panel.focused('L').text).toBe('DEL AAA   ?'); // Precondition
+
+            await unit.panel.outer('L', -1);
+
+            expect(unit.errors).toEqual([]);
+            expect(unit.panel.focused('L')).toEqual({row: 1, col: 0, text: 'AAA   I    '});
+            expect(Screen.read().status().right).toBe('SUP');
             expect(userIdents(unit)).toEqual(['AAA', 'BBB', 'CCC']);
         });
 });
@@ -142,4 +178,37 @@ describe('WaypointDeleteListItem on OTH 3 (characterization)', () => {
             expect(Screen.read().status()).toMatchObject({left: 'OTH 3', right: 'SUP'});
             expect(userIdents(unit)).toEqual(['AAA', 'BBB', 'CCC']);
         });
+});
+
+// #358: a right knob turned while the question is open closes the waypoint page (it has no cursor, so the knob goes
+// to the page beneath, #56) and moves the right side on. Withdrawing the question afterwards must not pop the right
+// side again. The right side's page after the knob is the next page group after SUP (code behavior); withdrawing the
+// question leaves it there (characterization: the guide does not describe this sequence)
+describe('WaypointDeleteListItem on OTH 3, a right knob during the question (characterization, #358)', () => {
+    it('withdraws the question on CRSR after a right knob without an error (characterization, #358)', async () => {
+        const unit = await oth3();
+        await unit.panel.clr();
+        await unit.panel.outer('R', 1);
+        expect(Screen.read().status().right).toBe('CTR 1'); // Precondition: the waypoint page is gone
+
+        await unit.panel.cursor('L');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[2]).toBe('BBB   I    ');
+        expect(Screen.read().status()).toMatchObject({left: 'OTH 3', right: 'CTR 1'});
+        expect(userIdents(unit)).toEqual(['AAA', 'BBB', 'CCC']);
+    });
+
+    it('withdraws the question on a second CLR after a right knob without an error (characterization, #358)', async () => {
+        const unit = await oth3();
+        await unit.panel.clr();
+        await unit.panel.outer('R', 1);
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 0, text: 'BBB   I    '});
+        expect(Screen.read().status().right).toBe('CTR 1');
+        expect(userIdents(unit)).toEqual(['AAA', 'BBB', 'CCC']);
+    });
 });

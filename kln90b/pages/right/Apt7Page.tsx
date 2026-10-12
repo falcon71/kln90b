@@ -193,12 +193,18 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         }
 
         switch (step) {
+            //Each list gets the entry chosen there before, so that the cursor comes back on it (#273). The page we come
+            //from carries that entry: a runway page carries the transition chosen before it and no runway, a transition
+            //page the runway chosen before it and no transition, and the preview and add pages carry both. So the runway
+            //list takes `rwy` and the transition list takes `trans`, wherever we come from: for a SID the runway list
+            //comes first, for a STAR the transition list.
             case 0:
                 this.currentApt7Page = new Apt7ProcedurePage({
                     ...this.props,
                     selectProcedure: this.selectProcedure.bind(this),
                     type: type,
                     changeFacility: this.changeFacility.bind(this),
+                    selected: proc,
                 });
                 break;
             case 1:
@@ -209,6 +215,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
                         trans: trans,
                         selectRunway: this.selectRunway.bind(this),
                         type: type,
+                        selected: rwy,
                     });
                 } else {
                     this.currentApt7Page = new Apt7TransitionPage({
@@ -217,6 +224,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
                         rwy: rwy,
                         selectTransition: this.selectTransition.bind(this),
                         type: type,
+                        selected: trans,
                     });
                 }
                 break;
@@ -228,6 +236,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
                         rwy: rwy,
                         selectTransition: this.selectTransition.bind(this),
                         type: type,
+                        selected: trans,
                     });
                 } else {
                     this.currentApt7Page = new Apt7RunwayPage({
@@ -236,6 +245,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
                         trans: trans,
                         selectRunway: this.selectRunway.bind(this),
                         type: type,
+                        selected: rwy,
                     });
                 }
                 break;
@@ -480,6 +490,8 @@ interface Apt7ProcedurePageProps extends PageProps {
     selectProcedure: (proc: ArrivalProcedure | DepartureProcedure) => void,
     type: KLNLegType,
     changeFacility: (fac: string | AirportFacility) => void,
+    /** The procedure chosen on this list before, when CLR comes back to it: the cursor comes on there (#273) */
+    selected?: Procedure | null,
 }
 
 type Apt7ProcedurePageTypes = {
@@ -509,11 +521,14 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
     protected readonly listRef: NodeReference<HTMLDivElement> = FSComponent.createRef<HTMLDivElement>();
     private readonly selectProcedure: (proc: ArrivalProcedure | DepartureProcedure) => void;
     private procedureType: KLNLegType;
+    private pendingSelected: Procedure | null;
+    private suppressDbWarning: boolean = false;
 
     constructor(props: Apt7ProcedurePageProps) {
         super(props);
         this.selectProcedure = props.selectProcedure;
         this.procedureType = props.type;
+        this.pendingSelected = props.selected ?? null;
 
         const facility = unpackFacility(this.facility);
 
@@ -563,7 +578,8 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
         // Based on the KLN 89 trainer, this message is also shown on the APT 7 pages
         // It is shown every time the cursor is activated (even for airports without procedures),
         // but procedures can still be selected
-        if (cursorActive && !this.props.database.isAiracCurrent()) {
+        // A CLR step back puts the cursor on again, but it was on before, so it is not a new CRSR press (#273)
+        if (cursorActive && !this.suppressDbWarning && !this.props.database.isAiracCurrent()) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "OUTDATED DB");
         }
     }
@@ -586,6 +602,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
 
     protected redraw(): void {
         const facility = unpackFacility(this.facility);
+        let selectedItem: SimpleListItem<Procedure> | null = null;
         this.children.get("nearestSelector").setFacility(this.facility);
         if (facility === null) {
             this.mainRef.instance.classList.add("d-none");
@@ -595,7 +612,8 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
             this.mainRef.instance.classList.remove("d-none");
             this.children.get("createWpt").setVisible(false);
             const procedures: readonly Procedure[] = this.procedureType === KLNLegType.SID ? facility.departures : facility.arrivals;
-            const procs = procedures.filter(proc => SidStar.isProcedureRecognized(proc)).map((proc, idx) => new SimpleListItem<Procedure>({
+            const recognized = procedures.filter(proc => SidStar.isProcedureRecognized(proc));
+            const procs = recognized.map((proc, idx) => new SimpleListItem<Procedure>({
                 bus: this.props.bus,
                 value: proc,
                 fulltext: (idx + 1).toString().padStart(2, " ") + " " + proc.name.padEnd(7, " "),
@@ -610,10 +628,24 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
                 this.emptyRef.instance.classList.add("d-none");
                 this.listRef.instance.classList.remove("d-none");
                 this.children.get("list").refresh(UIElementChildren.forList(procs));
+                selectedItem = this.pendingSelected === null ? null : procs[recognized.indexOf(this.pendingSelected)] ?? null;
             }
         }
 
         this.cursorController.refreshChildren(this.children);
+
+        if (this.pendingSelected !== null) {
+            if (selectedItem !== null) {
+                //CLR back to this list keeps the cursor on, on the procedure chosen before. Checked in the KLN 89
+                //trainer, 2026-10-07 (medium) (#273). The fields exist only now, so the focus is set by the field and
+                //not by an index
+                this.suppressDbWarning = true;
+                this.cursorController.setCursorActive(true);
+                this.suppressDbWarning = false;
+                this.cursorController.focusField(selectedItem);
+            }
+            this.pendingSelected = null;
+        }
     }
 }
 
@@ -648,6 +680,8 @@ interface Apt7RunwayPageProps extends PageProps {
     trans: EnrouteTransition | null,
     selectRunway: (proc: Procedure, rwy: RunwayTransition, trans: EnrouteTransition | null) => void,
     type: KLNLegType,
+    /** The runway chosen on this list before, when CLR comes back to it: the cursor comes on there (#273) */
+    selected?: RunwayTransition | null,
 }
 
 
@@ -664,6 +698,7 @@ class Apt7RunwayPage extends Apt7SelectorPage {
     public readonly trans: EnrouteTransition | null;
     protected readonly procedureType: KLNLegType;
     private readonly selectRunway: (proc: Procedure, rwy: RunwayTransition, trans: (EnrouteTransition | null)) => void;
+    private selectedItem: SimpleListItem<RunwayTransition> | null = null;
 
     constructor(props: Apt7RunwayPageProps) {
         super(props);
@@ -673,12 +708,17 @@ class Apt7RunwayPage extends Apt7SelectorPage {
         this.selectRunway = props.selectRunway;
 
         this.children = new UIElementChildren<Apt7RunwayPageTypes>({
-            list: new LastItemAlwaysVisibleList(this.buildList(), 4),
+            list: new LastItemAlwaysVisibleList(this.buildList(props.selected ?? null), 4),
         });
 
         this.cursorController = new CursorController(this.children);
         this.cursorController.setStartFieldProvider(() => this.children.get("list").topVisibleField()); //T23: the top visible entry of a scrolled list (#355)
         this.cursorController.setCursorActive(true);
+        if (this.selectedItem !== null) {
+            //CLR back to this list keeps the cursor on the entry chosen before, checked in the KLN 89 trainer (2026-10-07,
+            //medium; this list by analogy) (#273)
+            this.cursorController.focusField(this.selectedItem);
+        }
     }
 
     public render(): VNode {
@@ -689,13 +729,15 @@ class Apt7RunwayPage extends Apt7SelectorPage {
         </pre>);
     }
 
-    private buildList(): UIElementChildren<any> {
-        const rwys = this.proc.runwayTransitions.filter(runwayTransition => SidStar.isProcedureRecognized(this.proc, runwayTransition, this.trans)).map((rwy, idx) => new SimpleListItem<RunwayTransition>({
+    private buildList(selected: RunwayTransition | null): UIElementChildren<any> {
+        const recognized = this.proc.runwayTransitions.filter(runwayTransition => SidStar.isProcedureRecognized(this.proc, runwayTransition, this.trans));
+        const rwys = recognized.map((rwy, idx) => new SimpleListItem<RunwayTransition>({
             bus: this.props.bus,
             value: rwy,
             fulltext: (idx + 1).toString().padStart(2, " ") + " " + RunwayUtils.getRunwayNameString(rwy.runwayNumber, rwy.runwayDesignation, true, "RW").padEnd(5, " "),
             onEnter: (rwy) => this.selectRunway(this.proc, rwy, this.trans),
         }));
+        this.selectedItem = selected === null ? null : rwys[recognized.indexOf(selected)] ?? null;
 
         return UIElementChildren.forList(rwys);
     }
@@ -707,6 +749,8 @@ interface Apt7TransitionPageProps extends PageProps {
     rwy: RunwayTransition | null,
     selectTransition: (proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null) => void,
     type: KLNLegType,
+    /** The transition chosen on this list before, when CLR comes back to it: the cursor comes on there (#273) */
+    selected?: EnrouteTransition | null,
 }
 
 
@@ -723,6 +767,7 @@ class Apt7TransitionPage extends Apt7SelectorPage {
     public readonly rwy: RunwayTransition | null;
     protected readonly procedureType: KLNLegType;
     private readonly selectTransition: (proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null) => void;
+    private selectedItem: SimpleListItem<ApproachTransition> | null = null;
 
     constructor(props: Apt7TransitionPageProps) {
         super(props);
@@ -732,12 +777,17 @@ class Apt7TransitionPage extends Apt7SelectorPage {
         this.selectTransition = props.selectTransition;
 
         this.children = new UIElementChildren<Apt7TransitionPageTypes>({
-            list: new LastItemAlwaysVisibleList(this.buildList(), 4),
+            list: new LastItemAlwaysVisibleList(this.buildList(props.selected ?? null), 4),
         });
 
         this.cursorController = new CursorController(this.children);
         this.cursorController.setStartFieldProvider(() => this.children.get("list").topVisibleField()); //T23: the top visible entry of a scrolled list (#355)
         this.cursorController.setCursorActive(true);
+        if (this.selectedItem !== null) {
+            //CLR back to this list keeps the cursor on the entry chosen before, checked in the KLN 89 trainer (2026-10-07,
+            //medium; this list by analogy) (#273)
+            this.cursorController.focusField(this.selectedItem);
+        }
     }
 
     public render(): VNode {
@@ -748,13 +798,15 @@ class Apt7TransitionPage extends Apt7SelectorPage {
         </pre>);
     }
 
-    private buildList(): UIElementChildren<any> {
-        const iafs = this.proc.enRouteTransitions.filter(enrouteTransition => SidStar.isProcedureRecognized(this.proc, this.rwy, enrouteTransition)).map((trans, idx) => new SimpleListItem<ApproachTransition>({
+    private buildList(selected: EnrouteTransition | null): UIElementChildren<any> {
+        const recognized = this.proc.enRouteTransitions.filter(enrouteTransition => SidStar.isProcedureRecognized(this.proc, this.rwy, enrouteTransition));
+        const iafs = recognized.map((trans, idx) => new SimpleListItem<ApproachTransition>({
             bus: this.props.bus,
             value: trans,
             fulltext: (idx + 1).toString().padStart(2, " ") + " " + trans.name.padEnd(5, " "),
             onEnter: (trans) => this.selectTransition(this.proc, this.rwy, trans),
         }));
+        this.selectedItem = selected === null ? null : iafs[recognized.indexOf(selected)] ?? null;
 
         return UIElementChildren.forList(iafs);
     }

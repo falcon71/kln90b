@@ -143,12 +143,12 @@ The sim globals are installed once per test file by the setup files `test/harnes
 - **`unit.consoleErrors`** holds the arguments of every `console.error` call. The call is passed on to the
   `console.error` it replaced, and the teardown puts that one back. `Flight` reads it for its "no console.error"
   monitor.
-- **Unhandled rejections** are collected through a `process` listener, into `unit.rejections` and `unit.errors`. Many
-  input handlers are not awaited (ENT, for example), so a throw inside one is a rejection nobody sees. Vitest stops
-  reporting unhandled rejections once a second listener exists, which makes this collector the only check. It is
-  strict: a rejection still in `unit.rejections` when the test ends fails that test. The check runs while the unit is
-  still up, before the teardown (Vitest runs `onTestFinished` callbacks last registered first), and a throw in it does
-  not stop the teardown. The teardown removes the listener.
+- **Unhandled rejections** are collected through a `process` listener, into `unit.rejections` and `unit.errors`. Some
+  async callbacks of ENT are not awaited (`RefPage.calcRef`, for example; section 6), so a throw inside one is a
+  rejection nobody sees. Vitest stops reporting unhandled rejections once a second listener exists, which makes this
+  collector the only check. It is strict: a rejection still in `unit.rejections` when the test ends fails that test. The
+  check runs while the unit is still up, before the teardown (Vitest runs `onTestFinished` callbacks last registered
+  first), and a throw in it does not stop the teardown. The teardown removes the listener.
 
 `bootUnitExpectingError({...bootOptions, platform})` is the boot for a start-up that is expected to fail (#50). It
 shares the guard and the teardown with `bootUnit`, but waits for the first `error` event instead of `propsReady`,
@@ -818,11 +818,13 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   `/// <reference types="node" />`. The directive makes the Node types available to the whole `tsc` program, because the
   `include` of the root `tsconfig.json` compiles `kln90b/` and `test/` together; it does not keep Node APIs out of the
   code in `kln90b/`, so `tsc` will not catch an accidental Node call there.
-- **Errors thrown on the ENT path do not reach the error page.** `MainPage` starts `handleEnter` without awaiting it,
-  so a throw is an unhandled rejection, not an `error` event (the exception handling of ticks and synchronous input
-  does not see it; #118 asks whether that is intended). The harness collects the rejection and fails the test that
-  leaves one untaken (section 3), so a broken ENT is no longer silent. A test that provokes one takes it with
-  `unit.takeRejections()` (section 4).
+- **Errors thrown on the ENT path reach the error page.** The ENT paths hand their promise to `reportErrors`
+  (`controls/ErrorPage.tsx`), so an error there reaches the `error` topic like any input error (#118). The harness
+  still collects unhandled rejections and fails a test that leaves one untaken (section 3). Deeper drops remain: an
+  async `enterCallback` that `Editor.enter` and `WaypointEditor.currentValueConfirmed` do not await (such as
+  `RefPage.calcRef`), `onCharChanged`, and the async selections of APT 7 and APT 8. A throw there is still an unhandled
+  rejection, and catching it would mean awaiting it, which changes when ENT completes. A test that provokes one takes
+  it with `unit.takeRejections()` (section 4).
 - **The harness collects `console.error` but does not fail on it.** `unit.consoleErrors` holds every call, and only
   `Flight` fails on one (its `no console.error` monitor, which also counts the boot). A render or unit test that must
   not log asserts that the list is empty.
@@ -1201,6 +1203,19 @@ its line, in the comment above it or in the title of its `describe`.
   case 4-3 describes. The unreliable AVsoftech trainer, whose header scrolls off as on the 90B, put the cursor on the
   top visible waypoint of a long plan built on the page.
 
+**2026-10-12**
+- SET 1 ident: with no edit open, CLR changes nothing (no blank field, no `Ent` prompt, no waypoint page) and the ENT
+  after it changes nothing either; during an open ident edit CLR brings the old ident back (#244, like #307). After the
+  ident, ENT, ENT the cursor goes straight to `Ok?` (#248).
+- USR 2 of a user waypoint about 2000 NM from any VOR of the demo database: Ref, Rad and Dis are dashes and the cursor
+  reaches all three. A typed radial or distance is accepted (the value shows, the `Ent` prompt goes, the cursor moves
+  on, no message; the message is medium confidence) but the waypoint does not move, and after leaving the page Rad and
+  Dis are dashes again (#286).
+- ALT and the message page, run by the maintainer: ALT showed the first altitude page, MSG the message page, ALT the
+  second altitude page, MSG again, ALT closed the altitude pages, MSG again, ALT showed the first altitude page once
+  more. So ALT on the message page acts on the altitude page cycle beneath it, which the 90B, with its single ALT
+  page, has as a toggle (#335).
+
 # 9. Next steps
 
 Gathered from the baseline sessions (2026-10-03 to 2026-10-10) and grouped by area. A harness gap is built only when
@@ -1353,13 +1368,13 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   cold-and-dark unit in take-home never gets a fix and that the position dead-reckons a straight line on the SET 1 track
   instead of following the plan (5-46, 3-19); no issue was filed.
 - **The `FiveSegmentPage` tests are characterizations**: no trainer check is recorded for the SCAN rule its code comment
-  names. The comment on the left branch of `handleEnter` (`FiveSegmentPage.tsx:217`) says the right half has priority
+  names. The comment on the left branch of `handleEnter` (`FiveSegmentPage.tsx:222`) says the right half has priority
   when it waits for confirmation, while the code serves the left half first; the test holds the code's order.
 - **The `fields` array of the `CursorController` constructor is dead** (`CursorController.ts:62-63`, behind
   `@ts-ignore`): the field list is recomputed on every call. It looks like a cache, so do not rely on it.
 - **A blank Direct page:** ENT on the 89's Direct page with a blank field returns to the page before (section 8,
   2026-10-09, T1), while the 90B code stays on the DIR page. The 90B guide was not checked for the case, and the #335
-  pin does not assert it.
+  tests do not assert it.
 - **Left page leads** (seen and not confirmed or not filed):
     - FPL 0 shows an empty top row when the active waypoint is the first one, and after a list rebuild with the cursor
       on; the guide's figures do not show the case (a trainer question). `DirectToPage.test.ts` reads rows 1 to 5
@@ -1389,11 +1404,11 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       constructor text for one display tick at power-on; APT 2 truncates half-hour time zones; the `aptPage` memory
       writes of `PageManager.startMainPage` are redundant.
     - APT 7 decides on raw transition counts while it lists the recognized ones; an IAF number of ten or more has no
-      blank before the name (`Apt8Page.tsx:470`); the IAF list is not filtered by recognition; the cursor on APPROVE? of
+      blank before the name (`Apt8Page.tsx:514`); the IAF list is not filtered by recognition; the cursor on APPROVE? of
       the add question is only characterized.
     - D/T 1 and D/T 2 beside another page hide the last-waypoint block when the active waypoint is the last one (4-12 is
       silent). After LOAD IN FPL on ACT 8 the ACT page switches to the new active waypoint (the guide is silent).
-    - The code comment at `Apt8Page.tsx:352` quotes a sentence of 6-4 nearly word for word; it should be paraphrased.
+    - The code comment at `Apt8Page.tsx:373` quotes a sentence of 6-4 nearly word for word; it should be paraphrased.
 
 ## Controls
 
@@ -1437,9 +1452,6 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 
 ## Boot, power and the unit as a whole
 
-- **Errors thrown on the ENT path never reach the error page**, although `CLAUDE.md` and `architecture.md` say input
-  exceptions are shown there (section 6). The question is #118; once it is decided, either the code changes or the two
-  documents do. The harness collector stays either way.
 - **Code notes** (latent or possibly intended, so questions rather than bugs; the code is unchanged):
     - `TickController.setupLoops` starts new intervals without clearing the old ones. Only the dedup upstream
       (`PowerButton` publishes a power event on a change only, `SimVarSync` dedups its enable and disable) keeps a second
@@ -1492,10 +1504,8 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       empty remark line changes the click counts in the setup of `stores a remark with a hyphen and shows it again`
       (`FreetextEditor.test.ts`); the fix of #262 must keep NO
       SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests);
-    - a fix of #335 turns the #334 pin red as well,
-      though #334 still needs its own fix for SET 0 and Super NAV 5; a fix of #332 with a ride-through above about 1.5 s
-      needs the 3 s waits of the circuit tests raised; `HEADING_INPUT` in
-      `RollSteeringController.test.ts` can bite once #143 is fixed.
+    - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised;
+      `HEADING_INPUT` in `RollSteeringController.test.ts` can bite once #143 is fixed.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): #146 (the alert time on a Direct To a
   waypoint of FPL 0 that has a following leg), #147 (a waypoint alert in OBS mode), duplicate idents on a waypoint page
   (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 cannot be answered there, because

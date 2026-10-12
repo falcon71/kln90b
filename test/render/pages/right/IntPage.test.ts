@@ -3,7 +3,7 @@ import {Facility, FacilityType, ICAO, VorClass, VorType} from '@microsoft/msfs-s
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {intersection, vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
-import {savedUserWaypoints} from '../../../harness/storage';
+import {savedFlightplan, savedUserWaypoints} from '../../../harness/storage';
 import {userWaypoints} from '../../../harness/readers';
 import {distanceNm, pointFrom} from '../../../harness/flight/geo';
 import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
@@ -384,9 +384,8 @@ describe('user intersection (5-18, 5-19)', () => {
     });
 
     // 5-19 step 8, figure 5-72: after the approval of the reference waypoint the page returns with the cursor over the
-    // RAD dashes; the KLN 89 trainer (2026-10-07) does the same (Ref, ENT, ENT, then the cursor is on Rad). The cursor
-    // stays on REF
-    it.fails('moves the cursor to RAD after the REF approval (5-19, figure 5-72, the KLN 89 trainer, #284)', async () => {
+    // RAD dashes; the KLN 89 trainer (2026-10-07) does the same (Ref, ENT, ENT, then the cursor is on Rad)
+    it('moves the cursor to RAD after the REF approval (5-19, figure 5-72, the KLN 89 trainer, #284)', async () => {
         const unit = await refOrd();
 
         expect(unit.panel.focused('R').row).toBe(2);
@@ -400,8 +399,8 @@ describe('user intersection (5-18, 5-19)', () => {
         expect(Screen.read().rows('R').slice(0, 2)).toEqual([' INT15     ', 'REF:  ORD  ']);
     });
 
-    // 5-19 step 10: ENT on the radial moves the cursor to DIS. The cursor is on REF after the approval today
-    // (#284), so the test turns the knob to the dashes of RAD, the first match going clockwise
+    // 5-19 step 10: ENT on the radial moves the cursor to DIS. The cursor is on RAD after the approval (5-19 step 8),
+    // so cursorTo finds the dashes of RAD at once
     it('moves the cursor to DIS after the radial (5-19)', async () => {
         const unit = await refOrd();
         await unit.panel.cursorTo('R', '___._');
@@ -529,6 +528,18 @@ describe('user intersection (5-18, 5-19)', () => {
     });
 });
 
+/** QQI with no VOR within the 100 NM of the reference search, so REF stays dashed; the cursor on RAD */
+async function withoutReference(): Promise<HeadlessUnit> {
+    const unit = await bootUnit({
+        storage: savedUserWaypoints([{kind: 'int', ident: 'QQI', lat: 47.1, lon: 11.0}]), position: {lat: 47, lon: 8},
+    });
+    await unit.panel.selectPage('R', 'INT  ');
+    await vi.advanceTimersByTimeAsync(9000);
+    await unit.panel.cursor('R');
+    await unit.panel.cursorTo('R', '___._'); // RAD, after the ident characters and REF
+    return unit;
+}
+
 describe('stored user intersection', () => {
     // QQI, a stored user intersection 6.0 NM north of MKC
     const storage = () => savedUserWaypoints([{kind: 'int', ident: 'QQI', lat: 47.1, lon: 11.0}]);
@@ -619,31 +630,130 @@ describe('stored user intersection', () => {
         expect(w[4]).toBeCloseTo(11.0, 6);
     });
 
-    /** QQI with no VOR within the 100 NM of the reference search, so REF stays dashed; the cursor on RAD */
-    async function withoutReference(): Promise<HeadlessUnit> {
-        const unit = await bootUnit({storage: storage(), position: {lat: 47, lon: 8}});
-        await unit.panel.selectPage('R', 'INT  ');
-        await vi.advanceTimersByTimeAsync(9000);
-        await unit.panel.cursor('R');
-        await unit.panel.cursorTo('R', '___._'); // RAD, after the ident characters and REF
-        return unit;
-    }
-
-    // Sibling of the pin below: the page has no reference, and the cursor is on RAD
+    // The page has no reference, and the cursor is on RAD (the precondition of the tests of #286 below)
     it('has no reference VOR and puts the cursor on RAD (characterization)', async () => {
         const unit = await withoutReference();
 
         expect(Screen.read().rows('R')[1]).toBe('REF:  _____');
         expect(unit.panel.focused('R')).toEqual({row: 2, col: 17, text: '___._'});
     });
+});
 
-    // A throw on ENT is never the real unit's behavior (testing.md section 5, as #243). IntPage.setRad reads this.ref!
-    // (null without a reference VOR, and during the 8 s of the REF calculation), and the TypeError rejects the ENT
-    it.fails('does not throw on ENT of a radial without a reference (#286)', async () => {
+describe('stored user intersection without a reference VOR (#286)', () => {
+    // A throw on ENT is never the real unit's behavior (testing.md section 5, as #243). IntPage.setRad read this.ref!
+    // (null without a reference VOR, and during the 8 s of the REF calculation), and the TypeError rejected the ENT.
+    // Since #118 a throw is also an `error` event on the error page, so the test checks both
+    it('does not throw on ENT of a radial without a reference (#286)', async () => {
         const unit = await withoutReference();
         await unit.panel.type('R', '0900');
         await unit.panel.ent();
 
         expect(unit.takeRejections()).toEqual([]);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-12 (USR 2 of a user waypoint far from any VOR): a radial typed without a
+    // reference is shown and the cursor moves on, but the waypoint does not move (#286)
+    it('shows a radial entered without a reference and moves nothing (checked in the KLN 89 trainer, 2026-10-12, #286)', async () => {
+        const unit = await withoutReference();
+        const before = userTuples(unit);
+
+        await unit.panel.type('R', '0900');
+        await unit.panel.ent();
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R')[2]).toBe('RAD: 090.0°');
+        expect(unit.panel.focused('R').row).toBe(3); // DIS
+        expect(userTuples(unit)).toEqual(before);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-12: without a reference, Rad and Dis are dashes again after the page has
+    // been left and shown again; the radial entered before is not kept (#286)
+    it('shows dashes again for a radial entered without a reference after the page is left (checked in the KLN 89 trainer, 2026-10-12, #286)', async () => {
+        const unit = await withoutReference();
+        await unit.panel.type('R', '0900');
+        await unit.panel.ent();
+        expect(Screen.read().rows('R')[2]).toBe('RAD: 090.0°'); // Precondition: the radial is shown after the ENT
+        await unit.panel.cursor('R'); // off, so that the outer knob turns the page
+
+        await unit.panel.outer('R', 1);
+        expect(Screen.read().status().right).not.toBe('INT'); // Precondition: the page is left
+        await unit.panel.outer('R', -1);
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().status().right).toBe('INT');
+        expect(Screen.read().rows('R')[2]).toBe('RAD: ___._°');
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-12 (USR 2 of a user waypoint far from any VOR): a distance typed without a
+    // reference is shown and the waypoint does not move (#286)
+    it('shows a distance entered without a reference and moves nothing (checked in the KLN 89 trainer, 2026-10-12, #286)', async () => {
+        const unit = await withoutReference();
+        await unit.panel.outer('R', 1);
+        expect(unit.panel.focused('R').row).toBe(3); // precondition: the DIS field
+        const before = userTuples(unit);
+
+        await unit.panel.type('R', '0100');
+        await unit.panel.ent();
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R')[3].slice(5, 9)).toBe('10.0'); // the digits only: the format around them is #282
+        expect(userTuples(unit)).toEqual(before);
+    });
+});
+
+
+// #359: CLR while the waypoint page of a reference waypoint awaits the approval. 4-2 step 7 has CLR reject the waypoint
+// page of a wrong identifier on FPL, and the REF case follows it by analogy. The field then shows the editor's own CLR
+// result: blank, waiting for ENT, as on DIRECT TO.
+describe('INT page CLR while the reference waypoint awaits approval (#359)', () => {
+    /**
+     * INT15 on the right with USER POS? and REF ORD entered, the waypoint page of ORD awaiting the approval. ORD is
+     * stored in FPL 0 and the left shows FPL 0 with its cursor off (CLR would ask DELETE FPL?, 4-5), or the left page
+     * stays on its default, which does not answer CLR
+     */
+    async function refOrdAwaiting(leftFpl0: boolean): Promise<HeadlessUnit> {
+        const ord = vor('ORD', 47.0, 11.0);
+        const unit = await bootUnit({
+            facilities: [kenzy(), ord],
+            storage: savedFlightplan(0, [ord]),
+            position: {lat: 47, lon: 8},
+        });
+        if (leftFpl0) {
+            await unit.panel.selectPage('L', 'FPL 0');
+        }
+        await unit.panel.selectPage('R', 'INT  ');
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'INT15');
+        await unit.panel.cursorTo('R', 'USER POS?');
+        await unit.panel.ent();
+        await unit.panel.outer('R', -3);
+        await unit.panel.enterIdent('R', 'ORD');
+        await unit.panel.ent(); // the waypoint page of ORD
+        expect(Screen.read().status().right).toBe('VOR'); // precondition: the page awaits the approval
+        return unit;
+    }
+
+    it('characterization: CLR rejects a reference waypoint awaiting approval, not the left page (#359)', async () => {
+        const unit = await refOrdAwaiting(true);
+        expect(Screen.read().rows('L').some(r => r.includes('ORD'))).toBe(true); // precondition: FPL 0 holds ORD
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R').slice(0, 2)).toEqual([' INT15     ', 'REF:  _____']); // the INT page again, REF blank and waiting for ENT
+        expect(Screen.read().rows('L').some(r => r.includes('DELETE'))).toBe(false);
+    });
+
+    it('characterization: CLR rejects a reference waypoint awaiting approval with a left page that ignores CLR (#359)', async () => {
+        const unit = await refOrdAwaiting(false);
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R').slice(0, 2)).toEqual([' INT15     ', 'REF:  _____']); // the INT page again, REF blank and waiting for ENT
     });
 });

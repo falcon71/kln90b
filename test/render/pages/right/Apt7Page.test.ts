@@ -601,7 +601,9 @@ describe('APT 7 cursor after CLR', () => {
         expect(rows('R').slice(0, 4)).toEqual([' KPRC', 'SELECT STAR', ' 1 ARR1', ' 2 ARR2']);
     });
 
-    it.fails('keeps the cursor on the chosen STAR when CLR returns to the STAR list (KLN 89 trainer, #273)', async () => {
+    // Checked in the KLN 89 trainer, 2026-10-07 (medium): CLR from the runway list returned to the STAR list with the
+    // cursor on the chosen STAR; the same for the transition list is by analogy
+    it('keeps the cursor on the chosen STAR when CLR returns to the STAR list (KLN 89 trainer, #273)', async () => {
         const unit = await bootOnApt7({sids: [], stars: true});
         await unit.panel.cursor('R');
         await unit.panel.outer('R', 1);
@@ -610,6 +612,41 @@ describe('APT 7 cursor after CLR', () => {
         await unit.panel.clr();
 
         expect(unit.panel.focused('R')).toEqual({row: 3, col: 12, text: ' 2 ARR2   '});
+    });
+
+    // 6-5: CLR goes back one step. That the cursor then stands on the transition chosen there is by analogy with the STAR
+    // list (KLN 89 trainer, 2026-10-07, where CLR from the runway list returned to the STAR list); the transition list
+    // itself was not observed
+    it('keeps the cursor on the chosen transition when CLR returns to the transition list (6-5, by analogy with the KLN 89 trainer, #273)', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // ARR2: the transitions
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // TRNAB: the runways
+        expect(rows('R')[1]).toBe('RUNWAY'); // Precondition: the runway list shows
+
+        await unit.panel.clr();
+
+        expect(rows('R').slice(0, 4)).toEqual(['ARR2-Æ', 'TRANSITION', ' 1 TRNAA', ' 2 TRNAB']);
+        expect(unit.panel.focused('R')).toEqual({row: 3, col: 12, text: ' 2 TRNAB'});
+    });
+
+    // 6-5: CLR goes back one step. That the cursor then stands on the runway chosen there is by analogy with the STAR
+    // list (KLN 89 trainer, 2026-10-07, where CLR from the runway list returned to the STAR list); the runway list
+    // itself was not observed
+    it('keeps the cursor on the chosen runway when CLR returns to the runway list (6-5, by analogy with the KLN 89 trainer, #273)', async () => {
+        const unit = await bootOnApt7({sids: ['DEP1'], stars: false});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP1: the runways
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // 27L: the transitions
+        expect(rows('R')[1]).toBe('TRANSITION'); // Precondition: the transition list shows
+
+        await unit.panel.clr();
+
+        expect(rows('R').slice(0, 4)).toEqual(['DEP1-SID', 'RUNWAY', ' 1 RW09', ' 2 RW27L']);
+        expect(unit.panel.focused('R')).toEqual({row: 3, col: 12, text: ' 2 RW27L'});
     });
 
     // The cursor of the SID list starts on the first SID. The trainer shows it for APT 7 as 6-4 does for APT 8
@@ -623,6 +660,21 @@ describe('APT 7 cursor after CLR', () => {
 });
 
 describe('APT 7 page (characterization)', () => {
+    // The code posts the message only when the cursor comes on by CRSR. A CLR that returns to the STAR list puts the
+    // cursor on again, but it was on before, so a step back is not a new CRSR press (#273)
+    it('posts no further OUTDATED DB when CLR returns to the STAR list with an expired database', async () => {
+        const unit = await bootOnApt7({sids: [], stars: true}, 1, {start: new Date('2026-07-01T12:00:00Z')});
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // ARR2: the transitions
+        const seen = collectStatusMessages(unit);
+
+        await unit.panel.clr();
+
+        expect(unit.panel.focused('R')).toEqual({row: 3, col: 12, text: ' 2 ARR2   '}); // Precondition: the list is back with the cursor
+        expect(seen).toEqual([]);
+    });
+
     it('shows the STAR page with the cursor on the first STAR', async () => {
         const unit = await bootOnApt7({sids: ['DEP1'], stars: true}, 2);
         await unit.panel.cursor('R');

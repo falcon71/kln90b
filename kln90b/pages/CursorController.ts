@@ -206,12 +206,20 @@ export class CursorController implements CursorHandler {
         if (field === null) {
             return false;
         }
+        if (field.isEntered && field.outerRight()) {
+            return true;
+        }
+        //An entered field that refuses the knob holds a question (DEL ?): the knob withdraws it and the cursor moves on.
+        //Checked in the KLN 89 trainer, 2026-10-08 (#317)
         if (field.isEntered) {
-            return field.outerRight();
+            field.setFocused(false);
         }
 
         const fields = this.getFields();
         if (this.cursorField >= fields.length - 1) {
+            if (!field.isFocused) {
+                this.focusAt(this.cursorField, fields);
+            }
             return true; //4-3: The cursor stops at the last field, it does not wrap. Checked in the KLN 89 trainer (#218)
         }
 
@@ -225,11 +233,19 @@ export class CursorController implements CursorHandler {
         if (field === null) {
             return false;
         }
+        if (field.isEntered && field.outerLeft()) {
+            return true;
+        }
+        //An entered field that refuses the knob holds a question (DEL ?): the knob withdraws it and the cursor moves on.
+        //Checked in the KLN 89 trainer, 2026-10-08 (#317)
         if (field.isEntered) {
-            return field.outerLeft();
+            field.setFocused(false);
         }
 
         if (this.cursorField <= 0) {
+            if (!field.isFocused) {
+                this.focusAt(this.cursorField);
+            }
             return true; //4-3: The cursor stops at the first field, it does not wrap. Checked in the KLN 89 trainer (#218)
         }
 
@@ -244,6 +260,16 @@ export class CursorController implements CursorHandler {
         }
         this.getCurrentFocusedField()?.setFocused(false);
         this.focusAt(index);
+    }
+
+    /**
+     * Puts the cursor on the given field, when it is one of the cursor's fields
+     */
+    public focusField(field: Field): void {
+        const index = this.getFields().indexOf(field);
+        if (index !== -1) {
+            this.focusIndex(index);
+        }
     }
 
     public innerRight(): boolean {
@@ -291,6 +317,14 @@ export class CursorController implements CursorHandler {
         }
 
         return false;
+    }
+
+    /**
+     * True while the field under the cursor holds an open entry: an edit, a DEL question or a waypoint waiting for
+     * approval. Such a side takes CLR before the other side (#307)
+     */
+    public hasEnteredField(): boolean {
+        return this.getCurrentFocusedField()?.isEntered ?? false;
     }
 
     private getFields(): Field[] {

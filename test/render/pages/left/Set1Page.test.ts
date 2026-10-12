@@ -4,6 +4,7 @@ import {messages} from '../../../harness/readers';
 import {Screen} from '../../../harness/render/screen';
 import {airport} from '../../../harness/navdata/builders';
 import {OneTimeMessage} from '../../../../kln90b/data/MessageHandler';
+import {blinkCycle} from '../../../harness/render/blink';
 
 /** An airport 0.4° south and 0.25° west of the aircraft, far enough that the two positions read differently */
 const kaaa = () => airport('KAAA', 47.1, 11.0);
@@ -58,7 +59,7 @@ describe('SET 1 initialization (3-18)', () => {
 
     // 3-18, figures 3-59 and 3-60: the first ENT shows the waypoint page on the right and leaves the position alone; the
     // second ENT confirms the waypoint, and the position rows take its latitude and longitude. KAAA is at 47.1 N 11.0 E,
-    // which is N 47°06.00' and E 11°00.00' (0.1° is 6.00'). The sibling of the #248 pin below.
+    // which is N 47°06.00' and E 11°00.00' (0.1° is 6.00'). The sibling of the #248 test below.
     it('takes the position of a confirmed waypoint (3-18)', async () => {
         const unit = await onSet1();
         await unit.panel.cursor('L');
@@ -73,9 +74,9 @@ describe('SET 1 initialization (3-18)', () => {
         expect(Screen.read().rows('L').slice(1, 4)).toEqual(['WPT: KAAA  ', "N 47°06.00'", "E 11°00.00'"]);
     });
 
-    // 3-18 step 8 and the KLN 89 trainer (2026-10-07): once the waypoint is confirmed the cursor goes straight to
-    // CONFIRM?, over the latitude and the longitude. Set1Page.setWpt leaves it on the latitude.
-    it.fails('moves the cursor to CONFIRM? once the waypoint is confirmed (3-18, checked in the KLN 89 trainer, 2026-10-07, #248)', async () => {
+    // 3-18 step 8 and the KLN 89 trainer (2026-10-07, 2026-10-12): once the waypoint is confirmed the cursor goes
+    // straight to CONFIRM?, the last field. The cursor's move after the approval leaves it there (#248).
+    it('moves the cursor to CONFIRM? once the waypoint is confirmed (3-18, checked in the KLN 89 trainer, 2026-10-07, #248)', async () => {
         const unit = await onSet1();
         await unit.panel.cursor('L');
         await unit.panel.enterIdent('L', 'KAAA');
@@ -276,7 +277,7 @@ describe('SET 1 bugs', () => {
     }
 
     // 3-18: the cursor comes back over the WPT field, which still shows the confirmed waypoint. The sibling of the CLR
-    // pin below.
+    // tests below.
     it('puts the cursor back on the confirmed WPT field (3-18)', async () => {
         const unit = await onConfirmedWptField();
 
@@ -285,9 +286,9 @@ describe('SET 1 bugs', () => {
     });
 
     // Checked in the KLN 89 trainer (2026-10-07): CLR then ENT on the WPT field changes nothing, the old ident stays and
-    // no error shows. Here the CLR asks for the confirmation of no waypoint, and the ENT that confirms it hands null to
-    // Set1Page.setWpt, which reads waypoint!.lat (Set1Page.tsx:73) and throws on the ENT path.
-    it.fails('keeps the old ident without an error after CLR and ENT on the WPT field (checked in the KLN 89 trainer, 2026-10-07, #244)', async () => {
+    // no error shows. Until #244 the CLR blanked the ident and asked for the confirmation of no waypoint, and the ENT
+    // that confirmed it handed null to Set1Page.setWpt, which reads waypoint!.lat and threw on the ENT path.
+    it('keeps the old ident without an error after CLR and ENT on the WPT field (checked in the KLN 89 trainer, 2026-10-07, #244)', async () => {
         const unit = await onConfirmedWptField();
         await unit.panel.clr();
         await unit.panel.ent();
@@ -295,6 +296,54 @@ describe('SET 1 bugs', () => {
         expect(unit.takeRejections()).toEqual([]);
         expect(unit.errors).toEqual([]);
         expect(Screen.read().rows('L').slice(1, 4)).toEqual(['WPT: KAAA  ', "N 47°06.00'", "E 11°00.00'"]);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-12: with no edit open, CLR on the SET 1 ident changes nothing; no blank
+    // field, no ent prompt
+    it('keeps the ident on CLR without an open edit (checked in the KLN 89 trainer, 2026-10-12, #244)', async () => {
+        const unit = await onConfirmedWptField();
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[1]).toBe('WPT: KAAA  ');
+        expect(unit.panel.focused('L')).toEqual({row: 1, col: 5, text: 'KAAA '});
+        expect((await blinkCycle(() => Screen.read().status().mode)).some(m => m.endsWith('ent'))).toBe(false);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-12: CLR during an open ident edit brings the old ident back
+    it('brings the old ident back on CLR during an open edit (checked in the KLN 89 trainer, 2026-10-12, #244)', async () => {
+        const unit = await onConfirmedWptField();
+        await unit.panel.inner('L', 1); // opens the edit
+        expect(Screen.read().rows('L')[1]).not.toBe('WPT: KAAA  '); // Precondition
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[1]).toBe('WPT: KAAA  ');
+        expect((await blinkCycle(() => Screen.read().status().mode)).some(m => m.endsWith('ent'))).toBe(false);
+    });
+});
+
+describe('SET 1 CLR while the waypoint awaits approval (characterization)', () => {
+    // The first ENT shows the waypoint page of KAAA on the right and holds the ident for the approval (the first ENT of
+    // 'takes the position of a confirmed waypoint' above). CLR rejects it: the right side comes back and the field
+    // keeps its old value, which is blank on a page that never had a waypoint (the first test of this file). The
+    // behavior is the code's, not a trainer record, and the real unit's answer to CLR here is not recorded (#244).
+    it('characterization: CLR while the SET 1 waypoint awaits approval rejects it and keeps the old ident (#244)', async () => {
+        const unit = await onSet1();
+        const rightBefore = Screen.read().status().right;
+        await unit.panel.cursor('L');
+        await unit.panel.enterIdent('L', 'KAAA');
+        await unit.panel.ent();
+        expect(Screen.read().status().right).toBe('APT 1'); // Precondition: the waypoint page shows for approval
+
+        await unit.panel.clr();
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().status().right).toBe(rightBefore);
+        expect(Screen.read().rows('L')[1]).toBe('WPT:       ');
     });
 });
 

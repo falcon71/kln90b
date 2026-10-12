@@ -14,6 +14,7 @@ import {
     EVT_R_OUTER_RIGHT,
 } from "../HEvents";
 import {StatusLine} from "../controls/StatusLine";
+import {reportErrors} from "../controls/ErrorPage";
 import {CursorController, EnterResult} from "./CursorController";
 import {Page, PageProps, UiElement, UIElementChildren} from "./Page";
 import {KeyboardService} from "../services/KeyboardService";
@@ -32,10 +33,10 @@ export abstract class SixLinePage extends DisplayComponent<PageProps> implements
 
     enter(): boolean {
         if (this.lCursorController.isEnterAccepted()) {
-            this.lCursorController.enter();
+            reportErrors(this.lCursorController.enter(), this.props.bus);
             return true;
         } else if (this.rCursorController.isEnterAccepted()) {
-            this.rCursorController.enter();
+            reportErrors(this.rCursorController.enter(), this.props.bus);
             return true;
         }
         return false;
@@ -107,7 +108,7 @@ export class FourSegmentPage extends DisplayComponent<FourPageProps> implements 
             case EVT_R_INNER_RIGHT:
                 return this.props.page.rCursorController.innerRight();
             case EVT_ENT:
-                this.handleEnter();
+                reportErrors(this.handleEnter(), this.props.bus);
                 return true;
 
             case EVT_CLR:

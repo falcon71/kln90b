@@ -6,6 +6,7 @@ import {MainPage} from '../../../kln90b/pages/MainPage';
 import {MessagePage} from '../../../kln90b/controls/MessagePage';
 import {SuperNav1Page} from '../../../kln90b/pages/left/SuperNav1Page';
 import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
+import {Fpl0Page} from '../../../kln90b/pages/left/FplPage';
 
 /** The left half page's row n (11 characters) */
 function left(n: number): string {
@@ -198,13 +199,11 @@ async function msgPage(unit: HeadlessUnit): Promise<void> {
     expect(unit.overlay()).toBeInstanceOf(MessagePage);
 }
 
-// #56 (closed) names the MSG page beside the ALT and DIR pages: in the KLN 89 trainer the outer knob leaves it and
-// turns to the next page, and the inner knob turns the pages of the page shown before it. Its fix (14972b6) covers the
-// pushed half pages only; on the MSG page the knobs do nothing. Checked in the KLN 89 trainer, 2026-10-09 (T3): on the
-// MSG page a click of the outer or the inner knob, either direction, closes it and the knob acts on the page beneath.
-// CRSR closes it as well and turns the cursor on beneath (T4). The 89 has one knob pair and no right half, so the pin
-// of the right knob applies the same rule to the right side (3-13). The pages are those of 3-12 and 3-13, from NAV 2
-// and SUP. CLR on the MSG page is ignored on the trainer and in the code: it has no test.
+// The knobs and CRSR close the MSG page and act on the page beneath, and CLR on it is ignored. Checked in the KLN 89
+// trainer, 2026-10-09 (T3): on the MSG page a click of the outer or the inner knob, either direction, closes it and the
+// knob acts on the page beneath. CRSR closes it as well and turns the cursor on beneath (T4), and CLR on it does nothing
+// (T4). The 89 has one knob pair and no right half, so the right knob's rule is the code's choice by analogy with T3, see
+// the characterization after this describe. The left page order is that of 3-12, starting from NAV 2.
 describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 T4, #333)', () => {
     // The setup sibling of the pins below: the MSG page is up over NAV 2 and SUP (3-16)
     it('shows the MSG page over NAV 2 and SUP (3-16)', async () => {
@@ -216,7 +215,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
         expect(main.isLeftCursorActive()).toBe(false);
     });
 
-    it.fails('leaves the MSG page on the left outer knob and turns NAV 2 to CAL 1 (#56, 3-12, #333)', async () => {
+    it('leaves the MSG page on the left outer knob and turns NAV 2 to CAL 1 (#56, 3-12, #333)', async () => {
         const unit = await bootUnit();
         await msgPage(unit);
 
@@ -226,7 +225,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
         expect(names()).toEqual(['CAL 1', 'SUP']);
     });
 
-    it.fails('leaves the MSG page on the left inner knob and turns NAV 2 to NAV 3 (#56, 3-12, #333)', async () => {
+    it('leaves the MSG page on the left inner knob and turns NAV 2 to NAV 3 (#56, 3-12, #333)', async () => {
         const unit = await bootUnit();
         await msgPage(unit);
 
@@ -236,14 +235,26 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
         expect(names()).toEqual(['NAV 3', 'SUP']);
     });
 
-    it.fails('leaves the MSG page on the right outer knob and turns SUP to CTR 1 (#56, 3-13, #333)', async () => {
+    // Counterclockwise: the outer knob gives the previous page group, FPL before NAV (3-12), and the inner knob the
+    // previous page of the group (T3)
+    it('leaves the MSG page on the left outer knob counterclockwise and turns NAV 2 to FPL 0 (#56, 3-12, T3, #333)', async () => {
         const unit = await bootUnit();
         await msgPage(unit);
 
-        await unit.panel.outer('R', 1);
+        await unit.panel.outer('L', -1);
 
         expect(unit.overlay()).toBeNull();
-        expect(names()).toEqual(['NAV 2', 'CTR 1']);
+        expect(names()).toEqual(['FPL 0', 'SUP']);
+    });
+
+    it('leaves the MSG page on the left inner knob counterclockwise and turns NAV 2 to NAV 1 (#56, 3-12, T3, #333)', async () => {
+        const unit = await bootUnit();
+        await msgPage(unit);
+
+        await unit.panel.inner('L', -1);
+
+        expect(unit.overlay()).toBeNull();
+        expect(names()).toEqual(['NAV 1', 'SUP']);
     });
 
     // NAV 2 has no cursor field, so the pin and its siblings use NAV 4 on the left (5-7 step 3: cursor on SEL)
@@ -266,7 +277,7 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
         expect(names()).toEqual(['CRSR', 'SUP']);
     });
 
-    it.fails('closes the MSG page on CRSR and turns the left cursor on beneath (T4, #333)', async () => {
+    it('closes the MSG page on CRSR and turns the left cursor on beneath (T4, #333)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'NAV 4');
         await msgPage(unit);
@@ -275,6 +286,31 @@ describe('the knobs and CRSR on the MSG page (#56, KLN 89 trainer 2026-10-09 T3 
 
         expect(unit.overlay()).toBeNull();
         expect(names()).toEqual(['CRSR', 'SUP']);
+    });
+
+    // T4: CLR on the MSG page is ignored, so the page stays up and no error shows
+    it('ignores CLR on the MSG page (checked in the KLN 89 trainer, 2026-10-09, T4)', async () => {
+        const unit = await bootUnit();
+        await msgPage(unit);
+
+        await unit.panel.clr();
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.overlay()).toBeInstanceOf(MessagePage);
+    });
+});
+
+describe('the MSG page and a right knob (characterization)', () => {
+    // SUP to CTR 1 is the right page order of 3-13, which is only where the turn lands. The MSG page closing on a RIGHT
+    // knob is the code's choice by analogy with T3 (the KLN 89 has one knob pair); no source shows it
+    it('characterization: leaves the MSG page on the right outer knob and turns SUP to CTR 1 (#333)', async () => {
+        const unit = await bootUnit();
+        await msgPage(unit);
+
+        await unit.panel.outer('R', 1);
+
+        expect(unit.overlay()).toBeNull();
+        expect(names()).toEqual(['NAV 2', 'CTR 1']);
     });
 });
 
@@ -300,9 +336,10 @@ describe('D-> on the MSG page over Super NAV 1 (3-27, 3-32, #334)', () => {
         expect((unit.props.pageManager.getCurrentPage() as MainPage).getLeftPage().name).toBe('DIR  ');
     });
 
-    // The code drops the top full-screen page, which is the MSG page, instead of Super NAV 1, so Super NAV 1 stays over
-    // the DIR page. Whether the MSG page should stay up is #335; the test closes it if it is still there
-    it.fails('shows the DIR page, not Super NAV 1, once the MSG page is gone (3-27, 3-32, #334)', async () => {
+    // Super NAV 1 ends when the DIR page takes the left side (3-32), so it is removed from wherever it lies in the overlay
+    // stack, even under the MSG page, and the DIR page shows on the left (3-27). D-> has already closed the MSG page, so
+    // closeMsgPage is a guard here
+    it('shows the DIR page, not Super NAV 1, once the MSG page is gone (3-27, 3-32, #334)', async () => {
         const unit = await bootUnit();
         await superNav1(unit);
         await msgPage(unit);
@@ -316,6 +353,26 @@ describe('D-> on the MSG page over Super NAV 1 (3-27, 3-32, #334)', () => {
     });
 });
 
+describe('the MSG page over Super NAV 1, a page change from outside (characterization, #334)', () => {
+    // No page number: no source covers a page change from outside the panel (the EFB route load in KlnEfbLoader calls
+    // setLeftPage with no key) while the MSG page is up. The MSG page stays, and Super NAV 1 ends beneath it, so the
+    // super page is removed by its instance and not the top of the overlay stack
+    it('characterization: a page change from outside ends Super NAV 1 under the MSG page, and the MSG page stays (#334)', async () => {
+        const unit = await bootUnit();
+        await superNav1(unit);
+        await msgPage(unit);
+        const main = unit.props.pageManager.getCurrentPage() as MainPage;
+
+        main.setLeftPage(new Fpl0Page(main.props));
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.overlay()).toBeInstanceOf(MessagePage);
+        await closeMsgPage(unit);
+        expect(unit.overlay()).toBeNull();
+        expect(main.getLeftPage().name).toBe('FPL 0');
+    });
+});
+
 /** KBBB 0.6 NM north of the aircraft, after the first nearest search (every 10 s): ENT on the MSG page has a target */
 async function bootNearKbbb(): Promise<HeadlessUnit> {
     const unit = await bootUnit({facilities: [airport('KBBB', 47.2, 8.0)], position: {lat: 47.19, lon: 8.0}});
@@ -324,11 +381,10 @@ async function bootNearKbbb(): Promise<HeadlessUnit> {
 }
 
 // 3-27: D-> shows the Direct To page on the left with the cursor over the identifier. 3-39 and 3-55 step 1: ALT shows
-// the Altitude page on the left and NAV 4 on the right, both with the cursor on. The guide makes no exception for the
-// MSG page; the code opens either page under the MSG page, where it cannot be seen until the MSG page is closed.
-// Checked in the KLN 89 trainer, 2026-10-09: D-> on the MSG page opens the Direct To page at once (T1), and ENT on its
-// blank field returns to the page before, with no Direct To made and no nearest airport (T1); ALT on the MSG page
-// opens the Altitude page at once (T2)
+// the Altitude page on the left and NAV 4 on the right, both with the cursor on. D-> and ALT close the MSG page first,
+// so that page shows at once. Checked in the KLN 89 trainer, 2026-10-09: D-> on the MSG page opens the Direct To page
+// at once (T1), and ENT on its blank field returns to the page before, with no Direct To made and no nearest airport
+// (T1); ALT on the MSG page opens the Altitude page at once (T2)
 describe('D-> and ALT on the MSG page (3-27, 3-39, 3-55, KLN 89 trainer 2026-10-09 T1 T2, #335)', () => {
     // The setup sibling of the pins: on the MSG page, D-> and ALT are taken and their pages become the left page. It
     // says nothing about what is in view, which is the subject of the pins
@@ -344,10 +400,10 @@ describe('D-> and ALT on the MSG page (3-27, 3-39, 3-55, KLN 89 trainer 2026-10-
         expect(main.getLeftPage().name).toBe('ALT  ');
     });
 
-    // The ENT that follows belongs to the DIR page: with the blank field it makes no Direct To and it does not show
-    // the nearest airport on the right (3-23), which is what ENT on the MSG page does with KBBB in range (the sibling
-    // in MessagePage.test.ts holds that). What the DIR page does with the blank field is not asserted here
-    it.fails('shows the DIRECT TO page when D-> is pressed on the MSG page (3-27, T1, #335)', async () => {
+    // The ENT that follows is the DIR page's, on its blank field: no Direct To is made and no nearest airport is involved
+    // (T1), and the right side keeps the page it had before the MSG page. Which page is left after that ENT is not
+    // asserted here
+    it('shows the DIRECT TO page when D-> is pressed on the MSG page (3-27, T1, #335)', async () => {
         const unit = await bootNearKbbb();
         await msgPage(unit);
 
@@ -363,7 +419,9 @@ describe('D-> and ALT on the MSG page (3-27, 3-39, 3-55, KLN 89 trainer 2026-10-
         expect(unit.overlay()).toBeNull();
     });
 
-    it.fails('shows the ALT page when ALT is pressed on the MSG page (3-39, 3-55, T2, #335)', async () => {
+    // ALT closes the MSG page and shows the Altitude page on the left with the cursor on, and NAV 4 on the right (3-39,
+    // 3-55 step 1, T2)
+    it('shows the ALT page when ALT is pressed on the MSG page (3-39, 3-55, T2, #335)', async () => {
         const unit = await bootUnit();
         await msgPage(unit);
 
@@ -371,6 +429,24 @@ describe('D-> and ALT on the MSG page (3-27, 3-39, 3-55, KLN 89 trainer 2026-10-
 
         expect(Screen.read().rows('L')[0]).toBe(' ALTITUDE  ');
         expect(names()).toEqual(['CRSR', 'CRSR']);
+    });
+
+    // The trainer showed ALT on the message page acting on the altitude page cycle beneath it: ALT, MSG, ALT showed the
+    // second altitude page, and after another MSG the third ALT closed the altitude pages. The 90B has one ALT page, so
+    // its cycle is a toggle: ALT on the MSG page closes the ALT page that lies beneath it
+    it('closes the ALT page when ALT is pressed on the MSG page over it (checked in the KLN 89 trainer, 2026-10-12, #335)', async () => {
+        const unit = await bootUnit();
+        const main = unit.props.pageManager.getCurrentPage() as MainPage;
+        const before = [main.getLeftPage().name, main.getRightPage().name];
+        await unit.panel.alt();
+        expect([main.getLeftPage().name, main.getRightPage().name]).toEqual(['ALT  ', 'NAV 4']); // Precondition
+        await msgPage(unit);
+
+        await unit.panel.alt();
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.overlay()).toBeNull();
+        expect([main.getLeftPage().name, main.getRightPage().name]).toEqual(before);
     });
 });
 

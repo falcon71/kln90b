@@ -250,6 +250,12 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
         const facility = unpackFacility(this.facility);
         if (facility) {
             this.rad = radial;
+            if (this.ref === null) {
+                //No reference VOR (none within range, or the REF calculation still runs): the radial is shown but moves
+                //nothing. Checked in the KLN 89 trainer, 2026-10-12 (#286)
+                this.requiresRedraw = true;
+                return;
+            }
 
             this.props.facilityRepository.update(facility, fac => {
                 const refCoords = new GeoPoint(this.ref!.lat, this.ref!.lon);
@@ -269,6 +275,12 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
         const facility = unpackFacility(this.facility);
         if (facility) {
             this.dis = dist;
+            if (this.ref === null) {
+                //No reference VOR (none within range, or the REF calculation still runs): the distance is shown but moves
+                //nothing. Checked in the KLN 89 trainer, 2026-10-12 (#286)
+                this.requiresRedraw = true;
+                return;
+            }
             this.props.facilityRepository.update(facility, fac => {
                 const refCoords = new GeoPoint(this.ref!.lat, this.ref!.lon);
                 const newCoords = refCoords.offset(this.rad!, UnitType.NMILE.convertTo(dist, UnitType.GA_RADIAN), new GeoPoint(0, 0));
