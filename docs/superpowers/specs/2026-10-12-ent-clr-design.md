@@ -1,13 +1,14 @@
 # ENT and CLR: design
 
-Date: 2026-10-12. Issues: #118, #244, #248, #273, #284, #286, #307, #310, #316, #317, #333, #334, #335. Branch:
-`ent-clr`.
+Date: 2026-10-12. Issues: #118, #244, #248, #273, #284, #286, #307, #310, #316, #317, #333, #334, #335, #358.
+Branch: `ent-clr`.
 
 The session started from the ENT and CLR issues the maintainer named (#118, #244, #273, #286, #307, #310, #316,
 #335) and took in the related issues that share their code or their flow: #334 (tangled with #335), #333 (the same
 MSG overlay branches), #317 (the third key on the DEL question of #316), #248 (the same `Set1Page.setWpt` as #244)
-and #284 (the same `WaypointConfirmPage.enter` and INT page as #286). #291 (REF on FPL 0) stays out: it is tangled
-with the cursor focus of #242 and needs its own session.
+and #284 (the same `WaypointConfirmPage.enter` and INT page as #286). #358 was found while planning (the right page
+of the OTH 3 question is popped unconditionally) and is fixed here because #316 and #317 would reach it. #291 (REF on
+FPL 0) stays out: it is tangled with the cursor focus of #242 and needs its own session.
 
 ## 1. Evidence
 
@@ -33,13 +34,20 @@ and 3-55 (D-> and ALT), 3-32 (Super NAV 1), 3-12 and 3-13 (the page order), 6-5 
 
 ## 2. ENT errors reach the error page (#118)
 
-ENT starts an async chain, and five places drop its promise without a catch: `MainPage` (`handleEnter`),
+ENT starts an async chain, and these places drop its promise without a catch: `MainPage` (`handleEnter`),
 `SixLinePage.enter` (the overlays: SET 0, Super NAV 1, Super NAV 5), the `FourSegmentPage` and `FiveSegmentPage`
-containers, and `WelcomePage`. A throw on that path is an unhandled rejection that never reaches the `ErrorPage`.
+containers, `WelcomePage`, `FlightplanList` (the two `.then` chains after an item's `enter()` and
+`confirmCurrentValue()`) and `DirectToPage` (`confirmCurrentValue()`). A throw on that path is an unhandled rejection
+that never reaches the `ErrorPage`.
 
 **Design.** A small helper, `reportErrors(promise, bus)`, attaches the same handling the synchronous try/catch in
 `KLN90BCore.onInteractionEvent` gives the other keys: `console.error`, and `error` published on the bus for an
-`Error`. Each of the five places calls it on the promise it drops today. The return types of `onInteractionEvent` stay
+`Error`. It lives next to `ErrorEvent` in `controls/ErrorPage.tsx`. Each of the places above calls it on the promise
+it drops today.
+
+Deeper drops stay as they are and are documented in `docs/testing.md`: an async `enterCallback` that `Editor.enter`
+and `WaypointEditor.currentValueConfirmed` do not await (for example `RefPage.calcRef`), `onCharChanged`, and the async
+selections of APT 7 and APT 8. Catching those would mean awaiting them, which changes when ENT completes. The return types of `onInteractionEvent` stay
 `boolean`; nothing about timing or order changes. (A central catch through a `boolean | Promise<boolean>` return type
 was considered and rejected: a wider interface change, and a type that invites `if (onInteractionEvent(...))`.)
 
@@ -60,8 +68,14 @@ and that pin would pass for the wrong reason, so the #118 commit adds `expect(un
 field, and a following ENT finds nothing to accept. Without an open edit, CLR is not accepted, as today.
 `WaypointEditor` keeps its own CLR (blank the ident and wait for an ENT, 3-29) by default.
 
-Pages that handle CLR themselves before or instead of their cursor controller (Super NAV 5, SET 0, APT 7, APT 8,
-ACT) are checked for an editor that can hold an open edit; any that can must let the editor take CLR first.
+The pages that handle CLR themselves (Super NAV 5, SET 0, APT 7, APT 8, FPL with the cursor off) hold no editor that
+can have an open edit while their CLR runs; ACT delegates to its inner page.
+
+**CLR priority.** `MainPage` gives CLR to the left page first, so a left page that answers CLR wins over an open edit
+on the right: FPL with its cursor off asks `DELETE FPL?` while the pilot meant to close a RAD entry on INT. As ENT
+already does with `isEnterAccepted`, CLR goes first to a side whose focused field is entered (an open edit, a DEL
+question, a waypoint waiting for approval), the left side when both are; otherwise the order stays left, then right.
+The same rule applies to the `FiveSegmentPage` container.
 
 **#244, CLR on the SET 1 WPT field.** `WaypointEditor` gets a constructor option that turns its blanking CLR off;
 with it set, the editor falls back to the base `Editor` CLR of #307. SET 1 sets it. CLR during an open ident edit
@@ -75,8 +89,11 @@ holds this coupling.
 **#310, CLR while a typed FPL waypoint waits for approval.** `FlightplanListItem.isClearAccepted()` and `clear()`
 accept CLR while the item has no waypoint but its waypoint editor waits for a confirmation, and hand it to
 `WaypointEditor.clear` (as the Direct To page does). The waypoint page closes and the blank position stays under the
-cursor; the ENT that follows confirms the blank, which ends the insert and adds nothing. The plan confirms what
-`onInsertDone(idx, null, …)` does at that position.
+cursor; the ENT that follows confirms the blank, which ends the insert and adds nothing
+(`EditableFlightplan.insertLeg` rebuilds the rows from the plan). On the trailing blank row the cursor stays on that
+row. An insert in the middle loses its row, so this ENT returns `Handled_Keep_Focus` and the cursor rests on the
+waypoint that followed the insert instead of jumping past it. The host copies the editor's `isEntered` after
+forwarding CLR.
 
 **#286, RAD or DIS without a reference VOR.** `IntPage.setRad`/`setDist` and the same methods of `SupPage` keep the
 typed value for display and change no position while the reference is `null`; they no longer read `this.ref!`. The
@@ -86,11 +103,18 @@ assumption.
 
 **#284, the cursor to RAD after the REF approval.** `WaypointConfirmPage.enter` serves editors on the right side.
 After `callingEditor.currentValueConfirmed()` returns `Handled_Move_Focus` (which pops the confirm page), it moves the
-right page's cursor on with `outerRight()` when that cursor is on, which is what `CursorController.enter` does on the
-left. This covers INT and SUP at once. The plan lists every right-side `WaypointEditor` that reaches this path; all of
-them get the same move.
+right page's cursor on with `outerRight()`, which is what `CursorController.enter` does on the left, but only when
+the right page's focused field is the calling editor. `RefPage` does not mark its editor as right-side, and the REF to
+FPL flow can bring a left editor to this page, so the side cannot be read from `pageSite`. This covers INT and SUP
+(also inside ACT); on REF the editor is the only field, so the cursor stays; NAV 4's VNAV waypoint moves on to its
+distance.
 
-## 4. The DEL question (#316, #317)
+## 4. The DEL question (#358, #316, #317)
+
+**#358, the right page popped twice.** `WaypointDeleteListItem` pops the right page whenever its question is withdrawn,
+but a right knob may already have closed that page (it has no cursor, so `MainPage` pops it and hands the knob on);
+the second pop throws `Cannot pop the base page`. One helper pops the page only while the right page is still the one
+the item pushed; `setFocused`, `clear` and the `enter` of #316 use it.
 
 **#316, ENT on OTH 3's question.** `WaypointDeleteListItem` overrides `enter`: while its question is open it pops the
 waypoint page it pushed on the right, then deletes through `SimpleListItem.enter`. Its second CLR and the cursor
@@ -135,12 +159,15 @@ page's fields exist. The plan checks whether `ActPage` shows these pages in the 
 ## 7. Testing
 
 - One `fixes #NN` commit per issue, with its tests and doc changes, in this order: #118; #307, #244, #248, #310, #286,
-  #284; #316, #317; #334, #335, #333; #273. Every commit keeps `npx tsc --noEmit`, `npm run build` and `npm test`
+  #284; #358, #316, #317; #334, #335, #333; #273. Every commit keeps `npx tsc --noEmit`, `npm run build` and `npm test`
   green.
 - Each fix turns its `it.fails` pin into `it`; the issue number stays in the name.
 - New tests: an ENT error reaches the `error` topic and no rejection is left (#118, for the half pages and an
   overlay); SET 1 CLR without an edit changes nothing, and CLR during an open ident edit restores the ident (#244,
-  2026-10-12 trainer); RAD and DIS without a reference on SUP (#286); the question withdrawn on the last field (#317).
+  2026-10-12 trainer); CLR closes an open edit on the right while FPL with its cursor off is on the left (#307); RAD
+  and DIS without a reference on SUP (#286); the question withdrawn on the last field (#317); a right knob, then CRSR
+  or a second CLR on the OTH 3 question, without an error (#358); an ENT that confirms the blank of a middle insert
+  leaves the cursor on the following waypoint (#310).
 - Labels follow `docs/testing.md` section 5: a test cites the manual page or the dated trainer check that says what it
   asserts, or it is a characterization.
 - **Before the plan:** each issue's temporary fix is applied in a throwaway worktree and the whole suite is run, to
