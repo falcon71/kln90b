@@ -18,6 +18,12 @@ interface WaypointEditorProps extends PageProps {
 
     parent: SixLineHalfPage,
 
+    /**
+     * False: CLR does not blank the ident, it only closes an open edit (Editor's CLR). SET 1, checked in the KLN 89
+     * trainer, 2026-10-12 (#244). Default true: CLR blanks the ident and waits for ENT (3-29)
+     */
+    clearBlanks?: boolean,
+
 }
 
 /**
@@ -145,10 +151,16 @@ export class WaypointEditor extends Editor<Facility | null> {
     }
 
     isClearAccepted(): boolean {
+        if (this.props.clearBlanks === false) {
+            return super.isClearAccepted();
+        }
         return true;
     }
 
     clear(): boolean {
+        if (this.props.clearBlanks === false) {
+            return super.clear();
+        }
         if (this.isAwaitingConfirmation) {
             this.cancelAwaitingConfirmation();
         }

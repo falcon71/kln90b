@@ -1053,7 +1053,8 @@ export class Set3Page extends SixLineHalfPage {
    `enterCallback(facility)`. ENT on the right side reaches `WaypointConfirmPage.enter()`, which delegates to
    `callingEditor`.
 7. Turning the inner knob or typing while waiting → `cancelAwaitingConfirmation()` (3-28). Outer knob is blocked while
-   waiting. CLR → `confirmValue(null)`, which clears.
+   waiting. CLR → `confirmValue(null)`, which clears. An editor with `clearBlanks: false` (the SET 1 ident) closes the
+   edit instead and keeps the old value (#244).
 8. Alternate method (3-15): ENT on a non-entered editor while a waypoint page is shown on the right adopts that
    waypoint.
 9. `confirmCurrentValue()` starts confirmation directly. Used by `DirectToPage` (pre-filled from: the FPL 0 cursor

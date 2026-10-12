@@ -47,6 +47,7 @@ export class Set1Page extends SixLineHalfPage {
                 ...this.props,
                 enterCallback: this.setWpt.bind(this),
                 parent: this,
+                clearBlanks: false, // Checked in the KLN 89 trainer, 2026-10-12: CLR keeps the ident (#244)
             }),
             lat: new LatitudeEditor(this.props.bus, this.lat, this.setLat.bind(this)),
             lon: new LongitudeEditor(this.props.bus, this.lon, this.setLon.bind(this)),

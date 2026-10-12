@@ -1203,6 +1203,11 @@ its line, in the comment above it or in the title of its `describe`.
   case 4-3 describes. The unreliable AVsoftech trainer, whose header scrolls off as on the 90B, put the cursor on the
   top visible waypoint of a long plan built on the page.
 
+**2026-10-12**
+- SET 1 ident: with no edit open, CLR changes nothing (no blank field, no `Ent` prompt, no waypoint page) and the ENT
+  after it changes nothing either; during an open ident edit CLR brings the old ident back (#244, like #307). After the
+  ident, ENT, ENT the cursor goes straight to `Ok?` (#248).
+
 # 9. Next steps
 
 Gathered from the baseline sessions (2026-10-03 to 2026-10-10) and grouped by area. A harness gap is built only when
