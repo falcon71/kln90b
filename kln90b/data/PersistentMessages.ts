@@ -13,7 +13,7 @@ import {AltPage} from "../pages/left/AltPage";
 import {Message} from "./MessageHandler";
 import {Vnav, VnavState} from "../services/Vnav";
 import {Nav4LeftPage, Nav4RightPage} from "../pages/left/Nav4Page";
-import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
+import {isBaroTransmitted, KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 
 /*
 We have pretty all messages except for failures and RAIM problems
@@ -227,7 +227,7 @@ class PressAltToSetBaroMessage implements Message {
 
     public isConditionValid(): boolean {
         //6-8: Not displayed when an air data computer supplies the barometric pressure. The ALT page is read-only then
-        if (this.planeSettings.input.airdata.baroSource > 0) {
+        if (isBaroTransmitted(this.planeSettings)) {
             return false;
         }
 

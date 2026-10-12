@@ -5,6 +5,7 @@ import {CursorController} from "../CursorController";
 import {BaroFieldset, BaroFieldsetFactory} from "../../controls/selects/BaroFieldset";
 import {SelectField} from "../../controls/selects/SelectField";
 import {Inhg} from "../../data/Units";
+import {isBaroTransmitted} from "../../settings/KLN90BPlaneSettings";
 
 
 type AltPageTypes = {
@@ -33,7 +34,7 @@ export class AltPage extends SixLineHalfPage {
             warn: new SelectField(["2", "3", "4", "5", "6", "7", "8", "9"], this.props.memory.altPage.alertWarn / 100 - 2, this.setAlertWarn.bind(this)),
         });
 
-        this.children.get("baro").setReadonly(this.props.planeSettings.input.airdata.baroSource > 0);
+        this.children.get("baro").setReadonly(isBaroTransmitted(this.props.planeSettings));
 
         this.children.get("alert").isReadonly = !this.props.planeSettings.output.altitudeAlertEnabled;
         this.children.get("warn").isReadonly = !this.props.memory.altPage.alertEnabled;
@@ -57,7 +58,7 @@ export class AltPage extends SixLineHalfPage {
     public tick(blink: boolean): void {
         super.tick(blink);
 
-        if (this.props.planeSettings.input.airdata.baroSource > 0) {
+        if (isBaroTransmitted(this.props.planeSettings)) {
             this.children.get("baro").setBaro(this.props.sensors.in.airdata.barometer);
         }
     }

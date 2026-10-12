@@ -567,6 +567,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   does `AppArmSwitchInstalled=true` on a `VFROnly` unit, which cannot have the switch (Installation Manual 2-6); the
   switch falls back to false. `KLN90BCore` publishes the lines as `panelXmlErrors`, and `controls/PanelXmlErrorPage`
   shows them to the aircraft developer; OK closes it and the unit runs on. The runtime override LVars are not checked.
+- Keys of an interface that is not installed are ignored, not rejected: the fuel computer keys without
+  `FuelComputer.IsInterfaced`, and `BaroSource` without `Airdata.IsInterfaced`. Code asks `isBaroTransmitted(settings)`
+  instead of reading `baroSource` alone (#360).
 - Keys and defaults:
     - `TakeHomeMode` = false
     - `BasePath` = `html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B`, used for asset URLs

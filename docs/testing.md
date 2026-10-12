@@ -1475,8 +1475,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       line without a mode, the code `enr-leg ent`; `VFROnlyPage.acknowledge` taking the OBS branch always is an
       equivalent mutant, because the OBS warning moves on by itself with the switch in LEG; the coverage text on line
       1 of the Database page and the cursor after ENT on the fourth Turn-On line (5-28 is silent) are not asserted.
-    - Self test: `SelfTestRightPage` makes the baro read-only for `BaroSource` above 0 even without
-      `Airdata.IsInterfaced`, and the baro then never updates (an invalid panel.xml combination, #145); `POSITION DIFFERS`
+    - Self test: `POSITION DIFFERS`
       posts while the self-test page shows with empty storage, and whether a real unit posts it before APPROVE? is not known; the ALT row's padding and the case of `ft`; whether a
       baro change takes effect before ENT; the distance indicator's 0 KTS and 0 MIN of Installation Manual 2-69; a time
       entry in a time zone other than UTC.

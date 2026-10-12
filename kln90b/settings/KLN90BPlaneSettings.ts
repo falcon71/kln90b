@@ -54,6 +54,13 @@ export interface KLN90PlaneSettings {
     }
 }
 
+/**
+ * True if an air data computer sends the baro setting. BaroSource is ignored without an air data computer, as the
+ * fuel computer keys are without a fuel computer (#360)
+ */
+export function isBaroTransmitted(settings: KLN90PlaneSettings): boolean {
+    return settings.input.airdata.isInterfaced && settings.input.airdata.baroSource > 0;
+}
 
 const OBS_DEVICES = [0, 1, 2] as const;
 const BARO_SOURCES = [0, 1, 2] as const;

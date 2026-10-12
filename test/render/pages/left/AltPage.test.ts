@@ -81,6 +81,25 @@ describe('ALT page (characterization)', () => {
     });
 });
 
+// BaroSource only means something with an air data computer (as the fuel computer keys need a fuel computer); without
+// one the pilot sets the baro (3-39)
+describe('ALT page with a BaroSource but no air data computer (#360)', () => {
+    it('lets the pilot set the baro', async () => {
+        const unit = await bootUnit({
+            panelXml: panelXml({'Input.Airdata.BaroSource': 1}),
+            simVars: [{name: 'KOHLSMAN SETTING HG:1', unit: 'inches of mercury', value: 30.12}],
+        });
+        await unit.panel.alt();
+        expect(unit.panel.focused('L')).toEqual({row: 1, col: 5, text: '29'});
+
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.props.sensors.in.airdata.barometer).toBe(30.92);
+        expect(Screen.read().rows('L')[1]).toBe('BARO:30.92"');
+    });
+});
+
 describe('ALT page (spec)', () => {
     // 3-55 steps 1 to 3: the cursor starts over the first two digits of the baro field, which has three cursor
     // positions; one more step of the left outer knob puts it over ALERT

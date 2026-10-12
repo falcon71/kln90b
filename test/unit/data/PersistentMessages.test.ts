@@ -343,6 +343,17 @@ describe('PRESS ALT TO SET BARO (6-8, B-3)', () => {
         expect(h.tick()).toEqual([]);
     });
 
+    // BaroSource only means something with an air data computer; without one nothing supplies the baro
+    it('shows when the approach arms with a BaroSource but no air data computer (#360)', () => {
+        const w = quietWorld();
+        w.airdataInterfaced = false;
+        w.baroSource = 1;
+        const h = harness(w);
+        h.tick();
+        w.navmode = NavMode.ARM_LEG;
+        expect(h.tick()).toEqual(['PRESS ALT TO SET BARO']);
+    });
+
     it('shows when the approach arms with air data that does not supply the baro (sibling of #174)', () => {
         const w = quietWorld();
         w.airdataInterfaced = true;

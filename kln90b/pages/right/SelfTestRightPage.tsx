@@ -15,6 +15,7 @@ import {VFROnlyPage} from "../VFROnlyPage";
 import {format} from "numerable";
 import {Inhg} from "../../data/Units";
 import {ObswarningPage} from "../ObsWarningPage";
+import {isBaroTransmitted} from "../../settings/KLN90BPlaneSettings";
 
 
 type SelftTestRightPageChildTypes = {
@@ -60,7 +61,7 @@ export class SelfTestRightPage extends SixLineHalfPage {
             altitude: new TextDisplay(this.formatAlt()),
         });
 
-        this.children.get("barometer").setReadonly(this.props.planeSettings.input.airdata.baroSource > 0);
+        this.children.get("barometer").setReadonly(isBaroTransmitted(this.props.planeSettings));
 
         //3-6 step 9, 3-7 step 11: ENT after the baro moves the cursor on toward APPROVE?, although the baro has nothing to accept (#354)
         this.cursorController = new CursorController(this.children, undefined, true);
@@ -97,7 +98,7 @@ export class SelfTestRightPage extends SixLineHalfPage {
         this.children.get("time").setValue(now);
         this.children.get("seconds").text = this.formatSeconds(now);
 
-        if (this.props.planeSettings.input.airdata.baroSource > 0) {
+        if (isBaroTransmitted(this.props.planeSettings)) {
             this.children.get("barometer").setBaro(this.props.sensors.in.airdata.barometer);
         }
     }
