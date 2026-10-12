@@ -115,10 +115,16 @@ export class FlightplanListItem implements Field, ListItem {
     }
 
     outerLeft(): boolean {
+        if (this.isDeleting) {
+            return false; //The knob withdraws the DEL question (#317)
+        }
         return this.waypointEditor.outerLeft();
     }
 
     outerRight(): boolean {
+        if (this.isDeleting) {
+            return false; //The knob withdraws the DEL question (#317)
+        }
         return this.waypointEditor.outerRight();
     }
 

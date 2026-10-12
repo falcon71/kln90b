@@ -844,7 +844,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   visible entry of a scrolled list (`List.topVisibleField`, #355). `focusIndex(i)` moves a cursor that is on.
 - With the cursor on:
     - outer knob moves between fields, unless the focused field `isEntered`, in which case the field receives the outer
-      knob (moving within an editor);
+      knob (moving within an editor). An entered field that refuses the knob (a DEL question) is unfocused, which
+      withdraws its question, and the cursor moves on; at the first or last field the question goes and the cursor stays
+      (#317);
     - inner knob → `field.innerLeft/Right()`;
     - `enter()` → `field.enter()`;
     - `clear()` only if `field.isClearAccepted()`.
