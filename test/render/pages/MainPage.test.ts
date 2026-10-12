@@ -6,6 +6,7 @@ import {MainPage} from '../../../kln90b/pages/MainPage';
 import {MessagePage} from '../../../kln90b/controls/MessagePage';
 import {SuperNav1Page} from '../../../kln90b/pages/left/SuperNav1Page';
 import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
+import {Fpl0Page} from '../../../kln90b/pages/left/FplPage';
 
 /** The left half page's row n (11 characters) */
 function left(n: number): string {
@@ -300,9 +301,9 @@ describe('D-> on the MSG page over Super NAV 1 (3-27, 3-32, #334)', () => {
         expect((unit.props.pageManager.getCurrentPage() as MainPage).getLeftPage().name).toBe('DIR  ');
     });
 
-    // The code drops the top full-screen page, which is the MSG page, instead of Super NAV 1, so Super NAV 1 stays over
-    // the DIR page. Whether the MSG page should stay up is #335; the test closes it if it is still there
-    it.fails('shows the DIR page, not Super NAV 1, once the MSG page is gone (3-27, 3-32, #334)', async () => {
+    // Super NAV 1 ends when the DIR page takes the left side (3-32), so it is removed from wherever it lies in the overlay
+    // stack, even under the MSG page, and the DIR page shows on the left (3-27). The test closes the MSG page itself
+    it('shows the DIR page, not Super NAV 1, once the MSG page is gone (3-27, 3-32, #334)', async () => {
         const unit = await bootUnit();
         await superNav1(unit);
         await msgPage(unit);
@@ -313,6 +314,26 @@ describe('D-> on the MSG page over Super NAV 1 (3-27, 3-32, #334)', () => {
         expect(unit.overlay()).not.toBeInstanceOf(SuperNav1Page);
         expect(Screen.read().rows('L')[0]).toBe('DIRECT TO: ');
         expect(Screen.read().status().left).toBe('CRSR');
+    });
+});
+
+describe('the MSG page over Super NAV 1, a page change from outside (characterization, #334)', () => {
+    // No page number: no source covers a page change from outside the panel (the EFB route load in KlnEfbLoader calls
+    // setLeftPage with no key) while the MSG page is up. The MSG page stays, and Super NAV 1 ends beneath it, so the
+    // super page is removed by its instance and not the top of the overlay stack
+    it('characterization: a page change from outside ends Super NAV 1 under the MSG page, and the MSG page stays (#334)', async () => {
+        const unit = await bootUnit();
+        await superNav1(unit);
+        await msgPage(unit);
+        const main = unit.props.pageManager.getCurrentPage() as MainPage;
+
+        main.setLeftPage(new Fpl0Page(main.props));
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.overlay()).toBeInstanceOf(MessagePage);
+        await closeMsgPage(unit);
+        expect(unit.overlay()).toBeNull();
+        expect(main.getLeftPage().name).toBe('FPL 0');
     });
 });
 

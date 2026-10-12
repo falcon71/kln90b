@@ -99,6 +99,16 @@ class OverlayStack {
         return this.stack.pop()!;
     }
 
+    /**
+     * Removes the page of that type wherever it lies: a super page ends while the MSG page may lie above it (#334)
+     */
+    public remove(type: typeof SuperNav1Page | typeof SuperNav5Page | typeof Set0Page): void {
+        const idx = this.stack.findIndex(page => page instanceof type);
+        if (idx !== -1) {
+            this.stack.splice(idx, 1);
+        }
+    }
+
     public getCurrentPage(): SixLinePage | SevenLinePage | null {
         if (this.stack.length === 0) {
             return null;
@@ -282,6 +292,11 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
 
         this.rerenderOverlayPage = true;
         return oldPage;
+    }
+
+    private removeOverlayPage(type: typeof SuperNav1Page | typeof SuperNav5Page | typeof Set0Page): void {
+        this.overlayPageStack.remove(type);
+        this.rerenderOverlayPage = true;
     }
 
     onInteractionEvent(evt: string): boolean {
@@ -685,14 +700,14 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         if (showSuperNav1 && !superNav1Shown) {
             this.pushOverlayPage(new SuperNav1Page(this.props));
         } else if (!showSuperNav1 && superNav1Shown) {
-            this.popOverlayPage();
+            this.removeOverlayPage(SuperNav1Page);
         }
         const showSuperNav5 = this.getLeftPage() instanceof Nav5Page && this.getRightPage() instanceof Nav5Page;
         const superNav5Shown = this.overlayPageStack.contains(SuperNav5Page);
         if (showSuperNav5 && !superNav5Shown) {
             this.pushOverlayPage(new SuperNav5Page(this.props));
         } else if (!showSuperNav5 && superNav5Shown) {
-            this.popOverlayPage();
+            this.removeOverlayPage(SuperNav5Page);
         }
 
         const showSet0 = this.getLeftPage() instanceof Set0DummyPage;
@@ -700,7 +715,7 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         if (showSet0 && !set0Shown) {
             this.pushOverlayPage(new Set0Page(this.props));
         } else if (!showSet0 && set0Shown) {
-            this.popOverlayPage();
+            this.removeOverlayPage(Set0Page);
         }
 
 
