@@ -1,6 +1,7 @@
 <PlaneHTMLConfig>
     <Instrument>
         <Name>KLN90B</Name>
+        <!-- An invalid value is not used: the unit falls back to the default and lists the value on a message at start-up -->
         <VFROnly>false</VFROnly> <!-- true, if this instrument is not rated for IFR -->
         <Input>
             <AltimeterInterfaced>true</AltimeterInterfaced> <!-- true if the altimeter is interfaced via gray code. Required for IFR. Irrelevant when Airdata.IsInterfaced is set to true  -->

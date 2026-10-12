@@ -965,8 +965,8 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   an empty document gives the defaults; the GPS SimVars are written with `WriteGPSSimVars` and not without it, against
   independent geometry; the `"kln90b"` planner mirrors FPL 0; the EFB route is loaded and answered; the V1 and V2
   waypoint and flight plan strings are hand-laid literals, through the loaders, the persistors and the V1 to V2
-  conversion; the user setting keys are pinned. *Untested:* invalid panel.xml values (by decision; the enhancement
-  #145), `TakeHomeMode`, the effect of a custom `BasePath` (needs a `FakeXhr` mount), the `Internal_*` events except
+  conversion; the user setting keys are pinned. Invalid panel.xml values fall back to the default with one recorded line each,
+  and the panel.xml error page lists them (#145). *Untested:* `TakeHomeMode`, the effect of a custom `BasePath` (needs a `FakeXhr` mount), the `Internal_*` events except
   `Internal_Key`, the 5 kt threshold of the roll command, the clamp and boot value of `L:KLN90B_Brightness`
   (undocumented), temporary (`XY`)
   waypoints round-tripped through storage, the ten-message cap of the flight plan loader and the failing V1 restore.
@@ -1475,8 +1475,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       line without a mode, the code `enr-leg ent`; `VFROnlyPage.acknowledge` taking the OBS branch always is an
       equivalent mutant, because the OBS warning moves on by itself with the switch in LEG; the coverage text on line
       1 of the Database page and the cursor after ENT on the fourth Turn-On line (5-28 is silent) are not asserted.
-    - Self test: `SelfTestRightPage` makes the baro read-only for `BaroSource` above 0 even without
-      `Airdata.IsInterfaced`, and the baro then never updates (an invalid panel.xml combination, #145); `POSITION DIFFERS`
+    - Self test: `POSITION DIFFERS`
       posts while the self-test page shows with empty storage, and whether a real unit posts it before APPROVE? is not known; the ALT row's padding and the case of `ft`; whether a
       baro change takes effect before ENT; the distance indicator's 0 KTS and 0 MIN of Installation Manual 2-69; a time
       entry in a time zone other than UTC.

@@ -209,6 +209,92 @@ describe('panel.xml parser', () => {
         });
     });
 
+    // #145: an invalid value is never used. The parser falls back to the default of the key and records one line per
+    // problem, which the unit shows to the aircraft developer on the panel.xml error page
+    describe('invalid values (#145)', () => {
+        const parseWithProblems = (xml: string) => {
+            const parser = new KLN90BPlaneSettingsParser();
+            const settings = parser.parsePlaneSettings(new DOMParser().parseFromString(xml, 'text/xml'));
+            return {settings, problems: parser.problems};
+        };
+
+        it('records no problem for the sample cfg/panel.xml', () => {
+            expect(parseWithProblems(sample).problems).toEqual([]);
+        });
+
+        it('records no problem for an empty PlaneHTMLConfig', () => {
+            expect(parseWithProblems('<PlaneHTMLConfig></PlaneHTMLConfig>').problems).toEqual([]);
+        });
+
+        // A pretty-printed element ends in whitespace; that is formatting and not part of the value
+        it.each([
+            ['<VFROnly>\n    true\n</VFROnly>', 'vfrOnly', true],
+            ['<Input><ObsSource> 2 </ObsSource></Input>', 'input.obsSource', 2],
+            ['<Input><FuelComputer><Unit>\tKG\n</Unit></FuelComputer></Input>', 'input.fuelComputer.unit', 'KG'],
+        ])('accepts the value of %j with the whitespace around it', (inner, path, value) => {
+            const {settings, problems} = parseWithProblems(kln(inner));
+
+            expect(problems).toEqual([]);
+            expect(withoutAltAlert(settings)).toEqual(withField(path, value));
+        });
+
+        it.each([
+            ['<VFROnly>True</VFROnly>', 'VFROnly: "True" is not true or false. The default false is used.'],
+            ['<Input><HeadingInput>1</HeadingInput></Input>', 'Input.HeadingInput: "1" is not true or false. The default false is used.'],
+            ['<Input><AltimeterInterfaced></AltimeterInterfaced></Input>', 'Input.AltimeterInterfaced: "" is not true or false. The default true is used.'],
+            ['<Output><WriteGPSSimVars>yes</WriteGPSSimVars></Output>', 'Output.WriteGPSSimVars: "yes" is not true or false. The default true is used.'],
+            ['<Input><ObsSource>one</ObsSource></Input>', 'Input.ObsSource: "one" is not one of 0, 1, 2. The default 1 is used.'],
+            ['<Input><ObsSource></ObsSource></Input>', 'Input.ObsSource: "" is not one of 0, 1, 2. The default 1 is used.'],
+            ['<Input><ObsSource>2.0</ObsSource></Input>', 'Input.ObsSource: "2.0" is not one of 0, 1, 2. The default 1 is used.'],
+            ['<Output><ObsTarget>3</ObsTarget></Output>','Output.ObsTarget: "3" is not one of 0, 1, 2. The default 0 is used.'],
+            ['<Input><Airdata><BaroSource>1.5</BaroSource></Airdata></Input>', 'Input.Airdata.BaroSource: "1.5" is not one of 0, 1, 2. The default 0 is used.'],
+            ['<Input><FuelComputer><Unit>gal</Unit></FuelComputer></Input>', 'Input.FuelComputer.Unit: "gal" is not one of GAL, IMP, L, KG, LB. The default GAL is used.'],
+            ['<Input><FuelComputer><Type>Jet A1</Type></FuelComputer></Input>', 'Input.FuelComputer.Type: "Jet A1" is not one of Avgas, JetA1, JetB. The default Avgas is used.'],
+        ])('uses the default for %s and records the problem', (inner, problem) => {
+            const {settings, problems} = parseWithProblems(kln(inner));
+
+            expect(withoutAltAlert(settings)).toEqual(DEFAULTS);
+            expect(problems).toEqual([problem]);
+            expectDefaultLVars();
+        });
+
+        // The default of this key is the pinned bug #141, so only the field is compared
+        it('uses the default for an invalid AltitudeAlertEnabled and records the problem', () => {
+            const {settings, problems} = parseWithProblems(kln('<Output><AltitudeAlertEnabled>no</AltitudeAlertEnabled></Output>'));
+
+            expect(settings.output.altitudeAlertEnabled).toBe(true);
+            expect(problems).toEqual(['Output.AltitudeAlertEnabled: "no" is not true or false. The default true is used.']);
+        });
+
+        it('records every problem, in the order of the keys, and keeps the valid keys', () => {
+            const {settings, problems} = parseWithProblems(kln('<VFROnly>1</VFROnly><Input><HeadingInput>true</HeadingInput>'
+                + '<ObsSource>4</ObsSource></Input><Output><ObsTarget>2</ObsTarget></Output>'));
+
+            expect(problems).toEqual([
+                'VFROnly: "1" is not true or false. The default false is used.',
+                'Input.ObsSource: "4" is not one of 0, 1, 2. The default 1 is used.',
+            ]);
+            const expected = withField('input.headingInput', true);
+            expected.output.obsTarget = 2;
+            expect(withoutAltAlert(settings)).toEqual(expected);
+        });
+
+        // Installation Manual 2-6: the approach arm select pin is strapped for VFR only, so a VFR only unit has no
+        // approach arm switch (and therefore no APT 8, 3-49, #133). VFROnly is kept and the switch falls back
+        it('drops the approach arm switch of a VFR only unit', () => {
+            const {settings, problems} = parseWithProblems(kln('<VFROnly>true</VFROnly>'
+                + '<Input><ExternalSwitches><AppArmSwitchInstalled>true</AppArmSwitchInstalled></ExternalSwitches></Input>'));
+
+            expect(withoutAltAlert(settings)).toEqual(withField('vfrOnly', true));
+            expect(problems).toEqual(['Input.ExternalSwitches.AppArmSwitchInstalled: a VFR only unit (VFROnly true) has no approach arm switch. The default false is used.']);
+        });
+
+        it('records no problem for a VFR only unit without the approach arm switch', () => {
+            expect(parseWithProblems(kln('<VFROnly>true</VFROnly>'
+                + '<Input><ExternalSwitches><AppArmSwitchInstalled>false</AppArmSwitchInstalled></ExternalSwitches></Input>')).problems).toEqual([]);
+        });
+    });
+
     // The maintainer's ruling: false is intended, and the sample, the wiki sample and cfg/panel.xml all show false.
     // The code defaults to true today, so every aircraft that omits the key gets an enabled alert.
     it.fails('defaults AltitudeAlertEnabled to false (#141)', () => {

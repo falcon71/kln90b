@@ -321,6 +321,24 @@ describe('self-test right page with an air data baro (spec)', () => {
     });
 });
 
+// BaroSource only means something with an air data computer; without one the baro is a cursor field (3-6)
+describe('self-test right page with a BaroSource but no air data computer (#360)', () => {
+    it('keeps the baro in the cursor fields and does not take the altimeter setting', async () => {
+        const unit = await onSelfTestPage({panelXml: panelXml({'Input.Airdata.BaroSource': 1}), simVars: ALTIMETER_AT_30_12});
+
+        const texts = new Set([unit.panel.focused('R').text]);
+        for (const dir of [-1, 1] as const) {
+            for (let i = 0; i < 8; i++) {
+                await unit.panel.outer('R', dir);
+                texts.add(unit.panel.focused('R').text);
+            }
+        }
+
+        expect(texts.has('29')).toBe(true);
+        expect(Screen.read().rows('R')[4]).toBe('BARO:29.92"');
+    });
+});
+
 const NO_ALTITUDE_ALERT_XML = panelXml(ALTITUDE_ALERT(false));
 
 describe('approving the self-test page (spec)', () => {

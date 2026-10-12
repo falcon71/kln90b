@@ -163,12 +163,12 @@ describe('APT 8 and the approach arm switch (3-49, #133)', () => {
 });
 
 // A real VFR only unit cannot have the switch: its pin 30 is strapped (installation manual 2-6, figure 2-17 sheet 8).
-// The code decides APT 8 by the switch alone, so a panel.xml that sets both has APT 8; #145 asks to reject that panel.xml
-describe('APT 8 of a panel.xml with VFR only and the approach arm switch (characterization)', () => {
-    it('has APT 1 to APT 8', async () => {
+// The code decides APT 8 by the switch alone; the parser rejects the switch of a VFR only panel.xml (#145)
+describe('APT 8 of a panel.xml with VFR only and the approach arm switch (#145)', () => {
+    it('has no APT 8', async () => {
         const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 8.0)], panelXml: panelXml({...VFR_ONLY, ...APR_ARM_SWITCH})});
 
-        expect(await walk(unit, 'R', 'APT 1')).toEqual(APT_WITH_APT8);
+        expect(await walk(unit, 'R', 'APT 1')).toEqual(APT_WITHOUT_APT8);
     });
 });
 

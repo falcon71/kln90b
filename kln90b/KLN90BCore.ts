@@ -82,6 +82,7 @@ import {SidStar} from "./data/navdata/SidStar";
 import {SimVarSync} from "./SimVarSync";
 import {KeyboardEvent, KeyboardEventData} from "./controls/StatusLine";
 import {ErrorEvent} from "./controls/ErrorPage";
+import {PanelXmlErrorEvent} from "./controls/PanelXmlErrorPage";
 import {SignalOutputFillterTick} from "./services/SignalOutputFillterTick";
 import {RollSteeringController} from "./services/RollSteeringController";
 import {KlnEfbSaver} from "./services/KlnEfbSaver";
@@ -225,13 +226,17 @@ export class KLN90BCore {
     private async asyncInit(xmlConfig: Document) {
 
         //The xml is not available before init!
-        this.planeSettings = new KLN90BPlaneSettingsParser().parsePlaneSettings(xmlConfig);
+        const planeSettingsParser = new KLN90BPlaneSettingsParser();
+        this.planeSettings = planeSettingsParser.parsePlaneSettings(xmlConfig);
 
         const forceReadyToUse = this.isForceReadyToUse();
 
         console.log("forceReadyToUse", forceReadyToUse);
 
         this.pageManager.Init(this.bus, this.userSettings);
+        if (planeSettingsParser.problems.length > 0) { //The page that shows them only exists after Init
+            this.bus.getPublisher<PanelXmlErrorEvent>().pub("panelXmlErrors", planeSettingsParser.problems);
+        }
 
         const brightnessManager = new BrightnessManager(this.bus, this.planeSettings);
         this.powerButton = new PowerButton({
