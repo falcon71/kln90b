@@ -1207,6 +1207,10 @@ its line, in the comment above it or in the title of its `describe`.
 - SET 1 ident: with no edit open, CLR changes nothing (no blank field, no `Ent` prompt, no waypoint page) and the ENT
   after it changes nothing either; during an open ident edit CLR brings the old ident back (#244, like #307). After the
   ident, ENT, ENT the cursor goes straight to `Ok?` (#248).
+- USR 2 of a user waypoint about 2000 NM from any VOR of the demo database: Ref, Rad and Dis are dashes and the cursor
+  reaches all three. A typed radial or distance is accepted (the value shows, the `Ent` prompt goes, the cursor moves
+  on, no message; the message is medium confidence) but the waypoint does not move, and after leaving the page Rad and
+  Dis are dashes again (#286).
 
 # 9. Next steps
 

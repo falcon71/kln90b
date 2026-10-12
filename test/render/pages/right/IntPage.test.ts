@@ -529,6 +529,18 @@ describe('user intersection (5-18, 5-19)', () => {
     });
 });
 
+/** QQI with no VOR within the 100 NM of the reference search, so REF stays dashed; the cursor on RAD */
+async function withoutReference(): Promise<HeadlessUnit> {
+    const unit = await bootUnit({
+        storage: savedUserWaypoints([{kind: 'int', ident: 'QQI', lat: 47.1, lon: 11.0}]), position: {lat: 47, lon: 8},
+    });
+    await unit.panel.selectPage('R', 'INT  ');
+    await vi.advanceTimersByTimeAsync(9000);
+    await unit.panel.cursor('R');
+    await unit.panel.cursorTo('R', '___._'); // RAD, after the ident characters and REF
+    return unit;
+}
+
 describe('stored user intersection', () => {
     // QQI, a stored user intersection 6.0 NM north of MKC
     const storage = () => savedUserWaypoints([{kind: 'int', ident: 'QQI', lat: 47.1, lon: 11.0}]);
@@ -619,33 +631,77 @@ describe('stored user intersection', () => {
         expect(w[4]).toBeCloseTo(11.0, 6);
     });
 
-    /** QQI with no VOR within the 100 NM of the reference search, so REF stays dashed; the cursor on RAD */
-    async function withoutReference(): Promise<HeadlessUnit> {
-        const unit = await bootUnit({storage: storage(), position: {lat: 47, lon: 8}});
-        await unit.panel.selectPage('R', 'INT  ');
-        await vi.advanceTimersByTimeAsync(9000);
-        await unit.panel.cursor('R');
-        await unit.panel.cursorTo('R', '___._'); // RAD, after the ident characters and REF
-        return unit;
-    }
-
-    // Sibling of the pin below: the page has no reference, and the cursor is on RAD
+    // The page has no reference, and the cursor is on RAD (the precondition of the tests of #286 below)
     it('has no reference VOR and puts the cursor on RAD (characterization)', async () => {
         const unit = await withoutReference();
 
         expect(Screen.read().rows('R')[1]).toBe('REF:  _____');
         expect(unit.panel.focused('R')).toEqual({row: 2, col: 17, text: '___._'});
     });
+});
 
-    // A throw on ENT is never the real unit's behavior (testing.md section 5, as #243). IntPage.setRad reads this.ref!
-    // (null without a reference VOR, and during the 8 s of the REF calculation), and the TypeError rejects the ENT.
-    // Since #118 the throw is also an `error` event on the error page, so the pin checks both
-    it.fails('does not throw on ENT of a radial without a reference (#286)', async () => {
+describe('stored user intersection without a reference VOR (#286)', () => {
+    // A throw on ENT is never the real unit's behavior (testing.md section 5, as #243). IntPage.setRad read this.ref!
+    // (null without a reference VOR, and during the 8 s of the REF calculation), and the TypeError rejected the ENT.
+    // Since #118 a throw is also an `error` event on the error page, so the test checks both
+    it('does not throw on ENT of a radial without a reference (#286)', async () => {
         const unit = await withoutReference();
         await unit.panel.type('R', '0900');
         await unit.panel.ent();
 
         expect(unit.takeRejections()).toEqual([]);
         expect(unit.errors).toEqual([]);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-12 (USR 2 of a user waypoint far from any VOR): a radial typed without a
+    // reference is shown and the cursor moves on, but the waypoint does not move (#286)
+    it('shows a radial entered without a reference and moves nothing (checked in the KLN 89 trainer, 2026-10-12, #286)', async () => {
+        const unit = await withoutReference();
+        const before = userTuples(unit);
+
+        await unit.panel.type('R', '0900');
+        await unit.panel.ent();
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R')[2]).toBe('RAD: 090.0°');
+        expect(unit.panel.focused('R').row).toBe(3); // DIS
+        expect(userTuples(unit)).toEqual(before);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-12: without a reference, Rad and Dis are dashes again after the page has
+    // been left and shown again; the radial entered before is not kept (#286)
+    it('shows dashes again for a radial entered without a reference after the page is left (checked in the KLN 89 trainer, 2026-10-12, #286)', async () => {
+        const unit = await withoutReference();
+        await unit.panel.type('R', '0900');
+        await unit.panel.ent();
+        expect(Screen.read().rows('R')[2]).toBe('RAD: 090.0°'); // Precondition: the radial is shown after the ENT
+        await unit.panel.cursor('R'); // off, so that the outer knob turns the page
+
+        await unit.panel.outer('R', 1);
+        expect(Screen.read().status().right).not.toBe('INT'); // Precondition: the page is left
+        await unit.panel.outer('R', -1);
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().status().right).toBe('INT');
+        expect(Screen.read().rows('R')[2]).toBe('RAD: ___._°');
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-12 (USR 2 of a user waypoint far from any VOR): a distance typed without a
+    // reference is shown and the waypoint does not move (#286)
+    it('shows a distance entered without a reference and moves nothing (checked in the KLN 89 trainer, 2026-10-12, #286)', async () => {
+        const unit = await withoutReference();
+        await unit.panel.outer('R', 1);
+        expect(unit.panel.focused('R').row).toBe(3); // precondition: the DIS field
+        const before = userTuples(unit);
+
+        await unit.panel.type('R', '0100');
+        await unit.panel.ent();
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R')[3].slice(5, 9)).toBe('10.0'); // the digits only: the format around them is #282
+        expect(userTuples(unit)).toEqual(before);
     });
 });
