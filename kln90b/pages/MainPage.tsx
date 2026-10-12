@@ -22,6 +22,7 @@ import {
 import {FivePageProps, SixLineHalfPage} from "./FiveSegmentPage";
 import {NO_CHILDREN, Page, PageSide} from "./Page";
 import {StatusLine} from "../controls/StatusLine";
+import {reportErrors} from "../controls/ErrorPage";
 import {EnterResult} from "./CursorController";
 import {MessagePage} from "../controls/MessagePage";
 import {DirectToPage} from "./left/DirectToPage";
@@ -536,8 +537,7 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                 if (this.overlayPageStack.isShown()) {
                     return this.getOverlayPage()!.enter();
                 }
-                // noinspection JSIgnoredPromiseFromCall
-                this.handleEnter();
+                reportErrors(this.handleEnter(), this.props.bus);
                 return true;
             case EVT_CLR:
                 if (this.overlayPageStack.isShown()) {

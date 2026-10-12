@@ -9,6 +9,7 @@ import {Nav1Page} from "./Nav1Page";
 import {Fpl0Page} from "./FplPage";
 import {SuperNav5Page} from "./SuperNav5Page";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
+import {reportErrors} from "../../controls/ErrorPage";
 import {format} from "numerable";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {KLNFixType} from "../../data/flightplan/Flightplan";
@@ -63,7 +64,7 @@ export class DirectToPage extends SixLineHalfPage {
         this.cursorController = new CursorController(this.children);
         this.cursorController.setCursorActive(true);
         if (directToAutoFill !== null) {
-            this.children.get("wpt").confirmCurrentValue();
+            reportErrors(this.children.get("wpt").confirmCurrentValue(), this.props.bus);
         }
     }
 

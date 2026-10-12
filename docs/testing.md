@@ -143,12 +143,12 @@ The sim globals are installed once per test file by the setup files `test/harnes
 - **`unit.consoleErrors`** holds the arguments of every `console.error` call. The call is passed on to the
   `console.error` it replaced, and the teardown puts that one back. `Flight` reads it for its "no console.error"
   monitor.
-- **Unhandled rejections** are collected through a `process` listener, into `unit.rejections` and `unit.errors`. Many
-  input handlers are not awaited (ENT, for example), so a throw inside one is a rejection nobody sees. Vitest stops
-  reporting unhandled rejections once a second listener exists, which makes this collector the only check. It is
-  strict: a rejection still in `unit.rejections` when the test ends fails that test. The check runs while the unit is
-  still up, before the teardown (Vitest runs `onTestFinished` callbacks last registered first), and a throw in it does
-  not stop the teardown. The teardown removes the listener.
+- **Unhandled rejections** are collected through a `process` listener, into `unit.rejections` and `unit.errors`. Some
+  async callbacks of ENT are not awaited (`RefPage.calcRef`, for example; section 6), so a throw inside one is a
+  rejection nobody sees. Vitest stops reporting unhandled rejections once a second listener exists, which makes this
+  collector the only check. It is strict: a rejection still in `unit.rejections` when the test ends fails that test. The
+  check runs while the unit is still up, before the teardown (Vitest runs `onTestFinished` callbacks last registered
+  first), and a throw in it does not stop the teardown. The teardown removes the listener.
 
 `bootUnitExpectingError({...bootOptions, platform})` is the boot for a start-up that is expected to fail (#50). It
 shares the guard and the teardown with `bootUnit`, but waits for the first `error` event instead of `propsReady`,
@@ -818,11 +818,13 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   `/// <reference types="node" />`. The directive makes the Node types available to the whole `tsc` program, because the
   `include` of the root `tsconfig.json` compiles `kln90b/` and `test/` together; it does not keep Node APIs out of the
   code in `kln90b/`, so `tsc` will not catch an accidental Node call there.
-- **Errors thrown on the ENT path do not reach the error page.** `MainPage` starts `handleEnter` without awaiting it,
-  so a throw is an unhandled rejection, not an `error` event (the exception handling of ticks and synchronous input
-  does not see it; #118 asks whether that is intended). The harness collects the rejection and fails the test that
-  leaves one untaken (section 3), so a broken ENT is no longer silent. A test that provokes one takes it with
-  `unit.takeRejections()` (section 4).
+- **Errors thrown on the ENT path reach the error page.** The ENT paths hand their promise to `reportErrors`
+  (`controls/ErrorPage.tsx`), so an error there reaches the `error` topic like any input error (#118). The harness
+  still collects unhandled rejections and fails a test that leaves one untaken (section 3). Deeper drops remain: an
+  async `enterCallback` that `Editor.enter` and `WaypointEditor.currentValueConfirmed` do not await (such as
+  `RefPage.calcRef`), `onCharChanged`, and the async selections of APT 7 and APT 8. A throw there is still an unhandled
+  rejection, and catching it would mean awaiting it, which changes when ENT completes. A test that provokes one takes
+  it with `unit.takeRejections()` (section 4).
 - **The harness collects `console.error` but does not fail on it.** `unit.consoleErrors` holds every call, and only
   `Flight` fails on one (its `no console.error` monitor, which also counts the boot). A render or unit test that must
   not log asserts that the list is empty.
@@ -1437,9 +1439,6 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 
 ## Boot, power and the unit as a whole
 
-- **Errors thrown on the ENT path never reach the error page**, although `CLAUDE.md` and `architecture.md` say input
-  exceptions are shown there (section 6). The question is #118; once it is decided, either the code changes or the two
-  documents do. The harness collector stays either way.
 - **Code notes** (latent or possibly intended, so questions rather than bugs; the code is unchanged):
     - `TickController.setupLoops` starts new intervals without clearing the old ones. Only the dedup upstream
       (`PowerButton` publishes a power event on a change only, `SimVarSync` dedups its enable and disable) keeps a second

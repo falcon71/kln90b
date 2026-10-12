@@ -16,6 +16,7 @@ import {
     EVT_R_SCAN_RIGHT,
 } from "../HEvents";
 import {StatusLine} from "../controls/StatusLine";
+import {reportErrors} from "../controls/ErrorPage";
 import {CursorController, EnterResult} from "./CursorController";
 import {Page, PageProps, UiElement, UIElementChildren} from "./Page";
 import {KeyboardService} from "../services/KeyboardService";
@@ -153,7 +154,7 @@ export class FiveSegmentPage extends DisplayComponent<FivePageProps> implements 
             case EVT_R_INNER_RIGHT:
                 return this.props.rPage.getCursorController().innerRight();
             case EVT_ENT:
-                this.handleEnter();
+                reportErrors(this.handleEnter(), this.props.bus);
                 return true;
             case EVT_CLR:
                 return this.props.lPage.clear() || this.props.rPage.clear();

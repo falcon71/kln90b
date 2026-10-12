@@ -6,6 +6,20 @@ export interface ErrorEvent {
     error: Error;
 }
 
+/**
+ * Shows an error of an async input handler on the error page, as KLN90BCore.onInteractionEvent does for a synchronous
+ * one. ENT runs async (the editors wait for the facility search), and a promise dropped without a catch would never
+ * reach the error page (#118)
+ */
+export function reportErrors(promise: Promise<unknown>, bus: EventBus): void {
+    promise.catch(e => {
+        console.error(e);
+        if (e instanceof Error) {
+            bus.getPublisher<ErrorEvent>().pub("error", e);
+        }
+    });
+}
+
 export interface ErrorPageProps extends ComponentProps {
     bus: EventBus;
 }

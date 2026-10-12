@@ -9,6 +9,7 @@ import {ListItem} from "./ListItem";
 import {SixLineHalfPage} from "../pages/FiveSegmentPage";
 import {ActiveWaypoint} from "../data/flightplan/ActiveWaypoint";
 import {StatusLineMessageEvents} from "./StatusLine";
+import {reportErrors} from "./ErrorPage";
 import {TextDisplay} from "./displays/TextDisplay";
 import {TickController} from "../TickController";
 import {FlightplanArrow} from "./displays/FlightplanArrow";
@@ -474,20 +475,20 @@ class EditableFlightplan {
                             break;
                         case FplWptEnterMode.ENTER:
                             //we can't use the cursorcontroller for enter here, because that would result in an infinte loop of creating waypoint
-                            listItem.enter().then(result => {
+                            reportErrors(listItem.enter().then(result => {
                                     //oh, the hacks get worse and worse...
                                     if (result === EnterResult.Handled_Move_Focus) {
                                         this.cursorController.outerRight();
                                     }
                                 },
-                            );
+                            ), this.props.bus);
                             break;
                         case FplWptEnterMode.KEYBOARD:
                             listItem.innerRight();
                             listItem.keyboard(leg.enterKeyboardKey!);
                             break;
                         case FplWptEnterMode.CONFIRM:
-                            listItem.confirmCurrentValue().then(_ => this.cursorController.setCursorActive(false));
+                            reportErrors(listItem.confirmCurrentValue().then(_ => this.cursorController.setCursorActive(false)), this.props.bus);
                             break;
                     }
                 };
