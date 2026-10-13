@@ -19,8 +19,9 @@ async function onSet1(): Promise<HeadlessUnit> {
 }
 
 describe('SET 1 page (characterization)', () => {
-    // Row 4 (ground speed and track) is left out: its ground speed format is the #245 pin below. The CONFIRM? row
-    // shows with the cursor off, which is the code's choice (a comment in Set1Page.tsx cites a video of a real unit)
+    // Row 4 (ground speed and track) is left out: the ground speed format has its own tests (#245, below and in
+    // SpeedEditor.test.ts). The CONFIRM? row shows with the cursor off, which is the code's choice (a comment in
+    // Set1Page.tsx cites a video of a real unit)
     it('shows the present position with the cursor off', async () => {
         const unit = await onSet1();
 
@@ -253,11 +254,10 @@ describe('SET 1 CONFIRM? before the first fix (characterization)', () => {
 });
 
 describe('SET 1 bugs', () => {
-    // 3-18, figures 3-57 to 3-60: the ground speed of a parked aircraft reads 0 KT, one digit. The page shows 00, because
-    // the tens digit of SpeedEditor is a plain digit (SpeedEditor.tsx). The aircraft is parked and the world has no
-    // magnetic variation, so the track is 000. The sibling is the characterization of the page above, which holds every
-    // other row of the page.
-    it.fails('shows the ground speed of a parked aircraft as 0 KT (3-18, #245)', async () => {
+    // 3-18, figures 3-57 to 3-60: the ground speed of a parked aircraft reads 0 KT, one digit: the SpeedEditor blanks the
+    // hundreds and tens of an entered speed. The aircraft is parked and the world has no magnetic variation, so the
+    // track is 000. The sibling is the characterization of the page above, which holds every other row of the page.
+    it('shows the ground speed of a parked aircraft as 0 KT (3-18, #245)', async () => {
         await onSet1();
 
         expect(Screen.read().rows('L')[4]).toBe('  0 KT 000°');

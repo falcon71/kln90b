@@ -18,7 +18,7 @@ async function onGroundspeed(): Promise<HeadlessUnit> {
 
 /** With the cursor on the ground speed: 120 kt selected with the knobs and entered */
 async function select120(unit: HeadlessUnit): Promise<void> {
-    await unit.panel.inner('L', 1); // opens the field: the hundreds cell blank, the others dashed
+    await unit.panel.inner('L', 1); // opens the field: the hundreds cell 0, the others dashed
     await unit.panel.inner('L', 1); // 1
     await unit.panel.outer('L', 1);
     await unit.panel.inner('L', 3); // 2
@@ -41,12 +41,12 @@ describe('SpeedEditor on SET 1 (3-18, 3-19)', () => {
     });
 
     // Figures 3-57 to 3-60 show the ground speed with its leading zeros suppressed (0 KT), and the KLN 89 trainer shows
-    // an entered 5 as blank-padded after ENT (checked in the KLN 89 trainer, 2026-10-08); the tens digit of SpeedEditor
-    // is a plain digit, so 5 kt shows 05 after ENT
-    it.fails('shows an entered ground speed of 5 KT without leading zeros (3-18, figures 3-57 to 3-60, '
+    // an entered 5 as blank-padded after ENT while the open field shows 005 (T11, checked in the KLN 89 trainer,
+    // 2026-10-08): the hundreds and tens blank once entered
+    it('shows an entered ground speed of 5 KT without leading zeros (3-18, figures 3-57 to 3-60, '
         + 'checked in the KLN 89 trainer, 2026-10-08, #245)', async () => {
         const unit = await onGroundspeed();
-        await unit.panel.inner('L', 1); // opens the field with the blank
+        await unit.panel.inner('L', 1); // opens the field with the hundreds 0
         await unit.panel.outer('L', 1);
         await unit.panel.inner('L', 1); // 0
         await unit.panel.outer('L', 1);
@@ -56,7 +56,7 @@ describe('SpeedEditor on SET 1 (3-18, 3-19)', () => {
         expect(Screen.read().rows('L')[4].slice(0, 6)).toBe('  5 KT');
     });
 
-    // Sibling of the #245 pin: the same knob turns commit 5 kt
+    // Sibling of the #245 test above: the same knob turns commit 5 kt
     it('takes a ground speed of 5 KT (3-19)', async () => {
         const unit = await onGroundspeed();
         await unit.panel.inner('L', 1);
@@ -76,74 +76,82 @@ describe('SpeedEditor on SET 1 (checked in the KLN 89 trainer, 2026-10-08)', () 
     // tens cell of the ground speed is such a cell: ten clicks after the opening 0 give 9, one more gives 0
     it('wraps a digit cell from 9 to 0 (checked in the KLN 89 trainer, 2026-10-08)', async () => {
         const unit = await onGroundspeed();
-        await unit.panel.inner('L', 1); // opens the field: the hundreds cell blank
+        await unit.panel.inner('L', 1); // opens the field: the hundreds cell shows a 0
         await unit.panel.outer('L', 1);
         await unit.panel.inner('L', 10);
-        expect(unit.panel.focused('L').text).toBe(' 9_');
+        expect(unit.panel.focused('L').text).toBe('09_');
         await unit.panel.inner('L', 1);
 
-        expect(unit.panel.focused('L').text).toBe(' 0_');
+        expect(unit.panel.focused('L').text).toBe('00_');
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-08 (T11): the open ground speed shows its zeros (005); the first click opens
+    // the field with the hundreds 0
+    it('opens the field with the hundreds 0 (checked in the KLN 89 trainer, 2026-10-08, #245)', async () => {
+        const unit = await onGroundspeed();
+        await unit.panel.inner('L', 1);
+
+        expect(unit.panel.focused('L').text).toBe('0__');
     });
 });
 
 describe('SpeedEditor on SET 1 (characterization)', () => {
-    // The hundreds cell offers a blank and 1 to 9 and wraps: ten clicks after the opening blank come back to it
-    it('wraps the hundreds cell from 9 to the blank', async () => {
+    // The hundreds cell offers 0 to 9 and wraps: ten clicks after the opening 0 come back to it
+    it('wraps the hundreds cell from 9 to 0', async () => {
         const unit = await onGroundspeed();
         await unit.panel.inner('L', 1);
         await unit.panel.inner('L', 9);
         expect(unit.panel.focused('L').text).toBe('9__');
         await unit.panel.inner('L', 1);
 
-        expect(unit.panel.focused('L').text).toBe(' __');
+        expect(unit.panel.focused('L').text).toBe('0__');
     });
 });
 
 describe('SpeedEditor keyboard', () => {
-    // #109's suggested fix maps a typed 0 to the blank of a cell whose charset has a blank instead of a 0 (the keyboard
-    // is the project's own feature, so the expectation is that issue's). Today the 0 is refused and the cursor stays on
-    // the hundreds cell, where the 9 lands
-    it.fails('types a ground speed below 100 KT with a leading 0 (#109)', async () => {
+    // The hundreds cell has a 0 since #245, so the keyboard can type it (the ground speed half of #109; the date,
+    // runway surface and NDB frequency halves stay open, the last one pinned in NdbFreqEditor.test.ts). The open field
+    // shows its zeros (T11, checked in the KLN 89 trainer, 2026-10-08)
+    it('types a ground speed below 100 KT with a leading 0 (#109)', async () => {
         const unit = await onGroundspeed();
         await unit.panel.type('L', '095');
 
-        expect(unit.panel.focused('L').text).toBe(' 95');
+        expect(unit.panel.focused('L').text).toBe('095');
     });
 
-    // Sibling of the pin: the keyboard reaches the field and fills the cells that follow a blank hundreds cell. A pilot
-    // cannot type that blank (the PC keyboard sends A to Z and 0 to 9, KLN90BCore.handleKeyboardEvent), so the inner
-    // knob sets it and the outer knob moves on
-    it('types the tens and units after a blank hundreds cell set with the knob (characterization)', async () => {
+    // Sibling of the test above: the keyboard reaches the field and fills the cells that follow the hundreds 0, which the inner
+    // knob set and the outer knob moved past. The open field shows its zeros
+    it('types the tens and units after the hundreds 0 set with the knob (characterization)', async () => {
         const unit = await onGroundspeed();
-        await unit.panel.inner('L', 1); // opens the field on the blank
+        await unit.panel.inner('L', 1); // opens the field on the hundreds 0
         await unit.panel.outer('L', 1);
         await unit.panel.type('L', '95');
 
-        expect(unit.panel.focused('L').text).toBe(' 95');
+        expect(unit.panel.focused('L').text).toBe('095');
     });
 });
 
 describe('SpeedEditor, the outer knob at the ends of an open edit (checked in the KLN 89 trainer, 2026-10-08, #306)', () => {
     // The trainer check was made on a latitude, a radial, the date and an FPL 0 ident; the editors share the cell
-    // index, and the ground speed has three cells. Open edit: the hundreds blank, the tens and units dashed.
+    // index, and the ground speed has three cells. Open edit: the hundreds 0, the tens and units dashed.
     it('stops at the last cell: the next inner click turns the units again', async () => {
         const unit = await onGroundspeed();
         await unit.panel.inner('L', 1);
         await unit.panel.outer('L', 2);
         await unit.panel.inner('L', 1);
-        expect(Screen.read().rows('L')[4].slice(0, 3)).toBe(' _0');
+        expect(Screen.read().rows('L')[4].slice(0, 3)).toBe('0_0');
 
         await unit.panel.outer('L', 1);
         await unit.panel.inner('L', 1);
 
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().rows('L')[4].slice(0, 3)).toBe(' _1');
+        expect(Screen.read().rows('L')[4].slice(0, 3)).toBe('0_1');
     });
 
     it('stops at the first cell: the next inner click turns the hundreds', async () => {
         const unit = await onGroundspeed();
         await unit.panel.inner('L', 1);
-        expect(Screen.read().rows('L')[4].slice(0, 3)).toBe(' __');
+        expect(Screen.read().rows('L')[4].slice(0, 3)).toBe('0__');
 
         await unit.panel.outer('L', -1);
         await unit.panel.inner('L', 1);
