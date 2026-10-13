@@ -134,7 +134,7 @@ async function distanceEntered(digits: string, extra: Facility[] = []): Promise<
 }
 
 describe('INT page (characterization)', () => {
-    // Row 3 (DIS) is left out: its leading zeros are #282
+    // Row 3 (DIS) is left out: the DIS format has its own tests (#282)
     it('shows a database intersection with its reference VOR, cursor off', async () => {
         const unit = await intPageOf([kenzy(), mkc()]);
 
@@ -223,7 +223,7 @@ describe('INT page reference waypoint (3-50, 3-51)', () => {
     });
 
     // The distance from the new reference: RIS lies 0.2° of latitude (12.0 NM) north of KENZY, MKC 6.0 NM south of it.
-    // The digits are parsed, so that the leading zero of #282 does not matter here
+    // The digits are parsed, so that the format of the distance (#282) does not matter here
     it('computes the distance from the entered REF waypoint (3-51, figure 3-158, the KLN 89 trainer, #279)', async () => {
         await withRefRis();
 
@@ -330,8 +330,8 @@ describe('INT page radial and distance (3-50, 5-19)', () => {
     // Figures 3-155, 3-158, 5-67, 5-75 and 5-76 and a photo of a real unit (the SUP page, same layout) show DIS without
     // leading zeros (48.1, 3.7); the KLN 89 trainer (2026-10-07) pads its distances with blanks as well (` 11.0nm`,
     // `  6.8nm`).
-    // KENZY lies 12.0 NM north of MKC; the page shows DIS:012.0
-    it.fails('shows the distance without leading zeros (figures 3-155, 5-75, the KLN 89 trainer, #282)', async () => {
+    // KENZY lies 12.0 NM north of MKC; the page shows DIS: 12.0
+    it('shows the distance without leading zeros (figures 3-155, 5-75, the KLN 89 trainer, #282)', async () => {
         await intPageOf([intersection('KENZY', 47.2, 11.0), mkc()]);
 
         expect(Screen.read().rows('R')[3].slice(0, 9)).toBe('DIS: 12.0');
@@ -345,7 +345,7 @@ describe('INT page radial and distance (3-50, 5-19)', () => {
         expect(Screen.read().rows('R')[3].slice(9)).toBe('nm');
     });
 
-    // Sibling of the pins above: the distance digits are those of 12.0 NM
+    // Sibling of the two tests above: the distance digits are those of 12.0 NM
     it('shows the distance of 12.0 NM (3-50)', async () => {
         await intPageOf([intersection('KENZY', 47.2, 11.0), mkc()]);
 
@@ -420,15 +420,15 @@ describe('user intersection (5-18, 5-19)', () => {
         await unit.panel.cursorTo('R', '___._');
         await unit.panel.type('R', '0900');
         await unit.panel.ent();
-        // The edit field keeps the typed 0: figure 5-74 shows DIS:048.1 while the distance is being edited, so the fix
-        // of #282 changes the display after ENT and leaves the first cell of the editor alone
+        // The edit field keeps the typed 0: figure 5-74 shows DIS:048.1 while the distance is being edited; the blank of
+        // #282 comes only after ENT
         await unit.panel.type('R', '0481');
         await unit.panel.ent();
 
         const p = pointFrom({lat: 47.0, lon: 11.0}, 90, 48.1);
         const rows = Screen.read().rows('R');
-        // Figure 5-75 keeps REF, RAD and DIS on the page after the creation. The DIS digits are parsed, so that
-        // #282 does not matter here
+        // Figure 5-75 keeps REF, RAD and DIS on the page after the creation. The DIS digits are parsed, so that the
+        // format of the distance (#282) does not matter here
         expect(rows.slice(0, 3)).toEqual([' INT15     ', 'REF:  ORD  ', 'RAD: 090.0°']);
         expect(parseFloat(rows[3].slice(4))).toBe(48.1);
         expect(rows.slice(4)).toEqual(["N 46°59.64'", "E 12°10.40'"]);
@@ -700,7 +700,7 @@ describe('stored user intersection without a reference VOR (#286)', () => {
 
         expect(unit.takeRejections()).toEqual([]);
         expect(unit.errors).toEqual([]);
-        expect(Screen.read().rows('R')[3].slice(5, 9)).toBe('10.0'); // the digits only: the format around them is #282
+        expect(Screen.read().rows('R')[3].slice(5, 9)).toBe('10.0'); // the digits only: the format has its own tests (#282)
         expect(userTuples(unit)).toEqual(before);
     });
 });

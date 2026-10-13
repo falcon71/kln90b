@@ -12,6 +12,7 @@ export class DistanceEditor extends Editor<number> {
             new NumberEditorField(),
             new NumberEditorField(),
         ], value, enterCallback);
+        this.setLeadingZeroCells([0, 1]); //#282: figures 3-155, 5-75, 5-76: blanks once entered, zeros in the open field (5-74)
     }
 
     public render(): VNode {

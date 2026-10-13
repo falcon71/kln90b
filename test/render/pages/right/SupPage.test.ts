@@ -85,7 +85,7 @@ async function qqWithApprovedRefAbc(o: { magvar?: number, vorVariation?: number 
 const userWaypoint = (unit: HeadlessUnit, ident: string) =>
     KLNFacilityRepository.getRepository(unit.props.bus).get(ICAO.value('U', 'XX', '', ident));
 
-// The DIS row (row 3) is left out: it shows the distance with a leading zero (#282).
+// The DIS row (row 3) is left out: the DIS format has its own tests (#282).
 // With no magnetic variation the RAD row shows the same value either way (#280).
 describe('SUP page (characterization)', () => {
     it('shows a user waypoint with its reference VOR, radial and coordinates', async () => {
@@ -162,7 +162,7 @@ describe('SUP page', () => {
         const rows = rightRows();
         expect(rows[1]).toBe('REF:  ABC  ');
         expect(rows[2]).toBe('RAD: 000.0°');
-        expect(rows[3].slice(5, 9)).toBe('12.0'); // the digits only: the format around them is #282
+        expect(rows[3].slice(5, 9)).toBe('12.0'); // the digits only: the format has its own tests (#282)
     });
 
     // A radial is the course out of the VOR, the initial bearing at the station (figure 5-76; the KLN 89 trainer,
@@ -274,7 +274,7 @@ describe('SUP page', () => {
 
         expect(rightRows().slice(4)).toEqual(["N 46°57.76'", "E 13°25.56'"]);
         // Figure 5-75: the reference waypoint, radial and distance stay on the page. Only the numbers are read: the format
-        // around them is #282
+        // around them has its own tests (#282)
         expect(rightRows()[1]).toBe('REF:  ABC  ');
         expect(rightRows()[2].slice(6, 10)).toBe('90.0');
         expect(rightRows()[3].slice(4, 9)).toBe('120.0');
@@ -414,7 +414,7 @@ describe('SUP page', () => {
     // The same for an entered radial: 350.0 magnetic with 10 degrees east at ABC is 000 true, so QQ is 100.0 NM due north
     // of ABC, 48.66369 N on the sphere the unit computes on (by hand, the textbook formula of the creation test, course
     // 000); the local variation would give another longitude. The distance has three places before the point, so that
-    // this pin still turns red when the leading distance place is fixed too (#282). Sibling: the creation test above.
+    // this pin does not depend on the blank of the leading distance place (#282). Sibling: the creation test above.
     it.fails('takes an entered radial as magnetic with the variation of the reference VOR (5-19, 5-44, the KLN 89 trainer, #280)', async () => {
         const unit = await qqWithApprovedRefAbc({magvar: 4, vorVariation: 10});
         await unit.panel.cursorTo('R', '___._');
@@ -436,8 +436,9 @@ describe('SUP page', () => {
 
     // Figures 5-75 and 5-76 show a distance below 100 NM with a blank in front ("DIS: 48.1"), and the KLN 89 trainer
     // (2026-10-07) shows blanks, never zeros, outside the edit field (figure 5-74 shows the zero only in the open edit
-    // field). Figure 3-159 shows a distance below 10 NM as 09.1, so this pin asserts the hundreds digit only.
-    it.fails('shows a blank instead of a leading zero in front of a distance below 100 NM (5-19, the KLN 89 trainer, #282)', async () => {
+    // field). Figure 3-159 shows a distance below 10 NM as 09.1; the 12.0 NM of this page is above that, so the test does not
+    // touch the disagreement.
+    it('shows a blank instead of a leading zero in front of a distance below 100 NM (5-19, the KLN 89 trainer, #282)', async () => {
         await supPage();
 
         expect(rightRows()[3].slice(0, 9)).toBe('DIS: 12.0');
@@ -569,7 +570,7 @@ async function supPageWithCursorOn(text: string): Promise<HeadlessUnit> {
     return unit;
 }
 
-/** The SUP page of USUP with the cursor on the distance, reached from the radial (the text of the distance field changes with #282) */
+/** The SUP page of USUP with the cursor on the distance, reached from the radial */
 async function supPageWithCursorOnDis(): Promise<HeadlessUnit> {
     const unit = await supPageWithCursorOn('000.0');
     await unit.panel.outer('R', 1);
@@ -670,7 +671,7 @@ describe('SUP page without a reference VOR (#286)', () => {
 
         expect(unit.takeRejections()).toEqual([]);
         expect(unit.errors).toEqual([]);
-        expect(rightRows()[3].slice(5, 9)).toBe('10.0'); // the digits only: the format around them is #282
+        expect(rightRows()[3].slice(5, 9)).toBe('10.0'); // the digits only: the format has its own tests (#282)
         expect(userWaypoint(unit, 'USUR')!.lat).toBeCloseTo(47.0, 9);
         expect(userWaypoint(unit, 'USUR')!.lon).toBeCloseTo(11.0, 9);
     });
