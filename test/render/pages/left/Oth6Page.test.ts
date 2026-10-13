@@ -45,6 +45,22 @@ describe('OTH 6 page (characterization)', () => {
         expect(Screen.read().rows('L').slice(2, 5)).toEqual([' ENDUR12:36', ' RANGE 1512', ' NM/GAL 012']);
     });
 
+    // #337: 9.97 NM per gallon rounds to 10.0, which takes the three-digit form of 10 and more, so the row keeps the
+    // eleven cells of the half page (the trainer has no efficiency, so the form is the code's own)
+    it('characterization: shows 9.97 NM/GAL as 010 (#337)', async () => {
+        const unit = await single({fobLb: 756, reserve: 0, groundspeedKt: 99.7, flowPph: 60});
+        expect(unit.props.sensors.in.gps.groundspeed).toBeCloseTo(99.7, 1); // precondition: 9.97 NM/GAL
+
+        expect(Screen.read().rows('L')[4]).toBe(' NM/GAL 010');
+    });
+
+    // Sibling of the #337 test: 9.94 NM per gallon keeps its tenth
+    it('characterization: shows 9.94 NM/GAL as 9.9 (#337)', async () => {
+        await single({fobLb: 756, reserve: 0, groundspeedKt: 99.4, flowPph: 60});
+
+        expect(Screen.read().rows('L')[4]).toBe(' NM/GAL 9.9');
+    });
+
     // The efficiency is clamped at 999: 120 kt on 0.1 GAL/HR is 1200 NM per gallon
     it('characterization: clamps NM/GAL at 999', async () => {
         await single({fobLb: 30, reserve: 0, groundspeedKt: 120, flowPph: 0.6});

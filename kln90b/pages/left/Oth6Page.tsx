@@ -74,7 +74,8 @@ export class Oth6Page extends SixLineHalfPage {
                 range = endurance * this.props.sensors.in.gps.groundspeed / 3600;
             }
             const efficiency = this.props.sensors.in.gps.groundspeed / ff;
-            if (efficiency >= 10) {
+            //#337: compare the rounded value, so 9.95 to 9.99 take the three-digit form of 10 and keep the field's cells
+            if (Math.round(efficiency * 10) / 10 >= 10) {
                 efficiencyString = format(Math.min(efficiency, 999), "000");
             } else {
                 efficiencyString = format(efficiency, "0.0");
