@@ -4,6 +4,7 @@ import {
     FacilityType,
     FacilityUtils,
     FSComponent,
+    GeoPoint,
     LodBoundary,
     NodeReference,
     UnitType,
@@ -293,7 +294,7 @@ export class Ctr1Page extends SixLineHalfPage {
             isTemporary: false, //irrelevant, because this flag is not persisted
             userFacilityType: UserFacilityType.LAT_LONG,
             reference1IcaoStruct: closestVor.icaoStruct,
-            reference1Radial: intersection.intersection.bearingFrom(closestVor),
+            reference1Radial: new GeoPoint(closestVor.lat, closestVor.lon).bearingTo(intersection.intersection), //#339: the radial is measured at the VOR
             reference1Distance: UnitType.GA_RADIAN.convertTo(intersection.intersection.distance(closestVor), UnitType.NMILE),
         };
 

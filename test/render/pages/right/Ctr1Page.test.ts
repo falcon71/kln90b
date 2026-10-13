@@ -2,7 +2,8 @@ import {describe, expect, it, vi} from 'vitest';
 import {Facility, FacilityType} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {centerWorld} from '../../../harness/fixtures';
-import {intersection} from '../../../harness/navdata/builders';
+import {courseDeg} from '../../../harness/flight/geo';
+import {intersection, vor} from '../../../harness/navdata/builders';
 import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
@@ -57,6 +58,23 @@ describe('CTR 1 page (characterization)', () => {
           ...........
           ..........."
         `);
+    });
+});
+
+describe('CTR 1 page, the radial of a new waypoint (characterization)', () => {
+    // CTR 1 is a 90B page without a counterpart in the KLN 89 trainer: the radial of a new waypoint is measured at its
+    // reference VOR like the NAV 2 radial (#339, checked in the KLN 89 trainer, 2026-10-12, on NAV 2). The VOR OFF lies
+    // 14 NM from the crossing at 42.75 N on the meridian and is not on it, so the initial bearing at the VOR and the final
+    // one at the crossing differ by about 0.2 degrees (BGD is due north of the crossing, where both agree). The radial
+    // is stored true
+    it('characterization: stores the radial measured at the reference VOR (#339)', async () => {
+        const off = vor('OFF', 42.85, -99.7);
+        const unit = await onCtr1(w => [w.kaaa, w.kbbb], [off]);
+        await ent(unit);
+
+        const created = userWaypoints(unit, FacilityType.USR).filter(f => f.icaoStruct.ident === 'OFF00') as unknown as { lat: number, lon: number, reference1Radial: number }[];
+        expect(created).toHaveLength(1);
+        expect(created[0].reference1Radial).toBeCloseTo(courseDeg(off, created[0]), 2);
     });
 });
 

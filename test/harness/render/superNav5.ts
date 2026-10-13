@@ -111,13 +111,13 @@ export async function superNav5OnLeg(o: {
 }
 
 /**
- * Boots in the arc world on the 225 radial of the left arc, loads the approach (the arc is active) and shows Super
- * NAV 5
+ * Boots in the arc world on the true radial `radial` (default 225) of the left arc, loads the approach (the arc is
+ * active) and shows Super NAV 5
  */
-export async function superNav5OnArc(o: { storage?: Record<string, unknown>, magvar?: number } = {}): Promise<HeadlessUnit> {
+export async function superNav5OnArc(o: { storage?: Record<string, unknown>, magvar?: number, radial?: number } = {}): Promise<HeadlessUnit> {
     const w = arcWorld();
     const unit = await bootUnit({
-        facilities: w.facilities, position: w.at(225, 10), magvar: o.magvar,
+        facilities: w.facilities, position: w.at(o.radial ?? 225, 10), magvar: o.magvar,
         panelXml: panelXml(APR_ARM_SWITCH),
         storage: {...savedFlightplan(0, [w.kprc]), ...o.storage},
     });

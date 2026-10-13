@@ -61,4 +61,13 @@ describe('Super NAV 5 field 3', () => {
         await superNav5OnArc({magvar: 10, storage: {superNav5Field3: SuperNav5Field3.TK}});
         expect(field3()).toBe('Ø225°');
     });
+
+    // The Super NAV 5 page is the 90B's own (the 89 has none), so the trainer does not cover it: the arc radial is
+    // measured at the VOR like the one of NAV 2 (#339). On the true radial 225.55 at 10 NM from ABC the initial bearing
+    // at ABC is 225.55 and the final one at the aircraft 225.42 (courseDeg and finalCourseDeg of geo.ts), which round
+    // to 226 and 225
+    it('characterization: shows the arc radial measured at the VOR (#339)', async () => {
+        await superNav5OnArc({radial: 225.55, storage: {superNav5Field3: SuperNav5Field3.TK}});
+        expect(field3()).toBe('Ø226°');
+    });
 });

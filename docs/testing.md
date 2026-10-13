@@ -1216,6 +1216,9 @@ its line, in the comment above it or in the title of its `describe`.
   the unit's own variation model at the reference's position (about 15.4 E for a user waypoint at 45 N 120 W; 4.2, 5.4
   and 3.8 W for an airport, an NDB and an intersection near Chicago; a user waypoint at the NDB's position gave the
   NDB's value). Any waypoint type is accepted as the reference.
+- NAV 2 with the Ref set to a VOR far away (#339): the radial is the true initial bearing at the VOR minus the VOR's own
+  published variation, rounded to whole degrees (309 NM from ORD: 86 shown, the final bearing at the aircraft would
+  give 90; 427 NM from RHI: 116 shown, the final bearing 122).
 
 # 9. Next steps
 

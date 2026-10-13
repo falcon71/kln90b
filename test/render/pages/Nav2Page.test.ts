@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, NEAREST_SEARCH_WAIT_MS} from '../../harness/boot';
+import {pointFrom} from '../../harness/flight/geo';
 import {vor} from '../../harness/navdata/builders';
 import {Screen} from '../../harness/render/screen';
 
@@ -207,5 +208,17 @@ describe('NAV 2 before the first fix (3-8)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(Screen.read().rows('L')[5]).toBe("----°--.--'");
+    });
+});
+
+describe('NAV 2, the radial of the nearest VOR', () => {
+    // Checked in the KLN 89 trainer, 2026-10-12: the radial is the true initial bearing at the VOR (minus its own
+    // variation), not the bearing measured at the aircraft. 60 NM east of ABC at 47 N the two differ by about 1.1
+    // degrees: initial 090, final about 091.1
+    it('shows the radial measured at the VOR (3-32, checked in the KLN 89 trainer, 2026-10-12, #339)', async () => {
+        const abc = vor('ABC', 47.0, 11.0);
+        await nav2At(pointFrom(abc, 90, 60), [abc]);
+
+        expect(Screen.read().rows('L')[2]).toBe('ABC  090°fr');
     });
 });
