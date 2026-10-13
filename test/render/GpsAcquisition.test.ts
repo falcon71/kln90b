@@ -427,7 +427,7 @@ describe('correcting the position or the time during a search (3-5, 3-17, #357)'
         await unit.panel.outer('L', 1);
         await unit.panel.inner('L', 9); // an 8
         await unit.panel.ent();
-        expect(Screen.read().rows('L').slice(2, 4)).toEqual(["N 47°00.00'", "E 08°00.00'"]); // Precondition: the entry took
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(["N 47°00.00'", "E  8°00.00'"]); // Precondition: the entry took
         expect(gps.isValid()).toBe(false); // Precondition: the search runs
         await unit.panel.cursorTo('L', 'CONFIRM?');
         await unit.panel.ent();

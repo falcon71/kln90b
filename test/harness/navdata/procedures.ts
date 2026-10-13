@@ -32,7 +32,8 @@ export const Leg = {
     PI: (fix: Fix, courseMag: number, turn = LegTurnDirection.Right, flags = 0) =>
         FlightPlan.createLeg({type: LegType.PI, fixIcaoStruct: icaoOf(fix), course: courseMag, turnDirection: turn, fixTypeFlags: flags}),
     /**
-     * DME arc to endFix around navaid. SidStar uses fromRadial (course) and toRadial (theta) as true bearings, and the arc
+     * DME arc to endFix around navaid. fromRadial (course) and toRadial (theta) are magnetic radials, and SidStar converts
+     * them with the VOR's own variation (with the builders' default variation of 0 they are the true radials too). The arc
      * must not be the first leg that survives filtering (the conversion replaces the leg before it with the entry).
      */
     AF: (endFix: Fix, navaid: VorFacility, o: { radiusNm: number; fromRadial: number; toRadial: number; turn: LegTurnDirection; flags?: number }) =>

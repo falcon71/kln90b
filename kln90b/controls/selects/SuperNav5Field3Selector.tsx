@@ -1,8 +1,9 @@
-import {FSComponent, UserSetting} from "@microsoft/msfs-sdk";
+import {FSComponent, GeoPoint, UserSetting} from "@microsoft/msfs-sdk";
 import {SelectField} from "./SelectField";
 import {NavPageState} from "../../data/VolatileMemory";
 import {TickController} from "../../TickController";
 import {format} from "numerable";
+import {roundBearing} from "../../data/Coordinates";
 import {Sensors} from "../../Sensors";
 import {SuperNav5Field3} from "../../settings/KLN90BUserSettings";
 import {KLNMagvar} from "../../data/navdata/KLNMagvar";
@@ -48,7 +49,7 @@ export class SuperNav5Field3Selector extends SelectField {
             if (vor !== null) {
                 //6-18 Overriden to DTK, when an arc is active
                 field = SuperNav5Field3.ARC;
-                const radialTrue = this.sensors.in.gps.coords.bearingFrom(vor.lat, vor.lon);
+                const radialTrue = new GeoPoint(vor.lat, vor.lon).bearingTo(this.sensors.in.gps.coords); //#339: the radial is measured at the VOR
                 arc = this.magvar.trueToMag(radialTrue, -vor.magneticVariation);
             }
 
@@ -77,6 +78,6 @@ export class SuperNav5Field3Selector extends SelectField {
         if (degrees === null) {
             return "---°";
         }
-        return `${format(degrees, "000")}°`;
+        return `${format(roundBearing(degrees), "000")}°`;
     }
 }

@@ -89,16 +89,16 @@ describe('NDB page contents (3-50)', () => {
         expect([rows[0], rows[1], rows[4], rows[5]]).toEqual([' OWI       ', 'OTTAWA     ', "N 47°30.00'", "E 11°15.00'"]);
     });
 
-    // Figures 3-153 and 3-154 show the frequency of a database NDB on a whole kHz without a decimal point or a tenth, and
-    // so did every NDB of the KLN 89 trainer (2026-10-07, medium confidence: no half kHz NDB in its database). The page
-    // shows FREQ  251.0. The digits are compared without the blanks, so that the column of the whole number is open
-    it.fails('shows a database NDB on a whole kHz without tenths (3-50, figures 3-153, 3-154, the KLN 89 trainer, #287)', async () => {
+    // Figures 3-153 and 3-154 show the frequency of a database NDB on a whole kHz without a decimal point or a tenth,
+    // the whole number right-aligned in the field. The KLN 89 trainer (2026-10-07, medium confidence: no half
+    // kHz NDB in its database) showed the NDBs of its database without a tenth too, which says nothing about the layout
+    it('shows a database NDB on a whole kHz without tenths (3-50, figures 3-153, 3-154, #287)', async () => {
         await ndbPageOf(ndb('OWI', 47.5, 11.25, {frequencyKHz: 251}));
 
-        expect(Screen.read().rows('R')[3].replace(/ /g, '')).toBe('FREQ251');
+        expect(Screen.read().rows('R')[3]).toBe('FREQ    251');
     });
 
-    // Sibling of the pin above: the page shows the NDB with the whole kHz frequency
+    // Sibling of the test above: the page shows the NDB with the whole kHz frequency
     it('shows the ident and the frequency row of an NDB on a whole kHz (3-50)', async () => {
         await ndbPageOf(ndb('OWI', 47.5, 11.25, {frequencyKHz: 251}));
 

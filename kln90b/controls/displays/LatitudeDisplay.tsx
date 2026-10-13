@@ -33,7 +33,7 @@ export class LatitudeDisplay implements UiElement {
 
         const northSount = this.latitude >= 0 ? "N" : "S";
         const {degrees, minutes} = splitDegreesMinutes(this.latitude);
-        const degreesString = format(degrees, "00");
+        const degreesString = String(degrees).padStart(2, " "); //#230: a degree below 10 is padded with a blank
         const minutesString = format(minutes, "00.00");
 
         return `${northSount} ${degreesString}°${minutesString}'`;

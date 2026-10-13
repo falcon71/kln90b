@@ -89,7 +89,7 @@ export class Ctr2Page extends SixLineHalfPage {
         this.children.get("ctrFrom").text = this.getAirspaceName(wpt.airspaceFrom);
         this.children.get("ctrTo").text = this.getAirspaceName(wpt.airspaceTo);
         this.children.get("vor").text = wpt.wpt.reference1IcaoStruct!.ident.padEnd(5, " ");
-        this.children.get("bearing").bearing = this.props.magvar.trueToMag(wpt.wpt.reference1Radial!);
+        this.children.get("bearing").bearing = this.props.magvar.trueToMag(wpt.wpt.reference1Radial!, wpt.refMagvar ?? undefined); //#362
         this.children.get("dist").distance = wpt.wpt.reference1Distance!;
         this.children.get("lat").latitude = wpt.wpt.lat;
         this.children.get("lon").longitude = wpt.wpt.lon;

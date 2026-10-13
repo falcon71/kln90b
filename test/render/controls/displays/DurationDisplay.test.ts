@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {DurationDisplay} from '../../../../kln90b/controls/displays/DurationDisplay';
+import {DurationDisplay, formatDuration} from '../../../../kln90b/controls/displays/DurationDisplay';
 import {bootUnit} from '../../../harness/boot';
 import {pointFrom} from '../../../harness/flight/geo';
 import {airport} from '../../../harness/navdata/builders';
@@ -40,20 +40,28 @@ describe('DurationDisplay', () => {
         expect(shown(null)).toBe('--:--');
     });
 
-    // The setup sibling of the pins: 59.4 minutes rounds down and stays in the hour
+    // The setup sibling of the #223 tests below: 59.4 minutes rounds down and stays in the hour
     it('shows 59.4 minutes as :59 (5-7)', () => {
         expect(shown(59.4)).toBe('  :59');
     });
 
-    // 3-31, 5-7: the minutes of a duration run from 00 to 59. 59.7 minutes rounds to 1:00 (the figures of 5-7 round); a
-    // unit that truncates would show :59 (the KLN 89 trainer, 2026-10-07, never showed :60). The code rounds the
-    // minutes after splitting off the hour. Pinned on NAV 1, OTH 6, TRI 3, D/T 1 and D/T 4 as well.
-    it.fails('never shows 60 minutes below an hour (3-31, 5-7, #223)', () => {
-        expect(['  :59', ' 1:00']).toContain(shown(59.7));
+    // 3-31, 5-7: the unit rounds the minutes (the figures of 5-7, and the KLN 89 trainer's CAL 1, 2026-10-12), and the
+    // hour rolls over, so the minutes run from 00 to 59: 59.7 minutes are 1:00. Held on NAV 1, OTH 6, TRI 3, D/T 1 and
+    // D/T 4 as well.
+    it('never shows 60 minutes below an hour (3-31, 5-7, #223)', () => {
+        expect(shown(59.7)).toBe(' 1:00');
     });
 
-    it.fails('never shows 60 minutes above an hour (3-31, 5-7, #223)', () => {
-        expect([' 4:59', ' 5:00']).toContain(shown(4 * 60 + 59.7));
+    // The same rule above an hour: 4 h 59.7 min are 5:00
+    it('never shows 60 minutes above an hour (3-31, 5-7, #223)', () => {
+        expect(shown(4 * 60 + 59.7)).toBe(' 5:00');
+    });
+
+    // 5-7: the minutes are rounded, and the rounding carries into the hour: 59.7 minutes are 1:00 (#223)
+    it('carries a rounded 60 minutes into the hour (5-7, #223)', () => {
+        expect(formatDuration(59.7 * 60)).toBe(' 1:00');
+        expect(formatDuration(119.56 * 60, true)).toBe(' 2:00');
+        expect(formatDuration(59.4 * 60)).toBe('  :59');
     });
 });
 

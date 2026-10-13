@@ -82,7 +82,8 @@ describe('APT 1 page on a nearest entry', () => {
 
             expect(Screen.read().rows('R')[0]).toBe(' KBBB      ');
             // KBBB's coordinates, no longer bearing and distance. The longitude row (row 5) is left out of these three
-            // tests: it shows a degree below 10 written with a zero (#230). The latitude row holds the coordinates.
+            // tests: its blank-padded degree below 10 is held by the #230 tests of NAV 2 and the displays. The latitude row holds
+            // the coordinates.
             expect(Screen.read().rows('R')[4]).toBe('N 47°12.00\'');
         });
 
@@ -520,7 +521,7 @@ describe('APT 1 page creating a user airport', () => {
 
     // 5-17 step 8, figures 5-56 to 5-58: USER POS? shows dashed coordinates with the cursor on the latitude; ENT on the
     // latitude moves the cursor to the longitude, ENT on the longitude approves the position. The longitude is typed
-    // at 100 degrees or more, because the keyboard cannot type one below 100 (#109).
+    // at 100 degrees or more (the keyboard types one below 100 as well since #304, with a 0 in the hundreds).
     it('creates the airport at an entered position with USER POS? (5-17)', async () => {
         const unit = await typeFarm();
         await unit.panel.cursorTo('R', 'USER POS?');

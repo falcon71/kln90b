@@ -524,8 +524,7 @@ export class FrontPanel {
     }
 
     /**
-     * Every run of inverted cells on a side: none at a cursor position without a field of its own. Two runs that one plain
-     * "." separates are one field (joinAcrossPoint).
+     * Every run of inverted cells on a side: none at a cursor position without a field of its own.
      */
     private focusedRuns(side: Side): Field[] {
         const s = this.screen();
@@ -544,26 +543,6 @@ export class FrontPanel {
                 }
             }
         }
-        return this.joinAcrossPoint(s, runs);
-    }
-
-    /**
-     * Joins two runs of a row that one plain "." separates: the NDB frequency and DIS editors do not invert their point,
-     * so the digits around it are two runs of one field. The real cursor covers the point (figure 5-74), so the plain
-     * point is a bug (#302); once it is fixed this join can go.
-     */
-    private joinAcrossPoint(s: Screen, runs: Field[]): Field[] {
-        const out: Field[] = [];
-        for (const run of runs) {
-            const prev = out[out.length - 1];
-            const gap = prev === undefined ? -1 : prev.col + prev.text.length;
-            if (prev !== undefined && prev.row === run.row && run.col === gap + 1
-                && s.cell(run.row, gap).ch === '.' && s.cell(run.row, gap).attr === '.') {
-                out[out.length - 1] = {row: prev.row, col: prev.col, text: prev.text + '.' + run.text};
-            } else {
-                out.push(run);
-            }
-        }
-        return out;
+        return runs;
     }
 }

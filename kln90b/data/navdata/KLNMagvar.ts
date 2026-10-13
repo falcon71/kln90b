@@ -1,4 +1,4 @@
-import {LatLonInterface, MagVar} from "@microsoft/msfs-sdk";
+import {Facility, FacilityType, FacilityUtils, LatLonInterface, MagVar, VorFacility} from "@microsoft/msfs-sdk";
 import {Degrees} from "../Units";
 import {CalcTickable} from "../../TickController";
 import {Sensors} from "../../Sensors";
@@ -32,6 +32,18 @@ export class KLNMagvar implements CalcTickable {
 
     public magToTrue(mag: Degrees, magvar: number = this.getCurrentMagvar()): Degrees {
         return MagVar.magneticToTrue(mag, magvar);
+    }
+
+    /**
+     * The variation that turns a true radial from a reference into the magnetic radial the unit shows, east positive.
+     * A VOR (database or user) uses its own published variation; any other waypoint the variation model at its position.
+     * Checked in the KLN 89 trainer, 2026-10-07 (VOR, #280) and 2026-10-12 (airport, NDB, intersection, user waypoint)
+     */
+    public static getReferenceMagvar(ref: Facility): number {
+        if (FacilityUtils.isFacilityType(ref, FacilityType.VOR)) {
+            return -(ref as VorFacility).magneticVariation; //The sim stores a VOR's variation with west positive (Nav2Page)
+        }
+        return MagVar.get(ref);
     }
 
     public getCurrentMagvar(): number {

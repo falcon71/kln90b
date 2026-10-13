@@ -6,6 +6,7 @@ import {SelectField} from "../../controls/selects/SelectField";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {NavMode, NavPageState} from "../../data/VolatileMemory";
 import {format} from "numerable";
+import {roundBearing} from "../../data/Coordinates";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {Sensors} from "../../Sensors";
 import {ModeController} from "../../services/ModeController";
@@ -211,7 +212,7 @@ class ModObsElement implements Field {
     }
 
     private getDisplayValue(): string {
-        return this.modeController.isObsModeActive() ? `${format(this.navState.obsMag, "000")}°` : "---°";
+        return this.modeController.isObsModeActive() ? `${format(roundBearing(this.navState.obsMag), "000")}°` : "---°";
     }
 
     private canObsBeEntered(): boolean {

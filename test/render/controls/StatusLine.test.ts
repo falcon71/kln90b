@@ -224,6 +224,28 @@ describe('status line, the keyboard mode (characterization)', () => {
     });
 });
 
+// The status line mode segment is the 90B's own. The KLN 89 trainer (2026-10-07) shows the OBS course at north as 000,
+// never 360; that rule is applied to this segment by analogy. A course of 359.7 shows as 000, the sibling 359.4 as 359
+describe('status line, the OBS course at north (characterization)', () => {
+    it('characterization: shows the OBS course 359.7 in the mode field as 000 (#263)', async () => {
+        const unit = await onRoute();
+        await unit.panel.obsMode();
+        unit.props.modeController.setObs(359.7);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().status().mode.slice(0, 7)).toBe('enr:000');
+    });
+
+    it('characterization: shows the OBS course 359.4 in the mode field as 359 (#263)', async () => {
+        const unit = await onRoute();
+        await unit.panel.obsMode();
+        unit.props.modeController.setObs(359.4);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().status().mode.slice(0, 7)).toBe('enr:359');
+    });
+});
+
 describe('status line after an ENT prompt (#320)', () => {
     /**
      * MOD 2 with the ent prompt and the boot messages unread; display ticks run until the blink phase (the MSG light is

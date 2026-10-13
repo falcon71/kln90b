@@ -7,10 +7,11 @@ export class SpeedEditor extends Editor<number> {
 
     constructor(bus: EventBus, value: number | null, enterCallback: (text: number) => void) {
         super(bus, [
-            NumberEditorField.createWithBlankMax(9),
+            new NumberEditorField(), //#245: the open field shows its zeros (005), checked in the KLN 89 trainer, 2026-10-08
             new NumberEditorField(),
             new NumberEditorField(),
         ], value, enterCallback);
+        this.setLeadingZeroCells([0, 1]); //#245: 3-18, an entered speed has no leading zeros (  5, 0 KT as   0)
     }
 
     public render(): VNode {

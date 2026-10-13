@@ -135,6 +135,27 @@ describe('Direct To in OBS mode (5-37)', () => {
     });
 });
 
+// The CRS message is the 90B's own (5-37). The KLN 89 trainer (2026-10-07) shows the OBS course at north as 000, never
+// 360; that rule is applied to the course in this message by analogy
+describe('Direct To in OBS mode, the CRS message at north (characterization)', () => {
+    const offLeg = pointFrom(pointBefore(kaaa, abc, 10), 141, 3); // 3 NM right of KAAA - ABC
+
+    // #263: the direct course is 034.2 true; with a variation of 34.5 east at ABC it is 359.7 magnetic, which the CRS
+    // message shows as 000
+    it('characterization: shows a direct course of 359.7 in the CRS message as 000 (#263)', async () => {
+        const variation = courseDeg(offLeg, abc) + 0.3; // the direct course minus this is 359.7
+        const abcNorth = vor('ABC', abc.lat, abc.lon, {magneticVariation: -variation});
+        const unit = await planInObs(offLeg, {obs: 50, abc: abcNorth});
+        await unit.panel.selectPage('R', 'CTR 1');
+
+        await unit.panel.dct();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().status().mode).toBe('d› CRS 000');
+    });
+});
+
 describe('the left side after a direct-to from FPL 0 (#82)', () => {
     /** FPL 0 KAAA, ABC, KBBB; the cursor on ABC, DCT, and the ENT that approves the waypoint page: the direct-to is made */
     async function directToAbcFromFpl0() {

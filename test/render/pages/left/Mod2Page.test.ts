@@ -221,9 +221,10 @@ describe('MOD 2 OBS course knob (spec)', () => {
     });
 });
 
-// 5-35 and the KLN 89 trainer: north shows 000, never 360. On the equator leg the course the unit takes is a hair under
-// 090 (89.99999914 as the unit computes it), so ninety clicks to the left leave a hair under 360, which the row rounds
-// to 360
+// 5-35 and the KLN 89 trainer (2026-10-07): the OBS course shows 000, never 360. On the equator leg the course the unit
+// takes is a hair under 090 (89.99999914 as the unit computes it), so ninety clicks to the left leave a hair under 360,
+// which the row shows as 000 (the 90B pads with zeros). The 89 trainer also showed a bearing going from 359 to 0 and
+// never 360 (2026-10-08, T34)
 describe('MOD 2 OBS course just below north', () => {
     /** The equator leg with the course entered on the unit, and the course turned 90 degrees left (22.5 s of clicks) */
     async function turned90Left() {
@@ -242,7 +243,7 @@ describe('MOD 2 OBS course just below north', () => {
         expect(obs).toBeLessThan(360);
     }, 30_000); // turned90Left clicks the knob 90 times, 22.5 s of simulated time with every tick running
 
-    it.fails('shows a course just below north as 000° (5-35, checked in the KLN 89 trainer, 2026-10-07, #263)', async () => {
+    it('shows a course just below north as 000° (5-35, checked in the KLN 89 trainer, 2026-10-07, #263)', async () => {
         const unit = await turned90Left();
 
         expect(Screen.read().rows('L')[3]).toBe('OBS:000°   ');

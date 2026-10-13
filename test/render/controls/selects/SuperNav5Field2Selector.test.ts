@@ -18,6 +18,18 @@ describe('Super NAV 5 field 2', () => {
         expect(field2()).toBe('Ô079°');
     });
 
+    // #361: the bearing to KDDD is 089.46 true; a variation of 89.86 east makes it 359.6 magnetic, which is 000, the
+    // north rule of #263, and 90.06 east makes it 359.4
+    it('characterization: shows a magnetic bearing of 359.6 as Ô000° (#361)', async () => {
+        await superNav5OnLeg({westNm: 30, magvar: 89.86, storage: {superNav5Field2: SuperNav5Field2.BRG}});
+        expect(field2()).toBe('Ô000°');
+    });
+
+    it('characterization: shows a magnetic bearing of 359.4 as Ô359° (#361)', async () => {
+        await superNav5OnLeg({westNm: 30, magvar: 90.06, storage: {superNav5Field2: SuperNav5Field2.BRG}});
+        expect(field2()).toBe('Ô359°');
+    });
+
     // 3-36: or the radial from the active waypoint, the reciprocal of the bearing: 259
     it('shows the radial from the active waypoint: 259 (3-36)', async () => {
         await superNav5OnLeg({westNm: 30, magvar: 10, storage: {superNav5Field2: SuperNav5Field2.RAD}});

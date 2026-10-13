@@ -429,9 +429,9 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   to fill the ident selectors of the APT, VOR, NDB, INT and SUP pages. It refuses everything the PC keyboard cannot
   send: only `A` to `Z` and `0` to `9` pass (`KLN90BCore.handleKeyboardEvent`, which also maps the numpad digits), and
   a text with any other character throws before the first key goes out. A pilot cannot type a blank, so a cell that
-  needs one (the hundreds cell of a longitude below 100 degrees, the thousands cell of an NDB frequency below 1000 kHz)
-  is entered with the knobs: the inner knob until the blank shows, the outer knob to the next cell, then the digits
-  (`SupPage.test.ts`, `NdbPage.test.ts`). A test of the raw H event presses it with
+  needs one (the thousands cell of an NDB frequency below 1000 kHz) is entered with the knobs: the inner knob until
+  the blank shows, the outer knob to the next cell, then the digits (`NdbPage.test.ts`). The hundreds cell of a
+  longitude takes a typed 0 since #304 (`SupPage.test.ts` still selects it with the knob). A test of the raw H event presses it with
   `unit.panel.press('KLN90B_Internal_Key:RIGHT: ')` and says in a comment that only an aircraft's H event can send
   that character.
 - **`mount(el)`** (`render/mount.ts`) renders a display or control into a detached element, the way a page renders its
@@ -599,10 +599,7 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       character already shows the wanted letter (the VNAV waypoint `ABC` of NAV 4, entering `AAA`) no click has started
       the edit, and the outer knob would leave the field, so `enterIdent` clicks once to start it. `type(side, text)` is
       the keyboard alternative that types the same characters.
-    - `focused(side)` returns the one focused field `{row, col, text}`. Two runs of inverted cells that one plain `.`
-      separates are one field: the NDB frequency and DIS editors invert their digits and not their point, so the DIS
-      field of the INT page reads `___._`. The real cursor covers the point, so the plain point is a bug (#302,
-      section 6).
+    - `focused(side)` returns the one focused field `{row, col, text}`.
       `cursorTo(side, 'USER POS?')` turns the outer knob until that field has the cursor, stepping over the cursor
       positions that focus nothing (the SUP page without user waypoints has one after the ident characters). It turns
       clockwise and, once the cursor stops at the last field, counterclockwise, and throws with the screen after
@@ -866,14 +863,6 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **The IAF list of APT 8 and ACT 8 is placed by the reader, not by layout.** happy-dom computes no CSS positions, so
   `Screen.read()` moves the rows of `.apt-8-iaf-list` by a fixed four cells (section 3). A change of the list's position
   in `KLN90B.scss` would not show in a test; the reader only throws when the list no longer starts in cell 4.
-- **The NDB frequency and DIS editors do not invert their decimal point, which is a bug (#302).**
-  `NdbFreqEditor` and `DistanceEditor` (the NDB frequency and the INT and SUP DIS field) draw the point as plain text,
-  while `VorFreqEditor` and `RadialEditor` invert theirs. Figure 5-74 (5-19) shows the open DIS field as one inverse
-  block with the point inside, like the RAD field of figures 5-72 and 5-73; no figure shows the cursor in the NDB
-  frequency, so its pin extends them. `focused()` and `cursorTo` still join two runs across one plain point
-  (section 4) until the bug is fixed, and then `FrontPanel.joinAcrossPoint` can go. The mask assertion of the DIS
-  field is the pin `covers the decimal point of the DIS field` in `test/render/harness/focused.test.ts`; no snapshot
-  may hold the plain point (section 5).
 - **A class with no visible effect is invisible to the reader.** `Screen` follows the CSS (section 3), so an
   `inverted-blink` left on a cell without `inverted` reads as a plain cell, as it renders. A control that forgets to
   remove the class (the cell under the cursor after the cursor is turned off, for example) passes every mask assertion
@@ -1215,6 +1204,21 @@ its line, in the comment above it or in the title of its `describe`.
   second altitude page, MSG again, ALT closed the altitude pages, MSG again, ALT showed the first altitude page once
   more. So ALT on the message page acts on the altitude page cycle beneath it, which the 90B, with its single ALT
   page, has as a toggle (#335).
+- ETE minutes (#223): CAL 1 rounds to the nearest minute (every reading where rounding and truncation differ came out
+  rounded, among them about 59.9 minutes shown as `1:00`); NAV 1 truncates (`0:03` for 3.7 to 3.5 NM at 59 kt, and the
+  minute drops as the distance passes 3.0) and shows seconds below one minute (`:ss`). The 90B's figures round (5-7),
+  so the unit keeps rounding everywhere; the 89's NAV 1 is recorded, not followed.
+- Distances of 1000 NM and more (#341): a waypoint 1000 NM or more from its entered reference is accepted with no
+  message; its distance shows as whole NM (`1323nm`, `8768nm`, `10011nm`). The four-digit distance places of the
+  waypoint pages and the NAV 2 reference line show 1000 to 9999 NM as digits and dashes from 10000 NM on. Side finding
+  (medium-high): the distances match the WGS-84 ellipsoid and the long-range bearings a sphere (#364).
+- The variation of a reference that is not a VOR (#280): the radial is the true initial bearing at the reference minus
+  the unit's own variation model at the reference's position (about 15.4 E for a user waypoint at 45 N 120 W; 4.2, 5.4
+  and 3.8 W for an airport, an NDB and an intersection near Chicago; a user waypoint at the NDB's position gave the
+  NDB's value). Any waypoint type is accepted as the reference.
+- NAV 2 with the Ref set to a VOR far away (#339): the radial is the true initial bearing at the VOR minus the VOR's own
+  published variation, rounded to whole degrees (309 NM from ORD: 86 shown, the final bearing at the aircraft would
+  give 90; 427 NM from RHI: 116 shown, the final bearing 122).
 
 # 9. Next steps
 
@@ -1356,9 +1360,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 - CTR leads: a recomputation without insertion creates a new user waypoint with the next number (BGD00, then BGD01),
   and the orphans count against the limit until power-off; a crossing without a VOR within 100 NM, or without a free
   number, is dropped silently; when the first waypoint lies in no Center the first crossing is dropped
-  (`AirspacesAlongRoute.cleanup`); `getWaypointIfExistsInFpl` compares coordinates with `===`; CTR 2 converts the radial
-  with the variation at the present position, NAV 2 with the VOR's own (#280 rules the VOR's own for INT, SUP and REF);
-  the status line shows `msg` for one display tick after CTR 1 is selected.
+  (`AirspacesAlongRoute.cleanup`); `getWaypointIfExistsInFpl` compares coordinates with `===`; CTR 2 and NAV 2 convert the
+  radial with the VOR's own variation (#280, #362); the status line shows `msg` for one display tick after CTR 1 is
+  selected.
 
 ## Pages
 
@@ -1414,7 +1418,6 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 
 - **The 4-3 cursor tests** (where the cursor comes on over a numbered plan, #355) sit in `WaypointEditor.test.ts`,
   though their subject is `CursorController`; they could move to `FplPage.test.ts` or a `CursorController` test file.
-- The controls' bugs that the right pages showed (#282) are pinned on the pages and at control level.
 - **Leads** (seen and not confirmed or not filed):
     - Editors: `FreetextEditor.convertFromValue` drops a cell for a stored character outside its charset;
       `MagvarEditor` enters 0°W as -0 and cuts a variation of 100° or more to two digits (polar VORs only);
@@ -1427,11 +1430,10 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       silent); the inches cell of `BaroFieldset` caps at 30.99 while millibars reach 1099; `OthFuelFieldset` shows a
       rounded value and rebuilds from one with a fraction; `MapOrientationSelector` renders an undefined value for a
       stored HDG up without a heading input; `SuperNav5RangeSelector` builds its index with `indexOf`, -1 for a stored
-      scale outside its list; CAL 4 at 9.9° and 999 kt shows an FPM of `1770` for about 17700 (the question #257); the
-      Super NAV 5 fields 2 and 3 round 359.5 to 360 (#263's rule); `AltitudeFieldset` shows `00000` below sea level,
-      while a low-confidence photo of the self-test page shows a negative altitude; `ModObsElement.innerRight` (MOD 2)
-      and `FuelOnBoardSelect.innerRight` return `false` while `innerLeft` returns `true` (no visible effect; the Super
-      NAV 5 case, #238, is fixed in `ObsDtkElement`).
+      scale outside its list; CAL 4 at 9.9° and 999 kt shows an FPM of `1770` for about 17700 (the question #257);
+      `AltitudeFieldset` shows `00000` below sea level, while a low-confidence photo of the self-test page shows a
+      negative altitude; `ModObsElement.innerRight` (MOD 2) and `FuelOnBoardSelect.innerRight` return `false` while
+      `innerLeft` returns `true` (no visible effect; the Super NAV 5 case, #238, is fixed in `ObsDtkElement`).
     - Lists: figures 4-4 and 4-5 read `LOAD INVRT?` in the PDF's text layer while the first waypoint of an empty plan is
       entered, where the code shows LOAD FPL 0? (worth a look at the printed page); the procedure header hides the arrow
       column while focused, and whether its text starts in column 0 or 1 was not checked; `SimpleListItem.tick` toggles

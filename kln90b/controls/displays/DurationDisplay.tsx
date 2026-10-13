@@ -41,13 +41,13 @@ export function formatDuration(duration: Seconds | null, tripForm: boolean = fal
     if (duration === null) {
         return "--:--";
     }
-    const totalMinutes = duration / 60;
+    //#223: round the total minutes first, so 59.5 minutes after a whole hour carry into the next hour instead of
+    //showing :60. The figures of 5-7 round; the KLN 89 trainer's CAL 1 rounds too (2026-10-12)
+    const totalMinutes = Math.round(duration / 60);
     if (totalMinutes / 60 >= 100) {
         return "--:--";
     }
     const hours = Math.floor(totalMinutes / 60);
-
-
     const minutes = totalMinutes % 60;
 
     if (hours === 0) {

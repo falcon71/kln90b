@@ -23,6 +23,7 @@ export class LatitudeEditor extends Editor<Latitude> {
             new NumberEditorField(),
             new NumberEditorField(),
         ], value, enterCallback);
+        this.setLeadingZeroCells([1]); //#230
     }
 
     public render(): VNode {

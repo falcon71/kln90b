@@ -464,6 +464,18 @@ describe('ADJ NAV IND CRS TO nnn, a readable indicator', () => {
         expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 046°']);
     });
 
+    // #361: a DTK of 359.7 magnetic is named 000 in the message, the north rule of #263
+    it('names a DTK of 359.7 as 000° (characterization, #361)', () => {
+        vi.useFakeTimers({toFake: ['Date']});
+        vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
+        const w = quietWorld();
+        w.dtkMag = 359.7;
+        w.obsIn = 10; // more than 5 degrees off
+        const h = harness(w);
+
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 000°']);
+    });
+
     it('does not show at 5 degrees off the DTK (B-1)', () => {
         const {w, h} = readable();
         w.obsIn = 41;

@@ -28,6 +28,7 @@ import {Scanlist} from "../../data/navdata/Scanlist";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {buildIcao, buildIcaoStruct, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {KLNMagvar} from "../../data/navdata/KLNMagvar";
 
 
 type IntPageTypes = {
@@ -220,7 +221,9 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
         const refCoords = new GeoPoint(ref.lat, ref.lon);
         const intCoords = new GeoPoint(facility.lat, facility.lon);
         this.dis = UnitType.GA_RADIAN.convertTo(intCoords.distance(refCoords), UnitType.NMILE);
-        this.rad = refCoords.bearingTo(intCoords); //5-19, figure 5-76 The radial is the initial bearing at the VOR
+        //5-19, figure 5-76 The radial is the initial bearing at the VOR
+        //#280: the radial is magnetic, with the variation of the reference (5-44)
+        this.rad = this.props.magvar.trueToMag(refCoords.bearingTo(intCoords), KLNMagvar.getReferenceMagvar(ref));
     }
 
     private calculateRef() {
@@ -259,7 +262,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
 
             this.props.facilityRepository.update(facility, fac => {
                 const refCoords = new GeoPoint(this.ref!.lat, this.ref!.lon);
-                const newCoords = refCoords.offset(radial, UnitType.NMILE.convertTo(this.dis!, UnitType.GA_RADIAN), new GeoPoint(0, 0));
+                const newCoords = refCoords.offset(this.trueRadial(radial), UnitType.NMILE.convertTo(this.dis!, UnitType.GA_RADIAN), new GeoPoint(0, 0));
                 fac.lat = newCoords.lat;
                 fac.lon = newCoords.lon;
             });
@@ -269,6 +272,11 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
             this.rad = radial;
             this.createIfReady();
         }
+    }
+
+    /** #280: the page keeps the magnetic radial; the geometry needs the true one, converted with the reference in use */
+    private trueRadial(radial: number): number {
+        return this.props.magvar.magToTrue(radial, KLNMagvar.getReferenceMagvar(this.ref!));
     }
 
     private setDist(dist: number) {
@@ -283,7 +291,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
             }
             this.props.facilityRepository.update(facility, fac => {
                 const refCoords = new GeoPoint(this.ref!.lat, this.ref!.lon);
-                const newCoords = refCoords.offset(this.rad!, UnitType.NMILE.convertTo(dist, UnitType.GA_RADIAN), new GeoPoint(0, 0));
+                const newCoords = refCoords.offset(this.trueRadial(this.rad!), UnitType.NMILE.convertTo(dist, UnitType.GA_RADIAN), new GeoPoint(0, 0));
                 fac.lat = newCoords.lat;
                 fac.lon = newCoords.lon;
             });
@@ -346,7 +354,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
 
         if (this.ref !== null && this.rad !== null && this.dis !== null) {
             const refCoords = new GeoPoint(this.ref.lat, this.ref.lon);
-            const newCoords = refCoords.offset(this.rad, UnitType.NMILE.convertTo(this.dis, UnitType.GA_RADIAN), new GeoPoint(0, 0));
+            const newCoords = refCoords.offset(this.trueRadial(this.rad), UnitType.NMILE.convertTo(this.dis, UnitType.GA_RADIAN), new GeoPoint(0, 0));
             lat = newCoords.lat;
             lon = newCoords.lon;
 

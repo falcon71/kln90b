@@ -2,8 +2,8 @@ import {describe, expect, it, vi} from 'vitest';
 import {ICAO, UserFacility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {insertLeg} from '../../../harness/flightplan';
-import {pointFrom} from '../../../harness/flight/geo';
-import {vor} from '../../../harness/navdata/builders';
+import {courseDeg, pointFrom} from '../../../harness/flight/geo';
+import {ndb, vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {savedUserWaypoints} from '../../../harness/storage';
@@ -29,17 +29,17 @@ const REF_DELAY_MS = 9000;
 const rightRows = () => Screen.read().rows('R');
 
 /**
- * Enters an east longitude below 100 degrees into the open longitude field. The hundreds cell shows a blank only
- * with the inner knob, because a pilot cannot type a blank: the PC keyboard sends A to Z and 0 to 9
- * (KLN90BCore.handleKeyboardEvent, #109). So E is typed, the knob sets the blank, and the remaining digits (tens
- * and units of the degrees, then the minutes) are typed in the cells after it.
+ * Enters an east longitude below 100 degrees into the open longitude field. E is typed, the inner knob selects the
+ * hundreds 0 (the open field shows it, #304), and the remaining digits (tens and units of the degrees, then the
+ * minutes) are typed in the cells after it. A pilot could type that 0 as well since #304 (the PC keyboard sends A to Z
+ * and 0 to 9, KLN90BCore.handleKeyboardEvent); the knob step stays as it is.
  */
 async function typeEastBelow100(unit: HeadlessUnit, digits: string): Promise<void> {
     await unit.panel.type('R', 'E');
     await unit.panel.inner('R', 1);
-    // The knob step happened: the hundreds cell is no longer the dash of the typed E. It shows a blank here, though the
-    // real unit shows a 0 (#304), so both are accepted and a fix of #304 leaves this precondition green
-    expect(['E ', 'E0']).toContain(rightRows()[5].slice(0, 2));
+    // The knob step happened: the hundreds cell is no longer the dash of the typed E. The open field shows the
+    // hundreds 0 (#304)
+    expect(rightRows()[5].slice(0, 2)).toBe('E0');
     await unit.panel.outer('R', 1);
     await unit.panel.type('R', digits);
 }
@@ -85,7 +85,7 @@ async function qqWithApprovedRefAbc(o: { magvar?: number, vorVariation?: number 
 const userWaypoint = (unit: HeadlessUnit, ident: string) =>
     KLNFacilityRepository.getRepository(unit.props.bus).get(ICAO.value('U', 'XX', '', ident));
 
-// The DIS row (row 3) is left out: it shows the distance with a leading zero (#282).
+// The DIS row (row 3) is left out: the DIS format has its own tests (#282).
 // With no magnetic variation the RAD row shows the same value either way (#280).
 describe('SUP page (characterization)', () => {
     it('shows a user waypoint with its reference VOR, radial and coordinates', async () => {
@@ -162,7 +162,7 @@ describe('SUP page', () => {
         const rows = rightRows();
         expect(rows[1]).toBe('REF:  ABC  ');
         expect(rows[2]).toBe('RAD: 000.0°');
-        expect(rows[3].slice(5, 9)).toBe('12.0'); // the digits only: the format around them is #282
+        expect(rows[3].slice(5, 9)).toBe('12.0'); // the digits only: the format has its own tests (#282)
     });
 
     // A radial is the course out of the VOR, the initial bearing at the station (figure 5-76; the KLN 89 trainer,
@@ -274,7 +274,7 @@ describe('SUP page', () => {
 
         expect(rightRows().slice(4)).toEqual(["N 46°57.76'", "E 13°25.56'"]);
         // Figure 5-75: the reference waypoint, radial and distance stay on the page. Only the numbers are read: the format
-        // around them is #282
+        // around them has its own tests (#282)
         expect(rightRows()[1]).toBe('REF:  ABC  ');
         expect(rightRows()[2].slice(6, 10)).toBe('90.0');
         expect(rightRows()[3].slice(4, 9)).toBe('120.0');
@@ -370,7 +370,7 @@ describe('SUP page', () => {
         return unit;
     }
 
-    // Sibling of the pin below: the far REF is taken, with the radial due south
+    // Sibling of the test below: the far REF is taken, with the radial due south
     it('takes a reference 1200 NM away (characterization)', async () => {
         const unit = await farReferenceEntered();
 
@@ -378,13 +378,19 @@ describe('SUP page', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // The DIS field has four cells, so 1200 NM does not fit: the page shows `DIS:120.nm ` with a blank tenth and the unit
-    // moved one cell left (DistanceEditor.convertFromValue takes the characters of "1200.0" by position). What the real unit
-    // shows is not known, so the pin asserts the shape of the row only: three cells, the point, one cell, then nm
-    it.fails('does not garble the DIS row for a distance that does not fit the field (#341)', async () => {
+    // USUP at 47.2 N and FAR at 67.2 N on one meridian are 20 degrees apart, 1202.1 NM on the unit's sphere (6378100 m,
+    // 20 x 60.107 NM, distanceNm of flight/geo.ts). The KLN 89 trainer shows whole NM from 1000 NM on (2026-10-12);
+    // where the digits sit in the 90B's five cells (right-aligned) is the code's own layout
+    it('shows the distance of a reference 1200 NM away in whole NM (checked in the KLN 89 trainer, 2026-10-12, #341)', async () => {
         await farReferenceEntered();
 
-        expect(rightRows()[3]).toMatch(/^DIS:[ 0-9_]{3}\.[0-9_]nm$/);
+        expect(rightRows()[3].slice(4).trim()).toBe('1202nm');
+    });
+
+    it('characterization: shows the distance of a reference 1200 NM away right-aligned in the DIS cells (#341)', async () => {
+        await farReferenceEntered();
+
+        expect(rightRows()[3]).toBe('DIS: 1202nm');
     });
 
     // 3-51, 5-19 note: the REF, radial and distance are not stored and are lost when another page is viewed; the page
@@ -405,7 +411,7 @@ describe('SUP page', () => {
     // page and for an entry. Here ABC has a variation of 10 degrees east, the aircraft's position 4 degrees east, so only
     // the VOR's variation gives the expected value: USUP is due north of ABC, radial 350.0 (the local variation would
     // give 356.0). Sibling: 'shows the radial and distance from the nearest VOR' (no variation).
-    it.fails('shows the radial magnetic with the variation of the reference VOR (5-44, the KLN 89 trainer, #280)', async () => {
+    it('shows the radial magnetic with the variation of the reference VOR (5-44, the KLN 89 trainer, #280)', async () => {
         await supPage({magvar: 4, vorVariation: 10});
 
         expect(rightRows()[2]).toBe('RAD: 350.0°');
@@ -414,12 +420,52 @@ describe('SUP page', () => {
     // The same for an entered radial: 350.0 magnetic with 10 degrees east at ABC is 000 true, so QQ is 100.0 NM due north
     // of ABC, 48.66369 N on the sphere the unit computes on (by hand, the textbook formula of the creation test, course
     // 000); the local variation would give another longitude. The distance has three places before the point, so that
-    // this pin still turns red when the leading distance place is fixed too (#282). Sibling: the creation test above.
-    it.fails('takes an entered radial as magnetic with the variation of the reference VOR (5-19, 5-44, the KLN 89 trainer, #280)', async () => {
+    // this test does not depend on the blank of the leading distance place (#282). Sibling: the creation test above.
+    it('takes an entered radial as magnetic with the variation of the reference VOR (5-19, 5-44, the KLN 89 trainer, #280)', async () => {
         const unit = await qqWithApprovedRefAbc({magvar: 4, vorVariation: 10});
         await unit.panel.cursorTo('R', '___._');
         await unit.panel.type('R', '3500');
         await unit.panel.ent();
+        await unit.panel.type('R', '1000');
+        await unit.panel.ent();
+
+        expect(rightRows().slice(4)).toEqual(["N 48°39.82'", "E 10°30.00'"]);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-12: a reference that is not a VOR (an airport, an NDB, an intersection, a
+    // user waypoint) gives the radial with the unit's variation model at the reference's position. Here the variation is
+    // 15 E north of 47.4 N (the NDB XYN at 47.5 N) and 4 E south of it (USUP at 47.2 N, the aircraft at 46.8 N); the
+    // radial from XYN to USUP is 180 true, so 165.0 (the local variation would give 176.0)
+    it('takes the variation at the position of a reference that is not a VOR (checked in the KLN 89 trainer, 2026-10-12, #280)', async () => {
+        const unit = await bootUnit({
+            facilities: [abc(), ndb('XYN', 47.5, 10.5)], position: POSITION, storage: SUPS(),
+            magvar: (lat: number) => lat > 47.4 ? 15 : 4,
+        });
+        await unit.panel.selectPage('R', 'SUP  ');
+        await vi.advanceTimersByTimeAsync(REF_DELAY_MS);
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', 'ABC');
+        await unit.panel.enterIdent('R', 'XYN');
+        await unit.panel.ent();
+        await unit.panel.ent();
+
+        expect(rightRows().slice(1, 3)).toEqual(['REF:  XYN  ', 'RAD: 165.0°']);
+    });
+
+    // #280: the page keeps the magnetic radial it shows and converts it with the reference in use when it moves the
+    // waypoint, so a radial typed before the REF lands as one typed after it (the sibling is the REF-first test above)
+    it('characterization: converts a radial typed before the REF with that REF\'s variation (#280)', async () => {
+        const unit = await createNewQq({magvar: 4, vorVariation: 10});
+        await unit.panel.cursorTo('R', 'USER POS?');
+        await unit.panel.ent();
+        await unit.panel.outer('R', -2); // RAD
+        await unit.panel.type('R', '3500');
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', '_____'); // REF
+        await unit.panel.enterIdent('R', 'ABC');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', '___._'); // DIS
         await unit.panel.type('R', '1000');
         await unit.panel.ent();
 
@@ -436,8 +482,9 @@ describe('SUP page', () => {
 
     // Figures 5-75 and 5-76 show a distance below 100 NM with a blank in front ("DIS: 48.1"), and the KLN 89 trainer
     // (2026-10-07) shows blanks, never zeros, outside the edit field (figure 5-74 shows the zero only in the open edit
-    // field). Figure 3-159 shows a distance below 10 NM as 09.1, so this pin asserts the hundreds digit only.
-    it.fails('shows a blank instead of a leading zero in front of a distance below 100 NM (5-19, the KLN 89 trainer, #282)', async () => {
+    // field). Figure 3-159 shows a distance below 10 NM as 09.1; the 12.0 NM of this page is above that, so the test does not
+    // touch the disagreement.
+    it('shows a blank instead of a leading zero in front of a distance below 100 NM (5-19, the KLN 89 trainer, #282)', async () => {
         await supPage();
 
         expect(rightRows()[3].slice(0, 9)).toBe('DIS: 12.0');
@@ -569,7 +616,7 @@ async function supPageWithCursorOn(text: string): Promise<HeadlessUnit> {
     return unit;
 }
 
-/** The SUP page of USUP with the cursor on the distance, reached from the radial (the text of the distance field changes with #282) */
+/** The SUP page of USUP with the cursor on the distance, reached from the radial */
 async function supPageWithCursorOnDis(): Promise<HeadlessUnit> {
     const unit = await supPageWithCursorOn('000.0');
     await unit.panel.outer('R', 1);
@@ -627,6 +674,40 @@ describe('SUP page, changing a stored user waypoint (characterization)', () => {
         expect(userWaypoint(unit, 'USUP')!.lat).toBeCloseTo(50.32738, 5);
         expect(userWaypoint(unit, 'USUP')!.lon).toBeCloseTo(10.5, 9);
     });
+
+    // A radial is magnetic with the variation of the reference VOR, on entry too (the KLN 89 trainer, 2026-10-07; #280).
+    // ABC has 10 E, the aircraft 4 E, USUP is due north of ABC and shows 350.0. The typed 045.0 is the true 055 course
+    // out of ABC, at the stored distance (the arc of 0.2 degrees, 12.0215 NM); the raw 045 or the aircraft's variation
+    // (049) would put the waypoint elsewhere (pointFrom, flight/geo.ts)
+    it('moves the waypoint to a typed radial magnetic with the variation of the reference VOR (the KLN 89 trainer, 2026-10-07, #280)', async () => {
+        const unit = await supPage({magvar: 4, vorVariation: 10});
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', '350.0');
+
+        await unit.panel.type('R', '0450');
+        await unit.panel.ent();
+
+        const expected = pointFrom({lat: 47.0, lon: 10.5}, 55, 0.2 * Math.PI / 180 * 6378100 / 1852);
+        expect(userWaypoint(unit, 'USUP')!.lat).toBeCloseTo(expected.lat, 6);
+        expect(userWaypoint(unit, 'USUP')!.lon).toBeCloseTo(expected.lon, 6);
+    });
+
+    // As above for a typed distance: the shown radial 350.0 is the true 000 course out of ABC (10 E), so 200.0 NM out
+    // the waypoint lies due north of ABC, on the meridian; the raw 350 would put it west of it (pointFrom, flight/geo.ts)
+    it('moves the waypoint along the radial magnetic with the variation of the reference VOR when a distance is typed (the KLN 89 trainer, 2026-10-07, #280)', async () => {
+        const unit = await supPage({magvar: 4, vorVariation: 10});
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', '350.0');
+        await unit.panel.outer('R', 1);
+        expect(unit.panel.focused('R').row).toBe(3); // precondition: the DIS field
+
+        await unit.panel.type('R', '2000');
+        await unit.panel.ent();
+
+        const expected = pointFrom({lat: 47.0, lon: 10.5}, 0, 200);
+        expect(userWaypoint(unit, 'USUP')!.lat).toBeCloseTo(expected.lat, 6);
+        expect(userWaypoint(unit, 'USUP')!.lon).toBeCloseTo(expected.lon, 6);
+    });
 });
 
 describe('SUP page without a reference VOR (#286)', () => {
@@ -670,8 +751,31 @@ describe('SUP page without a reference VOR (#286)', () => {
 
         expect(unit.takeRejections()).toEqual([]);
         expect(unit.errors).toEqual([]);
-        expect(rightRows()[3].slice(5, 9)).toBe('10.0'); // the digits only: the format around them is #282
+        expect(rightRows()[3].slice(5, 9)).toBe('10.0'); // the digits only: the format has its own tests (#282)
         expect(userWaypoint(unit, 'USUR')!.lat).toBeCloseTo(47.0, 9);
         expect(userWaypoint(unit, 'USUR')!.lon).toBeCloseTo(11.0, 9);
+    });
+});
+
+describe('SUP page, a radial just below north (characterization)', () => {
+    // The only VOR NNN lies 12 NM from USUP on the true course 179.97, so the true radial from NNN to USUP is 359.97
+    // (checked below), which rounds to 360.0. No variation anywhere, so the magnetic radial is the true one. The field
+    // takes 000.0 to 359.9 (T10, for entry), and the code shows north as 000.0. The 89 shows a radial of 0 as 360.0 (the
+    // lead in docs/testing.md, section 9), so the rounding at the top of the range is the code's own form
+    it('characterization: shows a radial of 359.97 from the reference VOR as 000.0 (#340)', async () => {
+        const usup = {lat: 47.2, lon: 10.5};
+        const nnn = pointFrom(usup, 179.97, 12);
+        const radial = courseDeg(nnn, usup);
+        expect(radial).toBeGreaterThanOrEqual(359.95); // precondition: the radial rounds to 360.0 at one decimal
+        expect(radial).toBeLessThan(360);
+        const unit = await bootUnit({
+            facilities: [vor('NNN', nnn.lat, nnn.lon)], position: POSITION, magvar: 0,
+            storage: savedUserWaypoints([{kind: 'sup', ident: 'USUP', ...usup}]),
+        });
+        await unit.panel.selectPage('R', 'SUP  ');
+        await vi.advanceTimersByTimeAsync(REF_DELAY_MS);
+        expect(rightRows()[0]).toBe(' USUP      '); // precondition
+
+        expect(rightRows()[2]).toBe('RAD: 000.0°');
     });
 });

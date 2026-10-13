@@ -27,6 +27,7 @@ import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {TickController} from "../../TickController";
 import {buildIcao, buildIcaoStruct, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {KLNMagvar} from "../../data/navdata/KLNMagvar";
 
 
 type SupPageTypes = {
@@ -217,7 +218,9 @@ export class SupPage extends WaypointPage<UserFacility> {
         const refCoords = new GeoPoint(ref.lat, ref.lon);
         const intCoords = new GeoPoint(facility.lat, facility.lon);
         this.dis = UnitType.GA_RADIAN.convertTo(intCoords.distance(refCoords), UnitType.NMILE);
-        this.rad = refCoords.bearingTo(intCoords); //5-19, figure 5-76 The radial is the initial bearing at the VOR
+        //5-19, figure 5-76 The radial is the initial bearing at the VOR
+        //#280: the radial is magnetic, with the variation of the reference (5-44)
+        this.rad = this.props.magvar.trueToMag(refCoords.bearingTo(intCoords), KLNMagvar.getReferenceMagvar(ref));
     }
 
     private calculateRef() {
@@ -233,7 +236,7 @@ export class SupPage extends WaypointPage<UserFacility> {
             this.props.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(facility.reference1IcaoStruct), facility.reference1IcaoStruct).then(ref => {
                 this.ref = ref; //5-22 This is only set for REF Waypoints
                 this.dis = facility.reference1Distance!;
-                this.rad = facility.reference1Radial!;
+                this.rad = this.props.magvar.trueToMag(facility.reference1Radial!, KLNMagvar.getReferenceMagvar(ref)); //#280: stored true, shown magnetic
                 this.requiresRedraw = true;
             });
             return;
@@ -265,7 +268,7 @@ export class SupPage extends WaypointPage<UserFacility> {
 
             this.props.facilityRepository.update(facility, fac => {
                 const refCoords = new GeoPoint(this.ref!.lat, this.ref!.lon);
-                const newCoords = refCoords.offset(radial, UnitType.NMILE.convertTo(this.dis!, UnitType.GA_RADIAN), new GeoPoint(0, 0));
+                const newCoords = refCoords.offset(this.trueRadial(radial), UnitType.NMILE.convertTo(this.dis!, UnitType.GA_RADIAN), new GeoPoint(0, 0));
                 fac.lat = newCoords.lat;
                 fac.lon = newCoords.lon;
             });
@@ -274,6 +277,11 @@ export class SupPage extends WaypointPage<UserFacility> {
             this.rad = radial;
             this.createIfReady();
         }
+    }
+
+    /** #280: the page keeps the magnetic radial; the geometry needs the true one, converted with the reference in use */
+    private trueRadial(radial: number): number {
+        return this.props.magvar.magToTrue(radial, KLNMagvar.getReferenceMagvar(this.ref!));
     }
 
     private setDist(dist: number) {
@@ -288,7 +296,7 @@ export class SupPage extends WaypointPage<UserFacility> {
             }
             this.props.facilityRepository.update(facility!, fac => {
                 const refCoords = new GeoPoint(this.ref!.lat, this.ref!.lon);
-                const newCoords = refCoords.offset(this.rad!, UnitType.NMILE.convertTo(dist, UnitType.GA_RADIAN), new GeoPoint(0, 0));
+                const newCoords = refCoords.offset(this.trueRadial(this.rad!), UnitType.NMILE.convertTo(dist, UnitType.GA_RADIAN), new GeoPoint(0, 0));
                 fac.lat = newCoords.lat;
                 fac.lon = newCoords.lon;
             });
@@ -351,7 +359,7 @@ export class SupPage extends WaypointPage<UserFacility> {
 
         if (this.ref !== null && this.rad !== null && this.dis !== null) {
             const refCoords = new GeoPoint(this.ref.lat, this.ref.lon);
-            const newCoords = refCoords.offset(this.rad, UnitType.NMILE.convertTo(this.dis, UnitType.GA_RADIAN), new GeoPoint(0, 0));
+            const newCoords = refCoords.offset(this.trueRadial(this.rad), UnitType.NMILE.convertTo(this.dis, UnitType.GA_RADIAN), new GeoPoint(0, 0));
             lat = newCoords.lat;
             lon = newCoords.lon;
             calcRef = false;

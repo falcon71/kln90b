@@ -101,6 +101,26 @@ describe('Super NAV 5 mode row (5-32)', () => {
     });
 });
 
+// The Super NAV 5 mode row is the 90B's own. The KLN 89 trainer (2026-10-07) shows the OBS course at north as 000, never
+// 360; that rule is applied to this row by analogy
+describe('Super NAV 5 mode row at north (characterization)', () => {
+    it('characterization: shows the OBS course 359.7 in the mode field as 000 (#263)', async () => {
+        const {unit} = await enrouteObs();
+        unit.props.modeController.setObs(359.7);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(SuperNav5.read().left[2]).toBe(`${ENR}000`);
+    });
+
+    it('characterization: shows the OBS course 359.4 in the mode field as 359 (#263)', async () => {
+        const {unit} = await enrouteObs();
+        unit.props.modeController.setObs(359.4);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(SuperNav5.read().left[2]).toBe(`${ENR}359`);
+    });
+});
+
 // 3-36: on Super NAV 5 the message prompt sits in the lower left corner of the map; 3-16: it flashes in inverse video
 // while a message is new
 describe('Super NAV 5 message prompt (3-16, 3-36)', () => {

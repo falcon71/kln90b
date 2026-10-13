@@ -69,14 +69,14 @@ describe('FrontPanel.enterIdent (harness)', () => {
 
         // The cursor starts on the first character of each selector. The alphabetically first facility of each type (the
         // one at 47.1, 8.1) shows without any typing, so the screens below, which show the one at 48, 9, prove the typed ident.
-        // The NDB is on a half kHz, because a whole kHz shows a tenth today (#287)
+        // The NDB is on a half kHz, so its frequency shows the tenth; a database NDB on a whole kHz shows none (#287)
         const facilities = () => [vor('ABC', 47.1, 8.1), vor('XYZ', 48.0, 9.0), ndb('NDA', 47.1, 8.1), ndb('NDB', 48.0, 9.0, {frequencyKHz: 350.5}),
             intersection('ALPHA', 47.1, 8.1), intersection('BRAVO', 48.0, 9.0)];
 
         it.each([
-            ['VOR  ', 'XYZ', [' XYZ D     ', 'XYZ        ', '          H', '114.30  0°E', "N 48°00.00'"]],
-            ['NDB  ', 'NDB', [' NDB       ', 'NDB        ', '           ', 'FREQ  350.5', "N 48°00.00'"]],
-            ['INT  ', 'BRAVO', [' BRAVO     ', 'REF:  _____', 'RAD: ___._°', 'DIS:___._nm', "N 48°00.00'"]],
+            ['VOR  ', 'XYZ', [' XYZ D     ', 'XYZ        ', '          H', '114.30  0°E', "N 48°00.00'", "E  9°00.00'"]],
+            ['NDB  ', 'NDB', [' NDB       ', 'NDB        ', '           ', 'FREQ  350.5', "N 48°00.00'", "E  9°00.00'"]],
+            ['INT  ', 'BRAVO', [' BRAVO     ', 'REF:  _____', 'RAD: ___._°', 'DIS:___._nm', "N 48°00.00'", "E  9°00.00'"]],
         ])('enters an ident on the %s page', async (page, ident, expected) => {
             const unit = await bootUnit({facilities: facilities()});
             await unit.panel.selectPage('R', page);
@@ -84,8 +84,8 @@ describe('FrontPanel.enterIdent (harness)', () => {
 
             await unit.panel.enterIdent('R', ident);
 
-            // The longitude row is left out because of #230 (the latitude row still shows the typed facility)
-            expect(Screen.read().rows('R').slice(0, 5)).toEqual(expected);
+            // Row 5, the longitude, shows 9 degrees east with the blank of the degrees below 10 (#230)
+            expect(Screen.read().rows('R').slice(0, 6)).toEqual(expected);
         });
 
         it('enters an ident of the full selector length on the SUP page, where an unknown ident offers to create it', async () => {

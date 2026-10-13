@@ -34,7 +34,7 @@ export class LongitudeDisplay implements UiElement {
 
         const eastWest = this.longitude >= 0 ? "E" : "W";
         const {degrees, minutes} = splitDegreesMinutes(this.longitude);
-        const degreesString = format(degrees, "00").padStart(3, " ");
+        const degreesString = String(degrees).padStart(3, " "); //#230
         const minutesString = format(minutes, "00.00");
 
         return `${eastWest}${degreesString}°${minutesString}'`;

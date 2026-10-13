@@ -17,7 +17,7 @@ export class LongitudeEditor extends Editor<Longitude> {
     }) {
         super(bus, [
             new EastWestEditorField(),
-            NumberEditorField.createWithBlankMax(1),
+            NumberEditorField.createWithMinMax(0, 1), //#304: the open edit shows the hundreds 0 (E008°); helper A blanks it once entered
             new NumberEditorField(),
             new NumberEditorField(),
             NumberEditorField.createWithMinMax(0, 5),
@@ -25,6 +25,7 @@ export class LongitudeEditor extends Editor<Longitude> {
             new NumberEditorField(),
             new NumberEditorField(),
         ], value, enterCallback);
+        this.setLeadingZeroCells([1, 2]); //#230
     }
 
     public render(): VNode {

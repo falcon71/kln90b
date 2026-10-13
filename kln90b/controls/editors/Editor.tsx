@@ -3,6 +3,7 @@ import {EnterResult, Field} from "../../pages/CursorController";
 import {UIElementChildren} from '../../pages/Page';
 import {EditorField, EditorFieldValue} from "./EditorField";
 import {StatusLineMessageEvents} from "../StatusLine";
+import {TickController} from "../../TickController";
 
 
 export type Rawvalue = number[];
@@ -19,9 +20,14 @@ export abstract class Editor<T> implements Field {
     public isReadonly = false;
     public DEFAULT_FIELD_VALUE: EditorFieldValue = null; //this character will be shown in all fields, when the users enters the editor
     protected readonly containerRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
+    /** The cells of an editor that has an idle text (render puts them in this span) */
+    protected readonly cellsRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
+    /** The span that shows the idle text in place of the cells */
+    protected readonly idleRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     protected convertedValue: Rawvalue | null = null;
     protected cursorIndex = 0;
     protected statusLineMessagePublisher: Publisher<StatusLineMessageEvents>;
+    private leadingZeroCells: number[] = [];
 
     protected constructor(bus: EventBus,
                           protected readonly editorFields: EditorField[],
@@ -128,6 +134,7 @@ export abstract class Editor<T> implements Field {
 
         this.applyValueToFields(this.convertedValue);
         this.isEntered = false;
+        this.applyLeadingBlanks();
         this.enterCallback(value);
         return EnterResult.Handled_Move_Focus;
     }
@@ -156,6 +163,35 @@ export abstract class Editor<T> implements Field {
         return this.isEntered;
     }
 
+    /**
+     * A text that the closed field shows in place of its cells, or null to show the cells (#341: a distance that does not
+     * fit the cells). An open edit always shows the cells
+     */
+    protected idleText(): string | null {
+        return null;
+    }
+
+    /** For editors that render cellsRef and idleRef: shows the idle text or the cells. Call it from tick() */
+    protected tickIdleText(): void {
+        if (!TickController.checkRef(this.cellsRef, this.idleRef)) {
+            return;
+        }
+        const text = this.isEntered ? null : this.idleText();
+        if (text === null) {
+            this.idleRef.instance.classList.add("d-none");
+            this.cellsRef.instance.classList.remove("d-none");
+        } else {
+            this.idleRef.instance.textContent = text;
+            this.idleRef.instance.classList.remove("d-none");
+            this.cellsRef.instance.classList.add("d-none");
+            if (this.isFocused) {
+                this.idleRef.instance.classList.add("inverted");
+            } else {
+                this.idleRef.instance.classList.remove("inverted");
+            }
+        }
+    }
+
     protected onCharChanged(): Promise<void> {
         return Promise.resolve();
     }
@@ -172,6 +208,26 @@ export abstract class Editor<T> implements Field {
                 this.editorFields[i].value = value[i];
             }
         }
+        this.applyLeadingBlanks();
+    }
+
+    /**
+     * The cells, in display order, whose zeros are blanked while the edit is closed: from the first up to the first cell
+     * that is not 0. An open edit shows every cell as it is. Checked in the KLN 89 trainer: a degree below 10 shows a
+     * blank once entered and its zeros while edited (2026-10-07, #230), the open longitude shows E008° (2026-10-08, #304)
+     */
+    protected setLeadingZeroCells(cells: number[]): void {
+        this.leadingZeroCells = cells;
+        this.applyLeadingBlanks();
+    }
+
+    private applyLeadingBlanks(): void {
+        let leading = !this.isEntered;
+        for (const i of this.leadingZeroCells) {
+            const field = this.editorFields[i];
+            leading = leading && field.value === 0;
+            field.isBlank = leading;
+        }
     }
 
     protected setEntered(isEntered: boolean) {
@@ -185,6 +241,7 @@ export abstract class Editor<T> implements Field {
             this.applyValueToFields(this.convertedValue);
         }
         this.isEntered = isEntered;
+        this.applyLeadingBlanks();
     }
 
     private incrementCurrentChar() {

@@ -75,12 +75,13 @@ describe('keyboard input of a longitude (3-18, #109)', () => {
         expect(storedLongitudes(unit)).toEqual([120.5]);
     });
 
-    // Half-fixed #25: the hundreds digit of the longitude has the charset [" ", "1"], and a key is matched against the
-    // whole entry, so "0" is rejected. A longitude below 100 degrees cannot be typed, and the cursor does not advance.
-    // The pin asserts what #109 decides: the stored longitude, 8.5 degrees east, and the cells of the entered row that
-    // the zero of the tens (#230) does not touch. 3-18, figure 3-57 shows the entered value with a blank in the
-    // hundreds place and its degrees right-aligned.
-    it.fails('types a longitude below 100 degrees, with a 0 for the hundreds digit (3-18, #109)', async () => {
+    // The hundreds cell of the longitude offers 0 and 1 (#304), so the key "0" is accepted and a longitude below 100
+    // degrees can be typed (the longitude half of #109; the date, runway surface and NDB frequency halves stay open, the
+    // last one pinned in NdbFreqEditor.test.ts). The test asserts
+    // the stored longitude, 8.5 degrees east, and the cells of the entered row: the hundreds and tens are blank once
+    // entered (#230), and 3-18, figure 3-57 shows the entered value with a blank in the hundreds place and its degrees
+    // right-aligned.
+    it('types a longitude below 100 degrees, with a 0 for the hundreds digit (3-18, #109)', async () => {
         const unit = await onLongitude();
         for (const key of ['E', '0', '0', '8', '3', '0', '0', '0']) {
             await type(unit, key);

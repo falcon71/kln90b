@@ -30,7 +30,7 @@ describe('latitude and longitude editors', () => {
         expect(text(new LatitudeEditor(bus, -90, () => undefined))).toBe('S 90°00.00');
     });
 
-    // The longitude side of the same edge: its hundreds cell offers a blank and a 1, which holds the 1 of 180 degrees
+    // The longitude side of the same edge: its hundreds cell offers 0 and 1, which holds the 1 of 180 degrees
     it('shows a longitude of 180 degrees as E180°00.00 (3-8, 3-32, #345)', () => {
         const bus = new EventBus();
 
@@ -77,6 +77,75 @@ describe('latitude and longitude editors at negative zero (checked in the KLN 89
 
         expect(text(new LatitudeEditor(bus, -0, () => undefined)).slice(0, 1)).toBe('N');
         expect(text(new LongitudeEditor(bus, -0, () => undefined)).slice(0, 1)).toBe('E');
+    });
+});
+
+describe('the degrees of an entered coordinate below 10 (#230)', () => {
+    // The trainer showed a degree below 10 padded with a blank once the value is entered (N  8° and W  8°), and zeros
+    // only in the open edit field. The first two tests hold the cases it showed (8° N, 8° E); the 100 degree and zero
+    // cases are ours
+    it('shows the latitude 8°30\' N as N  8°30.00 (checked in the KLN 89 trainer, 2026-10-07, #230)', () => {
+        expect(text(new LatitudeEditor(new EventBus(), 8.5, () => undefined))).toBe('N  8°30.00');
+    });
+
+    it('shows the longitude 8° E as E  8°00.00 (checked in the KLN 89 trainer, 2026-10-07, #230)', () => {
+        expect(text(new LongitudeEditor(new EventBus(), 8, () => undefined))).toBe('E  8°00.00');
+    });
+
+    it('characterization: keeps the zero of a longitude of 100 degrees or more (#230)', () => {
+        expect(text(new LongitudeEditor(new EventBus(), 108, () => undefined))).toBe('E108°00.00');
+    });
+
+    it('characterization: shows the longitude 0° as E  0°00.00 (#230)', () => {
+        expect(text(new LongitudeEditor(new EventBus(), 0, () => undefined))).toBe('E  0°00.00');
+    });
+});
+
+describe('the tens of the degrees of a latitude while its edit opens and closes (#230)', () => {
+    /** A latitude editor of 8.5 degrees, mounted and focused; `shown` ticks the cells (they redraw on a tick) and reads them */
+    const focusedLatitude = () => {
+        const editor = new LatitudeEditor(new EventBus(), 8.5, () => undefined);
+        const mounted = mount(editor);
+        editor.setFocused(true);
+        return {
+            editor, shown: () => {
+                editor.children.walk(cell => cell.tick(false));
+                return mounted.text();
+            },
+        };
+    };
+
+    // The trainer, 2026-10-07: zeros only inside an open edit field. A zero typed into the tens stays a zero there
+    it('shows a typed zero in the tens of an open edit (checked in the KLN 89 trainer, 2026-10-07, #230)', () => {
+        const {editor, shown} = focusedLatitude();
+        expect(shown()).toBe('N  8°30.00'); // precondition: entered, blank tens
+
+        editor.innerRight(); // opens the edit
+        editor.outerRight(); // the tens
+        editor.keyboard('0');
+
+        expect(shown()).toBe('N 0_°__.__');
+    });
+
+    // CLR closes an open edit and brings the old value back (#307); the blank is back with it
+    it('characterization: CLR closes an open edit and the blank tens are back (#230)', () => {
+        const {editor, shown} = focusedLatitude();
+        editor.innerRight();
+        expect(shown()).toBe('N __°__.__'); // precondition: the edit is open
+
+        expect(editor.clear()).toBe(true);
+
+        expect(shown()).toBe('N  8°30.00');
+    });
+
+    it('characterization: leaving the field during an open edit brings the blank tens back (#230)', () => {
+        const {editor, shown} = focusedLatitude();
+        editor.innerRight();
+        expect(shown()).toBe('N __°__.__'); // precondition: the edit is open
+
+        editor.setFocused(false);
+
+        expect(shown()).toBe('N  8°30.00');
     });
 });
 
@@ -320,8 +389,8 @@ describe('longitude editor, the hundreds digit', () => {
 
     // Checked in the KLN 89 trainer, 2026-10-08 (T8, also recorded in #230): while a longitude below 100 degrees is
     // being selected, the open edit field shows the hundreds place as a 0 (E008°); only the entered value shows a
-    // blank. NumberEditorField.createWithBlankMax(1) offers a blank and a 1, so the open field shows a blank (E 08°).
-    it.fails('shows a 0 in the hundreds place while a longitude below 100 degrees ' +
+    // blank. The hundreds cell offers 0 and 1, and the editor blanks the 0 once the value is entered (the test above).
+    it('shows a 0 in the hundreds place while a longitude below 100 degrees ' +
         'is selected (checked in the KLN 89 trainer, 2026-10-08, #304)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 2);
@@ -331,7 +400,7 @@ describe('longitude editor, the hundreds digit', () => {
         expect(rowsL()[3]).toBe("E008°__.__'");
     });
 
-    // The sibling of the pin: the hundreds place offers two choices, one of them a 1
+    // The sibling of the #304 test above: the hundreds place offers two choices, one of them a 1
     it('offers two choices in the hundreds place, one of them a 1 (characterization)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 2);
@@ -506,8 +575,8 @@ describe('longitude editor and the sim keyboard (characterization, sim-only feat
     };
 
     // An early SUP test entered E 10°30.00' with a typed blank. Only the harness's raw key event can carry a
-    // blank. The PC keyboard's space bar (key code 32) is not passed on, so #109 stands for the keyboard: the hundreds
-    // place takes neither a 0 nor a blank, and a longitude below 100 degrees cannot be typed.
+    // blank. The PC keyboard's space bar (key code 32) is not passed on, so the hundreds place ignores it. A pilot
+    // types a longitude below 100 degrees with a 0 in the hundreds place, which the cell takes since #304.
     it('does not pass the space bar on, so the hundreds place stays open', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 2);

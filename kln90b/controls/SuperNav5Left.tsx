@@ -9,6 +9,7 @@ import {SuperNav5Field3Selector} from "./selects/SuperNav5Field3Selector";
 import {SuperNav5RangeSelector} from "./selects/SuperNav5RangeSelector";
 import {NavMode} from "../data/VolatileMemory";
 import {format} from "numerable";
+import {roundBearing} from "../data/Coordinates";
 import {SidStar} from "../data/navdata/SidStar";
 
 type SuperNav5LeftTypes = {
@@ -102,11 +103,11 @@ export class SuperNav5Left implements UiElement {
             case NavMode.ENR_LEG:
                 return "Ê-Ë";
             case NavMode.ENR_OBS:
-                return `Ê${format(this.props.memory.navPage.obsMag, "000")}`;
+                return `Ê${format(roundBearing(this.props.memory.navPage.obsMag), "000")}`;
             case NavMode.ARM_LEG:
                 return "Í-Ë";
             case NavMode.ARM_OBS:
-                return `Í:${format(this.props.memory.navPage.obsMag, "000")}`;
+                return `Í:${format(roundBearing(this.props.memory.navPage.obsMag), "000")}`;
             case NavMode.APR_LEG:
                 return "Ì-Ë";
         }

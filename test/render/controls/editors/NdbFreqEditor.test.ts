@@ -1,4 +1,7 @@
 import {describe, expect, it} from 'vitest';
+import {EventBus} from '@microsoft/msfs-sdk';
+import {NdbFreqEditor} from '../../../../kln90b/controls/editors/NdbFreqEditor';
+import {mountedText} from '../../../harness/render/mount';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {userWaypoints} from '../../../harness/readers';
@@ -71,17 +74,16 @@ describe('NdbFreqEditor on the NDB page (5-18)', () => {
     });
 
     // Figures 5-72 to 5-74 draw the cursor over the RAD and DIS fields of the same chapter with their decimal point
-    // inside the inverse block; no figure shows the cursor in the NDB frequency, so this pin extends those figures to
-    // it (the guide's rule, not a figure of this field). NdbFreqEditor draws the point as plain text
-    it.fails('covers the decimal point with the cursor while the frequency is entered '
-        + '(5-18, extends figures 5-72 to 5-74, #302)', async () => {
+    // inside the inverse block; no figure shows the cursor in the NDB frequency, so the NDB field follows them by
+    // analogy. NdbFreqEditor inverts its point like RadialEditor
+    it('characterization: covers the decimal point with the cursor while the frequency is entered (#302)', async () => {
         const unit = await onFreq();
         await select350(unit);
 
         expect(Screen.read().cell(3, POINT_COL)).toEqual({ch: '.', attr: 'I'});
     });
 
-    // Sibling of the #302 pin: the point is in that cell, the digit in front of it is inverted, and the tenth after
+    // Sibling of the test above: the point is in that cell, the digit in front of it is inverted, and the tenth after
     // it is the cursor's own cell, which flashes (inverse on three display ticks of four, flashing on the fourth)
     it('shows the point between inverted digits while the frequency is entered (5-18)', async () => {
         const unit = await onFreq();
@@ -187,5 +189,31 @@ describe('NdbFreqEditor keyboard', () => {
         await unit.panel.type('R', '3500');
 
         expect(Screen.read().rows('R')[3]).toBe('FREQ  350.0');
+    });
+});
+
+describe('NdbFreqEditor, a database NDB (3-50, #287)', () => {
+    // Figure 3-153 (3-50): a database NDB on a whole kHz shows the integer, right-aligned; figure 5-66 (5-18): a user
+    // NDB keeps its tenth. A database NDB is the read-only editor of the NDB page
+    const readonly = (khz: number) => {
+        const editor = new NdbFreqEditor(new EventBus(), khz, () => undefined);
+        editor.isReadonly = true;
+        return mountedText(editor);
+    };
+
+    it('shows a database NDB on 251 kHz as 251 (3-50, figure 3-153, #287)', () => {
+        expect(readonly(251)).toBe('   251');
+    });
+
+    it('characterization: shows a database NDB on 1025 kHz as 1025 (#287)', () => {
+        expect(readonly(1025)).toBe('  1025');
+    });
+
+    it('characterization: keeps the tenth of a database NDB on a half kHz (#287)', () => {
+        expect(readonly(251.5)).toBe(' 251.5');
+    });
+
+    it('keeps the tenth of a user NDB on a whole kHz (5-18, figure 5-66, #287)', () => {
+        expect(mountedText(new NdbFreqEditor(new EventBus(), 251, () => undefined))).toBe(' 251.0');
     });
 });

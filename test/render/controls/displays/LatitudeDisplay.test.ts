@@ -30,14 +30,14 @@ describe('LatitudeDisplay', () => {
         expect(shown(null)).toBe("- --°--.--'");
     });
 
-    // The setup sibling of the #230 pin: 8°30' north shows its minutes
+    // The setup sibling of the #230 test below: 8°30' north shows its minutes
     it('shows the minutes of a latitude below 10 degrees (3-32)', () => {
         expect(shown(8.5).slice(4)).toBe("°30.00'");
     });
 
     // The Pilot's Guide has no figure of a degree below 10. The KLN 89 trainer (2026-10-07) showed N  8° blank-padded
-    // once confirmed, zeros only inside an open edit field. Pinned on NAV 2 as well.
-    it.fails(
+    // once confirmed, zeros only inside an open edit field. The display pads the degrees with a blank the same way.
+    it(
         'shows a latitude below 10 degrees with a blank (checked in the KLN 89 trainer, 2026-10-07, #230)',
         () => {
             expect(shown(8.5)).toBe("N  8°30.00'");
@@ -75,14 +75,14 @@ describe('LatitudeDisplay', () => {
     });
 });
 
-// Only the hemisphere cell is asserted: the degrees below 10 are the #230 pin above
+// Only the hemisphere cell is asserted: the degrees below 10 are held by the #230 test above
 describe('LatitudeDisplay at the equator', () => {
-    // 3-8, 3-32: the sibling of the pin, a latitude just north of the equator shows N
+    // 3-8, 3-32: a latitude just north of the equator shows N
     it('shows N just north of the equator (3-8, 3-32)', () => {
         expect(shown(0.5).slice(0, 1)).toBe('N');
     });
 
-    // 3-8, 3-32: the sibling of the pin, a latitude just south of the equator shows S
+    // 3-8, 3-32: a latitude just south of the equator shows S
     it('shows S just south of the equator (3-8, 3-32)', () => {
         expect(shown(-0.5).slice(0, 1)).toBe('S');
     });
