@@ -2,7 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {ICAO, UserFacility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {insertLeg} from '../../../harness/flightplan';
-import {pointFrom} from '../../../harness/flight/geo';
+import {courseDeg, pointFrom} from '../../../harness/flight/geo';
 import {vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {collectStatusMessages} from '../../../harness/statusLine';
@@ -673,5 +673,28 @@ describe('SUP page without a reference VOR (#286)', () => {
         expect(rightRows()[3].slice(5, 9)).toBe('10.0'); // the digits only: the format around them is #282
         expect(userWaypoint(unit, 'USUR')!.lat).toBeCloseTo(47.0, 9);
         expect(userWaypoint(unit, 'USUR')!.lon).toBeCloseTo(11.0, 9);
+    });
+});
+
+describe('SUP page, a radial just below north (characterization)', () => {
+    // The only VOR NNN lies 12 NM from USUP on the true course 179.97, so the true radial from NNN to USUP is 359.97
+    // (checked below), which rounds to 360.0. No variation anywhere, so the magnetic radial is the true one. The field
+    // takes 000.0 to 359.9 (T10, for entry), and the code shows north as 000.0. The 89 shows a radial of 0 as 360.0 (the
+    // lead in docs/testing.md, section 9), so the rounding at the top of the range is the code's own form
+    it('characterization: shows a radial of 359.97 from the reference VOR as 000.0 (#340)', async () => {
+        const usup = {lat: 47.2, lon: 10.5};
+        const nnn = pointFrom(usup, 179.97, 12);
+        const radial = courseDeg(nnn, usup);
+        expect(radial).toBeGreaterThanOrEqual(359.95); // precondition: the radial rounds to 360.0 at one decimal
+        expect(radial).toBeLessThan(360);
+        const unit = await bootUnit({
+            facilities: [vor('NNN', nnn.lat, nnn.lon)], position: POSITION, magvar: 0,
+            storage: savedUserWaypoints([{kind: 'sup', ident: 'USUP', ...usup}]),
+        });
+        await unit.panel.selectPage('R', 'SUP  ');
+        await vi.advanceTimersByTimeAsync(REF_DELAY_MS);
+        expect(rightRows()[0]).toBe(' USUP      '); // precondition
+
+        expect(rightRows()[2]).toBe('RAD: 000.0°');
     });
 });

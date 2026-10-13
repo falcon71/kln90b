@@ -3,7 +3,7 @@ import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {EventBus} from '@microsoft/msfs-sdk';
 import {RadialEditor} from '../../../../kln90b/controls/editors/RadialEditor';
 import {vor} from '../../../harness/navdata/builders';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedText} from '../../../harness/render/mount';
 import {Screen} from '../../../harness/render/screen';
 import {userWaypoints} from '../../../harness/readers';
 import {savedUserWaypoints} from '../../../harness/storage';
@@ -166,5 +166,18 @@ describe('RadialEditor on the INT page (characterization)', () => {
         await unit.panel.inner('R', 1);
 
         expect(unit.panel.focused('R').text).toBe('0__._');
+    });
+});
+
+describe('RadialEditor at north (characterization)', () => {
+    // The field takes 000.0 to 359.9 (T10, for entry), and the code shows north as 000.0. The 89 shows a radial of 0 as
+    // 360.0 (the lead in docs/testing.md, section 9), so the rounding at the top of the range is the code's own form:
+    // a radial of 359.97 shows 000.0
+    it('characterization: shows a radial of 359.97 as 000.0 (#340)', () => {
+        expect(mountedText(new RadialEditor(new EventBus(), 359.97, () => {}))).toBe('000.0');
+    });
+
+    it('characterization: shows a radial of 359.94 as 359.9 (#340)', () => {
+        expect(mountedText(new RadialEditor(new EventBus(), 359.94, () => {}))).toBe('359.9');
     });
 });
