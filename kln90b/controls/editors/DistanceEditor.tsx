@@ -1,9 +1,12 @@
 import {Editor, Rawvalue} from "./Editor";
-import {EventBus, FSComponent, VNode} from "@microsoft/msfs-sdk";
+import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NumberEditorField} from "./EditorField";
 import {format} from "numerable";
+import {TickController} from "../../TickController";
 
 export class DistanceEditor extends Editor<number> {
+
+    private dotRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
     constructor(bus: EventBus, value: number | null, enterCallback: (text: number) => void) {
         super(bus, [
@@ -17,7 +20,8 @@ export class DistanceEditor extends Editor<number> {
 
     public render(): VNode {
         return (<span ref={this.containerRef}>
-            {this.editorFields[0].render()}{this.editorFields[1].render()}{this.editorFields[2].render()}.{this.editorFields[3].render()}
+            {this.editorFields[0].render()}{this.editorFields[1].render()}{this.editorFields[2].render()}<span
+            ref={this.dotRef}>.</span>{this.editorFields[3].render()}
         </span>);
     }
 
@@ -33,5 +37,17 @@ export class DistanceEditor extends Editor<number> {
 
     protected convertToValue(rawValue: Rawvalue): Promise<number | null> {
         return Promise.resolve(Number(String(rawValue[0]) + String(rawValue[1]) + String(rawValue[2]) + "." + String(rawValue[3])));
+    }
+
+    tick(blink: boolean): void {
+        super.tick(blink);
+        if (!TickController.checkRef(this.dotRef)) {
+            return;
+        }
+        if (this.isFocused) { //#302: figure 5-74, the cursor covers the point
+            this.dotRef!.instance.classList.add("inverted");
+        } else {
+            this.dotRef!.instance.classList.remove("inverted");
+        }
     }
 }

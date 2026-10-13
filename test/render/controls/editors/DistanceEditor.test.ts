@@ -69,8 +69,8 @@ describe('DistanceEditor on the INT page (5-19)', () => {
     });
 
     // Figure 5-74 draws the cursor over the whole open field, the point included (five inverse cells); figures 5-72 and
-    // 5-73 do the same for RAD, whose editor inverts its point. DistanceEditor draws the point as plain text
-    it.fails('covers the decimal point with the cursor while the distance is entered '
+    // 5-73 do the same for RAD, whose editor inverts its point as DistanceEditor does now
+    it('covers the decimal point with the cursor while the distance is entered '
         + '(5-19, figure 5-74, #302)', async () => {
         const unit = await onDis();
         await unit.panel.type('R', '048');
@@ -78,7 +78,7 @@ describe('DistanceEditor on the INT page (5-19)', () => {
         expect(Screen.read().cell(3, POINT_COL)).toEqual({ch: '.', attr: 'I'});
     });
 
-    // Sibling of the #302 pin: the point is in that cell, the digit in front of it is inverted, and the tenth after
+    // Sibling of the test above: the point is in that cell, the digit in front of it is inverted, and the tenth after
     // it is the cursor's own cell, which flashes (inverse on three display ticks of four, flashing on the fourth)
     it('shows the point between inverted digits while the distance is entered (5-19, figure 5-74)', async () => {
         const unit = await onDis();

@@ -599,10 +599,7 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       character already shows the wanted letter (the VNAV waypoint `ABC` of NAV 4, entering `AAA`) no click has started
       the edit, and the outer knob would leave the field, so `enterIdent` clicks once to start it. `type(side, text)` is
       the keyboard alternative that types the same characters.
-    - `focused(side)` returns the one focused field `{row, col, text}`. Two runs of inverted cells that one plain `.`
-      separates are one field: the NDB frequency and DIS editors invert their digits and not their point, so the DIS
-      field of the INT page reads `___._`. The real cursor covers the point, so the plain point is a bug (#302,
-      section 6).
+    - `focused(side)` returns the one focused field `{row, col, text}`.
       `cursorTo(side, 'USER POS?')` turns the outer knob until that field has the cursor, stepping over the cursor
       positions that focus nothing (the SUP page without user waypoints has one after the ident characters). It turns
       clockwise and, once the cursor stops at the last field, counterclockwise, and throws with the screen after
@@ -866,14 +863,6 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **The IAF list of APT 8 and ACT 8 is placed by the reader, not by layout.** happy-dom computes no CSS positions, so
   `Screen.read()` moves the rows of `.apt-8-iaf-list` by a fixed four cells (section 3). A change of the list's position
   in `KLN90B.scss` would not show in a test; the reader only throws when the list no longer starts in cell 4.
-- **The NDB frequency and DIS editors do not invert their decimal point, which is a bug (#302).**
-  `NdbFreqEditor` and `DistanceEditor` (the NDB frequency and the INT and SUP DIS field) draw the point as plain text,
-  while `VorFreqEditor` and `RadialEditor` invert theirs. Figure 5-74 (5-19) shows the open DIS field as one inverse
-  block with the point inside, like the RAD field of figures 5-72 and 5-73; no figure shows the cursor in the NDB
-  frequency, so its pin extends them. `focused()` and `cursorTo` still join two runs across one plain point
-  (section 4) until the bug is fixed, and then `FrontPanel.joinAcrossPoint` can go. The mask assertion of the DIS
-  field is the pin `covers the decimal point of the DIS field` in `test/render/harness/focused.test.ts`; no snapshot
-  may hold the plain point (section 5).
 - **A class with no visible effect is invisible to the reader.** `Screen` follows the CSS (section 3), so an
   `inverted-blink` left on a cell without `inverted` reads as a plain cell, as it renders. A control that forgets to
   remove the class (the cell under the cursor after the cursor is turned off, for example) passes every mask assertion

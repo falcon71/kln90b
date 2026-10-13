@@ -1,9 +1,12 @@
 import {Editor, Rawvalue} from "./Editor";
-import {EventBus, FSComponent, VNode} from "@microsoft/msfs-sdk";
+import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NumberEditorField} from "./EditorField";
 import {format} from "numerable";
+import {TickController} from "../../TickController";
 
 export class NdbFreqEditor extends Editor<number> {
+
+    private dotRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
     constructor(bus: EventBus, value: number | null, enterCallback: (text: number) => void) {
         super(bus, [
@@ -17,7 +20,8 @@ export class NdbFreqEditor extends Editor<number> {
 
     public render(): VNode {
         return (<span ref={this.containerRef}>
-            {this.editorFields[0].render()}{this.editorFields[1].render()}{this.editorFields[2].render()}{this.editorFields[3].render()}.{this.editorFields[4].render()}
+            {this.editorFields[0].render()}{this.editorFields[1].render()}{this.editorFields[2].render()}{this.editorFields[3].render()}<span
+            ref={this.dotRef}>.</span>{this.editorFields[4].render()}
         </span>);
     }
 
@@ -39,5 +43,17 @@ export class NdbFreqEditor extends Editor<number> {
             return Promise.resolve(null);
         }
         return Promise.resolve(newValue);
+    }
+
+    tick(blink: boolean): void {
+        super.tick(blink);
+        if (!TickController.checkRef(this.dotRef)) {
+            return;
+        }
+        if (this.isFocused) { //#302: figures 5-72 to 5-74 show the cursor over the point of RAD and DIS; extended to this field
+            this.dotRef!.instance.classList.add("inverted");
+        } else {
+            this.dotRef!.instance.classList.remove("inverted");
+        }
     }
 }
