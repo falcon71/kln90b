@@ -1212,6 +1212,10 @@ its line, in the comment above it or in the title of its `describe`.
   message; its distance shows as whole NM (`1323nm`, `8768nm`, `10011nm`). The four-digit distance places of the
   waypoint pages and the NAV 2 reference line show 1000 to 9999 NM as digits and dashes from 10000 NM on. Side finding
   (medium-high): the distances match the WGS-84 ellipsoid and the long-range bearings a sphere (#364).
+- The variation of a reference that is not a VOR (#280): the radial is the true initial bearing at the reference minus
+  the unit's own variation model at the reference's position (about 15.4 E for a user waypoint at 45 N 120 W; 4.2, 5.4
+  and 3.8 W for an airport, an NDB and an intersection near Chicago; a user waypoint at the NDB's position gave the
+  NDB's value). Any waypoint type is accepted as the reference.
 
 # 9. Next steps
 

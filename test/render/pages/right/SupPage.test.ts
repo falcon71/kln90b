@@ -3,7 +3,7 @@ import {ICAO, UserFacility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {insertLeg} from '../../../harness/flightplan';
 import {courseDeg, pointFrom} from '../../../harness/flight/geo';
-import {vor} from '../../../harness/navdata/builders';
+import {ndb, vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {savedUserWaypoints} from '../../../harness/storage';
@@ -411,7 +411,7 @@ describe('SUP page', () => {
     // page and for an entry. Here ABC has a variation of 10 degrees east, the aircraft's position 4 degrees east, so only
     // the VOR's variation gives the expected value: USUP is due north of ABC, radial 350.0 (the local variation would
     // give 356.0). Sibling: 'shows the radial and distance from the nearest VOR' (no variation).
-    it.fails('shows the radial magnetic with the variation of the reference VOR (5-44, the KLN 89 trainer, #280)', async () => {
+    it('shows the radial magnetic with the variation of the reference VOR (5-44, the KLN 89 trainer, #280)', async () => {
         await supPage({magvar: 4, vorVariation: 10});
 
         expect(rightRows()[2]).toBe('RAD: 350.0°');
@@ -420,12 +420,52 @@ describe('SUP page', () => {
     // The same for an entered radial: 350.0 magnetic with 10 degrees east at ABC is 000 true, so QQ is 100.0 NM due north
     // of ABC, 48.66369 N on the sphere the unit computes on (by hand, the textbook formula of the creation test, course
     // 000); the local variation would give another longitude. The distance has three places before the point, so that
-    // this pin does not depend on the blank of the leading distance place (#282). Sibling: the creation test above.
-    it.fails('takes an entered radial as magnetic with the variation of the reference VOR (5-19, 5-44, the KLN 89 trainer, #280)', async () => {
+    // this test does not depend on the blank of the leading distance place (#282). Sibling: the creation test above.
+    it('takes an entered radial as magnetic with the variation of the reference VOR (5-19, 5-44, the KLN 89 trainer, #280)', async () => {
         const unit = await qqWithApprovedRefAbc({magvar: 4, vorVariation: 10});
         await unit.panel.cursorTo('R', '___._');
         await unit.panel.type('R', '3500');
         await unit.panel.ent();
+        await unit.panel.type('R', '1000');
+        await unit.panel.ent();
+
+        expect(rightRows().slice(4)).toEqual(["N 48°39.82'", "E 10°30.00'"]);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-12: a reference that is not a VOR (an airport, an NDB, an intersection, a
+    // user waypoint) gives the radial with the unit's variation model at the reference's position. Here the variation is
+    // 15 E north of 47.4 N (the NDB XYN at 47.5 N) and 4 E south of it (USUP at 47.2 N, the aircraft at 46.8 N); the
+    // radial from XYN to USUP is 180 true, so 165.0 (the local variation would give 176.0)
+    it('takes the variation at the position of a reference that is not a VOR (checked in the KLN 89 trainer, 2026-10-12, #280)', async () => {
+        const unit = await bootUnit({
+            facilities: [abc(), ndb('XYN', 47.5, 10.5)], position: POSITION, storage: SUPS(),
+            magvar: (lat: number) => lat > 47.4 ? 15 : 4,
+        });
+        await unit.panel.selectPage('R', 'SUP  ');
+        await vi.advanceTimersByTimeAsync(REF_DELAY_MS);
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', 'ABC');
+        await unit.panel.enterIdent('R', 'XYN');
+        await unit.panel.ent();
+        await unit.panel.ent();
+
+        expect(rightRows().slice(1, 3)).toEqual(['REF:  XYN  ', 'RAD: 165.0°']);
+    });
+
+    // #280: the page keeps the magnetic radial it shows and converts it with the reference in use when it moves the
+    // waypoint, so a radial typed before the REF lands as one typed after it (the sibling is the REF-first test above)
+    it('characterization: converts a radial typed before the REF with that REF\'s variation (#280)', async () => {
+        const unit = await createNewQq({magvar: 4, vorVariation: 10});
+        await unit.panel.cursorTo('R', 'USER POS?');
+        await unit.panel.ent();
+        await unit.panel.outer('R', -2); // RAD
+        await unit.panel.type('R', '3500');
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', '_____'); // REF
+        await unit.panel.enterIdent('R', 'ABC');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', '___._'); // DIS
         await unit.panel.type('R', '1000');
         await unit.panel.ent();
 
@@ -633,6 +673,40 @@ describe('SUP page, changing a stored user waypoint (characterization)', () => {
 
         expect(userWaypoint(unit, 'USUP')!.lat).toBeCloseTo(50.32738, 5);
         expect(userWaypoint(unit, 'USUP')!.lon).toBeCloseTo(10.5, 9);
+    });
+
+    // A radial is magnetic with the variation of the reference VOR, on entry too (the KLN 89 trainer, 2026-10-07; #280).
+    // ABC has 10 E, the aircraft 4 E, USUP is due north of ABC and shows 350.0. The typed 045.0 is the true 055 course
+    // out of ABC, at the stored distance (the arc of 0.2 degrees, 12.0215 NM); the raw 045 or the aircraft's variation
+    // (049) would put the waypoint elsewhere (pointFrom, flight/geo.ts)
+    it('moves the waypoint to a typed radial magnetic with the variation of the reference VOR (the KLN 89 trainer, 2026-10-07, #280)', async () => {
+        const unit = await supPage({magvar: 4, vorVariation: 10});
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', '350.0');
+
+        await unit.panel.type('R', '0450');
+        await unit.panel.ent();
+
+        const expected = pointFrom({lat: 47.0, lon: 10.5}, 55, 0.2 * Math.PI / 180 * 6378100 / 1852);
+        expect(userWaypoint(unit, 'USUP')!.lat).toBeCloseTo(expected.lat, 6);
+        expect(userWaypoint(unit, 'USUP')!.lon).toBeCloseTo(expected.lon, 6);
+    });
+
+    // As above for a typed distance: the shown radial 350.0 is the true 000 course out of ABC (10 E), so 200.0 NM out
+    // the waypoint lies due north of ABC, on the meridian; the raw 350 would put it west of it (pointFrom, flight/geo.ts)
+    it('moves the waypoint along the radial magnetic with the variation of the reference VOR when a distance is typed (the KLN 89 trainer, 2026-10-07, #280)', async () => {
+        const unit = await supPage({magvar: 4, vorVariation: 10});
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', '350.0');
+        await unit.panel.outer('R', 1);
+        expect(unit.panel.focused('R').row).toBe(3); // precondition: the DIS field
+
+        await unit.panel.type('R', '2000');
+        await unit.panel.ent();
+
+        const expected = pointFrom({lat: 47.0, lon: 10.5}, 0, 200);
+        expect(userWaypoint(unit, 'USUP')!.lat).toBeCloseTo(expected.lat, 6);
+        expect(userWaypoint(unit, 'USUP')!.lon).toBeCloseTo(expected.lon, 6);
     });
 });
 

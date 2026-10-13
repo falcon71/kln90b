@@ -206,8 +206,8 @@ describe('REF page, the radial of the reference waypoint', () => {
     // checked in the KLN 89 trainer, 2026-10-07 (high confidence: the true initial bearing at the VOR minus the VOR's
     // own variation), and 5-44. On the equator a perpendicular to a north-south leg leaves TXK due west, 270 degrees true.
     // The area has 10 degrees of easterly variation and TXK 4, so the radial is 266.0 (a conversion with the local
-    // variation would give 260.0). The SUP page shows the stored true value
-    it.fails('shows RAD as a magnetic radial with the variation of the reference VOR (5-44, the KLN 89 trainer, 2026-10-07, #280)', async () => {
+    // variation would give 260.0). The SUP page converts the stored true value with the variation of TXK
+    it('shows RAD as a magnetic radial with the variation of the reference VOR (5-44, the KLN 89 trainer, 2026-10-07, #280)', async () => {
         const unit = await bootOnEquator();
 
         await enterReference(unit, 'TXK');
