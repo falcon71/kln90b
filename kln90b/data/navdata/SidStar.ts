@@ -38,11 +38,11 @@ import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "./IcaoBuilder";
 import {KLNFacilityRepository} from "./KLNFacilityRepository";
 
 export interface ArcData {
-    beginRadial: Degrees, //The published beginning radial
+    beginRadial: Degrees, //The published beginning radial, true (#365)
     beginPoint: LatLonInterface, //Published Coordinates of the beginning
     entryFacility: Facility, //The point where the aircraft will enter the arc. Somewhere between begin and end
 
-    endRadial: Degrees,
+    endRadial: Degrees, //True (#365)
     endFacility: Facility, //The end waypoint of the arc
     endPoint: LatLonInterface,
 
@@ -612,6 +612,13 @@ export class SidStar {
         const vor = await this.facilityLoader.getFacility(FacilityType.VOR, convertedLeg.leg.originIcaoStruct);
         const vorPoint = new GeoPoint(vor.lat, vor.lon);
 
+        //#365: the published radials are magnetic by the ARINC 424 convention unless trueDegrees is set. They are converted
+        //here with the VOR's own variation, as the SDK does for course legs (getLegTrueCourse)
+        const magvar = KLNMagvar.getReferenceMagvar(vor);
+        const toTrue = (radial: number): number => convertedLeg.leg.trueDegrees ? radial : MagVar.magneticToTrue(radial, magvar);
+        const beginRadial = toTrue(convertedLeg.leg.course);
+        const endRadial = toTrue(convertedLeg.leg.theta);
+
         const circleCenter = new Float64Array(3);
         vorPoint.toCartesian(circleCenter);
 
@@ -619,7 +626,7 @@ export class SidStar {
 
         //Published beginning
         const beginPoint = new GeoPoint(0, 0);
-        vorPoint.offset(convertedLeg.leg.course, UnitType.METER.convertTo(convertedLeg.leg.rho, UnitType.GA_RADIAN), beginPoint);
+        vorPoint.offset(beginRadial, UnitType.METER.convertTo(convertedLeg.leg.rho, UnitType.GA_RADIAN), beginPoint);
 
         //Entry based on current position
         const entryPoint = new GeoPoint(0, 0);
@@ -631,11 +638,11 @@ export class SidStar {
         let start;
         let end;
         if (convertedLeg.leg.turnDirection == LegTurnDirection.Left) {
-            start = convertedLeg.leg.theta;
-            end = convertedLeg.leg.course;
+            start = endRadial;
+            end = beginRadial;
         } else {
-            start = convertedLeg.leg.course;
-            end = convertedLeg.leg.theta;
+            start = beginRadial;
+            end = endRadial;
             //Not sure if it is *always* correct to reverse it for right hand turns, but it seemed to work fine for all procedures as LGKO
             circle.reverse();
         }
@@ -643,7 +650,7 @@ export class SidStar {
         if (!NavMath.bearingIsBetween(radial, start, end)) {
             //Outside of arc, then it defaults to the beginning of the arc
             entryPoint.set(beginPoint);
-            radial = convertedLeg.leg.course;
+            radial = beginRadial;
         }
 
         // noinspection JSDeprecatedSymbols
@@ -674,10 +681,10 @@ export class SidStar {
         }
 
         return {
-            beginRadial: convertedLeg.leg.course,
+            beginRadial: beginRadial,
             beginPoint: beginPoint,
             entryFacility: entryFacility,
-            endRadial: convertedLeg.leg.theta,
+            endRadial: endRadial,
             endFacility: convertedLeg.facility,
             endPoint: endPoint,
             turnDirection: convertedLeg.leg.turnDirection,

@@ -390,6 +390,27 @@ describe('SidStar conversion of procedures to KLN legs', () => {
     // 6-16: the entry lies on the radial the aircraft is on, or at the beginning of the arc when that radial is outside
     // the arc. 1ef2a35 reads the range of a left-hand arc from its end radial to its begin radial.
     describe('the entry of an arc (1ef2a35)', () => {
+        /**
+         * The approach of arcApproach with the arc published in magnetic radials around an ABC of `variationEast` degrees
+         * east (stored as the sim stores it, negated): the fixes lie on the true radials `fromMag + variationEast` and
+         * `toMag + variationEast`. With `trueDegrees` the leg is flagged true and the fixes lie on the radials as given.
+         */
+        function arcApproachE(turn: LegTurnDirection, fromMag: number, toMag: number, variationEast: number, trueDegrees = false) {
+            const abcE = vor('ABC', abc.lat, abc.lon, {magneticVariation: -variationEast});
+            const shift = trueDegrees ? 0 : variationEast;
+            const arcbg = fixAt('ARCBG', fromMag + shift, 10);
+            const arcen = fixAt('ARCEN', toMag + shift, 10);
+            const arc = FlightPlan.createLeg({
+                ...Leg.AF(arcen, abcE, {radiusNm: 10, fromRadial: fromMag, toRadial: toMag, turn}), trueDegrees,
+            });
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{name: 'ARCBG', legs: [Leg.IF(arcbg, FixTypeFlags.IAF), arc, Leg.TF(fafaa, FixTypeFlags.FAF)]}],
+                final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+            });
+            return {app, facs: [abcE, arcbg, arcen, fafaa, mapaa, kprc]};
+        }
+
         it.each([
             ['left arc 270 to 180, aircraft on radial 225', LEFT, 270, 180, 225, 'D225J'],
             ['left arc 270 to 180, aircraft on radial 45, outside the arc: the beginning of the arc', LEFT, 270, 180, 45, 'D270J'],
@@ -419,6 +440,97 @@ describe('SidStar conversion of procedures to KLN legs', () => {
 
             expect(identsOf(legs)[0]).toBe('D225J');
             expect((legs[0].wpt as unknown as { reference1Radial: number }).reference1Radial).toBeCloseTo(235, 0);
+        });
+
+        // 6-16: outside the published arc the entry is its beginning. The published radials are magnetic by the ARINC 424
+        // convention (not from the guide), converted with the VOR's own variation as the SDK does for course legs: with
+        // 10 E, the left arc 270 to 180 magnetic
+        // covers 190 to 280 true. The aircraft on the true 285 (magnetic 275) is outside: the entry is the beginning,
+        // on the true 280, named after the magnetic 270. Read as true, the code put the beginning on the true 270
+        // (named D260J by #363's magnetic name)
+        it('enters a magnetic arc at its published beginning from outside (6-16, #365)', async () => {
+            const {app, facs} = arcApproachE(LEFT, 270, 180, 10);
+            const legs = await convert(facs, at(285, 20), kprc, app);
+
+            expect(identsOf(legs)[0]).toBe('D270J');
+            const begin = pointFrom({lat: abc.lat, lon: abc.lon}, 280, 10);
+            expect(Math.abs(legs[0].wpt.lat - begin.lat)).toBeLessThan(1e-4);
+            expect(Math.abs(legs[0].wpt.lon - begin.lon)).toBeLessThan(1e-4);
+            expect(legs[0].arcData!.beginRadial).toBeCloseTo(280, 6);
+            expect(legs[0].arcData!.endRadial).toBeCloseTo(190, 6);
+        });
+
+        // The aircraft on the true 275 (magnetic 265) is inside the published arc: the entry is on its radial. Read as
+        // true (180 to 270), the code took it for outside and gave the beginning, D260J
+        it('enters a magnetic arc on the aircraft\'s radial from inside (6-16, #365)', async () => {
+            const {app, facs} = arcApproachE(LEFT, 270, 180, 10);
+            const legs = await convert(facs, at(275, 20), kprc, app);
+
+            expect(identsOf(legs)[0]).toBe('D265J');
+        });
+
+        // The right-hand arc 180 to 270 magnetic with 10 E covers the true 190 to 280. Outside, on the true 185 (magnetic
+        // 175): the entry is the beginning, the true 190, named after the magnetic 180. Read as true (180 to 270) the code
+        // took 185 for inside and named it D175J
+        it('enters a magnetic right-hand arc at its published beginning from outside (6-16, #365)', async () => {
+            const {app, facs} = arcApproachE(RIGHT, 180, 270, 10);
+            const legs = await convert(facs, at(185, 20), kprc, app);
+
+            expect(identsOf(legs)[0]).toBe('D180J');
+            const begin = pointFrom({lat: abc.lat, lon: abc.lon}, 190, 10);
+            expect(Math.abs(legs[0].wpt.lat - begin.lat)).toBeLessThan(1e-4);
+            expect(Math.abs(legs[0].wpt.lon - begin.lon)).toBeLessThan(1e-4);
+            expect(legs[0].arcData!.beginRadial).toBeCloseTo(190, 6);
+            expect(legs[0].arcData!.endRadial).toBeCloseTo(280, 6);
+        });
+
+        // Inside, on the true 235 (magnetic 225): the entry is on the aircraft's radial, D225J. The true 235 is inside the
+        // arc read as true as well, so this case holds the right-hand branch of the name only; the next one separates
+        it('enters a magnetic right-hand arc on the aircraft\'s radial from inside (6-16, #365)', async () => {
+            const {app, facs} = arcApproachE(RIGHT, 180, 270, 10);
+            const legs = await convert(facs, at(235, 20), kprc, app);
+
+            expect(identsOf(legs)[0]).toBe('D225J');
+        });
+
+        // The true 275 (magnetic 265) is inside the arc 190 to 280 true and outside 180 to 270 read as true, where the
+        // entry would be the beginning, D170J
+        it('enters a magnetic right-hand arc on a radial that only the converted range contains (6-16, #365)', async () => {
+            const {app, facs} = arcApproachE(RIGHT, 180, 270, 10);
+            const legs = await convert(facs, at(275, 20), kprc, app);
+
+            expect(identsOf(legs)[0]).toBe('D265J');
+        });
+
+        // The recalculation of the entry reads the stored radials, which are true: the aircraft on the true 275 flies
+        // inbound (track 095) to the arc 190 to 280 true (10 E). Stored as published (270 to 180) it would be outside the
+        // arc and the recalculation would return nothing. The track meets the circle on the true 275 (within half a
+        // degree), the magnetic 265
+        it('recalculates the entry of a magnetic arc inside its converted range (6-17, #365)', async () => {
+            const {app, facs} = arcApproachE(LEFT, 270, 180, 10);
+            const where = at(275, 20);
+            const legs = await convert(facs, where, kprc, app);
+            const sensors = {in: {gps: {coords: new GeoPoint(where.lat, where.lon), getTrackTrueRespectingGroundspeed: () => 95}}} as any;
+
+            const data = SidStar.recalculateArcEntryData(legs[0], sensors);
+
+            expect(data).not.toBeNull();
+            expect((data!.entryFacility as unknown as { icaoStruct: { ident: string } }).icaoStruct.ident).toBe('D265J');
+        });
+
+        // The SDK flag trueDegrees (a characterization: no unit source) keeps the radials as given: the left arc 270 to
+        // 180 true, the fixes on the true 270 and 180. The aircraft on the true 275 is outside, so the entry is the
+        // beginning on the true 270, named after the magnetic 260
+        it('characterization: uses the radials of a leg with trueDegrees as given (#365)', async () => {
+            const {app, facs} = arcApproachE(LEFT, 270, 180, 10, true);
+            const legs = await convert(facs, at(275, 20), kprc, app);
+
+            expect(identsOf(legs)[0]).toBe('D260J');
+            const begin = pointFrom({lat: abc.lat, lon: abc.lon}, 270, 10);
+            expect(Math.abs(legs[0].wpt.lat - begin.lat)).toBeLessThan(1e-4);
+            expect(Math.abs(legs[0].wpt.lon - begin.lon)).toBeLessThan(1e-4);
+            expect(legs[0].arcData!.beginRadial).toBeCloseTo(270, 6);
+            expect(legs[0].arcData!.endRadial).toBeCloseTo(180, 6);
         });
 
         // 6-17: the entry is recalculated from the arc as the conversion built it. The aircraft is 20 NM out on the
