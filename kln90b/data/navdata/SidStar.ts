@@ -16,6 +16,7 @@ import {
     LatLonInterface,
     LegTurnDirection,
     LegType,
+    MagVar,
     NavMath,
     Procedure,
     RnavTypeFlags,
@@ -28,6 +29,8 @@ import {
 } from "@microsoft/msfs-sdk";
 import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType, ProcedureInformation} from "../flightplan/Flightplan";
 import {Degrees, NauticalMiles} from "../Units";
+import {roundBearing} from "../Coordinates";
+import {KLNMagvar} from "./KLNMagvar";
 import {format} from "numerable";
 import {Sensors} from "../../Sensors";
 import {NavPageState} from "../VolatileMemory";
@@ -170,8 +173,8 @@ export class SidStar {
             if (NavMath.bearingIsBetween(radial, start, end)) {
                 // noinspection JSDeprecatedSymbols
                 const entryFacility: UserFacility = {
-                    icao: buildIcao('U', TEMPORARY_WAYPOINT, this.getArcEntryName(arcData.vor.icaoStruct.ident, radial, dist)),
-                    icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, this.getArcEntryName(arcData.vor.icaoStruct.ident, radial, dist)),
+                    icao: buildIcao('U', TEMPORARY_WAYPOINT, this.getArcEntryName(arcData.vor.icaoStruct.ident, SidStar.magneticRadial(radial, arcData.vor), dist)),
+                    icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, this.getArcEntryName(arcData.vor.icaoStruct.ident, SidStar.magneticRadial(radial, arcData.vor), dist)),
                     name: "",
                     lat: entryPoint.lat,
                     lon: entryPoint.lon,
@@ -281,9 +284,16 @@ export class SidStar {
     }
 
     /**
+     * 6-6: the name carries the magnetic radial from the arc VOR, with the VOR's own variation (#363)
+     */
+    private static magneticRadial(radial: Degrees, vor: VorFacility): Degrees {
+        return MagVar.trueToMagnetic(radial, KLNMagvar.getReferenceMagvar(vor));
+    }
+
+    /**
      * 6-6, 6-16
      * @param navaid
-     * @param radial
+     * @param radial the magnetic radial from the VOR
      * @param dist
      */
     private static getArcEntryName(navaid: String, radial: Degrees, dist: NauticalMiles): string {
@@ -291,9 +301,9 @@ export class SidStar {
         if (rounded <= 26) {
             const ALPHABET = [' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
-            return `D${format(radial, "000")}${ALPHABET[rounded]}`;
+            return `D${format(roundBearing(radial), "000")}${ALPHABET[rounded]}`;
         } else { // 6-6: beyond 26 NM the first two letters of the DME ident and the radial
-            return `${navaid.substring(0, 2)}${format(radial, "000")}`;
+            return `${navaid.substring(0, 2)}${format(roundBearing(radial), "000")}`;
         }
 
     }
@@ -638,8 +648,8 @@ export class SidStar {
 
         // noinspection JSDeprecatedSymbols
         const entryFacility: UserFacility = {
-            icao: buildIcao('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(vor.icaoStruct.ident, radial, dist)),
-            icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(vor.icaoStruct.ident, radial, dist)),
+            icao: buildIcao('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(vor.icaoStruct.ident, SidStar.magneticRadial(radial, vor), dist)),
+            icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, SidStar.getArcEntryName(vor.icaoStruct.ident, SidStar.magneticRadial(radial, vor), dist)),
             name: "",
             lat: entryPoint.lat,
             lon: entryPoint.lon,

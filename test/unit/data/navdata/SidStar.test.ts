@@ -169,6 +169,15 @@ describe('SidStar.getArcEntryName (#28 063a836)', () => {
     ])('names the arc entry of %s radial %i at %i NM beyond 26 NM', (navaid, radial, dist, name) => {
         expect(getArcEntryName(navaid, radial, dist)).toBe(name);
     });
+
+    // A radial just below north is named 000, never 360 (the north rule of #263): characterization, #363
+    it('characterization: names an entry on the radial 359.6 D000J (#363)', () => {
+        expect(getArcEntryName('ABC', 359.6, 10)).toBe('D000J');
+    });
+
+    it('characterization: names an entry on the radial 359.6 beyond 26 NM AB000 (#363)', () => {
+        expect(getArcEntryName('ABC', 359.6, 30)).toBe('AB000');
+    });
 });
 
 // 6-17: an arc entry is recalculated from the current track: the point where the track meets the arc, ahead of the
@@ -391,6 +400,27 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(identsOf(legs)).toEqual([entry, 'ARCEN', 'FAFAA', 'MAPAA']);
         });
 
+        // 6-6: the name carries the radial from the VOR, which is magnetic with the VOR's own variation (real-world
+        // names match "true minus the station declination", the comment on #363). The aircraft is on the true 235 radial,
+        // the magnetic 225, inside the arc
+        it('names the entry after the magnetic radial (6-6, #363)', async () => {
+            const abcE = vor('ABC', abc.lat, abc.lon, {magneticVariation: -10});
+            const arcbg = fixAt('ARCBG', 280, 10);
+            const arcen = fixAt('ARCEN', 190, 10);
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{
+                    name: 'ARCBG',
+                    legs: [Leg.IF(arcbg, FixTypeFlags.IAF), Leg.AF(arcen, abcE, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: LEFT}), Leg.TF(fafaa, FixTypeFlags.FAF)],
+                }],
+                final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+            });
+            const legs = await convert([abcE, arcbg, arcen, fafaa, mapaa, kprc], at(235, 20), kprc, app);
+
+            expect(identsOf(legs)[0]).toBe('D225J');
+            expect((legs[0].wpt as unknown as { reference1Radial: number }).reference1Radial).toBeCloseTo(235, 0);
+        });
+
         // 6-17: the entry is recalculated from the arc as the conversion built it. The aircraft is 20 NM out on the
         // radial 225 and flies towards the VOR (track 045): its track meets the circle close to the same radial (within half
         // a degree, the great circle bends away from the rhumb line), 10 NM from the VOR, for either direction of the arc (#104).
@@ -409,6 +439,30 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(entry.icaoStruct.ident).toBe('D225J');
             expect(entry.reference1Radial).toBeCloseTo(225, 0);
             expect(entry.reference1Distance).toBeCloseTo(10, 4);
+        });
+
+        // 6-6 gives the name format; that its radial is magnetic comes from the real-world navdata (the comment on #363).
+        // The recalculated entry carries the magnetic radial in its name as well, with the variation of ABC
+        // (10 E, stored -10): the track meets the circle on the true radial 225 (within half a degree), the magnetic 215
+        it('names a recalculated entry after the magnetic radial (6-6, #363)', async () => {
+            const abcE = vor('ABC', abc.lat, abc.lon, {magneticVariation: -10});
+            const arcbg = fixAt('ARCBG', 270, 10);
+            const arcen = fixAt('ARCEN', 180, 10);
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{
+                    name: 'ARCBG',
+                    legs: [Leg.IF(arcbg, FixTypeFlags.IAF), Leg.AF(arcen, abcE, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: LEFT}), Leg.TF(fafaa, FixTypeFlags.FAF)],
+                }],
+                final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+            });
+            const where = at(225, 20);
+            const legs = await convert([abcE, arcbg, arcen, fafaa, mapaa, kprc], where, kprc, app);
+            const sensors = {in: {gps: {coords: new GeoPoint(where.lat, where.lon), getTrackTrueRespectingGroundspeed: () => 45}}} as any;
+
+            const data = SidStar.recalculateArcEntryData(legs[0], sensors)!;
+
+            expect((data.entryFacility as unknown as { icaoStruct: { ident: string } }).icaoStruct.ident).toBe('D215J');
         });
     });
 
