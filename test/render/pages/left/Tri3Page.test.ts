@@ -118,7 +118,7 @@ describe('TRI 3 ETE just under two hours', () => {
         return airport('KBBB', p.lat, p.lon);
     };
 
-    // 5-5: the sibling of the pin below. The route and the ground speed it relies on: 298.9 NM at the TAS of 150 kt
+    // 5-5: the sibling of the #223 test below. The route and the ground speed it relies on: 298.9 NM at the TAS of 150 kt
     it('shows 299nm and 150kt for a trip of 298.9 NM (5-5)', async () => {
         const unit = await bootTri3([kaaa(), far()]);
         await enterRoute(unit, 'KAAA', 'KBBB');
@@ -127,13 +127,12 @@ describe('TRI 3 ETE just under two hours', () => {
         expect(rows[2].slice(0, 5)).toBe('150kt');
     });
 
-    // 5-5, figures 5-12 to 5-16 (ETE 1:14, 1:43, 2:21): the ETE is hours and minutes, h:mm. 119.56 minutes is 2:00
-    // rounded or 1:59 truncated, never 1:60 (the same kind as #99 and #184). The page numbers show the h:mm form only;
-    // that the real unit never shows :60 was checked in the KLN 89 trainer, 2026-10-07. Above an hour, where the
-    // form is the same on every page
-    it.fails('shows 119.56 minutes as 2:00 or 1:59, not 1:60 (5-5, #223)', async () => {
+    // 5-5, figures 5-12 to 5-16 (ETE 1:14, 1:43, 2:21): the ETE is hours and minutes, h:mm. The unit rounds the minutes
+    // (5-7), and the hour rolls over, so 119.56 minutes are 2:00, never 1:60. That the real unit never shows :60 was
+    // checked in the KLN 89 trainer, 2026-10-07 (the same kind as #99 and #184)
+    it('shows 119.56 minutes as 2:00, not 1:60 (5-5, #223)', async () => {
         const unit = await bootTri3([kaaa(), far()]);
         await enterRoute(unit, 'KAAA', 'KBBB');
-        expect([' 2:00', ' 1:59']).toContain(Screen.read().rows('L')[2].slice(6));
+        expect(Screen.read().rows('L')[2].slice(6)).toBe(' 2:00');
     });
 });

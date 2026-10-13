@@ -120,16 +120,17 @@ describe('D/T 4 page', () => {
         expect(Screen.read().rows('R')[0]).toBe('d›KCCC  UTC');
     });
 
-    // 4-13 and the KLN 89 trainer (2026-10-07): a duration never shows 60 minutes. KBBB is 119.2 NM ahead at 120 kt,
-    // 59.6 min, which ETE shows as :60. Either the next whole hour or :59 is accepted, as in the other #223 pins
-    it.fails('never shows 60 minutes (4-13, #223)', async () => {
+    // 4-13, 5-7 and the KLN 89 trainer (2026-10-07): a duration never shows 60 minutes. KBBB is 119.2 NM ahead at 120
+    // kt, 59.6 min, which the unit rounds to the next whole hour (5-7; the hour rolls over, so the minutes run from 00
+    // to 59)
+    it('never shows 60 minutes (4-13, #223)', async () => {
         const {kaaa, abc} = dtWorld();
         const kbbb = airport('KBBB', 47.1 + 119.2 / 60.108, 10.0);
         const unit = await bootMoving([kaaa, abc, kbbb]);
 
         const rows = await show(unit, 'FPL 0');
         expect(rows[0]).toBe('  KBBB  UTC'); // precondition
-        expect(['ETE    1:00', 'ETE     :59']).toContain(rows[5]);
+        expect(rows[5]).toBe('ETE    1:00');
     });
 });
 

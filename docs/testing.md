@@ -1215,6 +1215,10 @@ its line, in the comment above it or in the title of its `describe`.
   second altitude page, MSG again, ALT closed the altitude pages, MSG again, ALT showed the first altitude page once
   more. So ALT on the message page acts on the altitude page cycle beneath it, which the 90B, with its single ALT
   page, has as a toggle (#335).
+- ETE minutes (#223): CAL 1 rounds to the nearest minute (every reading where rounding and truncation differ came out
+  rounded, among them about 59.9 minutes shown as `1:00`); NAV 1 truncates (`0:03` for 3.7 to 3.5 NM at 59 kt, and the
+  minute drops as the distance passes 3.0) and shows seconds below one minute (`:ss`). The 90B's figures round (5-7),
+  so the unit keeps rounding everywhere; the 89's NAV 1 is recorded, not followed.
 
 # 9. Next steps
 

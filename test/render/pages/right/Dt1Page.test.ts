@@ -129,16 +129,16 @@ describe('D/T 1 page', () => {
     });
 
     // 4-11 (hours:minutes), 5-7 and the KLN 89 trainer (2026-10-07): a duration never shows 60 minutes. DEF is 119.2 NM
-    // ahead at 120 kt, 59.6 min, which the page shows as :60. Either the next whole hour or :59 is accepted, as in the
-    // other #223 pins
-    it.fails('never shows 60 minutes (4-11, 5-7, #223)', async () => {
+    // ahead at 120 kt, 59.6 min, which the unit rounds to the next whole hour (5-7; the hour rolls over, so the minutes
+    // run from 00 to 59)
+    it('never shows 60 minutes (4-11, 5-7, #223)', async () => {
         const {kaaa, abc} = dtWorld();
         const def = intersection('DEF', 47.1 + 119.2 / 60.108, 10.0);
         const unit = await bootOnDtWorld({legs: [kaaa, abc, def]});
 
         const rows = await show(unit, 'FPL 0');
         expect(rows[3].slice(0, 4)).toBe('119 '); // precondition: DEF is in the third row
-        expect(['119    1:00', '119     :59']).toContain(rows[3]);
+        expect(rows[3]).toBe('119    1:00');
     });
 });
 

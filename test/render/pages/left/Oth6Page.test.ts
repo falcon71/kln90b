@@ -85,15 +85,15 @@ describe('OTH 6 page, endurance, range and efficiency (5-41)', () => {
         expect(Screen.read().rows('L').slice(2, 6)).toEqual([' ENDUR 3:00', ' RANGE  225', ' NM/GAL 7.5', ' RES: 00020']);
     });
 
-    // 5-41: the endurance is shown in hours and minutes, so a minute never reads 60. 49.95 GAL on board at 10 GAL/HR are
-    // 4 h 59.7 min; the page may round or truncate, but not show 4:60
-    it.fails('never shows 60 minutes of endurance (5-41, #223)', async () => {
+    // 5-41, 5-7: the endurance is shown in hours and minutes, rounded like the other durations (5-7), and the hour rolls
+    // over, so a minute never reads 60. 49.95 GAL on board at 10 GAL/HR are 4 h 59.7 min, which is 5:00
+    it('never shows 60 minutes of endurance (5-41, #223)', async () => {
         await single({fobLb: 299.7, reserve: 0});
 
-        expect([' 4:59', ' 5:00']).toContain(Screen.read().rows('L')[2].slice(6));
+        expect(Screen.read().rows('L')[2].slice(6)).toBe(' 5:00');
     });
 
-    // The sibling of the pin above: the same boot and page with 49 GAL on board, 4 h 54 min
+    // The sibling of the #223 test above: the same boot and page with 49 GAL on board, 4 h 54 min
     it('shows the endurance in hours and minutes (5-41)', async () => {
         await single({fobLb: 294, reserve: 0});
 

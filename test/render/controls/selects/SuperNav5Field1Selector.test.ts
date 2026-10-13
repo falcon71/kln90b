@@ -53,10 +53,11 @@ describe('Super NAV 5 field 1', () => {
 
     // 3-36: the ETE is hours and minutes, so the minutes run from 00 to 59. 59.9 minutes showed 0:60 once
     // (SuperNav5Field1Selector.formatEte rounded the minutes after splitting off the hours, the error of #223 in another
-    // function). Whether the unit rounds or truncates is open (#223), so both forms pass.
-    it('never shows 60 minutes in the ETE (3-36, #312)', async () => {
+    // function). The unit rounds the minutes of a duration (#223, 5-7 and the KLN 89 trainer's CAL 1, 2026-10-12, which
+    // both show CAL 1, not this field), so 3594 s are 59.9 minutes, which round to 60 and show as 1:00.
+    it('never shows 60 minutes in the ETE (3-36, 5-7, #312)', async () => {
         await superNav5OnLeg({westNm: 119.8, storage: {superNav5Field1: SuperNav5Field1.ETE}});
-        expect(['Ð1:00', 'Ð0:59']).toContain(field1());
+        expect(field1()).toBe('Ð1:00');
     });
 
     // 3-36: the ETE field takes h:mm of four characters, so an ETE of 10 hours or more is dashes. The limit applies to

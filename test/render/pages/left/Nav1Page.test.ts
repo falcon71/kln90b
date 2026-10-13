@@ -102,7 +102,7 @@ describe('NAV 1 page', () => {
         expect(Screen.read().rows('L')[5]).toBe('BRG    079°');
     });
 
-    // The setup sibling of the ETE pin: 99.5 NM at 100 kt is 59.7 minutes
+    // The setup sibling of the #223 test below: 99.5 NM at 100 kt is 59.7 minutes
     it('reaches an ETE of 59.7 minutes (3-31)', async () => {
         const unit = await onLeg(99.5, 100);
 
@@ -113,13 +113,13 @@ describe('NAV 1 page', () => {
         expect(rows[4].startsWith('ETE ')).toBe(true);
     });
 
-    // 3-31, 5-7: the ETE is hours and minutes, so the minutes are 00 to 59. 59.7 minutes rounds to 1:00 (the figures of
-    // 5-7 round); a unit that truncates would show :59 (the KLN 89 trainer, 2026-10-07, truncates its NAV 1 ETE and
-    // never showed :60 across the hour). The code rounds the minutes alone and shows :60.
-    it.fails('never shows 60 minutes in the ETE (3-31, 5-7, #223)', async () => {
+    // 3-31, 5-7: the unit rounds the minutes (the figures of 5-7), and the hour rolls over, so the minutes run from 00
+    // to 59: 59.7 minutes are 1:00. The 89's NAV 1 truncates instead (the KLN 89 trainer, 2026-10-12); the 90B keeps
+    // rounding.
+    it('never shows 60 minutes in the ETE (3-31, 5-7, #223)', async () => {
         await onLeg(99.5, 100);
 
-        expect(['ETE    1:00', 'ETE     :59']).toContain(Screen.read().rows('L')[4]);
+        expect(Screen.read().rows('L')[4]).toBe('ETE    1:00');
     });
 
     // The setup sibling of the DIS test of #226: 99.97 NM from KDDD
