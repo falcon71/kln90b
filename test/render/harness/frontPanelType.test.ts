@@ -28,8 +28,8 @@ describe('FrontPanel.type (harness)', () => {
 });
 
 // The PC keyboard path (KLN90BCore.handleKeyboardEvent) sends A to Z and 0 to 9 and nothing else, so a test that
-// types anything else tests a unit no pilot can operate (#109: no pilot can type a blank into the hundreds cell of a
-// longitude)
+// types anything else tests a unit no pilot can operate (no pilot can type a blank; the hundreds cell of a longitude
+// takes a typed 0 since #304)
 describe('FrontPanel.type, the keyboard guard (harness)', () => {
     // press() waits one display tick after each event, and there is no unit here to install the fake timers
     beforeEach(() => vi.useFakeTimers());

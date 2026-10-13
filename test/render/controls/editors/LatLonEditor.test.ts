@@ -30,7 +30,7 @@ describe('latitude and longitude editors', () => {
         expect(text(new LatitudeEditor(bus, -90, () => undefined))).toBe('S 90°00.00');
     });
 
-    // The longitude side of the same edge: its hundreds cell offers a blank and a 1, which holds the 1 of 180 degrees
+    // The longitude side of the same edge: its hundreds cell offers 0 and 1, which holds the 1 of 180 degrees
     it('shows a longitude of 180 degrees as E180°00.00 (3-8, 3-32, #345)', () => {
         const bus = new EventBus();
 
@@ -389,8 +389,8 @@ describe('longitude editor, the hundreds digit', () => {
 
     // Checked in the KLN 89 trainer, 2026-10-08 (T8, also recorded in #230): while a longitude below 100 degrees is
     // being selected, the open edit field shows the hundreds place as a 0 (E008°); only the entered value shows a
-    // blank. NumberEditorField.createWithBlankMax(1) offers a blank and a 1, so the open field shows a blank (E 08°).
-    it.fails('shows a 0 in the hundreds place while a longitude below 100 degrees ' +
+    // blank. The hundreds cell offers 0 and 1, and the editor blanks the 0 once the value is entered (the test above).
+    it('shows a 0 in the hundreds place while a longitude below 100 degrees ' +
         'is selected (checked in the KLN 89 trainer, 2026-10-08, #304)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 2);
@@ -400,7 +400,7 @@ describe('longitude editor, the hundreds digit', () => {
         expect(rowsL()[3]).toBe("E008°__.__'");
     });
 
-    // The sibling of the pin: the hundreds place offers two choices, one of them a 1
+    // The sibling of the #304 test above: the hundreds place offers two choices, one of them a 1
     it('offers two choices in the hundreds place, one of them a 1 (characterization)', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 2);
@@ -575,8 +575,8 @@ describe('longitude editor and the sim keyboard (characterization, sim-only feat
     };
 
     // An early SUP test entered E 10°30.00' with a typed blank. Only the harness's raw key event can carry a
-    // blank. The PC keyboard's space bar (key code 32) is not passed on, so #109 stands for the keyboard: the hundreds
-    // place takes neither a 0 nor a blank, and a longitude below 100 degrees cannot be typed.
+    // blank. The PC keyboard's space bar (key code 32) is not passed on, so the hundreds place ignores it. A pilot
+    // types a longitude below 100 degrees with a 0 in the hundreds place, which the cell takes since #304.
     it('does not pass the space bar on, so the hundreds place stays open', async () => {
         const unit = await coldSet1();
         await unit.panel.outer('L', 2);

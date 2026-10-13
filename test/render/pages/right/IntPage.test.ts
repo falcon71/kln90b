@@ -495,7 +495,7 @@ describe('user intersection (5-18, 5-19)', () => {
 
     // 5-18: the first method needs only the latitude and longitude. 5-19, note and figure 5-76: once the waypoint exists,
     // the page refers it to its closest VOR, whatever reference was used. INT15 is 6.0 NM north of the VOR ORD at 100° E
-    // (the keyboard cannot type a longitude below 100°, #109)
+    // (a longitude below 100° could be typed as well since #304; this test keeps the 100° form)
     it('shows the nearest VOR as REF of a waypoint created from its position (5-18, 5-19)', async () => {
         const unit = await bootUnit({facilities: [kenzy(), vor('ORD', 47.0, 100.0)], position: {lat: 47, lon: 8}});
         await unit.panel.selectPage('R', 'INT  ');

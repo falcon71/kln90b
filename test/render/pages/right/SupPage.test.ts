@@ -29,17 +29,17 @@ const REF_DELAY_MS = 9000;
 const rightRows = () => Screen.read().rows('R');
 
 /**
- * Enters an east longitude below 100 degrees into the open longitude field. The hundreds cell shows a blank only
- * with the inner knob, because a pilot cannot type a blank: the PC keyboard sends A to Z and 0 to 9
- * (KLN90BCore.handleKeyboardEvent, #109). So E is typed, the knob sets the blank, and the remaining digits (tens
- * and units of the degrees, then the minutes) are typed in the cells after it.
+ * Enters an east longitude below 100 degrees into the open longitude field. E is typed, the inner knob selects the
+ * hundreds 0 (the open field shows it, #304), and the remaining digits (tens and units of the degrees, then the
+ * minutes) are typed in the cells after it. A pilot could type that 0 as well since #304 (the PC keyboard sends A to Z
+ * and 0 to 9, KLN90BCore.handleKeyboardEvent); the knob step stays as it is.
  */
 async function typeEastBelow100(unit: HeadlessUnit, digits: string): Promise<void> {
     await unit.panel.type('R', 'E');
     await unit.panel.inner('R', 1);
-    // The knob step happened: the hundreds cell is no longer the dash of the typed E. It shows a blank here, though the
-    // real unit shows a 0 (#304), so both are accepted and a fix of #304 leaves this precondition green
-    expect(['E ', 'E0']).toContain(rightRows()[5].slice(0, 2));
+    // The knob step happened: the hundreds cell is no longer the dash of the typed E. The open field shows the
+    // hundreds 0 (#304)
+    expect(rightRows()[5].slice(0, 2)).toBe('E0');
     await unit.panel.outer('R', 1);
     await unit.panel.type('R', digits);
 }

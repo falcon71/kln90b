@@ -429,9 +429,9 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   to fill the ident selectors of the APT, VOR, NDB, INT and SUP pages. It refuses everything the PC keyboard cannot
   send: only `A` to `Z` and `0` to `9` pass (`KLN90BCore.handleKeyboardEvent`, which also maps the numpad digits), and
   a text with any other character throws before the first key goes out. A pilot cannot type a blank, so a cell that
-  needs one (the hundreds cell of a longitude below 100 degrees, the thousands cell of an NDB frequency below 1000 kHz)
-  is entered with the knobs: the inner knob until the blank shows, the outer knob to the next cell, then the digits
-  (`SupPage.test.ts`, `NdbPage.test.ts`). A test of the raw H event presses it with
+  needs one (the thousands cell of an NDB frequency below 1000 kHz) is entered with the knobs: the inner knob until
+  the blank shows, the outer knob to the next cell, then the digits (`NdbPage.test.ts`). The hundreds cell of a
+  longitude takes a typed 0 since #304 (`SupPage.test.ts` still selects it with the knob). A test of the raw H event presses it with
   `unit.panel.press('KLN90B_Internal_Key:RIGHT: ')` and says in a comment that only an aircraft's H event can send
   that character.
 - **`mount(el)`** (`render/mount.ts`) renders a display or control into a detached element, the way a page renders its
