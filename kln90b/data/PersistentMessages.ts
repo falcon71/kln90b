@@ -2,6 +2,7 @@ import {PageProps} from "../pages/Page";
 import {Sensors} from "../Sensors";
 import {ModeController} from "../services/ModeController";
 import {format} from "numerable";
+import {roundBearing} from "./Coordinates";
 import {NavMath} from "@microsoft/msfs-sdk";
 import {NavMode, NavPageState} from "./VolatileMemory";
 import {KLNFixType} from "./flightplan/Flightplan";
@@ -62,7 +63,7 @@ class AdjustCourseToWithObsReadingMessage implements Message {
             return false;
         }
 
-        this.message = [`ADJ NAV IND CRS TO ${format(dtk, "000")}°`];
+        this.message = [`ADJ NAV IND CRS TO ${format(roundBearing(dtk), "000")}°`];
 
         if (this.lastCourse === null || Math.abs(NavMath.diffAngle(this.lastCourse, dtk)) > 5) {
             //First part: Whenever turn changes to more than 5 degress

@@ -17,6 +17,17 @@ describe('Super NAV 5 field 3', () => {
         expect(field3()).toBe('Ö080°');
     });
 
+    // #361: a magnetic track of 359.6 is 000, the north rule of #263
+    it('characterization: shows a magnetic track of 359.6 as Ö000° (#361)', async () => {
+        await superNav5OnLeg({westNm: 30, magvar: 90.4, storage: {superNav5Field3: SuperNav5Field3.TK}});
+        expect(field3()).toBe('Ö000°');
+    });
+
+    it('characterization: shows a magnetic track of 359.4 as Ö359° (#361)', async () => {
+        await superNav5OnLeg({westNm: 30, magvar: 90.6, storage: {superNav5Field3: SuperNav5Field3.TK}});
+        expect(field3()).toBe('Ö359°');
+    });
+
     // 3-36: the radial from the active waypoint: 259
     it('shows the radial from the active waypoint: 259 (3-36)', async () => {
         await superNav5OnLeg({westNm: 30, magvar: 10, storage: {superNav5Field3: SuperNav5Field3.RAD}});

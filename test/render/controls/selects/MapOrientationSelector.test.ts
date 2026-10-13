@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {HeadlessUnit} from '../../../harness/boot';
+import {HeadlessUnit, moveAircraft} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {storedSetting} from '../../../harness/storage';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
@@ -45,6 +45,30 @@ describe('map orientation selector', () => {
 
         expect(Screen.read().rows('L')[5].slice(0, 4)).toBe('050°');
         expect(Screen.read().maskRows('L')[5].slice(0, 4)).toBe('....');
+    });
+});
+
+describe('map orientation selector at north (characterization, #361)', () => {
+    /** TK up on NAV 5, the aircraft at KAAA on the true track 090 with the given variation (east), away from the cursor */
+    async function trackUp(magvar: number): Promise<HeadlessUnit> {
+        const unit = await bootOnStandardRoute({storage: {nav5MapOrientation: 2}, magvar});
+        await unit.panel.selectPage('L', 'NAV 5');
+        await moveAircraft(unit, {lat: 47.0, lon: 8.0}, {groundspeedKt: 120, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(1000);
+        return unit;
+    }
+
+    // #361: a magnetic track of 359.6 is 000, the north rule of #263
+    it('characterization: shows a magnetic track of 359.6 as 000° (#361)', async () => {
+        await trackUp(90.4);
+
+        expect(Screen.read().rows('L')[5].slice(0, 4)).toBe('000°');
+    });
+
+    it('characterization: shows a magnetic track of 359.4 as 359° (#361)', async () => {
+        await trackUp(90.6);
+
+        expect(Screen.read().rows('L')[5].slice(0, 4)).toBe('359°');
     });
 });
 

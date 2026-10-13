@@ -1431,11 +1431,10 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       silent); the inches cell of `BaroFieldset` caps at 30.99 while millibars reach 1099; `OthFuelFieldset` shows a
       rounded value and rebuilds from one with a fraction; `MapOrientationSelector` renders an undefined value for a
       stored HDG up without a heading input; `SuperNav5RangeSelector` builds its index with `indexOf`, -1 for a stored
-      scale outside its list; CAL 4 at 9.9° and 999 kt shows an FPM of `1770` for about 17700 (the question #257); the
-      Super NAV 5 fields 2 and 3 round 359.5 to 360 (#263's rule); `AltitudeFieldset` shows `00000` below sea level,
-      while a low-confidence photo of the self-test page shows a negative altitude; `ModObsElement.innerRight` (MOD 2)
-      and `FuelOnBoardSelect.innerRight` return `false` while `innerLeft` returns `true` (no visible effect; the Super
-      NAV 5 case, #238, is fixed in `ObsDtkElement`).
+      scale outside its list; CAL 4 at 9.9° and 999 kt shows an FPM of `1770` for about 17700 (the question #257);
+      `AltitudeFieldset` shows `00000` below sea level, while a low-confidence photo of the self-test page shows a
+      negative altitude; `ModObsElement.innerRight` (MOD 2) and `FuelOnBoardSelect.innerRight` return `false` while
+      `innerLeft` returns `true` (no visible effect; the Super NAV 5 case, #238, is fixed in `ObsDtkElement`).
     - Lists: figures 4-4 and 4-5 read `LOAD INVRT?` in the PDF's text layer while the first waypoint of an empty plan is
       entered, where the code shows LOAD FPL 0? (worth a look at the printed page); the procedure header hides the arrow
       column while focused, and whether its text starts in column 0 or 1 was not checked; `SimpleListItem.tick` toggles

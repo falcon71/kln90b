@@ -3,6 +3,7 @@ import {SelectField} from "./SelectField";
 import {NavPageState} from "../../data/VolatileMemory";
 import {TickController} from "../../TickController";
 import {format} from "numerable";
+import {roundBearing} from "../../data/Coordinates";
 import {Sensors} from "../../Sensors";
 import {SuperNav5Field2} from "../../settings/KLN90BUserSettings";
 import {UIElementChildren} from "../../pages/Page";
@@ -89,6 +90,6 @@ export class SuperNav5Field2Selector extends SelectField {
         if (degrees === null) {
             return "---°";
         }
-        return `${format(degrees, "000")}°`;
+        return `${format(roundBearing(degrees), "000")}°`;
     }
 }

@@ -1,5 +1,8 @@
+import {EventBus} from '@microsoft/msfs-sdk';
 import {describe, expect, it} from 'vitest';
+import {BearingEditor} from '../../../../kln90b/controls/editors/BearingEditor';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
+import {mountedText} from '../../../harness/render/mount';
 import {Screen} from '../../../harness/render/screen';
 import {collectStatusMessages} from '../../../harness/statusLine';
 
@@ -86,5 +89,17 @@ describe('BearingEditor on SET 1 (characterization)', () => {
         await unit.panel.inner('L', 1);
 
         expect(unit.panel.focused('L').text).toBe('0__');
+    });
+});
+
+describe('BearingEditor at north (characterization, #361)', () => {
+    // The SET 1 track is magnetic in [0, 360); 359.6 is shown as 000, the north rule of #263, and a value the field
+    // itself refuses (360) is never shown
+    it('characterization: shows a track of 359.6 as 000 (#361)', () => {
+        expect(mountedText(new BearingEditor(new EventBus(), 359.6, () => {}))).toBe('000');
+    });
+
+    it('characterization: shows a track of 359.4 as 359 (#361)', () => {
+        expect(mountedText(new BearingEditor(new EventBus(), 359.4, () => {}))).toBe('359');
     });
 });

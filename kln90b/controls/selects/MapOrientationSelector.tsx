@@ -3,6 +3,7 @@ import {SelectField} from "./SelectField";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {TickController} from "../../TickController";
 import {format} from "numerable";
+import {roundBearing} from "../../data/Coordinates";
 import {Sensors} from "../../Sensors";
 import {Nav5Orientation} from "../../settings/KLN90BUserSettings";
 import {ModeController} from "../../services/ModeController";
@@ -64,6 +65,6 @@ export class MapOrientationSelector extends SelectField {
         if (degrees === null) {
             return "---°";
         }
-        return `${format(degrees, "000")}°`;
+        return `${format(roundBearing(degrees), "000")}°`;
     }
 }
