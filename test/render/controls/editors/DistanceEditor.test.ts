@@ -3,7 +3,7 @@ import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {EventBus} from '@microsoft/msfs-sdk';
 import {DistanceEditor} from '../../../../kln90b/controls/editors/DistanceEditor';
 import {vor} from '../../../harness/navdata/builders';
-import {mount} from '../../../harness/render/mount';
+import {mount, mountedText} from '../../../harness/render/mount';
 import {Screen} from '../../../harness/render/screen';
 import {userWaypoints} from '../../../harness/readers';
 import {blinkCycle} from '../../../harness/render/blink';
@@ -208,5 +208,57 @@ describe('DistanceEditor, an entered distance (3-50, 5-19, #282)', () => {
         [0.4, '  0.4'],
     ])('characterization: shows %f as "%s" (#282)', (nm, text) => {
         expect(mount(new DistanceEditor(new EventBus(), nm, () => undefined)).text()).toBe(text);
+    });
+});
+
+describe('DistanceEditor, a distance of 1000 NM or more (#341)', () => {
+    // Checked in the KLN 89 trainer, 2026-10-12: a reference 1000 NM or more away is accepted, and the distance shows as
+    // whole NM (1323nm, 10011nm), no dashes and no message. Where the digits sit in the 90B's five cells is the code's
+    // own layout: right-aligned, as the tenths of a smaller distance end there
+    it.each([
+        [1202.2, ' 1202'],
+        [10011, '10011'],
+        [999.95, ' 1000'],
+    ])('characterization: shows %f as "%s" (#341)', (nm, text) => {
+        expect(mountedText(new DistanceEditor(new EventBus(), nm, () => undefined))).toBe(text);
+    });
+
+    // Sibling: just below the cutoff the distance keeps its tenth
+    it('characterization: shows 999.94 as 999.9 (#341)', () => {
+        expect(mountedText(new DistanceEditor(new EventBus(), 999.94, () => undefined))).toBe('999.9');
+    });
+
+    it('characterization: inverts the whole distance under the cursor (#341)', () => {
+        const editor = new DistanceEditor(new EventBus(), 1202.2, () => undefined);
+        const m = mount(editor);
+        editor.setFocused(true);
+        m.tick();
+
+        expect(m.mask()).toBe('IIIII');
+    });
+
+    // The inverse of the idle text goes with the cursor: focus, tick, unfocus, tick
+    it('characterization: takes the inverse off the distance when the cursor leaves (#341)', () => {
+        const editor = new DistanceEditor(new EventBus(), 1202.2, () => undefined);
+        const m = mount(editor);
+        editor.setFocused(true);
+        m.tick();
+        expect(m.mask()).toBe('IIIII'); // precondition
+        editor.setFocused(false);
+        m.tick();
+
+        expect(m.mask()).toBe('.....');
+    });
+
+    // An open edit shows its cells: the first click gives the opening 0, as for any other distance
+    it('characterization: shows the cells while the edit is open (#341)', () => {
+        const editor = new DistanceEditor(new EventBus(), 1202.2, () => undefined);
+        const m = mount(editor);
+        editor.setFocused(true);
+        editor.innerRight();
+        m.tick();
+        editor.children.walk(cell => cell.tick(false)); // the page ticks the cells; mount ticks the editor only
+
+        expect(m.text()).toBe('0__._');
     });
 });

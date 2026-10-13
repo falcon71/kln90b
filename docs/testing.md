@@ -1208,6 +1208,10 @@ its line, in the comment above it or in the title of its `describe`.
   rounded, among them about 59.9 minutes shown as `1:00`); NAV 1 truncates (`0:03` for 3.7 to 3.5 NM at 59 kt, and the
   minute drops as the distance passes 3.0) and shows seconds below one minute (`:ss`). The 90B's figures round (5-7),
   so the unit keeps rounding everywhere; the 89's NAV 1 is recorded, not followed.
+- Distances of 1000 NM and more (#341): a waypoint 1000 NM or more from its entered reference is accepted with no
+  message; its distance shows as whole NM (`1323nm`, `8768nm`, `10011nm`). The four-digit distance places of the
+  waypoint pages and the NAV 2 reference line show 1000 to 9999 NM as digits and dashes from 10000 NM on. Side finding
+  (medium-high): the distances match the WGS-84 ellipsoid and the long-range bearings a sphere (#364).
 
 # 9. Next steps
 

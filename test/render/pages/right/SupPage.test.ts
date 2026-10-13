@@ -370,7 +370,7 @@ describe('SUP page', () => {
         return unit;
     }
 
-    // Sibling of the pin below: the far REF is taken, with the radial due south
+    // Sibling of the test below: the far REF is taken, with the radial due south
     it('takes a reference 1200 NM away (characterization)', async () => {
         const unit = await farReferenceEntered();
 
@@ -378,13 +378,19 @@ describe('SUP page', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // The DIS field has four cells, so 1200 NM does not fit: the page shows `DIS:120.nm ` with a blank tenth and the unit
-    // moved one cell left (DistanceEditor.convertFromValue takes the characters of "1200.0" by position). What the real unit
-    // shows is not known, so the pin asserts the shape of the row only: three cells, the point, one cell, then nm
-    it.fails('does not garble the DIS row for a distance that does not fit the field (#341)', async () => {
+    // USUP at 47.2 N and FAR at 67.2 N on one meridian are 20 degrees apart, 1202.1 NM on the unit's sphere (6378100 m,
+    // 20 x 60.107 NM, distanceNm of flight/geo.ts). The KLN 89 trainer shows whole NM from 1000 NM on (2026-10-12);
+    // where the digits sit in the 90B's five cells (right-aligned) is the code's own layout
+    it('shows the distance of a reference 1200 NM away in whole NM (checked in the KLN 89 trainer, 2026-10-12, #341)', async () => {
         await farReferenceEntered();
 
-        expect(rightRows()[3]).toMatch(/^DIS:[ 0-9_]{3}\.[0-9_]nm$/);
+        expect(rightRows()[3].slice(4).trim()).toBe('1202nm');
+    });
+
+    it('characterization: shows the distance of a reference 1200 NM away right-aligned in the DIS cells (#341)', async () => {
+        await farReferenceEntered();
+
+        expect(rightRows()[3]).toBe('DIS: 1202nm');
     });
 
     // 3-51, 5-19 note: the REF, radial and distance are not stored and are lost when another page is viewed; the page
