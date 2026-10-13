@@ -2,6 +2,7 @@ import {FSComponent, NavMath, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN} from "../../pages/Page";
 import {EnterResult, Field} from "../../pages/CursorController";
 import {format} from "numerable";
+import {roundBearing} from "../../data/Coordinates";
 import {TickController} from "../../TickController";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {Sensors} from "../../Sensors";
@@ -102,7 +103,7 @@ export class ObsDtkElement implements Field {
 
     private getDisplayValue(): string {
         const dtk = this.modeController.getDtkOrObsMagnetic();
-        return dtk === null ? "---°" : `${format(dtk, "000")}°`;
+        return dtk === null ? "---°" : `${format(roundBearing(dtk), "000")}°`;
     }
 
     private canObsBeEntered(): boolean {

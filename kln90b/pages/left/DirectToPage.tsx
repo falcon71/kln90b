@@ -11,6 +11,7 @@ import {SuperNav5Page} from "./SuperNav5Page";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
 import {reportErrors} from "../../controls/ErrorPage";
 import {format} from "numerable";
+import {roundBearing} from "../../data/Coordinates";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {KLNFixType} from "../../data/flightplan/Flightplan";
 import {FROM} from "../../data/VolatileMemory";
@@ -118,7 +119,7 @@ export class DirectToPage extends SixLineHalfPage {
                     this.props.modeController.setObs(obsMag);
 
                     if (this.props.planeSettings.output.obsTarget === 0) {
-                        this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", `d› CRS ${format(obsMag, "000")}` as any);
+                        this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", `d› CRS ${format(roundBearing(obsMag), "000")}` as any);
                     }
                 }
 

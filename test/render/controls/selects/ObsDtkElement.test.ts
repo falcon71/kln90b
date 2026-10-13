@@ -62,6 +62,28 @@ describe('OBS/DTK element', () => {
         expect(unit.panel.focused('L').text).toBe('001°');
     });
 
+    // Checked in the KLN 89 trainer, 2026-10-07 (#263): north shows 000, never 360. An OBS course of 359.7 (from a DTK
+    // with a fraction) is shown as 000; the sibling 359.4 as 359
+    it('shows an OBS course of 359.7 as 000° (checked in the KLN 89 trainer, 2026-10-07, #263)', async () => {
+        const unit = await nav3(OBS_SOURCE_OFF);
+        await unit.panel.obsMode();
+        await unit.panel.selectPage('L', 'NAV 3');
+        unit.props.modeController.setObs(359.7);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L')[1].slice(7, 11)).toBe('000°');
+    });
+
+    it('shows an OBS course of 359.4 as 359° (checked in the KLN 89 trainer, 2026-10-07, #263)', async () => {
+        const unit = await nav3(OBS_SOURCE_OFF);
+        await unit.panel.obsMode();
+        await unit.panel.selectPage('L', 'NAV 3');
+        unit.props.modeController.setObs(359.4);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L')[1].slice(7, 11)).toBe('359°');
+    });
+
     // 4-9: with an external indicator whose selected course differs from the DTK by more than 10 degrees, the DTK on
     // NAV 3 flashes. The indicator at 100, the DTK 089: 11 degrees apart.
     it('flashes the DTK when the external course is 11 degrees off (4-9)', async () => {

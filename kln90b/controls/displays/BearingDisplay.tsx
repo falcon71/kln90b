@@ -3,6 +3,7 @@ import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
 import {Degrees} from "../../data/Units";
 import {format} from "numerable";
+import {roundBearing} from "../../data/Coordinates";
 
 /**
  * Displays a formatted bearing/course/radial
@@ -43,6 +44,6 @@ export class BearingDisplay implements UiElement {
         if (this.bearing === null) {
             return "---°";
         }
-        return `${format(this.bearing, "000")}°`;
+        return `${format(roundBearing(this.bearing), "000")}°`;
     }
 }

@@ -41,20 +41,20 @@ describe('BearingDisplay', () => {
 
 describe('BearingDisplay at north', () => {
     // 5-12, figure 5-37 (CAL 3 HDG 000°) and 3-22, figure 3-71 (003°): a bearing has three digits, padded with zeros.
-    // The sibling of the pin: a bearing that rounds down to north shows 000°
+    // The sibling of the 360 test below: a bearing that rounds down to north shows 000°
     it('shows a bearing just above north as 000° (5-12, 3-22)', () => {
         expect(shown(0.4)).toBe('000°');
     });
 
-    // 3-31, figure 3-97 (BRG 303°): the sibling of the pin, a bearing that rounds down below north keeps its degrees
+    // 3-31, figure 3-97 (BRG 303°): the sibling of the 360 test below, a bearing that rounds down below north keeps its degrees
     it('shows 359.4 as 359° (3-31)', () => {
         expect(shown(359.4)).toBe('359°');
     });
 
     // 5-12, figure 5-37 (HDG 000°), 3-22, figure 3-71 (003°) and the KLN 89 trainer, 2026-10-08: a bearing swept
     // through north went from 359° to 0° and never showed 360° (the 89 pads with blanks, 0°; the 90B figures pad with
-    // zeros, so 000°). The code rounds 359.5 up to 360. The OBS course of #263 shows the same 360.
-    it.fails('shows 359.5 as 000°, never 360° (5-12, 3-22, checked in the KLN 89 trainer, 2026-10-08, #263)', () => {
+    // zeros, so 000°). A bearing that rounds up to 360 is shown as 000°.
+    it('shows 359.5 as 000°, never 360° (5-12, 3-22, checked in the KLN 89 trainer, 2026-10-08, #263)', () => {
         expect(shown(359.5)).toBe('000°');
     });
 });
