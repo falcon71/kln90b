@@ -69,7 +69,7 @@ describe('FrontPanel.enterIdent (harness)', () => {
 
         // The cursor starts on the first character of each selector. The alphabetically first facility of each type (the
         // one at 47.1, 8.1) shows without any typing, so the screens below, which show the one at 48, 9, prove the typed ident.
-        // The NDB is on a half kHz, because a whole kHz shows a tenth today (#287)
+        // The NDB is on a half kHz, so its frequency shows the tenth; a database NDB on a whole kHz shows none (#287)
         const facilities = () => [vor('ABC', 47.1, 8.1), vor('XYZ', 48.0, 9.0), ndb('NDA', 47.1, 8.1), ndb('NDB', 48.0, 9.0, {frequencyKHz: 350.5}),
             intersection('ALPHA', 47.1, 8.1), intersection('BRAVO', 48.0, 9.0)];
 

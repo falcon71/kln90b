@@ -19,10 +19,18 @@ export class NdbFreqEditor extends Editor<number> {
     }
 
     public render(): VNode {
-        return (<span ref={this.containerRef}>
+        return (<span ref={this.containerRef}><span ref={this.cellsRef}>
             {this.editorFields[0].render()}{this.editorFields[1].render()}{this.editorFields[2].render()}{this.editorFields[3].render()}<span
             ref={this.dotRef}>.</span>{this.editorFields[4].render()}
-        </span>);
+        </span><span ref={this.idleRef} class="d-none"></span></span>);
+    }
+
+    /** #287: figure 3-153, a database NDB (the read-only field) on a whole kHz shows the integer, right-aligned */
+    protected idleText(): string | null {
+        if (!this.isReadonly || this.value === null || Math.abs(this.value - Math.round(this.value)) > 0.001) {
+            return null;
+        }
+        return String(Math.round(this.value)).padStart(6, " ");
     }
 
     protected convertFromValue(value: number): Rawvalue {
@@ -47,6 +55,7 @@ export class NdbFreqEditor extends Editor<number> {
 
     tick(blink: boolean): void {
         super.tick(blink);
+        this.tickIdleText();
         if (!TickController.checkRef(this.dotRef)) {
             return;
         }

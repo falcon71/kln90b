@@ -1,4 +1,7 @@
 import {describe, expect, it} from 'vitest';
+import {EventBus} from '@microsoft/msfs-sdk';
+import {NdbFreqEditor} from '../../../../kln90b/controls/editors/NdbFreqEditor';
+import {mountedText} from '../../../harness/render/mount';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {userWaypoints} from '../../../harness/readers';
@@ -186,5 +189,31 @@ describe('NdbFreqEditor keyboard', () => {
         await unit.panel.type('R', '3500');
 
         expect(Screen.read().rows('R')[3]).toBe('FREQ  350.0');
+    });
+});
+
+describe('NdbFreqEditor, a database NDB (3-50, #287)', () => {
+    // Figure 3-153 (3-50): a database NDB on a whole kHz shows the integer, right-aligned; figure 5-66 (5-18): a user
+    // NDB keeps its tenth. A database NDB is the read-only editor of the NDB page
+    const readonly = (khz: number) => {
+        const editor = new NdbFreqEditor(new EventBus(), khz, () => undefined);
+        editor.isReadonly = true;
+        return mountedText(editor);
+    };
+
+    it('shows a database NDB on 251 kHz as 251 (3-50, figure 3-153, #287)', () => {
+        expect(readonly(251)).toBe('   251');
+    });
+
+    it('characterization: shows a database NDB on 1025 kHz as 1025 (#287)', () => {
+        expect(readonly(1025)).toBe('  1025');
+    });
+
+    it('characterization: keeps the tenth of a database NDB on a half kHz (#287)', () => {
+        expect(readonly(251.5)).toBe(' 251.5');
+    });
+
+    it('keeps the tenth of a user NDB on a whole kHz (5-18, figure 5-66, #287)', () => {
+        expect(mountedText(new NdbFreqEditor(new EventBus(), 251, () => undefined))).toBe(' 251.0');
     });
 });
