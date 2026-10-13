@@ -1360,9 +1360,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 - CTR leads: a recomputation without insertion creates a new user waypoint with the next number (BGD00, then BGD01),
   and the orphans count against the limit until power-off; a crossing without a VOR within 100 NM, or without a free
   number, is dropped silently; when the first waypoint lies in no Center the first crossing is dropped
-  (`AirspacesAlongRoute.cleanup`); `getWaypointIfExistsInFpl` compares coordinates with `===`; CTR 2 converts the radial
-  with the variation at the present position, NAV 2 with the VOR's own (#280 rules the VOR's own for INT, SUP and REF);
-  the status line shows `msg` for one display tick after CTR 1 is selected.
+  (`AirspacesAlongRoute.cleanup`); `getWaypointIfExistsInFpl` compares coordinates with `===`; CTR 2 and NAV 2 convert the
+  radial with the VOR's own variation (#280, #362); the status line shows `msg` for one display tick after CTR 1 is
+  selected.
 
 ## Pages
 

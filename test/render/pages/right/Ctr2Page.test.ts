@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {centerWorld} from '../../../harness/fixtures';
-import {vor} from '../../../harness/navdata/builders';
+import {intersection, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 
@@ -33,6 +33,32 @@ async function computed(o: { magvar?: number, vorMagneticVariation?: number, cen
 }
 
 const right = () => Screen.read().rows('R');
+
+/**
+ * A plan of 26 waypoints around 40 N, KBBB and KCCC on FPL 1 (both VORs 4 E, the aircraft 10 E): the first computation
+ * and the insertion of BGD00 and GCK00 are done, the plan page was left and selected again, so that the next ENT on
+ * CTR 1 computes a second time (the setup of the 'does not count' test of Ctr1Page.test.ts; a second computation in one
+ * unit meets #102, which finds one of the two crossings again)
+ */
+async function afterInsertionOfFullPlan(): Promise<HeadlessUnit> {
+    const w = centerWorld();
+    const fa = Array.from({length: 26}, (_, i) => intersection(`FA${String(i).padStart(2, '0')}`, 40.0 + i * 0.01, -100.0));
+    const vors = [vor('BGD', w.bgd.lat, w.bgd.lon, {magneticVariation: -4}), vor('GCK', w.gck.lat, w.gck.lon, {magneticVariation: -4})];
+    const unit = await bootUnit({
+        facilities: [w.kbbb, w.kccc, ...fa, ...vors],
+        position: {lat: 39.0, lon: -100.0}, magvar: 10, airspaces: w.centers,
+        storage: savedFlightplan(1, [...fa, w.kbbb, w.kccc]),
+    });
+    await settle(unit);
+    await unit.panel.selectPage('L', 'FPL 1');
+    await unit.panel.selectPage('R', 'CTR 1');
+    await unit.panel.ent();
+    await vi.advanceTimersByTimeAsync(3000);
+    await unit.panel.ent(); // insert
+    await unit.panel.selectPage('L', 'FPL 2');
+    await unit.panel.selectPage('L', 'FPL 1');
+    return unit;
+}
 
 describe('CTR 2 page (characterization)', () => {
     // The guide shows CTR 2 only with Center waypoints; this is the code's page before a computation
@@ -123,6 +149,48 @@ describe('CTR 2 page (5-25, 5-26)', () => {
         await unit.panel.inner('R', 1);
 
         expect(right()[2]).toBe('BGD    170°');
+    });
+
+    // #362: the radial from the reference VOR is magnetic with that VOR's own variation, the rule of #280 (checked in the
+    // KLN 89 trainer, 2026-10-07, on the INT and USR pages; CTR 2 is the 90B's own page, so this is a characterization).
+    // 10 E at the aircraft, 4 E at BGD: the true radial 180 is 176, not the local 170
+    it('characterization: converts the radial with the variation of the reference VOR (#362)', async () => {
+        const unit = await computed({magvar: 10, vorMagneticVariation: -4});
+        await unit.panel.inner('R', 1);
+
+        expect(right()[2]).toBe('BGD    176°');
+    });
+
+    // #362 for a Center waypoint that is in the plan already (5-27: it is not created again). A plan of 26 waypoints
+    // around 40 N, KBBB and KCCC takes both crossings as BGD00 and GCK00 (a full plan of 30); the second computation
+    // meets #102 and finds only one of them again, and CTR 2 converts its radial with the variation of its VOR as well
+    // (10 E at the aircraft, 4 E at both VORs). Characterization, as above
+    it('characterization: converts the radial of a Center waypoint that exists already with the variation of its VOR (#362)', async () => {
+        const unit = await afterInsertionOfFullPlan();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.props.memory.ctrPage.waypoints.map(wpt => wpt.isNew)).toEqual([false]); // Precondition: one existing waypoint
+        await unit.panel.inner('R', 1);
+
+        expect(right().slice(0, 3)).toEqual([' BGD00     ', 'FW -ABQ CTR', 'BGD    176°']);
+    });
+
+    // A Center waypoint of the plan whose reference VOR is gone from the database (a cartridge change, a deleted user
+    // VOR): the second computation still ends in the computed state, with no error, and CTR 2 converts the radial with
+    // the variation at the aircraft, the only one left (10 E, so 170). Characterization, #362
+    it('characterization: computes with a Center waypoint whose reference VOR is gone from the database (#362)', async () => {
+        const unit = await afterInsertionOfFullPlan();
+        // Only the lookup of CTR 1 sees BGD gone: other pages that show BGD keep loading it from the database
+        const real = unit.props.facilityLoader.tryGetFacility.bind(unit.props.facilityLoader);
+        unit.props.facilityLoader.tryGetFacility = (type, icao, flags) =>
+            icao.ident.trim() === 'BGD' ? Promise.resolve(null) : real(type, icao, flags);
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(right()[0]).toBe(' 0 NEW WPTS');
+        await unit.panel.inner('R', 1);
+        expect(right().slice(0, 3)).toEqual([' BGD00     ', 'FW -ABQ CTR', 'BGD    170°']);
+        expect(unit.errors).toEqual([]);
     });
 
     // 5-26: leaving the flight plan page on the left and returning to it reverts CTR 1 and CTR 2 to the start state, the

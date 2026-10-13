@@ -5,6 +5,7 @@ import {
     FacilityUtils,
     FSComponent,
     GeoPoint,
+    ICAO,
     LodBoundary,
     NodeReference,
     UnitType,
@@ -25,6 +26,7 @@ import {StatusLineMessageEvents} from "../../controls/StatusLine";
 import {insertLegIntoFpl} from "../../services/FlightplanUtils";
 import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 import {getUniqueIdentWithNumbers} from "../../data/navdata/UniqueIdentGenerator";
+import {KLNMagvar} from "../../data/navdata/KLNMagvar";
 
 type Ctr1PageTypes = {
     newWpts: TextDisplay;
@@ -36,6 +38,8 @@ export interface CenterWaypoint {
     airspaceFrom: LodBoundary,
     airspaceTo: LodBoundary,
     isNew: boolean,
+    /** #362: the variation of the reference VOR, east positive; null when the waypoint has no reference yet */
+    refMagvar: number | null,
 }
 
 /**
@@ -216,6 +220,14 @@ export class Ctr1Page extends SixLineHalfPage {
                 wpt = await this.createWpt(intersections[i]);
             }
             if (wpt !== null) {
+                if (wpt.refMagvar === null && wpt.wpt.reference1IcaoStruct !== undefined) {
+                    //#362: CTR 2 converts the radial with the reference VOR's own variation. A reference that is gone from
+                    //the database stays null: CTR 2 then falls back to the variation at the present position
+                    const refVor = await this.props.facilityLoader.tryGetFacility(ICAO.getFacilityTypeFromValue(wpt.wpt.reference1IcaoStruct), wpt.wpt.reference1IcaoStruct);
+                    if (refVor !== null) {
+                        wpt.refMagvar = KLNMagvar.getReferenceMagvar(refVor);
+                    }
+                }
                 this.props.memory.ctrPage.waypoints.push(wpt);
             }
         }
@@ -260,6 +272,7 @@ export class Ctr1Page extends SixLineHalfPage {
             if (FacilityUtils.isFacilityType(leg.wpt, FacilityType.USR) && leg.wpt.lat === intersection.intersection.lat && leg.wpt.lon === intersection.intersection.lon) {
                 return {
                     isNew: false,
+                    refMagvar: null, //Filled in from the reference VOR when the waypoints are collected
                     idx: -1, //Only relevant for inserting new waypoints
                     airspaceFrom: intersection.airspaceFrom,
                     airspaceTo: intersection.airspaceTo,
@@ -308,6 +321,7 @@ export class Ctr1Page extends SixLineHalfPage {
 
         return {
             isNew: true,
+            refMagvar: KLNMagvar.getReferenceMagvar(closestVor), //Saves the load of the collecting loop, which resolves only the nulls
             idx: intersection.legIdx,
             airspaceFrom: intersection.airspaceFrom,
             airspaceTo: intersection.airspaceTo,
