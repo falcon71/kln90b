@@ -80,6 +80,75 @@ describe('latitude and longitude editors at negative zero (checked in the KLN 89
     });
 });
 
+describe('the degrees of an entered coordinate below 10 (#230)', () => {
+    // The trainer showed a degree below 10 padded with a blank once the value is entered (N  8° and W  8°), and zeros
+    // only in the open edit field. The first two tests hold the cases it showed (8° N, 8° E); the 100 degree and zero
+    // cases are ours
+    it('shows the latitude 8°30\' N as N  8°30.00 (checked in the KLN 89 trainer, 2026-10-07, #230)', () => {
+        expect(text(new LatitudeEditor(new EventBus(), 8.5, () => undefined))).toBe('N  8°30.00');
+    });
+
+    it('shows the longitude 8° E as E  8°00.00 (checked in the KLN 89 trainer, 2026-10-07, #230)', () => {
+        expect(text(new LongitudeEditor(new EventBus(), 8, () => undefined))).toBe('E  8°00.00');
+    });
+
+    it('characterization: keeps the zero of a longitude of 100 degrees or more (#230)', () => {
+        expect(text(new LongitudeEditor(new EventBus(), 108, () => undefined))).toBe('E108°00.00');
+    });
+
+    it('characterization: shows the longitude 0° as E  0°00.00 (#230)', () => {
+        expect(text(new LongitudeEditor(new EventBus(), 0, () => undefined))).toBe('E  0°00.00');
+    });
+});
+
+describe('the tens of the degrees of a latitude while its edit opens and closes (#230)', () => {
+    /** A latitude editor of 8.5 degrees, mounted and focused; `shown` ticks the cells (they redraw on a tick) and reads them */
+    const focusedLatitude = () => {
+        const editor = new LatitudeEditor(new EventBus(), 8.5, () => undefined);
+        const mounted = mount(editor);
+        editor.setFocused(true);
+        return {
+            editor, shown: () => {
+                editor.children.walk(cell => cell.tick(false));
+                return mounted.text();
+            },
+        };
+    };
+
+    // The trainer, 2026-10-07: zeros only inside an open edit field. A zero typed into the tens stays a zero there
+    it('shows a typed zero in the tens of an open edit (checked in the KLN 89 trainer, 2026-10-07, #230)', () => {
+        const {editor, shown} = focusedLatitude();
+        expect(shown()).toBe('N  8°30.00'); // precondition: entered, blank tens
+
+        editor.innerRight(); // opens the edit
+        editor.outerRight(); // the tens
+        editor.keyboard('0');
+
+        expect(shown()).toBe('N 0_°__.__');
+    });
+
+    // CLR closes an open edit and brings the old value back (#307); the blank is back with it
+    it('characterization: CLR closes an open edit and the blank tens are back (#230)', () => {
+        const {editor, shown} = focusedLatitude();
+        editor.innerRight();
+        expect(shown()).toBe('N __°__.__'); // precondition: the edit is open
+
+        expect(editor.clear()).toBe(true);
+
+        expect(shown()).toBe('N  8°30.00');
+    });
+
+    it('characterization: leaving the field during an open edit brings the blank tens back (#230)', () => {
+        const {editor, shown} = focusedLatitude();
+        editor.innerRight();
+        expect(shown()).toBe('N __°__.__'); // precondition: the edit is open
+
+        editor.setFocused(false);
+
+        expect(shown()).toBe('N  8°30.00');
+    });
+});
+
 describe('latitude and longitude editors without a value (5-17)', () => {
     // 5-17 step 8, figure 5-56: USER POS? shows the latitude as dashes in the cells of a hemisphere, two degree digits,
     // two minute digits and two hundredths, the longitude with three degree digits and no blank after the hemisphere

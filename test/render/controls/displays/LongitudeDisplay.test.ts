@@ -23,15 +23,15 @@ describe('LongitudeDisplay', () => {
         expect(shown(179 + 59.18 / 60)).toBe("E179°59.18'");
     });
 
-    // The setup sibling of the #230 pin: 8 degrees east shows its minutes
+    // The setup sibling of the #230 test below: 8 degrees east shows its minutes
     it('shows the minutes of a longitude below 10 degrees (3-32)', () => {
         expect(shown(8.25).slice(4)).toBe("°15.00'");
     });
 
     // The Pilot's Guide has no figure of a degree below 10. The KLN 89 trainer (2026-10-07) showed W  8° with two
     // blanks once confirmed, zeros only inside an open edit field; a photo of a KLN 90 (0260952.jpg) shows the same
-    // blank on NAV 2. Pinned on NAV 2 as well.
-    it.fails(
+    // blank on NAV 2. The display pads the degrees with blanks the same way.
+    it(
         'shows a longitude below 10 degrees with blanks (checked in the KLN 89 trainer, 2026-10-07, #230)',
         () => {
             expect(shown(8.25)).toBe("E  8°15.00'");
@@ -70,14 +70,14 @@ describe('LongitudeDisplay', () => {
     });
 });
 
-// Only the hemisphere cell is asserted: the degrees below 10 are the #230 pin above
+// Only the hemisphere cell is asserted: the degrees below 10 are held by the #230 test above
 describe('LongitudeDisplay at the meridian of Greenwich', () => {
-    // 3-8, 3-32: the sibling of the pin, a longitude just east of the meridian shows E
+    // 3-8, 3-32: a longitude just east of the meridian shows E
     it('shows E just east of the meridian (3-8, 3-32)', () => {
         expect(shown(0.5).slice(0, 1)).toBe('E');
     });
 
-    // 3-8, 3-32: the sibling of the pin, a longitude just west of the meridian shows W
+    // 3-8, 3-32: a longitude just west of the meridian shows W
     it('shows W just west of the meridian (3-8, 3-32)', () => {
         expect(shown(-0.5).slice(0, 1)).toBe('W');
     });

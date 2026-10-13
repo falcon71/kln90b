@@ -22,6 +22,7 @@ export abstract class Editor<T> implements Field {
     protected convertedValue: Rawvalue | null = null;
     protected cursorIndex = 0;
     protected statusLineMessagePublisher: Publisher<StatusLineMessageEvents>;
+    private leadingZeroCells: number[] = [];
 
     protected constructor(bus: EventBus,
                           protected readonly editorFields: EditorField[],
@@ -128,6 +129,7 @@ export abstract class Editor<T> implements Field {
 
         this.applyValueToFields(this.convertedValue);
         this.isEntered = false;
+        this.applyLeadingBlanks();
         this.enterCallback(value);
         return EnterResult.Handled_Move_Focus;
     }
@@ -172,6 +174,26 @@ export abstract class Editor<T> implements Field {
                 this.editorFields[i].value = value[i];
             }
         }
+        this.applyLeadingBlanks();
+    }
+
+    /**
+     * The cells, in display order, whose zeros are blanked while the edit is closed: from the first up to the first cell
+     * that is not 0. An open edit shows every cell as it is. Checked in the KLN 89 trainer: a degree below 10 shows a
+     * blank once entered and its zeros while edited (2026-10-07, #230), the open longitude shows E008° (2026-10-08, #304)
+     */
+    protected setLeadingZeroCells(cells: number[]): void {
+        this.leadingZeroCells = cells;
+        this.applyLeadingBlanks();
+    }
+
+    private applyLeadingBlanks(): void {
+        let leading = !this.isEntered;
+        for (const i of this.leadingZeroCells) {
+            const field = this.editorFields[i];
+            leading = leading && field.value === 0;
+            field.isBlank = leading;
+        }
     }
 
     protected setEntered(isEntered: boolean) {
@@ -185,6 +207,7 @@ export abstract class Editor<T> implements Field {
             this.applyValueToFields(this.convertedValue);
         }
         this.isEntered = isEntered;
+        this.applyLeadingBlanks();
     }
 
     private incrementCurrentChar() {

@@ -12,6 +12,11 @@ export abstract class EditorField implements UiElement {
     public isFocused = false;
     public isParentFocused = false;
     public isParentBlink = false;
+    /**
+     * A leading zero of an entered value shows as a blank. The value stays 0; only the text changes. The editor sets
+     * it from its leading zero cells (Editor.setLeadingZeroCells), and clears it while its edit is open
+     */
+    public isBlank = false;
     private ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
 
@@ -74,7 +79,10 @@ export abstract class EditorField implements UiElement {
     }
 
     private toString() {
-        return this.value == null ? "_".repeat(this.fieldLength()) : this.charset[this.value];
+        if (this.value == null) {
+            return "_".repeat(this.fieldLength());
+        }
+        return this.isBlank ? " ".repeat(this.fieldLength()) : this.charset[this.value];
     }
 
     public keyboard(key: string): boolean {

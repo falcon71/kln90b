@@ -82,7 +82,8 @@ describe('APT 1 page on a nearest entry', () => {
 
             expect(Screen.read().rows('R')[0]).toBe(' KBBB      ');
             // KBBB's coordinates, no longer bearing and distance. The longitude row (row 5) is left out of these three
-            // tests: it shows a degree below 10 written with a zero (#230). The latitude row holds the coordinates.
+            // tests: its blank-padded degree below 10 is held by the #230 tests of NAV 2 and the displays. The latitude row holds
+            // the coordinates.
             expect(Screen.read().rows('R')[4]).toBe('N 47°12.00\'');
         });
 

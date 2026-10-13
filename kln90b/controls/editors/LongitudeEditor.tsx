@@ -25,6 +25,7 @@ export class LongitudeEditor extends Editor<Longitude> {
             new NumberEditorField(),
             new NumberEditorField(),
         ], value, enterCallback);
+        this.setLeadingZeroCells([1, 2]); //#230
     }
 
     public render(): VNode {

@@ -17,8 +17,8 @@ describe('NAV 2 page (characterization)', () => {
         await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
 
         const screen = Screen.read();
-        // Row 5, the longitude, is left out of this test and of the snapshot: it shows a degree below 10 written with a
-        // zero, the bug of the pin below (#230)
+        // Row 5, the longitude, is left out of this test and of the snapshot: its degree below 10 is held by the #230 test
+        // below
         expect(screen.half('L').split('\n').slice(0, 5)).toEqual([
             'PRESENT POS',
             '           ',
@@ -89,22 +89,22 @@ describe('NAV 2 page', () => {
 
     // The Pilot's Guide has no figure of a degree below 10, so the KLN 89 trainer decides (2026-10-07): a user waypoint
     // at 8 degrees west showed "W  8°" with two blanks once confirmed, and the zeros ("W008°") only in the open edit
-    // field. A photo of a KLN 90 (reference-photos-index.md, 0260952.jpg) shows the same blank on NAV 2. The code pads the
-    // degrees with zeros (LongitudeDisplay). The sibling is the characterization above, which boots the same position.
-    it.fails('shows a longitude below 10 degrees with a blank, not a zero (checked in the KLN 89 trainer, 2026-10-07, #230)', async () => {
+    // field. A photo of a KLN 90 (reference-photos-index.md, 0260952.jpg) shows the same blank on NAV 2. The
+    // LongitudeDisplay pads the degrees with blanks. The sibling is the characterization above, which boots the same position.
+    it('shows a longitude below 10 degrees with a blank, not a zero (checked in the KLN 89 trainer, 2026-10-07, #230)', async () => {
         await nav2At({lat: 47.0, lon: 8.0}, [vor('ABC', 47.2, 8.0, {magneticVariation: 0})]);
 
         expect(Screen.read().rows('L')[5]).toBe("E  8°00.00'");
     });
 
     // The same for the latitude: the trainer showed "N  8°" blank-padded once confirmed (2026-10-07)
-    it.fails('shows a latitude below 10 degrees with a blank, not a zero (checked in the KLN 89 trainer, 2026-10-07, #230)', async () => {
+    it('shows a latitude below 10 degrees with a blank, not a zero (checked in the KLN 89 trainer, 2026-10-07, #230)', async () => {
         await nav2At({lat: 8.5, lon: 47});
 
         expect(Screen.read().rows('L')[4]).toBe("N  8°30.00'");
     });
 
-    // The setup sibling of the latitude pin: the position 8 30 N 47 E, whose longitude row has two digits of degrees
+    // The setup sibling of the latitude test above: the position 8 30 N 47 E, whose longitude row has two digits of degrees
     it('reads a position 8°30\' north (3-32)', async () => {
         const unit = await nav2At({lat: 8.5, lon: 47});
 
@@ -112,8 +112,8 @@ describe('NAV 2 page', () => {
         expect(Screen.read().rows('L')[5]).toBe("E 47°00.00'");
     });
 
-    // The setup sibling of the longitude pin: the position 47 N 8 E (8 degrees, which the first characterization above no
-    // longer shows in row 5), with the VOR 12 NM north
+    // The setup sibling of the longitude test above: the position 47 N 8 E (8 degrees, whose row 5 the first
+    // characterization above leaves out), with the VOR 12 NM north
     it('reads a position 8 degrees east with the VOR 12 NM north (3-32)', async () => {
         const unit = await nav2At({lat: 47.0, lon: 8.0}, [vor('ABC', 47.2, 8.0, {magneticVariation: 0})]);
 
