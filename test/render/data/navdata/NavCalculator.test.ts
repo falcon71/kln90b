@@ -529,6 +529,68 @@ describe('GPS invalid (3-31)', () => {
     });
 });
 
+// #120: past the last waypoint of a plan that ends in the same waypoint twice, the active leg has no length. Checked in
+// the KLN 89 trainer, 2026-10-14 (FPL 0 KMSN, BAE, BUU, BUU): the unit sequenced onto BUU - BUU and kept the DTK of the
+// leg before; the distance and the ETE counted up, the bearing pointed back at BUU, the CDI stayed valid and centered,
+// FROM. (It showed TO from 1.8 NM past for no reason seen; that is not modeled, and the test stays within 1 NM.)
+describe('a plan that ends in the same waypoint twice (checked in the KLN 89 trainer, 2026-10-14)', () => {
+    it('keeps navigating on the course of the leg before past the waypoint (checked in the KLN 89 trainer, 2026-10-14, #120)', async () => {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootUnit({facilities: [kaaa, abc], position: pointBefore(kaaa, abc, 5), magvar: 0, storage: savedFlightplan(0, [kaaa, abc, abc])});
+        await settle(unit);
+        await unit.panel.selectPage('L', 'NAV 1');
+        const leg = finalCourseDeg(kaaa, abc);
+        for (const before of [2, 1, 0.5]) {
+            await moveAircraft(unit, pointBefore(kaaa, abc, before), {groundspeedKt: 120, trackTrue: leg});
+        }
+
+        // The 89 alerted 0.5 NM out at 119 kt (ETE :14). A waypoint followed by its own copy takes the branch without a
+        // turn: 0.4 NM at 120 kt are 12 s, inside the 15 s with turn anticipation on (the default)
+        await moveAircraft(unit, pointBefore(kaaa, abc, 0.4), {groundspeedKt: 120, trackTrue: leg});
+        expect(nav(unit).waypointAlert).toBe(true);
+
+        for (const past of [0.2, 0.5, 1]) {
+            await moveAircraft(unit, pointFrom(abc, leg, past), {groundspeedKt: 120, trackTrue: leg});
+            await vi.advanceTimersByTimeAsync(500);
+            expect(nav(unit).waypointAlert).toBe(false); // the 89 stopped the alert at 0.0 NM
+            expect(nav(unit).activeWaypoint.getActiveFplIdx()).toBe(2);
+            expect(angleBetween(nav(unit).desiredTrack, leg)).toBeLessThan(0.1);
+            expect(Math.abs(nav(unit).xtkToActive!)).toBeLessThan(0.01);
+            expect(nav(unit).toFrom).toBe(false); // FROM
+            expect(nav(unit).distToActive!).toBeCloseTo(past, 2);
+            expect(nav(unit).eteToActive!).toBeCloseTo(past / 120 * 3600, 0);
+            // The SimVar and the HSI flag are the external outputs of the DTK and the FROM the 89 showed on its screen
+            // (the SensorsOut mapping); the 89 itself has no such outputs
+            expect(angleBetween(unit.env.sim.get('GPS WP DESIRED TRACK', 'degrees'), leg)).toBeLessThan(0.1); // magvar 0: magnetic = true
+            expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(2); // FROM, not flagged
+            expect(Screen.read().rows('L')[1]).not.toContain('F L A G');
+        }
+        expect(unit.errors).toEqual([]);
+    });
+});
+
+describe('a plan of one waypoint twice (characterization)', () => {
+    // A plan of one waypoint twice has no leg before the zero-length leg. What the unit shows then is not known; it keeps
+    // what it can compute (characterization)
+    it('has no XTK, DTK or TO/FROM with no leg before, but distance, bearing and ETE (characterization, #120)', async () => {
+        const {kaaa} = standardRoute();
+        const start = pointFrom(kaaa, 270, 5);
+        const unit = await bootUnit({facilities: [kaaa], position: start, storage: savedFlightplan(0, [kaaa, kaaa])});
+        await settle(unit);
+        await moveAircraft(unit, start, {groundspeedKt: 120, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(nav(unit).activeWaypoint.getActiveFplIdx()).toBe(1);
+        expect(nav(unit).xtkToActive).toBeNull();
+        expect(nav(unit).desiredTrack).toBeNull();
+        expect(nav(unit).toFrom).toBeNull();
+        expect(nav(unit).distToActive!).toBeCloseTo(5, 2);
+        expect(angleBetween(nav(unit).bearingToActive, courseDeg(start, kaaa))).toBeLessThan(0.1);
+        expect(nav(unit).eteToActive!).toBeCloseTo(5 / 120 * 3600, 0);
+        expect(unit.env.sim.get('GPS WP DISTANCE', 'nautical miles')).toBeCloseTo(5, 2);
+    });
+});
+
 // Characterization: below 2 kt there is no ETE (NAV 1 shows dashes) and no sequencing. This is what the code does today;
 // no page of the Pilot's Guide gives a ground speed threshold for either.
 describe('ground speed below 2 kt (characterization)', () => {

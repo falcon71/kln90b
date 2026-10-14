@@ -100,11 +100,11 @@ describe('no turn anticipation into a duplicated waypoint (#27)', () => {
     });
 });
 
-// #120: with a plan whose only leg has no length, [KAAA, KAAA], sequencing cannot advance, so every
-// calculation tick takes the NaN-path return of NavCalculator.tick (the fix of #19) before setOutput(). Every other
-// early return of tick calls setOutput(), so the GPS SimVars are refreshed, flagged or not. Here they are not written
-// at all. Expected behavior (public contract, CLAUDE.md "GPS SimVars written when Output.WriteGPSSimVars is set"): the
-// position outputs follow the aircraft. The Pilot's Guide 4-1 does not say what a plan without leg length shows.
+// #120: with a plan whose only leg has no length, [KAAA, KAAA], sequencing cannot advance and no leg lies before the
+// zero-length one. The unit keeps what it can compute (distance, bearing and ETE) and writes all outputs, so the GPS
+// SimVars follow the aircraft (public contract, CLAUDE.md "GPS SimVars written when Output.WriteGPSSimVars is set").
+// The Pilot's Guide 4-1 does not say what a plan without leg length shows. With a leg before it, the unit navigates on
+// that leg's course (test/render/data/navdata/NavCalculator.test.ts).
 describe('a plan whose only leg has no length (#120)', () => {
     const recorded: { moved: number; outputLagNm: number | null } = {moved: 0, outputLagNm: null};
 
@@ -128,7 +128,7 @@ describe('a plan whose only leg has no length (#120)', () => {
         recorded.outputLagNm = flight.sim.lastWrite('GPS POSITION LAT') === undefined ? null : distanceNm({lat, lon}, flight.aircraft);
     });
 
-    it.fails('keeps the GPS position outputs current while the aircraft moves (#120)', () => {
+    it('keeps the GPS position outputs current while the aircraft moves (#120)', () => {
         expect(recorded.moved).toBeGreaterThan(0.5);
         expect(recorded.outputLagNm).not.toBeNull();
         expect(recorded.outputLagNm!).toBeLessThan(0.1);

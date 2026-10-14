@@ -403,6 +403,10 @@ sim.
 - It handles self-test and GPS-invalid by flagging all values to null. If there is no active leg it calls
   `activateFpl0()`.
 - DIS is always the direct distance, even for arcs (6-18).
+- A leg without length (FROM and TO are the same waypoint, so its path has no center) is sequenced at once when a next
+  leg exists. The last one navigates on the course of the leg before it (#120, as the KLN 89 trainer does): XTK, DTK
+  and TO/FROM come from that leg's path, and all outputs are written. With no leg before it, XTK, DTK and TO/FROM are
+  null and the distance, bearing and ETE remain.
 - XTK uses the top of the turn stack during turns (4-8) and the leg circle otherwise.
 - DTK is the bearing at the closest point. `bearingForAP` equals the DTK on arcs, a workaround so the autopilot tracks
   DME arcs.
