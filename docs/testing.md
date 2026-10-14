@@ -965,10 +965,11 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   GPS-invalid path, LEG and OBS and the OBS synthetic waypoint, the ENR, ARM and APR scaling, the Direct To flows, the
   flight plan bounds, insert and delete and the duplicate waypoint cases. Flights cover the large turn, duplicate
   waypoints, the DME arc, the alert through a turn, the TO/FROM flag and the magnetic track. *Pins and
-  characterizations only:* roll steering (the #100 pins, by decision) and the XTK output filter (#158; its step
-  response is a unit test) and the return to ACTV after the GPS APR press before the FAF (#162, the maintainer's
-  ruling). *Untested:* the approach-scale cases (#163; the trainer shows neither ARM nor ACTV), the alert questions #146 and #147, the turn circle on a great-circle leg (only
-  the arc case), and the nav-source gate and a cold start in a flight (render tests hold both).
+  characterizations only:* roll steering (the #100 pins, by decision), the XTK output filter (#158; its step
+  response is a unit test), the return to ACTV after the GPS APR press before the FAF (#162) and the ACTV scale ramp
+  from the activation (#163); the last two are the maintainer's rulings, because the trainer shows neither ARM nor
+  ACTV. *Untested:* the alert questions #146 and #147, the turn circle on a great-circle leg (only the arc case), and
+  the nav-source gate and a cold start in a flight (render tests hold both).
 - **Navdata** (`data/navdata/`, `Gps.ts`). *Spec and characterization:* `KLNFacilityLoader` merging the user
   repository with the database and its user and temporary regions, the nearest lists (order, update interval, the
   selected entry dropping out (#39), the filters of #57 and SET 3), the scan list including its cache window (#40,

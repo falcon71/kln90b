@@ -337,7 +337,9 @@ describe('approach arm ramp (characterization)', () => {
 });
 
 describe('approach active ramp (characterization)', () => {
-    it('ramps linearly with the distance to the FAF, 0.65 at 1 NM', async () => {
+    // The ramp runs from the scale at the activation (1) to 0.3 at the FAF over the distance left at the activation:
+    // activated at 1.95 NM, the scale at 1 NM is 0.3 + 0.7 * 1 / 1.95 = 0.659 (characterization, #163)
+    it('ramps linearly from the activation, 0.659 at 1 NM after activating at 1.95 NM (characterization, #163)', async () => {
         const {w, unit} = await approachLoaded(7.5);
         expect(await scaleAfter(unit, 31)).toBe(1);
         for (const nm of [5 + 1.95, 5 + 1]) {
@@ -345,7 +347,72 @@ describe('approach active ramp (characterization)', () => {
             await vi.advanceTimersByTimeAsync(1000);
         }
 
-        expect(nav(unit).xtkScale).toBeCloseTo(0.65, 2);
+        expect(nav(unit).xtkScale).toBeCloseTo(0.659, 3);
+    });
+
+    // A late switch to LEG at 1 NM: the unit goes ACTV at 1 NM and ramps from 1 to 0.3 over that 1 NM, so 0.5 NM before
+    // the FAF the scale is 0.3 + 0.7 * 0.5 / 1 = 0.65 (characterization, #163)
+    it('ramps from 1 over the last 1 NM after a late switch to LEG (characterization, #163)', async () => {
+        const {w, unit} = await approachLoaded(7.5);
+        expect(await scaleAfter(unit, 31)).toBe(1);
+        await moveAircraft(unit, w.north(5 + 2.5), {groundspeedKt: 120, trackTrue: 180});
+        unit.env.sim.set('Nav OBS:1', 'degrees', 180); // The final course, so the FAF stays on the TO side
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(nav(unit).navmode).toBe(NavMode.ARM_OBS);
+        await moveAircraft(unit, w.north(5 + 1), {groundspeedKt: 120, trackTrue: 180});
+        await unit.panel.selectPage('L', 'MOD 1');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
+        expect(nav(unit).xtkScale).toBeCloseTo(1, 6); // 0.3 + 0.7 in floating point
+
+        await moveAircraft(unit, w.north(5 + 0.5), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(nav(unit).xtkScale).toBeCloseTo(0.65, 3);
+    });
+
+    // Activated while the arming ramp is still running (the scale is above 1), the ramp starts from 1, not from the
+    // higher scale: activated at 1.9 NM, the scale at 1 NM is 0.3 + 0.7 * 1 / 1.9 = 0.668 (characterization, #163)
+    it('ramps from 1, not from the arming scale, when activated before the arming ramp has finished (characterization, #163)', async () => {
+        const {w, unit} = await approachLoaded(5 + 1.9);
+        await moveAircraft(unit, w.north(5 + 1.9), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
+        expect(nav(unit).xtkScale).toBe(1);
+
+        await flyTo(w, unit, 5 + 1);
+
+        expect(nav(unit).xtkScale).toBeCloseTo(0.668, 3);
+    });
+
+    // Moving back away from the FAF in ACTV the scale stays at 1, not above it (characterization, #163)
+    it('stays at 1 when the aircraft moves back 3 NM from the FAF in ACTV (characterization, #163)', async () => {
+        const {w, unit} = await armedBeforeFaf();
+        await flyTo(w, unit, 5 + 1.95);
+        expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
+
+        await moveAircraft(unit, w.north(5 + 3), {groundspeedKt: 120, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
+        expect(nav(unit).xtkScale).toBe(1);
+    });
+
+    // Case 2 of #163: a Direct To the FAF inside 2 NM in ACTV goes to ARM, and the next calculation tick activates again
+    // (characterization, #163)
+    it('goes ARM at a Direct To the FAF 1.5 NM before it and ACTV one tick later (characterization, #163)', async () => {
+        const {w, unit} = await armedBeforeFaf();
+        await flyTo(w, unit, 5 + 1.5);
+        expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
+
+        // No wait after the ENT: the state asserted next lasts only until the next calculation tick
+        await unit.panel.directTo('FAFAA', {waitMs: 0});
+        expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
     });
 });
 

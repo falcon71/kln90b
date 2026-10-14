@@ -426,7 +426,9 @@ sim.
   or until the legs are another object (the approach was removed, replaced or loaded again). A power-up clears it.
 - ARM becomes APR when the FAF is active (or the IAF copy of a fix that is IAF and FAF, `ActiveWaypoint.getActiveFafLeg()`),
   within 2 NM, the MAP is ahead and the track is within 110 deg of FAF to MAP. APR becomes 0.3 at the FAF ("Integrity
-  check?" is a TODO; there is no RAIM).
+  check?" is a TODO; there is no RAIM). In APR the scale ramps from its value at the activation to 0.3 over the distance
+  to the FAF left at the activation (capped at 1); both values are kept in `navPage.aprActivationScale` and
+  `navPage.aprActivationDist`.
 - `armApproachPressed()` is triggered from MainPage on `EVT_APPR_ARM`.
 - **OBS mode is implemented as a direct-to from a synthetic user facility (`ICAO.value("U","XX",...)`) 1000 NM away on
   the reciprocal of the OBS** (`setObs`). `setObs` skips an unchanged course unless `force` is set (entering OBS and

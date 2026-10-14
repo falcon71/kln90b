@@ -78,6 +78,9 @@ export class NavPageState {
     public toFrom: ToFrom | null = null;
     public xtkScale: number = 5;
     public approachDisarmedLeg: KLNFlightplanLeg | null = null; //6-1: the first APP leg of FPL 0 when the pilot disarmed the approach (#139)
+    //6-3, 6-11: the distance to the FAF and the scale when the unit went ACTV; the ramp to 0.3 runs from there (#163)
+    public aprActivationDist: NauticalMiles = 2;
+    public aprActivationScale: number = 1;
 
     public waypointAlert = false;
 
@@ -256,6 +259,8 @@ export class VolatileMemory {
         this.navPage.nav4VnavDist = 0;
         this.navPage.navmode = NavMode.ENR_LEG;
         this.navPage.approachDisarmedLeg = null; //The legs of a short power-off stay in FPL 0, the disarm does not (#139)
+        this.navPage.aprActivationDist = 2;
+        this.navPage.aprActivationScale = 1;
         this.navPage.userMagvar = 0;
 
         this.calPage.cal6TimeZ = null;

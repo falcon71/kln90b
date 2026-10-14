@@ -366,7 +366,10 @@ export class ModeController implements CalcTickable {
         }
 
         const dist = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(faf.wpt), UnitType.NMILE);
-        this.navState.xtkScale = dist * 0.35 + 0.3;  //Scale reaches 0.3 at 0 distance
+        //From the scale at the activation to 0.3 at the FAF over the distance left at the activation, so a late switch
+        //compresses the change (6-11); never above 1 when moving back out (#163)
+        const ratio = this.navState.aprActivationDist > 0 ? dist / this.navState.aprActivationDist : 0;
+        this.navState.xtkScale = Math.min(0.3 + (this.navState.aprActivationScale - 0.3) * ratio, 1);
     }
 
     private checkSwitchAprArmToActive(): void {
@@ -379,7 +382,8 @@ export class ModeController implements CalcTickable {
             return; //6-3: only with the FAF active, or the IAF copy of a fix that is IAF and FAF (#129)
         }
 
-        if (UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(faf.wpt), UnitType.NMILE) > 2) {
+        const fafDist = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(faf.wpt), UnitType.NMILE);
+        if (fafDist > 2) {
             return; //Within 2 NM
         }
 
@@ -400,6 +404,8 @@ export class ModeController implements CalcTickable {
 
         console.log("Moving to Apr mode");
         //If all this has passed, we switch to approach active
+        this.navState.aprActivationDist = fafDist;
+        this.navState.aprActivationScale = Math.min(this.navState.xtkScale, 1);
         this.navState.navmode = NavMode.APR_LEG;
     }
 
