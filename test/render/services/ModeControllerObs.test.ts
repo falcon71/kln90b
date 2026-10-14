@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {Facility, FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
+import {Facility, FixTypeFlags, FlightPlanLeg, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {standardRoute} from '../../harness/fixtures';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
@@ -277,8 +277,8 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
         return {unit, aw};
     }
 
-    // 5-36 and 6-11: the sibling of the pin below; its setup holds and the switch back to LEG works
-    it('the pin setup: the IAF copy is active in ARM-OBS, and LEG brings the unit to ARM-LEG with TXOAA active (the setup of #153)', async () => {
+    // 5-36 and 6-11: the setup of the test below holds and the switch back to LEG works
+    it('the IAF copy is active in ARM-OBS, and LEG brings the unit to ARM-LEG with TXOAA active (the setup of #153)', async () => {
         const {unit, aw} = await iafIsFafInObs();
 
         await legMode(unit);
@@ -287,15 +287,27 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
         expect(activeIdent(unit)).toBe('TXOAA');
     });
 
-    // 6-11 step 5: after the course reversal at an IAF that is also the FAF, switching to LEG makes the FAF active.
-    // Run as a plain it, the pin fails at the index assertion: expected 1 to be 2
-    it.fails('makes the FAF copy active when the IAF and the FAF are the same fix (#153)', async () => {
+    // 6-11 (the example procedure and its note): after the course reversal at a fix that is IAF and FAF, switching to
+    // LEG makes the FAF active
+    it('makes the FAF copy active when the IAF and the FAF are the same fix (#153)', async () => {
         const {unit, aw} = await iafIsFafInObs();
 
         await legMode(unit);
 
         expect(aw.getActiveFplIdx()).toBe(2);
         expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.FAF);
+    });
+
+    // 6-11: LEG with the FAF active is what the approach needs to become active; 6-3: within 2 NM of the FAF, heading
+    // toward it, the unit goes ACTV
+    it('goes ACTV after the switch to LEG, within 2 NM of the fix and heading toward it (6-3, 6-11)', async () => {
+        const {unit, aw} = await iafIsFafInObs();
+        await legMode(unit);
+        expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.FAF);
+
+        await moveAircraft(unit, pointFrom(txo, 0, 1.5), {groundspeedKt: 120, trackTrue: 180});
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.APR_LEG);
     });
 
     // 6-11 note and 6-19 note: after holding at a missed approach holding point that is also the FAF, switching to LEG
@@ -346,6 +358,74 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
 
         expect(aw.getActiveFplIdx()).toBe(2);
         expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.FAF);
+    });
+});
+
+// The maintainer's adjacency ruling for #153 (characterization, no page): LEG promotes an IAF copy to the FAF only when
+// the FAF copy of the same fix follows it directly. Real procedure data has both shapes below, and in both the IAF copy
+// stays active
+describe('OBS to LEG with an IAF that is not directly followed by its own FAF (characterization)', () => {
+    const kprc = airport('KPRC', 47.0, 8.0);
+    const mapaa = intersection('MAPAA', 47.0, 8.0);
+    const txoPos = pointFrom(kprc, 0, 5);
+    const txo = intersection('TXOAA', txoPos.lat, txoPos.lon);
+    const othPos = pointFrom(txo, 90, 8);
+    const oth = intersection('OTHAA', othPos.lat, othPos.lon);
+    const enrPos = pointFrom(txo, 0, 30);
+    const enraa = intersection('ENRAA', enrPos.lat, enrPos.lon);
+
+    /** The approach is loaded behind ENRAA, the IAF copy is active, then OBS 180 */
+    async function iafInObs(transition: FlightPlanLeg[], final: FlightPlanLeg[], expectedPlan: string[]) {
+        const apt = withProcedures(kprc, {
+            approaches: [approach({
+                type: ApproachType.APPROACH_TYPE_VOR, runway: '18',
+                transitions: [{name: 'TXOAA', legs: transition}],
+                final,
+            })],
+        });
+        const unit = await bootUnit({
+            facilities: [apt, enraa, txo, oth, mapaa], position: pointFrom(txo, 0, 6),
+            panelXml: panelXml(APR_ARM_SWITCH),
+            storage: {...savedFlightplan(0, [enraa, apt]), turnAnticipation: false},
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        await vi.advanceTimersByTimeAsync(2000);
+        const aw = unit.props.memory.navPage.activeWaypoint;
+        expect(fplIdents(unit)).toEqual(expectedPlan);
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.IAF);
+        unit.env.sim.set('Nav OBS:1', 'degrees', 180);
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(aw.getActiveFplIdx()).toBe(1);
+        return {unit, aw};
+    }
+
+    it('keeps the IAF copy active when the FAF copy of the same fix is not the next leg', async () => {
+        const {unit, aw} = await iafInObs(
+            [Leg.IF(txo, FixTypeFlags.IAF), Leg.TF(oth)],
+            [Leg.IF(txo, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            ['ENRAA', 'TXOAA', 'OTHAA', 'TXOAA', 'MAPAA', 'KPRC'],
+        );
+
+        await legMode(unit);
+
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.IAF);
+    });
+
+    it('keeps the IAF copy active when the next leg is a FAF at another fix', async () => {
+        const {unit, aw} = await iafInObs(
+            [Leg.IF(txo, FixTypeFlags.IAF)],
+            [Leg.IF(txo), Leg.TF(oth, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            ['ENRAA', 'TXOAA', 'OTHAA', 'MAPAA', 'KPRC'],
+        );
+
+        await legMode(unit);
+
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.IAF);
     });
 });
 

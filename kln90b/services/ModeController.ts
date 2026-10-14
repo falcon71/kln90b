@@ -103,9 +103,31 @@ export class ModeController implements CalcTickable {
             } else {
                 const fromCoords: LatLonInterface = this.navState.activeWaypoint.getFromWpt()!;
                 const from = UserFacilityUtils.createFromLatLon(ICAO.value("U", "XX", "", "d"), fromCoords.lat, fromCoords.lon, true);
-                this.navState.activeWaypoint.directTo(from, active);
+                const activeIdx = this.navState.activeWaypoint.getActiveFplIdx();
+                const fafIdx = activeIdx >= 0 ? this.getFafCopyIdx(activeIdx) : -1;
+                if (fafIdx >= 0) {
+                    this.navState.activeWaypoint.directToFlightplanIndex(from, fafIdx); //6-11: LEG makes the FAF active (#153)
+                } else {
+                    this.navState.activeWaypoint.directTo(from, active);
+                }
             }
         }
+    }
+
+    /**
+     * 6-11: LEG makes the FAF active at an IAF that is also the FAF. Returns the index of the FAF copy when the leg at
+     * idx is such an IAF copy, -1 otherwise. Which copies count is the maintainer's ruling for #153 (characterization):
+     * only an IAF copy directly followed by the FAF copy of the same fix; where other legs lie between the two copies,
+     * or the next FAF is another fix, the IAF copy stays active
+     */
+    private getFafCopyIdx(idx: number): number {
+        const legs = this.fpl0.getLegs();
+        const leg = legs[idx];
+        const next = legs[idx + 1];
+        if (leg.fixType === KLNFixType.IAF && next?.fixType === KLNFixType.FAF && ICAO.valueEquals(next.wpt.icaoStruct, leg.wpt.icaoStruct)) {
+            return idx + 1;
+        }
+        return -1;
     }
 
     /**
