@@ -118,6 +118,8 @@ change what they mean; add new ones instead:
 - **Manual references are the spec.** Comments like `3-29` or `5-36` are page numbers in the *KLN 90B Pilot's Guide*
   (006-08773-0000, a free download linked in the README). Comments may also cite the install or maintenance manual, a
   YouTube timestamp, or the KLN 89 trainer. Keep these references and add one when you implement or change behaviour.
+  Dated KLN 89 trainer checks are recorded in [docs/kln89-trainer-record.md](docs/kln89-trainer-record.md); a new check
+  adds a block there.
 - `target: es2017` is chosen for Coherent GT; don't rely on newer runtime features.
 - Display text is uppercase, with only `A-Z 0-9 space -` from the database (`data/Text.ts`). Lowercase letters are small
   glyphs in the font (`nm`, `ft`, `ent`, `enr-leg`), so use them only where the real unit shows small text.

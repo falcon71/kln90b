@@ -761,7 +761,7 @@ describe('SUP page, a radial just below north (characterization)', () => {
     // The only VOR NNN lies 12 NM from USUP on the true course 179.97, so the true radial from NNN to USUP is 359.97
     // (checked below), which rounds to 360.0. No variation anywhere, so the magnetic radial is the true one. The field
     // takes 000.0 to 359.9 (T10, for entry), and the code shows north as 000.0. The 89 shows a radial of 0 as 360.0 (the
-    // lead in docs/testing.md, section 9), so the rounding at the top of the range is the code's own form
+    // lead in docs/testing.md, section 8), so the rounding at the top of the range is the code's own form
     it('characterization: shows a radial of 359.97 from the reference VOR as 000.0 (#340)', async () => {
         const usup = {lat: 47.2, lon: 10.5};
         const nnn = pointFrom(usup, 179.97, 12);

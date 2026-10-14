@@ -171,7 +171,7 @@ describe('RadialEditor on the INT page (characterization)', () => {
 
 describe('RadialEditor at north (characterization)', () => {
     // The field takes 000.0 to 359.9 (T10, for entry), and the code shows north as 000.0. The 89 shows a radial of 0 as
-    // 360.0 (the lead in docs/testing.md, section 9), so the rounding at the top of the range is the code's own form:
+    // 360.0 (the lead in docs/testing.md, section 8), so the rounding at the top of the range is the code's own form:
     // a radial of 359.97 shows 000.0
     it('characterization: shows a radial of 359.97 as 000.0 (#340)', () => {
         expect(mountedText(new RadialEditor(new EventBus(), 359.97, () => {}))).toBe('000.0');

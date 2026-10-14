@@ -309,7 +309,7 @@ describe('waypoint editor on FPL 0, CLR on a blank position (characterization)',
     // 4-2 step 7 has CLR reject the typed identifier of a waypoint page. What follows is the code's behavior, not shown
     // by the manual: on an insert in front of a waypoint the ENT that confirms the blank ends the insert, the row goes,
     // nothing is added, and the cursor rests on the waypoint the insert was in front of (#310). The trainer check T18
-    // (docs/testing.md section 8) records only that CLR during the FPL 0 confirmation returns to the blank position
+    // (docs/kln89-trainer-record.md) records only that CLR during the FPL 0 confirmation returns to the blank position
     // with the cursor on it. That position at the end of FPL 0 is the setup of the #310 test in the describe above
     // ('removes the waypoint page on CLR ...'), not of this one.
     it('characterization: ends an insert in the middle on CLR and ENT, with the cursor on the following waypoint (#310)', async () => {
