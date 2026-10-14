@@ -6,7 +6,7 @@ import {TimeStamp} from '../../../kln90b/data/Time';
 import {DtPageState} from '../../../kln90b/data/VolatileMemory';
 import {simEnv} from '../../harness/sim/install';
 
-// The settings manager is a singleton bound to the first bus (testing.md, Unit), so one bus serves the file.
+// The settings manager is a singleton bound to the first bus (test/README.md, Unit), so one bus serves the file.
 const bus = new EventBus();
 const settings = new KLN90BUserSettings(bus);
 

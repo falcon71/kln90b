@@ -3,7 +3,7 @@ import {HeadlessUnit} from './boot';
 
 /**
  * The status-line messages (`statusLineMessage`, controls/StatusLine.tsx) published from now on, in order. The bus calls
- * a new subscriber at once with the last cached message (testing.md section 6); that call is dropped.
+ * a new subscriber at once with the last cached message (test/README.md section 6); that call is dropped.
  */
 export function collectStatusMessages(unit: HeadlessUnit): string[] {
     const seen: string[] = [];

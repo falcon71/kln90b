@@ -399,7 +399,7 @@ describe('no sequencing past the MAP (6-7)', () => {
 });
 
 // 3-31, figure 3-101: when the unit is not usable for navigation NAV 1 shows FLAG over the CDI and dashes for DIS, GS,
-// ETE and BRG. The GPS loses its solution in flight (gps.reset() in the middle of the test, testing.md).
+// ETE and BRG. The GPS loses its solution in flight (gps.reset() in the middle of the test, test/README.md).
 describe('GPS invalid (3-31)', () => {
     it('flags NAV 1 and the HSI', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();

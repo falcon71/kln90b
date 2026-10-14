@@ -131,7 +131,7 @@ async function onFpl0(): Promise<HeadlessUnit> {
 
 describe('FlightplanArrow on FPL 0 during a NAV flag', () => {
     // 4-7, figure 4-29: the setup sibling of the pin. Navigating, FPL 0 draws the leg symbol from KAAA to ABC; after
-    // the GPS loses its solution (gps.reset() in the middle of the test, testing.md) the unit is flagged and ABC stays
+    // the GPS loses its solution (gps.reset() in the middle of the test, test/README.md) the unit is flagged and ABC stays
     // active
     it('draws the leg symbol while navigating, and keeps ABC active through the flag (4-7)', async () => {
         const unit = await onFpl0();

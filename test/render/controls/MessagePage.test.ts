@@ -32,7 +32,7 @@ async function bootNearKbbb(): Promise<HeadlessUnit> {
     return unit;
 }
 
-/** Reads the boot messages (testing.md section 6): MSG until the page closes, then the one-time messages go */
+/** Reads the boot messages (test/README.md section 6): MSG until the page closes, then the one-time messages go */
 async function readAll(unit: HeadlessUnit): Promise<void> {
     await unit.panel.readMessages();
     expect(unit.props.messageHandler.getMessages()).toEqual([]); // the precondition: nothing is left to read

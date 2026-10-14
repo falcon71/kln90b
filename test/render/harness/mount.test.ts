@@ -22,7 +22,7 @@ describe('mount (harness)', () => {
         expect(tick.mock.calls).toEqual([[true], [false]]);
     });
 
-    // A display changes its text on a display tick only (testing.md section 4), so the test ticks the mounted control
+    // A display changes its text on a display tick only (test/README.md section 4), so the test ticks the mounted control
     it('shows a text set after the render only after tick()', () => {
         const el = new TextDisplay('OLD');
         const m = mount(el);

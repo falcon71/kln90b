@@ -418,7 +418,7 @@ export class FrontPanel {
     }
 
     /**
-     * Loads the first procedure of APT 7 or APT 8 into FPL 0 the way a pilot does (testing.md, Procedures): select the
+     * Loads the first procedure of APT 7 or APT 8 into FPL 0 the way a pilot does (test/README.md, Procedures): select the
      * page, enter the airport when given (the APT pages open on the first airport of the scan list), cursor, ENT on the
      * first entry (its only transition is taken without a question), ENT on LOAD IN FPL, cursor off. FPL 0 scrolls to the
      * active leg only at the next calculation tick, so it waits one second.

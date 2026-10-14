@@ -40,10 +40,10 @@ npx vitest run --project flight   # one stage
 - The version in `package.json` must be **at most 6 characters**, because it is shown on the unit's screen.
 
 Tests live in `test/` and run with Vitest in three stages: unit (Node), render (happy-dom, reads the 23×7 screen) and
-flight (boots the whole unit headless and flies it on simulated time). See **[docs/testing.md](docs/testing.md)**. There
-is no linter. `tsc` and the build are separate checks; the GitHub Actions workflow `.github/workflows/ci.yml` runs
-both and `npm test` on every push and pull request. Behavior changes should come with a test at the cheapest stage that
-can observe them.
+flight (boots the whole unit headless and flies it on simulated time). See **[test/README.md](test/README.md)**; the
+records about the suite (coverage, next steps, KLN 89 trainer checks) are in `docs/`. There is no linter. `tsc` and the
+build are separate checks; the GitHub Actions workflow `.github/workflows/ci.yml` runs both and `npm test` on every push
+and pull request. Behavior changes should come with a test at the cheapest stage that can observe them.
 
 ## Public contract with aircraft — do not break
 
@@ -149,7 +149,7 @@ Every time you spot a bug, whether in code you read, in a test or during a revie
   and observed vs. expected values), the file and line, the impact on the user, and a suggested fix. If it continues a
   closed issue, reference that issue instead of reopening it.
 - **Do not fix it on the side** of unrelated work. Pin it with an `it.fails('… (#NN)')` test where a test can observe it
-  (see [docs/testing.md](docs/testing.md)), so the pin turns red once the bug is fixed.
+  (see [test/README.md](test/README.md)), so the pin turns red once the bug is fixed.
 - Cite manual pages in issues; never copy manual text into them (see below).
 
 ## Reference material (copyrighted — never commit)

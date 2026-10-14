@@ -161,7 +161,7 @@ describe('MOD 2 page (spec)', () => {
 // course set on the unit has to reach the indicator at once, or the indicator's old course replaces it (#261)
 describe('MOD 2 OBS course with a driven indicator', () => {
     /** ObsTarget 1 with the indicator on 090, OBS mode, the cursor on the course. The fake acts on K:VOR1_SET only on
-     * request (testing.md), so it moves Nav OBS:1 here, as the sim does */
+     * request (test/README.md), so it moves Nav OBS:1 here, as the sim does */
     async function drivenIndicatorOn90() {
         const unit = await onEquatorLeg(panelXml({'Output.ObsTarget': 1}));
         unit.env.sim.applyObsKeyEvents = true;

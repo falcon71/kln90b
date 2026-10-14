@@ -37,7 +37,7 @@ describe('create waypoint message (5-16)', () => {
 
         await unit.panel.inner('R', -1);
 
-        // Screen.read() throws when a half page holds a character below its sixth row (docs/testing.md, section 3),
+        // Screen.read() throws when a half page holds a character below its sixth row (test/README.md, section 3),
         // which is where a creation block that stayed visible under the waypoint page would show
         expect(rows()).toEqual([
             ' BAAA      ', 'ROTH FIELD ', '           ', '           ', "N 47°12.00'", "E 10°30.00'",

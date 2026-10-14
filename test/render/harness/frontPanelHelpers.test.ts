@@ -116,7 +116,7 @@ ${Screen.read().dump()}`);
 
 describe('FrontPanel.confirmSet1AndReselect (harness)', () => {
     // 3-18: CONFIRM? commits the entered values. That the GPS then holds the track while the aircraft stands still is
-    // the harness simulation (moveAircraft in testing.md), not the guide
+    // the harness simulation (moveAircraft in test/README.md), not the guide
     it('confirms SET 1, leaves the cursor off and shows SET 1 again', async () => {
         const unit = await booted({position: {lat: 47.5, lon: 11.25}});
         await unit.panel.selectPage('L', 'SET 1');

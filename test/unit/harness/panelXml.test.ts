@@ -7,7 +7,7 @@ import {
 } from '../../harness/panelXml';
 import {simEnv} from '../../harness/sim/install';
 
-// The parser writes LVars, and the unit stage has no teardown (testing.md section 4)
+// The parser writes LVars, and the unit stage has no teardown (test/README.md section 4)
 beforeEach(() => simEnv().sim.reset());
 
 const parse = (xml: string) =>

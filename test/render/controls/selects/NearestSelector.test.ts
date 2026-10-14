@@ -5,7 +5,7 @@ import {blinkCycle} from '../../../harness/render/blink';
 import {Screen} from '../../../harness/render/screen';
 
 // Every test advances twelve simulated seconds with every tick running before it starts: the 5 s default of the render
-// stage times out when the machine is busy (docs/testing.md, section 6), so each test has its own timeout.
+// stage times out when the machine is busy (test/README.md, section 6), so each test has its own timeout.
 const TIMEOUT = 20_000;
 
 // The rank of a nearest waypoint (nr n) after the identifier of the APT, VOR and NDB pages. KAAA is the nearest

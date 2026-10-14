@@ -3,7 +3,7 @@ import {SignalOutputFilter} from '../../../kln90b/services/SignalOutputFilter';
 
 // The filter reads the time through Date. The unit stage installs no fake clock, so the test fakes Date alone.
 const START = new Date('2026-06-01T12:00:00Z').getTime();
-// The 16 Hz signal loop runs every 62 ms under the fake timers (docs/testing.md section 6); the calculation tick, which
+// The 16 Hz signal loop runs every 62 ms under the fake timers (test/README.md section 6); the calculation tick, which
 // gives the filter a new value, every 1000 ms.
 const SIGNAL_MS = 62;
 const CALC_MS = 1000;

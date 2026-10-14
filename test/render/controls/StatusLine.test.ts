@@ -23,7 +23,7 @@ async function msgLightOverTwoSeconds(unit: HeadlessUnit): Promise<Set<number>> 
 // aircraft must not add a flash of its own. A wrong external CDI course is the cheap trigger of a persistent message.
 describe('L:KLN90B_MsgLight (spec)', () => {
     it('flashes while a message is unread (3-16, 3-59)', async () => {
-        // A booted unit always has unread messages (docs/testing.md, section 6)
+        // A booted unit always has unread messages (test/README.md, section 6)
         const unit = await bootUnit();
         await settle(unit);
 
@@ -159,7 +159,7 @@ describe('status line, the center segment (spec)', () => {
     // 3-16, figure 3-55: a new message makes the msg prompt flash in inverse video. The harness reads the flashing
     // inverse as I in one phase and F in the other
     it('flashes msg in inverse video while a message is unread (3-16, figure 3-55)', async () => {
-        await bootUnit(); // the boot messages are unread (testing.md section 6)
+        await bootUnit(); // the boot messages are unread (test/README.md section 6)
 
         expectFlashing(await twoCycles(prompt), 'msg III', 'msg FFF');
     });

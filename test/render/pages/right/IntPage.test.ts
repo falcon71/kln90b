@@ -682,7 +682,7 @@ describe('stored user intersection', () => {
 });
 
 describe('stored user intersection without a reference VOR (#286)', () => {
-    // A throw on ENT is never the real unit's behavior (testing.md section 5, as #243). IntPage.setRad read this.ref!
+    // A throw on ENT is never the real unit's behavior (test/README.md section 5, as #243). IntPage.setRad read this.ref!
     // (null without a reference VOR, and during the 8 s of the REF calculation), and the TypeError rejected the ENT.
     // Since #118 a throw is also an `error` event on the error page, so the test checks both
     it('does not throw on ENT of a radial without a reference (#286)', async () => {

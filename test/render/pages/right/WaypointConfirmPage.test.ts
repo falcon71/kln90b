@@ -130,7 +130,7 @@ describe('waypoint confirmation page (3-14)', () => {
 
         await unit.panel.ent();
         expect(Screen.read().status().right).toBe('NAV 1');
-        expect(Screen.read().status().mode).toBe('enr-leg msg'); // no ENT; the boot lights MSG (testing.md section 6)
+        expect(Screen.read().status().mode).toBe('enr-leg msg'); // no ENT; the boot lights MSG (test/README.md section 6)
         expect(Screen.read().rows('L')[0]).toBe('KAAA -     ');
         expect(unit.errors).toEqual([]);
     });

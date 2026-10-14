@@ -48,7 +48,7 @@ describe('D/T 4 page', () => {
         await show(unit, 'FPL 0');
 
         // Ten simulated minutes with every tick running: the 5 s default timeout is too short on a busy machine, hence
-        // the 30 s one below (docs/testing.md, Long render tests need their own timeout)
+        // the 30 s one below (test/README.md, Long render tests need their own timeout)
         await vi.advanceTimersByTimeAsync(600_000);
 
         const rows = Screen.read().rows('R');

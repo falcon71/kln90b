@@ -181,7 +181,7 @@ describe('showSuperNav5 and the boots onto it (harness)', () => {
         }
     });
 
-    // The leg world of testing.md section 3: 30 NM west of KDDD on the leg to it, KDDD active
+    // The leg world of test/README.md section 3: 30 NM west of KDDD on the leg to it, KDDD active
     it('superNav5OnLeg boots on the leg to KDDD and shows Super NAV 5', async () => {
         const unit = await superNav5OnLeg({westNm: 30});
 

@@ -14,7 +14,7 @@ import {GPS_ERA_DURATION, SearchMode} from '../../kln90b/GpsSearch';
 // set in powerChanged after the off time is added to timeZulu (#211), as the model reads it on the first tick.
 //
 // The acquisition tests simulate several minutes each: they carry their own timeout, as the 5 s default fails when the
-// machine is busy (testing.md).
+// machine is busy (test/README.md).
 const SLOW = 60_000;
 const VERY_SLOW = 240_000;
 
@@ -44,7 +44,7 @@ async function powerOnCold(storage: Record<string, unknown>, clockOffsetMs = 0, 
     return unit;
 }
 
-/** Seconds from now until the GPS has a solution, or cap when it has none by then. The time is the subject (testing.md) */
+/** Seconds from now until the GPS has a solution, or cap when it has none by then. The time is the subject (test/README.md) */
 async function secondsToFix(unit: HeadlessUnit, cap: number): Promise<number> {
     const gps = unit.props.sensors.in.gps;
     let s = 0;

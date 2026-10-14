@@ -3,7 +3,7 @@ import {bootUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 
 // The tests pass STA 3 on the way back to STA 4, and STA 3 shows the version, which the build injects into Version.ts
-// (testing.md section 4)
+// (test/README.md section 4)
 vi.mock('../../../../kln90b/Version', () => ({VERSION: '2.2.0'}));
 
 const HOUR = 3600;

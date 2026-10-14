@@ -3,7 +3,7 @@
 Detailed companion to [CLAUDE.md](../CLAUDE.md). It covers the big-picture wiring that takes many files to see.
 All paths are relative to the repo root and the code lives under `kln90b/`. It describes the code as of v2.2.0
 (commit `456356d`); check the code when this document and the code disagree, and update this document.
-Automated tests are described in [testing.md](testing.md).
+Automated tests are described in [test/README.md](../test/README.md).
 
 - Part 1, **Core**: boot, tick loops, sensors/GPS, sim outputs, navigation, navdata, persistence, configuration,
   messages.
@@ -38,7 +38,7 @@ the tick loops. Its constructor takes a `KLN90BPlatform` and the re-dispatch cal
 (`kln90b/KLN90BPlatform.ts`) is what the core needs from outside the sim's global APIs (`SimVar`, `Coherent` and
 `DataStore` stay global): `createFacilityClient(bus)`, `getFacilityRepository(bus)` and `getRouteManager()`. The sim
 passes `SIM_PLATFORM`, which wraps the SDK `FacilityLoader`, `KLNFacilityRepository` and `FlightPlanRouteManager`. The
-tests create `KLN90BCore` directly with a `FakePlatform` (testing.md), which is the reason the split exists. The
+tests create `KLN90BCore` directly with a `FakePlatform` (test/README.md), which is the reason the split exists. The
 sections below say `KLN90BCore` where the code moved and `KLN90B` where the adapter still acts.
 
 **constructor** of `KLN90BCore` (runs before the XML config is available):
@@ -664,7 +664,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   SDK style. Beware of aliasing.
 - **Global and singleton state:** `KLNFacilityRepository.INSTANCE`, the `KLN90BUser*Settings` managers (`INSTANCE ??=`),
   `FlightPlanner` id `"kln90b"`, and the `SimVar`/`Coherent` globals from `@microsoft/msfs-types`. Because of these
-  singletons the tests run one headless unit per test (testing.md). `global.d.ts` only
+  singletons the tests run one headless unit per test (test/README.md). `global.d.ts` only
   declares `*.scss`. `KeyCode.*` constants are ambient.
 - **Error handling:** a try/catch around every tick and interaction publishes `error`, which shows the on-screen error
   page with an "OK and suppress further errors" button. Async code mostly uses `.catch(e => bus.pub("error"))` or

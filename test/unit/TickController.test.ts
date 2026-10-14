@@ -85,7 +85,7 @@ afterEach(() => {
 // blink true one tick in four, the calculations run at 1 Hz in the order of the list, the analog signal outputs at
 // 16 Hz, and the loops run only while the unit is powered and enabled. The literals are those rates times the elapsed
 // time.
-// The 16 Hz loop fires every 62 ms under the fake timers (docs/testing.md section 6), which gives 16 per second for the
+// The 16 Hz loop fires every 62 ms under the fake timers (test/README.md section 6), which gives 16 per second for the
 // first seconds; the counts below stay within the first two seconds.
 describe('TickController loops (spec, docs/architecture.md Core 2)', () => {
     it('runs nothing before the unit is powered', () => {

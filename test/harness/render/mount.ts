@@ -18,7 +18,7 @@ export interface Mounted {
  * Renders a display or control into a detached element, the way a page renders its children, so that a test can read
  * the control's own format without booting a unit. There is no tick loop: a control whose text changes only on a
  * display tick (the arrows, the deviation bars, any value set after render) is ticked by the test with `tick()`
- * (testing.md section 4).
+ * (test/README.md section 4).
  */
 export function mount(el: UiElement): Mounted {
     const host = document.createElement('div');

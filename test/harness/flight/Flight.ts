@@ -167,7 +167,7 @@ export class Flight {
      * (measured: the timer that fired longest ago goes first, which is the 1 Hz one), so the display tick that follows
      * already shows it and the screen is normally current at once. This helper is a guard for a state where the display
      * would run first, such as the first shared second after the tick loops are created; otherwise it flies one or two
-     * display ticks (testing.md section 4).
+     * display ticks (test/README.md section 4).
      *
      * A calculation tick is recognized by DIS to the active waypoint changing, so this needs an aircraft that moves
      * toward or away from an active waypoint. Without one nothing changes, and it returns after one display tick.

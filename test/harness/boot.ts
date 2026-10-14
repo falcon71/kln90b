@@ -324,7 +324,7 @@ export async function bootUnit(opts: BootOptions = {}): Promise<HeadlessUnit> {
 /**
  * A cold-and-dark boot to the self-test page: the unit is powered on and the clock runs past the Turn-On page (17 s)
  * until the self-test page shows APPROVE?, which it does until it is approved (3-3 to 3-7). The hand-written copies of
- * this sequence in older tests stay as they are (testing.md section 8)
+ * this sequence in older tests stay as they are (docs/test-next-steps.md)
  */
 export async function bootToSelfTest(opts: BootOptions = {}): Promise<HeadlessUnit> {
     const unit = await bootUnit({...opts, engineRunning: false});

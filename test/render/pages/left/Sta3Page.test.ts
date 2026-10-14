@@ -3,7 +3,7 @@ import {bootUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 
 // STA 3 shows the version, which the build injects into Version.ts; the source carries a placeholder 18 cells wide
-// (testing.md section 4)
+// (test/README.md section 4)
 vi.mock('../../../../kln90b/Version', () => ({VERSION: '2.2.0'}));
 
 // The page shows the version of this project as the host software, a fixed receiver software and the default OBS

@@ -88,7 +88,7 @@ describe('SET 0 page, the ENT prompt (2-5)', () => {
     const prompt = () => `${Screen.read().row(6).slice(14, 17)} ${Screen.read().mask().split('\n')[6].slice(14, 17)}`;
 
     // 2-5, figure 2-3: with the cursor on UPDATE PUBLISHED DB the status line shows CRSR and the ENT prompt; 3-11 and
-    // 3-10: ENT flashes as plain text, not inverse, on one display tick in four (testing.md, blinkCycle)
+    // 3-10: ENT flashes as plain text, not inverse, on one display tick in four (test/README.md, blinkCycle)
     it('flashes ent while the cursor is on UPDATE PUBLISHED DB (2-5, figure 2-3, 3-10, 3-11)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 0');

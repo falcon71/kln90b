@@ -3,7 +3,7 @@ import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {OneTimeMessage} from '../../../kln90b/data/MessageHandler';
 
-// The last position matches the boot position, so that POSITION DIFFERS does not post (testing.md section 6)
+// The last position matches the boot position, so that POSITION DIFFERS does not post (test/README.md section 6)
 async function booted(): Promise<HeadlessUnit> {
     const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}, position: {lat: 47, lon: 8}});
     await settle(unit);

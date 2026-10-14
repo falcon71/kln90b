@@ -54,7 +54,7 @@ describe('readers (harness)', () => {
         expect(turnStackLength(unit)).toBe(0);
     });
 
-    // ActiveWaypoint replaces the array on clearTurnStack (testing.md section 6), so the reader must not hold one
+    // ActiveWaypoint replaces the array on clearTurnStack (test/README.md section 6), so the reader must not hold one
     it('turnStackLength reads the array the active waypoint holds now', async () => {
         const unit = await bootUnit();
         await settle(unit);

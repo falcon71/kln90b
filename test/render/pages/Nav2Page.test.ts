@@ -28,7 +28,7 @@ describe('NAV 2 page (characterization)', () => {
             "N 47°00.00'",
         ]);
         expect(screen.leftName()).toBe('NAV 2');
-        // The snapshot also pins the SUP page and the lit MSG annunciator from the engine-running boot (docs/testing.md, limitations)
+        // The snapshot also pins the SUP page and the lit MSG annunciator from the engine-running boot (test/README.md, limitations)
         const dump = screen.dump().split('\n');
         dump.splice(13, 1); // the mask of row 5
         dump.splice(5, 1); // the text of row 5

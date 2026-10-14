@@ -1,7 +1,7 @@
 # KLN 89 trainer record
 
 A dated record of the checks made on the KLN 89 trainer, the evidence that decides where the KLN 90B Pilot's Guide is
-silent ([testing.md](testing.md), section 5). Each block is true on its date: a new check adds a block, and an old
+silent ([test/README.md](../test/README.md), section 5). Each block is true on its date: a new check adds a block, and an old
 block is not edited. The trainer runs in a virtual machine that the maintainer starts. Each check is paraphrased, with
 its confidence where it was not high and the issue it led to. The 89 has one knob pair, a four-line screen and its own
 layout, so section 5 of the testing guide decides how far a check counts for the 90B.
