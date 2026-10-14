@@ -109,7 +109,9 @@ describe('NAV 3 page, direct-to', () => {
 describe('NAV 3 page on an FPL 0 leg', () => {
     // 3-32, 5-35: in OBS mode the selected course replaces DTK; the colon after OBS says it can be entered on the unit,
     // which it can without an external indicator. 5-36: switching to OBS without an external indicator keeps the
-    // deviation, so on the course the OBS is the DTK, 088.8 true there (the course from the aircraft to KDDD), 089.
+    // deviation, so the unit lays the leg's own course through KDDD: finalCourseDeg of KAAA - KDDD is 90.00 (KAAA lies
+    // due west of KDDD by construction, see legWorld), with the variation of 0 that is 090 (#151). The DTK at the
+    // aircraft, 089, is not the course.
     it('shows OBS: with the course in OBS mode without an external indicator (3-32, 5-35, 5-36)', async () => {
         const unit = await nav3OnLeg(0);
         await unit.panel.obsMode();
@@ -117,7 +119,7 @@ describe('NAV 3 page on an FPL 0 leg', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
-        expect(Screen.read().rows('L')[1]).toBe('OBS:   089°');
+        expect(Screen.read().rows('L')[1]).toBe('OBS:   090°');
     });
 
     // 5-35: with an external indicator the course is set there, and OBS shows without the colon. The indicator is set to
@@ -134,21 +136,22 @@ describe('NAV 3 page on an FPL 0 leg', () => {
     });
 
     // 5-35 steps b and c (figures 5-113, 5-114): with the colon shown the cursor goes over the OBS course and the inner
-    // knob changes it, one degree per click
+    // knob changes it, one degree per click. The unit starts from the leg's course at KDDD, 090 (finalCourseDeg of
+    // KAAA - KDDD is 90.00, #151), so two clicks up are 092 and three down from there 089
     it('changes the OBS course with the inner knob under the cursor (5-35)', async () => {
         const unit = await nav3OnLeg(0);
         await unit.panel.obsMode();
         await unit.panel.selectPage('L', 'NAV 3');
         await unit.panel.cursor('L');
-        expect(unit.panel.focused('L')).toEqual({row: 1, col: 7, text: '089°'});
+        expect(unit.panel.focused('L')).toEqual({row: 1, col: 7, text: '090°'});
 
         await unit.panel.inner('L', 2);
         await vi.advanceTimersByTimeAsync(1000);
-        expect(Screen.read().rows('L')[1]).toBe('OBS:   091°');
+        expect(Screen.read().rows('L')[1]).toBe('OBS:   092°');
 
         await unit.panel.inner('L', -3);
         await vi.advanceTimersByTimeAsync(1000);
-        expect(Screen.read().rows('L')[1]).toBe('OBS:   088°');
+        expect(Screen.read().rows('L')[1]).toBe('OBS:   089°');
     });
 
     // 5-35: with an indicator the unit reads and drives (ObsSource 1 by default, ObsTarget 1) the course turned on NAV 3

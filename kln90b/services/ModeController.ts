@@ -21,6 +21,8 @@ import {StatusLineMessageEvents} from "../controls/StatusLine";
 import {CalcTickable, TICK_TIME_CALC} from "../TickController";
 import {KLNMagvar} from "../data/navdata/KLNMagvar";
 
+const VEC3_CACHE = new Float64Array(3);
+
 /**
  * 5-36
  */
@@ -259,7 +261,14 @@ export class ModeController implements CalcTickable {
         if (this.sensors.in.obsMag !== null && this.planeSettings.output.obsTarget === 0) {
             this.setObs(this.sensors.in.obsMag, true);
         } else if (active !== null) {
-            const obsTrue = this.navState.desiredTrack ?? this.navState.bearingToActive!; //Null when TO and FROM are the same waypoint
+            //5-36: the course of the current path at the active waypoint, so that the course laid through it is the leg
+            //itself and the deviation is kept on any leg length (#151). A degenerate path (TO and FROM the same
+            //waypoint, #67) falls back to the DTK or the bearing. The waypoint is taken to its closest point on the
+            //path first: the end fix of a DME arc is a database fix and need not lie on the arc circle, and bearingAt
+            //throws for a point off the circle (as in NavCalculator)
+            const fromPath = this.navState.activeWaypoint.getFromLeg()?.path;
+            const pathCourse = fromPath !== undefined && fromPath.isValid() ? fromPath.bearingAt(fromPath.closest(active, VEC3_CACHE)) : NaN;
+            const obsTrue = isNaN(pathCourse) ? (this.navState.desiredTrack ?? this.navState.bearingToActive!) : pathCourse;
 
             const magvar = this.getMagvarForObs(active);
             this.setObsOnUnit(this.magvar.trueToMag(obsTrue, magvar), true);

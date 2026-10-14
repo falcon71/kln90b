@@ -14,7 +14,7 @@ const OBS_SOURCE_OFF = panelXml(NO_OBS);
 /**
  * A leg from KAAA to the VOR ABC with the aircraft on it and ABC active, boxed in by the callers below. The legs lie on
  * the equator or on a meridian, so their true course is exactly 090 or 000 everywhere, and the variation is 0: the
- * course the unit takes for OBS is that course by construction
+ * course the unit takes for OBS is that course by construction. The exception is onNearEquatorLeg below
  */
 async function onLeg(from: {lat: number, lon: number}, to: {lat: number, lon: number}, position: {lat: number, lon: number}, xml?: string): Promise<HeadlessUnit> {
     const kaaa = airport('KAAA', from.lat, from.lon);
@@ -30,6 +30,11 @@ const onEquatorLeg = (xml?: string) => onLeg({lat: 0, lon: 8}, {lat: 0, lon: 9},
 
 /** A leg due north along a meridian, KAAA (0, 8) to ABC (1, 8), with the aircraft on it at 0.4 N: OBS 000 */
 const onMeridianLeg = (xml?: string) => onLeg({lat: 0, lon: 8}, {lat: 1, lon: 8}, {lat: 0.4, lon: 8}, xml);
+
+/** A leg just north of east, KAAA (0, 8) to ABC (0.003, 9), the aircraft on it at 8.4 E: the course at ABC is a hair
+ * under 090, about 089.83 (the leg climbs 0.003 degrees of latitude over one degree of longitude). Unlike the two
+ * helpers above this is not exactly 090, which is the point: it keeps a course just below north in reach */
+const onNearEquatorLeg = (xml?: string) => onLeg({lat: 0, lon: 8}, {lat: 0.003, lon: 9}, {lat: 0.0012, lon: 8.4}, xml);
 
 describe('MOD 2 page (characterization)', () => {
     it('shows ACTIVE MODE and the course read from the indicator in ENR-OBS (characterization)', async () => {
@@ -238,21 +243,24 @@ describe('MOD 2 OBS course knob (spec)', () => {
     });
 });
 
-// 5-35 and the KLN 89 trainer (2026-10-07): the OBS course shows 000, never 360. On the equator leg the course the unit
-// takes is a hair under 090 (89.99999914 as the unit computes it), so ninety clicks to the left leave a hair under 360,
-// which the row shows as 000 (the 90B pads with zeros). The 89 trainer also showed a bearing going from 359 to 0 and
-// never 360 (2026-10-08, T34)
+// 5-35 and the KLN 89 trainer (2026-10-07): the OBS course shows 000, never 360. On the near-equator leg the course the
+// unit takes is its course at ABC, about 089.83 (finalCourseDeg of the leg), so ninety clicks to the left leave just
+// under 360 (359.83), which the row shows as 000 (the 90B pads with zeros). The 89 trainer also showed a bearing going from 359
+// to 0 and never 360 (2026-10-08, T34)
 describe('MOD 2 OBS course just below north', () => {
-    /** The equator leg with the course entered on the unit, and the course turned 90 degrees left (22.5 s of clicks) */
+    /** The near-equator leg with the course entered on the unit, and the course turned 90 degrees left (22.5 s of clicks) */
     async function turned90Left() {
-        const unit = await onEquatorLeg(OBS_SOURCE_OFF);
+        const unit = await onNearEquatorLeg(OBS_SOURCE_OFF);
         await unit.panel.obsMode();
+        const course = unit.props.memory.navPage.obsMag;
+        expect(course).toBeGreaterThan(89.5); // Precondition: just below 090, so ninety clicks left end just below 360
+        expect(course).toBeLessThan(90);
         await unit.panel.cursor('L');
         await unit.panel.inner('L', -90);
         return unit;
     }
 
-    it('turns the course 90 degrees left from the equator leg (5-35)', async () => {
+    it('turns the course 90 degrees left from a leg just north of east (5-35)', async () => {
         const unit = await turned90Left();
 
         const obs = unit.props.memory.navPage.obsMag;

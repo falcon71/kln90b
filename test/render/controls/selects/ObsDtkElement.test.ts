@@ -46,17 +46,21 @@ describe('OBS/DTK element', () => {
     });
 
     // Checked in the KLN 89 trainer, 2026-10-07 (recorded in #263): one degree per click, and the course wraps between
-    // 000 and 359 as on a compass card: 089 turned down 90 clicks is 359, and two clicks up from there 001
-    it('turns the OBS course across north: 089 down 90 is 359, up 2 is 001 '
+    // 000 and 359 as on a compass card. The unit chooses the leg's course at KDDD, where the leg KAAA - KDDD arrives
+    // due east: finalCourseDeg is 90.00, so OBS starts at 090 (the DTK at the aircraft, 089.46, is not the course,
+    // #151). 90 clicks down is 000, one more is 359, and two clicks up from there 001
+    it('turns the OBS course across north: 090 down 90 is 000, down 1 more is 359, up 2 is 001 '
         + '(checked in the KLN 89 trainer, 2026-10-07, #263)', async () => {
         const unit = await nav3(OBS_SOURCE_OFF);
         await unit.panel.obsMode();
         await unit.panel.selectPage('L', 'NAV 3');
         await unit.panel.cursor('L');
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
-        expect(unit.panel.focused('L')).toEqual({row: 1, col: 7, text: '089°'});
+        expect(unit.panel.focused('L')).toEqual({row: 1, col: 7, text: '090°'});
 
         await unit.panel.inner('L', -90);
+        expect(unit.panel.focused('L').text).toBe('000°');
+        await unit.panel.inner('L', -1);
         expect(unit.panel.focused('L').text).toBe('359°');
         await unit.panel.inner('L', 2);
         expect(unit.panel.focused('L').text).toBe('001°');

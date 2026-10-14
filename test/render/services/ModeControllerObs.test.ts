@@ -42,7 +42,7 @@ describe('LEG to OBS (5-36)', () => {
 
     // The same with a magnetic variation, so that the unit must convert the true course it chooses to the magnetic OBS.
     // The OBS course is magnetic and the path true: at a variation of 0 a missing conversion cannot be seen. The course
-    // the unit chooses is the leg's DTK at the aircraft (its final course to within 0.2 degrees, 5 NM before the end) less the variation.
+    // the unit chooses is the leg's course at the active waypoint (its final course) less the variation (#151).
     describe('keeps a deviation of 2 NM and sets the magnetic OBS course', () => {
         /** ObsSource 0, 5 NM before the end of the leg KAAA - `end`, 2 NM right of it */
         async function twoNmRight(end: Facility, magvar: number | undefined) {
@@ -77,11 +77,12 @@ describe('LEG to OBS (5-36)', () => {
         });
     });
 
-    // 5-36 rule 2.ii. The unit takes the DTK at the aircraft as the OBS, but the OBS course is laid through the active
-    // waypoint, where the great circle of the leg has another course. 100 NM before the end of a 150 NM leg to the east
-    // at 47 N the two differ by about 1.8 degrees, so an aircraft on the leg gets a deviation of about 3.1 NM.
-    // Its passing sibling is the 2 NM test above (the same flow on a short leg); the preconditions here are the
-    // aircraft on the leg and the OBS mode entered, which the sibling below asserts without the final deviation
+    // 5-36 rule 2.ii. The OBS course is laid through the active waypoint, so the unit takes the leg's course at that
+    // waypoint, where the great circle of the leg has another course than at the aircraft. 100 NM before the end of a
+    // 150 NM leg to the east at 47 N the two differ by about 1.8 degrees: the DTK at the aircraft would give the
+    // aircraft a deviation of about 3.1 NM, the course at the waypoint keeps it on the leg.
+    // Its sibling is the 2 NM test above (the same flow on a short leg); the preconditions here are the aircraft on the
+    // leg and the OBS mode entered, which the sibling below asserts without the final deviation
     // (5-36 rule 1: the active waypoint stays)
     async function longLegInObs() {
         const start = airport('KAAA', 47.0, 8.0);
@@ -106,10 +107,60 @@ describe('LEG to OBS (5-36)', () => {
         expect(nav.activeWaypoint.isDctNavigation()).toBe(true);
     });
 
-    it.fails('keeps the deviation of an aircraft on a long leg, 100 NM before the waypoint (#151)', async () => {
+    // 5-36 rule 2.ii; checked in the KLN 89 trainer, 2026-10-14: 100 NM before the end of a 136 NM leg the deviation
+    // stayed 0.02 NM
+    it('keeps the deviation of an aircraft on a long leg, 100 NM before the waypoint (5-36, #151)', async () => {
         const {unit, nav} = await longLegInObs();
 
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.1);
+    });
+
+    // Robustness (characterization): the end fix of a DME arc is a database fix, and nothing puts it exactly on the arc
+    // circle that the unit builds from the VOR and the radius. Here ARCEN lies 30 m outside the 10 NM circle, on the 180
+    // radial; the aircraft is on the arc at the 190 radial. Entering OBS must not raise an error. The course is the
+    // arc's course at the end, 090 (the arc arrives at the 180 radial heading east); the wired APR switch arms the
+    // approach, so the mode is ARM-OBS. By hand, with the VOR at the origin and north up, the OBS line runs east-west
+    // through ARCEN, 10.0162 NM south of the VOR; the aircraft is 10 * cos(10 deg) = 9.848 NM south of the VOR, so it is
+    // 10.0162 - 9.848 = 0.168 NM from the line
+    it('enters OBS on a DME arc whose end fix lies 30 m off the arc circle without an error (characterization)', async () => {
+        const abc = vor('ABC', 47.3, 8.3);
+        const at = (bearing: number, nm: number) => pointFrom(abc, bearing, nm);
+        const arcbg = intersection('ARCBG', at(270, 10).lat, at(270, 10).lon);
+        const arcenPos = at(180, 10 + 30 / 1852);
+        const arcen = intersection('ARCEN', arcenPos.lat, arcenPos.lon);
+        const fafaa = intersection('FAFAA', 47.1, 8.7);
+        const mapaa = intersection('MAPAA', 47.0, 8.7);
+        const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
+            approaches: [approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{
+                    name: 'ARCBG', legs: [
+                        Leg.IF(arcbg, FixTypeFlags.IAF),
+                        Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: LegTurnDirection.Left}),
+                        Leg.TF(fafaa, FixTypeFlags.FAF),
+                    ],
+                }],
+                final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+            })],
+        });
+        const unit = await bootUnit({
+            facilities: [kprc, abc, arcbg, arcen, fafaa, mapaa], position: at(190, 10), panelXml: panelXml({...APR_ARM_SWITCH, ...NO_OBS}),
+            storage: savedFlightplan(0, [kprc]),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(activeIdent(unit)).toBe('ARCEN'); // Precondition: the arc is the active leg
+
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.errors).toEqual([]);
+        const nav = unit.props.memory.navPage;
+        expect(nav.navmode).toBe(NavMode.ARM_OBS);
+        expect(activeIdent(unit)).toBe('ARCEN');
+        expect(Math.abs(nav.obsMag - 90)).toBeLessThan(0.5);
+        expect(Math.abs(nav.xtkToActive!)).toBeCloseTo(0.168, 1);
     });
 
     // C-1: NO ACTV WPT when OBS is selected without an active waypoint; the mode stays

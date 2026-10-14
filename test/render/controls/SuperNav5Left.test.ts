@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {approachWorld, standardRoute} from '../../harness/fixtures';
-import {courseDeg} from '../../harness/flight/geo';
+import {finalCourseDeg} from '../../harness/flight/geo';
 import {blinkCycle} from '../../harness/render/blink';
 import {readRows} from '../../harness/render/screen';
 import {showSuperNav5, SuperNav5} from '../../harness/render/superNav5';
@@ -43,12 +43,12 @@ async function mapPromptCycles(): Promise<string[][]> {
 }
 
 /** Super NAV 5 on the standard route in the enroute OBS mode (OBS selected on the first leg, no external OBS input) */
-async function enrouteObs(): Promise<{ unit: HeadlessUnit, dtk: number }> {
+async function enrouteObs(): Promise<{ unit: HeadlessUnit, course: number }> {
     const {kaaa, abc} = standardRoute();
     const unit = await bootOnStandardRoute({panelXml: panelXml(NO_OBS)});
     await unit.panel.obsMode();
     await showSuperNav5(unit);
-    return {unit, dtk: Math.round(courseDeg(kaaa, abc))};
+    return {unit, course: Math.round(finalCourseDeg(kaaa, abc))};
 }
 
 // 5-32: the modes are annunciated on the left side of Super NAV 5, with the abbreviations of the table; figure 6-14
@@ -81,23 +81,24 @@ describe('Super NAV 5 mode row (5-32)', () => {
         expect(SuperNav5.read().left[2]).toBe(`${ARM}:180`);
     });
 
-    // 5-32: the preconditions of the pin below, ENR and the course 050
+    // 5-32: the preconditions of the pin below, ENR and the course 051
     it('shows ENR and the OBS course in the enroute OBS mode (sibling of #321) (5-32)', async () => {
-        const {unit, dtk} = await enrouteObs();
+        const {unit, course} = await enrouteObs();
 
-        // The DTK of the active leg to ABC, from the geometry. The aircraft is on the leg's course (the deviation stays
-        // unchanged, 5-36), so OBS takes that course
-        expect(dtk).toBe(50);
+        // The course of the active leg KAAA - ABC at ABC, from the geometry: finalCourseDeg is 51.03, so 051 with the
+        // variation of 0. OBS lays its course through the active waypoint, so the unit takes the leg's course there and
+        // the deviation stays unchanged (5-36; #151)
+        expect(course).toBe(51);
         const mode = SuperNav5.read().left[2];
         expect(mode.startsWith(ENR)).toBe(true);
-        expect(mode.endsWith('050')).toBe(true);
+        expect(mode.endsWith('051')).toBe(true);
     });
 
     // 5-32: ENR:274, the colon between the mode and the course, as ARM:259 has it (and the code has it for ARM)
     it.fails('shows ENR: and the OBS course in the enroute OBS mode (5-32, #321)', async () => {
         const {unit} = await enrouteObs();
 
-        expect(SuperNav5.read().left[2]).toBe(`${ENR}:050`);
+        expect(SuperNav5.read().left[2]).toBe(`${ENR}:051`);
     });
 });
 

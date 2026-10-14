@@ -569,7 +569,8 @@ describe('Super NAV 5 near the MAP', () => {
 
 describe('Super NAV 5 OBS course', () => {
     /**
-     * The standard route with the aircraft at KAAA, in OBS mode on ABC with an OBS course of 050 (the DTK of the leg).
+     * The standard route with the aircraft at KAAA, in OBS mode on ABC with an OBS course of 051: the course of the leg
+     * at ABC, finalCourseDeg of KAAA - ABC is 51.03, with the variation of 0 (#151).
      * ObsSource 0: the unit has no external indicator, so the pilot enters the OBS course on the unit itself (5-34, 5-35).
      * The left cursor is on the OBS course, which is the field after the line that names the course.
      */
@@ -579,10 +580,10 @@ describe('Super NAV 5 OBS course', () => {
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
         await showSuperNav5(unit);
-        expect(SuperNav5.read().left[5]).toBe('Ù050°');
+        expect(SuperNav5.read().left[5]).toBe('Ù051°');
         await unit.panel.cursor('L');
         await unit.panel.outer('L', -2);
-        expect(focusedLeft()).toEqual(['050°']);
+        expect(focusedLeft()).toEqual(['051°']);
         return unit;
     }
 
@@ -593,7 +594,7 @@ describe('Super NAV 5 OBS course', () => {
         await unit.panel.inner('L', -1);
 
         expect(unit.overlay()).toBeInstanceOf(SuperNav5Page);
-        expect(SuperNav5.read().left[5]).toBe('Ù049°');
+        expect(SuperNav5.read().left[5]).toBe('Ù050°');
     });
 
     // 5-34, 5-35: turned right, the course is one degree more and Super NAV 5 stays
@@ -602,6 +603,6 @@ describe('Super NAV 5 OBS course', () => {
         await unit.panel.inner('L', 1);
 
         expect(unit.overlay()).toBeInstanceOf(SuperNav5Page);
-        expect(SuperNav5.read().left[5]).toBe('Ù051°');
+        expect(SuperNav5.read().left[5]).toBe('Ù052°');
     });
 });
