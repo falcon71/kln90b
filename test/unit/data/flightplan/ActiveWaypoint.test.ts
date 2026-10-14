@@ -274,3 +274,61 @@ describe('ActiveWaypoint direct-to flows', () => {
         expect(aw.getFromWpt()!.icaoStruct.ident).toBe('ABC');
     });
 });
+
+// 6-3: the FAF is the active waypoint of the switch. That the IAF copy of a fix that is IAF and FAF counts as the FAF
+// follows the maintainer's ruling of #153 (an IAF copy directly followed by the FAF copy of the same fix), so those
+// cases are characterizations (#129)
+describe('ActiveWaypoint.getActiveFafLeg', () => {
+    const app = (wpt: Facility, fixType: KLNFixType): KLNFlightplanLeg => ({wpt, type: KLNLegType.APP, fixType});
+    /** The aircraft 5 NM before B on the leg A - B, so that B (index 1) is the active waypoint */
+    const activeAtB = (legs: KLNFlightplanLeg[]) => {
+        const aw = activeWaypointOver(legs, pointFrom(B, 270, 5));
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(1); // Precondition: the leg at index 1 is active
+        return aw;
+    };
+
+    it('returns the FAF leg itself while it is active (6-3)', () => {
+        const faf = app(B, KLNFixType.FAF);
+        const aw = activeAtB([user(A), faf, app(C, KLNFixType.MAP)]);
+
+        expect(aw.getActiveFafLeg()).toBe(faf);
+    });
+
+    it('returns the FAF copy while the IAF copy of the same fix is active (characterization, #129)', () => {
+        const fafCopy = app(B, KLNFixType.FAF);
+        const aw = activeAtB([user(A), app(B, KLNFixType.IAF), fafCopy, app(C, KLNFixType.MAP)]);
+
+        expect(aw.getActiveFafLeg()).toBe(fafCopy);
+    });
+
+    it('returns null while an IAF is active and the next leg is the FAF of another fix (characterization, #129)', () => {
+        const aw = activeAtB([user(A), app(B, KLNFixType.IAF), app(C, KLNFixType.FAF), app(D, KLNFixType.MAP)]);
+
+        expect(aw.getActiveFafLeg()).toBeNull();
+    });
+
+    it('returns null while an IAF is active and the next leg is not a FAF (characterization, #129)', () => {
+        const aw = activeAtB([user(A), app(B, KLNFixType.IAF), app(C, KLNFixType.MAP)]);
+
+        expect(aw.getActiveFafLeg()).toBeNull();
+    });
+
+    it('returns null while an IAF is active and the FAF of the same fix is not the next leg (characterization, #129)', () => {
+        const aw = activeAtB([user(A), app(B, KLNFixType.IAF), app(C, KLNFixType.IAF), app(B, KLNFixType.FAF), app(D, KLNFixType.MAP)]);
+
+        expect(aw.getActiveFafLeg()).toBeNull();
+    });
+
+    it('returns null while the IAF is the last leg of the plan (characterization, #129)', () => {
+        const aw = activeAtB([user(A), app(B, KLNFixType.IAF)]);
+
+        expect(aw.getActiveFafLeg()).toBeNull();
+    });
+
+    it('returns null while a leg that is neither IAF nor FAF is active (characterization, #129)', () => {
+        const aw = activeAtB([user(A), app(B, KLNFixType.MAP)]);
+
+        expect(aw.getActiveFafLeg()).toBeNull();
+    });
+});

@@ -422,8 +422,9 @@ sim.
   5 (ENR), 1 (ARM) or 0.3 (APR).
 - Auto-arm happens within 30 NM of the approach airport (the `parentFacility` of the first APP leg). The scale ramps 5
   to 1 over 30 s.
-- ARM becomes APR when the FAF is active, within 2 NM, the MAP is ahead and the track is within 110 deg of FAF to MAP.
-  APR becomes 0.3 at the FAF ("Integrity check?" is a TODO; there is no RAIM).
+- ARM becomes APR when the FAF is active (or the IAF copy of a fix that is IAF and FAF, `ActiveWaypoint.getActiveFafLeg()`),
+  within 2 NM, the MAP is ahead and the track is within 110 deg of FAF to MAP. APR becomes 0.3 at the FAF ("Integrity
+  check?" is a TODO; there is no RAIM).
 - `armApproachPressed()` is triggered from MainPage on `EVT_APPR_ARM`.
 - **OBS mode is implemented as a direct-to from a synthetic user facility (`ICAO.value("U","XX",...)`) 1000 NM away on
   the reciprocal of the OBS** (`setObs`). `setObs` skips an unchanged course unless `force` is set (entering OBS and

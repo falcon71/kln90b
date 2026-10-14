@@ -208,6 +208,25 @@ export class ActiveWaypoint {
     }
 
     /**
+     * 6-3, 6-10: the FAF leg while the FAF is the active waypoint, also when the active leg is the IAF copy of a fix that
+     * is IAF and FAF at once (the next leg is the same fix typed FAF, #129). Null otherwise
+     */
+    public getActiveFafLeg(): KLNFlightplanLeg | null {
+        const active = this.getActiveLeg();
+        if (active === null) {
+            return null;
+        }
+        if (active.fixType === KLNFixType.FAF) {
+            return active;
+        }
+        const next = this.getFollowingLeg();
+        if (active.fixType === KLNFixType.IAF && next?.fixType === KLNFixType.FAF && ICAO.valueEquals(next.wpt.icaoStruct, active.wpt.icaoStruct)) {
+            return next;
+        }
+        return null;
+    }
+
+    /**
      * Gets the index of the current active waypoint in the fpl
      * -1 if there is no active waypoint or a direct to outside of the flp is occuring.
      */

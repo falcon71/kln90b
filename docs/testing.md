@@ -1363,8 +1363,8 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   assertion fails. A tighter bound, or a monitor on the arc's radius, would hold it twice.
 - The XTK expectations of `ModeController.test.ts`, `ModeControllerObs.test.ts` and `DirectToObs.test.ts` come from
   `crossTrackNm` and are exact, while their 0.05 NM tolerances date from an approximation. They could be tightened.
-- **Surviving mutations near past fixes:** the 2 NM condition of 6-3 (`ModeController.ts:354`, `> 20` survives); the
-  110° limit (`ModeController.ts:369`) is held only between 100° and 120°; a halved roll-in distance
+- **Surviving mutations near past fixes:** the 110° limit of `checkSwitchAprArmToActive` is held only between 100° and
+  120°; a halved roll-in distance
   (`NavCalculator.ts:190`) survives the lower bound of the DME arc flight; the flag copy of `addArcInfoIfPrevIsSame`
   (`SidStar.ts:455`) has no arc whose fix carries other flags; the two halves of the SET 3 hard-surface filter
   (`NearestList.ts:163` and `:191-198`) and the two polygon guards of the SUA alert (`AirspaceAlert.ts:109`,

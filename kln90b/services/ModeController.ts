@@ -355,8 +355,8 @@ export class ModeController implements CalcTickable {
             return;
         }
 
-        const faf = this.navState.activeWaypoint.getActiveLeg();
-        if (faf?.fixType !== KLNFixType.FAF) {
+        const faf = this.navState.activeWaypoint.getActiveFafLeg();
+        if (faf === null) {
             this.navState.xtkScale = 0.3;
             return; //We moved on the MAP already
         }
@@ -370,9 +370,9 @@ export class ModeController implements CalcTickable {
             return; //No transition for OBS
         }
 
-        const faf = this.navState.activeWaypoint.getActiveLeg();
-        if (faf?.fixType !== KLNFixType.FAF) {
-            return; //Only when FAF is active
+        const faf = this.navState.activeWaypoint.getActiveFafLeg();
+        if (faf === null) {
+            return; //6-3: only with the FAF active, or the IAF copy of a fix that is IAF and FAF (#129)
         }
 
         if (UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(faf.wpt), UnitType.NMILE) > 2) {

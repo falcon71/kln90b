@@ -185,8 +185,8 @@ describe('arming to approach active at the FAF (633fdad)', () => {
 });
 
 // 6-3 lists a waypoint that is the IAF and the FAF at once as the active waypoint of the switch; 6-10 gives the example
-// where the unit switches to APR 2 NM from the IAF/FAF. ModeController.checkSwitchAprArmToActive returns unless the
-// active waypoint is typed FAF, but with such a fix the IAF copy is active during the last 2 NM (#129).
+// where the unit switches to APR 2 NM from the IAF/FAF. With such a fix the IAF copy is active during the last 2 NM, and
+// ActiveWaypoint.getActiveFafLeg() lets it count as the FAF for the switch (#129).
 describe('arming to approach active at a fix that is IAF and FAF (#129)', () => {
     async function armedNearIafFaf() {
         const kprc = airport('KPRC', 47.0, 8.0);
@@ -212,8 +212,8 @@ describe('arming to approach active at a fix that is IAF and FAF (#129)', () => 
         return {unit, txo};
     }
 
-    // The sibling of the pin: the setup works, the IAF copy is active and the unit stays armed 1.6 NM from the fix because the
-    // rest track of 0 points away from it
+    // The setup: the IAF copy is active and the unit stays armed 1.6 NM from the fix because the rest track of 0 points
+    // away from it
     it('is armed with the IAF copy of the fix active at 1.6 NM from it, on a rest track that points away from the fix (6-3)', async () => {
         const {unit} = await armedNearIafFaf();
         const nav = unit.props.memory.navPage;
@@ -226,7 +226,7 @@ describe('arming to approach active at a fix that is IAF and FAF (#129)', () => 
         expect(unit.errors).toEqual([]);
     });
 
-    it.fails('switches to APR within 2 NM of the fix, heading toward it (#129)', async () => {
+    it('switches to APR within 2 NM of the fix, heading toward it (#129)', async () => {
         const {unit, txo} = await armedNearIafFaf();
         const nav = unit.props.memory.navPage;
 
@@ -234,5 +234,26 @@ describe('arming to approach active at a fix that is IAF and FAF (#129)', () => 
 
         expect(unit.props.sensors.in.gps.trackTrue).toBeCloseTo(180, 0);
         expect(nav.navmode).toBe(NavMode.APR_LEG);
+    });
+
+    // 6-3, 6-10: active at the IAF copy, the unit sequences over the zero-length IAF to FAF leg and on to the MAP, and the
+    // scale is 0.3 past the FAF
+    it('flies on in APR past the fix to the MAP at 0.3 (6-3, 6-10)', async () => {
+        const {unit, txo} = await armedNearIafFaf();
+        const nav = unit.props.memory.navPage;
+        await moveAircraft(unit, pointFrom(txo, 0, 1.55), {groundspeedKt: 120, trackTrue: 180});
+        expect(nav.navmode).toBe(NavMode.APR_LEG);
+
+        await moveAircraft(unit, pointFrom(txo, 0, 0.5), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(nav.xtkScale).toBeGreaterThan(0.3);
+        expect(nav.xtkScale).toBeLessThan(0.7); // On the ramp to 0.3, 0.5 NM before the fix
+
+        await moveAircraft(unit, pointFrom(txo, 180, 1), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(activeIdent(unit)).toBe('MAPAA');
+        expect(nav.navmode).toBe(NavMode.APR_LEG);
+        expect(nav.xtkScale).toBe(0.3);
+        expect(unit.errors).toEqual([]);
     });
 });
