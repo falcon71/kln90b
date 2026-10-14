@@ -34,7 +34,7 @@ describe('OBS mode on the second occurrence of a waypoint (3415417, #67)', () =>
     // 5-36: switching to OBS keeps the active waypoint
     it('keeps the second occurrence active, with the plan behind it (#67)', async () => {
         const {unit, aw} = await directToSecondAbc();
-        // An external course of 0 is the stored one, so setObs would return early (#122) and replace nothing
+        // Any external course works; 90 is not the stored one
         unit.env.sim.set('Nav OBS:1', 'degrees', 90);
 
         await unit.panel.obsMode();

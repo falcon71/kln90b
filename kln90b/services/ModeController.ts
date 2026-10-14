@@ -168,8 +168,14 @@ export class ModeController implements CalcTickable {
 
     }
 
-    public setObs(obsMag: Degrees): void {
-        if (obsMag === this.navState.obsMag) {
+    /**
+     * Sets the OBS course and lays it through the active waypoint. An unchanged course is skipped unless force is set:
+     * the indicator is read every second (tick), and laying the same course again would make a new direct-to each time.
+     * Entering OBS and ACTIVATE force it, because the course must be laid even when its number did not change (5-36,
+     * 5-37; #122, #154)
+     */
+    public setObs(obsMag: Degrees, force: boolean = false): void {
+        if (!force && obsMag === this.navState.obsMag) {
             return;
         }
 
@@ -241,12 +247,12 @@ export class ModeController implements CalcTickable {
         }
 
         if (this.sensors.in.obsMag !== null && this.planeSettings.output.obsTarget === 0) {
-            this.setObs(this.sensors.in.obsMag);
+            this.setObs(this.sensors.in.obsMag, true);
         } else if (active !== null) {
             const obsTrue = this.navState.desiredTrack ?? this.navState.bearingToActive!; //Null when TO and FROM are the same waypoint
 
             const magvar = this.getMagvarForObs(active);
-            this.setObs(this.magvar.trueToMag(obsTrue, magvar));
+            this.setObs(this.magvar.trueToMag(obsTrue, magvar), true);
         }
     }
 

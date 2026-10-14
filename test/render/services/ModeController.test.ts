@@ -69,9 +69,9 @@ describe('ModeController OBS course of 000', () => {
         expect(Math.abs(nav.xtkToActive! - crossTrackNm(position, abc, 77))).toBeLessThan(0.05);
     });
 
-    // 5-36: the OBS course is the one the indicator selects, 000 included. ModeController.setObs returns at once when the
-    // course equals navState.obsMag, which is 0 at start and after a switch to LEG, so the leg path stays in force.
-    it.fails('measures the deviation from an OBS course of 000 through the waypoint (#122)', async () => {
+    // 5-36: the OBS course is whatever the indicator selects, 000 included. Entering OBS lays the course even when its
+    // number equals the stored one, which is 0 at start and after a switch to LEG.
+    it('measures the deviation from an OBS course of 000 through the waypoint (#122)', async () => {
         const {unit, position} = await enterObsWithCourse(0);
         const nav = unit.props.memory.navPage;
 
