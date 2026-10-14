@@ -93,8 +93,10 @@ The 1 Hz read-back in `tick` and the knob handlers keep the early return.
 A course set on the unit (MOD 2 and `ObsDtkElement`, i.e. NAV 3 and Super NAV 5, and the Direct To in OBS mode) goes
 through a new `ModeController` method that calls `setObs` and then writes the OBS output at once
 (`sensors.out.setObs`), so the indicator is slewed before the next read-back. With a pointer the unit only reads
-(`ObsTarget` 0) the extra write sends nothing new; `NavCalculator` stays the regular writer. The Direct To case gets its
-own test in the #261 commit.
+(`ObsTarget` 0) the extra write sends nothing new; `NavCalculator` stays the regular writer. The course the unit
+chooses itself on entering OBS with a driven indicator (5-36) goes the same way (`setObsOnUnit(obs, true)`), since the
+indicator's old course would be read back the same way. The Direct To case and the entry case get their own tests in
+the #261 commit.
 
 ### C. The course chosen on LEG to OBS (#151)
 
@@ -109,8 +111,9 @@ course is still just below north, so it keeps testing the north rule.
 `KLNMagvar.isMagvarValid()` also returns false in an OBS mode when the active waypoint lies outside N 74 / S 60. It
 compares the nav mode with the `const enum` values directly instead of importing `isObsMode`, which would close an
 import cycle. `ModeController.getMagvarForObs` checks validity before the VOR branch, so an out-of-area VOR is also
-referenced to true north (the maintainer's ruling). The reset of `userMagvar` in `KLNMagvar.tick` keeps keying on the
-aircraft position only.
+referenced to true north (the maintainer's ruling). `KLNMagvar.tick` keeps using `isMagvarValid()`, so in that state the
+model variation is not refreshed and a variation entered on SET 2 is kept (5-44) until the variation is valid again,
+when it is reset to 0 as today.
 
 ## 3. Returning to LEG
 
@@ -166,7 +169,9 @@ No code change. A characterization holds that the unit is back in ACTV one calcu
 On the switch to ACTV, `ModeController` records the distance to the FAF and the scale at that moment (at most 1). In ACTV
 the scale is `0.3 + (s0 - 0.3) * dist / d0`, capped at 1, with today's early return for a scale already at 0.3 (case 3)
 and the 0.3 past the FAF unchanged. Without a recorded activation (a test that sets the mode directly) the values
-default to 2 NM and 1, so the usual activation at 2 NM gives exactly today's `0.35 * dist + 0.3`. A late LEG switch at
+default to 2 NM and 1, which is today's `0.35 * dist + 0.3`. The unit activates on the first tick inside 2 NM, so a
+recorded d0 is a little under 2 and the slope a little steeper (1.95 NM in the tests: 0.659 at 1 NM instead of 0.65;
+the characterization `ramps linearly with the distance to the FAF, 0.65 at 1 NM` moves with it). A late LEG switch at
 1 NM ramps 1 to 0.3 over that 1 NM (6-11's compressed change); moving back out stays at 1 (characterization). Case 2
 gets a characterization. The commit says `fixes #163`.
 
@@ -174,8 +179,9 @@ gets a characterization. The commit says `fixes #163`.
 
 **#194.** `Vnav.armVnav` starts VNAV only from Inactive; an Active VNAV keeps its path and advisory altitude while the
 cursor stays on ANGLE, and Armed is unchanged. The characterization `re-arms an active descent from the present
-altitude when armVnav runs again` in `test/unit/services/Vnav.test.ts` becomes a test of the new rule citing the trainer
-check of 2026-10-06 (medium confidence, as recorded).
+altitude when armVnav runs again` in `test/unit/services/Vnav.test.ts` becomes a characterization of the new rule
+(#194), and a render test holds it on NAV 4 with the aircraft below the path. Both stay characterizations: the rule is
+the maintainer's ruling, and the trainer check of 2026-10-06 was medium and could not put the aircraft below the path.
 
 **#338.** No code change: since #185, `Vnav.tick` clears a VNAV waypoint that is not the active one in OBS mode and
 goes Inactive, NAV 4 then shows the active waypoint, nothing is posted, and LEG does not restore it, which is what the
@@ -193,8 +199,9 @@ characterization. The commit says `fixes #338`.
 - Every implementer applies the fix and runs the full suite before committing, and greps the suite for tests that use
   the bug as a vehicle.
 - Each commit updates the docs that describe its bug: `docs/architecture.md:422-426` (#129, #139) and the
-  `docs/testing.md` lines the inventory listed (around 971, 1284, 1287, 1341-1342; recheck before editing), and adds
-  its part of the 2026-10-14 trainer record to `docs/testing.md` section 8 (#151, #152, #154, #338).
+  `docs/testing.md` lines the inventory listed (around 971, 1284, 1287, 1341-1342; recheck before editing). The
+  2026-10-14 trainer record goes into `docs/testing.md` section 8 in one docs commit before the lanes start, so that no
+  two lanes edit the same block.
 - No manual text in code, tests, docs, commits or issues; page numbers and paraphrase only.
 
 ## 7. Tasks and order
