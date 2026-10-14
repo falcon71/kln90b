@@ -65,9 +65,9 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
         return {unit, nav: unit.props.memory.navPage, expected};
     }
 
-    // 5-37 (5.9.7) step 2: the sibling of the pin below. The same flow makes KBBB active and keeps the mode, so the pin
-    // fails only on the deviation
-    it('the pin setup: ACTIVATE with OBS 050 makes KBBB active and keeps ENR-OBS (the setup of #154)', async () => {
+    // 5-37 (5.9.7) step 2: the setup of the test below. The same flow makes KBBB active and keeps the mode, so the test
+    // below depends only on the deviation
+    it('ACTIVATE with OBS 050 makes KBBB active and keeps ENR-OBS (the setup of #154)', async () => {
         const {unit, nav} = await activateKbbbOnCourse50();
 
         expect(activeIdent(unit)).toBe('KBBB');
@@ -75,10 +75,9 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
         expect(nav.obsMag).toBe(50);
     });
 
-    // 5-37 (5.9.7) step 3: the D-bar is not recentered, the deviation is from the 050 course through KBBB. DirectToPage
-    // makes a direct-to from the present position and then calls setObs with the unchanged course, which returns early
-    // (ModeController.setObs), so the direct-to path stays and the deviation is zero
-    it.fails('does not recenter the deviation: it is measured from the OBS course through the new waypoint (#154)', async () => {
+    // 5-37 (5.9.7) step 3: the D-bar is not recentered, the deviation is from the 050 course through KBBB; checked in the
+    // KLN 89 trainer, 2026-10-14 (course 045 kept, Fly L 37.5 NM after ACTIVATE)
+    it('does not recenter the deviation: it is measured from the OBS course through the new waypoint (#154)', async () => {
         const {nav, expected} = await activateKbbbOnCourse50();
 
         expect(Math.abs(nav.xtkToActive! - expected)).toBeLessThan(0.05);
