@@ -78,7 +78,8 @@ export class Vnav implements CalcTickable {
 
     public armVnav(): void {
         const angle = this.getAngle();
-        if (this.state !== VnavState.Armed && angle !== 0) {
+        //5-8: the cursor over ANGLE starts VNAV; an active VNAV keeps its path while the cursor stays there (#194)
+        if (this.state === VnavState.Inactive && angle !== 0) {
             this.navState.nav4VnavAngle = angle;
             this.navState.nav4VnavWpt = this.getVnavWaypoint();
             this.state = VnavState.Armed;

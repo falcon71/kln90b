@@ -171,3 +171,19 @@ describe('NAV 4 VNAV', () => {
         expect(messages(unit)).not.toContain('VNV ALERT');
     });
 });
+
+describe('NAV 4 VNAV under the ANGLE cursor (characterization)', () => {
+    // The maintainer's ruling on #194: with VNAV active, the cursor staying on ANGLE keeps the path. 31 NM west the path
+    // is at 7437 ft (shown 7400); at 7000 ft, 437 ft below it, a new arming would count down instead
+    it('keeps the advisory altitude with the aircraft below the path and the cursor on ANGLE (characterization, #194)', async () => {
+        const unit = await bootAt(31, {angle: -1.8});
+        unit.props.vnav.armVnav();
+        expect((await unit.panel.show('L', 'NAV 4'))[0]).toBe('VNV 7400ft ');
+        unit.env.sim.set('PRESSURE ALTITUDE', 'feet', 7000);
+
+        await cursorToAngle(unit);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().rows('L')[0]).toBe('VNV 7400ft ');
+    });
+});
