@@ -1236,6 +1236,16 @@ its line, in the comment above it or in the title of its `describe`.
   the unit held a fraction, about 097.5 (#151).
 - After a Direct To in OBS mode NAV 1 showed only the arrow before the waypoint, where a Direct To in LEG showed `D->`.
   Not used for the 90B.
+- A Direct To in OBS mode to the same user waypoint about 100 NM away, from 5 NM north and 5 NM south of the old leg:
+  the needle was centered at once (`Fly 0.00nm`). The course set was the bearing from the aircraft to the waypoint
+  shown on NAV 1; setting the course by hand put the internal value at about 100.4 and 94.6, where the course of the
+  direct path at the waypoint would be about 1.6° more. No CRS message was seen (no external indicator; frames 0.9 s
+  apart) (#370).
+- In OBS mode the bearings to that user waypoint ran 3 to 4° above those shown in LEG mode at the same position,
+  consistent with the variation at the waypoint instead of at the aircraft (medium: the 89 shows no variation value).
+  This also accounts for the 097 against a DTK of 094 in the #151 check above (#371).
+- SET 1 ignored position changes of 1 to 5 NM (the entry showed for about a second, then reverted); changes of 28 NM
+  and more applied.
 
 # 9. Next steps
 
