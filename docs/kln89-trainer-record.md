@@ -207,3 +207,24 @@ its line, in the comment above it or in the title of its `describe`.
   This also accounts for the 097 against a DTK of 094 in the #151 check above (#371).
 - SET 1 ignored position changes of 1 to 5 NM (the entry showed for about a second, then reverted); changes of 28 NM
   and more applied.
+
+**2026-10-14** (evening; SET 1 take-home, the screen sampled about every 0.22 s; FPL 0 KMSN, BAE, BUU: DTK 097 into
+BAE, then 187, a 90° right turn; about 20 NM out at 239 kt unless noted)
+- Plan leg with turn anticipation on: the arrow started flashing 3.3 NM before BAE, the DTK switched to 187 at 1.8 NM,
+  BAE was sequenced at 0.7 NM, and the flashing went on about 25 s into the turn, then steady.
+- Direct To BAE from its FPL 0 row, turn anticipation on (a 97° turn from the Direct To course): onset 3.6 NM, DTK switch
+  2.0 NM, sequenced to BAE - BUU at 0.8 to 0.9 NM, the plan resumed. In both runs the onset came 22 to 23 s before the
+  DTK switch (#146).
+- Direct To C29, outside FPL 0, turn anticipation on: onset 1.0 NM (ETE :14), no DTK switch, the flashing stopped at
+  0.0 NM, FROM, no sequencing; at 121 kt onset 0.5 NM (:14, medium-high). With turn anticipation off: 2.4 NM (:36). A
+  plan leg with turn anticipation off: onset 2.4 NM, the DTK held to the waypoint, sequenced at it (#372).
+- OBS mode, BAE active, OBS 090: onset 1.0 NM (:14 to :15) with turn anticipation on, nothing at 2.8 NM; 2.4 NM
+  (:35 to :37) with it off. The flashing stopped at 0.0 NM, FROM, and BAE stayed active: no sequencing in OBS (#147).
+- FPL 0 KMSN, BAE, BUU, BUU, accepted without a message; on BAE - BUU at 119 kt, turn anticipation on (medium-high):
+  onset 0.5 NM (:14), stopped at 0.0 NM, then sequenced onto BUU - BUU with the DTK 187 kept. Past BUU the distance and
+  the ETE counted up, the bearing pointed back at BUU, and the CDI stayed valid and centered (Fly R 0.03 NM 3.3 NM past),
+  no flag and no new message. TO/FROM showed FROM up to 1.8 NM past, then TO, for no reason seen (#120, #372).
+- The third-party AVsoftech KLN 90B trainer, which is unreliable: the plan leg and a Direct To a plan waypoint alike
+  (onset about 2.1 NM at about 160 kt, sequenced at about 0.9 NM, the plan resumed); a Direct To off the plan alerted
+  about 2.0 NM out and still flashed 2.2 NM past. Its CDI scale jumped to 1.00 on arming at 37 NM and let 5.00 be selected
+  again while armed, which 5-38 and 6-1 rule out; not used (#160).
