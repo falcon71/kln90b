@@ -342,7 +342,6 @@ export class NavCalculator implements CalcTickable {
         nav.bearingForAP = null;
         nav.toFrom = null;
         nav.waypointAlert = false;
-        nav.xtkScale = 5;
         this.lastDistanceToTurn = 9999;
     }
 

@@ -635,33 +635,32 @@ describe('self-test outputs (3-4)', () => {
     });
 });
 
-// 5-38: the pilot selects the CDI scale on MOD 1 or MOD 2 (5, 1 or 0.3 NM); in the approach-arm mode the unit allows
-// nothing less sensitive than 1 NM. NavCalculator.setFlag resets the scale to 5 on every calculation tick without a
-// navigation solution (no active waypoint, or no GPS).
+/** Selects 1.00 on MOD 1 with the left inner knob, one click down from 5.00 */
+async function selectOneNm(unit: HeadlessUnit) {
+    await unit.panel.selectPage('L', 'MOD 1');
+    await unit.panel.cursor('L');
+    await unit.panel.inner('L', -1);
+    await unit.panel.cursor('L');
+    await vi.advanceTimersByTimeAsync(2000);
+}
+
+/** The approach of approachWorld() loaded, 2 NM before the MAP: the unit is in ARM */
+async function armedOnApproach() {
+    const w = approachWorld();
+    const unit = await bootUnit({
+        facilities: w.facilities, position: w.north(2), storage: savedFlightplan(0, [w.enraa, w.kprc]),
+        panelXml: panelXml(APR_ARM_SWITCH),
+    });
+    await settle(unit);
+    await unit.panel.loadProcedure('APT 8');
+    expect(activeIdent(unit)).toBe('MAPAA'); // Preconditions
+    await vi.advanceTimersByTimeAsync(35_000); // the ARM scale ramps from 5 to 1 NM in 30 s
+    return unit;
+}
+
+// 5-38: the pilot selects the CDI scale on MOD 1 or MOD 2 (5, 1 or 0.3 NM); the selected scale holds while the unit
+// navigates.
 describe('CDI scale selected on MOD 1 (5-38)', () => {
-    /** Selects 1.00 on MOD 1 with the left inner knob, one click down from 5.00 */
-    async function selectOneNm(unit: HeadlessUnit) {
-        await unit.panel.selectPage('L', 'MOD 1');
-        await unit.panel.cursor('L');
-        await unit.panel.inner('L', -1);
-        await unit.panel.cursor('L');
-        await vi.advanceTimersByTimeAsync(2000);
-    }
-
-    /** The approach of approachWorld() loaded, 2 NM before the MAP: the unit is in ARM */
-    async function armedOnApproach() {
-        const w = approachWorld();
-        const unit = await bootUnit({
-            facilities: w.facilities, position: w.north(2), storage: savedFlightplan(0, [w.enraa, w.kprc]),
-            panelXml: panelXml(APR_ARM_SWITCH),
-        });
-        await settle(unit);
-        await unit.panel.loadProcedure('APT 8');
-        expect(activeIdent(unit)).toBe('MAPAA'); // Preconditions
-        await vi.advanceTimersByTimeAsync(35_000); // the ARM scale ramps from 5 to 1 NM in 30 s
-        return unit;
-    }
-
     it('control: the selected 1.00 NM holds while the unit navigates', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
         await moveAircraft(unit, pointBefore(kaaa, abc, 20), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
@@ -670,9 +669,13 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
         expect(nav(unit).xtkScale).toBe(1);
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');
     });
+});
 
-    // The sibling of the pin below: the GPS is flagged after a reset and valid again 20 s later (fast acquisition: 10 s),
-    // so the pin tests the scale and not a fix that never came back
+// A NAV flag (no active waypoint, or no GPS) keeps the selected scale and a power-up starts at 5 NM again. Nothing in the
+// guide resets the scale on a flag; what the unit does is not checked on a real unit or a trainer (characterization).
+describe('a NAV flag and a power-up keep the CDI scale (characterization, #159)', () => {
+    // The control of the GPS-loss tests below: the GPS is flagged after a reset and valid again 20 s later (fast
+    // acquisition: 10 s), so they test the scale and not a fix that never came back
     it('control: the GPS is flagged after a mid-flight reset and valid again 20 s later', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
         await moveAircraft(unit, pointBefore(kaaa, abc, 20), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
@@ -684,7 +687,7 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
         expect(unit.props.sensors.in.gps.isValid()).toBe(true);
     });
 
-    it.fails('keeps the selected 1.00 NM over a GPS loss (#159)', async () => {
+    it('keeps the selected 1.00 NM over a GPS loss (#159)', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
         await moveAircraft(unit, pointBefore(kaaa, abc, 20), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
         await selectOneNm(unit);
@@ -706,8 +709,8 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');
     });
 
-    // After the loss MOD 1 shows no scale at all ("CDI:±NM") today, because the reset 5 is not one of the ARM choices
-    it.fails('keeps the 1 NM approach-arm scale while the GPS is lost (#159)', async () => {
+    // The flag keeps the ARM scale of 1 NM, which is one of the choices MOD 1 offers in ARM, so the field shows it
+    it('keeps the 1 NM approach-arm scale while the GPS is lost (#159)', async () => {
         const unit = await armedOnApproach();
         await unit.panel.selectPage('L', 'MOD 1');
         unit.props.sensors.in.gps.reset();
@@ -718,7 +721,7 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');
     });
 
-    it.fails('keeps the selected 1.00 NM without an active waypoint (#159)', async () => {
+    it('keeps the selected 1.00 NM without an active waypoint (#159)', async () => {
         const unit = await bootUnit();
         await settle(unit);
         expect(activeIdent(unit)).toBeUndefined(); // Precondition: there is no active waypoint
@@ -726,6 +729,21 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
 
         expect(nav(unit).xtkScale).toBe(1);
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');
+    });
+
+    // A power-up starts at 5 NM again (VolatileMemory.reset): the scale is unit state, not a setting. On the welcome
+    // page, before the self-test, which sets 5 NM on its own (characterization)
+    it('restores 5 NM at a power-up, before the self-test (characterization, #159)', async () => {
+        const {unit, kaaa, abc} = await onStandardRoute();
+        await moveAircraft(unit, pointBefore(kaaa, abc, 20), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
+        await selectOneNm(unit);
+        expect(nav(unit).xtkScale).toBe(1); // Precondition
+
+        await unit.panel.powerCycle();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(nav(unit).isSelfTestActive).toBe(false); // still the welcome page
+        expect(nav(unit).xtkScale).toBe(5);
     });
 });
 

@@ -401,7 +401,8 @@ Flightplan really is dead simple".
 sim.
 
 - It handles self-test and GPS-invalid by flagging all values to null. If there is no active leg it calls
-  `activateFpl0()`.
+  `activateFpl0()`. A flag does not change `navPage.xtkScale` (#159), and a power-up sets 5 NM again in
+  `VolatileMemory.reset`.
 - DIS is always the direct distance, even for arcs (6-18).
 - A leg without length (FROM and TO are the same waypoint, so its path has no center) is sequenced at once when a next
   leg exists. The last one navigates on the course of the leg before it (#120, as the KLN 89 trainer does): XTK, DTK
