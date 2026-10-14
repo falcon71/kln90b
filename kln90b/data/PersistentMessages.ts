@@ -5,7 +5,6 @@ import {format} from "numerable";
 import {roundBearing} from "./Coordinates";
 import {NavMath} from "@microsoft/msfs-sdk";
 import {NavMode, NavPageState} from "./VolatileMemory";
-import {KLNFixType} from "./flightplan/Flightplan";
 import {Database} from "./navdata/Database";
 import {KLNMagvar} from "./navdata/KLNMagvar";
 import {PageManager} from "../pages/PageManager";
@@ -131,8 +130,9 @@ class ArmGPSApproachMessage implements Message {
 
 
     public isConditionValid(): boolean {
-        const active = this.navstate.activeWaypoint.getActiveLeg();
-        if (active === null || active.fixType !== KLNFixType.FAF || !(this.navstate.navmode === NavMode.ENR_LEG || this.navstate.navmode === NavMode.ENR_OBS)) {
+        //B-1: near the FAF, also at the IAF copy of a fix that is IAF and FAF (#369)
+        const faf = this.navstate.activeWaypoint.getActiveFafLeg();
+        if (faf === null || !(this.navstate.navmode === NavMode.ENR_LEG || this.navstate.navmode === NavMode.ENR_OBS)) {
             return false;
         }
 

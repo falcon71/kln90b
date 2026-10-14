@@ -61,7 +61,10 @@ function quietWorld(): World {
 
 function harness(w: World) {
     const navPage = {
-        activeWaypoint: {getActiveLeg: () => w.activeLeg},
+        activeWaypoint: {
+            getActiveLeg: () => w.activeLeg,
+            getActiveFafLeg: () => w.activeLeg?.fixType === KLNFixType.FAF ? w.activeLeg : null,
+        },
         get navmode() {
             return w.navmode;
         },
