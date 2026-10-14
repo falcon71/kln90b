@@ -2,6 +2,7 @@ import {expect, onTestFailed, vi} from 'vitest';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 import {bootUnit, BootOptions, HeadlessUnit} from '../boot';
 import {Screen} from '../render/screen';
+import {HEADING_INPUT, panelXml} from '../panelXml';
 import {Aircraft, AircraftInit, AircraftOptions} from './Aircraft';
 import {coupledAutopilot, Pilot} from './pilots';
 import {World} from './World';
@@ -86,7 +87,11 @@ export class Flight {
         // bootUnit counts console.error from before the boot (unit.consoleErrors), so an error logged while the unit
         // starts up trips the monitor too
         const unit = await bootUnit({
-            ...boot, facilities: world.all(), airspaces: world.airspaces(), position: {lat: aircraft.lat, lon: aircraft.lon}, altitudeFt: aircraft.altitudeFt,
+            ...boot,
+            // The coupled autopilot flies on the roll command, which needs a heading input (2-69, #143), so a flight has one
+            // unless the test gives its own panel.xml
+            panelXml: boot.panelXml ?? panelXml(HEADING_INPUT),
+            facilities: world.all(), airspaces: world.airspaces(), position: {lat: aircraft.lat, lon: aircraft.lon}, altitudeFt: aircraft.altitudeFt,
             magvar: (lat, lon) => world.magvar(lat, lon),
         });
         const flight = new Flight(unit, world, new Aircraft(aircraft, aircraftOptions), pilot ?? coupledAutopilot());

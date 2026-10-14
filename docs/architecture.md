@@ -123,7 +123,8 @@ arrives.
       `gpsSatComputer.acquireAndUseSatellites()`.
 - While `isSelfTestActive` is set:
     - `NavCalculator` outputs fixed test values (XTK -2.5, DIS 34.5, DTK 315 mag, FROM, waypoint alert on).
-    - `RollSteeringController` sweeps 0 to -5 degrees of bank.
+    - `RollSteeringController` sweeps 0 to -5 degrees of bank, but only with a heading input (without one the roll
+      command stays 0, 2-69, #143).
     - `SensorsOut.setMode` writes `GPS APPROACH MODE = 3` and `L:KLN90B_AnnunTest = true`, so external annunciators
       light up.
 
@@ -330,7 +331,7 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
     - `GPS WP DESIRED TRACK`, `GPS WP TRACK ANGLE ERROR`, `GPS WP BEARING` (+TRUE), `GPS WP DISTANCE`, `GPS WP ETE`,
       `GPS WP ETA`, `GPS ETE`, `GPS ETA`
     - `GPS COURSE TO STEER` (radians; "real KLN does not have this"; `setRollCommand` writes the roll command LVar
-      regardless)
+      regardless; the course is written without a heading input too, on purpose, #143)
     - `GPS MAGVAR`, `GPS POSITION LAT/LON`, `GPS GROUND SPEED`, `GPS GROUND TRUE/MAGNETIC TRACK`
     - `GPS FLIGHT PLAN WP COUNT/INDEX`, `GPS WP NEXT/PREV ID/LAT/LON`, `GPS WP PREV VALID`
     - `GPS IS APPROACH ACTIVE`, `GPS APPROACH MODE` (0 = ENR, 1 = ARM, 2 = APR, 3 = self-test)
@@ -446,7 +447,9 @@ sim.
 - Status-line feedback: `NO APPROACH`, `NO ACTV WPT`.
 
 **`RollSteeringController`** (1 Hz) is adapted from WT `LNavComputer`. It writes `L:KLN90B_RollCommand` and,
-only with `writeGPSSimVars`, `GPS COURSE TO STEER`.
+only with `writeGPSSimVars`, `GPS COURSE TO STEER`. Without a heading input (`Input.HeadingInput`, also switched by
+`L:KLN90B_HeadingInput`) the roll command is 0 (2-69, #143), also during the self-test. `GPS COURSE TO STEER` is still
+written then, on purpose: the default autopilot reads it.
 
 - Cases: on track (proportional), no intercept (45-degree intercept), or optimal-bank intercept (at most 30 degrees).
 - `adjustBankAngleForArc` and `ArcTurnController` exist but are unused.

@@ -34,8 +34,8 @@ describe('self-test page', () => {
 const HEADING_INPUT_XML = panelXml(HEADING_INPUT);
 
 /**
- * The self-test page of a cold boot. HeadingInput is on, so that the roll command does not depend on the heading input
- * pin (#143)
+ * The self-test page of a cold boot. HeadingInput is on, because the unit sends the roll pattern only with a heading
+ * input (2-69, #143)
  */
 function onSelfTestPage() {
     return bootToSelfTest({magvar: 0, panelXml: HEADING_INPUT_XML});
@@ -83,6 +83,15 @@ describe('self-test LVar outputs (spec)', () => {
 
         expect(Math.min(...rolls)).toBe(-5);
         expect(Math.max(...rolls)).toBe(0);
+    });
+});
+
+// Installation Manual 2-69: without a heading input there is no roll steering output at all, so the self-test pattern
+// of 2-70 is not sent either (#143)
+describe('self-test roll command without a heading input (spec)', () => {
+    it('L:KLN90B_RollCommand is 0 throughout (2-69, #143)', async () => {
+        const unit = await bootToSelfTest({magvar: 0});
+        expect(await sampleSelfTest(unit, 'L:KLN90B_RollCommand', 'degrees')).toEqual(Array(48).fill(0));
     });
 });
 

@@ -1,12 +1,12 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, settle} from '../harness/boot';
-import {HEADING_INPUT, panelXml} from '../harness/panelXml';
+import {bootUnit, moveAircraft, settle} from '../harness/boot';
 import {storedSetting} from '../harness/storage';
 import {Screen} from '../harness/render/screen';
 import {recordMap} from '../harness/render/mapRecorder';
 import {showSuperNav5, SuperNav5} from '../harness/render/superNav5';
 import {bootOnStandardRoute} from '../harness/worldBoot';
 import {standardRoute} from '../harness/fixtures';
+import {courseDeg, pointBefore, pointFrom} from '../harness/flight/geo';
 
 // Public contract (LVars.ts, the wiki page panel.xml customization): L:KLN90B_HeadingInput is the runtime override of
 // Input.HeadingInput, synced like L:KLN90B_ObsSource (SimVarSync.test.ts)
@@ -27,6 +27,21 @@ describe('L:KLN90B_HeadingInput (public contract)', () => {
         await vi.advanceTimersByTimeAsync(2000);
         expect(unit.props.planeSettings.input.headingInput).toBe(false);
         expect(unit.props.sensors.in.headingGyro).toBeNull();
+    });
+
+    // The roll command follows the runtime override: with the input switched on, the unit banks toward the leg (#143)
+    it('gives roll steering once switched on at runtime (2-69, #143)', async () => {
+        const {kaaa, abc} = standardRoute();
+        const onLeg = pointBefore(kaaa, abc, 10);
+        const dtk = courseDeg(onLeg, abc);
+        const unit = await bootOnStandardRoute({magvar: 0});
+        await moveAircraft(unit, pointFrom(onLeg, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});
+        expect(unit.env.sim.lastWrite('L:KLN90B_RollCommand')?.value).toBe(0); // Precondition: no heading input
+
+        unit.env.sim.set('L:KLN90B_HeadingInput', 'bool', 1);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBeGreaterThan(0); // left bank, toward the leg
     });
 });
 

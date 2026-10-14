@@ -12,6 +12,7 @@ import {
     UnitType,
 } from "@microsoft/msfs-sdk";
 import {bankeAngleForStandardTurn, distanceToAchieveBankAngleChange} from "./KLNNavmath";
+import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 
 /**
  * How long it takes for the bank to switch between 0 and 5° on the selft test page.
@@ -41,13 +42,13 @@ export class RollSteeringController implements CalcTickable {
     private readonly loggingEnabled: boolean = false;
 
 
-    constructor(private readonly sensors: Sensors, private readonly memory: VolatileMemory) {
+    constructor(private readonly sensors: Sensors, private readonly memory: VolatileMemory, private readonly planeSettings: KLN90PlaneSettings) {
     }
 
     public tick(): void {
         const nav = this.memory.navPage;
         if (nav.isSelfTestActive) {
-            this.sensors.out.setRollCommand(this.selfTest(), null);
+            this.setOutput(this.selfTest(), null);
             return;
         } else {
             this.selfTestBank = 0;
@@ -56,7 +57,7 @@ export class RollSteeringController implements CalcTickable {
 
         const fromLeg = nav.activeWaypoint.getFromLeg();
         if (fromLeg == null || this.sensors.in.gps.groundspeed < 5) {
-            this.sensors.out.setRollCommand(null, null);
+            this.setOutput(null, null);
             this.arcController.reset();
             return;
         }
@@ -66,6 +67,15 @@ export class RollSteeringController implements CalcTickable {
 
     }
 
+
+    /**
+     * Installation Manual 2-69: without a heading input the unit gives no roll steering, so L:KLN90B_RollCommand is 0,
+     * also during the self-test (#143). GPS COURSE TO STEER is written either way: a deliberate decision, because the
+     * default autopilot reads it and holding it at 0 has unknown side effects
+     */
+    private setOutput(bankAngle: number | null, desiredTrack: number | null): void {
+        this.sensors.out.setRollCommand(this.planeSettings.input.headingInput ? bankAngle : null, desiredTrack);
+    }
 
     /**
      * Installation manual page 2-70
@@ -100,7 +110,7 @@ export class RollSteeringController implements CalcTickable {
             const desiredTrack = dtk - xtk * 50;
             const desiredBankAngle = this.desiredBank(track, desiredTrack, NavMath.getTurnDirection(track, desiredTrack));
             this.log(`On track, XKT:${xtk} DTK:${dtk} bank:${desiredBankAngle} courseToSteer:${desiredTrack}`);
-            this.sensors.out.setRollCommand(desiredBankAngle, desiredTrack);
+            this.setOutput(desiredBankAngle, desiredTrack);
             return desiredBankAngle;
         }
 
@@ -130,7 +140,7 @@ export class RollSteeringController implements CalcTickable {
         if (intersectionsCurrentTrackLegPoints.length === 0) {
             const desiredBankAngle = this.desiredBank(track, interceptTrack, NavMath.getTurnDirection(track, interceptTrack));
             this.log(`Track does not intercept leg, intercept with 45 degrees: bank:${desiredBankAngle} courseToSteer:${interceptTrack}`);
-            this.sensors.out.setRollCommand(desiredBankAngle, interceptTrack);
+            this.setOutput(desiredBankAngle, interceptTrack);
             return desiredBankAngle;
         }
 
@@ -157,7 +167,7 @@ export class RollSteeringController implements CalcTickable {
             && xtk > maxXtkForTracking) {
             const desiredBankAngle = this.desiredBank(track, interceptTrack, NavMath.getTurnDirection(track, interceptTrack));
             this.log(`Too far away, XTK ${xtk}>${maxXtkForTracking}, intercept with 45 degrees: bank:${desiredBankAngle} courseToSteer:${interceptTrack}`);
-            this.sensors.out.setRollCommand(desiredBankAngle, interceptTrack);
+            this.setOutput(desiredBankAngle, interceptTrack);
             return desiredBankAngle;
         }
 
@@ -166,7 +176,7 @@ export class RollSteeringController implements CalcTickable {
 
         this.log(`Intercepting leg: radius:${requiredTurnRadius} bank:${desiredBankAngle} courseToSteer:${dtk}`);
 
-        this.sensors.out.setRollCommand(desiredBankAngle, dtk);
+        this.setOutput(desiredBankAngle, dtk);
         return desiredBankAngle;
     }
 

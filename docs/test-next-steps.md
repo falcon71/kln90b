@@ -285,8 +285,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       empty remark line changes the click counts in the setup of `stores a remark with a hyphen and shows it again`
       (`FreetextEditor.test.ts`); the fix of #262 must keep NO
       SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests);
-    - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised;
-      `HEADING_INPUT` in `RollSteeringController.test.ts` can bite once #143 is fixed.
+    - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): duplicate idents on a waypoint
   page (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 are no open questions: the
   trainer shows neither ARM nor ACTV, so the maintainer's rulings settle them and the tests hold them as characterizations.

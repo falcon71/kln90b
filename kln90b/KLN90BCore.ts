@@ -346,7 +346,7 @@ export class KLN90BCore {
                 new Timers(sensors, this.userSettings, memory.dtPage),
                 vnav,
                 this.messageHandler,
-                new RollSteeringController(sensors, memory),
+                new RollSteeringController(sensors, memory, this.planeSettings),
             ], [
                 new SignalOutputFillterTick(sensors),
             ]);
