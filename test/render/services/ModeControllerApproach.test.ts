@@ -31,6 +31,24 @@ async function scaleAfter(unit: HeadlessUnit, seconds: number): Promise<number> 
     return nav(unit).xtkScale;
 }
 
+/**
+ * 2.5 NM before the FAF (7.5 NM north of KPRC), FAFAA active, armed, the arming ramp finished. At rest the GPS track
+ * is 0, away from the FAF, so the unit stays armed until it moves.
+ */
+async function armedBeforeFaf() {
+    const {w, unit} = await approachLoaded(7.5);
+    expect(await scaleAfter(unit, 31)).toBe(1);
+    expect(activeIdent(unit)).toBe('FAFAA');
+    expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
+    return {w, unit};
+}
+
+/** Moves on the final course to `nm` NM north of KPRC, and runs one calculation tick more */
+async function flyTo(w: ReturnType<typeof approachWorld>, unit: HeadlessUnit, nm: number) {
+    await moveAircraft(unit, w.north(nm), {groundspeedKt: 120, trackTrue: 180});
+    await vi.advanceTimersByTimeAsync(1000);
+}
+
 describe('approach arm and the CDI scale ramp to 1 NM (6-1, 6-3)', () => {
     // The sibling: beyond 30 NM the loaded approach leaves the unit in ENR at +-5
     it('stays in ENR at +-5 with the approach loaded 40 NM from the airport (6-3)', async () => {
@@ -180,24 +198,6 @@ describe('GPS APR switch while armed', () => {
 });
 
 describe('approach active and the CDI scale ramp to 0.3 NM (6-3, 6-11)', () => {
-    /**
-     * 2.5 NM before the FAF (7.5 NM north of KPRC), FAFAA active, armed, the arming ramp finished. At rest the GPS track
-     * is 0, away from the FAF, so the unit stays armed until it moves.
-     */
-    async function armedBeforeFaf() {
-        const {w, unit} = await approachLoaded(7.5);
-        expect(await scaleAfter(unit, 31)).toBe(1);
-        expect(activeIdent(unit)).toBe('FAFAA');
-        expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
-        return {w, unit};
-    }
-
-    /** Moves on the final course to `nm` NM north of KPRC, and runs one calculation tick more */
-    async function flyTo(w: ReturnType<typeof approachWorld>, unit: HeadlessUnit, nm: number) {
-        await moveAircraft(unit, w.north(nm), {groundspeedKt: 120, trackTrue: 180});
-        await vi.advanceTimersByTimeAsync(1000);
-    }
-
     // 6-3 (steps 4 and 5), 6-11, Installation Manual AFMS (B-15): at 2 NM from the FAF the unit goes ACTV and the scale
     // changes from +-1 to +-0.3 over the 2 NM to the FAF; at the FAF it is +-0.3 and stays there
     it('ramps the scale from 1 at 2 NM to 0.3 at the FAF, and keeps 0.3 to the MAP (6-3)', async () => {
@@ -274,8 +274,8 @@ describe('approach active and the CDI scale ramp to 0.3 NM (6-3, 6-11)', () => {
         expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
     });
 
-    // 6-1: 1.5 NM before the FAF, heading toward it, the press cancels ACTV to ARM at +-1. Whether the unit may go back
-    // to ACTV by itself before the FAF is a question for the maintainer, so only the press is held
+    // 6-1: 1.5 NM before the FAF, heading toward it, the press cancels ACTV to ARM at +-1. What follows, the return to
+    // ACTV at the next calculation tick, is held by the characterization at the end of the file (#162)
     it('goes to ARM at +-1 at the GPS APR press 1.5 NM before the FAF (6-1)', async () => {
         const {w, unit} = await armedBeforeFaf();
         await flyTo(w, unit, 5 + 1.5);
@@ -362,5 +362,22 @@ describe('the pilot disarm and a new approach (characterization)', () => {
         await vi.advanceTimersByTimeAsync(3000);
 
         expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
+    });
+});
+
+describe('ACTV before the FAF after a cancel (characterization)', () => {
+    // The maintainer's ruling on #162: the conditions of the switch still hold before the FAF, so the unit is back in ACTV
+    // at the next calculation tick
+    it('is back in ACTV one calculation tick after the GPS APR press 1.5 NM before the FAF (characterization, #162)', async () => {
+        const {w, unit} = await armedBeforeFaf();
+        await flyTo(w, unit, 5 + 1.5);
+        expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
+        unit.send('KLN90B_ApprArm_Push');
+        expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
+
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
+        expect(activeIdent(unit)).toBe('FAFAA');
     });
 });

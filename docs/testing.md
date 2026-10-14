@@ -966,8 +966,8 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   flight plan bounds, insert and delete and the duplicate waypoint cases. Flights cover the large turn, duplicate
   waypoints, the DME arc, the alert through a turn, the TO/FROM flag and the magnetic track. *Pins and
   characterizations only:* roll steering (the #100 pins, by decision) and the XTK output filter (#158; its step
-  response is a unit test). *Untested:* the approach-scale cases and the APR cancel before the FAF (#162, #163; the
-  trainer shows neither ARM nor ACTV), the alert questions #146 and #147, the turn circle on a great-circle leg (only
+  response is a unit test) and the return to ACTV after the GPS APR press before the FAF (#162, the maintainer's
+  ruling). *Untested:* the approach-scale cases (#163; the trainer shows neither ARM nor ACTV), the alert questions #146 and #147, the turn circle on a great-circle leg (only
   the arc case), and the nav-source gate and a cold start in a flight (render tests hold both).
 - **Navdata** (`data/navdata/`, `Gps.ts`). *Spec and characterization:* `KLNFacilityLoader` merging the user
   repository with the database and its user and temporary regions, the nearest lists (order, update interval, the
@@ -1524,9 +1524,10 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       `HEADING_INPUT` in `RollSteeringController.test.ts` can bite once #143 is fixed.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): #146 (the alert time on a Direct To a
   waypoint of FPL 0 that has a following leg), #147 (a waypoint alert in OBS mode), duplicate idents on a waypoint page
-  (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 cannot be answered there, because
-  the trainer shows neither ARM nor ACTV; what the 90B shows on an empty MSG page (#325), the prompt while the MSG page
-  shows and an airport below sea level cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is
+  (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 are no open questions: the trainer
+  shows neither ARM nor ACTV, so the maintainer's rulings settle them and the tests hold them as characterizations.
+  What the 90B shows on an empty MSG page (#325), the prompt while the MSG page shows and an airport below sea level
+  cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is
   the question #326.
 - **Debug `console.log` calls** left in the code: `Apt3MapPage.tsx:30`, `TemporaryWaypointDeleter.ts:27` and `:32`,
   `WaypointPage.tsx:46` and `WaypointPage.getScrollSpeed`, `SupPage.tsx`, the constructors of the waypoint pages
