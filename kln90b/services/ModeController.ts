@@ -239,6 +239,9 @@ export class ModeController implements CalcTickable {
     }
 
     public getMagvarForObs(wpt: Facility | null) {
+        if (!this.magvar.isMagvarValid()) {
+            return this.magvar.getCurrentMagvar(); //5-44: true north (or the variation entered on SET 2), also for a VOR (#190)
+        }
         if (wpt !== null && FacilityUtils.isFacilityType(wpt, FacilityType.VOR)) {
             return -(wpt as VorFacility).magneticVariation; //Seems to be opposite to the magvar service
         }

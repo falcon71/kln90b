@@ -445,7 +445,9 @@ only with `writeGPSSimVars`, `GPS COURSE TO STEER`.
 **`KLNMagvar`** (`data/navdata/KLNMagvar.ts`):
 
 - Uses `MagVar.get(coords)` between 74°N and 60°S (5-44). Outside that band it uses the pilot-entered
-  `navPage.userMagvar`, which resets to 0 when re-entering coverage.
+  `navPage.userMagvar`, which resets to 0 when re-entering coverage. In OBS mode the active waypoint must lie inside
+  the band too (5-44, #190): otherwise the variation counts as invalid, and `getMagvarForObs` references the OBS course
+  to true north (or the variation entered on SET 2), also for an active VOR.
 - Convention: DTK and bearings are stored **true**; `obsMag` and `getDtkOrObsMagnetic()` are magnetic, and the names say
   which.
 
