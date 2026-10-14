@@ -6,7 +6,9 @@ import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 import {APR_ARM_SWITCH, LEG_OBS_SWITCH, panelXml} from '../../../harness/panelXml';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
-import {NavMode} from '../../../../kln90b/data/VolatileMemory';
+import {NavMode, NavPageState} from '../../../../kln90b/data/VolatileMemory';
+import {CdiScaleField} from '../../../../kln90b/controls/selects/CdiScaleField';
+import {mountedText} from '../../../harness/render/mount';
 
 /** Boots 40 NM north of KPRC with the approach loaded from APT 8, so the unit is in ENR at +-5 */
 async function approachLoaded40(): Promise<HeadlessUnit> {
@@ -22,7 +24,7 @@ async function approachLoaded40(): Promise<HeadlessUnit> {
 }
 
 describe('MOD 1 CDI scale field with an approach loaded 40 NM from the airport', () => {
-    // 5-38 (figure 5-120): MOD 1 shows the CDI scale. The sibling of the pin below: in ENR the field reads +-5.00
+    // 5-38 (figure 5-120): MOD 1 shows the CDI scale. The control for the #160 test below: in ENR the field reads +-5.00
     it('shows CDI:±5.00NM in ENR 40 NM from the airport (5-38)', async () => {
         const unit = await approachLoaded40();
         await unit.panel.selectPage('L', 'MOD 1');
@@ -32,7 +34,7 @@ describe('MOD 1 CDI scale field with an approach loaded 40 NM from the airport',
         expect(Screen.read().rows('L')[5]).toBe('CDI:±5.00NM');
     });
 
-    // The other sibling of the pin: the switch arms the unit at 40 NM and leaves the scale at +-5
+    // The other control for that test: the switch arms the unit at 40 NM and leaves the scale at +-5
     it('is armed at +-5 after the switch 40 NM from the airport (6-1)', async () => {
         const unit = await approachLoaded40();
         await vi.advanceTimersByTimeAsync(6000);
@@ -43,9 +45,8 @@ describe('MOD 1 CDI scale field with an approach loaded 40 NM from the airport',
         expect(unit.props.memory.navPage.xtkScale).toBe(5);
     });
 
-    // 6-1: armed with the switch beyond 30 NM the scale stays +-5, so MOD 1 must show it. Mod1Page.getScaleIdx looks 5 up in
-    // the scales valid for ARM, [0.3, 1], gets -1 and the field shows no value
-    it.fails('shows CDI:±5.00NM when armed by the switch 40 NM from the airport (#160)', async () => {
+    // 6-1: armed with the switch beyond 30 NM the scale stays +-5, and MOD 1 shows the scale in use (5-38)
+    it('shows CDI:±5.00NM when armed by the switch 40 NM from the airport (5-38, 6-1, #160)', async () => {
         const unit = await approachLoaded40();
         await vi.advanceTimersByTimeAsync(6000);
         await unit.panel.press('KLN90B_ApprArm_Push');
@@ -208,5 +209,24 @@ describe('MOD 1 CDI scale when the unit arms with the page in view', () => {
         // guide does not give (5-38 only rules out the less sensitive scale). The pin holds that the scale stays one of them
         expect([0.3, 1]).toContain(unit.props.memory.navPage.xtkScale);
         expect(Number.isFinite(unit.env.sim.get('GPS CDI SCALING', 'meters'))).toBe(true);
+    });
+});
+
+// In APR the scale ramps from 1 to 0.3 NM over the last 2 NM to the FAF (6-3). The field shows 0.30 throughout, also on
+// the tick of the activation, where the scale is still exactly 1 (characterization: the guide shows no value for the
+// ramp)
+describe('CDI scale field display (characterization)', () => {
+    const field = (navmode: NavMode, xtkScale: number) => new CdiScaleField({navmode, xtkScale} as unknown as NavPageState);
+
+    it('shows 0.30 in APR with the scale still exactly 1 (characterization, #160)', () => {
+        expect(mountedText(field(NavMode.APR_LEG, 1))).toBe('0.30');
+    });
+
+    it('shows 0.30 in APR during the ramp (characterization, #160)', () => {
+        expect(mountedText(field(NavMode.APR_LEG, 0.65))).toBe('0.30');
+    });
+
+    it('shows 1.00 during the ARM ramp from 5 to 1 NM (characterization, #160)', () => {
+        expect(mountedText(field(NavMode.ARM_LEG, 3))).toBe('1.00');
     });
 });

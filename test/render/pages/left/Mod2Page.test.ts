@@ -293,7 +293,7 @@ describe('MOD 2 CDI scale field with an approach armed 40 NM from the airport (#
         return unit;
     }
 
-    // 6-1: the sibling of the pin below. Armed beyond 30 NM the scale stays at 5 NM, and MOD 2 is in view
+    // 6-1: the control for the #160 test below. Armed beyond 30 NM the scale stays at 5 NM, and MOD 2 is in view
     it('armed 40 NM from the airport by the switch, MOD 2 shown (6-1)', async () => {
         const unit = await armedAt40WithMod2();
 
@@ -302,9 +302,8 @@ describe('MOD 2 CDI scale field with an approach armed 40 NM from the airport (#
         expect(Screen.read().status().left).toBe('MOD 2');
     });
 
-    // 5-38, 6-1: the scale in use is 5 NM, so MOD 2 must show it. Mod2Page.getScaleIdx looks 5 up in the ARM choices
-    // [0.3, 1], gets -1, and the field shows no value
-    it.fails('shows CDI:±5.00NM when armed by the switch 40 NM from the airport (5-38, 6-1, #160)', async () => {
+    // 5-38, 6-1: armed beyond 30 NM the scale stays 5 NM, and MOD 2 shows the scale in use (5-38)
+    it('shows CDI:±5.00NM when armed by the switch 40 NM from the airport (5-38, 6-1, #160)', async () => {
         const unit = await armedAt40WithMod2();
 
         expect(Screen.read().rows('L')[5]).toBe('CDI:±5.00NM');
