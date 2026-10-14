@@ -71,19 +71,21 @@ describe('the mode after a power cycle (3-3)', () => {
     });
 });
 
+/** Boots `nm` NM north of KPRC and loads the approach of approachWorld() */
+async function approachLoadedAt(nm: number) {
+    const w = approachWorld();
+    const unit = await bootUnit({
+        facilities: w.facilities, position: w.north(nm),
+        panelXml: panelXml(APR_ARM_SWITCH),
+        storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
+    });
+    await settle(unit);
+    await unit.panel.loadProcedure('APT 8');
+    return unit;
+}
+
 describe('procedures over a power cycle (6-5, 6-23)', () => {
-    /** Boots 40 NM north of KPRC and loads the approach of approachWorld() */
-    async function approachLoaded() {
-        const w = approachWorld();
-        const unit = await bootUnit({
-            facilities: w.facilities, position: w.north(40),
-            panelXml: panelXml(APR_ARM_SWITCH),
-            storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
-        });
-        await settle(unit);
-        await unit.panel.loadProcedure('APT 8');
-        return unit;
-    }
+    const approachLoaded = () => approachLoadedAt(40);
 
     const procedureLegs = (unit: HeadlessUnit) =>
         unit.props.memory.fplPage.flightplans[0].getLegs().filter(l => l.procedure !== undefined).map(l => l.wpt.icaoStruct.ident);
@@ -321,5 +323,25 @@ describe('the waypoint pages (characterization)', () => {
         await cycle(unit);
 
         expect(unit.props.memory.vorPage.ident).toBe('ABC');
+    });
+});
+
+describe('the approach disarm over a power cycle (characterization)', () => {
+    // The Pilot's Guide does not say what a power cycle does to a disarm. A power-off of under 5 minutes keeps the
+    // approach in FPL 0 (6-5) and the unit powers up in ENR-LEG (3-3), so the unit arms by itself again inside 30 NM (#139)
+    it('arms by itself again after a power cycle of 1 minute that followed the pilot disarm (characterization, #139)', async () => {
+        const unit = await approachLoadedAt(20);
+        const nav = unit.props.memory.navPage;
+        expect(nav.navmode).toBe(NavMode.ARM_LEG); // Precondition: armed by itself
+        await unit.panel.press('KLN90B_ApprArm_Push');
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(nav.navmode).toBe(NavMode.ENR_LEG); // Precondition: disarmed, and it holds
+        expect(fplIdents(unit)).toContain('FAFAA'); // Precondition: the approach is still in the plan
+
+        await cycle(unit, 60);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(fplIdents(unit)).toContain('FAFAA');
+        expect(nav.navmode).toBe(NavMode.ARM_LEG);
     });
 });

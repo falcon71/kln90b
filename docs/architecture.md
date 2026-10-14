@@ -421,7 +421,9 @@ sim.
 - Modes are `NavMode {ENR_LEG, ENR_OBS, ARM_LEG, ARM_OBS, APR_LEG}`, stored in `navPage.navmode`. `navPage.xtkScale` is
   5 (ENR), 1 (ARM) or 0.3 (APR).
 - Auto-arm happens within 30 NM of the approach airport (the `parentFacility` of the first APP leg). The scale ramps 5
-  to 1 over 30 s.
+  to 1 over 30 s, also when the pilot arms with the GPS APR switch inside 30 NM. A press while armed disarms: the
+  first APP leg is kept in `navPage.approachDisarmedLeg`, and the auto-arm skips that approach until the next press,
+  or until the legs are another object (the approach was removed, replaced or loaded again). A power-up clears it.
 - ARM becomes APR when the FAF is active (or the IAF copy of a fix that is IAF and FAF, `ActiveWaypoint.getActiveFafLeg()`),
   within 2 NM, the MAP is ahead and the track is within 110 deg of FAF to MAP. APR becomes 0.3 at the FAF ("Integrity
   check?" is a TODO; there is no RAIM).

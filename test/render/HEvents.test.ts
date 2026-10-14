@@ -481,7 +481,7 @@ describe('approach arm button (6-1, C-1)', () => {
         expect(nav.xtkScale).toBe(5);
     });
 
-    // The sibling of the pin: the setup works, the unit has armed on its own 20 NM from the airport, and the press disarms
+    // The setup: the unit has armed on its own 20 NM from the airport, and the press disarms
     it('has armed on its own 20 NM from the airport and disarms at the press', async () => {
         const unit = await approachLoaded(20);
         const nav = unit.props.memory.navPage;
@@ -492,10 +492,9 @@ describe('approach arm button (6-1, C-1)', () => {
         expect(nav.navmode).toBe(NavMode.ENR_LEG);
     });
 
-    // #139. 6-1: a press while armed disarms the approach until the next press. B-1: ARM GPS APPROACH is the reminder for
-    // an approach that was disarmed inside 30 NM. ModeController.tick calls checkSwitchEnrToArmMode on every tick in ENR, so
-    // the unit arms again by itself within a second
-    it.fails('stays disarmed after the press 20 NM from the airport (#139)', async () => {
+    // 6-1: a press while armed disarms the approach until the next press, also inside 30 NM; the auto-arm skips an
+    // approach the pilot disarmed (#139)
+    it('stays disarmed after the press 20 NM from the airport (#139)', async () => {
         const unit = await approachLoaded(20);
         const nav = unit.props.memory.navPage;
 

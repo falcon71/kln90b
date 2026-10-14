@@ -4,7 +4,7 @@ import {approachWorld} from '../../harness/fixtures';
 import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {savedFlightplan} from '../../harness/storage';
 import {Screen} from '../../harness/render/screen';
-import {activeIdent, fplIdents} from '../../harness/readers';
+import {activeIdent, fplIdents, messageLines} from '../../harness/readers';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 
 // The world is approachWorld(): an RNAV approach to KPRC from the north with the FAF FAFAA 5 NM and a step-down fix
@@ -100,17 +100,82 @@ describe('approach arm and the CDI scale ramp to 1 NM (6-1, 6-3)', () => {
 });
 
 describe('GPS APR switch while armed', () => {
-    // 6-1: pressing the switch while armed disarms the approach: ENR and +-5. Sent without moving the clock: inside 30 NM
-    // the unit arms itself again at the next calculation tick (#139), so only the press is held
+    // 6-1: pressing the switch while armed disarms the approach: ENR and +-5, also inside 30 NM
     it('goes to ENR at +-5 on the press while armed (6-1)', async () => {
         const {unit} = await approachLoaded(20);
         expect(await scaleAfter(unit, 31)).toBe(1);
         expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
 
-        unit.send('KLN90B_ApprArm_Push');
+        await unit.panel.press('KLN90B_ApprArm_Push');
 
         expect(nav(unit).navmode).toBe(NavMode.ENR_LEG);
         expect(nav(unit).xtkScale).toBe(5);
+        expect(await scaleAfter(unit, 3)).toBe(5);
+        expect(nav(unit).navmode).toBe(NavMode.ENR_LEG);
+    });
+
+    // 6-1: the press disarms in OBS too, also inside 30 NM
+    it('goes to ENR-OBS on the press while armed in OBS and stays there (6-1)', async () => {
+        const {unit} = await approachLoaded(20);
+        expect(await scaleAfter(unit, 31)).toBe(1);
+        await unit.panel.obsMode();
+        expect(nav(unit).navmode).toBe(NavMode.ARM_OBS);
+
+        await unit.panel.press('KLN90B_ApprArm_Push');
+
+        expect(nav(unit).navmode).toBe(NavMode.ENR_OBS);
+        expect(await scaleAfter(unit, 3)).toBe(5);
+        expect(nav(unit).navmode).toBe(NavMode.ENR_OBS);
+    });
+
+    // 6-1: a second press arms again; 6-1, 6-3: armed inside 30 NM, the scale changes from 5 to 1 over the next 30 s
+    it('arms again at the second press inside 30 NM and ramps the scale to 1 over 30 s (6-1, 6-3)', async () => {
+        const {unit} = await approachLoaded(20);
+        expect(await scaleAfter(unit, 31)).toBe(1);
+        await unit.panel.press('KLN90B_ApprArm_Push');
+        expect(await scaleAfter(unit, 3)).toBe(5);
+        expect(nav(unit).navmode).toBe(NavMode.ENR_LEG);
+
+        await unit.panel.press('KLN90B_ApprArm_Push');
+        expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
+        const mid = await scaleAfter(unit, 15);
+        expect(mid).toBeGreaterThan(1.5); // A ramp, not a jump
+        expect(mid).toBeLessThan(4.5);
+        expect(await scaleAfter(unit, 16)).toBe(1);
+    });
+
+    // 6-1: the second press arms again in OBS too; 6-1, 6-3: armed inside 30 NM, the scale changes from 5 to 1 over the next 30 s
+    it('arms again at the second press in OBS inside 30 NM and ramps the scale to 1 over 30 s (6-1, 6-3)', async () => {
+        const {unit} = await approachLoaded(20);
+        expect(await scaleAfter(unit, 31)).toBe(1);
+        await unit.panel.obsMode();
+        expect(nav(unit).navmode).toBe(NavMode.ARM_OBS);
+        await unit.panel.press('KLN90B_ApprArm_Push');
+        expect(await scaleAfter(unit, 3)).toBe(5);
+        expect(nav(unit).navmode).toBe(NavMode.ENR_OBS);
+
+        await unit.panel.press('KLN90B_ApprArm_Push');
+        expect(nav(unit).navmode).toBe(NavMode.ARM_OBS);
+        const mid = await scaleAfter(unit, 15);
+        expect(mid).toBeGreaterThan(1.5); // A ramp, not a jump
+        expect(mid).toBeLessThan(4.5);
+        expect(await scaleAfter(unit, 16)).toBe(1);
+    });
+
+    // B-1: with the approach disarmed, the unit reminds the pilot 3 NM before the FAF. The FAF FAFAA is 5 NM north of
+    // KPRC, so 7.9 NM north is 2.9 NM before it
+    it('shows ARM GPS APPROACH before the FAF with the approach disarmed (B-1)', async () => {
+        const {w, unit} = await approachLoaded(20);
+        await unit.panel.press('KLN90B_ApprArm_Push');
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(nav(unit).navmode).toBe(NavMode.ENR_LEG);
+
+        await moveAircraft(unit, w.north(7.9), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(activeIdent(unit)).toBe('FAFAA');
+        expect(nav(unit).navmode).toBe(NavMode.ENR_LEG);
+        expect(messageLines(unit)).toContainEqual(['ARM GPS APPROACH']);
     });
 });
 
@@ -281,5 +346,21 @@ describe('approach active ramp (characterization)', () => {
         }
 
         expect(nav(unit).xtkScale).toBeCloseTo(0.65, 2);
+    });
+});
+
+describe('the pilot disarm and a new approach (characterization)', () => {
+    // The disarm belongs to the approach that was loaded; the same approach loaded again is a new approach, which arms by
+    // itself inside 30 NM (#139)
+    it('arms by itself again when the approach is loaded again after the disarm (characterization, #139)', async () => {
+        const {unit} = await approachLoaded(20);
+        await unit.panel.press('KLN90B_ApprArm_Push');
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(nav(unit).navmode).toBe(NavMode.ENR_LEG);
+
+        await unit.panel.loadProcedure('APT 8');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
     });
 });

@@ -35,36 +35,33 @@ export class ModeController implements CalcTickable {
 
     public armApproachPressed() {
         let apt: AirportFacility | null;
+        this.navState.approachDisarmedLeg = null; //6-1: every press ends a disarm (#139)
         switch (this.navState.navmode) {
             case NavMode.ENR_LEG:
                 apt = this.getApproachApt();
                 if (apt === null) {
                     this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO APPROACH");
                 } else {
-                    this.navState.navmode = NavMode.ARM_LEG;
-                    if (UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(apt), UnitType.NMILE) <= 30) {
-                        this.navState.xtkScale = 1;
-                    }
+                    this.navState.navmode = NavMode.ARM_LEG; //6-1, 6-3: inside 30 NM the scale ramps to 1 (adjustXtkScaleArm)
                 }
                 break;
             case NavMode.ARM_LEG:
                 this.navState.navmode = NavMode.ENR_LEG;
                 this.navState.xtkScale = 5;
+                this.navState.approachDisarmedLeg = this.getFirstApproachLeg(); //6-1: disarmed until the next press (#139)
                 break;
             case NavMode.ENR_OBS:
                 apt = this.getApproachApt();
                 if (apt === null) {
                     this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO APPROACH");
                 } else {
-                    this.navState.navmode = NavMode.ARM_OBS;
-                    if (UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(apt), UnitType.NMILE) <= 30) {
-                        this.navState.xtkScale = 1;
-                    }
+                    this.navState.navmode = NavMode.ARM_OBS; //6-1, 6-3: inside 30 NM the scale ramps to 1 (adjustXtkScaleArm)
                 }
                 break;
             case NavMode.ARM_OBS:
                 this.navState.navmode = NavMode.ENR_OBS;
                 this.navState.xtkScale = 5;
+                this.navState.approachDisarmedLeg = this.getFirstApproachLeg(); //6-1: disarmed until the next press (#139)
                 break;
             case NavMode.APR_LEG:
                 this.navState.navmode = NavMode.ARM_LEG;
@@ -332,6 +329,13 @@ export class ModeController implements CalcTickable {
     }
 
     private checkSwitchEnrToArmMode(apt: AirportFacility | null): void {
+        const disarmed = this.navState.approachDisarmedLeg;
+        if (disarmed !== null) {
+            if (disarmed === this.getFirstApproachLeg()) {
+                return; //6-1: the pilot disarmed this approach (#139)
+            }
+            this.navState.approachDisarmedLeg = null; //The approach was removed, replaced or loaded again
+        }
         if (apt !== null && UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(apt), UnitType.NMILE) <= 30) {
             console.log("Moving to Arm mode");
             this.navState.navmode = this.navState.navmode === NavMode.ENR_OBS ? NavMode.ARM_OBS : NavMode.ARM_LEG;
@@ -404,7 +408,11 @@ export class ModeController implements CalcTickable {
      * If there is an approach in the Flightplan, then this will return the corresponding airport. Null otherwise
      */
     private getApproachApt(): AirportFacility | null {
-        return this.fpl0.getLegs().find(leg => leg.type === KLNLegType.APP)?.parentFacility ?? null;
+        return this.getFirstApproachLeg()?.parentFacility ?? null;
+    }
+
+    private getFirstApproachLeg(): KLNFlightplanLeg | null {
+        return this.fpl0.getLegs().find(leg => leg.type === KLNLegType.APP) ?? null;
     }
 
     /**

@@ -967,9 +967,8 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   waypoints, the DME arc, the alert through a turn, the TO/FROM flag and the magnetic track. *Pins and
   characterizations only:* roll steering (the #100 pins, by decision) and the XTK output filter (#158; its step
   response is a unit test). *Untested:* the approach-scale cases and the APR cancel before the FAF (#162, #163; the
-  trainer shows neither ARM nor ACTV), the alert questions #146 and #147, ARM GPS APPROACH in a booted unit (only the
-  unit stage while #139 stands), the turn circle on a great-circle leg (only the arc case), and the nav-source gate and
-  a cold start in a flight (render tests hold both).
+  trainer shows neither ARM nor ACTV), the alert questions #146 and #147, the turn circle on a great-circle leg (only
+  the arc case), and the nav-source gate and a cold start in a flight (render tests hold both).
 - **Navdata** (`data/navdata/`, `Gps.ts`). *Spec and characterization:* `KLNFacilityLoader` merging the user
   repository with the database and its user and temporary regions, the nearest lists (order, update interval, the
   selected entry dropping out (#39), the filters of #57 and SET 3), the scan list including its cache window (#40,
@@ -1355,9 +1354,8 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 
 - **Approach arming** (the ARM and APR scale ramps), the waypoint alert without turn anticipation and the GPS-invalid
   path are held at the render stage, where a held position plus `moveAircraft` observes them; flights would only add the
-  motion. **ARM GPS APPROACH** is tested at the unit stage only (`PersistentMessages.test.ts`): while #139 stands the
-  unit re-arms within 30 NM on every tick, so ENR-LEG within 3 NM of the FAF is unreachable. Add a render test once #139
-  is fixed.
+  motion. **ARM GPS APPROACH** is tested at the unit stage (`PersistentMessages.test.ts`) and in a booted unit
+  (`ModeControllerApproach.test.ts`, with the approach disarmed by the pilot's press, #139).
 - **The flown-through bound of `dmeArc.test.ts` does not hold the arc reversal.** With `fromDtk` reversed on arc legs
   the monitor's bound north of the leg stays green (0.895 NM against a radius of 1.012 NM); only the circle-center
   assertion fails. A tighter bound, or a monitor on the arc's radius, would hold it twice.
