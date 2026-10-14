@@ -1,10 +1,13 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
-import {airport} from '../../../harness/navdata/builders';
+import {airport, intersection} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
 import {messages} from '../../../harness/readers';
+import {NO_OBS, panelXml} from '../../../harness/panelXml';
+import {NavMode} from '../../../../kln90b/data/VolatileMemory';
+import {VnavState} from '../../../../kln90b/services/Vnav';
 
 // 5-7 to 5-9: advisory VNAV on NAV 4, set up after the Pilot's Guide example (figures 5-21 to 5-28): 64.8 NM to the
 // destination at 7500 ft, SEL 1900 ft and an offset of 2 NM, so the VNAV target is 62.8 NM away and 5600 ft below.
@@ -185,5 +188,70 @@ describe('NAV 4 VNAV under the ANGLE cursor (characterization)', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(Screen.read().rows('L')[0]).toBe('VNV 7400ft ');
+    });
+});
+
+// Checked in the KLN 89 trainer, 2026-10-14: VNAV to a waypoint after the active one is cancelled in OBS mode, the
+// active waypoint is shown as the VNAV waypoint, no message comes, and LEG does not bring the programming back; VNAV to
+// the active waypoint stays. MIDAA lies 50 NM west of KDDD on the leg, so it is the active waypoint 64.8 NM west
+describe('VNAV and the switch to OBS (checked in the KLN 89 trainer, 2026-10-14, #338)', () => {
+    const MIDAA = intersection('MIDAA', west(50).lat, west(50).lon);
+
+    async function armedTo(target: 'KDDD' | 'MIDAA') {
+        const unit = await bootUnit({
+            facilities: [KAAA, MIDAA, KDDD], position: west(64.8), altitudeFt: 7500, panelXml: panelXml(NO_OBS),
+            storage: savedFlightplan(0, [KAAA, MIDAA, KDDD]),
+        });
+        await settle(unit);
+        await moveAircraft(unit, west(64.8), {groundspeedKt: 145, trackTrue: 90});
+        const nav = unit.props.memory.navPage;
+        nav.nav4SelectedAltitude = 1900;
+        nav.nav4VnavDist = 2;
+        nav.nav4VnavAngle = -1.8;
+        nav.nav4VnavWpt = target === 'KDDD' ? KDDD : MIDAA;
+        unit.props.vnav.armVnav();
+        expect(unit.props.vnav.state).not.toBe(VnavState.Inactive); // Precondition: programmed
+        return unit;
+    }
+
+    it('cancels VNAV to a waypoint after the active one, shows the active waypoint and adds no message', async () => {
+        const unit = await armedTo('KDDD');
+        const before = messages(unit);
+
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.vnav.state).toBe(VnavState.Inactive);
+        const rows = await unit.panel.show('L', 'NAV 4');
+        expect(rows[0]).toBe('VNV INACTV ');
+        expect(rows[4]).toMatch(/^MIDAA/);
+        // The course advisory of LEG mode (ADJ NAV IND CRS TO, PersistentMessages) leaves the list with the switch, so
+        // the lists differ by that removal; the cancel itself adds none
+        const added = messages(unit).filter(m => !before.includes(m));
+        expect(added).toEqual([]);
+    });
+
+    it('does not bring the VNAV waypoint back on the switch to LEG', async () => {
+        const unit = await armedTo('KDDD');
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        await unit.panel.selectPage('L', 'MOD 1');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_LEG);
+        expect(unit.props.vnav.state).toBe(VnavState.Inactive);
+        expect((await unit.panel.show('L', 'NAV 4'))[4]).toMatch(/^MIDAA/);
+    });
+
+    it('keeps VNAV to the active waypoint through the switch to OBS', async () => {
+        const unit = await armedTo('MIDAA');
+
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.vnav.state).not.toBe(VnavState.Inactive);
+        expect(unit.props.memory.navPage.nav4VnavWpt!.icaoStruct.ident).toBe('MIDAA');
     });
 });
