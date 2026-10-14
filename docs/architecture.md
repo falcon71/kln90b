@@ -990,7 +990,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `SelectField(valueSet: string[], index, changedCallback)`: the inner knob cycles and calls back at once;
       `keyboard()` picks a value by its text.
     - `CdiScaleField` is the CDI scale of MOD 1 and MOD 2: a `SelectField` over the scales the current mode allows (5-38,
-      6-1) that shows the step the scale is at or ramping to.
+      6-1) that shows the step the scale is at or ramping to. The choices are rebuilt at every display tick, and a click
+      sets the scale from the list that was on the screen.
     - `*Fieldset` classes (`AltitudeFieldset`, `BaroFieldset`, `BearingFieldset`, `FpmFieldset`, `FuelFieldset`,
       `SpeedFieldset`, `TempFieldset`, `TimeFieldset`, `VolumeFieldset`, `VnavFieldsets`) are plain `UiElement`s with
       one `SelectField` per digit, so each digit is its own cursor stop. They offer `setValue`/`setReadonly`.

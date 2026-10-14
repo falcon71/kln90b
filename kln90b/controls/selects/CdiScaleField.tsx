@@ -36,14 +36,20 @@ const formatScale = (scale: number): string => format(scale, "0.00");
  * The CDI scale field of MOD 1 and MOD 2 (5-38)
  */
 export class CdiScaleField extends SelectField {
+    private readonly shown: { scales: number[] };
 
     constructor(private readonly navState: NavPageState) {
-        const scales = selectableScales(navState);
-        super(scales.map(formatScale), scales.indexOf(shownScale(navState)), idx => navState.xtkScale = selectableScales(navState)[idx]);
+        const shown = {scales: selectableScales(navState)};
+        //#260: a knob click sets the scale from the list the pilot saw, not from the list of a mode that changed since
+        super(shown.scales.map(formatScale), shown.scales.indexOf(shownScale(navState)), idx => navState.xtkScale = shown.scales[idx]);
+        this.shown = shown;
     }
 
     public tick(blink: boolean): void {
-        this.value = selectableScales(this.navState).indexOf(shownScale(this.navState));
+        //The choices follow the mode at every display tick (#260)
+        this.shown.scales = selectableScales(this.navState);
+        this.valueSet = this.shown.scales.map(formatScale);
+        this.value = this.shown.scales.indexOf(shownScale(this.navState));
         super.tick(blink);
     }
 }
