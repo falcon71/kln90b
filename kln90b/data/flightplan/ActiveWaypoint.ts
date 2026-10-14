@@ -19,6 +19,8 @@ export interface FromLeg {
 }
 
 const CACHED_CIRCLE = new GeoCircle(new Float64Array(3), 0);
+const ARC_FROM_CACHE = new GeoPoint(0, 0);
+const ARC_TO_CACHE = new GeoPoint(0, 0);
 
 export class TurnStackEntry {
 
@@ -313,7 +315,10 @@ export class ActiveWaypoint {
             circle.closest(this.sensors.in.gps.coords, tempClosestGeoPoint);
 
             let distGPSClosestWpt: number;
-            if (this.isPointOnCircleBetween(tempFromGeoPoint, to, tempClosestGeoPoint)) {
+            const between = from.arcData === undefined
+                ? this.isPointOnCircleBetween(tempFromGeoPoint, to, tempClosestGeoPoint)
+                : this.isPointOnArcBetween(circle, from.wpt, to, tempClosestGeoPoint);
+            if (between) {
                 distGPSClosestWpt = tempClosestGeoPoint.distance(this.sensors.in.gps.coords)
             } else {
                 //The closest point is not between from and to, so lets use the distance between GPS and from instead
@@ -342,6 +347,17 @@ export class ActiveWaypoint {
         const distPointTo = pointToCheck.distance(to);
         //If the distance between A & C and B & C is the same as A & B, then C lies between A & B, otherwise it is outside
         return distPointFrom + distPointTo <= distFromTo + GeoCircle.ANGULAR_TOLERANCE;
+    }
+
+    /**
+     * #121: checks if a point of a DME arc lies between from and to, by the angle along the arc's circle in its own
+     * direction. The chord test of isPointOnCircleBetween needs a great circle; the ends need not lie exactly on the
+     * arc's circle, so they are projected onto it first
+     */
+    private isPointOnArcBetween(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, pointToCheck: GeoPoint): boolean {
+        circle.closest(from, ARC_FROM_CACHE);
+        circle.closest(to, ARC_TO_CACHE);
+        return circle.angleAlong(ARC_FROM_CACHE, pointToCheck, Math.PI) <= circle.angleAlong(ARC_FROM_CACHE, ARC_TO_CACHE, Math.PI) + GeoCircle.ANGULAR_TOLERANCE;
     }
 
     private assertToMatchesFplIdx(): void {

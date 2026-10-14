@@ -223,24 +223,119 @@ describe('waypoint alert without turn anticipation (4-9)', () => {
     });
 });
 
-// 3-29: Direct To a waypoint: the alert starts about 36 s before it. Turn anticipation is on (the default), but there is
-// no next leg to anticipate a turn onto, so the 36 s apply.
-describe('waypoint alert on a Direct To (3-29)', () => {
-    it('starts about 36 s before a Direct To waypoint outside the flight plan, with turn anticipation on', async () => {
+// #372: with turn anticipation on, a waypoint without a turn to anticipate alerts about 15 s before it, and the alert
+// ends once the waypoint is passed. Checked in the KLN 89 trainer, 2026-10-14: a Direct To outside the plan alerted 1.0 NM
+// out at 239 kt and 0.5 NM out at 121 kt (ETE :14 both times) and stopped at the waypoint; with turn anticipation off it
+// alerted 2.4 NM out at 239 kt (36 s). The guides give about 36 s for a Direct To (3-29) without this distinction; the
+// maintainer ruled for the measured 15 s. At 120 kt 15 s are 0.5 NM: off at 0.6 NM (18 s), on at 0.4 NM (12 s).
+describe('waypoint alert on a Direct To outside the flight plan (checked in the KLN 89 trainer, 2026-10-14)', () => {
+    /** A Direct To ABC from 5 NM before it, ABC not in any plan; the aircraft then held on the line to ABC at 120 kt */
+    async function directToAbc(turnAnticipation: boolean) {
         const {kaaa, abc} = standardRoute();
         const start = pointBefore(kaaa, abc, 5);
-        const unit = await bootUnit({facilities: [kaaa, abc], position: start});
+        const unit = await bootUnit({facilities: [kaaa, abc], position: start, storage: {turnAnticipation}});
         await settle(unit);
         await unit.panel.directTo('ABC');
         expect(nav(unit).activeWaypoint.isDctNavigation()).toBe(true); // Preconditions
         expect(activeIdent(unit)).toBe('ABC');
         expect(nav(unit).activeWaypoint.getActiveFplIdx()).toBe(-1);
-        const leg = courseDeg(start, abc);
+        const at = (nmBefore: number) => moveAircraft(unit, pointBefore(start, abc, nmBefore), {groundspeedKt: 120, trackTrue: courseDeg(start, abc)});
+        return {unit, abc, start, at};
+    }
 
-        await moveAircraft(unit, pointBefore(start, abc, 1.3), {groundspeedKt: 120, trackTrue: leg});
+    it('starts about 15 s before the waypoint with turn anticipation on (checked in the KLN 89 trainer, 2026-10-14, #372)', async () => {
+        const {unit, at} = await directToAbc(true);
+
+        await at(0.6);
         expect(nav(unit).waypointAlert).toBe(false);
 
-        await moveAircraft(unit, pointBefore(start, abc, 1.1), {groundspeedKt: 120, trackTrue: leg});
+        await at(0.4);
+        expect(nav(unit).waypointAlert).toBe(true);
+        // The WPT annunciator follows the alert (3-59); the 89 has no external output and showed only the arrow
+        expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(1);
+    });
+
+    it('ends once the waypoint is passed (checked in the KLN 89 trainer, 2026-10-14, #372)', async () => {
+        const {unit, abc, start, at} = await directToAbc(true);
+        await at(0.4);
+        expect(nav(unit).waypointAlert).toBe(true); // Precondition: the alert is on
+
+        // 0.2 NM past ABC, 6 s: inside 15 s of the waypoint, but behind it
+        await moveAircraft(unit, pointFrom(abc, finalCourseDeg(start, abc), 0.2), {groundspeedKt: 120, trackTrue: finalCourseDeg(start, abc)});
+        expect(activeIdent(unit)).toBe('ABC'); // nothing to sequence to
+        expect(nav(unit).toFrom).toBe(false); // FROM
+        expect(nav(unit).waypointAlert).toBe(false);
+        // The WPT annunciator follows the alert (3-59); the 89 has no external output and showed only the arrow
+        expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(0);
+    });
+
+    // 36 s at 120 kt are 1.2 NM: off at 1.3 NM (39 s), on at 1.1 NM (33 s)
+    it('starts about 36 s before the waypoint with turn anticipation off (checked in the KLN 89 trainer, 2026-10-14)', async () => {
+        const {unit, at} = await directToAbc(false);
+
+        await at(1.3);
+        expect(nav(unit).waypointAlert).toBe(false);
+
+        await at(1.1);
+        expect(nav(unit).waypointAlert).toBe(true);
+    });
+});
+
+// The last waypoint of FPL 0 has no turn to anticipate either and takes the same branch; the 89 was flown only toward a
+// waypoint followed by a copy of itself (see the #120 tests), so this case is a characterization of the same rule
+describe('waypoint alert at the last waypoint of FPL 0 with turn anticipation on (characterization)', () => {
+    it('starts about 15 s before the last waypoint (characterization, #372)', async () => {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootUnit({facilities: [kaaa, abc], position: pointBefore(kaaa, abc, 5), storage: savedFlightplan(0, [kaaa, abc])});
+        await settle(unit);
+        expect(activeIdent(unit)).toBe('ABC'); // Precondition: ABC is active and the last waypoint
+        expect(nav(unit).activeWaypoint.getActiveFplIdx()).toBe(1);
+        const leg = finalCourseDeg(kaaa, abc);
+
+        await moveAircraft(unit, pointBefore(kaaa, abc, 0.6), {groundspeedKt: 120, trackTrue: leg});
+        expect(nav(unit).waypointAlert).toBe(false);
+
+        await moveAircraft(unit, pointBefore(kaaa, abc, 0.4), {groundspeedKt: 120, trackTrue: leg});
+        expect(nav(unit).waypointAlert).toBe(true);
+    });
+});
+
+// #147: in OBS mode there is no sequencing (5-35), but the waypoint alert works as for a waypoint without a turn.
+// Checked in the KLN 89 trainer, 2026-10-14: in OBS mode toward the active waypoint the arrow flashed from 1.0 NM at
+// 239 kt with turn anticipation on (ETE :14) and from 2.4 NM with it off, stopped at the waypoint, and the waypoint
+// stayed active. The OBS course is the one the unit chooses on entering OBS: the leg's course at ABC (5-36).
+describe('waypoint alert in OBS mode (checked in the KLN 89 trainer, 2026-10-14)', () => {
+    async function obsTowardAbc(turnAnticipation: boolean) {
+        const {unit, kaaa, abc} = await onStandardRoute({turnAnticipation});
+        const leg = finalCourseDeg(kaaa, abc);
+        await moveAircraft(unit, pointBefore(kaaa, abc, 5), {groundspeedKt: 120, trackTrue: leg});
+        await unit.panel.obsMode();
+        expect(unit.props.modeController.isObsModeActive()).toBe(true); // Precondition
+        const at = (nmBefore: number) => moveAircraft(unit, pointBefore(kaaa, abc, nmBefore), {groundspeedKt: 120, trackTrue: leg});
+        return {unit, kaaa, abc, leg, at};
+    }
+
+    it('starts about 15 s before the active waypoint and ends past it, with turn anticipation on (checked in the KLN 89 trainer, 2026-10-14, #147)', async () => {
+        const {unit, abc, leg, at} = await obsTowardAbc(true);
+
+        await at(0.6);
+        expect(nav(unit).waypointAlert).toBe(false);
+        await at(0.4);
+        expect(nav(unit).waypointAlert).toBe(true);
+        // The WPT annunciator follows the alert (3-59); the 89 has no external output and showed only the arrow
+        expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(1);
+
+        await moveAircraft(unit, pointFrom(abc, leg, 0.2), {groundspeedKt: 120, trackTrue: leg});
+        expect(activeIdent(unit)).toBe('ABC'); // 5-35: no sequencing in OBS mode
+        expect(nav(unit).waypointAlert).toBe(false);
+    });
+
+    it('starts about 36 s before the active waypoint with turn anticipation off (checked in the KLN 89 trainer, 2026-10-14, #147)', async () => {
+        const {unit, at} = await obsTowardAbc(false);
+
+        await at(1.3);
+        expect(nav(unit).waypointAlert).toBe(false);
+        await at(1.1);
         expect(nav(unit).waypointAlert).toBe(true);
     });
 });
@@ -434,6 +529,68 @@ describe('GPS invalid (3-31)', () => {
     });
 });
 
+// #120: past the last waypoint of a plan that ends in the same waypoint twice, the active leg has no length. Checked in
+// the KLN 89 trainer, 2026-10-14 (FPL 0 KMSN, BAE, BUU, BUU): the unit sequenced onto BUU - BUU and kept the DTK of the
+// leg before; the distance and the ETE counted up, the bearing pointed back at BUU, the CDI stayed valid and centered,
+// FROM. (It showed TO from 1.8 NM past for no reason seen; that is not modeled, and the test stays within 1 NM.)
+describe('a plan that ends in the same waypoint twice (checked in the KLN 89 trainer, 2026-10-14)', () => {
+    it('keeps navigating on the course of the leg before past the waypoint (checked in the KLN 89 trainer, 2026-10-14, #120)', async () => {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootUnit({facilities: [kaaa, abc], position: pointBefore(kaaa, abc, 5), magvar: 0, storage: savedFlightplan(0, [kaaa, abc, abc])});
+        await settle(unit);
+        await unit.panel.selectPage('L', 'NAV 1');
+        const leg = finalCourseDeg(kaaa, abc);
+        for (const before of [2, 1, 0.5]) {
+            await moveAircraft(unit, pointBefore(kaaa, abc, before), {groundspeedKt: 120, trackTrue: leg});
+        }
+
+        // The 89 alerted 0.5 NM out at 119 kt (ETE :14). A waypoint followed by its own copy takes the branch without a
+        // turn: 0.4 NM at 120 kt are 12 s, inside the 15 s with turn anticipation on (the default)
+        await moveAircraft(unit, pointBefore(kaaa, abc, 0.4), {groundspeedKt: 120, trackTrue: leg});
+        expect(nav(unit).waypointAlert).toBe(true);
+
+        for (const past of [0.2, 0.5, 1]) {
+            await moveAircraft(unit, pointFrom(abc, leg, past), {groundspeedKt: 120, trackTrue: leg});
+            await vi.advanceTimersByTimeAsync(500);
+            expect(nav(unit).waypointAlert).toBe(false); // the 89 stopped the alert at 0.0 NM
+            expect(nav(unit).activeWaypoint.getActiveFplIdx()).toBe(2);
+            expect(angleBetween(nav(unit).desiredTrack, leg)).toBeLessThan(0.1);
+            expect(Math.abs(nav(unit).xtkToActive!)).toBeLessThan(0.01);
+            expect(nav(unit).toFrom).toBe(false); // FROM
+            expect(nav(unit).distToActive!).toBeCloseTo(past, 2);
+            expect(nav(unit).eteToActive!).toBeCloseTo(past / 120 * 3600, 0);
+            // The SimVar and the HSI flag are the external outputs of the DTK and the FROM the 89 showed on its screen
+            // (the SensorsOut mapping); the 89 itself has no such outputs
+            expect(angleBetween(unit.env.sim.get('GPS WP DESIRED TRACK', 'degrees'), leg)).toBeLessThan(0.1); // magvar 0: magnetic = true
+            expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(2); // FROM, not flagged
+            expect(Screen.read().rows('L')[1]).not.toContain('F L A G');
+        }
+        expect(unit.errors).toEqual([]);
+    });
+});
+
+describe('a plan of one waypoint twice (characterization)', () => {
+    // A plan of one waypoint twice has no leg before the zero-length leg. What the unit shows then is not known; it keeps
+    // what it can compute (characterization)
+    it('has no XTK, DTK or TO/FROM with no leg before, but distance, bearing and ETE (characterization, #120)', async () => {
+        const {kaaa} = standardRoute();
+        const start = pointFrom(kaaa, 270, 5);
+        const unit = await bootUnit({facilities: [kaaa], position: start, storage: savedFlightplan(0, [kaaa, kaaa])});
+        await settle(unit);
+        await moveAircraft(unit, start, {groundspeedKt: 120, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(nav(unit).activeWaypoint.getActiveFplIdx()).toBe(1);
+        expect(nav(unit).xtkToActive).toBeNull();
+        expect(nav(unit).desiredTrack).toBeNull();
+        expect(nav(unit).toFrom).toBeNull();
+        expect(nav(unit).distToActive!).toBeCloseTo(5, 2);
+        expect(angleBetween(nav(unit).bearingToActive, courseDeg(start, kaaa))).toBeLessThan(0.1);
+        expect(nav(unit).eteToActive!).toBeCloseTo(5 / 120 * 3600, 0);
+        expect(unit.env.sim.get('GPS WP DISTANCE', 'nautical miles')).toBeCloseTo(5, 2);
+    });
+});
+
 // Characterization: below 2 kt there is no ETE (NAV 1 shows dashes) and no sequencing. This is what the code does today;
 // no page of the Pilot's Guide gives a ground speed threshold for either.
 describe('ground speed below 2 kt (characterization)', () => {
@@ -478,33 +635,32 @@ describe('self-test outputs (3-4)', () => {
     });
 });
 
-// 5-38: the pilot selects the CDI scale on MOD 1 or MOD 2 (5, 1 or 0.3 NM); in the approach-arm mode the unit allows
-// nothing less sensitive than 1 NM. NavCalculator.setFlag resets the scale to 5 on every calculation tick without a
-// navigation solution (no active waypoint, or no GPS).
+/** Selects 1.00 on MOD 1 with the left inner knob, one click down from 5.00 */
+async function selectOneNm(unit: HeadlessUnit) {
+    await unit.panel.selectPage('L', 'MOD 1');
+    await unit.panel.cursor('L');
+    await unit.panel.inner('L', -1);
+    await unit.panel.cursor('L');
+    await vi.advanceTimersByTimeAsync(2000);
+}
+
+/** The approach of approachWorld() loaded, 2 NM before the MAP: the unit is in ARM */
+async function armedOnApproach() {
+    const w = approachWorld();
+    const unit = await bootUnit({
+        facilities: w.facilities, position: w.north(2), storage: savedFlightplan(0, [w.enraa, w.kprc]),
+        panelXml: panelXml(APR_ARM_SWITCH),
+    });
+    await settle(unit);
+    await unit.panel.loadProcedure('APT 8');
+    expect(activeIdent(unit)).toBe('MAPAA'); // Preconditions
+    await vi.advanceTimersByTimeAsync(35_000); // the ARM scale ramps from 5 to 1 NM in 30 s
+    return unit;
+}
+
+// 5-38: the pilot selects the CDI scale on MOD 1 or MOD 2 (5, 1 or 0.3 NM); the selected scale holds while the unit
+// navigates.
 describe('CDI scale selected on MOD 1 (5-38)', () => {
-    /** Selects 1.00 on MOD 1 with the left inner knob, one click down from 5.00 */
-    async function selectOneNm(unit: HeadlessUnit) {
-        await unit.panel.selectPage('L', 'MOD 1');
-        await unit.panel.cursor('L');
-        await unit.panel.inner('L', -1);
-        await unit.panel.cursor('L');
-        await vi.advanceTimersByTimeAsync(2000);
-    }
-
-    /** The approach of approachWorld() loaded, 2 NM before the MAP: the unit is in ARM */
-    async function armedOnApproach() {
-        const w = approachWorld();
-        const unit = await bootUnit({
-            facilities: w.facilities, position: w.north(2), storage: savedFlightplan(0, [w.enraa, w.kprc]),
-            panelXml: panelXml(APR_ARM_SWITCH),
-        });
-        await settle(unit);
-        await unit.panel.loadProcedure('APT 8');
-        expect(activeIdent(unit)).toBe('MAPAA'); // Preconditions
-        await vi.advanceTimersByTimeAsync(35_000); // the ARM scale ramps from 5 to 1 NM in 30 s
-        return unit;
-    }
-
     it('control: the selected 1.00 NM holds while the unit navigates', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
         await moveAircraft(unit, pointBefore(kaaa, abc, 20), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
@@ -513,9 +669,13 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
         expect(nav(unit).xtkScale).toBe(1);
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');
     });
+});
 
-    // The sibling of the pin below: the GPS is flagged after a reset and valid again 20 s later (fast acquisition: 10 s),
-    // so the pin tests the scale and not a fix that never came back
+// A NAV flag (no active waypoint, or no GPS) keeps the selected scale and a power-up starts at 5 NM again. Nothing in the
+// guide resets the scale on a flag; what the unit does is not checked on a real unit or a trainer (characterization).
+describe('a NAV flag and a power-up keep the CDI scale (characterization, #159)', () => {
+    // The control of the GPS-loss tests below: the GPS is flagged after a reset and valid again 20 s later (fast
+    // acquisition: 10 s), so they test the scale and not a fix that never came back
     it('control: the GPS is flagged after a mid-flight reset and valid again 20 s later', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
         await moveAircraft(unit, pointBefore(kaaa, abc, 20), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
@@ -527,7 +687,7 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
         expect(unit.props.sensors.in.gps.isValid()).toBe(true);
     });
 
-    it.fails('keeps the selected 1.00 NM over a GPS loss (#159)', async () => {
+    it('keeps the selected 1.00 NM over a GPS loss (#159)', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
         await moveAircraft(unit, pointBefore(kaaa, abc, 20), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
         await selectOneNm(unit);
@@ -549,8 +709,8 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');
     });
 
-    // After the loss MOD 1 shows no scale at all ("CDI:±NM") today, because the reset 5 is not one of the ARM choices
-    it.fails('keeps the 1 NM approach-arm scale while the GPS is lost (#159)', async () => {
+    // The flag keeps the ARM scale of 1 NM, which is one of the choices MOD 1 offers in ARM, so the field shows it
+    it('keeps the 1 NM approach-arm scale while the GPS is lost (#159)', async () => {
         const unit = await armedOnApproach();
         await unit.panel.selectPage('L', 'MOD 1');
         unit.props.sensors.in.gps.reset();
@@ -561,7 +721,7 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');
     });
 
-    it.fails('keeps the selected 1.00 NM without an active waypoint (#159)', async () => {
+    it('keeps the selected 1.00 NM without an active waypoint (#159)', async () => {
         const unit = await bootUnit();
         await settle(unit);
         expect(activeIdent(unit)).toBeUndefined(); // Precondition: there is no active waypoint
@@ -569,6 +729,21 @@ describe('CDI scale selected on MOD 1 (5-38)', () => {
 
         expect(nav(unit).xtkScale).toBe(1);
         expect(Screen.read().rows('L')[5]).toBe('CDI:±1.00NM');
+    });
+
+    // A power-up starts at 5 NM again (VolatileMemory.reset): the scale is unit state, not a setting. On the welcome
+    // page, before the self-test, which sets 5 NM on its own (characterization)
+    it('restores 5 NM at a power-up, before the self-test (characterization, #159)', async () => {
+        const {unit, kaaa, abc} = await onStandardRoute();
+        await moveAircraft(unit, pointBefore(kaaa, abc, 20), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
+        await selectOneNm(unit);
+        expect(nav(unit).xtkScale).toBe(1); // Precondition
+
+        await unit.panel.powerCycle();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(nav(unit).isSelfTestActive).toBe(false); // still the welcome page
+        expect(nav(unit).xtkScale).toBe(5);
     });
 });
 

@@ -1,5 +1,5 @@
 import {SimVarValueType} from "@microsoft/msfs-sdk";
-import {LVAR_ELECTRICITY_INDEX, LVAR_GPS_SIMVARS, LVAR_OBS_SOURCE, LVAR_OBS_TARGET} from "../LVars";
+import {LVAR_ELECTRICITY_INDEX, LVAR_GPS_SIMVARS, LVAR_HEADING_INPUT, LVAR_OBS_SOURCE, LVAR_OBS_TARGET} from "../LVars";
 
 /**
  * The index of Input.ElectricitySimVar is only a trailing colon and digits ("CIRCUIT ON:1"). Any other colon belongs to the
@@ -127,6 +127,7 @@ export class KLN90BPlaneSettingsParser {
 
         SimVar.SetSimVarValue(LVAR_OBS_SOURCE, SimVarValueType.Number, options.input.obsSource);
         SimVar.SetSimVarValue(LVAR_OBS_TARGET, SimVarValueType.Number, options.output.obsTarget);
+        SimVar.SetSimVarValue(LVAR_HEADING_INPUT, SimVarValueType.Bool, options.input.headingInput);
         SimVar.SetSimVarValue(LVAR_GPS_SIMVARS, SimVarValueType.Bool, options.output.writeGPSSimVars);
         const electricityIndex = ELECTRICITY_INDEX.exec(options.input.electricitySimVar);
         if (electricityIndex !== null) {

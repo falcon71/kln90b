@@ -2,9 +2,9 @@ import {FSComponent, NavMath, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {NO_CHILDREN, PageProps, UIElementChildren} from "../Page";
 import {CursorController, EnterResult, Field} from "../CursorController";
-import {SelectField} from "../../controls/selects/SelectField";
+import {CdiScaleField} from "../../controls/selects/CdiScaleField";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {NavMode, NavPageState} from "../../data/VolatileMemory";
+import {NavPageState} from "../../data/VolatileMemory";
 import {format} from "numerable";
 import {roundBearing} from "../../data/Coordinates";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
@@ -18,7 +18,7 @@ type Mod2PageTypes = {
     title2: TextDisplay,
     obsLabel: TextDisplay,
     obs: ModObsElement,
-    cdiScale: SelectField,
+    cdiScale: CdiScaleField,
 }
 
 export class Mod2Page extends SixLineHalfPage {
@@ -37,7 +37,7 @@ export class Mod2Page extends SixLineHalfPage {
             title2: new TextDisplay(""),
             obsLabel: new TextDisplay(""),
             obs: new ModObsElement(this.props.planeSettings, this.props.sensors, this.props.memory.navPage, this.props.modeController),
-            cdiScale: new SelectField(this.buildValidScales().map(scale => format(scale, "0.00")), this.getScaleIdx(), this.setCDIScale.bind(this)),
+            cdiScale: new CdiScaleField(this.props.memory.navPage),
         });
 
         this.cursorController = new CursorController(this.children);
@@ -86,37 +86,6 @@ export class Mod2Page extends SixLineHalfPage {
             }
         }
         this.children.get("obsLabel").text = this.canObsBeEntered() ? ":" : " ";
-        this.children.get("cdiScale").value = this.getScaleIdx();
-    }
-
-    private buildValidScales(): number[] {
-        switch (this.props.memory.navPage.navmode) {
-            case NavMode.ENR_LEG:
-            case NavMode.ENR_OBS:
-                return [0.3, 1, 5];
-            case NavMode.ARM_LEG:
-            case NavMode.ARM_OBS:
-                return [0.3, 1];
-            case NavMode.APR_LEG:
-                return [0.3];
-        }
-    }
-
-    private setCDIScale(scaleIdx: number) {
-        this.props.memory.navPage.xtkScale = this.buildValidScales()[scaleIdx];
-    }
-
-    private getScaleIdx(): number {
-        let displayScale = this.props.memory.navPage.xtkScale;
-
-        //We only display 0.3, 1 and 5 here, but the actual scale can be anything inbetween when transitionen approach modes
-        if (displayScale < 1) {
-            displayScale = 0.3;
-        } else if (displayScale < 5) {
-            displayScale = 1;
-        }
-
-        return this.buildValidScales().indexOf(displayScale);
     }
 
     private canObsBeEntered(): boolean {

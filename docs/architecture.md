@@ -123,7 +123,8 @@ arrives.
       `gpsSatComputer.acquireAndUseSatellites()`.
 - While `isSelfTestActive` is set:
     - `NavCalculator` outputs fixed test values (XTK -2.5, DIS 34.5, DTK 315 mag, FROM, waypoint alert on).
-    - `RollSteeringController` sweeps 0 to -5 degrees of bank.
+    - `RollSteeringController` sweeps 0 to -5 degrees of bank, but only with a heading input (without one the roll
+      command stays 0, 2-69, #143).
     - `SensorsOut.setMode` writes `GPS APPROACH MODE = 3` and `L:KLN90B_AnnunTest = true`, so external annunciators
       light up.
 
@@ -177,7 +178,8 @@ calls `in.reset()` and `out.reset()`, and on a power-off also `out.setPoweredOff
 
 - `GPS DRIVES NAV1`. When it is true, it reads `Nav OBS:{1|2}` according to `Input.ObsSource`. When it is false,
   `obsMag = null` ("the manual implies" OBS can only be read when the GPS is the nav source).
-- `PLANE HEADING DEGREES GYRO` if `Input.HeadingInput`.
+- `PLANE HEADING DEGREES GYRO` while `input.headingInput` is set (`Input.HeadingInput` or `L:KLN90B_HeadingInput`), null
+  otherwise (#368).
 - Then `gps.tick()`, `fuelComputer.tick()` and `airdata.tick()`.
 
 `FuelComputer` (only if `Input.FuelComputer.IsInterfaced`) reads `FUEL TOTAL QUANTITY WEIGHT EX1`, `ENG FUEL FLOW PPH:n`
@@ -313,7 +315,8 @@ on them.
     - Writable by aircraft:
         - `L:KLN90B_Brightness` (0 to 1)
         - `L:KLN90B_Disabled` (hot swap)
-        - `L:KLN90B_ObsSource`, `L:KLN90B_ObsTarget`, `L:KLN90B_ElectricitySimVarIndex`, `L:KLN90B_WriteGpsSimvars`.
+        - `L:KLN90B_ObsSource`, `L:KLN90B_ObsTarget`, `L:KLN90B_HeadingInput`, `L:KLN90B_ElectricitySimVarIndex`,
+          `L:KLN90B_WriteGpsSimvars`.
           These override panel.xml values at runtime: `KLN90BPlaneSettingsParser` seeds the LVars from the XML and
           `SimVarSync.tick` reads them back every 100 ms into the mutable `planeSettings` object.
 - Wiki pages referenced in the comments (RMI, CDI-HSI, Autopilot, External-Annunciators, Hot-Swapping) document this
@@ -328,7 +331,7 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
     - `GPS WP DESIRED TRACK`, `GPS WP TRACK ANGLE ERROR`, `GPS WP BEARING` (+TRUE), `GPS WP DISTANCE`, `GPS WP ETE`,
       `GPS WP ETA`, `GPS ETE`, `GPS ETA`
     - `GPS COURSE TO STEER` (radians; "real KLN does not have this"; `setRollCommand` writes the roll command LVar
-      regardless)
+      regardless; the course is written without a heading input too, on purpose, #143)
     - `GPS MAGVAR`, `GPS POSITION LAT/LON`, `GPS GROUND SPEED`, `GPS GROUND TRUE/MAGNETIC TRACK`
     - `GPS FLIGHT PLAN WP COUNT/INDEX`, `GPS WP NEXT/PREV ID/LAT/LON`, `GPS WP PREV VALID`
     - `GPS IS APPROACH ACTIVE`, `GPS APPROACH MODE` (0 = ENR, 1 = ARM, 2 = APR, 3 = self-test)
@@ -398,12 +401,19 @@ Flightplan really is dead simple".
 sim.
 
 - It handles self-test and GPS-invalid by flagging all values to null. If there is no active leg it calls
-  `activateFpl0()`.
+  `activateFpl0()`. A flag does not change `navPage.xtkScale` (#159), and a power-up sets 5 NM again in
+  `VolatileMemory.reset`.
 - DIS is always the direct distance, even for arcs (6-18).
+- A leg without length (FROM and TO are the same waypoint, so its path has no center) is sequenced at once when a next
+  leg exists. The last one navigates on the course of the leg before it (#120, as the KLN 89 trainer does): XTK, DTK
+  and TO/FROM come from that leg's path, and all outputs are written. With no leg before it, XTK, DTK and TO/FROM are
+  null and the distance, bearing and ETE remain.
 - XTK uses the top of the turn stack during turns (4-8) and the leg circle otherwise.
 - DTK is the bearing at the closest point. `bearingForAP` equals the DTK on arcs, a workaround so the autopilot tracks
   DME arcs.
 - TO/FROM is defined as `|bearing - dtk| <= 90`.
+- In OBS mode there is no sequencing (5-35); the waypoint alert is still computed, as for a waypoint without a turn
+  (#147).
 - Sequencing (not in OBS mode, GS > 2):
     - With `turnAnticipation` on and the waypoint not fly-over or duplicated, it computes the turn radius from
       `bankeAngleForStandardTurn(gs)` (`services/KLNNavmath.ts`; it assumes 5 deg/s roll rate,
@@ -413,7 +423,10 @@ sim.
     - If the turn is too tight, it sequences immediately ("like KLN 89 trainer", fix #76).
 - Without turn anticipation, it sequences on FROM.
 - **The MAP is never auto-sequenced.**
-- Waypoint alert thresholds: `WPT_ALERT_WITH_TURN_ANTI` / `WPT_ALERT_WITHOUT_TURN_ANTI = 36` s.
+- Waypoint alert thresholds: 20 s before an anticipated turn (`WPT_ALERT_WITH_TURN_ANTI`); before a waypoint without a
+  turn 15 s with turn anticipation on (`WPT_ALERT_NO_TURN_WITH_TURN_ANTI`, #372, measured in the KLN 89 trainer) or 36 s
+  with it off (`WPT_ALERT_WITHOUT_TURN_ANTI`). The alert of a waypoint without a turn ends once the waypoint is behind
+  (FROM), unless a turn is still being flown.
 - `MAX_BANK_ANGLE = 25`. `HOURS_TO_SECONDS` is exported from here and widely imported.
 
 **`ModeController`** (`services/ModeController.ts`, manual 5-36):
@@ -439,7 +452,9 @@ sim.
 - Status-line feedback: `NO APPROACH`, `NO ACTV WPT`.
 
 **`RollSteeringController`** (1 Hz) is adapted from WT `LNavComputer`. It writes `L:KLN90B_RollCommand` and,
-only with `writeGPSSimVars`, `GPS COURSE TO STEER`.
+only with `writeGPSSimVars`, `GPS COURSE TO STEER`. Without a heading input (`Input.HeadingInput`, also switched by
+`L:KLN90B_HeadingInput`) the roll command is 0 (2-69, #143), also during the self-test. `GPS COURSE TO STEER` is still
+written then, on purpose: the default autopilot reads it.
 
 - Cases: on track (proportional), no intercept (45-degree intercept), or optimal-bank intercept (at most 30 degrees).
 - `adjustBankAngleForArc` and `ArcTurnController` exist but are unused.
@@ -593,9 +608,12 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `Output.{ObsTarget=0, AltitudeAlertEnabled=true, WriteGPSSimVars=true}`
     - `debugMode` = false (hard-coded)
 - Note that the sample `cfg/panel.xml` sets `AltitudeAlertEnabled=false`, while the code default is true.
-- After parsing it writes the four runtime-override LVars (Core 4). An `ElectricitySimVar` like `CIRCUIT ON:1` has its
+- After parsing it writes the runtime-override LVars (Core 4). An `ElectricitySimVar` like `CIRCUIT ON:1` has its
   index replaced every 100 ms by `L:KLN90B_ElectricitySimVarIndex`.
 - `KLN90PlaneSettings` is **mutable at runtime** through `SimVarSync`; code reads `planeSettings.input/output.*` live.
+  Without a heading input a stored HDG up map orientation is drawn north up (`effectiveMapOrientation`, #368). The
+  stored setting is never changed. A runtime change of the input applies to the orientation fields and to the CAL 3 and
+  OTH 9 layout at the next page build, while the NAV 5 and Super NAV 5 maps follow the input at once.
 - Consumers: `Sensors` (all inputs and outputs), `ModeController`, `NavCalculator.setMode` (writeObs),
   `PersistentMessages` (obsTarget chooses between `AdjustCourse...` variants; `AltitudeFailMessage`),
   `BrightnessManager`, `AudioGenerator`, `AltAlert`, `HtAboveAirportAlert`, `WTFlightplanSync`, `KlnEfbSaver`, `MSA` and
@@ -984,6 +1002,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - **Selects** (`controls/selects/`; immediate-effect fields, no ENT):
     - `SelectField(valueSet: string[], index, changedCallback)`: the inner knob cycles and calls back at once;
       `keyboard()` picks a value by its text.
+    - `CdiScaleField` is the CDI scale of MOD 1 and MOD 2: a `SelectField` over the scales the current mode allows (5-38,
+      6-1) that shows the step the scale is at or ramping to. The choices are rebuilt at every display tick, and a click
+      sets the scale from the list that was on the screen.
     - `*Fieldset` classes (`AltitudeFieldset`, `BaroFieldset`, `BearingFieldset`, `FpmFieldset`, `FuelFieldset`,
       `SpeedFieldset`, `TempFieldset`, `TimeFieldset`, `VolumeFieldset`, `VnavFieldsets`) are plain `UiElement`s with
       one `SelectField` per digit, so each digit is its own cursor stop. They offer `setValue`/`setReadonly`.

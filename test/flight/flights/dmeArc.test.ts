@@ -4,7 +4,7 @@ import {Flight} from '../../harness/flight/Flight';
 import {World} from '../../harness/flight/World';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
-import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
+import {APR_ARM_SWITCH, HEADING_INPUT, panelXml} from '../../harness/panelXml';
 import {savedFlightplan} from '../../harness/storage';
 import {fplIdents} from '../../harness/readers';
 import {angleBetween, angleDiff, courseDeg, crossTrackNm, distanceNm, EARTH_RADIUS_NM, pointFrom} from '../../harness/flight/geo';
@@ -52,7 +52,9 @@ async function loadedOnArc(turn: LegTurnDirection, radial: number, o: { radiusNm
     const track = (courseDeg(p, w.abc) + (turn === LegTurnDirection.Left ? 90 : -90) + 360) % 360;
     const flight = await Flight.start({
         world: w.world, storage: savedFlightplan(0, [w.kprc]),
-        panelXml: panelXml(APR_ARM_SWITCH),
+        // The unit flies the arc by roll steering, which needs a heading input (2-69, #143); an own panel.xml replaces the
+        // harness default, so it carries it
+        panelXml: panelXml({...APR_ARM_SWITCH, ...HEADING_INPUT}),
         aircraft: {lat: p.lat, lon: p.lon, altitudeFt: 3000, groundspeedKt: o.groundspeedKt ?? 120, trackTrue: track},
     });
     await flight.panel.loadProcedure('APT 8');

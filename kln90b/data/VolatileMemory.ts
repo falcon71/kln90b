@@ -258,6 +258,7 @@ export class VolatileMemory {
         this.navPage.nav4FromAlt = 0;
         this.navPage.nav4VnavDist = 0;
         this.navPage.navmode = NavMode.ENR_LEG;
+        this.navPage.xtkScale = 5; //A power-up starts at 5 NM, a NAV flag keeps the scale (#159)
         this.navPage.approachDisarmedLeg = null; //The legs of a short power-off stay in FPL 0, the disarm does not (#139)
         this.navPage.aprActivationDist = 2;
         this.navPage.aprActivationScale = 1;

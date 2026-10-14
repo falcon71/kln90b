@@ -22,6 +22,14 @@ export const enum Nav5Orientation {
     HDG_UP = 3,
 }
 
+/**
+ * #368: HDG up needs a heading input. Without one the map is drawn north up; the stored setting is the pilot's and is kept
+ * for when the input returns (an aircraft may switch it on after loading)
+ */
+export function effectiveMapOrientation(orientation: Nav5Orientation, headingInput: boolean): Nav5Orientation {
+    return orientation === Nav5Orientation.HDG_UP && !headingInput ? Nav5Orientation.NORTH_UP : orientation;
+}
+
 export const enum SuperNav5Field1 {
     ETE = 0,
     XTK = 1,

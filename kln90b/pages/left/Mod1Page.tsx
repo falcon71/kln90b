@@ -2,16 +2,14 @@ import {FSComponent, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController, EnterResult} from "../CursorController";
-import {SelectField} from "../../controls/selects/SelectField";
+import {CdiScaleField} from "../../controls/selects/CdiScaleField";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {format} from "numerable";
-import {NavMode} from "../../data/VolatileMemory";
 
 
 type Mod1PageTypes = {
     title1: TextDisplay,
     title2: TextDisplay,
-    cdiScale: SelectField,
+    cdiScale: CdiScaleField,
 }
 
 export class Mod1Page extends SixLineHalfPage {
@@ -28,7 +26,7 @@ export class Mod1Page extends SixLineHalfPage {
         this.children = new UIElementChildren<Mod1PageTypes>({
             title1: new TextDisplay(""),
             title2: new TextDisplay(""),
-            cdiScale: new SelectField(this.buildValidScales().map(scale => format(scale, "0.00")), this.getScaleIdx(), this.setCDIScale.bind(this)),
+            cdiScale: new CdiScaleField(this.props.memory.navPage),
         });
 
         this.cursorController = new CursorController(this.children);
@@ -75,37 +73,5 @@ export class Mod1Page extends SixLineHalfPage {
             this.children.get("title1").text = "ACTIVE MODE";
             this.children.get("title2").text = "";
         }
-
-        this.children.get("cdiScale").value = this.getScaleIdx();
-    }
-
-    private buildValidScales(): number[] {
-        switch (this.props.memory.navPage.navmode) {
-            case NavMode.ENR_LEG:
-            case NavMode.ENR_OBS:
-                return [0.3, 1, 5];
-            case NavMode.ARM_LEG:
-            case NavMode.ARM_OBS:
-                return [0.3, 1];
-            case NavMode.APR_LEG:
-                return [0.3];
-        }
-    }
-
-    private setCDIScale(scaleIdx: number) {
-        this.props.memory.navPage.xtkScale = this.buildValidScales()[scaleIdx];
-    }
-
-    private getScaleIdx(): number {
-        let displayScale = this.props.memory.navPage.xtkScale;
-
-        //We only display 0.3, 1 and 5 here, but the actual scale can be anything inbetween when transitionen approach modes
-        if (displayScale < 1) {
-            displayScale = 0.3;
-        } else if (displayScale < 5) {
-            displayScale = 1;
-        }
-
-        return this.buildValidScales().indexOf(displayScale);
     }
 }

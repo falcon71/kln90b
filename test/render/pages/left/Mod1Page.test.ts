@@ -6,7 +6,9 @@ import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 import {APR_ARM_SWITCH, LEG_OBS_SWITCH, panelXml} from '../../../harness/panelXml';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
-import {NavMode} from '../../../../kln90b/data/VolatileMemory';
+import {NavMode, NavPageState} from '../../../../kln90b/data/VolatileMemory';
+import {CdiScaleField} from '../../../../kln90b/controls/selects/CdiScaleField';
+import {mountedText} from '../../../harness/render/mount';
 
 /** Boots 40 NM north of KPRC with the approach loaded from APT 8, so the unit is in ENR at +-5 */
 async function approachLoaded40(): Promise<HeadlessUnit> {
@@ -22,7 +24,7 @@ async function approachLoaded40(): Promise<HeadlessUnit> {
 }
 
 describe('MOD 1 CDI scale field with an approach loaded 40 NM from the airport', () => {
-    // 5-38 (figure 5-120): MOD 1 shows the CDI scale. The sibling of the pin below: in ENR the field reads +-5.00
+    // 5-38 (figure 5-120): MOD 1 shows the CDI scale. The control for the #160 test below: in ENR the field reads +-5.00
     it('shows CDI:±5.00NM in ENR 40 NM from the airport (5-38)', async () => {
         const unit = await approachLoaded40();
         await unit.panel.selectPage('L', 'MOD 1');
@@ -32,7 +34,7 @@ describe('MOD 1 CDI scale field with an approach loaded 40 NM from the airport',
         expect(Screen.read().rows('L')[5]).toBe('CDI:±5.00NM');
     });
 
-    // The other sibling of the pin: the switch arms the unit at 40 NM and leaves the scale at +-5
+    // The other control for that test: the switch arms the unit at 40 NM and leaves the scale at +-5
     it('is armed at +-5 after the switch 40 NM from the airport (6-1)', async () => {
         const unit = await approachLoaded40();
         await vi.advanceTimersByTimeAsync(6000);
@@ -43,9 +45,8 @@ describe('MOD 1 CDI scale field with an approach loaded 40 NM from the airport',
         expect(unit.props.memory.navPage.xtkScale).toBe(5);
     });
 
-    // 6-1: armed with the switch beyond 30 NM the scale stays +-5, so MOD 1 must show it. Mod1Page.getScaleIdx looks 5 up in
-    // the scales valid for ARM, [0.3, 1], gets -1 and the field shows no value
-    it.fails('shows CDI:±5.00NM when armed by the switch 40 NM from the airport (#160)', async () => {
+    // 6-1: armed with the switch beyond 30 NM the scale stays +-5, and MOD 1 shows the scale in use (5-38)
+    it('shows CDI:±5.00NM when armed by the switch 40 NM from the airport (5-38, 6-1, #160)', async () => {
         const unit = await approachLoaded40();
         await vi.advanceTimersByTimeAsync(6000);
         await unit.panel.press('KLN90B_ApprArm_Push');
@@ -54,6 +55,31 @@ describe('MOD 1 CDI scale field with an approach loaded 40 NM from the airport',
 
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ARM_LEG);
         expect(Screen.read().rows('L')[5]).toBe('CDI:±5.00NM');
+    });
+
+    // 5-38: in the approach-arm mode nothing less sensitive than 1 NM can be selected. Once the pilot leaves the 5 NM the
+    // unit kept beyond 30 NM, only 1.00 and 0.30 are offered (the order of the choices is a characterization)
+    it('offers only 1.00 and 0.30 once the pilot leaves 5.00 while armed beyond 30 NM (5-38, #260)', async () => {
+        const unit = await approachLoaded40();
+        await vi.advanceTimersByTimeAsync(6000);
+        await unit.panel.press('KLN90B_ApprArm_Push');
+        await unit.panel.selectPage('L', 'MOD 1');
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.cursor('L');
+        expect(unit.panel.focused('L').text).toBe('5.00'); // Precondition: armed at 5 NM
+
+        await unit.panel.inner('L', -1);
+        await vi.advanceTimersByTimeAsync(500);
+        expect(unit.props.memory.navPage.xtkScale).toBe(1);
+
+        const seen = new Set<string>();
+        for (let i = 0; i < 4; i++) {
+            await unit.panel.inner('L', 1);
+            await vi.advanceTimersByTimeAsync(500);
+            seen.add(unit.panel.focused('L').text);
+            expect(unit.props.memory.navPage.xtkScale).not.toBe(5);
+        }
+        expect([...seen].sort()).toEqual(['0.30', '1.00']);
     });
 });
 
@@ -187,7 +213,7 @@ describe('MOD 1 CDI scale when the unit arms with the page in view', () => {
         return unit;
     }
 
-    // 5-38 note: the sibling of the pin below. The unit armed with the page in view, and the field shows 1.00 NM
+    // 5-38 note: the control for the #260 test below. The unit armed with the page in view, and the field shows 1.00 NM
     it('armed at 25 NM with MOD 1 in view, the field shows ±1.00 NM (5-38)', async () => {
         const unit = await armedWithMod1InView();
 
@@ -197,16 +223,50 @@ describe('MOD 1 CDI scale when the unit arms with the page in view', () => {
     });
 
     // 5-38 note: in ARM nothing less sensitive than 1 NM can be selected, so a click leaves 1 or 0.3 NM, and the CDI
-    // output stays a number
-    it.fails('keeps a valid CDI scale when the knob turns after the unit armed with MOD 1 in view (5-38, #260)', async () => {
+    // output stays a number. The field keeps the list it showed, and a click steps within it
+    it('keeps a valid CDI scale when the knob turns after the unit armed with MOD 1 in view (5-38, #260)', async () => {
         const unit = await armedWithMod1InView();
 
         await unit.panel.inner('L', 1);
         await vi.advanceTimersByTimeAsync(2000);
 
         // Both ARM choices are accepted: which one a click lands on depends on the order of the choices, which the
-        // guide does not give (5-38 only rules out the less sensitive scale). The pin holds that the scale stays one of them
+        // guide does not give (5-38 only rules out the less sensitive scale). The test holds that the scale stays one of them
         expect([0.3, 1]).toContain(unit.props.memory.navPage.xtkScale);
         expect(Number.isFinite(unit.env.sim.get('GPS CDI SCALING', 'meters'))).toBe(true);
+    });
+});
+
+// In APR the scale ramps from 1 to 0.3 NM over the last 2 NM to the FAF (6-3). The field shows 0.30 throughout, also on
+// the tick of the activation, where the scale is still exactly 1 (characterization: the guide shows no value for the
+// ramp)
+describe('CDI scale field display (characterization)', () => {
+    const field = (navmode: NavMode, xtkScale: number) => new CdiScaleField({navmode, xtkScale} as unknown as NavPageState);
+
+    it('shows 0.30 in APR with the scale still exactly 1 (characterization, #160)', () => {
+        expect(mountedText(field(NavMode.APR_LEG, 1))).toBe('0.30');
+    });
+
+    it('shows 0.30 in APR during the ramp (characterization, #160)', () => {
+        expect(mountedText(field(NavMode.APR_LEG, 0.65))).toBe('0.30');
+    });
+
+    it('shows 1.00 during the ARM ramp from 5 to 1 NM (characterization, #160)', () => {
+        expect(mountedText(field(NavMode.ARM_LEG, 3))).toBe('1.00');
+    });
+});
+
+describe('CDI scale field clicks (characterization)', () => {
+    // The mode changes at the 1 Hz tick, the field redraws at the 4 Hz display tick: a click in between must step within
+    // the choices on the screen, not index into the list of the new mode (#260)
+    it('a click before the next display tick steps within the choices shown, not those of the new mode (characterization, #260)', () => {
+        const nav = {navmode: NavMode.ENR_LEG, xtkScale: 5} as unknown as NavPageState;
+        const scale = new CdiScaleField(nav);
+        mountedText(scale); // The pilot sees 0.30, 1.00 and 5.00 with 5.00 selected
+        nav.navmode = NavMode.APR_LEG; // The unit switches to APR before the display ticks again
+
+        scale.innerLeft();
+
+        expect(nav.xtkScale).toBe(1);
     });
 });

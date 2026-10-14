@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
+import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {approachWorld} from '../../../harness/fixtures';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
@@ -293,7 +293,7 @@ describe('MOD 2 CDI scale field with an approach armed 40 NM from the airport (#
         return unit;
     }
 
-    // 6-1: the sibling of the pin below. Armed beyond 30 NM the scale stays at 5 NM, and MOD 2 is in view
+    // 6-1: the control for the #160 test below. Armed beyond 30 NM the scale stays at 5 NM, and MOD 2 is in view
     it('armed 40 NM from the airport by the switch, MOD 2 shown (6-1)', async () => {
         const unit = await armedAt40WithMod2();
 
@@ -302,11 +302,44 @@ describe('MOD 2 CDI scale field with an approach armed 40 NM from the airport (#
         expect(Screen.read().status().left).toBe('MOD 2');
     });
 
-    // 5-38, 6-1: the scale in use is 5 NM, so MOD 2 must show it. Mod2Page.getScaleIdx looks 5 up in the ARM choices
-    // [0.3, 1], gets -1, and the field shows no value
-    it.fails('shows CDI:±5.00NM when armed by the switch 40 NM from the airport (5-38, 6-1, #160)', async () => {
+    // 5-38, 6-1: armed beyond 30 NM the scale stays 5 NM, and MOD 2 shows the scale in use (5-38)
+    it('shows CDI:±5.00NM when armed by the switch 40 NM from the airport (5-38, 6-1, #160)', async () => {
         const unit = await armedAt40WithMod2();
 
         expect(Screen.read().rows('L')[5]).toBe('CDI:±5.00NM');
+    });
+});
+
+// 5-38 note: as on MOD 1 (Mod1Page.test.ts): MOD 2 is in view while the unit arms within 30 NM and ramps to 1 NM; a knob
+// click then leaves 1 or 0.3 NM, and the CDI output stays a number
+describe('MOD 2 CDI scale when the unit arms with the page in view', () => {
+    /** MOD 2 in view 40 NM north, then the aircraft moves to 25 NM: the unit arms and ramps to 1 NM; the cursor on the scale */
+    async function armedWithMod2InView() {
+        const w = approachWorld();
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.north(40),
+            panelXml: panelXml(APR_ARM_SWITCH),
+            storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        await unit.panel.selectPage('L', 'MOD 2');
+        await moveAircraft(unit, w.north(25), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(40_000); // The unit arms within 30 NM and ramps the scale to 1 NM in 30 s (6-1, 6-3)
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', '1.00');
+        return unit;
+    }
+
+    it('keeps a valid CDI scale when the knob turns after the unit armed with MOD 2 in view (5-38, #260)', async () => {
+        const unit = await armedWithMod2InView();
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ARM_LEG); // Preconditions
+        expect(unit.panel.focused('L').text).toBe('1.00');
+
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect([0.3, 1]).toContain(unit.props.memory.navPage.xtkScale);
+        expect(Number.isFinite(unit.env.sim.get('GPS CDI SCALING', 'meters'))).toBe(true);
     });
 });

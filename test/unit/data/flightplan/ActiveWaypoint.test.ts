@@ -104,8 +104,8 @@ describe('ActiveWaypoint.activateFpl0 with two waypoints always activates (#34)'
 
 describe('ActiveWaypoint.activateFpl0 on a DME arc', () => {
     // #41 continued (closed): the expected leg is the leg the aircraft is on, the rule of the #41 describe above.
-    // isPointOnCircleBetween compares distances along one great circle, so a point on a DME
-    // arc, a small circle, is never between the ends and the perpendicular distance is never used for an arc leg.
+    // On a DME arc the closest point lies on the small circle, and it is between FROM and TO when its angle along the
+    // arc, in the circle's own direction, is no larger than TO's (#121).
     // The arc P to Q runs 10 NM around a VOR from the west radial to the north radial; R is 30 NM east of Q.
     function arcPlan() {
         const station = vor('STN', 47.0, 8.0);
@@ -118,28 +118,40 @@ describe('ActiveWaypoint.activateFpl0 on a DME arc', () => {
         // Only circle is read by findClosestLegIdx; the other fields are filled in as far as they are known
         const arcData = {
             beginRadial: 270, beginPoint: p, entryFacility: P, endRadial: 0, endFacility: Q, endPoint: q,
-            vor: station, circle: GeoCircle.createFromPoint(station, NM(10)),
+            vor: station,
+            // A right arc (270 to 000 clockwise): SidStar reverses the circle of every arc that is not a left arc
+            circle: GeoCircle.createFromPoint(station, NM(10)).reverse(),
         } as unknown as ArcData;
         return {station, legs: [{...user(P), arcData}, user(Q), user(R)] as KLNFlightplanLeg[]};
     }
 
     it('activates the arc leg P to Q for an aircraft at the start of the arc, so the setup holds (#121)', () => {
-        // The pin below stands on this: the plan and the hand-built arc work when the aircraft is at P
+        // The next test stands on this: the plan and the hand-built arc work when the aircraft is at P
         const {station, legs} = arcPlan();
         const atStart = activeWaypointOver(legs, pointFrom(station, 270, 10));
-        // The position of the pin below lies on the arc as well, so it is a point of the leg and not a stray one
+        // The position of the next test lies on the arc as well, so it is a point of the leg and not a stray one
         const onArc = pointFrom(station, 330, 10);
         expect(legs[0].arcData!.circle.distance(onArc)).toBeCloseTo(0, 6);
         atStart.activateFpl0();
         expect(atStart.getActiveFplIdx()).toBe(1);
     });
 
-    it.fails('activates the arc leg P to Q when the aircraft is on the arc at the 330° radial (#121)', () => {
+    it('activates the arc leg P to Q when the aircraft is on the arc at the 330° radial (#121)', () => {
         const {station, legs} = arcPlan();
         const aw = activeWaypointOver(legs, pointFrom(station, 330, 10));
 
         expect(aw.activateFpl0()).not.toBeNull();
         expect(aw.getActiveFplIdx()).toBe(1);
+    });
+
+    // The other side of the rule: on the same DME circle but outside the arc's span, beside the leg Q to R, the aircraft
+    // is on that leg. Deciding "always between" for an arc leg would activate the arc here (#121)
+    it('activates the leg Q to R when the aircraft is on the DME circle outside the arc, at the 090° radial (#121)', () => {
+        const {station, legs} = arcPlan();
+        const aw = activeWaypointOver(legs, pointFrom(station, 90, 10));
+
+        expect(aw.activateFpl0()).not.toBeNull();
+        expect(aw.getActiveFplIdx()).toBe(2);
     });
 });
 

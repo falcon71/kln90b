@@ -1,7 +1,7 @@
 import {PageProps, UiElement, UIElementChildren} from "../pages/Page";
 import {SelectField} from "./selects/SelectField";
 import {FSComponent, NodeReference, UserSetting, VNode} from "@microsoft/msfs-sdk";
-import {Nav5Orientation, SuperNav5VOR} from "../settings/KLN90BUserSettings";
+import {effectiveMapOrientation, Nav5Orientation, SuperNav5VOR} from "../settings/KLN90BUserSettings";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {BearingDisplay} from "./displays/BearingDisplay";
 import {Degrees} from "../data/Units";
@@ -28,7 +28,7 @@ export class SuperNav5Right implements UiElement {
             ndb: new SelectField(["OFF", " ON"], this.props.userSettings.getSetting("superNav5Ndb").get() ? 1 : 0, this.saveNdb.bind(this)),
             apt: new SelectField(["OFF", " ON"], this.props.userSettings.getSetting("superNav5Apt").get() ? 1 : 0, this.saveApt.bind(this)),
             orientationValue: new BearingDisplay(this.getOrientationValue()),
-            orientation: new SelectField(this.getOrientationValueset(props.planeSettings), this.orientationSetting.get(), this.saveMapOrientation.bind(this)),
+            orientation: new SelectField(this.getOrientationValueset(props.planeSettings), effectiveMapOrientation(this.orientationSetting.get(), props.planeSettings.input.headingInput), this.saveMapOrientation.bind(this)),
 
         });
     }
@@ -55,7 +55,7 @@ export class SuperNav5Right implements UiElement {
     }
 
     private getOrientationValue(): Degrees | null {
-        switch (this.orientationSetting.get()) {
+        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.planeSettings.input.headingInput)) {
             case Nav5Orientation.NORTH_UP:
                 return 0;
             case Nav5Orientation.DTK_UP:

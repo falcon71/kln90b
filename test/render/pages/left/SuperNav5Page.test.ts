@@ -398,13 +398,13 @@ describe('Super NAV 5 page', () => {
     });
 
     // 3-29, 4-8: during the waypoint alert the whole identifier of the active waypoint flashes on Super NAV 5. The
-    // aircraft moves at 120 kt 0.5 NM before ABC, 15 s out, well inside the 36 s alert of a Direct To.
+    // aircraft moves at 120 kt 0.4 NM before ABC, 12 s out, inside the 15 s alert of a Direct To with turn anticipation on (#372).
     it('flashes the active identifier during the waypoint alert (3-29, 4-8)', async () => {
         const w = world();
         const unit = await bootUnit({facilities: w.facilities, position: {lat: w.kaaa.lat, lon: w.kaaa.lon}});
         await settle(unit);
         await unit.panel.directTo('ABC', {waitMs: 0});
-        await moveAircraft(unit, pointFrom(w.abc, 180, 0.5), {groundspeedKt: 120, trackTrue: 0});
+        await moveAircraft(unit, pointFrom(w.abc, 180, 0.4), {groundspeedKt: 120, trackTrue: 0});
         await showSuperNav5(unit);
         expect(unit.props.memory.navPage.waypointAlert).toBe(true);
 

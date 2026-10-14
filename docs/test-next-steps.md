@@ -208,8 +208,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       duplicated ident the VOR page reached by scanning and the selector can show different VORs (#105); the OBS taken
       from the DTK keeps its fraction (089.46) while the field shows 089, and the CDI follows the fraction (5-35 is
       silent); the inches cell of `BaroFieldset` caps at 30.99 while millibars reach 1099; `OthFuelFieldset` shows a
-      rounded value and rebuilds from one with a fraction; `MapOrientationSelector` renders an undefined value for a
-      stored HDG up without a heading input; `SuperNav5RangeSelector` builds its index with `indexOf`, -1 for a stored
+      rounded value and rebuilds from one with a fraction; `SuperNav5RangeSelector` builds its index with `indexOf`, -1 for a stored
       scale outside its list; CAL 4 at 9.9° and 999 kt shows an FPM of `1770` for about 17700 (the question #257);
       `AltitudeFieldset` shows `00000` below sea level, while a low-confidence photo of the self-test page shows a
       negative altitude; `ModObsElement.innerRight` (MOD 2) and `FuelOnBoardSelect.innerRight` return `false` while
@@ -286,12 +285,10 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       empty remark line changes the click counts in the setup of `stores a remark with a hyphen and shows it again`
       (`FreetextEditor.test.ts`); the fix of #262 must keep NO
       SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests);
-    - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised;
-      `HEADING_INPUT` in `RollSteeringController.test.ts` can bite once #143 is fixed.
-- **Open questions for the KLN 89 trainer** (the maintainer starts the VM): #146 (the alert time on a Direct To a
-  waypoint of FPL 0 that has a following leg), #147 (a waypoint alert in OBS mode), duplicate idents on a waypoint page
-  (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 are no open questions: the trainer
-  shows neither ARM nor ACTV, so the maintainer's rulings settle them and the tests hold them as characterizations.
+    - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised.
+- **Open questions for the KLN 89 trainer** (the maintainer starts the VM): duplicate idents on a waypoint
+  page (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 are no open questions: the
+  trainer shows neither ARM nor ACTV, so the maintainer's rulings settle them and the tests hold them as characterizations.
   What the 90B shows on an empty MSG page (#325), the prompt while the MSG page shows and an airport below sea level
   cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is
   the question #326.

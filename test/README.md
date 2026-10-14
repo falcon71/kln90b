@@ -298,7 +298,7 @@ pages accept.
   the GPS position at load time (the beginning of the arc when that point is outside it), so the position the unit boots
   at decides the entry. The arc's radials are true bearings: keep `magvar` at 0 or account for it. The arc must not be the
   first leg that survives the conversion, which replaces the leg before the arc with the entry.
-  Boot on the arc, so that the arc leg is the closest and becomes active (activation in the middle of an arc is #121).
+  Boot on the arc, so that the arc leg is the closest and becomes active.
   A test that recalculates the entry (MOVE? on Super NAV 5) can use a left or a right arc.
 - `Leg.TF(fix, FixTypeFlags.IAF)` and its siblings set the fix types. `SidStar` keeps a leg flagged IAF, FAF, MAP or MAHP
   even when its fix repeats, and drops an unflagged repeat.
@@ -561,7 +561,9 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
 - **`Flight.start(opts)`** boots the unit, starts the aircraft and flies until the GPS has a solution. Call it inside a
   test, because it registers `onTestFailed`. Besides `world` and `aircraft` it takes `aircraftOptions` (roll rate,
   maximum bank), `pilot`, and the `BootOptions` that make sense in flight (`storage`, `panelXml`, `engineRunning`,
-  `start`, `seed`, `atcModel`, `coldGps`, `efb`, `platform`, `defaultNavdata`). Airspaces are not a boot option here: they come from
+  `start`, `seed`, `atcModel`, `coldGps`, `efb`, `platform`, `defaultNavdata`). Without a `panelXml` it boots with
+  `panelXml(HEADING_INPUT)`, because the coupled autopilot flies on the roll command, which needs a heading input (2-69,
+  #143); a test that passes its own `panelXml` adds `HEADING_INPUT` itself. Airspaces are not a boot option here: they come from
   `World.addAirspace()`, and the facilities, position, altitude and magnetic variation from the world and the aircraft.
 - **Aircraft** (`flight/Aircraft.ts`): a point mass with constant ground speed and altitude, coordinated turns and a
   roll rate. No wind. It writes the SimVars the unit reads, 16 times per simulated second.

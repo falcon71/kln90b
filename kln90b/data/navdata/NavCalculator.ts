@@ -1,6 +1,6 @@
 import {CalcTickable, TICK_TIME_CALC} from "../../TickController";
 import {Sensors} from "../../Sensors";
-import {FROM, VolatileMemory} from "../VolatileMemory";
+import {FROM, TO, VolatileMemory} from "../VolatileMemory";
 import {GeoCircle, GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Degrees, NauticalMiles, Seconds} from "../Units";
@@ -16,6 +16,9 @@ import {TurnStackEntry} from "../flightplan/ActiveWaypoint";
 //4-8
 const WPT_ALERT_WITH_TURN_ANTI = 20;
 const WPT_ALERT_WITHOUT_TURN_ANTI = 36;
+//#372: a waypoint without a turn while turn anticipation is enabled. Checked in the KLN 89 trainer, 2026-10-14; the
+//guide gives 36 s for a Direct To (3-29) without this distinction
+const WPT_ALERT_NO_TURN_WITH_TURN_ANTI = 15;
 
 export const HOURS_TO_SECONDS = 3600;
 
@@ -91,12 +94,6 @@ export class NavCalculator implements CalcTickable {
 
         let dtk: Degrees;
 
-        if (!this.modeController.isObsModeActive() && isNaN(fromLeg.path.center[0])) { //Happens when FROM and TO are the same waypoint
-            console.warn("invalid path, sequencing to the next waypoint", fromLeg);
-            nav.activeWaypoint.sequenceToNextWaypoint();
-            return;
-        }
-
         //ETE
         if (this.sensors.in.gps.groundspeed > 2) {
             nav.eteToActive = nav.distToActive / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
@@ -105,6 +102,29 @@ export class NavCalculator implements CalcTickable {
             nav.eteToActive = null;
             nav.eteToDest = null;
             nav.waypointAlert = false;
+        }
+
+        let legPath = fromLeg.path;
+        if (!this.modeController.isObsModeActive() && isNaN(fromLeg.path.center[0])) { //Happens when FROM and TO are the same waypoint
+            const idx = nav.activeWaypoint.getActiveFplIdx();
+            nav.activeWaypoint.sequenceToNextWaypoint();
+            if (nav.activeWaypoint.getActiveFplIdx() !== idx) {
+                console.warn("invalid path, sequencing to the next waypoint", fromLeg);
+                return;
+            }
+            //#120: the last leg has no length. The unit keeps navigating on the course of the leg before it (checked in
+            //the KLN 89 trainer, 2026-10-14); without a leg before, only distance, bearing and ETE remain
+            const incoming = this.getIncomingPath(idx);
+            if (incoming === null) {
+                nav.xtkToActive = null;
+                nav.desiredTrack = null;
+                nav.toFrom = null;
+                nav.bearingForAP = nav.bearingToActive;
+                nav.waypointAlert = false;
+                this.setOutput();
+                return;
+            }
+            legPath = incoming;
         }
 
         //Special handling for turns
@@ -133,7 +153,7 @@ export class NavCalculator implements CalcTickable {
             const turnStackEntry = nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1];
             nav.xtkToActive = UnitType.GA_RADIAN.convertTo(turnStackEntry.path.distance(this.sensors.in.gps.coords), UnitType.NMILE);
         } else {
-            nav.xtkToActive = UnitType.GA_RADIAN.convertTo(fromLeg.path.distance(this.sensors.in.gps.coords), UnitType.NMILE);
+            nav.xtkToActive = UnitType.GA_RADIAN.convertTo(legPath.distance(this.sensors.in.gps.coords), UnitType.NMILE);
         }
 
 
@@ -144,12 +164,12 @@ export class NavCalculator implements CalcTickable {
             dtk = this.modeController.getObsTrue();
         } else {
             //XTK will be switched to the next XTK right at the start of the turn, even if the active waypoint has not been switched yet
-            const pathForDtk = nav.activeWaypoint.turnStack.length > 0 ? nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1].pathForDtk : fromLeg.path;
+            const pathForDtk = nav.activeWaypoint.turnStack.length > 0 ? nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1].pathForDtk : legPath;
 
             dtk = pathForDtk.bearingAt(pathForDtk.closest(this.sensors.in.gps.coords, VEC3_CACHE));
             nav.desiredTrack = dtk;
 
-            if (fromLeg.path.isGreatCircle()) {
+            if (legPath.isGreatCircle()) {
                 nav.bearingForAP = nav.bearingToActive;
             } else {
                 //The autopilot does not play well with DME arcs, when DTK and bearing to does not match.
@@ -162,8 +182,11 @@ export class NavCalculator implements CalcTickable {
         nav.toFrom = Math.abs(NavMath.diffAngle(nav.bearingToActive, dtk)) <= 90;
 
         //waypoint sequencing
-        const waypointSequencingAllowed = !this.modeController.isObsModeActive();
-        if (waypointSequencingAllowed && this.sensors.in.gps.groundspeed > 2) {
+        if (this.modeController.isObsModeActive()) {
+            //5-35: no sequencing in OBS mode; the alert as for a waypoint without a turn (#147, checked in the KLN 89
+            //trainer, 2026-10-14)
+            nav.waypointAlert = this.sensors.in.gps.groundspeed > 2 && this.isAlertWithoutTurn();
+        } else if (this.sensors.in.gps.groundspeed > 2) {
             TO_GEOPOINT_CACHE.set(toLeg.wpt);
             const followingLeg = nav.activeWaypoint.getFollowingLeg();
 
@@ -240,8 +263,7 @@ export class NavCalculator implements CalcTickable {
 
 
             } else {
-                //The turn onto the last leg is still being flown after the sequencing, the alert stays on until it ends (as above)
-                nav.waypointAlert = nav.eteToActive! <= WPT_ALERT_WITHOUT_TURN_ANTI || nav.activeWaypoint.turnStack.length > 0;
+                nav.waypointAlert = this.isAlertWithoutTurn();
                 if (toLeg.fixType !== KLNFixType.MAP && nav.toFrom === FROM) {
                     nav.activeWaypoint.sequenceToNextWaypoint();
                     console.log("moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt());
@@ -252,6 +274,32 @@ export class NavCalculator implements CalcTickable {
         }
 
         this.setOutput();
+    }
+
+    /**
+     * The waypoint alert for a waypoint without a turn to anticipate: no following leg, a fly-over, a waypoint followed by
+     * a copy of itself, or turn anticipation off. It ends once the waypoint is passed (#372). The turn onto the last leg
+     * is still being flown after the sequencing, so the alert stays on until it ends (#156)
+     */
+    private isAlertWithoutTurn(): boolean {
+        const nav = this.memory.navPage;
+        const alertTime = this.turnAnticipation.get() ? WPT_ALERT_NO_TURN_WITH_TURN_ANTI : WPT_ALERT_WITHOUT_TURN_ANTI;
+        return (nav.toFrom === TO && nav.eteToActive! <= alertTime) || nav.activeWaypoint.turnStack.length > 0;
+    }
+
+    /**
+     * #120: the path of the FPL 0 leg that ends where the zero-length leg at idx starts, null if there is none or it has
+     * no length either
+     */
+    private getIncomingPath(idx: number): GeoCircle | null {
+        if (idx < 2) {
+            return null;
+        }
+        const legs = this.memory.navPage.activeWaypoint.fpl0.getLegs();
+        const from = legs[idx - 2];
+        const to = legs[idx - 1];
+        const path = from.arcData === undefined ? GeoCircle.createGreatCircle(from.wpt, to.wpt) : from.arcData.circle;
+        return isNaN(path.center[0]) ? null : path;
     }
 
     /**
@@ -294,7 +342,6 @@ export class NavCalculator implements CalcTickable {
         nav.bearingForAP = null;
         nav.toFrom = null;
         nav.waypointAlert = false;
-        nav.xtkScale = 5;
         this.lastDistanceToTurn = 9999;
     }
 

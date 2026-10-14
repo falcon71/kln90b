@@ -535,8 +535,9 @@ describe('GPS SimVars with Output.WriteGPSSimVars off (public contract) (#126)',
         expect(unit.env.sim.lastWrite('GPS WP CROSS TRK')).toBeUndefined();
     });
 
+    // Roll steering needs the heading input (2-69, #143), so this one boots with it
     it('L:KLN90B_RollCommand is still written, as an output of the unit', async () => {
-        const unit = await bootMovingOnRoute(panelXml(NO_GPS_SIMVARS));
+        const unit = await bootMovingOnRoute(panelXml({...NO_GPS_SIMVARS, ...HEADING_INPUT}));
 
         // 1 NM right of the leg and on a track 10 degrees to the right of it, so the command is the full left bank (25
         // degrees, as in the power-off tests)

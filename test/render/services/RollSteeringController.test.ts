@@ -21,7 +21,7 @@ async function onRoute(xml?: string) {
 
 // Public contract: the Autopilot wiki page and the doc comment of LVAR_ROLL_COMMAND in LVars.ts: the roll command is in
 // degrees, a left bank is positive and a right bank negative. The Installation Manual (2-69) lets the unit give roll
-// steering only with a heading input; these tests run with HeadingInput on, the case without is pinned below (#143).
+// steering only with a heading input; these tests run with HeadingInput on, the case without follows below (#143).
 describe('L:KLN90B_RollCommand (public contract)', () => {
     it('is written as 0 without a flight plan', async () => {
         const unit = await bootUnit({panelXml: HEADING_INPUT_XML});
@@ -81,10 +81,9 @@ describe('L:KLN90B_RollCommand (public contract)', () => {
     });
 });
 
-// Installation Manual 2-69: without a heading input the unit gives no roll steering output. RollSteeringController
-// ignores Input.HeadingInput and always writes the command.
+// Installation Manual 2-69: without a heading input the unit gives no roll steering, so the command is 0 (#143)
 describe('L:KLN90B_RollCommand without a heading input (public contract)', () => {
-    it('the pin setup: HeadingInput is off, ABC is active and the aircraft is 2 NM off the leg at 120 kt', async () => {
+    it('the setup: HeadingInput is off, ABC is active and the aircraft is 2 NM off the leg at 120 kt', async () => {
         const {unit, abc, mid, dtk} = await onRoute();
 
         await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});
@@ -95,19 +94,31 @@ describe('L:KLN90B_RollCommand without a heading input (public contract)', () =>
         expect(unit.props.sensors.in.gps.groundspeed).toBeCloseTo(120, 6);
     });
 
-    it.fails('is 0 (#143)', async () => {
+    it('is 0 (2-69, #143)', async () => {
         const {unit, mid, dtk} = await onRoute();
 
         await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});
 
         expect(unit.env.sim.lastWrite('L:KLN90B_RollCommand')?.value).toBe(0);
     });
+
+    // GPS COURSE TO STEER is not an output of the real unit (the code adds it), and the default autopilot reads it. The
+    // maintainer decided to keep writing it without a heading input (characterization): the 45° intercept course of the
+    // leg, as in SensorsOut.test.ts
+    it('still writes GPS COURSE TO STEER, the intercept course (characterization, #143)', async () => {
+        const {unit, mid, dtk} = await onRoute();
+
+        await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});
+
+        const cts = unit.env.sim.lastWrite('GPS COURSE TO STEER')!.value as number;
+        expect(cts).toBeCloseTo(((dtk - 45 + 360) % 360) * Math.PI / 180, 2);
+    });
 });
 
 // #100 (its comment of 2026-10-05): far left of the leg on a track parallel to it, case 1 ("on track") of
 // RollSteeringController.updateBankAngle takes any negative XTK, and its course to steer DTK - 50 x XTK passes 180 degrees
-// off the DTK beyond about 3.6 NM, so the unit banks away from the leg. HeadingInput is on, so the pin survives the
-// fix of #143.
+// off the DTK beyond about 3.6 NM, so the unit banks away from the leg. HeadingInput is on, because the unit gives roll
+// steering only with it (2-69, #143).
 describe('L:KLN90B_RollCommand far left of the leg on a parallel track (#100)', () => {
     /** Abeam the point 20 NM before ABC, 5 NM left of the leg KAAA - ABC, flying the leg's course at 120 kt */
     async function farLeftParallel() {
