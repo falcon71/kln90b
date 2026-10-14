@@ -132,6 +132,23 @@ describe('Direct To in OBS mode (5-37)', () => {
         const vor1 = unit.env.sim.keyEvents.filter(k => k.name === 'K:VOR1_SET');
         expect(Math.abs(vor1[vor1.length - 1].value - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.5); // 024 magnetic
     });
+
+    // 5-37 (5.9.6): with an indicator the unit reads and drives (ObsSource 1, ObsTarget 1) the direct course is set and
+    // the indicator slewed to it; the indicator's old course (120) must not come back at the next tick (#261)
+    it('keeps the direct course and slews an indicator it reads and drives (5-37, #261)', async () => {
+        const unit = await planInObs(offLeg, {obs: 120, panelXml: panelXml({'Output.ObsTarget': 1}), abc: abcE});
+        unit.env.sim.applyObsKeyEvents = true;
+        const nav = unit.props.memory.navPage;
+        await unit.panel.selectPage('R', 'CTR 1');
+
+        await unit.panel.dct();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Math.abs(nav.obsMag - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.2 magnetic
+        expect(Math.abs(unit.env.sim.get('Nav OBS:1', 'degrees') - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.5);
+        expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
+    });
 });
 
 // The CRS message is the 90B's own (5-37). The KLN 89 trainer (2026-10-07) shows the OBS course at north as 000, never

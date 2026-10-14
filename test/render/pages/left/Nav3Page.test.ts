@@ -151,6 +151,26 @@ describe('NAV 3 page on an FPL 0 leg', () => {
         expect(Screen.read().rows('L')[1]).toBe('OBS:   088°');
     });
 
+    // 5-35: with an indicator the unit reads and drives (ObsSource 1 by default, ObsTarget 1) the course turned on NAV 3
+    // stays and the indicator is slewed to it. The assertions are relative to the course the unit shows before the
+    // clicks, which the unit chooses on the switch to OBS
+    it('keeps a course turned on NAV 3 and slews a driven indicator to it (5-35, #261)', async () => {
+        const unit = await nav3OnLeg(0, panelXml({'Output.ObsTarget': 1}));
+        unit.env.sim.applyObsKeyEvents = true;
+        await unit.panel.obsMode();
+        await unit.panel.selectPage('L', 'NAV 3');
+        await vi.advanceTimersByTimeAsync(2000);
+        await unit.panel.cursor('L');
+        expect(unit.panel.focused('L').text).toMatch(/^\d{3}°$/); // The cursor is on the OBS course of NAV 3
+        const start = unit.props.memory.navPage.obsMag;
+
+        await unit.panel.inner('L', 3);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.memory.navPage.obsMag).toBeCloseTo(start + 3, 3);
+        expect(Math.abs(unit.env.sim.get('Nav OBS:1', 'degrees') - (start + 3))).toBeLessThan(0.5);
+    });
+
     // 3-32 (figure 3-104): FLY L or R is the direction to fly back to the course, and the distance follows. 2.7 NM right
     // of the course reads FLY L 2.7nm
     it('reads FLY L 2.7nm 2.7 NM right of the course (3-32)', async () => {

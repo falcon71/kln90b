@@ -152,8 +152,8 @@ describe('MOD 2 page (spec)', () => {
 
 // 5-35 and its notes: with an indicator the unit reads and can drive (ObsSource 1 by default, ObsTarget 1: an EFIS or
 // a KA 90 on VOR 1), OBS shows a colon, the course is entered on MOD 2, and the indicator is slewed to it. Each
-// calculation tick first reads the indicator (Sensors), then ModeController.tick sets the OBS to what it read, and only
-// then NavCalculator writes K:VOR1_SET: a course turned on MOD 2 is replaced by the indicator's before it is ever sent
+// calculation tick first reads the indicator (Sensors) and then ModeController.tick sets the OBS to what it read: a
+// course set on the unit has to reach the indicator at once, or the indicator's old course replaces it (#261)
 describe('MOD 2 OBS course with a driven indicator', () => {
     /** ObsTarget 1 with the indicator on 090, OBS mode, the cursor on the course. The fake acts on K:VOR1_SET only on
      * request (testing.md), so it moves Nav OBS:1 here, as the sim does */
@@ -176,7 +176,7 @@ describe('MOD 2 OBS course with a driven indicator', () => {
         expect(unit.panel.focused('L')).toEqual({row: 3, col: 4, text: '090°'});
     });
 
-    it.fails('keeps a course turned on MOD 2 and slews the indicator to it (5-35, #261)', async () => {
+    it('keeps a course turned on MOD 2 and slews the indicator to it (5-35, #261)', async () => {
         const unit = await drivenIndicatorOn90();
 
         await unit.panel.inner('L', 3);
@@ -184,6 +184,23 @@ describe('MOD 2 OBS course with a driven indicator', () => {
 
         expect(Math.round(unit.props.memory.navPage.obsMag)).toBe(93);
         expect(Math.round(unit.env.sim.get('Nav OBS:1', 'degrees'))).toBe(93);
+    });
+
+    // 5-36: with an indicator the unit drives, the unit chooses the course on the switch to OBS so that the deviation
+    // stays, and 5-35: the indicator is slewed to it. In LEG the unit writes the DTK to the indicator, so MOD 2 is
+    // selected first and the indicator is turned to 120 only then, right before the ENT; the equator leg runs 090
+    it('slews a driven indicator to the course the unit chooses on the switch to OBS (5-35, 5-36, #261)', async () => {
+        const unit = await onEquatorLeg(panelXml({'Output.ObsTarget': 1}));
+        unit.env.sim.applyObsKeyEvents = true;
+        await unit.panel.selectPage('L', 'MOD 2');
+        unit.env.sim.set('Nav OBS:1', 'degrees', 120);
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
+
+        expect(Math.round(unit.props.memory.navPage.obsMag)).toBe(90);
+        expect(Math.round(unit.env.sim.get('Nav OBS:1', 'degrees'))).toBe(90);
     });
 });
 

@@ -426,7 +426,9 @@ sim.
   APR becomes 0.3 at the FAF ("Integrity check?" is a TODO; there is no RAIM).
 - `armApproachPressed()` is triggered from MainPage on `EVT_APPR_ARM`.
 - **OBS mode is implemented as a direct-to from a synthetic user facility (`ICAO.value("U","XX",...)`) 1000 NM away on
-  the reciprocal of the OBS** (`setObs`).
+  the reciprocal of the OBS** (`setObs`). `setObs` skips an unchanged course unless `force` is set (entering OBS and
+  ACTIVATE force it). A course set on the unit (MOD 2, NAV 3, a Direct To in OBS) goes through `setObsOnUnit`, which
+  also writes it to a driven indicator at once; otherwise the 1 Hz read-back of the indicator would replace it.
 - For OBS on VORs, the magnetic variation is taken from the VOR's `magneticVariation`, negated ("Seems to be opposite to
   the magvar service").
 - Status-line feedback: `NO APPROACH`, `NO ACTV WPT`.
