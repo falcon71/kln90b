@@ -300,6 +300,46 @@ describe('waypoint alert at the last waypoint of FPL 0 with turn anticipation on
     });
 });
 
+// #147: in OBS mode there is no sequencing (5-35), but the waypoint alert works as for a waypoint without a turn.
+// Checked in the KLN 89 trainer, 2026-10-14: in OBS mode toward the active waypoint the arrow flashed from 1.0 NM at
+// 239 kt with turn anticipation on (ETE :14) and from 2.4 NM with it off, stopped at the waypoint, and the waypoint
+// stayed active. The OBS course is the one the unit chooses on entering OBS: the leg's course at ABC (5-36).
+describe('waypoint alert in OBS mode (checked in the KLN 89 trainer, 2026-10-14)', () => {
+    async function obsTowardAbc(turnAnticipation: boolean) {
+        const {unit, kaaa, abc} = await onStandardRoute({turnAnticipation});
+        const leg = finalCourseDeg(kaaa, abc);
+        await moveAircraft(unit, pointBefore(kaaa, abc, 5), {groundspeedKt: 120, trackTrue: leg});
+        await unit.panel.obsMode();
+        expect(unit.props.modeController.isObsModeActive()).toBe(true); // Precondition
+        const at = (nmBefore: number) => moveAircraft(unit, pointBefore(kaaa, abc, nmBefore), {groundspeedKt: 120, trackTrue: leg});
+        return {unit, kaaa, abc, leg, at};
+    }
+
+    it('starts about 15 s before the active waypoint and ends past it, with turn anticipation on (checked in the KLN 89 trainer, 2026-10-14, #147)', async () => {
+        const {unit, abc, leg, at} = await obsTowardAbc(true);
+
+        await at(0.6);
+        expect(nav(unit).waypointAlert).toBe(false);
+        await at(0.4);
+        expect(nav(unit).waypointAlert).toBe(true);
+        // The WPT annunciator follows the alert (3-59); the 89 has no external output and showed only the arrow
+        expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(1);
+
+        await moveAircraft(unit, pointFrom(abc, leg, 0.2), {groundspeedKt: 120, trackTrue: leg});
+        expect(activeIdent(unit)).toBe('ABC'); // 5-35: no sequencing in OBS mode
+        expect(nav(unit).waypointAlert).toBe(false);
+    });
+
+    it('starts about 36 s before the active waypoint with turn anticipation off (checked in the KLN 89 trainer, 2026-10-14, #147)', async () => {
+        const {unit, at} = await obsTowardAbc(false);
+
+        await at(1.3);
+        expect(nav(unit).waypointAlert).toBe(false);
+        await at(1.1);
+        expect(nav(unit).waypointAlert).toBe(true);
+    });
+});
+
 // 4-8: with turn anticipation the alert starts about 20 s before the turn begins. The turn at ABC is 34.4° at 120 kt:
 // the standard-rate radius is v / (3°/s) = 0.637 NM, so the turn needs R * tan(17.2°) = 0.197 NM of lead, plus up to
 // 0.12 NM to roll into the bank (18.3° at 5°/s, 3.7 s): it begins 0.20 to 0.32 NM before ABC. 20 s at 120 kt are

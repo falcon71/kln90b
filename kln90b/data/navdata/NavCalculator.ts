@@ -165,8 +165,11 @@ export class NavCalculator implements CalcTickable {
         nav.toFrom = Math.abs(NavMath.diffAngle(nav.bearingToActive, dtk)) <= 90;
 
         //waypoint sequencing
-        const waypointSequencingAllowed = !this.modeController.isObsModeActive();
-        if (waypointSequencingAllowed && this.sensors.in.gps.groundspeed > 2) {
+        if (this.modeController.isObsModeActive()) {
+            //5-35: no sequencing in OBS mode; the alert as for a waypoint without a turn (#147, checked in the KLN 89
+            //trainer, 2026-10-14)
+            nav.waypointAlert = this.sensors.in.gps.groundspeed > 2 && this.isAlertWithoutTurn();
+        } else if (this.sensors.in.gps.groundspeed > 2) {
             TO_GEOPOINT_CACHE.set(toLeg.wpt);
             const followingLeg = nav.activeWaypoint.getFollowingLeg();
 

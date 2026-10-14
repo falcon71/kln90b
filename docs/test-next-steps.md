@@ -287,9 +287,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests);
     - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised;
       `HEADING_INPUT` in `RollSteeringController.test.ts` can bite once #143 is fixed.
-- **Open questions for the KLN 89 trainer** (the maintainer starts the VM): #147 (a waypoint alert in OBS
-  mode), duplicate idents on a waypoint page (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 are no open questions: the trainer
-  shows neither ARM nor ACTV, so the maintainer's rulings settle them and the tests hold them as characterizations.
+- **Open questions for the KLN 89 trainer** (the maintainer starts the VM): duplicate idents on a waypoint
+  page (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 are no open questions: the
+  trainer shows neither ARM nor ACTV, so the maintainer's rulings settle them and the tests hold them as characterizations.
   What the 90B shows on an empty MSG page (#325), the prompt while the MSG page shows and an airport below sea level
   cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is
   the question #326.

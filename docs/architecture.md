@@ -406,6 +406,8 @@ sim.
 - DTK is the bearing at the closest point. `bearingForAP` equals the DTK on arcs, a workaround so the autopilot tracks
   DME arcs.
 - TO/FROM is defined as `|bearing - dtk| <= 90`.
+- In OBS mode there is no sequencing (5-35); the waypoint alert is still computed, as for a waypoint without a turn
+  (#147).
 - Sequencing (not in OBS mode, GS > 2):
     - With `turnAnticipation` on and the waypoint not fly-over or duplicated, it computes the turn radius from
       `bankeAngleForStandardTurn(gs)` (`services/KLNNavmath.ts`; it assumes 5 deg/s roll rate,
