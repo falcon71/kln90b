@@ -169,9 +169,9 @@ describe('OBS to LEG (5-36)', () => {
         return {unit, nav, position, foot};
     }
 
-    // The sibling of the pin below: its setup holds, and the switch itself works (5-36: the mode changes, a waypoint is
+    // The setup of the test below holds, and the switch itself works (5-36: the mode changes, a waypoint is
     // active)
-    it('the pin setup: OBS 050 to ABC, 10 NM past ABC, 2 NM right of ABC - KBBB, FROM (the setup of #155)', async () => {
+    it('OBS 050 to ABC, 10 NM past ABC, 2 NM right of ABC - KBBB, FROM (the setup of #155)', async () => {
         const {unit, nav} = await pastAbcInObs();
 
         expect(nav.activeWaypoint.getActiveFplIdx()).toBe(1);
@@ -180,15 +180,14 @@ describe('OBS to LEG (5-36)', () => {
         await legMode(unit);
 
         expect(nav.navmode).toBe(NavMode.ENR_LEG);
-        // The unit re-orients on FPL 0 and flies to the leg's waypoint, KBBB, today and under the fix of the pin
+        // The unit re-orients on FPL 0 and flies to the leg's waypoint, KBBB
         expect(activeIdent(unit)).toBe('KBBB');
     });
 
     // 5-36 rules 1 and 2: on the FROM side the unit re-orients on FPL 0, computes the DTK for the new leg, and the
-    // deviation from that leg is kept; checked in the KLN 89 trainer: the leg comes back with its deviation. The unit
-    // makes a direct-to from the present position to KBBB instead (ModeController.switchToEnrLegMode, FROM branch), so the
-    // plan leg is lost and the deviation is zero
-    it.fails('re-activates the plan leg ABC - KBBB instead of a direct-to from the present position (#155)', async () => {
+    // deviation from that leg is kept; checked in the KLN 89 trainer, 2026-10-06 (the plan leg came back with its DTK and
+    // its deviation, TO)
+    it('re-activates the plan leg ABC - KBBB instead of a direct-to from the present position (#155)', async () => {
         const {unit, nav, foot} = await pastAbcInObs();
 
         await legMode(unit);

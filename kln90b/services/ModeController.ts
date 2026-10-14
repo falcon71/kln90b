@@ -5,7 +5,6 @@ import {
     Facility,
     FacilityType,
     FacilityUtils,
-    GeoCircle,
     GeoPoint,
     ICAO,
     LatLonInterface,
@@ -95,11 +94,8 @@ export class ModeController implements CalcTickable {
         this.navState.obsMag = 0;
         if (active !== null) {
             if (this.navState.toFrom === FROM && this.navState.activeWaypoint.getActiveFplIdx() !== -1) {
+                //5-36: on the FROM side the unit re-orients on FPL 0 and the leg found by position becomes active as a plan leg (#155)
                 this.navState.activeWaypoint.activateFpl0();
-                const from = UserFacilityUtils.createFromLatLon(ICAO.value("U", "XX", "", "d"), this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, true);
-                const to = this.reorientFlightplanLeg(this.sensors.in.gps.coords) ?? active;
-
-                this.navState.activeWaypoint.directTo(from, to);
             } else {
                 const fromCoords: LatLonInterface = this.navState.activeWaypoint.getFromWpt()!;
                 const from = UserFacilityUtils.createFromLatLon(ICAO.value("U", "XX", "", "d"), fromCoords.lat, fromCoords.lon, true);
@@ -305,33 +301,6 @@ export class ModeController implements CalcTickable {
                 }
                 break;
         }
-    }
-
-    private reorientFlightplanLeg(pos: LatLonInterface): Facility | null {
-        const legs = this.fpl0.getLegs();
-        if (legs.length < 2) {
-            return null;
-        }
-
-        const circle = new GeoCircle(new Float64Array(3), 0);
-        const tempGeoPoint = new GeoPoint(0, 0);
-        let distMin = 99999; //This is GA Radians!
-        let closestLeg: Facility | null = null;
-        for (let i = 1; i < legs.length; i++) {
-            const from = legs[i - 1].wpt;
-            const to = legs[i].wpt;
-            tempGeoPoint.set(from);
-            const distFromTo = tempGeoPoint.distance(to);
-            const path = circle.setAsGreatCircle(from, to);
-            path.closest(pos, tempGeoPoint);
-            const distFromClosest = tempGeoPoint.distance(from); //We use this to check, if closest is between from and to
-            const distClosestWpt = tempGeoPoint.distance(pos);
-            if (distFromClosest <= distFromTo && distClosestWpt < distMin) {
-                closestLeg = to;
-                distMin = distClosestWpt;
-            }
-        }
-        return closestLeg;
     }
 
     private checkSwitchEnrToArmMode(apt: AirportFacility | null): void {
