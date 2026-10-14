@@ -208,8 +208,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       duplicated ident the VOR page reached by scanning and the selector can show different VORs (#105); the OBS taken
       from the DTK keeps its fraction (089.46) while the field shows 089, and the CDI follows the fraction (5-35 is
       silent); the inches cell of `BaroFieldset` caps at 30.99 while millibars reach 1099; `OthFuelFieldset` shows a
-      rounded value and rebuilds from one with a fraction; `MapOrientationSelector` renders an undefined value for a
-      stored HDG up without a heading input; `SuperNav5RangeSelector` builds its index with `indexOf`, -1 for a stored
+      rounded value and rebuilds from one with a fraction; `SuperNav5RangeSelector` builds its index with `indexOf`, -1 for a stored
       scale outside its list; CAL 4 at 9.9° and 999 kt shows an FPM of `1770` for about 17700 (the question #257);
       `AltitudeFieldset` shows `00000` below sea level, while a low-confidence photo of the self-test page shows a
       negative altitude; `ModObsElement.innerRight` (MOD 2) and `FuelOnBoardSelect.innerRight` return `false` while

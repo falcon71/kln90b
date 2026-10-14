@@ -235,6 +235,8 @@ export class SensorsIn implements CalcTickable {
 
         if (this.options.input.headingInput) {
             this.headingGyro = SimVar.GetSimVarValue('PLANE HEADING DEGREES GYRO', SimVarValueType.Degree);
+        } else {
+            this.headingGyro = null; //The input can be switched off at runtime (#368)
         }
 
         this.gps.tick();

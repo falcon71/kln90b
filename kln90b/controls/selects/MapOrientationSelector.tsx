@@ -5,7 +5,7 @@ import {TickController} from "../../TickController";
 import {format} from "numerable";
 import {roundBearing} from "../../data/Coordinates";
 import {Sensors} from "../../Sensors";
-import {Nav5Orientation} from "../../settings/KLN90BUserSettings";
+import {effectiveMapOrientation, Nav5Orientation} from "../../settings/KLN90BUserSettings";
 import {ModeController} from "../../services/ModeController";
 import {KLNMagvar} from "../../data/navdata/KLNMagvar";
 
@@ -13,12 +13,12 @@ import {KLNMagvar} from "../../data/navdata/KLNMagvar";
 export class MapOrientationSelector extends SelectField {
 
 
-    private constructor(valueSet: string[], private readonly orientationSetting: UserSetting<Nav5Orientation>, private readonly sensors: Sensors, private readonly modeController: ModeController, private readonly magvar: KLNMagvar, changedCallback: (value: number) => void) {
-        super(valueSet, orientationSetting.get(), changedCallback);
+    private constructor(valueSet: string[], value: number, private readonly orientationSetting: UserSetting<Nav5Orientation>, private readonly sensors: Sensors, private readonly modeController: ModeController, private readonly magvar: KLNMagvar, changedCallback: (value: number) => void) {
+        super(valueSet, value, changedCallback);
     }
 
     public static build(options: KLN90PlaneSettings, orientationSetting: UserSetting<Nav5Orientation>, sensors: Sensors, modeController: ModeController, magvar: KLNMagvar): MapOrientationSelector {
-        return new MapOrientationSelector(this.getValueset(options), orientationSetting, sensors, modeController, magvar, (orientation) => this.saveMapOrientation(orientationSetting, orientation));
+        return new MapOrientationSelector(this.getValueset(options), effectiveMapOrientation(orientationSetting.get(), options.input.headingInput), orientationSetting, sensors, modeController, magvar, (orientation) => this.saveMapOrientation(orientationSetting, orientation));
     }
 
     private static getValueset(options: KLN90PlaneSettings): string[] {

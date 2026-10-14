@@ -6,6 +6,7 @@ import {
     LVAR_DISABLE,
     LVAR_ELECTRICITY_INDEX,
     LVAR_GPS_SIMVARS,
+    LVAR_HEADING_INPUT,
     LVAR_OBS_SOURCE,
     LVAR_OBS_TARGET,
 } from "./LVars";
@@ -48,6 +49,7 @@ export class SimVarSync {
 
         this.settings.input.obsSource = SimVar.GetSimVarValue(LVAR_OBS_SOURCE, SimVarValueType.Number);
         this.settings.output.obsTarget = SimVar.GetSimVarValue(LVAR_OBS_TARGET, SimVarValueType.Number);
+        this.settings.input.headingInput = !!SimVar.GetSimVarValue(LVAR_HEADING_INPUT, SimVarValueType.Bool);
 
         const writeGpsSimvars = !!SimVar.GetSimVarValue(LVAR_GPS_SIMVARS, SimVarValueType.Bool);
         if (writeGpsSimvars !== this.settings.output.writeGPSSimVars) {

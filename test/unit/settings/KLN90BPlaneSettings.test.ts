@@ -49,11 +49,12 @@ function parse(xml: string): KLN90PlaneSettings {
 /** A document with a KLN90B instrument holding only the given elements */
 const kln = (inner: string) => `<PlaneHTMLConfig><Instrument><Name>KLN90B</Name>${inner}</Instrument></PlaneHTMLConfig>`;
 
-/** The LVar writes of a parse that read no key: the defaults of the three synced LVars */
+/** The LVar writes of a parse that read no key: the defaults of the synced LVars */
 function expectDefaultLVars(): void {
     const sim = simEnv().sim;
     expect(sim.lastWrite('L:KLN90B_ObsSource')!.value).toBe(1);
     expect(sim.lastWrite('L:KLN90B_ObsTarget')!.value).toBe(0);
+    expect(sim.lastWrite('L:KLN90B_HeadingInput')!.value).toBe(0);
     expect(sim.lastWrite('L:KLN90B_WriteGpsSimvars')!.value).toBe(1);
     expect(sim.lastWrite('L:KLN90B_ElectricitySimVarIndex')).toBeUndefined();
 }
@@ -165,12 +166,13 @@ describe('panel.xml parser', () => {
     // The parser seeds these LVars, which aircraft may then override at runtime.
     describe('LVar writes', () => {
         it('seeds the synced LVars from the keys', () => {
-            parse(kln('<Input><ObsSource>2</ObsSource><ElectricitySimVar>CIRCUIT ON:3</ElectricitySimVar></Input>'
+            parse(kln('<Input><ObsSource>2</ObsSource><HeadingInput>true</HeadingInput><ElectricitySimVar>CIRCUIT ON:3</ElectricitySimVar></Input>'
                 + '<Output><ObsTarget>1</ObsTarget><WriteGPSSimVars>false</WriteGPSSimVars></Output>'));
 
             const sim = simEnv().sim;
             expect(sim.lastWrite('L:KLN90B_ObsSource')!.value).toBe(2);
             expect(sim.lastWrite('L:KLN90B_ObsTarget')!.value).toBe(1);
+            expect(sim.lastWrite('L:KLN90B_HeadingInput')!.value).toBe(1);
             expect(sim.lastWrite('L:KLN90B_WriteGpsSimvars')!.value).toBe(0);
             expect(sim.lastWrite('L:KLN90B_ElectricitySimVarIndex')!.value).toBe(3);
         });

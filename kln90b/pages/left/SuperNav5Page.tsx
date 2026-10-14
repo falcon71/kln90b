@@ -19,7 +19,7 @@ import {NO_CHILDREN, PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {Canvas, CanvasSize, CoordinateCanvasDrawContext} from "../../controls/Canvas";
 import {isUserWaypoint} from "../right/WaypointPage";
-import {Nav5Orientation, SuperNav5VOR} from "../../settings/KLN90BUserSettings";
+import {effectiveMapOrientation, Nav5Orientation, SuperNav5VOR} from "../../settings/KLN90BUserSettings";
 import {SuperNav5Left} from "../../controls/SuperNav5Left";
 import {SevenLinePage} from "../OneSegmentPage";
 import {KLNFixType, KLNFlightplanLeg} from "../../data/flightplan/Flightplan";
@@ -140,7 +140,7 @@ export class SuperNav5Page extends SevenLinePage {
         let ctx: CoordinateCanvasDrawContext;
 
 
-        switch (this.orientationSetting.get()) {
+        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.planeSettings.input.headingInput)) {
             case Nav5Orientation.NORTH_UP:
                 ctx = this.children.get("canvas").getDrawingContextWithCenterRange(this.props.sensors.in.gps.coords, range);
                 break;
@@ -382,7 +382,7 @@ export class SuperNav5Page extends SevenLinePage {
     }
 
     private drawPlaneIcon(ctx: CoordinateCanvasDrawContext) {
-        switch (this.orientationSetting.get()) {
+        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.planeSettings.input.headingInput)) {
             case Nav5Orientation.NORTH_UP:
             case Nav5Orientation.DTK_UP:
                 ctx.drawIcon(this.props.sensors.in.gps.coords, "$");

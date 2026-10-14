@@ -7,7 +7,7 @@ import {SelectField} from "../../controls/selects/SelectField";
 import {MainPage} from "../MainPage";
 import {unpackFacility, WaypointPage} from "../right/WaypointPage";
 import {MapOrientationSelector} from "../../controls/selects/MapOrientationSelector";
-import {Nav5Orientation} from "../../settings/KLN90BUserSettings";
+import {effectiveMapOrientation, Nav5Orientation} from "../../settings/KLN90BUserSettings";
 import {KLNFixType, KLNFlightplanLeg} from "../../data/flightplan/Flightplan";
 import {ActiveWaypoint} from "../../data/flightplan/ActiveWaypoint";
 import {NauticalMiles} from "../../data/Units";
@@ -67,7 +67,7 @@ export class Nav5Page extends SixLineHalfPage {
         }
 
         let ctx: CoordinateCanvasDrawContext;
-        switch (this.orientationSetting.get()) {
+        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.planeSettings.input.headingInput)) {
             case Nav5Orientation.NORTH_UP:
                 ctx = this.children.get("canvas").getDrawingContextWithCenterRange(this.props.sensors.in.gps.coords, this.rangeSetting.get());
                 break;
@@ -222,7 +222,7 @@ export class Nav5Page extends SixLineHalfPage {
     }
 
     private drawPlaneIcon(ctx: CoordinateCanvasDrawContext) {
-        switch (this.orientationSetting.get()) {
+        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.planeSettings.input.headingInput)) {
             case Nav5Orientation.NORTH_UP:
             case Nav5Orientation.DTK_UP:
                 ctx.drawIcon(this.props.sensors.in.gps.coords, "$");

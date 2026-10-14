@@ -177,7 +177,8 @@ calls `in.reset()` and `out.reset()`, and on a power-off also `out.setPoweredOff
 
 - `GPS DRIVES NAV1`. When it is true, it reads `Nav OBS:{1|2}` according to `Input.ObsSource`. When it is false,
   `obsMag = null` ("the manual implies" OBS can only be read when the GPS is the nav source).
-- `PLANE HEADING DEGREES GYRO` if `Input.HeadingInput`.
+- `PLANE HEADING DEGREES GYRO` while `input.headingInput` is set (`Input.HeadingInput` or `L:KLN90B_HeadingInput`), null
+  otherwise (#368).
 - Then `gps.tick()`, `fuelComputer.tick()` and `airdata.tick()`.
 
 `FuelComputer` (only if `Input.FuelComputer.IsInterfaced`) reads `FUEL TOTAL QUANTITY WEIGHT EX1`, `ENG FUEL FLOW PPH:n`
@@ -313,7 +314,8 @@ on them.
     - Writable by aircraft:
         - `L:KLN90B_Brightness` (0 to 1)
         - `L:KLN90B_Disabled` (hot swap)
-        - `L:KLN90B_ObsSource`, `L:KLN90B_ObsTarget`, `L:KLN90B_ElectricitySimVarIndex`, `L:KLN90B_WriteGpsSimvars`.
+        - `L:KLN90B_ObsSource`, `L:KLN90B_ObsTarget`, `L:KLN90B_HeadingInput`, `L:KLN90B_ElectricitySimVarIndex`,
+          `L:KLN90B_WriteGpsSimvars`.
           These override panel.xml values at runtime: `KLN90BPlaneSettingsParser` seeds the LVars from the XML and
           `SimVarSync.tick` reads them back every 100 ms into the mutable `planeSettings` object.
 - Wiki pages referenced in the comments (RMI, CDI-HSI, Autopilot, External-Annunciators, Hot-Swapping) document this
@@ -593,9 +595,12 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `Output.{ObsTarget=0, AltitudeAlertEnabled=true, WriteGPSSimVars=true}`
     - `debugMode` = false (hard-coded)
 - Note that the sample `cfg/panel.xml` sets `AltitudeAlertEnabled=false`, while the code default is true.
-- After parsing it writes the four runtime-override LVars (Core 4). An `ElectricitySimVar` like `CIRCUIT ON:1` has its
+- After parsing it writes the runtime-override LVars (Core 4). An `ElectricitySimVar` like `CIRCUIT ON:1` has its
   index replaced every 100 ms by `L:KLN90B_ElectricitySimVarIndex`.
 - `KLN90PlaneSettings` is **mutable at runtime** through `SimVarSync`; code reads `planeSettings.input/output.*` live.
+  Without a heading input a stored HDG up map orientation is drawn north up (`effectiveMapOrientation`, #368). The
+  stored setting is never changed. A runtime change of the input applies to the orientation fields and to the CAL 3 and
+  OTH 9 layout at the next page build, while the NAV 5 and Super NAV 5 maps follow the input at once.
 - Consumers: `Sensors` (all inputs and outputs), `ModeController`, `NavCalculator.setMode` (writeObs),
   `PersistentMessages` (obsTarget chooses between `AdjustCourse...` variants; `AltitudeFailMessage`),
   `BrightnessManager`, `AudioGenerator`, `AltAlert`, `HtAboveAirportAlert`, `WTFlightplanSync`, `KlnEfbSaver`, `MSA` and
