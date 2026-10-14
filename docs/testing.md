@@ -1220,6 +1220,23 @@ its line, in the comment above it or in the title of its `describe`.
   published variation, rounded to whole degrees (309 NM from ORD: 86 shown, the final bearing at the aircraft would
   give 90; 427 NM from RHI: 116 shown, the final bearing 122).
 
+**2026-10-14**
+- VNAV programmed to a waypoint after the active one (FPL 0 KORD, KUGN, KENW, KMKE, KENW, KUGN active, VNAV to KMKE),
+  then OBS: at the next VNAV recompute the state went inactive and the VNAV waypoint showed the active waypoint; no
+  message. Back in LEG the programmed waypoint did not return. The same with the descent already active; VNAV to the
+  active waypoint stayed active through OBS. The 89 recomputes VNAV only when an ALT 2 value is turned, so the cancel
+  was seen at a recompute: a LEG, OBS, LEG round trip without one kept VNAV to KMKE (#338).
+- ACTIVATE in OBS mode (D-> twice from FPL 0, then ENT) made the waypoint active, kept the course 045 and measured the
+  deviation through the new waypoint (Fly L 37.5 NM); a plain Direct To in OBS centered the needle and changed the
+  course (#154).
+- A waypoint twice in FPL 0 (KENW at rows 3 and 5): with the second copy active, both by a Direct To from FPL 0 and by
+  sequencing onto the leg KMKE - KENW, OBS and back to LEG kept the second copy active (#152).
+- LEG to OBS 100 NM before the end of a 136 NM leg (KMSN to a user waypoint), centered (0.02 NM): the deviation stayed
+  0.02 NM. The course shown was 097 against a DTK of 094 at the aircraft; setting 096, 097 and 098 by hand showed that
+  the unit held a fraction, about 097.5 (#151).
+- After a Direct To in OBS mode NAV 1 showed only the arrow before the waypoint, where a Direct To in LEG showed `D->`.
+  Not used for the 90B.
+
 # 9. Next steps
 
 Gathered from the baseline sessions (2026-10-03 to 2026-10-10) and grouped by area. A harness gap is built only when
