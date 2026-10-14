@@ -223,24 +223,79 @@ describe('waypoint alert without turn anticipation (4-9)', () => {
     });
 });
 
-// 3-29: Direct To a waypoint: the alert starts about 36 s before it. Turn anticipation is on (the default), but there is
-// no next leg to anticipate a turn onto, so the 36 s apply.
-describe('waypoint alert on a Direct To (3-29)', () => {
-    it('starts about 36 s before a Direct To waypoint outside the flight plan, with turn anticipation on', async () => {
+// #372: with turn anticipation on, a waypoint without a turn to anticipate alerts about 15 s before it, and the alert
+// ends once the waypoint is passed. Checked in the KLN 89 trainer, 2026-10-14: a Direct To outside the plan alerted 1.0 NM
+// out at 239 kt and 0.5 NM out at 121 kt (ETE :14 both times) and stopped at the waypoint; with turn anticipation off it
+// alerted 2.4 NM out at 239 kt (36 s). The guides give about 36 s for a Direct To (3-29) without this distinction; the
+// maintainer ruled for the measured 15 s. At 120 kt 15 s are 0.5 NM: off at 0.6 NM (18 s), on at 0.4 NM (12 s).
+describe('waypoint alert on a Direct To outside the flight plan (checked in the KLN 89 trainer, 2026-10-14)', () => {
+    /** A Direct To ABC from 5 NM before it, ABC not in any plan; the aircraft then held on the line to ABC at 120 kt */
+    async function directToAbc(turnAnticipation: boolean) {
         const {kaaa, abc} = standardRoute();
         const start = pointBefore(kaaa, abc, 5);
-        const unit = await bootUnit({facilities: [kaaa, abc], position: start});
+        const unit = await bootUnit({facilities: [kaaa, abc], position: start, storage: {turnAnticipation}});
         await settle(unit);
         await unit.panel.directTo('ABC');
         expect(nav(unit).activeWaypoint.isDctNavigation()).toBe(true); // Preconditions
         expect(activeIdent(unit)).toBe('ABC');
         expect(nav(unit).activeWaypoint.getActiveFplIdx()).toBe(-1);
-        const leg = courseDeg(start, abc);
+        const at = (nmBefore: number) => moveAircraft(unit, pointBefore(start, abc, nmBefore), {groundspeedKt: 120, trackTrue: courseDeg(start, abc)});
+        return {unit, abc, start, at};
+    }
 
-        await moveAircraft(unit, pointBefore(start, abc, 1.3), {groundspeedKt: 120, trackTrue: leg});
+    it('starts about 15 s before the waypoint with turn anticipation on (checked in the KLN 89 trainer, 2026-10-14, #372)', async () => {
+        const {unit, at} = await directToAbc(true);
+
+        await at(0.6);
         expect(nav(unit).waypointAlert).toBe(false);
 
-        await moveAircraft(unit, pointBefore(start, abc, 1.1), {groundspeedKt: 120, trackTrue: leg});
+        await at(0.4);
+        expect(nav(unit).waypointAlert).toBe(true);
+        // The WPT annunciator follows the alert (3-59); the 89 has no external output and showed only the arrow
+        expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(1);
+    });
+
+    it('ends once the waypoint is passed (checked in the KLN 89 trainer, 2026-10-14, #372)', async () => {
+        const {unit, abc, start, at} = await directToAbc(true);
+        await at(0.4);
+        expect(nav(unit).waypointAlert).toBe(true); // Precondition: the alert is on
+
+        // 0.2 NM past ABC, 6 s: inside 15 s of the waypoint, but behind it
+        await moveAircraft(unit, pointFrom(abc, finalCourseDeg(start, abc), 0.2), {groundspeedKt: 120, trackTrue: finalCourseDeg(start, abc)});
+        expect(activeIdent(unit)).toBe('ABC'); // nothing to sequence to
+        expect(nav(unit).toFrom).toBe(false); // FROM
+        expect(nav(unit).waypointAlert).toBe(false);
+        // The WPT annunciator follows the alert (3-59); the 89 has no external output and showed only the arrow
+        expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(0);
+    });
+
+    // 36 s at 120 kt are 1.2 NM: off at 1.3 NM (39 s), on at 1.1 NM (33 s)
+    it('starts about 36 s before the waypoint with turn anticipation off (checked in the KLN 89 trainer, 2026-10-14)', async () => {
+        const {unit, at} = await directToAbc(false);
+
+        await at(1.3);
+        expect(nav(unit).waypointAlert).toBe(false);
+
+        await at(1.1);
+        expect(nav(unit).waypointAlert).toBe(true);
+    });
+});
+
+// The last waypoint of FPL 0 has no turn to anticipate either and takes the same branch; the 89 was flown only toward a
+// waypoint followed by a copy of itself (see the #120 tests), so this case is a characterization of the same rule
+describe('waypoint alert at the last waypoint of FPL 0 with turn anticipation on (characterization)', () => {
+    it('starts about 15 s before the last waypoint (characterization, #372)', async () => {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootUnit({facilities: [kaaa, abc], position: pointBefore(kaaa, abc, 5), storage: savedFlightplan(0, [kaaa, abc])});
+        await settle(unit);
+        expect(activeIdent(unit)).toBe('ABC'); // Precondition: ABC is active and the last waypoint
+        expect(nav(unit).activeWaypoint.getActiveFplIdx()).toBe(1);
+        const leg = finalCourseDeg(kaaa, abc);
+
+        await moveAircraft(unit, pointBefore(kaaa, abc, 0.6), {groundspeedKt: 120, trackTrue: leg});
+        expect(nav(unit).waypointAlert).toBe(false);
+
+        await moveAircraft(unit, pointBefore(kaaa, abc, 0.4), {groundspeedKt: 120, trackTrue: leg});
         expect(nav(unit).waypointAlert).toBe(true);
     });
 });

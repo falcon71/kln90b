@@ -1,6 +1,6 @@
 import {CalcTickable, TICK_TIME_CALC} from "../../TickController";
 import {Sensors} from "../../Sensors";
-import {FROM, VolatileMemory} from "../VolatileMemory";
+import {FROM, TO, VolatileMemory} from "../VolatileMemory";
 import {GeoCircle, GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Degrees, NauticalMiles, Seconds} from "../Units";
@@ -16,6 +16,9 @@ import {TurnStackEntry} from "../flightplan/ActiveWaypoint";
 //4-8
 const WPT_ALERT_WITH_TURN_ANTI = 20;
 const WPT_ALERT_WITHOUT_TURN_ANTI = 36;
+//#372: a waypoint without a turn while turn anticipation is enabled. Checked in the KLN 89 trainer, 2026-10-14; the
+//guide gives 36 s for a Direct To (3-29) without this distinction
+const WPT_ALERT_NO_TURN_WITH_TURN_ANTI = 15;
 
 export const HOURS_TO_SECONDS = 3600;
 
@@ -240,8 +243,7 @@ export class NavCalculator implements CalcTickable {
 
 
             } else {
-                //The turn onto the last leg is still being flown after the sequencing, the alert stays on until it ends (as above)
-                nav.waypointAlert = nav.eteToActive! <= WPT_ALERT_WITHOUT_TURN_ANTI || nav.activeWaypoint.turnStack.length > 0;
+                nav.waypointAlert = this.isAlertWithoutTurn();
                 if (toLeg.fixType !== KLNFixType.MAP && nav.toFrom === FROM) {
                     nav.activeWaypoint.sequenceToNextWaypoint();
                     console.log("moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt());
@@ -252,6 +254,17 @@ export class NavCalculator implements CalcTickable {
         }
 
         this.setOutput();
+    }
+
+    /**
+     * The waypoint alert for a waypoint without a turn to anticipate: no following leg, a fly-over, a waypoint followed by
+     * a copy of itself, or turn anticipation off. It ends once the waypoint is passed (#372). The turn onto the last leg
+     * is still being flown after the sequencing, so the alert stays on until it ends (#156)
+     */
+    private isAlertWithoutTurn(): boolean {
+        const nav = this.memory.navPage;
+        const alertTime = this.turnAnticipation.get() ? WPT_ALERT_NO_TURN_WITH_TURN_ANTI : WPT_ALERT_WITHOUT_TURN_ANTI;
+        return (nav.toFrom === TO && nav.eteToActive! <= alertTime) || nav.activeWaypoint.turnStack.length > 0;
     }
 
     /**

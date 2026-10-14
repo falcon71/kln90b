@@ -8,8 +8,9 @@ import {angleBetween, courseDeg, distanceNm, pointBefore} from '../../harness/fl
 // #146: a Direct To a waypoint of FPL 0 that has a following leg is flown like the plan leg: the turn onto the next leg
 // is anticipated, the alert comes about 20 s before the turn (4-8), and the plan resumes after the waypoint (4-10).
 // Checked in the KLN 89 trainer, 2026-10-14: the DTK switched to the next leg 2.0 NM before the waypoint, the alert came
-// 22 to 23 s before that, and the next leg was a plan leg afterwards. A plain Direct To would alert about 36 s before
-// the waypoint and switch only there.
+// 22 to 23 s before that, and the next leg was a plan leg afterwards. A plain Direct To does not anticipate the turn
+// (after #372 it alerts about 15 s before the waypoint) and switches only there; the test tells the two apart by the
+// DTK switching while ABC is still active.
 describe('a Direct To a waypoint of FPL 0 with a following leg (#146)', () => {
     it('anticipates the turn onto the next leg and alerts about 20 s before it (checked in the KLN 89 trainer, 2026-10-14, #146)', async () => {
         const {kaaa, abc, kbbb} = standardRoute();
@@ -40,8 +41,8 @@ describe('a Direct To a waypoint of FPL 0 with a following leg (#146)', () => {
         const distAtTurnStart = distanceNm(flight.aircraft, abc);
         expect(distAtTurnStart).toBeGreaterThan(0.2);
         expect(distAtTurnStart).toBeLessThan(0.45);
-        // About 20 s before the turn (the 89: 22 to 23 s). A plain Direct To would have alerted 36 s before ABC, about
-        // 26 s before this turn start, so the upper bound excludes it
+        // About 20 s before the turn (the 89: 22 to 23 s). The test tells this apart from a plain Direct To by the DTK
+        // switching while ABC is still active (the activeIdent check and the distance bounds above), not by these bounds
         expect(alertOnAt).not.toBeNull();
         const alertLead = flight.t - alertOnAt!;
         expect(alertLead).toBeGreaterThan(15);

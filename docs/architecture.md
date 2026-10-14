@@ -415,7 +415,10 @@ sim.
     - If the turn is too tight, it sequences immediately ("like KLN 89 trainer", fix #76).
 - Without turn anticipation, it sequences on FROM.
 - **The MAP is never auto-sequenced.**
-- Waypoint alert thresholds: `WPT_ALERT_WITH_TURN_ANTI` / `WPT_ALERT_WITHOUT_TURN_ANTI = 36` s.
+- Waypoint alert thresholds: 20 s before an anticipated turn (`WPT_ALERT_WITH_TURN_ANTI`); before a waypoint without a
+  turn 15 s with turn anticipation on (`WPT_ALERT_NO_TURN_WITH_TURN_ANTI`, #372, measured in the KLN 89 trainer) or 36 s
+  with it off (`WPT_ALERT_WITHOUT_TURN_ANTI`). The alert of a waypoint without a turn ends once the waypoint is behind
+  (FROM), unless a turn is still being flown.
 - `MAX_BANK_ANGLE = 25`. `HOURS_TO_SECONDS` is exported from here and widely imported.
 
 **`ModeController`** (`services/ModeController.ts`, manual 5-36):
