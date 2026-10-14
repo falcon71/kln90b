@@ -200,8 +200,8 @@ describe('OBS to LEG (5-36)', () => {
         expect(Math.abs(nav.xtkToActive! - 2)).toBeLessThan(0.1);
     });
 
-    // 5-36 rule 1: the waypoint that was active in OBS stays active. switchToEnrLegMode looks it up by its ICAO
-    // (ActiveWaypoint.directTo), which finds the first copy in FPL 0
+    // 5-36 rule 1: the waypoint that was active in OBS stays active, and with a waypoint twice in FPL 0 that is the copy
+    // that was active, not the first one
     /** FPL 0 KAAA, ABC, KBBB, ABC, the second ABC active by a direct-to from FPL 0, then OBS */
     async function secondAbcInObs() {
         const unit = await bootUnit({
@@ -222,8 +222,8 @@ describe('OBS to LEG (5-36)', () => {
         return {unit, aw};
     }
 
-    // 5-36 rule 1: the sibling of the pin below; its setup holds and the switch back to LEG works
-    it('the pin setup: the second ABC of FPL 0 stays active in OBS, and LEG brings the unit back to ENR-LEG (the setup of #152)', async () => {
+    // 5-36 rule 1: the setup of the test below holds and the switch back to LEG works
+    it('the second ABC of FPL 0 stays active in OBS, and LEG brings the unit back to ENR-LEG (the setup of #152)', async () => {
         const {unit, aw} = await secondAbcInObs();
 
         await legMode(unit);
@@ -232,7 +232,9 @@ describe('OBS to LEG (5-36)', () => {
         expect(activeIdent(unit)).toBe('ABC');
     });
 
-    it.fails('keeps the second copy of a waypoint that is twice in FPL 0 active (#152)', async () => {
+    // 5-36 rule 1, the active waypoint stays; checked in the KLN 89 trainer, 2026-10-14 (the second copy stayed active
+    // through OBS and back)
+    it('keeps the second copy of a waypoint that is twice in FPL 0 active (#152)', async () => {
         const {unit, aw} = await secondAbcInObs();
 
         await legMode(unit);
@@ -311,8 +313,8 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
     });
 
     // 6-11 note and 6-19 note: after holding at a missed approach holding point that is also the FAF, switching to LEG
-    // makes the FAF active. This passes only because ActiveWaypoint.directTo takes the first copy of the waypoint, the
-    // lookup of #152: a fix of that pin that keeps the active copy turns this test red
+    // makes the FAF active: the MAHP copy goes to the FAF copy by the promotion of switchToEnrLegMode, while any other
+    // copy stays active (#152)
     it('makes the FAF copy active when the missed approach holding point is the FAF', async () => {
         const vvvPos = pointFrom(mapaa, 0, 5);
         const vvv = vor('VVV', vvvPos.lat, vvvPos.lon);
