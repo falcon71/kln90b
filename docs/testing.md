@@ -965,11 +965,11 @@ FAILR states are not modeled) and `FuelFieldset.tsx` 79.5.
   GPS-invalid path, LEG and OBS and the OBS synthetic waypoint, the ENR, ARM and APR scaling, the Direct To flows, the
   flight plan bounds, insert and delete and the duplicate waypoint cases. Flights cover the large turn, duplicate
   waypoints, the DME arc, the alert through a turn, the TO/FROM flag and the magnetic track. *Pins and
-  characterizations only:* roll steering (the #100 pins, by decision) and the XTK output filter (#158; its step
-  response is a unit test). *Untested:* the approach-scale cases and the APR cancel before the FAF (#162, #163; the
-  trainer shows neither ARM nor ACTV), the alert questions #146 and #147, ARM GPS APPROACH in a booted unit (only the
-  unit stage while #139 stands), the turn circle on a great-circle leg (only the arc case), and the nav-source gate and
-  a cold start in a flight (render tests hold both).
+  characterizations only:* roll steering (the #100 pins, by decision), the XTK output filter (#158; its step
+  response is a unit test), the return to ACTV after the GPS APR press before the FAF (#162) and the ACTV scale ramp
+  from the activation (#163); the last two are the maintainer's rulings, because the trainer shows neither ARM nor
+  ACTV. *Untested:* the alert questions #146 and #147, the turn circle on a great-circle leg (only the arc case), and
+  the nav-source gate and a cold start in a flight (render tests hold both).
 - **Navdata** (`data/navdata/`, `Gps.ts`). *Spec and characterization:* `KLNFacilityLoader` merging the user
   repository with the database and its user and temporary regions, the nearest lists (order, update interval, the
   selected entry dropping out (#39), the filters of #57 and SET 3), the scan list including its cache window (#40,
@@ -1220,6 +1220,33 @@ its line, in the comment above it or in the title of its `describe`.
   published variation, rounded to whole degrees (309 NM from ORD: 86 shown, the final bearing at the aircraft would
   give 90; 427 NM from RHI: 116 shown, the final bearing 122).
 
+**2026-10-14**
+- VNAV programmed to a waypoint after the active one (FPL 0 KORD, KUGN, KENW, KMKE, KENW, KUGN active, VNAV to KMKE),
+  then OBS: at the next VNAV recompute the state went inactive and the VNAV waypoint showed the active waypoint; no
+  message. Back in LEG the programmed waypoint did not return. The same with the descent already active; VNAV to the
+  active waypoint stayed active through OBS. The 89 recomputes VNAV only when an ALT 2 value is turned, so the cancel
+  was seen at a recompute: a LEG, OBS, LEG round trip without one kept VNAV to KMKE (#338).
+- ACTIVATE in OBS mode (D-> twice from FPL 0, then ENT) made the waypoint active, kept the course 045 and measured the
+  deviation through the new waypoint (Fly L 37.5 NM); a plain Direct To in OBS centered the needle and changed the
+  course (#154).
+- A waypoint twice in FPL 0 (KENW at rows 3 and 5): with the second copy active, both by a Direct To from FPL 0 and by
+  sequencing onto the leg KMKE - KENW, OBS and back to LEG kept the second copy active (#152).
+- LEG to OBS 100 NM before the end of a 136 NM leg (KMSN to a user waypoint), centered (0.02 NM): the deviation stayed
+  0.02 NM. The course shown was 097 against a DTK of 094 at the aircraft; setting 096, 097 and 098 by hand showed that
+  the unit held a fraction, about 097.5 (#151).
+- After a Direct To in OBS mode NAV 1 showed only the arrow before the waypoint, where a Direct To in LEG showed `D->`.
+  Not used for the 90B.
+- A Direct To in OBS mode to the same user waypoint about 100 NM away, from 5 NM north and 5 NM south of the old leg:
+  the needle was centered at once (`Fly 0.00nm`). The course set was the bearing from the aircraft to the waypoint
+  shown on NAV 1; setting the course by hand put the internal value at about 100.4 and 94.6, where the course of the
+  direct path at the waypoint would be about 1.6° more. No CRS message was seen (no external indicator; frames 0.9 s
+  apart) (#370).
+- In OBS mode the bearings to that user waypoint ran 3 to 4° above those shown in LEG mode at the same position,
+  consistent with the variation at the waypoint instead of at the aircraft (medium: the 89 shows no variation value).
+  This also accounts for the 097 against a DTK of 094 in the #151 check above (#371).
+- SET 1 ignored position changes of 1 to 5 NM (the entry showed for about a second, then reverted); changes of 28 NM
+  and more applied.
+
 # 9. Next steps
 
 Gathered from the baseline sessions (2026-10-03 to 2026-10-10) and grouped by area. A harness gap is built only when
@@ -1338,16 +1365,15 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 
 - **Approach arming** (the ARM and APR scale ramps), the waypoint alert without turn anticipation and the GPS-invalid
   path are held at the render stage, where a held position plus `moveAircraft` observes them; flights would only add the
-  motion. **ARM GPS APPROACH** is tested at the unit stage only (`PersistentMessages.test.ts`): while #139 stands the
-  unit re-arms within 30 NM on every tick, so ENR-LEG within 3 NM of the FAF is unreachable. Add a render test once #139
-  is fixed.
+  motion. **ARM GPS APPROACH** is tested at the unit stage (`PersistentMessages.test.ts`) and in a booted unit
+  (`ModeControllerApproach.test.ts`, with the approach disarmed by the pilot's press, #139).
 - **The flown-through bound of `dmeArc.test.ts` does not hold the arc reversal.** With `fromDtk` reversed on arc legs
   the monitor's bound north of the leg stays green (0.895 NM against a radius of 1.012 NM); only the circle-center
   assertion fails. A tighter bound, or a monitor on the arc's radius, would hold it twice.
 - The XTK expectations of `ModeController.test.ts`, `ModeControllerObs.test.ts` and `DirectToObs.test.ts` come from
   `crossTrackNm` and are exact, while their 0.05 NM tolerances date from an approximation. They could be tightened.
-- **Surviving mutations near past fixes:** the 2 NM condition of 6-3 (`ModeController.ts:354`, `> 20` survives); the
-  110° limit (`ModeController.ts:369`) is held only between 100° and 120°; a halved roll-in distance
+- **Surviving mutations near past fixes:** the 110° limit of `checkSwitchAprArmToActive` is held only between 100° and
+  120°; a halved roll-in distance
   (`NavCalculator.ts:190`) survives the lower bound of the DME arc flight; the flag copy of `addArcInfoIfPrevIsSame`
   (`SidStar.ts:455`) has no arc whose fix carries other flags; the two halves of the SET 3 hard-surface filter
   (`NearestList.ts:163` and `:191-198`) and the two polygon guards of the SUA alert (`AirspaceAlert.ts:109`,
@@ -1509,9 +1535,10 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       `HEADING_INPUT` in `RollSteeringController.test.ts` can bite once #143 is fixed.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): #146 (the alert time on a Direct To a
   waypoint of FPL 0 that has a following leg), #147 (a waypoint alert in OBS mode), duplicate idents on a waypoint page
-  (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 cannot be answered there, because
-  the trainer shows neither ARM nor ACTV; what the 90B shows on an empty MSG page (#325), the prompt while the MSG page
-  shows and an airport below sea level cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is
+  (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 are no open questions: the trainer
+  shows neither ARM nor ACTV, so the maintainer's rulings settle them and the tests hold them as characterizations.
+  What the 90B shows on an empty MSG page (#325), the prompt while the MSG page shows and an airport below sea level
+  cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is
   the question #326.
 - **Debug `console.log` calls** left in the code: `Apt3MapPage.tsx:30`, `TemporaryWaypointDeleter.ts:27` and `:32`,
   `WaypointPage.tsx:46` and `WaypointPage.getScrollSpeed`, `SupPage.tsx`, the constructors of the waypoint pages

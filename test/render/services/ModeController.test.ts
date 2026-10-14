@@ -6,7 +6,7 @@ import {airport, intersection} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {savedFlightplan} from '../../harness/storage';
-import {activeIdent, fplIdents} from '../../harness/readers';
+import {activeIdent, fplIdents, messageLines} from '../../harness/readers';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {crossTrackNm, pointBefore, pointFrom} from '../../harness/flight/geo';
 import {KLNFixType} from '../../../kln90b/data/flightplan/Flightplan';
@@ -69,9 +69,9 @@ describe('ModeController OBS course of 000', () => {
         expect(Math.abs(nav.xtkToActive! - crossTrackNm(position, abc, 77))).toBeLessThan(0.05);
     });
 
-    // 5-36: the OBS course is the one the indicator selects, 000 included. ModeController.setObs returns at once when the
-    // course equals navState.obsMag, which is 0 at start and after a switch to LEG, so the leg path stays in force.
-    it.fails('measures the deviation from an OBS course of 000 through the waypoint (#122)', async () => {
+    // 5-36: the OBS course is whatever the indicator selects, 000 included. Entering OBS lays the course even when its
+    // number equals the stored one, which is 0 at start and after a switch to LEG.
+    it('measures the deviation from an OBS course of 000 through the waypoint (#122)', async () => {
         const {unit, position} = await enterObsWithCourse(0);
         const nav = unit.props.memory.navPage;
 
@@ -184,36 +184,39 @@ describe('arming to approach active at the FAF (633fdad)', () => {
     });
 });
 
-// 6-3 lists a waypoint that is the IAF and the FAF at once as the active waypoint of the switch; 6-10 gives the example
-// where the unit switches to APR 2 NM from the IAF/FAF. ModeController.checkSwitchAprArmToActive returns unless the
-// active waypoint is typed FAF, but with such a fix the IAF copy is active during the last 2 NM (#129).
-describe('arming to approach active at a fix that is IAF and FAF (#129)', () => {
-    async function armedNearIafFaf() {
-        const kprc = airport('KPRC', 47.0, 8.0);
-        const mapaa = intersection('MAPAA', 47.0, 8.0);
-        const txoPos = pointFrom(kprc, 0, 5);
-        const txo = intersection('TXOAA', txoPos.lat, txoPos.lon);
-        const enrPos = pointFrom(txo, 0, 30);
-        const enraa = intersection('ENRAA', enrPos.lat, enrPos.lon);
-        const apt = withProcedures(kprc, {
-            approaches: [approach({
-                type: ApproachType.APPROACH_TYPE_VOR, runway: '18',
-                transitions: [{name: 'TXOAA', legs: [Leg.IF(txo, FixTypeFlags.IAF)]}],
-                final: [Leg.IF(txo, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
-            })],
-        });
-        const unit = await bootUnit({
-            facilities: [apt, enraa, txo, mapaa], position: pointFrom(txo, 0, 1.6),
-            panelXml: panelXml(APR_ARM_SWITCH),
-            storage: {...savedFlightplan(0, [enraa, apt]), turnAnticipation: false},
-        });
-        await settle(unit);
-        await unit.panel.loadProcedure('APT 8');
-        return {unit, txo};
-    }
+/** The approach to KPRC with a fix TXOAA that is IAF and FAF, `nmNorth` NM north of it, loaded in FPL 0 */
+async function iafFafWorld(nmNorth: number) {
+    const kprc = airport('KPRC', 47.0, 8.0);
+    const mapaa = intersection('MAPAA', 47.0, 8.0);
+    const txoPos = pointFrom(kprc, 0, 5);
+    const txo = intersection('TXOAA', txoPos.lat, txoPos.lon);
+    const enrPos = pointFrom(txo, 0, 30);
+    const enraa = intersection('ENRAA', enrPos.lat, enrPos.lon);
+    const apt = withProcedures(kprc, {
+        approaches: [approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '18',
+            transitions: [{name: 'TXOAA', legs: [Leg.IF(txo, FixTypeFlags.IAF)]}],
+            final: [Leg.IF(txo, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        })],
+    });
+    const unit = await bootUnit({
+        facilities: [apt, enraa, txo, mapaa], position: pointFrom(txo, 0, nmNorth),
+        panelXml: panelXml(APR_ARM_SWITCH),
+        storage: {...savedFlightplan(0, [enraa, apt]), turnAnticipation: false},
+    });
+    await settle(unit);
+    await unit.panel.loadProcedure('APT 8');
+    return {unit, txo};
+}
 
-    // The sibling of the pin: the setup works, the IAF copy is active and the unit stays armed 1.6 NM from the fix because the
-    // rest track of 0 points away from it
+// 6-3 lists a waypoint that is the IAF and the FAF at once as the active waypoint of the switch; 6-10 gives the example
+// where the unit switches to APR 2 NM from the IAF/FAF. With such a fix the IAF copy is active during the last 2 NM, and
+// ActiveWaypoint.getActiveFafLeg() lets it count as the FAF for the switch (#129).
+describe('arming to approach active at a fix that is IAF and FAF (#129)', () => {
+    const armedNearIafFaf = () => iafFafWorld(1.6);
+
+    // The setup: the IAF copy is active and the unit stays armed 1.6 NM from the fix because the rest track of 0 points
+    // away from it
     it('is armed with the IAF copy of the fix active at 1.6 NM from it, on a rest track that points away from the fix (6-3)', async () => {
         const {unit} = await armedNearIafFaf();
         const nav = unit.props.memory.navPage;
@@ -226,7 +229,7 @@ describe('arming to approach active at a fix that is IAF and FAF (#129)', () => 
         expect(unit.errors).toEqual([]);
     });
 
-    it.fails('switches to APR within 2 NM of the fix, heading toward it (#129)', async () => {
+    it('switches to APR within 2 NM of the fix, heading toward it (#129)', async () => {
         const {unit, txo} = await armedNearIafFaf();
         const nav = unit.props.memory.navPage;
 
@@ -234,5 +237,46 @@ describe('arming to approach active at a fix that is IAF and FAF (#129)', () => 
 
         expect(unit.props.sensors.in.gps.trackTrue).toBeCloseTo(180, 0);
         expect(nav.navmode).toBe(NavMode.APR_LEG);
+    });
+
+    // 6-3, 6-10: active at the IAF copy, the unit sequences over the zero-length IAF to FAF leg and on to the MAP, and the
+    // scale is 0.3 past the FAF
+    it('flies on in APR past the fix to the MAP at 0.3 (6-3, 6-10)', async () => {
+        const {unit, txo} = await armedNearIafFaf();
+        const nav = unit.props.memory.navPage;
+        await moveAircraft(unit, pointFrom(txo, 0, 1.55), {groundspeedKt: 120, trackTrue: 180});
+        expect(nav.navmode).toBe(NavMode.APR_LEG);
+
+        await moveAircraft(unit, pointFrom(txo, 0, 0.5), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(nav.xtkScale).toBeGreaterThan(0.3);
+        expect(nav.xtkScale).toBeLessThan(0.7); // On the ramp to 0.3, 0.5 NM before the fix
+
+        await moveAircraft(unit, pointFrom(txo, 180, 1), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(activeIdent(unit)).toBe('MAPAA');
+        expect(nav.navmode).toBe(NavMode.APR_LEG);
+        expect(nav.xtkScale).toBe(0.3);
+        expect(unit.errors).toEqual([]);
+    });
+});
+
+// B-1 (the reminder before the FAF, with the approach disarmed). That the IAF copy of a fix that is IAF and FAF is the
+// active waypoint on the way to the fix rests on the plan layout and the adjacency characterization of #153, not on B-1
+describe('ARM GPS APPROACH at a fix that is IAF and FAF (#369)', () => {
+    it('shows ARM GPS APPROACH 2.5 NM before the fix with the IAF copy active and the approach disarmed (reminder: B-1; IAF copy: characterization, #369)', async () => {
+        const {unit, txo} = await iafFafWorld(6);
+        const nav = unit.props.memory.navPage;
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(nav.navmode).toBe(NavMode.ARM_LEG); // 11 NM from KPRC: armed by itself
+        await unit.panel.press('KLN90B_ApprArm_Push');
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(nav.navmode).toBe(NavMode.ENR_LEG);
+
+        await moveAircraft(unit, pointFrom(txo, 0, 2.5), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(nav.activeWaypoint.getActiveLeg()!.fixType).toBe(KLNFixType.IAF);
+        expect(messageLines(unit)).toContainEqual(['ARM GPS APPROACH']);
     });
 });

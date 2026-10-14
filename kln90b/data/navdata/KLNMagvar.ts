@@ -2,7 +2,7 @@ import {Facility, FacilityType, FacilityUtils, LatLonInterface, MagVar, VorFacil
 import {Degrees} from "../Units";
 import {CalcTickable} from "../../TickController";
 import {Sensors} from "../../Sensors";
-import {NavPageState} from "../VolatileMemory";
+import {NavMode, NavPageState} from "../VolatileMemory";
 
 export class KLNMagvar implements CalcTickable {
 
@@ -15,10 +15,22 @@ export class KLNMagvar implements CalcTickable {
 
 
     /**
-     * 5-44
+     * 5-44: the variation is valid inside N 74 / S 60, and in OBS mode only while the active waypoint lies inside too
+     * (#190). The modes are compared directly; importing isObsMode would close an import cycle
      */
     public isMagvarValid() {
-        return this.lat <= 74 && this.lat >= -60;
+        if (!KLNMagvar.isInCoverage(this.lat)) {
+            return false;
+        }
+        if (this.navState.navmode === NavMode.ENR_OBS || this.navState.navmode === NavMode.ARM_OBS) {
+            const active = this.navState.activeWaypoint.getActiveWpt();
+            return active === null || KLNMagvar.isInCoverage(active.lat);
+        }
+        return true;
+    }
+
+    private static isInCoverage(lat: number): boolean {
+        return lat <= 74 && lat >= -60;
     }
 
     public trueToMag(tru: Degrees, magvar?: number): Degrees;

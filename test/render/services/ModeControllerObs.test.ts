@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {Facility, FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
+import {Facility, FixTypeFlags, FlightPlanLeg, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {standardRoute} from '../../harness/fixtures';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
@@ -42,7 +42,7 @@ describe('LEG to OBS (5-36)', () => {
 
     // The same with a magnetic variation, so that the unit must convert the true course it chooses to the magnetic OBS.
     // The OBS course is magnetic and the path true: at a variation of 0 a missing conversion cannot be seen. The course
-    // the unit chooses is the leg's DTK at the aircraft (its final course to within 0.2 degrees, 5 NM before the end) less the variation.
+    // the unit chooses is the leg's course at the active waypoint (its final course) less the variation (#151).
     describe('keeps a deviation of 2 NM and sets the magnetic OBS course', () => {
         /** ObsSource 0, 5 NM before the end of the leg KAAA - `end`, 2 NM right of it */
         async function twoNmRight(end: Facility, magvar: number | undefined) {
@@ -77,11 +77,12 @@ describe('LEG to OBS (5-36)', () => {
         });
     });
 
-    // 5-36 rule 2.ii. The unit takes the DTK at the aircraft as the OBS, but the OBS course is laid through the active
-    // waypoint, where the great circle of the leg has another course. 100 NM before the end of a 150 NM leg to the east
-    // at 47 N the two differ by about 1.8 degrees, so an aircraft on the leg gets a deviation of about 3.1 NM.
-    // Its passing sibling is the 2 NM test above (the same flow on a short leg); the preconditions here are the
-    // aircraft on the leg and the OBS mode entered, which the sibling below asserts without the final deviation
+    // 5-36 rule 2.ii. The OBS course is laid through the active waypoint, so the unit takes the leg's course at that
+    // waypoint, where the great circle of the leg has another course than at the aircraft. 100 NM before the end of a
+    // 150 NM leg to the east at 47 N the two differ by about 1.8 degrees: the DTK at the aircraft would give the
+    // aircraft a deviation of about 3.1 NM, the course at the waypoint keeps it on the leg.
+    // Its sibling is the 2 NM test above (the same flow on a short leg); the preconditions here are the aircraft on the
+    // leg and the OBS mode entered, which the sibling below asserts without the final deviation
     // (5-36 rule 1: the active waypoint stays)
     async function longLegInObs() {
         const start = airport('KAAA', 47.0, 8.0);
@@ -106,10 +107,60 @@ describe('LEG to OBS (5-36)', () => {
         expect(nav.activeWaypoint.isDctNavigation()).toBe(true);
     });
 
-    it.fails('keeps the deviation of an aircraft on a long leg, 100 NM before the waypoint (#151)', async () => {
+    // 5-36 rule 2.ii; checked in the KLN 89 trainer, 2026-10-14: 100 NM before the end of a 136 NM leg the deviation
+    // stayed 0.02 NM
+    it('keeps the deviation of an aircraft on a long leg, 100 NM before the waypoint (5-36, #151)', async () => {
         const {unit, nav} = await longLegInObs();
 
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.1);
+    });
+
+    // Robustness (characterization): the end fix of a DME arc is a database fix, and nothing puts it exactly on the arc
+    // circle that the unit builds from the VOR and the radius. Here ARCEN lies 30 m outside the 10 NM circle, on the 180
+    // radial; the aircraft is on the arc at the 190 radial. Entering OBS must not raise an error. The course is the
+    // arc's course at the end, 090 (the arc arrives at the 180 radial heading east); the wired APR switch arms the
+    // approach, so the mode is ARM-OBS. By hand, with the VOR at the origin and north up, the OBS line runs east-west
+    // through ARCEN, 10.0162 NM south of the VOR; the aircraft is 10 * cos(10 deg) = 9.848 NM south of the VOR, so it is
+    // 10.0162 - 9.848 = 0.168 NM from the line
+    it('enters OBS on a DME arc whose end fix lies 30 m off the arc circle without an error (characterization)', async () => {
+        const abc = vor('ABC', 47.3, 8.3);
+        const at = (bearing: number, nm: number) => pointFrom(abc, bearing, nm);
+        const arcbg = intersection('ARCBG', at(270, 10).lat, at(270, 10).lon);
+        const arcenPos = at(180, 10 + 30 / 1852);
+        const arcen = intersection('ARCEN', arcenPos.lat, arcenPos.lon);
+        const fafaa = intersection('FAFAA', 47.1, 8.7);
+        const mapaa = intersection('MAPAA', 47.0, 8.7);
+        const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
+            approaches: [approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{
+                    name: 'ARCBG', legs: [
+                        Leg.IF(arcbg, FixTypeFlags.IAF),
+                        Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: LegTurnDirection.Left}),
+                        Leg.TF(fafaa, FixTypeFlags.FAF),
+                    ],
+                }],
+                final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+            })],
+        });
+        const unit = await bootUnit({
+            facilities: [kprc, abc, arcbg, arcen, fafaa, mapaa], position: at(190, 10), panelXml: panelXml({...APR_ARM_SWITCH, ...NO_OBS}),
+            storage: savedFlightplan(0, [kprc]),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(activeIdent(unit)).toBe('ARCEN'); // Precondition: the arc is the active leg
+
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.errors).toEqual([]);
+        const nav = unit.props.memory.navPage;
+        expect(nav.navmode).toBe(NavMode.ARM_OBS);
+        expect(activeIdent(unit)).toBe('ARCEN');
+        expect(Math.abs(nav.obsMag - 90)).toBeLessThan(0.5);
+        expect(Math.abs(nav.xtkToActive!)).toBeCloseTo(0.168, 1);
     });
 
     // C-1: NO ACTV WPT when OBS is selected without an active waypoint; the mode stays
@@ -169,9 +220,9 @@ describe('OBS to LEG (5-36)', () => {
         return {unit, nav, position, foot};
     }
 
-    // The sibling of the pin below: its setup holds, and the switch itself works (5-36: the mode changes, a waypoint is
+    // The setup of the test below holds, and the switch itself works (5-36: the mode changes, a waypoint is
     // active)
-    it('the pin setup: OBS 050 to ABC, 10 NM past ABC, 2 NM right of ABC - KBBB, FROM (the setup of #155)', async () => {
+    it('OBS 050 to ABC, 10 NM past ABC, 2 NM right of ABC - KBBB, FROM (the setup of #155)', async () => {
         const {unit, nav} = await pastAbcInObs();
 
         expect(nav.activeWaypoint.getActiveFplIdx()).toBe(1);
@@ -180,15 +231,14 @@ describe('OBS to LEG (5-36)', () => {
         await legMode(unit);
 
         expect(nav.navmode).toBe(NavMode.ENR_LEG);
-        // The unit re-orients on FPL 0 and flies to the leg's waypoint, KBBB, today and under the fix of the pin
+        // The unit re-orients on FPL 0 and flies to the leg's waypoint, KBBB
         expect(activeIdent(unit)).toBe('KBBB');
     });
 
     // 5-36 rules 1 and 2: on the FROM side the unit re-orients on FPL 0, computes the DTK for the new leg, and the
-    // deviation from that leg is kept; checked in the KLN 89 trainer: the leg comes back with its deviation. The unit
-    // makes a direct-to from the present position to KBBB instead (ModeController.switchToEnrLegMode, FROM branch), so the
-    // plan leg is lost and the deviation is zero
-    it.fails('re-activates the plan leg ABC - KBBB instead of a direct-to from the present position (#155)', async () => {
+    // deviation from that leg is kept; checked in the KLN 89 trainer, 2026-10-06 (the plan leg came back with its DTK and
+    // its deviation, TO)
+    it('re-activates the plan leg ABC - KBBB instead of a direct-to from the present position (#155)', async () => {
         const {unit, nav, foot} = await pastAbcInObs();
 
         await legMode(unit);
@@ -200,8 +250,8 @@ describe('OBS to LEG (5-36)', () => {
         expect(Math.abs(nav.xtkToActive! - 2)).toBeLessThan(0.1);
     });
 
-    // 5-36 rule 1: the waypoint that was active in OBS stays active. switchToEnrLegMode looks it up by its ICAO
-    // (ActiveWaypoint.directTo), which finds the first copy in FPL 0
+    // 5-36 rule 1: the waypoint that was active in OBS stays active, and with a waypoint twice in FPL 0 that is the copy
+    // that was active, not the first one
     /** FPL 0 KAAA, ABC, KBBB, ABC, the second ABC active by a direct-to from FPL 0, then OBS */
     async function secondAbcInObs() {
         const unit = await bootUnit({
@@ -222,8 +272,8 @@ describe('OBS to LEG (5-36)', () => {
         return {unit, aw};
     }
 
-    // 5-36 rule 1: the sibling of the pin below; its setup holds and the switch back to LEG works
-    it('the pin setup: the second ABC of FPL 0 stays active in OBS, and LEG brings the unit back to ENR-LEG (the setup of #152)', async () => {
+    // 5-36 rule 1: the setup of the test below holds and the switch back to LEG works
+    it('the second ABC of FPL 0 stays active in OBS, and LEG brings the unit back to ENR-LEG (the setup of #152)', async () => {
         const {unit, aw} = await secondAbcInObs();
 
         await legMode(unit);
@@ -232,7 +282,9 @@ describe('OBS to LEG (5-36)', () => {
         expect(activeIdent(unit)).toBe('ABC');
     });
 
-    it.fails('keeps the second copy of a waypoint that is twice in FPL 0 active (#152)', async () => {
+    // 5-36 rule 1, the active waypoint stays; checked in the KLN 89 trainer, 2026-10-14 (the second copy stayed active
+    // through OBS and back)
+    it('keeps the second copy of a waypoint that is twice in FPL 0 active (#152)', async () => {
         const {unit, aw} = await secondAbcInObs();
 
         await legMode(unit);
@@ -277,8 +329,8 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
         return {unit, aw};
     }
 
-    // 5-36 and 6-11: the sibling of the pin below; its setup holds and the switch back to LEG works
-    it('the pin setup: the IAF copy is active in ARM-OBS, and LEG brings the unit to ARM-LEG with TXOAA active (the setup of #153)', async () => {
+    // 5-36 and 6-11: the setup of the test below holds and the switch back to LEG works
+    it('the IAF copy is active in ARM-OBS, and LEG brings the unit to ARM-LEG with TXOAA active (the setup of #153)', async () => {
         const {unit, aw} = await iafIsFafInObs();
 
         await legMode(unit);
@@ -287,9 +339,9 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
         expect(activeIdent(unit)).toBe('TXOAA');
     });
 
-    // 6-11 step 5: after the course reversal at an IAF that is also the FAF, switching to LEG makes the FAF active.
-    // Run as a plain it, the pin fails at the index assertion: expected 1 to be 2
-    it.fails('makes the FAF copy active when the IAF and the FAF are the same fix (#153)', async () => {
+    // 6-11 (the example procedure and its note): after the course reversal at a fix that is IAF and FAF, switching to
+    // LEG makes the FAF active
+    it('makes the FAF copy active when the IAF and the FAF are the same fix (#153)', async () => {
         const {unit, aw} = await iafIsFafInObs();
 
         await legMode(unit);
@@ -298,9 +350,21 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
         expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.FAF);
     });
 
+    // 6-11: LEG with the FAF active is what the approach needs to become active; 6-3: within 2 NM of the FAF, heading
+    // toward it, the unit goes ACTV
+    it('goes ACTV after the switch to LEG, within 2 NM of the fix and heading toward it (6-3, 6-11)', async () => {
+        const {unit, aw} = await iafIsFafInObs();
+        await legMode(unit);
+        expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.FAF);
+
+        await moveAircraft(unit, pointFrom(txo, 0, 1.5), {groundspeedKt: 120, trackTrue: 180});
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.APR_LEG);
+    });
+
     // 6-11 note and 6-19 note: after holding at a missed approach holding point that is also the FAF, switching to LEG
-    // makes the FAF active. This passes only because ActiveWaypoint.directTo takes the first copy of the waypoint, the
-    // lookup of #152: a fix of that pin that keeps the active copy turns this test red
+    // makes the FAF active: the MAHP copy goes to the FAF copy by the promotion of switchToEnrLegMode, while any other
+    // copy stays active (#152)
     it('makes the FAF copy active when the missed approach holding point is the FAF', async () => {
         const vvvPos = pointFrom(mapaa, 0, 5);
         const vvv = vor('VVV', vvvPos.lat, vvvPos.lon);
@@ -346,6 +410,74 @@ describe('OBS to LEG on an approach whose FAF is also the IAF or the missed appr
 
         expect(aw.getActiveFplIdx()).toBe(2);
         expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.FAF);
+    });
+});
+
+// The maintainer's adjacency ruling for #153 (characterization, no page): LEG promotes an IAF copy to the FAF only when
+// the FAF copy of the same fix follows it directly. Real procedure data has both shapes below, and in both the IAF copy
+// stays active
+describe('OBS to LEG with an IAF that is not directly followed by its own FAF (characterization)', () => {
+    const kprc = airport('KPRC', 47.0, 8.0);
+    const mapaa = intersection('MAPAA', 47.0, 8.0);
+    const txoPos = pointFrom(kprc, 0, 5);
+    const txo = intersection('TXOAA', txoPos.lat, txoPos.lon);
+    const othPos = pointFrom(txo, 90, 8);
+    const oth = intersection('OTHAA', othPos.lat, othPos.lon);
+    const enrPos = pointFrom(txo, 0, 30);
+    const enraa = intersection('ENRAA', enrPos.lat, enrPos.lon);
+
+    /** The approach is loaded behind ENRAA, the IAF copy is active, then OBS 180 */
+    async function iafInObs(transition: FlightPlanLeg[], final: FlightPlanLeg[], expectedPlan: string[]) {
+        const apt = withProcedures(kprc, {
+            approaches: [approach({
+                type: ApproachType.APPROACH_TYPE_VOR, runway: '18',
+                transitions: [{name: 'TXOAA', legs: transition}],
+                final,
+            })],
+        });
+        const unit = await bootUnit({
+            facilities: [apt, enraa, txo, oth, mapaa], position: pointFrom(txo, 0, 6),
+            panelXml: panelXml(APR_ARM_SWITCH),
+            storage: {...savedFlightplan(0, [enraa, apt]), turnAnticipation: false},
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        await vi.advanceTimersByTimeAsync(2000);
+        const aw = unit.props.memory.navPage.activeWaypoint;
+        expect(fplIdents(unit)).toEqual(expectedPlan);
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.IAF);
+        unit.env.sim.set('Nav OBS:1', 'degrees', 180);
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(aw.getActiveFplIdx()).toBe(1);
+        return {unit, aw};
+    }
+
+    it('keeps the IAF copy active when the FAF copy of the same fix is not the next leg', async () => {
+        const {unit, aw} = await iafInObs(
+            [Leg.IF(txo, FixTypeFlags.IAF), Leg.TF(oth)],
+            [Leg.IF(txo, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            ['ENRAA', 'TXOAA', 'OTHAA', 'TXOAA', 'MAPAA', 'KPRC'],
+        );
+
+        await legMode(unit);
+
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.IAF);
+    });
+
+    it('keeps the IAF copy active when the next leg is a FAF at another fix', async () => {
+        const {unit, aw} = await iafInObs(
+            [Leg.IF(txo, FixTypeFlags.IAF)],
+            [Leg.IF(txo), Leg.TF(oth, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            ['ENRAA', 'TXOAA', 'OTHAA', 'MAPAA', 'KPRC'],
+        );
+
+        await legMode(unit);
+
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.getActiveLeg()!.fixType).toBe(KLNFixType.IAF);
     });
 });
 

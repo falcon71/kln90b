@@ -5,7 +5,6 @@ import {
     Facility,
     FacilityType,
     FacilityUtils,
-    GeoCircle,
     GeoPoint,
     ICAO,
     LatLonInterface,
@@ -22,6 +21,8 @@ import {StatusLineMessageEvents} from "../controls/StatusLine";
 import {CalcTickable, TICK_TIME_CALC} from "../TickController";
 import {KLNMagvar} from "../data/navdata/KLNMagvar";
 
+const VEC3_CACHE = new Float64Array(3);
+
 /**
  * 5-36
  */
@@ -34,36 +35,33 @@ export class ModeController implements CalcTickable {
 
     public armApproachPressed() {
         let apt: AirportFacility | null;
+        this.navState.approachDisarmedLeg = null; //6-1: every press ends a disarm (#139)
         switch (this.navState.navmode) {
             case NavMode.ENR_LEG:
                 apt = this.getApproachApt();
                 if (apt === null) {
                     this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO APPROACH");
                 } else {
-                    this.navState.navmode = NavMode.ARM_LEG;
-                    if (UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(apt), UnitType.NMILE) <= 30) {
-                        this.navState.xtkScale = 1;
-                    }
+                    this.navState.navmode = NavMode.ARM_LEG; //6-1, 6-3: inside 30 NM the scale ramps to 1 (adjustXtkScaleArm)
                 }
                 break;
             case NavMode.ARM_LEG:
                 this.navState.navmode = NavMode.ENR_LEG;
                 this.navState.xtkScale = 5;
+                this.navState.approachDisarmedLeg = this.getFirstApproachLeg(); //6-1: disarmed until the next press (#139)
                 break;
             case NavMode.ENR_OBS:
                 apt = this.getApproachApt();
                 if (apt === null) {
                     this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO APPROACH");
                 } else {
-                    this.navState.navmode = NavMode.ARM_OBS;
-                    if (UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(apt), UnitType.NMILE) <= 30) {
-                        this.navState.xtkScale = 1;
-                    }
+                    this.navState.navmode = NavMode.ARM_OBS; //6-1, 6-3: inside 30 NM the scale ramps to 1 (adjustXtkScaleArm)
                 }
                 break;
             case NavMode.ARM_OBS:
                 this.navState.navmode = NavMode.ENR_OBS;
                 this.navState.xtkScale = 5;
+                this.navState.approachDisarmedLeg = this.getFirstApproachLeg(); //6-1: disarmed until the next press (#139)
                 break;
             case NavMode.APR_LEG:
                 this.navState.navmode = NavMode.ARM_LEG;
@@ -95,17 +93,41 @@ export class ModeController implements CalcTickable {
         this.navState.obsMag = 0;
         if (active !== null) {
             if (this.navState.toFrom === FROM && this.navState.activeWaypoint.getActiveFplIdx() !== -1) {
+                //5-36: on the FROM side the unit re-orients on FPL 0 and the leg found by position becomes active as a plan leg (#155)
                 this.navState.activeWaypoint.activateFpl0();
-                const from = UserFacilityUtils.createFromLatLon(ICAO.value("U", "XX", "", "d"), this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, true);
-                const to = this.reorientFlightplanLeg(this.sensors.in.gps.coords) ?? active;
-
-                this.navState.activeWaypoint.directTo(from, to);
             } else {
                 const fromCoords: LatLonInterface = this.navState.activeWaypoint.getFromWpt()!;
                 const from = UserFacilityUtils.createFromLatLon(ICAO.value("U", "XX", "", "d"), fromCoords.lat, fromCoords.lon, true);
-                this.navState.activeWaypoint.directTo(from, active);
+                const activeIdx = this.navState.activeWaypoint.getActiveFplIdx();
+                if (activeIdx >= 0) {
+                    const fafIdx = this.getFafCopyIdx(activeIdx);
+                    //5-36: the active copy stays active (#152); 6-11, 6-19: the FAF copy for an IAF or holding point that is the FAF
+                    this.navState.activeWaypoint.directToFlightplanIndex(from, fafIdx >= 0 ? fafIdx : activeIdx);
+                } else {
+                    this.navState.activeWaypoint.directTo(from, active);
+                }
             }
         }
+    }
+
+    /**
+     * 6-11: LEG makes the FAF active at an IAF that is also the FAF; 6-19: the same for a missed approach holding point
+     * that is the FAF. Returns the index of the FAF copy for such a leg at idx, -1 otherwise. Which IAF copies count is
+     * the maintainer's ruling for #153 (characterization): only an IAF copy directly followed by the FAF copy of the
+     * same fix; where other legs lie between the two copies, or the next FAF is another fix, the IAF copy stays active
+     */
+    private getFafCopyIdx(idx: number): number {
+        const legs = this.fpl0.getLegs();
+        const leg = legs[idx];
+        const next = legs[idx + 1];
+        if (leg.fixType === KLNFixType.IAF && next?.fixType === KLNFixType.FAF && ICAO.valueEquals(next.wpt.icaoStruct, leg.wpt.icaoStruct)) {
+            return idx + 1;
+        }
+        if (leg.fixType === KLNFixType.MAHP) {
+            //6-19: the missed approach holding point is also the FAF, which lies earlier in the plan
+            return legs.findIndex(l => l.fixType === KLNFixType.FAF && ICAO.valueEquals(l.wpt.icaoStruct, leg.wpt.icaoStruct));
+        }
+        return -1;
     }
 
     /**
@@ -145,8 +167,14 @@ export class ModeController implements CalcTickable {
 
     }
 
-    public setObs(obsMag: Degrees): void {
-        if (obsMag === this.navState.obsMag) {
+    /**
+     * Sets the OBS course and lays it through the active waypoint. An unchanged course is skipped unless force is set:
+     * the indicator is read every second (tick), and laying the same course again would make a new direct-to each time.
+     * Entering OBS and ACTIVATE force it, because the course must be laid even when its number did not change (5-36,
+     * 5-37; #122, #154)
+     */
+    public setObs(obsMag: Degrees, force: boolean = false): void {
+        if (!force && obsMag === this.navState.obsMag) {
             return;
         }
 
@@ -167,6 +195,16 @@ export class ModeController implements CalcTickable {
             this.navState.activeWaypoint.directTo(from, active);
         }
 
+    }
+
+    /**
+     * A course set on the unit: MOD 2, NAV 3, Super NAV 5, a Direct To in OBS, and the course the unit chooses on entering
+     * OBS with a driven indicator. 5-35, 5-37: a driven indicator is slewed to it, so the output is written at once;
+     * otherwise the indicator's old course is read back at the next tick and replaces it (#261)
+     */
+    public setObsOnUnit(obsMag: Degrees, force: boolean = false): void {
+        this.setObs(obsMag, force);
+        this.sensors.out.setObs(this.navState.obsMag);
     }
 
     public isObsModeActive(): boolean {
@@ -198,6 +236,9 @@ export class ModeController implements CalcTickable {
     }
 
     public getMagvarForObs(wpt: Facility | null) {
+        if (!this.magvar.isMagvarValid()) {
+            return this.magvar.getCurrentMagvar(); //5-44: true north (or the variation entered on SET 2), also for a VOR (#190)
+        }
         if (wpt !== null && FacilityUtils.isFacilityType(wpt, FacilityType.VOR)) {
             return -(wpt as VorFacility).magneticVariation; //Seems to be opposite to the magvar service
         }
@@ -218,12 +259,19 @@ export class ModeController implements CalcTickable {
         }
 
         if (this.sensors.in.obsMag !== null && this.planeSettings.output.obsTarget === 0) {
-            this.setObs(this.sensors.in.obsMag);
+            this.setObs(this.sensors.in.obsMag, true);
         } else if (active !== null) {
-            const obsTrue = this.navState.desiredTrack ?? this.navState.bearingToActive!; //Null when TO and FROM are the same waypoint
+            //5-36: the course of the current path at the active waypoint, so that the course laid through it is the leg
+            //itself and the deviation is kept on any leg length (#151). A degenerate path (TO and FROM the same
+            //waypoint, #67) falls back to the DTK or the bearing. The waypoint is taken to its closest point on the
+            //path first: the end fix of a DME arc is a database fix and need not lie on the arc circle, and bearingAt
+            //throws for a point off the circle (as in NavCalculator)
+            const fromPath = this.navState.activeWaypoint.getFromLeg()?.path;
+            const pathCourse = fromPath !== undefined && fromPath.isValid() ? fromPath.bearingAt(fromPath.closest(active, VEC3_CACHE)) : NaN;
+            const obsTrue = isNaN(pathCourse) ? (this.navState.desiredTrack ?? this.navState.bearingToActive!) : pathCourse;
 
             const magvar = this.getMagvarForObs(active);
-            this.setObs(this.magvar.trueToMag(obsTrue, magvar));
+            this.setObsOnUnit(this.magvar.trueToMag(obsTrue, magvar), true);
         }
     }
 
@@ -280,34 +328,14 @@ export class ModeController implements CalcTickable {
         }
     }
 
-    private reorientFlightplanLeg(pos: LatLonInterface): Facility | null {
-        const legs = this.fpl0.getLegs();
-        if (legs.length < 2) {
-            return null;
-        }
-
-        const circle = new GeoCircle(new Float64Array(3), 0);
-        const tempGeoPoint = new GeoPoint(0, 0);
-        let distMin = 99999; //This is GA Radians!
-        let closestLeg: Facility | null = null;
-        for (let i = 1; i < legs.length; i++) {
-            const from = legs[i - 1].wpt;
-            const to = legs[i].wpt;
-            tempGeoPoint.set(from);
-            const distFromTo = tempGeoPoint.distance(to);
-            const path = circle.setAsGreatCircle(from, to);
-            path.closest(pos, tempGeoPoint);
-            const distFromClosest = tempGeoPoint.distance(from); //We use this to check, if closest is between from and to
-            const distClosestWpt = tempGeoPoint.distance(pos);
-            if (distFromClosest <= distFromTo && distClosestWpt < distMin) {
-                closestLeg = to;
-                distMin = distClosestWpt;
-            }
-        }
-        return closestLeg;
-    }
-
     private checkSwitchEnrToArmMode(apt: AirportFacility | null): void {
+        const disarmed = this.navState.approachDisarmedLeg;
+        if (disarmed !== null) {
+            if (disarmed === this.getFirstApproachLeg()) {
+                return; //6-1: the pilot disarmed this approach (#139)
+            }
+            this.navState.approachDisarmedLeg = null; //The approach was removed, replaced or loaded again
+        }
         if (apt !== null && UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(apt), UnitType.NMILE) <= 30) {
             console.log("Moving to Arm mode");
             this.navState.navmode = this.navState.navmode === NavMode.ENR_OBS ? NavMode.ARM_OBS : NavMode.ARM_LEG;
@@ -331,14 +359,17 @@ export class ModeController implements CalcTickable {
             return;
         }
 
-        const faf = this.navState.activeWaypoint.getActiveLeg();
-        if (faf?.fixType !== KLNFixType.FAF) {
+        const faf = this.navState.activeWaypoint.getActiveFafLeg();
+        if (faf === null) {
             this.navState.xtkScale = 0.3;
             return; //We moved on the MAP already
         }
 
         const dist = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(faf.wpt), UnitType.NMILE);
-        this.navState.xtkScale = dist * 0.35 + 0.3;  //Scale reaches 0.3 at 0 distance
+        //From the scale at the activation to 0.3 at the FAF over the distance left at the activation, so a late switch
+        //compresses the change (6-11); never above 1 when moving back out (#163)
+        const ratio = this.navState.aprActivationDist > 0 ? dist / this.navState.aprActivationDist : 0;
+        this.navState.xtkScale = Math.min(0.3 + (this.navState.aprActivationScale - 0.3) * ratio, 1);
     }
 
     private checkSwitchAprArmToActive(): void {
@@ -346,12 +377,13 @@ export class ModeController implements CalcTickable {
             return; //No transition for OBS
         }
 
-        const faf = this.navState.activeWaypoint.getActiveLeg();
-        if (faf?.fixType !== KLNFixType.FAF) {
-            return; //Only when FAF is active
+        const faf = this.navState.activeWaypoint.getActiveFafLeg();
+        if (faf === null) {
+            return; //6-3: only with the FAF active, or the IAF copy of a fix that is IAF and FAF (#129)
         }
 
-        if (UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(faf.wpt), UnitType.NMILE) > 2) {
+        const fafDist = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(faf.wpt), UnitType.NMILE);
+        if (fafDist > 2) {
             return; //Within 2 NM
         }
 
@@ -372,6 +404,8 @@ export class ModeController implements CalcTickable {
 
         console.log("Moving to Apr mode");
         //If all this has passed, we switch to approach active
+        this.navState.aprActivationDist = fafDist;
+        this.navState.aprActivationScale = Math.min(this.navState.xtkScale, 1);
         this.navState.navmode = NavMode.APR_LEG;
     }
 
@@ -380,7 +414,11 @@ export class ModeController implements CalcTickable {
      * If there is an approach in the Flightplan, then this will return the corresponding airport. Null otherwise
      */
     private getApproachApt(): AirportFacility | null {
-        return this.fpl0.getLegs().find(leg => leg.type === KLNLegType.APP)?.parentFacility ?? null;
+        return this.getFirstApproachLeg()?.parentFacility ?? null;
+    }
+
+    private getFirstApproachLeg(): KLNFlightplanLeg | null {
+        return this.fpl0.getLegs().find(leg => leg.type === KLNLegType.APP) ?? null;
     }
 
     /**

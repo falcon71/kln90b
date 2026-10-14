@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
-import {airport} from '../../../harness/navdata/builders';
+import {airport, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {NO_OBS, panelXml} from '../../../harness/panelXml';
 import {activeIdent, messages} from '../../../harness/readers';
@@ -95,7 +95,7 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
         return unit;
     }
 
-    // The passing sibling of the pins below: it holds their setup, and in Leg mode the message stays away
+    // The counterpart of the OBS tests below: in Leg mode, with the aircraft inside the area, the message stays away
     it('does not show the message in Leg mode, with the aircraft inside the area (5-44)', async () => {
         const unit = await toKfar();
 
@@ -105,8 +105,8 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
         expect(messages(unit)).toContain('POSITION DIFFERS FROM LAST POSITION BY >2NM');
     });
 
-    // The setup of the pins below, held where it passes: the unit enters OBS mode on the leg to KFAR (characterization)
-    it('switches to OBS mode with KFAR active (characterization, setup of #190)', async () => {
+    // The unit enters OBS mode on the leg to KFAR, which runs due north (characterization)
+    it('switches to OBS mode with KFAR active (characterization, #190)', async () => {
         const unit = await toKfar();
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
@@ -117,7 +117,9 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
         expect(finalCourseDeg(kaaa, kfar)).toBeCloseTo(0, 5); // The leg runs due north
     });
 
-    it.fails('shows MAGNETIC VAR INVALID in OBS mode (5-44, #190)', async () => {
+    // 5-44: in OBS mode with the active waypoint outside the area the unit shows the message, although the aircraft is
+    // still inside it
+    it('shows MAGNETIC VAR INVALID in OBS mode (5-44, #190)', async () => {
         const unit = await toKfar();
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
@@ -127,11 +129,28 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
 
     // ObsSource 0: the unit chooses the OBS course itself, the DTK (000 true). Referenced to true north it is 000, not
     // 350 (000 less 10 E)
-    it.fails('chooses the OBS course referenced to true north (5-44, #190)', async () => {
+    it('chooses the OBS course referenced to true north (5-44, #190)', async () => {
         const unit = await toKfar();
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
 
+        expect(unit.props.memory.navPage.obsMag).toBeCloseTo(0, 1);
+    });
+
+    // 5-44: in OBS mode with the active waypoint outside the area the unit references to true north; this holds for an
+    // active VOR too, although 5-35 has an active VOR use its own variation inside the area (the maintainer's reading of
+    // the two pages for #190). VFAR at N 75 has a published variation of 10 E (the sim stores east as negative)
+    it('references an active VOR outside the area to true north too (5-44, #190)', async () => {
+        const vfar = vor('VFAR', 75.0, 8.0, {magneticVariation: -10});
+        const unit = await bootUnit({
+            facilities: [kaaa, vfar], position: {lat: 73.5, lon: 8.0}, magvar: 10, panelXml: OBS_SOURCE_OFF,
+            storage: savedFlightplan(0, [kaaa, vfar]),
+        });
+        await settle(unit);
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(activeIdent(unit)).toBe('VFAR');
         expect(unit.props.memory.navPage.obsMag).toBeCloseTo(0, 1);
     });
 });

@@ -5,7 +5,7 @@ import {standardRoute} from '../../../harness/fixtures';
 import {NO_OBS, panelXml} from '../../../harness/panelXml';
 import {activeIdent, fplIdents} from '../../../harness/readers';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
-import {vor} from '../../../harness/navdata/builders';
+import {intersection, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 import {courseDeg, crossTrackNm, pointBefore, pointFrom} from '../../../harness/flight/geo';
@@ -65,9 +65,9 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
         return {unit, nav: unit.props.memory.navPage, expected};
     }
 
-    // 5-37 (5.9.7) step 2: the sibling of the pin below. The same flow makes KBBB active and keeps the mode, so the pin
-    // fails only on the deviation
-    it('the pin setup: ACTIVATE with OBS 050 makes KBBB active and keeps ENR-OBS (the setup of #154)', async () => {
+    // 5-37 (5.9.7) step 2: the setup of the test below. The same flow makes KBBB active and keeps the mode, so the test
+    // below depends only on the deviation
+    it('ACTIVATE with OBS 050 makes KBBB active and keeps ENR-OBS (the setup of #154)', async () => {
         const {unit, nav} = await activateKbbbOnCourse50();
 
         expect(activeIdent(unit)).toBe('KBBB');
@@ -75,10 +75,9 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
         expect(nav.obsMag).toBe(50);
     });
 
-    // 5-37 (5.9.7) step 3: the D-bar is not recentered, the deviation is from the 050 course through KBBB. DirectToPage
-    // makes a direct-to from the present position and then calls setObs with the unchanged course, which returns early
-    // (ModeController.setObs), so the direct-to path stays and the deviation is zero
-    it.fails('does not recenter the deviation: it is measured from the OBS course through the new waypoint (#154)', async () => {
+    // 5-37 (5.9.7) step 3: the D-bar is not recentered, the deviation is from the 050 course through KBBB; checked in the
+    // KLN 89 trainer, 2026-10-14 (course 045 kept, Fly L 37.5 NM after ACTIVATE)
+    it('does not recenter the deviation: it is measured from the OBS course through the new waypoint (#154)', async () => {
         const {nav, expected} = await activateKbbbOnCourse50();
 
         expect(Math.abs(nav.xtkToActive! - expected)).toBeLessThan(0.05);
@@ -108,6 +107,49 @@ describe('Direct To in OBS mode (5-37)', () => {
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
     });
 
+    /**
+     * FPL 0 KAAA - EEE, EEE 150 NM east of KAAA. The aircraft is 100 NM before EEE and 5 NM north of the leg. In OBS mode
+     * (ObsSource 0, so that the course is the unit's own), D-> EEE and ENT, then 1 s.
+     */
+    async function longDirectToEee() {
+        const eeePos = pointFrom(kaaa, 90, 150);
+        const eee = intersection('EEE', eeePos.lat, eeePos.lon);
+        const onLeg = pointBefore(kaaa, eee, 100);
+        const position = pointFrom(onLeg, courseDeg(onLeg, eee) - 90, 5);
+        const unit = await bootUnit({facilities: [kaaa, eee], position, panelXml: panelXml(NO_OBS), storage: savedFlightplan(0, [kaaa, eee])});
+        await settle(unit);
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(2000);
+        const nav = unit.props.memory.navPage;
+        expect(nav.navmode).toBe(NavMode.ENR_OBS);
+
+        await unit.panel.selectPage('R', 'CTR 1'); // So DCT pre-fills the active waypoint (3-27 rule 4)
+        await unit.panel.dct();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+        return {unit, nav};
+    }
+
+    // 5-37 (5.9.6): the setup of the test below. The direct-to makes EEE active as a direct-to and keeps ENR-OBS
+    it('makes EEE active as a direct-to and keeps ENR-OBS on a long direct course (the setup of #370)', async () => {
+        const {unit, nav} = await longDirectToEee();
+
+        expect(activeIdent(unit)).toBe('EEE');
+        expect(nav.activeWaypoint.isDctNavigation()).toBe(true);
+        expect(nav.navmode).toBe(NavMode.ENR_OBS);
+    });
+
+    // 5-37 (5.9.6): the direct-to selects the OBS that leads from the present position to the waypoint and centers the
+    // deviation. #370: on a long direct course the unit sets the course at the aircraft but measures the deviation from
+    // the course through the waypoint; the direct path crosses the meridians, so its course at EEE (095.54 true here) is
+    // not the one at the aircraft (093.76 true, the obsMag shown is about 093.75), and the deviation reads about -3.11 NM
+    // instead of 0. The issue quotes 091.09 and 092.87 for its own variation; the -3.11 NM is the same
+    it.fails('centers the deviation after a long Direct To in OBS mode (5-37, #370)', async () => {
+        const {nav} = await longDirectToEee();
+
+        expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.1);
+    });
+
     // 5-37 (5.9.6) and C-1: on a non-driven indicator that shows the unit, the status line tells the course to set
     it('shows CRS with the direct course when the unit reads a non-driven indicator', async () => {
         const unit = await planInObs(offLeg, {obs: 50, abc: abcE});
@@ -132,6 +174,23 @@ describe('Direct To in OBS mode (5-37)', () => {
         expect(Screen.read().status().mode).not.toMatch(/CRS/);
         const vor1 = unit.env.sim.keyEvents.filter(k => k.name === 'K:VOR1_SET');
         expect(Math.abs(vor1[vor1.length - 1].value - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.5); // 024 magnetic
+    });
+
+    // 5-37 (5.9.6): with an indicator the unit reads and drives (ObsSource 1, ObsTarget 1) the direct course is set and
+    // the indicator slewed to it; the indicator's old course (120) must not come back at the next tick (#261)
+    it('keeps the direct course and slews an indicator it reads and drives (5-37, #261)', async () => {
+        const unit = await planInObs(offLeg, {obs: 120, panelXml: panelXml({'Output.ObsTarget': 1}), abc: abcE});
+        unit.env.sim.applyObsKeyEvents = true;
+        const nav = unit.props.memory.navPage;
+        await unit.panel.selectPage('R', 'CTR 1');
+
+        await unit.panel.dct();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Math.abs(nav.obsMag - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.2 magnetic
+        expect(Math.abs(unit.env.sim.get('Nav OBS:1', 'degrees') - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.5);
+        expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
     });
 });
 

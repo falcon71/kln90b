@@ -269,12 +269,10 @@ describe('Vnav states', () => {
         expect(vnav.isValidVnavWpt(vor('ABC', 47.2, 8.2))).toBe(false);
     });
 
-    // characterization: Nav4Page calls armVnav on every display tick while the cursor is over ANGLE, and armVnav
-    // re-arms an active VNAV from the present altitude. 29 NM before the target the path is at 7437.5 ft; an aircraft
-    // 437 ft below it, at 7000 ft, needs 5100 / tan(1.8 deg) = 26.71 NM, so VNAV goes back to armed with 2.29 NM to go.
-    // The KLN 89 trainer kept an active VNAV when the cursor came onto its VS field, so the 90B may differ from the real
-    // unit here; the question is filed, and this test pins only what the code does today.
-    it('re-arms an active descent from the present altitude when armVnav runs again (characterization)', () => {
+    // The maintainer's ruling on #194: Nav4Page calls armVnav on every display tick while the cursor is over ANGLE, and an
+    // active VNAV keeps its path. 29 NM before the target the path is at 7437.5 ft; the aircraft at 7000 ft is 437 ft
+    // below it, where a new arming would wait 2.29 NM for the path (characterization, #194)
+    it('keeps an active descent when armVnav runs again below the path (characterization, #194)', () => {
         let ind = 7500;
         const {vnav, nav} = dct({distToActive: 31, ind: 7500, offset: 2, angle: -1.8});
         // Reaches the private sensors of Vnav: vnavFor builds the sensors from a fixed altitude and the test changes it
@@ -284,9 +282,11 @@ describe('Vnav states', () => {
         expect(vnav.state).toBe(VnavState.Active);
         ind = 7000;
         nav.distToActive = 31;
+
         vnav.armVnav();
-        expect(vnav.state).toBe(VnavState.Armed);
-        expect(vnav.timeToVnav).toBeCloseTo(51.5, 0);
+
+        expect(vnav.state).toBe(VnavState.Active);
+        expect(nav.nav4VnavAngle).toBe(-1.8);
     });
 
     // characterization: a change of SEL, FR, the waypoint or the offset on NAV 4 disarms (Nav4Page calls disarmVnav),

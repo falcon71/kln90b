@@ -421,12 +421,19 @@ sim.
 - Modes are `NavMode {ENR_LEG, ENR_OBS, ARM_LEG, ARM_OBS, APR_LEG}`, stored in `navPage.navmode`. `navPage.xtkScale` is
   5 (ENR), 1 (ARM) or 0.3 (APR).
 - Auto-arm happens within 30 NM of the approach airport (the `parentFacility` of the first APP leg). The scale ramps 5
-  to 1 over 30 s.
-- ARM becomes APR when the FAF is active, within 2 NM, the MAP is ahead and the track is within 110 deg of FAF to MAP.
-  APR becomes 0.3 at the FAF ("Integrity check?" is a TODO; there is no RAIM).
+  to 1 over 30 s, also when the pilot arms with the GPS APR switch inside 30 NM. A press while armed disarms: the
+  first APP leg is kept in `navPage.approachDisarmedLeg`, and the auto-arm skips that approach until the next press,
+  or until the legs are another object (the approach was removed, replaced or loaded again). A power-up clears it.
+- ARM becomes APR when the FAF is active (or the IAF copy of a fix that is IAF and FAF, `ActiveWaypoint.getActiveFafLeg()`),
+  within 2 NM, the MAP is ahead and the track is within 110 deg of FAF to MAP. APR becomes 0.3 at the FAF ("Integrity
+  check?" is a TODO; there is no RAIM). In APR the scale ramps from its value at the activation to 0.3 over the distance
+  to the FAF left at the activation (capped at 1); both values are kept in `navPage.aprActivationScale` and
+  `navPage.aprActivationDist`.
 - `armApproachPressed()` is triggered from MainPage on `EVT_APPR_ARM`.
 - **OBS mode is implemented as a direct-to from a synthetic user facility (`ICAO.value("U","XX",...)`) 1000 NM away on
-  the reciprocal of the OBS** (`setObs`).
+  the reciprocal of the OBS** (`setObs`). `setObs` skips an unchanged course unless `force` is set (entering OBS and
+  ACTIVATE force it). A course set on the unit (MOD 2, NAV 3, a Direct To in OBS) goes through `setObsOnUnit`, which
+  also writes it to a driven indicator at once; otherwise the 1 Hz read-back of the indicator would replace it.
 - For OBS on VORs, the magnetic variation is taken from the VOR's `magneticVariation`, negated ("Seems to be opposite to
   the magvar service").
 - Status-line feedback: `NO APPROACH`, `NO ACTV WPT`.
@@ -443,7 +450,9 @@ only with `writeGPSSimVars`, `GPS COURSE TO STEER`.
 **`KLNMagvar`** (`data/navdata/KLNMagvar.ts`):
 
 - Uses `MagVar.get(coords)` between 74°N and 60°S (5-44). Outside that band it uses the pilot-entered
-  `navPage.userMagvar`, which resets to 0 when re-entering coverage.
+  `navPage.userMagvar`, which resets to 0 when re-entering coverage. In OBS mode the active waypoint must lie inside
+  the band too (5-44, #190): otherwise the variation counts as invalid, and `getMagvarForObs` references the OBS course
+  to true north (or the variation entered on SET 2), also for an active VOR.
 - Convention: DTK and bearings are stored **true**; `obsMag` and `getDtkOrObsMagnetic()` are magnetic, and the names say
   which.
 
