@@ -266,3 +266,40 @@ afterwards)
   (seen in the morning check of the same day) (#311).
 - The first character of a remark line does offer a blank, after the hyphen: Z, 0 to 9, -, blank, A. The first
   clockwise click on a remark line clears it to A followed by blanks.
+
+**2026-10-15** (night; agent checks of milestone 5 on both trainers; the 89's FPL 0 was restored afterwards)
+- Every approach of the demo database (KMSN, KUGN, KMDZ, KMKE) lists four waypoints with the suffixes of the IAF, FAF,
+  MAP and MAHP, the MAHP last; the APT 8 preview and FPL 0 agree. The holding point is listed once. Where the MAP is the
+  navaid itself, that fix is listed twice, as the MAP and again as the MAHP (`MSNm`, then `MSNh`); where the MAP is a
+  runway fix, the holding point follows it once. FPL 0 shows a `*NO WPT SEQ` row between the MAP and the MAHP (#220).
+- With an approach in FPL 0, loading another approach, the same approach again, or an approach to an airport that is not
+  in FPL 0 asks first whether to replace the existing approach, with APPROVE? flashing; for the other airport this is
+  the only question. CLR goes back to the waypoint preview with the cursor on its add choice and leaves the approach in
+  place; ENT replaces it and shows FPL 0 with the cursor off. Loading the first approach asks nothing (#274).
+- APT 7 asks the same before replacing a STAR, also for the same STAR with another runway, with APPROVE? flashing; CLR
+  goes back to the preview, ENT replaces the STAR and drops the waypoints that had been inserted into the old one. A STAR
+  loaded while FPL 0 holds an approach asks nothing. The demo database has no SID (#274).
+- FPL 0 holds 20 en-route waypoints and 35 in total with procedures, both limits applying on their own. An approach and
+  a STAR loaded onto 20 en-route waypoints come on top, without a question and without deleting anything. A waypoint
+  inserted in front of a STAR row opens at once with the `.` separator and counts only toward the 35; in front of an
+  approach row the unit answers that the add is invalid. When an addition would pass either limit (an en-route insert
+  at 20, a STAR insert at 35), the first inner-knob click, before any ident, asks to delete one waypoint to make room;
+  ENT deletes waypoint 1 and opens the insert row, CLR cancels with the plan unchanged; one question per waypoint. No
+  single procedure load in the database passes 35, so a load that needs room was not seen (#221, #222, #380).
+- The third-party AVsoftech KLN 90B trainer, which is unreliable:
+  - CTR 1 and CTR 2 go back to PRESS ENT TO COMPUTE CTR WPTS when the left page turns to another plan and back, and at
+    once when a waypoint is deleted from the plan while CTR 1 offers the insertion; turning only the right page away and
+    back keeps the computation. It never inserted a Center waypoint computed for an older plan (#301, #348).
+  - Its approach replace question reads `PRESS ENT / TO REPLACE / EXISTING / APPROACH / APPROVE?` under the approach
+    name, and the STAR one the same with `STAR`; both are asked for the same procedure too. CLR on the approach question
+    returns to the preview with the cursor on LOAD IN FPL; ENT replaces it, FPL 0 stays on the left and the approach
+    list comes back on the right with the cursor off. With FPL 0 holding an approach to another airport, the replace
+    question was the only one. Its STAR question's CLR went to an empty transition page, and the replaced STAR's
+    inserted waypoint stayed as an en-route waypoint; neither is used (#274).
+  - An approach whose airport is not in a full FPL 0 of 30 asks, after the add or replace question, on the left page
+    to delete waypoint 1 to make room, with CONTINUE?; the approach then comes on top (rows up to 35). It offered
+    waypoint 1 even while it was the from waypoint of the active leg, and once moved a Direct To to another waypoint;
+    both are taken for faults of that trainer. A STAR counted toward 30 there and was refused with FPL FULL; an insert
+    into a full FPL 0 asked the same delete question on the first inner-knob click and then deleted two waypoints for
+    one insert. These are not used either; the 89's two limits are (#221, #380).
+  - The APT 8 previews end with one waypoint marked as the MAHP (#220).
