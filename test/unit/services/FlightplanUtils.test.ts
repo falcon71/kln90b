@@ -5,7 +5,7 @@ import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from '../../../kln
 import {NavPageState} from '../../../kln90b/data/VolatileMemory';
 import {KLN90BUserSettings} from '../../../kln90b/settings/KLN90BUserSettings';
 import {Sensors} from '../../../kln90b/Sensors';
-import {calcDistToDestination, insertLegIntoFpl, roomSteps} from '../../../kln90b/services/FlightplanUtils';
+import {calcDistToDestination, insertLegIntoFpl, mayAddWaypointBefore, roomSteps} from '../../../kln90b/services/FlightplanUtils';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {pointFrom} from '../../harness/flight/geo';
 import {identsOf} from '../../harness/readers';
@@ -334,6 +334,40 @@ describe('roomSteps, the legs that go to make room in FPL 0 (#148)', () => {
         const legs = [...fullPlanLegs(), ...star];
         const {aw} = build(legs, START);
         expect(roomSteps(legs, navState(aw, null), 0, 1)).toEqual([1]);
+    });
+});
+
+describe('mayAddWaypointBefore, the approach legs (6-7)', () => {
+    // 6-7: no waypoint is added between two waypoints of an approach. The plan is the airport A, the approach B, C, D and
+    // the airport E after them
+    const app = (wpt: Facility): KLNFlightplanLeg => ({wpt, type: KLNLegType.APP});
+    const approachLegs: KLNFlightplanLeg[] = [user(A), app(B), app(C), app(D), user(E)];
+
+    it('refuses a waypoint between two waypoints of an approach (6-7, #349)', () => {
+        expect(mayAddWaypointBefore(approachLegs, 2)).toBe(false);
+        expect(mayAddWaypointBefore(approachLegs, 3)).toBe(false);
+    });
+});
+
+describe('mayAddWaypointBefore, the legs at the ends of an approach (characterization)', () => {
+    const app = (wpt: Facility): KLNFlightplanLeg => ({wpt, type: KLNLegType.APP});
+    const approachLegs: KLNFlightplanLeg[] = [user(A), app(B), app(C), app(D), user(E)];
+
+    // The leg into the IAF and the leg from the approach to the airport stay open for a waypoint (#349)
+    it('characterization: allows a waypoint on the leg into the IAF (#349)', () => {
+        expect(mayAddWaypointBefore(approachLegs, 1)).toBe(true);
+    });
+
+    it('characterization: allows a waypoint on the leg from the approach to the airport (#349)', () => {
+        expect(mayAddWaypointBefore(approachLegs, 4)).toBe(true);
+    });
+});
+
+describe('mayAddWaypointBefore, the en-route legs (characterization)', () => {
+    it('characterization: allows a waypoint on every en-route leg', () => {
+        const legs = [A, B, C].map(user);
+        expect(mayAddWaypointBefore(legs, 1)).toBe(true);
+        expect(mayAddWaypointBefore(legs, 2)).toBe(true);
     });
 });
 

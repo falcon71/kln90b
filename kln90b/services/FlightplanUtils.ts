@@ -69,6 +69,14 @@ export function roomSteps(legs: KLNFlightplanLeg[], navState: NavPageState, enRo
     return steps;
 }
 
+/**
+ * #349, #377 6-7: whether a waypoint may be added on the leg to the plan index `toIdx`: not between two approach
+ * waypoints. The leg into the IAF and the leg from the approach to the airport may take one
+ */
+export function mayAddWaypointBefore(legs: KLNFlightplanLeg[], toIdx: number): boolean {
+    return !(legs[toIdx - 1]?.type === KLNLegType.APP && legs[toIdx]?.type === KLNLegType.APP);
+}
+
 /** #148: deletes `count` legs from the front of the plan */
 export function deleteFrontLegs(fpl: Flightplan, count: number): void {
     for (let i = 0; i < count; i++) {

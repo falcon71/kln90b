@@ -583,6 +583,40 @@ describe('CTR 1 page, the 30 waypoint limit and the approach legs of FPL 0 (char
     });
 });
 
+describe('CTR 1 page, a crossing inside an approach (6-7)', () => {
+    // 6-7: no waypoint is added between two waypoints of an approach. The Center boundary at 42.75 N crosses only the leg
+    // from IAFDD (41.0 N) to FAFDD (44.5 N) of the RNAV 36 approach to KDDD; the leg from KAAA to IAFDD and the leg from
+    // MAPDD to KDDD cross no boundary
+    it('inserts no Center waypoint between two approach waypoints (6-7, #349)', async () => {
+        const w = centerWorld();
+        const iafdd = intersection('IAFDD', 41.0, -100.0);
+        const fafdd = intersection('FAFDD', 44.5, -100.0);
+        const mapdd = intersection('MAPDD', 44.7, -100.0);
+        const kddd = withProcedures(airport('KDDD', 44.8, -100.0), {
+            approaches: [approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '36',
+                transitions: [{name: 'IAFDD', legs: [Leg.IF(iafdd, FixTypeFlags.IAF)]}],
+                final: [Leg.IF(iafdd), Leg.TF(fafdd, FixTypeFlags.FAF), Leg.TF(mapdd, FixTypeFlags.MAP)],
+            })],
+        });
+        const unit = await bootUnit({
+            facilities: [w.kaaa, kddd, iafdd, fafdd, mapdd, w.bgd, w.gck],
+            position: {lat: 39.0, lon: -100.0}, magvar: 0, airspaces: w.centers,
+            storage: savedFlightplan(0, [w.kaaa, kddd]), panelXml: panelXml(APR_ARM_SWITCH),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8', {ident: 'KDDD'});
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.selectPage('R', 'CTR 1');
+
+        await ent(unit);
+        expect(right()[0]).toBe(' 0 NEW WPTS');
+
+        await ent(unit);
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'IAFDD', 'FAFDD', 'MAPDD', 'KDDD']);
+    });
+});
+
 describe('CTR 1 page, Center waypoints at the power-off (5-26)', () => {
     /** The user waypoints in the facility repository, as "ident region", sorted */
     const centerWaypoints = (unit: HeadlessUnit): string[] =>

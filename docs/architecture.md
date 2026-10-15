@@ -613,6 +613,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       `computedLegs` is a copy of the plan's legs from the computation: when the plan's legs differ (count or instance),
       `syncCtrState` and CTR 1's insert ENT go back to the start state (#348), and a computation that finishes after such a reset
       is discarded. The insertion therefore needs no room check of its own; the computation checks `fits`.
+      CTR 1 drops a crossing on a leg between two approach waypoints before it counts or creates anything
+      (`mayAddWaypointBefore` in `services/FlightplanUtils.ts`, 6-7, #349).
 - **Persistent messages** (`data/PersistentMessages.ts`) are condition-driven message objects. They are not stored; see
   Core 9.
 

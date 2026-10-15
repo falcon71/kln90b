@@ -24,7 +24,7 @@ import {AirspaceIntersection, airspaceIntersectionsAlongRoute} from "../../servi
 import {CtrState} from "../../data/VolatileMemory";
 import {KLNLegType} from "../../data/flightplan/Flightplan";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
-import {insertLegIntoFpl} from "../../services/FlightplanUtils";
+import {insertLegIntoFpl, mayAddWaypointBefore} from "../../services/FlightplanUtils";
 import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 import {getUniqueIdentWithNumbers} from "../../data/navdata/UniqueIdentGenerator";
 import {KLNMagvar} from "../../data/navdata/KLNMagvar";
@@ -206,7 +206,9 @@ export class Ctr1Page extends SixLineHalfPage {
         state.computedLegs = legs;
         const superseded = () => state.lastFplPage !== page || state.computedLegs !== legs || legsDiffer(fpl.getLegs(), legs);
 
-        const intersections = await airspaceIntersectionsAlongRoute(route, this.props.nearestUtils, BitFlags.createFlag(BoundaryType.Center));
+        //#349 6-7: no Center waypoint between two approach waypoints, so such a crossing is dropped before the room check
+        const intersections = (await airspaceIntersectionsAlongRoute(route, this.props.nearestUtils, BitFlags.createFlag(BoundaryType.Center)))
+            .filter(intersection => mayAddWaypointBefore(legs, intersection.legIdx));
         if (superseded()) {
             return;
         }
