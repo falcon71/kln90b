@@ -194,12 +194,10 @@ describe('CTR 2 page (5-25, 5-26)', () => {
     });
 
     // 5-26: leaving the flight plan page on the left and returning to it reverts CTR 1 and CTR 2 to the start state, the
-    // format of figure 5-90 on CTR 1; the Center waypoints are seen again only after ENT on CTR 1. Today the CTR 2 page
-    // keeps FPL 1's waypoints while the left page shows FPL 2 and after FPL 1 returns, and CTR 1, which did not see the
-    // other plan page, offers the insertion again. The guide shows no CTR 2 page without waypoints, so the literal for
-    // it is the code's own empty page (the characterization above). The passing siblings are the CTR 1 revert test
-    // and the two-waypoint test above
-    it.fails('returns CTR 1 and CTR 2 to the start state when the plan page is left and selected again (5-26) (#301)', async () => {
+    // format of figure 5-90 on CTR 1; the Center waypoints are seen again only after ENT on CTR 1. The guide shows no
+    // CTR 2 page without waypoints, so the literal for it is the code's own empty page (the characterization above).
+    // The page instance on the left marks the computation: FPL 1 again is a new instance, so the state is gone
+    it('returns CTR 1 and CTR 2 to the start state when the plan page is left and selected again (5-26) (#301)', async () => {
         const unit = await computed();
         await unit.panel.inner('R', 1);
         expect(right()[0]).toBe(' BGD00  new'); // Precondition: CTR 2 shows the first waypoint
@@ -213,5 +211,80 @@ describe('CTR 2 page (5-25, 5-26)', () => {
 
         expect(ctr1).toEqual(['           ', '           ', 'PRESS ENT  ', 'TO COMPUTE ', 'CTR WPTS   ', '           ']);
         expect(ctr2).toEqual(['           ', '           ', 'NO CTR     ', 'WAYPOINTS  ', '           ', '           ']);
+    });
+
+    it('returns CTR 1 to the start state when a page other than a plan page was on the left in between (5-26) (#301)', async () => {
+        const unit = await computed();
+        await unit.panel.inner('R', 1);
+        await unit.panel.selectPage('L', 'NAV 1');
+        await unit.panel.selectPage('L', 'FPL 1');
+        await unit.panel.inner('R', -1); // CTR 1
+
+        expect(right()).toEqual(['           ', '           ', 'PRESS ENT  ', 'TO COMPUTE ', 'CTR WPTS   ', '           ']);
+    });
+
+    // Leaving the plan page counts also while neither CTR page is on the screen to see it: FPL 1 selected again is a new
+    // page, not the one of the computation (5-26 as above; the same plan index does not keep the state)
+    it('returns CTR 1 to the start state when the plan page is left while the right page shows another page (5-26) (#301)', async () => {
+        const unit = await computed();
+        await unit.panel.selectPage('R', 'REF');
+        await unit.panel.selectPage('L', 'FPL 2');
+        await unit.panel.selectPage('L', 'FPL 1');
+        await unit.panel.selectPage('R', 'CTR 1');
+
+        expect(right()).toEqual(['           ', '           ', 'PRESS ENT  ', 'TO COMPUTE ', 'CTR WPTS   ', '           ']);
+    });
+});
+
+describe('CTR 2 page after the plan page is left (characterization, #301)', () => {
+    // The same revert while CTR 2 stays on the screen (5-26): the page swaps to its empty layout at once. The literal
+    // for the empty page is the code's own (the guide shows none)
+    it('shows the empty page at once when the plan page is left with CTR 2 on the screen (characterization, #301)', async () => {
+        const unit = await computed();
+        await unit.panel.inner('R', 1);
+        expect(right()[0]).toBe(' BGD00  new'); // Precondition: CTR 2 shows the first waypoint
+
+        await unit.panel.selectPage('L', 'FPL 2');
+
+        expect(right()).toEqual(['           ', '           ', 'NO CTR     ', 'WAYPOINTS  ', '           ', '           ']);
+    });
+
+    // The empty page is a single page again: with the second waypoint page shown, the page count and the page number go
+    // back too. Characterization, as the empty page itself (the guide shows none)
+    it('shows the empty page as a single page when the plan page is left on the second waypoint page (characterization, #301)', async () => {
+        const unit = await computed();
+        await unit.panel.inner('R', 1);
+        await unit.panel.inner('R', 1);
+        expect(right()[0]).toBe(' GCK00  new'); // Precondition: the second of two pages
+        expect(Screen.read().status().right).toBe('CTR+2');
+
+        await unit.panel.selectPage('L', 'FPL 2');
+
+        expect(right()).toEqual(['           ', '           ', 'NO CTR     ', 'WAYPOINTS  ', '           ', '           ']);
+        await vi.advanceTimersByTimeAsync(1000); // the status line follows the page one display tick later
+        expect(Screen.read().status().right).toBe('CTR 2');
+        await unit.panel.inner('R', -1); // the knob leaves CTR 2 and does not step to a page before it
+        expect(Screen.read().status().right).toBe('CTR 1');
+    });
+
+    // A page that is not a plan page on the left clears the computation as well (5-26: the computation belongs to the
+    // plan page that is shown). Selecting the plan page again offers the computation anew (5-26). The empty CTR 2 page
+    // while the left page shows another page is the code's own (characterization)
+    it('characterization: shows the empty CTR 2 page while a page other than a plan page is on the left (#301)', async () => {
+        const unit = await computed();
+        await unit.panel.inner('R', 1);
+
+        await unit.panel.selectPage('L', 'NAV 1');
+
+        expect(right()).toEqual(['           ', '           ', 'NO CTR     ', 'WAYPOINTS  ', '           ', '           ']);
+    });
+
+    // The AVsoftech trainer keeps the computation when only the right page is turned away and back
+    it('keeps the computation when only the right page is turned away and back (characterization, #301)', async () => {
+        const unit = await computed();
+        await unit.panel.selectPage('R', 'REF');
+        await unit.panel.selectPage('R', 'CTR 1');
+
+        expect(right()[0]).toBe(' 2 NEW WPTS');
     });
 });

@@ -18,6 +18,7 @@ import {PageProps, UIElementChildren} from "../Page";
 import {EnterResult, NO_CURSOR_CONTROLLER} from "../CursorController";
 import {MainPage} from "../MainPage";
 import {FplPage} from "../left/FplPage";
+import {syncCtrState} from "./CtrState";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {AirspaceIntersection, airspaceIntersectionsAlongRoute} from "../../services/AirspacesAlongRoute";
 import {CtrState} from "../../data/VolatileMemory";
@@ -137,18 +138,9 @@ export class Ctr1Page extends SixLineHalfPage {
     }
 
     tick(blink: boolean) {
-        const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
-        const page = mainPage.getLeftPage();
-
-
+        const page = syncCtrState(this.props); //#301
         const pageState = this.props.memory.ctrPage;
-        if (page instanceof FplPage) {
-            if (page.fplIdx !== pageState.lastFpl?.idx) {
-                pageState.state = CtrState.FPL;
-                pageState.waypoints = [];
-                pageState.lastFpl = this.props.memory.fplPage.flightplans[page.fplIdx];
-            }
-
+        if (page !== null) {
             switch (pageState.state) {
                 case CtrState.FPL:
                     this.refFpl.instance.classList.remove("d-none");
@@ -184,10 +176,6 @@ export class Ctr1Page extends SixLineHalfPage {
             }
             this.refOther.instance.classList.add("d-none");
         } else {
-            pageState.state = CtrState.NO_FPL;
-            pageState.lastFpl = null;
-            pageState.waypoints = [];
-
             this.refFpl.instance.classList.add("d-none");
             this.refCalulated.instance.classList.add("d-none");
             this.refDone.instance.classList.add("d-none");

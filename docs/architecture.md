@@ -608,6 +608,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `reset()` runs on every power-on. It resets these fields, **removes procedures from FPL 0 when the unit was off
       for more than 5 minutes** (6-5; `timeSincePowerChange` of the power event), and re-initialises the first scan-list
       entry per type, setting `isReady` when done; WelcomePage waits on `isReady`.
+    - `ctrPage` keeps the left FPL page instance of the CTR computation (`lastFplPage`). CTR 1 and CTR 2 call `syncCtrState`
+      (`pages/right/CtrState.ts`) in their display ticks and return to the start state when another instance is on the left (5-26).
 - **Persistent messages** (`data/PersistentMessages.ts`) are condition-driven message objects. They are not stored; see
   Core 9.
 

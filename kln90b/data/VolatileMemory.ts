@@ -18,6 +18,7 @@ import {Flightplan, KLNFlightplanLeg} from "./flightplan/Flightplan";
 import {ActiveWaypoint} from "./flightplan/ActiveWaypoint";
 import {TimeStamp} from "./Time";
 import {CenterWaypoint} from "../pages/right/Ctr1Page";
+import type {FplPage} from "../pages/left/FplPage";
 import {PowerEvent, PowerEventData} from "../PowerButton";
 import {Sensors} from "../Sensors";
 
@@ -137,6 +138,8 @@ export const enum CtrState {
 export interface CtrPageState {
     state: CtrState,
     lastFpl: Flightplan | null;
+    /** #301: the plan page on the left that the computation was made on; another instance means the page was left */
+    lastFplPage: FplPage | null;
     waypoints: CenterWaypoint[];
 }
 
@@ -210,6 +213,7 @@ export class VolatileMemory {
     public readonly ctrPage: CtrPageState = {
         state: CtrState.NO_FPL,
         lastFpl: null,
+        lastFplPage: null,
         waypoints: [],
     };
 
@@ -274,6 +278,7 @@ export class VolatileMemory {
 
         this.ctrPage.state = CtrState.NO_FPL;
         this.ctrPage.lastFpl = null;
+        this.ctrPage.lastFplPage = null;
         this.ctrPage.waypoints = [];
 
         this.othPage.reserve = 0;

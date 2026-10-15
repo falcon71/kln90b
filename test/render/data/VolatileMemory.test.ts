@@ -12,6 +12,7 @@ import {pointFrom} from '../../harness/flight/geo';
 import {CtrState, NavMode} from '../../../kln90b/data/VolatileMemory';
 import {TimeStamp} from '../../../kln90b/data/Time';
 import {CenterWaypoint} from '../../../kln90b/pages/right/Ctr1Page';
+import {FplPage} from '../../../kln90b/pages/left/FplPage';
 
 /** hh:mm of the simulated UTC clock, read from the fake Date and not from the unit */
 const utcNow = () => new Date(Date.now()).toISOString().slice(11, 16);
@@ -213,6 +214,7 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
         m.calPage.cal7Timezone = 6;
         m.ctrPage.state = CtrState.DONE;
         m.ctrPage.lastFpl = m.fplPage.flightplans[0];
+        m.ctrPage.lastFplPage = {} as unknown as FplPage; // Only its presence is read here
         m.ctrPage.waypoints = [{idx: 1} as unknown as CenterWaypoint]; // Only its presence is read here
         m.othPage.reserve = 45;
         await vi.advanceTimersByTimeAsync(2000);
@@ -228,7 +230,7 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
         expect(m.navPage.nav4FromAlt).toBe(0);
         expect(m.navPage.nav4VnavDist).toBe(0);
         expect(m.calPage).toMatchObject({cal6FromTimezone: null, cal6ToTimezone: null, cal7Wpt: null, cal7DateZ: null, cal7Timezone: null});
-        expect(m.ctrPage).toEqual({state: CtrState.NO_FPL, lastFpl: null, waypoints: []});
+        expect(m.ctrPage).toEqual({state: CtrState.NO_FPL, lastFpl: null, lastFplPage: null, waypoints: []});
         expect(m.othPage.reserve).toBe(0);
         expect(m.isReady).toBe(true);
     });
