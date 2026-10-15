@@ -297,7 +297,7 @@ export class FrontPanel {
      * KAAA.
      */
     public async enterIdent(side: Side, ident: string): Promise<void> {
-        const first = this.focused(side);
+        const first = await this.focusedWhenShown(side);
         if (first.text.length === 1) {
             await this.enterIntoSelector(side, ident, first);
             return;
@@ -519,6 +519,19 @@ export class FrontPanel {
             await this.ent();
         }
         await this.cursor('L');
+    }
+
+    /**
+     * The focused field once the cursor shows. A cell whose first display tick is a blink tick has the blink class but no
+     * inverse yet (EditorField.tick), so for one display tick the page shows no cursor; which tick that is depends on how
+     * many clicks went before. Waits up to a second, one display tick at a time, for the one run; then reads it as
+     * focused() does, with its error.
+     */
+    private async focusedWhenShown(side: Side): Promise<Field> {
+        for (let i = 0; i < 4 && this.focusedRuns(side).length === 0; i++) {
+            await vi.advanceTimersByTimeAsync(CLICK_MS);
+        }
+        return this.focused(side);
     }
 
     /** The one run of inverted cells on a side, which is the focused field. Columns are those of the whole screen. */

@@ -1,4 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
+import {Facility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {blinkCycle} from '../../../harness/render/blink';
@@ -42,9 +43,12 @@ const world = () => ({
 /** The identifier row of the DIRECT TO page: three blanks, the five cells of the editor, three blanks */
 const dctIdent = () => Screen.read().rows('L')[2];
 
-/** D-> on a unit without an active waypoint: the DIRECT TO page with five blank cells under the cursor (3-27 rule 5) */
-async function blankDirectTo(): Promise<HeadlessUnit> {
-    const unit = await bootUnit(world());
+/**
+ * D-> on a unit without an active waypoint: the DIRECT TO page with five blank cells under the cursor (3-27 rule 5).
+ * `extra` adds facilities to the world
+ */
+async function blankDirectTo(extra: Facility[] = []): Promise<HeadlessUnit> {
+    const unit = await bootUnit({...world(), facilities: [...world().facilities, ...extra]});
     await unit.panel.selectPage('R', 'NAV 1');
     await unit.panel.dct();
     expect(unit.panel.focused('L')).toEqual({row: 2, col: 3, text: '     '}); // precondition
@@ -52,8 +56,8 @@ async function blankDirectTo(): Promise<HeadlessUnit> {
 }
 
 /**
- * The first inner click starts the entry. What the first cell shows after it is #311's subject (a blank today, an
- * A after the fix), so the knob tests do not start from it: they turn the first cell clockwise until it shows `ch`.
+ * The first inner click starts the entry and gives an A (#311). The knob tests start from the first cell showing `ch`:
+ * they turn it clockwise from there until it does.
  */
 async function startEntryAt(unit: HeadlessUnit, ch: string): Promise<void> {
     await unit.panel.inner('L', 1);
@@ -175,10 +179,11 @@ describe('waypoint editor, the first character (checked in the KLN 89 trainer, 2
 // 3-14 says an editor is entered by turning the inner knob, and the KLN 89 trainer (2026-10-08, T6) shows what the
 // first click does: it puts an A in the first cell and offers the first identifier that begins with A, as it does for a
 // blank DIRECT TO field, a blank FPL 0 position and an inserted FPL position. The 90B has no SET 5 (the 89's default
-// first character), so the 89's A is taken for the 90B. The editor starts over blank cells instead.
-describe('waypoint editor, the first inner click (3-14, checked in the KLN 89 trainer, 2026-10-08)', () => {
+// first character), so the 89's A is taken for the 90B. The first click counterclockwise gives a 9 and the first
+// identifier that begins with 9 (checked in the KLN 89 trainer, 2026-10-15)
+describe('waypoint editor, the first inner click (3-14, checked in the KLN 89 trainer, 2026-10-08 and 2026-10-15)', () => {
     // The sibling below holds the setup (the same click on the same page)
-    it.fails('shows an A and the first identifier that begins with A after the first click '
+    it('shows an A and the first identifier that begins with A after the first click '
         + '(3-14, checked in the KLN 89 trainer, 2026-10-08, #311)', async () => {
         const unit = await blankDirectTo();
 
@@ -187,10 +192,31 @@ describe('waypoint editor, the first inner click (3-14, checked in the KLN 89 tr
         expect(dctIdent()).toBe('   ALF     ');
     });
 
+    // The same click the other way round (checked in the KLN 89 trainer, 2026-10-15, evening block, #311): a 9 and the
+    // first identifier that begins with 9. The airport 9A4 is added to the world; the others begin with letters
+    it('shows a 9 and the first identifier that begins with 9 after the first click counterclockwise '
+        + '(checked in the KLN 89 trainer, 2026-10-15, #311)', async () => {
+        const unit = await blankDirectTo([airport('9A4', 47.9, 8.0)]);
+
+        await unit.panel.inner('L', -1);
+
+        expect(dctIdent()).toBe('   9A4     ');
+    });
+
+    // The same, in a world where no identifier begins with 9: the 9 shows and the other cells are blank
+    it('shows a 9 and blanks after the first click counterclockwise when no identifier begins with 9 '
+        + '(checked in the KLN 89 trainer, 2026-10-15, #311)', async () => {
+        const unit = await blankDirectTo();
+
+        await unit.panel.inner('L', -1);
+
+        expect(dctIdent()).toBe('   9       ');
+    });
+
     // 3-14: the inner knob over an editor starts the entry with the first character under the cursor (it
     // flashes, the other cells stay inverted). The ent annunciation is shown at this point in the KLN 89 trainer
     // (2026-10-08, its Ent prompt while an edit is open); the 90B figures show ent only for a complete identifier
-    // (figure 3-45). Only the flashing cell is asserted, not the run's text (the pin's subject)
+    // (figure 3-45). Only the flashing cell is asserted, not the run's text (the test above)
     it('starts the entry under the cursor with the first click (3-14)', async () => {
         const unit = await blankDirectTo();
 
@@ -351,6 +377,24 @@ describe('waypoint editor on FPL 0 (4-2)', () => {
         expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: '     '});
         await unit.panel.ent();
         expect(fplIdents(unit)).toEqual(['KAAA']);
+    });
+});
+
+describe('waypoint editor on FPL 0, the first inner click (4-2, checked in the KLN 89 trainer, 2026-10-15)', () => {
+    // The end position of FPL 0 behaves as the D-> field does (the evening block of 2026-10-15): the first click
+    // clockwise gives an A and the first identifier that begins with A (the VOR ALF sorts before the airport AMID)
+    it('shows an A and the first identifier that begins with A at the blank end position after the first click '
+        + '(checked in the KLN 89 trainer, 2026-10-15, #311)', async () => {
+        const unit = await bootUnit({...world(), storage: savedFlightplan(0, [kaaa()])});
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1);
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: '     '}); // precondition
+
+        await unit.panel.inner('L', 1);
+
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['  1:KAAA   ', '  2:ALF    ']);
     });
 });
 

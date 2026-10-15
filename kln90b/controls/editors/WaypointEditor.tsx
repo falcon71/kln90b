@@ -178,7 +178,12 @@ export class WaypointEditor extends Editor<Facility | null> {
         if (this.isAwaitingConfirmation) { //3-28 Note: If an incorrect identifier has been entered, you may immediately start using the left inner knob to re-enter the correct identifier
             this.cancelAwaitingConfirmation();
         }
-        return super.innerLeft();
+        const startsEntry = !this.isEntered;
+        const handled = super.innerLeft();
+        if (startsEntry) {
+            this.startEntryWith("9");
+        }
+        return handled;
     }
 
     innerRight(): boolean {
@@ -186,7 +191,22 @@ export class WaypointEditor extends Editor<Facility | null> {
         if (this.isAwaitingConfirmation) { //3-28 Note: If an incorrect identifier has been entered, you may immediately start using the left inner knob to re-enter the correct identifier
             this.cancelAwaitingConfirmation();
         }
-        return super.innerRight();
+        const startsEntry = !this.isEntered;
+        const handled = super.innerRight();
+        if (startsEntry) {
+            this.startEntryWith("A");
+        }
+        return handled;
+    }
+
+    /**
+     * #311: the click that starts an entry gives the first character of the wheel in its direction, an A clockwise and a
+     * 9 counterclockwise, and offers the first identifier that begins with it (3-14, checked in the KLN 89 trainer,
+     * 2026-10-08 and 2026-10-15). The numeric editors keep the blank of Editor.setEntered, so this is not done there
+     */
+    private startEntryWith(ch: string): void {
+        this.editorFields[0].setDisplayValue(ch);
+        reportErrors(this.onCharChanged(), this.props.bus);
     }
 
     isEnterAccepted(): boolean {

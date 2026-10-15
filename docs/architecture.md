@@ -996,6 +996,10 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - The first inner-knob turn sets `isEntered` (fields reset to `DEFAULT_FIELD_VALUE`, cursor on char 0). The outer
       knob then moves between chars, the inner knob changes the char, and ENT validates and calls
       `enterCallback(value)`.
+    - The starting click is per editor (#311, not in `Editor.setEntered`, so the numeric editors keep their first
+      choice). `WaypointEditor` gives A clockwise and 9 counterclockwise in cell 0 and runs `onCharChanged()`, so the
+      first identifier that begins with it is offered (KLN 89 trainer, 2026-10-08 and 2026-10-15). `FreetextEditor` gives
+      an A when constructed with `firstClickGivesA`, which the remark lines of APT 5 do and the Turn-On page does not.
     - `setValue()` updates the display unless the editor is being edited.
     - Field classes in `EditorField.tsx`: `AlphabetEditorField` (space, A-Z, 0-9), `NumberEditorField` (
       `createWithMinMax`, `createWithBlankMax`), `MonthEditorField`, `NorthSouth/EastWest/RunwaySurfaceEditorField`.

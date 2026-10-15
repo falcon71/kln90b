@@ -200,7 +200,7 @@ describe('free text editor on APT 5 (3-47)', () => {
     // the airport's slot and shown again when the page is selected anew.
     it('stores a remark with a hyphen and shows it again (3-47)', async () => {
         const unit = await onRemarkLine();
-        await unit.panel.inner('R', 2); // the blank, A
+        await unit.panel.inner('R', 1); // the first click gives A (#311)
         await unit.panel.outer('R', 1);
         await unit.panel.inner('R', 1); // the blank
         await unit.panel.inner('R', -1); // the hyphen
@@ -228,9 +228,11 @@ describe('free text editor, the first click on an empty remark line (3-47, #311)
         expect(unit.panel.focused('R')).toEqual({row: 2, col: 12, text: ' '.repeat(11)});
     });
 
-    // Checked in the KLN 89 trainer, 2026-10-08 (T12): the first click on an empty remark line puts an A in the first
-    // cell (and dashes in the others). The code puts the blank there, so the first click selects nothing visible.
-    it.fails('gives A on the first click on an empty remark line (checked in the KLN 89 trainer, ' +
+    // The first click on an empty remark line gives an A: checked in the KLN 89 trainer, 2026-10-08 (T12). The evening
+    // block of 2026-10-15 adds that the first clockwise click clears a line that held text to an A and blanks. What the
+    // other cells show is the editor's own rendering of cells not yet set (underscores), which the trainer records do not
+    // pin; the lead in docs/test-next-steps.md holds the open question
+    it('gives A on the first click on an empty remark line (checked in the KLN 89 trainer, ' +
         '2026-10-08, #311)', async () => {
         const unit = await onRemarkLine();
 

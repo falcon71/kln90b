@@ -425,8 +425,8 @@ describe('REF page (characterization)', () => {
     });
 
     // A left inner click while the reference waypoint waits for its approval is the re-entry of 3-28: the page of the
-    // waypoint goes and the row is an ordinary entry being typed. CLR then clears it as on any entry (#310) and must
-    // not be taken for a rejection of the reference waypoint (#291)
+    // waypoint goes and the row is an ordinary entry being typed, which the click starts with an A (#311). CLR then
+    // clears it as on any entry (#310) and must not be taken for a rejection of the reference waypoint (#291)
     it('clears the row like any entry with CLR after a left inner click on the waiting reference waypoint (characterization, #291)', async () => {
         const unit = await bootOnRef('FPL 0');
         await enterReference(unit, 'TXK');
@@ -435,7 +435,7 @@ describe('REF page (characterization)', () => {
         await unit.panel.inner('L', 1);
         await vi.advanceTimersByTimeAsync(500);
         expect(Screen.read().status().right).toBe('CRSR'); // precondition: the page of TXKA is gone
-        expect(Screen.read().rows('L')[2]).toBe('  2:       ');
+        expect(Screen.read().rows('L')[2]).toBe('  2:A      '); // precondition: the entry started with the click's A
 
         await unit.panel.clr();
         await vi.advanceTimersByTimeAsync(500);

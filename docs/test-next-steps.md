@@ -244,6 +244,13 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - #343: a character in a later cell of an all-blank ident gives an ident that starts with a blank, and a waypoint
       page can create a user waypoint of it; the V2 loader trims it on reload. The knob no longer dials a blank into the
       first cell (#374), but an empty ident still starts with one. A lead for a trainer check before an issue is filed.
+    - #311: the first click on a Turn-On line (5-28) still gives a blank, while the remark lines of APT 5 give an A
+      (`FreetextEditor`'s `firstClickGivesA`). Neither the guide nor the KLN 89 trainer record says what the first click
+      on a Turn-On line gives. A lead for a check.
+    - #311: the remark line's first click is recorded clockwise only (an A). The unit gives the A counterclockwise too;
+      the 89 might give the blank or the hyphen there, by analogy with the wheel (Z, 0 to 9, hyphen, blank, A). The cells
+      after the A show as underscores in the 90B, while the only record of them, the evening block, says blanks. A trainer
+      question for the counterclockwise first click and for what the other cells show.
 
 ## Boot, power and the unit as a whole
 
@@ -294,9 +301,6 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone leaves both handler counts
       unchanged, and OTH 4 counts the `changed` topic of the remarks manager;
     - the fix of #95 turns its two pins red (the list and the error page);
-    - the fix of #311 in `WaypointEditor` leaves the `FplPage.test.ts` insert tests green, but its first click on an
-      empty remark line changes the click counts in the setup of `stores a remark with a hyphen and shows it again`
-      (`FreetextEditor.test.ts`);
     - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): duplicate idents on a waypoint
   page (2026-10-08, T20, not done), and the empty top row of FPL 0 with the first waypoint active (above). #162 and

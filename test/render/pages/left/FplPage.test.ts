@@ -693,8 +693,8 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
         if (n === 30) {
             expect(left()[5]).toBe(' 31:FA29   '); // Precondition: FA29 moved down to make room, so an insert is open
         }
-        // The new entry takes the number n. It is found by its number and not by its text (the text of the first click
-        // is #311)
+        // The new entry takes the number n. It is found by its number and not by its text (the first click gives an A and
+        // the first identifier that begins with it, #311)
         const cursorOnEntry = () => cursorRows().length === 1 && new RegExp(`^\\s*${n}:`).test(left()[cursorRows()[0]]);
         expect(cursorOnEntry()).toBe(true); // Precondition: the cursor is on the new entry
         await unit.panel.enterIdent('L', 'FA30');
@@ -802,8 +802,8 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
 describe('inserting a waypoint with the inner knob', () => {
     // 4-4 (figures 4-15 and 4-16, which show FPL 0): the inner knob on a waypoint opens an entry in front of it, the
     // waypoint moves down one position, and the cursor is on the new entry. The row of the new entry is looked up by
-    // its number, not by its text (the first click shows a blank, which #311 says is wrong): the page scrolls when the
-    // list is rebuilt
+    // its number, not by its text (the first click gives an A and the first identifier that begins with it, #311): the
+    // page scrolls when the list is rebuilt
     it('puts the cursor on the new entry when the inner knob opens an insert on FPL 0 (4-4)', async () => {
         const unit = await bootRoute(savedFlightplan(0, route7()));
         await unit.panel.selectPage('L', 'FPL 0');
@@ -831,8 +831,8 @@ describe('inserting a waypoint with the inner knob', () => {
 
     // 4-4: the inner knob can insert into any plan below the 30-waypoint limit, not only into FPL 0: it opens an entry
     // in front of the waypoint under the cursor and the waypoint moves down. This holds the insert of the numbered
-    // plan, by the number of the new entry and not by its text (the first click shows a blank, which #311 says is
-    // wrong); the cursor on it is held by the test below
+    // plan, by the number of the new entry and not by its text (the first click gives an A and the first identifier that
+    // begins with it, #311); the cursor on it is held by the test below
     it('opens an entry in front of the waypoint when the inner knob turns on a numbered plan (4-4)', async () => {
         const unit = await cursorOnAbcOfFpl3();
 
