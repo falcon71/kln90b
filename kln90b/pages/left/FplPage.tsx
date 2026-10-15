@@ -73,6 +73,10 @@ export abstract class FplPage extends SixLineHalfPage {
             return true;
         }
 
+        if (this.children.get("wptList").rejectRefApproval()) {
+            return true; //#291
+        }
+
         return this.cursorController.clear();
     }
 

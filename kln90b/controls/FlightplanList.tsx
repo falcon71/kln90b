@@ -341,10 +341,12 @@ class EditableFlightplan {
     }
 
     public insertLeg(idx: number, wpt: Facility | null, leg: KLNFlightplanLeg | null) {
+        const wasRefEntry = this.findRefRow(row => row.isRefEntry()) !== undefined; //#291 before the rebuild
         if (wpt === null) {
             //The user aborted the insert by turning the cursor off
             this.syncLegsFromFlightplan();
             this.buildList();
+            this.endRefApproval(wasRefEntry);
             return;
         }
 
@@ -367,10 +369,40 @@ class EditableFlightplan {
             }
 
             this.buildList();
+            this.endRefApproval(wasRefEntry);
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
             console.error(e);
+            this.endRefApproval(wasRefEntry);
         }
+    }
+
+    /**
+     * #291: the left cursor goes off once the reference waypoint is approved or rejected, not when its page appears
+     */
+    private endRefApproval(wasRefEntry: boolean): void {
+        if (wasRefEntry) {
+            this.cursorController.setCursorActive(false);
+        }
+    }
+
+    private findRefRow(predicate: (row: FlightplanListItem) => boolean): FlightplanListItem | undefined {
+        return this.listParent?.children.getall()
+            .find(c => c instanceof FlightplanListItem && predicate(c)) as FlightplanListItem | undefined;
+    }
+
+    /**
+     * #291: CLR while the reference waypoint waits for its approval rejects it. The waiting row is not in the plan, so
+     * it has no DEL, and the focused row is not necessarily the waiting one.
+     * @return true when a reference waypoint was waiting
+     */
+    public rejectRefApproval(): boolean {
+        const waiting = this.findRefRow(row => row.isAwaitingRefApproval());
+        if (waiting === undefined) {
+            return false; //an ordinary entry, CLR works as on any entry
+        }
+        waiting.setFocused(false); //cancels the confirmation and ends the insert (onInsertDone with null)
+        return true;
     }
 
     public createLeg(idx: number, enter: FplWptEnterMode, keyboardKey: string | undefined, wpt: Facility | null = null): void {
@@ -464,9 +496,11 @@ class EditableFlightplan {
 
             if (leg.enterMe !== undefined) {
                 focusIdx = numActiveFields - 1;
+                const mode = leg.enterMe;
+                leg.enterMe = undefined; //#291 the pending entry runs once
                 //This can only be done, after the cursorController is up-to-date.
                 enterMethod = () => {
-                    switch (leg.enterMe) {
+                    switch (mode) {
                         case FplWptEnterMode.ROTATE_LEFT:
                             listItem.innerLeft();
                             break;
@@ -488,7 +522,7 @@ class EditableFlightplan {
                             listItem.keyboard(leg.enterKeyboardKey!);
                             break;
                         case FplWptEnterMode.CONFIRM:
-                            reportErrors(listItem.confirmCurrentValue().then(_ => this.cursorController.setCursorActive(false)), this.props.bus);
+                            reportErrors(listItem.confirmCurrentValue(), this.props.bus);
                             break;
                     }
                 };
@@ -585,6 +619,10 @@ export class FlightplanList extends List {
 
     public askDeleteAll() {
         this.editPlan.askDeleteAll();
+    }
+
+    public rejectRefApproval(): boolean {
+        return this.editPlan.rejectRefApproval();
     }
 
     public load(fpl: Flightplan) {

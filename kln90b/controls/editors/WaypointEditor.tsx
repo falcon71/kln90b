@@ -89,6 +89,13 @@ export class WaypointEditor extends Editor<Facility | null> {
     }
 
     /**
+     * True while the waypoint (or the CLR of it) waits for the approval with ENT
+     */
+    public isWaitingForConfirmation(): boolean {
+        return this.isAwaitingConfirmation;
+    }
+
+    /**
      * True if we are showing the waypoint page on the right.
      * Might be different than isAwaitingConfirmation, if we confirm a CLR
      * @private

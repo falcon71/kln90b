@@ -1105,13 +1105,16 @@ export class Set3Page extends SixLineHalfPage {
    waiting. CLR → `confirmValue(null)`, which clears. When the editor is on the right side (REF of INT/SUP, the VNAV
    waypoint of NAV 4) the right page is the confirm page, which has no cursor: `WaypointConfirmPage.hasOpenEntry()`
    makes it take CLR first and `clear()` hands the key to the editor (#359). The REF to FPL confirmation keeps its
-   CLR on the left (#291). An editor with `clearBlanks: false` (the SET 1 ident) closes the edit instead and keeps
-   the old value (#244).
+   CLR on the left: `FplPage.clear()` asks `EditableFlightplan.rejectRefApproval()` first, which rejects the waiting
+   waypoint, because the focused row is not necessarily the waiting one. It reads the state of the rows
+   (`FlightplanListItem.isAwaitingRefApproval()`) and lets CLR through once the row was re-entered (3-28) (#291). An
+   editor with `clearBlanks: false` (the SET 1 ident) closes the edit instead and keeps the old value (#244).
 8. Alternate method (3-15): ENT on a non-entered editor while a waypoint page is shown on the right adopts that
    waypoint.
 9. `confirmCurrentValue()` starts confirmation directly. Used by `DirectToPage` (pre-filled from: the FPL 0 cursor
    waypoint → the Super NAV 5 target → the right waypoint page → the active waypoint, or the missed approach on a MAP
-   FROM leg → blank) and by FPL inserts from the REF page (`FplWptEnterMode.CONFIRM`).
+   FROM leg → blank) and by FPL inserts from the REF page (`FplWptEnterMode.CONFIRM`); the left cursor stays on until
+   the approval or rejection (#291).
 
 ### Dynamic lists pattern (FPL, OTH, APT 7/8)
 

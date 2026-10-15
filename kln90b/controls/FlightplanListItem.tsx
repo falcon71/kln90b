@@ -43,6 +43,7 @@ export class FlightplanListItem implements Field, ListItem {
     protected readonly readonlyRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     protected readonly delRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     private waypointEditor: WaypointEditor;
+    private refEntry = false; //#291 the reference waypoint of the REF page, from its confirmation until the entry is left
     private readonly type: KLNLegType;
     private readonly wptIdent: string;
 
@@ -139,6 +140,7 @@ export class FlightplanListItem implements Field, ListItem {
             this.props.onCreate(this.props.wptIdx, FplWptEnterMode.ROTATE_LEFT);
             return true;
         }
+        this.leaveRefEntry(); //#291 3-28
         const handled = this.waypointEditor.innerLeft();
         this.isEntered = this.waypointEditor.isEntered;
         return handled;
@@ -155,6 +157,7 @@ export class FlightplanListItem implements Field, ListItem {
             this.props.onCreate(this.props.wptIdx, FplWptEnterMode.ROTATE_RIGHT);
             return true;
         }
+        this.leaveRefEntry(); //#291
         const handled = this.waypointEditor.innerRight();
         this.isEntered = this.waypointEditor.isEntered;
         return handled;
@@ -200,6 +203,7 @@ export class FlightplanListItem implements Field, ListItem {
     }
 
     public confirmCurrentValue(): Promise<void> {
+        this.refEntry = true; //#291 only the REF page confirms a waypoint this way
         return this.waypointEditor.confirmCurrentValue();
     }
 
@@ -232,6 +236,32 @@ export class FlightplanListItem implements Field, ListItem {
         this.waypointEditor.tick(blink);
         this.waypointEditor.children.walk(c => c.tick(blink));
 
+    }
+
+    /**
+     * #291: this row is the reference waypoint of the REF page, whose approval is still pending
+     */
+    public isAwaitingRefApproval(): boolean {
+        return this.refEntry && this.waypointEditor.isWaitingForConfirmation();
+    }
+
+    /**
+     * #291: this row is the reference waypoint of the REF page, from its confirmation until the entry is left. It
+     * stays true while the approval is carried out.
+     */
+    public isRefEntry(): boolean {
+        return this.refEntry;
+    }
+
+    /**
+     * #291 3-28: typing over the waiting reference waypoint makes the row an ordinary new entry again. It is not in the
+     * plan, so it holds no waypoint and CLR must not ask DEL for it.
+     */
+    private leaveRefEntry(): void {
+        if (this.refEntry) {
+            this.refEntry = false;
+            this.wpt = null;
+        }
     }
 
     clear(): boolean {
@@ -276,6 +306,7 @@ export class FlightplanListItem implements Field, ListItem {
     }
 
     public keyboard(key: string): boolean {
+        this.leaveRefEntry(); //#291
         if (!this.isEntered) {
             //We need the normal logic to check if we can actually enter
             if (this.type === KLNLegType.APP) {

@@ -134,11 +134,9 @@ describe('REF page', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // 5-21 step 2: the reference waypoint works on the active flight plan as well. The page of the reference waypoint
-    // is canceled as soon as it is shown: FlightplanList turns the left cursor off when the confirmation page is up,
-    // which unfocuses the waiting entry, and WaypointEditor.setEntered(false) cancels the confirmation. FPL 2 escapes
-    // only because its focus lands on the wrong entry (#242)
-    it.fails('inserts the reference waypoint into FPL 0 after the approval (5-21, #291)', async () => {
+    // 5-21 step 2: the reference waypoint works on the active flight plan as well. The left cursor stays on while the
+    // page of the reference waypoint waits for its approval and the waypoint is inserted once it is approved (#291)
+    it('inserts the reference waypoint into FPL 0 after the approval (5-21, #291)', async () => {
         const unit = await bootOnRef('FPL 0');
         expect(Screen.read().status().left).toBe('FPL 0'); // precondition: the REF page asks for the waypoint beside FPL 0
         expect(Screen.read().rows('R')[2]).toBe('ENTER REF  ');
@@ -151,8 +149,8 @@ describe('REF page', () => {
     });
 
     // Figure 5-85: while the reference waypoint waits for its approval, the left cursor is on over the new entry of the
-    // flight plan (status line CRSR on the left). The code turns it off as soon as the waypoint page is up (#291)
-    it.fails('keeps the left cursor on while the reference waypoint waits for approval (figure 5-85, #291)', async () => {
+    // flight plan (status line CRSR on the left); it turns off with the approval (#291)
+    it('keeps the left cursor on while the reference waypoint waits for approval (figure 5-85, #291)', async () => {
         const unit = await bootOnRef('FPL 2');
 
         await enterReference(unit, 'TXK');
@@ -412,5 +410,74 @@ describe('REF page (characterization)', () => {
             "status": "CRSR",
           }
         `);
+    });
+
+    // The left cursor goes off after the approval on FPL 0 as on a numbered plan (figure 5-86 shows that case); #291
+    it('turns the left cursor off after the approval on FPL 0 (characterization, #291)', async () => {
+        const unit = await bootOnRef('FPL 0');
+        await enterReference(unit, 'TXK');
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'TXKA', 'KBBB']);
+        expect(Screen.read().status().left).toBe('FPL 0');
+    });
+
+    // A left inner click while the reference waypoint waits for its approval is the re-entry of 3-28: the page of the
+    // waypoint goes and the row is an ordinary entry being typed. CLR then clears it as on any entry (#310) and must
+    // not be taken for a rejection of the reference waypoint (#291)
+    it('clears the row like any entry with CLR after a left inner click on the waiting reference waypoint (characterization, #291)', async () => {
+        const unit = await bootOnRef('FPL 0');
+        await enterReference(unit, 'TXK');
+        expect(Screen.read().status().right).toBe('SUP'); // precondition: the page of TXKA waits for approval
+
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(500);
+        expect(Screen.read().status().right).toBe('CRSR'); // precondition: the page of TXKA is gone
+        expect(Screen.read().rows('L')[2]).toBe('  2:       ');
+
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().rows('L').slice(1, 4)).toEqual(['  1:KAAA   ', '  2:       ', '  3:KBBB   ']); // no DEL question
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'KBBB']);
+
+        await unit.panel.ent(); // adds nothing, as after CLR on any entry (#310)
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(unit.errors).toEqual([]);
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'KBBB']);
+    });
+
+    // After the re-entry of 3-28 on the waiting reference waypoint the insert is an ordinary one: the retyped waypoint
+    // goes into the plan and the left cursor stays on, as after any typed insert (#291)
+    it('keeps the left cursor on after a typed insert that replaced the waiting reference waypoint (characterization, #291)', async () => {
+        const unit = await bootOnRef('FPL 0');
+        await enterReference(unit, 'TXK');
+        await unit.panel.inner('L', 1); // the re-entry of 3-28
+        await unit.panel.enterIdent('L', 'TXKA');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(unit.errors).toEqual([]);
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'TXKA', 'KBBB']);
+        expect(Screen.read().status().left).toBe('CRSR');
+    });
+
+    // CLR while the reference waypoint waits for its approval rejects it. It must not ask DEL for the waiting row,
+    // whose ENT would delete the waypoint at that position of the plan (#291)
+    it.each(['FPL 0', 'FPL 2'] as const)('rejects the reference waypoint with CLR on %s (characterization, #291)', async fpl => {
+        const unit = await bootOnRef(fpl);
+        await enterReference(unit, 'TXK');
+        expect(Screen.read().status().right).toBe('SUP'); // precondition: the page of TXKA waits for approval
+
+        await unit.panel.clr();
+        await unit.panel.ent(); // the ENT that would answer a DEL question
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(fplIdents(unit, fpl === 'FPL 0' ? 0 : 2)).toEqual(['KAAA', 'KBBB']);
+        expect(Screen.read().status().left).toBe(fpl);
     });
 });
