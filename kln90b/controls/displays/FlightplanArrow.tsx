@@ -37,43 +37,45 @@ export class FlightplanArrow implements UiElement {
             return;
         }
 
-        const activeIdx = this.navPageState.activeWaypoint.getActiveFplIdx();
-        if (activeIdx === null) {
+        //4-7: no symbol without usable navigation. distToActive is null only while the navigation is flagged
+        //(NavCalculator.setFlag); toFrom is also null on a final zero-length leg, which still navigates (#120, #322)
+        if (this.navPageState.distToActive === null) {
             this.ref.instance.innerText = " ";
             this.ref.instance.classList.remove("blink");
-        } else {
-            if (activeIdx === this.idx && this.idx !== -1) { //The active waypoint
-                if (this.navPageState.activeWaypoint.isDctNavigation()) {
-                    this.ref.instance.innerText = "›";
-                } else {
-                    this.ref.instance.innerText = "À";
-                }
+            return;
+        }
 
-                //3-29 Waypoint alerting
-                if (this.navPageState.waypointAlert && blink) {
-                    this.ref.instance.classList.add("blink");
-                } else {
-                    this.ref.instance.classList.remove("blink");
-                }
-            } else if (activeIdx - 1 === this.idx && this.idx !== -1) { //The from waypoint
-                if (this.navPageState.activeWaypoint.isDctNavigation()) {
-                    this.ref.instance.innerText = " ";
-                } else {
-                    this.ref.instance.innerText = "Á";
-                }
-                this.ref.instance.classList.remove("blink");
-            } else if (activeIdx === this.idx + 0.5 && this.idx !== -1) { //Procedure between two waypoints
-                if (this.navPageState.activeWaypoint.isDctNavigation()) {
-                    this.ref.instance.innerText = " ";
-                } else {
-                    this.ref.instance.innerText = "Â";
-                }
-                this.ref.instance.classList.remove("blink");
-            } else { //Something else
-                this.ref.instance.innerText = " ";
-                this.ref.instance.classList.remove("blink");
+        const activeIdx = this.navPageState.activeWaypoint.getActiveFplIdx();
+        if (activeIdx === this.idx && this.idx !== -1) { //The active waypoint
+            if (this.navPageState.activeWaypoint.isDctNavigation()) {
+                this.ref.instance.innerText = "›";
+            } else {
+                this.ref.instance.innerText = "À";
             }
 
+            //3-29 Waypoint alerting
+            if (this.navPageState.waypointAlert && blink) {
+                this.ref.instance.classList.add("blink");
+            } else {
+                this.ref.instance.classList.remove("blink");
+            }
+        } else if (activeIdx - 1 === this.idx && this.idx !== -1) { //The from waypoint
+            if (this.navPageState.activeWaypoint.isDctNavigation()) {
+                this.ref.instance.innerText = " ";
+            } else {
+                this.ref.instance.innerText = "Á";
+            }
+            this.ref.instance.classList.remove("blink");
+        } else if (activeIdx === this.idx + 0.5 && this.idx !== -1) { //Procedure between two waypoints
+            if (this.navPageState.activeWaypoint.isDctNavigation()) {
+                this.ref.instance.innerText = " ";
+            } else {
+                this.ref.instance.innerText = "Â";
+            }
+            this.ref.instance.classList.remove("blink");
+        } else { //Something else
+            this.ref.instance.innerText = " ";
+            this.ref.instance.classList.remove("blink");
         }
     }
 }

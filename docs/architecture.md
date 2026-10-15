@@ -986,6 +986,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `AltitudeDisplay`/`ElevationDisplay`, `SpeedDisplay`, `DurationDisplay`, `TimeDisplay`, `FuelDisplay`,
       `TemperatureDisplay`, `LatitudeDisplay`, `LongitudeDisplay`, `RoundedDistanceDisplay`
     - `DeviationBar`, `SuperDeviationBar`, `ActiveArrow` (flashes during waypoint alert, 3-29), `FlightplanArrow`
+      (draws nothing while the navigation is flagged, 4-7, #322)
     - Convention: null value → dashes.
 - **Editors** (`controls/editors/`; manual 3-14, "jump in, edit char by char, confirm with ENT"):
     - `Editor<T>` is an abstract `Field` composed of `EditorField`s (char cells with a `charset`).

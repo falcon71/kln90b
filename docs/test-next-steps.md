@@ -221,10 +221,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       late and writes against the airport shown then, so a quick scan could show the previous airport's class;
       `ErrorPage.showError` writes the error text with `innerHTML`, unescaped; `getAirspaces(lat, lon, 10, …)` passes
       10 meters, which reads like nautical miles but works with `isInside`.
-    - Displays: the `targetLetterIndex == 9` branches of both deviation bars and the `activeIdx === null` branch of
-      `FlightplanArrow` are dead; `formatDuration` is exported but used only in its file; a negative OTH fuel clamps to
-      0; single-digit temperatures keep a zero (the trainer could not answer); the Super NAV 1 FLAG row draws 22 cells
-      instead of 23.
+    - Displays: the `targetLetterIndex == 9` branches of both deviation bars are dead; `formatDuration` is exported but
+      used only in its file; a negative OTH fuel clamps to 0; single-digit temperatures keep a zero (the trainer could
+      not answer); the Super NAV 1 FLAG row draws 22 cells instead of 23.
     - The trainer brings the cursor back on the first field after it is turned off and on, and on the top visible entry
       of a scrolled list ([the trainer record](kln89-trainer-record.md), 2026-10-08, T7 and T23; 2026-10-11). The code
       does the same (#355): a page's start field holds every time the cursor comes on, and the list pages start on the

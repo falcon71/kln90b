@@ -9,11 +9,15 @@ import {standardRoute} from '../../../harness/fixtures';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 
-/** The part of NavPageState that FlightplanArrow reads: the active index in FPL 0, Direct To, the waypoint alert */
-function navState(activeIdx: number, dct = false, waypointAlert = false): NavPageState {
+/**
+ * The part of NavPageState that FlightplanArrow reads: the active index in FPL 0, Direct To, the waypoint alert and
+ * the distance to the active waypoint, which is null while the navigation is flagged
+ */
+function navState(activeIdx: number, dct = false, waypointAlert = false, distToActive: number | null = 10): NavPageState {
     return {
         activeWaypoint: {getActiveFplIdx: () => activeIdx, isDctNavigation: () => dct},
         waypointAlert,
+        distToActive,
     } as unknown as NavPageState;
 }
 
@@ -108,6 +112,11 @@ describe('FlightplanArrow (characterization)', () => {
         expect(arrow(1.5, navState(2, true)).text).toBe(' ');
     });
 
+    // #322: during a NAV flag no arrow is drawn in front of the Direct To target either (4-7 names the leg symbol)
+    it('draws no Direct To arrow while the navigation is flagged (characterization, #322)', () => {
+        expect(arrow(1, navState(1, true, false, null)).text).toBe(' ');
+    });
+
     it('characterization: a hidden arrow (the row under the cursor) shows nothing', () => {
         const a = new FlightplanArrow(2, navState(2), cursor());
         const m = mount(a);
@@ -146,10 +155,10 @@ describe('FlightplanArrow on FPL 0 during a NAV flag', () => {
         expect(Screen.read().rows('L')[2].slice(2)).toBe('2:ABC    ');
     });
 
-    // 4-7: the leg symbol belongs to a unit that is navigating; without usable navigation it is not drawn. The arrow
-    // keeps drawing it through a NAV flag, because the flag keeps the active waypoint. Whether a plain arrow stays in
-    // front of ABC is not claimed: the pin asserts only that neither end of the symbol is drawn.
-    it.fails('draws no leg symbol during a NAV flag (4-7, #322)', async () => {
+    // 4-7: the leg symbol belongs to a unit that is navigating; without usable navigation it is not drawn, although the
+    // flag keeps the active waypoint. Whether a plain arrow stays in front of ABC is not claimed: the test asserts only
+    // that neither end of the symbol is drawn (#322).
+    it('draws no leg symbol during a NAV flag (4-7, #322)', async () => {
         const unit = await onFpl0();
         unit.props.sensors.in.gps.reset();
         await vi.advanceTimersByTimeAsync(1500);
