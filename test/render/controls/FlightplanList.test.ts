@@ -212,8 +212,8 @@ describe('FlightplanList, an insertion (4-4)', () => {
 
 describe('FlightplanList, an insertion made with the page scrolled down (#319)', () => {
     // On the leg FX2AA to FX3AA the page of FPL 0 follows the active leg while the cursor is off (4-8); with the cursor
-    // on over FX1AA the page shows waypoint 1 in its top row, the blank top line off the page. The sibling of the pin
-    // below holds that state and the insertion itself
+    // on over FX1AA the page shows waypoint 1 in its top row, the blank top line off the page. This test holds
+    // that state and the insertion itself, the one below the page after it
     it('inserts the waypoint in front of FX3AA and renumbers the last one, the page scrolled down by the active leg ' +
         '(4-4, 4-8)',
         async () => {
@@ -226,11 +226,11 @@ describe('FlightplanList, an insertion made with the page scrolled down (#319)',
             expect(left()[5].slice(1)).toBe(' 9:FX8AA  ');
         });
 
-    // An insertion made with the page scrolled down leaves the page where it was; the unit rebuilds the list and jumps
-    // to its top, to the blank top line (trainer T28: FPL 0 scrolled down, a waypoint inserted in the middle and
-    // approved, the page stayed, checked in the KLN 89 trainer, 2026-10-08). The expected rows are the same page with
-    // BUGLE as the third waypoint, the rest one position down
-    it.fails('keeps the page where it was after an insertion (checked in the KLN 89 trainer, 2026-10-08, #319)',
+    // An insertion made with the page scrolled down leaves the page where it was: the rebuilt list keeps its scroll
+    // offset (trainer T28: FPL 0 scrolled down, a waypoint inserted in the middle and approved, the page stayed, checked
+    // in the KLN 89 trainer, 2026-10-08, #319). The expected rows are the same page with BUGLE as the third waypoint,
+    // the rest one position down
+    it('keeps the page where it was after an insertion (checked in the KLN 89 trainer, 2026-10-08, #319)',
         async () => {
             const unit = await bootEightWithBugle(47.12);
 
@@ -284,6 +284,43 @@ describe('FlightplanList, after a deletion (characterization)', () => {
             expect(fplIdents(unit, 0)).toEqual(['FX1AA', 'FX3AA', 'FX4AA']);
             expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: 'FX3AA'});
         });
+});
+
+describe('FlightplanList, a deletion made with the page scrolled down (#319)', () => {
+    // 4-8: FPL 0 keeps its last waypoint in the bottom row. The rebuilt list keeps its scroll offset (#319), but the
+    // list is one row shorter after the deletion, so the offset must be clamped: otherwise the blank position behind
+    // the last waypoint would take the bottom row. FX7AA is deleted with the cursor on it, the page scrolled down to it
+    async function deleteFx7InScrolledFpl0(): Promise<HeadlessUnit> {
+        const unit = await bootUnit({facilities: eight(), position: {lat: 46.9, lon: 8}, storage: savedFlightplan(0, eight())});
+        await settle(unit);
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'FX7AA');
+        expect(left().map(r => r.slice(1))).toEqual([' 3:FX3AA  ', ' 4:FX4AA  ', ' 5:FX5AA  ', ' 6:FX6AA  ', ' 7:FX7AA  ', ' 8:FX8AA  ']); // Precondition: scrolled
+        await unit.panel.clr();
+        expect(unit.panel.focused('L').text).toBe('DEL FX7AA ?'); // Precondition: the question
+
+        await unit.panel.ent();
+
+        expect(fplIdents(unit, 0)).toEqual(['FX1AA', 'FX2AA', 'FX3AA', 'FX4AA', 'FX5AA', 'FX6AA', 'FX8AA']);
+        return unit;
+    }
+
+    it('keeps the last waypoint in the bottom row after a deletion in a scrolled FPL 0 (4-8, #319)', async () => {
+        await deleteFx7InScrolledFpl0();
+
+        // Seven waypoints: the bottom row is the last one, the 7th. No row is the blank position 8
+        expect(left()[5].slice(1)).toBe(' 7:FX8AA  ');
+        expect(left().some(r => r.slice(1, 3) === ' 8')).toBe(false);
+    });
+
+    // 4-8 says nothing about the rows above the last waypoint. The page keeps its offset as far as the shorter list
+    // allows: it shows the waypoints 2 to 6 above the last one
+    it('shows the waypoints 2 to 6 above the last one after the deletion (characterization, #319)', async () => {
+        await deleteFx7InScrolledFpl0();
+
+        expect(left().map(r => r.slice(1))).toEqual([' 2:FX2AA  ', ' 3:FX3AA  ', ' 4:FX4AA  ', ' 5:FX5AA  ', ' 6:FX6AA  ', ' 7:FX8AA  ']);
+    });
 });
 
 describe('FlightplanList, after a deletion on a numbered plan', () => {

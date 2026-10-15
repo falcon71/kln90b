@@ -160,9 +160,8 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   ([the trainer record](kln89-trainer-record.md), 2026-10-09, T1), while the 90B code stays on the DIR page. The 90B
   guide was not checked for the case, and the #335 tests do not assert it.
 - **Left page leads** (seen and not confirmed or not filed):
-    - FPL 0 shows an empty top row when the active waypoint is the first one, and after a list rebuild with the cursor
-      on; the guide's figures do not show the case (a trainer question). `DirectToPage.test.ts` reads rows 1 to 5
-      around it.
+    - FPL 0 shows an empty top row when the active waypoint is the first one; the guide's figures do not show the case
+      (a trainer question). `DirectToPage.test.ts` reads rows 1 to 5 around it.
     - An XTK of exactly 0 shows `-.-` on NAV 3 (`Nav3Page.tsx:55,95` treat 0 as no value); unreachable in practice.
     - CAL 2's `setTemp` writes the CAL 1 temperature too; 5-11 does not say whether the pages share it.
     - The ` 0` in the top row of an empty SUP page is also the trainer's behavior and is a spec test.
@@ -287,8 +286,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests);
     - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): duplicate idents on a waypoint
-  page (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 are no open questions: the
-  trainer shows neither ARM nor ACTV, so the maintainer's rulings settle them and the tests hold them as characterizations.
+  page (2026-10-08, T20, not done), and the empty top row of FPL 0 with the first waypoint active (above). #162 and
+  #163 are no open questions: the trainer shows neither ARM nor ACTV, so the maintainer's rulings settle them and the
+  tests hold them as characterizations.
   What the 90B shows on an empty MSG page (#325), the prompt while the MSG page shows and an airport below sea level
   cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is
   the question #326.

@@ -644,7 +644,12 @@ export class FlightplanList extends List {
     }
 
     public refresh(children: UIElementChildren<any>): void {
+        const scrollIdx = this.scrollIdx; //#319 a rebuild keeps the page where it was (4-4, 4-8)
         super.refresh(children);
+        if (this.children === children && scrollIdx > 0) {
+            this.scrollIdx = Math.min(scrollIdx, this.maxScrollIdx(children.getall().length));
+            this.redraw();
+        }
     }
 
     public getSelectedWaypoint(): FlightPlanWaypint | null {
