@@ -668,25 +668,30 @@ const FIXES31 = () => Array.from({length: 31}, (_, i) => intersection(`FA${Strin
 
 describe('FPL 1 to FPL 25 pages, a full plan', () => {
     /**
-     * Boots with FPL 5 full, walks the cursor to the 30th waypoint, opens an insert in front of it with the inner knob,
-     * enters FA30 there and confirms it on the waypoint page. The unit logs the refused insert with console.error, which
-     * the test keeps out of its output.
+     * Boots with FPL 5 full, walks the cursor to waypoint `n` (the 30th by default), opens an insert in front of it with
+     * the inner knob, enters FA30 there and confirms it on the waypoint page. The unit logs the refused insert with
+     * console.error, which the test keeps out of its output.
      */
-    async function insertIntoFullFpl5() {
+    async function insertIntoFullFpl5(n = 30) {
         muteConsoleError();
         const fixes = FIXES31();
+        const ident = `FA${String(n - 1).padStart(2, '0')}`; // waypoint n of the plan
         const unit = await bootUnit({facilities: fixes, position: {lat: 46.5, lon: 8}, storage: savedFlightplan(5, fixes.slice(0, 30))});
         await settle(unit);
         await unit.panel.selectPage('L', 'FPL 5');
         await unit.panel.cursor('L');
-        await unit.panel.outer('L', 31); // USE? INVRT?, then the 30 waypoints
-        expect(left()[5]).toBe(' 30:FA29   '); // Precondition
-        expect(unit.panel.focused('L').text).toBe('FA29 '); // Precondition
-        await unit.panel.inner('L', 1); // the insert in front of FA29
-        expect(left()[5]).toBe(' 31:FA29   '); // Precondition: FA29 moved down to make room, so an insert is open
-        // The new entry is number 30. It is found by its number and not by its text (the text of the first click is
-        // #311)
-        const cursorOnEntry = () => cursorRows().length === 1 && /^\s*30:/.test(left()[cursorRows()[0]]);
+        await unit.panel.outer('L', n + 1); // USE? INVRT?, then the waypoints up to n
+        if (n === 30) {
+            expect(left()[5]).toBe(' 30:FA29   '); // Precondition
+        }
+        expect(unit.panel.focused('L').text).toBe(`${ident} `); // Precondition
+        await unit.panel.inner('L', 1); // the insert in front of it
+        if (n === 30) {
+            expect(left()[5]).toBe(' 31:FA29   '); // Precondition: FA29 moved down to make room, so an insert is open
+        }
+        // The new entry takes the number n. It is found by its number and not by its text (the text of the first click
+        // is #311)
+        const cursorOnEntry = () => cursorRows().length === 1 && new RegExp(`^\\s*${n}:`).test(left()[cursorRows()[0]]);
         expect(cursorOnEntry()).toBe(true); // Precondition: the cursor is on the new entry
         await unit.panel.enterIdent('L', 'FA30');
         await unit.panel.ent(); // the waypoint page
@@ -723,15 +728,31 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // The refused waypoint stays on the page as a row until the page is left: the entry that held it is not removed
-    // from the list. The sibling above holds that the plan itself is unchanged. The cursor is walked over the whole page,
-    // to the top and back to the end, so the walk does not depend on where the cursor stands
-    it.fails('does not show the refused waypoint after FPL FULL (4-4, C-1, #240)', async () => {
+    // The refused waypoint is not shown after FPL FULL: the list is rebuilt from the plan as stored (#240). The sibling
+    // above holds that the plan itself is unchanged. The cursor is walked over the whole page, to the top and back to
+    // the end, so the walk does not depend on where the cursor stands
+    it('does not show the refused waypoint after FPL FULL (4-4, C-1, #240)', async () => {
         const unit = await insertIntoFullFpl5();
 
         const rows = numbered(await walkRows(unit, 40));
         const expectedIdent = (n: number) => `FA${String(n - 1).padStart(2, '0')}`;
         expect(rows.filter(r => r.ident !== expectedIdent(r.n))).toEqual([]);
+    });
+
+    // After FPL FULL the cursor goes back to the waypoint the insert was in front of (#240)
+    it('keeps the cursor on the waypoint the refused insert was in front of (characterization, #240)', async () => {
+        const unit = await insertIntoFullFpl5();
+
+        expect(unit.panel.focused('L').text).toBe('FA29 ');
+    });
+
+    // The same in the middle of the plan: the cursor is on waypoint 10, FA09, which the refused insert was in front of,
+    // and not on the waypoint behind it (#240)
+    it('keeps the cursor on the waypoint the refused insert was in front of, in the middle of the plan (characterization, #240)', async () => {
+        const unit = await insertIntoFullFpl5(10);
+
+        expect(Screen.read().status().mode).toBe('FPL FULL');
+        expect(unit.panel.focused('L').text).toBe('FA09 ');
     });
 
     // 4-4: the plan holds 30 waypoints. The walk is a fixed number of outer clicks over the fields of the page

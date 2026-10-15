@@ -21,7 +21,7 @@ export interface FlightplanListItemProps extends PageProps {
     wpt: Facility | null,
     onCreate: (idx: number, mode: FplWptEnterMode, keyboardKey?: string) => void,
     onDelete: (idx: number) => void,
-    onInsertDone: (idx: number, value: Facility | null, leg: KLNFlightplanLeg | null) => void,
+    onInsertDone: (idx: number, value: Facility | null, leg: KLNFlightplanLeg | null) => boolean, //false: refused with FPL FULL (#240)
     onBeforeDelete: (idx: number) => KLNErrorMessage | null,
     parent: SixLineHalfPage,
     cursorController: CursorController,
@@ -43,6 +43,7 @@ export class FlightplanListItem implements Field, ListItem {
     protected readonly readonlyRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     protected readonly delRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     private waypointEditor: WaypointEditor;
+    private insertRefused = false; //#240 the insert of the last confirmation was refused with FPL FULL
     private refEntry = false; //#291 the reference waypoint of the REF page, from its confirmation until the entry is left
     private readonly type: KLNLegType;
     private readonly wptIdent: string;
@@ -189,8 +190,14 @@ export class FlightplanListItem implements Field, ListItem {
                 return EnterResult.Handled_Keep_Focus;
             }
             const wasBlank = this.wpt === null;
+            this.insertRefused = false;
             const handled = await this.waypointEditor.enter();
             this.isEntered = this.waypointEditor.isEntered;
+            if (this.insertRefused) {
+                //4-4, C-1: nothing was added and the list is rebuilt as stored. The cursor stays where the refused
+                //entry was, on the waypoint the insert was in front of (#240)
+                return EnterResult.Handled_Keep_Focus;
+            }
             //The first ENT on a typed ident also leaves wpt null, but the editor still waits for the approval
             //(isEntered); only the confirmed blank ends the insert
             if (wasBlank && this.wpt === null && !this.waypointEditor.isEntered && handled === EnterResult.Handled_Move_Focus) {
@@ -302,7 +309,7 @@ export class FlightplanListItem implements Field, ListItem {
 
     private setFacility(facility: Facility | null) {
         this.wpt = facility;
-        this.props.onInsertDone(this.props.wptIdx, facility, this.props.leg);
+        this.insertRefused = !this.props.onInsertDone(this.props.wptIdx, facility, this.props.leg);
     }
 
     public keyboard(key: string): boolean {

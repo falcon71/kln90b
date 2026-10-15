@@ -341,14 +341,17 @@ class EditableFlightplan {
         this.buildList();
     }
 
-    public insertLeg(idx: number, wpt: Facility | null, leg: KLNFlightplanLeg | null) {
+    /**
+     * @return false when the insert was refused with FPL FULL, true otherwise (#240)
+     */
+    public insertLeg(idx: number, wpt: Facility | null, leg: KLNFlightplanLeg | null): boolean {
         const wasRefEntry = this.findRefRow(row => row.isRefEntry()) !== undefined; //#291 before the rebuild
         if (wpt === null) {
             //The user aborted the insert by turning the cursor off
             this.syncLegsFromFlightplan();
             this.buildList();
             this.endRefApproval(wasRefEntry);
-            return;
+            return true;
         }
 
         try {
@@ -371,10 +374,15 @@ class EditableFlightplan {
 
             this.buildList();
             this.endRefApproval(wasRefEntry);
+            return true;
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
             console.error(e);
+            //4-4, C-1: nothing is added, the page shows the plan as stored (#240)
+            this.syncLegsFromFlightplan();
+            this.buildList();
             this.endRefApproval(wasRefEntry);
+            return false;
         }
     }
 
