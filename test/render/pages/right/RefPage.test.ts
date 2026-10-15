@@ -1,12 +1,15 @@
 import {describe, expect, it, vi} from 'vitest';
-import {Facility} from '@microsoft/msfs-sdk';
+import {Facility, FacilityType, FixTypeFlags} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 import {courseDeg, distanceNm} from '../../../harness/flight/geo';
 import {collectStatusMessages} from '../../../harness/statusLine';
-import {fplIdents} from '../../../harness/readers';
+import {fplIdents, userWaypoints} from '../../../harness/readers';
+import {approach, Leg, star, withProcedures} from '../../../harness/navdata/procedures';
+import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
+import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 
 // The world of the REF tests: a leg KAAA to KBBB due north along 10 E, a VOR TXK 0.3 degree east of the middle of the
 // leg (a perpendicular to the leg exists, 5-21) and a VOR GRW beyond the end of the leg (only a perpendicular to the
@@ -379,6 +382,159 @@ describe('REF page, the ends of the leg (5-21)', () => {
         expect(Screen.read().status().mode).toBe('INVALID REF');
         expect(fplIdents(unit, 2)).toEqual(['KAAA', 'KBBB']);
     });
+});
+
+describe('REF page, the approach legs of FPL 0 (6-7)', () => {
+    // 6-7: no reference waypoint goes on a leg between two waypoints of an approach. TXK (47.5 N, 10.3 E) has a
+    // perpendicular to the leg from IAFDD (47.0 N) to FAFDD (48.0 N) on 10 E, but that leg is not eligible. The eligible
+    // legs are the leg from KAAA to IAFDD and the leg from MAPDD to KDDD; the perpendicular to TXK falls beyond the end
+    // of the first and behind the start of the second (5-21), so no leg is left and REF gives INVALID REF
+    it('offers no reference waypoint between two approach waypoints (6-7, #377)', async () => {
+        const kaaa = airport('KAAA', 46.0, 10.0);
+        const iafdd = intersection('IAFDD', 47.0, 10.0);
+        const fafdd = intersection('FAFDD', 48.0, 10.0);
+        const mapdd = intersection('MAPDD', 48.2, 10.0);
+        const txk = vor('TXK', 47.5, 10.3);
+        const kddd = withProcedures(airport('KDDD', 48.3, 10.0), {
+            approaches: [approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '36',
+                transitions: [{name: 'IAFDD', legs: [Leg.IF(iafdd, FixTypeFlags.IAF)]}],
+                final: [Leg.IF(iafdd), Leg.TF(fafdd, FixTypeFlags.FAF), Leg.TF(mapdd, FixTypeFlags.MAP)],
+            })],
+        });
+        const unit = await bootUnit({
+            facilities: [kaaa, kddd, iafdd, fafdd, mapdd, txk], position: {lat: 46.1, lon: 10.0},
+            storage: savedFlightplan(0, [kaaa, kddd]), panelXml: panelXml(APR_ARM_SWITCH),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8', {ident: 'KDDD'});
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.selectPage('R', 'REF');
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'IAFDD', 'FAFDD', 'MAPDD', 'KDDD']); // Precondition
+
+        await enterReference(unit, 'TXK');
+
+        expect(Screen.read().status().mode).toBe('INVALID REF');
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'IAFDD', 'FAFDD', 'MAPDD', 'KDDD']);
+        expect(userWaypoints(unit, FacilityType.USR).map(f => f.icaoStruct.ident)).not.toContain('TXKA');
+    });
+});
+
+describe('REF page, the legs beside an approach of FPL 0 (characterization)', () => {
+    // The leg from KAAA to IAFDD has an approach waypoint at one end only, so it is not a leg between two approach waypoints
+    // and stays eligible (#377). TXN (46.5 N, 10.3 E) has its perpendicular on that leg, and no other eligible leg reaches it
+    it('characterization: offers a reference waypoint on the leg into the IAF and inserts it as an en-route waypoint after the approval (#377)', async () => {
+        const unit = await bootOnApproachRef(46.5);
+
+        await enterReference(unit, 'TXN');
+
+        expect(Screen.read().status().right).toBe('SUP'); // offered: the reference waypoint waits for its approval
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'IAFDD', 'FAFDD', 'MAPDD', 'KDDD']);
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().status().mode).not.toBe('INVALID ADD');
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'TXNA', 'IAFDD', 'FAFDD', 'MAPDD', 'KDDD']);
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs()[1].type).toBe(KLNLegType.USER);
+    });
+
+    // The same world, the perpendicular on the leg from MAPDD to KDDD: an approach waypoint at one end only, too (#377).
+    // The reference waypoint lands in front of the airport, which is not an approach waypoint, after the approval
+    it('characterization: inserts a reference waypoint on the leg from the approach to the airport after the approval (#377)', async () => {
+        const unit = await bootOnApproachRef(48.25);
+
+        await enterReference(unit, 'TXN');
+        expect(Screen.read().status().right).toBe('SUP'); // Precondition: offered
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'IAFDD', 'FAFDD', 'MAPDD', 'TXNA', 'KDDD']);
+    });
+
+    /** FPL 0 KAAA, KDDD with the RNAV 36 approach loaded, REF on the right, and TXN at `txnLat` on 10.3 E */
+    async function bootOnApproachRef(txnLat: number): Promise<HeadlessUnit> {
+        const kaaa = airport('KAAA', 46.0, 10.0);
+        const iafdd = intersection('IAFDD', 47.0, 10.0);
+        const fafdd = intersection('FAFDD', 48.0, 10.0);
+        const mapdd = intersection('MAPDD', 48.2, 10.0);
+        const txn = vor('TXN', txnLat, 10.3);
+        const kddd = withProcedures(airport('KDDD', 48.3, 10.0), {
+            approaches: [approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '36',
+                transitions: [{name: 'IAFDD', legs: [Leg.IF(iafdd, FixTypeFlags.IAF)]}],
+                final: [Leg.IF(iafdd), Leg.TF(fafdd, FixTypeFlags.FAF), Leg.TF(mapdd, FixTypeFlags.MAP)],
+            })],
+        });
+        const unit = await bootUnit({
+            facilities: [kaaa, kddd, iafdd, fafdd, mapdd, txn], position: {lat: 46.1, lon: 10.0},
+            storage: savedFlightplan(0, [kaaa, kddd]), panelXml: panelXml(APR_ARM_SWITCH),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8', {ident: 'KDDD'});
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.selectPage('R', 'REF');
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'IAFDD', 'FAFDD', 'MAPDD', 'KDDD']); // Precondition
+        return unit;
+    }
+});
+
+describe('REF page, the legs into a STAR waypoint of FPL 0 (characterization)', () => {
+    // The reference waypoint goes in front of the STAR waypoint at the end of its leg and is a STAR leg itself, the copy
+    // of the row it goes in front of (#377). The leg from SAAAA to SBBBB runs along 10 E; TXS (47.5 N, 10.3 E) has its
+    // perpendicular on it, and no other leg of the plan reaches it
+    it('characterization: inserts a STAR leg for a reference waypoint on the leg between two STAR waypoints (#377)', async () => {
+        const unit = await bootOnStarRef(47.5);
+
+        await enterReference(unit, 'TXS');
+        expect(Screen.read().status().right).toBe('SUP'); // Precondition: offered
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        const legs = unit.props.memory.fplPage.flightplans[0].getLegs();
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.type])).toEqual([
+            ['KAAA', KLNLegType.USER], ['SAAAA', KLNLegType.STAR], ['TXSA', KLNLegType.STAR],
+            ['SBBBB', KLNLegType.STAR], ['KDDD', KLNLegType.USER],
+        ]);
+    });
+
+    // The same for the leg from the en-route waypoint into the first STAR waypoint: the row in front of the STAR waypoint
+    // is a STAR leg, so the reference waypoint is one, too
+    it('characterization: inserts a STAR leg for a reference waypoint on the leg from an en-route waypoint into the STAR (#377)', async () => {
+        const unit = await bootOnStarRef(46.5);
+
+        await enterReference(unit, 'TXS');
+        expect(Screen.read().status().right).toBe('SUP'); // Precondition: offered
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        const legs = unit.props.memory.fplPage.flightplans[0].getLegs();
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.type])).toEqual([
+            ['KAAA', KLNLegType.USER], ['TXSA', KLNLegType.STAR], ['SAAAA', KLNLegType.STAR],
+            ['SBBBB', KLNLegType.STAR], ['KDDD', KLNLegType.USER],
+        ]);
+    });
+
+    /** FPL 0 KAAA, KDDD with the STAR into KDDD (SAAAA, SBBBB) loaded, REF on the right, and TXS at `txsLat` on 10.3 E */
+    async function bootOnStarRef(txsLat: number): Promise<HeadlessUnit> {
+        const kaaa = airport('KAAA', 46.0, 10.0);
+        const saaaa = intersection('SAAAA', 47.0, 10.0);
+        const sbbbb = intersection('SBBBB', 48.0, 10.0);
+        const txs = vor('TXS', txsLat, 10.3);
+        const kddd = withProcedures(airport('KDDD', 48.3, 10.0), {
+            arrivals: [star('ARR1', {common: [Leg.TF(saaaa), Leg.TF(sbbbb)]})],
+        });
+        const unit = await bootUnit({
+            facilities: [kaaa, kddd, saaaa, sbbbb, txs], position: {lat: 46.1, lon: 10.0},
+            storage: savedFlightplan(0, [kaaa, kddd]),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 7', {ident: 'KDDD'});
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.selectPage('R', 'REF');
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'SAAAA', 'SBBBB', 'KDDD']); // Precondition
+        return unit;
+    }
 });
 
 describe('REF page (characterization)', () => {

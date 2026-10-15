@@ -763,7 +763,11 @@ export class FlightplanList extends List {
 
     public insertRefWpt(wpt: Facility, idx: number) {
         this.cursorController.setCursorActive(true);
-        this.editPlan.createLeg(idx, FplWptEnterMode.CONFIRM, undefined, wpt);
+        //#377: in front of the first waypoint of an approach the reference waypoint is an en-route leg, as an inner click on
+        //the approach header makes it (6-7). An integer index would copy the approach type of that waypoint and answer
+        //INVALID ADD. A SID or STAR waypoint keeps its copy (6-23)
+        const approachFirst = this.editPlan.legs[idx]?.leg?.type === KLNLegType.APP;
+        this.editPlan.createLeg(approachFirst ? idx - 0.5 : idx, FplWptEnterMode.CONFIRM, undefined, wpt);
     }
 
     public refreshFpl() {

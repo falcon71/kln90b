@@ -16,6 +16,7 @@ import {MainPage} from "../MainPage";
 import {FplPage} from "../left/FplPage";
 import {WaypointEditor} from "../../controls/editors/WaypointEditor";
 import {Flightplan} from "../../data/flightplan/Flightplan";
+import {mayAddWaypointBefore} from "../../services/FlightplanUtils";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
 import {getUniqueIdent} from "../../data/navdata/UniqueIdentGenerator";
 import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "../../data/navdata/IcaoBuilder";
@@ -148,6 +149,7 @@ export class RefPage extends SixLineHalfPage {
         const closestWpt = new GeoPoint(0, 0);
         let closestIdx = -1;
         for (let i = 1; i < legs.length; i++) {
+            if (!mayAddWaypointBefore(legs, i)) continue; //#377 6-7
             const from = legs[i - 1].wpt;
             const to = legs[i].wpt;
             tempGeoPoint.set(from);

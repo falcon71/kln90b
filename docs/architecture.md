@@ -608,13 +608,16 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `reset()` runs on every power-on. It resets these fields, **removes procedures from FPL 0 when the unit was off
       for more than 5 minutes** (6-5; `timeSincePowerChange` of the power event), and re-initialises the first scan-list
       entry per type, setting `isReady` when done; WelcomePage waits on `isReady`.
-    - `ctrPage` keeps the left FPL page instance of the CTR computation (`lastFplPage`). CTR 1 and CTR 2 call `syncCtrState`
-      (`pages/right/CtrState.ts`) in their display ticks and return to the start state when another instance is on the left (5-26).
+    - `ctrPage` keeps the left FPL page instance of the CTR computation (`lastFplPage`). CTR 1 and CTR 2 call
+      `syncCtrState` (`pages/right/CtrState.ts`) in their display ticks and return to the start state when another
+      instance is on the left (5-26).
       `computedLegs` is a copy of the plan's legs from the computation: when the plan's legs differ (count or instance),
-      `syncCtrState` and CTR 1's insert ENT go back to the start state (#348), and a computation that finishes after such a reset
-      is discarded. The insertion therefore needs no room check of its own; the computation checks `fits`.
+      `syncCtrState` and CTR 1's insert ENT go back to the start state (#348), and a computation that finishes after such
+      a reset is discarded. The insertion therefore needs no room check of its own; the computation checks `fits`.
       CTR 1 drops a crossing on a leg between two approach waypoints before it counts or creates anything
-      (`mayAddWaypointBefore` in `services/FlightplanUtils.ts`, 6-7, #349).
+      (`mayAddWaypointBefore` in `services/FlightplanUtils.ts`, 6-7, #349). REF skips such legs when it looks for the
+      closest leg, and gives INVALID REF when none is left (`RefPage.findClosestPoint`, 5-21, #377). A REF waypoint on
+      the leg into the IAF is inserted as an en-route leg in front of the approach header (`insertRefWpt`).
 - **Persistent messages** (`data/PersistentMessages.ts`) are condition-driven message objects. They are not stored; see
   Core 9.
 
