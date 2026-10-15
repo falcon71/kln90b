@@ -685,12 +685,8 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
         await unit.panel.inner('L', 1); // the insert in front of FA29
         expect(left()[5]).toBe(' 31:FA29   '); // Precondition: FA29 moved down to make room, so an insert is open
         // The new entry is number 30. It is found by its number and not by its text (the text of the first click is
-        // #311), and it is not on the page yet while the cursor stands on the waypoint before it
+        // #311)
         const cursorOnEntry = () => cursorRows().length === 1 && /^\s*30:/.test(left()[cursorRows()[0]]);
-        if (!cursorOnEntry()) {
-            // The cursor stays on the waypoint before the new entry (#242); one click moves it on
-            await unit.panel.outer('L', 1);
-        }
         expect(cursorOnEntry()).toBe(true); // Precondition: the cursor is on the new entry
         await unit.panel.enterIdent('L', 'FA30');
         await unit.panel.ent(); // the waypoint page
@@ -799,7 +795,7 @@ describe('inserting a waypoint with the inner knob', () => {
     // 4-4: the inner knob can insert into any plan below the 30-waypoint limit, not only into FPL 0: it opens an entry
     // in front of the waypoint under the cursor and the waypoint moves down. This holds the insert of the numbered
     // plan, by the number of the new entry and not by its text (the first click shows a blank, which #311 says is
-    // wrong); the cursor on it is the pin below
+    // wrong); the cursor on it is held by the test below
     it('opens an entry in front of the waypoint when the inner knob turns on a numbered plan (4-4)', async () => {
         const unit = await cursorOnAbcOfFpl3();
 
@@ -809,9 +805,9 @@ describe('inserting a waypoint with the inner knob', () => {
         expect(left()[3]).toBe('  3:ABC    ');
     });
 
-    // 4-4 puts the cursor on the entry being typed, whichever plan it is. On a numbered plan with waypoints it stays
-    // on the waypoint before the new entry, which is open for typing but not under the cursor
-    it.fails('puts the cursor on the new blank entry when the inner knob opens an insert on a numbered plan (4-4, #242)', async () => {
+    // 4-4 puts the cursor on the entry being typed, whichever plan it is: on a numbered plan with waypoints too, the
+    // cursor is on the new blank entry (#242)
+    it('puts the cursor on the new blank entry when the inner knob opens an insert on a numbered plan (4-4, #242)', async () => {
         const unit = await cursorOnAbcOfFpl3();
 
         await unit.panel.inner('L', 1);

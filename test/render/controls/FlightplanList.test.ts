@@ -297,7 +297,7 @@ describe('FlightplanList, after a deletion on a numbered plan', () => {
     }
 
     // 4-5: ENT deletes the waypoint and the later ones move up (figure 4-21); this holds the deletion, the cursor is
-    // the pin below
+    // held by the test below
     it('deletes the waypoint and moves the later ones up on a numbered plan (4-5)', async () => {
         const unit = await deleteFx2OfFpl4();
 
@@ -306,10 +306,9 @@ describe('FlightplanList, after a deletion on a numbered plan', () => {
     });
 
     // After ENT the cursor stays in the position of the deleted waypoint, on the one that moved up into it (checked in
-    // the KLN 89 trainer, 2026-10-08, T21 c; FPL 0 and OTH 3 do the same, #26). On a numbered plan with waypoints the
-    // unit puts it one position higher, on the waypoint before: the list counts one field for USE? and USE? INVRT?
-    // (FPLFirstLine.refreshButtons), the cause of #242
-    it.fails('keeps the cursor in the position of the deleted waypoint on a numbered plan ' +
+    // the KLN 89 trainer, 2026-10-08, T21 c; FPL 0 and OTH 3 do the same, #26). A numbered plan with waypoints does the
+    // same: the list counts USE? and USE? INVRT? as two fields (FPLFirstLine.refreshButtons, #242)
+    it('keeps the cursor in the position of the deleted waypoint on a numbered plan ' +
         '(checked in the KLN 89 trainer, 2026-10-08, #242)',
         async () => {
             const unit = await deleteFx2OfFpl4();
@@ -407,7 +406,7 @@ describe('FlightplanList, the DEL question', () => {
 
     // Trainer T21 b (checked in the KLN 89 trainer, 2026-10-08): the inner knob on the question: no question any more,
     // an entry row opens in front of the waypoint, which moves down. Whether the new row starts blank or with a letter
-    // is not asserted, nor where the cursor stands (on a numbered plan it is on the waypoint above, #242, pinned in
+    // is not asserted, nor where the cursor stands (on a numbered plan it is on the new entry, #242, held in
     // FplPage.test.ts)
     it('opens an entry in front of the waypoint when the inner knob turns (checked in the KLN 89 trainer, 2026-10-08)',
         async () => {

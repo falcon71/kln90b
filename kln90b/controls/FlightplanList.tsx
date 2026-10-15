@@ -145,7 +145,7 @@ class FPLFirstLine implements ListItem {
             this.children.get("useInverted").setVisible(true);
             this.children.get("del").setVisible(false);
             this.children.get("load0").setVisible(false);
-            return 1;
+            return 2; //#242 USE? and USE? INVRT? are two fields
         }
     }
 
