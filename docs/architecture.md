@@ -398,7 +398,9 @@ Flightplan really is dead simple".
   Would mess up the async asobo FPL sync"). Subscribers are `UserFlightplanPersistor` (persists every change) and
   `WTFlightplanSync`.
 - `getLegs()` returns the **internal mutable array**.
-- `removeProcedures()` keeps only USER legs. Procedures are never persisted.
+- `removeProcedures()` keeps only USER legs, and `removeProcedure(type)` drops one kind. Both publish
+  `flightplanChanged` when they removed a leg, so the planner mirror follows FPL 0 (#347). Procedures are never
+  persisted.
 - Branch `switch-to-wt-flightplan` (commit 580c4e7, Nov 2024, "does not compile at all and will probably be abandoned")
   lists why the SDK `FlightPlan`/`LNavComputer` does not fit:
     - pseudo-legs for direct-to versus the 30-leg limit

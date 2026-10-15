@@ -15,6 +15,7 @@ import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
 import {APR_ARM_SWITCH, NO_GPS_SIMVARS, panelXml} from '../../harness/panelXml';
 import {activeIdent, fplIdents} from '../../harness/readers';
+import {Screen} from '../../harness/render/screen';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {KLNLegType} from '../../../kln90b/data/flightplan/Flightplan';
 import {insertLegIntoFpl} from '../../../kln90b/services/FlightplanUtils';
@@ -438,5 +439,81 @@ describe('the "kln90b" flight planner behind a fence', () => {
         expect(aw.getActiveFplIdx()).toBe(2);
         expect(identsOf(plan)).toEqual(['ARCEN', 'FAFAA', 'MAPAA']);
         expect(plan.activeLateralLeg).toBe(0);
+    });
+});
+
+// #347: a procedure removed from FPL 0 is removed from the planner mirror too. Public contract (CLAUDE.md, "Public
+// contract with aircraft"; the wiki page Accessing the Flight Plan): plan 0 always matches FPL 0.
+describe('the "kln90b" flight planner after a procedure leaves FPL 0', () => {
+    /** FPL 0 of ENRBB, ENRAA and KPRC with the APT 8 approach loaded; the approach legs precede the airport */
+    async function bootWithApproach(): Promise<HeadlessUnit> {
+        const iafaa = intersection('IAFAA', 47.3, 7.7);
+        const ifaaa = intersection('IFAAA', 47.2, 7.8);
+        const fafaa = intersection('FAFAA', 47.1, 7.9);
+        const mapaa = intersection('MAPAA', 47.0, 8.0);
+        const mahaa = intersection('MAHAA', 47.0, 8.3);
+        const enraa = intersection('ENRAA', 47.6, 7.4);
+        const enrbb = intersection('ENRBB', 48.2, 6.8);
+        const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
+            approaches: [approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{name: 'IAFAA', legs: [Leg.IF(iafaa, FixTypeFlags.IAF), Leg.TF(ifaaa, FixTypeFlags.IF)]}],
+                final: [Leg.IF(ifaaa, FixTypeFlags.IF), Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+                missed: [Leg.CA(270), Leg.DF(mahaa), Leg.HM(mahaa, 90, LegTurnDirection.Right, FixTypeFlags.MAHP)],
+            })],
+        });
+        const unit = await bootUnit({
+            facilities: [kprc, iafaa, ifaaa, fafaa, mapaa, mahaa, enraa, enrbb], position: {lat: 47.9, lon: 7.1},
+            storage: savedFlightplan(0, [enrbb, enraa, kprc]), panelXml: panelXml(APR_ARM_SWITCH),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(1); // Precondition: the approach is loaded
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toContain('FAFAA'); // Precondition: the planner has it
+        return unit;
+    }
+
+    // The approach's legs as the planner mirrors them: the transition and the final, and no leg after the MAP (the fence)
+    const MIRRORED_APPROACH = ['ENRBB', 'ENRAA', 'IAFAA', 'IFAAA', 'FAFAA', 'MAPAA'];
+
+    it('drops the approach from plan 0 after DELETE APR (#347)', async () => {
+        const unit = await bootWithApproach();
+
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'CHANGE APR?');
+        await unit.panel.clr();
+        expect(Screen.read().text()).toContain('DELETE APR?'); // The question of the delete, before ENT answers it
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(fplIdents(unit)).toEqual(['ENRBB', 'ENRAA', 'KPRC']);
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(['ENRBB', 'ENRAA', 'KPRC']);
+    });
+
+    // 6-5, 6-23: FPL 0 loses its procedures when the unit was off for more than 5 minutes. The planner mirror follows at
+    // the power-on, which is the public contract (CLAUDE.md, "Public contract with aircraft"), so only the FPL 0 part cites
+    // the manual
+    it('drops the approach from plan 0 at the power-on after more than 5 minutes off (#347)', async () => {
+        const unit = await bootWithApproach();
+
+        await unit.panel.powerCycle({offSeconds: 360});
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['ENRBB', 'ENRAA', 'KPRC']);
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(['ENRBB', 'ENRAA', 'KPRC']);
+    });
+
+    // The sibling: a power cycle under 5 minutes keeps the procedures in FPL 0 (6-5, 6-23), so the mirror keeps them too
+    it('keeps the approach in plan 0 over a power cycle of 1 minute (#347)', async () => {
+        const unit = await bootWithApproach();
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(MIRRORED_APPROACH); // Precondition: the approach is mirrored
+
+        await unit.panel.powerCycle({offSeconds: 60});
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(MIRRORED_APPROACH);
     });
 });

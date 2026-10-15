@@ -137,19 +137,35 @@ export class Flightplan {
 
     /**
      * Removes all approaches, SIDs and STARs from this flightplan.
-     * Occurs when copying FPL 0 or when the device was powered off for more than 5 minutes
+     * Occurs when the device was powered off for more than 5 minutes. Copying FPL 0 does not call it, as `load`
+     * filters the procedure legs itself
      */
     public removeProcedures(): void {
-        this.legs = this.legs.filter(leg => leg.type === KLNLegType.USER);
+        this.removeLegs(leg => leg.type !== KLNLegType.USER);
     }
 
     public removeProcedure(type: KLNLegType): void {
-        this.legs = this.legs.filter(leg => leg.type !== type);
+        this.removeLegs(leg => leg.type === type);
+    }
+
+    /**
+     * #347: removes the legs and publishes, so that the flight planner mirror follows. Only when legs went: a publish at
+     * every power-on would rebuild the SDK planner for nothing. Inside a batch (startBatchInsert, #222, the procedure
+     * loads of APT 7 and 8) it does not publish: finishBatchInsert publishes once for the whole batch
+     */
+    private removeLegs(predicate: (leg: KLNFlightplanLeg) => boolean): void {
+        const kept = this.legs.filter(leg => !predicate(leg));
+        if (kept.length === this.legs.length) {
+            return;
+        }
+        this.legs = kept;
+        if (this.publishingEnabled) {
+            this.publisher.pub("flightplanChanged", this);
+        }
     }
 
     public load(fpl: Flightplan) {
-        this.legs = [...fpl.legs];
-        this.removeProcedures();
+        this.legs = fpl.legs.filter(leg => leg.type === KLNLegType.USER);
         this.publisher.pub("flightplanChanged", this);
     }
 

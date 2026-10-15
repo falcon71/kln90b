@@ -86,6 +86,19 @@ describe('Flightplan insert and delete', () => {
 
         expect(events).toEqual([]);
     });
+
+    // #347: the procedure removal of a load (#222) runs inside the batch too, so it is one event with the load
+    it('does not publish a procedure removal inside a batch, and publishes once when the batch finishes (characterization, #347)', () => {
+        const {fpl, events} = planWithEvents(0, [user(A), proc(B, KLNLegType.APP), user(C)]);
+
+        fpl.startBatchInsert();
+        fpl.removeProcedure(KLNLegType.APP);
+        expect(events).toEqual([]);
+        fpl.finishBatchInsert();
+
+        expect(events).toEqual([fpl]);
+        expect(identsOf(fpl.getLegs())).toEqual(['KAAA', 'KBBB']);
+    });
 });
 
 describe('Flightplan procedures', () => {
@@ -107,6 +120,19 @@ describe('Flightplan procedures', () => {
         fpl.removeProcedure(KLNLegType.STAR);
 
         expect(fpl.getLegs().map(l => l.type)).toEqual([KLNLegType.USER, KLNLegType.SID, KLNLegType.USER, KLNLegType.APP]);
+    });
+
+    // #347: the planner mirror follows FPL 0, so the removal publishes once, and a removal that removes nothing does not
+    // publish (characterization: the Pilot's Guide says nothing of events)
+    it('removeProcedures publishes once when it removes procedures, and not again when none are left (characterization, #347)', () => {
+        const {fpl, events} = planWithEvents(0, mixed());
+
+        fpl.removeProcedures();
+        expect(events).toEqual([fpl]);
+        expect(identsOf(fpl.getLegs())).toEqual(['KAAA', 'KBBB']);
+
+        fpl.removeProcedures();
+        expect(events).toEqual([fpl]);
     });
 });
 
