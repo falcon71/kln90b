@@ -1125,7 +1125,9 @@ export class Set3Page extends SixLineHalfPage {
   refreshes it.
 - Newly inserted rows carry `enterMe: FplWptEnterMode` (`ROTATE_LEFT`, `ROTATE_RIGHT`, `ENTER`, `CONFIRM`, `KEYBOARD`)
   so the new row is auto-entered after the rebuild.
-- FPL 0 keeps the active leg in view (4-8). `getVisibleLegsIndices()` feeds the D/T pages.
+- FPL 0 keeps the active leg in view (4-8), with the from waypoint on the page also when a procedure header lies between
+  it and the active waypoint (figure 6-43; a Direct To has no from waypoint, #239). `getVisibleLegsIndices()` feeds the
+  D/T pages.
 - `List.refresh` resets the scroll offset to the top. `FlightplanList.refresh` keeps it over a rebuild, clamped so that
   the last waypoint stays in the last row, so an insertion leaves the page where it was (#319).
 

@@ -194,8 +194,9 @@ async function bootWithApproach() {
 
 describe('FPL 0 page with an approach', () => {
     // Characterization: after a Direct To to the IAF the page follows the active waypoint with the approach header in its
-    // top row (the from waypoint scrolled off, #239). The cursor comes on at that top visible entry (T23, #355), the
-    // header, which then reads CHANGE APR? and asks for ENT (6-7). The guide does not show this case
+    // top row: a Direct To has no from waypoint in the plan to keep on the page (#239). The cursor comes on at that
+    // top visible entry (T23, #355), the header, which then reads CHANGE APR? and asks for ENT (6-7). The guide does not
+    // show this case
     it('characterization: turns the cursor on at the approach header in the top row, which reads CHANGE APR?', async () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
@@ -351,8 +352,9 @@ describe('FPL 0 page with a SID', () => {
 
 // 4-7: the tail of the active leg symbol stands left of the from waypoint; 4-8: the page follows the active leg.
 // Figure 6-43 (6-23) shows the from waypoint above a procedure header with the tail, the header, and
-// the active waypoint with the head below it. The unit scrolls to the row above the active waypoint, which is the
-// header, and the from waypoint leaves the page
+// the active waypoint with the head below it. The unit follows the figure: it scrolls so that the from waypoint is
+// on the page, not to the header (#239). The KLN 89 trainer differs here, it shows the header in the top row (checked
+// in the KLN 89 trainer, 2026-10-15), and the 90B follows the figure
 describe('FPL 0 page, the active leg across a procedure header', () => {
     async function bootOnTheFirstApproachLeg() {
         const w = approachWorld();
@@ -378,7 +380,7 @@ describe('FPL 0 page, the active leg across a procedure header', () => {
         expect(left().filter(r => r.startsWith('À'))).toEqual(['À 2 IAFAAà ']);
     });
 
-    it.fails('shows the from waypoint with the tail above the header (4-7, 4-8, 6-23, #239)', async () => {
+    it('shows the from waypoint with the tail above the header (4-7, 4-8, 6-23, #239)', async () => {
         const unit = await bootOnTheFirstApproachLeg();
 
         const rows = left();

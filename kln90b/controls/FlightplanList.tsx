@@ -672,7 +672,13 @@ export class FlightplanList extends List {
             for (let i = 0; i < childList.length; i++) {
                 const child = childList[i];
                 if (child instanceof FlightplanListItem && child.origWptIdx === actIdx) {
-                    const requiredScrollIdx = Math.max(Math.min(i - 1, this.maxScrollIdx(childList.length)), 0); //not using clamp, the order is important
+                    //4-7, 4-8, figure 6-43: the from waypoint stays on the page, also with a procedure header between it
+                    //and the active waypoint (#239). A Direct To has no from waypoint in the plan, and it is the only way
+                    //the active index is 0
+                    const fromIdx = actIdx > 0 && !this.activeWaypoint.isDctNavigation()
+                        ? childList.findIndex(c => c instanceof FlightplanListItem && c.origWptIdx === actIdx - 1) : -1;
+                    const anchor = fromIdx !== -1 ? fromIdx : i - 1;
+                    const requiredScrollIdx = Math.max(Math.min(anchor, this.maxScrollIdx(childList.length)), 0); //not using clamp, the order is important
                     if (requiredScrollIdx !== this.scrollIdx) {
                         this.scrollIdx = requiredScrollIdx;
                         this.redraw();
