@@ -229,6 +229,21 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       does the same (#355): a page's start field holds every time the cursor comes on, and the list pages start on the
       top visible entry while scrolled, which also explains why 4-3 sends a pilot back to USE? after building a long
       plan.
+- **Gaps left by the flight plan entry fixes** (code held by reading, not by a test; paraphrased from the milestone 4
+  review):
+    - #291: the run-once clearing of a pending CONFIRM entry (`enterMe`) is not held. It shows only when `createLeg` runs
+      while a REF row waits. The keyboard re-entry of a waiting REF row is untested too; the knob path is.
+    - #294: no ACT test for INT, NDB, SUP or an APT 2 to n page; the wiring of the arrow is mechanical, so a test there
+      would repeat the VOR and APT 1 ones.
+    - #262, creation page:
+        - A creation page that left the right stack (right cursor off, outer knob) makes the left CLR take the #310
+          blank-waits-for-ENT path. Untested.
+        - CLR on a duplicate-waypoint list above the creation page cancels the whole creation. Untested.
+        - A second CLR on D-> after a canceled creation goes through the existing D-> CLR path, while the KLN 89 left
+          the D-> page there ([the trainer record](kln89-trainer-record.md), 2026-10-15): a lead for a trainer check.
+    - #343: a waypoint page can create a user waypoint whose ident starts with a blank (a blank dialed into the first
+      cell, and now a character in a later cell of an all-blank ident); the V2 loader trims it on reload. A lead for a
+      trainer check before an issue is filed.
 
 ## Boot, power and the unit as a whole
 
