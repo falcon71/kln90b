@@ -254,3 +254,15 @@ afterwards)
   destination after a Direct To to the last waypoint of FPL 0 (medium-high, #298). The maintainer saw it also draw the
   arrow at the last copy of a destination that is twice in the plan while the first copy was active, which is taken
   for a fault of that trainer (#298). Its REF page refused both references tried, so it says nothing about #291.
+
+**2026-10-15** (evening; the maintainer's observation, then an agent check; nothing stored)
+- The first character of an identifier offers no blank: on the USR and APT 1 pages, in the D-> field, in an FPL 0
+  insert and at the blank end position of FPL 0 the inner knob runs A to Z, 0 to 9 and back to A (Z to 0, 9 to A;
+  counterclockwise A to 9, 0 to Z). Each step autofills the first identifier that starts with that character, or leaves
+  the rest blank when there is none. From the second character on the blank sits between 9 and A, with no autofill
+  while that character is blank (#374).
+- On a fresh D-> field and at the blank end position of FPL 0 the first clockwise click gives A with the autofill of the
+  first identifier starting with A; from an empty D-> field or FPL 0 position the first counterclockwise click gives 9
+  (seen in the morning check of the same day) (#311).
+- The first character of a remark line does offer a blank, after the hyphen: Z, 0 to 9, -, blank, A. The first
+  clockwise click on a remark line clears it to A followed by blanks.
