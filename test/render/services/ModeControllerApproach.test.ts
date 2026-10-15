@@ -423,14 +423,16 @@ describe('approach active ramp (characterization)', () => {
 
 describe('the pilot disarm and a new approach (characterization)', () => {
     // The disarm belongs to the approach that was loaded; the same approach loaded again is a new approach, which arms by
-    // itself inside 30 NM (#139)
+    // itself inside 30 NM (#139); the replace question of #274 is answered with APPROVE?
     it('arms by itself again when the approach is loaded again after the disarm (characterization, #139)', async () => {
         const {unit} = await approachLoaded(20);
         await unit.panel.press('KLN90B_ApprArm_Push');
         await vi.advanceTimersByTimeAsync(3000);
         expect(nav(unit).navmode).toBe(NavMode.ENR_LEG);
 
-        await unit.panel.loadProcedure('APT 8');
+        await unit.panel.loadProcedure('APT 8'); // the unit asks before it replaces the approach (#274)
+        await unit.panel.cursor('R'); // loadProcedure switched the cursor off, which the page switches on by itself
+        await unit.panel.ent(); // APPROVE?
         await vi.advanceTimersByTimeAsync(3000);
 
         expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);

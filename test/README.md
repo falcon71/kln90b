@@ -276,8 +276,9 @@ pages accept.
 
 - `Leg.TF(fix, flags)`, `Leg.IF`, `Leg.CF`, `Leg.DF`, `Leg.CA`, `Leg.VM`, `Leg.HM`, `Leg.HF`, `Leg.HA`, `Leg.PI`
   (holds and a procedure turn, with the arguments of `Leg.HM`), `Leg.AF` (a DME arc) and `Leg.RF`
-  (only to test that RF procedures are rejected) return legs as `FlightPlan.createLeg` does. `SidStar` writes into legs
-  (`fixTypeFlags`, `course`), so every call returns a new object; never share a leg between procedures.
+  (only to test that RF procedures are rejected) return legs as `FlightPlan.createLeg` does. Every call returns a new
+  object; never share a leg between procedures. `SidStar` converts copies of the legs, so the procedure stays as built
+  (#376).
 - `sid`, `star` and `approach` take the legs by role: runway transitions, enroute transitions, common legs, or an
   approach's transitions, final and missed legs. `withProcedures(apt, {...})` returns a copy of an `airport()` that carries
   them, because the builders in `builders.ts` stay procedure-free.
@@ -288,6 +289,13 @@ pages accept.
 - **`unit.panel.loadProcedure('APT 8')`** loads the first procedure of APT 7 or APT 8 into FPL 0 the way a pilot does:
   select the page, cursor, ENT on the first entry (a single transition is taken without a question), ENT on LOAD IN
   FPL, cursor off, then one second of clock, because FPL 0 scrolls to the active leg only at the next calculation tick.
+  A load into a full FPL 0 that must delete waypoints asks on the left page first (#222); the helper leaves that
+  question open, and the test answers it with `ent()` or `clr()`. A load of a procedure that FPL 0 holds one of the
+  same type already asks first to replace it on the right page (#274): the helper leaves that question open too, with
+  the cursor off, so the test turns the cursor on with `cursor('R')` and answers it with `ent()`. FPL 0 on the left
+  with its cursor off takes CLR for its DELETE FPL? question (4-5) before the right page sees it, which is the known
+  bug #383, not 4-5 behavior; until it is fixed a test that answers a question with CLR moves the left page away
+  first (`selectPage('L', 'NAV 1')`).
   APT 8 (and ACT 8) exists only on a unit with the approach arm switch (3-49, #133), so a test that reaches it boots
   with `panelXml(APR_ARM_SWITCH)`; the harness default panel.xml has no switch, as the parser default.
   The APT pages open on the first airport of the scan list, so with more than one airport pass
@@ -300,8 +308,11 @@ pages accept.
   first leg that survives the conversion, which replaces the leg before the arc with the entry.
   Boot on the arc, so that the arc leg is the closest and becomes active.
   A test that recalculates the entry (MOVE? on Super NAV 5) can use a left or a right arc.
+  Two arcs around one navaid with radii more than 0.1 NM apart stay two arcs: the first arc's end fix stays in the
+  list, and the second arc starts at a generated entry at its published beginning (#131).
 - `Leg.TF(fix, FixTypeFlags.IAF)` and its siblings set the fix types. `SidStar` keeps a leg flagged IAF, FAF, MAP or MAHP
-  even when its fix repeats, and drops an unflagged repeat.
+  even when its fix repeats, and drops an unflagged repeat. A missed approach that ends in a hold (HA, HF or HM) gets
+  the MAHP flag without a flagged leg in the test data (#220); one that ends otherwise has none.
 
 ## Reading the screen
 
@@ -772,10 +783,10 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   type argument and looks up by ICAO alone, so the type that `KLNFacilityLoader.getFacilities` passes down cannot be
   observed. The [next steps](../docs/test-next-steps.md) have the options.
 - **One fact about real procedures came from a navigation database queried locally and is not committed.** The pattern
-  `AF, CI (no fix), AF` around one navaid with two radii, which `SidStar` merges into one arc (#131), was found in an
+  `AF, CI (no fix), AF` around one navaid with two radii, which `SidStar` keeps as two arcs (#131), was found in an
   AIRAC 2607 export (five STARs). No row of it is in the repo (section 5 forbids recorded navdata), and the sim's own
-  representation of the CI legs was not checked: the invented procedure of the pin in `SidStar.test.ts` is built from the
-  pattern, not from the data.
+  representation of the CI legs was not checked: the invented procedure of the #131 test in `SidStar.test.ts` is built
+  from the pattern, not from the data.
 - **There is no wind.** Ground speed and track equal airspeed and heading, so crosswind effects are not modeled.
 - **`jump` skips integrated values**, and monitors and the recorder sample once per simulated second.
 - **The 16 Hz loops** run every 62 ms in tests: the fake timers round the 62.5 ms interval down to whole milliseconds.

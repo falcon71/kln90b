@@ -1,11 +1,11 @@
 import {describe, expect, it} from 'vitest';
-import {EventBus, Facility, GeoPoint} from '@microsoft/msfs-sdk';
+import {AirportFacility, EventBus, Facility, GeoPoint} from '@microsoft/msfs-sdk';
 import {ActiveWaypoint} from '../../../kln90b/data/flightplan/ActiveWaypoint';
 import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from '../../../kln90b/data/flightplan/Flightplan';
 import {NavPageState} from '../../../kln90b/data/VolatileMemory';
 import {KLN90BUserSettings} from '../../../kln90b/settings/KLN90BUserSettings';
 import {Sensors} from '../../../kln90b/Sensors';
-import {calcDistToDestination, insertLegIntoFpl} from '../../../kln90b/services/FlightplanUtils';
+import {calcDistToDestination, insertLegIntoFpl, mayAddWaypointBefore, roomSteps} from '../../../kln90b/services/FlightplanUtils';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {pointFrom} from '../../harness/flight/geo';
 import {identsOf} from '../../harness/readers';
@@ -168,6 +168,19 @@ describe('insertLegIntoFpl', () => {
         expect(fpl5.getLegs()).toHaveLength(30);
     });
 
+    // Checked in the KLN 89 trainer, 2026-10-15: a waypoint inserted in front of a STAR row of a plan whose en-route
+    // waypoints are at the limit is a STAR waypoint and goes in without deleting anything
+    it('inserts a STAR leg into FPL 0 with 30 en-route waypoints and keeps the first leg (checked in the KLN 89 trainer, 2026-10-15)', () => {
+        const star = (ident: string): KLNFlightplanLeg => ({wpt: intersection(ident, 46.9, 8.1), type: KLNLegType.STAR});
+        const {fpl0, aw} = build([...fullPlanLegs(), star('STRAA'), star('STRAB')], START);
+
+        insertLegIntoFpl(fpl0, navState(aw, null), 31, star('STRAC'));
+
+        expect(fpl0.getLegs()).toHaveLength(33);
+        expect(identsOf(fpl0.getLegs())[0]).toBe('FIX00');
+        expect(identsOf(fpl0.getLegs()).slice(30)).toEqual(['STRAA', 'STRAC', 'STRAB']);
+    });
+
     // characterization: the Pilot's Guide names only the refusal (FPL FULL when the first waypoint is part of the active
     // leg). That the first waypoint makes room in every other case is the unit's rule (FlightplanUtils.ts)
     it('drops the first leg of a full FPL 0 to append when no waypoint is active (characterization)', () => {
@@ -235,15 +248,126 @@ describe('insertLegIntoFpl', () => {
         expect(identsOf(fpl0.getLegs())).not.toContain('NEWWP');
     });
 
-    // 4-4: a waypoint typed over the first row goes in front of the first waypoint, so it becomes the first one. Today
-    // the index becomes -1 after the first leg is dropped, and splice(-1) puts the leg in front of the last one.
-    it.fails('puts a waypoint typed in front of the first leg of a full FPL 0 first (#148)', () => {
+    // 4-4: a waypoint typed over the first row goes in front of the first waypoint, so it becomes the first one. The
+    // first waypoint makes room and the index follows it (#148)
+    it('puts a waypoint typed in front of the first leg of a full FPL 0 first (4-4, #148)', () => {
         const {fpl0, aw} = build(fullPlanLegs(), START);
 
         insertLegIntoFpl(fpl0, navState(aw, null), 0, user(NEW));
 
         expect(identsOf(fpl0.getLegs()).slice(0, 2)).toEqual(['NEWWP', 'FIX01']);
         expect(identsOf(fpl0.getLegs())[29]).toBe('FIX29');
+    });
+});
+
+describe('roomSteps, the legs that go to make room in FPL 0 (#148)', () => {
+    const sidOf = (apt: Facility, ident: string): KLNFlightplanLeg =>
+        ({wpt: intersection(ident, 47.0, 8.2), type: KLNLegType.SID, parentFacility: apt as AirportFacility});
+
+    it('is empty when the legs fit (characterization)', () => {
+        const {fpl0, aw} = build(fullPlanLegs().slice(0, 29), START);
+        expect(roomSteps(fpl0.getLegs(), navState(aw, null), 1, 0)).toEqual([]);
+    });
+
+    it('deletes one waypoint for one en-route waypoint in a full plan (characterization)', () => {
+        const {fpl0, aw} = build(fullPlanLegs(), START);
+        expect(roomSteps(fpl0.getLegs(), navState(aw, null), 1, 0)).toEqual([1]);
+        expect(fpl0.getLegs()).toHaveLength(30); // nothing changed
+    });
+
+    // An airport deleted from the front takes its SID: the SID would otherwise start the plan without its airport
+    it('deletes the airport at the front together with the SID legs that follow it (characterization)', () => {
+        const kdep = airport('KDEP', 46.9, 8.0);
+        const legs = [{wpt: kdep, type: KLNLegType.USER}, sidOf(kdep, 'SIDAA'), sidOf(kdep, 'SIDAB'), ...fullPlanLegs().slice(0, 29)];
+        const {aw} = build(legs, START);
+        expect(roomSteps(legs, navState(aw, null), 1, 0)).toEqual([3]);
+    });
+
+    // C-1: FPL FULL while the first waypoint is part of the active leg
+    it('is null while the first leg is part of the active leg (C-1)', () => {
+        const {fpl0, aw} = build(fullPlanLegs(), pointFrom(START, 0, 2));
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(roomSteps(fpl0.getLegs(), navState(aw, 3), 1, 0)).toBeNull();
+    });
+
+    it('is null when the protected airport would have to go (characterization)', () => {
+        const legs = fullPlanLegs();
+        const {aw} = build(legs, START);
+        expect(roomSteps(legs, navState(aw, null), 1, 0, legs[0].wpt)).toBeNull();
+    });
+
+    it('deletes only the airport at the front when the SID legs behind it belong to another airport (characterization)', () => {
+        const kdep = airport('KDEP', 46.9, 8.0);
+        const koth = airport('KOTH', 46.8, 8.0);
+        const legs = [{wpt: kdep, type: KLNLegType.USER}, sidOf(koth, 'SIDAA'), sidOf(koth, 'SIDAB'), ...fullPlanLegs().slice(0, 29)];
+        const {aw} = build(legs, START);
+        expect(roomSteps(legs, navState(aw, null), 1, 0)).toEqual([1]);
+    });
+
+    // Task 3 replaces a procedure that holds the active leg: the list it offers lacks that leg, and none may go
+    it('is null when the active leg is not in the legs (characterization)', () => {
+        const {fpl0, aw} = build(fullPlanLegs(), pointFrom(START, 0, 7));
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(2); // Precondition: an active leg exists, FIX02
+        const active = aw.getActiveLeg();
+        const without = fpl0.getLegs().filter(leg => leg !== active);
+        expect(without).toHaveLength(29);
+        expect(roomSteps(without, navState(aw, 3), 2, 0)).toBeNull(); // 31 en-route would need FIX00 to go
+    });
+
+    it('is null when `keep` is a later leg that would have to go (characterization)', () => {
+        const legs = fullPlanLegs();
+        const {aw} = build(legs, START);
+        expect(roomSteps(legs, navState(aw, null), 2, 0, legs[1].wpt)).toBeNull();
+    });
+
+    it('is null when no number of deleted legs makes room (characterization)', () => {
+        const legs = fullPlanLegs();
+        const {aw} = build(legs, START);
+        expect(roomSteps(legs, navState(aw, null), 31, 0)).toBeNull();
+    });
+
+    // The total of 45 (#221): 30 en-route and 15 STAR legs, one more STAR leg deletes the first waypoint
+    it('deletes the first waypoint for a procedure leg past 45 legs (characterization)', () => {
+        const star = Array.from({length: 15}, (_, i): KLNFlightplanLeg => ({wpt: intersection(`ST${String(i).padStart(3, '0')}`, 46.8, 8 + 0.01 * i), type: KLNLegType.STAR}));
+        const legs = [...fullPlanLegs(), ...star];
+        const {aw} = build(legs, START);
+        expect(roomSteps(legs, navState(aw, null), 0, 1)).toEqual([1]);
+    });
+});
+
+describe('mayAddWaypointBefore, the approach legs (6-7)', () => {
+    // 6-7: no waypoint is added between two waypoints of an approach. The plan is the airport A, the approach B, C, D and
+    // the airport E after them
+    const app = (wpt: Facility): KLNFlightplanLeg => ({wpt, type: KLNLegType.APP});
+    const approachLegs: KLNFlightplanLeg[] = [user(A), app(B), app(C), app(D), user(E)];
+
+    it('refuses a waypoint between two waypoints of an approach (6-7, #349)', () => {
+        expect(mayAddWaypointBefore(approachLegs, 2)).toBe(false);
+        expect(mayAddWaypointBefore(approachLegs, 3)).toBe(false);
+    });
+});
+
+describe('mayAddWaypointBefore, the legs at the ends of an approach (characterization)', () => {
+    const app = (wpt: Facility): KLNFlightplanLeg => ({wpt, type: KLNLegType.APP});
+    const approachLegs: KLNFlightplanLeg[] = [user(A), app(B), app(C), app(D), user(E)];
+
+    // The leg into the IAF and the leg from the approach to the airport stay open for a waypoint (#349)
+    it('characterization: allows a waypoint on the leg into the IAF (#349)', () => {
+        expect(mayAddWaypointBefore(approachLegs, 1)).toBe(true);
+    });
+
+    it('characterization: allows a waypoint on the leg from the approach to the airport (#349)', () => {
+        expect(mayAddWaypointBefore(approachLegs, 4)).toBe(true);
+    });
+});
+
+describe('mayAddWaypointBefore, the en-route legs (characterization)', () => {
+    it('characterization: allows a waypoint on every en-route leg', () => {
+        const legs = [A, B, C].map(user);
+        expect(mayAddWaypointBefore(legs, 1)).toBe(true);
+        expect(mayAddWaypointBefore(legs, 2)).toBe(true);
     });
 });
 

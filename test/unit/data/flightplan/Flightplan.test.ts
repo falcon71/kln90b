@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {EventBus, Facility} from '@microsoft/msfs-sdk';
 import {Flightplan, FlightplanEvents, KLNFlightplanLeg, KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
-import {airport, vor} from '../../../harness/navdata/builders';
+import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {identsOf} from '../../../harness/readers';
 
 // Source of the rules: Pilot's Guide 4-1 (at most 30 waypoints per plan, FPL 0 needs two) and 4-4 (a waypoint may be
@@ -86,6 +86,19 @@ describe('Flightplan insert and delete', () => {
 
         expect(events).toEqual([]);
     });
+
+    // #347: the procedure removal of a load (#222) runs inside the batch too, so it is one event with the load
+    it('does not publish a procedure removal inside a batch, and publishes once when the batch finishes (characterization, #347)', () => {
+        const {fpl, events} = planWithEvents(0, [user(A), proc(B, KLNLegType.APP), user(C)]);
+
+        fpl.startBatchInsert();
+        fpl.removeProcedure(KLNLegType.APP);
+        expect(events).toEqual([]);
+        fpl.finishBatchInsert();
+
+        expect(events).toEqual([fpl]);
+        expect(identsOf(fpl.getLegs())).toEqual(['KAAA', 'KBBB']);
+    });
 });
 
 describe('Flightplan procedures', () => {
@@ -107,6 +120,19 @@ describe('Flightplan procedures', () => {
         fpl.removeProcedure(KLNLegType.STAR);
 
         expect(fpl.getLegs().map(l => l.type)).toEqual([KLNLegType.USER, KLNLegType.SID, KLNLegType.USER, KLNLegType.APP]);
+    });
+
+    // #347: the planner mirror follows FPL 0, so the removal publishes once, and a removal that removes nothing does not
+    // publish (characterization: the Pilot's Guide says nothing of events)
+    it('removeProcedures publishes once when it removes procedures, and not again when none are left (characterization, #347)', () => {
+        const {fpl, events} = planWithEvents(0, mixed());
+
+        fpl.removeProcedures();
+        expect(events).toEqual([fpl]);
+        expect(identsOf(fpl.getLegs())).toEqual(['KAAA', 'KBBB']);
+
+        fpl.removeProcedures();
+        expect(events).toEqual([fpl]);
     });
 });
 
@@ -153,5 +179,53 @@ describe('Flightplan copies', () => {
         fpl.delete();
 
         expect(fpl.getLegs()).toEqual([]);
+    });
+});
+
+describe('the limits of a flight plan (#221)', () => {
+    const fixes = (n: number, prefix = 'FX') => Array.from({length: n}, (_, i) => intersection(`${prefix}${String(i).padStart(2, '0')}`, 47, 8 + 0.01 * i));
+    const legs = (n: number, type: KLNLegType, prefix?: string): KLNFlightplanLeg[] => fixes(n, prefix).map(wpt => ({wpt, type}));
+
+    // Checked in the KLN 89 trainer, 2026-10-15: an approach and a STAR load on top of a plan whose en-route
+    // waypoints are at the limit
+    it('takes a procedure leg on top of 30 en-route waypoints in FPL 0 (4-1; checked in the KLN 89 trainer, 2026-10-15)', () => {
+        const fpl0 = new Flightplan(0, legs(30, KLNLegType.USER), new EventBus());
+
+        fpl0.insertLeg(30, legs(1, KLNLegType.APP, 'AP')[0]);
+
+        expect(fpl0.getLegs()).toHaveLength(31);
+    });
+
+    // 4-1: a flight plan holds 30 waypoints
+    it('refuses a 31st en-route waypoint in FPL 0 that also holds procedure legs (4-1)', () => {
+        const fpl0 = new Flightplan(0, [...legs(30, KLNLegType.USER), ...legs(3, KLNLegType.APP, 'AP')], new EventBus());
+
+        expect(() => fpl0.insertLeg(0, legs(1, KLNLegType.USER, 'NW')[0])).toThrow();
+        expect(fpl0.getLegs()).toHaveLength(33);
+    });
+
+    // The 90B gives no total; 45 keeps the KLN 89's room of 15 for procedures above its en-route limit (maintainer)
+    it('refuses a 46th leg of FPL 0 of any type (characterization)', () => {
+        const fpl0 = new Flightplan(0, [...legs(30, KLNLegType.USER), ...legs(15, KLNLegType.STAR, 'ST')], new EventBus());
+
+        expect(() => fpl0.insertLeg(31, legs(1, KLNLegType.STAR, 'SX')[0])).toThrow();
+        expect(fpl0.getLegs()).toHaveLength(45);
+    });
+
+    it('takes a 45th leg of FPL 0 (characterization)', () => {
+        const fpl0 = new Flightplan(0, [...legs(30, KLNLegType.USER), ...legs(14, KLNLegType.STAR, 'ST')], new EventBus());
+
+        fpl0.insertLeg(31, legs(1, KLNLegType.STAR, 'SX')[0]);
+
+        expect(fpl0.getLegs()).toHaveLength(45);
+    });
+
+    // 4-1: a numbered plan holds 30 waypoints
+    it('keeps the limit of 30 legs for a numbered plan (4-1)', () => {
+        const fpl5 = new Flightplan(5, legs(30, KLNLegType.USER), new EventBus());
+
+        expect(() => fpl5.insertLeg(30, legs(1, KLNLegType.APP, 'AP')[0])).toThrow('Cannot have more than 30 legs!');
+        expect(() => fpl5.insertLeg(0, legs(1, KLNLegType.USER, 'NW')[0])).toThrow('Cannot have more than 30 legs!');
+        expect(fpl5.getLegs()).toHaveLength(30);
     });
 });

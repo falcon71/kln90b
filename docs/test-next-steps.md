@@ -138,7 +138,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   300 NM, so each Center is first returned by a search from inside it. A second computation in the same unit meets
   #102; the #102 pin in `Ctr1Page.test.ts` is such a test on purpose, and the tests of the 30 waypoint limit there use one computation.
 - CTR leads: a recomputation without insertion creates a new user waypoint with the next number (BGD00, then BGD01),
-  and the orphans count against the limit until power-off; a crossing without a VOR within 100 NM, or without a free
+  and the orphans count against the limit until power-off (a computation discarded by #348 leaves its new waypoints the same way); a crossing without a VOR within 100 NM, or without a free
   number, is dropped silently; when the first waypoint lies in no Center the first crossing is dropped
   (`AirspacesAlongRoute.cleanup`); `getWaypointIfExistsInFpl` compares coordinates with `===`; CTR 2 and NAV 2 convert the
   radial with the VOR's own variation (#280, #362); the status line shows `msg` for one display tick after CTR 1 is

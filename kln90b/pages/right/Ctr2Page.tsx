@@ -1,4 +1,4 @@
-import {FSComponent, LodBoundary, VNode} from '@microsoft/msfs-sdk';
+import {FSComponent, LodBoundary, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
@@ -9,6 +9,7 @@ import {LatitudeDisplay} from "../../controls/displays/LatitudeDisplay";
 import {LongitudeDisplay} from "../../controls/displays/LongitudeDisplay";
 import {IcaoFixedLength} from "../../data/navdata/IcaoFixedLength";
 import {FIRMAP} from "../../data/FirMap";
+import {syncCtrState} from "./CtrState";
 
 type Ctr2PageTypes = {
     ident: TextDisplay,
@@ -33,6 +34,9 @@ export class Ctr2Page extends SixLineHalfPage {
 
     readonly name: string = "CTR 2";
 
+    private readonly refEmpty: NodeReference<HTMLPreElement> = FSComponent.createRef<HTMLPreElement>();
+    private readonly refWaypoint: NodeReference<HTMLPreElement> = FSComponent.createRef<HTMLPreElement>();
+
     constructor(props: PageProps) {
         super(props);
 
@@ -52,20 +56,22 @@ export class Ctr2Page extends SixLineHalfPage {
 
     }
 
+    /**
+     * Both layouts are rendered and the unused one is hidden, so that the page can fall back to its empty layout when
+     * the waypoints go while it is shown (#301)
+     */
     public render(): VNode {
-        if (this.props.memory.ctrPage.waypoints.length === 0) {
-            //No idea how this looks like in the real unit
-            return (
-                <pre>
+        const hasWaypoints = this.props.memory.ctrPage.waypoints.length > 0;
+        return (
+            <div>
+                {/* No idea how this looks like in the real unit */}
+                <pre ref={this.refEmpty} class={hasWaypoints ? "d-none" : ""}>
                     <br/>
                     <br/>
                     NO CTR<br/>
                     WAYPOINTS
                 </pre>
-            )
-        } else {
-            return (
-                <pre>
+                <pre ref={this.refWaypoint} class={hasWaypoints ? "" : "d-none"}>
                     &nbsp{this.children.get("ident").render()}&nbsp&nbsp{this.children.get("new").render()}<br/>
                     {this.children.get("ctrFrom").render()}-{this.children.get("ctrTo").render()} CTR<br/>
                     {this.children.get("vor").render()}&nbsp&nbsp{this.children.get("bearing").render()}<br/>
@@ -73,8 +79,23 @@ export class Ctr2Page extends SixLineHalfPage {
                     {this.children.get("lat").render()}<br/>
                     {this.children.get("lon").render()}<br/>
                 </pre>
-            )
+            </div>
+        )
+    }
+
+    tick(blink: boolean) {
+        //#301 5-26: the computation is gone once the plan page on the left was left. The layout follows the waypoints.
+        syncCtrState(this.props);
+
+        const hasWaypoints = this.props.memory.ctrPage.waypoints.length > 0;
+        if (!hasWaypoints) {
+            this.numPages = 1;
+            this.currentPage = 0;
         }
+        this.refEmpty.instance.classList.toggle("d-none", hasWaypoints);
+        this.refWaypoint.instance.classList.toggle("d-none", !hasWaypoints);
+
+        super.tick(blink);
     }
 
     protected redraw(): void {

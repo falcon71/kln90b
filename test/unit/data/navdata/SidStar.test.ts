@@ -634,6 +634,37 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(arc.endFacility.icaoStruct.ident).toBe('ARCEN');
             expect(radiusNm(legs[0])).toBeCloseTo(10, 2);
         });
+
+        // The filter keeps an arc that carries a flag, so the second arc still follows it in the conversion: the flagged
+        // step-down and the arc after it stay one arc. The doubled entry and the missing STEPD are bug #382, this holds
+        // the list as it is while the pin below is open.
+        const flaggedStepDown = () => approach({
+            type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [
+                    Leg.IF(arcbg),
+                    Leg.AF(step, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT, flags: FixTypeFlags.IAF}),
+                    Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                    Leg.TF(fafaa, FixTypeFlags.FAF),
+                ],
+            }],
+            final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+
+        it('keeps a flagged step-down on one arc as one arc (characterization, #131, #382)', async () => {
+            const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, flaggedStepDown());
+
+            expect(identsOf(legs)).toEqual(['D260J', 'D260J', 'ARCEN', 'FAFAA', 'MAPAA']);
+        });
+
+        // 6-5: the unit lists the IAF; 6-18: an arc has no step-down fixes of its own
+        it.fails('lists a flagged step-down fix on a DME arc once, after the arc entry (6-5, 6-18, #382)', async () => {
+            const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, flaggedStepDown());
+
+            expect(identsOf(legs)).toEqual(['D260J', 'STEPD', 'ARCEN', 'FAFAA', 'MAPAA']);
+            expect(legs[1].fixType).toBe(KLNFixType.IAF);
+        });
     });
 
     // 6-5, B-3: the unit tells the pilot that the enroute part of the flight plan already holds waypoints of the
@@ -679,8 +710,9 @@ describe('SidStar conversion of procedures to KLN legs', () => {
     });
 
     // 6-16 to 6-18: a DME arc is flown at its published distance. Real STARs fly AF, CI (no fix), AF around one navaid
-    // with two radii. The conversion drops the fixless CI leg, takes the first arc for a step-down fix of the second
-    // and flies the whole arc at the radius of the second.
+    // with two radii. The conversion drops the fixless CI leg and keeps the two arcs: the first ends at its own end fix,
+    // which stays in the list, and the second starts at its published beginning (#131). How the unit joins two radii is
+    // not described, so the leg between the arcs is a characterization.
     describe('AF, CI, AF around one navaid with two radii', () => {
         const stfix = fixAt('STFIX', 270, 20);
         const arc1end = fixAt('ARC1E', 225, 13);
@@ -716,11 +748,185 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(radiusNm(secondArc!)).toBeCloseTo(10, 1);
         });
 
-        it.fails('flies the first arc at its own radius of 13 NM (#131)', async () => {
+        it('flies the first arc at its own radius of 13 NM (#131)', async () => {
             const legs = await convertStar();
             const firstArc = legs.find(l => l.arcData?.endFacility.icaoStruct.ident === 'ARC1E');
             expect(firstArc).toBeDefined();
             expect(radiusNm(firstArc!)).toBeCloseTo(13, 1);
+        });
+
+        // 6-6: an arc entry is named D, the magnetic radial and the distance as a letter (M = 13, J = 10). The second
+        // arc starts at its published beginning, joined to the end of the first by a straight leg (characterization)
+        it('lists the first arc to ARC1E and the second from its beginning on radial 225 (characterization, #131)', async () => {
+            const legs = await convertStar();
+
+            expect(identsOf(legs)).toEqual(['D270M', 'ARC1E', 'D225J', 'ARC2E', 'FINAL']);
+            const second = legs.find(l => l.arcData?.endFacility.icaoStruct.ident === 'ARC2E')!;
+            expect(second.arcData!.beginRadial).toBeCloseTo(225, 3);
+            expect(radiusNm(second)).toBeCloseTo(10, 1);
+        });
+
+        // The aircraft is on radial 200, inside the span of the second arc (225 to 180). A first arc is entered abeam the
+        // aircraft there (6-16), but the second follows the first and so starts at its published beginning, not at D200J
+        it('starts the second arc at its beginning although the aircraft is abeam a point of it (characterization, #131)', async () => {
+            const legs = await sidStar(facs, at(200, 25)).getKLNProcedureLegList(kprc, arrival(), KLNLegType.STAR, null, null);
+
+            expect(identsOf(legs)).toEqual(['D270M', 'ARC1E', 'D225J', 'ARC2E', 'FINAL']);
+        });
+    });
+
+    // 6-18 covers step-downs on one arc. When two arcs are one arc is the code's ruling (#131): the same navaid and a
+    // radius within 0.1 NM; the tolerance is a characterization. The aircraft is on radial 270 of ABC at 25 NM.
+    describe('two arcs are one arc only around one navaid within 0.1 NM of radius (characterization, #131)', () => {
+        const xyz = vor('XYZ', 47.6, 8.9);
+        const atXyz = (radial: number, nm: number) => pointFrom({lat: xyz.lat, lon: xyz.lon}, radial, nm);
+        const fixAtXyz = (ident: string, radial: number, nm: number) => {
+            const p = atXyz(radial, nm);
+            return intersection(ident, p.lat, p.lon);
+        };
+        const stfix = fixAt('STFIX', 270, 25);
+        const final = fixAt('FINAL', 150, 10);
+        const convertTwoArcs = (navaid2: typeof abc, radius1: number, radius2: number) => {
+            const arc1end = fixAt('ARC1E', 225, radius1);
+            const arc2end = navaid2 === abc ? fixAt('ARC2E', 180, radius2) : fixAtXyz('ARC2E', 180, radius2);
+            const proc = star('ARR1', {
+                common: [
+                    Leg.IF(stfix),
+                    Leg.AF(arc1end, abc, {radiusNm: radius1, fromRadial: 270, toRadial: 225, turn: LEFT}),
+                    Leg.AF(arc2end, navaid2, {radiusNm: radius2, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                    Leg.TF(final),
+                ],
+            });
+            return sidStar([abc, xyz, stfix, arc1end, arc2end, final, kprc], at(270, 25)).getKLNProcedureLegList(kprc, proc, KLNLegType.STAR, null, null);
+        };
+
+        it('keeps two arcs of one radius around different navaids as two arcs, the second from its beginning', async () => {
+            const legs = await convertTwoArcs(xyz, 10, 10);
+
+            expect(identsOf(legs)).toEqual(['D270J', 'ARC1E', 'D225J', 'ARC2E', 'FINAL']);
+            expect(legs[2].arcData!.vor.icaoStruct.ident).toBe('XYZ');
+        });
+
+        it('merges two arcs whose radii differ by 0.05 NM into one arc', async () => {
+            const legs = await convertTwoArcs(abc, 10.05, 10);
+
+            expect(identsOf(legs)).toEqual(['D270J', 'ARC2E', 'FINAL']);
+            expect(legs[0].arcData!.beginRadial).toBeCloseTo(270, 3);
+        });
+
+        it('keeps two arcs whose radii differ by 0.2 NM as two arcs', async () => {
+            const legs = await convertTwoArcs(abc, 10.2, 10);
+
+            expect(identsOf(legs)).toEqual(['D270J', 'ARC1E', 'D225J', 'ARC2E', 'FINAL']);
+        });
+    });
+
+    // #376: the conversion works on copies of the legs the SDK hands out, so the database stays as it is and a second
+    // conversion (or a second transition) gives the same legs as the first. The approaches are built per test, so the
+    // assertions see that test's objects.
+    describe('a conversion leaves the procedure as the database has it (#376)', () => {
+        const stfix = fixAt('STFIX', 270, 10);
+        const arc1end = fixAt('ARC1E', 225, 10);
+        const arc2end = fixAt('ARC2E', 180, 10);
+        const WORLD = [abc, stfix, arc1end, arc2end, fafaa, mapaa, kprc];
+
+        /** The PHNY-shaped approach: the transition ends its arc at ARC1E, the final starts at the same fix (7fd640e) */
+        const phnyApproach = () => approach({
+            type: ApproachType.APPROACH_TYPE_VORDME, runway: '18',
+            transitions: [
+                {name: 'STFIX', legs: [Leg.IF(stfix, FixTypeFlags.IAF), Leg.AF(arc1end, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT})]},
+            ],
+            final: [Leg.IF(arc1end, FixTypeFlags.IAF), Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+
+        /** Two transitions: STFIX ends its arc at ARC1E, and ARC1E starts a transition of its own; the final starts with an arc */
+        const twoTransitionsApproach = () => approach({
+            type: ApproachType.APPROACH_TYPE_VORDME, runway: '18',
+            transitions: [
+                {name: 'STFIX', legs: [Leg.IF(stfix, FixTypeFlags.IAF), Leg.AF(arc1end, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT})]},
+                {name: 'ARC1E', legs: [Leg.IF(arc1end, FixTypeFlags.IAF)]},
+            ],
+            final: [Leg.AF(arc2end, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}), Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+
+        it('converts the same approach and transition twice to the same legs (characterization, #376)', async () => {
+            const app = phnyApproach();
+            const ss = sidStar(WORLD, at(250, 30));
+            const first = await ss.getKLNApproachLegList(kprc, app, app.transitions[0]);
+            const second = await ss.getKLNApproachLegList(kprc, app, app.transitions[0]);
+
+            expect(identsOf(first)).toEqual(['D250J', 'ARC1E', 'FAFAA', 'MAPAA']);
+            expect(identsOf(second)).toEqual(identsOf(first));
+        });
+
+        // 6-16: an arc entered from outside starts at its published beginning
+        it('starts the arc of the second transition at its published beginning after the first was converted (6-16, #376)', async () => {
+            const app = twoTransitionsApproach();
+            const ss = sidStar(WORLD, at(250, 30));
+            await ss.getKLNApproachLegList(kprc, app, app.transitions[0]); // STFIX
+            const legs = await ss.getKLNApproachLegList(kprc, app, app.transitions[1]); // ARC1E
+
+            expect(identsOf(legs)[0]).toBe('D225J');
+            expect(legs[0].arcData!.beginRadial).toBeCloseTo(225, 3);
+        });
+
+        it('leaves the course and the flags of the database legs unchanged (characterization, #376)', async () => {
+            const twoTransitions = twoTransitionsApproach();
+            const phny = phnyApproach();
+            // the two-transition approach (STFIX, then ARC1E) and the PHNY-shaped one-transition approach
+            await sidStar(WORLD, at(250, 30)).getKLNApproachLegList(kprc, twoTransitions, twoTransitions.transitions[0]);
+            await sidStar(WORLD, at(250, 30)).getKLNApproachLegList(kprc, phny, phny.transitions[0]);
+
+            expect(twoTransitions.finalLegs[0].course).toBe(225); // the final arc's published beginning
+            expect(phny.transitions[0].legs[1].fixTypeFlags).toBe(0); // the transition's arc carries no flag
+        });
+
+        // Two consecutive arcs on one navaid and radius: mergeAFsIfNecessary gives the second arc the course of the first.
+        // The arcs run 270 to 225 and 225 to 180 (magnetic, variation 0), so the merged arc runs from 270 to 180. The
+        // aircraft is on radial 250 at 20 NM, inside the merged arc: the entry is D250J (6-6, distance letter J = 10 NM).
+        it('converts the same STAR with consecutive arcs twice to the same legs and leaves its arcs unchanged (characterization, #376)', async () => {
+            const proc = star('ARR2', {
+                common: [
+                    Leg.IF(stfix),
+                    Leg.AF(arc1end, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT}),
+                    Leg.AF(arc2end, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                    Leg.TF(fafaa),
+                ],
+            });
+            const ss = sidStar(WORLD, at(250, 20));
+            const first = await ss.getKLNProcedureLegList(kprc, proc, KLNLegType.STAR, null, null);
+            const second = await ss.getKLNProcedureLegList(kprc, proc, KLNLegType.STAR, null, null);
+
+            expect(identsOf(first)).toEqual(['D250J', 'ARC2E', 'FAFAA']);
+            expect(identsOf(second)).toEqual(identsOf(first));
+            expect(first[0].arcData!.beginRadial).toBeCloseTo(270, 6);
+            expect(second[0].arcData!.beginRadial).toBeCloseTo(270, 6);
+            expect(proc.commonLegs[2].course).toBe(225); // the second arc's published beginning, as the database has it
+        });
+
+        // The same merge on a missed approach: the missed legs carry the two arcs (the final is one FAF leg). The list is
+        // FAFAA, the missed start, the entry, ARC2E and MAPAA; the entry replaces the missed start and is D250J as above.
+        it('converts the same missed approach with consecutive arcs twice to the same legs and leaves its arcs unchanged (characterization, #376)', async () => {
+            const missedStart = fixAt('MISSA', 300, 5);
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_VORDME, runway: '18',
+                final: [Leg.TF(fafaa, FixTypeFlags.FAF)],
+                missed: [
+                    Leg.TF(missedStart),
+                    Leg.AF(arc1end, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT}),
+                    Leg.AF(arc2end, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                    Leg.TF(mapaa, FixTypeFlags.MAP),
+                ],
+            });
+            const ss = sidStar([...WORLD, missedStart], at(250, 20));
+            const first = await ss.getKLNApproachLegList(kprc, app, null);
+            const second = await ss.getKLNApproachLegList(kprc, app, null);
+
+            expect(identsOf(first)).toEqual(['FAFAA', 'D250J', 'ARC2E', 'MAPAA']);
+            expect(identsOf(second)).toEqual(identsOf(first));
+            expect(first[1].arcData!.beginRadial).toBeCloseTo(270, 6);
+            expect(second[1].arcData!.beginRadial).toBeCloseTo(270, 6);
+            expect(app.missedLegs[2].course).toBe(225); // the second arc's published beginning, as the database has it
         });
     });
 });
@@ -864,9 +1070,9 @@ describe('the OBS reminder of holds and procedure turns', () => {
         ]);
     });
 
-    // The database pattern IF X (IAF), HF X: the flagged IF is kept, the hold is dropped as a repeat, and the OBS
-    // reminder of the hold is lost with it. Whether the sim flags its data this way is not verified.
-    it.fails('asks for OBS at an IAF whose hold follows it as a separate leg (#219)', async () => {
+    // B-2, 6-10: the database pattern IF X (IAF), HF X: the flagged IF is kept and the hold is dropped as a repeat; the
+    // OBS reminder of the hold moves to the kept leg. Whether the sim flags its data this way is not verified.
+    it('asks for OBS at an IAF whose hold follows it as a separate leg (#219)', async () => {
         const app = approach({
             type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
             transitions: [{name: 'HLDAA', legs: [Leg.IF(hldaa, FixTypeFlags.IAF), Leg.HF(hldaa, 90)]}],
@@ -918,6 +1124,47 @@ describe('an unflagged repeat of the last kept fix (characterization)', () => {
     });
 });
 
+describe('the OBS reminder of a dropped leg (characterization, #219)', () => {
+    it('is not set by a dropped repeat that is no hold or procedure turn', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'HLDAA', legs: [Leg.IF(hldaa, FixTypeFlags.IAF), Leg.TF(hldaa)]}],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.askObs])).toEqual([
+            ['HLDAA', false], ['FAFAA', false], ['MAPAA', false],
+        ]);
+    });
+
+    it('is not left on the previous leg by a hold dropped because the next leg goes to the same fix', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'IAFAA', legs: [Leg.IF(iafaa, FixTypeFlags.IAF), Leg.TF(ifaaa), Leg.HF(hldaa, 90), Leg.TF(hldaa)]}],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app);
+        // The HLDAA row is left out: whether the kept leg there asks for OBS is the bug #384 (pinned below)
+        expect(legs.filter(l => l.wpt.icaoStruct.ident !== 'HLDAA').map(l => [l.wpt.icaoStruct.ident, l.askObs])).toEqual([
+            ['IAFAA', false], ['IFAAA', false], ['FAFAA', false], ['MAPAA', false],
+        ]);
+    });
+});
+
+// 6-10, B-2: the reminder to select OBS comes before a waypoint that is the basis of a hold or a course reversal. The
+// hold is dropped here because the next leg goes to the same fix, and the kept leg asks for nothing (#384)
+describe('the OBS reminder of a hold dropped for the next leg to the same fix (B-2, 6-10)', () => {
+    it.fails('asks for OBS at a hold dropped because the next leg goes to the same fix (B-2, 6-10, #384)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'IAFAA', legs: [Leg.IF(iafaa, FixTypeFlags.IAF), Leg.TF(ifaaa), Leg.HF(hldaa, 90), Leg.TF(hldaa)]}],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app);
+        expect(legs.filter(l => l.wpt.icaoStruct.ident === 'HLDAA').map(l => l.askObs)).toEqual([true]);
+    });
+});
+
 // The manual shows no approach whose missed approach holds at the MAP; the code lists the fix twice, once per flag, as it
 // does for a co-located IAF and FAF.
 describe('a missed approach that holds at the MAP (characterization)', () => {
@@ -934,6 +1181,114 @@ describe('a missed approach that holds at the MAP (characterization)', () => {
     });
 });
 
+describe('the MAHP of a missed approach (#220)', () => {
+    // 6-5 to 6-7: the holding point of the missed approach shows once with its suffix; 6-11: the OBS reminder before it.
+    // The KLN 89 lists it once, last (checked in the KLN 89 trainer, 2026-10-15). The hold carries the MAHP flag as the
+    // conversion leaves it after the derivation below.
+    it('lists the holding point of the missed approach once with the MAHP suffix and the OBS reminder (6-5, 6-7, 6-11; checked in the KLN 89 trainer, 2026-10-15, #220)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.CA(270), Leg.DF(mahaa), Leg.HM(mahaa, 90, undefined, FixTypeFlags.MAHP)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType, l.askObs])).toEqual([
+            ['FAFAA', KLNFixType.FAF, false], ['MAPAA', KLNFixType.MAP, false], ['MAHAA', KLNFixType.MAHP, true],
+        ]);
+    });
+
+    // The sim sets no MAHP flag (the #220 comment: HKKI RNAV 24 ends CA, DF TEXAV, HM TEXAV). The hold that ends the
+    // missed approach is the MAHP (maintainer ruling). The conversion sets it on its copy, never on the SDK's leg.
+    it('derives the MAHP from an unflagged hold that ends the missed approach (characterization, #220)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.CA(270), Leg.DF(mahaa), Leg.HM(mahaa, 90)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType, l.askObs])).toEqual([
+            ['FAFAA', KLNFixType.FAF, false], ['MAPAA', KLNFixType.MAP, false], ['MAHAA', KLNFixType.MAHP, true],
+        ]);
+        expect(app.missedLegs[app.missedLegs.length - 1].fixTypeFlags).toBe(0);
+    });
+
+    // The database also ends a missed approach with a hold to an altitude or to a fix; the derivation does not depend on
+    // which hold type it is (the test above covers HM) (maintainer ruling)
+    it.each([
+        ['HA', (f: Facility) => Leg.HA(f, 90)],
+        ['HF', (f: Facility) => Leg.HF(f, 90)],
+    ])('makes a missed approach that ends in %s the MAHP (characterization, #220)', async (_name, hold) => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.CA(270), Leg.DF(mahaa), hold(mahaa)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType, l.askObs])).toEqual([
+            ['FAFAA', KLNFixType.FAF, false], ['MAPAA', KLNFixType.MAP, false], ['MAHAA', KLNFixType.MAHP, true],
+        ]);
+    });
+
+    // A leg without a fix is not listed, so the last listed leg decides (maintainer ruling)
+    it('makes the hold the MAHP when only a leg without a fix follows it (characterization, #220)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.CA(270), Leg.DF(mahaa), Leg.HM(mahaa, 90), Leg.CA(90)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType, l.askObs])).toEqual([
+            ['FAFAA', KLNFixType.FAF, false], ['MAPAA', KLNFixType.MAP, false], ['MAHAA', KLNFixType.MAHP, true],
+        ]);
+    });
+
+    // A hold at the MAP fix that ends the missed approach: the fix is listed as the MAP, then as the MAHP, the way the
+    // flagged hold at the MAP is (characterization)
+    it('derives the MAHP at the MAP fix from an unflagged hold at the MAP (characterization, #220)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.HM(mapaa, 90)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+            ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP], ['MAPAA', KLNFixType.MAHP],
+        ]);
+    });
+
+    // A missed approach that does not end in a hold gets no MAHP (maintainer ruling). A procedure turn is the leg most
+    // easily taken for one: it asks for OBS like a hold, but it is no hold.
+    it.each([
+        ['DF', (f: Facility) => Leg.DF(f)],
+        ['TF', (f: Facility) => Leg.TF(f)],
+        ['CF', (f: Facility) => Leg.CF(f, 270)],
+        ['PI', (f: Facility) => Leg.PI(f, 90)],
+    ])('marks no MAHP when the missed approach ends in %s, not in a hold (characterization, #220)', async (_name, last) => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.CA(270), last(mahaa)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+            ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP], ['MAHAA', undefined],
+        ]);
+    });
+
+    // Only the hold that ends the missed approach is the MAHP: a hold that a further leg follows is not (maintainer ruling)
+    it('marks no MAHP when a hold is followed by a further leg of the missed approach (characterization, #220)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.CA(270), Leg.DF(mahaa), Leg.HM(mahaa, 90), Leg.TF(misaa)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+            ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP], ['MAHAA', undefined], ['MISAA', undefined],
+        ]);
+    });
+});
+
 // The conversion of DME arcs: the entry on the aircraft's radial, one arc for consecutive arcs, the FAF kept. The pages
 // are cited on the spec tests.
 describe('DME arcs in the conversion', () => {
@@ -946,7 +1301,8 @@ describe('DME arcs in the conversion', () => {
     const step1 = fixAt('STEPA', 240, 10);
     const step2 = fixAt('STEPB', 210, 10);
     const arcen = fixAt('ARCEN', 180, 10);
-    const facs = [kprc, abc, arcbg, step1, step2, arcen, fafaa, mapaa];
+    const hldfx = fixAt('HLDFX', 180, 10);
+    const facs = [kprc, abc, arcbg, step1, step2, arcen, hldfx, fafaa, mapaa];
     const L = LegTurnDirection.Left;
     const convertAt = (app: ApproachProcedure, radial: number) => {
         const from = pointFrom({lat: abc.lat, lon: abc.lon}, radial, 20);
@@ -1019,6 +1375,81 @@ describe('DME arcs in the conversion', () => {
             ['D225J', KLNFixType.IAF], ['ARCEN', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
         ]);
         expect(legs[0].arcData!.endFacility.icaoStruct.ident).toBe('ARCEN');
+    });
+
+    // B-2, 6-10: the reminder before a waypoint that is the basis of a hold. That the arc to it stays an arc is the
+    // project's arc model (6-16), not B-2. The arc carries the IAF flag, so it is kept and the unflagged hold after it is
+    // dropped as a repeat (the #219 path)
+    it('asks for OBS at the end fix of an arc that leads to a hold (B-2, 6-10, #219)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [
+                    Leg.IF(arcbg),
+                    Leg.AF(hldfx, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: L, flags: FixTypeFlags.IAF}),
+                    Leg.HF(hldfx, 90),
+                ],
+            }],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertAt(app, 260);
+        const end = legs.find(l => l.wpt.icaoStruct.ident.trim() === 'HLDFX')!;
+        expect(legs.some(l => l.arcData?.endFacility.icaoStruct.ident.trim() === 'HLDFX')).toBe(true);
+        expect(end.askObs).toBe(true);
+        expect(legs[0].arcData).toBeDefined();
+        expect(legs[0].askObs).toBeUndefined();
+    });
+
+    // B-2, 6-10: the reminder before a waypoint that is the basis of a hold or a course reversal. That the arc to it stays
+    // an arc is the project's arc model (6-16), not B-2. Here the arc carries no flag, so it is dropped as a repeat and
+    // the unit takes the arc in the place of the hold (addArcInfoIfPrevIsSame); the hold's reminder must survive that.
+    // The hold is unflagged and not last (the else branch of filterOutDuplicates), or it carries a flag (the keep branch).
+    it.each([
+        ['HF', 'unflagged', () => Leg.HF(hldfx, 90)],
+        ['PI', 'unflagged', () => Leg.PI(hldfx, 90)],
+        ['HF', 'flagged IAF', () => Leg.HF(hldfx, 90, L, FixTypeFlags.IAF)],
+        ['PI', 'flagged IAF', () => Leg.PI(hldfx, 90, L, FixTypeFlags.IAF)],
+    ])('asks for OBS at the end fix of an unflagged arc that leads to a %s, %s (B-2, 6-10, #381)', async (_type, _flag, hold) => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [
+                    Leg.IF(arcbg),
+                    Leg.AF(hldfx, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: L}),
+                    hold(),
+                ],
+            }],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertAt(app, 260);
+        const end = legs.find(l => l.wpt.icaoStruct.ident.trim() === 'HLDFX')!;
+        expect(legs.some(l => l.arcData?.endFacility.icaoStruct.ident.trim() === 'HLDFX')).toBe(true);
+        expect(end.askObs).toBe(true);
+        expect(legs[0].askObs).toBeUndefined();
+    });
+
+    it.each([
+        ['unflagged', 0],
+        ['flagged IAF', FixTypeFlags.IAF],
+    ])('keeps no OBS reminder at the end fix of an unflagged arc followed by a leg that is no hold, %s (characterization, #381)', async (_flag, flags) => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [
+                    Leg.IF(arcbg),
+                    Leg.AF(hldfx, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: L}),
+                    Leg.TF(hldfx, flags),
+                ],
+            }],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertAt(app, 260);
+        const end = legs.find(l => l.wpt.icaoStruct.ident.trim() === 'HLDFX')!;
+        expect(legs.some(l => l.arcData?.endFacility.icaoStruct.ident.trim() === 'HLDFX')).toBe(true);
+        expect(end.askObs).toBe(false);
     });
 });
 

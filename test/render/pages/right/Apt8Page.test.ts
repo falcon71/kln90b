@@ -13,6 +13,7 @@ import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {EVT_CLR} from '../../../../kln90b/HEvents';
 import {MainPage} from '../../../../kln90b/pages/MainPage';
+import {blinkCycle} from '../../../harness/render/blink';
 
 const rows = (side: 'L' | 'R') => Screen.read().half(side).split('\n').map(r => r.trimEnd());
 
@@ -59,6 +60,19 @@ describe('APT 8 page after a waypoint confirmation page (80631c8)', () => {
         expect(Screen.read().text()).not.toContain('NO APPROACH');
     });
 });
+
+/** The question both units show before a procedure replaces the one in FPL 0: the right cursor stands on APPROVE? (#274) */
+const asksApprove = (unit: HeadlessUnit): boolean => {
+    try {
+        return unit.panel.focused('R').text.trim() === 'APPROVE?';
+    } catch (e) {
+        // No field under the cursor: no question. Any other state (several focused runs) is no answer and throws
+        if (e instanceof Error && e.message.includes('found 0')) {
+            return false;
+        }
+        throw e;
+    }
+};
 
 const fpl0Legs = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => [l.wpt.icaoStruct.ident, l.type]);
 
@@ -112,10 +126,9 @@ describe('APT 8 putting an approach into FPL 0', () => {
         expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0);
     });
 
-    // Checked in the KLN 89 trainer, 2026-10-07: loading an approach from APT 8 while FPL 0 holds another one makes the
-    // unit ask before it replaces the first. The 90B guide describes replacing only through FPL 0 (6-7), so the wording of
-    // the question is unknown and is not asserted; the first approach must still be in FPL 0 after LOAD IN FPL
-    it.fails('does not replace the approach that FPL 0 already holds without asking (KLN 89 trainer, #274)', async () => {
+    // The 89 asks before it replaces the approach FPL 0 holds (checked in the KLN 89 trainer, 2026-10-07 and 2026-10-15);
+    // the 90B guide describes replacing only through FPL 0 (6-7). Until APPROVE? the first approach stays in FPL 0
+    it('does not replace the approach that FPL 0 already holds without asking (checked in the KLN 89 trainer, 2026-10-07, #274)', async () => {
         const unit = await bootWithFirstApproachLoaded();
         await unit.panel.ent(); // VOR 09: the waypoints
         await unit.panel.ent(); // LOAD IN FPL
@@ -124,9 +137,181 @@ describe('APT 8 putting an approach into FPL 0', () => {
         expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0);
     });
 
+    // The 90B wording follows the AVsoftech trainer; that the unit asks, with APPROVE? flashing, is the KLN 89's
+    // (checked in the KLN 89 trainer, 2026-10-15)
+    it('asks to replace the existing approach with APPROVE? flashing (characterization, #274)', async () => {
+        const unit = await bootWithFirstApproachLoaded();
+        await unit.panel.ent(); // VOR 09: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+
+        expect(rows('R')).toEqual(['V09-KPRC', 'PRESS ENT', 'TO REPLACE', 'EXISTING', 'APPROACH', '  APPROVE?']);
+        expect(unit.panel.focused('R').text.trim()).toBe('APPROVE?');
+        const col = Screen.read().row(5).indexOf('APPROVE?', 12);
+        const cycle = await blinkCycle(() => Screen.read().cell(5, col).attr);
+        expect(cycle.sort()).toEqual(['F', 'I', 'I', 'I']);
+    });
+
+    it('replaces the approach on APPROVE? (checked in the KLN 89 trainer, 2026-10-15, #274)', async () => {
+        const unit = await bootWithFirstApproachLoaded();
+        await unit.panel.ent();
+        await unit.panel.ent();
+        expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0); // Precondition: nothing is replaced before APPROVE?
+        await unit.panel.ent(); // APPROVE?
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fpl0Legs(unit)).toEqual([
+            ['ENRAA', KLNLegType.USER], ['IAFBB', KLNLegType.APP], ['FAFBB', KLNLegType.APP], ['MAPAA', KLNLegType.APP],
+            ['KPRC', KLNLegType.USER],
+        ]);
+    });
+
+    // The 90B has a second side: where the load leaves the two halves follows the other loads of APT 8
+    it('shows FPL 0 on the left and the approach list on the right after APPROVE? (characterization, #274)', async () => {
+        const unit = await bootWithFirstApproachLoaded();
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await unit.panel.ent(); // APPROVE?
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().status().left).toBe('FPL 0');
+        expect(rows('R').slice(0, 2)).toEqual([' KPRC IAP', ' 1 RNAV 18']);
+    });
+
+    // CLR goes back to the preview and leaves the question: FPL 0 stays as it was (checked in the KLN 89 trainer)
+    it('goes back from the question on CLR and leaves FPL 0 unchanged (checked in the KLN 89 trainer, 2026-10-15, #274)', async () => {
+        const unit = await bootWithFirstApproachLoaded();
+        await unit.panel.selectPage('L', 'NAV 1'); // FPL 0 on the left would take CLR for its DELETE FPL? question first (4-5)
+        await unit.panel.ent();
+        await unit.panel.ent();
+        expect(asksApprove(unit)).toBe(true); // Precondition: the question shows
+        await unit.panel.clr();
+
+        expect(asksApprove(unit)).toBe(false);
+        expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0);
+    });
+
+    it('shows the waypoints with the cursor on LOAD IN FPL after CLR from the question (characterization, #274)', async () => {
+        const unit = await bootWithFirstApproachLoaded();
+        await unit.panel.selectPage('L', 'NAV 1');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await unit.panel.clr();
+
+        expect(rows('R')).toEqual(['V09-KPRC', ' 1 IAFBBà', ' 2 FAFBBá', ' 3 MAPAAã', '', 'LOAD IN FPL']);
+        expect(unit.panel.focused('R')).toEqual({row: 5, col: 12, text: 'LOAD IN FPL'});
+    });
+
+    // #273: the IAF list after CLR keeps the cursor on the IAF chosen before. The question carries the IAF through CLR
+    it('keeps the cursor on the chosen IAF when CLR goes from the replace question back to the IAF list (characterization, #273, #274)', async () => {
+        const unit = await bootUnit({...iapWorld(), panelXml: panelXml(APR_ARM_SWITCH)});
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 8');
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // RNAV 18: the IAFs
+        await unit.panel.ent(); // IAFAA: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL: the question to add KPRC
+        await unit.panel.ent(); // APPROVE?
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(fpl0Legs(unit).filter(l => l[1] === KLNLegType.APP).length).toBeGreaterThan(0); // Precondition: an approach is in FPL 0
+        await unit.panel.selectPage('L', 'NAV 1'); // FPL 0 on the left would take CLR for its DELETE FPL? question first (4-5)
+
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // RNAV 18 again: the IAFs
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // IAFAB: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL: the question to replace
+        expect(asksApprove(unit)).toBe(true); // Precondition
+        await unit.panel.clr(); // the waypoints
+        await unit.panel.clr(); // the IAFs
+
+        expect(rows('R').slice(0, 3)).toEqual(['R18-KPRC', 'IAF 1 IAFAA', '    2 IAFAB']);
+        expect(unit.panel.focused('R')).toEqual({row: 2, col: 16, text: '2 IAFAB'});
+    });
+
+    /** FPL 0 holds RNAV 18; RNAV 18 is chosen again and LOAD IN FPL pressed */
+    async function loadSameApproachAgain() {
+        const unit = await bootWithFirstApproachLoaded();
+        await unit.panel.outer('R', -1); // back to RNAV 18
+        await unit.panel.ent(); // RNAV 18: its waypoints (one transition)
+        await unit.panel.ent(); // LOAD IN FPL
+        return unit;
+    }
+
+    it('asks before it loads the same approach again (checked in the KLN 89 trainer, 2026-10-15, #274)', async () => {
+        const unit = await loadSameApproachAgain();
+
+        expect(asksApprove(unit)).toBe(true);
+        expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0);
+    });
+
+    it('shows the replace question for the same approach again (characterization, #274)', async () => {
+        const unit = await loadSameApproachAgain();
+
+        expect(rows('R').slice(1, 5)).toEqual(['PRESS ENT', 'TO REPLACE', 'EXISTING', 'APPROACH']);
+    });
+
+    /** FPL 0 holds RNAV 18 of KPRC and no KQQQ; the approach of KQQQ is chosen and LOAD IN FPL pressed */
+    async function loadApproachOfAirportNotInFpl0() {
+        const w = approachWorld();
+        const qa = intersection('QIAAA', 47.0, 9.4);
+        const qb = intersection('QFAAA', 47.0, 9.5);
+        const qc = intersection('QMAAA', 47.0, 9.6);
+        const kqqq = withProcedures(airport('KQQQ', 47.0, 9.6), {
+            approaches: [approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '09',
+                final: [Leg.IF(qa, FixTypeFlags.IAF), Leg.TF(qb, FixTypeFlags.FAF), Leg.TF(qc, FixTypeFlags.MAP)],
+            })],
+        });
+        const unit = await bootUnit({
+            facilities: [...w.facilities, kqqq, qa, qb, qc], position: w.north(40),
+            storage: savedFlightplan(0, [w.enraa, w.kprc]), panelXml: panelXml(APR_ARM_SWITCH),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8'); // RNAV 18 of KPRC, the nearest airport
+        expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0); // Precondition
+
+        await unit.panel.selectPage('R', 'APT 1'); // the airport is chosen on APT 1 (3-42)
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'KQQQ');
+        await unit.panel.cursor('R');
+        await unit.panel.selectPage('R', 'APT 8');
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // its approach: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+        return unit;
+    }
+
+    // An approach to an airport that FPL 0 lacks asks only to replace, not to add the airport (checked in the KLN 89
+    // trainer, 2026-10-15); the trainer shows no more than that the replace question is the only one
+    it('asks only to replace for an approach to an airport that FPL 0 lacks (checked in the KLN 89 trainer, 2026-10-15, #274)', async () => {
+        const unit = await loadApproachOfAirportNotInFpl0();
+
+        expect(asksApprove(unit)).toBe(true);
+        expect(Screen.read().text()).not.toContain('TO ADD');
+        expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0);
+    });
+
+    // After ENT the old approach is gone and the airport is appended behind its approach (the load of Task 3)
+    it('replaces the approach and appends the airport that FPL 0 lacks on APPROVE? (characterization, #274)', async () => {
+        const unit = await loadApproachOfAirportNotInFpl0();
+        await unit.panel.ent(); // APPROVE?
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fpl0Legs(unit)).toEqual([
+            ['ENRAA', KLNLegType.USER], ['KPRC', KLNLegType.USER],
+            ['QIAAA', KLNLegType.APP], ['QFAAA', KLNLegType.APP], ['QMAAA', KLNLegType.APP], ['KQQQ', KLNLegType.USER],
+        ]);
+    });
+
+    it('shows the replace question for an approach to an airport that FPL 0 lacks (characterization, #274)', async () => {
+        const unit = await loadApproachOfAirportNotInFpl0();
+
+        expect(rows('R').slice(0, 5)).toEqual(['R09-KQQQ', 'PRESS ENT', 'TO REPLACE', 'EXISTING', 'APPROACH']);
+    });
+
     // 6-7: an approach is changed through the FPL 0 header: with the left cursor on it reads CHANGE APR?, ENT opens APT 8,
-    // and the approach loaded there takes the place of the one in FPL 0. The route the guide describes, which does not depend
-    // on the question of #274
+    // and the approach loaded there takes the place of the one in FPL 0. The route the guide describes; the unit asks
+    // before it replaces here too, as on the KLN 89 (checked in the KLN 89 trainer, 2026-10-15, #274)
     it('replaces the approach in FPL 0 when it is changed through CHANGE APR? (6-7)', async () => {
         const {w, kprc, facilities} = twoApproaches();
         const unit = await bootUnit({
@@ -146,12 +331,35 @@ describe('APT 8 putting an approach into FPL 0', () => {
         await unit.panel.outer('R', 1); // VOR 09
         await unit.panel.ent();
         await unit.panel.ent(); // LOAD IN FPL
+        expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0); // Precondition: nothing is replaced before APPROVE?
+        await unit.panel.ent(); // APPROVE? of the replace question: the route through FPL 0 asks too (#274)
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(fpl0Legs(unit)).toEqual([
             ['ENRAA', KLNLegType.USER], ['IAFBB', KLNLegType.APP], ['FAFBB', KLNLegType.APP], ['MAPAA', KLNLegType.APP],
             ['KPRC', KLNLegType.USER],
         ]);
+    });
+
+    // A load is one batch: FPL 0 publishes one change, so the planner sync and the persistence see one (#222).
+    // A new bus subscriber is called at once with the last cached event, which is not a change made by the load
+    it('publishes one flightplanChanged for a load (characterization, #222)', async () => {
+        const w = approachWorld();
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.north(40), storage: savedFlightplan(0, [w.enraa, w.kprc]),
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
+        await settle(unit);
+        const changes: unknown[] = [];
+        let subscribed = false;
+        unit.props.bus.getSubscriber<any>().on('flightplanChanged').handle((fpl: unknown) => subscribed && changes.push(fpl));
+        subscribed = true;
+
+        await unit.panel.loadProcedure('APT 8');
+
+        expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0); // Precondition: the load happened
+        expect(changes).toHaveLength(1);
+        expect(changes[0]).toBe(unit.props.memory.fplPage.flightplans[0]);
     });
 
     // 6-5, B-3: the message after loading an approach whose waypoint is also an enroute waypoint of FPL 0
@@ -191,11 +399,10 @@ describe('APT 8 putting an approach into FPL 0', () => {
     });
 });
 
-// FPL 0 holds 30 legs. While the first leg is part of the active leg, the unit cannot make room by deleting it, so the
-// insertion stops and leaves a partial approach. Whether the approach should be refused as a whole is open.
-// a question: #221
-describe('APT 8 loading an approach into a full FPL 0 (characterization)', () => {
-    it('inserts the legs that fit, leaves out the rest and shows FPL FULL', async () => {
+// Procedure legs come on top of the en-route waypoints: FPL 0 holds 30 en-route waypoints and 45 legs, so an approach
+// loads whole while the first leg is active and nothing is deleted. The order of the approach legs is 6-5, 6-7.
+describe('APT 8 loading an approach on top of the en-route waypoints', () => {
+    it('loads the whole approach in front of the airport while the first leg is active (6-5, 6-7; checked in the KLN 89 trainer, 2026-10-15, #221)', async () => {
         const w = approachWorld();
         const fillers = Array.from({length: 26}, (_, i) => intersection(`FIL${String.fromCharCode(65 + i)}`, 46.5, 7.0 + 0.02 * i));
         const unit = await bootUnit({
@@ -204,7 +411,7 @@ describe('APT 8 loading an approach into a full FPL 0 (characterization)', () =>
             storage: savedFlightplan(0, [...fillers, w.kprc]),
         });
         await settle(unit);
-        // Preconditions: 27 legs, the first leg is part of the active leg (index 1), three places free for five approach legs
+        // Preconditions: 27 legs, the first leg is part of the active leg (index 1)
         expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(27);
         expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(1);
         const before = messages(unit);
@@ -213,16 +420,38 @@ describe('APT 8 loading an approach into a full FPL 0 (characterization)', () =>
 
         expect(fpl0Legs(unit)).toEqual([
             ...fillers.map(f => [f.icaoStruct.ident, KLNLegType.USER]),
-            ['IAFAA', KLNLegType.APP], ['IFAAA', KLNLegType.APP], ['FAFAA', KLNLegType.APP], ['KPRC', KLNLegType.USER],
+            ['IAFAA', KLNLegType.APP], ['IFAAA', KLNLegType.APP], ['FAFAA', KLNLegType.APP], ['SDFAA', KLNLegType.APP],
+            ['MAPAA', KLNLegType.APP], ['KPRC', KLNLegType.USER],
         ]);
-        expect(Screen.read().status().mode).toBe('FPL FULL');
+        expect(Screen.read().status().mode).not.toBe('FPL FULL');
         expect(messages(unit)).toEqual(before);
+    });
+
+    // 4-1: 30 en-route waypoints; the approach comes on top of them (checked in the KLN 89 trainer, 2026-10-15)
+    it('loads an approach onto 30 en-route waypoints without deleting one (4-1; checked in the KLN 89 trainer, 2026-10-15, #221)', async () => {
+        const w = approachWorld();
+        const fillers = Array.from({length: 29}, (_, i) => intersection(`FI${String(i).padStart(3, '0')}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [...w.facilities, ...fillers], position: {lat: 46.5, lon: 6.9},
+            panelXml: panelXml(APR_ARM_SWITCH),
+            storage: savedFlightplan(0, [...fillers, w.kprc]),
+        });
+        await settle(unit);
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(30); // Precondition: 30 en-route
+
+        await unit.panel.loadProcedure('APT 8');
+
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(35);
+        expect(legs[0][0]).toBe('FI000');
+        expect(legs.slice(-6).map(l => l[0])).toEqual(['IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+        expect(Screen.read().status().mode).not.toBe('FPL FULL');
     });
 });
 
-// When FPL 0 is full and its first leg is not part of the active leg, the unit makes room by deleting the first leg
-// (C-1 implies it). The approach waypoints must still come in order before the airport.
-describe('APT 8 loading an approach when FPL 0 has to make room', () => {
+// The approach legs come on top of the en-route waypoints, so nothing is deleted when the plan holds 27 en-route
+// waypoints. The approach waypoints must stand in order before the airport.
+describe('APT 8 loading an approach onto 27 en-route waypoints', () => {
     /** 26 filler fixes and KPRC in FPL 0, the aircraft on the way to the seventh filler: the active leg has index 6 */
     async function loadIntoFullPlan() {
         const w = approachWorld();
@@ -233,32 +462,277 @@ describe('APT 8 loading an approach when FPL 0 has to make room', () => {
             storage: savedFlightplan(0, [...fillers, w.kprc]),
         });
         await settle(unit);
-        // Preconditions: 27 legs, an active leg that does not need the first leg, five approach legs for three free places
+        // Preconditions: 27 legs and an active leg that does not need the first leg
         expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(27);
         expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(6);
         await unit.panel.loadProcedure('APT 8');
         return unit;
     }
 
-    it('deletes the two first legs and loads all five approach waypoints (setup of #222)', async () => {
+    it('loads all five approach waypoints without deleting a waypoint (checked in the KLN 89 trainer, 2026-10-15, #221)', async () => {
         const unit = await loadIntoFullPlan();
         const legs = fpl0Legs(unit);
 
-        expect(legs).toHaveLength(30);
-        expect(legs[0]).toEqual(['FILC', KLNLegType.USER]); // FILA and FILB are gone
+        expect(legs).toHaveLength(32);
+        expect(legs[0]).toEqual(['FILA', KLNLegType.USER]); // Nothing is deleted
         expect(legs.filter(l => l[1] === KLNLegType.APP).map(l => l[0]).sort()).toEqual(['FAFAA', 'IAFAA', 'IFAAA', 'MAPAA', 'SDFAA']);
         expect(legs.filter(l => l[0] === 'KPRC')).toEqual([['KPRC', KLNLegType.USER]]);
     });
 
-    // 6-5, 6-7 (figure 6-9): the approach waypoints, the MAP included, stand in front of the airport. The order is the one of the
-    // load that needs no room (the tests above).
-    it.fails('keeps the approach legs in order before the airport when FPL 0 makes room (6-5, 6-7, #222)', async () => {
+    // 6-5, 6-7 (figure 6-9): the approach waypoints, the MAP included, stand in front of the airport. References #222
+    it('keeps the approach legs in order before the airport on top of the en-route waypoints (6-5, 6-7, #221)', async () => {
         const unit = await loadIntoFullPlan();
 
-        expect(fpl0Legs(unit).slice(24)).toEqual([
+        expect(fpl0Legs(unit).slice(-6)).toEqual([
             ['IAFAA', KLNLegType.APP], ['IFAAA', KLNLegType.APP], ['FAFAA', KLNLegType.APP], ['SDFAA', KLNLegType.APP],
             ['MAPAA', KLNLegType.APP], ['KPRC', KLNLegType.USER],
         ]);
+    });
+});
+
+// A full FPL 0: the load decides the room before it changes anything (#222). Room is needed for the airport the load
+// adds and for the total of 45; the approach legs never delete a waypoint of their own (#221). When room must be made
+// the left page asks once per waypoint to delete; nothing goes before the last ENT
+describe('APT 8 loading an approach into a full FPL 0 that lacks its airport', () => {
+    const leftRows = () => Screen.read().half('L').split('\n').map(r => r.trimEnd());
+
+    /** 30 filler fixes in FPL 0, no KPRC; loads RNAV 18 of KPRC and approves adding the airport */
+    async function bootFullWithoutKprc(position: { lat: number, lon: number }) {
+        const w = approachWorld();
+        const fillers = Array.from({length: 30}, (_, i) => intersection(`FL${String(i).padStart(2, '0')}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [...w.facilities, ...fillers], position, panelXml: panelXml(APR_ARM_SWITCH),
+            storage: savedFlightplan(0, fillers),
+        });
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 1');
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'KPRC');
+        await unit.panel.cursor('R');
+        await unit.panel.selectPage('R', 'APT 8');
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // RNAV 18 (one transition)
+        await unit.panel.ent(); // LOAD IN FPL: the add question
+        await unit.panel.ent(); // APPROVE?
+        return unit;
+    }
+
+    // C-1: FPL FULL while the first waypoint is part of the active leg; nothing of the load is done
+    it('answers FPL FULL and leaves FPL 0 unchanged while the first leg is active (C-1, #222)', async () => {
+        const unit = await bootFullWithoutKprc({lat: 46.5, lon: 6.9});
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(1); // Precondition
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().status().mode).toBe('FPL FULL');
+        expect(fpl0Legs(unit)).toHaveLength(30);
+    });
+
+    // 6-5, 6-7: the approach goes in front of its airport, also when the airport is added at the end. C-1: the first
+    // waypoint makes room for the airport, since it is not part of the active leg
+    it('puts the approach in front of the airport it adds to a full FPL 0 (6-5, 6-7, C-1, #222)', async () => {
+        const unit = await bootFullWithoutKprc({lat: 46.5, lon: 7.12});
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(6); // Precondition
+        await unit.panel.ent(); // CONTINUE?
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(35);
+        expect(legs[0][0]).toBe('FL01');
+        expect(legs.slice(-6).map(l => l[0])).toEqual(['IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+    });
+
+    // The maintainer's ruling: one question per waypoint. The waypoint number names the waypoint that will go, since
+    // nothing is deleted before the last ENT
+    it('asks once per waypoint it has to delete and deletes nothing before the last ENT (characterization, #222)', async () => {
+        const w = approachWorld();
+        // An approach of 17 waypoints onto 29 fillers and KPRC: 47 legs, two over the 45
+        const fixes = Array.from({length: 17}, (_, i) => intersection(`AP${String(i).padStart(3, '0')}`, 46.8, 7.5 + 0.02 * i));
+        const longApp = approach({
+            type: ApproachType.APPROACH_TYPE_RNAV, runway: '18',
+            final: [Leg.IF(fixes[0], FixTypeFlags.IAF), ...fixes.slice(1, 16).map(f => Leg.TF(f)), Leg.TF(fixes[16], FixTypeFlags.MAP)],
+        });
+        const kprc = withProcedures(w.kprc, {approaches: [longApp]});
+        const fillers = Array.from({length: 29}, (_, i) => intersection(`FL${String(i).padStart(2, '0')}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [kprc, ...fixes, ...fillers], position: {lat: 46.5, lon: 7.12}, panelXml: panelXml(APR_ARM_SWITCH),
+            storage: savedFlightplan(0, [...fillers, kprc]),
+        });
+        await settle(unit);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(6); // Precondition
+        await unit.panel.selectPage('R', 'APT 8');
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // the approach (no transition)
+        await unit.panel.ent(); // LOAD IN FPL
+
+        expect(leftRows()[1]).toBe('WPT   1');
+        await unit.panel.ent();
+        expect(leftRows()[1]).toBe('WPT   2');
+        expect(fpl0Legs(unit)).toHaveLength(30); // nothing deleted yet
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(45);
+        expect(legs[0][0]).toBe('FL02');
+        expect(legs[44][0]).toBe('KPRC');
+    });
+
+    // A waypoint deleted to make room is no longer in FPL 0, so it does not make the approach redundant (6-5, B-3 name
+    // the message; that the deletion comes first is a characterization)
+    it('does not count a waypoint deleted to make room as redundant (characterization, #222)', async () => {
+        const w = approachWorld();
+        const fillers = Array.from({length: 29}, (_, i) => intersection(`FL${String(i).padStart(2, '0')}`, 46.5, 7.0 + 0.02 * i));
+        // 17 approach waypoints, one of them FL00, the first filler, which goes to make room
+        const fixes = Array.from({length: 16}, (_, i) => intersection(`AP${String(i).padStart(3, '0')}`, 46.8, 7.5 + 0.02 * i));
+        const longApp = approach({
+            type: ApproachType.APPROACH_TYPE_RNAV, runway: '18',
+            final: [Leg.IF(fixes[0], FixTypeFlags.IAF), ...fixes.slice(1, 15).map(f => Leg.TF(f)), Leg.TF(fillers[0]), Leg.TF(fixes[15], FixTypeFlags.MAP)],
+        });
+        const kprc = withProcedures(w.kprc, {approaches: [longApp]});
+        const unit = await bootUnit({
+            facilities: [kprc, ...fixes, ...fillers], position: {lat: 46.5, lon: 7.12}, panelXml: panelXml(APR_ARM_SWITCH),
+            storage: savedFlightplan(0, [...fillers, kprc]),
+        });
+        await settle(unit);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(6); // Precondition
+        const before = messages(unit);
+        await unit.panel.selectPage('R', 'APT 8');
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // the approach (no transition)
+        await unit.panel.ent(); // LOAD IN FPL
+        await unit.panel.ent(); // WPT 1
+        await unit.panel.ent(); // WPT 2
+        await vi.advanceTimersByTimeAsync(1000);
+
+        // Preconditions: the load deleted FL00 and FL01, and FL00 is in FPL 0 only as an approach waypoint
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(45);
+        expect(legs[0][0]).toBe('FL02');
+        expect(legs.filter(l => l[0] === 'FL00')).toEqual([['FL00', KLNLegType.APP]]);
+        expect(messages(unit)).toEqual(before);
+    });
+});
+
+// A long approach into a full FPL 0, also in place of another. The world: KPRC with RNAV 18 (five waypoints) and an
+// RNAV 36 of 17 waypoints; FPL 0 holds 29 fillers and KPRC (KPRC last, or first where a test says so). 30 en-route
+// waypoints and 17 approach legs pass the total of 45 by two (#221)
+describe('APT 8 loading a long approach into a full FPL 0', () => {
+    const leftRows = () => Screen.read().half('L').split('\n').map(r => r.trimEnd());
+
+    /** lon 7.12: the active leg has index 6 (KPRC last); lon 6.9: the first leg is part of the active leg */
+    async function bootReplaceWorld(lon: number, kprcFirst = false) {
+        const w = approachWorld();
+        const fixes = Array.from({length: 17}, (_, i) => intersection(`AP${String(i).padStart(3, '0')}`, 46.8, 7.5 + 0.02 * i));
+        const rnav36 = approach({
+            type: ApproachType.APPROACH_TYPE_RNAV, runway: '36',
+            final: [Leg.IF(fixes[0], FixTypeFlags.IAF), ...fixes.slice(1, 16).map(f => Leg.TF(f)), Leg.TF(fixes[16], FixTypeFlags.MAP)],
+        });
+        const kprc = withProcedures(w.kprc, {approaches: [...w.kprc.approaches, rnav36]});
+        const fillers = Array.from({length: 29}, (_, i) => intersection(`FL${String(i).padStart(2, '0')}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.sdfaa, w.mapaa, ...fixes, ...fillers],
+            position: {lat: 46.5, lon}, panelXml: panelXml(APR_ARM_SWITCH),
+            storage: savedFlightplan(0, kprcFirst ? [kprc, ...fillers] : [...fillers, kprc]),
+        });
+        await settle(unit);
+        return unit;
+    }
+
+    /**
+     * On APT 8 with the cursor off: the second entry, RNAV 36 (no transition), and LOAD IN FPL. With an approach in
+     * FPL 0 the replace question of #274 comes after LOAD IN FPL, before the room question: `replacing` answers it
+     */
+    async function loadRnav36(unit: HeadlessUnit, replacing = false) {
+        await unit.panel.selectPage('R', 'APT 8');
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1); // RNAV 36
+        await unit.panel.ent(); // its waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+        if (replacing) await unit.panel.ent(); // APPROVE? of the replace question (#274)
+    }
+
+    // The old approach goes in the same step, so its legs free room: 30 en-route waypoints and 17 approach legs need two
+    // deletions, not seven (the total of 45 of #221 and the ruling of one question per waypoint)
+    it('frees the legs of the approach it replaces and asks twice (characterization, #222)', async () => {
+        const unit = await bootReplaceWorld(7.12);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(6); // Precondition
+        await unit.panel.loadProcedure('APT 8'); // RNAV 18
+        expect(fpl0Legs(unit)).toHaveLength(35); // Precondition
+        await loadRnav36(unit, true);
+
+        expect(leftRows()[1]).toBe('WPT   1');
+        await unit.panel.ent();
+        expect(leftRows()[1]).toBe('WPT   2');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(45);
+        expect(legs[0][0]).toBe('FL02');
+        expect(legs.map(l => l[0])).not.toContain('IAFAA');
+    });
+
+    // C-1: FPL FULL while the first waypoint is part of the active leg; the approach that would be replaced stays
+    it('answers FPL FULL and keeps the old approach while the first leg is active (C-1, #222)', async () => {
+        const unit = await bootReplaceWorld(6.9);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(1); // Precondition
+        await unit.panel.loadProcedure('APT 8'); // RNAV 18
+        expect(fpl0Legs(unit)).toHaveLength(35); // Precondition
+        await loadRnav36(unit, true);
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().status().mode).toBe('FPL FULL');
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(35);
+        expect(legs.slice(-6).map(l => l[0])).toEqual(['IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+    });
+
+    // The ruling: the airport of the approach is never deleted to make room for it. Here the active leg would let the
+    // two first waypoints go, so the refusal is the airport's
+    it('answers FPL FULL rather than delete the airport of the approach (characterization, #222)', async () => {
+        const unit = await bootReplaceWorld(7.12, true);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBeGreaterThan(3); // Precondition
+        await loadRnav36(unit);
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().status().mode).toBe('FPL FULL');
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(30);
+        expect(legs[0][0]).toBe('KPRC');
+    });
+
+    // The deletions are part of the load's one batch: one change after the last ENT
+    it('publishes one flightplanChanged for a load that deletes waypoints (characterization, #222)', async () => {
+        const unit = await bootReplaceWorld(7.12);
+        await loadRnav36(unit);
+        await unit.panel.ent(); // WPT 1
+        const changes: unknown[] = [];
+        let subscribed = false;
+        unit.props.bus.getSubscriber<any>().on('flightplanChanged').handle((fpl: unknown) => subscribed && changes.push(fpl));
+        subscribed = true;
+
+        await unit.panel.ent(); // WPT 2
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fpl0Legs(unit)).toHaveLength(45); // Precondition: the load happened
+        expect(changes).toHaveLength(1);
+        expect(changes[0]).toBe(unit.props.memory.fplPage.flightplans[0]);
+    });
+
+    // The room is decided again on the last ENT: a waypoint that went while the question showed is not asked for again,
+    // so only the deletion still needed happens
+    it('deletes only what is still needed on the last ENT (characterization, #222)', async () => {
+        const unit = await bootReplaceWorld(7.12);
+        await loadRnav36(unit);
+        await unit.panel.ent(); // WPT 1
+        unit.props.memory.fplPage.flightplans[0].deleteLeg(0); // FL00 goes meanwhile: one deletion is left
+
+        await unit.panel.ent(); // WPT 2
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(45);
+        expect(legs[0][0]).toBe('FL02');
     });
 });
 

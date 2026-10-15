@@ -366,13 +366,41 @@ Flightplan really is dead simple".
 
 - `Flightplan(idx, legs, bus)` holds
   `KLNFlightplanLeg {wpt: Facility, type: KLNLegType(USER|SID|STAR|APP), parentFacility?, procedure?: ProcedureInformation, flyOver?, fixType?: KLNFixType(IAF|FAF|MAP|MAHP), askObs?, arcData?: ArcData}`.
-- There are 26 plans: index 0 is the active plan and 1 to 25 are stored. Each holds a maximum of 30 legs; `insertLeg`
-  throws. Use `services/FlightplanUtils.insertLegIntoFpl`, which drops leg 0 of FPL 0 when it is full (C-1).
+- There are 26 plans: index 0 is the active plan and 1 to 25 are stored. Each numbered plan holds 30 legs. FPL 0 holds
+  30 en-route legs (type USER) and 45 legs in total, because SID, STAR and approach legs come on top of the en-route
+  limit (#221, `legsFit`, `Flightplan.fits`); `insertLeg` throws past them. Use
+  `services/FlightplanUtils.insertLegIntoFpl`, which deletes from the front of a full FPL 0 as `roomSteps` says (#148):
+  one waypoint per step, an airport with the SID legs behind it, never a leg of the active leg (C-1). The insert index
+  follows the deleted legs.
+- The procedure loads of APT 7 and APT 8 (`load`) decide the room before they change FPL 0 (#222): `roomSteps` over the
+  legs without the procedure being replaced, with the airport the load adds as en-route and the procedure legs on top.
+  No room is FPL FULL with FPL 0 unchanged. When waypoints must go, `pages/left/ProcedureMakeRoomPage` (a subclass of
+  the abstract `MakeRoomPage`) asks on the left once per waypoint; ENT on the last question deletes them and loads,
+  CLR cancels. A load is one batch with one `flightplanChanged`, inserting with plain `insertLeg`.
+- An insert on the FPL 0 page asks before it makes room (#380). The inner-knob click, typed key or ENT (3-15, only
+  when it takes the waypoint of the right page) that would open an insert row or the entry of the blank position first
+  calls `EditableFlightplan.askRoom` through the row (`FlightplanListItem` prop `askRoom`). The added leg is a SID or
+  STAR leg in front of such a row (as `createLeg` copies the type), else en-route. When `roomSteps` says waypoints must
+  go, `pages/left/FplInsertMakeRoomPage` (a second subclass of `MakeRoomPage`) asks on the left; ENT deletes one step,
+  rebuilds the list with the cursor on the row the insert goes in front of (the new first waypoint when that one was
+  deleted, #148) and repeats the action through the cursor controller, which asks again or opens the entry. A row not
+  in the plan yet that asked (the en-route row an inner click on a procedure header creates, or the empty row of an
+  ENT) is made again there as it was, so a header's row stays an en-route leg in front of the procedure. CLR turns the
+  cursor off and rebuilds the list with FPL 0 unchanged. When room cannot be made (C-1) nothing is asked: the entry
+  opens and its ENT answers FPL FULL. The REF and CTR inserts keep the silent deletion of `insertLegIntoFpl`.
+- Before `load` runs, `loadIfFplContainsApt` of APT 7 and APT 8 chooses the question (#274). A procedure of the type being
+  loaded in FPL 0 (any approach for APT 8, a SID for a SID, a STAR for a STAR; also the same one) shows the replace page
+  (`Apt8ReplacePage`, `Apt7ReplacePage`: `PRESS ENT TO REPLACE EXISTING APPROACH/SID/STAR`, a flashing `APPROVE?`). It
+  is the only question: it also stands in for the question to add the airport, which `load` then adds. Otherwise a
+  missing airport asks to add it (`Apt8AddPage`, `Apt7AddPage`). APPROVE? calls `load`, so the room check follows; CLR
+  goes back to the waypoint preview with the cursor on LOAD IN FPL.
 - Mutations publish **`flightplanChanged`**. `startBatchInsert/finishBatchInsert` suppress the intermediate events ("
   Would mess up the async asobo FPL sync"). Subscribers are `UserFlightplanPersistor` (persists every change) and
   `WTFlightplanSync`.
 - `getLegs()` returns the **internal mutable array**.
-- `removeProcedures()` keeps only USER legs. Procedures are never persisted.
+- `removeProcedures()` keeps only USER legs, and `removeProcedure(type)` drops one kind. Both publish
+  `flightplanChanged` when they removed a leg, so the planner mirror follows FPL 0 (#347). Procedures are never
+  persisted.
 - Branch `switch-to-wt-flightplan` (commit 580c4e7, Nov 2024, "does not compile at all and will probably be abandoned")
   lists why the SDK `FlightPlan`/`LNavComputer` does not fit:
     - pseudo-legs for direct-to versus the 30-leg limit
@@ -474,7 +502,11 @@ written then, on purpose: the default autopilot reads it.
 **SID/STAR/approaches** (`data/navdata/SidStar.ts`):
 
 - Converts SDK procedures into KLN legs. It keeps the IAF/FAF/MAP/MAHP and the last leg, drops step-downs, merges
-  consecutive AF arcs and computes `ArcData` (VOR, radials, entry point, `GeoCircle`).
+  consecutive AF arcs around one navaid and radius (within 0.1 NM) and computes `ArcData` (VOR, radials, entry point,
+  `GeoCircle`). Two arcs of different radius stay two arcs (#131): the first arc's end fix stays in the list and the
+  second arc starts at a generated entry at its published beginning.
+- The sim sets no MAHP flag, so the MAHP is derived: the hold (HA, HF or HM) that ends the missed approach gets the
+  flag on the conversion's copy of the leg (#220). A missed approach that ends otherwise has none.
 - The arc entry point is created as a temporary user waypoint in `XY` and recalculated from the current position (
   `recalculateArcEntryData`).
 - `isProcedureRecognized` filters out RNAV procedures as the real unit does.
@@ -576,6 +608,16 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `reset()` runs on every power-on. It resets these fields, **removes procedures from FPL 0 when the unit was off
       for more than 5 minutes** (6-5; `timeSincePowerChange` of the power event), and re-initialises the first scan-list
       entry per type, setting `isReady` when done; WelcomePage waits on `isReady`.
+    - `ctrPage` keeps the left FPL page instance of the CTR computation (`lastFplPage`). CTR 1 and CTR 2 call
+      `syncCtrState` (`pages/right/CtrState.ts`) in their display ticks and return to the start state when another
+      instance is on the left (5-26).
+      `computedLegs` is a copy of the plan's legs from the computation: when the plan's legs differ (count or instance),
+      `syncCtrState` and CTR 1's insert ENT go back to the start state (#348), and a computation that finishes after such
+      a reset is discarded. The insertion therefore needs no room check of its own; the computation checks `fits`.
+      CTR 1 drops a crossing on a leg between two approach waypoints before it counts or creates anything
+      (`mayAddWaypointBefore` in `services/FlightplanUtils.ts`, 6-7, #349). REF skips such legs when it looks for the
+      closest leg, and gives INVALID REF when none is left (`RefPage.findClosestPoint`, 5-21, #377). A REF waypoint on
+      the leg into the IAF is inserted as an en-route leg in front of the approach header (`insertRefWpt`).
 - **Persistent messages** (`data/PersistentMessages.ts`) are condition-driven message objects. They are not stored; see
   Core 9.
 
@@ -653,7 +695,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - **Faithful emulation, including quirks:**
     - CRT warm-up and slow display; 1 Hz calculations
     - 90 s acquisition and almanac rules; the GPS week rollover
-    - the 30-leg limit; the MAP is not auto-sequenced
+    - the limits of FPL 0: 30 en-route waypoints and 45 legs in total (#221); the MAP is not auto-sequenced
     - SUA alerts treat everything as inside when there is no altitude input (3-40)
     - procedures are removed on power-on
     - only USER legs persist
@@ -1153,7 +1195,8 @@ export class Set3Page extends SixLineHalfPage {
 - `FplPage` creates its `CursorController(NO_CHILDREN)` first and passes it into `FlightplanList.build(...)`, which
   refreshes it.
 - Newly inserted rows carry `enterMe: FplWptEnterMode` (`ROTATE_LEFT`, `ROTATE_RIGHT`, `ENTER`, `CONFIRM`, `KEYBOARD`)
-  so the new row is auto-entered after the rebuild.
+  so the new row is auto-entered after the rebuild. A row marked `focusMe` gets the cursor after the rebuild; the room
+  question of an FPL 0 insert uses it before it repeats the knob, key or ENT (#380).
 - FPL 0 keeps the active leg in view (4-8), with the from waypoint on the page also when a procedure header lies between
   it and the active waypoint (figure 6-43; a Direct To has no from waypoint, #239). `getVisibleLegsIndices()` feeds the
   D/T pages.
