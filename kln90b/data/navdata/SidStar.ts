@@ -384,11 +384,12 @@ export class SidStar {
     public async getKLNApproachLegList(facility: AirportFacility, app: ApproachProcedure, iaf: ApproachTransition | null): Promise<KLNFlightplanLeg[]> {
         const legs: FlightPlanLeg[] = [];
 
+        //#376: the legs belong to the facility the SDK caches, so the conversion works on copies
         if (iaf != null) {
-            legs.push(...iaf.legs);
+            legs.push(...iaf.legs.map(leg => ({...leg})));
         }
 
-        legs.push(...app.finalLegs, ...app.missedLegs);
+        legs.push(...app.finalLegs.map(leg => ({...leg})), ...app.missedLegs.map(leg => ({...leg})));
 
         const cleaned = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
         const approachName = SidStar.formatApproachName(app, facility);
@@ -479,26 +480,27 @@ export class SidStar {
     public async getKLNProcedureLegList(facility: AirportFacility, proc: Procedure, type: KLNLegType, rwy: RunwayTransition | null, trans: EnrouteTransition | null): Promise<KLNFlightplanLeg[]> {
         const legs: FlightPlanLeg[] = [];
 
+        //#376: the legs belong to the facility the SDK caches, so the conversion works on copies
         if (type === KLNLegType.SID) {
             if (rwy != null) {
-                legs.push(...rwy.legs);
+                legs.push(...rwy.legs.map(leg => ({...leg})));
             }
 
-            legs.push(...proc.commonLegs);
+            legs.push(...proc.commonLegs.map(leg => ({...leg})));
 
             if (trans != null) {
-                legs.push(...trans.legs);
+                legs.push(...trans.legs.map(leg => ({...leg})));
             }
         } else {
 
             if (trans != null) {
-                legs.push(...trans.legs);
+                legs.push(...trans.legs.map(leg => ({...leg})));
             }
 
-            legs.push(...proc.commonLegs);
+            legs.push(...proc.commonLegs.map(leg => ({...leg})));
 
             if (rwy != null) {
-                legs.push(...rwy.legs);
+                legs.push(...rwy.legs.map(leg => ({...leg})));
             }
         }
 

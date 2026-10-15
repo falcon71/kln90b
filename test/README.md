@@ -276,8 +276,9 @@ pages accept.
 
 - `Leg.TF(fix, flags)`, `Leg.IF`, `Leg.CF`, `Leg.DF`, `Leg.CA`, `Leg.VM`, `Leg.HM`, `Leg.HF`, `Leg.HA`, `Leg.PI`
   (holds and a procedure turn, with the arguments of `Leg.HM`), `Leg.AF` (a DME arc) and `Leg.RF`
-  (only to test that RF procedures are rejected) return legs as `FlightPlan.createLeg` does. `SidStar` writes into legs
-  (`fixTypeFlags`, `course`), so every call returns a new object; never share a leg between procedures.
+  (only to test that RF procedures are rejected) return legs as `FlightPlan.createLeg` does. Every call returns a new
+  object; never share a leg between procedures. `SidStar` converts copies of the legs, so the procedure stays as built
+  (#376).
 - `sid`, `star` and `approach` take the legs by role: runway transitions, enroute transitions, common legs, or an
   approach's transitions, final and missed legs. `withProcedures(apt, {...})` returns a copy of an `airport()` that carries
   them, because the builders in `builders.ts` stay procedure-free.

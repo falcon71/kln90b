@@ -723,6 +723,115 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(radiusNm(firstArc!)).toBeCloseTo(13, 1);
         });
     });
+
+    // #376: the conversion works on copies of the legs the SDK hands out, so the database stays as it is and a second
+    // conversion (or a second transition) gives the same legs as the first. The approaches are built per test, so the
+    // assertions see that test's objects.
+    describe('a conversion leaves the procedure as the database has it (#376)', () => {
+        const stfix = fixAt('STFIX', 270, 10);
+        const arc1end = fixAt('ARC1E', 225, 10);
+        const arc2end = fixAt('ARC2E', 180, 10);
+        const WORLD = [abc, stfix, arc1end, arc2end, fafaa, mapaa, kprc];
+
+        /** The PHNY-shaped approach: the transition ends its arc at ARC1E, the final starts at the same fix (7fd640e) */
+        const phnyApproach = () => approach({
+            type: ApproachType.APPROACH_TYPE_VORDME, runway: '18',
+            transitions: [
+                {name: 'STFIX', legs: [Leg.IF(stfix, FixTypeFlags.IAF), Leg.AF(arc1end, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT})]},
+            ],
+            final: [Leg.IF(arc1end, FixTypeFlags.IAF), Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+
+        /** Two transitions: STFIX ends its arc at ARC1E, and ARC1E starts a transition of its own; the final starts with an arc */
+        const twoTransitionsApproach = () => approach({
+            type: ApproachType.APPROACH_TYPE_VORDME, runway: '18',
+            transitions: [
+                {name: 'STFIX', legs: [Leg.IF(stfix, FixTypeFlags.IAF), Leg.AF(arc1end, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT})]},
+                {name: 'ARC1E', legs: [Leg.IF(arc1end, FixTypeFlags.IAF)]},
+            ],
+            final: [Leg.AF(arc2end, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}), Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+
+        it('converts the same approach and transition twice to the same legs (characterization, #376)', async () => {
+            const app = phnyApproach();
+            const ss = sidStar(WORLD, at(250, 30));
+            const first = await ss.getKLNApproachLegList(kprc, app, app.transitions[0]);
+            const second = await ss.getKLNApproachLegList(kprc, app, app.transitions[0]);
+
+            expect(identsOf(first)).toEqual(['D250J', 'ARC1E', 'FAFAA', 'MAPAA']);
+            expect(identsOf(second)).toEqual(identsOf(first));
+        });
+
+        // 6-16: an arc entered from outside starts at its published beginning
+        it('starts the arc of the second transition at its published beginning after the first was converted (6-16, #376)', async () => {
+            const app = twoTransitionsApproach();
+            const ss = sidStar(WORLD, at(250, 30));
+            await ss.getKLNApproachLegList(kprc, app, app.transitions[0]); // STFIX
+            const legs = await ss.getKLNApproachLegList(kprc, app, app.transitions[1]); // ARC1E
+
+            expect(identsOf(legs)[0]).toBe('D225J');
+            expect(legs[0].arcData!.beginRadial).toBeCloseTo(225, 3);
+        });
+
+        it('leaves the course and the flags of the database legs unchanged (characterization, #376)', async () => {
+            const twoTransitions = twoTransitionsApproach();
+            const phny = phnyApproach();
+            // the two-transition approach (STFIX, then ARC1E) and the PHNY-shaped one-transition approach
+            await sidStar(WORLD, at(250, 30)).getKLNApproachLegList(kprc, twoTransitions, twoTransitions.transitions[0]);
+            await sidStar(WORLD, at(250, 30)).getKLNApproachLegList(kprc, phny, phny.transitions[0]);
+
+            expect(twoTransitions.finalLegs[0].course).toBe(225); // the final arc's published beginning
+            expect(phny.transitions[0].legs[1].fixTypeFlags).toBe(0); // the transition's arc carries no flag
+        });
+
+        // Two consecutive arcs on one navaid and radius: mergeAFsIfNecessary gives the second arc the course of the first.
+        // The arcs run 270 to 225 and 225 to 180 (magnetic, variation 0), so the merged arc runs from 270 to 180. The
+        // aircraft is on radial 250 at 20 NM, inside the merged arc: the entry is D250J (6-6, distance letter J = 10 NM).
+        it('converts the same STAR with consecutive arcs twice to the same legs and leaves its arcs unchanged (characterization, #376)', async () => {
+            const proc = star('ARR2', {
+                common: [
+                    Leg.IF(stfix),
+                    Leg.AF(arc1end, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT}),
+                    Leg.AF(arc2end, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                    Leg.TF(fafaa),
+                ],
+            });
+            const ss = sidStar(WORLD, at(250, 20));
+            const first = await ss.getKLNProcedureLegList(kprc, proc, KLNLegType.STAR, null, null);
+            const second = await ss.getKLNProcedureLegList(kprc, proc, KLNLegType.STAR, null, null);
+
+            expect(identsOf(first)).toEqual(['D250J', 'ARC2E', 'FAFAA']);
+            expect(identsOf(second)).toEqual(identsOf(first));
+            expect(first[0].arcData!.beginRadial).toBeCloseTo(270, 6);
+            expect(second[0].arcData!.beginRadial).toBeCloseTo(270, 6);
+            expect(proc.commonLegs[2].course).toBe(225); // the second arc's published beginning, as the database has it
+        });
+
+        // The same merge on a missed approach: the missed legs carry the two arcs (the final is one FAF leg). The list is
+        // FAFAA, the missed start, the entry, ARC2E and MAPAA; the entry replaces the missed start and is D250J as above.
+        it('converts the same missed approach with consecutive arcs twice to the same legs and leaves its arcs unchanged (characterization, #376)', async () => {
+            const missedStart = fixAt('MISSA', 300, 5);
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_VORDME, runway: '18',
+                final: [Leg.TF(fafaa, FixTypeFlags.FAF)],
+                missed: [
+                    Leg.TF(missedStart),
+                    Leg.AF(arc1end, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT}),
+                    Leg.AF(arc2end, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                    Leg.TF(mapaa, FixTypeFlags.MAP),
+                ],
+            });
+            const ss = sidStar([...WORLD, missedStart], at(250, 20));
+            const first = await ss.getKLNApproachLegList(kprc, app, null);
+            const second = await ss.getKLNApproachLegList(kprc, app, null);
+
+            expect(identsOf(first)).toEqual(['FAFAA', 'D250J', 'ARC2E', 'MAPAA']);
+            expect(identsOf(second)).toEqual(identsOf(first));
+            expect(first[1].arcData!.beginRadial).toBeCloseTo(270, 6);
+            expect(second[1].arcData!.beginRadial).toBeCloseTo(270, 6);
+            expect(app.missedLegs[2].course).toBe(225); // the second arc's published beginning, as the database has it
+        });
+    });
 });
 
 // The conversion paths of SidStar that the tests above leave out. The worlds are invented.

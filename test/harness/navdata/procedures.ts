@@ -10,8 +10,8 @@ const icaoOf = (f: Fix): IcaoValue => 'icaoStruct' in f ? f.icaoStruct : f;
 
 /**
  * Procedure legs as the sim's navdata delivers them: FlightPlan.createLeg fills every field the SDK declares
- * (msfssdk.d.ts, FlightPlanLeg) with a default. SidStar writes into legs (fixTypeFlags, course), so every call returns a
- * new, unfrozen object; never share a leg between procedures.
+ * (msfssdk.d.ts, FlightPlanLeg) with a default. Every call returns a new, unfrozen object; never share a leg between
+ * procedures.
  */
 export const Leg = {
     IF: (fix: Fix, flags = 0) => FlightPlan.createLeg({type: LegType.IF, fixIcaoStruct: icaoOf(fix), fixTypeFlags: flags}),
