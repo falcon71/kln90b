@@ -389,7 +389,15 @@ export class SidStar {
             legs.push(...iaf.legs.map(leg => ({...leg})));
         }
 
-        legs.push(...app.finalLegs.map(leg => ({...leg})), ...app.missedLegs.map(leg => ({...leg})));
+        const missedLegs = app.missedLegs.map(leg => ({...leg}));
+
+        //#220: the sim sets no MAHP flag; the hold that ends the missed approach is the MAHP (maintainer ruling)
+        const lastMissedLeg = missedLegs.filter(leg => SidStar.isLegSupported(leg)).pop();
+        if (lastMissedLeg !== undefined && [LegType.HA, LegType.HF, LegType.HM].includes(lastMissedLeg.type)) {
+            lastMissedLeg.fixTypeFlags |= FixTypeFlags.MAHP;
+        }
+
+        legs.push(...app.finalLegs.map(leg => ({...leg})), ...missedLegs);
 
         const {legs: cleaned, askObsLegs} = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
         const approachName = SidStar.formatApproachName(app, facility);

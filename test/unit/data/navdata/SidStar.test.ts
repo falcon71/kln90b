@@ -1084,6 +1084,114 @@ describe('a missed approach that holds at the MAP (characterization)', () => {
     });
 });
 
+describe('the MAHP of a missed approach (#220)', () => {
+    // 6-5 to 6-7: the holding point of the missed approach shows once with its suffix; 6-11: the OBS reminder before it.
+    // The KLN 89 lists it once, last (checked in the KLN 89 trainer, 2026-10-15). The hold carries the MAHP flag as the
+    // conversion leaves it after the derivation below.
+    it('lists the holding point of the missed approach once with the MAHP suffix and the OBS reminder (6-5, 6-7, 6-11; checked in the KLN 89 trainer, 2026-10-15, #220)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.CA(270), Leg.DF(mahaa), Leg.HM(mahaa, 90, undefined, FixTypeFlags.MAHP)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType, l.askObs])).toEqual([
+            ['FAFAA', KLNFixType.FAF, false], ['MAPAA', KLNFixType.MAP, false], ['MAHAA', KLNFixType.MAHP, true],
+        ]);
+    });
+
+    // The sim sets no MAHP flag (the #220 comment: HKKI RNAV 24 ends CA, DF TEXAV, HM TEXAV). The hold that ends the
+    // missed approach is the MAHP (maintainer ruling). The conversion sets it on its copy, never on the SDK's leg.
+    it('derives the MAHP from an unflagged hold that ends the missed approach (characterization, #220)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.CA(270), Leg.DF(mahaa), Leg.HM(mahaa, 90)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType, l.askObs])).toEqual([
+            ['FAFAA', KLNFixType.FAF, false], ['MAPAA', KLNFixType.MAP, false], ['MAHAA', KLNFixType.MAHP, true],
+        ]);
+        expect(app.missedLegs[app.missedLegs.length - 1].fixTypeFlags).toBe(0);
+    });
+
+    // The database also ends a missed approach with a hold to an altitude or to a fix; the derivation does not depend on
+    // which hold type it is (the test above covers HM) (maintainer ruling)
+    it.each([
+        ['HA', (f: Facility) => Leg.HA(f, 90)],
+        ['HF', (f: Facility) => Leg.HF(f, 90)],
+    ])('makes a missed approach that ends in %s the MAHP (characterization, #220)', async (_name, hold) => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.CA(270), Leg.DF(mahaa), hold(mahaa)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType, l.askObs])).toEqual([
+            ['FAFAA', KLNFixType.FAF, false], ['MAPAA', KLNFixType.MAP, false], ['MAHAA', KLNFixType.MAHP, true],
+        ]);
+    });
+
+    // A leg without a fix is not listed, so the last listed leg decides (maintainer ruling)
+    it('makes the hold the MAHP when only a leg without a fix follows it (characterization, #220)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.CA(270), Leg.DF(mahaa), Leg.HM(mahaa, 90), Leg.CA(90)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType, l.askObs])).toEqual([
+            ['FAFAA', KLNFixType.FAF, false], ['MAPAA', KLNFixType.MAP, false], ['MAHAA', KLNFixType.MAHP, true],
+        ]);
+    });
+
+    // A hold at the MAP fix that ends the missed approach: the fix is listed as the MAP, then as the MAHP, the way the
+    // flagged hold at the MAP is (characterization)
+    it('derives the MAHP at the MAP fix from an unflagged hold at the MAP (characterization, #220)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.HM(mapaa, 90)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+            ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP], ['MAPAA', KLNFixType.MAHP],
+        ]);
+    });
+
+    // A missed approach that does not end in a hold gets no MAHP (maintainer ruling). A procedure turn is the leg most
+    // easily taken for one: it asks for OBS like a hold, but it is no hold.
+    it.each([
+        ['DF', (f: Facility) => Leg.DF(f)],
+        ['TF', (f: Facility) => Leg.TF(f)],
+        ['CF', (f: Facility) => Leg.CF(f, 270)],
+        ['PI', (f: Facility) => Leg.PI(f, 90)],
+    ])('marks no MAHP when the missed approach ends in %s, not in a hold (characterization, #220)', async (_name, last) => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.CA(270), last(mahaa)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+            ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP], ['MAHAA', undefined],
+        ]);
+    });
+
+    // Only the hold that ends the missed approach is the MAHP: a hold that a further leg follows is not (maintainer ruling)
+    it('marks no MAHP when a hold is followed by a further leg of the missed approach (characterization, #220)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            final: [Leg.IF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            missed: [Leg.CA(270), Leg.DF(mahaa), Leg.HM(mahaa, 90), Leg.TF(misaa)],
+        });
+        const legs = await convertApp(app, null);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+            ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP], ['MAHAA', undefined], ['MISAA', undefined],
+        ]);
+    });
+});
+
 // The conversion of DME arcs: the entry on the aircraft's radial, one arc for consecutive arcs, the FAF kept. The pages
 // are cited on the spec tests.
 describe('DME arcs in the conversion', () => {

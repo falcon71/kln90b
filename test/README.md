@@ -302,7 +302,8 @@ pages accept.
   Boot on the arc, so that the arc leg is the closest and becomes active.
   A test that recalculates the entry (MOVE? on Super NAV 5) can use a left or a right arc.
 - `Leg.TF(fix, FixTypeFlags.IAF)` and its siblings set the fix types. `SidStar` keeps a leg flagged IAF, FAF, MAP or MAHP
-  even when its fix repeats, and drops an unflagged repeat.
+  even when its fix repeats, and drops an unflagged repeat. A missed approach that ends in a hold (HA, HF or HM) gets
+  the MAHP flag without a flagged leg in the test data (#220); one that ends otherwise has none.
 
 ## Reading the screen
 

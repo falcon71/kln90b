@@ -479,6 +479,8 @@ written then, on purpose: the default autopilot reads it.
 
 - Converts SDK procedures into KLN legs. It keeps the IAF/FAF/MAP/MAHP and the last leg, drops step-downs, merges
   consecutive AF arcs and computes `ArcData` (VOR, radials, entry point, `GeoCircle`).
+- The sim sets no MAHP flag, so the MAHP is derived: the hold (HA, HF or HM) that ends the missed approach gets the
+  flag on the conversion's copy of the leg (#220). A missed approach that ends otherwise has none.
 - The arc entry point is created as a temporary user waypoint in `XY` and recalculated from the current position (
   `recalculateArcEntryData`).
 - `isProcedureRecognized` filters out RNAV procedures as the real unit does.
