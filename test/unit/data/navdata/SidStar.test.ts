@@ -973,9 +973,9 @@ describe('the OBS reminder of holds and procedure turns', () => {
         ]);
     });
 
-    // The database pattern IF X (IAF), HF X: the flagged IF is kept, the hold is dropped as a repeat, and the OBS
-    // reminder of the hold is lost with it. Whether the sim flags its data this way is not verified.
-    it.fails('asks for OBS at an IAF whose hold follows it as a separate leg (#219)', async () => {
+    // B-2, 6-10: the database pattern IF X (IAF), HF X: the flagged IF is kept and the hold is dropped as a repeat; the
+    // OBS reminder of the hold moves to the kept leg. Whether the sim flags its data this way is not verified.
+    it('asks for OBS at an IAF whose hold follows it as a separate leg (#219)', async () => {
         const app = approach({
             type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
             transitions: [{name: 'HLDAA', legs: [Leg.IF(hldaa, FixTypeFlags.IAF), Leg.HF(hldaa, 90)]}],
@@ -1027,6 +1027,47 @@ describe('an unflagged repeat of the last kept fix (characterization)', () => {
     });
 });
 
+describe('the OBS reminder of a dropped leg (characterization, #219)', () => {
+    it('is not set by a dropped repeat that is no hold or procedure turn', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'HLDAA', legs: [Leg.IF(hldaa, FixTypeFlags.IAF), Leg.TF(hldaa)]}],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.askObs])).toEqual([
+            ['HLDAA', false], ['FAFAA', false], ['MAPAA', false],
+        ]);
+    });
+
+    it('is not left on the previous leg by a hold dropped because the next leg goes to the same fix', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'IAFAA', legs: [Leg.IF(iafaa, FixTypeFlags.IAF), Leg.TF(ifaaa), Leg.HF(hldaa, 90), Leg.TF(hldaa)]}],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app);
+        // The HLDAA row is left out: whether the kept leg there asks for OBS is the bug #384 (pinned below)
+        expect(legs.filter(l => l.wpt.icaoStruct.ident !== 'HLDAA').map(l => [l.wpt.icaoStruct.ident, l.askObs])).toEqual([
+            ['IAFAA', false], ['IFAAA', false], ['FAFAA', false], ['MAPAA', false],
+        ]);
+    });
+});
+
+// 6-10, B-2: the reminder to select OBS comes before a waypoint that is the basis of a hold or a course reversal. The
+// hold is dropped here because the next leg goes to the same fix, and the kept leg asks for nothing (#384)
+describe('the OBS reminder of a hold dropped for the next leg to the same fix (B-2, 6-10)', () => {
+    it.fails('asks for OBS at a hold dropped because the next leg goes to the same fix (B-2, 6-10, #384)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'IAFAA', legs: [Leg.IF(iafaa, FixTypeFlags.IAF), Leg.TF(ifaaa), Leg.HF(hldaa, 90), Leg.TF(hldaa)]}],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app);
+        expect(legs.filter(l => l.wpt.icaoStruct.ident === 'HLDAA').map(l => l.askObs)).toEqual([true]);
+    });
+});
+
 // The manual shows no approach whose missed approach holds at the MAP; the code lists the fix twice, once per flag, as it
 // does for a co-located IAF and FAF.
 describe('a missed approach that holds at the MAP (characterization)', () => {
@@ -1055,7 +1096,8 @@ describe('DME arcs in the conversion', () => {
     const step1 = fixAt('STEPA', 240, 10);
     const step2 = fixAt('STEPB', 210, 10);
     const arcen = fixAt('ARCEN', 180, 10);
-    const facs = [kprc, abc, arcbg, step1, step2, arcen, fafaa, mapaa];
+    const hldfx = fixAt('HLDFX', 180, 10);
+    const facs = [kprc, abc, arcbg, step1, step2, arcen, hldfx, fafaa, mapaa];
     const L = LegTurnDirection.Left;
     const convertAt = (app: ApproachProcedure, radial: number) => {
         const from = pointFrom({lat: abc.lat, lon: abc.lon}, radial, 20);
@@ -1128,6 +1170,30 @@ describe('DME arcs in the conversion', () => {
             ['D225J', KLNFixType.IAF], ['ARCEN', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
         ]);
         expect(legs[0].arcData!.endFacility.icaoStruct.ident).toBe('ARCEN');
+    });
+
+    // B-2, 6-10: the reminder before a waypoint that is the basis of a hold. That the arc to it stays an arc is the
+    // project's arc model (6-16), not B-2. The arc carries the IAF flag, so it is kept and the unflagged hold after it is
+    // dropped as a repeat (the #219 path)
+    it('asks for OBS at the end fix of an arc that leads to a hold (B-2, 6-10, #219)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [
+                    Leg.IF(arcbg),
+                    Leg.AF(hldfx, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: L, flags: FixTypeFlags.IAF}),
+                    Leg.HF(hldfx, 90),
+                ],
+            }],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertAt(app, 260);
+        const end = legs.find(l => l.wpt.icaoStruct.ident.trim() === 'HLDFX')!;
+        expect(legs.some(l => l.arcData?.endFacility.icaoStruct.ident.trim() === 'HLDFX')).toBe(true);
+        expect(end.askObs).toBe(true);
+        expect(legs[0].arcData).toBeDefined();
+        expect(legs[0].askObs).toBeUndefined();
     });
 });
 

@@ -391,7 +391,7 @@ export class SidStar {
 
         legs.push(...app.finalLegs.map(leg => ({...leg})), ...app.missedLegs.map(leg => ({...leg})));
 
-        const cleaned = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
+        const {legs: cleaned, askObsLegs} = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
         const approachName = SidStar.formatApproachName(app, facility);
         return await this.convertToKLN(facility, {
             displayName: approachName,
@@ -401,11 +401,17 @@ export class SidStar {
             transition: iaf?.name,
             runwayNumber: app.runwayNumber,
             runwayDesignator: app.runwayDesignator,
-        }, KLNLegType.APP, cleaned);
+        }, KLNLegType.APP, cleaned, askObsLegs);
     }
 
-    private filterOutDuplicates(legs: FlightPlanLeg[]): FlightPlanLeg[] {
+    /**
+     * Filters out the legs the KLN does not list.
+     * Returns the kept legs, and the kept legs that ask for OBS because a hold or procedure turn at the same fix was
+     * dropped after them (#219)
+     */
+    private filterOutDuplicates(legs: FlightPlanLeg[]): { legs: FlightPlanLeg[], askObsLegs: Set<FlightPlanLeg> } {
         const filtered: FlightPlanLeg[] = [];
+        const askObsLegs = new Set<FlightPlanLeg>();
 
         for (let i = 0; i < legs.length; i++) {
             const leg = legs[i];
@@ -429,11 +435,15 @@ export class SidStar {
                     }
                     this.mergeAFsIfNecessary(modifiedLeg, legs, i);
                     filtered.push(modifiedLeg);
+                } else if (isAlreadyLastInList && this.shouldAskObs(leg.type)) {
+                    //#219 B-2, 6-10: the dropped hold or procedure turn leaves its OBS reminder on the kept leg, which
+                    //keeps its own type (an arc stays an arc)
+                    askObsLegs.add(filtered[filtered.length - 1]);
                 }
             }
         }
 
-        return filtered;
+        return {legs: filtered, askObsLegs: askObsLegs};
     }
 
     private mergeAFsIfNecessary(leg: FlightPlanLeg, legs: FlightPlanLeg[], i: number) {
@@ -504,7 +514,7 @@ export class SidStar {
             }
         }
 
-        const cleaned = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
+        const {legs: cleaned, askObsLegs} = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
         const procedureName = `${proc.name}-${type === KLNLegType.SID ? "SID" : "Æ"}`;
         return await this.convertToKLN(facility, {
             displayName: procedureName,
@@ -512,7 +522,7 @@ export class SidStar {
             transition: trans?.name,
             runwayNumber: rwy?.runwayNumber,
             runwayDesignator: rwy?.runwayDesignation as RunwayDesignator ?? null,
-        }, type, cleaned);
+        }, type, cleaned, askObsLegs);
 
     }
 
@@ -523,9 +533,10 @@ export class SidStar {
      * @param procedureInformation
      * @param legType
      * @param legs
+     * @param askObsLegs the legs that ask for OBS besides those whose own type does (#219)
      * @private
      */
-    private async convertToKLN(facility: AirportFacility, procedureInformation: ProcedureInformation, legType: KLNLegType, legs: FlightPlanLeg[]): Promise<KLNFlightplanLeg[]> {
+    private async convertToKLN(facility: AirportFacility, procedureInformation: ProcedureInformation, legType: KLNLegType, legs: FlightPlanLeg[], askObsLegs: Set<FlightPlanLeg>): Promise<KLNFlightplanLeg[]> {
         const promises = legs.map(leg =>
             this.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(leg.fixIcaoStruct), leg.fixIcaoStruct).then(fac => ({
                     leg: leg,
@@ -558,7 +569,7 @@ export class SidStar {
             }
 
 
-            const askObs = this.shouldAskObs(enrichedLeg.leg.type);
+            const askObs = this.shouldAskObs(enrichedLeg.leg.type) || askObsLegs.has(enrichedLeg.leg);
             klnLegs.push({
                 wpt: enrichedLeg.facility,
                 type: legType,
