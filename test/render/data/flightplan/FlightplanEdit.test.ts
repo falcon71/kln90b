@@ -145,7 +145,9 @@ describe('adding a waypoint to a full FPL 0', () => {
         expect(idents[29]).toBe('FA29');
     });
 
-    it.fails('puts a waypoint typed over the first row first (#148)', async () => {
+    // 4-4: a waypoint typed over the first row goes in front of the first waypoint. The first waypoint makes room and
+    // the index follows it (#148)
+    it('puts a waypoint typed over the first row first (4-4, #148)', async () => {
         const unit = await bootFull(100);
 
         await typeKnewOver(unit, 0);

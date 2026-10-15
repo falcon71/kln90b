@@ -369,7 +369,9 @@ Flightplan really is dead simple".
 - There are 26 plans: index 0 is the active plan and 1 to 25 are stored. Each numbered plan holds 30 legs. FPL 0 holds
   30 en-route legs (type USER) and 45 legs in total, because SID, STAR and approach legs come on top of the en-route
   limit (#221, `legsFit`, `Flightplan.fits`); `insertLeg` throws past them. Use
-  `services/FlightplanUtils.insertLegIntoFpl`, which drops leg 0 of FPL 0 when it is full (C-1).
+  `services/FlightplanUtils.insertLegIntoFpl`, which deletes from the front of a full FPL 0 as `roomSteps` says (#148):
+  one waypoint per step, an airport with the SID legs behind it, never a leg of the active leg (C-1). The insert index
+  follows the deleted legs.
 - Mutations publish **`flightplanChanged`**. `startBatchInsert/finishBatchInsert` suppress the intermediate events ("
   Would mess up the async asobo FPL sync"). Subscribers are `UserFlightplanPersistor` (persists every change) and
   `WTFlightplanSync`.

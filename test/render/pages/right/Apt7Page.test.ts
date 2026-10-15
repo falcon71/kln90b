@@ -240,8 +240,8 @@ describe('APT 7 loading a STAR onto 27 en-route waypoints', () => {
 // An FPL 0 with 30 en-route waypoints that lacks the airport of the SID: the airport goes in at index 0, where the unit
 // has to make room first. The airport needs room, the SID legs do not (#221).
 // 6-22 step 7 (the unit asks to add the airport) and C-1 (room is made when the first leg is not part of the
-// active leg) imply the setup test below. Under the fix of #148 alone it turns red, because the next SID leg then
-// deletes the airport; that is a guard, intended.
+// active leg) imply the setup test below. The SID legs come on top of the en-route limit (#221), so they delete
+// nothing and the airport stays.
 describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
     /** 30 filler fixes in FPL 0, no KPRC, the aircraft on the way to the seventh filler: the active leg has index 6 */
     async function loadSidIntoFullPlan() {
@@ -280,8 +280,9 @@ describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
         expect(legs.filter(l => l[0] === 'KPRC')).toEqual([['KPRC', KLNLegType.USER]]);
     });
 
-    // 6-22: the airport comes first, followed by the SID in its order (figure 6-38)
-    it.fails('puts the airport first, then every SID leg in order, when FPL 0 makes room (6-22, #148, #222)', async () => {
+    // 6-22: the airport comes first, followed by the SID in its order (figure 6-38). The airport goes in at index 0, the
+    // first waypoint makes room and the index follows it, so no SID leg deletes the airport (#148, references #222)
+    it('puts the airport first, then every SID leg in order, when FPL 0 makes room (6-22, figure 6-38, #148)', async () => {
         const unit = await loadSidIntoFullPlan();
 
         expect(fpl0Legs(unit).slice(0, 3)).toEqual([['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID]]);
