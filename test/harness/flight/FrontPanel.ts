@@ -43,9 +43,16 @@ function range(from: number, to: number): number[] {
     return Array.from({length: to - from + 1}, (_, i) => from + i);
 }
 
-/** AlphabetEditorField.charset in kln90b/controls/editors/EditorField.tsx */
+/**
+ * AlphabetEditorField.charset in kln90b/controls/editors/EditorField.tsx. The first character of a waypoint ident skips
+ * the blank on the knob (FirstIdentEditorField, #374), so a step count computed over this cycle can be one click off
+ * there; setChar reads the cell again after each turn and corrects it
+ */
 const ALPHABET = [' ', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
-/** The characters of a waypoint selector (CHARSET in kln90b/controls/selects/WaypointSelector.tsx). It is the same cycle as ALPHABET, started at 0. */
+/**
+ * The characters of a waypoint selector (CHARSET in kln90b/controls/selects/WaypointSelector.tsx). It is the same cycle as
+ * ALPHABET, started at 0. Its first cell skips the blank (#374), see ALPHABET
+ */
 const SELECTOR_CHARSET = [...'0123456789', ' ', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
 /** One display tick, so the screen shows the result of each click (DOM changes only in display ticks) */
 const CLICK_MS = 250;

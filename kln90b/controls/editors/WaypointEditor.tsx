@@ -1,6 +1,6 @@
 import {Editor, Rawvalue} from "./Editor";
 import {Facility, FacilitySearchType, FSComponent, VNode} from "@microsoft/msfs-sdk";
-import {AlphabetEditorField, EditorField, EditorFieldValue} from "./EditorField";
+import {AlphabetEditorField, EditorField, EditorFieldValue, FirstIdentEditorField} from "./EditorField";
 import {PageProps, PageSide} from "../../pages/Page";
 import {MainPage} from "../../pages/MainPage";
 import {EnterResult} from "../../pages/CursorController";
@@ -55,7 +55,7 @@ export class WaypointEditor extends Editor<Facility | null> {
 
     constructor(private props: WaypointEditorProps) {
         super(props.bus, [
-            new AlphabetEditorField(),
+            new FirstIdentEditorField(),
             new AlphabetEditorField(),
             new AlphabetEditorField(),
             new AlphabetEditorField(),
@@ -285,7 +285,20 @@ export class WaypointEditor extends Editor<Facility | null> {
         return Promise.resolve();
     }
 
+    /**
+     * #374: the first cell takes no blank (checked in the KLN 89 trainer, 2026-10-15). True for a blank that would go
+     * into it: a key that starts an edit, or re-enters after the approval, goes to the first cell, as does a key with the
+     * cursor on it. Callers that open the edit before they hand the key over (FlightplanListItem) ask first, so that a
+     * refused key changes nothing
+     */
+    public refusesKey(key: string): boolean {
+        return key === " " && (!this.isEntered || this.isAwaitingConfirmation || this.cursorIndex === 0);
+    }
+
     public keyboard(key: string): boolean {
+        if (this.refusesKey(key)) {
+            return false; //Editor.keyboard would open the edit first
+        }
         this.cancelCreation(); //#262 the ident is changed: its creation page goes
         if (this.isAwaitingConfirmation) { //3-28 Note: If an incorrect identifier has been entered, you may immediately start using the left inner knob to re-enter the correct identifier
             this.cancelAwaitingConfirmation();

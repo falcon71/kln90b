@@ -73,41 +73,19 @@ describe('waypoint selector (3-20, 3-21)', () => {
         expect((unit.props.memory.aptPage.facility as { icaoStruct: { ident: string } }).icaoStruct.ident).toBe('KSAT');
     });
 
-    // 3-20 step 3: the characters wrap around, with a blank between 9 and A
-    it('steps from A to the blank to 9 counterclockwise and back clockwise (3-20)', async () => {
-        const unit = await b19WithCursor();
+    // 3-20 step 3: from the second character on the blank lies between 9 and A (the first character has none, see the first-character
+    // tests below; checked in the KLN 89 trainer, 2026-10-15, #374). The fourth cell of AB is blank
+    it('keeps the blank between 9 and A in the fourth character '
+        + '(3-20, checked in the KLN 89 trainer, 2026-10-15, #374)', async () => {
+        const unit = await abWithCursorOnFourthCell();
         const seen: string[] = [];
 
-        for (const click of [-1, -1, -1, 1, 1]) {
+        for (const click of [-1, 1, 1]) {
             await unit.panel.inner('R', click);
-            seen.push(firstChar());
+            seen.push(Screen.read().cell(0, 16).ch);
         }
 
-        expect(seen).toEqual(['A', ' ', '9', ' ', 'A']);
-    });
-
-    // 3-20: letters and digits wrap around, so Z is followed by 0 (the blank lies between 9 and A only). B to Z is 24
-    // clicks clockwise
-    it('steps from Z to 0 clockwise (3-20)', async () => {
-        const unit = await b19WithCursor();
-        await unit.panel.inner('R', 24);
-        expect(firstChar()).toBe('Z'); // precondition
-
-        await unit.panel.inner('R', 1);
-
-        expect(firstChar()).toBe('0');
-    });
-
-    // 3-20: the characters wrap around in both directions, so 0 is followed by Z counterclockwise. B to 0 is twelve
-    // clicks counterclockwise (past A and the blank)
-    it('steps from 0 to Z counterclockwise (3-20)', async () => {
-        const unit = await b19WithCursor();
-        await unit.panel.inner('R', -12);
-        expect(firstChar()).toBe('0'); // precondition
-
-        await unit.panel.inner('R', -1);
-
-        expect(firstChar()).toBe('Z');
+        expect(seen).toEqual(['9', ' ', 'A']);
     });
 
     // 3-20 steps 2 and 4: the cursor starts over the first character, and each step of the outer knob moves it over the
@@ -159,6 +137,62 @@ describe('waypoint selector (3-20, 3-21)', () => {
         await unit.panel.inner('R', 1);
 
         expect(identRow()).toBe(' B19A      ');
+    });
+});
+
+describe('waypoint selector, the first character (checked in the KLN 89 trainer, 2026-10-15, #374)', () => {
+    // 3-20 step 3 puts a blank between 9 and A for the general wheel. The first character of the ident has none: in the
+    // KLN 89 trainer (2026-10-15, #374) it ran A to Z, 0 to 9 and back to A on the USR and APT 1 pages (Z to 0, 9 to A,
+    // and A to 9, 0 to Z counterclockwise). The other cells keep the blank (the test of the fourth cell below)
+    it('steps from A to 9 counterclockwise and from 9 to A clockwise, with no blank in the first character '
+        + '(checked in the KLN 89 trainer, 2026-10-15, #374)', async () => {
+        const unit = await b19WithCursor();
+        await unit.panel.inner('R', -1);
+        expect(firstChar()).toBe('A'); // precondition
+
+        await unit.panel.inner('R', -1);
+        const below = firstChar();
+        await unit.panel.inner('R', 1);
+
+        expect([below, firstChar()]).toEqual(['9', 'A']);
+    });
+
+    // The same trainer check, a whole turn: from B clockwise every character once, none of them a blank
+    it('turns through the 36 characters of the first character with no blank '
+        + '(checked in the KLN 89 trainer, 2026-10-15, #374)', async () => {
+        const unit = await b19WithCursor();
+        let seen = '';
+
+        for (let click = 0; click < 36; click++) {
+            await unit.panel.inner('R', 1);
+            seen += firstChar();
+        }
+
+        expect(seen).toBe('CDEFGHIJKLMNOPQRSTUVWXYZ0123456789AB');
+    });
+
+    // 3-20: letters and digits wrap around, so Z is followed by 0 (checked in the KLN 89 trainer, 2026-10-15, for the
+    // first character). B to Z is 24 clicks clockwise
+    it('steps from Z to 0 clockwise (checked in the KLN 89 trainer, 2026-10-15, #374)', async () => {
+        const unit = await b19WithCursor();
+        await unit.panel.inner('R', 24);
+        expect(firstChar()).toBe('Z'); // precondition
+
+        await unit.panel.inner('R', 1);
+
+        expect(firstChar()).toBe('0');
+    });
+
+    // The characters wrap around in both directions, so 0 is followed by Z counterclockwise (checked in the KLN 89
+    // trainer, 2026-10-15, for the first character). B to 0 is eleven clicks counterclockwise (A, then 9 down to 0)
+    it('steps from 0 to Z counterclockwise (checked in the KLN 89 trainer, 2026-10-15, #374)', async () => {
+        const unit = await b19WithCursor();
+        await unit.panel.inner('R', -11);
+        expect(firstChar()).toBe('0'); // precondition
+
+        await unit.panel.inner('R', -1);
+
+        expect(firstChar()).toBe('Z');
     });
 });
 
@@ -239,6 +273,28 @@ describe('waypoint selector (characterization)', () => {
 
         expect(rows).toEqual([' K00       ', ' KS01      ', ' KSAT      ']);
         expect(unit.panel.focused('R')).toEqual({row: 0, col: 16, text: 'T'});
+    });
+
+    // The first character offers no blank on the knob (#374), so the keyboard does not take one either. Only an aircraft's
+    // H event can send a blank (the PC keyboard path passes A to Z and 0 to 9). The rejected key changes nothing: the
+    // cursor stays and the ident stays
+    it('rejects a blank typed into the first character (#374)', async () => {
+        const unit = await b19WithCursor();
+
+        await unit.panel.press('KLN90B_Internal_Key:RIGHT: ');
+
+        expect(identRow()).toBe(' B19       ');
+        expect(unit.panel.focused('R')).toEqual({row: 0, col: 13, text: 'B'});
+    });
+
+    // The cells after the first still take a typed blank (the second cell of B19 shows the 1)
+    it('takes a blank typed into the second character (#374)', async () => {
+        const unit = await b19WithCursor();
+        await unit.panel.outer('R', 1);
+
+        await unit.panel.press('KLN90B_Internal_Key:RIGHT: ');
+
+        expect(identRow().slice(0, 4)).toBe(' B  ');
     });
 });
 

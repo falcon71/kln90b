@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
+import {bootUnit, HeadlessUnit, moveAircraft, settle, untilCalcTick} from '../../harness/boot';
 import {approachWorld} from '../../harness/fixtures';
 import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {savedFlightplan} from '../../harness/storage';
@@ -407,8 +407,13 @@ describe('approach active ramp (characterization)', () => {
         await flyTo(w, unit, 5 + 1.5);
         expect(nav(unit).navmode).toBe(NavMode.APR_LEG);
 
-        // No wait after the ENT: the state asserted next lasts only until the next calculation tick
-        await unit.panel.directTo('FAFAA', {waitMs: 0});
+        // No wait after the ENT: the state asserted next lasts only until the next calculation tick. The approving ENT
+        // follows a calculation tick, so that the next one cannot fall into the ENT's own display tick
+        await unit.panel.dct();
+        await unit.panel.enterIdent('L', 'FAFAA');
+        await unit.panel.ent();
+        await untilCalcTick(unit);
+        await unit.panel.ent();
         expect(nav(unit).navmode).toBe(NavMode.ARM_LEG);
         await vi.advanceTimersByTimeAsync(1000);
 

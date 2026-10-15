@@ -393,6 +393,10 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - **`settle(unit)`** (`boot.ts`) advances the clock until the GPS has a solution, then two calculation ticks more, so that
   FPL 0 has activated and the display shows it (a force-ready boot is valid at once, but FPL 0 activates only at the first
   calculation tick). It throws when there is no fix within its cap (120 s by default).
+- **`untilCalcTick(unit)`** (`boot.ts`) advances the clock in display ticks until a calculation tick has run, so the next
+  is 750 to 1000 ms away. A test that asserts a state which lasts only until the next calculation tick (ARM after a Direct
+  To) performs its last action after it: each click of the steps before is a display tick, so without it the phase of the
+  calculation ticks moves with the click count and the test passes or fails by chance (#163, ModeControllerApproach).
 - **`NEAREST_SEARCH_WAIT_MS`** (`boot.ts`, 12 s) is how long a test advances the clock for the nearest lists to hold
   their result. The nearest lists and the airspace alert search every 10 s (`NearestList.ts`, `AirspaceAlert.ts`), so
   12 s leaves one search and the time its result needs; a wait below one search interval reads an empty list. Its

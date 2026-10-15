@@ -241,9 +241,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
         - CLR on a duplicate-waypoint list above the creation page cancels the whole creation. Untested.
         - A second CLR on D-> after a canceled creation goes through the existing D-> CLR path, while the KLN 89 left
           the D-> page there ([the trainer record](kln89-trainer-record.md), 2026-10-15): a lead for a trainer check.
-    - #343: a waypoint page can create a user waypoint whose ident starts with a blank (a blank dialed into the first
-      cell, and now a character in a later cell of an all-blank ident); the V2 loader trims it on reload. A lead for a
-      trainer check before an issue is filed.
+    - #343: a character in a later cell of an all-blank ident gives an ident that starts with a blank, and a waypoint
+      page can create a user waypoint of it; the V2 loader trims it on reload. The knob no longer dials a blank into the
+      first cell (#374), but an empty ident still starts with one. A lead for a trainer check before an issue is filed.
 
 ## Boot, power and the unit as a whole
 

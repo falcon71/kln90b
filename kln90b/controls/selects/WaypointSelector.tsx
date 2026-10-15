@@ -25,6 +25,36 @@ export type WaypointFieldsetTypes = {
 
 const CHARSET = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
+/**
+ * The first cell of an ident offers no blank on the knob or the keyboard (#374, checked in the KLN 89 trainer,
+ * 2026-10-15): the wheel runs A to Z and 0 to 9 and round again. The charset keeps the blank, so a cell that holds one
+ * (an empty ident, or one the page was left with) still shows it and the indices stay the shared ones
+ */
+class FirstCellSelectField extends SelectField {
+
+    private step(direction: 1 | -1): void {
+        const length = this.valueSet.length;
+        do {
+            this.value = (this.value + direction + length) % length;
+        } while (this.valueSet[this.value] === ' ');
+        this.changedCallback(this.value);
+    }
+
+    innerLeft(): boolean {
+        this.step(-1);
+        return true;
+    }
+
+    innerRight(): boolean {
+        this.step(1);
+        return true;
+    }
+
+    public keyboard(key: string): boolean {
+        return key !== ' ' && super.keyboard(key);
+    }
+}
+
 export abstract class WaypointSelector<T extends Facility> implements UiElement {
 
 
@@ -41,7 +71,8 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
         const childMap: { [key: string]: SelectField } = {};
 
         for (let i = 0; i < length; i++) {
-            childMap[`ident${i}`] = new SelectField(CHARSET, CHARSET.indexOf(ident.padEnd(length, " ").substring(i, i + 1)), idx => this.saveChar.bind(this)(idx, i));
+            const fieldClass = i === 0 ? FirstCellSelectField : SelectField;
+            childMap[`ident${i}`] = new fieldClass(CHARSET, CHARSET.indexOf(ident.padEnd(length, " ").substring(i, i + 1)), idx => this.saveChar.bind(this)(idx, i));
         }
 
         this.children = new UIElementChildren<WaypointFieldsetTypes>(childMap);

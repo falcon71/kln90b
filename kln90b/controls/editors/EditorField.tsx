@@ -105,6 +105,26 @@ export class AlphabetEditorField extends EditorField {
 }
 
 /**
+ * The first character of a waypoint ident: the knob and the keyboard offer no blank (#374, checked in the KLN 89
+ * trainer, 2026-10-15), so the wheel runs A to Z and 0 to 9 and round again. The charset keeps the blank, so a cell that
+ * holds one (an empty field, the blank CLR leaves) still shows it and the indices stay the shared ones
+ */
+export class FirstIdentEditorField extends AlphabetEditorField {
+
+    incrementChar() {
+        this.value = this.value === null || this.value >= this.charset.length - 1 ? 1 : this.value + 1;
+    }
+
+    decrementChar() {
+        this.value = this.value === null || this.value <= 1 ? this.charset.length - 1 : this.value - 1;
+    }
+
+    public keyboard(key: string): boolean {
+        return key !== ' ' && super.keyboard(key);
+    }
+}
+
+/**
  * A character of a remark on the APT 5 page (3-47): a letter, a digit, the hyphen or the blank. The hyphen follows the
  * 9 and precedes the blank (checked in the KLN 89 trainer, 2026-10-08)
  */

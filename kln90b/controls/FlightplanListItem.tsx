@@ -320,6 +320,9 @@ export class FlightplanListItem implements Field, ListItem {
     }
 
     public keyboard(key: string): boolean {
+        if (this.waypointEditor.refusesKey(key)) {
+            return false; //#374 a blank for the first cell: refused before a row is inserted or an edit is opened
+        }
         this.leaveRefEntry(); //#291
         if (!this.isEntered) {
             //We need the normal logic to check if we can actually enter

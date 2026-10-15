@@ -999,6 +999,12 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `setValue()` updates the display unless the editor is being edited.
     - Field classes in `EditorField.tsx`: `AlphabetEditorField` (space, A-Z, 0-9), `NumberEditorField` (
       `createWithMinMax`, `createWithBlankMax`), `MonthEditorField`, `NorthSouth/EastWest/RunwaySurfaceEditorField`.
+    - `FirstIdentEditorField` is cell 0 of `WaypointEditor`: the knob and the keyboard skip the blank, so the wheel runs
+      A to Z, 0 to 9 and round again (KLN 89 trainer, 2026-10-15, #374). It keeps the shared charset, so a blank first
+      cell (an empty field, CLR on D->/FPL rows) still shows and every index is the shared one. A blank typed with the
+      raw H event is refused (`WaypointEditor.refusesKey`) before an edit opens, by `WaypointEditor.keyboard` and by
+      `FlightplanListItem.keyboard` (which opens the row's edit or inserts a row before it hands a key over), so a refused
+      key changes nothing.
     - Concrete editors: Bearing, Date, Distance, Elevation, Freetext, Latitude, Longitude, Magvar, NdbFreq, Radial,
       RunwaySurface, Speed, Time, VorFreq, Waypoint.
 - **Selects** (`controls/selects/`; immediate-effect fields, no ENT):
@@ -1013,7 +1019,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `WaypointSelector` (base of `AirportSelector`, `VorSelector`, `NdbSelector`, `IntersectionSelector`) is the
       per-character ident at the top of waypoint pages. Changing a char looks up and loads the facility immediately via
       callback. A character entered after a blank cell keeps the blank before it (`AB A`) and that ident is searched
-      (KLN 89 trainer, 2026-10-15, #343).
+      (KLN 89 trainer, 2026-10-15, #343). Cell 0 is a `FirstCellSelectField`: the knob and the keyboard skip the blank
+      there (KLN 89 trainer, 2026-10-15, #374); the charset and its indices are the shared ones.
     - Also: `NearestSelector`, `MapOrientationSelector`, `SupplementarySelector`, `ObsDtkElement`,
       `CreateWaypointMessage` ("CREATE NEW WPT AT: USER POS? / PRES POS?" buttons, shown when the ident has no match),
       `SuperNav5Field1/2/3Selector`, `SuperNav5RangeSelector`, `SuperNav5DirectToSelector`.
