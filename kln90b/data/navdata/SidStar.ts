@@ -427,6 +427,7 @@ export class SidStar {
                 let modifiedLeg = leg;
                 if (i > 0) {
                     modifiedLeg = this.addArcInfoIfPrevIsSame(legs[i - 1], leg);
+                    this.keepObsOfArcInPlaceOf(leg, modifiedLeg, askObsLegs);
                 }
                 this.mergeAFsIfNecessary(modifiedLeg, legs, i);
                 filtered.push(modifiedLeg);
@@ -440,6 +441,7 @@ export class SidStar {
                     let modifiedLeg = leg;
                     if (i > 0) {
                         modifiedLeg = this.addArcInfoIfPrevIsSame(legs[i - 1], leg);
+                        this.keepObsOfArcInPlaceOf(leg, modifiedLeg, askObsLegs);
                     }
                     this.mergeAFsIfNecessary(modifiedLeg, legs, i);
                     filtered.push(modifiedLeg);
@@ -452,6 +454,18 @@ export class SidStar {
         }
 
         return {legs: filtered, askObsLegs: askObsLegs};
+    }
+
+    /**
+     * #381 B-2, 6-10: the arc taken in place of a hold or procedure turn keeps the hold's OBS reminder
+     * @param leg the leg the conversion keeps
+     * @param modifiedLeg what addArcInfoIfPrevIsSame returned for it: the leg itself, or the arc before it
+     * @param askObsLegs
+     */
+    private keepObsOfArcInPlaceOf(leg: FlightPlanLeg, modifiedLeg: FlightPlanLeg, askObsLegs: Set<FlightPlanLeg>): void {
+        if (modifiedLeg !== leg && this.shouldAskObs(leg.type)) {
+            askObsLegs.add(modifiedLeg);
+        }
     }
 
     /**

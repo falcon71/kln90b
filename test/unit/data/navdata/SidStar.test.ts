@@ -1400,6 +1400,57 @@ describe('DME arcs in the conversion', () => {
         expect(legs[0].arcData).toBeDefined();
         expect(legs[0].askObs).toBeUndefined();
     });
+
+    // B-2, 6-10: the reminder before a waypoint that is the basis of a hold or a course reversal. That the arc to it stays
+    // an arc is the project's arc model (6-16), not B-2. Here the arc carries no flag, so it is dropped as a repeat and
+    // the unit takes the arc in the place of the hold (addArcInfoIfPrevIsSame); the hold's reminder must survive that.
+    // The hold is unflagged and not last (the else branch of filterOutDuplicates), or it carries a flag (the keep branch).
+    it.each([
+        ['HF', 'unflagged', () => Leg.HF(hldfx, 90)],
+        ['PI', 'unflagged', () => Leg.PI(hldfx, 90)],
+        ['HF', 'flagged IAF', () => Leg.HF(hldfx, 90, L, FixTypeFlags.IAF)],
+        ['PI', 'flagged IAF', () => Leg.PI(hldfx, 90, L, FixTypeFlags.IAF)],
+    ])('asks for OBS at the end fix of an unflagged arc that leads to a %s, %s (B-2, 6-10, #381)', async (_type, _flag, hold) => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [
+                    Leg.IF(arcbg),
+                    Leg.AF(hldfx, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: L}),
+                    hold(),
+                ],
+            }],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertAt(app, 260);
+        const end = legs.find(l => l.wpt.icaoStruct.ident.trim() === 'HLDFX')!;
+        expect(legs.some(l => l.arcData?.endFacility.icaoStruct.ident.trim() === 'HLDFX')).toBe(true);
+        expect(end.askObs).toBe(true);
+        expect(legs[0].askObs).toBeUndefined();
+    });
+
+    it.each([
+        ['unflagged', 0],
+        ['flagged IAF', FixTypeFlags.IAF],
+    ])('keeps no OBS reminder at the end fix of an unflagged arc followed by a leg that is no hold, %s (characterization, #381)', async (_flag, flags) => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [
+                    Leg.IF(arcbg),
+                    Leg.AF(hldfx, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: L}),
+                    Leg.TF(hldfx, flags),
+                ],
+            }],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertAt(app, 260);
+        const end = legs.find(l => l.wpt.icaoStruct.ident.trim() === 'HLDFX')!;
+        expect(legs.some(l => l.arcData?.endFacility.icaoStruct.ident.trim() === 'HLDFX')).toBe(true);
+        expect(end.askObs).toBe(false);
+    });
 });
 
 // The code leaves out procedures with an RF leg anywhere and judges each transition by its own legs, as it does for
