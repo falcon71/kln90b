@@ -168,6 +168,19 @@ describe('insertLegIntoFpl', () => {
         expect(fpl5.getLegs()).toHaveLength(30);
     });
 
+    // Checked in the KLN 89 trainer, 2026-10-15: a waypoint inserted in front of a STAR row of a plan whose en-route
+    // waypoints are at the limit is a STAR waypoint and goes in without deleting anything
+    it('inserts a STAR leg into FPL 0 with 30 en-route waypoints and keeps the first leg (checked in the KLN 89 trainer, 2026-10-15)', () => {
+        const star = (ident: string): KLNFlightplanLeg => ({wpt: intersection(ident, 46.9, 8.1), type: KLNLegType.STAR});
+        const {fpl0, aw} = build([...fullPlanLegs(), star('STRAA'), star('STRAB')], START);
+
+        insertLegIntoFpl(fpl0, navState(aw, null), 31, star('STRAC'));
+
+        expect(fpl0.getLegs()).toHaveLength(33);
+        expect(identsOf(fpl0.getLegs())[0]).toBe('FIX00');
+        expect(identsOf(fpl0.getLegs()).slice(30)).toEqual(['STRAA', 'STRAC', 'STRAB']);
+    });
+
     // characterization: the Pilot's Guide names only the refusal (FPL FULL when the first waypoint is part of the active
     // leg). That the first waypoint makes room in every other case is the unit's rule (FlightplanUtils.ts)
     it('drops the first leg of a full FPL 0 to append when no waypoint is active (characterization)', () => {

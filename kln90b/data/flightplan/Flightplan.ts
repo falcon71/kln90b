@@ -42,9 +42,34 @@ export interface FlightplanEvents {
 }
 
 /**
- * The most waypoints a flight plan holds (4-4)
+ * The most en-route waypoints a flight plan holds (4-1, 4-4). A numbered plan holds only en-route waypoints, so this
+ * is its whole size.
  */
 export const MAX_LEGS = 30;
+
+/**
+ * #221: the most legs FPL 0 holds with its SID, STAR and approach legs, which come on top of the en-route limit (the
+ * KLN 89 does the same with 20 and 35, checked in its trainer on 2026-10-15). The 90B gives no total; 45 keeps the
+ * 89's room of 15 for procedures (maintainer ruling)
+ */
+export const MAX_FPL0_LEGS = 45;
+
+/** #221: the en-route legs, the ones the pilot enters (procedure legs are SID, STAR, APP) */
+export function countEnRouteLegs(legs: KLNFlightplanLeg[]): number {
+    return legs.filter(leg => leg.type === KLNLegType.USER).length;
+}
+
+/**
+ * #221: whether a plan with these legs takes `enRoute` more en-route legs and `procedure` more procedure legs.
+ * FPL 0 (`fplIdx` 0) has both limits, a numbered plan only its size.
+ */
+export function legsFit(fplIdx: number, legs: KLNFlightplanLeg[], enRoute: number, procedure: number): boolean {
+    const total = legs.length + enRoute + procedure;
+    if (fplIdx !== 0) {
+        return total <= MAX_LEGS;
+    }
+    return countEnRouteLegs(legs) + enRoute <= MAX_LEGS && total <= MAX_FPL0_LEGS;
+}
 
 /**
  * We don't use the WT Flighplan, because the KLN Flightplan really is dead simple
@@ -58,13 +83,19 @@ export class Flightplan {
         this.publisher = bus.getPublisher<FlightplanEvents>();
     }
 
+    /** #221: whether this plan takes `enRoute` more en-route and `procedure` more procedure legs */
+    public fits(enRoute: number, procedure: number): boolean {
+        return legsFit(this.idx, this.legs, enRoute, procedure);
+    }
+
     /**
      * Don't call this directly, use insertLegIntoFpl
      * @param idx
      * @param leg
      */
     public insertLeg(idx: number, leg: KLNFlightplanLeg) {
-        if (this.legs.length >= MAX_LEGS) {
+        const enRoute = leg.type === KLNLegType.USER ? 1 : 0;
+        if (!this.fits(enRoute, 1 - enRoute)) {
             throw new Error(`Cannot have more than ${MAX_LEGS} legs!`);
         }
         this.legs.splice(idx, 0, leg);

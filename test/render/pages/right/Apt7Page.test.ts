@@ -194,9 +194,9 @@ describe('APT 7 and APT 8 the REDUNDANT WPTS message with a STAR and an approach
     });
 });
 
-// When FPL 0 is full and its first leg is not part of the active leg, the unit makes room by deleting the first leg
-// (C-1 implies it). The STAR waypoints must still come in order before the airport.
-describe('APT 7 loading a STAR when FPL 0 has to make room', () => {
+// The STAR legs come on top of the en-route waypoints, so nothing is deleted when the plan holds 27 en-route
+// waypoints. The STAR waypoints must stand in order before the airport.
+describe('APT 7 loading a STAR onto 27 en-route waypoints', () => {
     /** 26 filler fixes and KPRC in FPL 0, the aircraft on the way to the seventh filler: the active leg has index 6 */
     async function loadStarIntoFullPlan() {
         const w = approachWorld();
@@ -209,35 +209,36 @@ describe('APT 7 loading a STAR when FPL 0 has to make room', () => {
             storage: savedFlightplan(0, [...fillers, kprc]),
         });
         await settle(unit);
-        // Preconditions: 27 legs, an active leg that does not need the first leg, five STAR legs for three free places
+        // Preconditions: 27 legs and an active leg that does not need the first leg
         expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(27);
         expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(6);
         await unit.panel.loadProcedure('APT 7', {ident: 'KPRC'});
         return unit;
     }
 
-    it('deletes the two first legs and loads all five STAR waypoints (setup of #222)', async () => {
+    it('loads all five STAR waypoints without deleting a waypoint (checked in the KLN 89 trainer, 2026-10-15, #221)', async () => {
         const unit = await loadStarIntoFullPlan();
         const legs = fpl0Legs(unit);
 
-        expect(legs).toHaveLength(30);
-        expect(legs[0]).toEqual(['FILC', KLNLegType.USER]); // FILA and FILB are gone
+        expect(legs).toHaveLength(32);
+        expect(legs[0]).toEqual(['FILA', KLNLegType.USER]); // Nothing is deleted
         expect(legs.filter(l => l[1] === KLNLegType.STAR).map(l => l[0]).sort()).toEqual(['STRAA', 'STRAB', 'STRAC', 'STRAD', 'STRAE']);
         expect(legs.filter(l => l[0] === 'KPRC')).toEqual([['KPRC', KLNLegType.USER]]);
     });
 
-    // 6-23: the STAR waypoints stand in front of the airport, in the order of the STAR
-    it.fails('keeps the STAR legs in order before the airport when FPL 0 makes room (6-23, #222)', async () => {
+    // 6-23: the STAR waypoints stand in front of the airport, in the order of the STAR. References #222
+    it('keeps the STAR legs in order before the airport on top of the en-route waypoints (6-23, #221)', async () => {
         const unit = await loadStarIntoFullPlan();
 
-        expect(fpl0Legs(unit).slice(24)).toEqual([
+        expect(fpl0Legs(unit).slice(-6)).toEqual([
             ['STRAA', KLNLegType.STAR], ['STRAB', KLNLegType.STAR], ['STRAC', KLNLegType.STAR], ['STRAD', KLNLegType.STAR],
             ['STRAE', KLNLegType.STAR], ['KPRC', KLNLegType.USER],
         ]);
     });
 });
 
-// A full FPL 0 that lacks the airport of the SID: the airport goes in at index 0, where the unit has to make room first.
+// An FPL 0 with 30 en-route waypoints that lacks the airport of the SID: the airport goes in at index 0, where the unit
+// has to make room first. The airport needs room, the SID legs do not (#221).
 // 6-22 step 7 (the unit asks to add the airport) and C-1 (room is made when the first leg is not part of the
 // active leg) imply the setup test below. Under the fix of #148 alone it turns red, because the next SID leg then
 // deletes the airport; that is a guard, intended.
@@ -271,11 +272,11 @@ describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
         return unit;
     }
 
-    it('asks to add the airport and keeps FPL 0 at 30 legs with the airport in it once (setup of #222)', async () => {
+    it('asks to add the airport and holds the airport once and the two SID legs on top of 30 en-route waypoints (setup of #222)', async () => {
         const unit = await loadSidIntoFullPlan();
         const legs = fpl0Legs(unit);
 
-        expect(legs).toHaveLength(30);
+        expect(legs).toHaveLength(32); // 30 fillers, one of them gone for the airport, the airport and two SID legs
         expect(legs.filter(l => l[0] === 'KPRC')).toEqual([['KPRC', KLNLegType.USER]]);
     });
 

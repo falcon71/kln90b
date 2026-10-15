@@ -191,11 +191,10 @@ describe('APT 8 putting an approach into FPL 0', () => {
     });
 });
 
-// FPL 0 holds 30 legs. While the first leg is part of the active leg, the unit cannot make room by deleting it, so the
-// insertion stops and leaves a partial approach. Whether the approach should be refused as a whole is open.
-// a question: #221
-describe('APT 8 loading an approach into a full FPL 0 (characterization)', () => {
-    it('inserts the legs that fit, leaves out the rest and shows FPL FULL', async () => {
+// Procedure legs come on top of the en-route waypoints: FPL 0 holds 30 en-route waypoints and 45 legs, so an approach
+// loads whole while the first leg is active and nothing is deleted. The order of the approach legs is 6-5, 6-7.
+describe('APT 8 loading an approach on top of the en-route waypoints', () => {
+    it('loads the whole approach in front of the airport while the first leg is active (6-5, 6-7; checked in the KLN 89 trainer, 2026-10-15, #221)', async () => {
         const w = approachWorld();
         const fillers = Array.from({length: 26}, (_, i) => intersection(`FIL${String.fromCharCode(65 + i)}`, 46.5, 7.0 + 0.02 * i));
         const unit = await bootUnit({
@@ -204,7 +203,7 @@ describe('APT 8 loading an approach into a full FPL 0 (characterization)', () =>
             storage: savedFlightplan(0, [...fillers, w.kprc]),
         });
         await settle(unit);
-        // Preconditions: 27 legs, the first leg is part of the active leg (index 1), three places free for five approach legs
+        // Preconditions: 27 legs, the first leg is part of the active leg (index 1)
         expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(27);
         expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(1);
         const before = messages(unit);
@@ -213,16 +212,38 @@ describe('APT 8 loading an approach into a full FPL 0 (characterization)', () =>
 
         expect(fpl0Legs(unit)).toEqual([
             ...fillers.map(f => [f.icaoStruct.ident, KLNLegType.USER]),
-            ['IAFAA', KLNLegType.APP], ['IFAAA', KLNLegType.APP], ['FAFAA', KLNLegType.APP], ['KPRC', KLNLegType.USER],
+            ['IAFAA', KLNLegType.APP], ['IFAAA', KLNLegType.APP], ['FAFAA', KLNLegType.APP], ['SDFAA', KLNLegType.APP],
+            ['MAPAA', KLNLegType.APP], ['KPRC', KLNLegType.USER],
         ]);
-        expect(Screen.read().status().mode).toBe('FPL FULL');
+        expect(Screen.read().status().mode).not.toBe('FPL FULL');
         expect(messages(unit)).toEqual(before);
+    });
+
+    // 4-1: 30 en-route waypoints; the approach comes on top of them (checked in the KLN 89 trainer, 2026-10-15)
+    it('loads an approach onto 30 en-route waypoints without deleting one (4-1; checked in the KLN 89 trainer, 2026-10-15, #221)', async () => {
+        const w = approachWorld();
+        const fillers = Array.from({length: 29}, (_, i) => intersection(`FI${String(i).padStart(3, '0')}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [...w.facilities, ...fillers], position: {lat: 46.5, lon: 6.9},
+            panelXml: panelXml(APR_ARM_SWITCH),
+            storage: savedFlightplan(0, [...fillers, w.kprc]),
+        });
+        await settle(unit);
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(30); // Precondition: 30 en-route
+
+        await unit.panel.loadProcedure('APT 8');
+
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(35);
+        expect(legs[0][0]).toBe('FI000');
+        expect(legs.slice(-6).map(l => l[0])).toEqual(['IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
+        expect(Screen.read().status().mode).not.toBe('FPL FULL');
     });
 });
 
-// When FPL 0 is full and its first leg is not part of the active leg, the unit makes room by deleting the first leg
-// (C-1 implies it). The approach waypoints must still come in order before the airport.
-describe('APT 8 loading an approach when FPL 0 has to make room', () => {
+// The approach legs come on top of the en-route waypoints, so nothing is deleted when the plan holds 27 en-route
+// waypoints. The approach waypoints must stand in order before the airport.
+describe('APT 8 loading an approach onto 27 en-route waypoints', () => {
     /** 26 filler fixes and KPRC in FPL 0, the aircraft on the way to the seventh filler: the active leg has index 6 */
     async function loadIntoFullPlan() {
         const w = approachWorld();
@@ -233,29 +254,28 @@ describe('APT 8 loading an approach when FPL 0 has to make room', () => {
             storage: savedFlightplan(0, [...fillers, w.kprc]),
         });
         await settle(unit);
-        // Preconditions: 27 legs, an active leg that does not need the first leg, five approach legs for three free places
+        // Preconditions: 27 legs and an active leg that does not need the first leg
         expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(27);
         expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(6);
         await unit.panel.loadProcedure('APT 8');
         return unit;
     }
 
-    it('deletes the two first legs and loads all five approach waypoints (setup of #222)', async () => {
+    it('loads all five approach waypoints without deleting a waypoint (checked in the KLN 89 trainer, 2026-10-15, #221)', async () => {
         const unit = await loadIntoFullPlan();
         const legs = fpl0Legs(unit);
 
-        expect(legs).toHaveLength(30);
-        expect(legs[0]).toEqual(['FILC', KLNLegType.USER]); // FILA and FILB are gone
+        expect(legs).toHaveLength(32);
+        expect(legs[0]).toEqual(['FILA', KLNLegType.USER]); // Nothing is deleted
         expect(legs.filter(l => l[1] === KLNLegType.APP).map(l => l[0]).sort()).toEqual(['FAFAA', 'IAFAA', 'IFAAA', 'MAPAA', 'SDFAA']);
         expect(legs.filter(l => l[0] === 'KPRC')).toEqual([['KPRC', KLNLegType.USER]]);
     });
 
-    // 6-5, 6-7 (figure 6-9): the approach waypoints, the MAP included, stand in front of the airport. The order is the one of the
-    // load that needs no room (the tests above).
-    it.fails('keeps the approach legs in order before the airport when FPL 0 makes room (6-5, 6-7, #222)', async () => {
+    // 6-5, 6-7 (figure 6-9): the approach waypoints, the MAP included, stand in front of the airport. References #222
+    it('keeps the approach legs in order before the airport on top of the en-route waypoints (6-5, 6-7, #221)', async () => {
         const unit = await loadIntoFullPlan();
 
-        expect(fpl0Legs(unit).slice(24)).toEqual([
+        expect(fpl0Legs(unit).slice(-6)).toEqual([
             ['IAFAA', KLNLegType.APP], ['IFAAA', KLNLegType.APP], ['FAFAA', KLNLegType.APP], ['SDFAA', KLNLegType.APP],
             ['MAPAA', KLNLegType.APP], ['KPRC', KLNLegType.USER],
         ]);

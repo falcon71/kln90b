@@ -208,8 +208,9 @@ export class Ctr1Page extends SixLineHalfPage {
         console.log("intersections", intersections);
 
         //5-26 Only the new waypoints count against the limit of 30. Nothing is created when they do not fit.
+        //5-26, #221: only the en-route waypoints count against 30, every leg against 45
         const existing = intersections.map(intersection => this.getWaypointIfExistsInFpl(intersection));
-        if (fplLegs.length + existing.filter(wpt => wpt === null).length > 30) {
+        if (!this.props.memory.ctrPage.lastFpl!.fits(existing.filter(wpt => wpt === null).length, 0)) {
             this.props.memory.ctrPage.state = CtrState.FULL;
             return;
         }
@@ -243,7 +244,8 @@ export class Ctr1Page extends SixLineHalfPage {
         const fpl = this.props.memory.ctrPage.lastFpl!;
         const newWpts = this.props.memory.ctrPage.waypoints.filter(wpt => wpt.isNew);
         //5-26 The plan may have grown since the computation. Insert all or none, as insertLegIntoFpl throws on a full plan.
-        if (fpl.getLegs().length + newWpts.length > 30) {
+        //5-26, #221: only the en-route waypoints count against 30, every leg against 45
+        if (!fpl.fits(newWpts.length, 0)) {
             this.props.memory.ctrPage.state = CtrState.FULL;
             return;
         }

@@ -366,8 +366,10 @@ Flightplan really is dead simple".
 
 - `Flightplan(idx, legs, bus)` holds
   `KLNFlightplanLeg {wpt: Facility, type: KLNLegType(USER|SID|STAR|APP), parentFacility?, procedure?: ProcedureInformation, flyOver?, fixType?: KLNFixType(IAF|FAF|MAP|MAHP), askObs?, arcData?: ArcData}`.
-- There are 26 plans: index 0 is the active plan and 1 to 25 are stored. Each holds a maximum of 30 legs; `insertLeg`
-  throws. Use `services/FlightplanUtils.insertLegIntoFpl`, which drops leg 0 of FPL 0 when it is full (C-1).
+- There are 26 plans: index 0 is the active plan and 1 to 25 are stored. Each numbered plan holds 30 legs. FPL 0 holds
+  30 en-route legs (type USER) and 45 legs in total, because SID, STAR and approach legs come on top of the en-route
+  limit (#221, `legsFit`, `Flightplan.fits`); `insertLeg` throws past them. Use
+  `services/FlightplanUtils.insertLegIntoFpl`, which drops leg 0 of FPL 0 when it is full (C-1).
 - Mutations publish **`flightplanChanged`**. `startBatchInsert/finishBatchInsert` suppress the intermediate events ("
   Would mess up the async asobo FPL sync"). Subscribers are `UserFlightplanPersistor` (persists every change) and
   `WTFlightplanSync`.
@@ -653,7 +655,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - **Faithful emulation, including quirks:**
     - CRT warm-up and slow display; 1 Hz calculations
     - 90 s acquisition and almanac rules; the GPS week rollover
-    - the 30-leg limit; the MAP is not auto-sequenced
+    - the limits of FPL 0: 30 en-route waypoints and 45 legs in total (#221); the MAP is not auto-sequenced
     - SUA alerts treat everything as inside when there is no altitude input (3-40)
     - procedures are removed on power-on
     - only USER legs persist

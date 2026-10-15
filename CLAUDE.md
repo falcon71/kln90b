@@ -87,8 +87,8 @@ change what they mean; add new ones instead:
   context, but no RAIM integrity monitoring or failure is modeled. The wrapper reaches into private SDK internals, so
   recheck it after SDK upgrades.
 - **Navigation** uses the project's own model, deliberately *not* the SDK flight plan or LNAV.
-    - `data/flightplan/`: 26 flight plans (FPL 0 is active) of at most 30 legs, and `ActiveWaypoint` with its turn
-      stack.
+    - `data/flightplan/`: 26 flight plans (FPL 0 is active) of at most 30 en-route legs (FPL 0 up to 45 with
+      procedures), and `ActiveWaypoint` with its turn stack.
     - `NavCalculator.ts` (1 Hz): DTK/XTK, sequencing and turn anticipation, sim outputs.
     - `ModeController.ts`: ENR/ARM/APR and LEG/OBS modes. OBS is a direct-to from a synthetic waypoint 1000 NM away.
     - `SidStar.ts`: converts SDK procedures to KLN legs and filters out procedures with RF legs or RNP AR.

@@ -1,9 +1,11 @@
 import {describe, expect, it, vi} from 'vitest';
-import {Facility, FacilityType} from '@microsoft/msfs-sdk';
+import {Facility, FacilityType, FixTypeFlags} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {centerWorld} from '../../../harness/fixtures';
 import {courseDeg} from '../../../harness/flight/geo';
-import {intersection, vor} from '../../../harness/navdata/builders';
+import {airport, intersection, vor} from '../../../harness/navdata/builders';
+import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
+import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
@@ -374,6 +376,49 @@ describe('CTR 1 page, the 30 waypoint limit (5-26)', () => {
         expect(right().map(r => r.trim()).filter(r => r !== '').join(' ')).toBe('NOT ENOUGH ROOM IN FPL');
         await ent(unit);
         expect(fplIdents(unit, 0).length).toBe(30);
+        expect(unit.errors).toEqual([]);
+    });
+});
+
+describe('CTR 1 page, the 30 waypoint limit and the approach legs of FPL 0 (characterization)', () => {
+    // 5-26 counts the waypoints of a plan; how it counts procedure legs is not said. FPL 0 holds procedure legs on top of
+    // its 30 en-route waypoints (#221), so the Center waypoint goes in while the legs of the plan pass 30
+    it('counts only the en-route waypoints of FPL 0 against 30 (characterization, #221)', async () => {
+        const w = centerWorld();
+        // The approach lies north of the Center boundary at 42.75 N, so the only crossing is the leg to its IAF
+        const iafdd = intersection('IAFDD', 44.0, -100.0);
+        const fafdd = intersection('FAFDD', 44.5, -100.0);
+        const mapdd = intersection('MAPDD', 44.7, -100.0);
+        const kddd = withProcedures(airport('KDDD', 44.8, -100.0), {
+            approaches: [approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '36',
+                transitions: [{name: 'IAFDD', legs: [Leg.IF(iafdd, FixTypeFlags.IAF)]}],
+                final: [Leg.IF(iafdd), Leg.TF(fafdd, FixTypeFlags.FAF), Leg.TF(mapdd, FixTypeFlags.MAP)],
+            })],
+        });
+        const fa = cluster(28);
+        const unit = await bootUnit({
+            facilities: [kddd, iafdd, fafdd, mapdd, w.bgd, w.gck, ...fa],
+            position: {lat: 39.0, lon: -100.0}, magvar: 0, airspaces: w.centers,
+            storage: savedFlightplan(0, [...fa, kddd]), panelXml: panelXml(APR_ARM_SWITCH),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8', {ident: 'KDDD'});
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.selectPage('R', 'CTR 1');
+        // Preconditions: 28 fixes and KDDD are 29 en-route waypoints, the approach adds three legs, so the legs pass 30
+        // with the Center waypoint while the en-route waypoints do not
+        const fpl0 = unit.props.memory.fplPage.flightplans[0];
+        expect(fpl0.getLegs().filter(l => l.type === KLNLegType.USER)).toHaveLength(29);
+        expect(fpl0.getLegs()).toHaveLength(32);
+        await ent(unit);
+        expect(right()[0]).toBe(' 1 NEW WPT '); // Precondition: one crossing, the leg of FA27 to IAFDD
+
+        await ent(unit);
+
+        expect(right()).toEqual(['           ', '           ', 'CTR WPT    ', 'INSERTION  ', 'COMPLETE   ', '           ']);
+        expect(fplIdents(unit, 0)).toHaveLength(33);
+        expect(fplIdents(unit, 0).slice(27)).toEqual(['FA27', 'BGD00', 'IAFDD', 'FAFDD', 'MAPDD', 'KDDD']);
         expect(unit.errors).toEqual([]);
     });
 });
