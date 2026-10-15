@@ -401,20 +401,51 @@ describe('waypoint editor on the REF page (C-2)', () => {
 });
 
 describe('waypoint editor with an unknown identifier', () => {
-    // The KLN 89 trainer (2026-10-07): an identifier that is not in the database, entered with D->, offers the creation
-    // of a user waypoint (#262, pinned on the DIRECT TO and FPL 0 pages with the knobs). Here the identifier is typed
-    // with the keyboard, which reaches the same check (WaypointEditor.enter). Sibling: the characterization of the
-    // keyboard path below
-    it.fails('offers to create a user waypoint for an identifier typed with the keyboard '
-        + '(checked in the KLN 89 trainer, 2026-10-07, #262)', async () => {
+    // The KLN 89 trainer (2026-10-07, 2026-10-15) showed the creation offer with the knobs: an identifier that is not
+    // in the database, entered with D->, offers the creation of a user waypoint on the right page, and the D-> field
+    // keeps the ident. The 89 has no keyboard path, so this one is a characterization: the identifier typed with the
+    // keyboard reaches the same check (WaypointEditor.enter). The knob path is held by the DIRECT TO and FPL page tests
+    it('offers to create a user waypoint for an identifier typed with the keyboard '
+        + '(characterization of the keyboard path, #262)', async () => {
         const unit = await blankDirectTo();
+        const messages = collectStatusMessages(unit);
+        await unit.panel.type('L', 'QQQQ');
+        const nav1 = Screen.read().rows('R');
+
+        await unit.panel.ent();
+
+        expect(messages).not.toContain('NO SUCH WPT');
+        expect(Screen.read().rows('R')).not.toEqual(nav1); // the right page is replaced
+        expect(dctIdent()).toBe('   QQQQ    ');
+    });
+
+    // The maintainer's ruling on #262: the creation page on D-> is the SUP page in its creation state
+    it('shows the creation rows of the SUP page for an identifier typed with the keyboard (characterization, #262)', async () => {
+        const unit = await blankDirectTo();
+        await unit.panel.type('L', 'QQQQ');
+
+        await unit.panel.ent();
+
+        expect(Screen.read().rows('R')).toEqual([
+            ' QQQQ      ', '           ', 'CREATE NEW ', 'WPT AT:    ', 'USER POS?  ', 'PRES POS?  ',
+        ]);
+    });
+
+    // The maintainer's ruling on #262: only the flight plan pages and D-> offer the creation; the other hosts of the
+    // editor answer NO SUCH WPT, as REF does (C-2). TRI 3 stands for them
+    it('posts NO SUCH WPT on TRI 3, which offers no creation (characterization, #262)', async () => {
+        const unit = await bootUnit(world());
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.selectPage('L', 'TRI 3');
+        await vi.advanceTimersByTimeAsync(6000); // the status line messages of the page change
+        await unit.panel.cursor('L');
         const messages = collectStatusMessages(unit);
         await unit.panel.type('L', 'QQQQ');
 
         await unit.panel.ent();
 
-        expect(messages).not.toContain('NO SUCH WPT');
-        expect(Screen.read().rows('R').slice(2, 4)).toEqual(['CREATE NEW ', 'WPT AT:    ']);
+        expect(messages).toEqual(['NO SUCH WPT']);
+        expect(Screen.read().status().right).toBe('NAV 1');
     });
 });
 

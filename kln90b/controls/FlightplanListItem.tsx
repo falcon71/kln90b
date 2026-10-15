@@ -60,6 +60,7 @@ export class FlightplanListItem implements Field, ListItem {
             ...props,
             value: this.wpt,
             enterCallback: this.setFacility.bind(this),
+            offerCreation: true, //#262 4-2: every flight plan page
         });
 
         this.type = this.props.leg?.type ?? KLNLegType.USER;
@@ -276,9 +277,15 @@ export class FlightplanListItem implements Field, ListItem {
             if (!this.waypointEditor.isEntered) {
                 return false;
             }
+            const wasWaitingForCreation = this.waypointEditor.isWaitingForCreation();
             //4-2 step 7: the waypoint page goes and the position is blank again (#310)
             const handled = this.waypointEditor.clear();
             this.isEntered = this.waypointEditor.isEntered;
+            if (wasWaitingForCreation && !this.waypointEditor.isWaitingForCreation()) {
+                //#262, checked in the KLN 89 trainer, 2026-10-15: CLR on the creation page ends the insert. Its row
+                //goes, or the blank position at the end is built again, and the cursor stays at its index
+                this.props.onInsertDone(this.props.wptIdx, null, null);
+            }
             return handled;
         }
         if (this.type === KLNLegType.APP) {

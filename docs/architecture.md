@@ -854,7 +854,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - `EVT_R_SCAN_*`: with the right cursor off → `page.scanLeft/Right()`. With the cursor on it *falls through* to
   inner-knob behaviour.
 - `EVT_ENT` → `handleEnter()`:
-    1. If left `isEnterAccepted()` → left.enter; else if right accepts → right.enter.
+    1. If left `isEnterAccepted()` → left.enter; else if right accepts → right.enter. A waypoint editor that waits for
+       its creation page on the right does not accept ENT, so ENT reaches that page (#262).
     2. Otherwise try left.enter, then right.enter.
     3. Overlays → `overlay.enter()`.
 - `EVT_CLR` → the overlay's `clear()` if an overlay is shown. Otherwise the half pages: like ENT, a side that holds an
@@ -1085,12 +1086,13 @@ export class Set3Page extends SixLineHalfPage {
 
 ### Waypoint ENT-confirmation flow (`controls/editors/WaypointEditor.tsx`, manual 3-14/3-15/3-28)
 
-1. Props: `{...props, value, enterCallback, parent: this, pageSite?}`. `parent` is the hosting half page, used for stack
-   parenting. `pageSite` is the side where `DuplicateWaypointPage` appears.
+1. Props: `{...props, value, enterCallback, parent: this, pageSite?, offerCreation?}`. `parent` is the hosting half
+   page, used for stack parenting. `pageSite` is the side where `DuplicateWaypointPage` appears. `offerCreation` is set
+   only by `FlightplanListItem` (every FPL page) and `DirectToPage` (#262, step 9).
 2. Inner knob → enter edit mode. Each char change runs `onCharChanged()`, which auto-completes the remaining chars from
    the first `searchByIdentWithIcaoStructs` match (3-14).
 3. ENT → `convertToValue` → `findNearestFacilitiesByIdent`, filtered to exact ident matches:
-    - none → `NO SUCH WPT`;
+    - none → `NO SUCH WPT`, or the creation page of step 9 when `offerCreation` is set;
     - several → `await DuplicateWaypointPage.selectDuplicateWaypoint()`. This pushes a list page and returns a Promise
       that resolves when a row is ENTed.
 4. `confirmValue()` sets `isAwaitingConfirmation` (the editor chars flash through `EditorField.isParentBlink`, and the
@@ -1113,7 +1115,22 @@ export class Set3Page extends SixLineHalfPage {
    editor with `clearBlanks: false` (the SET 1 ident) closes the edit instead and keeps the old value (#244).
 8. Alternate method (3-15): ENT on a non-entered editor while a waypoint page is shown on the right adopts that
    waypoint.
-9. `confirmCurrentValue()` starts confirmation directly. Used by `DirectToPage` (pre-filled from: the FPL 0 cursor
+9. Creation of an unknown ident (#262, 4-2, 5-16): with `offerCreation`, ENT on an ident in no database pushes
+   `SupPage.createWaypointPage(props, {ident, onCreated})` on the right, with the editor's `parent` as its parent. The
+   ident and the callback are a constructor argument, not props, so they do not reach the pages the SUP page's REF
+   editor pushes. That page is in its CREATE NEW WPT AT: state, with the right cursor over USER POS?, and leaves
+   `memory.supPage` alone. The editor stays entered and keeps the typed ident. While its creation page is on the right
+   stack (`MainPage.isInRightStack`: shown, or covered by the REF approval or duplicate list it pushed, 5-19),
+   `isEnterAccepted()` is false and `enter()` returns `Not_Handled`, so `handleEnter` passes ENT to the right side.
+   Once the SUP page has stored the waypoint (not on USR DB FULL) it calls `onCreated`; the editor pops the creation
+   page and runs `confirmValue` for the new waypoint, so its normal approval (step 4) follows. CLR on the left (the
+   left has the open entry, so it takes CLR first) goes to the right page first when that page holds an open entry (a
+   latitude being typed, a REF waypoint waiting for approval); otherwise it pops the creation page with the pages above
+   it and leaves the field blank and not entered. `FlightplanListItem.clear` then ends the insert with
+   `onInsertDone(idx, null, null)`. The inner knob, typing, turning the cursor off and leaving the page
+   (`setEntered(false)`) pop the creation page too. The pages the editor pushes get `offerCreation: false`, so the REF
+   editors of SUP and INT keep `NO SUCH WPT`.
+10. `confirmCurrentValue()` starts confirmation directly. Used by `DirectToPage` (pre-filled from: the FPL 0 cursor
    waypoint → the Super NAV 5 target → the right waypoint page → the active waypoint, or the missed approach on a MAP
    FROM leg → blank) and by FPL inserts from the REF page (`FplWptEnterMode.CONFIRM`); the left cursor stays on until
    the approval or rejection (#291).

@@ -281,8 +281,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - the fix of #95 turns its two pins red (the list and the error page);
     - the fix of #311 in `WaypointEditor` leaves the `FplPage.test.ts` insert tests green, but its first click on an
       empty remark line changes the click counts in the setup of `stores a remark with a hyphen and shows it again`
-      (`FreetextEditor.test.ts`); the fix of #262 must keep NO
-      SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests);
+      (`FreetextEditor.test.ts`);
     - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): duplicate idents on a waypoint
   page (2026-10-08, T20, not done), and the empty top row of FPL 0 with the first waypoint active (above). #162 and

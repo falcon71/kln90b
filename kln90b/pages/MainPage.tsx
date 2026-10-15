@@ -71,6 +71,13 @@ class PageStack {
     }
 
     /**
+     * True if the page is in this stack, shown or covered by a page pushed on top of it
+     */
+    public contains(page: SixLineHalfPage): boolean {
+        return this.stack.some(p => p.page === page);
+    }
+
+    /**
      * Should be called whenever a page is removed. This checks, if it is a parent page and removes those children
      * as well. Returns true, if children have been removed;
      * @param parent
@@ -268,6 +275,14 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         this.rerenderLeftPage = true;
         this.checkIfSuperPageIsShown();
         return oldPage;
+    }
+
+    /**
+     * True if the page is on the right stack, shown or covered by a page pushed on top of it (#262: the REF waypoint
+     * page that a creation page pushes for approval)
+     */
+    public isInRightStack(page: SixLineHalfPage): boolean {
+        return this.rightPageStack.contains(page);
     }
 
     public popRightPage(): SixLineHalfPage {
