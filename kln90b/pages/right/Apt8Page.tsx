@@ -28,7 +28,8 @@ import {Fpl0Page} from "../left/FplPage";
 import {KLNFlightplanLeg, KLNLegType} from "../../data/flightplan/Flightplan";
 import {OneTimeMessage} from "../../data/MessageHandler";
 import {SidStar} from "../../data/navdata/SidStar";
-import {insertLegIntoFpl} from "../../services/FlightplanUtils";
+import {deleteFrontLegs, roomSteps} from "../../services/FlightplanUtils";
+import {ProcedureMakeRoomPage} from "../left/ProcedureMakeRoomPage";
 
 
 type Apt8PageTypes = {
@@ -201,24 +202,52 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
 
     private load(app: ApproachProcedure, iaf: ApproachTransition | null, legs: KLNFlightplanLeg[]): void {
         console.log("load", app, iaf, legs);
+        const facility = unpackFacility(this.facility)!;
+        //#222: the room is decided before anything changes. The old approach goes in the same step, so its legs free
+        //room; procedure legs do not count toward the 30 en-route waypoints, only toward the 45 in total (#221)
+        const steps = this.roomFor(facility, legs);
+        if (steps === null) {
+            this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL"); //C-1
+            return;
+        }
+        if (steps.length === 0) {
+            this.loadNow(app, iaf, facility, legs, 0);
+            return;
+        }
+        const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
+        mainPage.pushLeftPage(new ProcedureMakeRoomPage(this.props, steps.length, () => {
+            //A right knob step does not remove the question, so the room is checked again (#222)
+            const now = this.roomFor(facility, legs);
+            if (now === null) {
+                this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
+                return;
+            }
+            this.loadNow(app, iaf, facility, legs, now.reduce((sum, size) => sum + size, 0));
+        }), this);
+    }
 
+    /** #222: the steps `roomSteps` gives for this load: the legs of FPL 0 without its approach, the airport if it is missing */
+    private roomFor(facility: AirportFacility, legs: KLNFlightplanLeg[]): number[] | null {
+        const remaining = this.props.memory.fplPage.flightplans[0].getLegs().filter(leg => leg.type !== KLNLegType.APP);
+        const addAirport = !remaining.some(leg => ICAO.valueEquals(leg.wpt.icaoStruct, facility.icaoStruct));
+        return roomSteps(remaining, this.props.memory.navPage, addAirport ? 1 : 0, legs.length, facility);
+    }
+
+    /**
+     * Loads the approach as one batch after deleting `deleteCount` legs from the front. The room was decided before (#222)
+     * for this `facility`, so the load takes the same airport and does not read the page's again
+     */
+    private loadNow(app: ApproachProcedure, iaf: ApproachTransition | null, facility: AirportFacility, legs: KLNFlightplanLeg[], deleteCount: number): void {
         const fpl0 = this.props.memory.fplPage.flightplans[0];
         fpl0.startBatchInsert();
         fpl0.removeProcedure(KLNLegType.APP); //I don't think you can have two approaches at the same time
+        deleteFrontLegs(fpl0, deleteCount);
         const fpl0Legs = fpl0.getLegs();
-        const facility = unpackFacility(this.facility)!;
         let idx = fpl0Legs.findIndex(wpt => ICAO.valueEquals(wpt.wpt.icaoStruct, facility.icaoStruct));
         if (idx === -1) {
             //Airport not in FPL?
             idx = fpl0Legs.length;
-            try {
-                insertLegIntoFpl(fpl0, this.props.memory.navPage, fpl0Legs.length, {wpt: facility, type: KLNLegType.USER});
-            } catch (e) {
-                this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
-                console.error(e);
-                fpl0.finishBatchInsert();
-                return;
-            }
+            fpl0.insertLeg(fpl0Legs.length, {wpt: facility, type: KLNLegType.USER});
         }
 
         // 6-5, B-3: only the enroute waypoints count, not the legs of a procedure that is already loaded
@@ -227,15 +256,7 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
         }
 
         for (const leg of legs) {
-            try {
-                insertLegIntoFpl(fpl0, this.props.memory.navPage, idx, leg);
-                idx++;
-            } catch (e) {
-                this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
-                console.error(e);
-                fpl0.finishBatchInsert();
-                break;
-            }
+            fpl0.insertLeg(idx++, leg); //#222: the room was made before
         }
         fpl0.finishBatchInsert();
 

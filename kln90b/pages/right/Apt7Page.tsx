@@ -33,7 +33,8 @@ import {OneTimeMessage} from "../../data/MessageHandler";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {NearestSelector} from "../../controls/selects/NearestSelector";
 import {SidStar} from "../../data/navdata/SidStar";
-import {insertLegIntoFpl} from "../../services/FlightplanUtils";
+import {deleteFrontLegs, roomSteps} from "../../services/FlightplanUtils";
+import {ProcedureMakeRoomPage} from "../left/ProcedureMakeRoomPage";
 
 
 export interface Apt7PageProps extends PageProps {
@@ -422,27 +423,53 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
 
     private load(proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null, legs: KLNFlightplanLeg[]): void {
         console.log("load", proc, rwy, trans, legs);
-
         const type = this.getProcedureType();
+        const facility = unpackFacility(this.facility)!;
+        //#222: the room is decided before anything changes. The old SID or STAR goes in the same step, so its legs free
+        //room; procedure legs do not count toward the 30 en-route waypoints, only toward the 45 in total (#221)
+        const steps = this.roomFor(type, facility, legs);
+        if (steps === null) {
+            this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL"); //C-1
+            return;
+        }
+        if (steps.length === 0) {
+            this.loadNow(type, facility, legs, 0);
+            return;
+        }
+        const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
+        mainPage.pushLeftPage(new ProcedureMakeRoomPage(this.props, steps.length, () => {
+            //A right knob step does not remove the question, so the room is checked again (#222)
+            const now = this.roomFor(type, facility, legs);
+            if (now === null) {
+                this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
+                return;
+            }
+            this.loadNow(type, facility, legs, now.reduce((sum, size) => sum + size, 0));
+        }), this);
+    }
 
+    /** #222: the steps `roomSteps` gives for this load: the legs of FPL 0 without the procedure of `type`, the airport if it is missing */
+    private roomFor(type: KLNLegType, facility: AirportFacility, legs: KLNFlightplanLeg[]): number[] | null {
+        const remaining = this.props.memory.fplPage.flightplans[0].getLegs().filter(leg => leg.type !== type);
+        const addAirport = !remaining.some(leg => ICAO.valueEquals(leg.wpt.icaoStruct, facility.icaoStruct));
+        return roomSteps(remaining, this.props.memory.navPage, addAirport ? 1 : 0, legs.length, facility);
+    }
+
+    /**
+     * Loads the procedure as one batch after deleting `deleteCount` legs from the front. The room was decided before (#222)
+     * for this `facility`, so the load takes the same airport and does not read the page's again
+     */
+    private loadNow(type: KLNLegType, facility: AirportFacility, legs: KLNFlightplanLeg[], deleteCount: number): void {
         const fpl0 = this.props.memory.fplPage.flightplans[0];
         fpl0.startBatchInsert();
         fpl0.removeProcedure(type); //I don't think you can have two approaches at the same time
+        deleteFrontLegs(fpl0, deleteCount);
         const fpl0Legs = fpl0.getLegs();
-        const facility = unpackFacility(this.facility)!;
         let idx = fpl0Legs.findIndex(wpt => ICAO.valueEquals(wpt.wpt.icaoStruct, facility.icaoStruct));
         if (idx === -1) {
             //Airport not in FPL?
             idx = type === KLNLegType.SID ? 0 : fpl0Legs.length;
-
-            try {
-                insertLegIntoFpl(fpl0, this.props.memory.navPage, idx, {wpt: facility, type: KLNLegType.USER});
-            } catch (e) {
-                this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
-                console.error(e);
-                fpl0.finishBatchInsert();
-                return;
-            }
+            fpl0.insertLeg(idx, {wpt: facility, type: KLNLegType.USER});
         }
         if (type === KLNLegType.SID) {
             //After the airport
@@ -460,15 +487,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         }
 
         for (const leg of legs) {
-            try {
-                insertLegIntoFpl(fpl0, this.props.memory.navPage, idx, leg);
-                idx++;
-            } catch (e) {
-                this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
-                console.error(e);
-                fpl0.finishBatchInsert();
-                return;
-            }
+            fpl0.insertLeg(idx++, leg); //#222: the room was made before
         }
         fpl0.finishBatchInsert();
 

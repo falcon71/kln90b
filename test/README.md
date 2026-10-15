@@ -289,6 +289,8 @@ pages accept.
 - **`unit.panel.loadProcedure('APT 8')`** loads the first procedure of APT 7 or APT 8 into FPL 0 the way a pilot does:
   select the page, cursor, ENT on the first entry (a single transition is taken without a question), ENT on LOAD IN
   FPL, cursor off, then one second of clock, because FPL 0 scrolls to the active leg only at the next calculation tick.
+  A load into a full FPL 0 that must delete waypoints asks on the left page first (#222); the helper leaves that
+  question open, and the test answers it with `ent()` or `clr()`.
   APT 8 (and ACT 8) exists only on a unit with the approach arm switch (3-49, #133), so a test that reaches it boots
   with `panelXml(APR_ARM_SWITCH)`; the harness default panel.xml has no switch, as the parser default.
   The APT pages open on the first airport of the scan list, so with more than one airport pass

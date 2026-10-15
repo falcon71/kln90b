@@ -13,6 +13,7 @@ import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {EVT_CLR} from '../../../../kln90b/HEvents';
 import {MainPage} from '../../../../kln90b/pages/MainPage';
+import {blinkCycle} from '../../../harness/render/blink';
 
 const rows = (side: 'L' | 'R') => Screen.read().half(side).split('\n').map(r => r.trimEnd());
 
@@ -237,14 +238,20 @@ describe('APT 7 loading a STAR onto 27 en-route waypoints', () => {
     });
 });
 
-// An FPL 0 with 30 en-route waypoints that lacks the airport of the SID: the airport goes in at index 0, where the unit
-// has to make room first. The airport needs room, the SID legs do not (#221).
-// 6-22 step 7 (the unit asks to add the airport) and C-1 (room is made when the first leg is not part of the
-// active leg) imply the setup test below. The SID legs come on top of the en-route limit (#221), so they delete
-// nothing and the airport stays.
+// An FPL 0 with 30 en-route waypoints that lacks the airport of the SID: the airport needs one en-route place, so the
+// unit has to make room for it. 6-22 step 7 (the unit asks to add the airport) and C-1 (room is made when the first leg
+// is not part of the active leg) imply the setup test below. Before it deletes the first waypoint the unit asks on the
+// left page (#222); nothing changes before the last ENT. The SID legs come on top of the en-route limit (#221), so they
+// delete nothing; they follow the airport, which goes in at index 0.
 describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
-    /** 30 filler fixes in FPL 0, no KPRC, the aircraft on the way to the seventh filler: the active leg has index 6 */
-    async function loadSidIntoFullPlan() {
+    const leftRows = () => Screen.read().half('L').split('\n').map(r => r.trimEnd());
+
+    /**
+     * 30 filler fixes in FPL 0, no KPRC, the aircraft on the way to the seventh filler: the active leg has index 6. Loads
+     * the SID, approves adding the airport and answers the room question on the left with `answer` (null: the question
+     * stays open)
+     */
+    async function loadSidIntoFullPlan(answer: 'ent' | 'clr' | null = 'ent') {
         const w = approachWorld();
         const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
         const sidaa = intersection('SIDAA', east(8).lat, east(8).lon);
@@ -269,23 +276,131 @@ describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
         await unit.panel.cursor('R');
         await unit.panel.ent(); // APPROVE?
         await vi.advanceTimersByTimeAsync(1000);
+        if (answer === 'ent') {
+            await unit.panel.ent(); // CONTINUE?
+        } else if (answer === 'clr') {
+            await unit.panel.clr();
+        }
+        if (answer !== null) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
         return unit;
     }
 
-    it('asks to add the airport and holds the airport once and the two SID legs on top of 30 en-route waypoints (setup of #222)', async () => {
+    it('asks to add the airport and holds the airport once and the two SID legs on top of 30 en-route waypoints (characterization, setup of #222)', async () => {
         const unit = await loadSidIntoFullPlan();
         const legs = fpl0Legs(unit);
 
         expect(legs).toHaveLength(32); // 30 fillers, one of them gone for the airport, the airport and two SID legs
+        expect(legs.map(l => l[0])).not.toContain('FL00');
+        expect(legs[3]).toEqual(['FL01', KLNLegType.USER]);
         expect(legs.filter(l => l[0] === 'KPRC')).toEqual([['KPRC', KLNLegType.USER]]);
     });
 
-    // 6-22: the airport comes first, followed by the SID in its order (figure 6-38). The airport goes in at index 0, the
-    // first waypoint makes room and the index follows it, so no SID leg deletes the airport (#148, references #222)
+    // 6-22: the airport comes first, followed by the SID in its order (figure 6-38). The first waypoint makes room and
+    // the airport goes in at index 0, so no SID leg deletes the airport (#148, references #222)
     it('puts the airport first, then every SID leg in order, when FPL 0 makes room (6-22, figure 6-38, #148)', async () => {
         const unit = await loadSidIntoFullPlan();
 
         expect(fpl0Legs(unit).slice(0, 3)).toEqual([['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID]]);
+    });
+
+    // The 90B wording follows the AVsoftech trainer. The KLN 89 asks one such question per waypoint for an FPL insert
+    // (checked in the KLN 89 trainer, 2026-10-15); a load that needs room was not seen there. Nothing is deleted while
+    // the question shows
+    it('asks on the left page to delete waypoint 1 before it adds the airport (characterization, #222)', async () => {
+        const unit = await loadSidIntoFullPlan(null);
+
+        expect(leftRows()).toEqual(['DELETING', 'WPT   1', 'TO MAKE', 'ROOM IN', 'FLIGHTPLAN-', 'CONTINUE?']);
+        expect(unit.panel.focused('L')).toMatchObject({row: 5, text: 'CONTINUE?'});
+        expect(fpl0Legs(unit)).toHaveLength(30);
+        const cycle = await blinkCycle(() => Screen.read().cell(5, 0).attr);
+        expect(cycle.sort()).toEqual(['F', 'I', 'I', 'I']);
+    });
+
+    it('leaves FPL 0 unchanged when the question is answered with CLR (characterization, #222)', async () => {
+        const unit = await loadSidIntoFullPlan('clr');
+
+        expect(fpl0Legs(unit).map(l => l[0])).toEqual(Array.from({length: 30}, (_, i) => `FL${String(i).padStart(2, '0')}`));
+    });
+});
+
+// A long STAR into a full FPL 0, also in place of another. The world: KPRC with ARR1 (five waypoints) and ARR2 of 17
+// waypoints; FPL 0 holds 29 fillers and KPRC (KPRC last, or first where a test says so), the aircraft on the way to
+// the seventh filler. 30 en-route waypoints and 17 STAR legs pass the total of 45 by two (#221)
+describe('APT 7 loading a long STAR into a full FPL 0', () => {
+    const leftRows = () => Screen.read().half('L').split('\n').map(r => r.trimEnd());
+
+    async function bootLongStarWorld(kprcFirst = false) {
+        const w = approachWorld();
+        const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
+        const short = ['STRAA', 'STRAB', 'STRAC', 'STRAD', 'STRAE'].map((ident, i) => intersection(ident, east(40 - 5 * i).lat, east(40 - 5 * i).lon));
+        const long = Array.from({length: 17}, (_, i) => intersection(`ST${String(i).padStart(3, '0')}`, 46.8, 7.5 + 0.02 * i));
+        const kprc = withProcedures(w.kprc, {
+            approaches: [],
+            arrivals: [
+                star('ARR1', {common: [Leg.IF(short[0]), ...short.slice(1).map(s => Leg.TF(s))]}),
+                star('ARR2', {common: [Leg.IF(long[0]), ...long.slice(1).map(s => Leg.TF(s))]}),
+            ],
+        });
+        const fillers = Array.from({length: 29}, (_, i) => intersection(`FL${String(i).padStart(2, '0')}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [kprc, ...short, ...long, ...fillers], position: {lat: 46.5, lon: 7.12},
+            storage: savedFlightplan(0, kprcFirst ? [kprc, ...fillers] : [...fillers, kprc]),
+        });
+        await settle(unit);
+        return unit;
+    }
+
+    /**
+     * On APT 7 with the cursor off: the second entry, ARR2, and LOAD IN FPL. With a STAR in FPL 0 the replace question
+     * of #274 will come after LOAD IN FPL, before the room question
+     */
+    async function loadArr2(unit: HeadlessUnit) {
+        await unit.panel.selectPage('R', 'APT 7');
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1); // ARR2
+        await unit.panel.ent(); // its waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+    }
+
+    // The old STAR goes in the same step, so its legs free room: two deletions, not seven (the total of 45 of #221 and
+    // the ruling of one question per waypoint)
+    it('frees the legs of the STAR it replaces and asks twice (characterization, #222)', async () => {
+        const unit = await bootLongStarWorld();
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(6); // Precondition
+        await unit.panel.loadProcedure('APT 7', {ident: 'KPRC'}); // ARR1
+        expect(fpl0Legs(unit)).toHaveLength(35); // Precondition
+        await loadArr2(unit);
+
+        expect(leftRows()[1]).toBe('WPT   1');
+        await unit.panel.ent();
+        expect(leftRows()[1]).toBe('WPT   2');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(45);
+        expect(legs[0][0]).toBe('FL02');
+        expect(legs.map(l => l[0])).not.toContain('STRAA');
+    });
+
+    // The ruling: the airport of the STAR is never deleted to make room for it. The active leg would let the two first
+    // waypoints go, so the refusal is the airport's
+    it('answers FPL FULL rather than delete the airport of the STAR (characterization, #222)', async () => {
+        const unit = await bootLongStarWorld(true);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBeGreaterThan(3); // Precondition
+        await unit.panel.selectPage('R', 'APT 1');
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'KPRC');
+        await unit.panel.cursor('R');
+        await loadArr2(unit);
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().status().mode).toBe('FPL FULL');
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(30);
+        expect(legs[0][0]).toBe('KPRC');
     });
 });
 

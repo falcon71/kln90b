@@ -372,6 +372,11 @@ Flightplan really is dead simple".
   `services/FlightplanUtils.insertLegIntoFpl`, which deletes from the front of a full FPL 0 as `roomSteps` says (#148):
   one waypoint per step, an airport with the SID legs behind it, never a leg of the active leg (C-1). The insert index
   follows the deleted legs.
+- The procedure loads of APT 7 and APT 8 (`load`) decide the room before they change FPL 0 (#222): `roomSteps` over the
+  legs without the procedure being replaced, with the airport the load adds as en-route and the procedure legs on top.
+  No room is FPL FULL with FPL 0 unchanged. When waypoints must go, `pages/left/ProcedureMakeRoomPage` (a subclass of
+  the abstract `MakeRoomPage`) asks on the left once per waypoint; ENT on the last question deletes them and loads,
+  CLR cancels. A load is one batch with one `flightplanChanged`, inserting with plain `insertLeg`.
 - Mutations publish **`flightplanChanged`**. `startBatchInsert/finishBatchInsert` suppress the intermediate events ("
   Would mess up the async asobo FPL sync"). Subscribers are `UserFlightplanPersistor` (persists every change) and
   `WTFlightplanSync`.
