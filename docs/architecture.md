@@ -854,7 +854,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - `EVT_R_SCAN_*`: with the right cursor off → `page.scanLeft/Right()`. With the cursor on it *falls through* to
   inner-knob behaviour.
 - `EVT_ENT` → `handleEnter()`:
-    1. If left `isEnterAccepted()` → left.enter; else if right accepts → right.enter.
+    1. If left `isEnterAccepted()` → left.enter; else if right accepts → right.enter. A waypoint editor that waits for
+       its creation page on the right does not accept ENT, so ENT reaches that page (#262).
     2. Otherwise try left.enter, then right.enter.
     3. Overlays → `overlay.enter()`.
 - `EVT_CLR` → the overlay's `clear()` if an overlay is shown. Otherwise the half pages: like ENT, a side that holds an
@@ -986,6 +987,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `AltitudeDisplay`/`ElevationDisplay`, `SpeedDisplay`, `DurationDisplay`, `TimeDisplay`, `FuelDisplay`,
       `TemperatureDisplay`, `LatitudeDisplay`, `LongitudeDisplay`, `RoundedDistanceDisplay`
     - `DeviationBar`, `SuperDeviationBar`, `ActiveArrow` (flashes during waypoint alert, 3-29), `FlightplanArrow`
+      (draws nothing while the navigation is flagged, 4-7, #322)
     - Convention: null value → dashes.
 - **Editors** (`controls/editors/`; manual 3-14, "jump in, edit char by char, confirm with ENT"):
     - `Editor<T>` is an abstract `Field` composed of `EditorField`s (char cells with a `charset`).
@@ -994,9 +996,19 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - The first inner-knob turn sets `isEntered` (fields reset to `DEFAULT_FIELD_VALUE`, cursor on char 0). The outer
       knob then moves between chars, the inner knob changes the char, and ENT validates and calls
       `enterCallback(value)`.
+    - The starting click is per editor (#311, not in `Editor.setEntered`, so the numeric editors keep their first
+      choice). `WaypointEditor` gives A clockwise and 9 counterclockwise in cell 0 and runs `onCharChanged()`, so the
+      first identifier that begins with it is offered (KLN 89 trainer, 2026-10-08 and 2026-10-15). `FreetextEditor` gives
+      an A when constructed with `firstClickGivesA`, which the remark lines of APT 5 do and the Turn-On page does not.
     - `setValue()` updates the display unless the editor is being edited.
     - Field classes in `EditorField.tsx`: `AlphabetEditorField` (space, A-Z, 0-9), `NumberEditorField` (
       `createWithMinMax`, `createWithBlankMax`), `MonthEditorField`, `NorthSouth/EastWest/RunwaySurfaceEditorField`.
+    - `FirstIdentEditorField` is cell 0 of `WaypointEditor`: the knob and the keyboard skip the blank, so the wheel runs
+      A to Z, 0 to 9 and round again (KLN 89 trainer, 2026-10-15, #374). It keeps the shared charset, so a blank first
+      cell (an empty field, CLR on D->/FPL rows) still shows and every index is the shared one. A blank typed with the
+      raw H event is refused (`WaypointEditor.refusesKey`) before an edit opens, by `WaypointEditor.keyboard` and by
+      `FlightplanListItem.keyboard` (which opens the row's edit or inserts a row before it hands a key over), so a refused
+      key changes nothing.
     - Concrete editors: Bearing, Date, Distance, Elevation, Freetext, Latitude, Longitude, Magvar, NdbFreq, Radial,
       RunwaySurface, Speed, Time, VorFreq, Waypoint.
 - **Selects** (`controls/selects/`; immediate-effect fields, no ENT):
@@ -1010,7 +1022,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       one `SelectField` per digit, so each digit is its own cursor stop. They offer `setValue`/`setReadonly`.
     - `WaypointSelector` (base of `AirportSelector`, `VorSelector`, `NdbSelector`, `IntersectionSelector`) is the
       per-character ident at the top of waypoint pages. Changing a char looks up and loads the facility immediately via
-      callback.
+      callback. A character entered after a blank cell keeps the blank before it (`AB A`) and that ident is searched
+      (KLN 89 trainer, 2026-10-15, #343). Cell 0 is a `FirstCellSelectField`: the knob and the keyboard skip the blank
+      there (KLN 89 trainer, 2026-10-15, #374); the charset and its indices are the shared ones.
     - Also: `NearestSelector`, `MapOrientationSelector`, `SupplementarySelector`, `ObsDtkElement`,
       `CreateWaypointMessage` ("CREATE NEW WPT AT: USER POS? / PRES POS?" buttons, shown when the ident has no match),
       `SuperNav5Field1/2/3Selector`, `SuperNav5RangeSelector`, `SuperNav5DirectToSelector`.
@@ -1083,12 +1097,13 @@ export class Set3Page extends SixLineHalfPage {
 
 ### Waypoint ENT-confirmation flow (`controls/editors/WaypointEditor.tsx`, manual 3-14/3-15/3-28)
 
-1. Props: `{...props, value, enterCallback, parent: this, pageSite?}`. `parent` is the hosting half page, used for stack
-   parenting. `pageSite` is the side where `DuplicateWaypointPage` appears.
+1. Props: `{...props, value, enterCallback, parent: this, pageSite?, offerCreation?}`. `parent` is the hosting half
+   page, used for stack parenting. `pageSite` is the side where `DuplicateWaypointPage` appears. `offerCreation` is set
+   only by `FlightplanListItem` (every FPL page) and `DirectToPage` (#262, step 9).
 2. Inner knob → enter edit mode. Each char change runs `onCharChanged()`, which auto-completes the remaining chars from
    the first `searchByIdentWithIcaoStructs` match (3-14).
 3. ENT → `convertToValue` → `findNearestFacilitiesByIdent`, filtered to exact ident matches:
-    - none → `NO SUCH WPT`;
+    - none → `NO SUCH WPT`, or the creation page of step 9 when `offerCreation` is set;
     - several → `await DuplicateWaypointPage.selectDuplicateWaypoint()`. This pushes a list page and returns a Promise
       that resolves when a row is ENTed.
 4. `confirmValue()` sets `isAwaitingConfirmation` (the editor chars flash through `EditorField.isParentBlink`, and the
@@ -1105,13 +1120,31 @@ export class Set3Page extends SixLineHalfPage {
    waiting. CLR → `confirmValue(null)`, which clears. When the editor is on the right side (REF of INT/SUP, the VNAV
    waypoint of NAV 4) the right page is the confirm page, which has no cursor: `WaypointConfirmPage.hasOpenEntry()`
    makes it take CLR first and `clear()` hands the key to the editor (#359). The REF to FPL confirmation keeps its
-   CLR on the left (#291). An editor with `clearBlanks: false` (the SET 1 ident) closes the edit instead and keeps
-   the old value (#244).
+   CLR on the left: `FplPage.clear()` asks `EditableFlightplan.rejectRefApproval()` first, which rejects the waiting
+   waypoint, because the focused row is not necessarily the waiting one. It reads the state of the rows
+   (`FlightplanListItem.isAwaitingRefApproval()`) and lets CLR through once the row was re-entered (3-28) (#291). An
+   editor with `clearBlanks: false` (the SET 1 ident) closes the edit instead and keeps the old value (#244).
 8. Alternate method (3-15): ENT on a non-entered editor while a waypoint page is shown on the right adopts that
    waypoint.
-9. `confirmCurrentValue()` starts confirmation directly. Used by `DirectToPage` (pre-filled from: the FPL 0 cursor
+9. Creation of an unknown ident (#262, 4-2, 5-16): with `offerCreation`, ENT on an ident in no database pushes
+   `SupPage.createWaypointPage(props, {ident, onCreated})` on the right, with the editor's `parent` as its parent. The
+   ident and the callback are a constructor argument, not props, so they do not reach the pages the SUP page's REF
+   editor pushes. That page is in its CREATE NEW WPT AT: state, with the right cursor over USER POS?, and leaves
+   `memory.supPage` alone. The editor stays entered and keeps the typed ident. While its creation page is on the right
+   stack (`MainPage.isInRightStack`: shown, or covered by the REF approval or duplicate list it pushed, 5-19),
+   `isEnterAccepted()` is false and `enter()` returns `Not_Handled`, so `handleEnter` passes ENT to the right side.
+   Once the SUP page has stored the waypoint (not on USR DB FULL) it calls `onCreated`; the editor pops the creation
+   page and runs `confirmValue` for the new waypoint, so its normal approval (step 4) follows. CLR on the left (the
+   left has the open entry, so it takes CLR first) goes to the right page first when that page holds an open entry (a
+   latitude being typed, a REF waypoint waiting for approval); otherwise it pops the creation page with the pages above
+   it and leaves the field blank and not entered. `FlightplanListItem.clear` then ends the insert with
+   `onInsertDone(idx, null, null)`. The inner knob, typing, turning the cursor off and leaving the page
+   (`setEntered(false)`) pop the creation page too. The pages the editor pushes get `offerCreation: false`, so the REF
+   editors of SUP and INT keep `NO SUCH WPT`.
+10. `confirmCurrentValue()` starts confirmation directly. Used by `DirectToPage` (pre-filled from: the FPL 0 cursor
    waypoint → the Super NAV 5 target → the right waypoint page → the active waypoint, or the missed approach on a MAP
-   FROM leg → blank) and by FPL inserts from the REF page (`FplWptEnterMode.CONFIRM`).
+   FROM leg → blank) and by FPL inserts from the REF page (`FplWptEnterMode.CONFIRM`); the left cursor stays on until
+   the approval or rejection (#291).
 
 ### Dynamic lists pattern (FPL, OTH, APT 7/8)
 
@@ -1121,7 +1154,11 @@ export class Set3Page extends SixLineHalfPage {
   refreshes it.
 - Newly inserted rows carry `enterMe: FplWptEnterMode` (`ROTATE_LEFT`, `ROTATE_RIGHT`, `ENTER`, `CONFIRM`, `KEYBOARD`)
   so the new row is auto-entered after the rebuild.
-- FPL 0 keeps the active leg in view (4-8). `getVisibleLegsIndices()` feeds the D/T pages.
+- FPL 0 keeps the active leg in view (4-8), with the from waypoint on the page also when a procedure header lies between
+  it and the active waypoint (figure 6-43; a Direct To has no from waypoint, #239). `getVisibleLegsIndices()` feeds the
+  D/T pages.
+- `List.refresh` resets the scroll offset to the top. `FlightplanList.refresh` keeps it over a rebuild, clamped so that
+  the last waypoint stays in the last row, so an insertion leaves the page where it was (#319).
 
 ### Recipe: add a new page (as the existing code does it)
 

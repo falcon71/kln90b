@@ -393,6 +393,10 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - **`settle(unit)`** (`boot.ts`) advances the clock until the GPS has a solution, then two calculation ticks more, so that
   FPL 0 has activated and the display shows it (a force-ready boot is valid at once, but FPL 0 activates only at the first
   calculation tick). It throws when there is no fix within its cap (120 s by default).
+- **`untilCalcTick(unit)`** (`boot.ts`) advances the clock in display ticks until a calculation tick has run, so the next
+  is 750 to 1000 ms away. A test that asserts a state which lasts only until the next calculation tick (ARM after a Direct
+  To) performs its last action after it: each click of the steps before is a display tick, so without it the phase of the
+  calculation ticks moves with the click count and the test passes or fails by chance (#163, ModeControllerApproach).
 - **`NEAREST_SEARCH_WAIT_MS`** (`boot.ts`, 12 s) is how long a test advances the clock for the nearest lists to hold
   their result. The nearest lists and the airspace alert search every 10 s (`NearestList.ts`, `AirspaceAlert.ts`), so
   12 s leaves one search and the time its result needs; a wait below one search interval reads an empty list. Its
@@ -722,7 +726,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   is: `Conversions.ts` and `Wind.ts` follow avform, and an expectation computed from avform restates the code.
 - **Pin known bugs with `it.fails('... (#NN)')`.** The test states the correct behavior, fails today, and turns red when
   someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See
-  `turnDirection.test.ts` (#100) and `ActPage.test.ts` (#294).
+  `turnDirection.test.ts` (#100).
 - **Prove a pin by fixing the bug, and keep heavy setup out of it.** An `it.fails` test passes on *any* failure, so a
   broken precondition inside it (a boot that threw, a wrong key sequence) is invisible: the pin stays green for the
   wrong reason. Prove a pin by fixing the bug temporarily and seeing the test turn red, then restore. Where it is cheap,

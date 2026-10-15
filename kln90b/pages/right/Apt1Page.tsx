@@ -89,7 +89,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
         }
 
         this.children = new UIElementChildren<Apt1PageTypes>({
-            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage, this.getActiveArrowFplIdx()),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "A"),
@@ -247,6 +247,9 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            this.requiresRedraw = true;
+            return;
         }
         this.props.memory.aptPage.facility = this.facility;
         this.cursorController.setCursorActive(false);
@@ -260,6 +263,10 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            this.cursorController.setCursorActive(true); //this page replaced the one that offered the creation, with its cursor on
+            this.requiresRedraw = true;
+            return;
         }
         this.props.memory.aptPage.facility = this.facility;
         this.cursorController.setCursorActive(false);

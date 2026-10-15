@@ -21,7 +21,7 @@ export interface FlightplanListItemProps extends PageProps {
     wpt: Facility | null,
     onCreate: (idx: number, mode: FplWptEnterMode, keyboardKey?: string) => void,
     onDelete: (idx: number) => void,
-    onInsertDone: (idx: number, value: Facility | null, leg: KLNFlightplanLeg | null) => void,
+    onInsertDone: (idx: number, value: Facility | null, leg: KLNFlightplanLeg | null) => boolean, //false: refused with FPL FULL (#240)
     onBeforeDelete: (idx: number) => KLNErrorMessage | null,
     parent: SixLineHalfPage,
     cursorController: CursorController,
@@ -43,6 +43,8 @@ export class FlightplanListItem implements Field, ListItem {
     protected readonly readonlyRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     protected readonly delRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     private waypointEditor: WaypointEditor;
+    private insertRefused = false; //#240 the insert of the last confirmation was refused with FPL FULL
+    private refEntry = false; //#291 the reference waypoint of the REF page, from its confirmation until the entry is left
     private readonly type: KLNLegType;
     private readonly wptIdent: string;
 
@@ -58,6 +60,7 @@ export class FlightplanListItem implements Field, ListItem {
             ...props,
             value: this.wpt,
             enterCallback: this.setFacility.bind(this),
+            offerCreation: true, //#262 4-2: every flight plan page
         });
 
         this.type = this.props.leg?.type ?? KLNLegType.USER;
@@ -139,6 +142,7 @@ export class FlightplanListItem implements Field, ListItem {
             this.props.onCreate(this.props.wptIdx, FplWptEnterMode.ROTATE_LEFT);
             return true;
         }
+        this.leaveRefEntry(); //#291 3-28
         const handled = this.waypointEditor.innerLeft();
         this.isEntered = this.waypointEditor.isEntered;
         return handled;
@@ -155,6 +159,7 @@ export class FlightplanListItem implements Field, ListItem {
             this.props.onCreate(this.props.wptIdx, FplWptEnterMode.ROTATE_RIGHT);
             return true;
         }
+        this.leaveRefEntry(); //#291
         const handled = this.waypointEditor.innerRight();
         this.isEntered = this.waypointEditor.isEntered;
         return handled;
@@ -186,8 +191,14 @@ export class FlightplanListItem implements Field, ListItem {
                 return EnterResult.Handled_Keep_Focus;
             }
             const wasBlank = this.wpt === null;
+            this.insertRefused = false;
             const handled = await this.waypointEditor.enter();
             this.isEntered = this.waypointEditor.isEntered;
+            if (this.insertRefused) {
+                //4-4, C-1: nothing was added and the list is rebuilt as stored. The cursor stays where the refused
+                //entry was, on the waypoint the insert was in front of (#240)
+                return EnterResult.Handled_Keep_Focus;
+            }
             //The first ENT on a typed ident also leaves wpt null, but the editor still waits for the approval
             //(isEntered); only the confirmed blank ends the insert
             if (wasBlank && this.wpt === null && !this.waypointEditor.isEntered && handled === EnterResult.Handled_Move_Focus) {
@@ -200,6 +211,7 @@ export class FlightplanListItem implements Field, ListItem {
     }
 
     public confirmCurrentValue(): Promise<void> {
+        this.refEntry = true; //#291 only the REF page confirms a waypoint this way
         return this.waypointEditor.confirmCurrentValue();
     }
 
@@ -234,14 +246,46 @@ export class FlightplanListItem implements Field, ListItem {
 
     }
 
+    /**
+     * #291: this row is the reference waypoint of the REF page, whose approval is still pending
+     */
+    public isAwaitingRefApproval(): boolean {
+        return this.refEntry && this.waypointEditor.isWaitingForConfirmation();
+    }
+
+    /**
+     * #291: this row is the reference waypoint of the REF page, from its confirmation until the entry is left. It
+     * stays true while the approval is carried out.
+     */
+    public isRefEntry(): boolean {
+        return this.refEntry;
+    }
+
+    /**
+     * #291 3-28: typing over the waiting reference waypoint makes the row an ordinary new entry again. It is not in the
+     * plan, so it holds no waypoint and CLR must not ask DEL for it.
+     */
+    private leaveRefEntry(): void {
+        if (this.refEntry) {
+            this.refEntry = false;
+            this.wpt = null;
+        }
+    }
+
     clear(): boolean {
         if (this.wpt === null) {
             if (!this.waypointEditor.isEntered) {
                 return false;
             }
+            const wasWaitingForCreation = this.waypointEditor.isWaitingForCreation();
             //4-2 step 7: the waypoint page goes and the position is blank again (#310)
             const handled = this.waypointEditor.clear();
             this.isEntered = this.waypointEditor.isEntered;
+            if (wasWaitingForCreation && !this.waypointEditor.isWaitingForCreation()) {
+                //#262, checked in the KLN 89 trainer, 2026-10-15: CLR on the creation page ends the insert. Its row
+                //goes, or the blank position at the end is built again, and the cursor stays at its index
+                this.props.onInsertDone(this.props.wptIdx, null, null);
+            }
             return handled;
         }
         if (this.type === KLNLegType.APP) {
@@ -272,10 +316,14 @@ export class FlightplanListItem implements Field, ListItem {
 
     private setFacility(facility: Facility | null) {
         this.wpt = facility;
-        this.props.onInsertDone(this.props.wptIdx, facility, this.props.leg);
+        this.insertRefused = !this.props.onInsertDone(this.props.wptIdx, facility, this.props.leg);
     }
 
     public keyboard(key: string): boolean {
+        if (this.waypointEditor.refusesKey(key)) {
+            return false; //#374 a blank for the first cell: refused before a row is inserted or an edit is opened
+        }
+        this.leaveRefEntry(); //#291
         if (!this.isEntered) {
             //We need the normal logic to check if we can actually enter
             if (this.type === KLNLegType.APP) {

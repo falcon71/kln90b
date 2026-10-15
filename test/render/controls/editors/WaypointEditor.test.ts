@@ -1,4 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
+import {Facility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {blinkCycle} from '../../../harness/render/blink';
@@ -42,9 +43,12 @@ const world = () => ({
 /** The identifier row of the DIRECT TO page: three blanks, the five cells of the editor, three blanks */
 const dctIdent = () => Screen.read().rows('L')[2];
 
-/** D-> on a unit without an active waypoint: the DIRECT TO page with five blank cells under the cursor (3-27 rule 5) */
-async function blankDirectTo(): Promise<HeadlessUnit> {
-    const unit = await bootUnit(world());
+/**
+ * D-> on a unit without an active waypoint: the DIRECT TO page with five blank cells under the cursor (3-27 rule 5).
+ * `extra` adds facilities to the world
+ */
+async function blankDirectTo(extra: Facility[] = []): Promise<HeadlessUnit> {
+    const unit = await bootUnit({...world(), facilities: [...world().facilities, ...extra]});
     await unit.panel.selectPage('R', 'NAV 1');
     await unit.panel.dct();
     expect(unit.panel.focused('L')).toEqual({row: 2, col: 3, text: '     '}); // precondition
@@ -52,8 +56,8 @@ async function blankDirectTo(): Promise<HeadlessUnit> {
 }
 
 /**
- * The first inner click starts the entry. What the first cell shows after it is #311's subject (a blank today, an
- * A after the fix), so the knob tests do not start from it: they turn the first cell clockwise until it shows `ch`.
+ * The first inner click starts the entry and gives an A (#311). The knob tests start from the first cell showing `ch`:
+ * they turn it clockwise from there until it does.
  */
 async function startEntryAt(unit: HeadlessUnit, ch: string): Promise<void> {
     await unit.panel.inner('L', 1);
@@ -64,28 +68,22 @@ async function startEntryAt(unit: HeadlessUnit, ch: string): Promise<void> {
 }
 
 describe('waypoint editor, the knobs (3-14, 3-20)', () => {
-    // 3-20 step 3: the characters wrap around, with one blank between 9 and A
-    it('steps from A to the blank to 9 counterclockwise and back clockwise (3-20)', async () => {
+    // 3-20 step 3: from the second character on the blank lies between 9 and A (the first character has none, see the first-character
+    // tests below; checked in the KLN 89 trainer, 2026-10-15, #374). The fifth cell after K00 is blank; the character
+    // that follows the fourth is not offered an autocompletion
+    it('keeps the blank between 9 and A in the fifth character '
+        + '(3-20, checked in the KLN 89 trainer, 2026-10-15, #374)', async () => {
         const unit = await blankDirectTo();
-        await startEntryAt(unit, 'A');
-
+        await startEntryAt(unit, 'K');
+        await unit.panel.outer('L', 4);
         const seen: string[] = [];
-        for (const click of [-1, -1, 1, 1]) {
+
+        for (const click of [-1, 1, 1]) {
             await unit.panel.inner('L', click);
-            seen.push(dctIdent()[3]);
+            seen.push(dctIdent()[7]);
         }
 
-        expect(seen).toEqual([' ', '9', ' ', 'A']);
-    });
-
-    // 3-20: letters and digits wrap around: Z is followed by 0 (the blank lies between 9 and A only)
-    it('steps from Z to 0 clockwise (3-20)', async () => {
-        const unit = await blankDirectTo();
-        await startEntryAt(unit, 'Z');
-
-        await unit.panel.inner('L', 1);
-
-        expect(dctIdent()[3]).toBe('0');
+        expect(seen).toEqual(['9', ' ', 'A']);
     });
 
     // 3-14 step 6 and 3-21: after each character the unit offers the first identifier in the database that begins with
@@ -123,13 +121,69 @@ describe('waypoint editor, the knobs (3-14, 3-20)', () => {
     });
 });
 
+describe('waypoint editor, the first character (checked in the KLN 89 trainer, 2026-10-15, #374)', () => {
+    // 3-20 step 3 puts a blank between 9 and A for the general wheel. The first character of the ident has none: in the
+    // KLN 89 trainer (2026-10-15, #374) it ran A to Z, 0 to 9 and back to A in the D-> field, in an FPL 0 insert and at
+    // the FPL 0 end position (Z to 0, 9 to A, and A to 9, 0 to Z counterclockwise). The other cells keep the blank (the
+    // test of the fifth character below)
+    it('steps from A to 9 counterclockwise and from 9 to A clockwise, with no blank in the first character '
+        + '(checked in the KLN 89 trainer, 2026-10-15, #374)', async () => {
+        const unit = await blankDirectTo();
+        await startEntryAt(unit, 'A');
+
+        await unit.panel.inner('L', -1);
+        const below = dctIdent()[3];
+        await unit.panel.inner('L', 1);
+
+        expect([below, dctIdent()[3]]).toEqual(['9', 'A']);
+    });
+
+    // The same trainer check, a whole turn: from A clockwise every character once, none of them a blank. The characters
+    // that no identifier of the world begins with blank the rest, so only the first cell is read
+    it('turns through the 36 characters of the first character with no blank '
+        + '(checked in the KLN 89 trainer, 2026-10-15, #374)', async () => {
+        const unit = await blankDirectTo();
+        await startEntryAt(unit, 'A');
+        let seen = '';
+
+        for (let click = 0; click < 36; click++) {
+            await unit.panel.inner('L', 1);
+            seen += dctIdent()[3];
+        }
+
+        expect(seen).toBe('BCDEFGHIJKLMNOPQRSTUVWXYZ0123456789A');
+    });
+
+    // 3-20: letters and digits wrap around: Z is followed by 0 (checked in the KLN 89 trainer, 2026-10-15, for the first
+    // character)
+    it('steps from Z to 0 clockwise (checked in the KLN 89 trainer, 2026-10-15, #374)', async () => {
+        const unit = await blankDirectTo();
+        await startEntryAt(unit, 'Z');
+
+        await unit.panel.inner('L', 1);
+
+        expect(dctIdent()[3]).toBe('0');
+    });
+
+    // The same wheel counterclockwise: 0 is followed by Z
+    it('steps from 0 to Z counterclockwise (checked in the KLN 89 trainer, 2026-10-15, #374)', async () => {
+        const unit = await blankDirectTo();
+        await startEntryAt(unit, '0');
+
+        await unit.panel.inner('L', -1);
+
+        expect(dctIdent()[3]).toBe('Z');
+    });
+});
+
 // 3-14 says an editor is entered by turning the inner knob, and the KLN 89 trainer (2026-10-08, T6) shows what the
 // first click does: it puts an A in the first cell and offers the first identifier that begins with A, as it does for a
 // blank DIRECT TO field, a blank FPL 0 position and an inserted FPL position. The 90B has no SET 5 (the 89's default
-// first character), so the 89's A is taken for the 90B. The editor starts over blank cells instead.
-describe('waypoint editor, the first inner click (3-14, checked in the KLN 89 trainer, 2026-10-08)', () => {
+// first character), so the 89's A is taken for the 90B. The first click counterclockwise gives a 9 and the first
+// identifier that begins with 9 (checked in the KLN 89 trainer, 2026-10-15)
+describe('waypoint editor, the first inner click (3-14, checked in the KLN 89 trainer, 2026-10-08 and 2026-10-15)', () => {
     // The sibling below holds the setup (the same click on the same page)
-    it.fails('shows an A and the first identifier that begins with A after the first click '
+    it('shows an A and the first identifier that begins with A after the first click '
         + '(3-14, checked in the KLN 89 trainer, 2026-10-08, #311)', async () => {
         const unit = await blankDirectTo();
 
@@ -138,10 +192,31 @@ describe('waypoint editor, the first inner click (3-14, checked in the KLN 89 tr
         expect(dctIdent()).toBe('   ALF     ');
     });
 
+    // The same click the other way round (checked in the KLN 89 trainer, 2026-10-15, evening block, #311): a 9 and the
+    // first identifier that begins with 9. The airport 9A4 is added to the world; the others begin with letters
+    it('shows a 9 and the first identifier that begins with 9 after the first click counterclockwise '
+        + '(checked in the KLN 89 trainer, 2026-10-15, #311)', async () => {
+        const unit = await blankDirectTo([airport('9A4', 47.9, 8.0)]);
+
+        await unit.panel.inner('L', -1);
+
+        expect(dctIdent()).toBe('   9A4     ');
+    });
+
+    // The same, in a world where no identifier begins with 9: the 9 shows and the other cells are blank
+    it('shows a 9 and blanks after the first click counterclockwise when no identifier begins with 9 '
+        + '(checked in the KLN 89 trainer, 2026-10-15, #311)', async () => {
+        const unit = await blankDirectTo();
+
+        await unit.panel.inner('L', -1);
+
+        expect(dctIdent()).toBe('   9       ');
+    });
+
     // 3-14: the inner knob over an editor starts the entry with the first character under the cursor (it
     // flashes, the other cells stay inverted). The ent annunciation is shown at this point in the KLN 89 trainer
     // (2026-10-08, its Ent prompt while an edit is open); the 90B figures show ent only for a complete identifier
-    // (figure 3-45). Only the flashing cell is asserted, not the run's text (the pin's subject)
+    // (figure 3-45). Only the flashing cell is asserted, not the run's text (the test above)
     it('starts the entry under the cursor with the first click (3-14)', async () => {
         const unit = await blankDirectTo();
 
@@ -305,6 +380,24 @@ describe('waypoint editor on FPL 0 (4-2)', () => {
     });
 });
 
+describe('waypoint editor on FPL 0, the first inner click (4-2, checked in the KLN 89 trainer, 2026-10-15)', () => {
+    // The end position of FPL 0 behaves as the D-> field does (the evening block of 2026-10-15): the first click
+    // clockwise gives an A and the first identifier that begins with A (the VOR ALF sorts before the airport AMID)
+    it('shows an A and the first identifier that begins with A at the blank end position after the first click '
+        + '(checked in the KLN 89 trainer, 2026-10-15, #311)', async () => {
+        const unit = await bootUnit({...world(), storage: savedFlightplan(0, [kaaa()])});
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1);
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: '     '}); // precondition
+
+        await unit.panel.inner('L', 1);
+
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['  1:KAAA   ', '  2:ALF    ']);
+    });
+});
+
 describe('waypoint editor on FPL 0, CLR on a blank position (characterization)', () => {
     // 4-2 step 7 has CLR reject the typed identifier of a waypoint page. What follows is the code's behavior, not shown
     // by the manual: on an insert in front of a waypoint the ENT that confirms the blank ends the insert, the row goes,
@@ -401,20 +494,128 @@ describe('waypoint editor on the REF page (C-2)', () => {
 });
 
 describe('waypoint editor with an unknown identifier', () => {
-    // The KLN 89 trainer (2026-10-07): an identifier that is not in the database, entered with D->, offers the creation
-    // of a user waypoint (#262, pinned on the DIRECT TO and FPL 0 pages with the knobs). Here the identifier is typed
-    // with the keyboard, which reaches the same check (WaypointEditor.enter). Sibling: the characterization of the
-    // keyboard path below
-    it.fails('offers to create a user waypoint for an identifier typed with the keyboard '
-        + '(checked in the KLN 89 trainer, 2026-10-07, #262)', async () => {
+    // The KLN 89 trainer (2026-10-07, 2026-10-15) showed the creation offer with the knobs: an identifier that is not
+    // in the database, entered with D->, offers the creation of a user waypoint on the right page, and the D-> field
+    // keeps the ident. The 89 has no keyboard path, so this one is a characterization: the identifier typed with the
+    // keyboard reaches the same check (WaypointEditor.enter). The knob path is held by the DIRECT TO and FPL page tests
+    it('offers to create a user waypoint for an identifier typed with the keyboard '
+        + '(characterization of the keyboard path, #262)', async () => {
         const unit = await blankDirectTo();
+        const messages = collectStatusMessages(unit);
+        await unit.panel.type('L', 'QQQQ');
+        const nav1 = Screen.read().rows('R');
+
+        await unit.panel.ent();
+
+        expect(messages).not.toContain('NO SUCH WPT');
+        expect(Screen.read().rows('R')).not.toEqual(nav1); // the right page is replaced
+        expect(dctIdent()).toBe('   QQQQ    ');
+    });
+
+    // The maintainer's ruling on #262: the creation page on D-> is the SUP page in its creation state
+    it('shows the creation rows of the SUP page for an identifier typed with the keyboard (characterization, #262)', async () => {
+        const unit = await blankDirectTo();
+        await unit.panel.type('L', 'QQQQ');
+
+        await unit.panel.ent();
+
+        expect(Screen.read().rows('R')).toEqual([
+            ' QQQQ      ', '           ', 'CREATE NEW ', 'WPT AT:    ', 'USER POS?  ', 'PRES POS?  ',
+        ]);
+    });
+
+    // The maintainer's ruling on #262: only the flight plan pages and D-> offer the creation; the other hosts of the
+    // editor answer NO SUCH WPT, as REF does (C-2). TRI 3 stands for them
+    it('posts NO SUCH WPT on TRI 3, which offers no creation (characterization, #262)', async () => {
+        const unit = await bootUnit(world());
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.selectPage('L', 'TRI 3');
+        await vi.advanceTimersByTimeAsync(6000); // the status line messages of the page change
+        await unit.panel.cursor('L');
         const messages = collectStatusMessages(unit);
         await unit.panel.type('L', 'QQQQ');
 
         await unit.panel.ent();
 
-        expect(messages).not.toContain('NO SUCH WPT');
-        expect(Screen.read().rows('R').slice(2, 4)).toEqual(['CREATE NEW ', 'WPT AT:    ']);
+        expect(messages).toEqual(['NO SUCH WPT']);
+        expect(Screen.read().status().right).toBe('NAV 1');
+    });
+});
+
+// The first character offers no blank on the knob (#374), so the keyboard does not take one either. The 89 has no
+// keyboard, and only an aircraft's H event can send a blank (the PC keyboard path passes A to Z and 0 to 9), so these
+// are characterizations
+describe('waypoint editor, a blank typed into the first character (characterization, #374)', () => {
+    const BLANK_KEY = 'KLN90B_Internal_Key:LEFT: ';
+
+    // The key is refused before the edit opens: nothing is half-entered, the field is still the idle blank field and
+    // the status line shows no ent
+    it('rejects the key on an idle field and leaves no open edit (characterization, #374)', async () => {
+        const unit = await blankDirectTo();
+
+        await unit.panel.press(BLANK_KEY);
+
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 3, text: '     '});
+        expect(Screen.read().status().mode.split(' ')).not.toContain('ent'); // an open edit shows ent
+    });
+
+    // The cursor is on the first character of an open edit: the key changes nothing
+    it('rejects the key on the first character of an open edit (characterization, #374)', async () => {
+        const unit = await blankDirectTo();
+        await startEntryAt(unit, 'K');
+
+        await unit.panel.press(BLANK_KEY);
+
+        expect(dctIdent()).toBe('   K00     ');
+    });
+
+    /** FPL 0 holds KAAA; the left cursor is on `onBlankEnd ? the blank end position : KAAA` */
+    async function fpl0WithCursor(onBlankEnd: boolean): Promise<HeadlessUnit> {
+        const unit = await bootUnit({...world(), storage: savedFlightplan(0, [kaaa()])});
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        if (onBlankEnd) {
+            await unit.panel.outer('L', 1);
+            expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: '     '}); // precondition
+        } else {
+            await unit.panel.cursorTo('L', 'KAAA');
+        }
+        return unit;
+    }
+
+    // An FPL row opens its edit itself before it hands the key to the editor, so the refusal is asked first: nothing is
+    // entered, no row is inserted and the status line shows no ent
+    it('rejects the key at the blank end position of FPL 0, entering nothing (characterization, #374)', async () => {
+        const unit = await fpl0WithCursor(true);
+
+        await unit.panel.press(BLANK_KEY);
+
+        expect(Screen.read().rows('L').slice(1, 4)).toEqual(['  1:KAAA   ', '  2:       ', '           ']);
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: '     '});
+        expect(Screen.read().status().mode.split(' ')).not.toContain('ent');
+    });
+
+    // The same on a waypoint: the key would insert an entry in front of it
+    it('rejects the key on a waypoint of FPL 0, inserting nothing (characterization, #374)', async () => {
+        const unit = await fpl0WithCursor(false);
+
+        await unit.panel.press(BLANK_KEY);
+
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['  1:KAAA   ', '  2:       ']);
+        expect(fplIdents(unit)).toEqual(['KAAA']);
+        expect(Screen.read().status().mode.split(' ')).not.toContain('ent');
+    });
+
+    // The characters after the first still take a blank
+    it('takes the key on the second character (characterization, #374)', async () => {
+        const unit = await blankDirectTo();
+        await startEntryAt(unit, 'K');
+        await unit.panel.outer('L', 1);
+
+        await unit.panel.press(BLANK_KEY);
+
+        expect(dctIdent().slice(3, 6)).toBe('K  ');
     });
 });
 
@@ -532,5 +733,24 @@ describe('waypoint editor (characterization)', () => {
 
         expect(dctIdent()).toBe('   QQQQ    ');
         expect(Screen.read().status().right).toBe('NAV 1');
+    });
+});
+
+// The KLN 89 trainer (2026-10-15): the outer knob moves the cursor past a blank cell of a short ident in the D-> field,
+// and a character entered there stays in its cell with the blank before it, with no autofill (#343). The creation that
+// follows is #262's subject
+describe('waypoint editor, a character after a blank cell (#343)', () => {
+    it('keeps the blank before a character entered after it, without an autofill '
+        + '(checked in the KLN 89 trainer, 2026-10-15, #343)', async () => {
+        const unit = await bootUnit({facilities: [airport('AB', 47.2, 8.0), airport('ABA', 47.3, 8.0)], position: {lat: 47.0, lon: 8.0}});
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.dct();
+        await startEntryAt(unit, 'A');
+        await unit.panel.outer('L', 3); // past the B, onto the fourth cell
+        expect(dctIdent()).toBe('   AB      '); // precondition: AB, the cursor on the fourth cell
+
+        await unit.panel.inner('L', 1);
+
+        expect(dctIdent()).toBe('   AB A    ');
     });
 });

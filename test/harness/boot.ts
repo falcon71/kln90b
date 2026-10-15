@@ -397,6 +397,24 @@ export async function settle(unit: HeadlessUnit, capSeconds = 120): Promise<void
 }
 
 /**
+ * Advances the clock in display ticks (250 ms) until a calculation tick has run, so the next one is 750 to 1000 ms away.
+ * A test that asserts a state which lasts only until the next calculation tick (ARM after a Direct To, say) performs its
+ * last action here: without it the phase of the calculation ticks depends on how many clicks the steps before took (each
+ * is a display tick), and a changed click count makes the test pass or fail by chance.
+ */
+export async function untilCalcTick(unit: HeadlessUnit): Promise<void> {
+    const spy = vi.spyOn(unit.props.sensors, 'tick');
+    try {
+        for (let i = 0; spy.mock.calls.length === 0; i++) {
+            if (i >= 4) throw new Error('untilCalcTick: no calculation tick within one second');
+            await vi.advanceTimersByTimeAsync(250);
+        }
+    } finally {
+        spy.mockRestore();
+    }
+}
+
+/**
  * Moves the aircraft of a render test so that the GPS computes a track (Gps.ts takes it from the last two positions
  * when the ground speed is at least 2 kt, 3-35). Without trackTrue the track is that of the jump from the present
  * position; with it, the aircraft first jumps to a point 0.05 NM behind the target on that track. Each jump is followed

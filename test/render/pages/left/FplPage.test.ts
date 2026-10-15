@@ -3,13 +3,15 @@ import {Facility, FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {muteConsoleError} from '../../../harness/console';
-import {fplIdents} from '../../../harness/readers';
+import {fplIdents, userWaypoints} from '../../../harness/readers';
+import {collectStatusMessages} from '../../../harness/statusLine';
 import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
-import {savedFlightplan, storedSetting} from '../../../harness/storage';
+import {savedFlightplan, savedUserWaypoints, storedSetting} from '../../../harness/storage';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, sid, withProcedures} from '../../../harness/navdata/procedures';
 import {approachWorld} from '../../../harness/fixtures';
 import {pointFrom} from '../../../harness/flight/geo';
+import {blinkCycle} from '../../../harness/render/blink';
 
 /** Seven waypoints north-east of KAAA. Idents sort before the default navdata (ZZXA, ZZV, ZZN, ZZXIN) */
 function route7(): Facility[] {
@@ -194,8 +196,9 @@ async function bootWithApproach() {
 
 describe('FPL 0 page with an approach', () => {
     // Characterization: after a Direct To to the IAF the page follows the active waypoint with the approach header in its
-    // top row (the from waypoint scrolled off, #239). The cursor comes on at that top visible entry (T23, #355), the
-    // header, which then reads CHANGE APR? and asks for ENT (6-7). The guide does not show this case
+    // top row: a Direct To has no from waypoint in the plan to keep on the page (#239). The cursor comes on at that
+    // top visible entry (T23, #355), the header, which then reads CHANGE APR? and asks for ENT (6-7). The guide does not
+    // show this case
     it('characterization: turns the cursor on at the approach header in the top row, which reads CHANGE APR?', async () => {
         const unit = await bootWithApproach();
         await unit.panel.selectPage('L', 'FPL 0');
@@ -351,8 +354,9 @@ describe('FPL 0 page with a SID', () => {
 
 // 4-7: the tail of the active leg symbol stands left of the from waypoint; 4-8: the page follows the active leg.
 // Figure 6-43 (6-23) shows the from waypoint above a procedure header with the tail, the header, and
-// the active waypoint with the head below it. The unit scrolls to the row above the active waypoint, which is the
-// header, and the from waypoint leaves the page
+// the active waypoint with the head below it. The unit follows the figure: it scrolls so that the from waypoint is
+// on the page, not to the header (#239). The KLN 89 trainer differs here, it shows the header in the top row (checked
+// in the KLN 89 trainer, 2026-10-15), and the 90B follows the figure
 describe('FPL 0 page, the active leg across a procedure header', () => {
     async function bootOnTheFirstApproachLeg() {
         const w = approachWorld();
@@ -378,7 +382,7 @@ describe('FPL 0 page, the active leg across a procedure header', () => {
         expect(left().filter(r => r.startsWith('À'))).toEqual(['À 2 IAFAAà ']);
     });
 
-    it.fails('shows the from waypoint with the tail above the header (4-7, 4-8, 6-23, #239)', async () => {
+    it('shows the from waypoint with the tail above the header (4-7, 4-8, 6-23, #239)', async () => {
         const unit = await bootOnTheFirstApproachLeg();
 
         const rows = left();
@@ -668,29 +672,30 @@ const FIXES31 = () => Array.from({length: 31}, (_, i) => intersection(`FA${Strin
 
 describe('FPL 1 to FPL 25 pages, a full plan', () => {
     /**
-     * Boots with FPL 5 full, walks the cursor to the 30th waypoint, opens an insert in front of it with the inner knob,
-     * enters FA30 there and confirms it on the waypoint page. The unit logs the refused insert with console.error, which
-     * the test keeps out of its output.
+     * Boots with FPL 5 full, walks the cursor to waypoint `n` (the 30th by default), opens an insert in front of it with
+     * the inner knob, enters FA30 there and confirms it on the waypoint page. The unit logs the refused insert with
+     * console.error, which the test keeps out of its output.
      */
-    async function insertIntoFullFpl5() {
+    async function insertIntoFullFpl5(n = 30) {
         muteConsoleError();
         const fixes = FIXES31();
+        const ident = `FA${String(n - 1).padStart(2, '0')}`; // waypoint n of the plan
         const unit = await bootUnit({facilities: fixes, position: {lat: 46.5, lon: 8}, storage: savedFlightplan(5, fixes.slice(0, 30))});
         await settle(unit);
         await unit.panel.selectPage('L', 'FPL 5');
         await unit.panel.cursor('L');
-        await unit.panel.outer('L', 31); // USE? INVRT?, then the 30 waypoints
-        expect(left()[5]).toBe(' 30:FA29   '); // Precondition
-        expect(unit.panel.focused('L').text).toBe('FA29 '); // Precondition
-        await unit.panel.inner('L', 1); // the insert in front of FA29
-        expect(left()[5]).toBe(' 31:FA29   '); // Precondition: FA29 moved down to make room, so an insert is open
-        // The new entry is number 30. It is found by its number and not by its text (the text of the first click is
-        // #311), and it is not on the page yet while the cursor stands on the waypoint before it
-        const cursorOnEntry = () => cursorRows().length === 1 && /^\s*30:/.test(left()[cursorRows()[0]]);
-        if (!cursorOnEntry()) {
-            // The cursor stays on the waypoint before the new entry (#242); one click moves it on
-            await unit.panel.outer('L', 1);
+        await unit.panel.outer('L', n + 1); // USE? INVRT?, then the waypoints up to n
+        if (n === 30) {
+            expect(left()[5]).toBe(' 30:FA29   '); // Precondition
         }
+        expect(unit.panel.focused('L').text).toBe(`${ident} `); // Precondition
+        await unit.panel.inner('L', 1); // the insert in front of it
+        if (n === 30) {
+            expect(left()[5]).toBe(' 31:FA29   '); // Precondition: FA29 moved down to make room, so an insert is open
+        }
+        // The new entry takes the number n. It is found by its number and not by its text (the first click gives an A and
+        // the first identifier that begins with it, #311)
+        const cursorOnEntry = () => cursorRows().length === 1 && new RegExp(`^\\s*${n}:`).test(left()[cursorRows()[0]]);
         expect(cursorOnEntry()).toBe(true); // Precondition: the cursor is on the new entry
         await unit.panel.enterIdent('L', 'FA30');
         await unit.panel.ent(); // the waypoint page
@@ -727,15 +732,31 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // The refused waypoint stays on the page as a row until the page is left: the entry that held it is not removed
-    // from the list. The sibling above holds that the plan itself is unchanged. The cursor is walked over the whole page,
-    // to the top and back to the end, so the walk does not depend on where the cursor stands
-    it.fails('does not show the refused waypoint after FPL FULL (4-4, C-1, #240)', async () => {
+    // The refused waypoint is not shown after FPL FULL: the list is rebuilt from the plan as stored (#240). The sibling
+    // above holds that the plan itself is unchanged. The cursor is walked over the whole page, to the top and back to
+    // the end, so the walk does not depend on where the cursor stands
+    it('does not show the refused waypoint after FPL FULL (4-4, C-1, #240)', async () => {
         const unit = await insertIntoFullFpl5();
 
         const rows = numbered(await walkRows(unit, 40));
         const expectedIdent = (n: number) => `FA${String(n - 1).padStart(2, '0')}`;
         expect(rows.filter(r => r.ident !== expectedIdent(r.n))).toEqual([]);
+    });
+
+    // After FPL FULL the cursor goes back to the waypoint the insert was in front of (#240)
+    it('keeps the cursor on the waypoint the refused insert was in front of (characterization, #240)', async () => {
+        const unit = await insertIntoFullFpl5();
+
+        expect(unit.panel.focused('L').text).toBe('FA29 ');
+    });
+
+    // The same in the middle of the plan: the cursor is on waypoint 10, FA09, which the refused insert was in front of,
+    // and not on the waypoint behind it (#240)
+    it('keeps the cursor on the waypoint the refused insert was in front of, in the middle of the plan (characterization, #240)', async () => {
+        const unit = await insertIntoFullFpl5(10);
+
+        expect(Screen.read().status().mode).toBe('FPL FULL');
+        expect(unit.panel.focused('L').text).toBe('FA09 ');
     });
 
     // 4-4: the plan holds 30 waypoints. The walk is a fixed number of outer clicks over the fields of the page
@@ -752,8 +773,8 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
     });
 
     // 4-4: only a plan of fewer than 30 offers a blank position for another waypoint; the KLN 89 trainer (2026-10-07)
-    // shows no blank position behind the last waypoint of a full plan and no cursor field there either
-    it.fails('shows no blank position after the 30th waypoint (4-4, checked in the KLN 89 trainer, 2026-10-07, #241)', async () => {
+    // shows no blank position behind the last waypoint of a full plan and no cursor field there either (#241)
+    it('shows no blank position after the 30th waypoint (4-4, checked in the KLN 89 trainer, 2026-10-07, #241)', async () => {
         const fixes = FIXES31();
         const unit = await bootUnit({facilities: fixes, position: {lat: 46.5, lon: 8}, storage: savedFlightplan(5, fixes.slice(0, 30))});
         await settle(unit);
@@ -764,13 +785,25 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
 
         expect(seen.filter(r => r.startsWith(' 31:'))).toEqual([]);
     });
+
+    // 4-3 step 10 and figure 4-9: with more than five waypoints the page shows the first four and then the last one.
+    // The last row shows the last waypoint, the 30th of a full plan, which has no blank position below it (#241)
+    it('shows the 30th waypoint in the last row of a full plan (4-3)', async () => {
+        const fixes = FIXES31();
+        const unit = await bootUnit({facilities: fixes, position: {lat: 46.5, lon: 8}, storage: savedFlightplan(5, fixes.slice(0, 30))});
+        await settle(unit);
+        await unit.panel.selectPage('L', 'FPL 5');
+        await unit.panel.cursor('L');
+
+        expect(left()[5]).toBe(' 30:FA29   ');
+    });
 });
 
 describe('inserting a waypoint with the inner knob', () => {
     // 4-4 (figures 4-15 and 4-16, which show FPL 0): the inner knob on a waypoint opens an entry in front of it, the
     // waypoint moves down one position, and the cursor is on the new entry. The row of the new entry is looked up by
-    // its number, not by its text (the first click shows a blank, which #311 says is wrong): the page scrolls when the
-    // list is rebuilt
+    // its number, not by its text (the first click gives an A and the first identifier that begins with it, #311): the
+    // page scrolls when the list is rebuilt
     it('puts the cursor on the new entry when the inner knob opens an insert on FPL 0 (4-4)', async () => {
         const unit = await bootRoute(savedFlightplan(0, route7()));
         await unit.panel.selectPage('L', 'FPL 0');
@@ -798,8 +831,8 @@ describe('inserting a waypoint with the inner knob', () => {
 
     // 4-4: the inner knob can insert into any plan below the 30-waypoint limit, not only into FPL 0: it opens an entry
     // in front of the waypoint under the cursor and the waypoint moves down. This holds the insert of the numbered
-    // plan, by the number of the new entry and not by its text (the first click shows a blank, which #311 says is
-    // wrong); the cursor on it is the pin below
+    // plan, by the number of the new entry and not by its text (the first click gives an A and the first identifier that
+    // begins with it, #311); the cursor on it is held by the test below
     it('opens an entry in front of the waypoint when the inner knob turns on a numbered plan (4-4)', async () => {
         const unit = await cursorOnAbcOfFpl3();
 
@@ -809,9 +842,9 @@ describe('inserting a waypoint with the inner knob', () => {
         expect(left()[3]).toBe('  3:ABC    ');
     });
 
-    // 4-4 puts the cursor on the entry being typed, whichever plan it is. On a numbered plan with waypoints it stays
-    // on the waypoint before the new entry, which is open for typing but not under the cursor
-    it.fails('puts the cursor on the new blank entry when the inner knob opens an insert on a numbered plan (4-4, #242)', async () => {
+    // 4-4 puts the cursor on the entry being typed, whichever plan it is: on a numbered plan with waypoints too, the
+    // cursor is on the new blank entry (#242)
+    it('puts the cursor on the new blank entry when the inner knob opens an insert on a numbered plan (4-4, #242)', async () => {
         const unit = await cursorOnAbcOfFpl3();
 
         await unit.panel.inner('L', 1);
@@ -820,18 +853,36 @@ describe('inserting a waypoint with the inner knob', () => {
     });
 });
 
-describe('FPL 0 page, an ident that is not in the database', () => {
-    /** The cursor on the blank position behind the plan, the right side on APT 1 (which shows no creation rows) */
-    async function cursorOnBlankPosition() {
-        const unit = await bootRoute(savedFlightplan(0, route7()));
-        await unit.panel.selectPage('R', 'APT 1');
-        await unit.panel.selectPage('L', 'FPL 0');
-        await unit.panel.cursor('L');
-        await unit.panel.outer('L', 7); // from waypoint 1 to the position behind waypoint 7
-        expect(unit.panel.focused('L').text.trim()).toBe(''); // Precondition: the blank position
-        return unit;
-    }
 
+/** The cursor on the blank position behind the plan, the right side on APT 1 (which shows no creation rows) */
+async function cursorOnBlankPosition() {
+    const unit = await bootRoute(savedFlightplan(0, route7()));
+    await unit.panel.selectPage('R', 'APT 1');
+    await unit.panel.selectPage('L', 'FPL 0');
+    await unit.panel.cursor('L');
+    await unit.panel.outer('L', 7); // from waypoint 1 to the position behind waypoint 7
+    expect(unit.panel.focused('L').text.trim()).toBe(''); // Precondition: the blank position
+    return unit;
+}
+
+/** The rows of the SUP page that offers to create QQQQ (5-16, CreateWaypointMessage) */
+const CREATION_ROWS = [' QQQQ      ', '           ', 'CREATE NEW ', 'WPT AT:    ', 'USER POS?  ', 'PRES POS?  '];
+
+/**
+ * The masks of the ident cells under the left cursor over a blink cycle, sorted. A waypoint that waits for its approval
+ * flashes on one display tick in four (3-14): FFFFF, IIIII, IIIII, IIIII
+ */
+async function identMasksOverBlink(): Promise<string[]> {
+    const row = cursorRows()[0];
+    const masks = await blinkCycle(() => Screen.read().maskRows('L')[row].slice(4, 9));
+    return masks.slice().sort();
+}
+const FLASHING = ['FFFFF', 'IIIII', 'IIIII', 'IIIII'];
+
+const route7Idents = () => route7().map(f => f.icaoStruct.ident);
+const userIdents = (unit: HeadlessUnit) => userWaypoints(unit).map(w => w.icaoStruct.ident);
+
+describe('FPL 0 page, an ident that is not in the database', () => {
     // 4-2: an ident that is not in the database, entered on the flight plan page, leads to the page that creates a user
     // waypoint. The sibling holds the entry up to ENT: QQQQ is in no database of the test world
     it('shows the typed unknown ident on FPL 0 (4-2)', async () => {
@@ -843,13 +894,364 @@ describe('FPL 0 page, an ident that is not in the database', () => {
         expect(Screen.read().rows('R')[2]).not.toBe('CREATE NEW '); // Precondition: the right side shows no creation rows yet
     });
 
-    it.fails('offers to create a user waypoint for an unknown ident (4-2, #262)', async () => {
+    // 4-2: ENT on an ident in no database brings up the page that creates a user waypoint of that name; 5-16 gives its
+    // rows, CREATE NEW WPT AT: with USER POS? and PRES POS?
+    it('offers to create a user waypoint for an unknown ident (4-2, 5-16, #262)', async () => {
+        const unit = await cursorOnBlankPosition();
+        const messages = collectStatusMessages(unit);
+        await unit.panel.enterIdent('L', 'QQQQ');
+
+        await unit.panel.ent();
+
+        expect(messages).not.toContain('NO SUCH WPT');
+        expect(Screen.read().rows('R')).toEqual(CREATION_ROWS);
+    });
+
+    // The KLN 89 trainer (2026-10-15): while the creation choices show, the flight plan keeps the typed ident at the
+    // position, with the cursor on it
+    it('keeps the typed ident on FPL 0 while the creation page shows (checked in the KLN 89 trainer, 2026-10-15, #262)', async () => {
         const unit = await cursorOnBlankPosition();
         await unit.panel.enterIdent('L', 'QQQQ');
 
         await unit.panel.ent();
 
-        expect(Screen.read().status().mode).not.toBe('NO SUCH WPT');
-        expect(Screen.read().rows('R').slice(2, 4)).toEqual(['CREATE NEW ', 'WPT AT:    ']);
+        expect(left()[5]).toBe('  8:QQQQ   ');
+        expect(cursorRows()).toEqual([5]);
+    });
+
+    // The creation page comes up with the right cursor on, over USER POS?, so that the next ENT goes to it
+    it('puts the right cursor on USER POS? of the creation page (characterization, #262)', async () => {
+        const unit = await cursorOnBlankPosition();
+        await unit.panel.enterIdent('L', 'QQQQ');
+
+        await unit.panel.ent();
+
+        expect(Screen.read().status().right).toBe('CRSR');
+        expect(unit.panel.focused('R').text).toBe('USER POS?');
+    });
+});
+
+describe('FPL pages, creating a user waypoint for an unknown ident', () => {
+    // The KLN 89 trainer (2026-10-15): the waypoint created for an unknown ident is inserted only after the approval
+    // of its page, and the cursor moves on to the next blank position (#262)
+    it('inserts the created waypoint after its approval (checked in the KLN 89 trainer, 2026-10-15, #262)', async () => {
+        const unit = await cursorOnBlankPosition();
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent(); // the creation page
+        await unit.panel.cursorTo('R', 'PRES POS?');
+
+        await unit.panel.ent(); // creates QQQQ; its page waits for approval
+        expect(userIdents(unit)).toContain('QQQQ');
+        expect(fplIdents(unit, 0)).toEqual(route7Idents()); // not inserted yet
+
+        await unit.panel.ent();
+
+        expect(fplIdents(unit, 0)).toEqual([...route7Idents(), 'QQQQ']);
+        expect(unit.panel.focused('L').text.trim()).toBe('');
+    });
+
+    // The approval page of the created waypoint is its SUP page, and the ident on the left flashes while it waits, as for
+    // a database waypoint (characterization, #262)
+    it('shows the SUP page of the created waypoint for approval (characterization, #262)', async () => {
+        const unit = await cursorOnBlankPosition();
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', 'PRES POS?');
+
+        await unit.panel.ent();
+
+        expect(Screen.read().status().right).toBe('SUP');
+        expect(Screen.read().rows('R')[0].trim()).toBe('QQQQ');
+        expect(await identMasksOverBlink()).toEqual(FLASHING);
+    });
+
+    /** The cursor on ABC, waypoint 2 of FPL 0, the right side on APT 1; the inner knob opens an entry in front of ABC */
+    async function insertInFrontOfAbc() {
+        const unit = await bootRoute(savedFlightplan(0, route7()));
+        await unit.panel.selectPage('R', 'APT 1');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1);
+        expect(unit.panel.focused('L').text).toBe('ABC  '); // Precondition
+        await unit.panel.inner('L', 1);
+        await unit.panel.enterIdent('L', 'QQQQ');
+        return unit;
+    }
+
+    // The KLN 89 trainer (2026-10-15): created in front of a waypoint, the new waypoint is inserted at that position
+    // after its approval, and the cursor is on the waypoint that follows it
+    it('inserts the created waypoint in front of the waypoint under the cursor (checked in the KLN 89 trainer, 2026-10-15, #262)', async () => {
+        const unit = await insertInFrontOfAbc();
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', 'PRES POS?');
+        await unit.panel.ent();
+
+        await unit.panel.ent();
+
+        const idents = route7Idents();
+        expect(fplIdents(unit, 0)).toEqual([idents[0], 'QQQQ', ...idents.slice(1)]);
+        expect(unit.panel.focused('L').text).toBe('ABC  ');
+    });
+
+    // The KLN 89 trainer (2026-10-15): CLR on the creation choices creates nothing; a blank position at the end of the
+    // plan stays and keeps the cursor
+    it('creates nothing after CLR on the creation page, the blank position keeping the cursor (checked in the KLN 89 trainer, 2026-10-15, #262)', async () => {
+        const unit = await cursorOnBlankPosition();
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+
+        await unit.panel.clr();
+
+        expect(userIdents(unit)).not.toContain('QQQQ');
+        expect(fplIdents(unit, 0)).toEqual(route7Idents());
+        expect(unit.panel.focused('L').text.trim()).toBe('');
+        expect(left()[cursorRows()[0]].slice(0, 4)).toBe('  8:');
+    });
+
+    // CLR on the creation page ends the entry: unlike CLR on a typed ident (#310), no blank is left waiting for ENT, so
+    // the blank position does not flash
+    it('leaves no approval waiting after CLR on the creation page (characterization, #262)', async () => {
+        const unit = await cursorOnBlankPosition();
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+
+        await unit.panel.clr();
+
+        const masks = await blinkCycle(() => Screen.read().maskRows('L')[cursorRows()[0]].slice(4, 9));
+        expect(masks).toEqual(['IIIII', 'IIIII', 'IIIII', 'IIIII']);
+    });
+
+    // The KLN 89 trainer (2026-10-15): CLR on the creation choices of an insert drops the insert, and the cursor is on
+    // the waypoint the insert was in front of
+    it('drops the insert after CLR on the creation page (checked in the KLN 89 trainer, 2026-10-15, #262)', async () => {
+        const unit = await insertInFrontOfAbc();
+        await unit.panel.ent();
+
+        await unit.panel.clr();
+
+        expect(userIdents(unit)).not.toContain('QQQQ');
+        expect(fplIdents(unit, 0)).toEqual(route7Idents());
+        expect(unit.panel.focused('L').text).toBe('ABC  ');
+    });
+
+    // After CLR on the creation page, the right side shows the page it showed before the ENT
+    it('shows the right page of before again after CLR on the creation page (characterization, #262)', async () => {
+        const unit = await cursorOnBlankPosition();
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+
+        await unit.panel.clr();
+
+        expect(Screen.read().status().right).toBe('APT 1');
+    });
+
+    // The KLN 89 trainer (2026-10-15): CLR on the approval of the created waypoint inserts nothing, but the user
+    // waypoint stays created
+    it('inserts nothing after CLR on the approval, and the created waypoint stays (checked in the KLN 89 trainer, 2026-10-15, #262)', async () => {
+        const unit = await cursorOnBlankPosition();
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', 'PRES POS?');
+        await unit.panel.ent();
+        expect(Screen.read().status().right).toBe('SUP'); // Precondition: the approval
+        expect(await identMasksOverBlink()).toEqual(FLASHING); // Precondition
+
+        await unit.panel.clr();
+
+        expect(fplIdents(unit, 0)).toEqual(route7Idents());
+        expect(userIdents(unit)).toContain('QQQQ');
+    });
+
+    // The KLN 89 trainer (2026-10-15): USER POS?, then the latitude with ENT and the longitude with ENT, shows the
+    // approval of the new waypoint, and its ENT inserts it
+    it('inserts the waypoint created at a typed position (checked in the KLN 89 trainer, 2026-10-15, #262)', async () => {
+        const unit = await cursorOnBlankPosition();
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', 'USER POS?');
+        await unit.panel.ent();
+        await unit.panel.type('R', 'N4800000');
+        await unit.panel.ent();
+        await unit.panel.type('R', 'E0090000');
+
+        await unit.panel.ent(); // creates QQQQ; its page waits for approval
+        const created = userWaypoints(unit).find(w => w.icaoStruct.ident === 'QQQQ');
+        expect(created?.lat).toBeCloseTo(48, 6);
+        expect(created?.lon).toBeCloseTo(9, 6);
+        expect(fplIdents(unit, 0)).toEqual(route7Idents()); // not inserted yet
+
+        await unit.panel.ent();
+
+        expect(fplIdents(unit, 0)).toEqual([...route7Idents(), 'QQQQ']);
+    });
+
+    /** The creation page of QQQQ at the blank position, USER POS? entered and the cursor turned back to REF (5-19) */
+    async function refFieldOfCreation(storage: Record<string, unknown> = savedFlightplan(0, route7())) {
+        const unit = await bootRoute(storage);
+        await unit.panel.selectPage('R', 'APT 1');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 7);
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', 'USER POS?');
+        await unit.panel.ent();
+        await unit.panel.outer('R', -3);
+        expect(unit.panel.focused('R')).toEqual({row: 1, col: 18, text: '_____'}); // Precondition: the REF field
+        return unit;
+    }
+
+    // 5-19 on the creation page: the REF waypoint is approved on its own page, pushed on top of the creation page; RAD
+    // and DIS then create the waypoint, whose approval follows, and its ENT inserts it. 10.0 NM on the radial 090 from
+    // ABC (no magnetic variation in the test world) is computed with flight/geo.ts
+    it('creates the waypoint from a REF waypoint, radial and distance and inserts it (characterization, #262)', async () => {
+        const unit = await refFieldOfCreation();
+        await unit.panel.enterIdent('R', 'ABC');
+        await unit.panel.ent();
+        expect(Screen.read().status().right).toBe('VOR'); // Precondition: ABC waits for its approval
+        await unit.panel.ent();
+        expect(Screen.read().rows('R')[1]).toBe('REF:  ABC  '); // Precondition: back on the creation page
+        await unit.panel.cursorTo('R', '___._'); // RAD
+        await unit.panel.type('R', '0900');
+        await unit.panel.ent();
+        await unit.panel.type('R', '0100'); // DIS 10.0
+        await unit.panel.ent(); // creates QQQQ; its page waits for approval
+
+        const created = userWaypoints(unit).find(w => w.icaoStruct.ident === 'QQQQ');
+        const expected = pointFrom({lat: 47.5, lon: 8.9}, 90, 10);
+        expect(created?.lat).toBeCloseTo(expected.lat, 6);
+        expect(created?.lon).toBeCloseTo(expected.lon, 6);
+        expect(Screen.read().status().right).toBe('SUP');
+        expect(await identMasksOverBlink()).toEqual(FLASHING);
+        expect(fplIdents(unit, 0)).toEqual(route7Idents()); // not inserted yet
+
+        await unit.panel.ent();
+
+        expect(fplIdents(unit, 0)).toEqual([...route7Idents(), 'QQQQ']);
+    });
+
+    // CLR on the REF waypoint waiting for its approval rejects that reference (#359) and keeps the creation open
+    it('rejects the REF waypoint with CLR and keeps the creation page (characterization, #262)', async () => {
+        const unit = await refFieldOfCreation();
+        await unit.panel.enterIdent('R', 'ABC');
+        await unit.panel.ent();
+        expect(Screen.read().status().right).toBe('VOR'); // Precondition
+
+        await unit.panel.clr();
+
+        expect(Screen.read().status().right).toBe('CRSR');
+        expect(Screen.read().rows('R')[0]).toBe(' QQQQ      ');
+        expect(left()[5]).toBe('  8:QQQQ   ');
+        expect(userIdents(unit)).not.toContain('QQQQ');
+    });
+
+    // A user waypoint as REF is approved on its own SUP page, which shows that waypoint and not the creation page
+    it('shows a user waypoint entered as REF on its own SUP page (characterization, #262)', async () => {
+        const storage = {
+            ...savedFlightplan(0, route7()),
+            ...savedUserWaypoints([{kind: 'sup' as const, ident: 'SAAA', lat: 47.3, lon: 8.5}]),
+        };
+        const unit = await refFieldOfCreation(storage);
+        await unit.panel.enterIdent('R', 'SAAA');
+
+        await unit.panel.ent();
+
+        expect(Screen.read().status().right).toBe('SUP');
+        expect(Screen.read().rows('R')[0].trim()).toBe('SAAA');
+        expect(Screen.read().rows('R')[4]).toBe("N 47°18.00'"); // 47.3 N
+    });
+
+    // CLR while the latitude of the creation page is being typed closes that entry, as on any editor (#307); the
+    // creation stays open
+    it('closes an open latitude entry on CLR and keeps the creation page (characterization, #262)', async () => {
+        const unit = await cursorOnBlankPosition();
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', 'USER POS?');
+        await unit.panel.ent();
+        await unit.panel.type('R', 'N48');
+
+        await unit.panel.clr();
+
+        expect(Screen.read().status().right).toBe('CRSR');
+        expect(left()[5]).toBe('  8:QQQQ   ');
+        expect(userIdents(unit)).not.toContain('QQQQ');
+        expect(fplIdents(unit, 0)).toEqual(route7Idents());
+    });
+
+    /** FPL 3 is empty, the right side on APT 1, and the cursor on the blank first position of FPL 3 */
+    async function emptyFpl3() {
+        const unit = await bootRoute(savedFlightplan(0, route7()));
+        await unit.panel.selectPage('R', 'APT 1');
+        await unit.panel.selectPage('L', 'FPL 3');
+        await unit.panel.cursor('L');
+        expect(unit.panel.focused('L').text.trim()).toBe(''); // Precondition: the blank first position
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', 'PRES POS?');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        return unit;
+    }
+
+    // The KLN 89 trainer (2026-10-15): a numbered plan takes the created waypoint the same way as FPL 0
+    it('makes the created waypoint the first of an empty numbered plan (checked in the KLN 89 trainer, 2026-10-15, #262)', async () => {
+        const unit = await emptyFpl3();
+
+        expect(fplIdents(unit, 3)).toEqual(['QQQQ']);
+    });
+
+    // After the insert the numbered plan shows USE? INVRT?, the new waypoint and a blank position under the cursor
+    it('shows the numbered plan with the created waypoint and the cursor on the next blank position (characterization, #262)', async () => {
+        await emptyFpl3();
+
+        expect(left().slice(0, 3)).toEqual(['USE? INVRT?', '  1:QQQQ   ', '  2:       ']);
+        expect(cursorRows()).toEqual([2]);
+    });
+
+    // #289 C-2: with 250 user waypoints stored, PRES POS? answers USR DB FULL, and the creation page stays
+    it('keeps the creation page when the user database is full (characterization, #262)', async () => {
+        muteConsoleError(); // the page logs the refusal
+        const full = savedUserWaypoints(Array.from({length: 250}, (_, i) => ({
+            kind: 'sup' as const, ident: `S${String(i).padStart(3, '0')}`, lat: 40 + i * 0.01, lon: 20,
+        })));
+        const unit = await bootRoute({...savedFlightplan(0, route7()), ...full});
+        expect(userWaypoints(unit)).toHaveLength(250); // Precondition
+        await unit.panel.selectPage('R', 'APT 1');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 7);
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', 'PRES POS?');
+        const messages = collectStatusMessages(unit);
+
+        await unit.panel.ent();
+
+        expect(messages).toEqual(['USR DB FULL']);
+        expect(Screen.read().rows('R')).toEqual(CREATION_ROWS);
+        expect(userIdents(unit)).not.toContain('QQQQ');
+        expect(fplIdents(unit, 0)).toEqual(route7Idents());
+
+        // The page is still the creation page: a second PRES POS? is refused the same way
+        await unit.panel.cursorTo('R', 'PRES POS?');
+        await unit.panel.ent();
+
+        expect(messages).toEqual(['USR DB FULL', 'USR DB FULL']);
+        expect(Screen.read().rows('R')).toEqual(CREATION_ROWS);
+        expect(userIdents(unit)).not.toContain('QQQQ');
+    });
+
+    // Turning the left cursor off ends the entry, and the creation page goes with it
+    it('removes the creation page when the left cursor is turned off (characterization, #262)', async () => {
+        const unit = await cursorOnBlankPosition();
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+
+        await unit.panel.cursor('L');
+
+        expect(Screen.read().status().right).toBe('APT 1');
+        expect(userIdents(unit)).not.toContain('QQQQ');
+        expect(fplIdents(unit, 0)).toEqual(route7Idents());
     });
 });

@@ -228,3 +228,41 @@ BAE, then 187, a 90° right turn; about 20 NM out at 239 kt unless noted)
   (onset about 2.1 NM at about 160 kt, sequenced at about 0.9 NM, the plan resumed); a Direct To off the plan alerted
   about 2.0 NM out and still flashed 2.2 NM past. Its CDI scale jumped to 1.00 on arming at 37 NM and let 5.00 be selected
   again while armed, which 5-38 and 6-1 rule out; not used (#160).
+
+**2026-10-15** (an agent check; FPL 0 and FPL 25, the idents 80, 81, 8V to 8Z made unknown on purpose, all deleted
+afterwards)
+- An unknown ident entered with D->, on FPL 0 and on a numbered plan leads the same way: ENT replaces the right page with
+  the creation choices `USR at:` / `User Pos L/L?` / `User Pos R/D?` / `Present Pos?`, and the left keeps the ident.
+  `Present Pos?` and ENT, or a latitude and a longitude each closed with ENT, shows the new waypoint's page with `Ent`
+  flashing; nothing is inserted yet. The next ENT inserts it, with the cursor on the next blank position at the end of
+  the plan or on the following waypoint after an insert, or executes the Direct To. CLR on the creation choices creates
+  nothing: D-> shows a blank ident field, a blank end position keeps the cursor, and an insert row is dropped with the
+  cursor on the waypoint that followed it. CLR on the approval inserts nothing, but the user waypoint stays (#262).
+- The outer knob moves the cursor past a blank cell of a short ident, on the USR page and in the D-> field. A character
+  entered there stays in its cell with the blank before it (`8V A`, `80 A`), with no autofill; the unit searches that
+  ident and offers to create it, and a user waypoint `80 A` was created from D-> (#343).
+- FPL 0 with the leg from an en-route waypoint to the IAF of an approach loaded behind it (80, then RNAV 05 KUGN), the
+  cursor off: the approach header takes the top row and the from waypoint is not shown; the cursor scrolls it back
+  above the header. The 90B guide's figure 6-43 shows the from waypoint above the header, and the 90B follows the
+  figure (#239).
+- A numbered plan with the 89's twenty waypoints: the inner knob on a waypoint opens no insert row but asks to delete
+  waypoint 1 to make room; ENT deletes it and opens the row, and the insert gives no message. The 90B answers a full
+  plan with FPL FULL (C-1), so this is not used (#240, #241).
+- The third-party AVsoftech KLN 90B trainer, which is unreliable: an unknown ident entered on FPL 0, a numbered plan or
+  D-> brings up the SUP page's `CREATE NEW` / `WPT AT:` / `USER POS?` / `PRES POS?` on the right, for idents of two to
+  five characters; its CLR and its D-> path misbehave there (#262). D/T 4 shows the Direct To symbol before the
+  destination after a Direct To to the last waypoint of FPL 0 (medium-high, #298). The maintainer saw it also draw the
+  arrow at the last copy of a destination that is twice in the plan while the first copy was active, which is taken
+  for a fault of that trainer (#298). Its REF page refused both references tried, so it says nothing about #291.
+
+**2026-10-15** (evening; the maintainer's observation, then an agent check; nothing stored)
+- The first character of an identifier offers no blank: on the USR and APT 1 pages, in the D-> field, in an FPL 0
+  insert and at the blank end position of FPL 0 the inner knob runs A to Z, 0 to 9 and back to A (Z to 0, 9 to A;
+  counterclockwise A to 9, 0 to Z). Each step autofills the first identifier that starts with that character, or leaves
+  the rest blank when there is none. From the second character on the blank sits between 9 and A, with no autofill
+  while that character is blank (#374).
+- On a fresh D-> field and at the blank end position of FPL 0 the first clockwise click gives A with the autofill of the
+  first identifier starting with A; from an empty D-> field or FPL 0 position the first counterclockwise click gives 9
+  (seen in the morning check of the same day) (#311).
+- The first character of a remark line does offer a blank, after the hyphen: Z, 0 to 9, -, blank, A. The first
+  clockwise click on a remark line clears it to A followed by blanks.

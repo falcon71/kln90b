@@ -549,8 +549,8 @@ describe('SUP page', () => {
 
     // C-2: USR DB FULL appears when a user waypoint is to be created while the user database holds 250 waypoints
     // (2-8, 5-16), and the waypoint is not created
-    /** 250 user waypoints far away, the SUP page with QQ entered, and PRES POS? */
-    async function createQqWithFullDatabase(): Promise<HeadlessUnit> {
+    /** 250 user waypoints far away and the SUP page with QQ entered, the CREATE NEW WPT AT: prompt showing */
+    async function createNewQqWithFullDatabase(): Promise<HeadlessUnit> {
         muteConsoleError(); // the page logs the refusal
         const full = savedUserWaypoints(Array.from({length: 250}, (_, i) => ({
             kind: 'sup' as const, ident: `S${String(i).padStart(3, '0')}`, lat: 40 + i * 0.01, lon: 20,
@@ -560,6 +560,12 @@ describe('SUP page', () => {
         await unit.panel.selectPage('R', 'SUP  ');
         await unit.panel.cursor('R');
         await unit.panel.enterIdent('R', 'QQ');
+        return unit;
+    }
+
+    /** As above, with PRES POS? chosen */
+    async function createQqWithFullDatabase(): Promise<HeadlessUnit> {
+        const unit = await createNewQqWithFullDatabase();
         await unit.panel.cursorTo('R', 'PRES POS?');
         await unit.panel.ent();
         return unit;
@@ -576,10 +582,30 @@ describe('SUP page', () => {
     // C-2: the waypoint is not created, so the page still has no waypoint for QQ and offers to create it (5-18, 5-19).
     // The page shows QQ with the present position instead, and D-> then makes it the active waypoint although it is
     // in no database. Sibling: the test above (the refusal itself).
-    it.fails('still offers to create the refused waypoint (C-2, 5-19, #289)', async () => {
-        await createQqWithFullDatabase();
+    it('still offers to create the refused waypoint (C-2, 5-19, #289)', async () => {
+        const unit = await createQqWithFullDatabase();
 
         expect(rightRows().slice(0, 4)).toEqual([' QQ        ', '           ', 'CREATE NEW ', 'WPT AT:    ']);
+        expect(unit.props.memory.supPage.facility).toBeNull();
+        expect(Screen.read().status().right).toBe('CRSR');
+    });
+
+    // C-2, 5-19: the USER POS? path refuses the same way: after the longitude ENT the waypoint is not stored and the
+    // page memory holds no waypoint
+    it('refuses a 251st user waypoint typed with USER POS? (C-2, 2-8, #289)', async () => {
+        const unit = await createNewQqWithFullDatabase();
+        await unit.panel.cursorTo('R', 'USER POS?');
+        await unit.panel.ent();
+        await unit.panel.type('R', 'N470600');
+        await unit.panel.ent();
+        await typeEastBelow100(unit, '103000');
+
+        await unit.panel.ent();
+
+        expect(Screen.read().status().mode).toBe('USR DB FULL');
+        expect(KLNFacilityRepository.getRepository(unit.props.bus).size()).toBe(250);
+        expect(userWaypoint(unit, 'QQ')).toBeUndefined();
+        expect(unit.props.memory.supPage.facility).toBeNull();
     });
 
     // 5-19 step 12: after the radial or the distance is entered, the latitude and longitude are calculated and displayed.

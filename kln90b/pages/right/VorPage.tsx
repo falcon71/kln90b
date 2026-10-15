@@ -72,7 +72,7 @@ export class VorPage extends WaypointPage<VorFacility> {
         }
 
         this.children = new UIElementChildren<VorPageTypes>({
-            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage, this.getActiveArrowFplIdx()),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             vor: new VorSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             dme: new TextDisplay(hasDme(facility) ? "D" : " "),
@@ -244,6 +244,9 @@ export class VorPage extends WaypointPage<VorFacility> {
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            //No redraw: a redraw from the missing facility would blank the typed values, which the page keeps (#289)
+            return;
         }
         this.props.memory.vorPage.facility = this.facility;
         this.cursorController.setCursorActive(false);

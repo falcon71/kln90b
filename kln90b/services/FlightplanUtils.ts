@@ -1,7 +1,7 @@
 import {NauticalMiles} from "../data/Units";
 import {GeoPoint, UnitType} from "@microsoft/msfs-sdk";
 import {NavPageState} from "../data/VolatileMemory";
-import {Flightplan, KLNFlightplanLeg} from "../data/flightplan/Flightplan";
+import {Flightplan, KLNFlightplanLeg, MAX_LEGS} from "../data/flightplan/Flightplan";
 
 export function calcDistToDestination(navState: NavPageState, futureLegs: KLNFlightplanLeg[]): NauticalMiles | null {
     const fplIdx = navState.activeWaypoint.getActiveFplIdx();
@@ -26,7 +26,7 @@ export function calcDistToDestination(navState: NavPageState, futureLegs: KLNFli
  * @param leg
  */
 export function insertLegIntoFpl(fpl: Flightplan, navstate: NavPageState, idx: number, leg: KLNFlightplanLeg): void {
-    if (fpl.idx !== 0 || fpl.getLegs().length < 30) {
+    if (fpl.idx !== 0 || fpl.getLegs().length < MAX_LEGS) {
         fpl.insertLeg(idx, leg);
         return;
     }

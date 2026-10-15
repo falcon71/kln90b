@@ -85,7 +85,7 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
         }
 
         this.children = new UIElementChildren<IntPageTypes>({
-            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage, this.getActiveArrowFplIdx()),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             int: new IntersectionSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(wptType),
@@ -393,6 +393,9 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            this.requiresRedraw = true;
+            return;
         }
         this.props.memory.intPage.facility = this.facility;
         this.cursorController.setCursorActive(false);
@@ -428,6 +431,9 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            this.requiresRedraw = true;
+            return;
         }
         this.props.memory.intPage.facility = this.facility;
         this.cursorController.setCursorActive(false);

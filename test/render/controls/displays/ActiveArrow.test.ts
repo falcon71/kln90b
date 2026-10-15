@@ -9,9 +9,15 @@ import {mount, mountedRead} from '../../../harness/render/mount';
 const KAAA = airport('KAAA', 47.0, 8.0);
 const KBBB = airport('KBBB', 47.5, 8.0);
 
-/** The part of NavPageState that ActiveArrow reads: the active waypoint and the waypoint alert */
-function navState(active: Facility | null, waypointAlert = false): NavPageState {
-    return {activeWaypoint: {getActiveWpt: () => active}, waypointAlert} as unknown as NavPageState;
+/**
+ * The part of NavPageState that ActiveArrow reads: the active waypoint, its index in FPL 0 (#294) and the waypoint
+ * alert
+ */
+function navState(active: Facility | null, waypointAlert = false, activeFplIdx = 0): NavPageState {
+    return {
+        activeWaypoint: {getActiveWpt: () => active, getActiveFplIdx: () => activeFplIdx},
+        waypointAlert,
+    } as unknown as NavPageState;
 }
 
 /** The arrow cell of a page showing `shown` (its ICAO, or null for a page without a waypoint) after a display tick */
@@ -67,8 +73,45 @@ describe('ActiveArrow', () => {
     });
 });
 
-// #294 (ACT marks every copy of the active waypoint) cannot be pinned here: ActiveArrow knows the waypoint, not its
-// place in the plan, so two copies are the same input. It is pinned on the ACT page (ActPage.test.ts).
+// #294: a page that knows the place of its waypoint in FPL 0 (the ACT pages) gives the arrow that index, and the arrow
+// compares it with the active one instead of the ICAOs, so two copies of one waypoint differ. The booted behavior is
+// held on the ACT page (ActPage.test.ts); here the arrow is driven directly.
+describe('ActiveArrow plan index', () => {
+    // 4-10: the arrow marks the active waypoint; the plan index identifies it
+    it('shows the arrow when its plan index is the active one (4-10, #294)', () => {
+        const m = mount(new ActiveArrow(KAAA.icaoStruct, navState(KAAA, false, 2), 2));
+        m.tick();
+        expect(m.text()).toBe('›');
+    });
+
+    it('characterization: shows a blank at another plan index although the ICAOs are equal (#294)', () => {
+        const m = mount(new ActiveArrow(KAAA.icaoStruct, navState(KAAA, false, 1), 3));
+        m.tick();
+        expect(m.text()).toBe(' ');
+    });
+
+    it('characterization: without a plan index the arrow compares the ICAOs (#294)', () => {
+        // The active index differs from every index the test could pass, so only the ICAO comparison can decide
+        const same = mount(new ActiveArrow(KAAA.icaoStruct, navState(KAAA, false, 5), null));
+        same.tick();
+        expect(same.text()).toBe('›');
+        const other = mount(new ActiveArrow(KBBB.icaoStruct, navState(KAAA, false, 5), null));
+        other.tick();
+        expect(other.text()).toBe(' ');
+    });
+
+    it('characterization: a plan index set after the construction is used at the next display tick (#294)', () => {
+        const arrowAt = new ActiveArrow(null, navState(KAAA, false, 2), -1);
+        const m = mount(arrowAt);
+        m.tick();
+        expect(m.text()).toBe(' ');
+
+        arrowAt.fplIdx = 2;
+        m.tick();
+        expect(m.text()).toBe('›');
+    });
+});
+
 describe('ActiveArrow (characterization)', () => {
     it('characterization: the cell is blank until the first display tick', () => {
         const m = mount(new ActiveArrow(KAAA.icaoStruct, navState(KAAA)));

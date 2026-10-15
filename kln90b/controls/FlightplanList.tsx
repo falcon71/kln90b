@@ -1,6 +1,6 @@
 import {AirportFacility, Facility, FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {PageProps, UiElement, UIElementChildren} from '../pages/Page';
-import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
+import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType, MAX_LEGS} from "../data/flightplan/Flightplan";
 import {List} from "./List";
 import {FlightplanListItem} from "./FlightplanListItem";
 import {Button} from "./Button";
@@ -145,7 +145,7 @@ class FPLFirstLine implements ListItem {
             this.children.get("useInverted").setVisible(true);
             this.children.get("del").setVisible(false);
             this.children.get("load0").setVisible(false);
-            return 1;
+            return 2; //#242 USE? and USE? INVRT? are two fields
         }
     }
 
@@ -319,6 +319,7 @@ class EditableFlightplan {
     public legs: EditableFlightplanLeg[] = [];
     public listParent: FlightplanList | undefined;
     public firstLine: FPLFirstLine;
+    public hasTrailingBlank = true;
 
 
     constructor(private cursorController: CursorController,
@@ -340,12 +341,17 @@ class EditableFlightplan {
         this.buildList();
     }
 
-    public insertLeg(idx: number, wpt: Facility | null, leg: KLNFlightplanLeg | null) {
+    /**
+     * @return false when the insert was refused with FPL FULL, true otherwise (#240)
+     */
+    public insertLeg(idx: number, wpt: Facility | null, leg: KLNFlightplanLeg | null): boolean {
+        const wasRefEntry = this.findRefRow(row => row.isRefEntry()) !== undefined; //#291 before the rebuild
         if (wpt === null) {
             //The user aborted the insert by turning the cursor off
             this.syncLegsFromFlightplan();
             this.buildList();
-            return;
+            this.endRefApproval(wasRefEntry);
+            return true;
         }
 
         try {
@@ -367,10 +373,45 @@ class EditableFlightplan {
             }
 
             this.buildList();
+            this.endRefApproval(wasRefEntry);
+            return true;
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "FPL FULL");
             console.error(e);
+            //4-4, C-1: nothing is added, the page shows the plan as stored (#240)
+            this.syncLegsFromFlightplan();
+            this.buildList();
+            this.endRefApproval(wasRefEntry);
+            return false;
         }
+    }
+
+    /**
+     * #291: the left cursor goes off once the reference waypoint is approved or rejected, not when its page appears
+     */
+    private endRefApproval(wasRefEntry: boolean): void {
+        if (wasRefEntry) {
+            this.cursorController.setCursorActive(false);
+        }
+    }
+
+    private findRefRow(predicate: (row: FlightplanListItem) => boolean): FlightplanListItem | undefined {
+        return this.listParent?.children.getall()
+            .find(c => c instanceof FlightplanListItem && predicate(c)) as FlightplanListItem | undefined;
+    }
+
+    /**
+     * #291: CLR while the reference waypoint waits for its approval rejects it. The waiting row is not in the plan, so
+     * it has no DEL, and the focused row is not necessarily the waiting one.
+     * @return true when a reference waypoint was waiting
+     */
+    public rejectRefApproval(): boolean {
+        const waiting = this.findRefRow(row => row.isAwaitingRefApproval());
+        if (waiting === undefined) {
+            return false; //an ordinary entry, CLR works as on any entry
+        }
+        waiting.setFocused(false); //cancels the confirmation and ends the insert (onInsertDone with null)
+        return true;
     }
 
     public createLeg(idx: number, enter: FplWptEnterMode, keyboardKey: string | undefined, wpt: Facility | null = null): void {
@@ -464,9 +505,11 @@ class EditableFlightplan {
 
             if (leg.enterMe !== undefined) {
                 focusIdx = numActiveFields - 1;
+                const mode = leg.enterMe;
+                leg.enterMe = undefined; //#291 the pending entry runs once
                 //This can only be done, after the cursorController is up-to-date.
                 enterMethod = () => {
-                    switch (leg.enterMe) {
+                    switch (mode) {
                         case FplWptEnterMode.ROTATE_LEFT:
                             listItem.innerLeft();
                             break;
@@ -488,7 +531,7 @@ class EditableFlightplan {
                             listItem.keyboard(leg.enterKeyboardKey!);
                             break;
                         case FplWptEnterMode.CONFIRM:
-                            reportErrors(listItem.confirmCurrentValue().then(_ => this.cursorController.setCursorActive(false)), this.props.bus);
+                            reportErrors(listItem.confirmCurrentValue(), this.props.bus);
                             break;
                     }
                 };
@@ -515,7 +558,12 @@ class EditableFlightplan {
 
     private syncLegsFromFlightplan() {
         this.legs = this.flightplan.getLegs().map((l, idx) => ({wpt: l.wpt, origIdx: idx, leg: l}));
-        this.legs.push({wpt: null, origIdx: -1});
+        //4-4: only a plan of fewer than 30 waypoints takes another one, so a full numbered plan has no blank position
+        //(#241). FPL 0 keeps it: an addition to a full FPL 0 can make room by dropping the first waypoint (C-1)
+        this.hasTrailingBlank = this.flightplan.idx === 0 || this.legs.length < MAX_LEGS;
+        if (this.hasTrailingBlank) {
+            this.legs.push({wpt: null, origIdx: -1});
+        }
     }
 
     /**
@@ -587,12 +635,21 @@ export class FlightplanList extends List {
         this.editPlan.askDeleteAll();
     }
 
+    public rejectRefApproval(): boolean {
+        return this.editPlan.rejectRefApproval();
+    }
+
     public load(fpl: Flightplan) {
         this.editPlan.load(fpl);
     }
 
     public refresh(children: UIElementChildren<any>): void {
+        const scrollIdx = this.scrollIdx; //#319 a rebuild keeps the page where it was (4-4, 4-8)
         super.refresh(children);
+        if (this.children === children && scrollIdx > 0) {
+            this.scrollIdx = Math.min(scrollIdx, this.maxScrollIdx(children.getall().length));
+            this.redraw();
+        }
     }
 
     public getSelectedWaypoint(): FlightPlanWaypint | null {
@@ -615,7 +672,13 @@ export class FlightplanList extends List {
             for (let i = 0; i < childList.length; i++) {
                 const child = childList[i];
                 if (child instanceof FlightplanListItem && child.origWptIdx === actIdx) {
-                    const requiredScrollIdx = Math.max(Math.min(i - 1, childList.length - this.height - 1), 0); //not using clamp, the order is important
+                    //4-7, 4-8, figure 6-43: the from waypoint stays on the page, also with a procedure header between it
+                    //and the active waypoint (#239). A Direct To has no from waypoint in the plan, and it is the only way
+                    //the active index is 0
+                    const fromIdx = actIdx > 0 && !this.activeWaypoint.isDctNavigation()
+                        ? childList.findIndex(c => c instanceof FlightplanListItem && c.origWptIdx === actIdx - 1) : -1;
+                    const anchor = fromIdx !== -1 ? fromIdx : i - 1;
+                    const requiredScrollIdx = Math.max(Math.min(anchor, this.maxScrollIdx(childList.length)), 0); //not using clamp, the order is important
                     if (requiredScrollIdx !== this.scrollIdx) {
                         this.scrollIdx = requiredScrollIdx;
                         this.redraw();
@@ -652,7 +715,17 @@ export class FlightplanList extends List {
         }
 
         //The last waypoint will always be shown
-        return childList[childList.length - 2];
+        return childList[this.lastWaypointChildIdx(childList.length)];
+    }
+
+    /** The index of the child shown in the last row while the end of the list is out of view: the last waypoint (4-8) */
+    private lastWaypointChildIdx(numChildren: number): number {
+        return this.editPlan.hasTrailingBlank ? numChildren - 2 : numChildren - 1;
+    }
+
+    /** The largest scroll offset that still shows the last waypoint in the last row */
+    private maxScrollIdx(numChildren: number): number {
+        return Math.max(this.lastWaypointChildIdx(numChildren) - (this.height - 1), 0);
     }
 
     protected calculateRequiredScrollIdx(focusedIdx: number) {
@@ -661,7 +734,7 @@ export class FlightplanList extends List {
         if (focusedIdx < requiredScrollIdx) {
             requiredScrollIdx = focusedIdx;
         }
-        if (focusedIdx < childList.length - 2) {
+        if (focusedIdx < this.lastWaypointChildIdx(childList.length)) {
             //behaves like a five line list
             if (focusedIdx >= requiredScrollIdx + 5) {
                 requiredScrollIdx = focusedIdx - 4;

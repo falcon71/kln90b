@@ -205,6 +205,13 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
 
     protected abstract getNearestList(): AirportNearestList | VorNearestList | NdbNearestList | null;
 
+    /**
+     * 4-10, #294: the index in FPL 0 of the waypoint an ACT page shows, null on the other pages and for a Direct To outside the plan
+     */
+    protected getActiveArrowFplIdx(): number | null {
+        return this.activeIdx > 0 ? this.activeIdx - 1 : null;
+    }
+
     protected getActiveIdxText(): string {
         if (this.activeIdx === -1) { //Not the act page
             return "";

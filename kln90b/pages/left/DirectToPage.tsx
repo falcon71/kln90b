@@ -59,6 +59,7 @@ export class DirectToPage extends SixLineHalfPage {
                 enterCallback: this.performDirectTo.bind(this),
                 value: facility,
                 parent: this,
+                offerCreation: true, //#262 4-2, checked in the KLN 89 trainer, 2026-10-15
             }),
         });
 

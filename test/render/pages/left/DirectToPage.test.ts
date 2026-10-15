@@ -7,9 +7,11 @@ import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures
 import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
-import {activeIdent} from '../../../harness/readers';
+import {activeIdent, userWaypoints} from '../../../harness/readers';
 import {pointFrom} from '../../../harness/flight/geo';
 import {MainPage} from '../../../../kln90b/pages/MainPage';
+import {blinkCycle} from '../../../harness/render/blink';
+import {collectStatusMessages} from '../../../harness/statusLine';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
 const abc = vor('ABC', 47.2, 8.0);
@@ -407,9 +409,9 @@ describe('DIRECT TO page at the missed approach point (3-27)', () => {
     });
 });
 
-// The KLN 89 trainer (2026-10-07): an identifier that is not in the database, entered with D->, offers the creation of
-// a user waypoint. The unit instead answers NO SUCH WPT on the status line and stays on the DIRECT TO page. The creation
-// rows are those the SUP page shows for an unknown ident (CreateWaypointMessage)
+// The KLN 89 trainer (2026-10-07, 2026-10-15): an identifier that is not in the database, entered with D->, offers the
+// creation of a user waypoint on the right page, and the ident stays in the D-> field. That the creation page is the SUP
+// page in its creation state (CreateWaypointMessage) is the maintainer's ruling on #262, held as characterization
 describe('DIRECT TO page with an unknown identifier', () => {
     /** D->, the identifier QQQQ typed (no facility of that name exists in the world) and ENT */
     async function unknownIdentEntered() {
@@ -427,14 +429,77 @@ describe('DIRECT TO page with an unknown identifier', () => {
         expect(Screen.read().status().right).toBe('NAV 1');
     });
 
-    it.fails('offers to create a user waypoint for an unknown ident (checked in the KLN 89 trainer, 2026-10-07, #262)', async () => {
+    // The KLN 89 trainer: ENT offers the creation on the right page instead of answering NO SUCH WPT (2026-10-07), and
+    // the D-> field keeps the typed ident (2026-10-15)
+    it('offers to create a user waypoint for an unknown ident (checked in the KLN 89 trainer, 2026-10-07 and 2026-10-15, #262)', async () => {
+        const unit = await unknownIdentEntered();
+        const messages = collectStatusMessages(unit);
+        const nav1 = Screen.read().rows('R');
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(messages).not.toContain('NO SUCH WPT');
+        expect(Screen.read().rows('R')).not.toEqual(nav1); // the right page is replaced
+        expect(Screen.read().rows('L')[2]).toBe('   QQQQ    ');
+    });
+
+    // The maintainer's ruling on #262: the creation page on D-> is the SUP page in its creation state, as on the flight
+    // plan pages
+    it('shows the creation rows of the SUP page on the right (characterization, #262)', async () => {
         const unit = await unknownIdentEntered();
 
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(500);
 
-        const screen = Screen.read();
-        expect(screen.rows('R').slice(2, 4)).toEqual(['CREATE NEW ', 'WPT AT:    ']);
-        expect(screen.status().mode).not.toBe('NO SUCH WPT');
+        expect(Screen.read().rows('R')).toEqual([
+            ' QQQQ      ', '           ', 'CREATE NEW ', 'WPT AT:    ', 'USER POS?  ', 'PRES POS?  ',
+        ]);
+    });
+
+    // The KLN 89 trainer (2026-10-15): PRES POS? ENT creates the waypoint and shows its page for approval, the Direct
+    // To is not executed yet; the next ENT executes it
+    it('executes the Direct To to the created waypoint after its approval (checked in the KLN 89 trainer, 2026-10-15, #262)', async () => {
+        const unit = await unknownIdentEntered();
+        await unit.panel.ent();
+        await unit.panel.cursorTo('R', 'PRES POS?');
+
+        await unit.panel.ent(); // creates QQQQ; its page waits for approval
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(userWaypoints(unit).map(w => w.icaoStruct.ident)).toContain('QQQQ');
+        expect(activeIdent(unit)).toBe('ABC'); // not executed yet
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(activeIdent(unit)).toBe('QQQQ');
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(true);
+    });
+
+    // The KLN 89 trainer (2026-10-15): CLR on the creation choices creates nothing, keeps the active waypoint and shows
+    // the DIRECT TO page with a blank ident field
+    it('creates nothing and shows a blank field after CLR on the creation page (checked in the KLN 89 trainer, 2026-10-15, #262)', async () => {
+        const unit = await unknownIdentEntered();
+        await unit.panel.ent();
+
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(userWaypoints(unit).map(w => w.icaoStruct.ident)).not.toContain('QQQQ');
+        expect(activeIdent(unit)).toBe('ABC');
+        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['DIRECT TO: ', '           ', '           ']);
+    });
+
+    // CLR on the creation page ends the entry: the cursor stays on the blank field, and unlike CLR on a typed ident,
+    // no blank waits for ENT, so the field does not flash
+    it('keeps the cursor on the blank field with no approval waiting after CLR on the creation page (characterization, #262)', async () => {
+        const unit = await unknownIdentEntered();
+        await unit.panel.ent();
+
+        await unit.panel.clr();
+
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 3, text: '     '});
+        const masks = await blinkCycle(() => Screen.read().maskRows('L')[2].slice(3, 8));
+        expect(masks).toEqual(['IIIII', 'IIIII', 'IIIII', 'IIIII']);
     });
 });

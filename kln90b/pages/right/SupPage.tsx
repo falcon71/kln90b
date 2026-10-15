@@ -52,6 +52,15 @@ interface UserSupplementary {
     lon: number | null,
 }
 
+/**
+ * #262: the SUP page that creates a user waypoint for an ident in no database, entered on a flight plan page or on D->
+ */
+interface SupCreation {
+    ident: string,
+    /** Called once the new waypoint is stored; not on USR DB FULL */
+    onCreated: (facility: UserFacility) => void,
+}
+
 export class SupPage extends WaypointPage<UserFacility> {
     public readonly cursorController;
     readonly children: UIElementChildren<SupPageTypes>;
@@ -63,9 +72,22 @@ export class SupPage extends WaypointPage<UserFacility> {
     private dis: number | null = null;
     private refDebounce = new DebounceTimer();
     private userSupplementary: UserSupplementary | null = null;
+    private readonly onCreated: ((facility: UserFacility) => void) | null = null;
 
-    constructor(props: PageProps) {
+    /**
+     * @param props
+     * @param creation #262: the creation page of a flight plan page or D->. Not part of the props, which the REF editor
+     * passes on to the pages it pushes
+     */
+    constructor(props: PageProps, creation: SupCreation | null = null) {
         super(props);
+
+        if (creation !== null) {
+            //#262 4-2, 5-16: the page shows CREATE NEW WPT AT: for the typed ident. It has no waypoint yet, so it
+            //neither reads nor writes the memory of the SUP page
+            this.ident = creation.ident;
+            this.onCreated = creation.onCreated;
+        }
 
         //C-2 The message belongs to selecting the SUP page type. A page built with a waypoint (or none) is the placeholder of the ACT page or the confirmation of a waypoint
         if (!isWaypointPageProps(props) && this.props.scanLists.supScanlist.isEmpty()) {
@@ -78,7 +100,7 @@ export class SupPage extends WaypointPage<UserFacility> {
 
 
         this.children = new UIElementChildren<SupPageTypes>({
-            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage, this.getActiveArrowFplIdx()),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             sup: new SupplementarySelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "S"),
@@ -98,7 +120,7 @@ export class SupPage extends WaypointPage<UserFacility> {
 
         this.mainRef = FSComponent.createRef<HTMLDivElement>();
 
-        if (this.activeIdx !== -1) {
+        if (this.activeIdx !== -1 || this.onCreated !== null) {
             this.children.get("sup").setReadonly(true);
         }
 
@@ -106,6 +128,36 @@ export class SupPage extends WaypointPage<UserFacility> {
 
         this.cursorController = new CursorController(this.children);
 
+        if (this.onCreated !== null) {
+            //#262: the cursor is on at once, over USER POS?, so that the next ENT goes to this page (characterization)
+            this.showCreateWpt();
+            this.cursorController.setCursorActive(true);
+            this.cursorController.focusField(this.children.get("createWpt").children.get("userPos"));
+        }
+    }
+
+    /**
+     * #262: the SUP page in its creation state for an ident in no database, which calls onCreated once the new waypoint
+     * is stored. The editor passes the ident cut at its trailing blanks only (#343)
+     */
+    public static createWaypointPage(props: PageProps, creation: SupCreation): SupPage {
+        const creationProps = {...props, facility: null};
+        if ("idx" in creationProps) {
+            delete creationProps.idx; //Not an ACT page
+        }
+        return new SupPage(creationProps, creation);
+    }
+
+    /**
+     * The fields of the creation state: only USER POS? and PRES POS? (5-16)
+     */
+    private showCreateWpt(): void {
+        this.children.get("ref").isReadonly = true;
+        this.children.get("refBearing").isReadonly = true;
+        this.children.get("refDist").isReadonly = true;
+        this.children.get("lat").isReadonly = true;
+        this.children.get("lon").isReadonly = true;
+        this.children.get("createWpt").setVisible(true);
     }
 
 
@@ -145,15 +197,8 @@ export class SupPage extends WaypointPage<UserFacility> {
         const facility = unpackFacility(this.facility);
         if (facility === null) {
             if (this.userSupplementary === null) {
-                this.children.get("ref").isReadonly = true;
-                this.children.get("refBearing").isReadonly = true;
-                this.children.get("refDist").isReadonly = true;
-                this.children.get("lat").isReadonly = true;
-                this.children.get("lon").isReadonly = true;
-
-
+                this.showCreateWpt();
                 this.mainRef.instance.classList.add("d-none");
-                this.children.get("createWpt").setVisible(true);
             } else {
 
                 this.children.get("ref").setValue(this.ref);
@@ -343,7 +388,9 @@ export class SupPage extends WaypointPage<UserFacility> {
         this.children.get("lat").isReadonly = false;
         this.children.get("lon").isReadonly = false;
         this.children.get("createWpt").setVisible(false);
-        this.cursorController.focusIndex(7);
+        //The cursor goes to DIS, and the ENT that pressed USER POS? moves it on to the latitude. Found by field, not by
+        //index: the creation page of #262 has no ident cells under the cursor
+        this.cursorController.focusField(this.children.get("refDist"));
 
         this.requiresRedraw = true;
     }
@@ -390,6 +437,12 @@ export class SupPage extends WaypointPage<UserFacility> {
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            this.requiresRedraw = true;
+            return;
+        }
+        if (this.handOverCreated(this.facility)) {
+            return;
         }
         this.props.memory.supPage.facility = this.facility;
         this.cursorController.setCursorActive(false);
@@ -417,10 +470,39 @@ export class SupPage extends WaypointPage<UserFacility> {
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            this.requiresRedraw = true;
+            return;
+        }
+        if (this.handOverCreated(this.facility)) {
+            return;
         }
         this.props.memory.supPage.facility = this.facility;
         this.cursorController.setCursorActive(false);
         this.calculateRef();
         this.requiresRedraw = true;
+    }
+
+    /**
+     * #262: the creation page of a flight plan page or D-> hands the stored waypoint to its editor, whose approval
+     * follows (checked in the KLN 89 trainer, 2026-10-15). The editor removes this page; the SUP page's memory stays as
+     * it was
+     * @return true if the waypoint was handed over
+     */
+    private handOverCreated(facility: UserFacility): boolean {
+        if (this.onCreated === null) {
+            return false;
+        }
+        this.cursorController.setCursorActive(false);
+        this.onCreated(facility);
+        return true;
+    }
+
+    scanLeft(): boolean {
+        return this.onCreated === null ? super.scanLeft() : false; //#262 the creation page shows only its ident
+    }
+
+    scanRight(): boolean {
+        return this.onCreated === null ? super.scanRight() : false; //#262 the creation page shows only its ident
     }
 }

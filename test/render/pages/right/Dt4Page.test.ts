@@ -7,6 +7,7 @@ import {savedFlightplan} from '../../../harness/storage';
 import {bootOnDtWorld} from '../../../harness/worldBoot';
 import {panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
+import {activeIdent, fplIdents} from '../../../harness/readers';
 
 // The world of the D/T tests is dtWorld() (see Dt1Page.test.ts): along 10 E, the aircraft 0.1 degree north of KAAA at 120
 // kt due north; KBBB, the last waypoint, 84.15 NM away (42.1 min). The fake clock starts at 12:00:00 UTC (DEFAULT_START)
@@ -112,11 +113,12 @@ describe('D/T 4 page', () => {
     });
 
     // A photo of a real unit (reference-photos-index.md, 0283863.jpg; low resolution, but the row reads clearly in a crop)
-    // shows the Direct To symbol in the first two cells, right before the destination ident. The code leaves the two cells
-    // blank
-    it.fails('shows the Direct To symbol before a Direct To destination (photo 0283863.jpg, #298)', async () => {
-        await directToOutsidePlan();
+    // shows the Direct To symbol in the first two cells, right before the destination ident, during a Direct To off the
+    // plan. FPL 0 holds a plan here (#298)
+    it('shows the Direct To symbol before a Direct To destination off the plan (photo 0283863.jpg, #298)', async () => {
+        const unit = await directToOutsidePlan();
 
+        expect(fplIdents(unit, 0)).toEqual(['KAAA', 'ABC', 'DEF', 'KBBB']); // precondition: FPL 0 holds its plan
         expect(Screen.read().rows('R')[0]).toBe('d›KCCC  UTC');
     });
 
@@ -135,6 +137,47 @@ describe('D/T 4 page', () => {
 });
 
 describe('D/T 4 page (characterization)', () => {
+    // While the last leg of FPL 0 is active, its waypoint is the destination and the active waypoint: only the arrow
+    // (maintainer ruling, #298)
+    it('shows the arrow before the destination while the last leg is active (characterization, #298)', async () => {
+        const {kaaa, abc, def, kbbb} = dtWorld();
+        const unit = await bootMoving([kaaa, kbbb], [kaaa, abc, def, kbbb]); // the first leg is the last leg
+        expect(activeIdent(unit)).toBe('KBBB'); // precondition
+
+        expect((await show(unit, 'FPL 0'))[0]).toBe(' ›KBBB  UTC');
+    });
+
+    // A Direct To to the last waypoint of FPL 0 shows the Direct To symbol, as off the plan (maintainer ruling, #298)
+    it('shows the Direct To symbol after a Direct To to the last waypoint (characterization, #298)', async () => {
+        const {kaaa, abc, def, kbbb} = dtWorld();
+        const unit = await bootMoving([kaaa, abc, def, kbbb]);
+        await unit.panel.directTo('KBBB', {waitMs: 2000});
+
+        expect((await show(unit, 'FPL 0'))[0]).toBe('d›KBBB  UTC');
+    });
+
+    // A Direct To to a middle waypoint: the destination stays the last waypoint, which is not active (#298)
+    it('shows blanks before the destination after a Direct To to a middle waypoint (characterization, #298)', async () => {
+        const {kaaa, abc, def, kbbb} = dtWorld();
+        const unit = await bootMoving([kaaa, abc, def, kbbb]);
+        await unit.panel.directTo('ABC', {waitMs: 2000});
+
+        expect((await show(unit, 'FPL 0'))[0]).toBe('  KBBB  UTC');
+    });
+
+    // The destination is twice in FPL 0 and its first copy is active: the arrow compares plan indices (maintainer
+    // ruling, #298)
+    it('shows no arrow before the destination while its first copy is active (characterization, #298)', async () => {
+        // A loop, so that the first KBBB is no 180 degree reversal: that turn's anticipation would sequence past it at
+        // once (turn anticipation is uncapped, as on the real unit)
+        const {kaaa, abc, kbbb} = dtWorld();
+        const kccc = airport('KCCC', 48.0, 10.5);
+        const unit = await bootMoving([kaaa, kbbb, kccc, abc, kbbb], [kaaa, abc, kbbb, kccc]);
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(1); // precondition: the first KBBB
+
+        expect((await show(unit, 'FPL 0'))[0]).toBe('  KBBB  UTC');
+    });
+
     it('shows dashes and no destination before the GPS has a fix', async () => {
         const {kaaa, abc} = dtWorld();
         const unit = await bootUnit({

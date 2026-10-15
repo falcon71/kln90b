@@ -51,14 +51,14 @@ export class Apt5Page extends WaypointPage<AirportFacility> {
         this.remarks = this.props.remarksManager.getRemarks(this.ident);
 
         this.children = new UIElementChildren<Apt5PageTypes>({
-            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage, this.getActiveArrowFplIdx()),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "A"),
             nearestSelector: new NearestSelector(this.facility),
-            rmk0: new FreetextEditor(this.props.bus, this.remarks[0], 11, rmk => this.saveRmk.bind(this)(rmk, 0), () => new RemarkEditorField()),
-            rmk1: new FreetextEditor(this.props.bus, this.remarks[1], 11, rmk => this.saveRmk.bind(this)(rmk, 1), () => new RemarkEditorField()),
-            rmk2: new FreetextEditor(this.props.bus, this.remarks[2], 11, rmk => this.saveRmk.bind(this)(rmk, 2), () => new RemarkEditorField()),
+            rmk0: new FreetextEditor(this.props.bus, this.remarks[0], 11, rmk => this.saveRmk.bind(this)(rmk, 0), () => new RemarkEditorField(), true),
+            rmk1: new FreetextEditor(this.props.bus, this.remarks[1], 11, rmk => this.saveRmk.bind(this)(rmk, 1), () => new RemarkEditorField(), true),
+            rmk2: new FreetextEditor(this.props.bus, this.remarks[2], 11, rmk => this.saveRmk.bind(this)(rmk, 2), () => new RemarkEditorField(), true),
             createWpt: new CreateWaypointMessage(() => Apt1Page.createAtUserPosition(props), () => Apt1Page.createAtPresentPosition(props)),
         });
 

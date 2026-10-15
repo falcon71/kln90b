@@ -43,9 +43,16 @@ function range(from: number, to: number): number[] {
     return Array.from({length: to - from + 1}, (_, i) => from + i);
 }
 
-/** AlphabetEditorField.charset in kln90b/controls/editors/EditorField.tsx */
+/**
+ * AlphabetEditorField.charset in kln90b/controls/editors/EditorField.tsx. The first character of a waypoint ident skips
+ * the blank on the knob (FirstIdentEditorField, #374), so a step count computed over this cycle can be one click off
+ * there; setChar reads the cell again after each turn and corrects it
+ */
 const ALPHABET = [' ', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
-/** The characters of a waypoint selector (CHARSET in kln90b/controls/selects/WaypointSelector.tsx). It is the same cycle as ALPHABET, started at 0. */
+/**
+ * The characters of a waypoint selector (CHARSET in kln90b/controls/selects/WaypointSelector.tsx). It is the same cycle as
+ * ALPHABET, started at 0. Its first cell skips the blank (#374), see ALPHABET
+ */
 const SELECTOR_CHARSET = [...'0123456789', ' ', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
 /** One display tick, so the screen shows the result of each click (DOM changes only in display ticks) */
 const CLICK_MS = 250;
@@ -290,7 +297,7 @@ export class FrontPanel {
      * KAAA.
      */
     public async enterIdent(side: Side, ident: string): Promise<void> {
-        const first = this.focused(side);
+        const first = await this.focusedWhenShown(side);
         if (first.text.length === 1) {
             await this.enterIntoSelector(side, ident, first);
             return;
@@ -512,6 +519,19 @@ export class FrontPanel {
             await this.ent();
         }
         await this.cursor('L');
+    }
+
+    /**
+     * The focused field once the cursor shows. A cell whose first display tick is a blink tick has the blink class but no
+     * inverse yet (EditorField.tick), so for one display tick the page shows no cursor; which tick that is depends on how
+     * many clicks went before. Waits up to a second, one display tick at a time, for the one run; then reads it as
+     * focused() does, with its error.
+     */
+    private async focusedWhenShown(side: Side): Promise<Field> {
+        for (let i = 0; i < 4 && this.focusedRuns(side).length === 0; i++) {
+            await vi.advanceTimersByTimeAsync(CLICK_MS);
+        }
+        return this.focused(side);
     }
 
     /** The one run of inverted cells on a side, which is the focused field. Columns are those of the whole screen. */

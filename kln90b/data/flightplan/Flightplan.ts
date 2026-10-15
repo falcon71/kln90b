@@ -42,6 +42,11 @@ export interface FlightplanEvents {
 }
 
 /**
+ * The most waypoints a flight plan holds (4-4)
+ */
+export const MAX_LEGS = 30;
+
+/**
  * We don't use the WT Flighplan, because the KLN Flightplan really is dead simple
  */
 export class Flightplan {
@@ -59,8 +64,8 @@ export class Flightplan {
      * @param leg
      */
     public insertLeg(idx: number, leg: KLNFlightplanLeg) {
-        if (this.legs.length >= 30) {
-            throw new Error("Cannot have more than 30 legs!");
+        if (this.legs.length >= MAX_LEGS) {
+            throw new Error(`Cannot have more than ${MAX_LEGS} legs!`);
         }
         this.legs.splice(idx, 0, leg);
         if (this.publishingEnabled) {

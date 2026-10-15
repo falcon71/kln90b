@@ -60,7 +60,7 @@ export class NdbPage extends WaypointPage<NdbFacility> {
         }
 
         this.children = new UIElementChildren<NdbPageTypes>({
-            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage, this.getActiveArrowFplIdx()),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             ndb: new NdbSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             waypointType: new TextDisplay(this.activeIdx === -1 ? "" : "N"),
@@ -194,6 +194,9 @@ export class NdbPage extends WaypointPage<NdbFacility> {
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            //No redraw: a redraw from the missing facility would blank the typed values, which the page keeps (#289)
+            return;
         }
         this.props.memory.ndbPage.facility = this.facility;
         this.cursorController.setCursorActive(false);

@@ -160,9 +160,8 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   ([the trainer record](kln89-trainer-record.md), 2026-10-09, T1), while the 90B code stays on the DIR page. The 90B
   guide was not checked for the case, and the #335 tests do not assert it.
 - **Left page leads** (seen and not confirmed or not filed):
-    - FPL 0 shows an empty top row when the active waypoint is the first one, and after a list rebuild with the cursor
-      on; the guide's figures do not show the case (a trainer question). `DirectToPage.test.ts` reads rows 1 to 5
-      around it.
+    - FPL 0 shows an empty top row when the active waypoint is the first one; the guide's figures do not show the case
+      (a trainer question). `DirectToPage.test.ts` reads rows 1 to 5 around it.
     - An XTK of exactly 0 shows `-.-` on NAV 3 (`Nav3Page.tsx:55,95` treat 0 as no value); unreachable in practice.
     - CAL 2's `setTemp` writes the CAL 1 temperature too; 5-11 does not say whether the pages share it.
     - The ` 0` in the top row of an empty SUP page is also the trainer's behavior and is a spec test.
@@ -222,15 +221,36 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       late and writes against the airport shown then, so a quick scan could show the previous airport's class;
       `ErrorPage.showError` writes the error text with `innerHTML`, unescaped; `getAirspaces(lat, lon, 10, …)` passes
       10 meters, which reads like nautical miles but works with `isInside`.
-    - Displays: the `targetLetterIndex == 9` branches of both deviation bars and the `activeIdx === null` branch of
-      `FlightplanArrow` are dead; `formatDuration` is exported but used only in its file; a negative OTH fuel clamps to
-      0; single-digit temperatures keep a zero (the trainer could not answer); the Super NAV 1 FLAG row draws 22 cells
-      instead of 23.
+    - Displays: the `targetLetterIndex == 9` branches of both deviation bars are dead; `formatDuration` is exported but
+      used only in its file; a negative OTH fuel clamps to 0; single-digit temperatures keep a zero (the trainer could
+      not answer); the Super NAV 1 FLAG row draws 22 cells instead of 23.
     - The trainer brings the cursor back on the first field after it is turned off and on, and on the top visible entry
       of a scrolled list ([the trainer record](kln89-trainer-record.md), 2026-10-08, T7 and T23; 2026-10-11). The code
       does the same (#355): a page's start field holds every time the cursor comes on, and the list pages start on the
       top visible entry while scrolled, which also explains why 4-3 sends a pilot back to USE? after building a long
       plan.
+- **Gaps left by the flight plan entry fixes** (code held by reading, not by a test; paraphrased from the milestone 4
+  review):
+    - #291: the run-once clearing of a pending CONFIRM entry (`enterMe`) is not held. It shows only when `createLeg` runs
+      while a REF row waits. The keyboard re-entry of a waiting REF row is untested too; the knob path is.
+    - #294: no ACT test for INT, NDB, SUP or an APT 2 to n page; the wiring of the arrow is mechanical, so a test there
+      would repeat the VOR and APT 1 ones.
+    - #262, creation page:
+        - A creation page that left the right stack (right cursor off, outer knob) makes the left CLR take the #310
+          blank-waits-for-ENT path. Untested.
+        - CLR on a duplicate-waypoint list above the creation page cancels the whole creation. Untested.
+        - A second CLR on D-> after a canceled creation goes through the existing D-> CLR path, while the KLN 89 left
+          the D-> page there ([the trainer record](kln89-trainer-record.md), 2026-10-15): a lead for a trainer check.
+    - #343: a character in a later cell of an all-blank ident gives an ident that starts with a blank, and a waypoint
+      page can create a user waypoint of it; the V2 loader trims it on reload. The knob no longer dials a blank into the
+      first cell (#374), but an empty ident still starts with one. A lead for a trainer check before an issue is filed.
+    - #311: the first click on a Turn-On line (5-28) still gives a blank, while the remark lines of APT 5 give an A
+      (`FreetextEditor`'s `firstClickGivesA`). Neither the guide nor the KLN 89 trainer record says what the first click
+      on a Turn-On line gives. A lead for a check.
+    - #311: the remark line's first click is recorded clockwise only (an A). The unit gives the A counterclockwise too;
+      the 89 might give the blank or the hyphen there, by analogy with the wheel (Z, 0 to 9, hyphen, blank, A). The cells
+      after the A show as underscores in the 90B, while the only record of them, the evening block, says blanks. A trainer
+      question for the counterclockwise first click and for what the other cells show.
 
 ## Boot, power and the unit as a whole
 
@@ -281,14 +301,11 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone leaves both handler counts
       unchanged, and OTH 4 counts the `changed` topic of the remarks manager;
     - the fix of #95 turns its two pins red (the list and the error page);
-    - the fix of #311 in `WaypointEditor` leaves the `FplPage.test.ts` insert tests green, but its first click on an
-      empty remark line changes the click counts in the setup of `stores a remark with a hyphen and shows it again`
-      (`FreetextEditor.test.ts`); the fix of #262 must keep NO
-      SUCH WPT on the REF page (held in `WaypointEditor.test.ts`, and the vehicle of the status line tests);
     - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): duplicate idents on a waypoint
-  page (2026-10-08, T20, not done), and the empty top row of FPL 0 above. #162 and #163 are no open questions: the
-  trainer shows neither ARM nor ACTV, so the maintainer's rulings settle them and the tests hold them as characterizations.
+  page (2026-10-08, T20, not done), and the empty top row of FPL 0 with the first waypoint active (above). #162 and
+  #163 are no open questions: the trainer shows neither ARM nor ACTV, so the maintainer's rulings settle them and the
+  tests hold them as characterizations.
   What the 90B shows on an empty MSG page (#325), the prompt while the MSG page shows and an airport below sea level
   cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is
   the question #326.

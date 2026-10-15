@@ -11,7 +11,12 @@ export class ActiveArrow implements UiElement {
     private ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
 
-    constructor(public icao: IcaoValue | null, private navPageState: NavPageState) {
+    /**
+     * #294 fplIdx: on the ACT pages the index in FPL 0 of the shown waypoint, null elsewhere. A page may change it
+     * between ticks; the next tick uses the new value. When it is not null, the arrow marks only the copy whose plan
+     * index is the active one (4-10).
+     */
+    constructor(public icao: IcaoValue | null, private navPageState: NavPageState, public fplIdx: number | null = null) {
     }
 
     render(): VNode {
@@ -27,7 +32,13 @@ export class ActiveArrow implements UiElement {
             this.ref.instance.innerText = " ";
             this.ref.instance.classList.remove("blink");
         } else {
-            if (this.icao !== null && ICAO.valueEquals(this.icao, activeWpt.icaoStruct)) {
+            let isActive: boolean;
+            if (this.fplIdx !== null) {
+                isActive = this.fplIdx === this.navPageState.activeWaypoint.getActiveFplIdx(); //#294
+            } else {
+                isActive = this.icao !== null && ICAO.valueEquals(this.icao, activeWpt.icaoStruct);
+            }
+            if (isActive) {
                 this.ref.instance.innerText = "›";
                 //3-29 Waypoint alerting
                 if (this.navPageState.waypointAlert && blink) {
