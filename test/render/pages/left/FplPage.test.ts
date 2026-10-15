@@ -748,8 +748,8 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
     });
 
     // 4-4: only a plan of fewer than 30 offers a blank position for another waypoint; the KLN 89 trainer (2026-10-07)
-    // shows no blank position behind the last waypoint of a full plan and no cursor field there either
-    it.fails('shows no blank position after the 30th waypoint (4-4, checked in the KLN 89 trainer, 2026-10-07, #241)', async () => {
+    // shows no blank position behind the last waypoint of a full plan and no cursor field there either (#241)
+    it('shows no blank position after the 30th waypoint (4-4, checked in the KLN 89 trainer, 2026-10-07, #241)', async () => {
         const fixes = FIXES31();
         const unit = await bootUnit({facilities: fixes, position: {lat: 46.5, lon: 8}, storage: savedFlightplan(5, fixes.slice(0, 30))});
         await settle(unit);
@@ -759,6 +759,18 @@ describe('FPL 1 to FPL 25 pages, a full plan', () => {
         const seen = await walkRows(unit, 34);
 
         expect(seen.filter(r => r.startsWith(' 31:'))).toEqual([]);
+    });
+
+    // 4-3 step 10 and figure 4-9: with more than five waypoints the page shows the first four and then the last one.
+    // The last row shows the last waypoint, the 30th of a full plan, which has no blank position below it (#241)
+    it('shows the 30th waypoint in the last row of a full plan (4-3)', async () => {
+        const fixes = FIXES31();
+        const unit = await bootUnit({facilities: fixes, position: {lat: 46.5, lon: 8}, storage: savedFlightplan(5, fixes.slice(0, 30))});
+        await settle(unit);
+        await unit.panel.selectPage('L', 'FPL 5');
+        await unit.panel.cursor('L');
+
+        expect(left()[5]).toBe(' 30:FA29   ');
     });
 });
 

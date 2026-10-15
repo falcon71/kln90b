@@ -1,6 +1,6 @@
 import {AirportFacility, Facility, FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {PageProps, UiElement, UIElementChildren} from '../pages/Page';
-import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
+import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType, MAX_LEGS} from "../data/flightplan/Flightplan";
 import {List} from "./List";
 import {FlightplanListItem} from "./FlightplanListItem";
 import {Button} from "./Button";
@@ -319,6 +319,7 @@ class EditableFlightplan {
     public legs: EditableFlightplanLeg[] = [];
     public listParent: FlightplanList | undefined;
     public firstLine: FPLFirstLine;
+    public hasTrailingBlank = true;
 
 
     constructor(private cursorController: CursorController,
@@ -549,7 +550,12 @@ class EditableFlightplan {
 
     private syncLegsFromFlightplan() {
         this.legs = this.flightplan.getLegs().map((l, idx) => ({wpt: l.wpt, origIdx: idx, leg: l}));
-        this.legs.push({wpt: null, origIdx: -1});
+        //4-4: only a plan of fewer than 30 waypoints takes another one, so a full numbered plan has no blank position
+        //(#241). FPL 0 keeps it: an addition to a full FPL 0 can make room by dropping the first waypoint (C-1)
+        this.hasTrailingBlank = this.flightplan.idx === 0 || this.legs.length < MAX_LEGS;
+        if (this.hasTrailingBlank) {
+            this.legs.push({wpt: null, origIdx: -1});
+        }
     }
 
     /**
@@ -653,7 +659,7 @@ export class FlightplanList extends List {
             for (let i = 0; i < childList.length; i++) {
                 const child = childList[i];
                 if (child instanceof FlightplanListItem && child.origWptIdx === actIdx) {
-                    const requiredScrollIdx = Math.max(Math.min(i - 1, childList.length - this.height - 1), 0); //not using clamp, the order is important
+                    const requiredScrollIdx = Math.max(Math.min(i - 1, this.maxScrollIdx(childList.length)), 0); //not using clamp, the order is important
                     if (requiredScrollIdx !== this.scrollIdx) {
                         this.scrollIdx = requiredScrollIdx;
                         this.redraw();
@@ -690,7 +696,17 @@ export class FlightplanList extends List {
         }
 
         //The last waypoint will always be shown
-        return childList[childList.length - 2];
+        return childList[this.lastWaypointChildIdx(childList.length)];
+    }
+
+    /** The index of the child shown in the last row while the end of the list is out of view: the last waypoint (4-8) */
+    private lastWaypointChildIdx(numChildren: number): number {
+        return this.editPlan.hasTrailingBlank ? numChildren - 2 : numChildren - 1;
+    }
+
+    /** The largest scroll offset that still shows the last waypoint in the last row */
+    private maxScrollIdx(numChildren: number): number {
+        return Math.max(this.lastWaypointChildIdx(numChildren) - (this.height - 1), 0);
     }
 
     protected calculateRequiredScrollIdx(focusedIdx: number) {
@@ -699,7 +715,7 @@ export class FlightplanList extends List {
         if (focusedIdx < requiredScrollIdx) {
             requiredScrollIdx = focusedIdx;
         }
-        if (focusedIdx < childList.length - 2) {
+        if (focusedIdx < this.lastWaypointChildIdx(childList.length)) {
             //behaves like a five line list
             if (focusedIdx >= requiredScrollIdx + 5) {
                 requiredScrollIdx = focusedIdx - 4;
