@@ -7,6 +7,7 @@ import {airport, intersection, vor} from '../../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures';
 import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
+import {CtrState} from '../../../../kln90b/data/VolatileMemory';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 import {fplIdents, userWaypoints} from '../../../harness/readers';
@@ -342,22 +343,6 @@ describe('CTR 1 page, the 30 waypoint limit (5-26)', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // The plan can grow between the computation and the insertion (on the left page, or on APT 7). The guide does not
-    // describe that. The insertion then does not fit: nothing is inserted, and CTR 1 says so, where the plan used to
-    // throw in the middle of it
-    it('characterization: says NOT ENOUGH ROOM IN FPL when the plan has grown since the computation', async () => {
-        const fa = cluster(26);
-        const unit = await onCtr1(w => [...fa, w.kbbb, w.kccc], fa);
-        await ent(unit);
-        expect(right()[0]).toBe(' 2 NEW WPTS'); // Precondition: computed, 28 plus 2 fits
-        unit.props.memory.fplPage.flightplans[1].insertLeg(0, {wpt: intersection('FB00', 41.0, -99.0), type: KLNLegType.USER});
-        await ent(unit);
-
-        expect(right().map(r => r.trim()).filter(r => r !== '').join(' ')).toBe('NOT ENOUGH ROOM IN FPL');
-        expect(fplIdents(unit, 1).length).toBe(29);
-        expect(unit.errors).toEqual([]);
-    });
-
     // The first waypoint of a full FPL 0 that is part of the active leg: the insertion used to throw (insertLegIntoFpl)
     // when it was offered, on the ENT path
     it('says NOT ENOUGH ROOM IN FPL for a full FPL 0 whose first leg is active (5-26, #161)', async () => {
@@ -376,6 +361,181 @@ describe('CTR 1 page, the 30 waypoint limit (5-26)', () => {
         expect(right().map(r => r.trim()).filter(r => r !== '').join(' ')).toBe('NOT ENOUGH ROOM IN FPL');
         await ent(unit);
         expect(fplIdents(unit, 0).length).toBe(30);
+        expect(unit.errors).toEqual([]);
+    });
+});
+
+// 5-27 describes a recomputation after the plan changed. That the offer goes back to the computation, and that the
+// insertion never works on a plan other than the computed one, is a characterization that follows the AVsoftech trainer
+describe('CTR 1 page, a plan edited after the computation (characterization)', () => {
+    // The plan grows between the computation and the insertion (on the left page, or on APT 7). The computed indices
+    // belong to the old plan, so ENT must not insert at them (#348); it offers the computation again. Nothing is
+    // inserted, and there is no insert-time room check any more (#161): the plan is the computed one, which passed it
+    it('characterization: offers the computation again when the plan has grown since the computation (#348)', async () => {
+        const fa = cluster(26);
+        const unit = await onCtr1(w => [...fa, w.kbbb, w.kccc], fa);
+        await ent(unit);
+        expect(right()[0]).toBe(' 2 NEW WPTS'); // Precondition: computed, 28 plus 2 fits
+        unit.props.memory.fplPage.flightplans[1].insertLeg(0, {wpt: intersection('FB00', 41.0, -99.0), type: KLNLegType.USER});
+        await ent(unit);
+
+        expect(right()).toEqual(['           ', '           ', 'PRESS ENT  ', 'TO COMPUTE ', 'CTR WPTS   ', '           ']);
+        expect(fplIdents(unit, 1).length).toBe(29);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The edit comes before the next display tick, so ENT is the first to see it: the insertion used to take the
+    // computed index 1 of the old plan and put BGD00 between FB00 and KAAA (#348)
+    it('characterization: offers the computation again when the plan is edited between the two ENTs (#348)', async () => {
+        const fb00 = intersection('FB00', 41.0, -99.0);
+        const unit = await onCtr1(w => [w.kaaa, w.kbbb], [fb00]);
+        await ent(unit);
+        expect(right()[0]).toBe(' 1 NEW WPT '); // Precondition: one Center waypoint computed
+        unit.props.memory.fplPage.flightplans[1].insertLeg(0, {wpt: fb00, type: KLNLegType.USER});
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(fplIdents(unit, 1)).toEqual(['FB00', 'KAAA', 'KBBB']);
+        expect(right()).toEqual(['           ', '           ', 'PRESS ENT  ', 'TO COMPUTE ', 'CTR WPTS   ', '           ']);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The same edit followed by a display tick: CTR 1 is back at the computation before any ENT
+    it('characterization: goes back to the computation in the display tick after the plan was edited (#348)', async () => {
+        const fb00 = intersection('FB00', 41.0, -99.0);
+        const unit = await onCtr1(w => [w.kaaa, w.kbbb], [fb00]);
+        await ent(unit);
+        expect(right()[0]).toBe(' 1 NEW WPT '); // Precondition: one Center waypoint computed
+        unit.props.memory.fplPage.flightplans[1].insertLeg(0, {wpt: fb00, type: KLNLegType.USER});
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(right()).toEqual(['           ', '           ', 'PRESS ENT  ', 'TO COMPUTE ', 'CTR WPTS   ', '           ']);
+        expect(fplIdents(unit, 1)).toEqual(['FB00', 'KAAA', 'KBBB']);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The count alone does not tell an edit: a waypoint replaced by another leaves the same number of legs, and the
+    // computed indices still belong to the old plan
+    it('characterization: goes back to the computation when a waypoint of the plan was replaced (#348)', async () => {
+        const fb00 = intersection('FB00', 41.0, -99.0);
+        const unit = await onCtr1(w => [w.kaaa, w.kbbb], [fb00]);
+        await ent(unit);
+        expect(right()[0]).toBe(' 1 NEW WPT '); // Precondition: one Center waypoint computed
+        const fpl1 = unit.props.memory.fplPage.flightplans[1];
+        fpl1.deleteLeg(0);
+        fpl1.insertLeg(0, {wpt: fb00, type: KLNLegType.USER});
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(fplIdents(unit, 1)).toEqual(['FB00', 'KBBB']); // the same number of legs as before
+        expect(right()).toEqual(['           ', '           ', 'PRESS ENT  ', 'TO COMPUTE ', 'CTR WPTS   ', '           ']);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // NOT ENOUGH ROOM IN FPL belongs to the plan as it was as well: when the plan is edited, the computation is offered
+    // again and may fit now
+    it('characterization: goes back to the computation when the plan was edited after NOT ENOUGH ROOM (#348)', async () => {
+        const fa = cluster(27);
+        const unit = await onCtr1(w => [...fa, w.kbbb, w.kccc], fa);
+        await ent(unit);
+        expect(right().map(r => r.trim()).filter(r => r !== '').join(' ')).toBe('NOT ENOUGH ROOM IN FPL'); // Precondition
+        unit.props.memory.fplPage.flightplans[1].deleteLeg(0);
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(right()).toEqual(['           ', '           ', 'PRESS ENT  ', 'TO COMPUTE ', 'CTR WPTS   ', '           ']);
+        expect(unit.errors).toEqual([]);
+    });
+});
+
+/**
+ * Replaces `method` of `target` by a version that waits for the returned release before it does its work, so that a
+ * test can act while the computation of CTR 1 waits at that call
+ */
+function hold<T extends object>(target: T, method: keyof T & string) {
+    const original = (target[method] as unknown as (...args: unknown[]) => unknown).bind(target);
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>(resolve => release = resolve);
+    const spy = vi.spyOn(target, method as never).mockImplementation((async (...args: unknown[]) => {
+        await gate;
+        return original(...args);
+    }) as never);
+    return {spy, release};
+}
+
+// A computation is asynchronous. When the plan page is left and selected again while it runs, CTR 1 is reset, and the
+// finished computation must not bring back its Center waypoints (#301, #348). Each test holds one of the awaits of the
+// computation until the page was left. The state itself is read after 1 ms, before the next display tick, because a
+// display tick would also clear a state that was wrongly written
+describe('CTR 1 page, a computation that finishes after the plan page was left (characterization)', () => {
+    async function leaveAndReturn(unit: HeadlessUnit, release: () => void) {
+        await unit.panel.selectPage('L', 'FPL 2');
+        await unit.panel.selectPage('L', 'FPL 1');
+        release();
+        await vi.advanceTimersByTimeAsync(1);
+    }
+
+    function expectReset(unit: HeadlessUnit) {
+        expect(unit.props.memory.ctrPage.state).toBe(CtrState.FPL);
+        expect(unit.props.memory.ctrPage.waypoints).toEqual([]);
+    }
+
+    it('characterization: discards a computation that finishes after the plan page was left, at the nearest VOR search (#348)', async () => {
+        const unit = await onCtr1(w => [w.kaaa, w.kbbb]);
+        const {spy, release} = hold(unit.props.nearestUtils, 'getNearestVor');
+        await ent(unit);
+        expect(spy).toHaveBeenCalled(); // Precondition: the computation waits for the search
+        await leaveAndReturn(unit, release);
+
+        expectReset(unit);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(right()).toEqual(['           ', '           ', 'PRESS ENT  ', 'TO COMPUTE ', 'CTR WPTS   ', '           ']);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The route search is the first await. A computation that notices the reset there creates no user waypoint at all
+    it('characterization: discards a computation that finishes after the plan page was left, at the route search (#348)', async () => {
+        const unit = await onCtr1(w => [w.kaaa, w.kbbb]);
+        const {spy, release} = hold(unit.props.nearestUtils, 'getAirspaces');
+        await ent(unit);
+        expect(spy).toHaveBeenCalled(); // Precondition: the computation waits for the route search
+        await leaveAndReturn(unit, release);
+
+        expectReset(unit);
+        expect(userWaypoints(unit, FacilityType.USR)).toEqual([]);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The plan is edited while the computation waits, with no page left and no display tick in between: the
+    // computation compares the plan with its own snapshot and writes nothing
+    it('characterization: discards a computation of a plan that was edited while it ran (#348)', async () => {
+        const fb00 = intersection('FB00', 41.0, -99.0);
+        const unit = await onCtr1(w => [w.kaaa, w.kbbb], [fb00]);
+        const {spy, release} = hold(unit.props.nearestUtils, 'getAirspaces');
+        await unit.panel.ent();
+        expect(spy).toHaveBeenCalled(); // Precondition: the computation waits for the route search
+        unit.props.memory.fplPage.flightplans[1].insertLeg(0, {wpt: fb00, type: KLNLegType.USER});
+        release();
+        await vi.advanceTimersByTimeAsync(1);
+
+        expectReset(unit);
+        expect(userWaypoints(unit, FacilityType.USR)).toEqual([]);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The reference VOR of a waypoint the plan already holds is loaded at the end of the computation (the setup of 'does
+    // not count a Center waypoint that the plan already holds': a second computation that sees an existing crossing)
+    it('characterization: discards a computation that finishes after the plan page was left, at the reference VOR (#348)', async () => {
+        const fa = cluster(26);
+        const unit = await onCtr1(w => [...fa, w.kbbb, w.kccc], fa);
+        await ent(unit);
+        await ent(unit); // the two Center waypoints are inserted
+        await unit.panel.selectPage('L', 'FPL 2');
+        await unit.panel.selectPage('L', 'FPL 1');
+        const {spy, release} = hold(unit.props.facilityLoader, 'tryGetFacility');
+        await ent(unit);
+        expect(spy).toHaveBeenCalled(); // Precondition: the computation waits for the reference VOR of the existing waypoint
+        await leaveAndReturn(unit, release);
+
+        expectReset(unit);
         expect(unit.errors).toEqual([]);
     });
 });

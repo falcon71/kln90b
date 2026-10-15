@@ -18,7 +18,7 @@ import {PageProps, UIElementChildren} from "../Page";
 import {EnterResult, NO_CURSOR_CONTROLLER} from "../CursorController";
 import {MainPage} from "../MainPage";
 import {FplPage} from "../left/FplPage";
-import {syncCtrState} from "./CtrState";
+import {legsDiffer, syncCtrState} from "./CtrState";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {AirspaceIntersection, airspaceIntersectionsAlongRoute} from "../../services/AirspacesAlongRoute";
 import {CtrState} from "../../data/VolatileMemory";
@@ -90,7 +90,11 @@ export class Ctr1Page extends SixLineHalfPage {
             case CtrState.FPL:
                 return this.calculateCenterWaypoints().then(() => EnterResult.Handled_Keep_Focus);
             case CtrState.CALCULATED:
-                this.insertIntoFpl();
+                //#348: the plan may have been edited since the computation and the next display tick has not seen it yet
+                syncCtrState(this.props);
+                if (this.props.memory.ctrPage.state === CtrState.CALCULATED) {
+                    this.insertIntoFpl();
+                }
                 return Promise.resolve(EnterResult.Handled_Keep_Focus);
         }
     }
@@ -185,58 +189,75 @@ export class Ctr1Page extends SixLineHalfPage {
     }
 
     private async calculateCenterWaypoints() {
-        const fplLegs = this.props.memory.ctrPage.lastFpl!.getLegs();
+        const state = this.props.memory.ctrPage;
+        const fpl = state.lastFpl!;
+        const fplLegs = fpl.getLegs();
         if (fplLegs.length < 2) {
             return;
         }
         const route = fplLegs.map(l => l.wpt);
 
+        //#348: the legs of this computation. A computation is superseded, and writes nothing, when after an await a
+        //reset has replaced or cleared them (the plan page left, or a display tick saw an edit; every reset nulls
+        //computedLegs, so the page comparison only repeats that one), or when the plan itself differs from them now (an
+        //edit that no display tick has seen yet)
+        const legs = [...fplLegs];
+        const page = state.lastFplPage;
+        state.computedLegs = legs;
+        const superseded = () => state.lastFplPage !== page || state.computedLegs !== legs || legsDiffer(fpl.getLegs(), legs);
+
         const intersections = await airspaceIntersectionsAlongRoute(route, this.props.nearestUtils, BitFlags.createFlag(BoundaryType.Center));
+        if (superseded()) {
+            return;
+        }
 
         console.log("intersections", intersections);
 
         //5-26 Only the new waypoints count against the limit of 30. Nothing is created when they do not fit.
         //5-26, #221: only the en-route waypoints count against 30, every leg against 45
+        //#348: the insertion needs no second check, because it is only offered for this unchanged plan
         const existing = intersections.map(intersection => this.getWaypointIfExistsInFpl(intersection));
-        if (!this.props.memory.ctrPage.lastFpl!.fits(existing.filter(wpt => wpt === null).length, 0)) {
-            this.props.memory.ctrPage.state = CtrState.FULL;
+        if (!fpl.fits(existing.filter(wpt => wpt === null).length, 0)) {
+            state.state = CtrState.FULL;
             return;
         }
 
+        const waypoints: CenterWaypoint[] = [];
         for (let i = 0; i < intersections.length; i++) {
             let wpt = existing[i];
             if (wpt === null) {
                 wpt = await this.createWpt(intersections[i]);
+                if (superseded()) {
+                    return;
+                }
             }
             if (wpt !== null) {
                 if (wpt.refMagvar === null && wpt.wpt.reference1IcaoStruct !== undefined) {
                     //#362: CTR 2 converts the radial with the reference VOR's own variation. A reference that is gone from
                     //the database stays null: CTR 2 then falls back to the variation at the present position
                     const refVor = await this.props.facilityLoader.tryGetFacility(ICAO.getFacilityTypeFromValue(wpt.wpt.reference1IcaoStruct), wpt.wpt.reference1IcaoStruct);
+                    if (superseded()) {
+                        return;
+                    }
                     if (refVor !== null) {
                         wpt.refMagvar = KLNMagvar.getReferenceMagvar(refVor);
                     }
                 }
-                this.props.memory.ctrPage.waypoints.push(wpt);
+                waypoints.push(wpt);
             }
         }
 
-
-        this.props.memory.ctrPage.state = CtrState.CALCULATED;
+        state.waypoints = waypoints;
+        state.state = CtrState.CALCULATED;
     }
 
     private insertIntoFpl() {
         const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
         const page = mainPage.getLeftPage() as FplPage;
 
+        //#348: the plan is the one the waypoints were computed for, and the computation checked that they fit
         const fpl = this.props.memory.ctrPage.lastFpl!;
         const newWpts = this.props.memory.ctrPage.waypoints.filter(wpt => wpt.isNew);
-        //5-26 The plan may have grown since the computation. Insert all or none, as insertLegIntoFpl throws on a full plan.
-        //5-26, #221: only the en-route waypoints count against 30, every leg against 45
-        if (!fpl.fits(newWpts.length, 0)) {
-            this.props.memory.ctrPage.state = CtrState.FULL;
-            return;
-        }
 
         let inserted = 0;
         for (const wpt of newWpts) {

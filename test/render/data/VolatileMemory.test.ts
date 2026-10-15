@@ -216,6 +216,7 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
         m.ctrPage.lastFpl = m.fplPage.flightplans[0];
         m.ctrPage.lastFplPage = {} as unknown as FplPage; // Only its presence is read here
         m.ctrPage.waypoints = [{idx: 1} as unknown as CenterWaypoint]; // Only its presence is read here
+        m.ctrPage.computedLegs = [];
         m.othPage.reserve = 45;
         await vi.advanceTimersByTimeAsync(2000);
         expect(m.navPage.nav4VnavWpt).toBe(kbbb); // The precondition: the unit keeps the seeded VNAV waypoint
@@ -230,7 +231,7 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
         expect(m.navPage.nav4FromAlt).toBe(0);
         expect(m.navPage.nav4VnavDist).toBe(0);
         expect(m.calPage).toMatchObject({cal6FromTimezone: null, cal6ToTimezone: null, cal7Wpt: null, cal7DateZ: null, cal7Timezone: null});
-        expect(m.ctrPage).toEqual({state: CtrState.NO_FPL, lastFpl: null, lastFplPage: null, waypoints: []});
+        expect(m.ctrPage).toEqual({state: CtrState.NO_FPL, lastFpl: null, lastFplPage: null, waypoints: [], computedLegs: null});
         expect(m.othPage.reserve).toBe(0);
         expect(m.isReady).toBe(true);
     });

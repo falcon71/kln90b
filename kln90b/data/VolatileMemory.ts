@@ -141,6 +141,8 @@ export interface CtrPageState {
     /** #301: the plan page on the left that the computation was made on; another instance means the page was left */
     lastFplPage: FplPage | null;
     waypoints: CenterWaypoint[];
+    /** #348: a copy of the plan's legs from the computation; the state goes back to the start when the plan differs */
+    computedLegs: KLNFlightplanLeg[] | null;
 }
 
 
@@ -215,6 +217,7 @@ export class VolatileMemory {
         lastFpl: null,
         lastFplPage: null,
         waypoints: [],
+        computedLegs: null,
     };
 
 
@@ -280,6 +283,7 @@ export class VolatileMemory {
         this.ctrPage.lastFpl = null;
         this.ctrPage.lastFplPage = null;
         this.ctrPage.waypoints = [];
+        this.ctrPage.computedLegs = null;
 
         this.othPage.reserve = 0;
 

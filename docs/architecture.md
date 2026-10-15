@@ -610,6 +610,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       entry per type, setting `isReady` when done; WelcomePage waits on `isReady`.
     - `ctrPage` keeps the left FPL page instance of the CTR computation (`lastFplPage`). CTR 1 and CTR 2 call `syncCtrState`
       (`pages/right/CtrState.ts`) in their display ticks and return to the start state when another instance is on the left (5-26).
+      `computedLegs` is a copy of the plan's legs from the computation: when the plan's legs differ (count or instance),
+      `syncCtrState` and CTR 1's insert ENT go back to the start state (#348), and a computation that finishes after such a reset
+      is discarded. The insertion therefore needs no room check of its own; the computation checks `fits`.
 - **Persistent messages** (`data/PersistentMessages.ts`) are condition-driven message objects. They are not stored; see
   Core 9.
 
