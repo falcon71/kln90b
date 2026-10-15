@@ -534,7 +534,7 @@ class Apt7ProcedurePage extends WaypointPage<AirportFacility> {
 
 
         this.children = new UIElementChildren<Apt7ProcedurePageTypes>({
-            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage, this.getActiveArrowFplIdx()),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             apt: new AirportSelector(this.props.bus, this.ident, this.props.facilityLoader, (fac) => {
                 props.changeFacility(fac); //Normally, only this.changeFacility would be called. But we also need to inform the parent, so it can calculate the number of pages correctly and set the correct procedure type

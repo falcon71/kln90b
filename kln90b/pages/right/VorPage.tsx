@@ -72,7 +72,7 @@ export class VorPage extends WaypointPage<VorFacility> {
         }
 
         this.children = new UIElementChildren<VorPageTypes>({
-            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage),
+            activeArrow: new ActiveArrow(facility?.icaoStruct ?? null, this.props.memory.navPage, this.getActiveArrowFplIdx()),
             activeIdx: new TextDisplay(this.getActiveIdxText()),
             vor: new VorSelector(this.props.bus, this.ident, this.props.facilityLoader, this.changeFacility.bind(this)),
             dme: new TextDisplay(hasDme(facility) ? "D" : " "),

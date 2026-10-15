@@ -142,6 +142,21 @@ describe('ACT page (characterization)', () => {
 
         expect(Screen.read().rows('R')[0]).toBe('  1 KAAA  A');
     });
+
+    // 4-10 supports the arrow at the active waypoint, not the second-copy rule at an airport: the KLN 89 trainer
+    // showed that rule for a VOR only (2026-10-07, the VOR test below). This is the airport page (#294)
+    it('shows the arrow only at the active copy of an airport (characterization, #294)', async () => {
+        const {kaaa, abc, kbbb} = dtWorld();
+        // FPL 0 KAAA, KBBB, ABC, KBBB; 0.1 degree north of KAAA the leg KAAA - KBBB is active, the first KBBB
+        const unit = await bootOnAct([kaaa, kbbb, abc, kbbb], [kaaa, abc, kbbb]);
+        expect(Screen.read().rows('R')[0]).toBe('› 2 KBBB  A'); // the ACT page opens on the active waypoint
+        await unit.panel.scan();
+
+        await unit.panel.inner('R', 2);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('R')[0]).toBe('  4 KBBB  A');
+    });
 });
 
 describe('ACT page, the first row (4-10)', () => {
@@ -268,9 +283,9 @@ describe('ACT page, scanning FPL 0 (4-10)', () => {
     });
 
     // 4-10: the arrow designates the active waypoint, and the KLN 89 trainer, 2026-10-07: with a waypoint twice in
-    // the plan and the first copy active, the scan shows the second copy without the arrow. ActiveArrow compares ICAOs, so
-    // the second copy gets the arrow as well
-    it.fails('shows no arrow at the second copy of the active waypoint (4-10, the KLN 89 trainer, 2026-10-07, #294)', async () => {
+    // the plan and the first copy active, the scan shows the second copy without the arrow. The ACT pages compare
+    // the plan index of the copy with the active one, not the ICAOs (#294)
+    it('shows no arrow at the second copy of the active waypoint (4-10, the KLN 89 trainer, 2026-10-07, #294)', async () => {
         const {kaaa, abc, def} = dtWorld();
         const unit = await bootOnAct([kaaa, abc, def, abc], [kaaa, abc, def]);
         await unit.panel.scan();

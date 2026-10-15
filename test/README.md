@@ -722,7 +722,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   is: `Conversions.ts` and `Wind.ts` follow avform, and an expectation computed from avform restates the code.
 - **Pin known bugs with `it.fails('... (#NN)')`.** The test states the correct behavior, fails today, and turns red when
   someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See
-  `turnDirection.test.ts` (#100) and `ActPage.test.ts` (#294).
+  `turnDirection.test.ts` (#100).
 - **Prove a pin by fixing the bug, and keep heavy setup out of it.** An `it.fails` test passes on *any* failure, so a
   broken precondition inside it (a boot that threw, a wrong key sequence) is invisible: the pin stays green for the
   wrong reason. Prove a pin by fixing the bug temporarily and seeing the test turn red, then restore. Where it is cheap,
