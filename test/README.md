@@ -303,6 +303,8 @@ pages accept.
   first leg that survives the conversion, which replaces the leg before the arc with the entry.
   Boot on the arc, so that the arc leg is the closest and becomes active.
   A test that recalculates the entry (MOVE? on Super NAV 5) can use a left or a right arc.
+  Two arcs around one navaid with radii more than 0.1 NM apart stay two arcs: the first arc's end fix stays in the
+  list, and the second arc starts at a generated entry at its published beginning (#131).
 - `Leg.TF(fix, FixTypeFlags.IAF)` and its siblings set the fix types. `SidStar` keeps a leg flagged IAF, FAF, MAP or MAHP
   even when its fix repeats, and drops an unflagged repeat. A missed approach that ends in a hold (HA, HF or HM) gets
   the MAHP flag without a flagged leg in the test data (#220); one that ends otherwise has none.
@@ -776,10 +778,10 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   type argument and looks up by ICAO alone, so the type that `KLNFacilityLoader.getFacilities` passes down cannot be
   observed. The [next steps](../docs/test-next-steps.md) have the options.
 - **One fact about real procedures came from a navigation database queried locally and is not committed.** The pattern
-  `AF, CI (no fix), AF` around one navaid with two radii, which `SidStar` merges into one arc (#131), was found in an
+  `AF, CI (no fix), AF` around one navaid with two radii, which `SidStar` keeps as two arcs (#131), was found in an
   AIRAC 2607 export (five STARs). No row of it is in the repo (section 5 forbids recorded navdata), and the sim's own
-  representation of the CI legs was not checked: the invented procedure of the pin in `SidStar.test.ts` is built from the
-  pattern, not from the data.
+  representation of the CI legs was not checked: the invented procedure of the #131 test in `SidStar.test.ts` is built
+  from the pattern, not from the data.
 - **There is no wind.** Ground speed and track equal airspeed and heading, so crosswind effects are not modeled.
 - **`jump` skips integrated values**, and monitors and the recorder sample once per simulated second.
 - **The 16 Hz loops** run every 62 ms in tests: the fake timers round the 62.5 ms interval down to whole milliseconds.

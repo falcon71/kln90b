@@ -432,7 +432,7 @@ export class SidStar {
                 filtered.push(modifiedLeg);
             } else {
                 const next = legs[i + 1];
-                const bothAreAF = leg.type === LegType.AF && next.type === LegType.AF; //The KLN does not support step down fixes. We merge multiple arcs
+                const bothAreAF = leg.type === LegType.AF && next.type === LegType.AF && SidStar.sameArc(leg, next); //The KLN does not support step down fixes. We merge multiple arcs of one navaid and radius (#131)
 
                 const nextIsSameWpt = ICAO.valueEquals(next.fixIcaoStruct, leg.fixIcaoStruct);
                 const isAlreadyLastInList = filtered.length > 0 && ICAO.valueEquals(filtered[filtered.length - 1].fixIcaoStruct, leg.fixIcaoStruct);
@@ -454,11 +454,19 @@ export class SidStar {
         return {legs: filtered, askObsLegs: askObsLegs};
     }
 
+    /**
+     * 6-18: two arcs are one arc (step-downs) only around the same navaid and at the same radius (#131).
+     * Arcs of another radius stay two arcs.
+     */
+    private static sameArc(a: FlightPlanLeg, b: FlightPlanLeg): boolean {
+        return ICAO.valueEquals(a.originIcaoStruct, b.originIcaoStruct) && Math.abs(a.rho - b.rho) <= UnitType.NMILE.convertTo(0.1, UnitType.METER);
+    }
+
     private mergeAFsIfNecessary(leg: FlightPlanLeg, legs: FlightPlanLeg[], i: number) {
         //If this is an arc, we must check the previous waypoint if that was an arc to. If so, we merge themn
         if (leg.type === LegType.AF) {
             let iPrev = i - 1;
-            while (iPrev >= 0 && legs[iPrev].type === LegType.AF) {
+            while (iPrev >= 0 && legs[iPrev].type === LegType.AF && SidStar.sameArc(legs[iPrev], legs[iPrev + 1])) {
                 const prev = legs[iPrev];
                 leg.course = prev.course; //Our new arc goes from the prev start to this ones theta
                 iPrev--;
@@ -556,22 +564,29 @@ export class SidStar {
         const enriched = await Promise.all(promises);
         const klnLegs: KLNFlightplanLeg[] = [];
 
+        let prevEnriched: { facility: Facility; leg: FlightPlanLeg } | undefined = undefined;
         for (const enrichedLeg of enriched) {
             if (enrichedLeg.leg.type === LegType.AF) {
                 //Entry here and exits below for arcs
 
                 //The KLN calculates its own entry
-                const originalEntry = klnLegs.pop()!;
+                //#131: a second arc of another radius starts at its published beginning; the first arc's end stays
+                const prevArcEnd = klnLegs.length >= 2 ? klnLegs[klnLegs.length - 2].arcData?.endFacility : undefined;
+                //The identity comparison works because both facilities come from this one loader result. An arc of the same
+                //navaid and radius is a step-down of the arc before it (the filter kept it for its flag), so it stays one arc (a leg that is no arc has a radius of 0 and never matches)
+                const afterArc = prevArcEnd !== undefined && prevArcEnd === klnLegs[klnLegs.length - 1].wpt
+                    && !(prevEnriched !== undefined && SidStar.sameArc(prevEnriched.leg, enrichedLeg.leg));
+                const originalEntry = afterArc ? undefined : klnLegs.pop()!;
 
 
-                const arcData = await this.getArcEntryData(enrichedLeg);
+                const arcData = await this.getArcEntryData(enrichedLeg, afterArc);
                 klnLegs.push({
                     wpt: arcData.entryFacility,
                     type: legType,
                     parentFacility: facility,
                     procedure: procedureInformation,
                     arcData: arcData,
-                    fixType: originalEntry.fixType,
+                    fixType: originalEntry?.fixType,
                     flyOver: enrichedLeg.leg.flyOver,
                 });
             }
@@ -587,7 +602,7 @@ export class SidStar {
                 askObs: askObs,
                 fixType: this.getKLNFixType(enrichedLeg.leg),
             });
-
+            prevEnriched = enrichedLeg;
         }
         return klnLegs;
 
@@ -628,8 +643,10 @@ export class SidStar {
      * 6-16
      * "Normal" systems use the published CI point as an entry. The KLN-90B does not support that type.
      * Therefore, it generates an artificialy entry waypoint based on the radial of the current position to the VOR.
+     * @param convertedLeg
+     * @param atBeginning enters at the published beginning, not abeam the aircraft: the arc follows an arc of another radius (#131)
      */
-    private async getArcEntryData(convertedLeg: { facility: Facility; leg: FlightPlanLeg }): Promise<ArcData> {
+    private async getArcEntryData(convertedLeg: { facility: Facility; leg: FlightPlanLeg }, atBeginning: boolean = false): Promise<ArcData> {
         const vor = await this.facilityLoader.getFacility(FacilityType.VOR, convertedLeg.leg.originIcaoStruct);
         const vorPoint = new GeoPoint(vor.lat, vor.lon);
 
@@ -668,7 +685,7 @@ export class SidStar {
             circle.reverse();
         }
 
-        if (!NavMath.bearingIsBetween(radial, start, end)) {
+        if (atBeginning || !NavMath.bearingIsBetween(radial, start, end)) {
             //Outside of arc, then it defaults to the beginning of the arc
             entryPoint.set(beginPoint);
             radial = beginRadial;

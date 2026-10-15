@@ -634,6 +634,37 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(arc.endFacility.icaoStruct.ident).toBe('ARCEN');
             expect(radiusNm(legs[0])).toBeCloseTo(10, 2);
         });
+
+        // The filter keeps an arc that carries a flag, so the second arc still follows it in the conversion: the flagged
+        // step-down and the arc after it stay one arc. The doubled entry and the missing STEPD are bug #382, this holds
+        // the list as it is while the pin below is open.
+        const flaggedStepDown = () => approach({
+            type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [
+                    Leg.IF(arcbg),
+                    Leg.AF(step, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT, flags: FixTypeFlags.IAF}),
+                    Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                    Leg.TF(fafaa, FixTypeFlags.FAF),
+                ],
+            }],
+            final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+
+        it('keeps a flagged step-down on one arc as one arc (characterization, #131, #382)', async () => {
+            const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, flaggedStepDown());
+
+            expect(identsOf(legs)).toEqual(['D260J', 'D260J', 'ARCEN', 'FAFAA', 'MAPAA']);
+        });
+
+        // 6-5: the unit lists the IAF; 6-18: an arc has no step-down fixes of its own
+        it.fails('lists a flagged step-down fix on a DME arc once, after the arc entry (6-5, 6-18, #382)', async () => {
+            const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, flaggedStepDown());
+
+            expect(identsOf(legs)).toEqual(['D260J', 'STEPD', 'ARCEN', 'FAFAA', 'MAPAA']);
+            expect(legs[1].fixType).toBe(KLNFixType.IAF);
+        });
     });
 
     // 6-5, B-3: the unit tells the pilot that the enroute part of the flight plan already holds waypoints of the
@@ -679,8 +710,9 @@ describe('SidStar conversion of procedures to KLN legs', () => {
     });
 
     // 6-16 to 6-18: a DME arc is flown at its published distance. Real STARs fly AF, CI (no fix), AF around one navaid
-    // with two radii. The conversion drops the fixless CI leg, takes the first arc for a step-down fix of the second
-    // and flies the whole arc at the radius of the second.
+    // with two radii. The conversion drops the fixless CI leg and keeps the two arcs: the first ends at its own end fix,
+    // which stays in the list, and the second starts at its published beginning (#131). How the unit joins two radii is
+    // not described, so the leg between the arcs is a characterization.
     describe('AF, CI, AF around one navaid with two radii', () => {
         const stfix = fixAt('STFIX', 270, 20);
         const arc1end = fixAt('ARC1E', 225, 13);
@@ -716,11 +748,76 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(radiusNm(secondArc!)).toBeCloseTo(10, 1);
         });
 
-        it.fails('flies the first arc at its own radius of 13 NM (#131)', async () => {
+        it('flies the first arc at its own radius of 13 NM (#131)', async () => {
             const legs = await convertStar();
             const firstArc = legs.find(l => l.arcData?.endFacility.icaoStruct.ident === 'ARC1E');
             expect(firstArc).toBeDefined();
             expect(radiusNm(firstArc!)).toBeCloseTo(13, 1);
+        });
+
+        // 6-6: an arc entry is named D, the magnetic radial and the distance as a letter (M = 13, J = 10). The second
+        // arc starts at its published beginning, joined to the end of the first by a straight leg (characterization)
+        it('lists the first arc to ARC1E and the second from its beginning on radial 225 (characterization, #131)', async () => {
+            const legs = await convertStar();
+
+            expect(identsOf(legs)).toEqual(['D270M', 'ARC1E', 'D225J', 'ARC2E', 'FINAL']);
+            const second = legs.find(l => l.arcData?.endFacility.icaoStruct.ident === 'ARC2E')!;
+            expect(second.arcData!.beginRadial).toBeCloseTo(225, 3);
+            expect(radiusNm(second)).toBeCloseTo(10, 1);
+        });
+
+        // The aircraft is on radial 200, inside the span of the second arc (225 to 180). A first arc is entered abeam the
+        // aircraft there (6-16), but the second follows the first and so starts at its published beginning, not at D200J
+        it('starts the second arc at its beginning although the aircraft is abeam a point of it (characterization, #131)', async () => {
+            const legs = await sidStar(facs, at(200, 25)).getKLNProcedureLegList(kprc, arrival(), KLNLegType.STAR, null, null);
+
+            expect(identsOf(legs)).toEqual(['D270M', 'ARC1E', 'D225J', 'ARC2E', 'FINAL']);
+        });
+    });
+
+    // 6-18 covers step-downs on one arc. When two arcs are one arc is the code's ruling (#131): the same navaid and a
+    // radius within 0.1 NM; the tolerance is a characterization. The aircraft is on radial 270 of ABC at 25 NM.
+    describe('two arcs are one arc only around one navaid within 0.1 NM of radius (characterization, #131)', () => {
+        const xyz = vor('XYZ', 47.6, 8.9);
+        const atXyz = (radial: number, nm: number) => pointFrom({lat: xyz.lat, lon: xyz.lon}, radial, nm);
+        const fixAtXyz = (ident: string, radial: number, nm: number) => {
+            const p = atXyz(radial, nm);
+            return intersection(ident, p.lat, p.lon);
+        };
+        const stfix = fixAt('STFIX', 270, 25);
+        const final = fixAt('FINAL', 150, 10);
+        const convertTwoArcs = (navaid2: typeof abc, radius1: number, radius2: number) => {
+            const arc1end = fixAt('ARC1E', 225, radius1);
+            const arc2end = navaid2 === abc ? fixAt('ARC2E', 180, radius2) : fixAtXyz('ARC2E', 180, radius2);
+            const proc = star('ARR1', {
+                common: [
+                    Leg.IF(stfix),
+                    Leg.AF(arc1end, abc, {radiusNm: radius1, fromRadial: 270, toRadial: 225, turn: LEFT}),
+                    Leg.AF(arc2end, navaid2, {radiusNm: radius2, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                    Leg.TF(final),
+                ],
+            });
+            return sidStar([abc, xyz, stfix, arc1end, arc2end, final, kprc], at(270, 25)).getKLNProcedureLegList(kprc, proc, KLNLegType.STAR, null, null);
+        };
+
+        it('keeps two arcs of one radius around different navaids as two arcs, the second from its beginning', async () => {
+            const legs = await convertTwoArcs(xyz, 10, 10);
+
+            expect(identsOf(legs)).toEqual(['D270J', 'ARC1E', 'D225J', 'ARC2E', 'FINAL']);
+            expect(legs[2].arcData!.vor.icaoStruct.ident).toBe('XYZ');
+        });
+
+        it('merges two arcs whose radii differ by 0.05 NM into one arc', async () => {
+            const legs = await convertTwoArcs(abc, 10.05, 10);
+
+            expect(identsOf(legs)).toEqual(['D270J', 'ARC2E', 'FINAL']);
+            expect(legs[0].arcData!.beginRadial).toBeCloseTo(270, 3);
+        });
+
+        it('keeps two arcs whose radii differ by 0.2 NM as two arcs', async () => {
+            const legs = await convertTwoArcs(abc, 10.2, 10);
+
+            expect(identsOf(legs)).toEqual(['D270J', 'ARC1E', 'D225J', 'ARC2E', 'FINAL']);
         });
     });
 
