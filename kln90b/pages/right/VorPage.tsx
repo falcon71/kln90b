@@ -244,6 +244,9 @@ export class VorPage extends WaypointPage<VorFacility> {
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            //No redraw: a redraw from the missing facility would blank the typed values, which the page keeps (#289)
+            return;
         }
         this.props.memory.vorPage.facility = this.facility;
         this.cursorController.setCursorActive(false);

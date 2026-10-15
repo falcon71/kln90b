@@ -247,6 +247,9 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            this.requiresRedraw = true;
+            return;
         }
         this.props.memory.aptPage.facility = this.facility;
         this.cursorController.setCursorActive(false);
@@ -260,6 +263,10 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            this.cursorController.setCursorActive(true); //this page replaced the one that offered the creation, with its cursor on
+            this.requiresRedraw = true;
+            return;
         }
         this.props.memory.aptPage.facility = this.facility;
         this.cursorController.setCursorActive(false);

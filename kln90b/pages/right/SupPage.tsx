@@ -390,6 +390,9 @@ export class SupPage extends WaypointPage<UserFacility> {
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            this.requiresRedraw = true;
+            return;
         }
         this.props.memory.supPage.facility = this.facility;
         this.cursorController.setCursorActive(false);
@@ -417,6 +420,9 @@ export class SupPage extends WaypointPage<UserFacility> {
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            this.requiresRedraw = true;
+            return;
         }
         this.props.memory.supPage.facility = this.facility;
         this.cursorController.setCursorActive(false);

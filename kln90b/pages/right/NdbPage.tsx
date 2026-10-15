@@ -194,6 +194,9 @@ export class NdbPage extends WaypointPage<NdbFacility> {
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            //No redraw: a redraw from the missing facility would blank the typed values, which the page keeps (#289)
+            return;
         }
         this.props.memory.ndbPage.facility = this.facility;
         this.cursorController.setCursorActive(false);

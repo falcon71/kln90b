@@ -393,6 +393,9 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            this.requiresRedraw = true;
+            return;
         }
         this.props.memory.intPage.facility = this.facility;
         this.cursorController.setCursorActive(false);
@@ -428,6 +431,9 @@ export class IntPage extends WaypointPage<IntersectionFacility | RunwayFacility>
         } catch (e) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
             console.error(e);
+            this.facility = null; //#289 the refused waypoint is not created
+            this.requiresRedraw = true;
+            return;
         }
         this.props.memory.intPage.facility = this.facility;
         this.cursorController.setCursorActive(false);
