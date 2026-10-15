@@ -107,7 +107,7 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
                     selected: iaf,
                 });
             }
-        } else if (this.currentApt8Page instanceof Apt8AddPage) {
+        } else if (this.currentApt8Page instanceof Apt8AddPage || this.currentApt8Page instanceof Apt8ReplacePage) {
             this.currentApt8Page = new Apt8PreviewPage({
                 ...this.props,
                 app: this.currentApt8Page.app,
@@ -183,6 +183,20 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
         console.log("loadIfFplContainsApt", app, iaf, legs);
         const fpl0Legs = this.props.memory.fplPage.flightplans[0].getLegs();
         const facility = unpackFacility(this.facility)!;
+
+        //#274: the unit asks before it replaces an approach, also the same one, and this is the only question (checked
+        //in the KLN 89 trainer, 2026-10-15)
+        if (fpl0Legs.some(leg => leg.type === KLNLegType.APP)) {
+            this.currentApt8Page = new Apt8ReplacePage({
+                ...this.props,
+                app: app,
+                iaf: iaf,
+                legs: legs,
+                load: this.load.bind(this),
+            });
+            this.requiresRedraw = true;
+            return;
+        }
 
         if (fpl0Legs.some(wpt => ICAO.valueEquals(wpt.wpt.icaoStruct, facility.icaoStruct))) {
             this.load(app, iaf, legs);
@@ -647,6 +661,59 @@ class Apt8AddPage extends Apt8SelectorPage {
             TO ADD {unpackFacility(this.facility)!.icaoStruct.ident}<br/>
             AND APPR TO<br/>
             FPL 0<br/>
+            {this.children.get("approve").render()}
+        </pre>);
+    }
+
+}
+
+interface Apt8ReplacePageProps extends PageProps {
+    app: ApproachProcedure,
+    iaf: ApproachTransition | null,
+    legs: KLNFlightplanLeg[],
+    load: (app: ApproachProcedure, iaf: ApproachTransition | null, legs: KLNFlightplanLeg[]) => void,
+}
+
+
+type Apt8ReplacePageTypes = {
+    approve: Button,
+}
+
+/**
+ * #274: FPL 0 holds an approach already. The unit asks before the new one replaces it (checked in the KLN 89 trainer,
+ * 2026-10-15; the 90B texts are a characterization)
+ */
+class Apt8ReplacePage extends Apt8SelectorPage {
+
+    public readonly cursorController;
+    readonly children: UIElementChildren<Apt8ReplacePageTypes>;
+
+    public readonly app: ApproachProcedure;
+    public readonly iaf: ApproachTransition | null;
+    public readonly legs: KLNFlightplanLeg[];
+
+    constructor(props: Apt8ReplacePageProps) {
+        super(props);
+        this.app = props.app;
+        this.iaf = props.iaf;
+        this.legs = props.legs;
+
+        this.children = new UIElementChildren<Apt8ReplacePageTypes>({
+            approve: new Button("  APPROVE? ", () => props.load(props.app, props.iaf, props.legs)),
+        });
+
+        this.cursorController = new CursorController(this.children);
+        this.cursorController.setCursorActive(true);
+    }
+
+
+    public render(): VNode {
+        return (<pre>
+            {this.formatTitle()}<br/>
+            PRESS ENT<br/>
+            TO REPLACE<br/>
+            EXISTING<br/>
+            APPROACH<br/>
             {this.children.get("approve").render()}
         </pre>);
     }

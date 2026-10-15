@@ -158,7 +158,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             rwy = this.currentApt7Page.rwy;
             trans = this.currentApt7Page.trans;
             step = 3;
-        } else if (this.currentApt7Page instanceof Apt7AddPage) {
+        } else if (this.currentApt7Page instanceof Apt7AddPage || this.currentApt7Page instanceof Apt7ReplacePage) {
             proc = this.currentApt7Page.proc;
             rwy = this.currentApt7Page.rwy;
             trans = this.currentApt7Page.trans;
@@ -402,6 +402,23 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         console.log("loadIfFplContainsApt", proc, rwy, trans, legs);
         const fpl0Legs = this.props.memory.fplPage.flightplans[0].getLegs();
         const facility = unpackFacility(this.facility)!;
+
+        //#274: the unit asks before it replaces a SID or a STAR, also the same one, and this is the only question
+        //(checked in the KLN 89 trainer, 2026-10-15, for the STAR; the SID is a characterization). A procedure of the
+        //other type does not count
+        if (fpl0Legs.some(leg => leg.type === this.getProcedureType())) {
+            this.currentApt7Page = new Apt7ReplacePage({
+                ...this.props,
+                proc: proc,
+                rwy: rwy,
+                trans: trans,
+                legs: legs,
+                load: this.load.bind(this),
+                type: this.getProcedureType(),
+            });
+            this.requiresRedraw = true;
+            return;
+        }
 
         if (fpl0Legs.some(wpt => ICAO.valueEquals(wpt.wpt.icaoStruct, facility.icaoStruct))) {
             this.load(proc, rwy, trans, legs);
@@ -949,6 +966,56 @@ class Apt7AddPage extends Apt7SelectorPage {
             TO ADD {unpackFacility(this.facility)!.icaoStruct.ident}<br/>
             AND {this.procedureType === KLNLegType.SID ? "SID" : "STAR"} TO<br/>
             FPL 0<br/>
+            {this.children.get("approve").render()}
+        </pre>);
+    }
+
+}
+
+
+type Apt7ReplacePageTypes = {
+    approve: Button,
+}
+
+/**
+ * #274: FPL 0 holds a procedure of this type already. The unit asks before the new one replaces it (checked in the
+ * KLN 89 trainer, 2026-10-15, for the STAR; the 90B texts and the SID are a characterization)
+ */
+class Apt7ReplacePage extends Apt7SelectorPage {
+
+    public readonly cursorController;
+    readonly children: UIElementChildren<Apt7ReplacePageTypes>;
+
+    public readonly proc: Procedure;
+    public readonly rwy: RunwayTransition | null;
+    public readonly trans: EnrouteTransition | null;
+    public readonly legs: KLNFlightplanLeg[];
+    protected readonly procedureType: KLNLegType;
+
+    constructor(props: Apt7AddPageProps) {
+        super(props);
+        this.proc = props.proc;
+        this.rwy = props.rwy;
+        this.trans = props.trans;
+        this.legs = props.legs;
+        this.procedureType = props.type;
+
+        this.children = new UIElementChildren<Apt7ReplacePageTypes>({
+            approve: new Button("  APPROVE? ", () => props.load(props.proc, props.rwy, props.trans, props.legs)),
+        });
+
+        this.cursorController = new CursorController(this.children);
+        this.cursorController.setCursorActive(true);
+    }
+
+
+    public render(): VNode {
+        return (<pre>
+            {this.formatTitle()}<br/>
+            PRESS ENT<br/>
+            TO REPLACE<br/>
+            EXISTING<br/>
+            {this.procedureType === KLNLegType.SID ? "SID" : "STAR"}<br/>
             {this.children.get("approve").render()}
         </pre>);
     }

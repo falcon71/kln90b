@@ -60,6 +60,19 @@ describe('APT 7 page after a waypoint confirmation page (80631c8)', () => {
     });
 });
 
+/** The question both units show before a procedure replaces the one in FPL 0: the right cursor stands on APPROVE? (#274) */
+const asksApprove = (unit: HeadlessUnit): boolean => {
+    try {
+        return unit.panel.focused('R').text.trim() === 'APPROVE?';
+    } catch (e) {
+        // No field under the cursor: no question. Any other state (several focused runs) is no answer and throws
+        if (e instanceof Error && e.message.includes('found 0')) {
+            return false;
+        }
+        throw e;
+    }
+};
+
 const fpl0Legs = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => [l.wpt.icaoStruct.ident, l.type]);
 
 describe('APT 7 putting a procedure into FPL 0', () => {
@@ -122,6 +135,258 @@ describe('APT 7 putting a procedure into FPL 0', () => {
             ['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID],
             ['ENRAA', KLNLegType.USER], ['KUUU', KLNLegType.USER],
         ]);
+    });
+});
+
+// #274: loading a SID or a STAR while FPL 0 holds one of that type asks before it replaces it. The KLN 89 check of
+// 2026-10-15 covers the STAR; the SID, which the 89 database lacks, and the 90B texts are characterizations
+describe('APT 7 replacing a procedure', () => {
+    /** sidStarWorld() with KPRC in FPL 0, so the unit asks no question to add it: [ENRAA, KPRC] */
+    function worldWithKprc(o: { sids: string[], stars: boolean }) {
+        const w = sidStarWorld(o);
+        return {...w, storage: savedFlightplan(0, [w.facilities[1], w.facilities[0]])};
+    }
+
+    /** FPL 0 holds ARR1 (TRNAA, SIDAB); the STAR page of APT 7 is open with the cursor off and the left page is NAV 1 */
+    async function bootWithStarLoaded() {
+        const unit = await bootUnit(worldWithKprc({sids: ['DEP1', 'DEP2'], stars: true}));
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 6');
+        await unit.panel.inner('R', 2); // the STAR page
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR1: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.selectPage('L', 'NAV 1'); // FPL 0 on the left would take CLR for its DELETE FPL? question first (4-5)
+        return unit;
+    }
+
+    const ARR1_IN_FPL_0 = [
+        ['ENRAA', KLNLegType.USER], ['TRNAA', KLNLegType.STAR], ['SIDAB', KLNLegType.STAR], ['KPRC', KLNLegType.USER],
+    ];
+
+    /** ARR2 by TRNAB and the runway 09: the waypoints, then LOAD IN FPL */
+    async function chooseArr2(unit: HeadlessUnit) {
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1); // ARR2
+        await unit.panel.ent(); // the transitions
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // TRNAB: the runways
+        await unit.panel.ent(); // 09: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+    }
+
+    /** FPL 0 holds DEP1 (SIDAA, SIDAB, TRNAA); APT 7 is open on the SID list with the cursor off and the left page is NAV 1 */
+    async function bootWithSidLoaded() {
+        const unit = await bootUnit(worldWithKprc({sids: ['DEP1', 'DEP2'], stars: false}));
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 6');
+        await unit.panel.inner('R', 1);
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP1: the runways
+        await unit.panel.ent(); // 09: the transitions
+        await unit.panel.ent(); // TRNAA: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.selectPage('L', 'NAV 1');
+        return unit;
+    }
+
+    const DEP1_IN_FPL_0 = [
+        ['ENRAA', KLNLegType.USER], ['KPRC', KLNLegType.USER],
+        ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID], ['TRNAA', KLNLegType.SID],
+    ];
+
+    /** DEP2 by the runway 09 and TRNAB: the waypoints, then LOAD IN FPL */
+    async function chooseDep2(unit: HeadlessUnit) {
+        await unit.panel.cursor('R');
+        await unit.panel.outer('R', 1); // DEP2
+        await unit.panel.ent(); // the runways
+        await unit.panel.ent(); // 09: the transitions
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // TRNAB: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+    }
+
+    it('does not replace the STAR that FPL 0 holds without asking (checked in the KLN 89 trainer, 2026-10-15, #274)', async () => {
+        const unit = await bootWithStarLoaded();
+        expect(fpl0Legs(unit)).toEqual(ARR1_IN_FPL_0); // Precondition
+
+        await chooseArr2(unit);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fpl0Legs(unit)).toEqual(ARR1_IN_FPL_0);
+    });
+
+    // The 90B wording follows the AVsoftech trainer; that the unit asks, with APPROVE? flashing, is the KLN 89's
+    // (checked in the KLN 89 trainer, 2026-10-15)
+    it('asks to replace the existing STAR with APPROVE? flashing (characterization, #274)', async () => {
+        const unit = await bootWithStarLoaded();
+
+        await chooseArr2(unit);
+
+        expect(rows('R')).toEqual(['ARR2-Æ', 'PRESS ENT', 'TO REPLACE', 'EXISTING', 'STAR', '  APPROVE?']);
+        expect(unit.panel.focused('R').text.trim()).toBe('APPROVE?');
+        const col = Screen.read().row(5).indexOf('APPROVE?', 12);
+        const cycle = await blinkCycle(() => Screen.read().cell(5, col).attr);
+        expect(cycle.sort()).toEqual(['F', 'I', 'I', 'I']);
+    });
+
+    it('replaces the STAR on APPROVE? (checked in the KLN 89 trainer, 2026-10-15, #274)', async () => {
+        const unit = await bootWithStarLoaded();
+        await chooseArr2(unit);
+        expect(fpl0Legs(unit)).toEqual(ARR1_IN_FPL_0); // Precondition: nothing is replaced before APPROVE?
+        await unit.panel.ent(); // APPROVE?
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fpl0Legs(unit)).toEqual([
+            ['ENRAA', KLNLegType.USER], ['TRNAB', KLNLegType.STAR], ['SIDAB', KLNLegType.STAR], ['SIDAA', KLNLegType.STAR],
+            ['KPRC', KLNLegType.USER],
+        ]);
+    });
+
+    // The 90B has a second side: FPL 0 on the left after a load follows the other loads of APT 7
+    it('shows FPL 0 on the left after APPROVE? of the STAR question (characterization, #274)', async () => {
+        const unit = await bootWithStarLoaded();
+        await chooseArr2(unit);
+        await unit.panel.ent(); // APPROVE?
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().status().left).toBe('FPL 0');
+    });
+
+    // CLR goes back to the preview and leaves the question: FPL 0 stays as it was (checked in the KLN 89 trainer)
+    it('goes back from the question on CLR and leaves FPL 0 unchanged (checked in the KLN 89 trainer, 2026-10-15, #274)', async () => {
+        const unit = await bootWithStarLoaded();
+        await chooseArr2(unit);
+        expect(asksApprove(unit)).toBe(true); // Precondition: the question shows
+        await unit.panel.clr();
+
+        expect(asksApprove(unit)).toBe(false);
+        expect(fpl0Legs(unit)).toEqual(ARR1_IN_FPL_0);
+    });
+
+    it('shows the waypoints with the cursor on LOAD IN FPL after CLR from the STAR question (characterization, #274)', async () => {
+        const unit = await bootWithStarLoaded();
+        await chooseArr2(unit);
+        await unit.panel.clr();
+
+        expect(rows('R')[0]).toBe('ARR2-Æ');
+        expect(rows('R')[5]).toBe('LOAD IN FPL');
+        expect(unit.panel.focused('R')).toEqual({row: 5, col: 12, text: 'LOAD IN FPL'});
+    });
+
+    // 6-5: the transition and the STAR survive CLR from the replace question through the runway list, as from the add
+    // question (its sibling is in the describe of the STAR selection)
+    it('keeps the transition and the STAR when the waypoints are chosen again after CLR from the replace question (characterization, #274)', async () => {
+        const unit = await bootWithStarLoaded();
+        await chooseArr2(unit);
+        await unit.panel.clr(); // the waypoints
+        await unit.panel.clr(); // the runways
+
+        await unit.panel.ent(); // 09 again
+
+        expect(rows('R').slice(0, 5)).toEqual(['ARR2-Æ', ' 1 TRNAB', ' 2 SIDAB', ' 3 SIDAA', '']);
+    });
+
+    /** FPL 0 holds ARR1; ARR1 is chosen again and LOAD IN FPL pressed */
+    async function loadSameStarAgain() {
+        const unit = await bootWithStarLoaded();
+        await unit.panel.cursor('R'); // ARR1 again
+        await unit.panel.ent(); // the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+        return unit;
+    }
+
+    it('asks before it loads the same STAR again (checked in the KLN 89 trainer, 2026-10-15, #274)', async () => {
+        const unit = await loadSameStarAgain();
+
+        expect(asksApprove(unit)).toBe(true);
+        expect(fpl0Legs(unit)).toEqual(ARR1_IN_FPL_0);
+    });
+
+    it('shows the replace question for the same STAR again (characterization, #274)', async () => {
+        const unit = await loadSameStarAgain();
+
+        expect(rows('R').slice(1, 5)).toEqual(['PRESS ENT', 'TO REPLACE', 'EXISTING', 'STAR']);
+    });
+
+    // The 89 database has no SIDs: the SID question is the STAR's by analogy, a characterization
+    it('asks to replace the existing SID and replaces it on APPROVE? (characterization, #274)', async () => {
+        const unit = await bootWithSidLoaded();
+        expect(fpl0Legs(unit)).toEqual(DEP1_IN_FPL_0); // Precondition
+
+        await chooseDep2(unit);
+        expect(rows('R')).toEqual(['DEP2-SID', 'PRESS ENT', 'TO REPLACE', 'EXISTING', 'SID', '  APPROVE?']);
+        expect(unit.panel.focused('R').text.trim()).toBe('APPROVE?');
+        expect(fpl0Legs(unit)).toEqual(DEP1_IN_FPL_0);
+
+        await unit.panel.ent(); // APPROVE?
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fpl0Legs(unit)).toEqual([
+            ['ENRAA', KLNLegType.USER], ['KPRC', KLNLegType.USER],
+            ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID], ['TRNAB', KLNLegType.SID],
+        ]);
+        expect(Screen.read().status().left).toBe('FPL 0');
+    });
+
+    it('goes back to the waypoints with the cursor on LOAD IN FPL on CLR from the SID question (characterization, #274)', async () => {
+        const unit = await bootWithSidLoaded();
+        await chooseDep2(unit);
+        await unit.panel.clr();
+
+        expect(rows('R')).toEqual(['DEP2-SID', ' 1 SIDAA', ' 2 SIDAB', ' 3 TRNAB', '', 'LOAD IN FPL']);
+        expect(unit.panel.focused('R')).toEqual({row: 5, col: 12, text: 'LOAD IN FPL'});
+        expect(fpl0Legs(unit)).toEqual(DEP1_IN_FPL_0);
+    });
+
+    // A SID in FPL 0 is no question for a STAR
+    it('asks nothing when a STAR is loaded while FPL 0 holds a SID (characterization, #274)', async () => {
+        const unit = await bootUnit(worldWithKprc({sids: ['DEP1'], stars: true}));
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 6');
+        await unit.panel.inner('R', 1); // the SID page
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP1: the runways
+        await unit.panel.ent(); // 09: the transitions
+        await unit.panel.ent(); // TRNAA: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(fpl0Legs(unit).map(l => l[1])).toContain(KLNLegType.SID); // Precondition
+
+        await unit.panel.inner('R', 1); // the STAR page
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR1: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().text()).not.toContain('REPLACE');
+        expect(fpl0Legs(unit).filter(l => l[1] === KLNLegType.STAR).map(l => l[0])).toEqual(['TRNAA', 'SIDAB']);
+        expect(fpl0Legs(unit).filter(l => l[1] === KLNLegType.SID)).toHaveLength(3);
+    });
+
+    // 6-23: the STAR goes in front of the approach. FPL 0 holds an approach and no STAR: there is nothing to replace
+    it('asks nothing when a STAR is loaded while FPL 0 holds an approach (6-23; checked in the KLN 89 trainer, 2026-10-15, #274)', async () => {
+        const w = approachWorld();
+        const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
+        const straa = intersection('STRAA', east(30).lat, east(30).lon);
+        const strab = intersection('STRAB', east(12).lat, east(12).lon);
+        const kprc = withProcedures(w.kprc, {approaches: [...w.kprc.approaches], arrivals: [star('ARR1', {common: [Leg.IF(straa), Leg.TF(strab)]})]});
+        const unit = await bootUnit({
+            facilities: [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.sdfaa, w.mapaa, straa, strab], position: w.north(40),
+            panelXml: panelXml(APR_ARM_SWITCH),
+            storage: savedFlightplan(0, [w.enraa, kprc]),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        expect(fpl0Legs(unit).map(l => l[1])).toContain(KLNLegType.APP); // Precondition
+
+        await unit.panel.loadProcedure('APT 7');
+
+        expect(asksApprove(unit)).toBe(false);
+        expect(fpl0Legs(unit).filter(l => l[1] === KLNLegType.STAR).map(l => l[0])).toEqual(['STRAA', 'STRAB']);
+        expect(fpl0Legs(unit).filter(l => l[1] === KLNLegType.APP)).toHaveLength(5);
     });
 });
 
@@ -354,14 +619,15 @@ describe('APT 7 loading a long STAR into a full FPL 0', () => {
 
     /**
      * On APT 7 with the cursor off: the second entry, ARR2, and LOAD IN FPL. With a STAR in FPL 0 the replace question
-     * of #274 will come after LOAD IN FPL, before the room question
+     * of #274 comes after LOAD IN FPL, before the room question: `replacing` answers it
      */
-    async function loadArr2(unit: HeadlessUnit) {
+    async function loadArr2(unit: HeadlessUnit, replacing = false) {
         await unit.panel.selectPage('R', 'APT 7');
         await unit.panel.cursor('R');
         await unit.panel.outer('R', 1); // ARR2
         await unit.panel.ent(); // its waypoints
         await unit.panel.ent(); // LOAD IN FPL
+        if (replacing) await unit.panel.ent(); // APPROVE? of the replace question (#274)
     }
 
     // The old STAR goes in the same step, so its legs free room: two deletions, not seven (the total of 45 of #221 and
@@ -371,7 +637,7 @@ describe('APT 7 loading a long STAR into a full FPL 0', () => {
         expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(6); // Precondition
         await unit.panel.loadProcedure('APT 7', {ident: 'KPRC'}); // ARR1
         expect(fpl0Legs(unit)).toHaveLength(35); // Precondition
-        await loadArr2(unit);
+        await loadArr2(unit, true);
 
         expect(leftRows()[1]).toBe('WPT   1');
         await unit.panel.ent();
@@ -928,7 +1194,7 @@ describe('APT 7 loading a second SID (characterization)', () => {
         ]);
         expect(Screen.read().status().left).toBe('FPL 0');
 
-        // DEPB with the runway 27L and TRNAB. KPRC is in FPL 0 now, so the unit loads at once
+        // DEPB with the runway 27L and TRNAB. KPRC is in FPL 0 now, so the unit asks only to replace the SID (#274)
         await unit.panel.cursor('R');
         await unit.panel.outer('R', 1);
         await unit.panel.ent(); // DEPB: the runways
@@ -937,6 +1203,8 @@ describe('APT 7 loading a second SID (characterization)', () => {
         await unit.panel.outer('R', 1);
         await unit.panel.ent(); // TRNAB: the waypoints
         await unit.panel.ent(); // LOAD IN FPL
+        expect(fpl0Legs(unit).filter(l => l[0] === 'TRNAB')).toHaveLength(0); // Precondition: nothing is replaced before APPROVE?
+        await unit.panel.ent(); // APPROVE? of the replace question (#274)
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(fpl0Legs(unit)).toEqual([

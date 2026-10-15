@@ -377,6 +377,12 @@ Flightplan really is dead simple".
   No room is FPL FULL with FPL 0 unchanged. When waypoints must go, `pages/left/ProcedureMakeRoomPage` (a subclass of
   the abstract `MakeRoomPage`) asks on the left once per waypoint; ENT on the last question deletes them and loads,
   CLR cancels. A load is one batch with one `flightplanChanged`, inserting with plain `insertLeg`.
+- Before `load` runs, `loadIfFplContainsApt` of APT 7 and APT 8 chooses the question (#274). A procedure of the type being
+  loaded in FPL 0 (any approach for APT 8, a SID for a SID, a STAR for a STAR; also the same one) shows the replace page
+  (`Apt8ReplacePage`, `Apt7ReplacePage`: `PRESS ENT TO REPLACE EXISTING APPROACH/SID/STAR`, a flashing `APPROVE?`). It
+  is the only question: it also stands in for the question to add the airport, which `load` then adds. Otherwise a
+  missing airport asks to add it (`Apt8AddPage`, `Apt7AddPage`). APPROVE? calls `load`, so the room check follows; CLR
+  goes back to the waypoint preview with the cursor on LOAD IN FPL.
 - Mutations publish **`flightplanChanged`**. `startBatchInsert/finishBatchInsert` suppress the intermediate events ("
   Would mess up the async asobo FPL sync"). Subscribers are `UserFlightplanPersistor` (persists every change) and
   `WTFlightplanSync`.
