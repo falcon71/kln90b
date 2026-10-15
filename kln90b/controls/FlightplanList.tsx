@@ -17,7 +17,8 @@ import {NavPageState} from "../data/VolatileMemory";
 import {MainPage} from "../pages/MainPage";
 import {Apt8Page} from "../pages/right/Apt8Page";
 import {Apt7Page} from "../pages/right/Apt7Page";
-import {insertLegIntoFpl} from "../services/FlightplanUtils";
+import {deleteFrontLegs, insertLegIntoFpl, roomSteps} from "../services/FlightplanUtils";
+import {FplInsertMakeRoomPage} from "../pages/left/FplInsertMakeRoomPage";
 
 export const enum FplWptEnterMode {
     ROTATE_LEFT, //Rotate inner cursor
@@ -436,6 +437,66 @@ class EditableFlightplan {
         this.buildList();
     }
 
+    /**
+     * #380: an addition to a full FPL 0 asks before it deletes the first waypoint (checked in the KLN 89 trainer,
+     * 2026-10-15). `idx` is the row the insert row would open at: in front of a waypoint, or the blank position at the
+     * end. ENT deletes one step of roomSteps, puts the cursor back on the row the insert goes in front of and calls
+     * `retry`, which asks again while that is not enough, or opens the entry. CLR turns the cursor off and shows the plan
+     * as stored. When room cannot
+     * be made (C-1) nothing is asked: the entry opens and its ENT answers FPL FULL (insertLeg).
+     * @return true when the question is shown
+     */
+    private askRoom(idx: number, retry: () => void): boolean {
+        if (this.flightplan.idx !== 0) {
+            return false;
+        }
+        //As createLeg, an insert in front of a SID or STAR waypoint is a leg of that procedure (#221)
+        const type = this.legs[idx]?.leg?.type ?? KLNLegType.USER;
+        const steps = this.roomSteps(type);
+        if (steps === null || steps.length === 0) {
+            return false;
+        }
+        //The waypoint of the plan the insert goes in front of; null for the blank position at the end. An insert row
+        //that is open and not entered yet goes in front of the plan row that follows it
+        const before = this.legs.slice(idx).find(l => l.origIdx !== -1)?.leg ?? null;
+        //A row that is not in the plan yet asks, before the blank position at the end: a row a procedure header or an ENT
+        //created. The rebuild drops it, so it is made again as it was: a header's row stays an en-route leg in front of
+        //the procedure, where a click on the procedure's first waypoint would copy its type (createLeg)
+        const pending = this.legs[idx];
+        const remake = pending !== undefined && pending.origIdx === -1 && before !== null;
+
+        const deleteAndContinue = () => {
+            const now = this.roomSteps(type); //The plan may have changed while the question was shown
+            if (now !== null && now.length > 0) {
+                deleteFrontLegs(this.flightplan, now[0]);
+            }
+            this.syncLegsFromFlightplan();
+            //#148: when the waypoint the insert went in front of was deleted, it goes in front of the new first one
+            const at = before === null ? this.legs.length - 1 : Math.max(this.flightplan.getLegs().indexOf(before), 0);
+            if (remake) {
+                this.legs.splice(at, 0, {wpt: null, leg: pending.leg, origIdx: -1, focusMe: true});
+            } else {
+                this.legs[at].focusMe = true;
+            }
+            this.cursorController.setCursorActive(true); //It stays on under the question; focusMe needs it on
+            this.buildList();
+            retry();
+        };
+        const cancel = () => {
+            this.cursorController.setCursorActive(false);
+            this.refreshFpl(); //A row a header or an ENT created goes; the plan is shown as stored
+        };
+
+        const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
+        mainPage.pushLeftPage(new FplInsertMakeRoomPage(this.props, deleteAndContinue, cancel), null);
+        return true;
+    }
+
+    private roomSteps(type: KLNLegType): number[] | null {
+        const enRoute = type === KLNLegType.USER ? 1 : 0;
+        return roomSteps(this.flightplan.getLegs(), this.props.memory.navPage, enRoute, 1 - enRoute);
+    }
+
     public askDeleteAll(): void {
         this.firstLine.askDeleteAll();
         this.cursorController.setCursorActive(true);
@@ -496,6 +557,7 @@ class EditableFlightplan {
                 onInsertDone: this.insertLeg.bind(this),
                 onDelete: this.deleteLeg.bind(this),
                 onBeforeDelete: () => null,
+                askRoom: this.askRoom.bind(this),
                 cursorController: this.cursorController,
             });
 

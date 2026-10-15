@@ -12,6 +12,7 @@ import {SixLineHalfPage} from "../pages/FiveSegmentPage";
 import {FplWptEnterMode} from "./FlightplanList";
 import {KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
 import {SidStar} from "../data/navdata/SidStar";
+import {reportErrors} from "./ErrorPage";
 
 export interface FlightplanListItemProps extends PageProps {
     fplIdx: number,
@@ -23,6 +24,8 @@ export interface FlightplanListItemProps extends PageProps {
     onDelete: (idx: number) => void,
     onInsertDone: (idx: number, value: Facility | null, leg: KLNFlightplanLeg | null) => boolean, //false: refused with FPL FULL (#240)
     onBeforeDelete: (idx: number) => KLNErrorMessage | null,
+    //#380: true when the addition that is about to open asks first to make room; `retry` repeats it on the rebuilt row
+    askRoom: (idx: number, retry: () => void) => boolean,
     parent: SixLineHalfPage,
     cursorController: CursorController,
 }
@@ -137,6 +140,9 @@ export class FlightplanListItem implements Field, ListItem {
             return true;
         }
 
+        if (this.askRoom(() => this.props.cursorController.innerLeft())) {
+            return true; //#380
+        }
         if (!this.waypointEditor.isEntered && this.wpt !== null) {
             //We trigger creation of a new leg, we don't enter this waypoint
             this.props.onCreate(this.props.wptIdx, FplWptEnterMode.ROTATE_LEFT);
@@ -154,6 +160,9 @@ export class FlightplanListItem implements Field, ListItem {
             return true;
         }
 
+        if (this.askRoom(() => this.props.cursorController.innerRight())) {
+            return true; //#380
+        }
         if (!this.waypointEditor.isEntered && this.wpt !== null) {
             //We trigger creation of a new leg, we don't enter this waypoint
             this.props.onCreate(this.props.wptIdx, FplWptEnterMode.ROTATE_RIGHT);
@@ -184,6 +193,11 @@ export class FlightplanListItem implements Field, ListItem {
             if (this.type === KLNLegType.APP) {
                 //6-7, C-1: Approach waypoints can't be added. ENT would open an entry in front of this one, like the knobs do
                 this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID ADD");
+                return EnterResult.Handled_Keep_Focus;
+            }
+            //#380: only an ENT that takes the waypoint of the right page adds one (3-15)
+            if (this.waypointEditor.offersRightPageWaypoint()
+                && this.askRoom(() => reportErrors(this.props.cursorController.enter(), this.props.bus))) {
                 return EnterResult.Handled_Keep_Focus;
             }
             if (!this.waypointEditor.isEntered && this.wpt !== null) {
@@ -314,6 +328,29 @@ export class FlightplanListItem implements Field, ListItem {
         return this.isFocused;
     }
 
+    /**
+     * #380: the addition that is about to open (an insert row in front of this waypoint, or the entry of the blank
+     * position) asks first when FPL 0 is full. Not while an entry is open or a waypoint waits for its approval, such as
+     * the reference waypoint of the REF page, which keeps its own path
+     * @return true when the question was shown
+     */
+    private askRoom(retry: () => void): boolean {
+        if (this.waypointEditor.isEntered || this.waypointEditor.isWaitingForConfirmation()) {
+            return false;
+        }
+        return this.props.askRoom(this.props.wptIdx, retry);
+    }
+
+    /**
+     * #380: the key that brought up the question, typed again once room is made. The cursor moves on as after any typed
+     * key (KeyboardService)
+     */
+    private retryKeyboard(key: string): void {
+        if (this.props.cursorController.keyboard(key)) {
+            this.props.cursorController.outerRight();
+        }
+    }
+
     private setFacility(facility: Facility | null) {
         this.wpt = facility;
         this.insertRefused = !this.props.onInsertDone(this.props.wptIdx, facility, this.props.leg);
@@ -322,6 +359,11 @@ export class FlightplanListItem implements Field, ListItem {
     public keyboard(key: string): boolean {
         if (this.waypointEditor.refusesKey(key)) {
             return false; //#374 a blank for the first cell: refused before a row is inserted or an edit is opened
+        }
+        if (!this.isEntered && this.type !== KLNLegType.APP && this.askRoom(() => this.retryKeyboard(key))) {
+            //#380: handled, so KeyboardService moves this page's cursor on under the question. That is harmless: ENT
+            //puts the cursor back on the row the insert goes in front of, CLR turns it off
+            return true;
         }
         this.leaveRefEntry(); //#291
         if (!this.isEntered) {

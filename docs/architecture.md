@@ -377,6 +377,17 @@ Flightplan really is dead simple".
   No room is FPL FULL with FPL 0 unchanged. When waypoints must go, `pages/left/ProcedureMakeRoomPage` (a subclass of
   the abstract `MakeRoomPage`) asks on the left once per waypoint; ENT on the last question deletes them and loads,
   CLR cancels. A load is one batch with one `flightplanChanged`, inserting with plain `insertLeg`.
+- An insert on the FPL 0 page asks before it makes room (#380). The inner-knob click, typed key or ENT (3-15, only
+  when it takes the waypoint of the right page) that would open an insert row or the entry of the blank position first
+  calls `EditableFlightplan.askRoom` through the row (`FlightplanListItem` prop `askRoom`). The added leg is a SID or
+  STAR leg in front of such a row (as `createLeg` copies the type), else en-route. When `roomSteps` says waypoints must
+  go, `pages/left/FplInsertMakeRoomPage` (a second subclass of `MakeRoomPage`) asks on the left; ENT deletes one step,
+  rebuilds the list with the cursor on the row the insert goes in front of (the new first waypoint when that one was
+  deleted, #148) and repeats the action through the cursor controller, which asks again or opens the entry. A row not
+  in the plan yet that asked (the en-route row an inner click on a procedure header creates, or the empty row of an
+  ENT) is made again there as it was, so a header's row stays an en-route leg in front of the procedure. CLR turns the
+  cursor off and rebuilds the list with FPL 0 unchanged. When room cannot be made (C-1) nothing is asked: the entry
+  opens and its ENT answers FPL FULL. The REF and CTR inserts keep the silent deletion of `insertLegIntoFpl`.
 - Before `load` runs, `loadIfFplContainsApt` of APT 7 and APT 8 chooses the question (#274). A procedure of the type being
   loaded in FPL 0 (any approach for APT 8, a SID for a SID, a STAR for a STAR; also the same one) shows the replace page
   (`Apt8ReplacePage`, `Apt7ReplacePage`: `PRESS ENT TO REPLACE EXISTING APPROACH/SID/STAR`, a flashing `APPROVE?`). It
@@ -1172,7 +1183,8 @@ export class Set3Page extends SixLineHalfPage {
 - `FplPage` creates its `CursorController(NO_CHILDREN)` first and passes it into `FlightplanList.build(...)`, which
   refreshes it.
 - Newly inserted rows carry `enterMe: FplWptEnterMode` (`ROTATE_LEFT`, `ROTATE_RIGHT`, `ENTER`, `CONFIRM`, `KEYBOARD`)
-  so the new row is auto-entered after the rebuild.
+  so the new row is auto-entered after the rebuild. A row marked `focusMe` gets the cursor after the rebuild; the room
+  question of an FPL 0 insert uses it before it repeats the knob, key or ENT (#380).
 - FPL 0 keeps the active leg in view (4-8), with the from waypoint on the page also when a procedure header lies between
   it and the active waypoint (figure 6-43; a Direct To has no from waypoint, #239). `getVisibleLegsIndices()` feeds the
   D/T pages.

@@ -81,13 +81,7 @@ export class WaypointEditor extends Editor<Facility | null> {
             return this.currentValueConfirmed();
         } else if (!this.isEntered) {
             //3.15 3.4.3 Alternate Waypoint Data Entry Methode
-            const mainPage = this.props.pageManager.getCurrentPage() as MainPage;
-            const rightPage = mainPage.getRightPage();
-
-            if (!isWapointPage(rightPage)) {
-                return EnterResult.Not_Handled;
-            }
-            const facility = unpackFacility(rightPage.facility);
+            const facility = this.rightPageFacility();
             if (facility === null) {
                 return EnterResult.Not_Handled;
             }
@@ -111,6 +105,21 @@ export class WaypointEditor extends Editor<Facility | null> {
             await this.confirmValue(editedValue, value);
             return EnterResult.Handled_Move_Focus;
         }
+    }
+
+    /**
+     * #380: true when ENT on this closed editor takes the waypoint of the waypoint page on the right (3-15)
+     */
+    public offersRightPageWaypoint(): boolean {
+        return !this.isCreationPageOpen() && !this.isAwaitingConfirmation && !this.isEntered && this.rightPageFacility() !== null;
+    }
+
+    /**
+     * The waypoint of the waypoint page on the right, which ENT on a closed editor takes (3-15), or null
+     */
+    private rightPageFacility(): Facility | null {
+        const rightPage = (this.props.pageManager.getCurrentPage() as MainPage).getRightPage();
+        return isWapointPage(rightPage) ? unpackFacility(rightPage.facility) : null;
     }
 
     /**

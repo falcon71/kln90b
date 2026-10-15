@@ -7,6 +7,8 @@ import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan, storedSetting} from '../../../harness/storage';
 import {activeIdent, fplIdents, messages} from '../../../harness/readers';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
+import {Leg, sid, star, withProcedures} from '../../../harness/navdata/procedures';
+import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 
 // Pilot's Guide 4-4 (adding a waypoint), 4-5 (deleting a waypoint and a plan), C-1 (FPL FULL)
 // A full FPL 0 of 30 legs along a line north from 47N 8E, FA00 at the start and 5 NM between the legs
@@ -34,6 +36,9 @@ async function typeKnewOver(unit: HeadlessUnit, rowsDown: number) {
     if (rowsDown > 0) {
         await unit.panel.outer('L', rowsDown);
     }
+    // The first inner-knob click asks before it deletes the first waypoint, ENT opens the insert row (#380)
+    await unit.panel.inner('L', 1);
+    await unit.panel.ent();
     await unit.panel.enterIdent('L', 'KNEW');
     await unit.panel.ent(); // The waypoint page
     await unit.panel.ent();
@@ -110,6 +115,9 @@ describe('adding a waypoint to a full FPL 0', () => {
         for (let i = 0; unit.panel.focused('L').text.replace(/[_ ]/g, '') !== '' && i < 40; i++) {
             await unit.panel.outer('L', 1);
         }
+        // The first inner-knob click asks before it deletes the first waypoint, ENT opens the entry (#380)
+        await unit.panel.inner('L', 1);
+        await unit.panel.ent();
         await unit.panel.enterIdent('L', 'KNEW');
         await unit.panel.ent();
         await unit.panel.ent();
@@ -154,6 +162,326 @@ describe('adding a waypoint to a full FPL 0', () => {
 
         expect(fplIdents(unit).slice(0, 3)).toEqual(['KNEW', 'FA01', 'FA02']);
         expect(fplIdents(unit)[29]).toBe('FA29');
+    });
+
+    const leftRows = () => Screen.read().half('L').split('\n').map(r => r.trimEnd());
+
+    /** A full FPL 0, the aircraft 100 NM along it (active leg 21), the cursor on FA01, one inner-knob click */
+    async function clickInFrontOfSecondWaypoint() {
+        const unit = await bootFull(100);
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        await unit.panel.outer('L', 1); // FA01
+        await unit.panel.inner('L', 1);
+        return unit;
+    }
+
+    // The KLN 89 asks on the first inner-knob click, before any ident, and deletes nothing yet (checked in the KLN 89
+    // trainer, 2026-10-15)
+    it('asks before it deletes a waypoint on the first inner-knob click (checked in the KLN 89 trainer, 2026-10-15, #380)', async () => {
+        const unit = await clickInFrontOfSecondWaypoint();
+
+        expect(fplIdents(unit)).toEqual(FIXES.map(f => f.icaoStruct.ident));
+        expect(leftRows()[5]).toBe('CONTINUE?');
+    });
+
+    // The 90B wording follows the AVsoftech trainer
+    it('shows DELETING WPT 1 TO MAKE ROOM IN FLIGHTPLAN- CONTINUE? (characterization, #380)', async () => {
+        await clickInFrontOfSecondWaypoint();
+
+        expect(leftRows()).toEqual(['DELETING', 'WPT   1', 'TO MAKE', 'ROOM IN', 'FLIGHTPLAN-', 'CONTINUE?']);
+    });
+
+    it('deletes waypoint 1 on ENT and opens the insert row in front of the same waypoint (checked in the KLN 89 trainer, 2026-10-15, #380)', async () => {
+        const unit = await clickInFrontOfSecondWaypoint();
+        await unit.panel.ent();
+
+        expect(fplIdents(unit)[0]).toBe('FA01');
+        expect(fplIdents(unit)).toHaveLength(29);
+        // the insert row is open above FA01, under the cursor with the A of the clockwise click (#311)
+        expect(unit.panel.focused('L')).toMatchObject({row: 0, text: 'A    '});
+        expect(leftRows()[1]).toBe('  2:FA01');
+        // type the rest of the ident and approve
+        await unit.panel.enterIdent('L', 'KNEW');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(fplIdents(unit).slice(0, 2)).toEqual(['KNEW', 'FA01']);
+        expect(fplIdents(unit)).toHaveLength(30);
+    });
+
+    // ENT deletes the waypoint the insert was to go in front of: as the waypoint typed over the first row (#148), the
+    // insert row opens in front of the new first waypoint, an A from the clockwise click (#311)
+    it('opens the insert row in front of the new first waypoint when ENT deletes the one under the cursor (characterization, #148, #380)', async () => {
+        const unit = await bootFull(100);
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // FA00
+        await unit.panel.inner('L', 1);
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(fplIdents(unit)).toEqual(FIXES.slice(1).map(f => f.icaoStruct.ident));
+        expect(leftRows().slice(0, 2)).toEqual(['  1:A', '  2:FA01']);
+        expect(unit.panel.focused('L').row).toBe(0);
+    });
+
+    it('cancels with CLR and leaves FPL 0 unchanged (checked in the KLN 89 trainer, 2026-10-15, #380)', async () => {
+        const unit = await clickInFrontOfSecondWaypoint();
+        await unit.panel.clr();
+
+        expect(fplIdents(unit)).toEqual(FIXES.map(f => f.icaoStruct.ident));
+    });
+
+    // The AVsoftech trainer turned the cursor off after CLR
+    it('turns the left cursor off after CLR on the question (characterization, #380)', async () => {
+        const unit = await clickInFrontOfSecondWaypoint();
+        await unit.panel.clr();
+
+        expect(Screen.read().status().left).toBe('FPL 0');
+    });
+
+    it('asks at the blank position after the 30th waypoint as well (checked in the KLN 89 trainer, 2026-10-15, #380)', async () => {
+        const unit = await bootFull(100);
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        for (let i = 0; unit.panel.focused('L').text.replace(/[_ ]/g, '') !== '' && i < 40; i++) {
+            await unit.panel.outer('L', 1);
+        }
+        await unit.panel.inner('L', 1);
+
+        expect(leftRows()[5]).toBe('CONTINUE?');
+        expect(fplIdents(unit)).toHaveLength(30);
+    });
+
+    // The PC keyboard is the simulator's own input. A typed key opens an insert row as the inner knob does, so it asks
+    // the same, and the key is typed once room is made
+    it('asks before a key typed on the PC keyboard adds a waypoint (characterization, #380)', async () => {
+        const unit = await bootFull(100);
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        await unit.panel.outer('L', 1); // FA01
+        await unit.panel.type('L', 'K');
+
+        expect(leftRows()[5]).toBe('CONTINUE?');
+        expect(fplIdents(unit)).toEqual(FIXES.map(f => f.icaoStruct.ident));
+
+        await unit.panel.ent();
+        await unit.panel.type('L', 'NEW');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(fplIdents(unit).slice(0, 2)).toEqual(['KNEW', 'FA01']);
+        expect(fplIdents(unit)).toHaveLength(30);
+    });
+
+    // 3-15: ENT on an empty position takes the waypoint of the waypoint page on the right. That ENT adds a waypoint as
+    // the inner knob does, so it asks the same (characterization)
+    it('asks before ENT adds the waypoint of the right page (characterization, #380)', async () => {
+        const unit = await bootFull(100);
+        await unit.panel.selectPage('R', 'APT 1');
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'KNEW');
+        await unit.panel.ent();
+        await unit.panel.cursor('R'); // off, APT 1 shows KNEW
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        await unit.panel.outer('L', 1); // FA01
+        await unit.panel.ent();
+
+        expect(leftRows()[5]).toBe('CONTINUE?');
+        expect(fplIdents(unit)).toEqual(FIXES.map(f => f.icaoStruct.ident));
+
+        await unit.panel.ent(); // CONTINUE?: KNEW waits for its approval in front of FA01
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(fplIdents(unit).slice(0, 2)).toEqual(['KNEW', 'FA01']);
+        expect(fplIdents(unit)).toHaveLength(30);
+    });
+
+    /** A full FPL 0 (active leg 21), the cursor on FA01, ENT while the right side shows no waypoint page */
+    async function entWithoutWaypointOnTheRight() {
+        const unit = await bootFull(100);
+        await unit.panel.selectPage('R', 'NAV 2');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        await unit.panel.outer('L', 1); // FA01
+        await unit.panel.ent();
+        return unit;
+    }
+
+    // An ENT that takes no waypoint adds none, so it deletes none and does not ask; the empty row it opens in front of
+    // FA01 stays as before #380
+    it('does not ask on an ENT that adds no waypoint (characterization, #380)', async () => {
+        const unit = await entWithoutWaypointOnTheRight();
+
+        expect(leftRows()[5]).not.toBe('CONTINUE?');
+        expect(leftRows()[0]).toBe('  1:FA00');
+        expect(fplIdents(unit)).toEqual(FIXES.map(f => f.icaoStruct.ident));
+    });
+
+    // The inner knob on that empty row opens its entry, which asks; the row goes in front of FA01, where it was
+    it('asks on the inner knob on the empty row such an ENT opened and inserts in front of the same waypoint (characterization, #380)', async () => {
+        const unit = await entWithoutWaypointOnTheRight();
+        await unit.panel.inner('L', 1);
+
+        expect(leftRows()[5]).toBe('CONTINUE?');
+        expect(fplIdents(unit)).toEqual(FIXES.map(f => f.icaoStruct.ident));
+
+        await unit.panel.ent();
+        await unit.panel.enterIdent('L', 'KNEW');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(fplIdents(unit).slice(0, 2)).toEqual(['KNEW', 'FA01']);
+        expect(fplIdents(unit)).toHaveLength(30);
+    });
+});
+
+// FPL 0 with 30 en-route waypoints and a SID: KPRC, the SID legs SIDAA and SIDAB, then 29 fillers (the SID was loaded
+// into a plan of 30 fillers, whose first one made room for KPRC). A leg inserted in front of a SID waypoint is a SID leg
+// (createLeg copies the type), which counts only toward the total of 45 (#221)
+describe('adding a waypoint in front of a SID waypoint of a full FPL 0', () => {
+    async function bootWithSid() {
+        const kprcBase = airport('KPRC', 47.0, 8.0);
+        const east = (nm: number) => pointFrom(kprcBase, 90, nm);
+        const sidaa = intersection('SIDAA', east(8).lat, east(8).lon);
+        const sidab = intersection('SIDAB', east(20).lat, east(20).lon);
+        const kprc = withProcedures(kprcBase, {
+            approaches: [],
+            departures: [sid('DEP1', {runways: [{runway: '09', legs: [Leg.CA(90), Leg.DF(sidaa)]}], common: [Leg.TF(sidab)]})],
+        });
+        const fillers = Array.from({length: 30}, (_, i) => intersection(`FL${String(i).padStart(2, '0')}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [kprc, sidaa, sidab, ...fillers], position: {lat: 46.5, lon: 7.12},
+            storage: savedFlightplan(0, fillers),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 7', {ident: 'KPRC'});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // APPROVE?
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.ent(); // CONTINUE? (#222)
+        await vi.advanceTimersByTimeAsync(1000);
+        // Preconditions: 30 en-route waypoints and the two SID legs
+        const legs = unit.props.memory.fplPage.flightplans[0].getLegs();
+        expect(legs.filter(l => l.type === KLNLegType.USER)).toHaveLength(30);
+        expect(legs.slice(0, 3).map(l => [l.wpt.icaoStruct.ident, l.type])).toEqual([
+            ['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID],
+        ]);
+        return unit;
+    }
+
+    it('opens the insert row in front of SIDAA without asking (characterization, #221, #380)', async () => {
+        const unit = await bootWithSid();
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        for (let i = 0; unit.panel.focused('L').text.trim() !== 'SIDAA' && i < 5; i++) {
+            await unit.panel.outer('L', 1); // over the SID header to SIDAA
+        }
+        expect(unit.panel.focused('L').text.trim()).toBe('SIDAA'); // Precondition
+        await unit.panel.inner('L', 1);
+
+        expect(unit.panel.focused('L').text).toBe('A    ');
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(32);
+    });
+
+    it('asks in front of the first filler, an en-route waypoint (characterization, #221, #380)', async () => {
+        const unit = await bootWithSid();
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        for (let i = 0; unit.panel.focused('L').text.trim() !== 'FL01' && i < 6; i++) {
+            await unit.panel.outer('L', 1);
+        }
+        expect(unit.panel.focused('L').text.trim()).toBe('FL01'); // Precondition
+        await unit.panel.inner('L', 1);
+
+        expect(unit.panel.focused('L').text).toBe('CONTINUE?');
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(32);
+    });
+});
+
+// FPL 0 with 30 en-route waypoints and a STAR: FL00 to FL28, then ARR1 (STRAA, STRAB) and KPRC. An inner-knob click on
+// the procedure header opens an en-route insert row in front of the procedure (createLeg with a half index), which asks
+// as any en-route insert does
+describe('adding a waypoint in front of the STAR header of a full FPL 0', () => {
+    const fpl0Legs = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => [l.wpt.icaoStruct.ident, l.type]);
+    const leftRows = () => Screen.read().half('L').split('\n').map(r => r.trimEnd());
+
+    async function clickOnStarHeader() {
+        const kprcBase = airport('KPRC', 47.0, 8.0);
+        const east = (nm: number) => pointFrom(kprcBase, 90, nm);
+        const straa = intersection('STRAA', east(20).lat, east(20).lon);
+        const strab = intersection('STRAB', east(10).lat, east(10).lon);
+        const kprc = withProcedures(kprcBase, {arrivals: [star('ARR1', {common: [Leg.IF(straa), Leg.TF(strab)]})]});
+        const fillers = Array.from({length: 29}, (_, i) => intersection(`FL${String(i).padStart(2, '0')}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [kprc, straa, strab, knew, ...fillers], position: {lat: 46.5, lon: 7.12},
+            storage: savedFlightplan(0, [...fillers, kprc]),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 7', {ident: 'KPRC'});
+        // Preconditions: 30 en-route waypoints, the STAR in front of KPRC
+        expect(fpl0Legs(unit).slice(-4)).toEqual([
+            ['FL28', KLNLegType.USER], ['STRAA', KLNLegType.STAR], ['STRAB', KLNLegType.STAR], ['KPRC', KLNLegType.USER],
+        ]);
+        expect(fpl0Legs(unit).filter(l => l[1] === KLNLegType.USER)).toHaveLength(30);
+
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        for (let i = 0; !unit.panel.focused('L').text.includes('CHANGE') && i < 40; i++) {
+            await unit.panel.outer('L', 1);
+        }
+        expect(unit.panel.focused('L').text).toContain('CHANGE'); // Precondition: the header of ARR1
+        await unit.panel.inner('L', 1);
+        return unit;
+    }
+
+    it('asks on the inner knob on the STAR header (characterization, #380)', async () => {
+        const unit = await clickOnStarHeader();
+
+        expect(leftRows()[5]).toBe('CONTINUE?');
+        expect(fpl0Legs(unit)[0]).toEqual(['FL00', KLNLegType.USER]);
+    });
+
+    it('inserts an en-route waypoint in front of the STAR header after ENT (characterization, #380)', async () => {
+        const unit = await clickOnStarHeader();
+        await unit.panel.ent();
+
+        // The open insert row, with the A of the clockwise click (#311), is waypoint 29 (after FL01 to FL28) and stands
+        // in front of the header, under the cursor
+        expect(leftRows().slice(3, 5)).toEqual([' 29:A', ' ARR1-Æ']);
+        expect(unit.panel.focused('L').row).toBe(3);
+        await unit.panel.enterIdent('L', 'KNEW');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1500);
+
+        const legs = fpl0Legs(unit);
+        expect(legs[0]).toEqual(['FL01', KLNLegType.USER]);
+        expect(legs.slice(-5)).toEqual([
+            ['FL28', KLNLegType.USER], ['KNEW', KLNLegType.USER], ['STRAA', KLNLegType.STAR], ['STRAB', KLNLegType.STAR],
+            ['KPRC', KLNLegType.USER],
+        ]);
+        expect(unit.errors).toEqual([]);
+    });
+
+    it('leaves no open row in front of the STAR header after CLR (characterization, #380)', async () => {
+        const unit = await clickOnStarHeader();
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(1500);
+
+        expect(Screen.read().status().left).toBe('FPL 0');
+        expect(fpl0Legs(unit)).toHaveLength(32);
+        // An empty row left in front of the header would number KPRC, the last row (4-8), 33
+        expect(leftRows()[5]).toBe(' 32:KPRC');
     });
 });
 
