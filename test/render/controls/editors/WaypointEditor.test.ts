@@ -534,3 +534,22 @@ describe('waypoint editor (characterization)', () => {
         expect(Screen.read().status().right).toBe('NAV 1');
     });
 });
+
+// The KLN 89 trainer (2026-10-15): the outer knob moves the cursor past a blank cell of a short ident in the D-> field,
+// and a character entered there stays in its cell with the blank before it, with no autofill (#343). The creation that
+// follows is #262's subject
+describe('waypoint editor, a character after a blank cell (#343)', () => {
+    it('keeps the blank before a character entered after it, without an autofill '
+        + '(checked in the KLN 89 trainer, 2026-10-15, #343)', async () => {
+        const unit = await bootUnit({facilities: [airport('AB', 47.2, 8.0), airport('ABA', 47.3, 8.0)], position: {lat: 47.0, lon: 8.0}});
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.dct();
+        await startEntryAt(unit, 'A');
+        await unit.panel.outer('L', 3); // past the B, onto the fourth cell
+        expect(dctIdent()).toBe('   AB      '); // precondition: AB, the cursor on the fourth cell
+
+        await unit.panel.inner('L', 1);
+
+        expect(dctIdent()).toBe('   AB A    ');
+    });
+});

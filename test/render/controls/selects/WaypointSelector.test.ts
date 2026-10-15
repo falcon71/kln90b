@@ -33,6 +33,21 @@ async function ksatWithCursor(): Promise<HeadlessUnit> {
     return unit;
 }
 
+/**
+ * APT 1 of AB. The world holds the airport ABA too (an A entered with the blank dropped would select it) and nothing
+ * that begins with AB A. The page opens on AB; the outer knob puts the right cursor on the fourth ident cell, the
+ * second blank after the B
+ */
+async function abWithCursorOnFourthCell(): Promise<HeadlessUnit> {
+    const unit = await bootUnit({facilities: [airport('AB', 47.2, 8.0), airport('ABA', 47.3, 8.0)], position: {lat: 47.0, lon: 8.0}});
+    await unit.panel.selectPage('R', 'APT 1');
+    await unit.panel.cursor('R');
+    await unit.panel.outer('R', 3);
+    expect(unit.panel.focused('R')).toEqual({row: 0, col: 16, text: ' '}); // precondition
+    expect(identRow().slice(1, 5)).toBe('AB  '); // precondition
+    return unit;
+}
+
 const identRow = () => Screen.read().rows('R')[0];
 const firstChar = () => Screen.read().cell(0, 13).ch;
 
@@ -224,5 +239,31 @@ describe('waypoint selector (characterization)', () => {
 
         expect(rows).toEqual([' K00       ', ' KS01      ', ' KSAT      ']);
         expect(unit.panel.focused('R')).toEqual({row: 0, col: 16, text: 'T'});
+    });
+});
+
+// The KLN 89 trainer (2026-10-15): a character entered after a blank cell stays in its cell with the blank before it,
+// and the unit searches that ident (#343). The 89 showed the kept blank, no autofill, and the ident searched and offered
+// for creation. The 89 has no CREATE NEW / WPT AT: rows, so the rows of the second test are a characterization
+describe('waypoint selector, a character after a blank cell (#343)', () => {
+    it('keeps the blank before a character entered after it (checked in the KLN 89 trainer, 2026-10-15, #343)', async () => {
+        const unit = await abWithCursorOnFourthCell();
+
+        await unit.panel.inner('R', 1);
+
+        expect(identRow().slice(1, 5)).toBe('AB A');
+        expect(unit.props.memory.aptPage.ident).toBe('AB A');
+    });
+
+    // Background: 5-16 has an ident in no database offer the creation of a user waypoint (held by the spec tests of
+    // CreateWaypointMessage.test.ts). What is pinned here is that the ident with the kept blank is the one searched and
+    // reaches that state: the world holds the airport ABA, so the rows show only for AB A and not for the ident without
+    // its blank
+    it('offers the creation for the ident with the kept blank (characterization, #343)', async () => {
+        const unit = await abWithCursorOnFourthCell();
+
+        await unit.panel.inner('R', 1);
+
+        expect(Screen.read().rows('R').slice(2, 4)).toEqual(['CREATE NEW ', 'WPT AT:    ']);
     });
 });

@@ -1010,7 +1010,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       one `SelectField` per digit, so each digit is its own cursor stop. They offer `setValue`/`setReadonly`.
     - `WaypointSelector` (base of `AirportSelector`, `VorSelector`, `NdbSelector`, `IntersectionSelector`) is the
       per-character ident at the top of waypoint pages. Changing a char looks up and loads the facility immediately via
-      callback.
+      callback. A character entered after a blank cell keeps the blank before it (`AB A`) and that ident is searched
+      (KLN 89 trainer, 2026-10-15, #343).
     - Also: `NearestSelector`, `MapOrientationSelector`, `SupplementarySelector`, `ObsDtkElement`,
       `CreateWaypointMessage` ("CREATE NEW WPT AT: USER POS? / PRES POS?" buttons, shown when the ident has no match),
       `SuperNav5Field1/2/3Selector`, `SuperNav5RangeSelector`, `SuperNav5DirectToSelector`.

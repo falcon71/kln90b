@@ -97,7 +97,8 @@ export abstract class WaypointSelector<T extends Facility> implements UiElement 
     }
 
     private saveChar(charIdx: number, idx: number): void {
-        let enteredIdent = this.ident.substring(0, idx) + CHARSET[charIdx];
+        //#343: a character after a blank cell keeps the gap, checked in the KLN 89 trainer (2026-10-15)
+        let enteredIdent = this.ident.padEnd(idx, " ").substring(0, idx) + CHARSET[charIdx];
         this.ident = enteredIdent;
 
         //console.log("searching for", enteredIdent);

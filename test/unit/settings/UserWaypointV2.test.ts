@@ -1,11 +1,13 @@
 import {beforeEach, describe, expect, it} from 'vitest';
-import {AirportFacility, EventBus, Facility, FacilityType, ICAO, NdbFacility, RunwaySurfaceType, UnitType, UserFacility, UserFacilityType, VorFacility} from '@microsoft/msfs-sdk';
+import {AirportFacility, EventBus, Facility, FacilitySearchType, FacilityType, ICAO, NdbFacility, RunwaySurfaceType, UnitType, UserFacility, UserFacilityType, VorFacility} from '@microsoft/msfs-sdk';
+import {ActualFacilityClient, KLNFacilityLoader} from '../../../kln90b/data/navdata/KLNFacilityLoader';
 import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
 import {KLN90BUserWaypointsSettings} from '../../../kln90b/settings/KLN90BUserWaypoints';
 import {KLN90BUserSettings} from '../../../kln90b/settings/KLN90BUserSettings';
 import {UserWaypointPersistor} from '../../../kln90b/settings/UserWaypointPersistor';
 import {UserWaypointLoaderV2} from '../../../kln90b/settings/UserWaypointLoaderV2';
 import {airport} from '../../harness/navdata/builders';
+import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
 
 const bus = new EventBus();
 const userSettings = new KLN90BUserSettings(bus);
@@ -291,5 +293,30 @@ describe('user waypoint V2 format', () => {
         const wpt = repo.get(ICAO.value('U', 'XX', '', 'MYWPT')) as UserFacility;
         expect(wpt.lat).toBeCloseTo(47.5, 6);
         expect(wpt.lon).toBeCloseTo(8.25, 6);
+    });
+});
+
+describe('user waypoint with a blank inside its ident', () => {
+    // The KLN 89 trainer created the user waypoint `80 A` (2026-10-15, #343), so the unit has to keep a waypoint whose
+    // ident holds a blank: the stored string keeps the blank in its place, the restore reads it back and the loader finds it
+    it('keeps a user waypoint whose ident holds a blank (checked in the KLN 89 trainer, 2026-10-15, #343)', async () => {
+        repo.add({
+            icao: '', icaoStruct: ICAO.value('U', 'XX', '', 'AB A'), name: '', lat: 47.5, lon: 8.25, region: 'XX', city: '',
+            isTemporary: false, userFacilityType: UserFacilityType.LAT_LONG,
+        } as unknown as UserFacility);
+        expect(storedSlot(0)).toBe('UXX        AB A    +4730.00+00815.00'); // written by hand: the 8 character ident field, blank inside
+
+        removeAll();
+        restoreFrom('UXX        AB A    +4730.00+00815.00');
+
+        const wpt = repo.get(ICAO.value('U', 'XX', '', 'AB A')) as UserFacility;
+        expect(wpt.icaoStruct.ident).toBe('AB A');
+        expect(wpt.lat).toBeCloseTo(47.5, 6);
+        expect(wpt.lon).toBeCloseTo(8.25, 6);
+        expect(storedSlot(0)).toBe('UXX        AB A    +4730.00+00815.00'); // and the restore leaves the slot alone (#103)
+
+        const loader = new KLNFacilityLoader(new MemoryFacilityClient([]) as unknown as ActualFacilityClient, repo);
+        const found = await loader.searchByIdentWithIcaoStructs(FacilitySearchType.User, 'AB A');
+        expect(found.map(icao => icao.ident)).toEqual(['AB A']);
     });
 });
