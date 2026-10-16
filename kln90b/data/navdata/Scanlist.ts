@@ -358,18 +358,19 @@ export class FacilityLoaderScanlist implements Scanlist {
     }
 
     /**
-     * Happens, when the user has selected an ident, that does not exist
-     * We now look by the ident to find the next closest entry, respecting the search direction
+     * Happens, when the user has selected an ident, that does not exist. Returns the position in the cache from which a
+     * step in the given direction reaches the next closest entry: clockwise the first entry after the ident,
+     * counterclockwise the last one before it (3-21, #202)
      * @param icao
      * @param direction
      * @private
      */
     private findClosest(icao: IcaoValue, direction: number): number {
-        let sign = Math.sign(direction) * -1;
-        if (sign === 0) {
-            sign = -1;
+        let firstAfter = this.icaoListCache.findIndex(testIcao => testIcao.ident.localeCompare(icao.ident) > 0);
+        if (firstAfter === -1) {
+            firstAfter = this.icaoListCache.length;
         }
-        return this.icaoListCache.findIndex(testIcao => testIcao.ident.localeCompare(icao.ident) == sign);
+        return direction > 0 ? firstAfter - 1 : firstAfter;
     }
 
     /**

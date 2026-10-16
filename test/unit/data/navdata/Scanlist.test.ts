@@ -505,6 +505,39 @@ describe('FacilityLoaderScanlist order (3-21)', () => {
     });
 });
 
+// 3-21: scanning is alphabetical. A scan from an ident that is not in the list goes on from where the ident would be
+// (#202): clockwise to the first waypoint after it, counterclockwise to the last one before it
+describe('FacilityLoaderScanlist from an ident that is not in the list (3-21, #202)', () => {
+    const intersections = () => [intersection('AAA', 47, 8), intersection('BBB', 47.1, 8), intersection('CCC', 47.2, 8)];
+
+    it('scans clockwise from BBC to CCC', async () => {
+        const list = await scanlist(FacilitySearchType.Intersection, intersections());
+
+        expect((await list.getNext(ICAO.value('W', 'K1', '', 'BBC'), 1))?.ident).toBe('CCC');
+    });
+
+    it('scans counterclockwise from BBC to BBB', async () => {
+        const list = await scanlist(FacilitySearchType.Intersection, intersections());
+
+        expect((await list.getNext(ICAO.value('W', 'K1', '', 'BBC'), -1))?.ident).toBe('BBB');
+    });
+
+    // The ends, as the clamp of a scan from a listed waypoint has them
+    it('scans clockwise from before the first waypoint to it and counterclockwise to nothing', async () => {
+        const list = await scanlist(FacilitySearchType.Intersection, intersections());
+
+        expect(await list.getNext(ICAO.value('W', 'K1', '', 'AA'), -1)).toBeNull();
+        expect((await list.getNext(ICAO.value('W', 'K1', '', 'AA'), 1))?.ident).toBe('AAA');
+    });
+
+    it('scans counterclockwise from after the last waypoint to it, and clockwise to nothing', async () => {
+        const list = await scanlist(FacilitySearchType.Intersection, intersections());
+
+        expect((await list.getNext(ICAO.value('W', 'K1', '', 'CCD'), -1))?.ident).toBe('CCC');
+        expect(await list.getNext(ICAO.value('W', 'K1', '', 'CCD'), 1)).toBeNull();
+    });
+});
+
 // 3-21: scanning slowly steps through the waypoints one at a time. The list keeps a window of about 1000 ICAOs and
 // refills it with ident searches as the pilot scans (#40, 8abd5f7); these lists are longer than one refill.
 describe('FacilityLoaderScanlist across the edge of its cache window (#40 8abd5f7)', () => {

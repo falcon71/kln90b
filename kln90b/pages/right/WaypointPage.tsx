@@ -158,8 +158,7 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
                 this.changeFacility(nearestlist[newIndex] as any);
             }
         } else {
-            const fac = unpackFacility(this.facility);
-            this.scanHandler.scanLeft(fac ? fac.icaoStruct : buildIcaoStructIdentOnly(this.ident.padEnd(5, " "))).then(nextFacility => {
+            this.scanHandler.scanLeft(this.getScanStart()).then(nextFacility => {
                 if (nextFacility === null) { //End of waypointlist, move to the nearestlist if avaiable
                     const nearestListGenerator = this.getNearestList();
                     if (nearestListGenerator !== null) {
@@ -196,8 +195,7 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
                 this.changeFacility(nearestlist[newIndex] as any);
             }
         } else {
-            const fac = unpackFacility(this.facility);
-            this.scanHandler.scanRight(fac ? fac.icaoStruct : buildIcaoStructIdentOnly(this.ident.padEnd(5, " "))).then(nextFacility => {
+            this.scanHandler.scanRight(this.getScanStart()).then(nextFacility => {
                 if (nextFacility !== null) {
                     this.changeFacility(nextFacility as any);
                 }
@@ -208,6 +206,19 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
     }
 
     protected abstract getMemory(): WaypointPageState<T>;
+
+    /**
+     * The waypoint a scan starts from: the one shown, else the last one the ident entry matched (#202, 3-21, KLN 89
+     * trainer 2026-10-07), else the typed ident
+     */
+    private getScanStart(): IcaoValue {
+        const fac = unpackFacility(this.facility);
+        if (fac) {
+            return fac.icaoStruct;
+        }
+        const lastMatch = this.getMemory().lastMatch;
+        return lastMatch ? lastMatch.icaoStruct : buildIcaoStructIdentOnly(this.ident.padEnd(5, " "));
+    }
 
     protected abstract getNearestList(): AirportNearestList | VorNearestList | NdbNearestList | null;
 
@@ -234,9 +245,16 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
         }
 
         if (typeof fac === "string") {
+            //#202: a typed ident that matches nothing replaces the last match. Nested pages call this again with the memory
+            //already cleared, so the memory decides
+            const memoryFacility = unpackFacility(this.getMemory().facility);
+            if (memoryFacility !== null) {
+                this.getMemory().lastMatch = memoryFacility;
+            }
             this.facility = null;
             this.ident = fac;
         } else {
+            this.getMemory().lastMatch = null; //#202: the ident matches a waypoint again
             this.facility = fac;
             const facility = unpackFacility(this.facility);
             this.ident = facility.icaoStruct.ident;

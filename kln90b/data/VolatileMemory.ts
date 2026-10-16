@@ -25,6 +25,11 @@ import {Sensors} from "../Sensors";
 export interface WaypointPageState<T extends Facility> {
     facility: T | NearestWpt<T> | null,
     ident: string,
+    /**
+     * #202: the last waypoint the ident entry matched, while the typed ident matches none. A scan starts from it (3-21,
+     * KLN 89 trainer 2026-10-07)
+     */
+    lastMatch: T | null,
 }
 
 export interface AltPageState {
@@ -157,22 +162,27 @@ export class VolatileMemory {
     public readonly aptPage: WaypointPageState<AirportFacility> = {
         facility: null,
         ident: "0   ",
+        lastMatch: null,
     };
     public readonly vorPage: WaypointPageState<VorFacility> = {
         facility: null,
         ident: "0  ",
+        lastMatch: null,
     };
     public readonly ndbPage: WaypointPageState<NdbFacility> = {
         facility: null,
         ident: "0  ",
+        lastMatch: null,
     };
     public readonly intPage: WaypointPageState<IntersectionFacility | RunwayFacility> = {
         facility: null,
         ident: "0    ",
+        lastMatch: null,
     };
     public readonly supPage: WaypointPageState<UserFacility> = {
         facility: null,
         ident: "0    ",
+        lastMatch: null,
     };
 
     public readonly altPage: AltPageState = {
@@ -242,6 +252,12 @@ export class VolatileMemory {
         }
 
         this.isReady = false;
+        //#202: a power cycle forgets the last match of the ident entry
+        this.aptPage.lastMatch = null;
+        this.vorPage.lastMatch = null;
+        this.ndbPage.lastMatch = null;
+        this.intPage.lastMatch = null;
+        this.supPage.lastMatch = null;
         this.altPage.alertEnabled = false;
         this.altPage.alertWarn = 300;
 
