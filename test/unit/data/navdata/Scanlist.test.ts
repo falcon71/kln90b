@@ -16,6 +16,29 @@ function managerJob(list: FacilityLoaderScanlist): Promise<void> | null {
     return (list as unknown as { listManangerJob: Promise<void> | null }).listManangerJob;
 }
 
+/**
+ * Sets the window the list keeps: the fields the background fill maintains, as a fill that was cancelled part way leaves
+ * them. The state is set by hand; this is a characterization of that state, not a path the list takes by itself.
+ */
+function setCacheWindow(list: FacilityLoaderScanlist, validFrom: string, validTo: string, icaos: IcaoValue[]): void {
+    const state = list as unknown as { cacheValidFromIdent: string; cacheValidToIdent: string; icaoListCache: IcaoValue[] };
+    state.cacheValidFromIdent = validFrom;
+    state.cacheValidToIdent = validTo;
+    state.icaoListCache = icaos;
+}
+
+/**
+ * A memory client whose search results are new objects on every call, as the sim's are (Coherent.call crosses the
+ * bridge). A cache dedupes by object identity, so with such results a waypoint found twice is kept twice.
+ */
+function copyingClient(facilities: Facility[]): FacilityClient {
+    const client = new MemoryFacilityClient(facilities);
+    const search = client.searchByIdentWithIcaoStructs.bind(client);
+    client.searchByIdentWithIcaoStructs = async (filter, ident, maxItems) =>
+        (await search(filter, ident, maxItems)).map(icao => ICAO.value(icao.type, icao.region, icao.airport, icao.ident));
+    return client as unknown as FacilityClient;
+}
+
 const airports = () => new MemoryFacilityClient([airport('KAAA', 47, 8), airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8)]);
 
 /** Initializes the list and waits until its background job has filled the cache, as a user scanning later would find it. */
@@ -517,7 +540,9 @@ describe('FacilityLoaderScanlist across the edge of its cache window (#40 8abd5f
 // 3-21: scanning visits every waypoint. When a user waypoint is added or deleted, the list throws its cache away and
 // refills it around the waypoint shown (waypointsChanged). NDB idents of different length share prefixes (AB, ABC).
 describe('FacilityLoaderScanlist after a user waypoint change', () => {
-    it.fails('scans counterclockwise from ABC to AB (#203)', async () => {
+    // #203: the refill going towards the beginning must search the shorter ident AB itself. It sorts before ABA, ABB and
+    // ABC, and it is not a prefix search result of any longer ident's search, so only its own search finds it.
+    it('scans counterclockwise from ABC to AB (#203)', async () => {
         const bus = new EventBus();
         const list = await scanlist(FacilitySearchType.Ndb, [ndb('AA', 47, 8), ndb('AB', 47, 8.1), ndb('ABC', 47, 8.2), ndb('ABD', 47, 8.3)], bus);
         const abc = ICAO.value('N', 'K1', '', 'ABC');
@@ -529,7 +554,70 @@ describe('FacilityLoaderScanlist after a user waypoint change', () => {
         expect((await step(list, abc, -1))?.ident).toBe('AB');
     });
 
-    // The same list scans correctly before the change: the pin above is about the refill, not the order
+    // #203, with the shorter ident a prefix of the next ones: A0 and A1 have a 0 and a 1 after A. Counterclockwise from A1
+    // the list shows A0, then the shorter ident A itself.
+    it('scans counterclockwise from A1 to A0 and then A after a user waypoint change (#203)', async () => {
+        const bus = new EventBus();
+        const list = await scanlist(FacilitySearchType.Ndb, [ndb('A', 47, 8), ndb('A0', 47, 8.1), ndb('A1', 47, 8.2)], bus);
+        const a1 = ICAO.value('N', 'K1', '', 'A1');
+        list.sync(a1);
+        await managerJob(list);
+        bus.getPublisher<any>().pub(KLNFacilityRepository.SYNC_TOPIC, undefined); // what the repository publishes on a change
+        await managerJob(list);
+
+        const first = await step(list, a1, -1);
+        const second = first === null ? null : await step(list, first, -1);
+        expect([first?.ident, second?.ident]).toEqual(['A0', 'A']);
+    });
+
+    // #203, with the copies: the sim returns a new object for every search result (Coherent.call crosses the bridge), so
+    // the cache dedupes nothing by object. The exact search for AB must not bring ABC and ABD back a second time. The
+    // copies are a characterization of the sim; the list shows each waypoint once (3-21).
+    it('shows each waypoint once scanning counterclockwise from ABD after a user waypoint change (#203)', async () => {
+        const bus = new EventBus();
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Ndb, copyingClient([ndb('AA', 47, 8), ndb('AB', 47, 8.1), ndb('ABC', 47, 8.2), ndb('ABD', 47, 8.3)]), bus);
+        await list.init();
+        await managerJob(list);
+        const abd = ICAO.value('N', 'K1', '', 'ABD');
+        list.sync(abd);
+        await managerJob(list);
+        bus.getPublisher<any>().pub(KLNFacilityRepository.SYNC_TOPIC, undefined); // what the repository publishes on a change
+        await managerJob(list);
+
+        expect(await scanToEnd(list, abd, -1, 10)).toEqual(['ABD', 'ABC', 'AB', 'AA']);
+    });
+
+    // #203, the refill that meets the shorter ident after a longer prefix: the state is the one a refill leaves when it is
+    // cancelled right after its search for AB0 (valid from AB0, with AB0, ABC and ABD cached). The refill then passes
+    // ABC and AB0 on its way down, and reaches the exact AB. The search for AB must not bring ABC, ABD and AB0 back a
+    // second time. The state is set by hand (characterization); the list shows each waypoint once (3-21).
+    it('shows each waypoint once when the refill from AB0 reaches the shorter ident AB (#203)', async () => {
+        const bus = new EventBus();
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Ndb, copyingClient([ndb('AA', 47, 8), ndb('AB', 47, 8.1), ndb('AB0', 47, 8.2), ndb('ABC', 47, 8.3), ndb('ABD', 47, 8.4)]), bus);
+        await list.init();
+        await managerJob(list);
+        setCacheWindow(list, 'AB0', 'ABD', [ICAO.value('N', 'K1', '', 'AB0'), ICAO.value('N', 'K1', '', 'ABC'), ICAO.value('N', 'K1', '', 'ABD')]);
+        const abd = ICAO.value('N', 'K1', '', 'ABD');
+        list.sync(abd);
+        await managerJob(list);
+
+        expect(await scanToEnd(list, abd, -1, 10)).toEqual(['ABD', 'ABC', 'AB0', 'AB', 'AA']);
+    });
+
+    // A scan that starts at AB (no cache) must list the longer idents ABC and ABD too: the start ident's own prefix search
+    // is not an exact search. The window is set to the one invalidateCache leaves (characterization).
+    it('lists the longer idents after AB when a scan starts at AB (#203)', async () => {
+        const bus = new EventBus();
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Ndb, copyingClient([ndb('AA', 47, 8), ndb('AB', 47, 8.1), ndb('ABC', 47, 8.2), ndb('ABD', 47, 8.3)]), bus);
+        await list.init();
+        await managerJob(list);
+        setCacheWindow(list, 'ZZZZ', '0', []);
+        const ab = ICAO.value('N', 'K1', '', 'AB');
+
+        expect(await scanToEnd(list, ab, 1, 10)).toEqual(['AB', 'ABC', 'ABD']);
+    });
+
+    // The same list scans correctly before the change: the test above is about the refill, not the order
     it('scans counterclockwise from ABC to AB before any change', async () => {
         const list = await scanlist(FacilitySearchType.Ndb, [ndb('AA', 47, 8), ndb('AB', 47, 8.1), ndb('ABC', 47, 8.2), ndb('ABD', 47, 8.3)]);
         const abc = ICAO.value('N', 'K1', '', 'ABC');

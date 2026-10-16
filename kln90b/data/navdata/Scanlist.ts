@@ -230,12 +230,13 @@ export class FacilityLoaderScanlist implements Scanlist {
         if (sizeBeforeCurrent < TARGET_CACHE_SIZE / 2) {
             this.log(`${this.facilitySearchType}: Size towards beginning: ${sizeBeforeCurrent}, extending cache towards beginning`);
             let ident: string | null = lastIcao.ident;
+            let exact = false;
             while (sizeBeforeCurrent < targetSizeForExtension) {
                 if (ident === null || ident === "") { //End of the list
                     break;
                 }
                 if (this.cacheValidFromIdent.localeCompare(ident) <= 0) {
-                    ident = this.getNextIdentForSearch(ident!, -1);
+                    [ident, exact] = this.getPreviousSearch(ident);
                     continue;
                 }
                 this.log(`${this.facilitySearchType} : Searching for ${ident}`);
@@ -247,9 +248,10 @@ export class FacilityLoaderScanlist implements Scanlist {
                     return;
                 }
                 this.cacheValidFromIdent = ident;
-                this.icaoListCache = this.addResultToCache(results);
+                const exactIdent: string = ident;
+                this.icaoListCache = this.addResultToCache(exact ? results.filter(icao => icao.ident === exactIdent) : results);
                 sizeBeforeCurrent += this.icaoListCache.length - sizeBefore;
-                ident = this.getNextIdentForSearch(ident!, -1);
+                [ident, exact] = this.getPreviousSearch(ident);
             }
 
         } else if (sizeBeforeCurrent > MAXIMUM_CACHE_SIZE / 2) {
@@ -443,6 +445,18 @@ export class FacilityLoaderScanlist implements Scanlist {
             }
             return this.getNextIdentForSearch(prevString, signOfDirection);
         }
+    }
+
+    /**
+     * #203: the search that comes before the prefix (or the exact ident) going towards the beginning of the list. Before
+     * the prefix AB0 comes the ident AB itself, which sorts before every longer ident, and only then the prefix AA.
+     * Returns the ident to search and whether only that exact ident is wanted.
+     */
+    private getPreviousSearch(ident: string): [string | null, boolean] {
+        if (ident.endsWith(CHARSET[0])) {
+            return [ident.substring(0, ident.length - 1), true];
+        }
+        return [this.getNextIdentForSearch(ident, -1), false];
     }
 
     private log(message?: any, ...optionalParams: any[]): void {
