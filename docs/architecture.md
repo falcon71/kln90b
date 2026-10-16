@@ -552,7 +552,7 @@ written then, on purpose: the default autopilot reads it.
 - `Scanlists` / `FacilityLoaderScanlist` (`data/navdata/Scanlist.ts`, 3-21) implement alphabetical scanning with
   outer-knob scrolling. Instead of holding all ICAOs, they keep a moving window cache filled by `searchByIdent`, plus an
   index of the first ident per letter. Async jobs are cancelled by a job id. `sync(icao)` re-centres the window.
-- `Nearestlists` (`data/navdata/NearestList.ts`): APT/VOR/NDB lists with a 9-item maximum and a 500 NM radius. The
+- `Nearestlists` (`data/navdata/NearestList.ts`): APT/VOR/NDB lists with a 9-item maximum and a 200 NM radius (#207). The
   search runs every 10 s and bearing and distance update every 1 Hz. The airport filter comes from the
   `nearestAptSurface` and `nearestAptMinRunwayLength` settings, with `updateFilters()` called from pages.
 - `NearestUtils`: nearest helpers for pages and airspaces. It double-checks `BoundaryUtils.isInside`, because the SDK

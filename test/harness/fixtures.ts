@@ -4,7 +4,7 @@ import {airspace} from './navdata/airspaces';
 import {airport, intersection, ndb, vor} from './navdata/builders';
 import {approach, Leg, sid, star, withProcedures} from './navdata/procedures';
 
-/** Where the default navdata lies: the South Pacific, far beyond the 500 NM nearest search of every test position */
+/** Where the default navdata lies: the South Pacific, far beyond the 200 NM nearest search and the 1000 NM reference VOR search of every test position */
 export const DEFAULT_NAVDATA_POSITION = {lat: -45, lon: -150};
 
 /**
@@ -124,7 +124,7 @@ export function dtWorld() {
  * The world of the CTR pages (the Center airspaces along a route): the airports KAAA (40 N), KBBB (45 N) and KCCC (50 N)
  * 5 degrees apart on 100 W, and three Center airspaces stacked south to north along the same meridian that share their
  * boundaries at 42.75 N and 47.75 N. The VOR BGD lies half a degree north of the first boundary and GCK half a degree
- * north of the second, so each is the only VOR within 100 NM of its crossing. The Centers are named after the idents
+ * north of the second, so each is the closest VOR to its crossing. The Centers are named after the idents
  * KZFW, KZAB and KZDV, and each carries a frequency: OTH 2 throws without one, and selectPage may pass OTH 2.
  *
  * The legs of a plan through the airports should be 300 NM long, as KAAA to KBBB is: the route search splits a leg and

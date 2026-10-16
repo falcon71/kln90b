@@ -32,11 +32,11 @@ describe('APT 1 page', () => {
 
 /**
  * Scanning after the shown nearest entry dropped off the nearest list (#39, c2e7b8e, d202f4a).
- * The nearest search radius is 500 NM, so a teleport of 10 degrees of latitude drops an entry at once; flying there
+ * The nearest search radius is 200 NM, so a teleport of 10 degrees of latitude drops an entry at once; flying there
  * would take hundreds of NM.
  */
 describe('APT 1 page on a nearest entry', () => {
-    // Invented airports on one meridian, 0.2 degrees (12 NM) apart; KZZZ is far out of the 500 NM search radius
+    // Invented airports on one meridian, 0.2 degrees (12 NM) apart; KZZZ is far out of the 200 NM search radius
     const kaaa = airport('KAAA', 47.0, 8.0);
     const kbbb = airport('KBBB', 47.2, 8.0);
     const kccc = airport('KCCC', 47.4, 8.0);

@@ -272,14 +272,19 @@ describe('the nearest NDB list with a user NDB (3-22, 5-45)', () => {
     });
 });
 
-// The code searches 500 NM around the aircraft; the guide gives no radius. This holds the code's value.
-describe('the nearest airport list radius (characterization)', () => {
-    it('lists an airport 450 NM away as nr 1 when nothing is nearer', async () => {
-        // 7.5 degrees of latitude north of the aircraft are 450 NM
-        const unit = await bootUnit({facilities: [airport('KFAR', 54.5, 8.0)], position: POSITION});
+// The 90B guide gives no radius for the nearest lists. The KLN 89 guide and trainer stop at 200 NM, the AVsoftech 90B
+// trainer at about 190 to 220 NM; the maintainer ruled 200 NM (#207). 3.3 degrees of latitude are 198 NM
+describe('the nearest list radius (characterization; KLN 89 guide and trainer, maintainer ruling #207)', () => {
+    it('lists an airport 198 NM away as nr 1 when nothing is nearer', async () => {
+        const unit = await bootUnit({facilities: [airport('KFAR', 50.3, 8.0)], position: POSITION});
 
-        // the radius is a question: #207
         expect(await nearestRows(unit)).toEqual([' KFAR  nr 1']);
+    });
+
+    it('leaves out an airport 204 NM away', async () => {
+        const unit = await bootUnit({facilities: [airport('KFAR', 50.4, 8.0)], position: POSITION});
+
+        expect(await nearestRows(unit)).toEqual([]);
     });
 });
 

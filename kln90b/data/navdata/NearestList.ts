@@ -24,6 +24,8 @@ import {CalcTickable, TICK_TIME_CALC} from "../../TickController";
 
 const NEAREST_TICK_TIME = 10000;
 const MAX_ITEMS = 9;
+//#207: the 90B guide gives no radius; the KLN 89's is 200 NM, and the maintainer ruled the same
+const NEAREST_SEARCH_RADIUS_NM = 200;
 
 type NearestSearchType = FacilitySearchType.Airport | FacilitySearchType.Vor | FacilitySearchType.Ndb;
 
@@ -97,7 +99,7 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
     }
 
     private async search(): Promise<void> {
-        const distanceMeters = UnitType.NMILE.convertTo(500, UnitType.METER);
+        const distanceMeters = UnitType.NMILE.convertTo(NEAREST_SEARCH_RADIUS_NM, UnitType.METER);
         const diff = await this.session!.searchNearest(this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, distanceMeters, MAX_ITEMS);
 
         for (const removedIcao of diff.removed) {

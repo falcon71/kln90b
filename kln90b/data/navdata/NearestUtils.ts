@@ -17,6 +17,9 @@ import {
 import {Latitude, Longitude} from "../Units";
 import {BoundaryUtils} from "./BoundaryUtils";
 
+//#207: the KLN 89 trainer shows the closest VOR as the reference up to 1000 NM (2026-10-16)
+export const REFERENCE_VOR_RADIUS_NM = 1000;
+
 export class NearestUtils {
     private vorSession: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[FacilitySearchType.Vor] | undefined;
 
@@ -50,7 +53,7 @@ export class NearestUtils {
      * @param lon
      */
     public async getNearestVor(lat: Latitude, lon: Longitude): Promise<VorFacility | null> {
-        const distanceMeters = UnitType.NMILE.convertTo(100, UnitType.METER);
+        const distanceMeters = UnitType.NMILE.convertTo(REFERENCE_VOR_RADIUS_NM, UnitType.METER);
         const diff = await this.vorSession!.searchNearest(lat, lon, distanceMeters, 1);
         for (const icao of diff.removed) {
             this.nearestVor = null;
