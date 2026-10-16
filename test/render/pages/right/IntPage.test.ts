@@ -65,9 +65,31 @@ describe('INT page reference VOR (3-50)', () => {
 
     // A user VOR in the repository has the class and type the user waypoint loaders give it (Unknown, Unknown).
     // IntPage.tsx:221 computes the REF itself because the database field "does not respect user VORs".
-    it.fails('takes a closer user VOR (#206)', async () => {
+    it('takes a closer user VOR (#206)', async () => {
         const unit = await bootUnit({facilities: [inta(), far()], position: {lat: 47.0, lon: 8.0}});
         KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.12, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
+
+        expect(await refRow(unit)).toBe('REF:  QQV  ');
+    });
+
+    // 3-50: the closest VOR. A user VOR added after the database VOR was found takes part, but the nearer one is the
+    // reference, not the one the nearest search reported last. NER is 3 NM and QQV 9 NM from INTA. Between the two REF
+    // calculations the page changes, so that the second one runs again.
+    it('takes a nearer database VOR over a user VOR added later (#206)', async () => {
+        const unit = await bootUnit({facilities: [inta(), vor('NER', 47.15, 8.0)], position: {lat: 47.0, lon: 8.0}});
+        expect(await refRow(unit)).toBe('REF:  NER  '); // precondition: the database VOR is found first
+        KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.25, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
+        await unit.panel.selectPage('R', 'VOR  ');
+
+        expect(await refRow(unit)).toBe('REF:  NER  ');
+    });
+
+    // The sibling of the test above: the same steps, the user VOR the nearer one
+    it('takes a nearer user VOR over a database VOR found earlier (#206)', async () => {
+        const unit = await bootUnit({facilities: [inta(), vor('NER', 47.25, 8.0)], position: {lat: 47.0, lon: 8.0}});
+        expect(await refRow(unit)).toBe('REF:  NER  '); // precondition
+        KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.15, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
+        await unit.panel.selectPage('R', 'VOR  ');
 
         expect(await refRow(unit)).toBe('REF:  QQV  ');
     });

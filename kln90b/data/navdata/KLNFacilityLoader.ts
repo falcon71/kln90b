@@ -31,6 +31,7 @@ import {
     Taf,
     UnitType,
     VorFacility,
+    VorType,
 } from "@microsoft/msfs-sdk";
 import {KLNFacilityRepository, KLNRepoSearchableFacilityTypes} from "./KLNFacilityRepository";
 
@@ -172,9 +173,10 @@ export class KLNNearestVorSearchSession extends KLNCoherentNearestSearchSession<
      * @param typeMask A bitmask to determine which JS VOR types to show.
      */
     public setVorFilter(classMask: number, typeMask: number): void {
-        //#128: the masks are flags (1 << value), as for the sim's session
+        //#128: the masks are flags (1 << value), as for the sim's session. #206: a user VOR has the type Unknown (the
+        //user waypoint loaders, the VOR page); it takes part anyway (5-45). Its class Unknown is filtered by the class mask
         this.repoSearchSession.seFacilityFilter(f => BitFlags.isAny(BitFlags.createFlag(f.vorClass), classMask)
-            && BitFlags.isAny(BitFlags.createFlag(f.type), typeMask));
+            && (f.type === VorType.Unknown || BitFlags.isAny(BitFlags.createFlag(f.type), typeMask)));
         this.coherentSearchSession.setVorFilter(classMask, typeMask);
     }
 

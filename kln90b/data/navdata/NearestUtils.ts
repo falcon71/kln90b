@@ -3,13 +3,11 @@ import {
     DefaultLodBoundaryCache,
     FacilityClient,
     FacilitySearchType,
-    FacilityType,
     LodBoundary,
     NearestBoundarySearchSession,
     NearestIcaoSearchSessionDataType,
     NearestLodBoundarySearchSession,
     NearestSearchSessionTypeMap,
-    UnitType,
     VorClass,
     VorFacility,
     VorType,
@@ -19,7 +17,7 @@ import {BoundaryUtils} from "./BoundaryUtils";
 import {NearestVorSearch} from "./NearestVorSearch";
 
 //#207: the KLN 89 trainer shows the closest VOR as the reference up to 1000 NM (2026-10-16)
-export const REFERENCE_VOR_RADIUS_NM = 1000;
+const REFERENCE_VOR_RADIUS_NM = 1000;
 //#204: the 90B guide gives no radius for NAV 2. The KLN 89 trainer found a VOR 190 NM away and none at 196 NM
 //(2026-10-16); maintainer ruling, #204: 200 NM
 const LOW_HIGH_VOR_RADIUS_NM = 200;
@@ -27,7 +25,7 @@ const LOW_HIGH_VOR_RADIUS_NM = 200;
 export class NearestUtils {
     private vorSession: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[FacilitySearchType.Vor] | undefined;
 
-    private nearestVor: VorFacility | null = null;
+    private vorSearch: NearestVorSearch | undefined;
 
     private lowHighVorSearch: NearestVorSearch | undefined;
 
@@ -41,10 +39,12 @@ export class NearestUtils {
 
     public async init() {
         this.vorSession = await this.facilityLoader.startNearestSearchSessionWithIcaoStructs(FacilitySearchType.Vor);
+        //3-50: the closest VOR, of any class (a user VOR has the class Unknown, #206)
         this.vorSession!.setVorFilter(
-            BitFlags.union(BitFlags.createFlag(VorClass.HighAlt), BitFlags.createFlag(VorClass.LowAlt), BitFlags.createFlag(VorClass.Terminal)),
+            BitFlags.union(BitFlags.createFlag(VorClass.HighAlt), BitFlags.createFlag(VorClass.LowAlt), BitFlags.createFlag(VorClass.Terminal), BitFlags.createFlag(VorClass.Unknown)),
             BitFlags.union(BitFlags.createFlag(VorType.VOR), BitFlags.createFlag(VorType.VORDME), BitFlags.createFlag(VorType.VORTAC)),
         );
+        this.vorSearch = new NearestVorSearch(this.facilityLoader, this.vorSession!, REFERENCE_VOR_RADIUS_NM);
 
         //3-8, 3-32: NAV 2 shows the nearest low or high altitude VOR, never a terminal one (#204)
         const lowHighVorSession = await this.facilityLoader.startNearestSearchSessionWithIcaoStructs(FacilitySearchType.Vor);
@@ -60,23 +60,14 @@ export class NearestUtils {
     }
 
     /**
-     * Returns the nearest VOR to the given location.
+     * Returns the nearest VOR to the given location, a user VOR included.
      *
      * @param lat
      * @param lon
      */
-    public async getNearestVor(lat: Latitude, lon: Longitude): Promise<VorFacility | null> {
-        const distanceMeters = UnitType.NMILE.convertTo(REFERENCE_VOR_RADIUS_NM, UnitType.METER);
-        const diff = await this.vorSession!.searchNearest(lat, lon, distanceMeters, 1);
-        for (const icao of diff.removed) {
-            this.nearestVor = null;
-        }
-
-        for (const icao of diff.added) {
-            this.nearestVor = await this.facilityLoader.getFacility(FacilityType.VOR, icao);
-        }
-
-        return this.nearestVor;
+    public getNearestVor(lat: Latitude, lon: Longitude): Promise<VorFacility | null> {
+        //#206: one search at a time, and the nearer one of the database VOR and the user VOR is the reference
+        return this.vorSearch!.search(lat, lon);
     }
 
     /**

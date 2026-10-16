@@ -334,13 +334,34 @@ describe('VOR classes in the nearest VOR list', () => {
 
     // 5-45: the nearest functions work on user-defined waypoints (see the NDB case above). A user VOR has the class
     // and type the user waypoint loaders give it (Unknown, Unknown); its page shows no D.
-    it.fails('lists a user VOR (#206)', async () => {
+    it('lists a user VOR (#206)', async () => {
         const unit = await bootUnit({facilities: [hig()], position: POSITION});
         KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.02, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
         await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
         await unit.panel.selectPage('R', 'VOR  ');
 
         expect(await nearestRowsBackwards(unit)).toEqual([' QQV   nr 1', ' HIG D nr 2']);
+    });
+
+    // 3-8, 3-32: NAV 2 shows a low or high altitude VOR. Maintainer ruling, #206: a user VOR (class Unknown) never is the
+    // NAV 2 VOR, however near it is. The user VOR is 1.2 NM, HIG 18.0 NM from the aircraft.
+    it('shows HIG on NAV 2 although a user VOR is nearer (3-8, 3-32; maintainer ruling, #206)', async () => {
+        const unit = await bootUnit({facilities: [hig()], position: POSITION});
+        KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.02, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('L', 'NAV 2');
+
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(['HIG  180°fr', '     18.0nm']);
+    });
+
+    // Characterization: the guide is silent on a database VOR of undefined class on NAV 2. It follows from "NAV 2 shows a
+    // low or high altitude VOR" (3-8, 3-32) only by inference, and the class mask of the NAV 2 search holds it
+    it('shows HIG on NAV 2 although a database VOR of undefined class is nearer (characterization; 3-8, 3-32)', async () => {
+        const unit = await bootUnit({facilities: [und(), hig()], position: POSITION});
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('L', 'NAV 2');
+
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(['HIG  180°fr', '     18.0nm']);
     });
 
     // 5-45: a user VOR of a real class is filtered like a database VOR, so the flags of its class and type are compared
