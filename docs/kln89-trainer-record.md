@@ -319,3 +319,11 @@ afterwards)
   - Its SUP page named the reference VOR at 136, 190 and about 1245 NM, with the distance dashed from 1000 NM on; its
     NAV 2 showed a VOR at 136.5 NM (#207).
   - APT 1 showed `WESTCHESTER` / `CO` for KHPN: a short form inside a longer word was not applied (#265).
+- NAV 2 (present position from the nearest VOR) picks its VOR again by itself while the page stays shown: after another
+  VOR became the nearer one, the page switched 1.4, 3.6 and 7 s later in three trials, which fits a choice made about
+  every 8 to 10 s; radial and distance follow every second. It found a VOR 190 NM away and none at about 196 or 200 NM,
+  where it shows dashes; after a position jump of about 1100 NM it kept the old VOR with its new distance for up to
+  about 25 s. Medium-high confidence (#204).
+- A VOR that is terminal in today's data (BJB; its class in the 1997 database is not known) was taken both by NAV 2 and
+  as the Ref of a user waypoint, with a high altitude VOR about 20 NM away. Medium confidence; the 90B guide gives NAV 2
+  a low or high altitude VOR, so this does not decide the 90B's NAV 2 (#204).
