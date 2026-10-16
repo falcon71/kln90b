@@ -216,8 +216,10 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
 
 export class VorNearestList extends NearestList<FacilitySearchType.Vor, VorFacility> {
     protected initFilters(session: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[FacilitySearchType.Vor]): void {
+        //#204: the list holds VORs of every class (3-22, 3-49; Super NAV 5 TLH, 3-37). NAV 2 searches its own
+        //(NearestUtils.getNearestLowHighVor)
         session.setVorFilter(
-            BitFlags.union(BitFlags.createFlag(VorClass.HighAlt), BitFlags.createFlag(VorClass.LowAlt)),
+            BitFlags.union(BitFlags.createFlag(VorClass.HighAlt), BitFlags.createFlag(VorClass.LowAlt), BitFlags.createFlag(VorClass.Terminal), BitFlags.createFlag(VorClass.Unknown)),
             BitFlags.union(BitFlags.createFlag(VorType.VOR), BitFlags.createFlag(VorType.VORDME), BitFlags.createFlag(VorType.VORTAC)),
         );
     }

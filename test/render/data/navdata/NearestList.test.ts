@@ -305,11 +305,11 @@ describe('VOR classes in the nearest VOR list', () => {
         return nearestRowsBackwards(unit);
     }
 
-    it.fails('lists a terminal VOR (#204)', async () => {
+    it('lists a terminal VOR (#204)', async () => {
         expect(await nearestVorRows(trm(), hig())).toEqual([' TRM D nr 1', ' HIG D nr 2']);
     });
 
-    it.fails('lists a VOR of undefined class (#204)', async () => {
+    it('lists a VOR of undefined class (#204)', async () => {
         expect(await nearestVorRows(und(), hig())).toEqual([' UND D nr 1', ' HIG D nr 2']);
     });
 
@@ -323,12 +323,12 @@ describe('VOR classes in the nearest VOR list', () => {
         return [...new Set(drawnLabels(map.drawn))].sort();
     }
 
-    // The sibling of the Super NAV 5 pin: the same page and spy see a high altitude VOR
+    // The sibling of the terminal VOR test below: the same page and spy see a high altitude VOR
     it('draws a high altitude VOR on Super NAV 5 with VOR: TLH', async () => {
         expect(await superNav5Labels(vor('HIG', 47.1, 8.05))).toEqual(['HIG']);
     });
 
-    it.fails('draws a terminal VOR on Super NAV 5 with VOR: TLH (#204)', async () => {
+    it('draws a terminal VOR on Super NAV 5 with VOR: TLH (#204)', async () => {
         expect(await superNav5Labels(trm(), vor('HIG', 47.1, 8.05))).toEqual(['HIG', 'TRM']);
     });
 
@@ -375,7 +375,8 @@ describe('VOR classes in the nearest VOR list', () => {
         expect(await nearestRowsBackwards(unit)).toEqual([' HIG D nr 1']);
     });
 
-    // The sibling of the pins: the list itself works for the classes it holds today, so the pins differ only in the class
+    // The sibling of the terminal and undefined class tests: a low and a high altitude VOR were listed before #204 as well, so
+    // those tests differ only in the class
     it('lists a low and a high altitude VOR', async () => {
         const low = vor('LOW', 47.05, 8.0, {vorClass: VorClass.LowAlt});
 
@@ -388,6 +389,19 @@ describe('VOR classes in the nearest VOR list', () => {
         await unit.panel.selectPage('L', 'NAV 2');
 
         // HIG is 18.0 NM north: the aircraft is on its 180 radial
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(['HIG  180°fr', '     18.0nm']);
+    });
+
+    // 3-8, 3-32: NAV 2 shows the nearest low or high altitude VOR, so it shows one behind nine nearer terminal VORs. That
+    // NAV 2 searches its VOR of its own (NearestUtils.getNearestLowHighVor), not in the nine entries of the VOR page, is
+    // the design of #204 (characterization).
+    it('shows a high altitude VOR on NAV 2 although nine nearer VORs are terminal (3-8, 3-32, #204)', async () => {
+        // T01..T09 are 0.6 to 5.4 NM north of the aircraft, never two at the same coordinates
+        const terminals = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => vor('T0' + i, 47.0 + 0.01 * i, 8.05, {vorClass: VorClass.Terminal}));
+        const unit = await bootUnit({facilities: [...terminals, hig()], position: POSITION});
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('L', 'NAV 2');
+
         expect(Screen.read().rows('L').slice(2, 4)).toEqual(['HIG  180°fr', '     18.0nm']);
     });
 });
