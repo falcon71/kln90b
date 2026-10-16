@@ -22,7 +22,6 @@ const SPEC_SURFACES: [RunwaySurfaceType, string][] = [
 
 // The SDK types the table above does not cover (water, paving that is not a runway material of the guide, ...) show
 // a blank surface.
-// Macadam is left out on purpose: whether it counts as hard surface is the open question #270.
 const BLANK_SURFACES = [
     RunwaySurfaceType.WaterFSX, RunwaySurfaceType.Urban, RunwaySurfaceType.Forest, RunwaySurfaceType.Coral,
     RunwaySurfaceType.OilTreated, RunwaySurfaceType.Planks, RunwaySurfaceType.WrightFlyerTrack,
@@ -38,17 +37,24 @@ describe('getKLNSurfaceString (3-44)', () => {
     });
 });
 
+// The maintainer ruled macadam a hard surface (#270); the guide does not name it (3-44)
+describe('getKLNSurfaceString, macadam (maintainer ruling, #270)', () => {
+    it('shows Macadam as HRD', () => {
+        expect(getKLNSurfaceString(rwy({surface: RunwaySurfaceType.Macadam}))).toBe('HRD');
+    });
+});
+
 describe('getKLNSurfaceString, characterization of the SDK types the guide does not name', () => {
     it.each(BLANK_SURFACES.map(s => ({n: name(s), surface: s})))('shows the type $n as a blank surface', ({surface}) => {
         expect(getKLNSurfaceString(rwy({surface}))).toBe('');
     });
 
-    // The tables above must hold every SDK value but Macadam, or a new SDK member would escape them
-    it('lists every SDK surface type except Macadam in one of the tables', () => {
+    // The tables above must hold every SDK value, or a new SDK member would escape them
+    it('lists every SDK surface type in one of the tables', () => {
         const all = Object.values(RunwaySurfaceType).filter((v): v is RunwaySurfaceType => typeof v === 'number');
-        const listed = [...SPEC_SURFACES.map(([s]) => s), ...BLANK_SURFACES];
+        const listed = [...SPEC_SURFACES.map(([s]) => s), RunwaySurfaceType.Macadam, ...BLANK_SURFACES];
 
-        expect([...listed].sort((a, b) => a - b)).toEqual(all.filter(s => s !== RunwaySurfaceType.Macadam).sort((a, b) => a - b));
+        expect([...listed].sort((a, b) => a - b)).toEqual(all.sort((a, b) => a - b));
     });
 });
 

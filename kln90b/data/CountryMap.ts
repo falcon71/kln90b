@@ -1,4 +1,4 @@
-import {Facility, FacilityType, FacilityUtils} from "@microsoft/msfs-sdk";
+import {Facility} from "@microsoft/msfs-sdk";
 
 export const STATEMAP: { [key: string]: string } = {
     Alaska: "AK",
@@ -334,14 +334,7 @@ export function getRegionOrCountry(facility: Facility) {
 }
 
 export function getCountry(facility: Facility) {
-    let region = facility.region;
-    if (FacilityUtils.isFacilityType(facility, FacilityType.Airport)) {
-        const ident = facility.icaoStruct.ident;
-        if (ident.length === 4 && ident.startsWith("K")) {
-            return "USA"; // 3-15 shows the country of each entry. A four-character US airport ident is K plus the location (ICAO Doc 7910); K and a letter is no region (the US regions are K1 to K7)
-        }
-        region = ident.substring(0, 2);
-    }
-
-    return COUNTRYMAP.hasOwnProperty(region) ? COUNTRYMAP[region] : "   ";
+    //3-15 shows the country of each entry. #342: the sim fills the region of every facility, an airport too (93F: K4,
+    //ETAR: ED), so the region decides. An empty region (KIG) and a user airport (XX) name no country
+    return COUNTRYMAP.hasOwnProperty(facility.region) ? COUNTRYMAP[facility.region] : "   ";
 }

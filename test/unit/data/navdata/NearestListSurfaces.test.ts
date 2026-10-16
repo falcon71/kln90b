@@ -1,10 +1,15 @@
-import {describe, expect, it} from 'vitest';
-import {FacilityClient, FacilitySearchType, FacilityType, GeoPoint, RunwaySurfaceType} from '@microsoft/msfs-sdk';
+import {beforeEach, describe, expect, it} from 'vitest';
+import {EventBus, FacilitySearchType, FacilityType, GeoPoint, RunwaySurfaceType} from '@microsoft/msfs-sdk';
+import {ActualFacilityClient, KLNFacilityLoader} from '../../../../kln90b/data/navdata/KLNFacilityLoader';
+import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
 import {AirportNearestList} from '../../../../kln90b/data/navdata/NearestList';
 import {Sensors} from '../../../../kln90b/Sensors';
 import {KLN90BUserSettings, SURFACE_HRD, SURFACE_HRD_SFT} from '../../../../kln90b/settings/KLN90BUserSettings';
 import {MemoryFacilityClient} from '../../../harness/navdata/MemoryFacilityClient';
 import {airport} from '../../../harness/navdata/builders';
+import {clearStatic} from '../../../harness/singletons';
+
+beforeEach(() => clearStatic(KLNFacilityRepository, 'INSTANCE', false));
 
 /**
  * The airport nearest list on its own: the aircraft at 47.0 N 8.0 E, the SET 3 settings as given. The list searches on
@@ -14,7 +19,7 @@ async function nearestAirports(facilities: ReturnType<typeof airport>[], surface
     const sensors = {in: {gps: {coords: new GeoPoint(47.0, 8.0)}}} as unknown as Sensors;
     const settings = {nearestAptSurface: surface, nearestAptMinRunwayLength: minLengthFt} as Record<string, unknown>;
     const userSettings = {getSetting: (name: string) => ({get: () => settings[name]})} as unknown as KLN90BUserSettings;
-    const list = new AirportNearestList(new MemoryFacilityClient(facilities) as unknown as FacilityClient, sensors, FacilitySearchType.Airport, FacilityType.Airport, userSettings);
+    const list = new AirportNearestList(new KLNFacilityLoader(new MemoryFacilityClient(facilities) as unknown as ActualFacilityClient, KLNFacilityRepository.getRepository(new EventBus())), sensors, FacilitySearchType.Airport, FacilityType.Airport, userSettings);
     await list.init();
     for (let i = 0; i < 10; i++) await list.tick();
     return list.getNearestList().map(w => w.facility.icaoStruct.ident);
@@ -75,5 +80,18 @@ describe('nearest airport surfaces (3-23)', () => {
 
     it('admits a snow runway with HRD SFT (#205)', async () => {
         expect(await nearestAirports(world([['SNOW', RunwaySurfaceType.Snow]]), SURFACE_HRD_SFT)).toEqual(['SNOW']);
+    });
+});
+
+// The maintainer ruled macadam a hard surface (#270), as the SDK classes it (RunwayUtils.getSurfaceCategory)
+describe('nearest airport surfaces, macadam (maintainer ruling, #270)', () => {
+    const macadam = () => [airport('MACA', 47.01, 8.0, {runways: [{lengthFt: 3000, surface: RunwaySurfaceType.Macadam}]})];
+
+    it('admits a macadam runway with HRD', async () => {
+        expect(await nearestAirports(macadam(), SURFACE_HRD)).toEqual(['MACA']);
+    });
+
+    it('admits a macadam runway with HRD SFT', async () => {
+        expect(await nearestAirports(macadam(), SURFACE_HRD_SFT)).toEqual(['MACA']);
     });
 });

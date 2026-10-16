@@ -24,6 +24,8 @@ import {CalcTickable, TICK_TIME_CALC} from "../../TickController";
 
 const NEAREST_TICK_TIME = 10000;
 const MAX_ITEMS = 9;
+//#207: the 90B guide gives no radius; the KLN 89's is 200 NM, and the maintainer ruled the same
+const NEAREST_SEARCH_RADIUS_NM = 200;
 
 type NearestSearchType = FacilitySearchType.Airport | FacilitySearchType.Vor | FacilitySearchType.Ndb;
 
@@ -80,33 +82,12 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
         //This stuff is very expensive, and is only run every 10 seconds
         this.isCalculating = true;
         this.tickTimer = 0;
-
-        const distanceMeters = UnitType.NMILE.convertTo(500, UnitType.METER);
-        const diff = await this.session!.searchNearest(this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, distanceMeters, MAX_ITEMS);
-
-        for (const removedIcao of diff.removed) {
-            for (let i = 0; i < this.nearestList.length; i++) {
-                if (ICAO.valueEquals(this.nearestList[i].facility.icaoStruct, removedIcao)) {
-                    this.nearestList[i].index = -1;
-                    this.nearestList.splice(i, 1);
-                }
-            }
+        try {
+            await this.search();
+        } finally {
+            //#95: a failed search must not stop every later search
+            this.isCalculating = false;
         }
-
-        const addedFacilities = await Promise.all(diff.added.map(addedIcao => this.facilityLoader.getFacility(this.facilityType, addedIcao)));
-
-        for (const addedFacility of addedFacilities) {
-            this.nearestList.push({
-                facility: addedFacility as any,
-                //Those values will be calculated in updateBearingDistance
-                bearingToTrue: 0,
-                distance: 0,
-                index: 0,
-            });
-
-        }
-        this.updateBearingDistance();
-        this.isCalculating = false;
     }
 
     /**
@@ -115,6 +96,36 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
      */
     public getNearestList(): NearestWpt<FacType>[] {
         return this.nearestList.slice(0, 9);
+    }
+
+    private async search(): Promise<void> {
+        const distanceMeters = UnitType.NMILE.convertTo(NEAREST_SEARCH_RADIUS_NM, UnitType.METER);
+        const diff = await this.session!.searchNearest(this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, distanceMeters, MAX_ITEMS);
+
+        for (const removedIcao of diff.removed) {
+            for (let i = this.nearestList.length - 1; i >= 0; i--) {
+                if (ICAO.valueEquals(this.nearestList[i].facility.icaoStruct, removedIcao)) {
+                    this.nearestList[i].index = -1;
+                    this.nearestList.splice(i, 1);
+                }
+            }
+        }
+
+        //#95: a facility that cannot be loaded is left out; the others of the same search are listed
+        const addedFacilities = await Promise.all(diff.added.map(addedIcao => this.facilityLoader.tryGetFacility(this.facilityType, addedIcao)));
+        for (const addedFacility of addedFacilities) {
+            if (addedFacility === null) {
+                continue;
+            }
+            this.nearestList.push({
+                facility: addedFacility as any,
+                //Those values will be calculated in updateBearingDistance
+                bearingToTrue: 0,
+                distance: 0,
+                index: 0,
+            });
+        }
+        this.updateBearingDistance();
     }
 
     protected abstract initFilters(session: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[SearchType]): void;
@@ -175,6 +186,7 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
                     BitFlags.createFlag(RunwaySurfaceType.Tarmac),
                     BitFlags.createFlag(RunwaySurfaceType.Brick),
                     BitFlags.createFlag(RunwaySurfaceType.Bituminous),
+                    BitFlags.createFlag(RunwaySurfaceType.Macadam), //#270: the maintainer ruled macadam a hard surface, as the SDK classes it
                     //soft
                     BitFlags.createFlag(RunwaySurfaceType.HardTurf),
                     BitFlags.createFlag(RunwaySurfaceType.Gravel),
@@ -197,6 +209,7 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
                     BitFlags.createFlag(RunwaySurfaceType.Tarmac),
                     BitFlags.createFlag(RunwaySurfaceType.Brick),
                     BitFlags.createFlag(RunwaySurfaceType.Bituminous),
+                    BitFlags.createFlag(RunwaySurfaceType.Macadam), //#270: the maintainer ruled macadam a hard surface, as the SDK classes it
                 );
         }
     }
@@ -205,8 +218,10 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
 
 export class VorNearestList extends NearestList<FacilitySearchType.Vor, VorFacility> {
     protected initFilters(session: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[FacilitySearchType.Vor]): void {
+        //#204: the list holds VORs of every class (3-22, 3-49; Super NAV 5 TLH, 3-37). NAV 2 searches its own
+        //(NearestUtils.getNearestLowHighVor)
         session.setVorFilter(
-            BitFlags.union(BitFlags.createFlag(VorClass.HighAlt), BitFlags.createFlag(VorClass.LowAlt)),
+            BitFlags.union(BitFlags.createFlag(VorClass.HighAlt), BitFlags.createFlag(VorClass.LowAlt), BitFlags.createFlag(VorClass.Terminal), BitFlags.createFlag(VorClass.Unknown)),
             BitFlags.union(BitFlags.createFlag(VorType.VOR), BitFlags.createFlag(VorType.VORDME), BitFlags.createFlag(VorType.VORTAC)),
         );
     }

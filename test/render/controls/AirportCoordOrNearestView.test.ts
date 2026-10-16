@@ -57,7 +57,7 @@ describe('APT 1 airspace row (3-42)', () => {
             kout());
 
         expect(await showApt1(unit)).toEqual(
-            [' KOUT      ', 'KOUT AIRPT ', '           ', '           ', 'N 46°51.00\'', 'E 12°09.00\'']);
+            [' KOUT      ', 'KOUT AIRPOR', 'T          ', '           ', 'N 46°51.00\'', 'E 12°09.00\'']);
     });
 });
 

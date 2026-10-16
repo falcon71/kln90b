@@ -145,6 +145,7 @@ export function getKLNSurfaceString(runway: AirportRunway): string {
         case RunwaySurfaceType.Bituminous:
         case RunwaySurfaceType.Brick:
         case RunwaySurfaceType.Tarmac:
+        case RunwaySurfaceType.Macadam: //#270: the maintainer ruled macadam a hard surface, as the SDK classes it
             return "HRD";
         case RunwaySurfaceType.Grass:
         case RunwaySurfaceType.GrassBumpy:

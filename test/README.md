@@ -172,7 +172,7 @@ instrument reads and nothing else. The data is synthetic; see the limitations in
 **Default navdata.** `bootUnit`, `bootUnitExpectingError` and `Flight.start` add one airport, VOR, NDB and intersection
 to every world (`defaultNavdata()` in `test/harness/fixtures.ts`), because a real unit always has a database: without
 them, the APT, VOR, NDB and INT pages of a world that lacks the type post `NO APT WPTS`, `NO VOR WPTS`, and so on, a state
-no real unit shows. They lie at 45 S 150 W, far beyond the 500 NM nearest search of every test position, so the nearest
+no real unit shows. They lie at 45 S 150 W, far beyond the 200 NM nearest search and the 1000 NM reference VOR search of every test position, so the nearest
 lists, the maps and the INT reference VOR are unchanged. Their idents (`ZZXA`, `ZZV`, `ZZN`, `ZZXIN`) sort after the idents
 of the tests, which matters because the scan lists are in ident order and the pages open on the first entry, and they are
 unique across the types, so no DUPLICATE page appears. `bootUnit` throws when a test facility has exactly one of their
@@ -239,7 +239,7 @@ first; the APT 7 and ACT 7 tests use it.
 the intersection DEF and the airport KBBB. Each leg is about 30 NM, which is 15 minutes at 120 kt. `centerWorld()`
 returns `{kaaa, kbbb, kccc, bgd, gck, centers}` for the CTR pages: three airports 5 degrees (300 NM) apart on 100 W, the
 VORs BGD and GCK, and three Center airspaces stacked along that meridian that share their boundaries at 42.75 N and
-47.75 N. BGD is the only VOR within 100 NM of the first crossing and GCK of the second. A plan through the airports
+47.75 N. BGD is the closest VOR to the first crossing and GCK to the second. A plan through the airports
 should keep its legs at 300 NM: the route search searches circles of about 75 NM radius at 0, 75 and 225 NM along a leg,
 so each Center is first returned by a search whose center lies inside it, and a Center first returned from outside it is
 dropped for good by the shared search session (#102). Both return fresh objects on every call; pass `centers` as
@@ -779,7 +779,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   `IcaoValue` object per facility, the same in search results, in the nearest `added` and `removed` lists and in
   `getFacility`; the sim answers with new objects each time. Code that compares ICAOs by reference instead of with
   `ICAO.valueEquals` therefore passes against the fake: `6a6c634` fixed such a bug in `Scanlist`, and the removal in
-  `NearestList.ts:89` would be the next (a break there survives the suite). The fake's `getFacility` also ignores its
+  `NearestList.ts:107` would be the next (a break there survives the suite). The fake's `getFacility` also ignores its
   type argument and looks up by ICAO alone, so the type that `KLNFacilityLoader.getFacilities` passes down cannot be
   observed. The [next steps](../docs/test-next-steps.md) have the options.
 - **One fact about real procedures came from a navigation database queried locally and is not committed.** The pattern

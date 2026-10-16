@@ -25,7 +25,7 @@ import {NearestSelector} from "../../controls/selects/NearestSelector";
 import {AirportNearestList} from "../../data/navdata/NearestList";
 import {AirportCoordOrNearestView} from "../../controls/AirportCoordOrNearestView";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
-import {convertTextToKLNCharset} from "../../data/Text";
+import {AirportNameFormatter} from "../../data/AirportNameFormatter";
 import {buildIcao, buildIcaoStruct, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 
@@ -85,7 +85,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
         const facility = unpackFacility(this.facility);
 
         if (facility) {
-            name = this.formatAirportName(Utils.Translate(facility.name));
+            name = AirportNameFormatter.format(Utils.Translate(facility.name));
         }
 
         this.children = new UIElementChildren<Apt1PageTypes>({
@@ -182,7 +182,7 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
             this.mainRef.instance.classList.remove("d-none");
             this.children.get("createWpt").setVisible(false);
 
-            const name = this.formatAirportName(Utils.Translate(facility.name));
+            const name = AirportNameFormatter.format(Utils.Translate(facility.name));
             this.children.get("name1").text = this.multiline(name)[0];
             this.children.get("name2").text = this.multiline(name)[1];
         }
@@ -360,43 +360,6 @@ export class Apt1Page extends WaypointPage<AirportFacility> {
             transitionLevel: 0,
             iata: "",
         };
-    }
-
-    private formatAirportName(name: string): string {
-        name = convertTextToKLNCharset(name);
-
-        name = name.replace("NORTHWEST", "NW");
-        name = name.replace("NORTHEAST", "NE");
-        name = name.replace("SOUTHWEST", "SW");
-        name = name.replace("SOUTHEAST", "SE");
-
-        name = name.replace("NORTHERN", "N");
-        name = name.replace("NORTH", "N");
-        name = name.replace("EASTERN", "E");
-        name = name.replace("EAST", "E");
-        name = name.replace("SOUTHERN", "S");
-        name = name.replace("SOUTH", "S");
-        name = name.replace("WESTERN", "W");
-        name = name.replace("WEST", "W");
-
-        name = name.replace("POINT", "PT");
-        name = name.replace("PORT", "PT");
-        name = name.replace("FORT", "FT");
-        name = name.replace("SAINT", "ST");
-        name = name.replace("GENERAL", "GEN");
-        name = name.replace("CITY OF", "");
-        name = name.replace("GREATER", "");
-        name = name.replace("THE", "");
-
-        name = name.replace(".", "");
-        name = name.replace(",", "");
-        name = name.replace(":", "");
-        name = name.replace("'", "");
-
-        name = name.replace("INTERNATIONAL", "INT");
-        name = name.replace("REGIONAL", "REG");
-
-        return name;
     }
 
     private multiline(name: string): [string, string] {

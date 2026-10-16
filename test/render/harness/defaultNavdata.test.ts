@@ -63,13 +63,13 @@ describe('default navdata (harness)', () => {
         await expect(bootUnit({facilities: [facility]})).rejects.toThrow(new RegExp(`${ident} is an ident of the default navdata`));
     });
 
-    // The nearest search reaches 500 NM (NearestList.ts), and the test positions lie in central Europe
+    // The nearest search reaches 200 NM, the reference VOR search 1000 NM (NearestList.ts, NearestUtils.ts), and the test positions lie in central Europe
     describe('far from the tests', () => {
         const TEST_POSITIONS = [{lat: 47.0, lon: 8.0}, {lat: 46.0, lon: 7.0}, {lat: 47.5, lon: 8.9}, {lat: 48.2, lon: 9.2}];
 
-        it.each(defaultNavdata().map(f => [f.icaoStruct.ident, f] as const))('%s lies more than 500 NM from every test position', (_ident, facility) => {
+        it.each(defaultNavdata().map(f => [f.icaoStruct.ident, f] as const))('%s lies more than 1000 NM from every test position', (_ident, facility) => {
             const distances = TEST_POSITIONS.map(p => distanceNm(p, {lat: facility.lat, lon: facility.lon}));
-            expect(Math.min(...distances)).toBeGreaterThan(500);
+            expect(Math.min(...distances)).toBeGreaterThan(1000);
         });
 
         it.each([['airport', 'aptNearestList', 'KAAA'], ['VOR', 'vorNearestList', 'ABC'], ['NDB', 'ndbNearestList', 'NDA']] as const)('the nearest %s list of a test world holds only the test facility', async (_type, list, ident) => {

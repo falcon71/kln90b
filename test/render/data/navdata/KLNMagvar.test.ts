@@ -139,9 +139,10 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
 
     // 5-44: in OBS mode with the active waypoint outside the area the unit references to true north; this holds for an
     // active VOR too, although 5-35 has an active VOR use its own variation inside the area (the maintainer's reading of
-    // the two pages for #190). VFAR at N 75 has a published variation of 10 E (the sim stores east as negative)
+    // the two pages for #190). VFA at N 75 has a published variation of 10 E (the sim stores east as negative). Its ident
+    // has three letters, so that it fits the row of NAV 2, which shows it as the nearest VOR
     it('references an active VOR outside the area to true north too (5-44, #190)', async () => {
-        const vfar = vor('VFAR', 75.0, 8.0, {magneticVariation: -10});
+        const vfar = vor('VFA', 75.0, 8.0, {magneticVariation: -10});
         const unit = await bootUnit({
             facilities: [kaaa, vfar], position: {lat: 73.5, lon: 8.0}, magvar: 10, panelXml: OBS_SOURCE_OFF,
             storage: savedFlightplan(0, [kaaa, vfar]),
@@ -150,7 +151,7 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(activeIdent(unit)).toBe('VFAR');
+        expect(activeIdent(unit)).toBe('VFA');
         expect(unit.props.memory.navPage.obsMag).toBeCloseTo(0, 1);
     });
 });

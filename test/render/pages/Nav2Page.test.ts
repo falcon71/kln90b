@@ -1,10 +1,11 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, NEAREST_SEARCH_WAIT_MS} from '../../harness/boot';
+import {VorClass, VorType} from '@microsoft/msfs-sdk';
+import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS} from '../../harness/boot';
 import {pointFrom} from '../../harness/flight/geo';
 import {vor} from '../../harness/navdata/builders';
 import {Screen} from '../../harness/render/screen';
 
-/** Boots at `position` with the facilities given, then waits for the nearest VOR list (it searches every 10 s) */
+/** Boots at `position` with the facilities given, then waits for the NAV 2 VOR search (it searches every 10 s) */
 async function nav2At(position: { lat: number, lon: number }, facilities: ReturnType<typeof vor>[] = [], magvar = 0) {
     const unit = await bootUnit({facilities, position, magvar});
     await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
@@ -14,7 +15,7 @@ async function nav2At(position: { lat: number, lon: number }, facilities: Return
 describe('NAV 2 page (characterization)', () => {
     it('shows radial and distance from the nearest VOR and the present position', async () => {
         await bootUnit({facilities: [vor('ABC', 47.2, 8.0, {magneticVariation: 0})], position: {lat: 47.0, lon: 8.0}});
-        // The nearest VOR list searches every 10 s (NEAREST_TICK_TIME in NearestList.ts)
+        // NAV 2 searches its VOR every 10 s (SEARCH_INTERVAL_TICKS in Nav2Page.tsx)
         await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
 
         const screen = Screen.read();
@@ -220,5 +221,136 @@ describe('NAV 2, the radial of the nearest VOR', () => {
         await nav2At(pointFrom(abc, 90, 60), [abc]);
 
         expect(Screen.read().rows('L')[2]).toBe('ABC  090°fr');
+    });
+});
+
+// 3-8, 3-32: NAV 2 shows the nearest low or high altitude VOR. The invented VORs are 12 NM north of the aircraft
+describe('NAV 2, the classes and types of its VOR', () => {
+    it('shows a low altitude VOR (3-8, 3-32)', async () => {
+        await nav2At({lat: 47.0, lon: 8.0}, [vor('LOW', 47.2, 8.0, {vorClass: VorClass.LowAlt})]);
+
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(['LOW  180°fr', '     12.0nm']);
+    });
+
+    // Characterization: the guide names no VOR types for NAV 2; a VOR, a VOR-DME and a VORTAC are all VORs. The other
+    // tests of this file use the builder's VOR-DME
+    it.each([['VOR', VorType.VOR], ['VORTAC', VorType.VORTAC]] as const)('shows a high altitude %s (characterization)', async (_name, type) => {
+        await nav2At({lat: 47.0, lon: 8.0}, [vor('TYP', 47.2, 8.0, {type})]);
+
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(['TYP  180°fr', '     12.0nm']);
+    });
+});
+
+/** Selects NAV 1 and then NAV 2 on the left, so that a new NAV 2 page opens and searches (pages are recreated) */
+async function reopenNav2(unit: HeadlessUnit): Promise<void> {
+    await unit.panel.selectPage('L', 'NAV 1');
+    await unit.panel.selectPage('L', 'NAV 2');
+}
+
+// The 90B guide does not say how often NAV 2 picks its VOR again, nor how far it looks. The KLN 89 trainer (2026-10-16)
+// switched to a new nearer VOR 1.4 to 7 s after it became the nearer one, with the page shown all the time, and found a
+// VOR 190 NM away and none at about 196 NM. The maintainer ruled for the 90B: NAV 2 searches when it opens, then every
+// 10 s while it is shown, within 200 NM (#204)
+describe('NAV 2 picks its VOR again (characterization; KLN 89 trainer 2026-10-16, maintainer ruling #204)', () => {
+    // NTH is 0.2 degrees (12 NM) north of the start, STH 0.4 degrees (24 NM) south of it. At 46.7 N STH is 6 NM and NTH
+    // 30 NM away
+    const nth = () => vor('NTH', 47.2, 8.0);
+    const sth = () => vor('STH', 46.6, 8.0);
+
+    it('switches to a new nearer VOR at the next search, 10 s after the page opened, not at once', async () => {
+        const unit = await nav2At({lat: 47.0, lon: 8.0}, [nth(), sth()]);
+        await reopenNav2(unit); // the page opens and searches; 250 ms of the click have passed
+        unit.env.sim.set('PLANE LATITUDE', 'degrees', 46.7);
+        await vi.advanceTimersByTimeAsync(1750);
+
+        // 2 s after the page opened: the present position is the new one (precondition), the VOR stays
+        expect(Screen.read().rows('L')[4]).toBe("N 46°42.00'");
+        expect(Screen.read().rows('L')[2]).toBe('NTH  180°fr');
+        await vi.advanceTimersByTimeAsync(7000);
+        expect(Screen.read().rows('L')[2]).toBe('NTH  180°fr'); // 9 s
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(Screen.read().rows('L')[2]).toBe('STH  000°fr'); // 11 s
+    });
+
+    // 3.3 degrees of latitude are 198 NM, 3.4 degrees 204 NM
+    it('shows a high altitude VOR 198 NM away', async () => {
+        await nav2At({lat: 47.0, lon: 8.0}, [vor('FAR', 50.3, 8.0)]);
+
+        expect(Screen.read().rows('L')[2]).toBe('FAR  180°fr');
+    });
+
+    it('shows no VOR when the only one is 204 NM away', async () => {
+        await nav2At({lat: 47.0, lon: 8.0}, [vor('FAR', 50.4, 8.0)]);
+
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(['---  ---°fr', '   ----.-nm']);
+    });
+
+    it('searches when it opens and then every 10 s while it is shown', async () => {
+        const unit = await nav2At({lat: 47.0, lon: 8.0}, [nth()]);
+        const spy = vi.spyOn(unit.props.nearestUtils, 'getNearestLowHighVor');
+        await reopenNav2(unit);
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        await vi.advanceTimersByTimeAsync(25_000);
+
+        expect(spy).toHaveBeenCalledTimes(3); // 0, 10 and 20 s after the page opened
+    });
+
+    it('does not search while another page is shown', async () => {
+        const unit = await nav2At({lat: 47.0, lon: 8.0}, [nth()]);
+        await unit.panel.selectPage('L', 'NAV 1');
+        const spy = vi.spyOn(unit.props.nearestUtils, 'getNearestLowHighVor');
+
+        await vi.advanceTimersByTimeAsync(25_000);
+
+        expect(spy).not.toHaveBeenCalled();
+    });
+
+    // A code contract: a search that answers late is not joined by a second one; the next one starts once it answered
+    it('starts no second search while one has not answered', async () => {
+        const unit = await nav2At({lat: 47.0, lon: 8.0}, [nth()]);
+        const original = unit.props.nearestUtils.getNearestLowHighVor.bind(unit.props.nearestUtils);
+        let release: () => void = () => undefined;
+        const gate = new Promise<void>(resolve => release = resolve);
+        const spy = vi.spyOn(unit.props.nearestUtils, 'getNearestLowHighVor').mockImplementation(async (lat, lon) => {
+            await gate;
+            return original(lat, lon);
+        });
+        await reopenNav2(unit);
+        await vi.advanceTimersByTimeAsync(25_000);
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(Screen.read().rows('L')[2]).toBe('---  ---°fr'); // precondition: the page has no answer yet
+
+        release();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(spy).toHaveBeenCalledTimes(2);
+        expect(Screen.read().rows('L')[2]).toBe('NTH  180°fr');
+    });
+
+    // A code contract, as for the nearest lists (#95): a failed search shows on the error page, and the next one runs
+    describe('a failed search', () => {
+        async function nav2WithAFailedFirstSearch() {
+            const unit = await nav2At({lat: 47.0, lon: 8.0}, [nth()]);
+            vi.spyOn(unit.props.nearestUtils, 'getNearestLowHighVor').mockRejectedValueOnce(new Error('nearest search failed'));
+            await reopenNav2(unit);
+            return unit;
+        }
+
+        it('shows the VOR found by the next search', async () => {
+            await nav2WithAFailedFirstSearch();
+            expect(Screen.read().rows('L')[2]).toBe('---  ---°fr'); // precondition: the first search failed
+
+            await vi.advanceTimersByTimeAsync(10_500);
+
+            expect(Screen.read().rows('L')[2]).toBe('NTH  180°fr');
+        });
+
+        it('shows on the error page', async () => {
+            const unit = await nav2WithAFailedFirstSearch();
+
+            expect(unit.errors.map(e => e.message)).toEqual(['nearest search failed']);
+            expect(document.querySelector('.errorpage')!.classList.contains('d-none')).toBe(false);
+        });
     });
 });

@@ -6,7 +6,8 @@ import {savedFlightplan} from '../../harness/storage';
 import {fplIdents} from '../../harness/readers';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {Screen} from '../../harness/render/screen';
-import {intersection, vor} from '../../harness/navdata/builders';
+import {airport, intersection, vor} from '../../harness/navdata/builders';
+import {AirportFacility, Facility} from '@microsoft/msfs-sdk';
 import {Leg, star, withProcedures} from '../../harness/navdata/procedures';
 import {pointFrom} from '../../harness/flight/geo';
 import {CtrState, NavMode} from '../../../kln90b/data/VolatileMemory';
@@ -346,5 +347,22 @@ describe('the approach disarm over a power cycle (characterization)', () => {
 
         expect(fplIdents(unit)).toContain('FAFAA');
         expect(nav.navmode).toBe(NavMode.ARM_LEG);
+    });
+});
+
+describe('the last match of the ident entry after a power cycle (characterization, #202)', () => {
+    // A rule of the state, not a page of the Pilot's Guide: the last match is volatile and a power cycle forgets it
+    it('forgets the last match of every waypoint page', async () => {
+        const unit = await bootUnit({facilities: [airport('KCCC', 47.0, 8.0)], position: {lat: 47.0, lon: 8.0}});
+        await unit.panel.selectPage('R', 'APT 1');
+        const kccc = unit.props.memory.aptPage.facility as AirportFacility;
+        const memory = unit.props.memory;
+        for (const page of [memory.aptPage, memory.vorPage, memory.ndbPage, memory.intPage, memory.supPage]) {
+            (page as { lastMatch: Facility | null }).lastMatch = kccc;
+        }
+
+        await cycle(unit);
+
+        expect([memory.aptPage, memory.vorPage, memory.ndbPage, memory.intPage, memory.supPage].map(page => page.lastMatch)).toEqual([null, null, null, null, null]);
     });
 });

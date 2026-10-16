@@ -161,7 +161,9 @@ only run while the unit is powered AND enabled.**
 - **Hard rule from the class doc: DOM manipulation happens only inside a display tick, never directly in a state change
   or input handler.** Handlers mutate state and the next `tick(blink)` renders it.
 - Each tickable is wrapped in try/catch, which logs the error and publishes `error`. **Async ticks** (`NearestList.tick`
-  is `async`) are not awaited, so their rejections escape this handler.
+  is `async`) are not awaited, but `tickCalc` attaches the same handler to the returned promise (#95), so their
+  rejections reach the error page too. `NearestList` clears `isCalculating` in a `finally`, so a failed search does not
+  stop the later ones.
 - Expensive work throttles itself inside the 1 Hz tick: `NearestList` and `AirspaceAlert` search every 10 s (
   `NEAREST_TICK_TIME`, `ALERT_TICK_TIME`); `GPS` and `Timers` save every 60 s.
 - Separate intervals: `SimVarSync` runs every 100 ms and always runs, even when powered off. `BrightnessManager` uses
@@ -550,11 +552,14 @@ written then, on purpose: the default autopilot reads it.
 - `Scanlists` / `FacilityLoaderScanlist` (`data/navdata/Scanlist.ts`, 3-21) implement alphabetical scanning with
   outer-knob scrolling. Instead of holding all ICAOs, they keep a moving window cache filled by `searchByIdent`, plus an
   index of the first ident per letter. Async jobs are cancelled by a job id. `sync(icao)` re-centres the window.
-- `Nearestlists` (`data/navdata/NearestList.ts`): APT/VOR/NDB lists with a 9-item maximum and a 500 NM radius. The
-  search runs every 10 s and bearing and distance update every 1 Hz. The airport filter comes from the
-  `nearestAptSurface` and `nearestAptMinRunwayLength` settings, with `updateFilters()` called from pages.
+- `Nearestlists` (`data/navdata/NearestList.ts`): APT/VOR/NDB lists with a 9-item maximum and a 200 NM radius (#207);
+  the VOR list holds every VOR class (#204). The search runs every 10 s and bearing and distance update every 1 Hz. The
+  airport filter comes from the `nearestAptSurface` and `nearestAptMinRunwayLength` settings, with `updateFilters()`
+  called from pages.
 - `NearestUtils`: nearest helpers for pages and airspaces. It double-checks `BoundaryUtils.isInside`, because the SDK
-  only checks the bounding box ("CANADA RVSM").
+  only checks the bounding box ("CANADA RVSM"). `getNearestLowHighVor` gives NAV 2 its low or high altitude VOR within
+  200 NM through a `NearestVorSearch` (`data/navdata/NearestVorSearch.ts`); NAV 2 calls it when it opens and every 10 s
+  while it is shown, never while another page is (#204).
 - `Database` (`data/navdata/Database.ts`): AIRAC expiry from `FacilityLoader.getDatabaseCycles().current`;
   `isAiracCurrent()`.
 - `FirMap.ts` (FIR code to 3-letter name) and `CountryMap.ts` (`STATEMAP`, `COUNTRYMAP`) are static lookup tables used

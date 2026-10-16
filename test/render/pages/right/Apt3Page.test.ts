@@ -75,12 +75,12 @@ describe('APT 3 page, runway diagram and list (characterization)', () => {
         `);
     });
 
-    // The code gives the sim's macadam surface no abbreviation, so the surface cells stay blank
-    it('shows a blank surface for a macadam runway', async () => {
+    // The maintainer ruled macadam a hard surface (#270), so its surface cell shows HRD
+    it('shows HRD for a macadam runway (maintainer ruling, #270)', async () => {
         const unit = await bootUnit({facilities: [withRunways('KAAA', [{surface: RunwaySurfaceType.Macadam}])], position: {lat: 47.0, lon: 12.0}});
         await unit.panel.selectPage('R', 'APT 3');
 
-        expect((await listPage(unit, 1))[3]).toBe("  5000'    ");
+        expect((await listPage(unit, 1))[3]).toBe("  5000' HRD");
     });
 });
 

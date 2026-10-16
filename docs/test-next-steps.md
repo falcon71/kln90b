@@ -95,7 +95,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   (`savedTemporary` in `TemporaryWaypointDeleter.test.ts`); an `XY` option would replace them.
 - **Options of the fake navdata** (section 6): a cloning option that hands out a copy of the `IcaoValue` per call, which
   would make the reference comparisons observable (`Scanlist`, fixed in `6a6c634`, and the nearest list removal at
-  `NearestList.ts:89`, which a break survives); a `getFacility` that checks its type argument; and a search that returns
+  `NearestList.ts:107`, which a break survives); a `getFacility` that checks its type argument; and a search that returns
   matches in insertion order, which would show whether the code orders the autocompletion itself (also unobservable
   with the instant fake: `WaypointEditor.onCharChanged` has no guard against a stale result, and
   `WaypointEditor.convertToValue` looks for the exact ident among the first 99 results only).
@@ -130,15 +130,13 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   120°; a halved roll-in distance
   (`NavCalculator.ts:190`) survives the lower bound of the DME arc flight; the flag copy of `addArcInfoIfPrevIsSame`
   (`SidStar.ts:455`) has no arc whose fix carries other flags; the two halves of the SET 3 hard-surface filter
-  (`NearestList.ts:163` and `:191-198`) and the two polygon guards of the SUA alert (`AirspaceAlert.ts:109`,
+  (`NearestList.ts:173` and `:205-213`) and the two polygon guards of the SUA alert (`AirspaceAlert.ts:109`,
   `MessageHandler.ts:87`) cover each other.
-- The removal loop of `NearestList.tick` splices while it iterates (`NearestList.ts:87-93`), so of two adjacent
-  removals one waits for the next search.
 - **CTR computes once per unit in tests.** With `centerWorld()` one computation needs no OTH 2 detour: its legs are
   300 NM, so each Center is first returned by a search from inside it. A second computation in the same unit meets
   #102; the #102 pin in `Ctr1Page.test.ts` is such a test on purpose, and the tests of the 30 waypoint limit there use one computation.
 - CTR leads: a recomputation without insertion creates a new user waypoint with the next number (BGD00, then BGD01),
-  and the orphans count against the limit until power-off (a computation discarded by #348 leaves its new waypoints the same way); a crossing without a VOR within 100 NM, or without a free
+  and the orphans count against the limit until power-off (a computation discarded by #348 leaves its new waypoints the same way); a crossing without a VOR within 1000 NM, or without a free
   number, is dropped silently; when the first waypoint lies in no Center the first crossing is dropped
   (`AirspacesAlongRoute.cleanup`); `getWaypointIfExistsInFpl` compares coordinates with `===`; CTR 2 and NAV 2 convert the
   radial with the VOR's own variation (#280, #362); the status line shows `msg` for one display tick after CTR 1 is
@@ -203,8 +201,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       `ElevationEditor` has no sign, so a user airport below sea level cannot get its elevation; `VorFreqEditor` takes
       any 10 kHz step (113.13), while VOR channels are 50 kHz apart (the guide gives no rule); a user elevation is saved
       in whole meters, so a change of 1 ft is not observable.
-    - Selectors and fieldsets: `VorSelector` leaves out TACAN-only stations (2-1 and 2-2 name VORs only); for a
-      duplicated ident the VOR page reached by scanning and the selector can show different VORs (#105); the OBS taken
+    - Selectors and fieldsets: `VorSelector` leaves out TACAN-only stations (2-1 and 2-2 name VORs only); the OBS taken
       from the DTK keeps its fraction (089.46) while the field shows 089, and the CDI follows the fraction (5-35 is
       silent); the inches cell of `BaroFieldset` caps at 30.99 while millibars reach 1099; `OthFuelFieldset` shows a
       rounded value and rebuilds from one with a fraction; `SuperNav5RangeSelector` builds its index with `indexOf`, -1 for a stored
@@ -300,7 +297,6 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - the fix of #96 needs `PageStack` in `MainPage.tsx` to destroy the half page it replaces (`setCurrentPage`, `pop`,
       `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone leaves both handler counts
       unchanged, and OTH 4 counts the `changed` topic of the remarks manager;
-    - the fix of #95 turns its two pins red (the list and the error page);
     - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): duplicate idents on a waypoint
   page (2026-10-08, T20, not done), and the empty top row of FPL 0 with the first waypoint active (above). #162 and

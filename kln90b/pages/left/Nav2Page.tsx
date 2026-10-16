@@ -1,4 +1,4 @@
-import {FSComponent, GeoPoint, UnitType, VNode} from '@microsoft/msfs-sdk';
+import {FSComponent, GeoPoint, UnitType, VNode, VorFacility} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
@@ -8,6 +8,12 @@ import {BearingDisplay} from "../../controls/displays/BearingDisplay";
 import {LatitudeDisplay} from "../../controls/displays/LatitudeDisplay";
 import {LongitudeDisplay} from "../../controls/displays/LongitudeDisplay";
 import {SidStar} from "../../data/navdata/SidStar";
+import {TICK_TIME_DISPLAY} from "../../TickController";
+import {ErrorEvent} from "../../controls/ErrorPage";
+
+//#204: the 90B guide does not say how often NAV 2 picks its VOR again. The KLN 89 trainer switched to a new nearer VOR
+//within about 10 s while the page stayed shown (2026-10-16); maintainer ruling, #204: when the page opens, then every 10 s
+const SEARCH_INTERVAL_TICKS = 10000 / TICK_TIME_DISPLAY;
 
 
 type Nav2PageTypes = {
@@ -25,9 +31,15 @@ export class Nav2Page extends SixLineHalfPage {
 
     readonly name: string = "NAV 2";
 
+    //3-8, 3-32: the nearest low or high altitude VOR, as the last search found it. The page searches only while it is
+    //shown (#204)
+    private nearestVor: VorFacility | null = null;
+    private isSearching: boolean = false;
+    private ticksToSearch: number = SEARCH_INTERVAL_TICKS;
+
     constructor(props: PageProps) {
         super(props);
-
+        this.searchNearestVor();
 
         this.children = new UIElementChildren<Nav2PageTypes>({
             vor: new TextDisplay("---"),
@@ -51,6 +63,10 @@ export class Nav2Page extends SixLineHalfPage {
     }
 
     tick(blink: boolean) {
+        this.ticksToSearch--;
+        if (this.ticksToSearch <= 0) {
+            this.searchNearestVor();
+        }
         this.requiresRedraw = true;
         super.tick(blink);
     }
@@ -63,10 +79,7 @@ export class Nav2Page extends SixLineHalfPage {
             //3-32 displays VOR of arc, when within 30NM
             let vor = SidStar.getVorIfWithin30NMOfArc(this.props.memory.navPage, this.props.memory.fplPage.flightplans[0]);
             if (vor === null) {
-                const nearestVors = this.props.nearestLists.vorNearestList.getNearestList();
-                if (nearestVors.length > 0) {
-                    vor = nearestVors[0].facility;
-                }
+                vor = this.nearestVor;
             }
 
             if (vor === null) {
@@ -90,4 +103,24 @@ export class Nav2Page extends SixLineHalfPage {
 
     }
 
+    private searchNearestVor(): void {
+        //One search at a time; a search that answers late is not overtaken by the next one
+        if (this.isSearching) {
+            return;
+        }
+        this.isSearching = true;
+        this.ticksToSearch = SEARCH_INTERVAL_TICKS;
+        const coords = this.props.sensors.in.gps.coords;
+        this.props.nearestUtils.getNearestLowHighVor(coords.lat, coords.lon).then(vor => {
+            this.nearestVor = vor;
+            this.isSearching = false;
+        }, e => {
+            //A failed search shows on the error page, as one of a nearest list does (#95), and the next one runs
+            this.isSearching = false;
+            console.error(e);
+            if (e instanceof Error) {
+                this.props.bus.getPublisher<ErrorEvent>().pub("error", e);
+            }
+        });
+    }
 }

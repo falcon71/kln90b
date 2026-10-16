@@ -32,11 +32,11 @@ describe('APT 1 page', () => {
 
 /**
  * Scanning after the shown nearest entry dropped off the nearest list (#39, c2e7b8e, d202f4a).
- * The nearest search radius is 500 NM, so a teleport of 10 degrees of latitude drops an entry at once; flying there
+ * The nearest search radius is 200 NM, so a teleport of 10 degrees of latitude drops an entry at once; flying there
  * would take hundreds of NM.
  */
 describe('APT 1 page on a nearest entry', () => {
-    // Invented airports on one meridian, 0.2 degrees (12 NM) apart; KZZZ is far out of the 500 NM search radius
+    // Invented airports on one meridian, 0.2 degrees (12 NM) apart; KZZZ is far out of the 200 NM search radius
     const kaaa = airport('KAAA', 47.0, 8.0);
     const kbbb = airport('KBBB', 47.2, 8.0);
     const kccc = airport('KCCC', 47.4, 8.0);
@@ -62,7 +62,7 @@ describe('APT 1 page on a nearest entry', () => {
     }
 
     // 3-24: with the cursor off, the airport stays displayed and its nr changes with the aircraft's position. (The case
-    // with the cursor parked on nr 1 is another one; its pin is in "APT 1 page with the cursor on the nearest rank".)
+    // with the cursor parked on nr 1 is another one; its test is in "APT 1 page with the cursor on the nearest rank".)
     it('follows the aircraft with the nr of the shown airport (3-24, d202f4a)', async () => {
         const unit = await bootAtNearest();
 
@@ -117,6 +117,35 @@ describe('APT 1 page on a nearest entry', () => {
     });
 });
 
+// Invented airports, a few NM apart. Typing KC matches KCCC; KCZ matches nothing, and KCCC was the last match.
+const world = () => ({
+    facilities: [airport('KAAA', 47.0, 8.0), airport('KBBB', 47.02, 8.0), airport('KCCC', 47.04, 8.0), airport('KDDD', 47.06, 8.0)],
+    position: {lat: 47.0, lon: 8.0},
+});
+const CHARSET = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+
+/** Sets the character of the focused selector cell with the inner knob, the shorter way around the selector's characters */
+async function setChar(unit: HeadlessUnit, ch: string): Promise<void> {
+    for (let guard = 0; unit.panel.focused('R').text[0] !== ch; guard++) {
+        expect(guard).toBeLessThan(CHARSET.length);
+        let delta = CHARSET.indexOf(ch) - CHARSET.indexOf(unit.panel.focused('R').text[0]);
+        if (delta > CHARSET.length / 2) delta -= CHARSET.length;
+        if (delta < -CHARSET.length / 2) delta += CHARSET.length;
+        await unit.panel.inner('R', delta > 0 ? 1 : -1);
+    }
+}
+
+/** APT 1 with K and C typed char by char: the page shows KCCC, the last match */
+async function typeKc(): Promise<HeadlessUnit> {
+    const unit = await bootUnit(world());
+    await unit.panel.selectPage('R', 'APT 1');
+    await unit.panel.cursor('R');
+    await setChar(unit, 'K');
+    await unit.panel.outer('R', 1);
+    await setChar(unit, 'C');
+    return unit;
+}
+
 /**
  * Scanning from a typed ident that matches no waypoint. Checked in the KLN 89 trainer (2026-10-07; the 89 shows dashes
  * and no CREATE NEW state, but its scan is the same): the scan is relative to the last waypoint the ident entry matched,
@@ -125,14 +154,7 @@ describe('APT 1 page on a nearest entry', () => {
  * scan from the typed ident would have shown the last match itself. 3-21 gives the alphabetical order of the scan.
  */
 describe('APT 1 page scanning from a typed ident that matches no airport (3-21)', () => {
-    // Invented airports, a few NM apart. Typing KC matches KCCC; KCZ matches nothing, and KCCC was the last match.
-    const world = () => ({
-        facilities: [airport('KAAA', 47.0, 8.0), airport('KBBB', 47.02, 8.0), airport('KCCC', 47.04, 8.0), airport('KDDD', 47.06, 8.0)],
-        position: {lat: 47.0, lon: 8.0},
-    });
-    const CHARSET = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
-
-    /** APT 1 with KCZ entered with the knobs (enterIdent) and the cursor off: the state the pins scan from */
+    /** APT 1 with KCZ entered with the knobs (enterIdent) and the cursor off: the state the scans start from */
     async function enterKcz(): Promise<HeadlessUnit> {
         const unit = await bootUnit(world());
         await unit.panel.selectPage('R', 'APT 1');
@@ -151,31 +173,10 @@ describe('APT 1 page scanning from a typed ident that matches no airport (3-21)'
         return unit;
     }
 
-    /** Sets the character of the focused selector cell with the inner knob, the shorter way around the selector's characters */
-    async function setChar(unit: HeadlessUnit, ch: string): Promise<void> {
-        for (let guard = 0; unit.panel.focused('R').text[0] !== ch; guard++) {
-            expect(guard).toBeLessThan(CHARSET.length);
-            let delta = CHARSET.indexOf(ch) - CHARSET.indexOf(unit.panel.focused('R').text[0]);
-            if (delta > CHARSET.length / 2) delta -= CHARSET.length;
-            if (delta < -CHARSET.length / 2) delta += CHARSET.length;
-            await unit.panel.inner('R', delta > 0 ? 1 : -1);
-        }
-    }
-
-    /** APT 1 with K and C typed char by char: the page shows KCCC, the last match */
-    async function typeKc(): Promise<HeadlessUnit> {
-        const unit = await bootUnit(world());
-        await unit.panel.selectPage('R', 'APT 1');
-        await unit.panel.cursor('R');
-        await setChar(unit, 'K');
-        await unit.panel.outer('R', 1);
-        await setChar(unit, 'C');
-        return unit;
-    }
-
-    // The passing siblings of the pins: after KC the page shows KCCC, the last match, and after KCZ the page offers to
-    // create a waypoint, typed char by char and (below) on the pins' own path. Without them the scans could start anywhere.
-    // The name row of KCCC is not asserted here: the pin below holds it.
+    // The passing siblings of the scan tests: after KC the page shows KCCC, the last match, and after KCZ the page offers to
+    // create a waypoint, typed char by char and (below) on the path of the scan tests. Without them the scans could start
+    // anywhere.
+    // The name row of KCCC is not asserted here: the #265 test below holds it.
     it('shows KCCC after KC and the CREATE NEW state after KCZ (3-21, 5-16)', async () => {
         const unit = await typeKc();
         expect(Screen.read().rows('R')[0]).toBe(' KCCC      ');
@@ -190,31 +191,106 @@ describe('APT 1 page scanning from a typed ident that matches no airport (3-21)'
     // 3-26: names are shortened only where they are too long for the display, and "KCCC AIRPORT" (the builder names every
     // airport "<ident> AIRPORT") fits the two name rows. Figures 3-71 and 3-84 show a listed word inside a longer word
     // (WESTCHESTER, NEWPORT) staying whole. So the name stays whole and continues on the second row after the eleventh
-    // cell (figure 3-85). The code replaces PORT inside AIRPORT and shows KCCC AIRPT.
-    it.fails('shows the name KCCC AIRPORT with the word AIRPORT whole (3-26, #265)', async () => {
+    // cell (figure 3-85).
+    it('shows the name KCCC AIRPORT with the word AIRPORT whole (3-26, #265)', async () => {
         const unit = await typeKc();
 
         expect(Screen.read().rows('R').slice(1, 3)).toEqual(['KCCC AIRPOR', 'T          ']);
     });
 
-    it('shows the CREATE NEW state for KCZ entered the way the pins enter it (5-16)', async () => {
+    it('shows the CREATE NEW state for KCZ entered the way the scan tests enter it (5-16)', async () => {
         const unit = await enterKcz();
 
         const rows = Screen.read().rows('R');
         expect([rows[0], rows[2], rows[3]]).toEqual([' KCZ       ', 'CREATE NEW ', 'WPT AT:    ']);
     });
 
-    it.fails('scans clockwise to the waypoint after the last match (3-21, #202)', async () => {
+    it('scans clockwise to the waypoint after the last match (3-21, #202)', async () => {
         const unit = await scanFromKcz(1);
 
         expect(Screen.read().rows('R')[0]).toBe(' KDDD      ');
     });
 
     // A scan from the typed ident would show KCCC (the airport before KCZ), so this case tells the two readings apart
-    it.fails('scans counterclockwise to the waypoint before the last match (3-21, #202)', async () => {
+    it('scans counterclockwise to the waypoint before the last match (3-21, #202)', async () => {
         const unit = await scanFromKcz(-1);
 
         expect(Screen.read().rows('R')[0]).toBe(' KBBB      ');
+    });
+});
+
+describe('APT 1 page scanning after a typed ident matched again (characterization, #202)', () => {
+    // Characterization: the clockwise scan starts from the last match too. KCB sorts before its last match KCCC, so a
+    // scan from the typed ident would show KCCC and one from the last match shows KDDD. The trainer record shows only the
+    // case where the typed ident sorts after its last match, so this is not a trainer check.
+    it('scans clockwise from the last match when the typed ident sorts before it (characterization, #202)', async () => {
+        const unit = await typeKc();
+        await unit.panel.outer('R', 1);
+        await setChar(unit, 'B'); // KCB: miss, before KCCC
+        expect(Screen.read().rows('R')[0]).toBe(' KCB       ');
+        await unit.panel.cursor('R');
+
+        await unit.panel.scan();
+        await unit.panel.inner('R', 1);
+        await vi.advanceTimersByTimeAsync(400);
+
+        expect(Screen.read().rows('R')[0]).toBe(' KDDD      ');
+    });
+
+    // Characterization of the last match's rule: a second miss in a row keeps the last match
+    it('scans from the last match after two typed idents in a row matched nothing (characterization, #202)', async () => {
+        const unit = await typeKc();
+        await unit.panel.outer('R', 1);
+        await setChar(unit, 'Z'); // KCZ: miss
+        await setChar(unit, 'Y'); // KCY: miss again
+        expect(Screen.read().rows('R')[0]).toBe(' KCY       ');
+        await unit.panel.cursor('R');
+
+        await unit.panel.scan();
+        await unit.panel.inner('R', -1);
+        await vi.advanceTimersByTimeAsync(400);
+
+        expect(Screen.read().rows('R')[0]).toBe(' KBBB      ');
+    });
+
+    // Characterization of the last match's rule (design section 3A, approved in chat; the trainer record does not say
+    // how a later match behaves): a typed ident that matches again clears the last match, and a later miss starts from
+    // that match. KCZ misses (last match KCCC), KD matches KDDD; KDZ misses and the scan starts from KDDD
+    async function typeKczThenKdz(): Promise<HeadlessUnit> {
+        const unit = await typeKc();
+        await unit.panel.outer('R', 1);
+        await setChar(unit, 'Z'); // KCZ
+        await unit.panel.outer('R', -1);
+        await setChar(unit, 'D'); // KD: KDDD
+        expect(Screen.read().rows('R')[0]).toBe(' KDDD      ');
+        await unit.panel.outer('R', 1);
+        await setChar(unit, 'Z'); // KDZ
+        expect(Screen.read().rows('R')[0]).toBe(' KDZ       ');
+        await unit.panel.cursor('R');
+        return unit;
+    }
+
+    it('scans from KDDD, the latest match, and not from KCCC, after KDZ missed (characterization, #202)', async () => {
+        const unit = await typeKczThenKdz();
+
+        await unit.panel.scan();
+        await unit.panel.inner('R', -1);
+        await vi.advanceTimersByTimeAsync(400);
+
+        expect(Screen.read().rows('R')[0]).toBe(' KCCC      ');
+    });
+
+    it('clears the last match of the page memory when the typed ident matches again (characterization, #202)', async () => {
+        const unit = await typeKc();
+        await unit.panel.outer('R', 1);
+        await setChar(unit, 'Z'); // KCZ: the miss keeps KCCC as the last match
+        expect(unit.props.memory.aptPage.lastMatch?.icaoStruct.ident).toBe('KCCC');
+
+        await unit.panel.outer('R', -1);
+        await setChar(unit, 'B'); // KB matches KBBB
+
+        expect(Screen.read().rows('R')[0]).toBe(' KBBB      ');
+        expect(unit.props.memory.aptPage.lastMatch).toBeNull();
     });
 });
 
@@ -340,36 +416,45 @@ describe('APT 1 page of a database airport', () => {
         expect((await showApt1(unit))[3]).toBe('     PRIVAT');
     });
 
-    // 3-26: whole words are abbreviated (Fort to FT, Saint to ST, Regional to REG), and the name is cut after eleven
-    // cells (figure 3-85)
+    // 3-26: whole words are abbreviated (Saint to ST, Regional to REG) in a name too long for the display, and the name
+    // is cut after eleven cells (figure 3-85). A first word of eight characters or fewer stays (FORT, SAINT).
     it.each([
-        ['FORT SMITH REGIONAL', ['FT SMITH RE', 'G          ']],
-        ['SAINT CLAIR COUNTY', ['ST CLAIR CO', 'UNTY       ']],
+        ['FORT SMITH REGIONAL AIRPORT DISTRICT', ['FORT SMITH ', 'REG AIRPORT']],
+        ['SAINT CLAIR COUNTY INTERNATIONAL', ['SAINT CLAIR', ' COUNTY INT']],
     ])('abbreviates the words of %s (3-26)', async (name, rows) => {
         const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name})], position: POS});
 
         expect((await showApt1(unit)).slice(1, 3)).toEqual(rows);
     });
 
-    // 3-26 abbreviates the words West and Port; figures 3-71 and 3-84 show WESTCHESTER and NEWPORT MUN, so a word that
-    // only contains them stays whole. The spec test above is the sibling: the same page shortens whole words.
-    it.fails('keeps WESTCHESTER whole (3-26, #265)', async () => {
-        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'WESTCHESTER COUNTY'})], position: POS});
+    // 3-26: names are shortened only where they are too long for the display
+    it('shows FORT SMITH REGIONAL whole because it fits (3-26)', async () => {
+        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'FORT SMITH REGIONAL'})], position: POS});
+
+        expect((await showApt1(unit)).slice(1, 3)).toEqual(['FORT SMITH ', 'REGIONAL   ']);
+    });
+
+    // Figures 3-71 and 3-84 show WESTCHESTER and NEWPORT MUN, so a word that only contains West or Port stays whole. The
+    // names are longer than the two rows, so that the rules apply at all; the it.each above is the sibling: the same
+    // page shortens whole words.
+    it('keeps WESTCHESTER whole (3-26, #265)', async () => {
+        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'WESTCHESTER COUNTY AIRPORT'})], position: POS});
 
         expect((await showApt1(unit))[1]).toBe('WESTCHESTER');
     });
 
-    it.fails('keeps NEWPORT whole (3-26, #265)', async () => {
-        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'NEWPORT MUNICIPAL'})], position: POS});
+    it('keeps NEWPORT whole (3-26, #265)', async () => {
+        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'ALPHA NEWPORT MUNICIPAL AIRPORT'})], position: POS});
 
-        expect((await showApt1(unit))[1]).toBe('NEWPORT MUN');
+        expect((await showApt1(unit)).slice(1, 3)).toEqual(['ALPHA NEWPO', 'RT MUNICIPA']);
     });
 
-    // 3-26 deletes the word The; the name then starts with the next word, not with a blank
-    it.fails('deletes a leading THE without leaving a blank (3-26, #265)', async () => {
-        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'THE HARTSFIELD'})], position: POS});
+    // 3-26 deletes the word The; the name then starts with the next word, not with a blank. Only a name too long for the
+    // display is shortened, so the name here is longer than the two rows.
+    it('deletes a leading THE without leaving a blank (3-26, #265)', async () => {
+        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'THE HARTSFIELD ATLANTA INTERNATIONAL'})], position: POS});
 
-        expect((await showApt1(unit))[1]).toBe('HARTSFIELD ');
+        expect((await showApt1(unit)).slice(1, 3)).toEqual(['HARTSFIELD ', 'ATLANTA INT']);
     });
 
     // 3-42: an arrow precedes the ident of the active waypoint. FPL 0 KBBB to KAAA makes KAAA active.
@@ -456,23 +541,112 @@ describe('APT 1 page with the cursor on the nearest rank', () => {
         return unit;
     }
 
-    // 3-24, the sibling of the pin: the cursor stays on the rank, and the unit's nearest list has KCCC first, so the pin
-    // fails on the page only
+    // 3-24, the sibling of the test below: the cursor stays on the rank, and the unit's nearest list has KCCC first, so
+    // the test below fails on the page only
     it('keeps the cursor on the rank while the nearest list changes (3-24)', async () => {
         const unit = await parkOnNr1ThenMove();
 
-        expect(unit.panel.focused('R').text).toMatch(/^nr [12]$/);
+        expect(unit.panel.focused('R').text).toBe('nr 1');
         expect(unit.props.nearestLists.aptNearestList.getNearestList().map(w => w.facility.icaoStruct.ident)).toEqual(['KCCC', 'KBBB']);
     });
 
     // 3-24: as long as the cursor stays parked on NR 1, the page keeps showing the nearest airport as the flight goes
     // on. Checked in the KLN 89 trainer (2026-10-07): the page switched to the new nearest airport at rank 1 and kept
-    // tracking it. Only the parked cursor is the bug: with the cursor off, the shown airport stays and its rank counts
-    // up (the spec test of "APT 1 page on a nearest entry").
-    it.fails('follows the nearest airport while the cursor is parked on nr 1 (3-24, KLN 89 trainer, #268)', async () => {
+    // tracking it. With the cursor off, the shown airport stays and its rank counts up (the spec test of "APT 1 page on
+    // a nearest entry").
+    it('follows the nearest airport while the cursor is parked on nr 1 (3-24, KLN 89 trainer, #268)', async () => {
         const unit = await parkOnNr1ThenMove();
 
         expect(Screen.read().rows('R')[0]).toBe(' KCCC  nr 1');
+    });
+
+    describe('the parked rank (characterization: neither 3-24 nor the KLN 89 trainer show these cases, #268)', () => {
+        const kbbb = airport('KBBB', 47.2, 12.0);
+        const kccc = airport('KCCC', 47.6, 12.0);
+        const kddd = airport('KDDD', 48.0, 12.0);
+        // 600 NM and more from the aircraft at the start, the only airport within the search radius at 57.0
+        const kzzz = airport('KZZZ', 57.1, 12.0);
+
+        /** KBBB is the nearest at the start and the cursor is parked on nr 1 for some display ticks, so the page holds the rank */
+        async function parkOnNr1(facilities: AirportFacility[]): Promise<HeadlessUnit> {
+            const unit = await bootUnit({facilities, position: {lat: 47.19, lon: 12.0}});
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+            await unit.panel.msg();
+            await unit.panel.ent();
+            await unit.panel.cursor('R');
+            await unit.panel.cursorTo('R', 'nr 1');
+            await vi.advanceTimersByTimeAsync(1000);
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 1');
+            return unit;
+        }
+
+        // KDDD is 139 NM from the aircraft at the start and out of the 200 NM search radius from 45.0 degrees; KBBB and KCCC stay
+        const kfar = airport('KDDD', 49.5, 12.0);
+
+        it('shows the last entry when the list shrinks below the parked rank', async () => {
+            const unit = await parkOnNr1([kbbb, kccc, kfar]);
+            await unit.panel.cursor('R'); // The cursor leaves nr 1
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', 49.5);
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 3'); // Precondition: KBBB is the third of three
+            await unit.panel.cursor('R');
+            await unit.panel.cursorTo('R', 'nr 3');
+            await vi.advanceTimersByTimeAsync(1000);
+
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', 45.0);
+            await vi.advanceTimersByTimeAsync(25000); // KDDD leaves the search radius; KBBB stays in the list, now the first
+
+            expect(unit.props.nearestLists.aptNearestList.getNearestList().map(w => w.facility.icaoStruct.ident)).toEqual(['KBBB', 'KCCC']);
+            expect(Screen.read().rows('R')[0]).toBe(' KCCC  nr 2');
+            expect(unit.errors).toEqual([]);
+            expect(unit.consoleErrors).toEqual([]);
+        });
+
+        it('keeps the shown airport when the list is empty', async () => {
+            const unit = await parkOnNr1([kbbb, kzzz]);
+
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', 37.0);
+            await vi.advanceTimersByTimeAsync(25000); // Both airports are out of the search radius
+
+            expect(unit.props.nearestLists.aptNearestList.getNearestList()).toEqual([]);
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB      ');
+            expect(unit.errors).toEqual([]);
+            expect(unit.consoleErrors).toEqual([]);
+        });
+
+        it('parks on the rank the page shows when the cursor returns, not on the rank it left', async () => {
+            const unit = await parkOnNr1([kbbb, kccc, kddd]);
+            await unit.panel.cursor('R'); // The cursor leaves nr 1
+            await vi.advanceTimersByTimeAsync(1000);
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', 47.59);
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 2'); // Precondition: the shown airport stays, its rank counts up
+
+            await unit.panel.cursor('R');
+            await unit.panel.cursorTo('R', 'nr 2');
+            await vi.advanceTimersByTimeAsync(1000);
+
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 2');
+        });
+
+        it('follows a parked rank above 1', async () => {
+            const unit = await parkOnNr1([kbbb, kccc, kddd]);
+            await unit.panel.cursor('R'); // The cursor leaves nr 1
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', 47.59);
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 2'); // Precondition: the shown airport stays, its rank counts up
+            await unit.panel.cursor('R');
+            await unit.panel.cursorTo('R', 'nr 2');
+            await vi.advanceTimersByTimeAsync(1000);
+
+            // The aircraft is at KDDD: KDDD is the nearest, KCCC the second, KBBB the third
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', 48.0);
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+
+            expect(unit.props.nearestLists.aptNearestList.getNearestList().map(w => w.facility.icaoStruct.ident)).toEqual(['KDDD', 'KCCC', 'KBBB']);
+            expect(Screen.read().rows('R')[0]).toBe(' KCCC  nr 2');
+            expect(unit.panel.focused('R').text).toBe('nr 2');
+        });
     });
 });
 

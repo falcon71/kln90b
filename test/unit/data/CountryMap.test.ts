@@ -15,36 +15,63 @@ describe('getCountry', () => {
         expect(getCountry(vor('ABC', 50, -100, {region: 'CY'}))).toBe('CAN');
     });
 
-    it('names the country of an airport by the first two letters of its ident (D-1 to D-3)', () => {
-        // airports carry no region in the sim's ICAO
-        expect(getCountry(airport('LSZZ', 47, 8))).toBe('CHE');
-        expect(getCountry(airport('EGZZ', 51, 0))).toBe('GBR');
+    it('names the country of an airport by its region (D-1 to D-3)', () => {
+        expect(getCountry(airport('LSZZ', 47, 8, {region: 'LS'}))).toBe('CHE');
+        expect(getCountry(airport('EGZZ', 51, 0, {region: 'EG'}))).toBe('GBR');
+    });
+
+    // 3-15: each entry carries its country. The sim fills the region of every facility, airports too, so the region
+    // decides and not the ident (the maintainer's examples, #342). MT is the ident prefix of Haiti (HTI), but the
+    // region is K1
+    it('names the country of an airport by its region (3-15, #342)', () => {
+        expect(getCountry(airport('93F', 40, -100, {region: 'K4'}))).toBe('USA');
+        expect(getCountry(airport('ETAR', 49.4, 7.6, {region: 'ED'}))).toBe('DEU');
+        expect(getCountry(airport('MT99', 46.5, -110, {region: 'K1'}))).toBe('USA');
+    });
+
+    // The sim leaves the region of some airports empty (KIG in the maintainer's comment on #342). The characterization
+    // is the three blanks of an empty region. LSZZ has the first two letters of a real region (LS), so an ident fallback
+    // would give CHE here and fail the assertion
+    it('leaves three blanks for an airport with an empty region (characterization, #342)', () => {
+        expect(getCountry(airport('KIG', -5, 145, {region: ''}))).toBe('   ');
+        expect(getCountry(airport('LSZZ', 47, 8, {region: ''}))).toBe('   ');
+    });
+
+    // User airports carry the region XX, which names no country (maintainer ruling, #342)
+    it('leaves three blanks for a user airport (maintainer ruling, #342)', () => {
+        expect(getCountry(airport('FARM', 47, 8, {region: 'XX'}))).toBe('   ');
     });
 
     it('leaves three blanks for an unknown region (characterization)', () => {
         expect(getCountry(vor('ABC', 0, 0, {region: 'QQ'}))).toBe('   ');
     });
 
-    // 3-15, figure 3-52: the Duplicate Waypoint page lists the US entries as USA. A US airport ident starts with K and
-    // a letter (KAAA), whose first two letters are no region
+    // 3-15, figure 3-52: the Duplicate Waypoint page lists the US entries as USA. The US regions K1 to K7 name the
+    // country (#168)
     it('names a US airport USA (#168)', () => {
-        expect(getCountry(airport('KAAA', 40, -100))).toBe('USA');
-        expect(getCountry(airport('KZZZ', 40, -100))).toBe('USA');
+        expect(getCountry(airport('KAAA', 40, -100, {region: 'K1'}))).toBe('USA');
+        expect(getCountry(airport('KZZZ', 40, -100, {region: 'K1'}))).toBe('USA');
     });
 
-    // The K of the US is the first letter of the four. LKPR (Czech Republic) has a K in second place, and the airports
-    // of other countries keep the country of their first two letters
-    it('does not take an airport with a K after the first letter for a US airport (#168)', () => {
-        expect(getCountry(airport('LKAA', 50, 14))).toBe('CZE');
-        expect(getCountry(airport('PAAA', 61, -150))).toBe('USA'); // Alaska has its own entry
+    // 3-15: each entry carries its country. LKPR (Czech Republic) has a K in second place, and PA, the region of
+    // Alaska's airports, gives USA (#168)
+    it('names the country of an airport by its region (3-15, #168)', () => {
+        expect(getCountry(airport('LKAA', 50, 14, {region: 'LK'}))).toBe('CZE');
+        expect(getCountry(airport('PAAA', 61, -150, {region: 'PA'}))).toBe('USA');
+    });
+
+    // Characterization (#168, #342): the region decides even for an ident that starts with K. The four-character ident
+    // KAAA is invented here, in the region LK
+    it('takes the country from the region when the ident starts with K (characterization, #168)', () => {
+        expect(getCountry(airport('KAAA', 50, 14, {region: 'LK'}))).toBe('CZE');
     });
 
     // 3-15, figure 3-52: every entry of the Duplicate Waypoint page carries its country. US airports with a
-    // three-character ident (B19 and K00 are airports of the database in the guide's examples) get none from the first
-    // two letters of the ident
-    it.fails('names a US airport with a three-character ident USA (3-15, #342)', () => {
-        expect(getCountry(airport('B19', 40, -100))).toBe('USA');
-        expect(getCountry(airport('K00', 40, -100))).toBe('USA');
+    // three-character ident (B19 and K00 are airports of the database in the guide's examples) take the country of
+    // their region
+    it('names a US airport with a three-character ident USA (3-15, #342)', () => {
+        expect(getCountry(airport('B19', 40, -100, {region: 'K6'}))).toBe('USA');
+        expect(getCountry(airport('K00', 40, -100, {region: 'K6'}))).toBe('USA');
     });
 
     // D-1 to D-3 against the ICAO regions of the Caribbean: TD Dominica (DMA), TR Montserrat (MSR), TT Trinidad and
@@ -72,15 +99,16 @@ describe('getRegionOrCountry', () => {
         expect(getRegionOrCountry({...airport('CYZZ', 46, -71), city: 'Quebec City, Quebec'})).toBe('PQ');
     });
 
-    // 3-15 and APT 2 take the country when there is no state: a K airport whose city names no known state is in the USA
-    it('falls back to USA for a K airport whose city has no known state (#168)', () => {
-        expect(getRegionOrCountry({...airport('KAAA', 40, -100), city: 'Wichita'})).toBe('USA');
-        expect(getRegionOrCountry({...airport('KAAA', 40, -100), city: 'Wichita, Nowhere'})).toBe('USA');
+    // 3-15 and APT 2 take the country when there is no state: an airport in a US region (K1 to K7) whose city names no
+    // known state is in the USA
+    it('falls back to USA for a US-region airport whose city has no known state (#168)', () => {
+        expect(getRegionOrCountry({...airport('KAAA', 40, -100, {region: 'K1'}), city: 'Wichita'})).toBe('USA');
+        expect(getRegionOrCountry({...airport('KAAA', 40, -100, {region: 'K1'}), city: 'Wichita, Nowhere'})).toBe('USA');
     });
 
     it('falls back to the country when the second part of the city is no state (characterization)', () => {
-        expect(getRegionOrCountry({...airport('LSZZ', 47, 8), city: 'Zurich, Switzerland'})).toBe('CHE');
-        expect(getRegionOrCountry({...airport('LSZZ', 47, 8), city: 'Zurich'})).toBe('CHE');
+        expect(getRegionOrCountry({...airport('LSZZ', 47, 8, {region: 'LS'}), city: 'Zurich, Switzerland'})).toBe('CHE');
+        expect(getRegionOrCountry({...airport('LSZZ', 47, 8, {region: 'LS'}), city: 'Zurich'})).toBe('CHE');
     });
 });
 

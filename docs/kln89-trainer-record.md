@@ -303,3 +303,27 @@ afterwards)
     into a full FPL 0 asked the same delete question on the first inner-knob click and then deleted two waypoints for
     one insert. These are not used either; the 89's two limits are (#221, #380).
   - The APT 8 previews end with one waypoint marked as the MAHP (#220).
+
+**2026-10-16**
+- On the USR page the reference VOR of a user waypoint moved north away from IMT stayed IMT, with radial and distance,
+  up to 999.7 NM; at about 1000.7 NM and beyond Ref, Rad and Dis all showed dashes, as they did for a waypoint near the
+  South Pole. The edge is also where the three-digit distance field runs out, so a search radius and a display limit
+  cannot be told apart. The values were there within about 2 s of turning to the page. Tested in one direction only
+  (#207).
+- The third-party AVsoftech KLN 90B trainer, which is unreliable:
+  - Its nearest airport list reached an isolated airport (Bermuda) from 186.8 NM east but not from 189.3 NM east, and
+    from 217.1 NM north but not from about 218 NM north. Both edges fell on whole-degree lines, as if the search covered
+    the aircraft's one-degree cell and three cells each way. Its VOR and NDB lists reached as far (#207).
+  - With nothing in range it kept the old list with growing distances and no message, and it filled unused slots by
+    repeating an entry; neither is used.
+  - Its SUP page named the reference VOR at 136, 190 and about 1245 NM, with the distance dashed from 1000 NM on; its
+    NAV 2 showed a VOR at 136.5 NM (#207).
+  - APT 1 showed `WESTCHESTER` / `CO` for KHPN: a short form inside a longer word was not applied (#265).
+- NAV 2 (present position from the nearest VOR) picks its VOR again by itself while the page stays shown: after another
+  VOR became the nearer one, the page switched 1.4, 3.6 and 7 s later in three trials, which fits a choice made about
+  every 8 to 10 s; radial and distance follow every second. It found a VOR 190 NM away and none at about 196 or 200 NM,
+  where it shows dashes; after a position jump of about 1100 NM it kept the old VOR with its new distance for up to
+  about 25 s. Medium-high confidence (#204).
+- A VOR that is terminal in today's data (BJB; its class in the 1997 database is not known) was taken both by NAV 2 and
+  as the Ref of a user waypoint, with a high altitude VOR about 20 NM away. Medium confidence; the 90B guide gives NAV 2
+  a low or high altitude VOR, so this does not decide the 90B's NAV 2 (#204).

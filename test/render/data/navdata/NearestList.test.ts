@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {Facility, FacilitySearchType, RunwaySurfaceType, VorClass, VorType} from '@microsoft/msfs-sdk';
+import {Facility, FacilitySearchType, FacilityType, RunwaySurfaceType, VorClass, VorType} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS} from '../../../harness/boot';
 import {MemoryFacilityClient} from '../../../harness/navdata/MemoryFacilityClient';
 import {airport, ndb, vor} from '../../../harness/navdata/builders';
@@ -272,14 +272,19 @@ describe('the nearest NDB list with a user NDB (3-22, 5-45)', () => {
     });
 });
 
-// The code searches 500 NM around the aircraft; the guide gives no radius. This holds the code's value.
-describe('the nearest airport list radius (characterization)', () => {
-    it('lists an airport 450 NM away as nr 1 when nothing is nearer', async () => {
-        // 7.5 degrees of latitude north of the aircraft are 450 NM
-        const unit = await bootUnit({facilities: [airport('KFAR', 54.5, 8.0)], position: POSITION});
+// The 90B guide gives no radius for the nearest lists. The KLN 89 guide and trainer stop at 200 NM, the AVsoftech 90B
+// trainer at about 190 to 220 NM; the maintainer ruled 200 NM (#207). 3.3 degrees of latitude are 198 NM
+describe('the nearest list radius (characterization; KLN 89 guide and trainer, maintainer ruling #207)', () => {
+    it('lists an airport 198 NM away as nr 1 when nothing is nearer', async () => {
+        const unit = await bootUnit({facilities: [airport('KFAR', 50.3, 8.0)], position: POSITION});
 
-        // the radius is a question: #207
         expect(await nearestRows(unit)).toEqual([' KFAR  nr 1']);
+    });
+
+    it('leaves out an airport 204 NM away', async () => {
+        const unit = await bootUnit({facilities: [airport('KFAR', 50.4, 8.0)], position: POSITION});
+
+        expect(await nearestRows(unit)).toEqual([]);
     });
 });
 
@@ -300,11 +305,11 @@ describe('VOR classes in the nearest VOR list', () => {
         return nearestRowsBackwards(unit);
     }
 
-    it.fails('lists a terminal VOR (#204)', async () => {
+    it('lists a terminal VOR (#204)', async () => {
         expect(await nearestVorRows(trm(), hig())).toEqual([' TRM D nr 1', ' HIG D nr 2']);
     });
 
-    it.fails('lists a VOR of undefined class (#204)', async () => {
+    it('lists a VOR of undefined class (#204)', async () => {
         expect(await nearestVorRows(und(), hig())).toEqual([' UND D nr 1', ' HIG D nr 2']);
     });
 
@@ -318,18 +323,18 @@ describe('VOR classes in the nearest VOR list', () => {
         return [...new Set(drawnLabels(map.drawn))].sort();
     }
 
-    // The sibling of the Super NAV 5 pin: the same page and spy see a high altitude VOR
+    // The sibling of the terminal VOR test below: the same page and spy see a high altitude VOR
     it('draws a high altitude VOR on Super NAV 5 with VOR: TLH', async () => {
         expect(await superNav5Labels(vor('HIG', 47.1, 8.05))).toEqual(['HIG']);
     });
 
-    it.fails('draws a terminal VOR on Super NAV 5 with VOR: TLH (#204)', async () => {
+    it('draws a terminal VOR on Super NAV 5 with VOR: TLH (#204)', async () => {
         expect(await superNav5Labels(trm(), vor('HIG', 47.1, 8.05))).toEqual(['HIG', 'TRM']);
     });
 
     // 5-45: the nearest functions work on user-defined waypoints (see the NDB case above). A user VOR has the class
     // and type the user waypoint loaders give it (Unknown, Unknown); its page shows no D.
-    it.fails('lists a user VOR (#206)', async () => {
+    it('lists a user VOR (#206)', async () => {
         const unit = await bootUnit({facilities: [hig()], position: POSITION});
         KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.02, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
         await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
@@ -338,7 +343,61 @@ describe('VOR classes in the nearest VOR list', () => {
         expect(await nearestRowsBackwards(unit)).toEqual([' QQV   nr 1', ' HIG D nr 2']);
     });
 
-    // The sibling of the pins: the list itself works for the classes it holds today, so the pins differ only in the class
+    // 3-8, 3-32: NAV 2 shows a low or high altitude VOR. Maintainer ruling, #206: a user VOR (class Unknown) never is the
+    // NAV 2 VOR, however near it is. The user VOR is 1.2 NM, HIG 18.0 NM from the aircraft.
+    it('shows HIG on NAV 2 although a user VOR is nearer (3-8, 3-32; maintainer ruling, #206)', async () => {
+        const unit = await bootUnit({facilities: [hig()], position: POSITION});
+        KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.02, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('L', 'NAV 2');
+
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(['HIG  180°fr', '     18.0nm']);
+    });
+
+    // Characterization: the guide is silent on a database VOR of undefined class on NAV 2. It follows from "NAV 2 shows a
+    // low or high altitude VOR" (3-8, 3-32) only by inference, and the class mask of the NAV 2 search holds it
+    it('shows HIG on NAV 2 although a database VOR of undefined class is nearer (characterization; 3-8, 3-32)', async () => {
+        const unit = await bootUnit({facilities: [und(), hig()], position: POSITION});
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('L', 'NAV 2');
+
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(['HIG  180°fr', '     18.0nm']);
+    });
+
+    // 5-45: a user VOR of a real class is filtered like a database VOR, so the flags of its class and type are compared
+    // with the masks of the VOR page (#128). The VOR type shows no D.
+    it('lists a user VOR of low altitude class and VOR type (#128)', async () => {
+        const unit = await bootUnit({facilities: [hig()], position: POSITION});
+        KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.02, 8.0, {region: 'XX', vorClass: VorClass.LowAlt, type: VorType.VOR}));
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('R', 'VOR  ');
+
+        expect(await nearestRowsBackwards(unit)).toEqual([' QQV   nr 1', ' HIG D nr 2']);
+    });
+
+    // Code contracts (characterization): each guard keeps one of the two flags inside its mask and moves the other out.
+    // TACAN is not in the type mask of the VOR page. VOT is not in its class mask, and it is not one of the four classes
+    // of 2-2, so no page pins it. The terminal and undefined classes are held by the #204 and #206 tests.
+    it('leaves out a user VOR whose type is outside the type mask (#128)', async () => {
+        const unit = await bootUnit({facilities: [hig()], position: POSITION});
+        KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQT', 47.02, 8.0, {region: 'XX', vorClass: VorClass.HighAlt, type: VorType.TACAN}));
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('R', 'VOR  ');
+
+        expect(await nearestRowsBackwards(unit)).toEqual([' HIG D nr 1']);
+    });
+
+    it('leaves out a user VOR whose class is outside the class mask (#128)', async () => {
+        const unit = await bootUnit({facilities: [hig()], position: POSITION});
+        KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQO', 47.02, 8.0, {region: 'XX', vorClass: VorClass.VOT, type: VorType.VOR}));
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('R', 'VOR  ');
+
+        expect(await nearestRowsBackwards(unit)).toEqual([' HIG D nr 1']);
+    });
+
+    // The sibling of the terminal and undefined class tests: a low and a high altitude VOR were listed before #204 as well, so
+    // those tests differ only in the class
     it('lists a low and a high altitude VOR', async () => {
         const low = vor('LOW', 47.05, 8.0, {vorClass: VorClass.LowAlt});
 
@@ -351,6 +410,19 @@ describe('VOR classes in the nearest VOR list', () => {
         await unit.panel.selectPage('L', 'NAV 2');
 
         // HIG is 18.0 NM north: the aircraft is on its 180 radial
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(['HIG  180°fr', '     18.0nm']);
+    });
+
+    // 3-8, 3-32: NAV 2 shows the nearest low or high altitude VOR, so it shows one behind nine nearer terminal VORs. That
+    // NAV 2 searches its VOR of its own (NearestUtils.getNearestLowHighVor), not in the nine entries of the VOR page, is
+    // the design of #204 (characterization).
+    it('shows a high altitude VOR on NAV 2 although nine nearer VORs are terminal (3-8, 3-32, #204)', async () => {
+        // T01..T09 are 0.6 to 5.4 NM north of the aircraft, never two at the same coordinates
+        const terminals = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => vor('T0' + i, 47.0 + 0.01 * i, 8.05, {vorClass: VorClass.Terminal}));
+        const unit = await bootUnit({facilities: [...terminals, hig()], position: POSITION});
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('L', 'NAV 2');
+
         expect(Screen.read().rows('L').slice(2, 4)).toEqual(['HIG  180°fr', '     18.0nm']);
     });
 });
@@ -389,7 +461,7 @@ async function ndbListAfterAFirstSearch(rejectFirst: boolean) {
     const {client, rejectedSearches} = clientForNdbSearch([], rejectFirst);
     const unit = await bootUnit({platform: {createFacilityClient: () => client as any}});
     await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
-    unit.takeRejections(); // The rejected search is an unhandled rejection; the harness would fail the test for it
+    expect(unit.takeRejections()).toEqual([]); // since #95 the tick controller handles a rejected search, so none reaches the test
     client.add(ndb('NAA', 47.05, 8.0));
     await vi.advanceTimersByTimeAsync(2 * NEAREST_SEARCH_WAIT_MS);
     const listed = unit.props.nearestLists.ndbNearestList.getNearestList().map(w => w.facility.icaoStruct.ident);
@@ -397,12 +469,10 @@ async function ndbListAfterAFirstSearch(rejectFirst: boolean) {
 }
 
 // 3-22: the nearest lists follow the aircraft, so a waypoint that comes into range is listed at a later search.
-// NearestList.tick is async and TickController.tickCalc does not await it (docs/architecture.md, Core 2: an async tick's
-// rejection escapes the handler that keeps one failing tickable from stopping the others), so a rejected search leaves
-// isCalculating set and the list is never searched again (#95). The rejection is also unhandled, so the error page
-// never shows it (#95).
+// NearestList.tick is async. A rejected search used to leave isCalculating set, so the list was never searched again, and
+// TickController.tickCalc did not await the promise, so the error page never showed the rejection (#95).
 describe('the nearest NDB list after a rejected search (#95)', () => {
-    // The sibling of the pins: the same client and the same steps without the failure, so the pins differ only in it
+    // The sibling of the tests below: the same client and the same steps without the failure, so they differ only in it
     it('lists an NDB that comes into range after the first search (3-22)', async () => {
         const {rejected, listed} = await ndbListAfterAFirstSearch(false);
 
@@ -410,14 +480,14 @@ describe('the nearest NDB list after a rejected search (#95)', () => {
         expect(listed).toEqual(['NAA']);
     });
 
-    // The setup of the pins: the failing client does reject one search, whatever the unit does with it
-    it('the failing client rejects one NDB search (setup of the #95 pins)', async () => {
+    // The setup of the tests below: the failing client does reject one search, whatever the unit does with it
+    it('the failing client rejects one NDB search (setup of the #95 tests)', async () => {
         const {rejected} = await ndbListAfterAFirstSearch(true);
 
         expect(rejected).toBe(1);
     });
 
-    it.fails('lists an NDB that comes into range after a rejected search (3-22, #95)', async () => {
+    it('lists an NDB that comes into range after a rejected search (3-22, #95)', async () => {
         const {listed} = await ndbListAfterAFirstSearch(true);
 
         expect(listed).toEqual(['NAA']);
@@ -425,9 +495,26 @@ describe('the nearest NDB list after a rejected search (#95)', () => {
 
     // The synchronous tickables show their errors on the error page (docs/architecture.md, Core 2); a failed search is
     // as much a failure of the unit
-    it.fails('shows a failed nearest search on the error page (#95)', async () => {
+    it('shows a failed nearest search on the error page (#95)', async () => {
         await ndbListAfterAFirstSearch(true);
 
         expect(document.querySelector('.errorpage')!.classList.contains('d-none')).toBe(false);
+    });
+
+    // The database rejects for a facility it cannot load (KLNFacilityLoader answers null for it); the search finds the
+    // NDB NBD, but loading it fails. The other NDB of the same search is listed. A code contract (characterization): the
+    // guide does not say what the unit does with a facility it cannot load.
+    it('lists the NDBs it can load when one of a search cannot be loaded (#95)', async () => {
+        const client = new MemoryFacilityClient([ndb('NAA', 47.05, 8.0), ndb('NBD', 47.0667, 8.0)]);
+        const getFacility = client.getFacility.bind(client);
+        client.getFacility = (type: FacilityType, icao: any) => {
+            if (typeof icao !== 'string' && icao.ident === 'NBD') return Promise.reject(new Error('facility cannot be loaded'));
+            return getFacility(type, icao);
+        };
+        const unit = await bootUnit({platform: {createFacilityClient: () => client as any}});
+
+        await vi.advanceTimersByTimeAsync(2 * NEAREST_SEARCH_WAIT_MS);
+
+        expect(unit.props.nearestLists.ndbNearestList.getNearestList().map(w => w.facility.icaoStruct.ident)).toEqual(['NAA']);
     });
 });

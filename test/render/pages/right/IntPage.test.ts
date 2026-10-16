@@ -43,10 +43,12 @@ async function refRow(unit: HeadlessUnit): Promise<string> {
     return rows[1];
 }
 
+/** INTA at 47.1 N 8.0 E, the intersection of the reference VOR tests */
+const inta = () => intersection('INTA', 47.1, 8.0);
+
 // 3-50: the INT page gives the position of the intersection as radial and distance from the closest VOR (NearestUtils
 // .getNearestVor). Only NAV 2 is said to leave terminal VORs out (3-8, 3-32).
 describe('INT page reference VOR (3-50)', () => {
-    const inta = () => intersection('INTA', 47.1, 8.0);
     const far = () => vor('FAR', 47.3, 8.0); // 12 NM from INTA, high altitude
 
     it('takes the closest VOR', async () => {
@@ -63,11 +65,49 @@ describe('INT page reference VOR (3-50)', () => {
 
     // A user VOR in the repository has the class and type the user waypoint loaders give it (Unknown, Unknown).
     // IntPage.tsx:221 computes the REF itself because the database field "does not respect user VORs".
-    it.fails('takes a closer user VOR (#206)', async () => {
+    it('takes a closer user VOR (#206)', async () => {
         const unit = await bootUnit({facilities: [inta(), far()], position: {lat: 47.0, lon: 8.0}});
         KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.12, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
 
         expect(await refRow(unit)).toBe('REF:  QQV  ');
+    });
+
+    // 3-50: the closest VOR. A user VOR added after the database VOR was found takes part, but the nearer one is the
+    // reference, not the one the nearest search reported last. NER is 3 NM and QQV 9 NM from INTA. Between the two REF
+    // calculations the page changes, so that the second one runs again.
+    it('takes a nearer database VOR over a user VOR added later (#206)', async () => {
+        const unit = await bootUnit({facilities: [inta(), vor('NER', 47.15, 8.0)], position: {lat: 47.0, lon: 8.0}});
+        expect(await refRow(unit)).toBe('REF:  NER  '); // precondition: the database VOR is found first
+        KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.25, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
+        await unit.panel.selectPage('R', 'VOR  ');
+
+        expect(await refRow(unit)).toBe('REF:  NER  ');
+    });
+
+    // The sibling of the test above: the same steps, the user VOR the nearer one
+    it('takes a nearer user VOR over a database VOR found earlier (#206)', async () => {
+        const unit = await bootUnit({facilities: [inta(), vor('NER', 47.25, 8.0)], position: {lat: 47.0, lon: 8.0}});
+        expect(await refRow(unit)).toBe('REF:  NER  '); // precondition
+        KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.15, 8.0, {region: 'XX', vorClass: VorClass.Unknown, type: VorType.Unknown}));
+        await unit.panel.selectPage('R', 'VOR  ');
+
+        expect(await refRow(unit)).toBe('REF:  QQV  ');
+    });
+});
+
+// The 90B guide gives no limit for the reference VOR. The KLN 89 trainer named the closest VOR up to 999.7 NM and showed
+// none from about 1000.7 NM (2026-10-16, one direction). 16.5 degrees of latitude are 990 NM, 17.0 are 1020 NM
+describe('INT page reference VOR distance (characterization; KLN 89 trainer 2026-10-16, #207)', () => {
+    it('takes a VOR 990 NM away', async () => {
+        const unit = await bootUnit({facilities: [inta(), vor('FAR', 63.6, 8.0)], position: {lat: 47.0, lon: 8.0}});
+
+        expect(await refRow(unit)).toBe('REF:  FAR  ');
+    });
+
+    it('takes no VOR 1020 NM away', async () => {
+        const unit = await bootUnit({facilities: [inta(), vor('FAR', 64.1, 8.0)], position: {lat: 47.0, lon: 8.0}});
+
+        expect(await refRow(unit)).toBe('REF:  _____');
     });
 });
 
@@ -527,7 +567,7 @@ describe('user intersection (5-18, 5-19)', () => {
     });
 });
 
-/** QQI with no VOR within the 100 NM of the reference search, so REF stays dashed; the cursor on RAD */
+/** QQI with no VOR within the 1000 NM of the reference search, so REF stays dashed; the cursor on RAD */
 async function withoutReference(): Promise<HeadlessUnit> {
     const unit = await bootUnit({
         storage: savedUserWaypoints([{kind: 'int', ident: 'QQI', lat: 47.1, lon: 11.0}]), position: {lat: 47, lon: 8},
