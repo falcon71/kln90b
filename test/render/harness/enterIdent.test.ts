@@ -98,9 +98,10 @@ describe('FrontPanel.enterIdent (harness)', () => {
             expect(Screen.read().rows('R')).toEqual([' ZZZZZ     ', '           ', 'CREATE NEW ', 'WPT AT:    ', 'USER POS?  ', 'PRES POS?  ']);
         });
 
-        // The fresh VOR page shows ABC SOUTH (the first of the two in the database), so its first character is an A, the
-        // second a B and the third a C already: no click is needed, and none would start a search for ABC. The search
-        // result for ABC is the first VOR of that ident in the list order, region K1.
+        // The fresh VOR page shows the first VOR of the list, ABC NORTH (K1). One scan clockwise (SCAN pulled, 3-21) shows the second
+        // of the two, ABC SOUTH (K2), so its first character is an A, the second a B and the third a C already: no click
+        // is needed, and none would start a search for ABC. The search result for ABC is the first VOR of that ident in
+        // the list order, region K1 (#105), so a search shows as the page changing back to ABC NORTH.
         it('runs the search when the selector already shows the typed characters', async () => {
             const unit = await bootUnit({
                 facilities: [
@@ -109,6 +110,9 @@ describe('FrontPanel.enterIdent (harness)', () => {
                 ],
             });
             await unit.panel.selectPage('R', 'VOR  ');
+            await unit.panel.scan();
+            await unit.panel.inner('R', 1);
+            await unit.panel.scan();
             await unit.panel.cursor('R');
             expect(Screen.read().rows('R').slice(0, 2)).toEqual([' ABC D     ', 'ABC SOUTH  ']);
 

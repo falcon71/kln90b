@@ -8,6 +8,11 @@ const CHARSET = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C'
 
 export const MAX_SCROLL_SPEED = TARGET_CACHE_SIZE / 4;
 
+//No ident is longer. A prefix of this length cannot be divided into longer prefixes
+const MAX_IDENT_LENGTH = 5;
+//The results asked for when the index looks for a first or last waypoint
+const INDEX_SEARCH_SIZE = 1000;
+
 export class Scanlists {
     public readonly aptScanlist: Scanlist;
     public readonly vorScanlist: Scanlist;
@@ -360,23 +365,53 @@ export class FacilityLoaderScanlist implements Scanlist {
         for (let i = 0; i < CHARSET.length; i++) {
             const res = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, CHARSET[i], 1);
             if (res.length > 0) {
-                this.index.push(res[0]);
+                //#105: with duplicate idents the search may return any of them. The index holds the first in list order
+                const sameIdent = await this.searchExactIdent(res[0].ident);
+                this.index.push(sameIdent.length > 0 ? sameIdent[0] : res[0]);
             }
         }
 
         //Now we just need to find the very last navaid
         if (this.index.length > 0) {
             const lastResult = this.index[this.index.length - 1];
-            const res = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, lastResult.ident.substring(0, 1), 1000);
-            const lastEntry = res[res.length - 1];
-            if (!ICAO.valueEquals(lastEntry, lastResult)) {
+            const lastEntry = await this.findLastInListOrder(lastResult.ident.substring(0, 1));
+            if (lastEntry !== null && !ICAO.valueEquals(lastEntry, lastResult)) {
                 this.index.push(lastEntry);
             }
         }
 
         this.log("index", this.index);
         return this.index;
+    }
 
+    /**
+     * The waypoints with exactly this ident, in list order
+     */
+    private async searchExactIdent(ident: string): Promise<IcaoValue[]> {
+        const results = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, ident, INDEX_SEARCH_SIZE);
+        return results.filter(icao => icao.ident === ident).sort(this.listSortFunction);
+    }
+
+    /**
+     * #105: the last waypoint in list order whose ident starts with the prefix. A search that returns INDEX_SEARCH_SIZE
+     * results may have been cut (whether the sim honors maxItems is not known), so the longest group is searched then,
+     * from the last character down.
+     */
+    private async findLastInListOrder(prefix: string): Promise<IcaoValue | null> {
+        const results = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, prefix, INDEX_SEARCH_SIZE);
+        if (results.length < INDEX_SEARCH_SIZE || prefix.length >= MAX_IDENT_LENGTH) {
+            const sorted = results.slice().sort(this.listSortFunction);
+            return sorted.length > 0 ? sorted[sorted.length - 1] : null;
+        }
+        for (let i = CHARSET.length - 1; i >= 0; i--) {
+            const last = await this.findLastInListOrder(prefix + CHARSET[i]);
+            if (last !== null) {
+                return last;
+            }
+        }
+        //No longer ident exists: the prefix is an ident of its own
+        const sameIdent = await this.searchExactIdent(prefix);
+        return sameIdent.length > 0 ? sameIdent[sameIdent.length - 1] : null;
     }
 
     /**

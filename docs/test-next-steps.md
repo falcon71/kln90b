@@ -203,8 +203,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       `ElevationEditor` has no sign, so a user airport below sea level cannot get its elevation; `VorFreqEditor` takes
       any 10 kHz step (113.13), while VOR channels are 50 kHz apart (the guide gives no rule); a user elevation is saved
       in whole meters, so a change of 1 ft is not observable.
-    - Selectors and fieldsets: `VorSelector` leaves out TACAN-only stations (2-1 and 2-2 name VORs only); for a
-      duplicated ident the VOR page reached by scanning and the selector can show different VORs (#105); the OBS taken
+    - Selectors and fieldsets: `VorSelector` leaves out TACAN-only stations (2-1 and 2-2 name VORs only); the OBS taken
       from the DTK keeps its fraction (089.46) while the field shows 089, and the CDI follows the fraction (5-35 is
       silent); the inches cell of `BaroFieldset` caps at 30.99 while millibars reach 1099; `OthFuelFieldset` shows a
       rounded value and rebuilds from one with a fraction; `SuperNav5RangeSelector` builds its index with `indexOf`, -1 for a stored

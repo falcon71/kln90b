@@ -276,11 +276,10 @@ describe('FacilityLoaderScanlist with duplicate idents (d3228dd)', () => {
         expect([first?.ident, first?.region]).toEqual(['ABC', 'K1']);
     });
 
-    // The index takes the first search result of each letter as it comes (rebuildIndex), while the cache sorts by
-    // ident and then by full ICAO. With the K2 VOR returned first, the start of the list is behind the K1 VOR that
-    // the sorted list starts with. The test database returns equal idents in insertion order; what the sim returns
-    // for equal idents is not known.
-    it.fails('starts at the first of two VORs with the same ident in list order (#105)', async () => {
+    // The index takes the first of the waypoints with the same ident in list order (the cache sorts by ident and then by
+    // full ICAO). The test database returns equal idents in insertion order, here the K2 VOR first; what the sim
+    // returns for equal idents is not known, which is why the index must not depend on it.
+    it('starts at the first of two VORs with the same ident in list order (#105)', async () => {
         const client = new MemoryFacilityClient([vor('ABC', 40, -100, {region: 'K2'}), vor('ABC', 47, 8, {region: 'K1'})]);
         const list = new FacilityLoaderScanlist(FacilitySearchType.Vor, client as unknown as FacilityClient, new EventBus());
         const first = await list.init();
@@ -294,6 +293,141 @@ async function scanlist(type: FacilitySearchType, facilities: Facility[], bus = 
     await managerJob(list);
     return list;
 }
+
+describe('FacilityLoaderScanlist index (#105)', () => {
+    // The top-speed jump goes to the index entries: the first waypoint of each character and the very last waypoint.
+    // With more waypoints of the last character than one search returns, the last one must still be found (#105).
+    it('jumps at top speed to the last waypoint of a character with more waypoints than one search returns (#105)', async () => {
+        const CH = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const facilities: Facility[] = [];
+        for (let i = 0; i < 1100; i++) {
+            // ZA000 to ZA0UJ: 1100 idents that sort before ZZZZZ
+            const ident = 'ZA' + CH[Math.floor(i / 1296) % 36] + CH[Math.floor(i / 36) % 36] + CH[i % 36];
+            facilities.push(intersection(ident, 47 + i * 0.0001, 8));
+        }
+        facilities.push(intersection('ZZZZZ', 46.9, 8));
+        const list = await scanlist(FacilitySearchType.Intersection, facilities);
+
+        const last = await list.getNext(ICAO.value('W', 'K1', '', 'ZA000'), MAX_SCROLL_SPEED);
+
+        expect(last?.ident).toBe('ZZZZZ');
+    });
+
+    // Characterizations of the index code (code contract, not a page of the Pilot's Guide).
+    /** The index entries as the list holds them. Reaches the private index: nothing public hands it out */
+    function indexOf(list: FacilityLoaderScanlist): string[] {
+        return (list as unknown as { index: IcaoValue[] }).index.map(icao => `${icao.ident}/${icao.region}`);
+    }
+
+    /** A client that answers every search with the given function and records the searches that ask for a full result */
+    function stubClient(answer: (ident: string, maxItems: number) => IcaoValue[]) {
+        const indexSearches: string[] = [];
+        const client = {
+            searchByIdentWithIcaoStructs: (_type: FacilitySearchType, ident: string, maxItems = 40): Promise<IcaoValue[]> => {
+                if (maxItems === 1000) indexSearches.push(ident);
+                return Promise.resolve(answer(ident, maxItems));
+            },
+        };
+        return {client: client as unknown as FacilityClient, indexSearches};
+    }
+
+    it('holds the first and the last of two VORs with the same last ident in list order', async () => {
+        // K2 is inserted before K1, so neither the first nor the last in insertion order is the answer
+        const list = await scanlist(FacilitySearchType.Vor, [
+            vor('ABC', 47, 8), vor('ZZZ', 40, -100, {region: 'K2'}), vor('ZZZ', 47, 8, {region: 'K1'}),
+        ]);
+
+        expect(indexOf(list)).toEqual(['ABC/K1', 'ZZZ/K1', 'ZZZ/K2']);
+    });
+
+    // A search that returned fewer results than asked for was not cut: no need to search the longer prefixes
+    it('finds the last waypoint with one search when that search was not cut', async () => {
+        const client = new MemoryFacilityClient([intersection('ZAAAA', 47, 8), intersection('ZBBBB', 47.1, 8), intersection('ZZZZZ', 47.2, 8)]);
+        const spy = vi.spyOn(client, 'searchByIdentWithIcaoStructs');
+
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Intersection, client as unknown as FacilityClient, new EventBus());
+        await list.init();
+
+        const full = spy.mock.calls.filter(call => call[2] === 1000).map(call => call[1]);
+        expect(full).toEqual(['ZAAAA', 'Z']);
+        expect(indexOf(list)).toEqual(['ZAAAA/K1', 'ZZZZZ/K1']);
+    });
+
+    // More waypoints share one ident than one search returns: the search for the full ident cannot be divided further
+    it('stops dividing at the longest ident and takes the last of the results', async () => {
+        const CH = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const facilities: Facility[] = [];
+        for (let i = 0; i < 1100; i++) {
+            facilities.push(intersection('ZZZZZ', 47 + i * 0.0001, 8, {region: CH[Math.floor(i / 36) % 36] + CH[i % 36]}));
+        }
+        const client = new MemoryFacilityClient(facilities);
+        const spy = vi.spyOn(client, 'searchByIdentWithIcaoStructs');
+
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Intersection, client as unknown as FacilityClient, new EventBus());
+        await list.init();
+
+        const full = spy.mock.calls.filter(call => call[2] === 1000).map(call => call[1]);
+        expect(full).toEqual(['ZZZZZ', 'Z', 'ZZ', 'ZZZ', 'ZZZZ', 'ZZZZZ']);
+        // The test database cuts the 1100 equal idents to the first 1000 inserted (regions 00 to RR); the last of those
+        expect(indexOf(list)[0]).toBe('ZZZZZ/00');
+        expect(indexOf(list)[1]).toBe('ZZZZZ/RR');
+    });
+
+    // The ident of the prefix itself is the last waypoint when no longer ident exists, even with a full search of them
+    it('finds the last of as many waypoints as one search returns that all have a one-character ident', async () => {
+        const CH = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const facilities: Facility[] = [];
+        for (let i = 0; i < 1000; i++) {
+            facilities.push(intersection('Z', 47 + i * 0.0001, 8, {region: CH[Math.floor(i / 36) % 36] + CH[i % 36]}));
+        }
+
+        const list = await scanlist(FacilitySearchType.Intersection, facilities);
+
+        expect(indexOf(list)).toEqual(['Z/00', 'Z/RR']);
+    });
+
+    it('takes the first result when the search for its exact ident finds nothing, and adds no last entry when the last search is empty', async () => {
+        const first = ICAO.value('W', 'K1', '', 'ZAAAA');
+        const {client} = stubClient((ident, maxItems) => (maxItems === 1 && ident === 'Z' ? [first] : []));
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Intersection, client, new EventBus());
+
+        await list.init();
+
+        expect(indexOf(list)).toEqual(['ZAAAA/K1']);
+        expect(await list.getNext(first, MAX_SCROLL_SPEED)).toBeNull();
+    });
+
+    it('ignores waypoints with a longer ident in the search for an exact ident', async () => {
+        const abc = ICAO.value('W', 'K1', '', 'ABC');
+        const abcd = ICAO.value('W', 'K1', '', 'ABCD');
+        const {client} = stubClient((ident, maxItems) => {
+            if (maxItems === 1 && ident === 'A') return [abc];
+            if (maxItems === 1000 && ident === 'ABC') return [abcd];
+            return [];
+        });
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Intersection, client, new EventBus());
+
+        await list.init();
+
+        expect(indexOf(list)).toEqual(['ABC/K1']);
+    });
+
+    it('adds no last entry when no waypoint of a divided search exists, not even one with the ident of the prefix', async () => {
+        const first = ICAO.value('W', 'K1', '', 'ZAAAA');
+        const cut: IcaoValue[] = [];
+        for (let i = 0; i < 1000; i++) cut.push(ICAO.value('W', 'K1', '', 'ZA' + String(100 + i)));
+        const {client} = stubClient((ident, maxItems) => {
+            if (maxItems === 1 && ident === 'Z') return [first];
+            if (maxItems === 1000 && ident === 'Z') return cut;
+            return [];
+        });
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Intersection, client, new EventBus());
+
+        await list.init();
+
+        expect(indexOf(list)).toEqual(['ZAAAA/K1']);
+    });
+});
 
 /**
  * One slow knob step as WaypointPage does it: getNext, then the page shows the waypoint and changeFacility syncs the
