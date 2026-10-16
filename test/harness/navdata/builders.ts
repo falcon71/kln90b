@@ -48,6 +48,8 @@ export interface AirportOptions {
     surface?: RunwaySurfaceType;
     name?: string;
     city?: string;
+    /** The facility's region (Facility.region, filled by the sim since SU2). Default K1 */
+    region?: string;
     /**
      * Zero or more runways. Absent: one runway from runwayHeading, runwayLengthFt and surface. An empty array is a
      * heliport (the nearest filters treat it specially, see MemoryFacilityClient).
@@ -87,7 +89,7 @@ export function airport(ident: string, lat: number, lon: number, opts: AirportOp
     // noinspection JSDeprecatedSymbols
     return {
         icao: ICAO.valueToStringV1(icaoStruct), icaoStruct, name: opts.name ?? `${ident} AIRPORT`, lat, lon,
-        region: DEFAULT_REGION, city: opts.city ?? '', magvar: 0, airportPrivateType: AirportPrivateType.Public,
+        region: opts.region ?? DEFAULT_REGION, city: opts.city ?? '', magvar: 0, airportPrivateType: AirportPrivateType.Public,
         fuel1: '', fuel2: '', bestApproach: '', radarCoverage: GpsBoolean.Unknown, airspaceType: 0,
         airportClass: opts.airportClass ?? derivedClass(runways),
         towered: opts.towered ?? false, frequencies: [], runways, departures: [], approaches: [], arrivals: [],
