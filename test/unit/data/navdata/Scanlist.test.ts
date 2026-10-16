@@ -19,11 +19,12 @@ function managerJob(list: FacilityLoaderScanlist): Promise<void> | null {
 /**
  * Sets the window the list keeps: the fields the background fill maintains, as a fill that was cancelled part way leaves
  * them. The state is set by hand; this is a characterization of that state, not a path the list takes by itself.
+ * validFrom: the first ident cached (null: nothing); validBelow: every ident below it is cached (null: to the end).
  */
-function setCacheWindow(list: FacilityLoaderScanlist, validFrom: string, validTo: string, icaos: IcaoValue[]): void {
-    const state = list as unknown as { cacheValidFromIdent: string; cacheValidToIdent: string; icaoListCache: IcaoValue[] };
+function setCacheWindow(list: FacilityLoaderScanlist, validFrom: string | null, validBelow: string | null, icaos: IcaoValue[]): void {
+    const state = list as unknown as { cacheValidFromIdent: string | null; cacheValidBelowIdent: string | null; icaoListCache: IcaoValue[] };
     state.cacheValidFromIdent = validFrom;
-    state.cacheValidToIdent = validTo;
+    state.cacheValidBelowIdent = validBelow;
     state.icaoListCache = icaos;
 }
 
@@ -159,7 +160,9 @@ describe('FacilityLoaderScanlist background jobs', () => {
 
     // Two jobs that overlap. The first search of the first job is answered after the second job has started: the first job
     // must stop there and not search any further. A random id would give both jobs the same id once in ten thousand times;
-    // the stub makes it happen every time.
+    // the stub makes it happen every time. The list is longer than one refill, and both jobs start from cached waypoints
+    // near the end of the window: the half towards the beginning has nothing to search, so the jobs wait in the half
+    // towards the end.
     it.each([
         ['a job id that is a fresh number each time', undefined],
         ['the random generator returning the same number twice', 0.5],
@@ -168,14 +171,15 @@ describe('FacilityLoaderScanlist background jobs', () => {
             vi.spyOn(Math, 'random').mockReturnValue(random);
         }
         try {
-            const client = new GatedClient([airport('KAAA', 47, 8), airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8)]);
+            const all = idents('A', 700);
+            const client = new GatedClient(all.map((ident, i) => airport(ident, 47 + i * 0.0001, 8)));
             const list = await filledList(client);
             client.gateClosed = true;
             client.searched.length = 0;
 
-            list.sync(ICAO.value('A', '', '', 'KAAB'));
+            list.sync(ICAO.value('A', '', '', all[200]));
             expect(client.waiting).toHaveLength(1); // The first job waits for its first search
-            list.sync(ICAO.value('A', '', '', 'KAAC'));
+            list.sync(ICAO.value('A', '', '', all[201]));
             expect(client.waiting).toHaveLength(2); // The second job waits for its first search
             const searchedByBoth = client.searched.length;
 
@@ -212,8 +216,9 @@ describe('FacilityLoaderScanlist background jobs', () => {
         const client = new GatedClient([airport('KAAA', 47, 8), airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8)]);
         const list = await filledList(client);
         client.gateClosed = true;
-        list.sync(ICAO.value('A', '', '', 'KAAB'));
-        list.sync(ICAO.value('A', '', '', 'KAAC'));
+        // KAAD and KAAE are not cached: both jobs throw the cache away and search
+        list.sync(ICAO.value('A', '', '', 'KAAD'));
+        list.sync(ICAO.value('A', '', '', 'KAAE'));
         const newest = managerJob(list)!;
 
         client.gateClosed = false;
@@ -507,7 +512,7 @@ describe('FacilityLoaderScanlist across the edge of its cache window (#40 8abd5f
     const world = () => [...idents('A', 650), ...idents('B', 10)];
     const facilities = (list: string[]) => list.map((ident, i) => intersection(ident, 47 + i * 0.0001, 8));
 
-    it.fails('shows every intersection once scanning clockwise from the first (#201)', async () => {
+    it('shows every intersection once scanning clockwise from the first (#201)', async () => {
         const all = world();
         const list = await scanlist(FacilitySearchType.Intersection, facilities(all));
 
@@ -516,7 +521,7 @@ describe('FacilityLoaderScanlist across the edge of its cache window (#40 8abd5f
         expect(shown).toEqual(all);
     });
 
-    it.fails('shows every intersection once scanning counterclockwise from the last (#201)', async () => {
+    it('shows every intersection once scanning counterclockwise from the last (#201)', async () => {
         const all = world();
         const list = await scanlist(FacilitySearchType.Intersection, facilities(all));
 
@@ -525,7 +530,7 @@ describe('FacilityLoaderScanlist across the edge of its cache window (#40 8abd5f
         expect(shown).toEqual(all.slice().reverse());
     });
 
-    // The pins above are about the window: a list that fits one refill (600 idents, two groups of 300) scans completely
+    // The tests above are about the window: a list that fits one refill (600 idents, two groups of 300) scans completely
     it('shows every intersection of a list that fits one refill, in both directions', async () => {
         const all = [...idents('A', 300), ...idents('B', 300)];
         const list = await scanlist(FacilitySearchType.Intersection, facilities(all));
@@ -534,6 +539,180 @@ describe('FacilityLoaderScanlist across the edge of its cache window (#40 8abd5f
         const counterclockwise = await scanToEnd(list, ICAO.value('W', 'K1', '', all[all.length - 1]), -1, 1000);
 
         expect([clockwise, counterclockwise]).toEqual([all, all.slice().reverse()]);
+    });
+});
+
+// 3-21: scanning slowly shows the waypoints one at a time in alphabetical order. Here more idents start with AB than
+// one search of the scan list asks for, so the search for the prefix AB may have been cut (whether the sim honors
+// maxItems is not known; the test database honors it and keeps the first idents). The list is the 3-21 order; the cut
+// is a characterization of the database (#201).
+describe('FacilityLoaderScanlist with a prefix whose search may be cut (#201)', () => {
+    const CH = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    // AA, AAZZZ, the ident AB itself, then AB00 to ABJ7 (700 idents), ABZ0 to ABZ9 under the last longer prefix, then AC:
+    // in this order
+    const all = () => ['AA', 'AAZZZ', 'AB', ...Array.from({length: 700}, (_, i) => 'AB' + CH[Math.floor(i / 36)] + CH[i % 36]),
+        ...Array.from({length: 10}, (_, i) => 'ABZ' + CH[i]), 'AC'];
+    const facilities = (list: string[]) => list.map((ident, i) => intersection(ident, 47 + i * 0.0001, 8));
+
+    // After a change the refill starts at AB, and its own search for the prefix AB is cut: the refill searches the
+    // longer prefixes ABZ down to AB0, which all come after AB. They do not count as waypoints before AB, so the refill
+    // goes on to AB itself and to AA.
+    it('steps counterclockwise from AB to AAZZZ after a user waypoint change', async () => {
+        const bus = new EventBus();
+        const list = await scanlist(FacilitySearchType.Intersection, facilities(all()), bus);
+        const ab = ICAO.value('W', 'K1', '', 'AB');
+        list.sync(ab);
+        await managerJob(list);
+        bus.getPublisher<any>().pub(KLNFacilityRepository.SYNC_TOPIC, undefined); // what the repository publishes on a change
+        await managerJob(list);
+
+        const first = await step(list, ab, -1);
+        const second = first === null ? null : await step(list, first, -1);
+        expect([first?.ident, second?.ident]).toEqual(['AAZZZ', 'AA']);
+    });
+
+    // Going towards the end, the cut search for AB keeps the ident AB itself, then the longer prefixes are searched
+    it('shows every intersection once scanning clockwise from the first', async () => {
+        const list = await scanlist(FacilitySearchType.Intersection, facilities(all()));
+
+        expect(await scanToEnd(list, ICAO.value('W', 'K1', '', 'AA'), 1, 1000)).toEqual(all());
+    });
+
+    // Going towards the beginning from AC, the cut search for AB is followed by its longer prefixes from the last one,
+    // ABZ, down to AB0: the scan needs the last idents of AB first
+    it('shows every intersection once scanning counterclockwise from the last', async () => {
+        const list = await scanlist(FacilitySearchType.Intersection, facilities(all()));
+
+        expect(await scanToEnd(list, ICAO.value('W', 'K1', '', 'AC'), -1, 1000)).toEqual(all().reverse());
+    });
+});
+
+// 3-21: every waypoint is shown, two waypoints with the same ident included (d3228dd). The cache drops the waypoints
+// furthest away from the one shown, half the cache (750) away; the cut must not part two waypoints with one ident. The
+// two here have the short ident AB (or AC) ahead of 760 longer idents AB000 to AB0L3: the refill searches AB (or AC) as
+// one of its steps, and a bound that says AB is cached would keep the dropped one away. The scans stop right after the
+// step whose refill drops the first of the two: one step more, and the cache drops the second one too. The order of the
+// two (K1 before K2) is the code's own, as in the duplicate idents tests above. The last test starts from the state a
+// drop leaves inside the longer idents of the waypoint shown, set by hand.
+describe('FacilityLoaderScanlist dropping a part of its cache (#201)', () => {
+    const CH = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const longer = Array.from({length: 760}, (_, i) => 'AB0' + CH[Math.floor(i / 36)] + CH[i % 36]);
+    const facilities = (list: string[]) => list.map((ident, i) => intersection(ident, 47 + i * 0.0001, 8));
+    const second = (ident: string) => intersection(ident, 40, -100, {region: 'K2'});
+
+    // The list is AB (K1), AB (K2), then the longer idents. 751 steps clockwise end on longer[749], with 751 waypoints
+    // before it in the cache. Then all the way back to the start
+    it('shows both waypoints with the first ident after scanning clockwise far and back', async () => {
+        const list = await scanlist(FacilitySearchType.Intersection, [...facilities(['AB', ...longer]), second('AB')]);
+
+        const clockwise = await scanToEnd(list, ICAO.value('W', 'K1', '', 'AB'), 1, 751);
+        const back = await scanToEnd(list, ICAO.value('W', 'K1', '', longer[749]), -1, 1000);
+
+        expect(clockwise.slice(0, 3)).toEqual(['AB', 'AB', longer[0]]);
+        expect(back).toEqual([longer[749], ...clockwise.slice().reverse()]);
+    });
+
+    // The list is the longer idents, then AC (K1), AC (K2). 750 steps counterclockwise end on longer[11], with 751
+    // waypoints from it to the end in the cache. Then all the way forward to the end
+    it('shows both waypoints with the last ident after scanning counterclockwise far and back', async () => {
+        const list = await scanlist(FacilitySearchType.Intersection, [...facilities([...longer, 'AC']), second('AC')]);
+
+        const counterclockwise = await scanToEnd(list, ICAO.value('W', 'K2', '', 'AC'), -1, 750);
+        const forward = await scanToEnd(list, ICAO.value('W', 'K1', '', longer[11]), 1, 1000);
+
+        expect(counterclockwise.slice(0, 3)).toEqual(['AC', 'AC', longer[longer.length - 1]]);
+        expect(forward).toEqual([longer[11], ...counterclockwise.slice().reverse()]);
+    });
+
+    // The cache dropped its end inside the longer idents of the waypoint shown, AB: AB10 to AB13 are gone, and the bound
+    // says every ident below AB10 is cached. The refill towards the end starts with the prefix AB itself. The state is
+    // the one the drop leaves, set by hand (characterization); the list shows every waypoint (3-21).
+    it('shows the longer idents of the waypoint shown that the cache dropped', async () => {
+        const all = ['AA', 'AB', ...Array.from({length: 40}, (_, i) => 'AB' + CH[Math.floor(i / 36)] + CH[i % 36]), 'AC'];
+        const list = await scanlist(FacilitySearchType.Intersection, facilities(all));
+        setCacheWindow(list, 'AA', 'AB10', all.slice(0, all.indexOf('AB10')).map(ident => ICAO.value('W', 'K1', '', ident)));
+
+        expect(await scanToEnd(list, ICAO.value('W', 'K1', '', 'AB'), 1, 1000)).toEqual(all.slice(1));
+    });
+});
+
+// 3-21: scanning slowly shows the next waypoint in alphabetical order. One job of the cache may both extend it towards the
+// beginning (or drop waypoints there) and drop waypoints towards the end, half the cache (750) after the waypoint shown.
+// Both changes towards the beginning move the waypoint shown in the cache, and the drop towards the end must count from
+// where it is then. The sizes in the comments are what the test database gives (characterization); the tests assert the
+// order only.
+describe('FacilityLoaderScanlist changing both ends of its cache in one job (#201)', () => {
+    const CH = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const group = (prefix: string, n: number) => Array.from({length: n}, (_, i) => prefix + CH[Math.floor(i / 1296) % 36] + CH[Math.floor(i / 36) % 36] + CH[i % 36]);
+    const facilities = (list: string[]) => list.map((ident, i) => intersection(ident, 47 + i * 0.0001, 8));
+
+    // One refill can overshoot its size by up to one search: the refill after the sync to M0000 leaves 1100 waypoints
+    // before it and 1001 after it. The next job drops waypoints at both ends
+    it('keeps scanning when one job drops waypoints at both ends of the cache', async () => {
+        const all = ['AAAAA', ...group('LY', 550), ...group('LZ', 550), 'M0000', ...group('M1', 500), ...group('M2', 500), 'ZZZZZ'];
+        const list = await scanlist(FacilitySearchType.Intersection, facilities(all));
+        const m0000 = ICAO.value('W', 'K1', '', 'M0000');
+        list.sync(m0000);
+        await managerJob(list);
+
+        const first = await list.getNext(m0000, 1);
+        const second = first === null ? null : await list.getNext(first, 1);
+        await managerJob(list);
+
+        expect([first?.ident, second?.ident]).toEqual(['M1000', 'M1001']);
+    });
+
+    // The top-speed jump goes to M0000, the index entry of M, 30 waypoints into a cache of 1255 around m1[590]. Its job
+    // extends the cache towards the beginning by 1060 waypoints and drops waypoints towards the end in the same run
+    it('steps clockwise from a top-speed jump whose job extends the cache towards the beginning and drops its end', async () => {
+        const m1 = group('M1', 1300);
+        const all = ['AAAAA', ...group('LX', 500), ...group('LY', 560), ...group('LZ', 30), 'M0000', ...m1, 'ZZZZZ'];
+        const list = await scanlist(FacilitySearchType.Intersection, facilities(all));
+        const from = ICAO.value('W', 'K1', '', m1[590]);
+        list.sync(from);
+        await managerJob(list);
+
+        const jump = await list.getNext(from, -MAX_SCROLL_SPEED);
+        await managerJob(list);
+        const next = jump === null ? null : await list.getNext(jump, 1);
+
+        expect([jump?.ident, next?.ident]).toEqual(['M0000', 'M1000']);
+    });
+});
+
+// Characterizations of the searches that fill the cache (code contract, not a page of the Pilot's Guide)
+describe('FacilityLoaderScanlist searches (characterization, #201)', () => {
+    // The whole list is cached once a fill has reached its end: a job for a cached waypoint searches nothing
+    it('searches nothing for a cached waypoint once the whole list is cached', async () => {
+        const client = new GatedClient([airport('KAAA', 47, 8), airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8)]);
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, client as unknown as FacilityClient, new EventBus());
+        await list.init();
+        await managerJob(list);
+        client.searched.length = 0;
+
+        list.sync(ICAO.value('A', '', '', 'KAAB'));
+        await managerJob(list);
+
+        expect(client.searched).toEqual([]);
+    });
+
+    // A five-character ident cannot be divided: a full search for it is not taken as cut. Here 600 intersections share
+    // one ident, as many as a search of the scan list asks for. The first fill searches AAAAA in both halves
+    it('divides no search of a five-character ident', async () => {
+        const CH = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const facilities: Facility[] = [];
+        for (let i = 0; i < 600; i++) {
+            facilities.push(intersection('AAAAA', 47 + i * 0.0001, 8, {region: CH[Math.floor(i / 36)] + CH[i % 36]}));
+        }
+        facilities.push(intersection('AAAAB', 46, 8));
+        const client = new GatedClient(facilities);
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Intersection, client as unknown as FacilityClient, new EventBus());
+        await list.init();
+        await managerJob(list);
+
+        expect(client.searched.filter(ident => ident.length > 5)).toEqual([]);
+        // The last of the 600 in list order: region GN (G = 16, N = 23; 16 * 36 + 23 = 599)
+        expect((await list.getNext(ICAO.value('W', 'K1', '', 'AAAAB'), -1))?.region).toBe('GN');
     });
 });
 
@@ -588,7 +767,8 @@ describe('FacilityLoaderScanlist after a user waypoint change', () => {
     });
 
     // #203, the refill that meets the shorter ident after a longer prefix: the state is the one a refill leaves when it is
-    // cancelled right after its search for AB0 (valid from AB0, with AB0, ABC and ABD cached). The refill then passes
+    // canceled right after its search for AB0 (valid from AB0 and below ABE, the search after ABD, with AB0, ABC and
+    // ABD cached). The refill then passes
     // ABC and AB0 on its way down, and reaches the exact AB. The search for AB must not bring ABC, ABD and AB0 back a
     // second time. The state is set by hand (characterization); the list shows each waypoint once (3-21).
     it('shows each waypoint once when the refill from AB0 reaches the shorter ident AB (#203)', async () => {
@@ -596,7 +776,7 @@ describe('FacilityLoaderScanlist after a user waypoint change', () => {
         const list = new FacilityLoaderScanlist(FacilitySearchType.Ndb, copyingClient([ndb('AA', 47, 8), ndb('AB', 47, 8.1), ndb('AB0', 47, 8.2), ndb('ABC', 47, 8.3), ndb('ABD', 47, 8.4)]), bus);
         await list.init();
         await managerJob(list);
-        setCacheWindow(list, 'AB0', 'ABD', [ICAO.value('N', 'K1', '', 'AB0'), ICAO.value('N', 'K1', '', 'ABC'), ICAO.value('N', 'K1', '', 'ABD')]);
+        setCacheWindow(list, 'AB0', 'ABE', [ICAO.value('N', 'K1', '', 'AB0'), ICAO.value('N', 'K1', '', 'ABC'), ICAO.value('N', 'K1', '', 'ABD')]);
         const abd = ICAO.value('N', 'K1', '', 'ABD');
         list.sync(abd);
         await managerJob(list);
@@ -611,7 +791,7 @@ describe('FacilityLoaderScanlist after a user waypoint change', () => {
         const list = new FacilityLoaderScanlist(FacilitySearchType.Ndb, copyingClient([ndb('AA', 47, 8), ndb('AB', 47, 8.1), ndb('ABC', 47, 8.2), ndb('ABD', 47, 8.3)]), bus);
         await list.init();
         await managerJob(list);
-        setCacheWindow(list, 'ZZZZ', '0', []);
+        setCacheWindow(list, null, '0', []);
         const ab = ICAO.value('N', 'K1', '', 'AB');
 
         expect(await scanToEnd(list, ab, 1, 10)).toEqual(['AB', 'ABC', 'ABD']);
@@ -625,6 +805,23 @@ describe('FacilityLoaderScanlist after a user waypoint change', () => {
         await managerJob(list);
 
         expect((await step(list, abc, -1))?.ident).toBe('AB');
+    });
+});
+
+// 3-21: scanning visits every waypoint, also those with idents from ZZZZ on. After a user waypoint change the list
+// throws its cache away and refills it around the waypoint shown; the emptied cache must not claim any ident as
+// cached (#201: the old "ZZZZ" sentinel did, and the refill skipped every ident from ZZZZ on).
+describe('FacilityLoaderScanlist idents after ZZZZ (#201)', () => {
+    it('steps counterclockwise from ZZZZB to ZZZZA after a user waypoint change', async () => {
+        const bus = new EventBus();
+        const list = await scanlist(FacilitySearchType.Intersection, [intersection('AAAAA', 47, 8), intersection('ZZZZA', 47.1, 8), intersection('ZZZZB', 47.2, 8)], bus);
+        const zzzzb = ICAO.value('W', 'K1', '', 'ZZZZB');
+        list.sync(zzzzb);
+        await managerJob(list);
+        bus.getPublisher<any>().pub(KLNFacilityRepository.SYNC_TOPIC, undefined); // what the repository publishes on a change
+        await managerJob(list);
+
+        expect((await list.getNext(zzzzb, -1))?.ident).toBe('ZZZZA');
     });
 });
 

@@ -12,6 +12,9 @@ export const MAX_SCROLL_SPEED = TARGET_CACHE_SIZE / 4;
 const MAX_IDENT_LENGTH = 5;
 //The results asked for when the index looks for a first or last waypoint
 const INDEX_SEARCH_SIZE = 1000;
+//The number of results asked for in each search that fills the cache. Whether the sim honors maxItems is not known: a
+//search that returns this many or more may have been cut, so its prefix is not taken as complete (#201)
+const SEARCH_SIZE = TARGET_CACHE_SIZE / 2 + 100;
 
 export class Scanlists {
     public readonly aptScanlist: Scanlist;
@@ -81,10 +84,11 @@ export class FacilityLoaderScanlist implements Scanlist {
     //The last icao the pilot viewed. This should be the center of the moving cache window
     private lastIcao: IcaoValue = ICAO.emptyValue();
 
-    //The first icao our cache currently encompasses. Might be smaller than the first value. We may have checked '0', but the first used icao can be '1'
-    private cacheValidFromIdent = "ZZZZ";
-    //The last icao our cache currently encompasses.
-    private cacheValidToIdent = "0";
+    //#201: the first ident the cache encompasses; every ident from it up to the current waypoint is cached. null: nothing.
+    //Might be smaller than the first value. We may have checked '0', but the first used icao can be '1'
+    private cacheValidFromIdent: string | null = null;
+    //#201: every ident below this one, down to cacheValidFromIdent, is in the cache. null: up to the end of the list
+    private cacheValidBelowIdent: string | null = "0";
 
     private readonly loggingEnabled: boolean = false;
 
@@ -214,7 +218,7 @@ export class FacilityLoaderScanlist implements Scanlist {
         let sizeAfterCurrent = 0;
 
         const listIndex = this.indexOfIcaoInCache(lastIcao);
-        this.log(`${this.facilitySearchType}: Cache size: ${this.icaoListCache.length} ${this.cacheValidFromIdent}-${this.cacheValidToIdent}, lastIcao: ${lastIcao}, index: ${listIndex}`);
+        this.log(`${this.facilitySearchType}: Cache size: ${this.icaoListCache.length} ${this.cacheValidFromIdent}-${this.cacheValidBelowIdent}, lastIcao: ${lastIcao}, index: ${listIndex}`);
 
         if (listIndex == -1) {
             //Happens with sync. We jumped to a random waypoint not in our list, now we need to throw everything away
@@ -235,71 +239,122 @@ export class FacilityLoaderScanlist implements Scanlist {
                 if (ident === null || ident === "") { //End of the list
                     break;
                 }
-                if (this.cacheValidFromIdent.localeCompare(ident) <= 0) {
+                if (this.cacheValidFromIdent !== null && this.cacheValidFromIdent.localeCompare(ident) <= 0) {
                     [ident, exact] = this.getPreviousSearch(ident);
                     continue;
                 }
                 this.log(`${this.facilitySearchType} : Searching for ${ident}`);
-                const sizeBefore = this.icaoListCache.length;
-                const results = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, ident, targetSizeForExtension - sizeBeforeCurrent);
+                const results = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, ident, SEARCH_SIZE);
                 if (jobId !== this.lastManangerJobId) {
                     //Happens, when we use the index, that one does not wait for this job to finish
                     this.log(`${this.facilitySearchType}: filling of list canceled`);
                     return;
                 }
+                //An exact ident is not divided any further. Its search is a prefix search too: when the sim cuts it, the
+                //waypoints of the exact ident stay only if the sim keeps the first idents in list order (the shorter
+                //ident sorts first). Which ones the sim keeps is not known; that case is not covered
+                if (!exact && this.mayBeCut(results, ident)) {
+                    //#201: the scan needs the last idents of this prefix. Search its longer prefixes, from the last one
+                    ident = ident + CHARSET[CHARSET.length - 1];
+                    continue;
+                }
                 this.cacheValidFromIdent = ident;
                 const exactIdent: string = ident;
                 this.icaoListCache = this.addResultToCache(exact ? results.filter(icao => icao.ident === exactIdent) : results);
-                sizeBeforeCurrent += this.icaoListCache.length - sizeBefore;
+                //#201: only the waypoints before the current one count. The search of the current ident's own prefix
+                //finds the longer idents after it too, and so do all of its longer prefixes when that search was cut
+                sizeBeforeCurrent = this.countBefore(lastIcao);
                 [ident, exact] = this.getPreviousSearch(ident);
             }
 
         } else if (sizeBeforeCurrent > MAXIMUM_CACHE_SIZE / 2) {
             this.log(`${this.facilitySearchType}: Size towards beginning: ${sizeBeforeCurrent}, Pruning beginning of cache`);
-            this.icaoListCache = this.icaoListCache.slice(sizeBeforeCurrent - MAXIMUM_CACHE_SIZE / 2, this.icaoListCache.length - 1);
+            //#201: the cut falls between two idents, so that every waypoint of the first ident kept stays. The last entry
+            //stays too. With more waypoints of one ident before the current one than half the cache holds, the cut falls
+            //inside that ident at the current waypoint (not covered; no ident is that common)
+            let start = sizeBeforeCurrent - MAXIMUM_CACHE_SIZE / 2;
+            while (start < listIndex && this.icaoListCache[start].ident === this.icaoListCache[start - 1].ident) {
+                start++;
+            }
+            this.icaoListCache = this.icaoListCache.slice(start);
             this.cacheValidFromIdent = this.icaoListCache[0].ident;
         }
 
         if (sizeAfterCurrent < TARGET_CACHE_SIZE / 2) {
             this.log(`${this.facilitySearchType}: Size towards end: ${sizeAfterCurrent}, extending cache towards end`);
+            //#201: the walk starts with the prefix of the current ident itself, whose longer idents may be missing after a prune
             let ident: string | null = lastIcao.ident;
             while (sizeAfterCurrent < targetSizeForExtension) {
-                ident = this.getNextIdentForSearch(ident!, 1);
                 if (ident === null) { //End of the list
                     break;
                 }
-                if (this.cacheValidToIdent.localeCompare(ident) >= 0) {
+                const upperIdent: string | null = this.getNextIdentForSearch(ident, 1);
+                if (this.cacheValidBelowIdent === null || (upperIdent !== null && upperIdent.localeCompare(this.cacheValidBelowIdent) <= 0)) {
+                    ident = upperIdent;
                     continue;
                 }
                 this.log(`${this.facilitySearchType} : Searching for ${ident}`);
                 const sizeBefore = this.icaoListCache.length;
-                const results = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, ident, targetSizeForExtension - sizeAfterCurrent);
+                const results = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, ident, SEARCH_SIZE);
                 if (jobId !== this.lastManangerJobId) {
                     //Happens, when we use the index, that one does not wait for this job to finish
                     this.log(`${this.facilitySearchType}: filling of list canceled`);
                     return;
                 }
-                this.cacheValidToIdent = ident;
+                if (this.mayBeCut(results, ident)) {
+                    //#201: take this ident itself, then search its longer prefixes, from the first one. The ident sorts
+                    //first in its prefix; it is in a cut result only if the sim keeps the first idents in list order
+                    //(not known; as with the exact ident towards the beginning, the other case is not covered)
+                    const prefix: string = ident;
+                    this.icaoListCache = this.addResultToCache(results.filter(icao => icao.ident === prefix));
+                    sizeAfterCurrent += this.icaoListCache.length - sizeBefore;
+                    //The bound stays: it lies below this prefix or inside it, and is true either way. Lowering it to the
+                    //first longer prefix would search cached idents again
+                    ident = prefix + CHARSET[0];
+                    continue;
+                }
                 this.icaoListCache = this.addResultToCache(results);
                 sizeAfterCurrent += this.icaoListCache.length - sizeBefore;
-                if (this.icaoListCache.length > 0) {
-                    this.cacheValidToIdent = this.icaoListCache[this.icaoListCache.length - 1].ident;
-                }
+                this.cacheValidBelowIdent = upperIdent;
+                ident = upperIdent;
             }
         } else if (sizeAfterCurrent > MAXIMUM_CACHE_SIZE / 2) {
             this.log(`${this.facilitySearchType}: Size towards end: ${sizeAfterCurrent}, pruning end of cache`);
-            this.icaoListCache = this.icaoListCache.slice(0, listIndex + MAXIMUM_CACHE_SIZE / 2);
-            this.cacheValidToIdent = this.icaoListCache[this.icaoListCache.length - 1].ident;
+            //#201: the bound is the first ident dropped, and it excludes that ident. When the cut falls inside the
+            //waypoints of one ident, the ident is not taken as cached, and the next refill searches it again.
+            //The half towards the beginning may have moved the current waypoint (a prune drops entries before it, an
+            //extension adds some), so its position is read again. Nothing after it was dropped, so more than half the cache
+            //still follows it and the first entry dropped exists
+            const end = this.countBefore(lastIcao) + MAXIMUM_CACHE_SIZE / 2;
+            this.cacheValidBelowIdent = this.icaoListCache[end].ident;
+            this.icaoListCache = this.icaoListCache.slice(0, end);
         }
-        this.log(`${this.facilitySearchType}: "Listmanager done ${this.cacheValidFromIdent}-${this.cacheValidToIdent}`, this.icaoListCache);
+        this.log(`${this.facilitySearchType}: "Listmanager done ${this.cacheValidFromIdent}-${this.cacheValidBelowIdent}`, this.icaoListCache);
         this.listManangerJob = null;
     }
 
     private invalidateCache() {
         //Happens with sync. We jumped to a random waypoint not in our list, now we need to throw everything away
-        this.cacheValidFromIdent = "ZZZZ";
-        this.cacheValidToIdent = "0";
+        this.cacheValidFromIdent = null;
+        this.cacheValidBelowIdent = "0";
         this.icaoListCache = [];
+    }
+
+    /**
+     * #201: the number of cached waypoints that come before the waypoint in list order, whether it is cached or not
+     */
+    private countBefore(icao: IcaoValue): number {
+        let start = 0;
+        let end = this.icaoListCache.length;
+        while (start < end) {
+            const mid = Math.floor((start + end) / 2);
+            if (this.listSortFunction(this.icaoListCache[mid], icao) < 0) {
+                start = mid + 1;
+            } else {
+                end = mid;
+            }
+        }
+        return start;
     }
 
     /**
@@ -349,9 +404,23 @@ export class FacilityLoaderScanlist implements Scanlist {
         return this.cleanupCache(cache);
     }
 
+    /**
+     * #201: a search that returned SEARCH_SIZE results or more may have been cut at maxItems, unless its prefix cannot be
+     * divided any further
+     */
+    private mayBeCut(results: IcaoValue[], prefix: string): boolean {
+        return results.length >= SEARCH_SIZE && prefix.length < MAX_IDENT_LENGTH;
+    }
+
     private cleanupCache(cache: IcaoValue[]): IcaoValue[] {
-        cache = [...new Set(cache)];
-        return cache.sort(this.listSortFunction);
+        //#201: a prefix may be searched again. The sim returns new objects each time, so equal ICAOs are found by their uid
+        const byUid = new Map<string, IcaoValue>();
+        for (const icao of cache) {
+            byUid.set(ICAO.getUid(icao), icao);
+        }
+        const unique: IcaoValue[] = [];
+        byUid.forEach(icao => unique.push(icao));
+        return unique.sort(this.listSortFunction);
     }
 
     private listSortFunction(aIcao: IcaoValue, bIcao: IcaoValue): number {
