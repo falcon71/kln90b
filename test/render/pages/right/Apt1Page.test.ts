@@ -62,7 +62,7 @@ describe('APT 1 page on a nearest entry', () => {
     }
 
     // 3-24: with the cursor off, the airport stays displayed and its nr changes with the aircraft's position. (The case
-    // with the cursor parked on nr 1 is another one; its pin is in "APT 1 page with the cursor on the nearest rank".)
+    // with the cursor parked on nr 1 is another one; its test is in "APT 1 page with the cursor on the nearest rank".)
     it('follows the aircraft with the nr of the shown airport (3-24, d202f4a)', async () => {
         const unit = await bootAtNearest();
 
@@ -465,23 +465,112 @@ describe('APT 1 page with the cursor on the nearest rank', () => {
         return unit;
     }
 
-    // 3-24, the sibling of the pin: the cursor stays on the rank, and the unit's nearest list has KCCC first, so the pin
-    // fails on the page only
+    // 3-24, the sibling of the test below: the cursor stays on the rank, and the unit's nearest list has KCCC first, so
+    // the test below fails on the page only
     it('keeps the cursor on the rank while the nearest list changes (3-24)', async () => {
         const unit = await parkOnNr1ThenMove();
 
-        expect(unit.panel.focused('R').text).toMatch(/^nr [12]$/);
+        expect(unit.panel.focused('R').text).toBe('nr 1');
         expect(unit.props.nearestLists.aptNearestList.getNearestList().map(w => w.facility.icaoStruct.ident)).toEqual(['KCCC', 'KBBB']);
     });
 
     // 3-24: as long as the cursor stays parked on NR 1, the page keeps showing the nearest airport as the flight goes
     // on. Checked in the KLN 89 trainer (2026-10-07): the page switched to the new nearest airport at rank 1 and kept
-    // tracking it. Only the parked cursor is the bug: with the cursor off, the shown airport stays and its rank counts
-    // up (the spec test of "APT 1 page on a nearest entry").
-    it.fails('follows the nearest airport while the cursor is parked on nr 1 (3-24, KLN 89 trainer, #268)', async () => {
+    // tracking it. With the cursor off, the shown airport stays and its rank counts up (the spec test of "APT 1 page on
+    // a nearest entry").
+    it('follows the nearest airport while the cursor is parked on nr 1 (3-24, KLN 89 trainer, #268)', async () => {
         const unit = await parkOnNr1ThenMove();
 
         expect(Screen.read().rows('R')[0]).toBe(' KCCC  nr 1');
+    });
+
+    describe('the parked rank (characterization: neither 3-24 nor the KLN 89 trainer show these cases, #268)', () => {
+        const kbbb = airport('KBBB', 47.2, 12.0);
+        const kccc = airport('KCCC', 47.6, 12.0);
+        const kddd = airport('KDDD', 48.0, 12.0);
+        // 600 NM and more from the aircraft at the start, the only airport within the search radius at 57.0
+        const kzzz = airport('KZZZ', 57.1, 12.0);
+
+        /** KBBB is the nearest at the start and the cursor is parked on nr 1 for some display ticks, so the page holds the rank */
+        async function parkOnNr1(facilities: AirportFacility[]): Promise<HeadlessUnit> {
+            const unit = await bootUnit({facilities, position: {lat: 47.19, lon: 12.0}});
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+            await unit.panel.msg();
+            await unit.panel.ent();
+            await unit.panel.cursor('R');
+            await unit.panel.cursorTo('R', 'nr 1');
+            await vi.advanceTimersByTimeAsync(1000);
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 1');
+            return unit;
+        }
+
+        // KDDD is 139 NM from the aircraft at the start and out of the 200 NM search radius from 45.0 degrees; KBBB and KCCC stay
+        const kfar = airport('KDDD', 49.5, 12.0);
+
+        it('shows the last entry when the list shrinks below the parked rank', async () => {
+            const unit = await parkOnNr1([kbbb, kccc, kfar]);
+            await unit.panel.cursor('R'); // The cursor leaves nr 1
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', 49.5);
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 3'); // Precondition: KBBB is the third of three
+            await unit.panel.cursor('R');
+            await unit.panel.cursorTo('R', 'nr 3');
+            await vi.advanceTimersByTimeAsync(1000);
+
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', 45.0);
+            await vi.advanceTimersByTimeAsync(25000); // KDDD leaves the search radius; KBBB stays in the list, now the first
+
+            expect(unit.props.nearestLists.aptNearestList.getNearestList().map(w => w.facility.icaoStruct.ident)).toEqual(['KBBB', 'KCCC']);
+            expect(Screen.read().rows('R')[0]).toBe(' KCCC  nr 2');
+            expect(unit.errors).toEqual([]);
+            expect(unit.consoleErrors).toEqual([]);
+        });
+
+        it('keeps the shown airport when the list is empty', async () => {
+            const unit = await parkOnNr1([kbbb, kzzz]);
+
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', 37.0);
+            await vi.advanceTimersByTimeAsync(25000); // Both airports are out of the search radius
+
+            expect(unit.props.nearestLists.aptNearestList.getNearestList()).toEqual([]);
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB      ');
+            expect(unit.errors).toEqual([]);
+            expect(unit.consoleErrors).toEqual([]);
+        });
+
+        it('parks on the rank the page shows when the cursor returns, not on the rank it left', async () => {
+            const unit = await parkOnNr1([kbbb, kccc, kddd]);
+            await unit.panel.cursor('R'); // The cursor leaves nr 1
+            await vi.advanceTimersByTimeAsync(1000);
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', 47.59);
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 2'); // Precondition: the shown airport stays, its rank counts up
+
+            await unit.panel.cursor('R');
+            await unit.panel.cursorTo('R', 'nr 2');
+            await vi.advanceTimersByTimeAsync(1000);
+
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 2');
+        });
+
+        it('follows a parked rank above 1', async () => {
+            const unit = await parkOnNr1([kbbb, kccc, kddd]);
+            await unit.panel.cursor('R'); // The cursor leaves nr 1
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', 47.59);
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+            expect(Screen.read().rows('R')[0]).toBe(' KBBB  nr 2'); // Precondition: the shown airport stays, its rank counts up
+            await unit.panel.cursor('R');
+            await unit.panel.cursorTo('R', 'nr 2');
+            await vi.advanceTimersByTimeAsync(1000);
+
+            // The aircraft is at KDDD: KDDD is the nearest, KCCC the second, KBBB the third
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', 48.0);
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+
+            expect(unit.props.nearestLists.aptNearestList.getNearestList().map(w => w.facility.icaoStruct.ident)).toEqual(['KDDD', 'KCCC', 'KBBB']);
+            expect(Screen.read().rows('R')[0]).toBe(' KCCC  nr 2');
+            expect(unit.panel.focused('R').text).toBe('nr 2');
+        });
     });
 });
 

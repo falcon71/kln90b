@@ -76,6 +76,9 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
     //-1 if this is not an ACT page
     protected activeIdx: number;
     private scanHandler: ScanHandler;
+    //#268: the rank the cursor is parked on (3-24), null while the cursor is elsewhere. The cursor does not survive a
+    //new page, so neither does the rank
+    private parkedRank: number | null = null;
 
     protected constructor(props: PageProps) {
         super(props);
@@ -121,19 +124,22 @@ export abstract class WaypointPage<T extends Facility> extends SixLineHalfPage {
 
     tick(blink: boolean) {
         super.tick(blink);
-        if (isNearestWpt(this.facility)) {
-            const nearestSelector = this.children.get("nearestSelector");
-            if (nearestSelector && (nearestSelector as NearestSelector).isFocused) {
-                //3-24 the waypoint will be continuously updated
-                const nearestList: NearestWpt<T>[] = this.getNearestList()!.getNearestList() as any;
-                const idx = Math.min(this.facility.index, nearestList.length - 1);
-                if (idx > -1) {
-                    const newFacility = nearestList[idx];
-                    if (newFacility != this.facility) {
-                        this.changeFacility(newFacility);
-                    }
+        const nearestSelector = this.children.get("nearestSelector");
+        if (isNearestWpt(this.facility) && nearestSelector && (nearestSelector as NearestSelector).isFocused) {
+            //3-24 the waypoint will be continuously updated: the page shows whatever waypoint holds the parked rank (#268)
+            if (this.parkedRank === null) {
+                this.parkedRank = this.facility.index;
+            }
+            const nearestList: NearestWpt<T>[] = this.getNearestList()!.getNearestList() as any;
+            const idx = Math.min(this.parkedRank, nearestList.length - 1);
+            if (idx > -1) {
+                const newFacility = nearestList[idx];
+                if (newFacility != this.facility) {
+                    this.changeFacility(newFacility);
                 }
             }
+        } else {
+            this.parkedRank = null;
         }
     }
 
