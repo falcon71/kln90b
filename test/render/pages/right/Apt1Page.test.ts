@@ -190,8 +190,8 @@ describe('APT 1 page scanning from a typed ident that matches no airport (3-21)'
     // 3-26: names are shortened only where they are too long for the display, and "KCCC AIRPORT" (the builder names every
     // airport "<ident> AIRPORT") fits the two name rows. Figures 3-71 and 3-84 show a listed word inside a longer word
     // (WESTCHESTER, NEWPORT) staying whole. So the name stays whole and continues on the second row after the eleventh
-    // cell (figure 3-85). The code replaces PORT inside AIRPORT and shows KCCC AIRPT.
-    it.fails('shows the name KCCC AIRPORT with the word AIRPORT whole (3-26, #265)', async () => {
+    // cell (figure 3-85).
+    it('shows the name KCCC AIRPORT with the word AIRPORT whole (3-26, #265)', async () => {
         const unit = await typeKc();
 
         expect(Screen.read().rows('R').slice(1, 3)).toEqual(['KCCC AIRPOR', 'T          ']);
@@ -340,36 +340,45 @@ describe('APT 1 page of a database airport', () => {
         expect((await showApt1(unit))[3]).toBe('     PRIVAT');
     });
 
-    // 3-26: whole words are abbreviated (Fort to FT, Saint to ST, Regional to REG), and the name is cut after eleven
-    // cells (figure 3-85)
+    // 3-26: whole words are abbreviated (Saint to ST, Regional to REG) in a name too long for the display, and the name
+    // is cut after eleven cells (figure 3-85). A first word of eight characters or fewer stays (FORT, SAINT).
     it.each([
-        ['FORT SMITH REGIONAL', ['FT SMITH RE', 'G          ']],
-        ['SAINT CLAIR COUNTY', ['ST CLAIR CO', 'UNTY       ']],
+        ['FORT SMITH REGIONAL AIRPORT DISTRICT', ['FORT SMITH ', 'REG AIRPORT']],
+        ['SAINT CLAIR COUNTY INTERNATIONAL', ['SAINT CLAIR', ' COUNTY INT']],
     ])('abbreviates the words of %s (3-26)', async (name, rows) => {
         const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name})], position: POS});
 
         expect((await showApt1(unit)).slice(1, 3)).toEqual(rows);
     });
 
-    // 3-26 abbreviates the words West and Port; figures 3-71 and 3-84 show WESTCHESTER and NEWPORT MUN, so a word that
-    // only contains them stays whole. The spec test above is the sibling: the same page shortens whole words.
-    it.fails('keeps WESTCHESTER whole (3-26, #265)', async () => {
-        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'WESTCHESTER COUNTY'})], position: POS});
+    // 3-26: names are shortened only where they are too long for the display
+    it('shows FORT SMITH REGIONAL whole because it fits (3-26)', async () => {
+        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'FORT SMITH REGIONAL'})], position: POS});
+
+        expect((await showApt1(unit)).slice(1, 3)).toEqual(['FORT SMITH ', 'REGIONAL   ']);
+    });
+
+    // Figures 3-71 and 3-84 show WESTCHESTER and NEWPORT MUN, so a word that only contains West or Port stays whole. The
+    // names are longer than the two rows, so that the rules apply at all; the it.each above is the sibling: the same
+    // page shortens whole words.
+    it('keeps WESTCHESTER whole (3-26, #265)', async () => {
+        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'WESTCHESTER COUNTY AIRPORT'})], position: POS});
 
         expect((await showApt1(unit))[1]).toBe('WESTCHESTER');
     });
 
-    it.fails('keeps NEWPORT whole (3-26, #265)', async () => {
-        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'NEWPORT MUNICIPAL'})], position: POS});
+    it('keeps NEWPORT whole (3-26, #265)', async () => {
+        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'ALPHA NEWPORT MUNICIPAL AIRPORT'})], position: POS});
 
-        expect((await showApt1(unit))[1]).toBe('NEWPORT MUN');
+        expect((await showApt1(unit)).slice(1, 3)).toEqual(['ALPHA NEWPO', 'RT MUNICIPA']);
     });
 
-    // 3-26 deletes the word The; the name then starts with the next word, not with a blank
-    it.fails('deletes a leading THE without leaving a blank (3-26, #265)', async () => {
-        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'THE HARTSFIELD'})], position: POS});
+    // 3-26 deletes the word The; the name then starts with the next word, not with a blank. Only a name too long for the
+    // display is shortened, so the name here is longer than the two rows.
+    it('deletes a leading THE without leaving a blank (3-26, #265)', async () => {
+        const unit = await bootUnit({facilities: [airport('KAAA', 47.1, 12.0, {name: 'THE HARTSFIELD ATLANTA INTERNATIONAL'})], position: POS});
 
-        expect((await showApt1(unit))[1]).toBe('HARTSFIELD ');
+        expect((await showApt1(unit)).slice(1, 3)).toEqual(['HARTSFIELD ', 'ATLANTA INT']);
     });
 
     // 3-42: an arrow precedes the ident of the active waypoint. FPL 0 KBBB to KAAA makes KAAA active.
