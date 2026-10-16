@@ -14,6 +14,11 @@ export const LVAR_ROLL_COMMAND = "L:KLN90B_RollCommand"; //Roll steering command
 
 export const LVAR_INTEGRITY_WARNING = "L:KLN90B_IntegrityWarn"; //Based on ARINC label 275 bit 22. True if GPS signal is not available
 
+// Number, nautical miles, positive = fly left. The cross track of ARINC label 116, for EFIS displays. Being digital, it
+// changes once per second and is not smoothed like the analog deviation bar, which GPS WP CROSS TRK follows. 0 without an
+// active waypoint. Please see https://github.com/falcon71/kln90b/wiki/CDI--HSI for details
+export const LVAR_XTK = "L:KLN90B_XTK";
+
 //External annunciators, see https://github.com/falcon71/kln90b/wiki/External-Annunciators for details
 export const LVAR_MSG_LIGHT = "L:KLN90B_MsgLight"; //Boolean. true whenever the MSG light flashes
 export const LVAR_WPT_LIGHT = "L:KLN90B_WptLight"; //Boolean. true if the waypoint alert is active

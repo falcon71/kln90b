@@ -28,6 +28,7 @@ import {
     LVAR_MSG_LIGHT,
     LVAR_ROLL_COMMAND,
     LVAR_WPT_LIGHT,
+    LVAR_XTK,
 } from "./LVars";
 import {GPS} from "./Gps";
 import {SignalOutputFilter} from "./services/SignalOutputFilter";
@@ -288,16 +289,19 @@ export class SensorsOut {
     }
 
     public setXTK(xtk: number | null, scaling: number) {
+        //The LVar is an output of the unit (ARINC 429 label 116), independent of the GPS SimVars
+        SimVar.SetSimVarValue(LVAR_XTK, SimVarValueType.NM, xtk ?? 0);
+
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
         SimVar.SetSimVarValue('GPS CDI SCALING', SimVarValueType.Meters, UnitType.NMILE.convertTo(scaling, UnitType.METER));
         if (xtk === null) {
-            this.xtkFilter.setValue(0);
+            this.xtkFilter.setValue(0, scaling);
             SimVar.SetSimVarValue('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, false);
             SimVar.SetSimVarValue('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, false);
         } else {
-            this.xtkFilter.setValue(UnitType.NMILE.convertTo(-xtk, UnitType.METER));
+            this.xtkFilter.setValue(-xtk, scaling);
             SimVar.SetSimVarValue('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, true);
             SimVar.SetSimVarValue('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, true);
         }
@@ -319,13 +323,13 @@ export class SensorsOut {
     }
 
     /**
-     * The deviation bar signal is filtered by analog circuitry, so we set this more often
+     * The deviation bar signal is filtered by analog circuitry (see SignalOutputFilter), so we set this more often
      */
     public setFilteredOutputs() {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
-        SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, this.xtkFilter.getCurrentValue());
+        SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, UnitType.NMILE.convertTo(this.xtkFilter.getCurrentValue(), UnitType.METER));
     }
 
     public setDesiredTrack(dtkMag: number | null, actualTrack: number | null, magvar: number) {
@@ -579,6 +583,8 @@ export class SensorsOut {
         SimVar.SetSimVarValue(LVAR_ANNUN_TEST, SimVarValueType.Bool, false);
         SimVar.SetSimVarValue(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, false);
         SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
+        SimVar.SetSimVarValue(LVAR_XTK, SimVarValueType.NM, 0);
+        this.xtkFilter.reset();
     }
 
     public setGpsOverriden(): void {

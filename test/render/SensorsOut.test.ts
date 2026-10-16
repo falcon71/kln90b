@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle} from '../harness/boot';
+import {bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle, untilCalcTick} from '../harness/boot';
 import {Screen} from '../harness/render/screen';
 import {standardRoute} from '../harness/fixtures';
 import {savedFlightplan} from '../harness/storage';
@@ -544,5 +544,93 @@ describe('GPS SimVars with Output.WriteGPSSimVars off (public contract) (#126)',
         const written = unit.env.sim.lastWrite('L:KLN90B_RollCommand');
         expect(written).toBeDefined();
         expect(written!.value).toBeCloseTo(25, 6);
+    });
+});
+
+// Public contract (#158): L:KLN90B_XTK is the cross track the unit sends on ARINC 429 label 116 (GAMA ARINC 429 General
+// Aviation Subset: nautical miles, positive = fly left), for EFIS displays that take the digital data. Being digital it
+// is not smoothed like the analog D-bar, which GPS WP CROSS TRK follows (SignalOutputFilter), so it is opt-in. It is an
+// output of the unit, written whatever Output.WriteGPSSimVars says.
+describe('L:KLN90B_XTK, the ARINC 429 cross track (public contract) (#158)', () => {
+    /** ABC active, 1 NM right of the first leg (fly left), moving at 120 kt along the leg */
+    async function bootRightOfLeg(xml?: string) {
+        const {kaaa, abc} = standardRoute();
+        const onLeg = pointBefore(kaaa, abc, 20);
+        const legCourse = courseDeg(onLeg, abc);
+        const p = pointFrom(onLeg, legCourse + 90, 1);
+        const unit = await bootOnStandardRoute({position: p, magvar: 0, panelXml: xml});
+        await moveAircraft(unit, p, {groundspeedKt: 120, trackTrue: legCourse});
+        return {unit, onLeg, legCourse};
+    }
+
+    it('is the cross track in nautical miles, positive to fly left', async () => {
+        const {unit} = await bootRightOfLeg();
+
+        expect(activeIdent(unit)).toBe('ABC'); // Precondition
+        expect(unit.env.sim.get('L:KLN90B_XTK', 'nautical miles')).toBeCloseTo(1, 3);
+    });
+
+    it('is written also with Output.WriteGPSSimVars off', async () => {
+        const {unit} = await bootRightOfLeg(panelXml(NO_GPS_SIMVARS));
+
+        expect(unit.env.sim.get('L:KLN90B_XTK', 'nautical miles')).toBeCloseTo(1, 3);
+    });
+
+    it('is 0 without an active waypoint', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+
+        expect(unit.props.memory.navPage.xtkToActive).toBeNull(); // Precondition
+        expect(unit.env.sim.lastWrite('L:KLN90B_XTK')?.value).toBe(0);
+    });
+
+    // The aircraft jumps from 1 NM right of the leg to 1 NM left of it. Right after the calculation tick the LVar is the
+    // new cross track, while the smoothed GPS WP CROSS TRK (negated: +1 NM is 1 NM left) is still on its way there: the
+    // calculation tick ran 0 to 250 ms ago and τ = 0.24 s, so at least a third of the 2 NM is left to go.
+    it('is not smoothed: right after a jump across the leg it is the new cross track', async () => {
+        const {unit, onLeg, legCourse} = await bootRightOfLeg();
+        const left = pointFrom(onLeg, legCourse - 90, 1);
+        unit.env.sim.set('PLANE LATITUDE', 'degrees', left.lat);
+        unit.env.sim.set('PLANE LONGITUDE', 'degrees', left.lon);
+        await untilCalcTick(unit);
+
+        expect(unit.props.memory.navPage.xtkToActive).toBeCloseTo(-1, 3); // Precondition: the unit has the new position
+        expect(unit.env.sim.get('L:KLN90B_XTK', 'nautical miles')).toBeCloseTo(-1, 3);
+        expect(unit.env.sim.get('GPS WP CROSS TRK', 'nautical miles')).toBeLessThan(0.4);
+
+        // Sibling: the smoothed output gets there too, 12 τ later
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.env.sim.get('GPS WP CROSS TRK', 'nautical miles')).toBeCloseTo(-unit.env.sim.get('L:KLN90B_XTK', 'nautical miles'), 4);
+    });
+
+    it('is 0 at the power-off', async () => {
+        const {unit} = await bootRightOfLeg();
+        expect(unit.env.sim.get('L:KLN90B_XTK', 'nautical miles')).toBeCloseTo(1, 3); // Precondition
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.env.sim.get('L:KLN90B_XTK', 'nautical miles')).toBe(0);
+    });
+});
+
+// The D-bar filter's capacitor discharges while the unit is off, so after a power cycle GPS WP CROSS TRK starts from 0
+// rather than from the deviation before the power-off. The first signal tick runs 62 ms after the power-on, before the
+// first calculation tick.
+describe('GPS WP CROSS TRK after a power cycle (#158)', () => {
+    it('starts from 0', async () => {
+        const {kaaa, abc} = standardRoute();
+        const onLeg = pointBefore(kaaa, abc, 20);
+        const p = pointFrom(onLeg, courseDeg(onLeg, abc) + 90, 1);
+        const unit = await bootOnStandardRoute({position: p, magvar: 0});
+        await moveAircraft(unit, p, {groundspeedKt: 120, trackTrue: courseDeg(onLeg, abc)});
+        expect(unit.env.sim.get('GPS WP CROSS TRK', 'nautical miles')).toBeCloseTo(-1, 3); // Precondition
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+        unit.send('KLN90B_Power_On');
+        await vi.advanceTimersByTimeAsync(100);
+
+        expect(unit.env.sim.get('GPS WP CROSS TRK', 'nautical miles')).toBe(0);
     });
 });

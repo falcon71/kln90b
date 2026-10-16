@@ -156,8 +156,11 @@ only run while the unit is powered AND enabled.**
 | `TICK_TIME_SIGNALS = 1000/16` ms (16 Hz) | `CalcTickable.tick()`                                                        | `SignalOutputFillterTick(sensors)`, which writes the smoothed `GPS WP CROSS TRK`                                                                                                                                 |
 
 - Rationale is given in the class doc: the real unit has a CRT redrawn line by line (maintenance manual p.43) and does
-  its calculations at 1 Hz (from a video, and MM p.189). The 16 Hz loop emulates the analog filtering of the deviation
-  output (MM p.186) through `services/SignalOutputFilter` (linear prediction smoothing).
+  its calculations at 1 Hz (from a video). The 16 Hz loop emulates the analog D-bar driver through
+  `services/SignalOutputFilter`: the PWM deviation, clamped to two full scales, through the RC low-pass of the main
+  module (51.1 kΩ × 4.7 µF, τ = 0.24 s; the class doc has the reading of the schematic). It filters the deviation in
+  full scales and gives it back on the current scale, so it never overshoots and a scale change moves the needle
+  smoothly (#158).
 - **Hard rule from the class doc: DOM manipulation happens only inside a display tick, never directly in a state change
   or input handler.** Handlers mutate state and the next `tick(blink)` renders it.
 - Each tickable is wrapped in try/catch, which logs the error and publishes `error`. **Async ticks** (`NearestList.tick`
@@ -312,7 +315,9 @@ on them.
           optimised for the autopilot.
         - `L:KLN90B_HSI_TF_FLAGS`: 0 = off, 1 = TO, 2 = FROM.
         - `L:KLN90B_RollCommand`: degrees, positive = left.
-        - `L:KLN90B_IntegrityWarn`: newest (#87); true when the GPS is not valid.
+        - `L:KLN90B_IntegrityWarn` (#87): true when the GPS is not valid.
+        - `L:KLN90B_XTK`: newest (#158); the ARINC 429 label 116 cross track in NM, positive = fly left, 0 without an
+          active waypoint. Not smoothed, unlike `GPS WP CROSS TRK`.
         - `L:KLN90B_MsgLight`, `L:KLN90B_WptLight`, `L:KLN90B_AnnunTest`.
     - Writable by aircraft:
         - `L:KLN90B_Brightness` (0 to 1)
@@ -357,7 +362,7 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
       legs become temporary user waypoints in region `XY`).
 - The ticks that write the L:KLN90B_* outputs stop with the power, so `SensorsOut.setPoweredOff()` writes their zero
   state once on a power-off: `L:KLN90B_RollCommand` 0, `L:KLN90B_HSI_TF_FLAGS` 0 (flagged) and the MSG, WPT and annunciator
-  test lights false, `L:KLN90B_IntegrityWarn` 0 and `L:KLN90B_GPS_WP_BEARING` 0, whatever `writeGPSSimVars` says. A unit that is only disabled for hot swapping keeps its values, but a power-off while disabled zeroes them too.
+  test lights false, `L:KLN90B_IntegrityWarn` 0, `L:KLN90B_GPS_WP_BEARING` 0 and `L:KLN90B_XTK` 0, whatever `writeGPSSimVars` says. It also discharges the D-bar filter, so `GPS WP CROSS TRK` starts from 0 after the next power-on. A unit that is only disabled for hot swapping keeps its values, but a power-off while disabled zeroes them too.
 - `SensorsOut.reset()` has the SimVar-zeroing code commented out because of an observed **CTD** when combined with
   `L:KLN90B_Disabled` and hot-swapping. Read that comment before touching GPS SimVar resets.
 

@@ -618,8 +618,8 @@ describe('ground speed below 2 kt (characterization)', () => {
 
 // 3-4: during the self-test DIS is 34.5 NM and the D-bar shows half scale right, which is 2.5 NM left of course on the
 // 5 NM scale. GPS WP CROSS TRK is the negated cross track (SensorsOutSimVars.test.ts), so 2.5 NM left is +4630 m. The
-// XTK output filter overshoots after its step from zero (#158), so the outputs are read late, 30 s after the power-on
-// (well into the self-test page), when it has settled.
+// D-bar filter smooths the step from zero (SignalOutputFilter), so the outputs are read 30 s after the power-on (well
+// into the self-test page), when it has settled.
 describe('self-test outputs (3-4)', () => {
     it('writes DIS 34.5 NM and a half-scale right deviation', async () => {
         const unit = await bootUnit({engineRunning: false, magvar: 0});

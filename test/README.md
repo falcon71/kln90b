@@ -792,11 +792,11 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
 - **The 16 Hz loops** run every 62 ms in tests: the fake timers round the 62.5 ms interval down to whole milliseconds.
   The aircraft integrates the time that really passed, but the instrument's own 16 Hz signal loop (the XTK output
   filter) also runs at that rate, which matters for any future test of filter timing.
-- **The XTK output filter overshoots a step** (#158): after the XTK jumps (a sequencing, a direct-to, an OBS course
-  change, the self-test) `GPS WP CROSS TRK` runs on to about twice the step one second later and settles a second after
-  that. An XTK output read right after a step therefore depends on the tick phase. Read the output once it has settled
-  (the self-test test in `NavCalculator.test.ts` reads it 30 s in), read `navPage.xtkToActive` instead, or test the
-  filter itself at the unit stage, as `test/unit/services/SignalOutputFilter.test.ts` does: only `Date` is faked
+- **The XTK output follows the D-bar filter** (#158): `GPS WP CROSS TRK` is the deviation through an RC low-pass with
+  τ = 0.24 s (`kln90b/services/SignalOutputFilter.ts`), so after a step it needs about 1 s (4 τ) to get within 2 % and
+  3 s to settle to 4 decimals. Read it once it has settled (the self-test test in `NavCalculator.test.ts` reads it 30 s
+  in), read `L:KLN90B_XTK` or `navPage.xtkToActive`, which are not smoothed, or test the filter itself at the unit
+  stage, as `test/unit/services/SignalOutputFilter.test.ts` does: only `Date` is faked
   (`vi.useFakeTimers({toFake: ['Date']})`), a value is set every 1000 ms and the output sampled every 62 ms.
 - **A booted engine-running unit starts with the MSG annunciator lit.** Empty storage means the last position is 0/0, so
   `POSITION DIFFERS FROM LAST POSITION BY >2NM` posts; that is a fact of the harness, and the NAV 2 screens of the
