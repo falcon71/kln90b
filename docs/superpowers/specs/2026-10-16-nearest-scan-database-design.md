@@ -76,7 +76,10 @@ search never counts as cut. The #108 fix and its tests stay.
   cached and the walk goes on with the longer prefixes (forward: keep the exact-ident entries, then `prefix + '0'`;
   backward: `prefix + 'Z'`); a five-character prefix is never cut;
 - the upper cache bound becomes exclusive (`null` = to the end); the `"ZZZZ"` sentinel goes;
-- both prunes cut between two different idents and keep the entry at the edge (the end prune had the same defect);
+- the beginning prune cuts between two different idents and keeps the entry at the edge; the end prune may cut inside
+  an ident, because the exclusive upper bound then claims nothing of that ident and the next refill searches it again
+  (amended 2026-10-16: the boundary loop the plan gave the end prune made a pathological case worse); both prunes
+  measure from the current waypoint's position at the time of the prune (the end prune had the same defect);
 - the cache drops duplicates by ICAO uid, not by object identity (the sim returns new objects for every search).
 Vehicles: the three #117 tests (`Scanlist.test.ts:140-167`, `:188-207`) sync to waypoints that are already cached and
 relied on wasted searches; they sync to uncached waypoints instead. A trimmed copy of the inventory's stress test stays
@@ -97,6 +100,10 @@ returns the entry after the typed ident clockwise, not the first one before it. 
 waypoint at that rank (or the last one, if the list got shorter) on every tick; a scan while parked moves the rank.
 The rank is a page field: the cursor does not survive a page recreation. The same code serves every nearest page (APT,
 VOR, NDB). Spec: 3-24 and the KLN 89 check of 2026-10-07.
+
+*Amended 2026-10-16 (ruling R5):* the rank is held only while the cursor stays on it. No pilot path moves it
+while it is parked (no scan reaches the page then), so the plan's case of a scan while parked is dropped and nothing
+moves the rank.
 
 **C. Airport names (#265).** A new class `AirportNameFormatter` (`kln90b/data/AirportNameFormatter.ts`) takes the translated
 name and returns the text APT 1 shows; `Apt1Page` keeps only the split into its two rows of 11. Rules, per 3-26:
@@ -126,9 +133,16 @@ splices inside a forward loop.
 input could show it; one can).
 
 **C. All VOR classes in the list; NAV 2 keeps low/high (#204).** The shared VOR nearest list takes the classes
-terminal, low, high and undefined. NAV 2 gets its nearest VOR from a nearest list of its own with the low/high mask, so
-a low or high VOR behind nine nearer terminal VORs is still found; the DME-arc exception of 3-32 still comes first.
-Super NAV 5 filters TLH/LH/H from the shared list as today. Spec: 3-8, 3-32, 3-37, 3-49.
+terminal, low, high and undefined. Super NAV 5 filters TLH/LH/H from the shared list as today. Spec: 3-8, 3-32,
+3-37, 3-49.
+
+*Amended 2026-10-16 (maintainer):* NAV 2 keeps no nearest list of its own. Like the INT/SUP reference, it asks
+`NearestUtils` for the nearest low or high altitude VOR (a search session with the low/high mask, 200 NM) when the page
+opens and then every 10 s while it is shown; nothing runs while NAV 2 is not displayed. A low or high VOR behind nine
+nearer terminal VORs is still found; the DME-arc exception of 3-32 still comes first. The cadence and the radius follow
+the KLN 89 trainer check of 2026-10-16 (a re-pick about every 8 to 10 s; a VOR at 190 NM, none at about 196 NM) and are
+characterizations for the 90B. The reference search and the NAV 2 search share one class that mirrors a session's
+results, serializes its calls and returns the nearest result. The first fix, a ticked low/high list, was replaced.
 
 **D. User VORs (#206).** The repository filter accepts VORs of class and type Unknown (every user VOR). With 4C a user
 VOR is in the VOR nearest list, drawn on Super NAV 5 with TLH, and never on NAV 2. `NearestUtils.getNearestVor` keeps
