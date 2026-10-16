@@ -82,3 +82,16 @@ describe('nearest airport surfaces (3-23)', () => {
         expect(await nearestAirports(world([['SNOW', RunwaySurfaceType.Snow]]), SURFACE_HRD_SFT)).toEqual(['SNOW']);
     });
 });
+
+// The maintainer ruled macadam a hard surface (#270), as the SDK classes it (RunwayUtils.getSurfaceCategory)
+describe('nearest airport surfaces, macadam (maintainer ruling, #270)', () => {
+    const macadam = () => [airport('MACA', 47.01, 8.0, {runways: [{lengthFt: 3000, surface: RunwaySurfaceType.Macadam}]})];
+
+    it('admits a macadam runway with HRD', async () => {
+        expect(await nearestAirports(macadam(), SURFACE_HRD)).toEqual(['MACA']);
+    });
+
+    it('admits a macadam runway with HRD SFT', async () => {
+        expect(await nearestAirports(macadam(), SURFACE_HRD_SFT)).toEqual(['MACA']);
+    });
+});

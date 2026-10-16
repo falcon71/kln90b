@@ -779,7 +779,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   `IcaoValue` object per facility, the same in search results, in the nearest `added` and `removed` lists and in
   `getFacility`; the sim answers with new objects each time. Code that compares ICAOs by reference instead of with
   `ICAO.valueEquals` therefore passes against the fake: `6a6c634` fixed such a bug in `Scanlist`, and the removal in
-  `NearestList.ts:89` would be the next (a break there survives the suite). The fake's `getFacility` also ignores its
+  `NearestList.ts:107` would be the next (a break there survives the suite). The fake's `getFacility` also ignores its
   type argument and looks up by ICAO alone, so the type that `KLNFacilityLoader.getFacilities` passes down cannot be
   observed. The [next steps](../docs/test-next-steps.md) have the options.
 - **One fact about real procedures came from a navigation database queried locally and is not committed.** The pattern

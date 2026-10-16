@@ -186,6 +186,7 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
                     BitFlags.createFlag(RunwaySurfaceType.Tarmac),
                     BitFlags.createFlag(RunwaySurfaceType.Brick),
                     BitFlags.createFlag(RunwaySurfaceType.Bituminous),
+                    BitFlags.createFlag(RunwaySurfaceType.Macadam), //#270: the maintainer ruled macadam a hard surface, as the SDK classes it
                     //soft
                     BitFlags.createFlag(RunwaySurfaceType.HardTurf),
                     BitFlags.createFlag(RunwaySurfaceType.Gravel),
@@ -208,6 +209,7 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
                     BitFlags.createFlag(RunwaySurfaceType.Tarmac),
                     BitFlags.createFlag(RunwaySurfaceType.Brick),
                     BitFlags.createFlag(RunwaySurfaceType.Bituminous),
+                    BitFlags.createFlag(RunwaySurfaceType.Macadam), //#270: the maintainer ruled macadam a hard surface, as the SDK classes it
                 );
         }
     }

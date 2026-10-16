@@ -95,7 +95,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   (`savedTemporary` in `TemporaryWaypointDeleter.test.ts`); an `XY` option would replace them.
 - **Options of the fake navdata** (section 6): a cloning option that hands out a copy of the `IcaoValue` per call, which
   would make the reference comparisons observable (`Scanlist`, fixed in `6a6c634`, and the nearest list removal at
-  `NearestList.ts:89`, which a break survives); a `getFacility` that checks its type argument; and a search that returns
+  `NearestList.ts:107`, which a break survives); a `getFacility` that checks its type argument; and a search that returns
   matches in insertion order, which would show whether the code orders the autocompletion itself (also unobservable
   with the instant fake: `WaypointEditor.onCharChanged` has no guard against a stale result, and
   `WaypointEditor.convertToValue` looks for the exact ident among the first 99 results only).
@@ -130,7 +130,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   120°; a halved roll-in distance
   (`NavCalculator.ts:190`) survives the lower bound of the DME arc flight; the flag copy of `addArcInfoIfPrevIsSame`
   (`SidStar.ts:455`) has no arc whose fix carries other flags; the two halves of the SET 3 hard-surface filter
-  (`NearestList.ts:163` and `:191-198`) and the two polygon guards of the SUA alert (`AirspaceAlert.ts:109`,
+  (`NearestList.ts:173` and `:205-213`) and the two polygon guards of the SUA alert (`AirspaceAlert.ts:109`,
   `MessageHandler.ts:87`) cover each other.
 - **CTR computes once per unit in tests.** With `centerWorld()` one computation needs no OTH 2 detour: its legs are
   300 NM, so each Center is first returned by a search from inside it. A second computation in the same unit meets
