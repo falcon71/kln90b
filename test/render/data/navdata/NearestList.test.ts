@@ -343,6 +343,38 @@ describe('VOR classes in the nearest VOR list', () => {
         expect(await nearestRowsBackwards(unit)).toEqual([' QQV   nr 1', ' HIG D nr 2']);
     });
 
+    // 5-45: a user VOR of a real class is filtered like a database VOR, so the flags of its class and type are compared
+    // with the masks of the VOR page (#128). The VOR type shows no D.
+    it('lists a user VOR of low altitude class and VOR type (#128)', async () => {
+        const unit = await bootUnit({facilities: [hig()], position: POSITION});
+        KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQV', 47.02, 8.0, {region: 'XX', vorClass: VorClass.LowAlt, type: VorType.VOR}));
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('R', 'VOR  ');
+
+        expect(await nearestRowsBackwards(unit)).toEqual([' QQV   nr 1', ' HIG D nr 2']);
+    });
+
+    // Code contracts (characterization): each guard keeps one of the two flags inside its mask and moves the other out.
+    // TACAN is not in the type mask of the VOR page. VOT is not in its class mask, and it is not one of the four classes
+    // of 2-2, so no page pins it. The terminal and undefined classes are held by the #204 and #206 tests.
+    it('leaves out a user VOR whose type is outside the type mask (#128)', async () => {
+        const unit = await bootUnit({facilities: [hig()], position: POSITION});
+        KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQT', 47.02, 8.0, {region: 'XX', vorClass: VorClass.HighAlt, type: VorType.TACAN}));
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('R', 'VOR  ');
+
+        expect(await nearestRowsBackwards(unit)).toEqual([' HIG D nr 1']);
+    });
+
+    it('leaves out a user VOR whose class is outside the class mask (#128)', async () => {
+        const unit = await bootUnit({facilities: [hig()], position: POSITION});
+        KLNFacilityRepository.getRepository(unit.props.bus).add(vor('QQO', 47.02, 8.0, {region: 'XX', vorClass: VorClass.VOT, type: VorType.VOR}));
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('R', 'VOR  ');
+
+        expect(await nearestRowsBackwards(unit)).toEqual([' HIG D nr 1']);
+    });
+
     // The sibling of the pins: the list itself works for the classes it holds today, so the pins differ only in the class
     it('lists a low and a high altitude VOR', async () => {
         const low = vor('LOW', 47.05, 8.0, {vorClass: VorClass.LowAlt});
