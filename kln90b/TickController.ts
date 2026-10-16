@@ -75,13 +75,21 @@ export class TickController {
     public tickCalc(): void {
         for (const tickable of this.calcTickables) {
             try {
-                tickable.tick();
-            } catch (e) {
-                console.error(e);
-                if (e instanceof Error) {
-                    this.bus.getPublisher<ErrorEvent>().pub("error", e);
+                //#95: an async tick (NearestList) returns a promise; its rejection must reach the error page too
+                const result: unknown = tickable.tick();
+                if (result instanceof Promise) {
+                    result.catch(this.handleError.bind(this));
                 }
+            } catch (e) {
+                this.handleError(e);
             }
+        }
+    }
+
+    private handleError(e: unknown): void {
+        console.error(e);
+        if (e instanceof Error) {
+            this.bus.getPublisher<ErrorEvent>().pub("error", e);
         }
     }
 

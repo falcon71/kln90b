@@ -161,7 +161,9 @@ only run while the unit is powered AND enabled.**
 - **Hard rule from the class doc: DOM manipulation happens only inside a display tick, never directly in a state change
   or input handler.** Handlers mutate state and the next `tick(blink)` renders it.
 - Each tickable is wrapped in try/catch, which logs the error and publishes `error`. **Async ticks** (`NearestList.tick`
-  is `async`) are not awaited, so their rejections escape this handler.
+  is `async`) are not awaited, but `tickCalc` attaches the same handler to the returned promise (#95), so their
+  rejections reach the error page too. `NearestList` clears `isCalculating` in a `finally`, so a failed search does not
+  stop the later ones.
 - Expensive work throttles itself inside the 1 Hz tick: `NearestList` and `AirspaceAlert` search every 10 s (
   `NEAREST_TICK_TIME`, `ALERT_TICK_TIME`); `GPS` and `Timers` save every 60 s.
 - Separate intervals: `SimVarSync` runs every 100 ms and always runs, even when powered off. `BrightnessManager` uses

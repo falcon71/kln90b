@@ -80,33 +80,12 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
         //This stuff is very expensive, and is only run every 10 seconds
         this.isCalculating = true;
         this.tickTimer = 0;
-
-        const distanceMeters = UnitType.NMILE.convertTo(500, UnitType.METER);
-        const diff = await this.session!.searchNearest(this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, distanceMeters, MAX_ITEMS);
-
-        for (const removedIcao of diff.removed) {
-            for (let i = 0; i < this.nearestList.length; i++) {
-                if (ICAO.valueEquals(this.nearestList[i].facility.icaoStruct, removedIcao)) {
-                    this.nearestList[i].index = -1;
-                    this.nearestList.splice(i, 1);
-                }
-            }
+        try {
+            await this.search();
+        } finally {
+            //#95: a failed search must not stop every later search
+            this.isCalculating = false;
         }
-
-        const addedFacilities = await Promise.all(diff.added.map(addedIcao => this.facilityLoader.getFacility(this.facilityType, addedIcao)));
-
-        for (const addedFacility of addedFacilities) {
-            this.nearestList.push({
-                facility: addedFacility as any,
-                //Those values will be calculated in updateBearingDistance
-                bearingToTrue: 0,
-                distance: 0,
-                index: 0,
-            });
-
-        }
-        this.updateBearingDistance();
-        this.isCalculating = false;
     }
 
     /**
@@ -115,6 +94,36 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
      */
     public getNearestList(): NearestWpt<FacType>[] {
         return this.nearestList.slice(0, 9);
+    }
+
+    private async search(): Promise<void> {
+        const distanceMeters = UnitType.NMILE.convertTo(500, UnitType.METER);
+        const diff = await this.session!.searchNearest(this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, distanceMeters, MAX_ITEMS);
+
+        for (const removedIcao of diff.removed) {
+            for (let i = this.nearestList.length - 1; i >= 0; i--) {
+                if (ICAO.valueEquals(this.nearestList[i].facility.icaoStruct, removedIcao)) {
+                    this.nearestList[i].index = -1;
+                    this.nearestList.splice(i, 1);
+                }
+            }
+        }
+
+        //#95: a facility that cannot be loaded is left out; the others of the same search are listed
+        const addedFacilities = await Promise.all(diff.added.map(addedIcao => this.facilityLoader.tryGetFacility(this.facilityType, addedIcao)));
+        for (const addedFacility of addedFacilities) {
+            if (addedFacility === null) {
+                continue;
+            }
+            this.nearestList.push({
+                facility: addedFacility as any,
+                //Those values will be calculated in updateBearingDistance
+                bearingToTrue: 0,
+                distance: 0,
+                index: 0,
+            });
+        }
+        this.updateBearingDistance();
     }
 
     protected abstract initFilters(session: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[SearchType]): void;

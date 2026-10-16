@@ -132,8 +132,6 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   (`SidStar.ts:455`) has no arc whose fix carries other flags; the two halves of the SET 3 hard-surface filter
   (`NearestList.ts:163` and `:191-198`) and the two polygon guards of the SUA alert (`AirspaceAlert.ts:109`,
   `MessageHandler.ts:87`) cover each other.
-- The removal loop of `NearestList.tick` splices while it iterates (`NearestList.ts:87-93`), so of two adjacent
-  removals one waits for the next search.
 - **CTR computes once per unit in tests.** With `centerWorld()` one computation needs no OTH 2 detour: its legs are
   300 NM, so each Center is first returned by a search from inside it. A second computation in the same unit meets
   #102; the #102 pin in `Ctr1Page.test.ts` is such a test on purpose, and the tests of the 30 waypoint limit there use one computation.
@@ -299,7 +297,6 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - the fix of #96 needs `PageStack` in `MainPage.tsx` to destroy the half page it replaces (`setCurrentPage`, `pop`,
       `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone leaves both handler counts
       unchanged, and OTH 4 counts the `changed` topic of the remarks manager;
-    - the fix of #95 turns its two pins red (the list and the error page);
     - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): duplicate idents on a waypoint
   page (2026-10-08, T20, not done), and the empty top row of FPL 0 with the first waypoint active (above). #162 and

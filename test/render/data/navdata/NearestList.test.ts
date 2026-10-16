@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {Facility, FacilitySearchType, RunwaySurfaceType, VorClass, VorType} from '@microsoft/msfs-sdk';
+import {Facility, FacilitySearchType, FacilityType, RunwaySurfaceType, VorClass, VorType} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS} from '../../../harness/boot';
 import {MemoryFacilityClient} from '../../../harness/navdata/MemoryFacilityClient';
 import {airport, ndb, vor} from '../../../harness/navdata/builders';
@@ -389,7 +389,7 @@ async function ndbListAfterAFirstSearch(rejectFirst: boolean) {
     const {client, rejectedSearches} = clientForNdbSearch([], rejectFirst);
     const unit = await bootUnit({platform: {createFacilityClient: () => client as any}});
     await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
-    unit.takeRejections(); // The rejected search is an unhandled rejection; the harness would fail the test for it
+    expect(unit.takeRejections()).toEqual([]); // since #95 the tick controller handles a rejected search, so none reaches the test
     client.add(ndb('NAA', 47.05, 8.0));
     await vi.advanceTimersByTimeAsync(2 * NEAREST_SEARCH_WAIT_MS);
     const listed = unit.props.nearestLists.ndbNearestList.getNearestList().map(w => w.facility.icaoStruct.ident);
@@ -397,12 +397,10 @@ async function ndbListAfterAFirstSearch(rejectFirst: boolean) {
 }
 
 // 3-22: the nearest lists follow the aircraft, so a waypoint that comes into range is listed at a later search.
-// NearestList.tick is async and TickController.tickCalc does not await it (docs/architecture.md, Core 2: an async tick's
-// rejection escapes the handler that keeps one failing tickable from stopping the others), so a rejected search leaves
-// isCalculating set and the list is never searched again (#95). The rejection is also unhandled, so the error page
-// never shows it (#95).
+// NearestList.tick is async. A rejected search used to leave isCalculating set, so the list was never searched again, and
+// TickController.tickCalc did not await the promise, so the error page never showed the rejection (#95).
 describe('the nearest NDB list after a rejected search (#95)', () => {
-    // The sibling of the pins: the same client and the same steps without the failure, so the pins differ only in it
+    // The sibling of the tests below: the same client and the same steps without the failure, so they differ only in it
     it('lists an NDB that comes into range after the first search (3-22)', async () => {
         const {rejected, listed} = await ndbListAfterAFirstSearch(false);
 
@@ -410,14 +408,14 @@ describe('the nearest NDB list after a rejected search (#95)', () => {
         expect(listed).toEqual(['NAA']);
     });
 
-    // The setup of the pins: the failing client does reject one search, whatever the unit does with it
-    it('the failing client rejects one NDB search (setup of the #95 pins)', async () => {
+    // The setup of the tests below: the failing client does reject one search, whatever the unit does with it
+    it('the failing client rejects one NDB search (setup of the #95 tests)', async () => {
         const {rejected} = await ndbListAfterAFirstSearch(true);
 
         expect(rejected).toBe(1);
     });
 
-    it.fails('lists an NDB that comes into range after a rejected search (3-22, #95)', async () => {
+    it('lists an NDB that comes into range after a rejected search (3-22, #95)', async () => {
         const {listed} = await ndbListAfterAFirstSearch(true);
 
         expect(listed).toEqual(['NAA']);
@@ -425,9 +423,26 @@ describe('the nearest NDB list after a rejected search (#95)', () => {
 
     // The synchronous tickables show their errors on the error page (docs/architecture.md, Core 2); a failed search is
     // as much a failure of the unit
-    it.fails('shows a failed nearest search on the error page (#95)', async () => {
+    it('shows a failed nearest search on the error page (#95)', async () => {
         await ndbListAfterAFirstSearch(true);
 
         expect(document.querySelector('.errorpage')!.classList.contains('d-none')).toBe(false);
+    });
+
+    // The database rejects for a facility it cannot load (KLNFacilityLoader answers null for it); the search finds the
+    // NDB NBD, but loading it fails. The other NDB of the same search is listed. A code contract (characterization): the
+    // guide does not say what the unit does with a facility it cannot load.
+    it('lists the NDBs it can load when one of a search cannot be loaded (#95)', async () => {
+        const client = new MemoryFacilityClient([ndb('NAA', 47.05, 8.0), ndb('NBD', 47.0667, 8.0)]);
+        const getFacility = client.getFacility.bind(client);
+        client.getFacility = (type: FacilityType, icao: any) => {
+            if (typeof icao !== 'string' && icao.ident === 'NBD') return Promise.reject(new Error('facility cannot be loaded'));
+            return getFacility(type, icao);
+        };
+        const unit = await bootUnit({platform: {createFacilityClient: () => client as any}});
+
+        await vi.advanceTimersByTimeAsync(2 * NEAREST_SEARCH_WAIT_MS);
+
+        expect(unit.props.nearestLists.ndbNearestList.getNearestList().map(w => w.facility.icaoStruct.ident)).toEqual(['NAA']);
     });
 });
