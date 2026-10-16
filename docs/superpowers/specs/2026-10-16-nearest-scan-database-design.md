@@ -81,8 +81,8 @@ search never counts as cut. The #108 fix and its tests stay.
 Vehicles: the three #117 tests (`Scanlist.test.ts:140-167`, `:188-207`) sync to waypoints that are already cached and
 relied on wasted searches; they sync to uncached waypoints instead. A trimmed copy of the inventory's stress test stays
 as a unit test: some 3000 idents with prefix chains and duplicates, scanned both ways and after a user waypoint change,
-over fakes that honor `maxItems`, ignore it, and return fresh ICAO objects (options of
-`test/harness/navdata/MemoryFacilityClient.ts`). Spec: 3-21.
+over fakes that honor `maxItems`, ignore it, and return fresh ICAO objects (subclasses of
+`test/harness/navdata/MemoryFacilityClient.ts` in the test file). Spec: 3-21.
 
 ## 3. Waypoint page (#202, #268, #265)
 
@@ -166,11 +166,10 @@ Spec: 3-15.
   is this design; the plan follows.
 - A commit keeps the suite green: it updates the tests that used its bug as their vehicle and says so in the message.
 - Lanes, each file with one owner, integrated linearly by cherry-pick onto `m6-nearest-scan`:
-  - A, scan list: #105, #203, #201 (`Scanlist.ts`, `Scanlist.test.ts`, `enterIdent.test.ts`,
-    `MemoryFacilityClient.ts`).
-  - B, nearest lists: #95, #128, #204, #206, #207, #270 (`TickController.ts`, `NearestList.ts`, `KLNFacilityLoader.ts`,
+  - A, scan list: #105, #203, #201 (`Scanlist.ts`, `Scanlist.test.ts`, `enterIdent.test.ts`, the new stress test).
+  - B, nearest lists: #95, #207, #128, #204, #206, #270 (`TickController.ts`, `NearestList.ts`, `KLNFacilityLoader.ts`,
     `NearestUtils.ts`, `Nav2Page.tsx`, `Apt3ListPage.tsx` and their tests, `NearestList.test.ts`, `IntPage.test.ts`).
-  - C, waypoint page and names: #202, #268, #265, #342 (`WaypointPage.tsx`, `VolatileMemory.ts`, `Apt1Page.tsx`, the
+  - C, waypoint page and names: #342, #265, #268, then #202 (`WaypointPage.tsx`, `VolatileMemory.ts`, `Apt1Page.tsx`, the
     new formatter, `CountryMap.ts`, `builders.ts`, `Apt1Page.test.ts`, `CountryMap.test.ts`,
     `AirportCoordOrNearestView.test.ts`). Lane A's `findClosest` change for #202 is lane C's: `Scanlist.ts` is A's
     file, so C's #202 commit goes after A's commits.
