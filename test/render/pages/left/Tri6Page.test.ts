@@ -14,9 +14,11 @@ describe('TRI 6 page (characterization)', () => {
         await unit.panel.selectPage('L', 'TRI 6');
         await vi.advanceTimersByTimeAsync(2000); // The airspace search is asynchronous
         expect(unit.errors).toEqual([]);
+        // The leg from ABC (47.5N 8.9E) to KBBB (48.2N 9.2E) crosses 9E at 47.73N into the sector from 47N 9E
+        // (11600), which the 40 NM steps of the service used to miss (#181)
         expect(Screen.read().half('L')).toMatchInlineSnapshot(`
           "FP 0       
-          ESA 11400ft
+          ESA 11600ft
                      
                      
                      
