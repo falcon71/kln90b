@@ -70,7 +70,7 @@ export class Oth2Page extends SixLineHalfPage {
     }
 
     private loadCenter() {
-        this.props.nearestUtils.getAirspaces(this.props.sensors.in.gps.coords.lat, this.props.sensors.in.gps.coords.lon, 0, 20, BitFlags.createFlag(BoundaryType.Center)).then(
+        this.props.nearestUtils.getAirspacesAt(this.props.sensors.in.gps.coords.lat, this.props.sensors.in.gps.coords.lon, 20, BitFlags.createFlag(BoundaryType.Center)).then(
             centers => {
                 //todo need to test if this is actually working. We currently assume, that all boundaries are the same center
                 console.log("OTH2", centers);

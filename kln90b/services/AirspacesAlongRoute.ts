@@ -68,7 +68,7 @@ export async function airspacesAlongRoute(route: LatLonInterface[], utils: Neare
     for (let i = 1; i < route.length; i++) {
         legs.push(...splitLeg(i - 1, route[i - 1], route[i]));
     }
-    const airspaces: LodBoundary[][] = Array(route.length - 1).fill([]);
+    const airspaces: LodBoundary[][] = Array.from({length: route.length - 1}, (): LodBoundary[] => []);
     for (const leg of legs) {
         airspaces[leg.fromIdx].push(...await utils.getAirspaces(leg.coord.lat, leg.coord.lon, UnitType.METER.convertFrom(leg.searchRadius, UnitType.NMILE), 200, SPECIAL_USE_AIRSPACE_FILTER));
     }
@@ -124,7 +124,7 @@ export async function airspaceIntersectionsAlongRoute(route: LatLonInterface[], 
     for (let i = 1; i < route.length; i++) {
         legs.push(...splitLeg(i - 1, route[i - 1], route[i]));
     }
-    const airspaces: LodBoundary[][] = Array(route.length - 1).fill([]);
+    const airspaces: LodBoundary[][] = Array.from({length: route.length - 1}, (): LodBoundary[] => []);
     for (const leg of legs) {
         airspaces[leg.fromIdx].push(...await utils.getAirspaces(leg.coord.lat, leg.coord.lon, UnitType.METER.convertFrom(leg.searchRadius, UnitType.NMILE), 200, filter));
     }

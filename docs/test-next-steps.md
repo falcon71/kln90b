@@ -132,9 +132,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   (`SidStar.ts:455`) has no arc whose fix carries other flags; the two halves of the SET 3 hard-surface filter
   (`NearestList.ts:173` and `:205-213`) and the two polygon guards of the SUA alert (`AirspaceAlert.ts:109`,
   `MessageHandler.ts:87`) cover each other.
-- **CTR computes once per unit in tests.** With `centerWorld()` one computation needs no OTH 2 detour: its legs are
-  300 NM, so each Center is first returned by a search from inside it. A second computation in the same unit meets
-  #102; the #102 pin in `Ctr1Page.test.ts` is such a test on purpose, and the tests of the 30 waypoint limit there use one computation.
+- **CTR tests with `centerWorld()`:** its legs are 300 NM, so each Center is met by a search from inside it. The #102
+  test in `Ctr1Page.test.ts` computes twice in one unit on purpose, and the tests of the 30 waypoint limit there use
+  one computation.
 - CTR leads: a recomputation without insertion creates a new user waypoint with the next number (BGD00, then BGD01),
   and the orphans count against the limit until power-off (a computation discarded by #348 leaves its new waypoints the same way); a crossing without a VOR within 1000 NM, or without a free
   number, is dropped silently; when the first waypoint lies in no Center the first crossing is dropped
@@ -216,8 +216,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - Status line, MSG page and views: `MessagePage.enter` with an empty nearest list keeps the MSG page, while the
       comment at `MessagePage.tsx:53` reads as if the unit removes it; `AirportCoordOrNearestView.loadAirspace` resolves
       late and writes against the airport shown then, so a quick scan could show the previous airport's class;
-      `ErrorPage.showError` writes the error text with `innerHTML`, unescaped; `getAirspaces(lat, lon, 10, …)` passes
-      10 meters, which reads like nautical miles but works with `isInside`.
+      `ErrorPage.showError` writes the error text with `innerHTML`, unescaped.
     - Displays: the `targetLetterIndex == 9` branches of both deviation bars are dead; `formatDuration` is exported but
       used only in its file; a negative OTH fuel clamps to 0; single-digit temperatures keep a zero (the trainer could
       not answer); the Super NAV 1 FLAG row draws 22 cells instead of 23.

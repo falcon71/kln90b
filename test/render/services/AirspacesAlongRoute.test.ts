@@ -8,8 +8,8 @@ import {Screen} from '../../harness/render/screen';
 import {savedFlightplan} from '../../harness/storage';
 
 // The route runs 40 NM due north from the aircraft's position at 47.0N 8.0E. The unit searches the airspaces along
-// a leg from two centers of radius 20 NM, the start and the middle of the leg, and #102 hides what these searches
-// miss: an area is listed only if it holds the start of the route.
+// a leg from two centers of radius 20 NM, the start and the middle of the leg. (Before #102 was fixed, an area was
+// listed only if it held the start of the route.)
 const POS = {lat: 47.0, lon: 8.0};
 const KAAA = airport('KAAA', POS.lat, POS.lon);
 const KBBB_POS = pointFrom(POS, 0, 40);
@@ -74,7 +74,7 @@ async function showTri6(unit: HeadlessUnit): Promise<void> {
 
 // 5-4 (TRI 2), 5-5 (TRI 4) and 5-6 (TRI 6): the pages list the areas of special use airspace along the route
 describe('special use airspaces along the route, TRI 2 (5-4)', () => {
-    // The area holds the present position, which is the first search center, so #102 does not hide it
+    // The area holds the present position, which is the first search center
     it('lists an area that holds the start of the route', async () => {
         const unit = await bootWith([squareAt('R-ST', 0)]);
 
@@ -83,7 +83,7 @@ describe('special use airspaces along the route, TRI 2 (5-4)', () => {
         expect(areaRows()).toEqual(FIRST_AREA('R-ST'));
     });
 
-    it.fails('lists an area in the far part of the route (#102)', async () => {
+    it('lists an area in the far part of the route (#102)', async () => {
         const unit = await bootWith([squareAt('R-FAR', 32)]);
 
         await showTri2(unit);
@@ -92,8 +92,9 @@ describe('special use airspaces along the route, TRI 2 (5-4)', () => {
     });
 
     // The area holds the second search center. The first search, from the present position, sees it by its bounding box
-    // and rejects it; the shared session then does not offer it again to the search from the middle of the route.
-    it.fails('lists an area that holds the middle of the route (#102)', async () => {
+    // and (before #102 was fixed) the shared session then did not offer it again to the search from the middle of the
+    // route.
+    it('lists an area that holds the middle of the route (#102)', async () => {
         const unit = await bootWith([squareAt('R-MID', 20)]);
 
         await showTri2(unit);
@@ -111,7 +112,7 @@ describe('special use airspaces along the route, TRI 4 (5-5)', () => {
         expect(areaRows()).toEqual(FIRST_AREA('R-ST'));
     });
 
-    it.fails('lists an area in the far part of the route (#102)', async () => {
+    it('lists an area in the far part of the route (#102)', async () => {
         const unit = await bootWith([squareAt('R-FAR', 32)]);
 
         await showTri4(unit);
@@ -129,7 +130,7 @@ describe('special use airspaces along the route, TRI 6 (5-6)', () => {
         expect(areaRows()).toEqual(FIRST_AREA('R-ST'));
     });
 
-    it.fails('lists an area in the far part of the route (#102)', async () => {
+    it('lists an area in the far part of the route (#102)', async () => {
         const unit = await bootWith([squareAt('R-FAR', 32)], savedFlightplan(0, [KAAA, KBBB]));
 
         await showTri6(unit);

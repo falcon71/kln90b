@@ -104,7 +104,7 @@ class MemoryNearestSession {
  * The raw sim boundary session (NearestBoundarySearchSession): it returns BoundaryFacility objects and reports removed
  * ones by id. The candidates are the airspaces of the type mask whose bounding box meets the search circle; they are
  * sorted by the distance to the box and cut at maxItems. This is inferred from the comment in
- * NearestUtils.getAirspaces ("searchNearest seems to only check the bounding box"), not observed in the sim. The SDK's
+ * NearestUtils.getAirspacesAt ("searchNearest seems to only check the bounding box"), not observed in the sim. The SDK's
  * NearestLodBoundarySearchSession wraps it and builds the LodBoundary objects in a throttled queue on
  * requestAnimationFrame, so a test advances the clock for a search to finish.
  */

@@ -36,8 +36,7 @@ describe('TRI 6 page (characterization)', () => {
 
 describe('TRI 6 page (5-6)', () => {
     // 5-6, step 4 and figures 5-19 and 5-20: after a plan is selected on TRI 5, TRI 6 shows the same plan. FPL 3 lies
-    // far from FPL 0 and starts inside a restricted area (the route search finds only such areas, #102), so the area
-    // tells the plans apart
+    // far from FPL 0 and starts inside a restricted area, so the area tells the plans apart
     it('shows the flight plan selected on TRI 5 (5-6)', async () => {
         const kccc = airport('KCCC', 52.0, 4.0);
         const kddd = airport('KDDD', 52.5, 4.0);

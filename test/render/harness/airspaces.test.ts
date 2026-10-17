@@ -41,7 +41,7 @@ describe('airspaces served by the harness', () => {
 
     it('lists an airspace that lies on the route on TRI 2', async () => {
         // The route runs from the present position (47.0N) to KBBB, 20 NM north. The airspace straddles the route and
-        // holds its search centers (the position and the middle of the route), so #102 does not hide it.
+        // holds its search centers (the position and the middle of the route).
         const unit = await bootUnit({
             facilities: [airport('KBBB', 47.3333, 8.0)],
             position: {lat: 47.0, lon: 8.0}, altitudeFt: 0,

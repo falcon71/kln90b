@@ -561,10 +561,15 @@ written then, on purpose: the default autopilot reads it.
   the VOR list holds every VOR class (#204). The search runs every 10 s and bearing and distance update every 1 Hz. The
   airport filter comes from the `nearestAptSurface` and `nearestAptMinRunwayLength` settings, with `updateFilters()`
   called from pages.
-- `NearestUtils`: nearest helpers for pages and airspaces. It double-checks `BoundaryUtils.isInside`, because the SDK
-  only checks the bounding box ("CANADA RVSM"). `getNearestLowHighVor` gives NAV 2 its low or high altitude VOR within
-  200 NM through a `NearestVorSearch` (`data/navdata/NearestVorSearch.ts`); NAV 2 calls it when it opens and every 10 s
-  while it is shown, never while another page is (#204).
+- `NearestUtils`: nearest helpers for pages and airspaces. Every airspace search goes through one
+  `NearestLodBoundarySearchSession`, which reports a result as the difference from its previous search. So the class
+  mirrors the session in one map (every added airspace in, every removed one out) and runs the searches one at a time
+  in a FIFO queue; each queued run sets its own type mask first (#102). `getAirspacesAt` (OTH 2, the APT 1 airspace
+  row) searches at radius 0 and keeps only the airspaces that contain the point (`BoundaryUtils.isInside`), because
+  the SDK seems to only check the bounding box ("CANADA RVSM"). `getAirspaces` (TRI 2, 4 and 6, CTR 1) returns the
+  airspaces whose box meets the search circle and leaves the geometry to the caller. `getNearestLowHighVor` gives
+  NAV 2 its low or high altitude VOR within 200 NM through a `NearestVorSearch` (`data/navdata/NearestVorSearch.ts`);
+  NAV 2 calls it when it opens and every 10 s while it is shown, never while another page is (#204).
 - `Database` (`data/navdata/Database.ts`): AIRAC expiry from `FacilityLoader.getDatabaseCycles().current`;
   `isAiracCurrent()`.
 - `FirMap.ts` (FIR code to 3-letter name) and `CountryMap.ts` (`STATEMAP`, `COUNTRYMAP`) are static lookup tables used
