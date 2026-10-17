@@ -3,6 +3,8 @@ import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {legWorld} from '../../../harness/fixtures';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan, storedSetting} from '../../../harness/storage';
+import {mount} from '../../../harness/render/mount';
+import {VnavAngleFieldset} from '../../../../kln90b/controls/selects/VnavFieldsets';
 
 // VnavAngleFieldset: a sign that is shown and not entered, a units digit and a tenths digit around a fixed point.
 // VnavDistanceFieldset: the two digits of the VNAV offset in whole NM. The angle is hosted on CAL 4 (row 4, after
@@ -82,9 +84,9 @@ describe('VNAV angle fieldset', () => {
 
     // 5-12 (figures 5-39 to 5-41): the angle is a sign, a digit, the point and a digit, followed by the degree sign in
     // the last cell. At 10.3 degrees the tenths cell is empty (its value is not a number), so the degree sign moves one
-    // cell left and the row reads "ANGLE: 1.°": an angle that reads as one degree and a field one cell short. What the
-    // unit shows instead (a cap at 9.9, dashes) is open; any of them keeps the degree sign in the last cell.
-    it.fails('keeps the degree sign in the last cell at 10.3 degrees (5-12, #314)', async () => {
+    // cell left and the row reads "ANGLE: 1.°": an angle that reads as one degree and a field one cell short. Dashes
+    // (#314) keep the degree sign in the last cell.
+    it('keeps the degree sign in the last cell at 10.3 degrees (5-12, #314)', async () => {
         const unit = await bootUnit({storage: {cal4GS: 60, cal4Fpm: 1000, cal4Angle: 9.35}});
         await unit.panel.selectPage('L', 'CAL 4');
         await unit.panel.cursor('L');
@@ -95,6 +97,148 @@ describe('VNAV angle fieldset', () => {
         const row = Screen.read().rows('L')[4];
         expect(row[10]).toBe('°');
         expect(row.slice(6, 10)).not.toMatch(/^ 1\.$/);
+    });
+
+    // 60 kt is 6076.1 ft/min: atan(1100 / 6076.1) = 10.26 degrees, which does not fit the units digit. The 90B's own
+    // form of a value that does not fit is not shown by any page, so the dashes are a characterization.
+    it('shows -.- when the rate is raised to 1100 ft/min at 60 kt, 10.26 degrees (characterization, #314)', async () => {
+        const unit = await bootUnit({storage: {cal4GS: 60, cal4Fpm: 1000, cal4Angle: 9.35}});
+        await unit.panel.selectPage('L', 'CAL 4');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 4); // the hundreds of FPM
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   1100', 'ANGLE: -.-°']);
+    });
+
+    // atan(1060 / 6076.1) = 9.90 degrees still fits: the digits show, with the degree sign in the last cell
+    it('shows 9.9 for a stored angle of 9.90 degrees (characterization, #314)', async () => {
+        const unit = await bootUnit({storage: {cal4GS: 60, cal4Fpm: 1060, cal4Angle: 9.9}});
+        await unit.panel.selectPage('L', 'CAL 4');
+
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   1060', 'ANGLE: 9.9°']);
+    });
+
+    // An angle that rounds to 10.0 does not fit either: 9.96 shows as dashes, 9.94 as 9.9
+    it('shows -.- for a stored angle of 9.96 degrees, which rounds to 10.0 (characterization, #314)', async () => {
+        const unit = await bootUnit({storage: {cal4GS: 60, cal4Fpm: 1000, cal4Angle: 9.96}});
+        await unit.panel.selectPage('L', 'CAL 4');
+
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE: -.-°');
+    });
+
+    it('shows 9.9 for a stored angle of 9.94 degrees (characterization, #314)', async () => {
+        const unit = await bootUnit({storage: {cal4GS: 60, cal4Fpm: 1000, cal4Angle: 9.94}});
+        await unit.panel.selectPage('L', 'CAL 4');
+
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE: 9.9°');
+    });
+
+    // A stored angle that does not fit opens dashed
+    it('opens a stored angle of 10.26 degrees as -.- (characterization, #314)', async () => {
+        const unit = await bootUnit({storage: {cal4GS: 60, cal4Fpm: 1100, cal4Angle: 10.26}});
+        await unit.panel.selectPage('L', 'CAL 4');
+
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE: -.-°');
+    });
+
+    // The sign cell shows a minus for a negative angle (characterization: the sign is not entered, and CAL 4 stores
+    // none, so this holds the sign cell, not a page)
+    it('shows the sign of a stored negative angle (characterization, #314)', async () => {
+        const unit = await bootUnit({storage: {cal4GS: 60, cal4Fpm: 100, cal4Angle: -2.3}});
+        await unit.panel.selectPage('L', 'CAL 4');
+
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE:-2.3°');
+    });
+
+    // An edit of the dashed angle starts from 0.0: the units turned up once give 1.0 degree, which is 106 ft/min at
+    // 60 kt and shows as 0100 (hundreds)
+    it('edits a dashed angle from 0.0 (characterization, #314)', async () => {
+        const unit = await onAngle({cal4GS: 60, cal4Fpm: 1100, cal4Angle: 10.26});
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE: -.-°');
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   0100', 'ANGLE: 1.0°']);
+        expect(storedSetting(unit, 'cal4Angle')).toBe(1);
+    });
+
+    // The tenths of the dashed angle edit from 0.0 as well: 0.5 degrees is 53 ft/min at 60 kt, shown as 0100
+    it('edits the tenths of a dashed angle from 0.0 (characterization, #314)', async () => {
+        const unit = await onAngle({cal4GS: 60, cal4Fpm: 1100, cal4Angle: 10.26});
+        await unit.panel.outer('L', 1);
+        expect(unit.panel.focused('L')).toMatchObject({row: 4, col: 9});
+        await unit.panel.inner('L', 5);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   0100', 'ANGLE: 0.5°']);
+        expect(storedSetting(unit, 'cal4Angle')).toBe(0.5);
+    });
+
+    // The dashes hold no value, also when the angle fitted a moment before: 9.35 degrees at 60 kt and 1000 ft/min, the
+    // rate raised to 1100 ft/min dashes the angle, and the units turned up once give 1.0, not 1.4 from the 9.35 behind
+    // the dashes
+    it('edits the units of an angle dashed by the rate from 0.0, not from the angle before (characterization, #314)', async () => {
+        const unit = await bootUnit({storage: {cal4GS: 60, cal4Fpm: 1000, cal4Angle: 9.35}});
+        await unit.panel.selectPage('L', 'CAL 4');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 4); // the hundreds of FPM
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE: -.-°');
+        await unit.panel.outer('L', 1); // the tens and ones of FPM are read-only: the units of the angle
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   0100', 'ANGLE: 1.0°']);
+        expect(storedSetting(unit, 'cal4Angle')).toBe(1);
+    });
+
+    it('edits the tenths of an angle dashed by the rate from 0.0, not from the angle before (characterization, #314)', async () => {
+        const unit = await bootUnit({storage: {cal4GS: 60, cal4Fpm: 1000, cal4Angle: 9.35}});
+        await unit.panel.selectPage('L', 'CAL 4');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 4);
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE: -.-°');
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 5);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   0100', 'ANGLE: 0.5°']);
+        expect(storedSetting(unit, 'cal4Angle')).toBe(0.5);
+    });
+
+    // A zero angle is not negative: the sign cell stays blank
+    it('shows a zero angle with a blank sign (characterization, #314)', async () => {
+        const unit = await bootUnit({storage: {cal4GS: 60, cal4Fpm: 0, cal4Angle: 0}});
+        await unit.panel.selectPage('L', 'CAL 4');
+
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE: 0.0°');
+    });
+
+    // The field rendered on its own, before any display tick: an angle that does not fit, none and NaN (the angle to a
+    // waypoint at the altitude of the aircraft, 0 / 0, on NAV 4) show dashes; 9.9 is the largest that fits
+    it('renders an angle that does not fit, none and NaN as dashes (characterization, #314)', () => {
+        const noop = () => undefined;
+        expect([10.26, -12, 100, null, NaN].map(a => mount(new VnavAngleFieldset(a, noop)).text()))
+            .toEqual([' -.-', ' -.-', ' -.-', ' -.-', ' -.-']);
+        expect(mount(new VnavAngleFieldset(9.94, noop)).text()).toBe(' 9.9');
+    });
+
+    // The sign of a negative angle goes when the angle then does not fit
+    it('blanks the sign when a negative angle becomes dashes (characterization, #314)', () => {
+        const field = new VnavAngleFieldset(-2.3, () => undefined);
+        const shown = mount(field);
+        const tickAll = () => (['sign', 'angle1', 'angle01'] as const).forEach(c => field.children.get(c).tick(false));
+        tickAll();
+        expect(shown.text()).toBe('-2.3');
+
+        field.setValue(-12);
+        tickAll();
+        expect(shown.text()).toBe(' -.-');
     });
 });
 
