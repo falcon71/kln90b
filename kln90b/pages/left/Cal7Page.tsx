@@ -3,7 +3,7 @@ import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {SelectField} from "../../controls/selects/SelectField";
-import {TimeStamp, TIMEZONES, UTC} from "../../data/Time";
+import {TimeStamp, TIMEZONES} from "../../data/Time";
 import {WaypointEditor} from "../../controls/editors/WaypointEditor";
 import {DateEditor} from "../../controls/editors/DateEditor";
 import {TimeDisplay} from "../../controls/displays/TimeDisplay";
@@ -32,19 +32,19 @@ export class Cal7Page extends SixLineHalfPage {
         super(props);
 
 
-        let date = this.props.memory.calPage.cal7DateZ;
-        if (date === null) {
-            date = this.props.sensors.in.gps.timeZulu;
-            this.props.memory.calPage.cal7DateZ = date;
-        }
-
         let zone = this.props.memory.calPage.cal7Timezone;
         if (zone === null) {
             zone = this.props.userSettings.getSetting("timezone").get();
             this.props.memory.calPage.cal7Timezone = zone;
         }
 
-        date = date.atTimezone(TIMEZONES[zone]);
+        let date = this.props.memory.calPage.cal7Date;
+        if (date === null) {
+            //5-15: the date defaults to today, in the zone the page shows
+            const now = this.props.sensors.in.gps.timeZulu.atTimezone(TIMEZONES[zone]);
+            date = TimeStamp.createDate(now.getYear(), now.getMonth(), now.getDate());
+            this.props.memory.calPage.cal7Date = date;
+        }
 
 
         let wpt = this.props.memory.calPage.cal7Wpt;
@@ -87,8 +87,10 @@ export class Cal7Page extends SixLineHalfPage {
             this.children.get("set").time = null;
         } else {
             const timeZone = TIMEZONES[this.props.memory.calPage.cal7Timezone!];
-            //#166: the date on the page is shown in the selected zone, and the times are for that date
-            const date = this.props.memory.calPage.cal7DateZ!.atTimezone(timeZone);
+            //#166: the times are for the date shown, in the selected zone. #390: the date is a calendar date that stays
+            //as entered, so a zone change does not move it
+            const d = this.props.memory.calPage.cal7Date!;
+            const date = TimeStamp.createDate(d.getYear(), d.getMonth(), d.getDate(), timeZone);
             const sunrise = calculateSunrise(date, this.props.memory.calPage.cal7Wpt);
             const sunset = calculateSunset(date, this.props.memory.calPage.cal7Wpt);
             this.children.get("rise").time = sunrise?.atTimezone(timeZone) ?? null;
@@ -102,7 +104,7 @@ export class Cal7Page extends SixLineHalfPage {
     }
 
     private saveDate(date: TimeStamp): void {
-        this.props.memory.calPage.cal7DateZ = date.atTimezone(UTC);
+        this.props.memory.calPage.cal7Date = TimeStamp.createDate(date.getYear(), date.getMonth(), date.getDate());
         this.requiresRedraw = true;
     }
 

@@ -126,7 +126,8 @@ export interface CalPageState {
     cal6ToTimezone: number | null,
 
     cal7Wpt: Facility | null,
-    cal7DateZ: TimeStamp | null,
+    /** The calendar date shown on CAL 7: a UTC midnight stamp used only for its year, month and day (#390) */
+    cal7Date: TimeStamp | null,
     cal7Timezone: number | null,
 
 
@@ -218,7 +219,7 @@ export class VolatileMemory {
 
         cal7Wpt: null,
         cal7Timezone: null,
-        cal7DateZ: null,
+        cal7Date: null,
 
     };
 
@@ -292,7 +293,7 @@ export class VolatileMemory {
         this.calPage.cal6ToTimezone = null;
 
         this.calPage.cal7Wpt = null;
-        this.calPage.cal7DateZ = null;
+        this.calPage.cal7Date = null;
         this.calPage.cal7Timezone = null;
 
         this.ctrPage.state = CtrState.NO_FPL;

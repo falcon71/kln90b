@@ -68,7 +68,7 @@ describe('date editor on SET 2', () => {
 });
 
 /**
- * CAL 7 (5-15): its date is always editable, and the entered date is kept in `memory.calPage.cal7DateZ`. The clock
+ * CAL 7 (5-15): its date is always editable, and the entered date is kept in `memory.calPage.cal7Date`. The clock
  * starts at 12:00 UTC on 1 June 2026 and the system zone is UTC, so the page opens on 01 JUN 26.
  */
 async function onCal7Date(): Promise<HeadlessUnit> {
@@ -82,7 +82,7 @@ async function onCal7Date(): Promise<HeadlessUnit> {
 
 const dateRow = () => Screen.read().rows('L')[2];
 const cal7Date = (unit: HeadlessUnit) => {
-    const d = unit.props.memory.calPage.cal7DateZ!;
+    const d = unit.props.memory.calPage.cal7Date!;
     return [d.getYear(), d.getMonth(), d.getDate()];
 };
 

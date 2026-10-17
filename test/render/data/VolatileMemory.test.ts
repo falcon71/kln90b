@@ -211,7 +211,7 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
         m.calPage.cal6FromTimezone = 4;
         m.calPage.cal6ToTimezone = 5;
         m.calPage.cal7Wpt = abc;
-        m.calPage.cal7DateZ = TimeStamp.create(0);
+        m.calPage.cal7Date = TimeStamp.create(0);
         m.calPage.cal7Timezone = 6;
         m.ctrPage.state = CtrState.DONE;
         m.ctrPage.lastFpl = m.fplPage.flightplans[0];
@@ -231,7 +231,7 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
         expect(m.navPage.nav4VnavAngle).toBeNull();
         expect(m.navPage.nav4FromAlt).toBe(0);
         expect(m.navPage.nav4VnavDist).toBe(0);
-        expect(m.calPage).toMatchObject({cal6FromTimezone: null, cal6ToTimezone: null, cal7Wpt: null, cal7DateZ: null, cal7Timezone: null});
+        expect(m.calPage).toMatchObject({cal6FromTimezone: null, cal6ToTimezone: null, cal7Wpt: null, cal7Date: null, cal7Timezone: null});
         expect(m.ctrPage).toEqual({state: CtrState.NO_FPL, lastFpl: null, lastFplPage: null, waypoints: [], computedLegs: null});
         expect(m.othPage.reserve).toBe(0);
         expect(m.isReady).toBe(true);
