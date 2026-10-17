@@ -569,7 +569,9 @@ written then, on purpose: the default autopilot reads it.
   the SDK seems to only check the bounding box ("CANADA RVSM"). `getAirspaces` (TRI 2, 4 and 6, CTR 1) returns the
   airspaces whose box meets the search circle and leaves the geometry to the caller. `getNearestLowHighVor` gives
   NAV 2 its low or high altitude VOR within 200 NM through a `NearestVorSearch` (`data/navdata/NearestVorSearch.ts`);
-  NAV 2 calls it when it opens and every 10 s while it is shown, never while another page is (#204).
+  NAV 2 calls it when it opens and every 10 s while it is shown, never while another page is (#204). OTH 2 looks up
+  the Center of the present position through `getAirspacesAt` when it opens and every 10 s while it is shown, one
+  lookup at a time (#251, 3-52).
 - `Database` (`data/navdata/Database.ts`): AIRAC expiry from `FacilityLoader.getDatabaseCycles().current`;
   `isAiracCurrent()`.
 - `FirMap.ts` (FIR code to 3-letter name) and `CountryMap.ts` (`STATEMAP`, `COUNTRYMAP`) are static lookup tables used
