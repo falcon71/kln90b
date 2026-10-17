@@ -91,20 +91,27 @@ export class Tri5Page extends SixLineHalfPage {
             this.to = IcaoFixedLength.getIdentFromFacility(fplLegs[fplLegs.length - 1].wpt);
 
             const from = new GeoPoint(0, 0);
-            let gs: Knots | null = 0;
+            let hours = 0;
+            let noSolution = false;
             this.dist = 0;
             for (let i = 1; i < fplLegs.length; i++) {
                 from.set(fplLegs[i - 1].wpt);
-
-                this.dist += UnitType.GA_RADIAN.convertTo(from.distance(fplLegs[i].wpt), UnitType.NMILE);
-                const bearing = from.bearingTo(fplLegs[i].wpt);
-                const legGs = calculateGroundspeedAlongCourse(this.props.memory.triPage.tas, bearing, this.props.memory.triPage.windSpeed, this.props.memory.triPage.windDirTrue);
+                const legDist = UnitType.GA_RADIAN.convertTo(from.distance(fplLegs[i].wpt), UnitType.NMILE);
+                this.dist += legDist;
+                const legGs = calculateGroundspeedAlongCourse(this.props.memory.triPage.tas, from.bearingTo(fplLegs[i].wpt), this.props.memory.triPage.windSpeed, this.props.memory.triPage.windDirTrue);
                 //a leg the wind leaves no solution for leaves the plan without a ground speed (#167)
-                gs = gs === null || legGs === null ? null : gs + legGs;
+                if (legGs === null) {
+                    noSolution = true;
+                } else {
+                    hours += legDist / legGs;
+                }
             }
 
-            this.gs = gs === null ? null : gs / (fplLegs.length - 1);
-            this.ete = this.gs === null ? null : this.dist / this.gs * HOURS_TO_SECONDS;
+            //#254: 5-6 calls the shown GS the average of the plan, from the TAS and wind applied to each leg, but does not
+            //say how the legs are weighted. The maintainer's ruling: the ETE of the plan is the sum of the leg times, and
+            //the GS row is the distance over that time
+            this.gs = noSolution ? null : this.dist / hours;
+            this.ete = noSolution ? null : hours * HOURS_TO_SECONDS;
         }
 
         this.children.get("from").text = this.from;

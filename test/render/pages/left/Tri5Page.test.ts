@@ -34,11 +34,12 @@ describe('TRI 5 page (characterization)', () => {
         Object.assign(unit.props.memory.triPage, {ff: 30, reserve: 25}); // volatile memory, read when the page is built
         await unit.panel.selectPage('L', 'TRI 5');
         expect(unit.errors).toEqual([]);
-        // Row 2 (the ground speed and the ETE) is left out until the average of the leg speeds is decided (#254)
-        expect(Screen.read().rows('L').filter((_, i) => i !== 2)).toMatchInlineSnapshot(`
+        // Row 2 is 91.23 NM at 150 kt (no wind), 36.49 min: 0:36 (the GS row is characterization, #254)
+        expect(Screen.read().rows('L')).toMatchInlineSnapshot(`
           [
             "FP 0   91nm",
             "KAAA -KBBB ",
+            "150kt  0:36",
             "FF: 00030.0",
             "RES:00025.0",
             "F REQ  43.2",
@@ -142,19 +143,42 @@ describe('TRI 5 ground speed with a wind that differs per leg', () => {
         return unit;
     }
 
-    // 5-6: the sibling of the pin below. The plan and its total distance
+    // 5-6: the plan and its total distance, the context of the #254 tests below
     it('shows FPL 0 from KAAA to KCCC, 300 NM (5-6)', async () => {
         await bootWindRoute();
         expect(Screen.read().rows('L').slice(0, 2)).toEqual(['FP 0  300nm', 'KAAA -KCCC ']);
     });
 
-    // 5-6: the TAS and wind are applied to each leg of the plan, and the page gives the ETE of the plan. 30 NM at
-    // 100 kt and 270 NM at 200 kt take 0.3 h + 1.35 h = 99 min (an average ground speed of 300 / 1.65 = 182 kt). The
-    // page averages the two leg speeds without weighting them by distance, 150 kt, and shows 120 min. Above an hour,
-    // where the form is the same on every page
-    it.fails('shows the ETE of the plan as the sum of the leg times, 1:39 (5-6, #254)', async () => {
+    // The sum of the leg times is the maintainer's ruling for #254, not a rule of the guide. 5-6 applies the TAS and wind
+    // to each leg and calls the ground speed the average of the plan, but does not say how the legs are weighted. Here
+    // 30 NM at 100 kt and 270 NM at 200 kt take 0.3 h + 1.35 h = 99 min, 1:39 (an average ground speed of
+    // 300 / 1.65 = 182 kt). The distance over the mean of the leg speeds (150 kt) would give 2:00, the value the page
+    // showed before #254. The ETE is above an hour, where it has the h:mm form that every page uses
+    it('shows the ETE of the plan as the sum of the leg times, 1:39 (characterization, #254)', async () => {
         await bootWindRoute();
         expect(Screen.read().rows('L')[2].slice(6)).toBe(' 1:39');
+    });
+
+    // The GS row shows the plan distance over the summed leg times: 300 NM / 1.65 h = 181.8 kt, shown as 182kt. 5-6 calls
+    // it the average of the plan but not how it is weighted, so the weighting is the maintainer's ruling (#254)
+    it('shows the plan distance over the summed leg times as the GS, 182kt (characterization, #254)', async () => {
+        await bootWindRoute();
+        expect(Screen.read().rows('L')[2]).toBe('182kt  1:39');
+    });
+
+    // The GS hundreds turned up and back down: 300 NM / 282 kt is 1.064 h, 1:04, and 300 NM / 182 kt is 1:39 again.
+    // The cursor reaches the hundreds digit as in the test above (characterization, #254)
+    it('recomputes the ETE from the GS edited up and back: 282kt 1:04, then 182kt 1:39 (characterization, #254)', async () => {
+        const unit = await bootWindRoute();
+        await unit.panel.cursor('L');
+        for (let i = 0; i < 10 && unit.panel.focused('L').row !== 2; i++) {
+            await unit.panel.outer('L', 1);
+        }
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 0, text: '1'}); // the hundreds digit of the ground speed
+        await unit.panel.inner('L', 1); // 182 -> 282
+        expect(Screen.read().rows('L')[2]).toBe('282kt  1:04');
+        await unit.panel.inner('L', -1); // 282 -> 182
+        expect(Screen.read().rows('L')[2]).toBe('182kt  1:39');
     });
 });
 
