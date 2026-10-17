@@ -29,8 +29,11 @@ export class SpeedDisplay implements UiElement {
         if (this.speed === null) {
             return "---";
         }
-        const clamped = Utils.Clamp(this.speed, 0, 999);
-        return format(clamped, "0").padStart(3, " ");
+        const rounded = Math.round(this.speed);
+        if (!(rounded >= 0 && rounded <= 999)) {
+            return "---"; //#257: a speed that does not fit shows dashes, it was clamped to 999
+        }
+        return format(rounded, "0").padStart(3, " ");
     }
 }
 

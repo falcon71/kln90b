@@ -73,45 +73,17 @@ export class BoundaryUtils {
      * @param lon2
      */
     public static intersects(boundary: LodBoundary, lat1: number, lon1: number, lat2: number, lon2: number): boolean {
-        if (boundary.lods.length <= 0 || boundary.lods[0].length <= 0) {
-            return false;
-        }
-        const lod = boundary.lods[0][0];
-
-        const isCrossingDateLine = boundary.facility.bottomRight.long - boundary.facility.topLeft.long > 180;
-        if (isCrossingDateLine && lon1 <= 0) {
-            lon1 += 360; //If the airspace crosses the dateline, we shift the entire coordinate system of the left hemisphere to the right
-        }
-        if (isCrossingDateLine && lon2 <= 0) {
-            lon2 += 360; //If the airspace crosses the dateline, we shift the entire coordinate system of the left hemisphere to the right
-        }
-
-        //todo we are only calculating direct paths here and ignore the circle property. This means, we do not support any circular airspaces!
-        // The ring is closed (the last point equals the first), so the edges run from point 0 to the last point
-        for (let current = 0; current < lod.length - 1; current++) {
-            const next = current + 1;
-            const lat3 = lod[current].end.lat;
-            let lon3 = lod[current].end.lon;
-            const lat4 = lod[next].end.lat;
-            let lon4 = lod[next].end.lon;
-
-            if (isCrossingDateLine && lon3 <= 0) {
-                lon3 += 360; //If the airspace crosses the dateline, we shift the entire coordinate system of the left hemisphere to the right
-            }
-            if (isCrossingDateLine && lon4 <= 0) {
-                lon4 += 360; //If the airspace crosses the dateline, we shift the entire coordinate system of the left hemisphere to the right
-            }
-
-            const intersection = this.getIntersectionBetweenTwoLines(lat1, lon1, lat2, lon2, lat3, lon3, lat4, lon4);
-
-            if (intersection !== null) {
-                return true;
-            }
-        }
-
-        return false;
+        return this.getIntersections(boundary, lat1, lon1, lat2, lon2).length > 0;
     }
 
+    /**
+     * Returns the points, where the flightpath crosses the airspace boundary
+     * @param boundary
+     * @param lat1
+     * @param lon1
+     * @param lat2
+     * @param lon2
+     */
     public static getIntersections(boundary: LodBoundary, lat1: number, lon1: number, lat2: number, lon2: number): GeoPoint[] {
         if (boundary.lods.length <= 0 || boundary.lods[0].length <= 0) {
             return [];
@@ -119,14 +91,25 @@ export class BoundaryUtils {
         const lod = boundary.lods[0][0];
         const results: GeoPoint[] = [];
 
+        //#106: the path and the ring are unwrapped into one continuous longitude range around the box, so that neither
+        //the date line nor the prime meridian splits them. A box wider than 180 degrees is the code's sign of a box across
+        //the date line (#9); its reference is 180, otherwise the middle of the box. GeoPoint normalizes the results.
+        const left = boundary.facility.topLeft.long;
+        const right = boundary.facility.bottomRight.long;
+        const reference = right - left > 180 ? 180 : (left + right) / 2;
+        const unwrap = (lon: number) => lon + 360 * Math.round((reference - lon) / 360);
+        const pathLon1 = unwrap(lon1);
+        const pathLon2 = pathLon1 + (((lon2 - lon1) % 360 + 540) % 360 - 180);
+
+        //todo we are only calculating direct paths here and ignore the circle property. This means, we do not support any circular airspaces!
         // The ring is closed (the last point equals the first), so the edges run from point 0 to the last point
         for (let current = 0; current < lod.length - 1; current++) {
             const next = current + 1;
             const lat3 = lod[current].end.lat;
-            const lon3 = lod[current].end.lon;
+            const lon3 = unwrap(lod[current].end.lon);
             const lat4 = lod[next].end.lat;
-            const lon4 = lod[next].end.lon;
-            const intersection = this.getIntersectionBetweenTwoLines(lat1, lon1, lat2, lon2, lat3, lon3, lat4, lon4);
+            const lon4 = unwrap(lod[next].end.lon);
+            const intersection = this.getIntersectionBetweenTwoLines(lat1, pathLon1, lat2, pathLon2, lat3, lon3, lat4, lon4);
 
             if (intersection !== null) {
                 results.push(intersection);

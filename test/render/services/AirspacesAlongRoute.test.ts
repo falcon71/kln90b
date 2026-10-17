@@ -8,12 +8,14 @@ import {Screen} from '../../harness/render/screen';
 import {savedFlightplan} from '../../harness/storage';
 
 // The route runs 40 NM due north from the aircraft's position at 47.0N 8.0E. The unit searches the airspaces along
-// a leg from two centers of radius 20 NM, the start and the middle of the leg, and #102 hides what these searches
-// miss: an area is listed only if it holds the start of the route.
+// a leg from two centers of radius 20 NM, the start and the middle of the leg. (Before #102 was fixed, an area was
+// listed only if it held the start of the route.)
 const POS = {lat: 47.0, lon: 8.0};
 const KAAA = airport('KAAA', POS.lat, POS.lon);
 const KBBB_POS = pointFrom(POS, 0, 40);
 const KBBB = airport('KBBB', KBBB_POS.lat, KBBB_POS.lon);
+// 1e-9 degrees north of KAAA: a leg between them has no length to split (#391)
+const KNEAR = airport('KNEAR', POS.lat + 1e-9, POS.lon);
 
 /** A restricted area of 5 NM by 5 NM, centered alongNm NM along the route (corners from pointFrom) */
 function squareAt(name: string, alongNm: number): BoundaryFacility {
@@ -74,7 +76,7 @@ async function showTri6(unit: HeadlessUnit): Promise<void> {
 
 // 5-4 (TRI 2), 5-5 (TRI 4) and 5-6 (TRI 6): the pages list the areas of special use airspace along the route
 describe('special use airspaces along the route, TRI 2 (5-4)', () => {
-    // The area holds the present position, which is the first search center, so #102 does not hide it
+    // The area holds the present position, which is the first search center
     it('lists an area that holds the start of the route', async () => {
         const unit = await bootWith([squareAt('R-ST', 0)]);
 
@@ -83,7 +85,7 @@ describe('special use airspaces along the route, TRI 2 (5-4)', () => {
         expect(areaRows()).toEqual(FIRST_AREA('R-ST'));
     });
 
-    it.fails('lists an area in the far part of the route (#102)', async () => {
+    it('lists an area in the far part of the route (#102)', async () => {
         const unit = await bootWith([squareAt('R-FAR', 32)]);
 
         await showTri2(unit);
@@ -92,8 +94,9 @@ describe('special use airspaces along the route, TRI 2 (5-4)', () => {
     });
 
     // The area holds the second search center. The first search, from the present position, sees it by its bounding box
-    // and rejects it; the shared session then does not offer it again to the search from the middle of the route.
-    it.fails('lists an area that holds the middle of the route (#102)', async () => {
+    // and (before #102 was fixed) the shared session then did not offer it again to the search from the middle of the
+    // route.
+    it('lists an area that holds the middle of the route (#102)', async () => {
         const unit = await bootWith([squareAt('R-MID', 20)]);
 
         await showTri2(unit);
@@ -111,12 +114,58 @@ describe('special use airspaces along the route, TRI 4 (5-5)', () => {
         expect(areaRows()).toEqual(FIRST_AREA('R-ST'));
     });
 
-    it.fails('lists an area in the far part of the route (#102)', async () => {
+    it('lists an area in the far part of the route (#102)', async () => {
         const unit = await bootWith([squareAt('R-FAR', 32)]);
 
         await showTri4(unit);
 
         expect(areaRows()).toEqual(FIRST_AREA('R-FAR'));
+    });
+});
+
+// The guide does not show a route without length (its examples are two different waypoints), so these pins are
+// characterization. The code searches the point of such a route, and an area holding that point is listed by the same
+// rule as any route start (the test above and "lists an area that holds the start of the route").
+describe('special use airspaces along a route without length, TRI 4 (characterization)', () => {
+    it('lists the area around a route from a waypoint to itself (characterization, #391)', async () => {
+        const unit = await bootWith([squareAt('R-HERE', 0)]);
+        await settle(unit);
+        await unit.panel.selectPage('L', 'TRI 3');
+        await unit.panel.cursor('L');
+        await unit.panel.type('L', 'KAAA');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await unit.panel.type('L', 'KAAA');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await unit.panel.cursor('L');
+        await unit.panel.selectPage('L', 'TRI 4');
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().rows('L')[0]).toBe('KAAA -KAAA ');
+        expect(areaRows()).toEqual(FIRST_AREA('R-HERE'));
+    });
+
+    // A leg of 1e-9 degrees (about 6e-8 NM) is below the threshold of splitLeg: its great circle degenerates and the
+    // search threw "the specified point does not lie on this circle" in a promise nobody catches (characterization, #391)
+    it('lists the area around a leg of 1e-9 degrees without throwing (characterization, #391)', async () => {
+        const unit = await bootUnit({
+            facilities: [KAAA, KNEAR], position: POS, altitudeFt: 0, airspaces: [squareAt('R-HERE', 0)],
+        });
+        await settle(unit);
+        await unit.panel.selectPage('L', 'TRI 3');
+        await unit.panel.cursor('L');
+        await unit.panel.type('L', 'KAAA');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await unit.panel.type('L', 'KNEAR');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await unit.panel.cursor('L');
+        await unit.panel.selectPage('L', 'TRI 4');
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(areaRows()).toEqual(FIRST_AREA('R-HERE'));
     });
 });
 
@@ -129,7 +178,7 @@ describe('special use airspaces along the route, TRI 6 (5-6)', () => {
         expect(areaRows()).toEqual(FIRST_AREA('R-ST'));
     });
 
-    it.fails('lists an area in the far part of the route (#102)', async () => {
+    it('lists an area in the far part of the route (#102)', async () => {
         const unit = await bootWith([squareAt('R-FAR', 32)], savedFlightplan(0, [KAAA, KBBB]));
 
         await showTri6(unit);

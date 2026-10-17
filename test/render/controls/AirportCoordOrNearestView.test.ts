@@ -61,9 +61,10 @@ describe('APT 1 airspace row (3-42)', () => {
     });
 });
 
-// #102: NearestUtils.getAirspaces keeps one search session and one result map for every caller. The session reports
-// only what was added or removed since the last search, and the map takes an added airspace only if the search point
-// lies inside it
+// #102: NearestUtils keeps one search session and one result map for every caller. The session reports only what was
+// added or removed since the last search; the map mirrors that result, and the airport row takes the airspaces that
+// contain the airport (getAirspacesAt). The pins below failed while the map took an added airspace only if the search
+// point lay inside it
 describe('APT 1 airspace row after another airport (#102)', () => {
     // 3-42: the preconditions of the first pin below, KIN under the Class C and KOUT next on the scan
     it('shows CL C for KIN, then KOUT on the scan (sibling of the first #102 pin) (3-42)', async () => {
@@ -74,8 +75,8 @@ describe('APT 1 airspace row after another airport (#102)', () => {
         expect((await scanToNext(unit))[0]).toBe(' KOUT      ');
     });
 
-    // 3-42: KOUT lies under no airspace; the Class C of KIN, shown before, stays in the shared map
-    it.fails('leaves the row blank for KOUT after KIN under a Class C (3-42, #102)', async () => {
+    // 3-42: KOUT lies under no airspace; the Class C of KIN, shown before, must not stay on the row of KOUT
+    it('leaves the row blank for KOUT after KIN under a Class C (3-42, #102)', async () => {
         const unit = await bootWith([triangle('TEST CLASS C', BoundaryType.ClassC)]);
         await showApt1(unit);
 
@@ -83,7 +84,7 @@ describe('APT 1 airspace row after another airport (#102)', () => {
     });
 
     // 3-42: the preconditions of the second pin below. The search for KAOU (KOUT's position), shown first, offers the
-    // airspace and the map refuses it, so the row is blank; KIN is next on the scan
+    // airspace and getAirspacesAt filters it out (KAOU lies outside it), so the row is blank; KIN is next on the scan
     it('shows KAOU with a blank row, then KIN on the scan (sibling of the second #102 pin) (3-42)', async () => {
         const unit = await bootWith([triangle('TEST CLASS C', BoundaryType.ClassC)], airport('KAOU', 46.85, 12.15),
             kin());
@@ -94,7 +95,7 @@ describe('APT 1 airspace row after another airport (#102)', () => {
     });
 
     // 3-42: KIN lies under the Class C, whichever airport was shown before
-    it.fails('shows CL C for KIN after KAOU (3-42, #102)', async () => {
+    it('shows CL C for KIN after KAOU (3-42, #102)', async () => {
         const unit = await bootWith([triangle('TEST CLASS C', BoundaryType.ClassC)], airport('KAOU', 46.85, 12.15),
             kin());
         await showApt1(unit);

@@ -26,17 +26,14 @@ export class TripFuelDisplay implements UiElement {
     }
 
     private formatFuel(): string {
-        if (this.fuel === null) {
-            return "---.-";
+        if (this.fuel === null || !(this.fuel >= 0) || Math.round(this.fuel) > 99999) {
+            return "---.-"; //#257: a fuel that does not fit shows dashes, it was capped at 99999
         }
-
-        const actFuel = Math.min(this.fuel, 99999);
-
         //Compare the rounded value, 99.97 is shown as 100.0 otherwise
-        if (Math.round(actFuel * 10) / 10 >= 100) { //Number is too large for decimals
-            return format(actFuel, "00").padStart(5, " ");
+        if (Math.round(this.fuel * 10) / 10 >= 100) { //Number is too large for decimals
+            return format(this.fuel, "00").padStart(5, " ");
         } else {
-            return format(actFuel, "0.0").padStart(5, " ");
+            return format(this.fuel, "0.0").padStart(5, " ");
         }
     }
 }

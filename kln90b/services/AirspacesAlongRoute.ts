@@ -13,6 +13,9 @@ interface SplittedLeg {
 
 const MAX_SEARCH_RADIUS = 100;
 
+// A leg shorter than this (about 2 mm) is searched at its point, see splitLeg (#391)
+const MIN_LEG_LENGTH: NauticalMiles = 1e-6;
+
 const CACHED_POINT = new GeoPoint(0, 0);
 
 
@@ -29,6 +32,12 @@ function splitLeg(idx: number, from: LatLonInterface, to: LatLonInterface, maxDi
     const circle = new GeoCircle(new Float64Array(3), 0);
     CACHED_POINT.set(from);
     const dist = UnitType.GA_RADIAN.convertTo(CACHED_POINT.distance(to), UnitType.NMILE);
+
+    if (dist < MIN_LEG_LENGTH) {
+        //#391: a leg without length is searched at its point; the split below would divide 0 by 0, and
+        //setAsGreatCircle has no circle through one point. Below the threshold the circle degenerates as well.
+        return [{fromIdx: idx, coord: from, searchRadius: 0}];
+    }
 
     const numResults = Math.ceil(dist / (maxDist * 2));
 
@@ -68,7 +77,7 @@ export async function airspacesAlongRoute(route: LatLonInterface[], utils: Neare
     for (let i = 1; i < route.length; i++) {
         legs.push(...splitLeg(i - 1, route[i - 1], route[i]));
     }
-    const airspaces: LodBoundary[][] = Array(route.length - 1).fill([]);
+    const airspaces: LodBoundary[][] = Array.from({length: route.length - 1}, (): LodBoundary[] => []);
     for (const leg of legs) {
         airspaces[leg.fromIdx].push(...await utils.getAirspaces(leg.coord.lat, leg.coord.lon, UnitType.METER.convertFrom(leg.searchRadius, UnitType.NMILE), 200, SPECIAL_USE_AIRSPACE_FILTER));
     }
@@ -124,7 +133,7 @@ export async function airspaceIntersectionsAlongRoute(route: LatLonInterface[], 
     for (let i = 1; i < route.length; i++) {
         legs.push(...splitLeg(i - 1, route[i - 1], route[i]));
     }
-    const airspaces: LodBoundary[][] = Array(route.length - 1).fill([]);
+    const airspaces: LodBoundary[][] = Array.from({length: route.length - 1}, (): LodBoundary[] => []);
     for (const leg of legs) {
         airspaces[leg.fromIdx].push(...await utils.getAirspaces(leg.coord.lat, leg.coord.lon, UnitType.METER.convertFrom(leg.searchRadius, UnitType.NMILE), 200, filter));
     }

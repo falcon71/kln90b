@@ -245,7 +245,7 @@ export class AirportCoordOrNearestView implements UiElement {
             return;
         }
 
-        this.nearestUtils.getAirspaces(facility.lat, facility.lon, 10, 100, BOUNDARY_FLAGS).then(airspaces => {
+        this.nearestUtils.getAirspacesAt(facility.lat, facility.lon, 100, BOUNDARY_FLAGS).then(airspaces => {
             if (this.facility) {
                 this.children.get("airportType").text = this.formatAirportType(airspaces);
             }

@@ -6,8 +6,8 @@ import {airspace} from '../../../harness/navdata/airspaces';
 import {airport} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 
-// The aircraft is at KAAA; KBBB lies 40 NM due north. The areas below all hold the present position, because the
-// route search only finds such areas (#102, pinned in AirspacesAlongRoute.test.ts).
+// The aircraft is at KAAA; KBBB lies 40 NM due north. The areas below all hold the present position, the first search
+// center of the route search (they were written while #102 hid the areas that do not).
 const POS = {lat: 47.0, lon: 8.0};
 
 /** A restricted area of 5 NM by 5 NM around the present position */

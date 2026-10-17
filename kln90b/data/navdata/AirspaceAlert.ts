@@ -147,7 +147,7 @@ export class AirspaceAlert implements CalcTickable {
         }
 
         //3-39 MSL is checked. AGL means is treated as GND to unlimited
-        if (airspace.minAltType === BoundaryAltitudeType.MSL && indicatedAltitude < UnitType.METER.convertTo(airspace.minAlt, UnitType.FOOT) - this.altBuffer.get()) {
+        if (!isCylinder(airspace) && airspace.minAltType === BoundaryAltitudeType.MSL && indicatedAltitude < UnitType.METER.convertTo(airspace.minAlt, UnitType.FOOT) - this.altBuffer.get()) {
             return false;
         }
 
@@ -164,7 +164,8 @@ export class AirspaceAlert implements CalcTickable {
         const maxStringlength = 22 - type.length; //Messages are intended
         const name = airspace.name.substring(0, maxStringlength - 1).padEnd(maxStringlength) + type;
 
-        const lowLimit = airspace.minAltType === BoundaryAltitudeType.MSL ? Math.round(UnitType.METER.convertTo(airspace.minAlt, UnitType.FOOT)) : null;
+        //#352, figure 3-126: a cylinder shows its upper limit only
+        const lowLimit = !isCylinder(airspace) && airspace.minAltType === BoundaryAltitudeType.MSL ? Math.round(UnitType.METER.convertTo(airspace.minAlt, UnitType.FOOT)) : null;
         const highLimit = airspace.maxAltType === BoundaryAltitudeType.MSL ? Math.round(UnitType.METER.convertTo(airspace.maxAlt, UnitType.FOOT)) : null;
 
         let altString = "";
@@ -179,6 +180,14 @@ export class AirspaceAlert implements CalcTickable {
         return altString === "" ? [name] : [name, altString];
     }
 
+}
+
+/**
+ * 3-40: Class B and C are stored by their outer lateral boundary as a cylinder, so every altitude below the upper
+ * limit counts as inside (#352)
+ */
+function isCylinder(airspace: BoundaryFacility): boolean {
+    return airspace.type === BoundaryType.ClassB || airspace.type === BoundaryType.ClassC;
 }
 
 export function formatAirspaceTypeName(type: BoundaryType): string {

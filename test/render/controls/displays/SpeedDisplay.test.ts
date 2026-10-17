@@ -28,10 +28,10 @@ describe('MachDisplay', () => {
 });
 
 describe('SpeedDisplay (characterization)', () => {
-    it('characterization: speeds are rounded to the knot and stop at 0 and 999', () => {
+    // #257 vehicle: this test also held a speed of 1234 as 999 and -5 as 0; a speed that does not fit now shows dashes
+    // (the tests below)
+    it('characterization: speeds are rounded to the knot', () => {
         expect(mountedText(new SpeedDisplay(144.6))).toBe('145');
-        expect(mountedText(new SpeedDisplay(1234))).toBe('999');
-        expect(mountedText(new SpeedDisplay(-5))).toBe('  0');
     });
 
     it('characterization: the Mach number stops at .99', () => {
@@ -47,5 +47,29 @@ describe('SpeedDisplay (characterization)', () => {
         ms.tick();
         mm.tick();
         expect([ms.text(), mm.text()]).toEqual(['193', '.50']);
+    });
+});
+
+// #257: a speed that does not fit the three cells shows dashes, as without a value (the KLN 89 shows dashes for its CAL
+// values out of range, checked in the KLN 89 trainer, 2026-10-17); the 90B's own form is a characterization
+describe('SpeedDisplay, a speed that does not fit (characterization, #257)', () => {
+    it('shows 999.4 as 999 (characterization, #257)', () => {
+        expect(mountedText(new SpeedDisplay(999.4))).toBe('999');
+    });
+
+    it('shows 999.5 as dashes (characterization, #257)', () => {
+        expect(mountedText(new SpeedDisplay(999.5))).toBe('---');
+    });
+
+    it('shows NaN as dashes (characterization, #257)', () => {
+        expect(mountedText(new SpeedDisplay(NaN))).toBe('---');
+    });
+
+    it('shows -1 as dashes (characterization, #257)', () => {
+        expect(mountedText(new SpeedDisplay(-1))).toBe('---');
+    });
+
+    it('shows Infinity as dashes (characterization, #257)', () => {
+        expect(mountedText(new SpeedDisplay(Infinity))).toBe('---');
     });
 });

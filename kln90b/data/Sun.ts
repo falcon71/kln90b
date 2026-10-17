@@ -1,4 +1,4 @@
-import {TimeStamp, UTC} from "./Time";
+import {TimeStamp} from "./Time";
 import {Degrees} from "./Units";
 import {LatLonInterface, NavMath} from "@microsoft/msfs-sdk";
 
@@ -18,10 +18,9 @@ export function calculateSunset(date: TimeStamp, coords: LatLonInterface, zenith
  * https://edwilliams.org/sunrise_sunset_algorithm.htm
  */
 function calculateSunriseSet(date: TimeStamp, coords: LatLonInterface, zenith: Degrees, isRise: boolean): TimeStamp | null {
-    const utcDate = date.atTimezone(UTC);
-
+    //#166, 5-15: the calendar date in the stamp's own zone is the day asked for, not the UTC date of the stamp
     //1. first calculate the day of the year
-    const N = calcDayOfYear(utcDate);
+    const N = calcDayOfYear(date);
 
     //2. convert the longitude to hour value and calculate an approximate time
     const lngHour = coords.lon / 15;
@@ -90,7 +89,7 @@ function calculateSunriseSet(date: TimeStamp, coords: LatLonInterface, zenith: D
     const hours = Math.floor(UT);
     const minutes = (UT - hours) * 60;
     //From the start of the day: the seconds of the date are not an input (5-15)
-    return TimeStamp.create(Date.UTC(utcDate.getYear(), utcDate.getMonth(), utcDate.getDate()) + (hours * 60 + minutes) * 60000);
+    return TimeStamp.create(Date.UTC(date.getYear(), date.getMonth(), date.getDate()) + (hours * 60 + minutes) * 60000);
 }
 
 function calcDayOfYear(date: TimeStamp) {

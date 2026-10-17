@@ -200,7 +200,7 @@ and `runwayFix(apt, '27')` and `runwayFix(apt, '09')` both resolve, 27 with a co
 them as `BootOptions.airspaces`, add them to a flight with `World.addAirspace()`, or call
 `MemoryFacilityClient.addAirspace()`. The boundary session filters by the type mask (`1 << BoundaryType`), selects the
 airspaces whose bounding box meets the search circle, sorts them by distance to the box, cuts at `maxItems` and reports
-removed ones by id. The bounding-box selection is inferred from a comment in `NearestUtils.getAirspaces`, not observed
+removed ones by id. The bounding-box selection is inferred from a comment in `NearestUtils.getAirspacesAt`, not observed
 in the sim. The SDK's `NearestLodBoundarySearchSession` builds the `LodBoundary` objects in a throttled queue on
 `requestAnimationFrame`, so a test advances the fake clock for a search to finish. The builder sets `lods: []`, so that
 LOD 0 is the exact ring instead of a simplified one, and `resetSingletons` clears the SDK's boundary cache, which is
@@ -241,8 +241,9 @@ returns `{kaaa, kbbb, kccc, bgd, gck, centers}` for the CTR pages: three airport
 VORs BGD and GCK, and three Center airspaces stacked along that meridian that share their boundaries at 42.75 N and
 47.75 N. BGD is the closest VOR to the first crossing and GCK to the second. A plan through the airports
 should keep its legs at 300 NM: the route search searches circles of about 75 NM radius at 0, 75 and 225 NM along a leg,
-so each Center is first returned by a search whose center lies inside it, and a Center first returned from outside it is
-dropped for good by the shared search session (#102). Both return fresh objects on every call; pass `centers` as
+so each Center is met by a search whose center lies inside it. (Before #102 was fixed, a Center first returned from
+outside it was dropped for good by the shared search session, which the long legs hid.) Both return fresh objects on
+every call; pass `centers` as
 `BootOptions.airspaces`.
 
 `legWorld()` returns `{kddd, kaaa, keee, west}`, the leg world of the NAV 3 and NAV 4 pages and the Super NAV 5
@@ -769,7 +770,7 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   instrument's own drawing, not a pixel-exact copy of what the sim shows.
 - **The navdata is synthetic, and some of its rules are inferred.** The facilities, airspaces and procedures are
   invented (section 3). The fake follows two rules, one inferred and one quoted: the nearest airspace search selects
-  by bounding box (inferred from a comment in `NearestUtils.getAirspaces`, not observed in the sim), and the nearest
+  by bounding box (inferred from a comment in `NearestUtils.getAirspacesAt`, not observed in the sim), and the nearest
   filters let an airport without runways pass the surface and length filters (the sim developers' rule, quoted to the
   maintainer from their code). A test that passes against the fake proves the instrument's use of those rules, not that
   the sim applies them.

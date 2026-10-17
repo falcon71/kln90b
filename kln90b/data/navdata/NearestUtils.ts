@@ -29,10 +29,14 @@ export class NearestUtils {
 
     private lowHighVorSearch: NearestVorSearch | undefined;
 
-    private readonly nearestAirspaces = new Map<number, LodBoundary>(); //All airspaces, that are near the plane
-
-
     private airspaceSession: NearestLodBoundarySearchSession | undefined;
+
+    //#102: the map mirrors the session's current result (every added airspace in, every removed one out), and the
+    //searches run one at a time: the session reports each result as the difference from its previous search, and
+    //NearestLodBoundarySearchSession builds the boundaries of a search in a throttled queue, so a large search can finish
+    //after a later one
+    private readonly airspaceMap = new Map<number, LodBoundary>();
+    private airspaceQueue: Promise<unknown> = Promise.resolve();
 
     public constructor(private readonly facilityLoader: FacilityClient) {
     }
@@ -81,25 +85,45 @@ export class NearestUtils {
     }
 
     /**
-     * Returns the airspaces at the given location.
-     * The result is always the complete list.
+     * Returns the airspaces that contain the given point (OTH 2, the APT 1 airspace row)
      * @param lat
      * @param lon
-     * @param radius
      * @param maxItems
      * @param filter
      */
-    public async getAirspaces(lat: number, lon: number, radius: number, maxItems: number, filter: number): Promise<LodBoundary[]> {
-        this.airspaceSession!.setFilter(filter);
-        const result = await this.airspaceSession!.searchNearest(lat, lon, radius, maxItems);
-        for (const airspace of result.added) {
-            if (BoundaryUtils.isInside(airspace, lat, lon)) { //We need to check this. searchNearest seems to only check the bounding box, which can be huge like CANADA RVSM
-                this.nearestAirspaces.set(airspace.facility.id, airspace);
+    public async getAirspacesAt(lat: number, lon: number, maxItems: number, filter: number): Promise<LodBoundary[]> {
+        const found = await this.searchAirspaces(lat, lon, 0, maxItems, filter);
+        //searchNearest seems to only check the bounding box, which can be huge like CANADA RVSM
+        return found.filter(airspace => BoundaryUtils.isInside(airspace, lat, lon));
+    }
+
+    /**
+     * Returns the airspaces whose bounding box seems to meet the search circle, for the route searches (TRI 2, 4 and 6,
+     * CTR 1); the caller checks the geometry
+     * @param lat
+     * @param lon
+     * @param radius in meters
+     * @param maxItems
+     * @param filter
+     */
+    public getAirspaces(lat: number, lon: number, radius: number, maxItems: number, filter: number): Promise<LodBoundary[]> {
+        return this.searchAirspaces(lat, lon, radius, maxItems, filter);
+    }
+
+    private searchAirspaces(lat: number, lon: number, radius: number, maxItems: number, filter: number): Promise<LodBoundary[]> {
+        const run = async () => {
+            this.airspaceSession!.setFilter(filter);
+            const result = await this.airspaceSession!.searchNearest(lat, lon, radius, maxItems);
+            for (const id of result.removed) {
+                this.airspaceMap.delete(id);
             }
-        }
-        for (const id of result.removed) {
-            this.nearestAirspaces.delete(id);
-        }
-        return [...this.nearestAirspaces.values()];
+            for (const airspace of result.added) {
+                this.airspaceMap.set(airspace.facility.id, airspace);
+            }
+            return [...this.airspaceMap.values()];
+        };
+        const search = this.airspaceQueue.then(run);
+        this.airspaceQueue = search.catch(() => undefined);
+        return search;
     }
 }

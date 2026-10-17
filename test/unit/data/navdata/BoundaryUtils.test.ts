@@ -40,19 +40,35 @@ describe('BoundaryUtils across the date line (characterization, #9 103ea59)', ()
             expect(BoundaryUtils.intersects(dateLineBox, 15, 170, 15, 175)).toBe(false);
         });
     });
+});
 
-    // Both bugs come from the same shift: a path from 10W to 10E has its western end shifted to 350E, so it appears to
-    // span the whole box, and getIntersections does no shifting at all.
-    describe('known bugs', () => {
-        it.fails('finds no intersection for a short path around 0 degrees longitude (#106)', () => {
-            expect(BoundaryUtils.intersects(dateLineBox, 15, -10, 15, 10)).toBe(false);
-        });
+// #106: the path and the ring are read in one continuous longitude range around the box, so neither the date line nor the
+// prime meridian splits them. This is geometry in the lat/lon plane, there is no manual page for it.
+describe('the longitude range of the path and the box (#106)', () => {
+    // A box from 5W to 5E, 10N to 20N: it does not cross the date line, its reference longitude is its middle, 0
+    const primeBox = new LodBoundary(airspace('PRIME', BoundaryType.Restricted, [[10, -5], [10, 5], [20, 5], [20, -5]]));
 
-        it.fails('returns both crossing points of a path across the date line (#106)', () => {
-            const points = BoundaryUtils.getIntersections(dateLineBox, 15, 178, 15, -178);
-            expect(points.map(p => p.lat)).toEqual([15, 15]);
-            expect(points.map(p => ((p.lon + 540) % 360) - 180).sort((a, b) => a - b)).toEqual([-179, 179]);
-        });
+    it('finds no intersection for a short path around 0 degrees longitude (#106)', () => {
+        expect(BoundaryUtils.intersects(dateLineBox, 15, -10, 15, 10)).toBe(false);
+    });
+
+    it('returns both crossing points of a path across the date line (#106)', () => {
+        const points = BoundaryUtils.getIntersections(dateLineBox, 15, 178, 15, -178);
+        expect(points.map(p => p.lat)).toEqual([15, 15]);
+        expect(points.map(p => ((p.lon + 540) % 360) - 180).sort((a, b) => a - b)).toEqual([-179, 179]);
+    });
+
+    it('returns both crossing points of a path from 10W to 10E through a box around 0 degrees (#106)', () => {
+        const points = BoundaryUtils.getIntersections(primeBox, 15, -10, 15, 10);
+        expect(points.map(p => p.lat)).toEqual([15, 15]);
+        expect(points.map(p => p.lon).sort((a, b) => a - b)).toEqual([-5, 5]);
+        expect(BoundaryUtils.intersects(primeBox, 15, -10, 15, 10)).toBe(true);
+    });
+
+    // The path from 170E to 170W is the short one across the date line, 20 degrees long; read as 170 to -170 it would
+    // span the whole world through the box
+    it('finds no intersection for a path across the date line with a box around 0 degrees (#106)', () => {
+        expect(BoundaryUtils.intersects(primeBox, 15, 170, 15, -170)).toBe(false);
     });
 });
 

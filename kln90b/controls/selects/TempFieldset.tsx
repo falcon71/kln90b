@@ -16,16 +16,20 @@ const TEMP_SET = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 export class TempFieldset implements UiElement {
 
-
     readonly children: UIElementChildren<TempFieldsetTypes>;
+    /**
+     * null while the field shows dashes or a temperature of 100 or more: it holds no value, and an edit starts from 000
+     * with the sign cell on 0 (#257)
+     */
+    private temp: Celsius | null = null;
 
-    constructor(private temp: Celsius, private readonly callback: (temp: Celsius) => void) {
-        const tempString = format(Math.abs(temp), "00");
+    constructor(temp: Celsius | null, private readonly callback: (temp: Celsius) => void) {
         this.children = new UIElementChildren<TempFieldsetTypes>({
-            TempSign: new SelectField(SIGN_SET, temp >= 0 ? 1 : 0, this.saveSign.bind(this)),
-            Temp10: new SelectField(TEMP_SET, Number(tempString.substring(0, 1)), this.saveTemp10.bind(this)),
-            Temp1: new SelectField(TEMP_SET, Number(tempString.substring(1, 2)), this.saveTemp1.bind(this)),
+            TempSign: new SelectField(SIGN_SET, 1, this.saveSign.bind(this)),
+            Temp10: new SelectField(TEMP_SET, 0, this.saveTemp10.bind(this)),
+            Temp1: new SelectField(TEMP_SET, 0, this.saveTemp1.bind(this)),
         });
+        this.setTemp(temp);
     }
 
     render(): VNode {
@@ -36,31 +40,59 @@ export class TempFieldset implements UiElement {
     tick(blink: boolean): void {
     }
 
-    public setTemp(temp: Celsius): void {
-        this.temp = temp;
-        const tempString = format(Math.abs(temp), "00");
-        this.children.get("TempSign").value = temp >= 0 ? 1 : 0;
-        this.children.get("Temp10").value = Number(tempString.substring(0, 1));
-        this.children.get("Temp1").value = Number(tempString.substring(1, 2));
+    /**
+     * #257: -99 to 99 shows the sign cell and two digits. 100 to 999 shows its hundreds digit in the sign cell, but
+     * the field holds no value, since the sign cell can only be - or 0. Anything else (none, NaN, -100 or less, 1000
+     * or more) shows dashes and holds no value.
+     */
+    public setTemp(temp: Celsius | null): void {
+        const rounded = temp === null ? NaN : Math.round(temp);
+        if (rounded >= -99 && rounded <= 99) { //rounded is NaN without a temperature
+            this.temp = temp;
+            this.children.get("TempSign").value = temp! >= 0 ? 1 : 0;
+            this.showDigits(format(Math.abs(temp!), "00"));
+            return;
+        }
 
+        this.temp = null;
+        this.children.get("TempSign").value = 1;
+        this.showDigits("00");
+        const override = rounded >= 100 && rounded <= 999 ? format(rounded, "000") : "---";
+        this.fields().forEach((field, i) => field.displayOverride = override.substring(i, i + 1));
+    }
+
+    private fields(): SelectField[] {
+        return [this.children.get("TempSign"), this.children.get("Temp10"), this.children.get("Temp1")];
+    }
+
+    /**
+     * Sets the two digit cells and clears every override. The sign cell keeps its value: it is the owner of the sign
+     */
+    private showDigits(digits: string): void {
+        this.children.get("Temp10").value = Number(digits.substring(0, 1));
+        this.children.get("Temp1").value = Number(digits.substring(1, 2));
+        this.fields().forEach(field => field.displayOverride = null);
     }
 
     private saveSign(newSign: number): void {
-        const oldTemp = Math.abs(this.temp);
-        this.temp = oldTemp * (newSign === 0 ? -1 : 1);
-        this.callback(this.temp);
+        const oldTemp = Math.abs(this.temp ?? 0);
+        this.save(oldTemp * (newSign === 0 ? -1 : 1));
     }
 
     private saveTemp10(newTemp10: number): void {
-        const oldTemp = format(Math.abs(this.temp), "00");
-        this.temp = this.sign() * Number(newTemp10 + oldTemp.substring(1));
-        this.callback(this.temp);
+        const oldTemp = format(Math.abs(this.temp ?? 0), "00");
+        this.save(this.sign() * Number(newTemp10 + oldTemp.substring(1)));
     }
 
     private saveTemp1(newTemp1: number): void {
-        const oldTemp = format(Math.abs(this.temp), "00");
-        this.temp = this.sign() * Number(oldTemp.substring(0, 1) + newTemp1);
-        this.callback(this.temp);
+        const oldTemp = format(Math.abs(this.temp ?? 0), "00");
+        this.save(this.sign() * Number(oldTemp.substring(0, 1) + newTemp1));
+    }
+
+    private save(temp: Celsius): void {
+        this.temp = temp;
+        this.showDigits(format(Math.abs(temp), "00"));
+        this.callback(temp);
     }
 
     /**

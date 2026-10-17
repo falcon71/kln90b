@@ -1,6 +1,6 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
-import {distanceNm} from '../../../harness/flight/geo';
+import {distanceNm, pointFrom} from '../../../harness/flight/geo';
 import {airport} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 
@@ -168,5 +168,63 @@ describe('TRI 1 page (5-3, 5-4)', () => {
         expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FF: 00030.0', 'RES:00005.0']);
         await unit.panel.selectPage('L', 'TRI 5');
         expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FF: 00030.0', 'RES:00005.0']);
+    });
+});
+
+// #257: a distance that does not fit the four cells shows dashes (the KLN 89 shows dashes for its CAL values out of
+// range, checked in the KLN 89 trainer, 2026-10-17); the 90B's own form is a characterization. A waypoint 10500 NM
+// away overflowed the row before, which the harness reports as an error.
+describe('TRI 1, a distance that does not fit (characterization, #257)', () => {
+    it('shows ----nm for a waypoint 10500 NM away (characterization, #257)', async () => {
+        const far = pointFrom(POS, 0, 10500);
+        const unit = await bootUnit({
+            facilities: [airport('KAAA', POS.lat, POS.lon), airport('KFAR', far.lat, far.lon)], position: POS, magvar: 0,
+        });
+        await settle(unit);
+        await unit.panel.selectPage('L', 'TRI 1');
+        expect(distanceNm(POS, far)).toBeCloseTo(10500, 0); // The precondition: the waypoint is 10500 NM away
+        await enterTo(unit, 'KFAR');
+        await unit.panel.cursor('L');
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.errors).toEqual([]);
+        const rows = Screen.read().rows('L');
+        expect(rows[0]).toBe('P.POS-KFAR ');
+        expect(rows[1].slice(0, 6)).toBe('----nm');
+    });
+});
+
+// #167: the TAS and wind are applied to the direction of flight: the aircraft crabs into the wind to hold the course
+// (5-3 says only that the result applies to the direction of flight; the crab and the dashes are math and the 90B's
+// own form, so they are characterizations).
+describe('TRI 1 ground speed along the course (characterization, #167)', () => {
+    // The course is 180. TAS 150 and a wind from 090 at 30 kt: sqrt(150^2 - 30^2) = 146.97 kt, 60.107 NM in 24.54 min (shown as 0:25).
+    // The heading formula gave 153 kt
+    it('shows 147kt for TAS 150 with a 30 kt crosswind (characterization, #167)', async () => {
+        const unit = await bootTri1({tas: 150, windDirTrue: 90, windSpeed: 30});
+        await enterTo(unit, 'KBBB');
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['  60nm 180°', '147kt  0:25']);
+    });
+
+    // TAS 20 against a 35 kt crosswind (50 kt from 045 on the course 180): no heading holds the course
+    it('shows dashes for the ground speed, ETE and F REQ where the wind leaves no solution (characterization, #167)', async () => {
+        const unit = await bootTri1({tas: 20, windDirTrue: 45, windSpeed: 50, ff: 10});
+        await enterTo(unit, 'KBBB');
+        expect(unit.errors).toEqual([]);
+        const rows = Screen.read().rows('L');
+        expect([rows[1], rows[2], rows[5]]).toEqual(['  60nm 180°', '---kt --:--', 'F REQ ---.-']);
+    });
+
+    // 5-3 shows only that any ground speed may be entered instead of the TAS and wind result; the rest is the math.
+    // After a route without a solution the ground speed is dashed; the inner knob edits it from 000 (#257) and the ETE
+    // and the fuel come back: 60.107 NM at 100 kt is 36.06 min, 0.601 h * 10 = 6.0
+    it('brings the ETE and F REQ back when a ground speed is entered after a route with no solution (characterization, #167)', async () => {
+        const unit = await bootTri1({tas: 20, windDirTrue: 45, windSpeed: 50, ff: 10});
+        await enterTo(unit, 'KBBB');
+        await cursorToCell(unit, 2, 0);
+        await unit.panel.inner('L', 1); // the hundreds digit: 000 -> 100
+        expect(unit.errors).toEqual([]);
+        const rows = Screen.read().rows('L');
+        expect([rows[2], rows[5]]).toEqual(['100kt  0:36', 'F REQ   6.0']);
     });
 });

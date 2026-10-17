@@ -128,9 +128,9 @@ export function dtWorld() {
  * KZFW, KZAB and KZDV, and each carries a frequency: OTH 2 throws without one, and selectPage may pass OTH 2.
  *
  * The legs of a plan through the airports should be 300 NM long, as KAAA to KBBB is: the route search splits a leg and
- * searches circles of about 75 NM radius at 0, 75 and 225 NM along it, so a Center is first returned by a search whose
- * center lies inside it. A Center that the shared search session first returns from outside it is dropped for good
- * (#102), so a shorter leg shows the bug instead of the page. Fresh objects on every call, airspaces included.
+ * searches circles of about 75 NM radius at 0, 75 and 225 NM along it, so each Center is met by a search whose center
+ * lies inside it. (Until #102 was fixed, a Center that the shared search session first returned from outside it was
+ * dropped for good, which the long legs hid.) Fresh objects on every call, airspaces included.
  */
 export function centerWorld() {
     /** A box of Center airspace from latitude s to n and longitude w to e, as [lat, lon] corners */

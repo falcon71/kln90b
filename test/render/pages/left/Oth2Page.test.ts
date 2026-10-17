@@ -60,9 +60,9 @@ describe('OTH 2 page, the Center of the present position (3-52)', () => {
         expect(Screen.read().rows('L').slice(0, 3)).toEqual(['BRAVO      ', 'CTR        ', '     132.85']);
     });
 
-    // 3-52: the page left on display follows the present position too; today it keeps the Center it found when it was
-    // selected
-    it.fails('names the Center of the new position while the page stays selected (3-52, #251)', async () => {
+    // 3-52: the page gives the Center of the present position, so the page left on display follows it too. That it updates
+    // by itself while shown was checked in the KLN 89 trainer, 2026-10-17
+    it('names the Center of the new position while the page stays selected (3-52, #251)', async () => {
         const unit = await bootUnit({position: {lat: 47.0, lon: 8.0}, altitudeFt: 0, airspaces: ALPHA_BRAVO()});
         await settle(unit);
         await unit.panel.selectPage('L', 'OTH 2');
@@ -72,6 +72,79 @@ describe('OTH 2 page, the Center of the present position (3-52)', () => {
         // Two periods of the unit's 10 s searches (nearest lists, airspace alert), so any periodic reload has happened by now
         await vi.advanceTimersByTimeAsync(20_000);
 
+        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['BRAVO      ', 'CTR        ', '     132.85']);
+    });
+});
+
+// The 10 s cadence is the project's common search period (NAV 2, the nearest lists, the airspace alert); the KLN 89
+// trainer's NRST CTR changed by itself within about 15 s of a boundary crossing (checked in the KLN 89 trainer,
+// 2026-10-17), which does not fix a period
+describe('OTH 2 page, how often it looks up the Center (characterization)', () => {
+    it('searches when selected and then every 10 s (characterization)', async () => {
+        const unit = await bootUnit({position: {lat: 47.0, lon: 8.0}, altitudeFt: 0, airspaces: ALPHA_BRAVO()});
+        await settle(unit);
+        const search = vi.spyOn(unit.props.nearestUtils, 'getAirspacesAt');
+        await unit.panel.selectPage('L', 'OTH 2');
+
+        await vi.advanceTimersByTimeAsync(9_000);
+        expect(search).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(2_000);
+        expect(search).toHaveBeenCalledTimes(2);
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(search).toHaveBeenCalledTimes(3);
+    });
+
+    it('starts no search while one is still running and keeps showing the Center it has (characterization)', async () => {
+        const unit = await bootUnit({position: {lat: 47.0, lon: 8.0}, altitudeFt: 0, airspaces: ALPHA_BRAVO()});
+        await settle(unit);
+        const search = vi.spyOn(unit.props.nearestUtils, 'getAirspacesAt');
+        await unit.panel.selectPage('L', 'OTH 2');
+        await vi.advanceTimersByTimeAsync(2_000);
+        search.mockImplementation(() => new Promise(() => undefined)); // every later search hangs
+
+        await moveAircraft(unit, {lat: 47.7, lon: 8.0}, {groundspeedKt: 150, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(25_000);
+
+        expect(search).toHaveBeenCalledTimes(2);
+        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['ALPHA      ', 'CTR        ', '     118.55']);
+    });
+
+    // A code contract, as for NAV 2 and the nearest lists (#95): a failed search shows on the error page and keeps the
+    // Center on screen, and the next one runs
+    it('shows a failed search on the error page, keeps the Center and searches again (characterization)', async () => {
+        const unit = await bootUnit({position: {lat: 47.0, lon: 8.0}, altitudeFt: 0, airspaces: ALPHA_BRAVO()});
+        await settle(unit);
+        const search = vi.spyOn(unit.props.nearestUtils, 'getAirspacesAt');
+        await unit.panel.selectPage('L', 'OTH 2');
+        await vi.advanceTimersByTimeAsync(2_000);
+        search.mockImplementationOnce(() => Promise.reject(new Error('center search failed'))); // the next search fails once
+
+        await moveAircraft(unit, {lat: 47.7, lon: 8.0}, {groundspeedKt: 150, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(10_000); // the failing search runs
+        expect(search).toHaveBeenCalledTimes(2);
+        expect(unit.errors.map(e => e.message)).toEqual(['center search failed']);
+        expect(document.querySelector('.errorpage')!.classList.contains('d-none')).toBe(false);
+        await vi.advanceTimersByTimeAsync(10_000); // and the one after it runs again
+
+        expect(search).toHaveBeenCalledTimes(3);
+        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['BRAVO      ', 'CTR        ', '     132.85']);
+    });
+
+    it('searches again after a result that could not be read (characterization)', async () => {
+        const unit = await bootUnit({position: {lat: 47.0, lon: 8.0}, altitudeFt: 0, airspaces: ALPHA_BRAVO()});
+        await settle(unit);
+        const search = vi.spyOn(unit.props.nearestUtils, 'getAirspacesAt');
+        await unit.panel.selectPage('L', 'OTH 2');
+        await vi.advanceTimersByTimeAsync(2_000);
+        search.mockResolvedValueOnce([null as any]); // the next result makes the handler throw
+
+        await moveAircraft(unit, {lat: 47.7, lon: 8.0}, {groundspeedKt: 150, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(search).toHaveBeenCalledTimes(2);
+        expect(unit.takeRejections()).toHaveLength(1);
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        expect(search).toHaveBeenCalledTimes(3);
         expect(Screen.read().rows('L').slice(0, 3)).toEqual(['BRAVO      ', 'CTR        ', '     132.85']);
     });
 });

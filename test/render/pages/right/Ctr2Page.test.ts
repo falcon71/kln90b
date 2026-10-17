@@ -7,8 +7,8 @@ import {Screen} from '../../../harness/render/screen';
 
 /**
  * The world of centerWorld(): three Centers stacked along 100 W (FW, ABQ and DEN in FIRMAP, Appendix D) with their
- * boundaries at 42.75 N and 47.75 N, crossed by the 300 NM legs KAAA to KBBB and KBBB to KCCC; the long legs keep each
- * Center from being first returned from outside it (#102). The VORs BGD and GCK lie 0.5 degrees north of the crossings.
+ * boundaries at 42.75 N and 47.75 N, crossed by the 300 NM legs KAAA to KBBB and KBBB to KCCC. The VORs BGD and GCK lie
+ * 0.5 degrees north of the crossings.
  * Boots with that plan as FPL 1, FPL 1 on the left, and computes the Center waypoints on CTR 1.
  */
 async function computed(o: { magvar?: number, vorMagneticVariation?: number, centerNames?: string[] } = {}): Promise<HeadlessUnit> {
@@ -37,8 +37,7 @@ const right = () => Screen.read().rows('R');
 /**
  * A plan of 26 waypoints around 40 N, KBBB and KCCC on FPL 1 (both VORs 4 E, the aircraft 10 E): the first computation
  * and the insertion of BGD00 and GCK00 are done, the plan page was left and selected again, so that the next ENT on
- * CTR 1 computes a second time (the setup of the 'does not count' test of Ctr1Page.test.ts; a second computation in one
- * unit meets #102, which finds one of the two crossings again)
+ * CTR 1 computes a second time (the setup of the 'does not count' test of Ctr1Page.test.ts)
  */
 async function afterInsertionOfFullPlan(): Promise<HeadlessUnit> {
     const w = centerWorld();
@@ -163,13 +162,14 @@ describe('CTR 2 page (5-25, 5-26)', () => {
 
     // #362 for a Center waypoint that is in the plan already (5-27: it is not created again). A plan of 26 waypoints
     // around 40 N, KBBB and KCCC takes both crossings as BGD00 and GCK00 (a full plan of 30); the second computation
-    // meets #102 and finds only one of them again, and CTR 2 converts its radial with the variation of its VOR as well
-    // (10 E at the aircraft, 4 E at both VORs). Characterization, as above
+    // finds both of them again, and CTR 2 converts the radial of the first with the variation of its VOR as well (10 E
+    // at the aircraft, 4 E at both VORs). Characterization, as above. Before the fix of #102 the shared airspace search
+    // session found only one of the two again, which this test took for its precondition
     it('characterization: converts the radial of a Center waypoint that exists already with the variation of its VOR (#362)', async () => {
         const unit = await afterInsertionOfFullPlan();
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(3000);
-        expect(unit.props.memory.ctrPage.waypoints.map(wpt => wpt.isNew)).toEqual([false]); // Precondition: one existing waypoint
+        expect(unit.props.memory.ctrPage.waypoints.map(wpt => wpt.isNew)).toEqual([false, false]); // Precondition: two existing waypoints
         await unit.panel.inner('R', 1);
 
         expect(right().slice(0, 3)).toEqual([' BGD00     ', 'FW -ABQ CTR', 'BGD    176°']);

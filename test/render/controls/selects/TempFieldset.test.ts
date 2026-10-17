@@ -2,6 +2,8 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {storedSetting} from '../../../harness/storage';
+import {mount} from '../../../harness/render/mount';
+import {TempFieldset} from '../../../../kln90b/controls/selects/TempFieldset';
 
 // TempFieldset: a sign cell and two digit cells, degrees C or F. Its host here is CAL 5, whose first field is the
 // Celsius temperature (row 1) and whose second is the Fahrenheit temperature (row 2); each value is saved as a setting
@@ -220,5 +222,114 @@ describe('temperature fieldset (characterization)', () => {
         expect(Screen.read().rows('L')[1]).toBe('   -25°C   ');
         expect(unit.panel.focused('L')).toEqual({row: 1, col: 4, text: '2'});
         expect(storedSetting(unit, 'cal5TempC')).toBe(-25);
+    });
+});
+
+// #257: a computed temperature that does not fit the sign cell and two digits. A positive one of 100 to 999 shows its
+// hundreds digit in the sign cell; anything else out of range shows dashes (the KLN 89 shows dashes for its CAL values
+// out of range, checked in the KLN 89 trainer, 2026-10-17). Either way the field holds no value, and a turn on any of its
+// cells starts from 000 with the sign cell on 0. The 90B's own forms here, the hundreds digit in the sign cell
+// included, are characterizations.
+describe('a temperature that does not fit its cells (characterization, #257)', () => {
+    /** CAL 5 from 0 C: the tens of the Celsius temperature turned to 4, 40 C */
+    async function on40C(): Promise<HeadlessUnit> {
+        const unit = await onCelsius(0, 32);
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 4);
+        await vi.advanceTimersByTimeAsync(1000);
+        return unit;
+    }
+
+    // 40 * 9 / 5 + 32 = 104
+    it('shows 40 C as 104 F, the hundreds digit in the sign cell (characterization, #257)', async () => {
+        await on40C();
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   040°C   ', '   104°F   ']);
+    });
+
+    // -80 * 9 / 5 + 32 = -112, which does not fit the sign and two digits
+    it('shows -80 C as dashes in F (characterization, #257)', async () => {
+        const unit = await onCelsius(0, 32);
+        await unit.panel.inner('L', 1); // the sign: -
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 8); // -80
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   -80°C   ', '   ---°F   ']);
+    });
+
+    it('opens a stored 104 F as 104 (characterization)', async () => {
+        await onCelsius(40, 104);
+        expect(Screen.read().rows('L')[2]).toBe('   104°F   ');
+    });
+
+    // The bound is on the rounded value: -73 C is -99.4 F (-73 * 9 / 5 + 32), which rounds to -99 and fits
+    it('shows -73 C as -99 F (characterization, #257)', async () => {
+        const unit = await onCelsius(-70, -94);
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 3); // the units: -73 C
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   -73°C   ', '   -99°F   ']);
+    });
+
+    it('opens a stored 1000 F as dashes (characterization, #257)', async () => {
+        await onCelsius(40, 1000);
+        expect(Screen.read().rows('L')[2]).toBe('   ---°F   ');
+    });
+
+    // The field rendered on its own, before any display tick: what a page shows when it is built
+    it('renders 104, -100 and none as 104 and dashes (characterization, #257)', () => {
+        const noop = () => undefined;
+        expect([104, -100, null].map(t => mount(new TempFieldset(t, noop)).text())).toEqual(['104', '---', '---']);
+        expect(mount(new TempFieldset(-99, noop)).text()).toBe('-99'); // The sibling: the lowest temperature that fits
+    });
+
+    // From 104 F the tens turned up once: the field holds no value, so the edit starts from 000 and gives 010 F,
+    // which is -12 C ((10 - 32) * 5 / 9 = -12.2)
+    it('edits 104 F from 000: the tens up once give 010 F and -12 C (characterization, #257)', async () => {
+        const unit = await on40C();
+        await unit.panel.outer('L', 3); // the tens of the Fahrenheit temperature
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 4, text: '0'});
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   -12°C   ', '   010°F   ']);
+        expect(storedSetting(unit, 'cal5TempF')).toBe(10);
+    });
+
+    // The sign cell of 104 F shows the hundreds digit, but its value is still 0: one turn makes it -, and the edit starts
+    // from 000, so the field is -00 F, which is -18 C ((0 - 32) * 5 / 9 = -17.8)
+    it('edits 104 F from 000: the sign cell turned once gives -00 F and -18 C (characterization, #257)', async () => {
+        const unit = await on40C();
+        await unit.panel.outer('L', 2); // the sign cell of the Fahrenheit temperature
+        expect(unit.panel.focused('L')).toEqual({row: 2, col: 3, text: '1'});
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   -18°C   ', '   -00°F   ']);
+    });
+
+    // -25 C (-13 F) with the tens turned to -85 C: -121 F, dashes. The units of F turned up once start from 000 with the
+    // sign cell on 0, not on the minus of -13 F behind the dashes: 001 F, which is -17 C ((1 - 32) * 5 / 9 = -17.2)
+    it('edits a dashed F from 000: the units up once give 001 F and -17 C (characterization, #257)', async () => {
+        const unit = await onCelsius(-25, -13);
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 6); // -85 C
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   -85°C   ', '   ---°F   ']);
+        await unit.panel.outer('L', 4); // the units of the Fahrenheit temperature
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   -17°C   ', '   001°F   ']);
+        expect(storedSetting(unit, 'cal5TempF')).toBe(1);
+    });
+
+    // -45 C (-49 F) with the sign turned to 45 C: 113 F. The tens of F turned up once start from 000 with the sign cell
+    // on 0, not on the minus of -49 F behind the 113: 010 F, which is -12 C
+    it('edits 113 F from 000 after -49 F: the tens up once give 010 F and -12 C (characterization, #257)', async () => {
+        const unit = await onCelsius(-45, -49);
+        await unit.panel.inner('L', 1); // the sign: 45 C
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   045°C   ', '   113°F   ']);
+        await unit.panel.outer('L', 4); // the tens of the Fahrenheit temperature
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['   -12°C   ', '   010°F   ']);
     });
 });

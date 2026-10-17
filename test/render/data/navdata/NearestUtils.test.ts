@@ -38,7 +38,7 @@ async function typeRowAfterEntering(unit: HeadlessUnit, ident: string): Promise<
     return rows[3];
 }
 
-describe('NearestUtils.getAirspaces tests the polygon, not the bounding box (133f4d8)', () => {
+describe('NearestUtils.getAirspacesAt tests the polygon, not the bounding box (133f4d8)', () => {
     describe('OTH 2', () => {
         async function oth2At(position: { lat: number; lon: number }): Promise<string[]> {
             const unit = await bootUnit({
@@ -82,13 +82,14 @@ describe('NearestUtils.getAirspaces tests the polygon, not the bounding box (133
 });
 
 describe('APT 1 airport type and the airport shown before', () => {
-    // 3-42: the airport type row depends on the airport shown and on nothing else. getAirspaces keeps one boundary
-    // session and one result map for all its callers, so the airspaces of an earlier search leak into the next (#102).
+    // 3-42: the airport type row depends on the airport shown and on nothing else. NearestUtils keeps one boundary
+    // session and one result map for all its callers; before #102 was fixed, the airspaces of an earlier search leaked
+    // into the next.
     // The passing siblings of both pins are the two single-airport tests above (133f4d8).
 
-    // Stale entry: the area found for KINS stays in the map, KOUT's search finds the same area, but it is neither added
-    // again nor removed, and the whole map comes back
-    it.fails('does not show the type of the airport shown before (#102)', async () => {
+    // The old stale entry: the area found for KINS stayed in the map, KOUT's search found the same area, but it was
+    // neither added again nor removed, and the whole map came back
+    it('does not show the type of the airport shown before (#102)', async () => {
         const unit = await bootWithAirports(airport('KINS', INSIDE.lat, INSIDE.lon), airport('KOUT', IN_BOX_ONLY.lat, IN_BOX_ONLY.lon));
 
         const shown = [await typeRowAfterEntering(unit, 'KINS'), await typeRowAfterEntering(unit, 'KOUT')];
@@ -96,13 +97,77 @@ describe('APT 1 airport type and the airport shown before', () => {
         expect(shown).toEqual(['CL B       ', '           ']);
     });
 
-    // Missed entry: KOUT's search records the area as seen and the polygon check rejects it; the search for ZZIN, which
-    // lies inside, then never gets it as added
-    it.fails('shows the type of an airport after one in the box only was shown (#102)', async () => {
+    // The old missed entry: KOUT's search recorded the area as seen and the polygon check rejected it; the search for
+    // ZZIN, which lies inside, then never got it as added
+    it('shows the type of an airport after one in the box only was shown (#102)', async () => {
         const unit = await bootWithAirports(airport('KOUT', IN_BOX_ONLY.lat, IN_BOX_ONLY.lon), airport('ZZIN', INSIDE.lat, INSIDE.lon));
 
         const shown = [await typeRowAfterEntering(unit, 'KOUT'), await typeRowAfterEntering(unit, 'ZZIN')];
 
         expect(shown).toEqual(['           ', 'CL B       ']);
+    });
+});
+
+// #102: the boundary session reports each result as the difference from its previous search, and a large search can
+// finish after a later one, so NearestUtils runs its airspace searches one at a time (characterization of the fix)
+describe('NearestUtils airspace searches run one at a time (#102)', () => {
+    type Result = {added: unknown[], removed: number[]};
+
+    async function utilsWithSession(searchNearest: (...args: unknown[]) => Promise<Result>, setFilter: (mask: number) => void = () => undefined) {
+        const unit = await bootUnit({});
+        await settle(unit);
+        const utils = unit.props.nearestUtils;
+        (utils as unknown as {airspaceSession: unknown}).airspaceSession = {setFilter, searchNearest};
+        return utils;
+    }
+
+    // each search sets its own filter when it runs, not when it is queued
+    it('starts the second search only after the first one has finished (characterization)', async () => {
+        const calls: string[] = [];
+        let finishFirst!: () => void;
+        const searchNearest = vi.fn()
+            .mockImplementationOnce(() => {
+                calls.push('start 1');
+                return new Promise<Result>(resolve => finishFirst = () => {
+                    calls.push('end 1');
+                    resolve({added: [], removed: []});
+                });
+            })
+            .mockImplementationOnce(() => {
+                calls.push('start 2');
+                return Promise.resolve({added: [], removed: []});
+            });
+        const utils = await utilsWithSession(searchNearest, mask => calls.push(`filter ${mask}`));
+
+        const first = utils.getAirspaces(47, 8, 1000, 10, 1);
+        const second = utils.getAirspaces(47, 8, 1000, 10, 2);
+        await vi.advanceTimersByTimeAsync(100);
+        expect(calls).toEqual(['filter 1', 'start 1']);
+
+        finishFirst();
+        await Promise.all([first, second]);
+        expect(calls).toEqual(['filter 1', 'start 1', 'end 1', 'filter 2', 'start 2']);
+    });
+
+    it('runs the next search after one that failed (characterization)', async () => {
+        const searchNearest = vi.fn()
+            .mockImplementationOnce(() => Promise.reject(new Error('search failed')))
+            .mockImplementationOnce(() => Promise.resolve({added: [], removed: []}));
+        const utils = await utilsWithSession(searchNearest);
+
+        await expect(utils.getAirspaces(47, 8, 1000, 10, 0)).rejects.toThrow('search failed');
+        await expect(utils.getAirspaces(47, 8, 1000, 10, 0)).resolves.toEqual([]);
+        expect(searchNearest).toHaveBeenCalledTimes(2);
+    });
+
+    it('answers with the current result of the session: what a search added stays, what it removed is gone (characterization)', async () => {
+        const area = (id: number) => ({facility: {id}});
+        const searchNearest = vi.fn()
+            .mockImplementationOnce(() => Promise.resolve({added: [area(1), area(2)], removed: []}))
+            .mockImplementationOnce(() => Promise.resolve({added: [area(3)], removed: [1]}));
+        const utils = await utilsWithSession(searchNearest);
+
+        expect((await utils.getAirspaces(47, 8, 1000, 10, 0)).map(a => a.facility.id)).toEqual([1, 2]);
+        expect((await utils.getAirspaces(47, 8, 1000, 10, 0)).map(a => a.facility.id)).toEqual([2, 3]);
     });
 });

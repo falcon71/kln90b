@@ -14,9 +14,11 @@ describe('TRI 6 page (characterization)', () => {
         await unit.panel.selectPage('L', 'TRI 6');
         await vi.advanceTimersByTimeAsync(2000); // The airspace search is asynchronous
         expect(unit.errors).toEqual([]);
+        // The leg from ABC (47.5N 8.9E) to KBBB (48.2N 9.2E) crosses 9E at 47.73N into the sector from 47N 9E
+        // (11600), which the 40 NM steps of the service used to miss (#181)
         expect(Screen.read().half('L')).toMatchInlineSnapshot(`
           "FP 0       
-          ESA 11400ft
+          ESA 11600ft
                      
                      
                      
@@ -36,8 +38,7 @@ describe('TRI 6 page (characterization)', () => {
 
 describe('TRI 6 page (5-6)', () => {
     // 5-6, step 4 and figures 5-19 and 5-20: after a plan is selected on TRI 5, TRI 6 shows the same plan. FPL 3 lies
-    // far from FPL 0 and starts inside a restricted area (the route search finds only such areas, #102), so the area
-    // tells the plans apart
+    // far from FPL 0 and starts inside a restricted area, so the area tells the plans apart
     it('shows the flight plan selected on TRI 5 (5-6)', async () => {
         const kccc = airport('KCCC', 52.0, 4.0);
         const kddd = airport('KDDD', 52.5, 4.0);

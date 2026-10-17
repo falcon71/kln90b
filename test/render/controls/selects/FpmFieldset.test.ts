@@ -2,6 +2,8 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {storedSetting} from '../../../harness/storage';
+import {mount} from '../../../harness/render/mount';
+import {FpmFieldset} from '../../../../kln90b/controls/selects/FpmFieldset';
 
 // FpmFieldset: four digit cells for a rate in feet per minute, of which the cursor reaches the thousands and the
 // hundreds. Its only host is CAL 4: GS on row 2 (three cells), FPM on row 3, ANGLE on row 4; the values are
@@ -149,5 +151,94 @@ describe('fpm fieldset (characterization)', () => {
             seen.push(unit.panel.focused('L'));
         }
         expect(seen).toEqual([{row: 3, col: 7, text: '0'}, {row: 3, col: 8, text: '8'}, {row: 4, col: 7, text: '2'}]);
+    });
+});
+
+// #346: a rate of 10000 ft/min or more does not fit the four cells. The KLN 89 shows dashes for its CAL values out of
+// range (checked in the KLN 89 trainer, 2026-10-17); the 90B's own form here, all four cells dashed, is a
+// characterization.
+describe('a rate that does not fit (characterization, #346)', () => {
+    // 600 kt is 60761 ft/min: tan(9.2 deg) * 60761 = 9842, rounded to 9800; tan(9.3 deg) * 60761 = 9950, rounded to 10000
+    it('shows 9800 for 9.2 degrees and dashes for 9.3 degrees at 600 kt (characterization)', async () => {
+        const unit = await onFpm({cal4GS: 600, cal4Fpm: 9800, cal4Angle: 9.2});
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   9800', 'ANGLE: 9.2°']);
+        await unit.panel.outer('L', 3); // the tenths of the angle
+        expect(unit.panel.focused('L')).toMatchObject({row: 4, col: 9});
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   ----', 'ANGLE: 9.3°']);
+        expect(storedSetting(unit, 'cal4Fpm')).toBe(10000);
+    });
+
+    it('opens a stored 10500 ft/min as dashes (characterization)', async () => {
+        await onFpm({cal4GS: 600, cal4Fpm: 10500, cal4Angle: 9.8});
+        expect(Screen.read().rows('L')[3]).toBe('FPM:   ----');
+    });
+
+    it('edits the dashed rate from 0000: the thousands up give 1000 and 0.9 degrees (characterization)', async () => {
+        const unit = await onFpm({cal4GS: 600, cal4Fpm: 10500, cal4Angle: 9.8});
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        // atan(1000 / 60761) = 0.94 degrees
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   1000', 'ANGLE: 0.9°']);
+        expect(storedSetting(unit, 'cal4Fpm')).toBe(1000);
+    });
+
+    it('edits the dashed rate from 0000: the thousands down give 9000 (characterization)', async () => {
+        const unit = await onFpm({cal4GS: 600, cal4Fpm: 10500, cal4Angle: 9.8});
+        await unit.panel.inner('L', -1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        // atan(9000 / 60761) = 8.43 degrees
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   9000', 'ANGLE: 8.4°']);
+        expect(storedSetting(unit, 'cal4Fpm')).toBe(9000);
+    });
+
+    it('edits the hundreds of the dashed rate from 0000 (characterization)', async () => {
+        const unit = await onFpm({cal4GS: 600, cal4Fpm: 10500, cal4Angle: 9.8});
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 3);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        // atan(300 / 60761) = 0.28 degrees
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   0300', 'ANGLE: 0.3°']);
+        expect(storedSetting(unit, 'cal4Fpm')).toBe(300);
+    });
+
+    // The rate showed 9800 before the angle 9.3 dashed it; the edit still starts from 0000, not from the 9800 behind
+    // the dashes
+    it('edits the rate dashed by the angle from 0000, not from the rate before (characterization)', async () => {
+        const unit = await onFpm({cal4GS: 600, cal4Fpm: 9800, cal4Angle: 9.2});
+        await unit.panel.outer('L', 3);
+        await unit.panel.inner('L', 1); // 9.3 degrees
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L')[3]).toBe('FPM:   ----');
+        await unit.panel.outer('L', -3); // the thousands of FPM
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FPM:   1000', 'ANGLE: 0.9°']);
+        expect(storedSetting(unit, 'cal4Fpm')).toBe(1000);
+    });
+
+    // The cursor never reaches the tens and the units, but their edit paths start from 0000 as well
+    it('edits the read-only tens and units of a dashed rate from 0000 (characterization)', () => {
+        const saved: number[] = [];
+        const tens = new FpmFieldset(10500, r => saved.push(r));
+        tens.children.get('Fpm10').innerRight();
+        const units = new FpmFieldset(10500, r => saved.push(r));
+        units.children.get('Fpm1').innerRight();
+
+        expect(saved).toEqual([10, 1]);
+    });
+
+    // The field rendered on its own, before any display tick: what a page shows when it is built
+    it('renders a rate that does not fit, a negative one and none as dashes (characterization)', () => {
+        const noop = () => undefined;
+        expect([10000, 10500, -1, null, NaN].map(r => mount(new FpmFieldset(r, noop)).text())).toEqual(['----', '----', '----', '----', '----']);
+        expect(mount(new FpmFieldset(9999.4, noop)).text()).toBe('9999'); // The sibling: the largest rate that fits
+        expect(mount(new FpmFieldset(0, noop)).text()).toBe('0000'); // The sibling: a rate of zero is a rate
     });
 });

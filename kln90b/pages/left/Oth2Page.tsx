@@ -4,6 +4,8 @@ import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {format} from "numerable";
+import {TICK_TIME_DISPLAY} from "../../TickController";
+import {ErrorEvent} from "../../controls/ErrorPage";
 
 
 type Oth2PageTypes = {
@@ -24,6 +26,8 @@ export class Oth2Page extends SixLineHalfPage {
     readonly name: string = "OTH 2";
 
     private centers: FacilityFrequency[] = [];
+    private ticksToSearch = 0;
+    private isSearching = false;
 
     constructor(props: PageProps) {
         super(props);
@@ -51,6 +55,16 @@ export class Oth2Page extends SixLineHalfPage {
         </pre>);
     }
 
+    tick(blink: boolean) {
+        //#251, 3-52: the Center of the present position is looked up again every 10 s while the page is shown, one
+        //search at a time, as NAV 2 does with its VOR
+        this.ticksToSearch--;
+        if (this.ticksToSearch <= 0 && !this.isSearching) {
+            this.loadCenter();
+        }
+        super.tick(blink);
+    }
+
     protected redraw() {
         if (this.centers.length === 0) {
             this.children.get("line1").text = "OUTSIDE";
@@ -70,23 +84,37 @@ export class Oth2Page extends SixLineHalfPage {
     }
 
     private loadCenter() {
-        this.props.nearestUtils.getAirspaces(this.props.sensors.in.gps.coords.lat, this.props.sensors.in.gps.coords.lon, 0, 20, BitFlags.createFlag(BoundaryType.Center)).then(
+        this.ticksToSearch = 10000 / TICK_TIME_DISPLAY;
+        this.isSearching = true;
+        this.props.nearestUtils.getAirspacesAt(this.props.sensors.in.gps.coords.lat, this.props.sensors.in.gps.coords.lon, 20, BitFlags.createFlag(BoundaryType.Center)).then(
             centers => {
-                //todo need to test if this is actually working. We currently assume, that all boundaries are the same center
-                console.log("OTH2", centers);
-                this.centers = [];
-                for (const center of centers) {
-                    const freq = this.getFrequency(center.facility);
-                    //There are actually some duplicate frequencies
-                    if (this.centers.findIndex(c => c.freqMHz === freq.freqMHz) === -1) {
-                        this.centers.push(freq);
+                //The flag clears even when the body throws, or the page would never search again
+                try {
+                    this.centers = [];
+                    for (const center of centers) {
+                        const freq = this.getFrequency(center.facility);
+                        //There are actually some duplicate frequencies
+                        if (this.centers.findIndex(c => c.freqMHz === freq.freqMHz) === -1) {
+                            this.centers.push(freq);
+                        }
                     }
-                }
 
-                this.centers.sort((a, b) => a.freqMHz - b.freqMHz);
-                this.requiresRedraw = true;
+                    this.centers.sort((a, b) => a.freqMHz - b.freqMHz);
+                    this.requiresRedraw = true;
+                } finally {
+                    this.isSearching = false;
+                }
             },
-        )
+            e => {
+                //A failed search keeps the Center on screen, shows on the error page, as one of a nearest list does (#95),
+                //and the next one runs
+                this.isSearching = false;
+                console.error(e);
+                if (e instanceof Error) {
+                    this.props.bus.getPublisher<ErrorEvent>().pub("error", e);
+                }
+            },
+        );
     }
 
     private getFrequncyTextAtIndex(i: number): string {

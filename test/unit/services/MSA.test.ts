@@ -1,7 +1,8 @@
 /// <reference types="node" />
 import {beforeAll, describe, expect, it} from 'vitest';
 import {readFileSync} from 'node:fs';
-import {MSA} from '../../../kln90b/services/MSA';
+import {GeoCircle, GeoPoint} from '@microsoft/msfs-sdk';
+import {legLatitudeRange, MSA} from '../../../kln90b/services/MSA';
 import {distanceNm, pointFrom} from '../../harness/flight/geo';
 
 const BASE_PATH = 'html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B';
@@ -124,9 +125,9 @@ const SHORT_TO = pointFrom(SHORT_FROM, 180, 30);
 
 describe('MSA.getMSAFromTo (the ESA of one leg)', () => {
     // 3-33: the ESA of a leg is the highest sector MSA from the start to the end, so the end's sector counts. The
-    // service samples every 40 NM from the start (f = 0, 40 NM / d, ...) and never the end point itself, so on a leg
-    // shorter than 40 NM it reads the start sector only.
-    it.fails('includes the sector of the end of a short leg (#181)', () => {
+    // service sampled every 40 NM from the start (f = 0, 40 NM / d, ...) and never the end point itself, so on a leg
+    // shorter than 40 NM it read the start sector only.
+    it('includes the sector of the end of a short leg (#181)', () => {
         expect(msa.getMSAFromTo(SHORT_FROM, SHORT_TO)).toBe(sector(46, 8));
     });
 
@@ -161,6 +162,28 @@ describe('MSA.getMSAFromTo (the ESA of one leg)', () => {
         expect(msa.getMSAFromTo(p, {...p})).toBe(sector(46, 7));
     });
 
+    // characterization (the corner rule of MSA.getMSA): the leg runs south-west from the corner 42N 11E and lies in the
+    // sector from 41N 10E after its start, which belongs to the sector from 42N 11E like a position there. A start
+    // read as a point offset along the leg can round to the other side of the grid lines and miss that sector (#181)
+    it('counts the sector of a start on a corner of sectors (characterization, #181)', () => {
+        expect(sector(42, 11)).toBeGreaterThan(sector(41, 10));
+        expect(msa.getMSAFromTo({lat: 42, lon: 11}, {lat: 41.6, lon: 10.7})).toBe(sector(42, 11));
+    });
+
+    // characterization (the corner rule of MSA.getMSA): the leg between 45.6N 10.7E and the corner 46N 11E lies in the
+    // sector from 45N 10E except for the corner, which belongs to the sector from 46N 11E. The grid lines through the
+    // corner cross the leg at the corner itself; a cut there would leave a piece of no length whose middle rounds to
+    // either side of the grid lines, into the higher sector from 46N 10E or from 45N 11E, which the leg never enters.
+    // Flown both ways, so the corner is once the end and once the start (#181)
+    it('counts no sector beside an end on a corner of sectors (characterization, #181)', () => {
+        const corner = {lat: 46, lon: 11};
+        const other = {lat: 45.6, lon: 10.7};
+        const expected = Math.max(sector(45, 10), sector(46, 11));
+        expect(Math.max(sector(46, 10), sector(45, 11))).toBeGreaterThan(expected);
+        expect(msa.getMSAFromTo(other, corner)).toBe(expected);
+        expect(msa.getMSAFromTo(corner, other)).toBe(expected);
+    });
+
     // characterization: a leg with an end outside the grid has no ESA (dashes), because one sample is undefined
     it('has no ESA for a leg that starts outside the grid (characterization)', () => {
         expect(msa.getMSAFromTo({lat: -57, lon: 10}, {lat: -55, lon: 10})).toBeNull();
@@ -190,5 +213,67 @@ describe('MSA.getMSAForRoute', () => {
     it('returns null when a leg is outside the grid (characterization)', () => {
         const p = {lat: -57, lon: 10};
         expect(msa.getMSAForRoute([{lat: 46.5, lon: 7.5}, {lat: 46.5, lon: 7.5}, p, {...p}])).toBeNull();
+    });
+});
+
+describe('legLatitudeRange', () => {
+    // The great circle through 60N 0E and 60N 40E peaks halfway, at 20E: atan(tan 60 / cos 20) = 61.52 degrees
+    it('reaches the vertex of a leg along a parallel', () => {
+        const [min, max] = legLatitudeRange({lat: 60, lon: 0}, {lat: 60, lon: 40});
+        expect(min).toBeCloseTo(60, 6);
+        expect(max).toBeCloseTo(61.52, 2);
+    });
+
+    it('reaches the southern vertex in the southern hemisphere', () => {
+        const [min, max] = legLatitudeRange({lat: -60, lon: 0}, {lat: -60, lon: 40});
+        expect(min).toBeCloseTo(-61.52, 2);
+        expect(max).toBeCloseTo(-60, 6);
+    });
+
+    it('is the range of the end points when the vertex lies outside the leg', () => {
+        const [min, max] = legLatitudeRange({lat: 46, lon: 8}, {lat: 47, lon: 9});
+        expect(min).toBeCloseTo(46, 6);
+        expect(max).toBeCloseTo(47, 6);
+    });
+
+    // The equator is a great circle without a vertex: every point of it is the closest to either pole
+    it('stays on the equator for a leg along it', () => {
+        expect(legLatitudeRange({lat: 0, lon: 10}, {lat: 0, lon: 20})).toEqual([0, 0]);
+    });
+});
+
+/**
+ * The independent oracle: the highest MSA of 20000 points along the great circle of the leg. It uses the SDK GeoCircle
+ * on purpose: the instrument's path is the SDK great circle, and sampling it densely is independent of the cut logic
+ */
+function denseEsa(from: { lat: number, lon: number }, to: { lat: number, lon: number }): number | null {
+    const circle = new GeoCircle(new Float64Array(3), 0).setAsGreatCircle(from, to);
+    const length = new GeoPoint(from.lat, from.lon).distance(to);
+    const p = new GeoPoint(0, 0);
+    let esa: number | null = 0;
+    for (let i = 0; i <= 20000; i++) {
+        circle.offsetDistanceAlong(from, length * i / 20000, p);
+        const m = msa.getMSA(p);
+        esa = m === null || esa === null ? null : Math.max(esa, m);
+    }
+    return esa;
+}
+
+describe('MSA.getMSAFromTo against a dense sampling of the leg (3-33, #181)', () => {
+    it.each([
+        ['30 NM south from 47.2N 8.5E', {lat: 47.2, lon: 8.5}, pointFrom({lat: 47.2, lon: 8.5}, 180, 30)],
+        ['along 46.5N from 5.5E to 9.5E', {lat: 46.5, lon: 5.5}, {lat: 46.5, lon: 9.5}],
+        ['60N 0E to 60N 40E over the vertex', {lat: 60, lon: 0}, {lat: 60, lon: 40}],
+        ['diagonal 45.1N 6.9E to 47.9N 10.1E', {lat: 45.1, lon: 6.9}, {lat: 47.9, lon: 10.1}],
+        ['across the date line at 52N', {lat: 52, lon: 175}, {lat: 53, lon: -170}],
+        ['ABC to KBBB of the TRI 6 world', {lat: 47.5, lon: 8.9}, {lat: 48.2, lon: 9.2}],
+        // The piece from the start to the cut at 8E runs from the sector from 44N 7E (14500) across 45N into the higher
+        // one from 45N 7E (17100); the middle of that piece lies south of 45N, so only the cut at 45N finds 17100
+        ['44.3N 7.3E to 45.5N 8.1E across a parallel off the middle of its piece', {lat: 44.3, lon: 7.3}, {lat: 45.5, lon: 8.1}],
+        ['35.9N 3.1E to 35.95N 15.1E over its vertex north of both ends', {lat: 35.9, lon: 3.1}, {lat: 35.95, lon: 15.1}],
+        ['35.9N 42E to 35.95N 53.9E, ending past a whole meridian', {lat: 35.9, lon: 42}, {lat: 35.95, lon: 53.9}],
+        ['35.9N 105.4E to 35.95N 130.4E, starting before a whole meridian', {lat: 35.9, lon: 105.4}, {lat: 35.95, lon: 130.4}],
+    ])('gives the highest sector of %s (3-33, #181)', (_name, from, to) => {
+        expect(msa.getMSAFromTo(from, to)).toBe(denseEsa(from, to));
     });
 });

@@ -65,14 +65,16 @@ export class VnavAngleFieldset implements UiElement {
 
 
     readonly children: UIElementChildren<VnavAngleFieldsetTypes>;
+    /** null while the field shows dashes: it holds no angle, and an edit starts from 0.0 (#314) */
+    private angle: Degrees | null = null;
 
-    constructor(private angle: Degrees, private readonly callback: (angle: Degrees) => void) {
-        const angleString = format(Math.abs(angle), "0.0");
+    constructor(angle: Degrees | null, private readonly callback: (angle: Degrees) => void) {
         this.children = new UIElementChildren<VnavAngleFieldsetTypes>({
-            sign: new TextDisplay(angle >= 0 ? " " : "-"),
-            angle1: new SelectField(CHAR_SET, Number(angleString.substring(0, 1)), this.saveAngle1.bind(this)),
-            angle01: new SelectField(CHAR_SET, Number(angleString.substring(2, 3)), this.saveAngle01.bind(this)),
+            sign: new TextDisplay(" "),
+            angle1: new SelectField(CHAR_SET, 0, this.saveAngle1.bind(this)),
+            angle01: new SelectField(CHAR_SET, 0, this.saveAngle01.bind(this)),
         });
+        this.setValue(angle);
     }
 
     render(): VNode {
@@ -83,27 +85,48 @@ export class VnavAngleFieldset implements UiElement {
     tick(blink: boolean): void {
     }
 
-    public setValue(angle: Degrees) {
+    /**
+     * #314: an angle that does not fit the cells (or none, or NaN) shows dashes
+     */
+    public setValue(angle: Degrees | null): void {
+        const tenths = angle === null ? NaN : Math.round(Math.abs(angle) * 10);
+        if (!(tenths <= 99)) {
+            this.angle = null;
+            this.children.get("sign").text = " ";
+            this.showDigits(null);
+            return;
+        }
         this.angle = angle;
-        const angleString = format(Math.abs(angle), "0.0");
-        this.children.get("sign").text = angle >= 0 ? " " : "-";
-        this.children.get("angle1").value = Number(angleString.substring(0, 1));
-        this.children.get("angle01").value = Number(angleString.substring(2, 3));
+        const angleString = format(tenths / 10, "0.0");
+        this.children.get("sign").text = angle! >= 0 ? " " : "-";
+        this.showDigits(angleString);
     }
 
     public isFocused(): boolean {
         return this.children.get("angle1").isFocused || this.children.get("angle01").isFocused;
     }
 
+    private showDigits(angleString: string | null): void {
+        const angle1 = this.children.get("angle1");
+        const angle01 = this.children.get("angle01");
+        angle1.value = angleString === null ? 0 : Number(angleString.substring(0, 1));
+        angle01.value = angleString === null ? 0 : Number(angleString.substring(2, 3));
+        angle1.displayOverride = angleString === null ? "-" : null;
+        angle01.displayOverride = angleString === null ? "-" : null;
+    }
+
     private saveAngle1(newAngle1: number): void {
-        const oldAngle = format(this.angle, "+0.0", {zeroFormat: "+0.0"});
-        this.angle = Number(oldAngle.substring(0, 1) + newAngle1 + oldAngle.substring(2));
-        this.callback(this.angle);
+        const oldAngle = format(this.angle ?? 0, "+0.0", {zeroFormat: "+0.0"});
+        this.save(Number(oldAngle.substring(0, 1) + newAngle1 + oldAngle.substring(2)));
     }
 
     private saveAngle01(newAngle01: number): void {
-        const oldAngle = format(this.angle, "+0.0", {zeroFormat: "+0.0"});
-        this.angle = Number(oldAngle.substring(0, 3) + newAngle01);
-        this.callback(this.angle);
+        const oldAngle = format(this.angle ?? 0, "+0.0", {zeroFormat: "+0.0"});
+        this.save(Number(oldAngle.substring(0, 3) + newAngle01));
+    }
+
+    private save(angle: Degrees): void {
+        this.setValue(angle);
+        this.callback(angle);
     }
 }

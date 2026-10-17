@@ -61,9 +61,10 @@ describe('FuelDisplay (characterization)', () => {
         expect(mountedText(new FuelFlowDisplay(12345))).toBe('9999');
     });
 
-    it('characterization: OTH and TRI fuel stop at 99999', () => {
+    // #257 vehicle: this test also held the TRI fuel of 123456 as 99999; a TRI fuel that does not fit now shows dashes
+    // (the tests below)
+    it('characterization: OTH fuel stops at 99999', () => {
         expect(mountedText(new OthFuelDisplay(123456))).toBe('99999');
-        expect(mountedText(new TripFuelDisplay(123456))).toBe('99999');
     });
 
     // Negative values (an EXTRA below zero) are left out: what the real unit shows is an open question
@@ -80,5 +81,35 @@ describe('FuelDisplay (characterization)', () => {
         mo.tick();
         mf.tick();
         expect([mt.text(), mo.text(), mf.text()]).toEqual([' 89.5', '  126', '15  ']);
+    });
+});
+
+// #257: a fuel required that does not fit the five cells shows dashes, as without a value (the KLN 89's CAL 2 showed
+// dashes for a fuel required out of range and at GS 0, checked in the KLN 89 trainer, 2026-10-17); the 90B's own form
+// is a characterization
+describe('TripFuelDisplay, a fuel that does not fit (characterization, #257)', () => {
+    it('shows 99999 (characterization, #257)', () => {
+        expect(mountedText(new TripFuelDisplay(99999))).toBe('99999');
+    });
+
+    // The bound is on the rounded value: 99999.4 is shown as 99999, it fits
+    it('shows 99999.4 as 99999 (characterization, #257)', () => {
+        expect(mountedText(new TripFuelDisplay(99999.4))).toBe('99999');
+    });
+
+    it('shows 99999.5 as dashes (characterization, #257)', () => {
+        expect(mountedText(new TripFuelDisplay(99999.5))).toBe('---.-');
+    });
+
+    it('shows Infinity as dashes (characterization, #257)', () => {
+        expect(mountedText(new TripFuelDisplay(Infinity))).toBe('---.-');
+    });
+
+    it('shows NaN as dashes (characterization, #257)', () => {
+        expect(mountedText(new TripFuelDisplay(NaN))).toBe('---.-');
+    });
+
+    it('shows -12 as dashes (characterization, #257)', () => {
+        expect(mountedText(new TripFuelDisplay(-12))).toBe('---.-');
     });
 });

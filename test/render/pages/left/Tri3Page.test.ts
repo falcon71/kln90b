@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {Facility} from '@microsoft/msfs-sdk';
 import {bootUnit, BootOptions, HeadlessUnit, settle} from '../../../harness/boot';
 import {distanceNm, pointFrom} from '../../../harness/flight/geo';
@@ -134,5 +134,39 @@ describe('TRI 3 ETE just under two hours', () => {
         const unit = await bootTri3([kaaa(), far()]);
         await enterRoute(unit, 'KAAA', 'KBBB');
         expect(Screen.read().rows('L')[2].slice(6)).toBe(' 2:00');
+    });
+});
+
+// #257: at a ground speed of 0 the trip takes forever, so the fuel required has no value that fits its cells and shows
+// dashes, with or without a fuel flow (the KLN 89's CAL 2 showed dashes for its fuel required at GS 0, checked in the
+// KLN 89 trainer, 2026-10-17); the 90B's own form is a characterization
+describe('TRI 3, F REQ at a ground speed of 0 (characterization, #257)', () => {
+    /** TRI 3 from KAAA to KBBB with the fuel flow `ff`, the ground speed turned from 150 kt to 000 */
+    async function atGs0(ff: number): Promise<HeadlessUnit> {
+        const unit = await bootUnit({facilities: [kaaa(), kbbb()]});
+        await settle(unit);
+        Object.assign(unit.props.memory.triPage, {ff, reserve: 5}); // volatile memory, read when the page is built
+        await unit.panel.selectPage('L', 'TRI 3');
+        await enterRoute(unit, 'KAAA', 'KBBB');
+        await unit.panel.cursor('L');
+        await cursorToCell(unit, 2, 0);
+        await unit.panel.inner('L', -1); // 150 -> 050
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', -5); // 050 -> 000
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.errors).toEqual([]);
+        return unit;
+    }
+
+    it('shows F REQ ---.- at GS 0 with a fuel flow of 10 (characterization, #257)', async () => {
+        const unit = await atGs0(10);
+        const rows = Screen.read().rows('L');
+        expect([rows[2], rows[3], rows[5]]).toEqual(['000kt --:--', 'FF: 00010.0', 'F REQ ---.-']);
+    });
+
+    it('shows F REQ ---.- at GS 0 without a fuel flow (characterization, #257)', async () => {
+        const unit = await atGs0(0);
+        const rows = Screen.read().rows('L');
+        expect([rows[2], rows[3], rows[5]]).toEqual(['000kt --:--', 'FF: 00000.0', 'F REQ ---.-']);
     });
 });

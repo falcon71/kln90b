@@ -229,14 +229,14 @@ describe('CTR 1 page, a plan modified after the insertion (5-27)', () => {
     });
 
     // 5-27, figures 5-95 to 5-97: the recomputation treats the inserted Center waypoint like any other waypoint of the
-    // plan. CTR 2 then lists it without the new label, and the new crossing ABQ to DEN with it. Today the shared search
-    // session drops the ABQ Center, which the first computation saw: the old crossing is missing and the new one reads
-    // FW-DEN. This is the second computation in one unit, so it meets #102 by design (the sibling is the test above).
-    // The pin asserts the whole recomputed state, so that a fixed #102 shows the right result and not just a result:
-    // both CTR 2 pages in full (the existing waypoint without new, the new one with it, a page each), CTR 1 offering
+    // plan. CTR 2 then lists it without the new label, and the new crossing ABQ to DEN with it. This is the second
+    // computation in one unit (the sibling is the test above). Before #102 was fixed, the shared search session dropped
+    // the ABQ Center, which the first computation saw: the old crossing was missing and the new one read FW-DEN. The
+    // test asserts the whole recomputed state, so that it shows the right result and not just a result: both CTR 2
+    // pages in full (the existing waypoint without new, the new one with it, a page each), CTR 1 offering
     // the insertion (row 0, the count, is left out: the tests above hold it), and ENT inserting only the new
     // waypoint
-    it.fails('lists the existing Center waypoint without new and the new one with new (5-27, figure 5-97) (#102)', async () => {
+    it('lists the existing Center waypoint without new and the new one with new (5-27, figure 5-97) (#102)', async () => {
         const unit = await extendedAfterInsertion();
         await ent(unit);
         await unit.panel.inner('R', 1);
@@ -320,8 +320,8 @@ describe('CTR 1 page, the 30 waypoint limit (5-26)', () => {
 
     // 5-26: the limit counts the waypoints that would be inserted. A Center waypoint that the plan already holds from an
     // earlier insertion takes no new slot, so a full plan of the two inserted Center waypoints and 28 others is not
-    // refused for the crossings it already has, and ENT inserts nothing. (The second computation meets #102 and sees
-    // only one of the two crossings; every crossing it does see is an existing one, so the assertions hold either way.)
+    // refused for the crossings it already has, and ENT inserts nothing. (Before #102 was fixed, the second computation saw
+    // only one of the two crossings; every crossing it saw was an existing one, so the assertions held either way.)
     it('does not count a Center waypoint that the plan already holds (5-26)', async () => {
         const fa = cluster(26);
         const unit = await onCtr1(w => [...fa, w.kbbb, w.kccc], fa);
