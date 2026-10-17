@@ -156,3 +156,25 @@ Spec: 5-11, 5-12.
 - Each task runs `npm test`, `npx tsc --noEmit` and `npm run build` before its commit.
 - No public contract changes (H events, LVars, panel.xml keys, SimVars, persisted keys); no wiki change.
 - Close-out: a final review of the whole branch, then a local merge into master once the maintainer approves. No push.
+
+## 7. Amendments (2026-10-17, while writing the plan)
+
+- **The trainer record.** The AVsoftech results go into the 2026-10-17 block of `docs/kln89-trainer-record.md` as well,
+  marked unreliable, as earlier blocks do (section 6 said "this design only").
+- **5A, the dash forms.** A field that does not fit shows the no-value form it already has: F REQ `---.-`
+  (`TripFuelDisplay`), ETE `--:--`, distance `----`, speed `---`. The forms in 5A are examples, not new texts. The rule
+  lives in the shared displays (`SpeedDisplay`, `DurationDisplay`, `TripFuelDisplay`, `RoundedDistanceDisplay`) and in
+  `VnavAngleFieldset`, so it also reaches the other pages that use them (NAV 1, Super NAV 1 and 5, NAV 4, OTH 6 and 9,
+  D/T 1 to 4). There a value out of range is either unreachable or overflowed its row before.
+- **5A, a temperature with a hundreds digit.** A positive temperature of 100 or more is shown with the hundreds digit
+  in the sign cell, but the field cannot be edited from there: a turn on any of its cells works as on a dashed field.
+  The sign cell's own choices stay `-` and `0`.
+- **5A to 5C, the split.** #257 adds the dash mechanism (`SelectField.displayOverride`) and applies it to
+  `SpeedFieldset`, `TempFieldset` and the four displays. #314 applies it to `VnavAngleFieldset`, #346 to `FpmFieldset`,
+  and #389 adds CAL 3's guard (a TAS that does not fit gives no wind). A TRI page with no route keeps showing GS `000`;
+  only a speed without a solution shows dashes.
+- **5C, #388.** A plan whose legs all have no length shows GS dashes and an ETE of `0:00`.
+- **5D, the split.** #166 is the fix in `Sun.ts` (the day of the year and the returned date from the stamp's own
+  zone) plus CAL 7 handing it the date as shown in the selected zone. #390 then stores the calendar date in
+  `VolatileMemory` (`cal7Date`, replacing `cal7DateZ`), so a zone change and a return to the page keep the date as
+  entered; the date of first use is today in the selected zone.
