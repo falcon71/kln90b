@@ -192,3 +192,39 @@ describe('TRI 1, a distance that does not fit (characterization, #257)', () => {
         expect(rows[1].slice(0, 6)).toBe('----nm');
     });
 });
+
+// #167: the TAS and wind are applied to the direction of flight: the aircraft crabs into the wind to hold the course
+// (5-3 says only that the result applies to the direction of flight; the crab and the dashes are math and the 90B's
+// own form, so they are characterizations).
+describe('TRI 1 ground speed along the course (characterization, #167)', () => {
+    // The course is 180. TAS 150 and a wind from 090 at 30 kt: sqrt(150^2 - 30^2) = 146.97 kt, 60.107 NM in 24.54 min (shown as 0:25).
+    // The heading formula gave 153 kt
+    it('shows 147kt for TAS 150 with a 30 kt crosswind (characterization, #167)', async () => {
+        const unit = await bootTri1({tas: 150, windDirTrue: 90, windSpeed: 30});
+        await enterTo(unit, 'KBBB');
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['  60nm 180°', '147kt  0:25']);
+    });
+
+    // TAS 20 against a 35 kt crosswind (50 kt from 045 on the course 180): no heading holds the course
+    it('shows dashes for the ground speed, ETE and F REQ where the wind leaves no solution (characterization, #167)', async () => {
+        const unit = await bootTri1({tas: 20, windDirTrue: 45, windSpeed: 50, ff: 10});
+        await enterTo(unit, 'KBBB');
+        expect(unit.errors).toEqual([]);
+        const rows = Screen.read().rows('L');
+        expect([rows[1], rows[2], rows[5]]).toEqual(['  60nm 180°', '---kt --:--', 'F REQ ---.-']);
+    });
+
+    // 5-3 shows only that any ground speed may be entered instead of the TAS and wind result; the rest is the math.
+    // After a route without a solution the ground speed is dashed; the inner knob edits it from 000 (#257) and the ETE
+    // and the fuel come back: 60.107 NM at 100 kt is 36.06 min, 0.601 h * 10 = 6.0
+    it('brings the ETE and F REQ back when a ground speed is entered after a route with no solution (characterization, #167)', async () => {
+        const unit = await bootTri1({tas: 20, windDirTrue: 45, windSpeed: 50, ff: 10});
+        await enterTo(unit, 'KBBB');
+        await cursorToCell(unit, 2, 0);
+        await unit.panel.inner('L', 1); // the hundreds digit: 000 -> 100
+        expect(unit.errors).toEqual([]);
+        const rows = Screen.read().rows('L');
+        expect([rows[2], rows[5]]).toEqual(['100kt  0:36', 'F REQ   6.0']);
+    });
+});

@@ -10,7 +10,7 @@ import {Alignment, RoundedDistanceDisplay} from "../../controls/displays/Rounded
 import {BearingDisplay} from "../../controls/displays/BearingDisplay";
 import {DurationDisplay} from "../../controls/displays/DurationDisplay";
 import {TripFuelDisplay} from "../../controls/displays/FuelDisplay";
-import {calculateGroundspeed} from "../../data/Wind";
+import {calculateGroundspeedAlongCourse} from "../../data/Wind";
 import {HOURS_TO_SECONDS} from "../../data/navdata/NavCalculator";
 
 
@@ -86,13 +86,14 @@ export class Tri1Page extends SixLineHalfPage {
             const bearingTrue =
                 this.bearingTrue = this.props.sensors.in.gps.coords.bearingTo(wpt);
             this.dist = UnitType.GA_RADIAN.convertTo(this.props.sensors.in.gps.coords.distance(wpt!), UnitType.NMILE);
-            this.gs = calculateGroundspeed(this.props.memory.triPage.tas, bearingTrue, this.props.memory.triPage.windSpeed, this.props.memory.triPage.windDirTrue);
-            this.ete = this.dist / this.gs * HOURS_TO_SECONDS;
+            this.gs = calculateGroundspeedAlongCourse(this.props.memory.triPage.tas, bearingTrue, this.props.memory.triPage.windSpeed, this.props.memory.triPage.windDirTrue);
+            this.ete = this.gs === null ? null : this.dist / this.gs * HOURS_TO_SECONDS;
         }
 
         this.children.get("bearing").bearing = this.props.magvar.trueToMag(this.bearingTrue);
         this.children.get("distance").distance = this.dist;
-        this.children.get("gs").setSpeed(this.gs ?? 0);
+        //no route keeps 000; a route the wind leaves no solution for shows dashes (#167)
+        this.children.get("gs").setSpeed(this.dist === null ? 0 : this.gs);
         this.children.get("ete").time = this.ete;
 
         this.calcFuelRequired();

@@ -12,14 +12,17 @@ import {bootOnStandardRoute} from '../../../harness/worldBoot';
 const meridianRoute = () => ({kaaa: airport('KAAA', 47.0, 8.0), abc: vor('ABC', 47.5, 8.0), kbbb: airport('KBBB', 48.0, 8.0)});
 
 async function bootTri5(
-    facilities: Facility[], storage: Record<string, unknown>, o: { coldGps?: boolean, tas?: number } = {},
+    facilities: Facility[], storage: Record<string, unknown>,
+    o: { coldGps?: boolean, tas?: number, windDirTrue?: number, windSpeed?: number, ff?: number } = {},
 ): Promise<HeadlessUnit> {
     const unit = await bootUnit({facilities, storage, coldGps: o.coldGps});
     if (!o.coldGps) {
         await settle(unit);
     }
-    if (o.tas !== undefined) {
-        unit.props.memory.triPage.tas = o.tas; // volatile memory, read when the page is built
+    for (const key of ['tas', 'windDirTrue', 'windSpeed', 'ff'] as const) {
+        if (o[key] !== undefined) {
+            unit.props.memory.triPage[key] = o[key]!; // volatile memory, read when the page is built
+        }
     }
     await unit.panel.selectPage('L', 'TRI 5');
     return unit;
@@ -152,5 +155,60 @@ describe('TRI 5 ground speed with a wind that differs per leg', () => {
     it.fails('shows the ETE of the plan as the sum of the leg times, 1:39 (5-6, #254)', async () => {
         await bootWindRoute();
         expect(Screen.read().rows('L')[2].slice(6)).toBe(' 1:39');
+    });
+});
+
+// #167: the TAS and wind are applied to the direction of each leg: the aircraft crabs into the wind to hold the
+// course. 5-6 says only that the wind applies to each leg; the crab and the dashes are math and the 90B's own form.
+describe('TRI 5 ground speed along the course (characterization, #167)', () => {
+    // Both legs run due north. TAS 150 and a wind from 090 at 30 kt: sqrt(150^2 - 30^2) = 146.97 kt on each leg,
+    // 60.107 NM in 24.54 min (shown as 0:25). The heading formula gave 153 kt
+    it('shows 147kt for TAS 150 with a 30 kt crosswind (characterization, #167)', async () => {
+        const {kaaa, abc, kbbb} = meridianRoute();
+        const unit = await bootTri5([kaaa, abc, kbbb], savedFlightplan(0, [kaaa, abc, kbbb]),
+            {coldGps: true, tas: 150, windDirTrue: 90, windSpeed: 30});
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['FP 0   60nm', 'KAAA -KBBB ', '147kt  0:25']);
+    });
+
+    // The wind applies to each leg in the direction of that leg (math). Both legs run due north into a wind from 360
+    // at 25 kt: a headwind of 25 kt, 125 kt on each leg (a reversed leg course gives 175 kt). 60.107 NM in 28.85 min
+    it('shows 125kt for TAS 150 into a 25 kt headwind on both legs (characterization, #167)', async () => {
+        const {kaaa, abc, kbbb} = meridianRoute();
+        const unit = await bootTri5([kaaa, abc, kbbb], savedFlightplan(0, [kaaa, abc, kbbb]),
+            {coldGps: true, tas: 150, windDirTrue: 0, windSpeed: 25});
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['FP 0   60nm', 'KAAA -KBBB ', '125kt  0:29']);
+    });
+
+    // TAS 20, wind from 090 at 25 kt. A leg of 30 NM west has a tailwind (45 kt), a leg of 30 NM north a 25 kt
+    // crosswind above the TAS (no solution). One leg without a solution leaves the whole plan without one, whichever
+    // leg it is
+    async function bootTwoLegs(firstCourse: number, secondCourse: number): Promise<string[]> {
+        const a = {lat: 47.0, lon: 8.0};
+        const b = pointFrom(a, firstCourse, 30);
+        const c = pointFrom(b, secondCourse, 30);
+        const [kaaa, kbbb, kccc] = [airport('KAAA', a.lat, a.lon), airport('KBBB', b.lat, b.lon), airport('KCCC', c.lat, c.lon)];
+        const unit = await bootTri5([kaaa, kbbb, kccc], savedFlightplan(0, [kaaa, kbbb, kccc]),
+            {coldGps: true, tas: 20, windDirTrue: 90, windSpeed: 25, ff: 10});
+        expect(unit.errors).toEqual([]);
+        return Screen.read().rows('L');
+    }
+
+    it('shows dashes where the last leg has no solution (characterization, #167)', async () => {
+        const rows = await bootTwoLegs(270, 0);
+        expect([rows[1], rows[2], rows[5]]).toEqual(['KAAA -KCCC ', '---kt --:--', 'F REQ ---.-']);
+    });
+
+    it('shows dashes where the first leg has no solution (characterization, #167)', async () => {
+        const rows = await bootTwoLegs(0, 270);
+        expect([rows[1], rows[2], rows[5]]).toEqual(['KAAA -KCCC ', '---kt --:--', 'F REQ ---.-']);
+    });
+
+    // The no-route form stays 000: dashes are for a route with no solution, not for a plan of one waypoint
+    it('shows 000kt --:-- for a plan of one waypoint (characterization, #167)', async () => {
+        const kaaa = airport('KAAA', 47.0, 8.0);
+        await bootTri5([kaaa], savedFlightplan(0, [kaaa]));
+        expect(Screen.read().rows('L')[2]).toBe('000kt --:--');
     });
 });

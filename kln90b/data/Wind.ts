@@ -2,14 +2,21 @@ import {Degrees, Knots} from "./Units";
 import {NavMath} from "@microsoft/msfs-sdk";
 
 /**
+ * #167, 5-2, 5-3: the TAS and wind apply to the direction of flight (what those pages show). The ground speed along a
+ * course is the math of it: the aircraft crabs into the wind to hold the course.
+ * Returns null where the crosswind is stronger than the TAS (no heading holds the course) or no forward speed is left.
  * https://edwilliams.org/avform147.htm#Wind
- * @param tas
- * @param windspeed
- * @param windDirection
- * @param heading
  */
-export function calculateGroundspeed(tas: Knots, heading: Degrees, windspeed: Knots, windDirection: Degrees) {
-    return Math.sqrt((windspeed ** 2) + (tas ** 2) - 2 * windspeed * tas * Math.cos(heading * Avionics.Utils.DEG2RAD - windDirection * Avionics.Utils.DEG2RAD));
+export function calculateGroundspeedAlongCourse(tas: Knots, course: Degrees, windspeed: Knots, windDirection: Degrees): Knots | null {
+    const angle = (windDirection - course) * Avionics.Utils.DEG2RAD;
+    const crosswind = windspeed * Math.sin(angle);
+    const radicand = tas ** 2 - crosswind ** 2;
+    if (radicand < -1e-6) {
+        return null;
+    }
+    //the clamp absorbs rounding: sin(180 deg) is not exactly 0, which made a tailwind at TAS 0 the root of a negative
+    const groundspeed = Math.sqrt(Math.max(0, radicand)) - windspeed * Math.cos(angle);
+    return groundspeed > 0 ? groundspeed : null;
 }
 
 /**

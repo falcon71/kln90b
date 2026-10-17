@@ -8,7 +8,7 @@ import {TripFuelFieldset} from "../../controls/selects/FuelFieldset";
 import {Alignment, RoundedDistanceDisplay} from "../../controls/displays/RoundedDistanceDisplay";
 import {DurationDisplay} from "../../controls/displays/DurationDisplay";
 import {TripFuelDisplay} from "../../controls/displays/FuelDisplay";
-import {calculateGroundspeed} from "../../data/Wind";
+import {calculateGroundspeedAlongCourse} from "../../data/Wind";
 import {SelectField} from "../../controls/selects/SelectField";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {IcaoFixedLength} from "../../data/navdata/IcaoFixedLength";
@@ -91,24 +91,27 @@ export class Tri5Page extends SixLineHalfPage {
             this.to = IcaoFixedLength.getIdentFromFacility(fplLegs[fplLegs.length - 1].wpt);
 
             const from = new GeoPoint(0, 0);
-            let gs = 0;
+            let gs: Knots | null = 0;
             this.dist = 0;
             for (let i = 1; i < fplLegs.length; i++) {
                 from.set(fplLegs[i - 1].wpt);
 
                 this.dist += UnitType.GA_RADIAN.convertTo(from.distance(fplLegs[i].wpt), UnitType.NMILE);
                 const bearing = from.bearingTo(fplLegs[i].wpt);
-                gs += calculateGroundspeed(this.props.memory.triPage.tas, bearing, this.props.memory.triPage.windSpeed, this.props.memory.triPage.windDirTrue);
+                const legGs = calculateGroundspeedAlongCourse(this.props.memory.triPage.tas, bearing, this.props.memory.triPage.windSpeed, this.props.memory.triPage.windDirTrue);
+                //a leg the wind leaves no solution for leaves the plan without a ground speed (#167)
+                gs = gs === null || legGs === null ? null : gs + legGs;
             }
 
-            this.gs = gs / (fplLegs.length - 1);
-            this.ete = this.dist / this.gs * HOURS_TO_SECONDS;
+            this.gs = gs === null ? null : gs / (fplLegs.length - 1);
+            this.ete = this.gs === null ? null : this.dist / this.gs * HOURS_TO_SECONDS;
         }
 
         this.children.get("from").text = this.from;
         this.children.get("to").text = this.to;
         this.children.get("distance").distance = this.dist;
-        this.children.get("gs").setSpeed(this.gs ?? 0);
+        //no route keeps 000; a route the wind leaves no solution for shows dashes (#167)
+        this.children.get("gs").setSpeed(this.dist === null ? 0 : this.gs);
         this.children.get("ete").time = this.ete;
 
         this.calcFuelRequired();
