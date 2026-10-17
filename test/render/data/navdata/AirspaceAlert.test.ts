@@ -323,6 +323,50 @@ describe('the vertical limits', () => {
     });
 });
 
+// 3-40: Class B and C (and CTA and TMA, not in the filter) are stored by their outer boundary as a cylinder, so every
+// altitude below the upper limit counts as inside. Figure 3-126, on 3-39, shows such an alert with the upper limit only
+describe('Class B and C as cylinders (#352)', () => {
+    async function insideOf(type: BoundaryType, altitudeFt: number) {
+        const unit = await bootUnit({
+            position: {lat: 47.0, lon: 8.0}, altitudeFt,
+            airspaces: [airspace('B-TEST', type, box(46.9, 47.1, 7.9, 8.1), {minFt: 3000, maxFt: 10000})],
+        });
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        return sua(unit);
+    }
+
+    it('alerts below the floor of a Class B sector and shows only its ceiling (3-40, 3-39, figure 3-126, #352)', async () => {
+        expect(await insideOf(BoundaryType.ClassB, 1500)).toEqual(['INSIDE SPC USE AIRSPACE B-TEST            CL B BELOW 10000ft']);
+    });
+
+    it('alerts below the floor of a Class C sector and shows only its ceiling (3-40, 3-39, figure 3-126, #352)', async () => {
+        expect(await insideOf(BoundaryType.ClassC, 1500)).toEqual(['INSIDE SPC USE AIRSPACE B-TEST            CL C BELOW 10000ft']);
+    });
+
+    it('shows only the ceiling between the floor and the ceiling of a Class B sector (3-40, 3-39, figure 3-126, #352)', async () => {
+        expect(await insideOf(BoundaryType.ClassB, 5000)).toEqual(['INSIDE SPC USE AIRSPACE B-TEST            CL B BELOW 10000ft']);
+    });
+
+    it('does not alert above the ceiling and buffer of a Class B sector (3-39, 3-40, 3-41)', async () => {
+        expect(await insideOf(BoundaryType.ClassB, 11000)).toEqual([]);
+    });
+
+    // The cylinder rule is for Class B and C only: any other type keeps its floor (3-39, 3-41)
+    // and its buffer
+    it('does not alert below the floor and its buffer of a Danger area (3-39, 3-41, #352)', async () => {
+        expect(await insideOf(BoundaryType.Danger, 1500)).toEqual([]);
+    });
+
+    // The 10 minute projection uses the same vertical check, so the cylinder also alerts ahead of an aircraft that is
+    // below the sector's floor (#352)
+    it('alerts 5 minutes before a Class B sector ahead whose floor is above the aircraft (3-40, #352)', async () => {
+        const unit = await flying(0, [airspace('B-AHEAD', BoundaryType.ClassB, box(47 + 10 * NM_LAT, 47.4, 7.9, 8.1), {minFt: 5000, maxFt: 10000})]);
+
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: B-AHEAD           CL B BELOW 10000ft']);
+    });
+});
+
 // The name is cut so that a blank stays before the type (characterization)
 describe('a long airspace name', () => {
     it('is cut one character before the type (characterization)', async () => {
