@@ -138,16 +138,22 @@ describe('what the sunrise depends on', () => {
         expect(calculateSunset(date, ORD)!.getTimestamp()).toBe(calculateSunset(start, ORD)!.getTimestamp());
     });
 
-    // The result lies on the UTC day of the date: ORD, at 87.9 W, rises about 12:23 UTC and sets about 23:5x UTC
-    it('puts the sunrise and the sunset of ORD on the UTC day of the date', () => {
-        const rise = calculateSunrise(noon, ORD)!;
-        const set = calculateSunset(noon, ORD)!;
+    // The result lies on the calendar day of the date in the zone of its stamp (#166): ORD, at 87.9 W, rises about 12:23 UTC
+    // and sets about 23:5x UTC. For the UTC stamp and for both CST stamps (the evening one is already 04 MAR in UTC) that
+    // is 03 MAR.
+    it.each([
+        ['a UTC stamp', noon],
+        ['the CST stamp at 08:00', morning],
+        ['the CST stamp at 20:00, which is 04 MAR in UTC', evening],
+    ] as const)('puts the sunrise and the sunset of ORD on the calendar day of the date, for %s', (_n, date) => {
+        const rise = calculateSunrise(date, ORD)!;
+        const set = calculateSunset(date, ORD)!;
         expect([rise.getYear(), rise.getMonth(), rise.getDate(), rise.getHours()]).toEqual([1989, 2, 3, 12]);
         expect([set.getYear(), set.getMonth(), set.getDate(), set.getHours()]).toEqual([1989, 2, 3, 23]);
     });
 
     // 5-15: the date on CAL 7 is shown in the selected time zone, and the rise is for that date.
-    it.fails('uses the calendar date in the zone of the stamp, not the UTC date (#166)', () => {
+    it('uses the calendar date in the zone of the stamp, not the UTC date (#166)', () => {
         expect(shown(calculateSunrise(evening, ORD)!.atTimezone(CST))).toBe(shown(calculateSunrise(morning, ORD)!.atTimezone(CST)));
     });
 });

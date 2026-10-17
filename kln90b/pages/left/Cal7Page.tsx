@@ -86,9 +86,11 @@ export class Cal7Page extends SixLineHalfPage {
             this.children.get("rise").time = null;
             this.children.get("set").time = null;
         } else {
-            const sunrise = calculateSunrise(this.props.memory.calPage.cal7DateZ!, this.props.memory.calPage.cal7Wpt);
-            const sunset = calculateSunset(this.props.memory.calPage.cal7DateZ!, this.props.memory.calPage.cal7Wpt);
             const timeZone = TIMEZONES[this.props.memory.calPage.cal7Timezone!];
+            //#166: the date on the page is shown in the selected zone, and the times are for that date
+            const date = this.props.memory.calPage.cal7DateZ!.atTimezone(timeZone);
+            const sunrise = calculateSunrise(date, this.props.memory.calPage.cal7Wpt);
+            const sunset = calculateSunset(date, this.props.memory.calPage.cal7Wpt);
             this.children.get("rise").time = sunrise?.atTimezone(timeZone) ?? null;
             this.children.get("set").time = sunset?.atTimezone(timeZone) ?? null;
         }
