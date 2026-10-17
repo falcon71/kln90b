@@ -55,6 +55,24 @@ describe('CAL 2 page (characterization)', () => {
     });
 });
 
+// #389: the TAS of 1063.5 kt does not fit the three cells of CAL 2 or of CAL 3 (SpeedDisplay and SpeedFieldset, #257);
+// CAL 3 then has no wind either. The 90B's dash forms are not shown by any source
+describe('CAL 2 TAS that does not fit, and the CAL 3 it hands it to (characterization, #389)', () => {
+    it('shows dashes for the TAS of CAS 999 kt at 40000 ft and 0 C, and CAL 3 shows dashes for TAS and wind (characterization)', async () => {
+        const unit = await bootUnit({storage: {cal2Cas: 999, cal12IndicatedAltitude: 40000, cal12Barometer: 29.92, cal2TAT: 0, cal3HeadingMag: 0}});
+        await unit.panel.selectPage('L', 'CAL 2');
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[5]).toBe('TAS   ---kt');
+        expect(unit.props.userSettings.getSetting('cal3Tas').get()).toBeCloseTo(1063.5, 1); // The precondition: CAL 3 got it
+
+        await unit.panel.inner('L', 1); // raw: changing the CAL subpage is the subject
+        expect(Screen.read().status().left).toBe('CAL 3');
+        const rows = Screen.read().rows('L');
+        expect(rows[1]).toBe('TAS   ---kt');
+        expect(rows.slice(3)).toEqual(['HDWND ---kt', 'WIND  ---°¥', '      ---kt']);
+    });
+});
+
 describe('CAL 2 barometer in millibars below 1000 (checked in the KLN 89 trainer, 2026-10-08, T16, #315)', () => {
     // The ALT page shares the fieldset (BaroFieldset.test.ts holds the cases); CAL 2 shows the blank too
     it('shows 993 MB with a blank in the first digit', async () => {

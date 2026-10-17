@@ -84,8 +84,18 @@ export class Cal3Page extends SixLineHalfPage {
             hdgTrue = this.props.magvar.magToTrue(this.props.userSettings.getSetting('cal3HeadingMag').get());
         }
 
-        const windSpeed = calculateWindspeed(this.props.userSettings.getSetting('cal3Tas').get(), this.props.sensors.in.gps.groundspeed, hdgTrue, this.props.sensors.in.gps.trackTrue);
-        const windDir = calculateWindDirection(this.props.userSettings.getSetting('cal3Tas').get(), this.props.sensors.in.gps.groundspeed, hdgTrue, this.props.sensors.in.gps.trackTrue);
+        const tas = this.props.userSettings.getSetting('cal3Tas').get();
+        if (!(Math.round(tas) <= 999)) {
+            //#389: a TAS that does not fit the field (CAL 2 computes more than 999 kt) shows dashes and gives no wind
+            this.children.get("windLabel").text = "HDWND";
+            this.children.get("windComponent").speed = null;
+            this.children.get("windDir").bearing = null;
+            this.children.get("windSpeed").speed = null;
+            return;
+        }
+
+        const windSpeed = calculateWindspeed(tas, this.props.sensors.in.gps.groundspeed, hdgTrue, this.props.sensors.in.gps.trackTrue);
+        const windDir = calculateWindDirection(tas, this.props.sensors.in.gps.groundspeed, hdgTrue, this.props.sensors.in.gps.trackTrue);
         const headWind = calculateHeadwind(windSpeed, windDir, hdgTrue);
 
         this.children.get("windLabel").text = headWind >= 0 ? "HDWND" : "TLWND";
