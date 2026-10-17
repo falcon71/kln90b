@@ -62,3 +62,24 @@ describe('RoundedDistanceDisplay (characterization)', () => {
         expect(m.text()).toBe('163 ');
     });
 });
+
+// #257: a distance that does not fit the four cells shows dashes, as without a value (the KLN 89 shows dashes for its
+// CAL values out of range, checked in the KLN 89 trainer, 2026-10-17); the 90B's own form is a characterization
+describe('RoundedDistanceDisplay, a distance that does not fit (characterization, #257)', () => {
+    it('shows 9999 (characterization, #257)', () => {
+        expect(shown(Alignment.right, 9999)).toBe('9999');
+    });
+
+    // The bound is on the rounded value: 9999.4 is shown as 9999, it fits
+    it('shows 9999.4 as 9999 (characterization, #257)', () => {
+        expect(shown(Alignment.right, 9999.4)).toBe('9999');
+    });
+
+    it('shows 9999.5 as dashes (characterization, #257)', () => {
+        expect(shown(Alignment.right, 9999.5)).toBe('----');
+    });
+
+    it('shows NaN as dashes (characterization, #257)', () => {
+        expect(shown(Alignment.right, NaN)).toBe('----');
+    });
+});

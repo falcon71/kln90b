@@ -9,6 +9,8 @@ export class SelectField implements Field {
     public isEntered = false;
     public isFocused = false;
     public isReadonly = false;
+    /** #257: a text shown in place of the value (dashes, or a digit the value set does not hold), until cleared */
+    public displayOverride: string | null = null;
     protected readonly ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
     public constructor(protected valueSet: string[], public value: number, protected readonly changedCallback: (value: number) => void) {
@@ -17,7 +19,7 @@ export class SelectField implements Field {
 
     public render(): VNode {
         return (
-            <span ref={this.ref}>{this.valueSet[this.value]}</span>);
+            <span ref={this.ref}>{this.displayOverride ?? this.valueSet[this.value]}</span>);
     }
 
 
@@ -66,7 +68,7 @@ export class SelectField implements Field {
             return;
         }
 
-        this.ref.instance.textContent = this.valueSet[this.value];
+        this.ref.instance.textContent = this.displayOverride ?? this.valueSet[this.value];
 
         if (this.isFocused) {
             this.ref!.instance.classList.add("inverted");

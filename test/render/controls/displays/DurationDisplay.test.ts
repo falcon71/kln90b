@@ -128,6 +128,22 @@ describe('DurationDisplay (characterization)', () => {
     });
 });
 
+// #257: a duration that cannot be shown shows dashes, as without a value (the KLN 89's CAL 1 showed dashes for an ETE
+// out of range and at GS 0, checked in the KLN 89 trainer, 2026-10-17); the 90B's own form is a characterization
+describe('formatDuration, a duration that cannot be shown (characterization, #257)', () => {
+    it('shows NaN as dashes (characterization, #257)', () => {
+        expect(formatDuration(NaN)).toBe('--:--');
+    });
+
+    it('shows Infinity as dashes (characterization, #257)', () => {
+        expect(formatDuration(Infinity)).toBe('--:--');
+    });
+
+    it('shows a negative duration of -60 s as dashes (characterization, #257)', () => {
+        expect(formatDuration(-60)).toBe('--:--');
+    });
+});
+
 // The same DurationDisplay class shows the ETE on the trip pages (TRI 1, 3 and 5), so their format is read on TRI 3,
 // which needs no GPS: a trip from KAAA due south at the TAS of 150 kt in no wind, 150 NM an hour
 describe('DurationDisplay on the trip pages (TRI 3)', () => {

@@ -1,6 +1,6 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
-import {distanceNm} from '../../../harness/flight/geo';
+import {distanceNm, pointFrom} from '../../../harness/flight/geo';
 import {airport} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 
@@ -168,5 +168,27 @@ describe('TRI 1 page (5-3, 5-4)', () => {
         expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FF: 00030.0', 'RES:00005.0']);
         await unit.panel.selectPage('L', 'TRI 5');
         expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FF: 00030.0', 'RES:00005.0']);
+    });
+});
+
+// #257: a distance that does not fit the four cells shows dashes (the KLN 89 shows dashes for its CAL values out of
+// range, checked in the KLN 89 trainer, 2026-10-17); the 90B's own form is a characterization. A waypoint 10500 NM
+// away overflowed the row before, which the harness reports as an error.
+describe('TRI 1, a distance that does not fit (characterization, #257)', () => {
+    it('shows ----nm for a waypoint 10500 NM away (characterization, #257)', async () => {
+        const far = pointFrom(POS, 0, 10500);
+        const unit = await bootUnit({
+            facilities: [airport('KAAA', POS.lat, POS.lon), airport('KFAR', far.lat, far.lon)], position: POS, magvar: 0,
+        });
+        await settle(unit);
+        await unit.panel.selectPage('L', 'TRI 1');
+        expect(distanceNm(POS, far)).toBeCloseTo(10500, 0); // The precondition: the waypoint is 10500 NM away
+        await enterTo(unit, 'KFAR');
+        await unit.panel.cursor('L');
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.errors).toEqual([]);
+        const rows = Screen.read().rows('L');
+        expect(rows[0]).toBe('P.POS-KFAR ');
+        expect(rows[1].slice(0, 6)).toBe('----nm');
     });
 });

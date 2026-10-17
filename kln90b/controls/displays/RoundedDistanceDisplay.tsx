@@ -44,7 +44,9 @@ export class RoundedDistanceDisplay implements UiElement {
             return "----";
         }
         const rounded = Math.round(this.distance);
-
+        if (!(rounded <= 9999)) {
+            return this.align("----"); //#257: a distance that does not fit shows dashes, it overflowed the row
+        }
         return this.align(format(rounded, "0").padStart(3, " "));
     }
 

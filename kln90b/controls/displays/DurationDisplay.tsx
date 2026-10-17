@@ -38,8 +38,8 @@ export class DurationDisplay implements UiElement {
 }
 
 export function formatDuration(duration: Seconds | null, tripForm: boolean = false): string {
-    if (duration === null) {
-        return "--:--";
+    if (duration === null || !Number.isFinite(duration) || duration < 0) {
+        return "--:--"; //#257: NaN and negative durations too
     }
     //#223: round the total minutes first, so 59.5 minutes after a whole hour carry into the next hour instead of
     //showing :60. The figures of 5-7 round; the KLN 89 trainer's CAL 1 rounds too (2026-10-12)

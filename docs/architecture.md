@@ -1045,7 +1045,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       `TemperatureDisplay`, `LatitudeDisplay`, `LongitudeDisplay`, `RoundedDistanceDisplay`
     - `DeviationBar`, `SuperDeviationBar`, `ActiveArrow` (flashes during waypoint alert, 3-29), `FlightplanArrow`
       (draws nothing while the navigation is flagged, 4-7, #322)
-    - Convention: null value → dashes.
+    - Convention: null value → dashes. A value that does not fit the field shows dashes as well: a negative speed, a rate
+      of 10000 ft/min or more, a duration of 100 hours or more (#257).
 - **Editors** (`controls/editors/`; manual 3-14, "jump in, edit char by char, confirm with ENT"):
     - `Editor<T>` is an abstract `Field` composed of `EditorField`s (char cells with a `charset`).
     - Subclass hooks: `convertFromValue(value): number[]` and `async convertToValue(raw): T|null`. Null → status
@@ -1071,6 +1072,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - **Selects** (`controls/selects/`; immediate-effect fields, no ENT):
     - `SelectField(valueSet: string[], index, changedCallback)`: the inner knob cycles and calls back at once;
       `keyboard()` picks a value by its text.
+    - `SelectField.displayOverride` is a text shown in place of the value (dashes, or a digit the value set does not
+      hold) until it is cleared. A fieldset whose value does not fit shows dashes through it, holds no value (null) and
+      edits from zero, so the dashes never leak a value from behind them (#257).
     - `CdiScaleField` is the CDI scale of MOD 1 and MOD 2: a `SelectField` over the scales the current mode allows (5-38,
       6-1) that shows the step the scale is at or ramping to. The choices are rebuilt at every display tick, and a click
       sets the scale from the list that was on the screen.
