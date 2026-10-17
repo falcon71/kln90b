@@ -182,3 +182,31 @@ issue as not planned.
 - Public contracts: the map range settings keep their keys and meaning (#236 only maps unknown values to the default);
   no H event, LVar, panel.xml key or SimVar changes; no wiki change.
 - Close-out: a final review of the whole branch, then a local merge into master once the maintainer approves. No push.
+
+## 6. Amendments (2026-10-17, while writing the plan)
+
+Measured in a scratch worktree on `m9-display-pages` (fixes and probes in the session scratchpad `measure/`).
+
+- **2B, the overlays.** Only the MSG page stays over FPL 0 after an EFB load. Super NAV 1, Super NAV 5 and SET 0 show
+  only while their left page shows (`MainPage.checkIfSuperPageIsShown`), so they end when FPL 0 replaces that page, as
+  the existing check already does.
+- **2B, where the method lives.** `MainPage.replaceLeftBasePage(page)` pops every pushed left page through
+  `popLeftPage` (which removes their right-side children), removes the right-side children of the old base page through
+  `PageStack.parentRemoved` (the creation page of an FPL 0 insert has the base page as its parent), then calls
+  `setLeftPage`. `KlnEfbLoader` calls it. No new `PageStack` method.
+- **2B, what the tests show.** Today's code already gives the ruled result for the plain D-> page, for an edit on the
+  left base page, for an edit on the right page, and for MSG, Super NAV 5 and SET 0; those tests hold the ruling. Three
+  cases differ today and are the fix's tests: the creation page of an unknown D-> ident stays on the right, the NAV 4
+  page of ALT stays on the right, and the creation page of an FPL 0 insert stays on the right.
+- **2A, the guard.** `setCurrentPage` destroys the replaced page without an `old !== page` guard: every caller passes a
+  new page, so a guard would hold no reachable case.
+- **3D, a vehicle.** The spec test `shows ARM: and the OBS course in the approach-arm OBS mode (5-32)` in
+  `SuperNav5Left.test.ts` changes: it uses no OBS input (the course can be entered), a case no figure shows. It becomes
+  a characterization of `ARM180`; the spec test for figures 6-20 and 6-22 uses the external OBS input.
+- **3E, vehicles.** The two `Super NAV 5 OBS course` tests in `SuperNav5Page.test.ts` show the editable form; they
+  assert the course digits only, and the form is held by the #396 tests. There is no reachable OBS mode without a course,
+  so the editable dash form is not tested.
+- **3B, the scale 7.** Figure 6-15 (6-9) shows Super NAV 5 at the 7 NM scale.
+- **4A, the cells.** NAV 3 gives the cross track the four cells after `FLY L`/`FLY R`: `0.xx` below 1 NM, otherwise
+  the blank and the three-cell form of today (` 3.1`, `  12`, ` -.-`).
+- **#393** changes no existing test; **#394** and **#395** change none either.
