@@ -327,3 +327,34 @@ afterwards)
 - A VOR that is terminal in today's data (BJB; its class in the 1997 database is not known) was taken both by NAV 2 and
   as the Ref of a user waypoint, with a high altitude VOR about 20 NM away. Medium confidence; the 90B guide gives NAV 2
   a low or high altitude VOR, so this does not decide the 90B's NAV 2 (#204).
+
+**2026-10-17**
+- Special use airspace cannot be checked on this trainer: its self test reports no altitude input, the only altitude is
+  the one typed on ALT 2, and NRST SUA found nothing at KORD (whose APT 3 lists `CL B`) or at Volk Field, with the SUA
+  alert enabled or not; the demo database holds no special use airspace (#352).
+- NRST CTR changed by itself from the Chicago Center (`127.00`/`132.10`) to the Minneapolis Center (`125.55`) while it
+  stayed on screen, flown at about 940 kt across the boundary near W88°07' between N44°00' and N44°04'; the change came
+  0 to about 15 s after the crossing. Its frequencies also changed by themselves at a sector change inside the Chicago
+  Center. Whether it rechecks continuously or every few seconds could not be told. Medium-high confidence (#251).
+- Values too large for their field show dashes; none was capped, cut or blanked (#257):
+  - CAL 1's ETE has one hour digit: GS 17 gave `9:38`; GS 16 (10:15 h), GS 1 and GS 0 gave ` -:--`.
+  - CAL 2's fuel required has four digits: 9627 and 9628 were shown; 10236, 10626 and GS 0 gave `----`. An ETE above
+    9:59 did not blank the fuel.
+  - CAL 6's TAS (CAS 999, 0 °C) showed `999` at Prs 29500 and `---kt` from 29600.
+  - The exact edges (9:59, 9999) were not checked.
+- CAL 1 from 92C (MSA 3200 in its cell) to 3D1 (3400 in the next cell north), 35 NM, gave `ESA 3400'`: the higher cell
+  where the trip ends counts. The reverse direction was not tried. Medium-high confidence (#181).
+- CAL 8: changing only the time zone left the date row as it was and shifted sunrise and sunset by exactly the zone
+  offset (KIMT, 17 OCT: `1212`/`2303` UTC, `0612`/`1703` CST, `0112`/`1203` SST), also in SST, where the moment of the
+  check was already the day before; no other day's times appeared (#166, #390). The first zone change turned the year
+  `26` into `00`, which stayed; not used.
+- The third-party AVsoftech KLN 90B trainer, which is unreliable:
+  - CAL 5: 40 °C showed `104°F`, the sign cell carrying the hundreds digit; -80 °C showed `-11°F` (true -112, cut, not
+    dashed); 868 kt showed `998MPH`, 869 kt `999MPH`, and from 899 kt the row was `---MPH`. Neither field takes more
+    than three digits (#257).
+  - CAL 4: the angle knob stops at 9.9; an angle of 10.0 or more (GS 60, FPM 1100) and GS 0 showed `-.-°`, while FPM
+    1060 at GS 60 still showed 9.9; GS 600 at 9.3° showed `9950` and at 9.4° `FPM: ----`; FPM takes no entry above
+    9999. A GS change recomputed the angle from the last FPM typed, not the one shown (#314, #346).
+  - TRI 1 and TRI 3 at GS 0 showed `000KT --:--` and `F REQ -----` (#257).
+  - Its TRI ground speed does not depend on the course (TAS 150 with 30 kt from 090 gave 171 kt on a southbound leg,
+    and TRI 5 used that one speed for the whole plan), so it settles neither #167 nor #254.
