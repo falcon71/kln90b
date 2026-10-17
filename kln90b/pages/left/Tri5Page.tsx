@@ -97,6 +97,9 @@ export class Tri5Page extends SixLineHalfPage {
             for (let i = 1; i < fplLegs.length; i++) {
                 from.set(fplLegs[i - 1].wpt);
                 const legDist = UnitType.GA_RADIAN.convertTo(from.distance(fplLegs[i].wpt), UnitType.NMILE);
+                if (legDist === 0) {
+                    continue; //#388: a leg from a waypoint to itself has no course and takes no time
+                }
                 this.dist += legDist;
                 const legGs = calculateGroundspeedAlongCourse(this.props.memory.triPage.tas, from.bearingTo(fplLegs[i].wpt), this.props.memory.triPage.windSpeed, this.props.memory.triPage.windDirTrue);
                 //a leg the wind leaves no solution for leaves the plan without a ground speed (#167)

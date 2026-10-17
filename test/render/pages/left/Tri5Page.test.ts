@@ -48,6 +48,28 @@ describe('TRI 5 page (characterization)', () => {
     });
 });
 
+describe('TRI 5 page of a waypoint repeated in the plan (characterization, #388)', () => {
+    // A leg from a waypoint to itself has no length and no course (its bearing is NaN). It adds no time, so the plan
+    // keeps the ground speed and the ETE of its one real leg: KAAA to KBBB, 60.107 NM at 150 kt is 24.04 min
+    it('skips a leg from KBBB to KBBB: 150kt and 0:24 for KAAA to KBBB (characterization, #388)', async () => {
+        const kaaa = airport('KAAA', 47.0, 8.0);
+        const kbbb = airport('KBBB', 48.0, 8.0);
+        const unit = await bootTri5([kaaa, kbbb], savedFlightplan(0, [kaaa, kbbb, kbbb]), {coldGps: true});
+        expect(unit.errors).toEqual([]);
+        const rows = Screen.read().rows('L');
+        expect([rows[0], rows[1], rows[2]]).toEqual(['FP 0   60nm', 'KAAA -KBBB ', '150kt  0:24']);
+    });
+
+    // A plan of two waypoints that are the same: no leg has a length, so the plan has no ground speed (dashes) and
+    // no time. The ETE is 0:00, the sum of no leg times
+    it('shows dashes for the GS and 0:00 for the ETE of a plan KAAA to KAAA (characterization, #388)', async () => {
+        const kaaa = airport('KAAA', 47.0, 8.0);
+        const unit = await bootTri5([kaaa], savedFlightplan(0, [kaaa, kaaa]), {coldGps: true});
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('L')[2]).toBe('---kt  0:00');
+    });
+});
+
 describe('TRI 5 page of one waypoint (characterization)', () => {
     // The plan has one waypoint: there is no last waypoint and no distance. The ground speed row is left out
     it('shows the first waypoint and dashes for the distance and the fuel of a plan of one waypoint (characterization)', async () => {
