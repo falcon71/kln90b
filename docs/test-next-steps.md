@@ -205,7 +205,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       from the DTK keeps its fraction (089.46) while the field shows 089, and the CDI follows the fraction (5-35 is
       silent); the inches cell of `BaroFieldset` caps at 30.99 while millibars reach 1099; `OthFuelFieldset` shows a
       rounded value and rebuilds from one with a fraction; `SuperNav5RangeSelector` builds its index with `indexOf`, -1 for a stored
-      scale outside its list; CAL 4 at 9.9° and 999 kt shows an FPM of `1770` for about 17700 (the question #257);
+      scale outside its list;
       `AltitudeFieldset` shows `00000` below sea level, while a low-confidence photo of the self-test page shows a
       negative altitude; `ModObsElement.innerRight` (MOD 2) and `FuelOnBoardSelect.innerRight` return `false` while
       `innerLeft` returns `true` (no visible effect; the Super NAV 5 case, #238, is fixed in `ObsDtkElement`).
