@@ -70,13 +70,16 @@ function arcApproach(turn: LegTurnDirection, o: {
     return {abc, at, kprc, facilities: [kprc, abc, arcbg, arcen, fafaa, mapaa]};
 }
 
+// #236: 25 NM is not a map scale any more; the arc tests use 20 NM
+const ARC_MAP_RANGE = 20;
+
 describe('NAV 5 page with a DME arc', () => {
     /**
      * Lit pixels of the NAV 5 canvas (396 x 312) in the four quarters around its center, less a margin of 8 px, and
      * `onRing(from, to)`: the lit pixels within 6 px of the 10 NM ring around ABC between two radials. The map is north
      * up with the aircraft in the middle and its range is the distance from the aircraft to the top of the screen
-     * (Pilot's Guide 3-35), so 25 NM are half the canvas height (6.24 px per NM) and the 10 NM ring has a radius of 62.4
-     * px. ABC is 0.5 NM west of the aircraft, which is the center of the canvas.
+     * (Pilot's Guide 3-35), so the 20 NM of ARC_MAP_RANGE are half the canvas height (7.8 px per NM) and the 10 NM ring has a
+     * radius of 78 px. ABC is 0.5 NM west of the aircraft, which is the center of the canvas.
      */
     function readMap() {
         const rows = canvasToAscii(document.querySelector('canvas') as HTMLCanvasElement).split('\n');
@@ -87,7 +90,7 @@ describe('NAV 5 page with a DME arc', () => {
             for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (rows[y][x] === '#') n++;
             return n;
         };
-        const pxPerNm = (height / 2) / 25;
+        const pxPerNm = (height / 2) / ARC_MAP_RANGE;
         const onRing = (fromRadial: number, toRadial: number) => {
             let n = 0;
             for (let y = 0; y < height; y++) {
@@ -110,7 +113,7 @@ describe('NAV 5 page with a DME arc', () => {
     // south-west quarter from the 180 to the 270 radial). 15d9b35 reverses the circle for right-hand arcs; without it
     // the right arc is drawn the long way round, through the other three quarters, and fills the north-east quarter.
     // (Reverting all of 15d9b35 only moved the arrowhead, so it is the SidStar line that the break removes.)
-    // The map is north up and 25 NM, centered on the aircraft 0.5 NM east of the VOR; the rest of the plan lies far
+    // The map is north up and 20 NM, centered on the aircraft 0.5 NM east of the VOR; the rest of the plan lies far
     // south-west, so nothing but the arc can reach the north-east quarter. The north-west quarter holds labels.
     it.each([
         ['right', LegTurnDirection.Right, 240, 254],
@@ -120,7 +123,7 @@ describe('NAV 5 page with a DME arc', () => {
         const unit = await bootUnit({
             facilities: w.facilities, position: w.at(225, 10),
             panelXml: panelXml(APR_ARM_SWITCH),
-            storage: {...savedFlightplan(0, [w.kprc]), nav5MapOrientation: 0, nav5MapRange: 25},
+            storage: {...savedFlightplan(0, [w.kprc]), nav5MapOrientation: 0, nav5MapRange: ARC_MAP_RANGE},
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
@@ -136,10 +139,10 @@ describe('NAV 5 page with a DME arc', () => {
         expect(map.ne).toBe(0);
         // The solid arc itself, in a window of the sector between the entry (225) and the arc's end that holds no labels
         // or other lines (right 240 to 254, left 196 to 208). The line is 4 px wide (one map pixel), so a full line is
-        // the window's length on the 62.4 px ring times 4 and at least half of it must be lit (measured 71 and 58 of
-        // about 61 and 52). The dashed arc from the beginning to the entry lies on the other side of the entry. Without
+        // the window's length on the 78 px ring times 4 and at least half of it must be lit (measured 93 and 55 of
+        // about 76 and 65). The dashed arc from the beginning to the entry lies on the other side of the entry. Without
         // the solid arc (a map that stops drawing it) no pixel is left in the window.
-        const fullLine = (toRadial - fromRadial) * Math.PI / 180 * 62.4 * 4;
+        const fullLine = (toRadial - fromRadial) * Math.PI / 180 * 78 * 4;
         expect(map.onRing(fromRadial, toRadial)).toBeGreaterThan(fullLine / 2);
     });
 
@@ -200,9 +203,9 @@ describe('NAV 5 page (characterization)', () => {
             .toMatchFileSnapshot('./__snapshots__/nav5Route.txt');
     });
 
-    // The scales between 1 and 1000 NM are not known to be those of the real unit (the code says so itself), so this
-    // pins the list the inner knob offers today, in its order, and claims nothing about the real unit.
-    // the scales between 1 and 1000 NM are a question: #236
+    // 3-35 gives only the end points, 1 and 1000 NM. The steps between them are those of the AVsoftech trainer
+    // (unreliable), as the maintainer reported them on #236 and adopted them. This pins the list the inner knob offers,
+    // in its order, and claims nothing about the real unit.
     it('NAV 5 range scales (characterization)', async () => {
         const {unit} = await nav5OnRoute({storage: {nav5MapRange: 1}});
         await unit.panel.cursor('L');
@@ -214,9 +217,19 @@ describe('NAV 5 page (characterization)', () => {
             await unit.panel.inner('L', 1);
         }
         expect(seen).toEqual([
-            '1', '2', '3', '5', '10', '15', '20', '25', '30', '40', '60', '80', '100', '120', '160', '240', '320', '480', '1000',
+            '1', '2', '3', '5', '7', '10', '15', '20', '30', '40', '60', '80', '120', '160', '240', '320', '480', '640', '1000',
             '1',
         ]);
+    });
+
+    // #236, the maintainer's ruling: a saved range that is not in the list (an earlier version offered 25 and 100 NM)
+    // loads as the default, 40 NM, and is saved so
+    it('loads a saved range of 25 NM, which the list does not have, as 40 NM (#236)', async () => {
+        const {unit} = await nav5OnRoute({storage: {nav5MapRange: 25}});
+
+        expect(Screen.read().rows('L')[5]).toBe('N^       40'); // before: 'N^       25'
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(storedSetting(unit, 'nav5MapRange')).toBe(40);
     });
 });
 

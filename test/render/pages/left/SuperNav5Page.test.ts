@@ -6,11 +6,11 @@ import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures
 import {canvasToAscii, downsampled} from '../../../harness/render/canvas';
 import {APR_ARM_SWITCH, HEADING_INPUT, NO_OBS, panelXml} from '../../../harness/panelXml';
 import {activeIdent} from '../../../harness/readers';
-import {showSuperNav5, SuperNav5} from '../../../harness/render/superNav5';
+import {showSuperNav5, SuperNav5, superNav5OnArc} from '../../../harness/render/superNav5';
 import {recordMap} from '../../../harness/render/mapRecorder';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan, storedSetting} from '../../../harness/storage';
-import {standardRoute} from '../../../harness/fixtures';
+import {arcWorld, standardRoute} from '../../../harness/fixtures';
 import {courseDeg, pointFrom} from '../../../harness/flight/geo';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {SuperNav5Page} from '../../../../kln90b/pages/left/SuperNav5Page';
@@ -94,11 +94,9 @@ describe('Super NAV 5 page (characterization)', () => {
         await expect(downsampled(ascii)).toMatchFileSnapshot('./__snapshots__/superNav5Route.txt');
     });
 
-    // The scales between 1 and 1000 NM are not known to be those of the real unit (the code says so itself), so this
-    // pins the list the inner knob offers today, in its order, and claims nothing about the real unit.
-    // the scales between 1 and 1000 NM are a question: #236
-    // The list has no 7 NM scale, although a figure of the guide's approach chapter shows AUTO at 7 NM; that goes into
-    // the question as well.
+    // 3-35 gives only the end points, 1 and 1000 NM. The steps between them are those of the AVsoftech trainer
+    // (unreliable), as the maintainer reported them on #236 and adopted them; the list has the 7 NM scale that figure
+    // 6-15 shows. This pins the list the inner knob offers, in its order, and claims nothing about the real unit.
     it('Super NAV 5 range scales (characterization)', async () => {
         const {unit} = await superNav5OnRoute({storage: {superNav5MapRange: 0}});
         await unit.panel.cursor('L');
@@ -109,9 +107,18 @@ describe('Super NAV 5 page (characterization)', () => {
             await unit.panel.inner('L', 1);
         }
         expect(seen).toEqual([
-            'AUTO', '1', '2', '3', '5', '10', '15', '20', '25', '30', '40', '60', '80', '100', '120', '160', '240', '320', '480', '1000',
+            'AUTO', '1', '2', '3', '5', '7', '10', '15', '20', '30', '40', '60', '80', '120', '160', '240', '320', '480', '640', '1000',
             'AUTO',
         ]);
+    });
+
+    // #236, the maintainer's ruling: a saved range that is not in the list loads as 40 NM
+    it('loads a saved range of 100 NM, which the list does not have, as 40 NM (#236)', async () => {
+        const {unit} = await superNav5OnRoute({storage: {superNav5MapRange: 100}});
+
+        expect(SuperNav5.read().range.trim()).toBe('40');
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(storedSetting(unit, 'superNav5MapRange')).toBe(40);
     });
 
     // The fourth row of the right menu shows 000 and N^ with north up. The menu figures only show a track value there,
@@ -121,6 +128,47 @@ describe('Super NAV 5 page (characterization)', () => {
         await unit.panel.cursor('R');
 
         expect(SuperNav5.read().right![3]).toBe(' 000° N^');
+    });
+
+    // 3-37 shows a route VOR only; an NDB of FPL 0 is drawn once by analogy (#233). No trainer drew one
+    it('labels an NDB of FPL 0 once with the NDBs on (characterization, #233)', async () => {
+        const w = world();
+        const map = recordMap({KAAA: w.kaaa, AB: w.ab, KBBB: w.kbbb});
+        const unit = await bootUnit({
+            facilities: w.facilities, position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
+            storage: {...savedFlightplan(0, [w.kaaa, w.ab, w.kbbb]), superNav5Ndb: true},
+        });
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await showSuperNav5(unit);
+
+        expect(labels(map.drawn).filter(l => l === 'AB')).toEqual(['AB']);
+        expect(map.drawn).not.toContain('icon ( AB');
+    });
+
+    // By analogy with the KLN 89's NAV 4 map, checked in the KLN 89 trainer, 2026-10-17 (#233): with the VORs on, a VOR
+    // of FPL 0 gets no VOR symbol, only the route's square. No Super NAV 5 page shows it
+    it('characterization: draws no VOR symbol at a VOR of FPL 0 with VOR: H (#233)', async () => {
+        const {map} = await superNav5OnRoute({storage: {superNav5Vor: 1}}); // 1 = H, which selects ABC
+
+        expect(map.drawn).toContain('icon ) HIG'); // Precondition: the VORs are drawn
+        expect(map.drawn).not.toContain('icon ) ABC');
+        expect(map.drawn).toContain('icon @ ABC');
+    });
+
+    // #233: the plan's waypoint is skipped by its ICAO, which holds the facility type, not by its identifier, so an NDB
+    // named like the route VOR ABC is another facility and is drawn. No manual page shows it
+    it('draws an NDB named like a VOR of FPL 0 (characterization, #233)', async () => {
+        const w = standardRoute();
+        const ndbAbc = ndb('ABC', 47.05, 8.1);
+        const map = recordMap({ABC: ndbAbc, VORABC: w.abc});
+        const unit = await bootOnStandardRoute({facilities: [ndbAbc], storage: {superNav5Ndb: true}});
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await showSuperNav5(unit);
+
+        expect(map.drawn).toContain('icon ( ABC');
+        expect(map.drawn).toContain('label ABC ABC');
+        expect(map.drawn).toContain('label ABC VORABC'); // the route's label of the VOR
     });
 });
 
@@ -240,7 +288,7 @@ describe('Super NAV 5 page', () => {
 
     // 3-37: H draws only high altitude VORs, LH low and high altitude VORs, OFF none. (TLH and terminal VORs: #204 in
     // NearestList.test.ts.) The VOR symbol is ")" in the map font (a circle with a dot), and each VOR is labeled with
-    // its identifier.
+    // its identifier. ABC, a VOR of FPL 0, is left to the route (the characterization of #233 above).
     it.each([
         ['OFF', 0, []],
         ['H', 1, ['HIG']],
@@ -249,7 +297,7 @@ describe('Super NAV 5 page', () => {
         const {map} = await superNav5OnRoute({storage: {superNav5Vor: setting}});
 
         const vors = map.drawn.filter(d => d.startsWith('icon )')).map(d => d.split(' ')[2]).sort();
-        expect(vors).toEqual([...idents, ...(setting === 0 ? [] : ['ABC'])].sort());
+        expect(vors).toEqual([...idents].sort());
     });
 
     // 3-37: NDB: ON draws the nearest NDBs (the smaller circle, "(" in the map font) and APT: ON the nearest airports
@@ -302,8 +350,8 @@ describe('Super NAV 5 page', () => {
         expect(Math.abs(squares[1][2] - 13.65)).toBeLessThanOrEqual(1);
     });
 
-    // The sibling of the pin below: with VOR: OFF the route labels ABC once, and with VOR: H ABC is a nearest VOR
-    it('labels a VOR of FPL 0 with the VORs off, and draws it as a nearest VOR with VOR: H (3-37)', async () => {
+    // 3-37: the route labels ABC, a VOR of FPL 0, once with the VORs off, and once with VOR: H, which selects ABC
+    it('labels a VOR of FPL 0 once, with the VORs off and with VOR: H (3-37)', async () => {
         const off = await superNav5OnRoute();
         expect(labels(off.map.drawn).filter(l => l === 'ABC')).toEqual(['ABC']);
         await off.unit.panel.cursor('R');
@@ -311,12 +359,23 @@ describe('Super NAV 5 page', () => {
         await off.unit.panel.cursor('R');
         await vi.advanceTimersByTimeAsync(500);
 
-        expect(off.map.drawn).toContain('icon ) ABC');
+        expect(labels(off.map.drawn).filter(l => l === 'ABC')).toEqual(['ABC']);
     });
 
     // 3-37 (figures 3-121 and 3-122): with the VORs on, the flight plan VOR LRP is labeled once
-    it.fails('labels a VOR of FPL 0 once with the VORs on (3-37, #233)', async () => {
+    it('labels a VOR of FPL 0 once with the VORs on (3-37, #233)', async () => {
         const {map} = await superNav5OnRoute({storage: {superNav5Vor: 1}});
+
+        expect(labels(map.drawn).filter(l => l === 'ABC')).toEqual(['ABC']);
+    });
+
+    // #233: the plan and the nearest list can hold different objects for the same facility (they are loaded at
+    // different times), so the plan's VOR is found by its ICAO. Here the plan holds a copy of ABC
+    it('labels a VOR of FPL 0 once when the plan holds another object for it (#233)', async () => {
+        const {unit, map} = await superNav5OnRoute({storage: {superNav5Vor: 1}});
+        const leg = unit.props.memory.fplPage.flightplans[0].getLegs().find(l => l.wpt.icaoStruct.ident === 'ABC')!;
+        leg.wpt = {...leg.wpt};
+        await vi.advanceTimersByTimeAsync(500);
 
         expect(labels(map.drawn).filter(l => l === 'ABC')).toEqual(['ABC']);
     });
@@ -417,11 +476,156 @@ describe('Super NAV 5 page', () => {
     });
 });
 
+// #394: pulling the knob with the menu open closes the menu and shows the scan window, by analogy with the KLN 89's map
+// page, the maintainer's check (the KLN 89 trainer, 2026-10-17, docs/kln89-trainer-record.md). The CRSR transitions and
+// the push are the maintainer's ruling (#394). A cursor field takes the pulled knob like the pushed-in one (by analogy
+// with CAL 1 of the KLN 89, checked in the KLN 89 trainer, 2026-10-17). While the menu hides the scan window, the
+// window takes neither DCT, CLR nor ENT (the ruling on #394)
+describe('Super NAV 5 menu and the pulled right knob (#394)', () => {
+    const menuValue = () => focusedRight().join('').trim();
+
+    it('closes the menu and shows the scan window when the knob is pulled with the menu open (#394)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.cursor('R');
+        expect(SuperNav5.read().right).not.toBeNull(); // Precondition
+
+        await unit.panel.scan();
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(SuperNav5.read().right).toBeNull();
+        expect(SuperNav5.read().directTo).toBe('ABC   ');
+    });
+
+    it('opens the menu with CRSR while pulled, and the pulled knob changes its field (#394)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.scan();
+        await unit.panel.cursor('R');
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBeNull();
+        expect(menuValue()).toBe('OFF');
+
+        await unit.panel.inner('R', 1);
+
+        expect(menuValue()).toBe('H');
+    });
+
+    it('changes the menu field with the pulled knob turned left (#394)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.scan();
+        await unit.panel.cursor('R');
+        expect(menuValue()).toBe('OFF'); // Precondition
+
+        await unit.panel.inner('R', -1);
+
+        expect(menuValue()).toBe('TLH');
+    });
+
+    it('closes the menu again with CRSR while pulled and shows the scan window (#394)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.scan();
+        await unit.panel.cursor('R');
+        await unit.panel.cursor('R');
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(SuperNav5.read().right).toBeNull();
+        expect(SuperNav5.read().directTo).toBe('ABC   ');
+    });
+
+    it('keeps the menu open when the knob is pushed in, and closes it when it is pulled again (#394)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.scan();
+        await unit.panel.cursor('R');
+        await unit.panel.scan(); // pushed in
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().right).not.toBeNull();
+        await unit.panel.inner('R', 1);
+        expect(menuValue()).toBe('H'); // the cursor is still on the field
+
+        await unit.panel.scan(); // pulled again
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(SuperNav5.read().right).toBeNull();
+        expect(SuperNav5.read().directTo).not.toBeNull();
+    });
+
+    // Without a waypoint in the scan window, the DIRECT TO page suggests the active waypoint, ABC (3-27 rule 4); the
+    // window scanned to KBBB is hidden by the menu and offers nothing
+    it('suggests the active waypoint and not the hidden scan window on the DIRECT TO page with the menu open (#394)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.scan();
+        await unit.panel.inner('R', 1);
+        expect(SuperNav5.read().directTo).toBe('KBBB  '); // Precondition
+        await unit.panel.cursor('R');
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBeNull(); // Precondition: the menu hides the window
+
+        await unit.panel.dct();
+        await vi.advanceTimersByTimeAsync(250);
+
+        const rows = Screen.read().rows('L');
+        expect(rows[0].trim()).toBe('DIRECT TO:');
+        expect(rows[2].trim()).toBe('ABC');
+    });
+
+    /** On the arc of arcWorld(), the knob pulled and the window scanned back to the arc's entry D225J */
+    async function onArcEntry() {
+        const w = arcWorld();
+        const map = recordMap({ABC: w.abc});
+        const unit = await superNav5OnArc({storage: {superNav5Vor: 3}}); // 3 = TLH: ABC, the arc's center, is drawn
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.scan();
+        await unit.panel.inner('R', -1);
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBe('D225Jà'); // Precondition: the entry, with the IAF symbol
+        return {unit, map};
+    }
+
+    // CLR with the menu open declutters the map (3-38), as without the knob pulled; the hidden window does not take it
+    // to MOVE ? (6-17)
+    it('declutters with CLR and leaves the hidden scan window on the arc entry with the menu open (#394)', async () => {
+        const {unit, map} = await onArcEntry();
+        expect(map.drawn).toContain('icon ) ABC'); // Precondition
+        await unit.panel.cursor('R');
+
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(map.drawn).not.toContain('icon ) ABC');
+        await unit.panel.cursor('R'); // closes the menu
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBe('D225Jà');
+    });
+
+    // ENT with the menu open does not move the arc entry, although the hidden window shows MOVE ?. The aircraft flies a
+    // track that meets the arc (as in SuperNav5DirectToSelector.test.ts), so that ENT in the window would move it
+    it('leaves the arc entry unchanged on ENT with the menu open over MOVE ? (#394)', async () => {
+        const {unit} = await onArcEntry();
+        const w = arcWorld();
+        const start = w.at(200, 15);
+        await moveAircraft(unit, start, {groundspeedKt: 0});
+        await moveAircraft(unit, pointFrom(start, 10, 0.05), {groundspeedKt: 120});
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBe('MOVE ?'); // Precondition
+        const [entry] = unit.props.memory.fplPage.flightplans[0].getLegs();
+        const arcData = entry.arcData;
+        expect(arcData).toBeDefined(); // Precondition: the entry of the arc
+        await unit.panel.cursor('R');
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        const [after] = unit.props.memory.fplPage.flightplans[0].getLegs();
+        expect(after.wpt.icaoStruct.ident).toBe('D225J');
+        expect(after.arcData).toBe(arcData);
+    });
+});
+
 describe('Super NAV 5 AUTO scale', () => {
     // The scales 5 and 15 are shown in figures of the Pilot's Guide (5 NM on 6-8, 6-12 and 6-17; 15 NM in figure 3-116 on
-    // 3-35), and 10 and 20 on photos of real units, so they are scales of the real unit. The list between them is not
-    // known (the code's own list is a guess), so the distances below sit just under a scale (9.5 and 19.5 NM): the
-    // expected scale then holds whether or not the real unit has a scale between.
+    // 3-35), and 10 and 20 on photos of real units, so they are scales of the real unit. The list between them is the
+    // AVsoftech trainer's (the maintainer's ruling, #236; unreliable), so the distances below sit just under a scale
+    // (9.5 and 19.5 NM): the expected scale then holds whether or not the real unit has a scale between.
     const P = {lat: 47.0, lon: 8.0};
     const at = (bearing: number, nm: number) => pointFrom(P, bearing, nm);
     const fix = (ident: string, bearing: number, nm: number) => intersection(ident, at(bearing, nm).lat, at(bearing, nm).lon);
@@ -464,6 +668,18 @@ describe('Super NAV 5 AUTO scale', () => {
         const star = map.pixels.find(p => p[0] === '%')!;
         expect(Math.abs(star[1] - 74)).toBeLessThanOrEqual(1);
         expect(Math.abs(star[2] - 2.3)).toBeLessThanOrEqual(1);
+    });
+
+    // 3-36: AUTO takes the smallest scale that shows the Direct To waypoint; figure 6-15 shows the 7 NM scale, which the
+    // waypoint 6.5 NM north needs (without it, 10)
+    it('takes the 7 NM scale for a Direct To waypoint 6.5 NM away (3-36, figure 6-15)', async () => {
+        const dct = fix('AAAE', 0, 6.5);
+        const unit = await bootUnit({facilities: [dct], position: P, storage: {superNav5MapRange: 0}});
+        await settle(unit);
+        await unit.panel.directTo('AAAE', {waitMs: 2000});
+        await showSuperNav5(unit);
+
+        expect(SuperNav5.read().range.trim()).toBe('7');
     });
 
     // The sibling of the test below: the active waypoint is A1, 19.5 NM north, and A2 4 NM north-east comes after it.
@@ -567,6 +783,9 @@ describe('Super NAV 5 near the MAP', () => {
     });
 });
 
+/** The OBS course of field 2 without its label, colon and degree sign; the form of the field is #396's (SuperNav5Left.test.ts) */
+const obsCourse = () => SuperNav5.read().left[5].replace(/^Ù:?/, '').replace('°', '');
+
 describe('Super NAV 5 OBS course', () => {
     /**
      * The standard route with the aircraft at KAAA, in OBS mode on ABC with an OBS course of 051: the course of the leg
@@ -580,12 +799,21 @@ describe('Super NAV 5 OBS course', () => {
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
         await showSuperNav5(unit);
-        expect(SuperNav5.read().left[5]).toBe('Ù051°');
+        expect(obsCourse()).toBe('051');
         await unit.panel.cursor('L');
         await unit.panel.outer('L', -2);
-        expect(focusedLeft()).toEqual(['051°']);
+        expect(focusedLeft()).toEqual(['051']);
         return unit;
     }
+
+    // The form of the field is #396's (SuperNav5Left.test.ts): with the cursor on the course, the label OBS: stays shown
+    // and in normal video, and only the course is inverted. No figure shows the field with the cursor on it
+    it('characterization: keeps OBS: shown and not inverted while the cursor is on the course (#396)', async () => {
+        await onObsCourse();
+
+        expect(SuperNav5.read().left[5]).toBe('Ù:051');
+        expect(focusedLeft()).toEqual(['051']);
+    });
 
     // 5-34, 5-35: the inner knob on the OBS course changes it by one degree. This is the sibling of the test below:
     // turned left, the page stays and the course is one degree less.
@@ -594,7 +822,7 @@ describe('Super NAV 5 OBS course', () => {
         await unit.panel.inner('L', -1);
 
         expect(unit.overlay()).toBeInstanceOf(SuperNav5Page);
-        expect(SuperNav5.read().left[5]).toBe('Ù050°');
+        expect(obsCourse()).toBe('050');
     });
 
     // 5-34, 5-35: turned right, the course is one degree more and Super NAV 5 stays
@@ -603,6 +831,6 @@ describe('Super NAV 5 OBS course', () => {
         await unit.panel.inner('L', 1);
 
         expect(unit.overlay()).toBeInstanceOf(SuperNav5Page);
-        expect(SuperNav5.read().left[5]).toBe('Ù052°');
+        expect(obsCourse()).toBe('052');
     });
 });

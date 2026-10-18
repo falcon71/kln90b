@@ -1,13 +1,17 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {approachWorld, standardRoute} from '../../harness/fixtures';
-import {finalCourseDeg} from '../../harness/flight/geo';
+import {courseDeg, finalCourseDeg} from '../../harness/flight/geo';
+import {messages} from '../../harness/readers';
+import {TICK_TIME_DISPLAY} from '../../../kln90b/TickController';
+import {OneTimeMessage} from '../../../kln90b/data/MessageHandler';
 import {blinkCycle} from '../../harness/render/blink';
 import {readRows} from '../../harness/render/screen';
 import {showSuperNav5, SuperNav5} from '../../harness/render/superNav5';
 import {savedFlightplan} from '../../harness/storage';
 import {APR_ARM_SWITCH, NO_OBS, panelXml, PanelOptions} from '../../harness/panelXml';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
+import {NavMode} from '../../../kln90b/data/VolatileMemory';
 
 /**
  * The mode glyphs of the KLN font (kln90b.ttf), read by drawing each code point: Ê is ENR, Ë is LEG, Í is ARM and Ì is
@@ -70,18 +74,7 @@ describe('Super NAV 5 mode row (5-32)', () => {
         expect(SuperNav5.read().left[2]).toBe(`${APR}-${LEG}`);
     });
 
-    // 5-32: ARM:259, the selected magnetic course after a colon. The final course of approachWorld() is 180 and the
-    // variation 0. Without an OBS input the unit picks the course that leaves the deviation unchanged (5-36); the
-    // aircraft is on the final course, so that is the DTK, 180
-    it('shows ARM: and the OBS course in the approach-arm OBS mode (5-32)', async () => {
-        const {unit} = await armed(NO_OBS);
-        await unit.panel.obsMode();
-        await showSuperNav5(unit);
-
-        expect(SuperNav5.read().left[2]).toBe(`${ARM}:180`);
-    });
-
-    // 5-32: the preconditions of the pin below, ENR and the course 051
+    // 5-32: ENR and the course 051, the course of the active leg
     it('shows ENR and the OBS course in the enroute OBS mode (sibling of #321) (5-32)', async () => {
         const {unit, course} = await enrouteObs();
 
@@ -93,12 +86,69 @@ describe('Super NAV 5 mode row (5-32)', () => {
         expect(mode.startsWith(ENR)).toBe(true);
         expect(mode.endsWith('051')).toBe(true);
     });
+});
 
-    // 5-32: ENR:274, the colon between the mode and the course, as ARM:259 has it (and the code has it for ARM)
-    it.fails('shows ENR: and the OBS course in the enroute OBS mode (5-32, #321)', async () => {
+// 6-12 and 6-14, figures 6-20 and 6-22: Super NAV 5 in the approach-arm OBS mode with the course set on the external
+// indicator shows ARM and the course with no colon and no space (the 5-32 table is the status line's form)
+describe('Super NAV 5 mode row in the OBS modes (6-12, 6-14)', () => {
+    it('shows ARM and the course without a colon in the approach-arm OBS mode (6-12, 6-14, figures 6-20 and 6-22)', async () => {
+        const {unit} = await armed();
+        unit.env.sim.set('Nav OBS:1', 'degrees', 180); // the final course of approachWorld(), magvar 0
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(1000);
+        await showSuperNav5(unit);
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ARM_OBS); // Precondition
+        expect(SuperNav5.read().left[2]).toBe(`${ARM}180`);
+    });
+});
+
+// The row has no colon in either OBS mode (the maintainer's ruling, #321), also where the course can be entered on the
+// unit (NO_OBS), a case no figure shows. The AVsoftech trainer is never a spec source for this row
+describe('Super NAV 5 mode row in the OBS modes (characterization)', () => {
+    // Without an OBS input the unit picks the course that leaves the deviation unchanged (5-36); the aircraft is on the
+    // final course, so that is the DTK, 180. The final course of approachWorld() is 180 and the variation 0
+    it('characterization: shows ARM and the course without a colon without an OBS input (#321)', async () => {
+        const {unit} = await armed(NO_OBS);
+        await unit.panel.obsMode();
+        await showSuperNav5(unit);
+
+        expect(SuperNav5.read().left[2]).toBe(`${ARM}180`);
+    });
+
+    // The AVsoftech trainer (unreliable) shows ENR300 in the enroute OBS mode; by analogy with figures 6-20 and 6-22
+    // (#321, which expected ENR:)
+    it('characterization: shows ENR and the course without a colon or a space in the enroute OBS mode (#321)', async () => {
         const {unit} = await enrouteObs();
 
-        expect(SuperNav5.read().left[2]).toBe(`${ENR}:051`);
+        expect(SuperNav5.read().left[2]).toBe(`${ENR}051`);
+    });
+});
+
+// 5-35: a colon after OBS means the course can be entered on the unit; figures 6-20 and 6-22 (6-12, 6-14) show the
+// field where the course is set on the external indicator: OBS, the course and its degree sign, no colon
+describe('Super NAV 5 OBS field (5-35, 6-12, 6-14)', () => {
+    // The figures' case: the approach-arm OBS mode with the course from the external indicator (armed() keeps the
+    // default OBS source, Nav OBS:1), as in the mode row test above
+    it('shows OBS, the course and its degree sign without a colon where the course comes from the external indicator (5-35, 6-12, 6-14)', async () => {
+        const {unit} = await armed();
+        unit.env.sim.set('Nav OBS:1', 'degrees', 180);
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(1000);
+        await showSuperNav5(unit);
+
+        expect(SuperNav5.read().left[5]).toBe('Ù180°');
+    });
+});
+
+// The maintainer's reading of 5-35 (#396): where the course can be entered, the colon follows OBS; the six cells of the
+// column leave no room for the degree sign then. No figure shows this case
+describe('Super NAV 5 OBS field (characterization)', () => {
+    it('characterization: shows OBS: and the course without a degree sign where the course can be entered (#396)', async () => {
+        const {unit} = await enrouteObs(); // NO_OBS
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(SuperNav5.read().left[5]).toBe('Ù:051');
     });
 });
 
@@ -146,5 +196,59 @@ describe('Super NAV 5 message prompt (3-16, 3-36)', () => {
 
         const [first, second] = await mapPromptCycles();
         expect(new Set([...first, ...second])).toEqual(new Set(['    ...']));
+    });
+
+    // A pilot reaches this state: the ADJ NAV IND CRS message is read and Super NAV 5 shows, then a new message is
+    // posted whose condition lapses before it is read (the shape of InsideAirspaceMessage). When the lapse falls between
+    // a flashing tick and the next display tick, the element that flashed is the one that must turn steady; whether it
+    // does so depends on the timing, so the test calls the message handler's tick itself, right after the flashing tick
+    // (the maintainer's ruling, #326)
+    it('keeps msg steady when the unread message lapses after a flashing tick (3-16, 3-36, #326)', async () => {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({magvar: 4});
+        unit.env.sim.set('Nav OBS:1', 'degrees', courseDeg(kaaa, abc) - 4 + 30);
+        await vi.advanceTimersByTimeAsync(15000); // Past the 10 s in which the message shows whatever the course is
+        await unit.panel.readMessages();
+        expect(messages(unit)).toEqual(['ADJ NAV IND CRS TO 046°']); // Preconditions
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
+        await showSuperNav5(unit);
+        const lapsing = new class extends OneTimeMessage {
+            public valid = true;
+
+            public isConditionValid(): boolean {
+                return this.valid && super.isConditionValid();
+            }
+        }(['NEW MESSAGE']);
+        unit.props.messageHandler.addMessage(lapsing);
+        for (let i = 0; i < 8 && mapPrompt() !== 'msg FFF'; i++) {
+            await vi.advanceTimersByTimeAsync(TICK_TIME_DISPLAY);
+        }
+        expect(mapPrompt()).toBe('msg FFF'); // Precondition: the prompt is unread and in its flashing phase
+
+        lapsing.valid = false;
+        unit.props.messageHandler.tick();
+        expect(messages(unit)).toEqual(['ADJ NAV IND CRS TO 046°']); // Precondition: only the read message is left
+        await vi.advanceTimersByTimeAsync(TICK_TIME_DISPLAY);
+
+        expect(mapPrompt()).toBe('msg III');
+        const [first, second] = await mapPromptCycles();
+        expect(new Set([...first, ...second])).toEqual(new Set(['msg III']));
+    });
+
+    // 3-16: a message whose condition needs action keeps the prompt on, not flashing, once it is read; 3-36 puts the same
+    // prompt on the map. The condition is a wrong external course, as in the status line test (StatusLine.test.ts). The
+    // steady inverse once read is the maintainer's ruling (#326)
+    it('keeps msg steady in inverse video once read while the condition stays (3-16, 3-36, #326)', async () => {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({magvar: 4});
+        unit.env.sim.set('Nav OBS:1', 'degrees', courseDeg(kaaa, abc) - 4 + 30);
+        await vi.advanceTimersByTimeAsync(15000); // Past the 10 s in which the message shows whatever the course is
+        await unit.panel.readMessages();
+        expect(messages(unit)).toEqual(['ADJ NAV IND CRS TO 046°']); // Preconditions
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
+        await showSuperNav5(unit);
+
+        const [first, second] = await mapPromptCycles();
+        expect(new Set([...first, ...second])).toEqual(new Set(['msg III']));
     });
 });

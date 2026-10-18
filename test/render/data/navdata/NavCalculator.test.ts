@@ -775,3 +775,32 @@ describe('passing a waypoint off course', () => {
         expect(activeIdent(unit)).toBe('KBBB');
     });
 });
+
+// #393: the calculator writes the distance to the destination, and the ETE to it is that distance over the ground speed. A
+// Direct To outside the plan makes the destination the active waypoint, so its distance is the distance to it. The aircraft
+// is put 1e-5 degree east of KCCC at 120 kt, about 4.1e-4 NM from it: right over the waypoint the course to it is not
+// defined and the SDK warns of a NaN heading. A position gives no distance of exactly 0, so the calculator's write is
+// stood in for: a value below 1e-3 NM is written as exactly 0, and the ETE is then computed by the calculator
+describe('NavCalculator, a distance to the destination of exactly 0 (#393)', () => {
+    it('characterization: computes an ETE of 0 to a destination at a distance of exactly 0 (#393)', async () => {
+        const kccc = airport('KCCC', 47.1, 10.5);
+        const unit = await bootUnit({facilities: [kccc], position: {lat: 47.1, lon: 10.0}});
+        await settle(unit);
+        await unit.panel.directTo('KCCC');
+        const navState = unit.props.memory.navPage;
+        let stored = navState.distToDest;
+        Object.defineProperty(navState, 'distToDest', {
+            get: () => stored,
+            set: (v: number | null) => {
+                stored = v !== null && v < 1e-3 ? 0 : v;
+            },
+            configurable: true,
+        });
+        await moveAircraft(unit, {lat: 47.1, lon: 10.50001}, {groundspeedKt: 120});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(navState.distToDest).toBe(0); // Precondition: the distance is exactly 0
+        expect(navState.eteToDest).toBe(0);
+        expect(unit.errors).toEqual([]);
+    });
+});

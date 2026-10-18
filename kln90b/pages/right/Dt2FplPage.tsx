@@ -186,7 +186,7 @@ export class Dt2FplPage extends SixLineHalfPage {
             return null;
         }
         const ete = data[legIdx].ete;
-        return ete ? now.addSeconds(ete) : null;
+        return ete !== null ? now.addSeconds(ete) : null; //#393: 0 is a value
     }
 
     private shouldDistanceBeVisible(fplIdx: number, row: number, actIdx: number, fplIndices: [number, number, number, number, number, number]): boolean {

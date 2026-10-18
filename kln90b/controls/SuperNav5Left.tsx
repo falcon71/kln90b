@@ -82,7 +82,9 @@ export class SuperNav5Left implements UiElement {
                     this.msgRef.instance.classList.remove("inverted-blink");
                 }
             } else {
-                this.msgRef.instance.classList.remove("inverted", "inverted-blink");
+                //3-16, #326: once read, the prompt stays on in inverse video without flashing, as on the status line
+                this.msgRef.instance.classList.add("inverted");
+                this.msgRef.instance.classList.remove("inverted-blink");
             }
         } else {
             this.msgRef.instance.classList.remove("inverted", "inverted-blink");
@@ -103,11 +105,14 @@ export class SuperNav5Left implements UiElement {
             case NavMode.ENR_LEG:
                 return "Ê-Ë";
             case NavMode.ENR_OBS:
+                //No colon on Super NAV 5, unlike the status line: by analogy with ARM (6-12, 6-14, figures 6-20 and
+                //6-22); ENR as the AVsoftech trainer (unreliable) shows it, #321
                 return `Ê${format(roundBearing(this.props.memory.navPage.obsMag), "000")}`;
             case NavMode.ARM_LEG:
                 return "Í-Ë";
             case NavMode.ARM_OBS:
-                return `Í:${format(roundBearing(this.props.memory.navPage.obsMag), "000")}`;
+                //6-12, 6-14 (figures 6-20, 6-22): no colon on Super NAV 5, unlike the status line (#321)
+                return `Í${format(roundBearing(this.props.memory.navPage.obsMag), "000")}`;
             case NavMode.APR_LEG:
                 return "Ì-Ë";
         }

@@ -28,6 +28,7 @@ import {SuperNav5Right} from "../../controls/SuperNav5Right";
 import {NearestWpt} from '../../data/navdata/NearestList';
 import {SuperNav5DirectToSelector} from "../../controls/selects/SuperNav5DirectToSelector";
 import {NauticalMiles} from "../../data/Units";
+import {MAP_RANGES} from "../../data/MapRanges";
 
 type SuperNav5PageTypes = {
     canvas: Canvas,
@@ -35,7 +36,6 @@ type SuperNav5PageTypes = {
     right: SuperNav5Right,
     directTo: SuperNav5DirectToSelector,
 }
-const RANGES = [1, 2, 3, 5, 10, 15, 20, 25, 30, 40, 60, 80, 100, 120, 160, 240, 320, 480, 1000]; //I have no idea, which ranges the device supports
 
 
 export class SuperNav5Page extends SevenLinePage {
@@ -67,7 +67,7 @@ export class SuperNav5Page extends SevenLinePage {
             canvas: new Canvas(CanvasSize.FULLPAGE),
             left: new SuperNav5Left(props),
             right: new SuperNav5Right(props, this.rCursorController),
-            directTo: new SuperNav5DirectToSelector(this.props.bus, this.props.hardware, this.props.memory.fplPage.flightplans[0], this.props.memory.navPage.activeWaypoint, this.props.sensors),
+            directTo: new SuperNav5DirectToSelector(this.props.bus, this.props.hardware, this.props.memory.fplPage.flightplans[0], this.props.memory.navPage.activeWaypoint, this.props.sensors, () => this.isScanWindowShown()),
         });
 
         this.lCursorController = new CursorController(this.children.get("left").children);
@@ -90,8 +90,16 @@ export class SuperNav5Page extends SevenLinePage {
         this.redraw();
     }
 
+    /**
+     * 3-38: the scan window shows while the right inner knob is pulled. #394: the open menu takes its place, and a
+     * hidden window takes neither DCT, CLR nor ENT; it keeps its waypoint for when the menu closes
+     */
+    private isScanWindowShown(): boolean {
+        return this.props.hardware.isScanPulled && !this.rCursorController.cursorActive;
+    }
+
     public clear(): boolean {
-        if (this.props.hardware.isScanPulled) {
+        if (this.isScanWindowShown()) {
             const didSomething = this.children.get("directTo").clear();
             if (!didSomething) {
                 this.isDecluttered = !this.isDecluttered;
@@ -102,6 +110,16 @@ export class SuperNav5Page extends SevenLinePage {
         return true;
     }
 
+    /**
+     * #394, the maintainer's own check on the KLN 89 trainer (2026-10-17): pulling the right knob while the menu is open
+     * closes the menu, and the scan window shows. Pushing it in changes nothing (the maintainer's ruling, #394)
+     */
+    public scanPulledChanged(): void {
+        if (this.props.hardware.isScanPulled && this.rCursorController.cursorActive) {
+            this.rCursorController.setCursorActive(false);
+        }
+    }
+
     public scanRight(): boolean {
         return this.children.get("directTo").scanRight();
     }
@@ -110,12 +128,13 @@ export class SuperNav5Page extends SevenLinePage {
         return this.children.get("directTo").scanLeft();
     }
 
+    /** 3-27 rule 2: the waypoint of the scan window, null while the window is not shown (#394) */
     public getDirectToTarget(): Facility | null {
         return this.children.get("directTo").getDirectToTarget();
     }
 
     public enter(): boolean {
-        if (this.props.hardware.isScanPulled && this.children.get("directTo").enter()) {
+        if (this.isScanWindowShown() && this.children.get("directTo").enter()) {
             return true;
         }
         return super.enter();
@@ -173,10 +192,10 @@ export class SuperNav5Page extends SevenLinePage {
         }
 
         if (!this.isDecluttered && this.vorSetting.get() !== SuperNav5VOR.OFF) {
-            this.drawNearestList(ctx, this.props.nearestLists.vorNearestList.getNearestList().filter(this.filterNearestVor.bind(this)), ")")
+            this.drawNearestList(ctx, this.props.nearestLists.vorNearestList.getNearestList().filter(this.filterNearestVor.bind(this)), ")", legs);
         }
         if (!this.isDecluttered && this.ndbSetting.get()) {
-            this.drawNearestList(ctx, this.props.nearestLists.ndbNearestList.getNearestList(), "(")
+            this.drawNearestList(ctx, this.props.nearestLists.ndbNearestList.getNearestList(), "(", legs);
         }
         if (!this.isDecluttered && this.aptSetting.get()) {
             this.drawAirports(ctx, legs, range)
@@ -222,7 +241,7 @@ export class SuperNav5Page extends SevenLinePage {
             distance = Math.max(distToActive ?? 0, distanceToFollowing);
         }
 
-        return RANGES.find((r) => r >= distance) ?? 1000;
+        return MAP_RANGES.find((r) => r >= distance) ?? 1000;
     }
 
     private drawFlightplan(ctx: CoordinateCanvasDrawContext, legs: KLNFlightplanLeg[], activeWaypoint: ActiveWaypoint) {
@@ -374,8 +393,13 @@ export class SuperNav5Page extends SevenLinePage {
         }
     }
 
-    private drawNearestList(ctx: CoordinateCanvasDrawContext, waypoints: NearestWpt<Facility>[], icon: string) {
+    private drawNearestList(ctx: CoordinateCanvasDrawContext, waypoints: NearestWpt<Facility>[], icon: string, legs: KLNFlightplanLeg[]) {
         for (const wpt of waypoints) {
+            //3-37, figures 3-121 and 3-122, #233: a waypoint of FPL 0 is drawn and labeled once, by the flight plan, as
+            //drawAirports does for airports. By ICAO: the plan and the nearest list load their facilities separately
+            if (legs.some(leg => ICAO.valueEquals(leg.wpt.icaoStruct, wpt.facility.icaoStruct))) {
+                continue;
+            }
             ctx.drawIcon(wpt.facility, icon);
             ctx.drawLabel(wpt.facility, wpt.facility.icaoStruct.ident);
         }

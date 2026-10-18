@@ -266,8 +266,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - `platform.getRouteManager().then(...)` in `KLN90BCore` has no catch; a rejection is an unhandled rejection
       (`bootFailure.test.ts` takes it), not an error-page error.
 - **Leads** (seen and not confirmed or not filed):
-    - Start-up pages: `WelcomePage` subscribes to `propsReady` in its constructor and never unsubscribes (the pattern of
-      #96); `docs/architecture.md` (UI 0) says the Turn-On page waits about 15 s, the code 17 s (the tests hold 14 to
+    - Start-up pages: `docs/architecture.md` (UI 0) says the Turn-On page waits about 15 s, the code 17 s (the tests hold 14 to
       19 s), and the code comment "page 84" is the V2 maintenance manual's numbering of the printed page 1011;
       `VFROnlyPage` renders a `<div>` where the other start-up pages use `<pre>`; figure 3-22 shows the VFR page's status
       line without a mode, the code `enr-leg ent`; `VFROnlyPage.acknowledge` taking the OBS branch always is an
@@ -284,26 +283,23 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       `memory.<x>Page.ident` writes of `PageManager.startMainPage` are equivalent, because `WaypointPage` uses the ident
       only when the facility cannot be read.
     - Overlays: a last active waypoint of a facility type `PageManager.ts:100` does not handle (a VIS fix of an approach)
-      would throw at power-on, if it can be stored at all; the right scan branches read the base right page's cursor
-      while an overlay shows; the overlay orders without MSG (ALT over DIR, DIR over ALT, ALT twice) have no source and
-      are not frozen; the error page lives outside the overlay stack, so a knob turned while it shows reaches the page
-      beneath, and it stays over a power cycle.
+      would throw at power-on, if it can be stored at all; the overlay orders without MSG (ALT over DIR, DIR over ALT,
+      ALT twice) have no source and are not frozen; the error page lives outside the overlay stack, so a knob turned
+      while it shows reaches the page beneath, and it stays over a power cycle.
 
 ## Across the suite
 
 - **Flip the pins when the bugs are fixed:** remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each
-  of which names its issue. Fixes that touch other tests:
-    - the fix of #96 needs `PageStack` in `MainPage.tsx` to destroy the half page it replaces (`setCurrentPage`, `pop`,
-      `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone leaves both handler counts
-      unchanged, and OTH 4 counts the `changed` topic of the remarks manager;
-    - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised.
+  of which names its issue. A fix that touches other tests: a fix of #332 with a ride-through above about 1.5 s needs
+  the 3 s waits of the circuit tests raised.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): duplicate idents on a waypoint
   page (2026-10-08, T20, not done), and the empty top row of FPL 0 with the first waypoint active (above). #162 and
   #163 are no open questions: the trainer shows neither ARM nor ACTV, so the maintainer's rulings settle them and the
   tests hold them as characterizations.
-  What the 90B shows on an empty MSG page (#325), the prompt while the MSG page shows and an airport below sea level
-  cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is
-  the question #326.
+  The prompt while the MSG page shows and an airport below sea level cannot be asked on the 89. What the 90B shows on
+  an empty MSG page is no open question: the maintainer ruled the blank page is kept (#325), and `MessagePage.test.ts`
+  holds it. The Super NAV 5 prompt once all messages are read is no open question: the maintainer
+  ruled it steady in inverse video (#326), and `SuperNav5Left.test.ts` holds it.
 - **Debug `console.log` calls** left in the code: `Apt3MapPage.tsx:30`, `TemporaryWaypointDeleter.ts:27` and `:32`,
   `WaypointPage.tsx:46` and `WaypointPage.getScrollSpeed`, `SupPage.tsx`, the constructors of the waypoint pages
   (`ActPage.tsx:43`, `Apt1Page.tsx:78`, `Apt6Page.tsx:43`, `IntPage.tsx:71`, `NdbPage.tsx:55`, `VorPage.tsx:58`,

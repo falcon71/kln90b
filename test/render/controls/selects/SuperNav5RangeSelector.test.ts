@@ -6,7 +6,7 @@ import {savedFlightplan, storedSetting} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
 
 // SuperNav5RangeSelector: the map scale of Super NAV 5 (SuperNav5.read().range), AUTO or a fixed scale, saved as the
-// setting superNav5MapRange (0 for AUTO). SuperNav5Page.test.ts holds the list of scales (a characterization, #236),
+// setting superNav5MapRange (0 for AUTO). SuperNav5Page.test.ts holds the list of scales (a characterization of the AVsoftech trainer's list, #236),
 // AUTO between 1 and 1000 and the AUTO choice of scale; this file holds what the field shows with the cursor on and
 // off.
 

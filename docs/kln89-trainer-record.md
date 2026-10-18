@@ -358,3 +358,30 @@ afterwards)
   - TRI 1 and TRI 3 at GS 0 showed `000KT --:--` and `F REQ -----` (#257).
   - Its TRI ground speed does not depend on the course (TAS 150 with 30 kt from 090 gave 171 kt on a southbound leg,
     and TRI 5 used that one speed for the whole plan), so it settles neither #167 nor #254.
+
+**2026-10-17, second session**
+- NAV 4 draws a VOR that is a waypoint of FPL 0 (BAE) once, as the route symbol with one label; with the VOR layer on
+  or off no pixel differs there, and the layer adds only the VORs that are not on the route (#233).
+- With the cursor on the CAL 1 ground speed, the pulled knob changed the field like the pushed-in knob (`001kt` to
+  `002kt`), with no scan. Only this field was tried (#394).
+- The maintainer's own check: with the map page's menu open, pulling the knob closed the menu and showed the scan window
+  with the waypoints (#394).
+- MSG with no message shows a page with only `No Message` on it until MSG is pressed again (#325).
+- The third-party AVsoftech KLN 90B trainer, which is unreliable:
+  - NAV 3 shows the cross track below 1 NM in hundredths with a leading zero and no blank after L or R (`FLY L0.31NM`,
+    `FLY L0.04NM`, `FLY L0.86NM`, on the course `FLY L0.00NM`), from 1 NM in tenths after a blank (`FLY L 3.1NM`), and
+    from 10 NM in tenths without the blank (`FLY L11.8NM`) (#231).
+  - MSG with no message shows six blank rows and the status line only; CLR does nothing and MSG returns (#325).
+  - Super NAV 5 shows the enroute OBS mode as `ENR300`, without a colon or a space, while the status line reads
+    `ENR 300` (#321). The armed OBS mode was not tried.
+  - Super NAV 5 draws a VOR of FPL 0 (ATY) once, as the route symbol with one label; the VOR layer changes nothing there
+    (#233). An NDB of FPL 0 was not tried.
+  - SET 0 shows no update prompt in the air, so #336 could not be checked there; on FPL 1 with the cursor on `USE?`, one
+    click of the inner knob either way changed nothing (#336).
+  - The map scales step 1, 2, 3, 5, 7, 10, 15, 20, 30, 40, 60, 80, 120, 160, 240, 320, 480, 640 and 1000 NM, then AUTO
+    (#236). AUTO showed 320 NM in every case tried, which is taken for a fault.
+  - With the Super NAV 5 menu open, the right inner knob changed the VOR choice; pulling the knob closed the menu
+    and showed the scan window on the active waypoint; a turn of the pulled knob stepped to the next waypoint of FPL 0;
+    pushing it in closed the window and left the cursor off (#394).
+  - The maintainer's own check: with the lasting message `OBS WPT > 200NM`, the Super NAV 5 prompt stayed in inverse
+    video without flashing once the message was read, as the status line does (#326).

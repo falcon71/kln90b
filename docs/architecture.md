@@ -816,7 +816,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       `SuperNav1Page`, `SuperNav5Page`, `Set0Page`. While shown, `leftRef`/`rightRef` get `d-none`.
     - `leftTreeController` / `rightTreeController` (`PageTreeController`).
 - API used by pages: `getLeftPage/getRightPage/getOverlayPage`, `setLeftPage/setRightPage` (replace the base page and
-  sync the tree), `pushLeftPage/pushRightPage/pushPage(page,parent,side)`, `popLeftPage/popRightPage/popPage(side)`,
+  sync the tree), `replaceLeftBasePage(page)` (the EFB load of FPL 0, #395: closes every page pushed on the left and
+  the right-side children of the old base page, then sets the page as the left base page),
+  `pushLeftPage/pushRightPage/pushPage(page,parent,side)`, `popLeftPage/popRightPage/popPage(side)`,
   `pushOverlayPage/popOverlayPage`. Pages reach MainPage with `this.props.pageManager.getCurrentPage() as MainPage`.
   This cast is everywhere.
 - Super pages, in `checkIfSuperPageIsShown()` (runs on every set/push/pop):
@@ -906,12 +908,21 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - **Order of precedence for knobs:** overlay page → cursor-active page → tree navigation. The MSG page is the
   exception: the knobs and CRSR close it first and act on the page beneath, and CLR on it is ignored (#333).
 - Outer knob with cursor off: on the base page → `treeController.movePage(±1)`. On a pushed page (DCT, confirm, ...) → *
-  *pop it and re-dispatch the same event** (KLN 89 trainer behaviour). The same holds for overlays when their cursor
-  controller returns false.
+  *pop it and re-dispatch the same event** (KLN 89 trainer behaviour). An overlay is never popped that way: with its
+  cursor on, the knob goes to its cursor controller, and a knob that the focused field refuses does nothing (#336; the
+  KLN 89 trainer, 2026-10-09, T5, checked the inner knob on a prompt). With its cursor off, the MSG page closes and the
+  knob acts on the page beneath (the MSG exception above, #56), and a super page passes the knob to the tree controller of its side.
 - Inner knob with cursor off: `isCustomPageTreeController(page)` → `page.pageTreeController.moveSubpage`. Otherwise base
   page → `moveSubpage`, otherwise pop and re-dispatch.
 - `EVT_R_SCAN_*`: with the right cursor off → `page.scanLeft/Right()`. With the cursor on it *falls through* to
-  inner-knob behaviour.
+  inner-knob behaviour. The cursor is the one the pilot sees (`isRightCursorActive()`): with an overlay shown, the
+  overlay's own right cursor decides, not that of the right page beneath (#394).
+- `EVT_R_SCAN` (the pull or push itself; `hardware.isScanPulled` is already toggled) →
+  `SuperNav5Page.scanPulledChanged()` when Super NAV 5 shows, and not handled otherwise. On Super NAV 5 (#394): a pull
+  with the menu open (its right cursor on) closes the menu and shows the scan window; CRSR while pulled opens the
+  menu, the pulled knob then changes the menu's fields, and CRSR again closes it and shows the window; a push with the
+  menu open changes nothing. While the menu hides the window (`SuperNav5Page.isScanWindowShown()` is false), the
+  window keeps its waypoint but takes neither DCT (no Direct To suggestion), CLR (the map declutters instead) nor ENT.
 - `EVT_ENT` → `handleEnter()`:
     1. If left `isEnterAccepted()` → left.enter; else if right accepts → right.enter. A waypoint editor that waits for
        its creation page on the right does not accept ENT, so ENT reaches that page (#262).
@@ -1030,10 +1041,15 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - Lifecycle:
     - `render()` builds the VNode, which may be called multiple times. `tick(blink)` handles updates. `redraw()` (
       SixLineHalfPage) handles flagged updates.
-    - `destroy()` exists only on `DisplayComponent` Pages (`MainPage`, `FiveSegmentPage`, `FourSegmentPage`,
-      `StatusLine`). Half pages are never destroyed; they are just dropped.
-    - Half pages that subscribe to the bus (`Oth3Page`, `Oth4Page`) never unsubscribe. Each recreation adds a
-      subscription, so this is a likely leak; avoid copying it.
+    - Every page is a `DisplayComponent`, and every way a page leaves calls its `destroy()` (#96): in `MainPage`,
+      `PageStack.setCurrentPage` (the page it replaces), `pop` and `parentRemoved` (the pushed pages of a removed
+      parent), `OverlayStack.pop` and `remove`, and `MainPage.destroy` at power-off, which destroys every page of the
+      three stacks. `PageContainer.setCurrentPage` destroys the full page it replaces (the welcome page, the main
+      page). `MainPage`, `FiveSegmentPage`, `FourSegmentPage` and `StatusLine` override it to destroy their
+      children.
+    - A page that subscribes to the bus keeps the `Subscription` and drops it in its `destroy()` (`Oth3Page`,
+      `Oth4Page`, `WelcomePage`), so the page's recreation on every knob step adds no handler. Follow that pattern in a
+      new page that subscribes.
     - No `onAfterRender` is used, except in `ErrorPage` and `PanelXmlErrorPage`.
 
 ### Element catalogue (`controls/`)
@@ -1283,7 +1299,10 @@ export class Set3Page extends SixLineHalfPage {
     - outer knob closing temporary pages;
     - SCAN acceleration by event rate (`ScanHandler`, `SPEEDSTEP`);
     - the ACT page shows the last active waypoint or "NO ACTIVE WAYPOINT", and SCAN moves along FPL 0;
-    - comments flag invented values ("I have no idea, which ranges the device supports" for the NAV 5 ranges).
+    - comments flag values that no manual page gives: the map scales of NAV 5 and Super NAV 5 are `MAP_RANGES`
+      (`data/MapRanges.ts`), where 3-35 gives only the end points, 1 and 1000 NM, and the steps between are those of
+      the AVsoftech KLN 90B trainer (unreliable), which the maintainer adopted (#236). A saved range that is not in the
+      list loads as 40 NM (`knownMapRange`, the default of both settings).
 - Formatting helpers: `format()` from npm `numerable` (`"000"`, `"0.0"`, `"00000"`, `"+00"`) plus `padStart`/`padEnd`.
   The display classes own the formatting rules. `Utils.Clamp` and `Utils.Translate` are MSFS globals. Unit type aliases
   come from `data/Units.ts` (`Feet`, `NauticalMiles`, `Degrees`). Magnetic conversion goes through

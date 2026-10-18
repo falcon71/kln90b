@@ -1,4 +1,4 @@
-import {ComponentProps, DisplayComponent, EventBus, FSComponent, VNode} from '@microsoft/msfs-sdk';
+import {ComponentProps, DisplayComponent, EventBus, FSComponent, Subscription, VNode} from '@microsoft/msfs-sdk';
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 import {Page, PageProps, UIElementChildren} from "./Page";
 import {CursorController} from "./CursorController";
@@ -51,6 +51,7 @@ export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> 
     public readonly lCursorController: CursorController;
     readonly children;
     private readonly startTime = Date.now();
+    private propsReadySub: Subscription | undefined;
 
     private readonly forceReadyToUse; //True if the aircraft was started on the runway. We skip all test pages
     constructor(props: WelcomePageProps | PageProps) {
@@ -79,7 +80,7 @@ export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> 
 
         this.lCursorController = new CursorController(this.children);
 
-        this.props.bus.getSubscriber<PropsReadyEvent>().on("propsReady").handle(this.setProps.bind(this));
+        this.propsReadySub = this.props.bus.getSubscriber<PropsReadyEvent>().on("propsReady").handle(this.setProps.bind(this));
     }
 
     onInteractionEvent(evt: string): boolean {
@@ -122,6 +123,11 @@ export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> 
 
     rightPageName(): string {
         return "";
+    }
+
+    public destroy(): void {
+        this.propsReadySub?.destroy(); //#96
+        super.destroy();
     }
 
     public render(): VNode {

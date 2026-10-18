@@ -7,6 +7,8 @@ import {MessagePage} from '../../../kln90b/controls/MessagePage';
 import {SuperNav1Page} from '../../../kln90b/pages/left/SuperNav1Page';
 import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
 import {Fpl0Page} from '../../../kln90b/pages/left/FplPage';
+import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
+import {showSuperNav5} from '../../harness/render/superNav5';
 
 /** The left half page's row n (11 characters) */
 function left(n: number): string {
@@ -490,5 +492,63 @@ describe('the MSG page over the ALT page (3-16, 3-55)', () => {
         expect(Screen.read().rows('L')[0]).toBe(' ALTITUDE  ');
         expect(Screen.read().rows('R')[0]).toBe('VNV INACTV ');
         expect(names()).toEqual(['CRSR', 'CRSR']);
+    });
+});
+
+// #96: pages are recreated on every knob step (CLAUDE.md), so a page that is left must be destroyed, or the handlers it
+// subscribed keep it alive. These are properties of the code, not of the real unit; no manual page applies
+describe('MainPage destroys the pages that leave (#96)', () => {
+    const main = (unit: HeadlessUnit) => unit.props.pageManager.getCurrentPage() as MainPage;
+
+    it('destroys the ALT page and the NAV 4 page it pushed on the right when ALT closes them (#96)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.alt();
+        const alt = vi.spyOn(main(unit).getLeftPage(), 'destroy');
+        const nav4 = vi.spyOn(main(unit).getRightPage(), 'destroy');
+
+        await unit.panel.alt(); // pops the ALT page; its right-side child goes with it (PageStack.parentRemoved)
+
+        expect(alt).toHaveBeenCalledTimes(1);
+        expect(nav4).toHaveBeenCalledTimes(1);
+    });
+
+    it('destroys the MSG page when it closes (#96)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.msg();
+        expect(unit.overlay()).toBeInstanceOf(MessagePage); // Precondition
+        const msg = vi.spyOn(unit.overlay()!, 'destroy');
+
+        await unit.panel.msg();
+
+        expect(unit.overlay()).toBeNull();
+        expect(msg).toHaveBeenCalledTimes(1);
+    });
+
+    it('destroys Super NAV 5 when the left side leaves NAV 5 (#96)', async () => {
+        const unit = await bootUnit();
+        await showSuperNav5(unit);
+        const sn5 = vi.spyOn(unit.overlay()!, 'destroy');
+
+        await unit.panel.inner('L', -1); // NAV 4 on the left: the super page ends (OverlayStack.remove)
+
+        expect(unit.overlay()).toBeNull();
+        expect(sn5).toHaveBeenCalledTimes(1);
+    });
+
+    it('destroys the pages of every stack at power-off (#96)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'NAV 1');
+        const before = unit.props.bus.getTopicSubscriberCount(KLNFacilityRepository.SYNC_TOPIC);
+        await unit.panel.selectPage('L', 'OTH 3'); // OTH 3 subscribes to the repository sync
+        await unit.panel.msg(); // an overlay over it
+        const right = vi.spyOn(main(unit).getRightPage(), 'destroy');
+        const overlay = vi.spyOn(unit.overlay()!, 'destroy');
+
+        await unit.panel.powerCycle();
+        await unit.panel.approveSelfTest();
+
+        expect(right).toHaveBeenCalledTimes(1);
+        expect(overlay).toHaveBeenCalledTimes(1);
+        expect(unit.props.bus.getTopicSubscriberCount(KLNFacilityRepository.SYNC_TOPIC)).toBe(before);
     });
 });

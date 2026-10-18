@@ -4,6 +4,7 @@ import {airport} from '../../harness/navdata/builders';
 import {blinkCycle} from '../../harness/render/blink';
 import {Screen} from '../../harness/render/screen';
 import {OneTimeMessage} from '../../../kln90b/data/MessageHandler';
+import {MessagePage} from '../../../kln90b/controls/MessagePage';
 
 /** The six text rows of the MSG page, trimmed */
 const msgRows = () => Array.from({length: 6}, (_, r) => Screen.read().row(r).trimEnd());
@@ -189,5 +190,19 @@ describe('MSG page, a message on a later page (#191)', () => {
         await unit.panel.msg(); // one page only: MSG closes the page
         await vi.advanceTimersByTimeAsync(1000);
         expect(unit.props.messageHandler.getMessages()).toEqual([]);
+    });
+});
+
+// With no message, MSG shows a blank page (the maintainer's ruling, #325), as the AVsoftech trainer (unreliable) does;
+// the KLN 89 trainer shows No Message there (docs/kln89-trainer-record.md, 2026-10-17, second session)
+describe('MSG page without a message (characterization)', () => {
+    it('characterization: shows a blank page when every message has been read (#325)', async () => {
+        const unit = await bootUnit();
+        await readAll(unit);
+
+        await unit.panel.msg();
+
+        expect(unit.overlay()).toBeInstanceOf(MessagePage);
+        expect(msgRows()).toEqual(['', '', '', '', '', '']);
     });
 });

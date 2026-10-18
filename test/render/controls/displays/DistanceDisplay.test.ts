@@ -62,10 +62,32 @@ describe('DistanceDisplay, three cells', () => {
     });
 
     // 3-32: three cells. 9.97 NM rounds up to 10.0, four cells. Expected: 10 (rounded) or 9.9 (truncated). Also tested
-    // on NAV 3. The sibling above holds the 0.2 below 1 NM in three cells; a fix of #231 (whether the real unit
-    // shows hundredths below 1 NM) would change that spec test, not this one
+    // on NAV 3. The three-cell form is the class default; the NAV 3 page itself uses the four-cell form of #231 below
     it('keeps a cross track that rounds up to 10 NM in its three cells (3-32, #226)', () => {
         expect([' 10', '9.9']).toContain(shown(3, 9.97));
+    });
+});
+
+/** The cells of the NAV 3 cross track (four cells, hundredths below 1 NM, #231) */
+const shownXtk = (distance: number | null): string => mountedText(new DistanceDisplay(4, distance, false, true));
+
+// #231, the maintainer's ruling after a photo of a real unit (TCAS,_GPS_and_Altitude_Alerter_(250504914).jpg, FLY
+// R0.09NM): below 1 NM the cross track takes the blank after L or R and shows hundredths with a zero in front; from
+// 1 NM it keeps the blank and the three-cell form of 3-32
+describe('DistanceDisplay, the NAV 3 cross track (#231)', () => {
+    it('shows hundredths below 1 NM in four cells (#231)', () => {
+        expect(shownXtk(0.09)).toBe('0.09');
+        expect(shownXtk(0.994)).toBe('0.99');
+    });
+
+    it('shows a tenth after a blank from 1 NM, also where hundredths round up to 1 (#231)', () => {
+        expect(shownXtk(0.996)).toBe(' 1.0');
+        expect(shownXtk(9.94)).toBe(' 9.9');
+    });
+
+    it('shows whole NM from 10 NM and dashes without a value after the blank (#231)', () => {
+        expect(shownXtk(12.3)).toBe('  12');
+        expect(shownXtk(null)).toBe(' -.-');
     });
 });
 

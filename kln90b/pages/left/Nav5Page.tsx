@@ -11,6 +11,7 @@ import {effectiveMapOrientation, Nav5Orientation} from "../../settings/KLN90BUse
 import {KLNFixType, KLNFlightplanLeg} from "../../data/flightplan/Flightplan";
 import {ActiveWaypoint} from "../../data/flightplan/ActiveWaypoint";
 import {NauticalMiles} from "../../data/Units";
+import {knownMapRange, MAP_RANGES} from "../../data/MapRanges";
 
 type Nav5PageTypes = {
     canvas: Canvas,
@@ -18,7 +19,7 @@ type Nav5PageTypes = {
     range: SelectField,
 }
 
-const RANGES = ["   1", "   2", "   3", "   5", "  10", "  15", "  20", "  25", "  30", "  40", "  60", "  80", " 100", " 120", " 160", " 240", " 320", " 480", "1000"]; //I have no idea, which ranges the device supports
+const RANGES = MAP_RANGES.map(r => r.toString().padStart(4, " "));
 
 export class Nav5Page extends SixLineHalfPage {
 
@@ -33,6 +34,7 @@ export class Nav5Page extends SixLineHalfPage {
         super(props);
 
         this.rangeSetting = this.props.userSettings.getSetting("nav5MapRange");
+        this.rangeSetting.set(knownMapRange(this.rangeSetting.get())); //#236
         this.orientationSetting = this.props.userSettings.getSetting("nav5MapOrientation");
 
         this.children = new UIElementChildren<Nav5PageTypes>({

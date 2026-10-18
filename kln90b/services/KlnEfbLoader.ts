@@ -52,7 +52,7 @@ export class KlnEfbLoader extends Flightplanloader {
 
         const currentPage = this.pageManager.getCurrentPage();
         if (currentPage instanceof MainPage) { //We might still be on the self-test page
-            currentPage.setLeftPage(new Fpl0Page(currentPage.props));
+            currentPage.replaceLeftBasePage(new Fpl0Page(currentPage.props));
         }
     }
 

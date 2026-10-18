@@ -18,7 +18,10 @@ export class SuperNav5DirectToSelector implements UiElement {
     private isMovingArc = false;
 
 
-    constructor(private readonly bus: EventBus, private readonly hardware: Hardware, private readonly flightplan: Flightplan, private readonly activeWpt: ActiveWaypoint, private readonly sensors: Sensors) {
+    /**
+     * @param isWindowShown #394: the knob is pulled and the page's menu is closed (SuperNav5Page.isScanWindowShown)
+     */
+    constructor(private readonly bus: EventBus, private readonly hardware: Hardware, private readonly flightplan: Flightplan, private readonly activeWpt: ActiveWaypoint, private readonly sensors: Sensors, private readonly isWindowShown: () => boolean) {
         this.legs = flightplan.getLegs();
     }
 
@@ -30,13 +33,18 @@ export class SuperNav5DirectToSelector implements UiElement {
     public tick(blink: boolean): void {
         if (this.hardware.isScanPulled) {
             if (!this.isInitialized) {
-                this.ref.instance.classList.remove("d-none");
                 this.legs = this.flightplan.getLegs();
                 this.idx = this.activeWpt.getActiveFplIdx();
                 if (this.idx === -1 && this.legs.length > 0) {
                     this.idx = 0;
                 }
                 this.isInitialized = true;
+            }
+            //#394: the open menu takes the place of the scan window; the window keeps its waypoint
+            if (this.isWindowShown()) {
+                this.ref.instance.classList.remove("d-none");
+            } else {
+                this.ref.instance.classList.add("d-none");
             }
             if (this.legs.length === 0) {
                 this.ref.instance.textContent = "      ";
@@ -67,7 +75,8 @@ export class SuperNav5DirectToSelector implements UiElement {
     }
 
     public getDirectToTarget(): Facility | null {
-        if (this.hardware.isScanPulled && this.legs.length > 0) {
+        //#394: a window hidden by the menu offers no waypoint
+        if (this.isWindowShown() && this.legs.length > 0) {
             return this.legs[this.idx].wpt;
         } else {
             return null;

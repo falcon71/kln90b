@@ -54,7 +54,7 @@ describe('OTH 4 page, the remarks subscription (characterization)', () => {
 // TRI, MOD and FPL pages and OTH 1 to OTH 3), none of which subscribes to the remarks changes, which is why the count
 // before the first visit is the count without a handler of this page
 describe('OTH 4 page, the lifecycle of its subscription (#96)', () => {
-    it.fails('leaves no remarks handler behind once it is left (#96)', async () => {
+    it('leaves no remarks handler behind once it is left (#96)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'NAV 1');
         const before = remarksHandlers(unit);

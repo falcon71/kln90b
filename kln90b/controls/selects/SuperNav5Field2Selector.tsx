@@ -24,7 +24,7 @@ export class SuperNav5Field2Selector extends SelectField {
     private constructor(valueSet: string[], private readonly setting: UserSetting<SuperNav5Field2>, private readonly state: NavPageState, private readonly sensors: Sensors, planeSettings: KLN90PlaneSettings, private readonly modeController: ModeController, private readonly magvar: KLNMagvar, changedCallback: (value: number) => void) {
         super(valueSet, setting.get(), changedCallback);
         this.children = new UIElementChildren<SuperNav5Field2SelectorTypes>({
-            obsdtk: new ObsDtkElement(planeSettings, sensors, state, modeController),
+            obsdtk: new ObsDtkElement(planeSettings, sensors, state, modeController, true),
         });
     }
 
@@ -67,8 +67,12 @@ export class SuperNav5Field2Selector extends SelectField {
 
             switch (field) {
                 case SuperNav5Field2.DTK:
-                    //4-9
-                    this.ref.instance.textContent = this.modeController.isObsModeActive() ? "Ù" : "Ó";
+                    //4-9; 5-35, #396: the colon after OBS says the course can be entered on the unit
+                    if (this.modeController.isObsModeActive()) {
+                        this.ref.instance.textContent = this.children.get("obsdtk").canObsBeEntered() ? "Ù:" : "Ù";
+                    } else {
+                        this.ref.instance.textContent = "Ó";
+                    }
                     break;
                 case SuperNav5Field2.BRG:
                     this.ref.instance.textContent = "Ô" + this.formatDegrees(this.magvar.trueToMag(this.state.bearingToActive));

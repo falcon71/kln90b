@@ -489,6 +489,11 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   `activeIdent(unit)` (undefined without an active waypoint) and `turnStackLength(unit)` read the navigation state;
   the last reads `turnStack` through the property each time, because `ActiveWaypoint` replaces the array (section 6).
   They read the unit's state, not the screen: use them where the state is the subject and `Screen` where the display is.
+- **`hold(state, key, value)`** (`navState.ts`) holds a field of `NavPageState` (`unit.props.memory.navPage`) at a value:
+  the field becomes an accessor that ignores every write, those of the calculation ticks included, until the teardown.
+  It is for a value that the world of a test cannot produce, such as a cross track or an ETE of exactly 0 (#393: NAV 3,
+  D/T 2, D/T 4). Where the aircraft can be flown to the value, fly it instead: a held field no longer follows the
+  calculation, so the test says nothing about what computes it.
 - **`bootOnStandardRoute(opts)` and `bootOnDtWorld(opts)`** (`worldBoot.ts`) are the boots the page tests repeated.
   `bootOnStandardRoute` stores `standardRoute()` as FPL 0, boots at KAAA unless `position` is given, settles, and
   throws unless ABC is active: a test that moves on without the check reads a unit that has not activated the plan,

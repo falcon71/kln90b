@@ -31,7 +31,7 @@ describe('OTH 3 page, the repository sync subscription (characterization)', () =
 // TRI, MOD and FPL pages and OTH 1 and OTH 2), none of which subscribes to the repository sync, which is why the count
 // before the first visit is the count without a handler of this page
 describe('OTH 3 page, the lifecycle of its subscription (#96)', () => {
-    it.fails('leaves no repository sync handler behind once it is left (#96)', async () => {
+    it('leaves no repository sync handler behind once it is left (#96)', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'NAV 1');
         const before = syncHandlers(unit);

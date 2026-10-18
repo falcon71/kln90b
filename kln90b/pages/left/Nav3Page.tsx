@@ -52,7 +52,7 @@ export class Nav3Page extends SixLineHalfPage {
             dtk: new ObsDtkElement(this.props.planeSettings, this.props.sensors, navState, this.props.modeController),
             track: new BearingDisplay(),
             flyDir: new TextDisplay(this.formatXTKDirection(navState.xtkToActive)),
-            flyDist: new DistanceDisplay(3, navState.xtkToActive ? Math.abs(navState.xtkToActive) : null),
+            flyDist: new DistanceDisplay(4, navState.xtkToActive !== null ? Math.abs(navState.xtkToActive) : null, false, true), //#393: 0 is a value
             msa: new AltitudeDisplay(gps.isValid() ? this.props.msa.getMSA(gps.coords) : null),
             esa: new AltitudeDisplay(this.calculateESA()),
         });
@@ -68,7 +68,7 @@ export class Nav3Page extends SixLineHalfPage {
             {this.children.get("from").render()}{this.children.get("activeArrow").render()}{this.children.get("to").render()}<br/>
             {this.children.get("dtkLabel").render()}&nbsp&nbsp&nbsp{this.children.get("dtk").render()}<br/>
             TK&nbsp&nbsp&nbsp&nbsp&nbsp{this.children.get("track").render()}<br/>
-            FLY {this.children.get("flyDir").render()} {this.children.get("flyDist").render()}nm<br/>
+            FLY {this.children.get("flyDir").render()}{this.children.get("flyDist").render()}nm<br/>
             MSA {this.children.get("msa").render()}ft<br/>
             ESA {this.children.get("esa").render()}ft<br/>
         </pre>);
@@ -92,7 +92,7 @@ export class Nav3Page extends SixLineHalfPage {
 
         this.children.get("track").bearing = gps.isValid() ? this.props.magvar.trueToMag(gps.getTrackTrueRespectingGroundspeed()) : null;
         this.children.get("flyDir").text = this.formatXTKDirection(navState.xtkToActive);
-        this.children.get("flyDist").distance = navState.xtkToActive ? Math.abs(navState.xtkToActive) : null;
+        this.children.get("flyDist").distance = navState.xtkToActive !== null ? Math.abs(navState.xtkToActive) : null; //#393: 0 is a value
 
         this.children.get("msa").altitude = gps.isValid() ? this.props.msa.getMSA(gps.coords) : null;
         this.children.get("esa").altitude = this.calculateESA();
