@@ -144,7 +144,7 @@ export class Set2Page extends SixLineHalfPage {
         const timezone = this.props.userSettings.getSetting("timezone").get();
 
         const oldDate = this.props.sensors.in.gps.timeZulu.atTimezone(TIMEZONES[timezone]);
-        const newDate = oldDate.withTime(date.getHours(), date.getMinutes());
+        const newDate = oldDate.withEnteredTime(date.getHours(), date.getMinutes()); //the seconds start at 00 (checked in the KLN 89 trainer, 2026-10-18; #397)
 
         this.props.sensors.in.gps.timeZulu = newDate.atTimezone(UTC);
         this.props.sensors.in.gps.reinitializeSearch(); //3-17, 3-53: the time corrected during a search speeds it up (#357)

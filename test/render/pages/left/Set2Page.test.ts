@@ -296,3 +296,42 @@ describe('SET 2 time zone (3-5, 3-54)', () => {
         expect([utc.getDate(), utc.getHours(), utc.getMinutes()]).toEqual([1, 23, 37]);
     });
 });
+
+/**
+ * Advances in 50 ms steps until the unit's clock has stepped to its next second, so that the next step is a second away
+ * (the same wait as untilClockSteps in SelfTestRightPage.test.ts, for the #331 twin of this test)
+ */
+async function untilClockSteps(unit: HeadlessUnit) {
+    const seconds = () => unit.props.sensors.in.gps.timeZulu.getSeconds();
+    const before = seconds();
+    for (let i = 0; seconds() === before; i++) {
+        if (i >= 40) throw new Error('untilClockSteps: the clock did not step within 2 s');
+        await vi.advanceTimersByTimeAsync(50);
+    }
+}
+
+describe('SET 2 time entry (checked in the KLN 89 trainer, 2026-10-18)', () => {
+    // 3-53 makes the time editable only while no satellite supplies it, hence the cold GPS. Checked in the KLN 89 trainer, 2026-10-18: a
+    // SET 2 time entry started the clock at the entered hour and minute with the seconds at 00. The seconds are their
+    // own cells of the time row, `20:00:32UTC`: columns 6 and 7 of the left half. The ENT is pressed just after the
+    // clock steps, so that the seconds are read before the next step, which would show 01
+    it('starts the clock with the seconds at zero when the time is entered (checked in the KLN 89 trainer, 2026-10-18) (#397)', async () => {
+        const unit = await bootUnit({storage: {fastGpsAcquisition: false}, coldGps: true});
+        await unit.panel.selectPage('L', 'SET 2');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1); // the time
+        await unit.panel.inner('L', 21); // the first click opens the entry on hour 00, so 21 clicks give 20
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1);
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1);
+        expect(Screen.read().rows('L')[3].slice(0, 5)).toBe('20:00'); // Precondition: the entry
+        await untilClockSteps(unit);
+        expect(unit.props.sensors.in.gps.timeZulu.getSeconds()).not.toBe(0); // Precondition: a zero would prove nothing
+        expect(unit.props.sensors.in.gps.isValid()).toBe(false); // Precondition: no satellite time replaces it
+
+        await unit.panel.ent();
+
+        expect(Screen.read().rows('L')[3].slice(0, 8)).toBe('20:00:00');
+    });
+});
