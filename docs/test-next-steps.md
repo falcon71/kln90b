@@ -297,8 +297,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   page (2026-10-08, T20, not done), and the empty top row of FPL 0 with the first waypoint active (above). #162 and
   #163 are no open questions: the trainer shows neither ARM nor ACTV, so the maintainer's rulings settle them and the
   tests hold them as characterizations.
-  What the 90B shows on an empty MSG page (#325), the prompt while the MSG page shows and an airport below sea level
-  cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is no open question: the maintainer
+  The prompt while the MSG page shows and an airport below sea level cannot be asked on the 89. What the 90B shows on
+  an empty MSG page is no open question: the maintainer ruled the blank page is kept (#325), and `MessagePage.test.ts`
+  holds it. The Super NAV 5 prompt once all messages are read is no open question: the maintainer
   ruled it steady in inverse video (#326), and `SuperNav5Left.test.ts` holds it.
 - **Debug `console.log` calls** left in the code: `Apt3MapPage.tsx:30`, `TemporaryWaypointDeleter.ts:27` and `:32`,
   `WaypointPage.tsx:46` and `WaypointPage.getScrollSpeed`, `SupPage.tsx`, the constructors of the waypoint pages
