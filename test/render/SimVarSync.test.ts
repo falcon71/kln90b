@@ -362,9 +362,19 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
 
 
 // The Hot Swapping wiki page: a disabled unit suspends and resumes where it left off, so the input meant for the unit
-// that replaced it must not reach it. KLN90BCore.onInteractionEvent has no check of L:KLN90B_Disabled, so the knob clicks
-// are applied and NAV 3 shows after the resume.
+// that replaced it must not reach it. The maintainer's ruling (#138): while the unit is disabled every H event is
+// ignored, the power and brightness events included; its power then follows only the electricity SimVar
 describe('H events while the unit is disabled (public contract)', () => {
+    async function disable(unit: HeadlessUnit): Promise<void> {
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+    }
+
+    async function resume(unit: HeadlessUnit): Promise<void> {
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(2000);
+    }
+
     it('the sibling: two clicks of the left inner knob move NAV 1 to NAV 3', async () => {
         const unit = await bootOnStandardRoute();
         await unit.panel.selectPage('L', 'NAV 1');
@@ -375,17 +385,86 @@ describe('H events while the unit is disabled (public contract)', () => {
         expect(Screen.read().status().left).toBe('NAV 3');
     });
 
-    it.fails('are ignored: the left page is still NAV 1 after the resume (#138)', async () => {
+    it('are ignored: the left page is still NAV 1 after the resume (#138)', async () => {
         const unit = await bootOnStandardRoute();
         await unit.panel.selectPage('L', 'NAV 1');
-        unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
-        await vi.advanceTimersByTimeAsync(300);
+        await disable(unit);
 
         await unit.panel.press('KLN90B_LeftSmallKnob_Right');
         await unit.panel.press('KLN90B_LeftSmallKnob_Right');
-        unit.env.sim.set('L:KLN90B_Disabled', 'bool', false);
-        await vi.advanceTimersByTimeAsync(2000);
+        await resume(unit);
 
         expect(Screen.read().status().left).toBe('NAV 1');
+    });
+
+    // The sibling of the next test: on an enabled unit KLN90B_Power_Off switches the unit off and writes the switch LVar
+    it('the sibling: KLN90B_Power_Off switches an enabled unit off', async () => {
+        const unit = await bootOnStandardRoute();
+
+        await unit.panel.powerOff();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.env.sim.get('L:KLN90B_Power', 'bool')).toBe(0);
+        expect(Screen.read().row(0)).toBe(BLANK_ROW);
+    });
+
+    it('ignores KLN90B_Power_Off: the unit is still on after the resume (#138)', async () => {
+        const unit = await bootOnStandardRoute();
+        await unit.panel.selectPage('L', 'NAV 1');
+        const cycles = unit.props.userSettings.getSetting('powercycles').value;
+        await disable(unit);
+
+        await unit.panel.powerOff();
+        await vi.advanceTimersByTimeAsync(2000);
+        await resume(unit);
+
+        expect(unit.env.sim.get('L:KLN90B_Power', 'bool')).toBe(1);
+        expect(Screen.read().status().left).toBe('NAV 1');
+        expect(unit.props.userSettings.getSetting('powercycles').value).toBe(cycles);
+    });
+
+    // The scan knob is pulled by KLN90B_RightScan_Toggle, which writes L:KLN90B_RightScan and makes the right inner knob
+    // the scan knob (KLN90BCore.onInteractionEvent)
+    it('ignores the scan toggle: neither L:KLN90B_RightScan nor the right inner knob changes (#138)', async () => {
+        const unit = await bootOnStandardRoute();
+        await unit.panel.selectPage('R', 'NAV 1');
+        await disable(unit);
+        const scanWrites = unit.env.sim.writeCount('L:KLN90B_RightScan');
+
+        await unit.panel.scan();
+        await resume(unit);
+
+        expect(unit.env.sim.writeCount('L:KLN90B_RightScan')).toBe(scanWrites);
+        expect(unit.props.hardware.isScanPulled).toBe(false);
+        await unit.panel.press('KLN90B_RightSmallKnob_Right'); // A page step, not a scan
+        expect(Screen.read().status().right).toBe('NAV 2');
+    });
+
+    it('ignores the brightness events: L:KLN90B_Brightness and the screen stay as they were (#138)', async () => {
+        const unit = await bootOnStandardRoute();
+        await vi.advanceTimersByTimeAsync(5000); // the fade-in of the boot is done
+        const opacity = unit.display.opacity();
+        expect(unit.env.sim.get('L:KLN90B_Brightness', 'number')).toBe(1); // Precondition: full brightness
+        await disable(unit);
+
+        await unit.panel.press('KLN90B_Brt_Dec', 2);
+        await resume(unit);
+
+        expect(unit.env.sim.get('L:KLN90B_Brightness', 'number')).toBe(1);
+        expect(unit.display.opacity()).toBe(opacity);
+    });
+
+    // The maintainer's ruling: L:KLN90B_Disabled is read only by the 100 ms poll of SimVarSync, which keeps the state on
+    // Hardware; the gates read the kept state, because reading the LVar is expensive. Ten polls in a second, whatever
+    // input arrives
+    it('reads L:KLN90B_Disabled only in the poll, also while H events arrive (#138)', async () => {
+        const unit = await bootOnStandardRoute();
+        await disable(unit);
+        const read = vi.spyOn(SimVar, 'GetSimVarValue');
+
+        await unit.panel.press('KLN90B_LeftSmallKnob_Right', 4); // 4 clicks of 250 ms: one second
+        await unit.panel.press('KLN90B_ENT_Push', 4);
+
+        expect(read.mock.calls.filter(c => c[0] === 'L:KLN90B_Disabled').length).toBe(20);
     });
 });

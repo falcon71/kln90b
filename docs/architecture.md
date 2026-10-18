@@ -128,14 +128,18 @@ arrives.
     - `SensorsOut.setMode` writes `GPS APPROACH MODE = 3` and `L:KLN90B_AnnunTest = true`, so external annunciators
       light up.
 
-**Hot-swap disable**: `SimVarSync.setDisabled` reacts to `L:KLN90B_Disabled`. It calls
-`tickController.setEnabled(false)` and `pageManager.resetKeyboard()`, and if `writeGPSSimVars` is set it toggles
-`GPS OVERRIDDEN`.
+**Hot-swap disable**: the 100 ms poll of `SimVarSync` is the only reader of `L:KLN90B_Disabled`. `setDisabled` keeps
+the state in `Hardware.isDisabled` (a unit taken out of the aircraft, not one switched off; its doc comment lists what a
+disabled unit does), calls `tickController.setEnabled(false)` and `pageManager.resetKeyboard()`, and if
+`writeGPSSimVars` is set it toggles `GPS OVERRIDDEN`. The gates read `Hardware.isDisabled`, never the LVar, so they lag
+it by at most one poll.
 
 **Input routing**: the sim delivers H events as `BaseInstrument.onInteractionEvent(args)`.
 
-- `KLN90B.onInteractionEvent` calls `super` and passes the event to `KLN90BCore.onInteractionEvent`, which handles the
-  SCAN pull state (`Hardware.isScanPulled`, mirrored to `L:KLN90B_RightScan`).
+- `KLN90B.onInteractionEvent` calls `super` and passes the event to `KLN90BCore.onInteractionEvent`. While
+  `Hardware.isDisabled` is set it drops every event, the power and brightness events included (#138), so the power of a
+  disabled unit follows only the electricity SimVar. Otherwise it handles the SCAN pull state (`Hardware.isScanPulled`,
+  mirrored to `L:KLN90B_RightScan`).
   While SCAN is pulled, it remaps right-inner turns to the internal `EVT_R_SCAN_LEFT/RIGHT`.
 - It then calls `hEventPublisher.dispatchHEvent([evt])`, which puts the event on the bus `hEvent` topic. `PowerButton`
   listens there for power and brightness events.

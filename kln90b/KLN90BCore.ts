@@ -187,6 +187,12 @@ export class KLN90BCore {
 
     public onInteractionEvent(args: Array<string>): void {
         try {
+            if (this.hardware.isDisabled) {
+                //#138, the maintainer's ruling: a unit taken out for hot swapping takes no input, the power and brightness
+                //events included. The keyboard is re-dispatched through here, so it is ignored as well
+                return;
+            }
+
             let evt = args[0];
 
             if (this.hardware.isScanPulled) {
@@ -351,7 +357,7 @@ export class KLN90BCore {
                 new SignalOutputFillterTick(sensors),
             ]);
 
-        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager, brightnessManager, this.wtFlightplanSync);
+        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager, brightnessManager, this.wtFlightplanSync, this.hardware);
 
         const msa = new MSA();
 

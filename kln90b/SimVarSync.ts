@@ -15,6 +15,7 @@ import {ModeController} from "./services/ModeController";
 import {PageManager} from "./pages/PageManager";
 import {BrightnessManager} from "./BrightnessManager";
 import {WTFlightplanSync} from "./services/WTFlightplanSync";
+import {Hardware} from "./Hardware";
 
 const SYNC_TICK = 100;
 
@@ -23,9 +24,7 @@ const SYNC_TICK = 100;
  */
 export class SimVarSync {
 
-    private disabled: boolean = false;
-
-    constructor(private readonly powerButton: PowerButton, private readonly settings: KLN90PlaneSettings, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager, private readonly brightnessManager: BrightnessManager, private readonly wtFlightplanSync: WTFlightplanSync) {
+    constructor(private readonly powerButton: PowerButton, private readonly settings: KLN90PlaneSettings, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager, private readonly brightnessManager: BrightnessManager, private readonly wtFlightplanSync: WTFlightplanSync, private readonly hardware: Hardware) {
         window.setInterval(this.tick.bind(this), SYNC_TICK);
     }
 
@@ -39,10 +38,10 @@ export class SimVarSync {
             this.powerButton.setElectricityAvailable(!!SimVar.GetSimVarValue(this.settings.input.electricitySimVar, SimVarValueType.Bool));
         }
 
-        const disabled = !!SimVar.GetSimVarValue(LVAR_DISABLE, SimVarValueType.Bool);
-        this.setDisabled(disabled);
+        //The only read of L:KLN90B_Disabled: everything else reads hardware.isDisabled (#138)
+        this.setDisabled(!!SimVar.GetSimVarValue(LVAR_DISABLE, SimVarValueType.Bool));
 
-        if (this.settings.input.externalSwitches.legObsSwitchInstalled && !disabled) {
+        if (this.settings.input.externalSwitches.legObsSwitchInstalled && !this.hardware.isDisabled) {
             //SensorsIn would be a better place for this, but this would create a circle reference between sensors and modecontroller
             this.modeController.setExternalObsMode(!!SimVar.GetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool));
         }
@@ -54,7 +53,7 @@ export class SimVarSync {
         const writeGpsSimvars = !!SimVar.GetSimVarValue(LVAR_GPS_SIMVARS, SimVarValueType.Bool);
         if (writeGpsSimvars !== this.settings.output.writeGPSSimVars) {
             this.settings.output.writeGPSSimVars = writeGpsSimvars;
-            if (!this.disabled) { //A disabled unit has released the GPS for hot swapping, setDisabled claims it again
+            if (!this.hardware.isDisabled) { //A disabled unit has released the GPS for hot swapping, setDisabled claims it again
                 SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, writeGpsSimvars);
             }
             if (writeGpsSimvars) {
@@ -66,11 +65,11 @@ export class SimVarSync {
     }
 
     private setDisabled(disabled: boolean): void {
-        if (disabled === this.disabled) {
+        if (disabled === this.hardware.isDisabled) {
             return;
         }
 
-        this.disabled = disabled;
+        this.hardware.isDisabled = disabled;
 
         this.tickController.setEnabled(!disabled);
         this.pageManager.resetKeyboard();
