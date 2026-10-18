@@ -136,8 +136,10 @@ The sim globals are installed once per test file by the setup files `test/harnes
   are faked, starting at `DEFAULT_START`. Advance it with `await vi.advanceTimersByTimeAsync(ms)`. All tick loops
   of the instrument (docs/architecture.md, Core 2) run on this clock.
 - `Math.random` is replaced by a seeded generator (`sim/random.ts`, default seed 1), so the GPS clock jitter repeats
-  between runs. A test that needs another jitter passes `seed`. The teardown puts the real `Math.random` back, so a
-  later unit test of the file sees the real generator.
+  between runs. A test that needs another jitter passes `seed`. The SDK's `UserSetting` draws once per setting it
+  builds, so `bootUnit` starts the sequence again from the seed once the `KLN90BCore` constructor has built the user
+  settings: a new setting key does not move the GPS draws of the seeded tests. The teardown puts the real
+  `Math.random` back, so a later unit test of the file sees the real generator.
 
 ## Collectors and boot failures
 

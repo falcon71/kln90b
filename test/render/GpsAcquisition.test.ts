@@ -25,9 +25,13 @@ const MINUTE = 60 * 1000;
 /** The stored data of a unit that was last used here yesterday: position 47/8 (the boot position), almanac a day old */
 const WARM = {fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 8, lastAlmanacDownload: START - DAY};
 
-/** Seeds whose warm start lands at the ends of the observed spread (found by the probe of the plan, Task 3 Step 6) */
-const FAST_WARM_SEED = 15;
-const SLOW_WARM_SEED = 4;
+/**
+ * Seeds whose warm start lands at the ends of the observed spread. Found by a probe of seeds 1 to 40 on 2026-10-18, after
+ * the harness began to start the sequence again once the user settings are built (test/harness/boot.ts): seed 12 had
+ * its fix after 38 s, seed 34 after 105 s
+ */
+const FAST_WARM_SEED = 12;
+const SLOW_WARM_SEED = 34;
 
 /** The antipode of the boot position 47/8: no satellite is in view from both */
 const ANTIPODE = {lastLatitude: -47, lastLongitude: -172};
