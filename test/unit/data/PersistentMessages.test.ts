@@ -448,6 +448,22 @@ describe('DATA BASE OUT OF DATE', () => {
         expect(h.tick()).toEqual([]);
     });
 
+    // The rulings of #351 (a read message keeps its seen flag over a power cycle) and #175 (the latch) together: the
+    // pilot reads the message and the unit is switched off before the next tick. The read clears the latch at the first
+    // tick, and the power-off clears it too, so it does not come back, read or unread
+    it('stays gone over a power cycle right after it is read (#351, #175)', () => {
+        const w = quietWorld();
+        const h = harness(w);
+        h.tick();
+        w.dbCurrent = false;
+        expect(h.tick()).toEqual([DB_TEXT]);
+        h.handler.getMessages()[0].seen = true;
+        h.handler.clear();
+
+        expect(h.tick()).toEqual([]);
+        expect(h.tick()).toEqual([]);
+    });
+
     // The maintainer's ruling (#175): a new change from current to expired after the read posts it again, once
     it('is posted again when the data base becomes out of date again after the read (#175)', () => {
         const w = quietWorld();

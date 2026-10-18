@@ -699,9 +699,10 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `MessageHandler` (a 1 Hz tickable) keeps `activeMessages`. Each tick it drops invalid messages, adds
       `persistentMessages` whose condition becomes true, and resets their `seen` flag when the condition goes false.
       `KLN90BCore` calls `clear()` at every power-off (also a loss of electricity): the active messages go and the
-      persistent ones return once their condition holds. They return unread, which is this project's choice and not a
-      fact from the manuals. `clear()` also calls the optional `onPowerOff()` of each persistent message, for one that
-      keeps state of the power-on in which it was posted.
+      persistent ones return once their condition holds. A read one returns read, because `clear()` keeps the `seen`
+      flags (the maintainer's ruling, #351); one whose condition lapsed meanwhile is reset by the tick. `clear()` calls
+      the optional `onPowerOff()` of each persistent message, for one that keeps state of the power-on in which it was
+      posted.
     - `DatabaseOutOfDateMessage` latches at the change from current to expired (a SET 2 or self-test date, the GPS
       correcting the date, the end passing in flight) and holds until it is seen; its `onPowerOff()` drops the latch and
       the last validity, so a power-up with the date already past the end posts nothing (#175; KLN 89 trainer,

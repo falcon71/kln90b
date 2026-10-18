@@ -54,13 +54,13 @@ export class MessageHandler implements CalcTickable {
 
     /**
      * A message describes the power-on in which it was posted, so the unit loses them all when it is switched off.
-     * The persistent messages come back at the next tick when their condition holds. That they come back unread (their
-     * seen flag is reset here) is this project's choice; the manuals do not say.
+     * The persistent messages come back at the next tick when their condition holds. A read one comes back read: its
+     * seen flag is kept (the maintainer's ruling, #351). One whose condition has lapsed by the first tick after the
+     * power-on has its seen flag reset by tick, as at any other time.
      */
     public clear(): void {
         this.activeMessages = [];
         for (const message of this.persistentMessages) {
-            message.seen = false;
             message.onPowerOff?.();
         }
     }
