@@ -182,6 +182,46 @@ describe('ALT page (spec)', () => {
     });
 });
 
+/**
+ * A unit whose air data computer sends the baro setting (BaroSource 1), with 30.12" on the altimeter, and whose
+ * installation disables altitude alerting
+ */
+async function airdataBaroWithoutAlerting(): Promise<HeadlessUnit> {
+    const unit = await bootUnit({
+        panelXml: panelXml({...AIRDATA, 'Input.Airdata.BaroSource': 1, ...ALTITUDE_ALERT(false)}),
+        simVars: [{name: 'KOHLSMAN SETTING HG:1', unit: 'inches of mercury', value: 30.12}],
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    return unit;
+}
+
+// #399: the baro comes from the altimeter and ALERT cannot be changed, so no field can take the cursor and the page
+// opens with it off. What the page shows is the ALT page of 3-39 and 3-55 (the baro and ALERT) with OFF for an
+// installation without altitude alerting (3-57)
+describe('ALT page with the air data baro and altitude alerting disabled (#399)', () => {
+    it('opens with the altimeter\'s baro, ALERT: OFF and the cursor off (#399)', async () => {
+        const unit = await airdataBaroWithoutAlerting();
+        await unit.panel.alt();
+
+        expect(unit.errors).toEqual([]);
+        const screen = Screen.read();
+        expect(screen.rows('L')).toEqual([' ALTITUDE  ', 'BARO:30.12"', 'ALERT:  OFF', '           ', '           ', '           ']);
+        expect(screen.maskRows('L').join('')).toMatch(/^\.+$/); // Nothing inverse: no field under a cursor
+        expect(screen.status().left).toBe('ALT'); // The page name, where the cursor would show CRSR
+    });
+
+    // The left CRSR finds no field either: the cursor stays off and nothing throws
+    it('keeps the cursor off at the left CRSR (#399)', async () => {
+        const unit = await airdataBaroWithoutAlerting();
+        await unit.panel.alt();
+        await unit.panel.cursor('L');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().maskRows('L').join('')).toMatch(/^\.+$/);
+        expect(Screen.read().status().left).toBe('ALT');
+    });
+});
+
 // 3-55 step 4: the pilot normally enters the warn altitude only the first time altitude alerting is used, so the unit
 // keeps it (the user setting altAlertWarn since #259). The AVsoftech trainer (unreliable) kept WARN 500 over a power cycle
 describe('ALT page WARN altitude over a power cycle', () => {

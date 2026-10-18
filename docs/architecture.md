@@ -971,7 +971,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   Toggling `isReadonly` (or `setVisible` on a `Button`) therefore adds or removes a field live.
 - **Cursor order = depth-first insertion order of the children map.** Declaring children in a different order changes
   the CRSR sequence. Nested sub-page children (e.g. `Apt2Page.dbPage/userPage`) are included.
-- `toggleCursor()` returns false when there are no fields. The cursor does not remember where it was: each time it
+- `toggleCursor()` returns false when there are no fields, while `setCursorActive(true)` throws then. A page that turns
+  its cursor on when it opens checks first that a field can take it (`AltPage` with the air data baro and altitude
+  alerting disabled opens with the cursor off, #399). The cursor does not remember where it was: each time it
   comes on, `setCursorActive` starts it on the page's start field (`setDefaultCursorField(n)`,
   `setDefaultCursorFieldToLast()`), or on the field `setStartFieldProvider` names, which the list pages use for the top
   visible entry of a scrolled list (`List.topVisibleField`, #355). `focusIndex(i)` moves a cursor that is on.

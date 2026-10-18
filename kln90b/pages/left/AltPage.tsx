@@ -34,13 +34,19 @@ export class AltPage extends SixLineHalfPage {
             warn: new SelectField(["2", "3", "4", "5", "6", "7", "8", "9"], this.props.userSettings.getSetting("altAlertWarn").get() / 100 - 2, this.setAlertWarn.bind(this)),
         });
 
-        this.children.get("baro").setReadonly(isBaroTransmitted(this.props.planeSettings));
+        const baroReadonly = isBaroTransmitted(this.props.planeSettings);
+        const alertReadonly = !this.props.planeSettings.output.altitudeAlertEnabled;
+        this.children.get("baro").setReadonly(baroReadonly);
 
-        this.children.get("alert").isReadonly = !this.props.planeSettings.output.altitudeAlertEnabled;
+        this.children.get("alert").isReadonly = alertReadonly;
         this.children.get("warn").isReadonly = !this.isAlertOn();
 
         this.cursorController = new CursorController(this.children);
-        this.cursorController.setCursorActive(true);
+        //#399: with the baro from the air data and no altitude alerting no field can take the cursor (WARN is read-only
+        //while ALERT is off), so the page opens with the cursor off
+        if (!baroReadonly || !alertReadonly) {
+            this.cursorController.setCursorActive(true);
+        }
     }
 
     public render(): VNode {
