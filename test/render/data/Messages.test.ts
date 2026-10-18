@@ -166,25 +166,6 @@ describe('messages at the power-off (#176)', () => {
         expect(messages(unit)).not.toContain('BEFORE THE LOSS');
     });
 
-    // This project's choice, not a fact from the manuals: a persistent message (ALTITUDE FAIL without an altitude
-    // input) whose condition holds again after the power-on is a new message again, even when it had been read before
-    // the power-off
-    it('bring a persistent message back unread when its condition holds again (characterization)', async () => {
-        const unit = await bootUnit({panelXml: panelXml(NO_ALTIMETER)});
-        await settle(unit);
-        await unit.panel.readMessages(); // the persistent message stays after it is read
-        await vi.advanceTimersByTimeAsync(2000);
-        expect(messages(unit)).toEqual(['ALTITUDE FAIL']); // the precondition: persistent and read
-        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
-
-        await unit.panel.powerCycle();
-        await unit.panel.approveSelfTest();
-        await vi.advanceTimersByTimeAsync(2000);
-
-        expect(messages(unit)).toContain('ALTITUDE FAIL');
-        expect(unit.props.messageHandler.getMessages().find(m => m.message[0] === 'ALTITUDE FAIL')!.seen).toBe(false);
-    });
-
     // A message posted before the first power-on (the restore of the user data runs while the unit starts) belongs to
     // that power-on, so only a power-off removes it, not the power-on itself
     it('leave a message posted at the start-up alone when the unit is switched on', async () => {
@@ -200,5 +181,28 @@ describe('messages at the power-off (#176)', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(messages(unit)).toContain('USER DATA LOST');
+    });
+});
+
+describe('a read message over a power cycle (#351)', () => {
+    // The maintainer's ruling (#351): a persistent message (ALTITUDE FAIL without an altitude input) that was read
+    // before the power-off and whose condition still holds after the power-on comes back read, so msg does not flash.
+    // The AVsoftech trainer (unreliable) kept a read OBS WPT > 200NM read over its power button; the KLN 89 could not
+    // show it (the condition does not survive its relaunch)
+    it('bring a read persistent message back read when its condition still holds (#351)', async () => {
+        const unit = await bootUnit({panelXml: panelXml(NO_ALTIMETER)});
+        await settle(unit);
+        await unit.panel.readMessages(); // the persistent message stays after it is read
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(messages(unit)).toEqual(['ALTITUDE FAIL']); // the precondition: persistent and read
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
+
+        await unit.panel.powerCycle();
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(messages(unit)).toContain('ALTITUDE FAIL');
+        expect(unit.props.messageHandler.getMessages().find(m => m.message[0] === 'ALTITUDE FAIL')!.seen).toBe(true);
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
     });
 });

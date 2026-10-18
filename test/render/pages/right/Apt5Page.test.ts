@@ -149,10 +149,46 @@ describe('APT 5 remarks of an 11th airport (#92)', () => {
     });
 
     // 3-47, C-2: RMKS FULL is for the 101st airport; with ten airports stored the 11th must be accepted
-    it.fails('accepts the remarks of an 11th airport without RMKS FULL (3-47, C-2, #92)', async () => {
+    it('accepts the remarks of an 11th airport without RMKS FULL (3-47, C-2, #92)', async () => {
         const unit = await bootUnit({facilities: [KAAA()], position: {lat: 47, lon: 8}, storage: storedRemarks(10)});
 
         expect(await enterRemark(unit)).toEqual([]);
+    });
+});
+
+/** The stored slots of 100 airports with remarks, K000 to K098 and then last, laid out by hand from the format (Core 7) */
+const fullList = (last: string) => Object.fromEntries(Array.from({length: 100}, (_, i) =>
+    [`rmk${i}`, (i === 99 ? last : `K${String(i).padStart(3, '0')}`) + 'X' + ' '.repeat(32)]));
+
+/** Enters MOTEL in the first remark line of KAAA on APT 5 and returns the status line messages published meanwhile */
+async function enterMotel(unit: HeadlessUnit): Promise<string[]> {
+    const seen = collectStatusMessages(unit);
+    await unit.panel.selectPage('R', 'APT 5');
+    await unit.panel.cursor('R');
+    await cursorToRow(unit, 2);
+    await unit.panel.type('R', 'MOTEL');
+    await unit.panel.ent();
+    await vi.advanceTimersByTimeAsync(1000);
+    return seen;
+}
+
+describe('APT 5 remarks in a full list (3-47, C-2)', () => {
+    // 3-47: remarks for up to 100 airports; C-2: RMKS FULL when the remarks of one more airport do not fit
+    it('refuses the remarks of a 101st airport with RMKS FULL (3-47, C-2)', async () => {
+        const unit = await bootUnit({facilities: [KAAA()], position: {lat: 47, lon: 8}, storage: fullList('K099')});
+
+        expect(await enterMotel(unit)).toEqual(['RMKS FULL']);
+        expect(unit.props.remarksManager.getAirportsWithRemarks()).not.toContain('KAAA');
+    });
+});
+
+// 3-47 and C-2 leave a change of a listed airport in a full list allowed, as it adds no airport (the note on #92)
+describe('APT 5 remarks of an airport in a full list (#92)', () => {
+    it('changes the remarks of an airport in a full list without RMKS FULL (#92)', async () => {
+        const unit = await bootUnit({facilities: [KAAA()], position: {lat: 47, lon: 8}, storage: fullList('KAAA')});
+
+        expect(await enterMotel(unit)).toEqual([]);
+        expect(storedSetting(unit, 'rmk99')).toBe('KAAAMOTEL      ' + ' '.repeat(22));
     });
 });
 

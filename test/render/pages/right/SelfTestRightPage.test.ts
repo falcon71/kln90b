@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {BootOptions, bootToSelfTest, HeadlessUnit} from '../../../harness/boot';
+import {BootOptions, bootToSelfTest, HeadlessUnit, untilCalcTick} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {recordSounds} from '../../../harness/sounds';
 import {AIRDATA, ALTITUDE_ALERT, NO_ALTIMETER, panelXml} from '../../../harness/panelXml';
@@ -276,7 +276,7 @@ describe('self-test right page time entry (spec)', () => {
     // later, the time in the entry not added. The seconds are their own cells of the time row, `12:00:19UTC`: columns
     // 6 and 7 of the right half. The unit has no GPS time yet, so that its own clock is the time shown; the ENT is
     // pressed just after the clock steps, so that the seconds are read before the next step, which would show 01
-    it.fails('starts the clock with the seconds at zero when the time is entered '
+    it('starts the clock with the seconds at zero when the time is entered '
         + '(3-6; checked in the KLN 89 trainer, 2026-10-09, T11) (#331)', async () => {
         const unit = await onSelfTestPage({storage: NO_FIX_YET});
         await enterTime1627(unit);
@@ -286,6 +286,27 @@ describe('self-test right page time entry (spec)', () => {
         await unit.panel.ent();
 
         expect(Screen.read().rows('R')[2].slice(6, 8)).toBe('00');
+    });
+});
+
+// The maintainer's ruling, #125: the self-test page keeps its date and time editable while the GPS is valid, and SET 2
+// keeps its lock (3-53). The KLN 89 trainer kept the date of its initialization page editable (checked in the KLN 89
+// trainer, 2026-10-18), and the AVsoftech trainer (unreliable) kept its self-test date and time editable. With a valid GPS
+// the next calculation tick puts the satellite time back
+describe('self-test right page entries while the GPS is valid (characterization)', () => {
+    it('takes a time entry, which the GPS time replaces at the next calculation tick, and offers the date (#125) (characterization)', async () => {
+        const unit = await onSelfTestPage();
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true); // Precondition: the fast acquisition has a fix by now
+        await enterTime1627(unit);
+        await untilCalcTick(unit); // The next calculation tick is 750 to 1000 ms away, past the display tick of ENT
+
+        await unit.panel.ent();
+        expect(Screen.read().rows('R')[2].slice(0, 5)).toBe('16:27');
+
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('R')[2].slice(0, 5)).toBe('12:00');
+        await backTo(unit, '01 JUN 26'); // The date is a cursor field too
+        expect(unit.errors).toEqual([]);
     });
 });
 
@@ -346,7 +367,7 @@ describe('approving the self-test page (spec)', () => {
     // tones are requested one at a time on the bus (AudioGenerator.test.ts); kln_short_beep is the id the aircraft
     // declares (public contract). The recorder reports the end of each tone as the sim does
     it('plays five short beeps (3-7)', async () => {
-        const unit = await onSelfTestPage();
+        const unit = await onSelfTestPage({panelXml: panelXml(ALTITUDE_ALERT(true))}); // #141: the alert audio is off by default
         const sounds = recordSounds(unit);
         await unit.panel.cursorTo('R', 'APPROVE?');
         expect(sounds.ids).toEqual([]);

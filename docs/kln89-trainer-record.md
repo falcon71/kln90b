@@ -385,3 +385,25 @@ afterwards)
     pushing it in closed the window and left the cursor off (#394).
   - The maintainer's own check: with the lasting message `OBS WPT > 200NM`, the Super NAV 5 prompt stayed in inverse
     video without flashing once the message was read, as the status line does (#326).
+
+**2026-10-18**
+- With the date inside the data base period at power-up, a SET 2 date after its end made the message prompt flash
+  within about 1 s, and the message page listed the data base message once; after it was read the prompt was gone and
+  the page showed no message. With the date already after the end at power-up, and after moving the SET 2 date back
+  into the period, no message appeared (#175).
+- A SET 2 time entry started the clock at the entered hour and minute with the seconds at `00` (#397).
+- The date on the initialization page and the SET 2 date and time stay editable while the unit navigates (#125).
+- Not observable on the 89: a lasting message over its relaunch (the condition does not survive the relaunch, #351),
+  the altitude alert values (the 89 has no altitude alert, #259), an indicator course (no course input, #330).
+- The third-party AVsoftech KLN 90B trainer, which is unreliable:
+  - Its power button, off for about 10 s, twice: the read `OBS WPT > 200NM` stayed listed, and the prompt stayed steady
+    in inverse video on the self-test page and after approval (#351).
+  - ALT: `WARN:±500FT` with ALERT ON, and `ALERT: OFF` with `WARN:±700FT` behind it, both kept over a power cycle (#259).
+  - The self-test page with no message and the HSI course well away from 315° showed no message prompt; messages that
+    existed already did show there (#330).
+  - After a time entry on the self-test page or on SET 2 the seconds kept running; its clock and hours were erratic
+    (#331, #397).
+  - It never showed a data base message, and its data base page ignored the entered date (#175).
+  - The self-test date and time are editable; that page shows no GPS state (#125).
+  - With a readable course off the desired track, `ADJ NAV IND CRS TO 224°` appeared about 6 s after the aircraft
+    started moving and came back as new 2 to 3 s after it was read.

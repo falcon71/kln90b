@@ -345,4 +345,36 @@ describe('KlnEfbSaver route contents', () => {
         expect(unit.efb!.replies).toEqual([]);
         expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']); // Not changed either, since nothing was built
     });
+
+    // The Hot Swapping wiki page ("Hot Swapping and Package Detection") and LVars.ts LVAR_DISABLE: a unit disabled for
+    // hot swapping has handed its outputs to the GPS that replaced it, so that GPS answers the EFB, not the KLN (#353)
+    it('leaves a route request unanswered while the unit is disabled for hot swapping (#353)', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true, storage: savedFlightplan(0, [kaaa, kbbb])});
+        await settle(unit);
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        unit.efb!.request();
+
+        expect(unit.efb!.replies).toEqual([]);
+    });
+
+    // The gate is the disabled state and nothing wider: the unit answers again once it is put back
+    it('answers a route request again after the resume (#353)', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true, storage: savedFlightplan(0, [kaaa, kbbb])});
+        await settle(unit);
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        unit.efb!.request();
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+        const before = unit.efb!.replies.length;
+
+        unit.efb!.request();
+
+        expect(unit.efb!.replies.length).toBe(before + 1);
+        const route = unit.efb!.replies[before].route;
+        expect(ICAO.valueToStringV2(route.departureAirport)).toBe(ICAO.valueToStringV2(kaaa.icaoStruct));
+        expect(ICAO.valueToStringV2(route.destinationAirport)).toBe(ICAO.valueToStringV2(kbbb.icaoStruct));
+    });
 });

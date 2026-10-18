@@ -158,7 +158,22 @@ describe('MessageHandler.clear (#176)', () => {
         expect(handler.hasUnreadMessages()).toBe(false);
     });
 
-    it('lets a persistent message return unread at the next tick while its condition holds, and not otherwise (characterization)', () => {
+    it('keeps a message that is added after it', () => {
+        const handler = new MessageHandler();
+        handler.addMessage(new OneTimeMessage(['BEFORE']));
+
+        handler.clear();
+        handler.addMessage(new OneTimeMessage(['AFTER']));
+        handler.tick();
+
+        expect(texts(handler)).toEqual(['AFTER']);
+    });
+});
+
+describe('MessageHandler.clear and the seen flags (#351)', () => {
+    // The maintainer's ruling (#351): a read persistent message whose condition still holds after the power-on comes
+    // back read. One whose condition ended meanwhile is new again when it returns, as at any other time (3-16)
+    it('lets a read persistent message return read at the next tick while its condition holds, and new once it lapsed (#351)', () => {
         const handler = new MessageHandler();
         const holds = new Condition('HOLDS');
         const ends = new Condition('ENDS');
@@ -175,17 +190,28 @@ describe('MessageHandler.clear (#176)', () => {
         handler.tick();
 
         expect(texts(handler)).toEqual(['HOLDS']);
-        expect(handler.hasUnreadMessages()).toBe(true);
-    });
+        expect(holds.seen).toBe(true);
+        expect(handler.hasUnreadMessages()).toBe(false);
 
-    it('keeps a message that is added after it', () => {
-        const handler = new MessageHandler();
-        handler.addMessage(new OneTimeMessage(['BEFORE']));
-
-        handler.clear();
-        handler.addMessage(new OneTimeMessage(['AFTER']));
+        ends.valid = true;
         handler.tick();
 
-        expect(texts(handler)).toEqual(['AFTER']);
+        expect(texts(handler)).toEqual(['HOLDS', 'ENDS']);
+        expect(ends.seen).toBe(false);
+    });
+
+    // #351: clear() keeps the seen flag as it is, so an unread message is not made read either
+    it('lets an unread persistent message return unread (#351)', () => {
+        const handler = new MessageHandler();
+        const holds = new Condition('HOLDS');
+        handler.persistentMessages = [holds];
+        holds.valid = true;
+        handler.tick();
+
+        handler.clear();
+        handler.tick();
+
+        expect(texts(handler)).toEqual(['HOLDS']);
+        expect(handler.hasUnreadMessages()).toBe(true);
     });
 });

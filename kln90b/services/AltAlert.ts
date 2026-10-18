@@ -3,6 +3,7 @@ import {VolatileMemory} from "../data/VolatileMemory";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {Sensors} from "../Sensors";
 import {Feet} from "../data/Units";
+import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 
 enum AltAlertState {
     ARMED,
@@ -19,12 +20,12 @@ export class AltAlert implements CalcTickable {
     private selectedAltitude = 0;
 
 
-    constructor(private memory: VolatileMemory, private settings: KLN90PlaneSettings, private sensors: Sensors) {
+    constructor(private memory: VolatileMemory, private settings: KLN90PlaneSettings, private sensors: Sensors, private readonly userSettings: KLN90BUserSettings) {
     }
 
     public tick(): void {
         const indicatedAlt = this.sensors.in.airdata.getIndicatedAlt();
-        if (!this.memory.altPage.alertEnabled || indicatedAlt === null || !this.settings.output.altitudeAlertEnabled) {
+        if (!this.userSettings.getSetting("altAlertEnabled").get() || indicatedAlt === null || !this.settings.output.altitudeAlertEnabled) {
             return;
         }
 
@@ -54,7 +55,7 @@ export class AltAlert implements CalcTickable {
                 }
                 return;
             case AltAlertState.REACHED:
-                if (!this.isAltWithinWindow(roundetAlt, this.selectedAltitude, this.memory.altPage.alertWarn)) {
+                if (!this.isAltWithinWindow(roundetAlt, this.selectedAltitude, this.userSettings.getSetting("altAlertWarn").get())) {
                     this.state = AltAlertState.REACHING;
                     this.sensors.out.audioGenerator.shortBeeps(4);
                 }

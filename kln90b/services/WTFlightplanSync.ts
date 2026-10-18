@@ -12,6 +12,7 @@ import {
 } from "@microsoft/msfs-sdk";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {ActiveWaypoint, ActiveWaypointChangedEvents} from "../data/flightplan/ActiveWaypoint";
+import {Hardware} from "../Hardware";
 
 
 const FLIGHTPLANNER_ID = "kln90b";
@@ -20,7 +21,7 @@ const DTO_PLAN_INDEX = 1;
 export class WTFlightplanSync {
     private readonly flightplanner: FlightPlanner;
 
-    constructor(bus: EventBus, facilityLoader: FacilityClient, private readonly planeSettings: KLN90PlaneSettings, private readonly activeWaypoint: ActiveWaypoint) {
+    constructor(bus: EventBus, facilityLoader: FacilityClient, private readonly planeSettings: KLN90PlaneSettings, private readonly activeWaypoint: ActiveWaypoint, private readonly hardware: Hardware) {
         bus.getSubscriber<FlightplanEvents>().on("flightplanChanged").handle(this.flightplanChanged.bind(this));
         bus.getSubscriber<ActiveWaypointChangedEvents>().on("activeWaypointChanged").handle(this.activeIdxChanged.bind(this));
 
@@ -57,7 +58,8 @@ export class WTFlightplanSync {
 
     /**
      * Mirrors FPL 0 right away. L:KLN90B_WriteGpsSimvars switches the option on at runtime, and the planner would stay
-     * empty or stale until the next change otherwise.
+     * empty or stale until the next change otherwise. SimVarSync also calls it when the unit is put back after hot
+     * swapping (#398).
      */
     public sync() {
         this.syncToWTFlightplan(this.activeWaypoint.fpl0, this.activeWaypoint.getActiveFplIdx());
@@ -72,6 +74,11 @@ export class WTFlightplanSync {
     }
 
     private syncToWTFlightplan(klnPlan: Flightplan, activeIdx: number) {
+        if (this.hardware.isDisabled) {
+            //#398: a unit disabled for hot swapping writes no outputs, whatever asks for the sync. SimVarSync syncs once
+            //when it is put back
+            return;
+        }
         this.writeFpl0(klnPlan, activeIdx);
         this.writeDtoPlan();
 

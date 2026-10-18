@@ -151,6 +151,7 @@ export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> 
             if (this.forceReadyToUse) {
                 //We got no time for that
                 this.props.sensors.in.gps.gpsSatComputer.acquireAndUseSatellites();
+                this.props.memory.navPage.isSelfTestApproved = true; //A skipped self-test counts as approved (#330)
                 this.props.pageManager.startMainPage(this.props);
             } else if (this.props.planeSettings.takeHomeMode) {
                 this.props.pageManager.setCurrentPage(FourSegmentPage, {

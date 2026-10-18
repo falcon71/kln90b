@@ -1,5 +1,7 @@
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, onTestFinished, vi} from 'vitest';
+import {UserSettingSaveManager} from '@microsoft/msfs-sdk';
 import {bootUnit, teardown} from '../../harness/boot';
+import {KLN90BCore} from '../../../kln90b/KLN90BCore';
 import {simEnv} from '../../harness/sim/install';
 
 describe('teardown of a booted unit (harness)', () => {
@@ -34,5 +36,35 @@ describe('Math.random across a boot (harness)', () => {
         teardown();
 
         expect(vi.isMockFunction(Math.random)).toBe(false);
+    });
+
+    // The SDK's UserSetting draws Math.random once per setting it builds, so every new setting key would shift each later
+    // draw, the GPS start times of the seeded tests in GpsAcquisition.test.ts among them. bootUnit starts the sequence
+    // again once the KLN90BCore constructor has built the settings
+    it('starts the sequence again from the seed once the user settings are built, however many draws building them took', async () => {
+        // 90 more draws while the settings are loaded, as 90 more setting keys would make
+        const load = UserSettingSaveManager.prototype.load;
+        const loadSpy = vi.spyOn(UserSettingSaveManager.prototype, 'load').mockImplementation(function (this: UserSettingSaveManager, key: string) {
+            for (let i = 0; i < 90; i++) {
+                Math.random();
+            }
+            load.call(this, key);
+        });
+        const init = KLN90BCore.prototype.init;
+        let firstInInit: number | undefined;
+        const initSpy = vi.spyOn(KLN90BCore.prototype, 'init').mockImplementation(function (this: KLN90BCore, xml: Document) {
+            firstInInit = Math.random();
+            return init.call(this, xml);
+        });
+        onTestFinished(() => {
+            loadSpy.mockRestore();
+            initSpy.mockRestore();
+        });
+
+        await bootUnit({seed: 7});
+
+        expect(loadSpy).toHaveBeenCalledTimes(1); // Precondition: the extra draws ran inside the constructor
+        // The first draw of mulberry32 from seed 7, computed once outside the harness from the published algorithm
+        expect(firstInInit).toBe(0.011704753153026104);
     });
 });

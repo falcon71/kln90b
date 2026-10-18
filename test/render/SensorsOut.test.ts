@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle, untilCalcTick} from '../harness/boot';
+import {BootOptions, bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle, untilCalcTick} from '../harness/boot';
 import {Screen} from '../harness/render/screen';
 import {standardRoute} from '../harness/fixtures';
 import {savedFlightplan} from '../harness/storage';
@@ -242,10 +242,10 @@ describe('L:KLN90B_WptLight during the waypoint alert (public contract)', () => 
 describe('outputs at power-off (public contract)', () => {
     const BLANK_SCREEN = Array.from({length: 7}, () => ' '.repeat(23)).join('\n');
 
-    /** Setup A: banking towards the leg, 2 NM right of the course, the leg to the left */
-    async function banking() {
+    /** Setup A: banking towards the leg, 2 NM right of the course, the leg to the left. `opts` adds to the boot */
+    async function banking(opts: BootOptions = {}) {
         const {kaaa, abc} = standardRoute();
-        const unit = await bootOnStandardRoute({panelXml: panelXml(HEADING_INPUT), magvar: 0});
+        const unit = await bootOnStandardRoute({panelXml: panelXml(HEADING_INPUT), magvar: 0, ...opts});
         const mid = pointBefore(kaaa, abc, 10);
         const dtk = courseDeg(mid, abc);
         await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});
@@ -400,14 +400,19 @@ describe('outputs at power-off (public contract)', () => {
         expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(1);
     });
 
-    // The freeze exists so that the unit resumes where it left off; a unit that is off has nothing to resume (maintainer)
+    // The freeze exists so that the unit resumes where it left off; a unit that is off has nothing to resume (maintainer).
+    // A disabled unit ignores the power H events (#138, the maintainer's ruling), so it is switched off by the aircraft
+    // power, Input.ElectricitySimVar
     it('zeroes the outputs of a unit that is switched off while it is disabled for hot swapping', async () => {
-        const unit = await banking();
+        const unit = await banking({
+            panelXml: panelXml({...HEADING_INPUT, 'Input.ElectricitySimVar': 'CIRCUIT ON:1'}),
+            simVars: [{name: 'CIRCUIT ON:1', unit: 'bool', value: 1}],
+        });
         unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
         await vi.advanceTimersByTimeAsync(300);
         expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBeCloseTo(25, 6); // Precondition: frozen
 
-        unit.send('KLN90B_Power_Off');
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
         await vi.advanceTimersByTimeAsync(3000);
 
         expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBe(0);

@@ -9,8 +9,8 @@ import {simEnv} from '../../harness/sim/install';
 // `KLN90BSettingSaveManager.save` writes, with its default. Users' saved profiles are keyed by these names, so a
 // rename or a changed default loses or changes what they stored.
 //
-// An exact pin on purpose: adding, renaming or removing a key, or changing a default, has to touch this list. When #92
-// is fixed with more remark slots, the `rmk` slots below change on purpose.
+// An exact pin on purpose: adding, renaming or removing a key, or changing a default, has to touch this list. #92 added
+// the remark slots rmk10 to rmk99 (3-47: the remarks of 100 airports).
 const PREFIX = 'persistent-setting.KLN TEST.profile_1.';
 
 const DEFAULTS: Record<string, unknown> = {
@@ -33,6 +33,8 @@ const DEFAULTS: Record<string, unknown> = {
     airspaceAlertEnabled: true,
     airspaceAlertBuffer: 500,
     altAlertVolume: 99,
+    altAlertEnabled: false, // #259
+    altAlertWarn: 300, // #259
     htAboveAptEnabled: false,
     htAboveAptOffset: 800,
     turnAnticipation: true,
@@ -82,7 +84,7 @@ describe('persisted user setting keys', () => {
         // 250 user waypoint slots (docs/architecture.md Core 7), FPL 0 to FPL 25 and the remark slots, empty
         for (let i = 0; i < 250; i++) expected[`${PREFIX}wpt${i}`] = '""';
         for (let i = 0; i <= 25; i++) expected[`${PREFIX}fpl${i}`] = '""';
-        for (let i = 0; i < 10; i++) expected[`${PREFIX}rmk${i}`] = '""';
+        for (let i = 0; i < 100; i++) expected[`${PREFIX}rmk${i}`] = '""';
 
         expect(Object.fromEntries(data)).toEqual(expected);
     });

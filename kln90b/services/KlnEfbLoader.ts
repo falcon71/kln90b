@@ -1,13 +1,13 @@
 import {
     DeepReadonly,
     EventBus,
+    Facility,
     FacilityClient,
     FlightPlanRouteEnrouteLeg,
     FlightPlanRouteManager,
     ICAO,
     IcaoValue,
     ReadonlyFlightPlanRoute,
-    SimVarValueType,
     UserFacility,
     UserFacilityType,
 } from "@microsoft/msfs-sdk";
@@ -21,20 +21,20 @@ import {getUniqueIdent} from "../data/navdata/UniqueIdentGenerator";
 import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "../data/navdata/IcaoBuilder";
 import {StatusLineMessageEvents} from "../controls/StatusLine";
 import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
-import {LVAR_DISABLE} from "../LVars";
+import {Hardware} from "../Hardware";
 
 /**
  * Imports routes from the EFB into the KLN
  */
 export class KlnEfbLoader extends Flightplanloader {
 
-    constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler, private readonly flightPlanRouteManager: FlightPlanRouteManager, private readonly fpl0: Flightplan, private readonly pageManager: PageManager, private readonly facilityRepository: KLNFacilityRepository) {
+    constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler, private readonly flightPlanRouteManager: FlightPlanRouteManager, private readonly fpl0: Flightplan, private readonly pageManager: PageManager, private readonly facilityRepository: KLNFacilityRepository, private readonly hardware: Hardware) {
         super(bus, facilityLoader, messageHandler);
         this.flightPlanRouteManager.syncedAvionicsRoute.sub(this.loadRoute.bind(this));
     }
 
     private async loadRoute(route: ReadonlyFlightPlanRoute | null): Promise<void> {
-        if (SimVar.GetSimVarValue(LVAR_DISABLE, SimVarValueType.Bool)) {
+        if (this.hardware.isDisabled) { //#188. The state SimVarSync keeps, not the LVar (#353)
             //A route that is synced for the GPS that replaced the KLN must not change the FPL 0 of the suspended KLN. The route is dropped, not loaded on resume
             console.log("Ignoring route, because the unit is disabled for hot swapping");
             return;
@@ -85,6 +85,11 @@ export class KlnEfbLoader extends Flightplanloader {
 
     private async loadLeg(enroute: DeepReadonly<FlightPlanRouteEnrouteLeg>): Promise<IcaoValue | null> {
         if (enroute.hasLatLon) {
+            const held = this.findHeldWaypoint(enroute.fixIcao);
+            if (held !== undefined) {
+                return held.icaoStruct;
+            }
+
             let ident = "CUST";
             if (!ICAO.isValueEmpty(enroute.fixIcao)) {
                 ident = enroute.fixIcao.ident;
@@ -126,5 +131,20 @@ export class KlnEfbLoader extends Flightplanloader {
         return null;
     }
 
+    /**
+     * #187, the maintainer's ruling: KlnEfbSaver sends a user (region XX) or temporary (region XY) waypoint as a lat/lon
+     * leg whose fixIcao names it, always with the type U. When the EFB syncs that leg back and the unit still holds the
+     * waypoint, the leg is that waypoint, matched by region and ident whatever its type, with the position the unit
+     * holds. The repository holds only user and temporary waypoints, so a database fix never matches
+     */
+    private findHeldWaypoint(fixIcao: DeepReadonly<IcaoValue>): Facility | undefined {
+        let held: Facility | undefined = undefined;
+        this.facilityRepository.forEach(fac => {
+            if (fac.icaoStruct.region === fixIcao.region && fac.icaoStruct.ident === fixIcao.ident) {
+                held = fac;
+            }
+        });
+        return held;
+    }
 
 }

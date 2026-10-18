@@ -25,9 +25,13 @@ const MINUTE = 60 * 1000;
 /** The stored data of a unit that was last used here yesterday: position 47/8 (the boot position), almanac a day old */
 const WARM = {fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 8, lastAlmanacDownload: START - DAY};
 
-/** Seeds whose warm start lands at the ends of the observed spread (found by the probe of the plan, Task 3 Step 6) */
-const FAST_WARM_SEED = 15;
-const SLOW_WARM_SEED = 4;
+/**
+ * Seeds whose warm start lands at the ends of the observed spread. Found by a probe of seeds 1 to 40 on 2026-10-18, after
+ * the harness began to start the sequence again once the user settings are built (test/harness/boot.ts): seed 12 had
+ * its fix after 38 s, seed 34 after 105 s
+ */
+const FAST_WARM_SEED = 12;
+const SLOW_WARM_SEED = 34;
 
 /** The antipode of the boot position 47/8: no satellite is in view from both */
 const ANTIPODE = {lastLatitude: -47, lastLongitude: -172};
@@ -760,10 +764,28 @@ describe('DATA BASE OUT OF DATE after the GPS sets the date (B-2)', () => {
         gps.timeZulu = TimeStamp.create(gps.timeZulu.getTimestamp() - 30 * DAY);
         await unit.panel.powerOn();
         expect(await secondsToFix(unit, 60)).toBeLessThan(60);
-        // #175: for one tick the message is listed twice (Database.onGPSAcquired and the persistent message); after it, once
         await vi.advanceTimersByTimeAsync(5000);
 
         expect(messages(unit).filter(m => m === TEXT)).toHaveLength(1);
+    });
+
+    // B-2 names one message, and 3-16 keeps it until read. Before #175 the one-time message of Database.onGPSAcquired and
+    // the persistent message were both listed at the fix
+    it('lists it once at every display tick from the fix on, unread (B-2, 3-16) (#175)', async () => {
+        const unit = await bootUnit({engineRunning: false, start: AFTER_CYCLE, storage: {lastLatitude: 47, lastLongitude: 8}});
+        const gps = unit.props.sensors.in.gps;
+        gps.timeZulu = TimeStamp.create(gps.timeZulu.getTimestamp() - 30 * DAY);
+        await unit.panel.powerOn();
+        expect(await secondsToFix(unit, 60)).toBeLessThan(60);
+
+        const counts: number[] = [];
+        for (let i = 0; i < 20; i++) {
+            counts.push(messages(unit).filter(m => m === TEXT).length);
+            await vi.advanceTimersByTimeAsync(250);
+        }
+
+        expect(counts).toEqual(new Array(20).fill(1));
+        expect(unit.props.messageHandler.getMessages().find(m => m.message.join(' ') === TEXT)!.seen).toBe(false);
     });
 
     it('does not post when the GPS leaves the date as it was (B-2)', async () => {

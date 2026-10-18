@@ -30,10 +30,17 @@ function removeAll(): void {
 beforeEach(removeAll);
 
 describe('user waypoint V1 format', () => {
-    it.fails('restores a V1 longitude of 100° or more (#101)', () => {
+    it('restores a V1 longitude of 100° or more (#101)', () => {
         restoreV1('WXX    WEST +3400.00-11830.00');
         const wpt = repo.get(ICAO.value('W', 'XX', '', 'WEST'))!;
         expect(wpt.lon).toBeCloseTo(-118.5, 6);
+    });
+
+    // The east of the issue's reproduction: 139 degrees 15 minutes east
+    it('restores an eastern V1 longitude of 100° or more (#101)', () => {
+        restoreV1('WXX    EAST +3400.00+13915.00');
+        const wpt = repo.get(ICAO.value('W', 'XX', '', 'EAST'))!;
+        expect(wpt.lon).toBeCloseTo(139.25, 6);
     });
 
     it('restores an intersection with a western longitude (#47)', () => {

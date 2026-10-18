@@ -32,6 +32,7 @@ interface World {
     obsTarget: number;
     airdataInterfaced: boolean;
     baroSource: number;
+    selfTestApproved: boolean;
 }
 
 /** A page object that passes the instanceof checks of PersistentMessages without being rendered */
@@ -56,6 +57,7 @@ function quietWorld(): World {
         obsTarget: 0,
         airdataInterfaced: false,
         baroSource: 0,
+        selfTestApproved: true,
     };
 }
 
@@ -73,6 +75,9 @@ function harness(w: World) {
         },
         get userMagvar() {
             return w.userMagvar;
+        },
+        get isSelfTestApproved() {
+            return w.selfTestApproved;
         },
     };
     const mainPage = Object.create(MainPage.prototype);
@@ -387,16 +392,91 @@ describe('DATA BASE OUT OF DATE', () => {
         expect(h.tick()).toEqual([]);
     });
 
-    // B-2, 3-16: a message is there for the pilot to read. Today the condition is true for one calculation tick only, so
-    // the message is gone a second later, unread, and the MSG prompt with it.
-    // This pin is bound to the persistent DatabaseOutOfDateMessage class (PersistentMessages.ts). If the fix deletes that
-    // class, delete this pin with it: the render pin below ("lists the message once") then carries the bug.
-    it.fails('stays until it is read (B-2, 3-16) (#175)', () => {
+    // B-2, 3-16: a message is there for the pilot to read. Before #175 the condition was true for one calculation tick
+    // only, so the message was gone a second later, unread, and the MSG prompt with it. The data base expiring while the
+    // unit runs is this path: the stub turns from current to expired between two ticks
+    it('stays until it is read (B-2, 3-16) (#175)', () => {
         const w = quietWorld();
         const h = harness(w);
         h.tick();
         w.dbCurrent = false;
         h.tick();
+        expect(h.tick()).toEqual([DB_TEXT]);
+        expect(h.handler.hasUnreadMessages()).toBe(true);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-18: after the message was read, the prompt was gone and the message page
+    // showed no message. The data base stays out of date, so only the read ends it
+    it('is gone once it is read, while the data base stays out of date (checked in the KLN 89 trainer, 2026-10-18) (#175)', () => {
+        const w = quietWorld();
+        const h = harness(w);
+        h.tick();
+        w.dbCurrent = false;
+        expect(h.tick()).toEqual([DB_TEXT]);
+        h.handler.getMessages()[0].seen = true; // What the MSG page does when it shows the message
+
+        expect(h.tick()).toEqual([]);
+        expect(h.tick()).toEqual([]);
+    });
+
+    // The maintainer's ruling (#176): the unit loses its messages at the power-off, and MessageHandler.clear is the
+    // power-off. The KLN 89 check of 2026-10-18 showed no message at a power-up with the date already past the end; it
+    // did not try an unread message over the power cycle, so the title cites the issues only
+    it('is not listed again after a power cycle with the message unread (#175, #176)', () => {
+        const w = quietWorld();
+        const h = harness(w);
+        h.tick();
+        w.dbCurrent = false;
+        expect(h.tick()).toEqual([DB_TEXT]); // Precondition: listed, unread
+        h.handler.clear();
+
+        expect(h.tick()).toEqual([]);
+        expect(h.tick()).toEqual([]);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-18: with the date already past the end at power-up there was no message.
+    // Here the data base expires while the unit is off, so the last tick before the power-off saw it current. That the
+    // same holds for this case is our reading of that observation, not a trainer result
+    it('is not posted at a power-on after the data base expired while the unit was off (#175)', () => {
+        const w = quietWorld();
+        const h = harness(w);
+        expect(h.tick()).toEqual([]);
+        h.handler.clear();
+        w.dbCurrent = false;
+
+        expect(h.tick()).toEqual([]);
+        expect(h.tick()).toEqual([]);
+    });
+
+    // The rulings of #351 (a read message keeps its seen flag over a power cycle) and #175 (the latch) together: the
+    // pilot reads the message and the unit is switched off before the next tick. The read clears the latch at the first
+    // tick, and the power-off clears it too, so it does not come back, read or unread
+    it('stays gone over a power cycle right after it is read (#351, #175)', () => {
+        const w = quietWorld();
+        const h = harness(w);
+        h.tick();
+        w.dbCurrent = false;
+        expect(h.tick()).toEqual([DB_TEXT]);
+        h.handler.getMessages()[0].seen = true;
+        h.handler.clear();
+
+        expect(h.tick()).toEqual([]);
+        expect(h.tick()).toEqual([]);
+    });
+
+    // The maintainer's ruling (#175): a new change from current to expired after the read posts it again, once
+    it('is posted again when the data base becomes out of date again after the read (#175)', () => {
+        const w = quietWorld();
+        const h = harness(w);
+        h.tick();
+        w.dbCurrent = false;
+        h.tick();
+        h.handler.getMessages()[0].seen = true;
+        expect(h.tick()).toEqual([]); // Precondition: gone once read
+        w.dbCurrent = true;
+        h.tick();
+        w.dbCurrent = false;
+
         expect(h.tick()).toEqual([DB_TEXT]);
         expect(h.handler.hasUnreadMessages()).toBe(true);
     });
@@ -448,7 +528,7 @@ describe('ADJ NAV IND CRS TO nnn, a readable indicator', () => {
         w.dtkMag = 46;
         w.obsIn = 46;
         const h = harness(w);
-        h.tick(); // The first DTK opens the force window; 31 s is past its 30 s
+        h.tick(); // The first DTK is the start-up course and opens no force window (#330); 31 s keep a window closed anyway
         vi.advanceTimersByTime(31_000);
         return {w, h};
     };
@@ -563,18 +643,110 @@ describe('ADJ NAV IND CRS TO nnn, a readable indicator', () => {
         expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 040°']);
     });
 
+    // Since #330 the course at the first evaluation after the approval is the start-up course and opens no window, so
+    // the first DTK here comes after a start-up without one, as at a Direct To after a start-up without a flight plan
     it('opens the window at the first DTK, even on course (characterization)', () => {
         vi.useFakeTimers({toFake: ['Date']});
         vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
         const w = quietWorld();
+        const h = harness(w);
+        expect(h.tick()).toEqual([]); // The start-up, without a DTK
         w.dtkMag = 3;
         w.obsIn = 3;
-        expect(harness(w).tick()).toEqual(['ADJ NAV IND CRS TO 003°']);
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 003°']);
     });
 
     it('does not show without a course read back from the indicator (characterization)', () => {
         const {w, h} = readable();
         w.obsIn = null;
+        expect(h.tick()).toEqual([]);
+    });
+});
+
+describe('ADJ NAV IND CRS TO nnn before the self-test is approved', () => {
+    const atNoon = () => {
+        vi.useFakeTimers({toFake: ['Date']});
+        vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
+    };
+
+    // Figure 3-4: the self-test page with the indicator on 242° against the fixed course of 315° and no message prompt.
+    // The maintainer's ruling (#330) widens this to the whole time before the approval, the Turn-On page included. The
+    // same world after the approval shows the message, so the approval is what lets it through
+    it('is not evaluated before the approval, with the indicator off the course (figure 3-4) (#330)', () => {
+        atNoon();
+        const w = quietWorld();
+        w.dtkMag = 315;
+        w.obsIn = 242;
+        w.selfTestApproved = false;
+        const h = harness(w);
+        expect(h.tick()).toEqual([]);
+        expect(h.tick()).toEqual([]);
+
+        w.selfTestApproved = true;
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 315°']);
+    });
+
+    // #330: the start-up is no DTK change. The DTK of 046° at the approval opens no 30 s window (#177) for a pilot whose
+    // indicator is already on it
+    it('takes the course at the approval as no DTK change, so it opens no 30 s window (#330)', () => {
+        atNoon();
+        const w = quietWorld();
+        w.selfTestApproved = false;
+        const h = harness(w);
+        expect(h.tick()).toEqual([]);
+        w.selfTestApproved = true;
+        w.dtkMag = 46;
+        w.obsIn = 46;
+
+        expect(h.tick()).toEqual([]);
+    });
+
+    // #330: the engine-running start skips the self-test and counts as approved; its first course is the start-up
+    // course as well
+    it('takes the first course of a start that skips the self-test as no DTK change (#330)', () => {
+        atNoon();
+        const w = quietWorld();
+        w.dtkMag = 46;
+        w.obsIn = 46;
+
+        expect(harness(w).tick()).toEqual([]);
+    });
+
+    // #330: every power-on starts anew. The last course of the previous power-on (046°) is not compared with the DTK at
+    // the next approval (100°), so that DTK opens no window either
+    it('takes the course at the approval after a power cycle as no DTK change (#330)', () => {
+        atNoon();
+        const w = quietWorld();
+        w.dtkMag = 46;
+        w.obsIn = 46;
+        const h = harness(w);
+        expect(h.tick()).toEqual([]); // Precondition: the start-up course opens no window
+        w.selfTestApproved = false; // The next power-on
+        expect(h.tick()).toEqual([]);
+        w.dtkMag = 100;
+        w.obsIn = 100;
+        w.selfTestApproved = true;
+
+        expect(h.tick()).toEqual([]);
+    });
+
+    // #330: a window opened by a DTK change before a power-off does not show after the approval of the next power-on,
+    // although its 30 s have not run out
+    it('ends a window from before the power-off at the approval (#330)', () => {
+        atNoon();
+        const w = quietWorld();
+        w.dtkMag = 46;
+        w.obsIn = 46;
+        const h = harness(w);
+        h.tick();
+        w.dtkMag = 100;
+        w.obsIn = 100;
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']); // Precondition: the DTK change opened the window
+        w.selfTestApproved = false; // The next power-on
+        expect(h.tick()).toEqual([]);
+        vi.advanceTimersByTime(5_000);
+        w.selfTestApproved = true;
+
         expect(h.tick()).toEqual([]);
     });
 });

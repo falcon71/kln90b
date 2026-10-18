@@ -187,6 +187,12 @@ export class KLN90BCore {
 
     public onInteractionEvent(args: Array<string>): void {
         try {
+            if (this.hardware.isDisabled) {
+                //#138, the maintainer's ruling: a unit taken out for hot swapping takes no input, the power and brightness
+                //events included. The keyboard is re-dispatched through here, so it is ignored as well
+                return;
+            }
+
             let evt = args[0];
 
             if (this.hardware.isScanPulled) {
@@ -253,7 +259,7 @@ export class KLN90BCore {
 
 
         this.audioGenerator = new AudioGenerator(this.bus, this.planeSettings);
-        const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, this.audioGenerator, this.messageHandler);
+        const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, this.audioGenerator, this.messageHandler, this.hardware);
 
         this.hEventPublisher.startPublish();
         console.log("KLN 90B ready to show welcome page");
@@ -321,7 +327,7 @@ export class KLN90BCore {
 
         const memory = new VolatileMemory(this.bus, this.userSettings, facilityLoader, sensors, scanlists, flightplans, lastActiveWaypoint);
 
-        this.wtFlightplanSync = new WTFlightplanSync(this.bus, facilityLoader, this.planeSettings, memory.navPage.activeWaypoint);
+        this.wtFlightplanSync = new WTFlightplanSync(this.bus, facilityLoader, this.planeSettings, memory.navPage.activeWaypoint, this.hardware);
 
         const airspaceAlert = new AirspaceAlert(this.userSettings, sensors, this.messageHandler, facilityLoader, memory.navPage);
         const vnav = new Vnav(memory.navPage, sensors, flightplans[0]);
@@ -342,7 +348,7 @@ export class KLN90BCore {
                 new NavCalculator(sensors, memory, magvar, this.userSettings, modeController, this.planeSettings),
                 airspaceAlert,
                 new HtAboveAirportAlert(memory.navPage, this.planeSettings, sensors, this.userSettings),
-                new AltAlert(memory, this.planeSettings, sensors),
+                new AltAlert(memory, this.planeSettings, sensors, this.userSettings),
                 new Timers(sensors, this.userSettings, memory.dtPage),
                 vnav,
                 this.messageHandler,
@@ -351,7 +357,7 @@ export class KLN90BCore {
                 new SignalOutputFillterTick(sensors),
             ]);
 
-        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager, brightnessManager, this.wtFlightplanSync);
+        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager, brightnessManager, this.wtFlightplanSync, this.hardware);
 
         const msa = new MSA();
 
@@ -364,8 +370,8 @@ export class KLN90BCore {
         const sidstar = new SidStar(facilityLoader, facilityRepository, sensors);
 
         this.platform.getRouteManager().then(manager => {
-            this.efbSaver = new KlnEfbSaver(this.planeSettings!, manager, flightplans[0]);
-            this.efbLoader = new KlnEfbLoader(this.bus, facilityLoader, this.messageHandler, manager, flightplans[0], this.pageManager, facilityRepository);
+            this.efbSaver = new KlnEfbSaver(this.planeSettings!, manager, flightplans[0], this.hardware);
+            this.efbLoader = new KlnEfbLoader(this.bus, facilityLoader, this.messageHandler, manager, flightplans[0], this.pageManager, facilityRepository, this.hardware);
         });
 
         Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), msa.init(this.planeSettings.basePath)]).then(() => {
@@ -388,7 +394,7 @@ export class KLN90BCore {
                 msa: msa,
                 vnav: vnav,
                 modeController: modeController,
-                database: new Database(this.bus, sensors, this.messageHandler),
+                database: new Database(sensors),
                 magvar: magvar,
                 sidstar: sidstar,
             };

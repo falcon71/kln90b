@@ -12,18 +12,23 @@ import {
 import {Flightplan, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {isUserWaypoint} from "../pages/right/WaypointPage";
+import {Hardware} from "../Hardware";
 
 /**
  * Sends routes from the KLN to the EFB
  */
 export class KlnEfbSaver {
 
-    constructor(private readonly options: KLN90PlaneSettings, private readonly flightPlanRouteManager: FlightPlanRouteManager, private readonly fpl0: Flightplan) {
+    constructor(private readonly options: KLN90PlaneSettings, private readonly flightPlanRouteManager: FlightPlanRouteManager, private readonly fpl0: Flightplan, private readonly hardware: Hardware) {
         this.flightPlanRouteManager.avionicsRouteRequested.on(this.handleAvionicsRouteRequested.bind(this));
     }
 
     private handleAvionicsRouteRequested(sender: FlightPlanRouteManager, requestId: number): void {
         if (!this.options.output.writeGPSSimVars) {
+            return;
+        }
+        if (this.hardware.isDisabled) {
+            //#353: the GPS that replaced the unit for hot swapping answers the EFB
             return;
         }
 

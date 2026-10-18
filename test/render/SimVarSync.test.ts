@@ -1,4 +1,4 @@
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, onTestFinished, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../harness/boot';
 import {Screen} from '../harness/render/screen';
 import {standardRoute} from '../harness/fixtures';
@@ -287,7 +287,7 @@ describe('L:KLN90B_WriteGpsSimvars (public contract)', () => {
 });
 
 // The Hot Swapping wiki page: a disabled unit does not claim the GPS (GPS OVERRIDDEN 0, see SensorsOut.test.ts #24), and
-// toggling WriteGpsSimvars does not change that (#137).
+// neither toggling WriteGpsSimvars (#137) nor a power change (#350) changes that.
 describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
     it('the sibling: the disabled unit has released GPS OVERRIDDEN', async () => {
         const unit = await bootOnStandardRoute();
@@ -358,13 +358,89 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
 
         expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
     });
+
+    // A power change claims the GPS at once (SensorsOut.reset). The aircraft power is Input.ElectricitySimVar; a disabled
+    // unit ignores the power H events (#138), so the circuit is its only power path
+    const onCircuit = () => bootOnStandardRoute({panelXml: CIRCUIT_XML, simVars: [{name: 'CIRCUIT ON:1', unit: 'bool', value: 1}]});
+
+    it('the sibling: a loss of the aircraft power claims the GPS of an enabled unit at once', async () => {
+        const unit = await onCircuit();
+        const sim = unit.env.sim;
+        sim.set('GPS OVERRIDDEN', 'bool', false); // As another device would
+
+        sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
+    });
+
+    it('stays released when the aircraft power goes off and comes back (#350)', async () => {
+        const unit = await onCircuit();
+        const sim = unit.env.sim;
+        sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
+        sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
+    });
+
+    it('claims the GPS on the resume after the aircraft power went off and came back while disabled (#350)', async () => {
+        const unit = await onCircuit();
+        const sim = unit.env.sim;
+        sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(3000);
+        sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
+    });
+
+    // The maintainer's ruling: the gates read Hardware.isDisabled, never the LVar (see the read count of #138 below). The
+    // gate of the power change (SensorsOut.reset) runs on each of the two circuit changes: two seconds of polls, ten per
+    // second, and no read of its own
+    it('reads L:KLN90B_Disabled only in the poll, also when the aircraft power changes (#350)', async () => {
+        const unit = await onCircuit();
+        const sim = unit.env.sim;
+        sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        const read = vi.spyOn(SimVar, 'GetSimVarValue');
+        onTestFinished(() => read.mockRestore()); // A second spyOn on the method would return this one with its calls
+
+        sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(1000);
+        sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(read.mock.calls.filter(c => c[0] === 'L:KLN90B_Disabled').length).toBe(20);
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0); // Precondition: the power change did not claim the GPS
+    });
 });
 
 
 // The Hot Swapping wiki page: a disabled unit suspends and resumes where it left off, so the input meant for the unit
-// that replaced it must not reach it. KLN90BCore.onInteractionEvent has no check of L:KLN90B_Disabled, so the knob clicks
-// are applied and NAV 3 shows after the resume.
+// that replaced it must not reach it. The maintainer's ruling (#138): while the unit is disabled every H event is
+// ignored, the power and brightness events included; its power then follows only the electricity SimVar
 describe('H events while the unit is disabled (public contract)', () => {
+    async function disable(unit: HeadlessUnit): Promise<void> {
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+    }
+
+    async function resume(unit: HeadlessUnit): Promise<void> {
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(2000);
+    }
+
     it('the sibling: two clicks of the left inner knob move NAV 1 to NAV 3', async () => {
         const unit = await bootOnStandardRoute();
         await unit.panel.selectPage('L', 'NAV 1');
@@ -375,17 +451,86 @@ describe('H events while the unit is disabled (public contract)', () => {
         expect(Screen.read().status().left).toBe('NAV 3');
     });
 
-    it.fails('are ignored: the left page is still NAV 1 after the resume (#138)', async () => {
+    it('are ignored: the left page is still NAV 1 after the resume (#138)', async () => {
         const unit = await bootOnStandardRoute();
         await unit.panel.selectPage('L', 'NAV 1');
-        unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
-        await vi.advanceTimersByTimeAsync(300);
+        await disable(unit);
 
         await unit.panel.press('KLN90B_LeftSmallKnob_Right');
         await unit.panel.press('KLN90B_LeftSmallKnob_Right');
-        unit.env.sim.set('L:KLN90B_Disabled', 'bool', false);
-        await vi.advanceTimersByTimeAsync(2000);
+        await resume(unit);
 
         expect(Screen.read().status().left).toBe('NAV 1');
+    });
+
+    // The sibling of the next test: on an enabled unit KLN90B_Power_Off switches the unit off and writes the switch LVar
+    it('the sibling: KLN90B_Power_Off switches an enabled unit off', async () => {
+        const unit = await bootOnStandardRoute();
+
+        await unit.panel.powerOff();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.env.sim.get('L:KLN90B_Power', 'bool')).toBe(0);
+        expect(Screen.read().row(0)).toBe(BLANK_ROW);
+    });
+
+    it('ignores KLN90B_Power_Off: the unit is still on after the resume (#138)', async () => {
+        const unit = await bootOnStandardRoute();
+        await unit.panel.selectPage('L', 'NAV 1');
+        const cycles = unit.props.userSettings.getSetting('powercycles').value;
+        await disable(unit);
+
+        await unit.panel.powerOff();
+        await vi.advanceTimersByTimeAsync(2000);
+        await resume(unit);
+
+        expect(unit.env.sim.get('L:KLN90B_Power', 'bool')).toBe(1);
+        expect(Screen.read().status().left).toBe('NAV 1');
+        expect(unit.props.userSettings.getSetting('powercycles').value).toBe(cycles);
+    });
+
+    // The scan knob is pulled by KLN90B_RightScan_Toggle, which writes L:KLN90B_RightScan and makes the right inner knob
+    // the scan knob (KLN90BCore.onInteractionEvent)
+    it('ignores the scan toggle: neither L:KLN90B_RightScan nor the right inner knob changes (#138)', async () => {
+        const unit = await bootOnStandardRoute();
+        await unit.panel.selectPage('R', 'NAV 1');
+        await disable(unit);
+        const scanWrites = unit.env.sim.writeCount('L:KLN90B_RightScan');
+
+        await unit.panel.scan();
+        await resume(unit);
+
+        expect(unit.env.sim.writeCount('L:KLN90B_RightScan')).toBe(scanWrites);
+        expect(unit.props.hardware.isScanPulled).toBe(false);
+        await unit.panel.press('KLN90B_RightSmallKnob_Right'); // A page step, not a scan
+        expect(Screen.read().status().right).toBe('NAV 2');
+    });
+
+    it('ignores the brightness events: L:KLN90B_Brightness and the screen stay as they were (#138)', async () => {
+        const unit = await bootOnStandardRoute();
+        await vi.advanceTimersByTimeAsync(5000); // the fade-in of the boot is done
+        const opacity = unit.display.opacity();
+        expect(unit.env.sim.get('L:KLN90B_Brightness', 'number')).toBe(1); // Precondition: full brightness
+        await disable(unit);
+
+        await unit.panel.press('KLN90B_Brt_Dec', 2);
+        await resume(unit);
+
+        expect(unit.env.sim.get('L:KLN90B_Brightness', 'number')).toBe(1);
+        expect(unit.display.opacity()).toBe(opacity);
+    });
+
+    // The maintainer's ruling: L:KLN90B_Disabled is read only by the 100 ms poll of SimVarSync, which keeps the state on
+    // Hardware; the gates read the kept state, because reading the LVar is expensive. Ten polls in a second, whatever
+    // input arrives
+    it('reads L:KLN90B_Disabled only in the poll, also while H events arrive (#138)', async () => {
+        const unit = await bootOnStandardRoute();
+        await disable(unit);
+        const read = vi.spyOn(SimVar, 'GetSimVarValue');
+
+        await unit.panel.press('KLN90B_LeftSmallKnob_Right', 4); // 4 clicks of 250 ms: one second
+        await unit.panel.press('KLN90B_ENT_Push', 4);
+
+        expect(read.mock.calls.filter(c => c[0] === 'L:KLN90B_Disabled').length).toBe(20);
     });
 });

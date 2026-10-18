@@ -117,10 +117,14 @@ arrives.
 - Welcome and self-test flow (lives in pages, summarised here for wiring): `WelcomePage.tick` waits `TEST_TIME=17000`
   ms, a free cursor and `memory.isReady`. It then goes to:
     - `FiveSegmentPage(SelfTestLeftPage, SelfTestRightPage)` normally. `SelfTestLeftPage` sets
-      `navPage.isSelfTestActive = true` and `SelfTestRightPage` clears it.
+      `navPage.isSelfTestActive = true` and `SelfTestRightPage` clears it at the approval, where it also sets
+      `navPage.isSelfTestApproved`.
     - `TakehomePage` if `takeHomeMode` is set.
     - `pageManager.startMainPage(props)` directly if `forceReadyToUse` is set. This also calls
-      `gpsSatComputer.acquireAndUseSatellites()`.
+      `gpsSatComputer.acquireAndUseSatellites()` and sets `navPage.isSelfTestApproved` (a skipped self-test counts as
+      approved).
+- `navPage.isSelfTestApproved` is false from every power-on (`VolatileMemory.reset`) until then. Unlike
+  `isSelfTestActive` it also covers the Turn-On page; ADJ NAV IND CRS is not evaluated before it (#330).
 - While `isSelfTestActive` is set:
     - `NavCalculator` outputs fixed test values (XTK -2.5, DIS 34.5, DTK 315 mag, FROM, waypoint alert on).
     - `RollSteeringController` sweeps 0 to -5 degrees of bank, but only with a heading input (without one the roll
@@ -128,14 +132,19 @@ arrives.
     - `SensorsOut.setMode` writes `GPS APPROACH MODE = 3` and `L:KLN90B_AnnunTest = true`, so external annunciators
       light up.
 
-**Hot-swap disable**: `SimVarSync.setDisabled` reacts to `L:KLN90B_Disabled`. It calls
-`tickController.setEnabled(false)` and `pageManager.resetKeyboard()`, and if `writeGPSSimVars` is set it toggles
-`GPS OVERRIDDEN`.
+**Hot-swap disable**: the 100 ms poll of `SimVarSync` is the only reader of `L:KLN90B_Disabled`. `setDisabled` keeps
+the state in `Hardware.isDisabled` (a unit taken out of the aircraft, not one switched off; its doc comment lists what a
+disabled unit does), calls `tickController.setEnabled(false)` and `pageManager.resetKeyboard()`, and if
+`writeGPSSimVars` is set it releases `GPS OVERRIDDEN` on the disable and claims it again on the resume. While
+disabled nothing claims it, since `SensorsOut.reset()` skips its claim on a power change then (#350). The gates read
+`Hardware.isDisabled`, never the LVar, so they lag it by at most one poll.
 
 **Input routing**: the sim delivers H events as `BaseInstrument.onInteractionEvent(args)`.
 
-- `KLN90B.onInteractionEvent` calls `super` and passes the event to `KLN90BCore.onInteractionEvent`, which handles the
-  SCAN pull state (`Hardware.isScanPulled`, mirrored to `L:KLN90B_RightScan`).
+- `KLN90B.onInteractionEvent` calls `super` and passes the event to `KLN90BCore.onInteractionEvent`. While
+  `Hardware.isDisabled` is set it drops every event, the power and brightness events included (#138), so the power of a
+  disabled unit follows only the electricity SimVar. Otherwise it handles the SCAN pull state (`Hardware.isScanPulled`,
+  mirrored to `L:KLN90B_RightScan`).
   While SCAN is pulled, it remaps right-inner turns to the internal `EVT_R_SCAN_LEFT/RIGHT`.
 - It then calls `hEventPublisher.dispatchHEvent([evt])`, which puts the event on the bus `hEvent` topic. `PowerButton`
   listens there for power and brightness events.
@@ -282,8 +291,8 @@ main computer; RAIM failures are still not modeled.
   `lastAlmanacDownload` and `lastEphemeris` (`"prn:time,prn:time"`, restored into the SDK satellites at boot, so a new
   session within the 2 h of the ephemeris is a hot start).
 - `gpsAcquired()` can post `POSITION DIFFERS FROM LAST POSITION BY >2NM`. If the time error is over 10 minutes it posts
-  `SYSTEM TIME UPDATED TO GPS TIME` and publishes **`timeUpdatedEvent`**; `Database` listens and posts the AIRAC-expired
-  message.
+  `SYSTEM TIME UPDATED TO GPS TIME` and publishes **`timeUpdatedEvent`** (SET 2 publishes it too; nothing subscribes
+  since #175). The AIRAC-expired message is the persistent `DatabaseOutOfDateMessage` alone (Core 9).
 - Internal clock `timeZulu` (`data/Time.ts TimeStamp`):
     - At construction it is set from `E:ABSOLUTE TIME` plus a random ±2.5 s. No hour is subtracted, and the hour
       `PowerButton` assumes for the CRT warm-up is not used.
@@ -357,9 +366,13 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
     - `WTFlightplanSync` mirrors FPL 0 into an SDK `FlightPlanner` with id `"kln90b"` (`initSyncRole:'primary'`): plan 0
       is DF legs and plan 1 is a direct-to plan "like the Garmins". Data stops after the MAP or an arc ("Install manual:
       We do not return data after a fence"). This happens only when `writeGPSSimVars` is set, and `SimVarSync` calls `WTFlightplanSync.sync()` once when
-      `L:KLN90B_WriteGpsSimvars` switches it on at runtime.
-    - `KlnEfbSaver` answers EFB `avionicsRouteRequested`; `KlnEfbLoader` loads `syncedAvionicsRoute` into FPL 0 (lat/lon
-      legs become temporary user waypoints in region `XY`).
+      `L:KLN90B_WriteGpsSimvars` switches it on at runtime. While `Hardware.isDisabled` is set nothing is written,
+      whatever asks for the sync, and `SimVarSync.setDisabled` syncs once on the resume (#398).
+    - `KlnEfbSaver` answers EFB `avionicsRouteRequested` (only with `writeGPSSimVars` set); `KlnEfbLoader` loads
+      `syncedAvionicsRoute` into FPL 0 (lat/lon legs become temporary user waypoints in region `XY`, except a leg whose
+      `fixIcao` names, by region and ident, a user or temporary waypoint the unit holds: the saver sends those as lat/lon
+      legs of type U, and they come back as themselves with the stored position, #187). While
+      `Hardware.isDisabled` is set the request goes unanswered (#353) and the synced route is dropped (#188).
 - The ticks that write the L:KLN90B_* outputs stop with the power, so `SensorsOut.setPoweredOff()` writes their zero
   state once on a power-off: `L:KLN90B_RollCommand` 0, `L:KLN90B_HSI_TF_FLAGS` 0 (flagged) and the MSG, WPT and annunciator
   test lights false, `L:KLN90B_IntegrityWarn` 0, `L:KLN90B_GPS_WP_BEARING` 0 and `L:KLN90B_XTK` 0, whatever `writeGPSSimVars` says. It also discharges the D-bar filter, so `GPS WP CROSS TRK` starts from 0 after the next power-on. A unit that is only disabled for hot swapping keeps its values, but a power-off while disabled zeroes them too.
@@ -584,12 +597,14 @@ written then, on purpose: the default autopilot reads it.
 Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (DataStore) under the key
 `"<ATC MODEL>.profile_1"`. `KLN90BSettingSaveManager` concatenates four managers:
 
-- `KLN90BUserSettings`: about 55 typed keys. These include `welcome1..4`, `powercycles`, `totalTime`, `timezone`, baro,
-  `lastLatitude/Longitude`, `lastAlmanacDownload`, `lastEphemeris`, `activeWaypoint` (ICAO **V1** string), alert settings,
+- `KLN90BUserSettings`: the typed keys that `KLN90BUserSettingsTypes` declares. These include `welcome1..4`, `powercycles`, `totalTime`, `timezone`, baro,
+  `lastLatitude/Longitude`, `lastAlmanacDownload`, `lastEphemeris`, `activeWaypoint` (ICAO **V1** string), alert settings
+  (the ALT page's `altAlertEnabled` and `altAlertWarn` since #259, which a power cycle keeps),
   `turnAnticipation`, the NAV 5 and Super NAV 5 layout, CAL page inputs, `fastGpsAcquisition` and `userDataFormat`.
 - `KLN90BUserWaypointsSettings`: `wpt0..wpt249` (`MAX_USER_WAYPOINTS=250`).
 - `KLN90BUserFlightplansSettings`: `fpl0..fpl25` (`NUM_FLIGHTPLANS=25`, inclusive loop).
-- `KLN90BUserRemarkSettings`: `rmk0..rmk9` (`NUM_REMARKS=10`).
+- `KLN90BUserRemarkSettings`: `rmk0..rmk99` (`NUM_REMARKS=100`, the 100 airports of 3-47; `rmk10` and up since #92).
+  `RemarksManager` writes the airports into the first slots on every save and empties the rest.
 - The setting key names and value formats are **backward-compatibility-critical**. Users keep data across versions. Add
   new keys with defaults; never repurpose old ones.
 
@@ -619,7 +634,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - Remarks (`settings/RemarksManager.ts`): stored as `ident(blank-padded to 4 chars) + 3×11 chars`, keyed by airport ident; publishes
   `changed` (`RemarksChangedEvent`).
 - **`VolatileMemory`** (`data/VolatileMemory.ts`) is not persisted. It holds RAM state for each page group:
-  `aptPage/vorPage/ndbPage/intPage/supPage` (`WaypointPageState`), `altPage`, `dtPage`, `fplPage {flightplans}`, *
+  `aptPage/vorPage/ndbPage/intPage/supPage` (`WaypointPageState`), `dtPage`, `fplPage {flightplans}`, *
   *`navPage: NavPageState`** (the hub for nav results, mode, `activeWaypoint`, `isSelfTestActive`, NAV 4 VNAV inputs,
   `userMagvar`), `triPage`, `calPage`, `ctrPage` and `othPage`.
     - `reset()` runs on every power-on. It resets these fields, **removes procedures from FPL 0 when the unit was off
@@ -664,9 +679,11 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `Input.Airdata.{IsInterfaced=false, BaroSource=0}`
     - `Input.FuelComputer.{IsInterfaced=false, Unit=GAL, Type=AVGAS, FOBTransmitted=true, FuelUsedTransmitted=true}`
     - `Input.ExternalSwitches.{LegObsSwitchInstalled=false, AppArmSwitchInstalled=false}`
-    - `Output.{ObsTarget=0, AltitudeAlertEnabled=true, WriteGPSSimVars=true}`
+    - `Output.{ObsTarget=0, AltitudeAlertEnabled=false, WriteGPSSimVars=true}` (`AltitudeAlertEnabled` was true before
+      #141)
     - `debugMode` = false (hard-coded)
-- Note that the sample `cfg/panel.xml` sets `AltitudeAlertEnabled=false`, while the code default is true.
+- The sample `cfg/panel.xml` sets `AltitudeAlertEnabled=false`, the default. An aircraft that wants the altitude alerter
+  sets it to true and declares the `kln_short_beep` and `kln_long_beep` sounds.
 - After parsing it writes the runtime-override LVars (Core 4). An `ElectricitySimVar` like `CIRCUIT ON:1` has its
   index replaced every 100 ms by `L:KLN90B_ElectricitySimVarIndex`.
 - `KLN90PlaneSettings` is **mutable at runtime** through `SimVarSync`; code reads `planeSettings.input/output.*` live.
@@ -686,14 +703,21 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `MessageHandler` (a 1 Hz tickable) keeps `activeMessages`. Each tick it drops invalid messages, adds
       `persistentMessages` whose condition becomes true, and resets their `seen` flag when the condition goes false.
       `KLN90BCore` calls `clear()` at every power-off (also a loss of electricity): the active messages go and the
-      persistent ones return once their condition holds. They return unread, which is this project's choice and not a
-      fact from the manuals.
+      persistent ones return once their condition holds. A read one returns read, because `clear()` keeps the `seen`
+      flags (the maintainer's ruling, #351); one whose condition lapsed meanwhile is reset by the tick. `clear()` calls
+      the optional `onPowerOff()` of each persistent message, for one that keeps state of the power-on in which it was
+      posted.
+    - `DatabaseOutOfDateMessage` latches at the change from current to expired (a SET 2 or self-test date, the GPS
+      correcting the date, the end passing in flight) and holds until it is seen; its `onPowerOff()` drops the latch and
+      the last validity, so a power-up with the date already past the end posts nothing (#175; KLN 89 trainer,
+      2026-10-18).
     - Messages are added with `messageHandler.addMessage(new OneTimeMessage(["LINE1","LINE2"]))`; each line holds at
       most about 22 to 23 characters.
 - `buildPersistentMessages(props)` creates: `AltitudeFailMessage`, `ArmGPSApproachMessage`, `DatabaseOutOfDateMessage`,
   `IfRequiredSelectObsMessage`, `MagvarMessage`, `Obs200NMMessage`, `PressAltToSetBaroMessage`, `VnavAlertMessage`, plus
   `AdjustCourseToWithObsReadingMessage` (`ADJ NAV IND CRS TO xxx°`) when `obsTarget===0`, otherwise
-  `AdjustCourseMessage`.
+  `AdjustCourseMessage`. The former is not evaluated before the self-test is approved, and it takes the course at its
+  first evaluation after the approval as the start, not as a DTK change that opens its 30 s window (#330).
 - The MSG page (`controls/MessagePage.tsx`) shows newest first. `controls/StatusLine.tsx` shows the `MSG` indicator and
   drives `L:KLN90B_MsgLight` in the display tick: flashing while unread, steady while read, off when empty.
 - **Status-line transient messages** are a separate channel. Publish `statusLineMessage` (`StatusLineMessageEvents`)
@@ -841,7 +865,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - `subPageIndices` remembers the last sub-page per group.
 - `createPage(type)` = `new type(this.props)`. **Pages are recreated on every knob step.** Instance state is lost, so
   durable state lives in `props.memory` (`VolatileMemory`: `aptPage`, `vorPage`, `ndbPage`, `intPage`, `supPage`,
-  `navPage`, `fplPage`, `dtPage`, `triPage`, `altPage`, ...) or in `userSettings`.
+  `navPage`, `fplPage`, `dtPage`, `triPage`, ...) or in `userSettings` (the ALT page's ALERT and WARN, #259).
 - The tree position is found with `instanceof` (`getPageIndices`). Every slot must therefore be a *distinct class*. That
   is why `Fpl0Page...Fpl25Page` are trivial subclasses of `FplPage({page:n})`, and why NAV 4 is split into
   `Nav4LeftPage`/`Nav4RightPage` (they differ in `getPageSide()`). Nav1/2/3/5 are the same classes in both trees.
@@ -952,7 +976,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   Toggling `isReadonly` (or `setVisible` on a `Button`) therefore adds or removes a field live.
 - **Cursor order = depth-first insertion order of the children map.** Declaring children in a different order changes
   the CRSR sequence. Nested sub-page children (e.g. `Apt2Page.dbPage/userPage`) are included.
-- `toggleCursor()` returns false when there are no fields. The cursor does not remember where it was: each time it
+- `toggleCursor()` returns false when there are no fields, while `setCursorActive(true)` throws then. A page that turns
+  its cursor on when it opens checks first that a field can take it (`AltPage` with the air data baro and altitude
+  alerting disabled opens with the cursor off, #399). The cursor does not remember where it was: each time it
   comes on, `setCursorActive` starts it on the page's start field (`setDefaultCursorField(n)`,
   `setDefaultCursorFieldToLast()`), or on the field `setStartFieldProvider` names, which the list pages use for the top
   visible entry of a scrolled list (`List.topVisibleField`, #355). `focusIndex(i)` moves a cursor that is on.

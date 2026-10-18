@@ -1,10 +1,13 @@
 import {describe, expect, it} from 'vitest';
+import {EventBus} from '@microsoft/msfs-sdk';
 import {AltAlert} from '../../../kln90b/services/AltAlert';
 import {VolatileMemory} from '../../../kln90b/data/VolatileMemory';
 import {KLN90PlaneSettings} from '../../../kln90b/settings/KLN90BPlaneSettings';
 import {Sensors} from '../../../kln90b/Sensors';
+import {KLN90BUserSettings} from '../../../kln90b/settings/KLN90BUserSettings';
 
-// 3-55 to 3-57: altitude alerting. ALERT ON/OFF and WARN live on the ALT page (memory.altPage), SEL on NAV 4
+// 3-55 to 3-57: altitude alerting. ALERT ON/OFF and WARN are set on the ALT page and kept in the user settings
+// altAlertEnabled and altAlertWarn (#259), SEL on NAV 4
 // (memory.navPage.nav4SelectedAltitude), IND is the indicated altitude. Tones: three short 1000 ft before SEL, two short
 // on reaching it, four short on a deviation of more than WARN, which is armed only by the "reached" alert (3-56).
 // The service is ticked once per second; the test calls tick() once per altitude.
@@ -15,14 +18,19 @@ interface Rig {
     tones: number[];
     /** Sets IND and runs one calculation tick */
     at: (indFt: number | null) => void;
-    memory: { altPage: { alertEnabled: boolean, alertWarn: number }, navPage: { nav4SelectedAltitude: number } };
+    memory: { navPage: { nav4SelectedAltitude: number } };
+    /** The ALT page's ALERT and WARN (#259) */
+    userSettings: KLN90BUserSettings;
 }
 
 function rig(opts: { sel: number, warn?: number, alertEnabled?: boolean, installed?: boolean }): Rig {
     const memory = {
-        altPage: {alertEnabled: opts.alertEnabled ?? true, alertWarn: opts.warn ?? 300},
         navPage: {nav4SelectedAltitude: opts.sel},
     };
+    // #259: ALERT and WARN are user settings. The rig's own bus keeps the tests of this file apart
+    const userSettings = new KLN90BUserSettings(new EventBus());
+    userSettings.getSetting('altAlertEnabled').set(opts.alertEnabled ?? true);
+    userSettings.getSetting('altAlertWarn').set(opts.warn ?? 300);
     let ind: number | null = null;
     const tones: number[] = [];
     const sensors = {
@@ -30,9 +38,9 @@ function rig(opts: { sel: number, warn?: number, alertEnabled?: boolean, install
         out: {audioGenerator: {shortBeeps: (n: number) => tones.push(n)}},
     } as unknown as Sensors;
     const settings = {output: {altitudeAlertEnabled: opts.installed ?? true}} as unknown as KLN90PlaneSettings;
-    const alert = new AltAlert(memory as unknown as VolatileMemory, settings, sensors);
+    const alert = new AltAlert(memory as unknown as VolatileMemory, settings, sensors, userSettings);
     return {
-        alert, tones, memory, at: (v) => {
+        alert, tones, memory, userSettings, at: (v) => {
             ind = v;
             alert.tick();
         },
@@ -167,7 +175,7 @@ describe('AltAlert', () => {
     it('gives three tones at once when switched on within 1000 ft of SEL (characterization)', () => {
         const r = rig({sel: 5000, alertEnabled: false});
         r.at(4500);
-        r.memory.altPage.alertEnabled = true;
+        r.userSettings.getSetting('altAlertEnabled').set(true);
         r.at(4500);
         expect(r.tones).toEqual([3]);
     });

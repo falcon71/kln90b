@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
+import {bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {approachWorld} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
 import {AIRDATA, APR_ARM_SWITCH, NO_ALTIMETER, panelXml, VFR_ONLY} from '../../harness/panelXml';
@@ -103,31 +103,48 @@ describe('PRESS ALT TO SET BARO (6-8, B-3)', () => {
     });
 });
 
+const DB_TEXT = 'DATA BASE OUT OF DATE ALL DATA MUST BE CONFIRMED BEFORE USE';
+
+/** How often the data base message is listed */
+const dbCopies = (unit: HeadlessUnit) => messages(unit).filter(m => m === DB_TEXT).length;
+
+/** How often the message is listed, at every display tick over two seconds */
+async function countsOverTwoSeconds(unit: HeadlessUnit): Promise<number[]> {
+    const counts: number[] = [];
+    for (let i = 0; i < 8; i++) {
+        counts.push(dbCopies(unit));
+        await vi.advanceTimersByTimeAsync(250);
+    }
+    return counts;
+}
+
+/**
+ * A unit whose GPS has no fix yet, so that the SET 2 date and time can be entered (3-53), with SET 2 shown and the
+ * cursor on the date. A booted unit has a fix at once, and the date is read-only with a fix
+ */
+async function onSet2(start?: Date): Promise<HeadlessUnit> {
+    const unit = await bootUnit({storage: {fastGpsAcquisition: false}, coldGps: true, start});
+    await unit.panel.selectPage('L', 'SET 2');
+    await unit.panel.cursor('L');
+    return unit;
+}
+
+/** Enters a date on SET 2 (the steps of enterDate, as in Set2Page.test.ts), then ENT */
+async function set2Date(unit: HeadlessUnit, day: number, month: number, year: [number, number], expected: string) {
+    await unit.panel.cursorTo('L', Screen.read().rows('L')[2].trim());
+    await unit.panel.enterDate('L', day, month, year);
+    expect(Screen.read().rows('L')[2]).toBe(`  ${expected}`);
+    await unit.panel.ent();
+}
+
+/** Enters 01 JAN 27 on SET 2, after the expiration of the data base */
+async function outOfDateBySet2() {
+    const unit = await onSet2();
+    await set2Date(unit, 1, 1, [2, 7], '01 JAN 27');
+    return unit;
+}
+
 describe('DATA BASE OUT OF DATE after a date entered on SET 2 (B-2)', () => {
-    /** Enters 01 JAN 27 on SET 2, after the expiration of the data base (the steps of enterDate, as in Set2Page.test.ts) */
-    async function outOfDateBySet2() {
-        // A booted unit has a fix at once, and the date is read-only with a fix
-        const unit = await bootUnit({storage: {fastGpsAcquisition: false}, coldGps: true});
-        await unit.panel.selectPage('L', 'SET 2');
-        await unit.panel.cursor('L');
-        await unit.panel.enterDate('L', 1, 1, [2, 7]);
-        expect(Screen.read().rows('L')[2]).toBe('  01 JAN 27');
-        await unit.panel.ent();
-        return unit;
-    }
-
-    const DB_TEXT = 'DATA BASE OUT OF DATE ALL DATA MUST BE CONFIRMED BEFORE USE';
-
-    /** How often the message is listed, at every display tick over two seconds */
-    async function countsOverTwoSeconds(unit: HeadlessUnit): Promise<number[]> {
-        const counts: number[] = [];
-        for (let i = 0; i < 8; i++) {
-            counts.push(messages(unit).filter(m => m === DB_TEXT).length);
-            await vi.advanceTimersByTimeAsync(250);
-        }
-        return counts;
-    }
-
     // The sibling of the pin: the message is posted and stays, unread
     it('posts the message and keeps it unread (B-2)', async () => {
         const unit = await outOfDateBySet2();
@@ -137,11 +154,108 @@ describe('DATA BASE OUT OF DATE after a date entered on SET 2 (B-2)', () => {
         expect(unit.props.messageHandler.hasUnreadMessages()).toBe(true);
     });
 
-    // B-2 names one message. The one-time message of Database.onGPSAcquired and the persistent DatabaseOutOfDateMessage
-    // both fire, so for one calculation tick the MSG page lists it twice
-    it.fails('lists the message once (B-2) (#175)', async () => {
+    // B-2 names one message. Before #175 the one-time message of Database.onGPSAcquired and the persistent
+    // DatabaseOutOfDateMessage both fired, so for one calculation tick the MSG page listed it twice
+    it('lists the message once (B-2) (#175)', async () => {
         const unit = await outOfDateBySet2();
 
         expect(Math.max(...await countsOverTwoSeconds(unit))).toBe(1);
+    });
+});
+
+describe('DATA BASE OUT OF DATE after a date entered on the self-test page (B-2, 3-16)', () => {
+    // B-2 lists the message after a date entered at the self-test. The self-test entry publishes no time update, so the
+    // persistent message is the one source; 3-16 keeps a message until it is read. Before #175 it was gone a second later, unread
+    it('posts the message and keeps it unread through the approval (B-2, 3-16)', async () => {
+        const unit = await bootToSelfTest({storage: {fastGpsAcquisition: false}});
+        await unit.panel.cursorTo('R', '01 JUN 26');
+        await unit.panel.enterDate('R', 1, 1, [2, 7]);
+        expect(Screen.read().text()).toContain('01 JAN 27'); // Precondition: the date as entered
+        await unit.panel.ent();
+        expect(await countsOverTwoSeconds(unit)).toEqual([1, 1, 1, 1, 1, 1, 1, 1]);
+
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(dbCopies(unit)).toBe(1);
+        expect(unit.props.messageHandler.getMessages().find(m => m.message.join(' ') === DB_TEXT)!.seen).toBe(false);
+    });
+});
+
+// Checked in the KLN 89 trainer, 2026-10-18: a SET 2 date after the end of the data base made the message prompt flash
+// and the message page list the message once; after it was read the prompt was gone and the page showed no message.
+// With the date already after the end at power-up, and after a SET 2 date moved back into the period, no message
+describe('DATA BASE OUT OF DATE (checked in the KLN 89 trainer, 2026-10-18)', () => {
+    it('is listed once, and gone once it is read (checked in the KLN 89 trainer, 2026-10-18) (#175)', async () => {
+        const unit = await outOfDateBySet2();
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(dbCopies(unit)).toBe(1);
+
+        const read = await unit.panel.readMessages();
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(read).toContain('DATA BASE OUT OF DATE'); // Precondition: the MSG page showed it
+        expect(dbCopies(unit)).toBe(0);
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
+        expect(unit.props.database.isAiracCurrent()).toBe(false); // The data base is still out of date
+    });
+
+    it('is not posted with the date already past the end at power-up, nor when SET 2 moves it back into the period (checked in the KLN 89 trainer, 2026-10-18)', async () => {
+        const unit = await onSet2(new Date('2026-07-01T12:00:00Z'));
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(unit.props.database.isAiracCurrent()).toBe(false); // Precondition: past the end from the start
+        expect(dbCopies(unit)).toBe(0);
+
+        await set2Date(unit, 1, 6, [2, 6], '01 JUN 26');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.props.database.isAiracCurrent()).toBe(true);
+        expect(dbCopies(unit)).toBe(0);
+    });
+});
+
+// The maintainer's ruling (#175): one copy on every path, and none when the validity of the data base did not change.
+// Before the fix every SET 2 entry past the end added a copy
+describe('DATA BASE OUT OF DATE, one copy (#175)', () => {
+    // The maintainer's ruling (#176): the unit loses its messages at the power-off. The date is still past the end at
+    // the power-on, where the KLN 89 check of 2026-10-18 showed no message; it did not try an unread message over the
+    // power cycle, so the title cites the issues only
+    it('is not listed again after a power cycle with the message unread (#175, #176)', async () => {
+        const unit = await outOfDateBySet2();
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(dbCopies(unit)).toBe(1); // Precondition: listed, unread
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(true);
+
+        await unit.panel.powerCycle();
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.props.database.isAiracCurrent()).toBe(false); // Precondition: still past the end
+        expect(dbCopies(unit)).toBe(0);
+    });
+
+    it('lists one copy after a second SET 2 date past the end (#175)', async () => {
+        const unit = await outOfDateBySet2();
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(dbCopies(unit)).toBe(1); // Precondition
+
+        await set2Date(unit, 1, 2, [2, 7], '01 FEB 27');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(dbCopies(unit)).toBe(1);
+    });
+
+    it('lists none after SET 2 time entries while the date is already past the end (#175)', async () => {
+        const unit = await onSet2(new Date('2026-07-01T12:00:00Z'));
+        await vi.advanceTimersByTimeAsync(2000);
+        for (let n = 0; n < 2; n++) {
+            await unit.panel.cursorTo('L', Screen.read().rows('L')[3].slice(0, 5));
+            await unit.panel.inner('L', 1); // Opens the entry on hour 00
+            await unit.panel.ent();
+            await vi.advanceTimersByTimeAsync(3000);
+        }
+
+        expect(unit.props.sensors.in.gps.timeZulu.getHours()).toBe(0); // Precondition: the entries were taken
+        expect(dbCopies(unit)).toBe(0);
     });
 });

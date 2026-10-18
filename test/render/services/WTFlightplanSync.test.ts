@@ -1,4 +1,4 @@
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, onTestFinished, vi} from 'vitest';
 import {
     FixTypeFlags,
     FlightPlan,
@@ -294,6 +294,119 @@ describe('the "kln90b" flight planner on the standard route', () => {
     });
 });
 
+// The Hot Swapping wiki page and the doc comment of Hardware.isDisabled: a unit disabled for hot swapping writes no
+// outputs, the "kln90b" planner included, whatever asks for the sync (#398). The planner was not written meanwhile, so
+// the resume mirrors FPL 0 once, when Output.WriteGPSSimVars is on
+describe('the "kln90b" flight planner while the unit is disabled for hot swapping (public contract)', () => {
+    const {kaaa, abc} = standardRoute();
+    const xray = intersection('XRAY', 47.2, 8.7);
+    const bootOnRoute = (xml?: string) => bootOnStandardRoute({facilities: [xray], position: pointBefore(kaaa, abc, 20), panelXml: xml});
+
+    async function setDisabled(unit: HeadlessUnit, disabled: boolean): Promise<void> {
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', disabled);
+        await vi.advanceTimersByTimeAsync(300);
+    }
+
+    // The sibling is 'mirrors FPL 0 at once when L:KLN90B_WriteGpsSimvars goes from 0 to 1' above
+    it('writes nothing when L:KLN90B_WriteGpsSimvars goes from 0 to 1 while disabled (#398)', async () => {
+        const unit = await bootOnRoute(NO_GPS_SIMVARS_XML);
+        await setDisabled(unit, true);
+
+        unit.env.sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
+    });
+
+    // The sibling is 'follows an edit of FPL 0' above
+    it('does not mirror a change of FPL 0 while disabled (#398)', async () => {
+        const unit = await bootOnRoute();
+        await setDisabled(unit, true);
+
+        insertLeg(unit, 2, xray);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'ABC', 'XRAY', 'KBBB']);
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(['KAAA', 'ABC', 'KBBB']);
+    });
+
+    // The maintainer's ruling: the gates read Hardware.isDisabled, never the LVar. The planner gate runs on an edit of
+    // FPL 0 and on the option going on: one second of polls, ten of them, and no read of its own
+    it('reads L:KLN90B_Disabled only in the poll, also when FPL 0 changes and the option toggles (#398)', async () => {
+        const unit = await bootOnRoute();
+        await setDisabled(unit, true);
+        const read = vi.spyOn(SimVar, 'GetSimVarValue');
+        onTestFinished(() => read.mockRestore()); // A second spyOn on the method would return this one with its calls
+
+        insertLeg(unit, 2, xray);
+        await vi.advanceTimersByTimeAsync(500);
+        unit.env.sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
+        await vi.advanceTimersByTimeAsync(200);
+        unit.env.sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(read.mock.calls.filter(c => c[0] === 'L:KLN90B_Disabled').length).toBe(10);
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(['KAAA', 'ABC', 'KBBB']); // Precondition: nothing was written
+    });
+
+    // sequenceToNextWaypoint publishes activeWaypointChanged without flightplanChanged, so this is the third entry into the
+    // sync. The sibling is 'stops mirroring the active leg when L:KLN90B_WriteGpsSimvars goes to 0' above
+    it('does not mirror a change of the active waypoint while disabled, and mirrors it on the resume (#398)', async () => {
+        const unit = await bootOnRoute();
+        const plan = plannerOf(unit).getFlightPlan(0);
+        expect(plan.activeLateralLeg).toBe(1); // Precondition: ABC, mirrored
+        await setDisabled(unit, true);
+
+        unit.props.memory.navPage.activeWaypoint.sequenceToNextWaypoint();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(activeIdent(unit)).toBe('KBBB'); // Precondition: the unit has sequenced
+        expect(plan.activeLateralLeg).toBe(1); // Not rewritten
+
+        await setDisabled(unit, false);
+
+        expect(plan.activeLateralLeg).toBe(2); // KBBB, mirrored on the resume
+    });
+
+    it('mirrors FPL 0 once on the resume (#398)', async () => {
+        const unit = await bootOnRoute();
+        await setDisabled(unit, true);
+        insertLeg(unit, 2, xray);
+        await vi.advanceTimersByTimeAsync(1000);
+        const planner = plannerOf(unit);
+        const writes = vi.spyOn(planner, 'getFlightPlan'); // WTFlightplanSync.writeFpl0 gets plan 0 once per write
+
+        await setDisabled(unit, false);
+
+        expect(writes).toHaveBeenCalledTimes(1);
+        expect(identsOf(planner.getFlightPlan(0))).toEqual(['KAAA', 'ABC', 'XRAY', 'KBBB']);
+    });
+
+    it('mirrors FPL 0 on the resume after the option went on while disabled (#398)', async () => {
+        const unit = await bootOnRoute(NO_GPS_SIMVARS_XML);
+        await setDisabled(unit, true);
+        unit.env.sim.set('L:KLN90B_WriteGpsSimvars', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        await setDisabled(unit, false);
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(['KAAA', 'ABC', 'KBBB']);
+    });
+
+    // With Output.WriteGPSSimVars off the unit does not write the planner (#142), and the resume does not either
+    it('writes nothing on the resume when L:KLN90B_WriteGpsSimvars went to 0 while disabled (#398)', async () => {
+        const unit = await bootOnRoute();
+        await setDisabled(unit, true);
+        unit.env.sim.set('L:KLN90B_WriteGpsSimvars', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+        insertLeg(unit, 2, xray);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        await setDisabled(unit, false);
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(['KAAA', 'ABC', 'KBBB']);
+    });
+});
+
 describe('the "kln90b" flight planner behind a fence', () => {
     // The VOR 36 of KDST as in ActiveWaypoint.test.ts (#41): the VOR VVV is the FAF 5 NM south of the MAP and the missed
     // approach holding point, so the missed approach is VVV again
@@ -445,8 +558,11 @@ describe('the "kln90b" flight planner behind a fence', () => {
 // #347: a procedure removed from FPL 0 is removed from the planner mirror too. Public contract (CLAUDE.md, "Public
 // contract with aircraft"; the wiki page Accessing the Flight Plan): plan 0 always matches FPL 0.
 describe('the "kln90b" flight planner after a procedure leaves FPL 0', () => {
-    /** FPL 0 of ENRBB, ENRAA and KPRC with the APT 8 approach loaded; the approach legs precede the airport */
-    async function bootWithApproach(): Promise<HeadlessUnit> {
+    /**
+     * FPL 0 of ENRBB, ENRAA and KPRC with the APT 8 approach loaded; the approach legs precede the airport. `power`
+     * powers the unit through Input.ElectricitySimVar CIRCUIT ON:1, on at the boot
+     */
+    async function bootWithApproach(power?: 'circuit'): Promise<HeadlessUnit> {
         const iafaa = intersection('IAFAA', 47.3, 7.7);
         const ifaaa = intersection('IFAAA', 47.2, 7.8);
         const fafaa = intersection('FAFAA', 47.1, 7.9);
@@ -464,7 +580,9 @@ describe('the "kln90b" flight planner after a procedure leaves FPL 0', () => {
         });
         const unit = await bootUnit({
             facilities: [kprc, iafaa, ifaaa, fafaa, mapaa, mahaa, enraa, enrbb], position: {lat: 47.9, lon: 7.1},
-            storage: savedFlightplan(0, [enrbb, enraa, kprc]), panelXml: panelXml(APR_ARM_SWITCH),
+            storage: savedFlightplan(0, [enrbb, enraa, kprc]),
+            panelXml: panelXml(power === 'circuit' ? {...APR_ARM_SWITCH, 'Input.ElectricitySimVar': 'CIRCUIT ON:1'} : APR_ARM_SWITCH),
+            simVars: power === 'circuit' ? [{name: 'CIRCUIT ON:1', unit: 'bool', value: 1}] : [],
         });
         await settle(unit);
         await unit.panel.loadProcedure('APT 8');
@@ -515,5 +633,26 @@ describe('the "kln90b" flight planner after a procedure leaves FPL 0', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(MIRRORED_APPROACH);
+    });
+
+    // #398: a unit disabled for hot swapping writes no outputs. Its power follows the circuit (it ignores the power H
+    // events, #138), and the power-on after more than 5 minutes off removes the approach from FPL 0 (6-5, 6-23) while it
+    // is disabled. The planner keeps the approach until the resume mirrors FPL 0
+    it('mirrors the removal of the approach at the power-on only when the unit is put back (#398)', async () => {
+        const unit = await bootWithApproach('circuit');
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(360_000);
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(fplIdents(unit)).toEqual(['ENRBB', 'ENRAA', 'KPRC']); // FPL 0 has lost the approach
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(MIRRORED_APPROACH);
+
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(['ENRBB', 'ENRAA', 'KPRC']);
     });
 });

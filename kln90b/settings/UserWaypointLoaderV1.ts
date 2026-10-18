@@ -267,7 +267,9 @@ export class UserWaypointLoaderV1 implements UserWaypointLoader {
 
     private deserializeLon(str: string): number {
         const sign = str.substring(20, 21) == '-' ? -1 : 1;
-        const degrees = Number(str.substring(22, 24));
+        //#101: the three degree digits follow the sign at 20 (the 1.x serializer wrote them with "+000"). Unlike V2, the
+        //slice never held the sign
+        const degrees = Number(str.substring(21, 24));
         const minutes = Number(str.substring(24, 29)) / 60;
 
         return sign * (degrees + minutes);

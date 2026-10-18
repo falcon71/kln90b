@@ -32,9 +32,9 @@ export function buildPersistentMessages(props: PageProps): Message[] {
     ];
 
     if (props.planeSettings.output.obsTarget === 0) {
-        messages.push(new AdjustCourseToWithObsReadingMessage(props.sensors, props.modeController));
+        messages.push(new AdjustCourseToWithObsReadingMessage(props.sensors, props.modeController, props.memory.navPage));
     } else {
-        messages.push(new AdjustCourseMessage(props.sensors));
+        messages.push(new AdjustCourseMessage(props.sensors, props.memory.navPage));
     }
 
     return messages;
@@ -49,15 +49,30 @@ class AdjustCourseToWithObsReadingMessage implements Message {
 
     private lastCourse: number | null = null;
     private validUntil: number = 0;
+    private atStartUp = true; //Until the first evaluation after the self-test is approved (#330)
 
 
-    constructor(private readonly sensors: Sensors, private readonly modeController: ModeController) {
+    constructor(private readonly sensors: Sensors, private readonly modeController: ModeController, private readonly navState: NavPageState) {
     }
 
 
     public isConditionValid(): boolean {
+        if (!this.navState.isSelfTestApproved) {
+            //#330: not evaluated before the self-test is approved, neither on the Turn-On page nor on the self-test page,
+            //whose fixed course is part of the check and not a course to set (figure 3-4)
+            this.atStartUp = true;
+            return false;
+        }
+
         //This message has two conditions. They must both be here, otherwise this message could be shown twice
         const dtk = this.modeController.getDtkOrObsMagnetic();
+        if (this.atStartUp) {
+            //#330: the course at the approval is where the unit starts, not a DTK change, so it opens no 30 s window,
+            //and a window from before the power-off is over
+            this.atStartUp = false;
+            this.forceShow = false;
+            this.lastCourse = dtk;
+        }
         if (dtk === null || this.modeController.isObsModeActive()) {
             return false;
         }
@@ -95,10 +110,16 @@ class AdjustCourseMessage implements Message {
     public seen: boolean = false;
 
 
-    constructor(private readonly sensors: Sensors) {
+    constructor(private readonly sensors: Sensors, private readonly navState: NavPageState) {
     }
 
     public isConditionValid(): boolean {
+        if (!this.navState.isSelfTestApproved) {
+            //#330: not evaluated before the self-test is approved, as for the readable indicator. The self-test page
+            //sends its fixed course (figure 3-4) to a driven indicator, which reads it back one tick later
+            return false;
+        }
+
         if (this.sensors.out.obsOut === null || this.sensors.in.obsMag === null) {
             return false;
         }
@@ -140,11 +161,17 @@ class ArmGPSApproachMessage implements Message {
     }
 }
 
+/**
+ * B-2: posted when the data base becomes out of date while the unit is on: a date entered on SET 2 or the self-test
+ * page, the GPS correcting the date, or the end of the data base passing in flight. It is the only source of this
+ * message (#175).
+ */
 class DatabaseOutOfDateMessage implements Message {
 
     public message: string[] = ["DATA BASE OUT OF DATE", "ALL DATA MUST BE", "CONFIRMED BEFORE USE"];
     public seen: boolean = false;
     private wasValid: boolean = false;
+    private latched: boolean = false;
 
     constructor(private readonly daabase: Database) {
     }
@@ -152,11 +179,26 @@ class DatabaseOutOfDateMessage implements Message {
 
     public isConditionValid(): boolean {
         const dbValidNow = this.daabase.isAiracCurrent();
-        const showMessage = this.wasValid && !dbValidNow;
-
+        if (this.wasValid && !dbValidNow) {
+            //3-16: it stays until the pilot has read it. MessageHandler.tick asks a listed message twice per tick, so the
+            //change from current to expired sets a latch instead of being the condition itself (#175)
+            this.latched = true;
+        }
         this.wasValid = dbValidNow;
 
-        return showMessage;
+        if (this.seen) {
+            //Gone once read; only a new change from current to expired brings it back (KLN 89 trainer, 2026-10-18)
+            this.latched = false;
+        }
+
+        return this.latched;
+    }
+
+    public onPowerOff(): void {
+        //A date already past the end at power-up posts nothing (KLN 89 trainer, 2026-10-18), so the next power-on
+        //starts as the first one did (#175)
+        this.latched = false;
+        this.wasValid = false;
     }
 }
 

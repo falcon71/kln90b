@@ -10,7 +10,7 @@ import {SevenLinePage} from '../../kln90b/pages/OneSegmentPage';
 import {ErrorEvent} from '../../kln90b/controls/ErrorPage';
 import {simEnv, SimEnvironment} from './sim/install';
 import {DEFAULT_NAVDATA_RANGE, startFakeClock} from './sim/clock';
-import {seedRandom} from './sim/random';
+import {mulberry32, seedRandom} from './sim/random';
 import {MemoryFacilityClient} from './navdata/MemoryFacilityClient';
 import {FakePlatform, FakeRouteManager} from './platform';
 import {FrontPanel} from './flight/FrontPanel';
@@ -52,6 +52,7 @@ export interface BootOptions {
      * OF DATE message, MSG lit). A unit test that needs another cycle clears that cache and sets the game var itself.
      */
     start?: Date;
+    /** The seed of Math.random (sim/random.ts); the sequence starts again from it once the user settings are built. Default 1 */
     seed?: number;
     atcModel?: string;
     /**
@@ -210,7 +211,8 @@ function prepareBoot(opts: BootOptions): PreparedBoot {
 
     const env = simEnv();
     startFakeClock(opts.start);
-    const randomSpy = seedRandom(opts.seed ?? 1);
+    const seed = opts.seed ?? 1;
+    const randomSpy = seedRandom(seed);
     state.restoreRandom = () => randomSpy.mockRestore();
 
     const model = opts.atcModel ?? 'KLN TEST';
@@ -272,6 +274,10 @@ function prepareBoot(opts: BootOptions): PreparedBoot {
 
     const efb = opts.efb ? new FakeRouteManager() : undefined;
     const core: KLN90BCore = new KLN90BCore(new FakePlatform(navdata, efb, opts.platform), args => core.onInteractionEvent(args));
+    // The constructor built the user settings, and the SDK's UserSetting draws Math.random once per setting. Starting
+    // the sequence again here keeps every later draw (the GPS jitter and start times) independent of the number of
+    // setting keys, so a new key does not move the seeded tests
+    randomSpy.mockImplementation(mulberry32(seed));
     core.bus.getSubscriber<ErrorEvent>().on('error').handle(e => errors.push(e));
 
     // Registered after the teardown. Vitest runs onTestFinished callbacks last registered first, so this check runs while

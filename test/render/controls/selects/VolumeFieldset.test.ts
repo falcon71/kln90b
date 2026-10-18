@@ -2,6 +2,10 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {storedSetting} from '../../../harness/storage';
+import {ALTITUDE_ALERT, panelXml} from '../../../harness/panelXml';
+
+// #141: the parser default of Output.AltitudeAlertEnabled is false, so a test that needs the altitude alerter states it
+const ALERT_INSTALLED = panelXml(ALTITUDE_ALERT(true));
 
 // VolumeFieldset: the alert volume 00 to 99 in two digit cells. Its only host is SET 9 (3-57), row 4, saved as the
 // setting altAlertVolume. SelectField.test.ts holds the generic rules of a cell on the same page (wrap, keyboard, CLR,
@@ -10,7 +14,7 @@ import {storedSetting} from '../../../harness/storage';
 describe('volume fieldset', () => {
     // 3-57 (figure 3-181): the two digits are two cursor positions; the outer knob stops on the units (4-3, #218)
     it('visits the tens and the units of the volume (3-57)', async () => {
-        const unit = await bootUnit({storage: {altAlertVolume: 37}});
+        const unit = await bootUnit({panelXml: ALERT_INSTALLED, storage: {altAlertVolume: 37}});
         await unit.panel.selectPage('L', 'SET 9');
         await unit.panel.cursor('L');
         const seen = [unit.panel.focused('L')];
@@ -25,7 +29,7 @@ describe('volume fieldset', () => {
     // 3-57: a volume between 00 and 99, digit by digit: 37 to 52, the units first so that a tens digit that overwrote
     // the units would show
     it('takes 52 digit by digit (3-57)', async () => {
-        const unit = await bootUnit({storage: {altAlertVolume: 37}});
+        const unit = await bootUnit({panelXml: ALERT_INSTALLED, storage: {altAlertVolume: 37}});
         await unit.panel.selectPage('L', 'SET 9');
         await unit.panel.cursor('L');
         await unit.panel.outer('L', 1);
@@ -47,7 +51,7 @@ describe('volume fieldset', () => {
     // Checked in the KLN 89 trainer, 2026-10-08, T4: a digit at the end of its list wraps in both directions. The units
     // digit of 37 turned up 3 clicks is 0 (30), and down one click is 9 (39)
     it('wraps the units digit of the volume (checked in the KLN 89 trainer, 2026-10-08, T4)', async () => {
-        const unit = await bootUnit({storage: {altAlertVolume: 37}});
+        const unit = await bootUnit({panelXml: ALERT_INSTALLED, storage: {altAlertVolume: 37}});
         await unit.panel.selectPage('L', 'SET 9');
         await unit.panel.cursor('L');
         await unit.panel.outer('L', 1);
@@ -60,7 +64,7 @@ describe('volume fieldset', () => {
 
     // 3-57: 00 is the lowest volume and a valid entry
     it('takes the lowest volume 00 (3-57)', async () => {
-        const unit = await bootUnit({storage: {altAlertVolume: 10}});
+        const unit = await bootUnit({panelXml: ALERT_INSTALLED, storage: {altAlertVolume: 10}});
         await unit.panel.selectPage('L', 'SET 9');
         await unit.panel.cursor('L');
         await unit.panel.inner('L', -1);

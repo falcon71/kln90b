@@ -21,13 +21,7 @@ const DEFAULTS = {
         fuelComputer: {isInterfaced: false, unit: 'GAL', type: 'Avgas', fobTransmitted: true, fuelUsedTransmitted: true},
         externalSwitches: {legObsSwitchInstalled: false, appArmSwitchInstalled: false},
     },
-    output: {obsTarget: 0, writeGPSSimVars: true},
-};
-
-/** The parsed settings without altitudeAlertEnabled, whose default is the pinned bug (#141) */
-const withoutAltAlert = (s: KLN90PlaneSettings) => {
-    const {altitudeAlertEnabled, ...output} = s.output;
-    return {...s, output};
+    output: {obsTarget: 0, altitudeAlertEnabled: false, writeGPSSimVars: true},
 };
 
 /** A deep copy of DEFAULTS with the field at the dotted path changed */
@@ -78,12 +72,21 @@ describe('panel.xml parser', () => {
         it('parses to the defaults, except the electricity SimVar', () => {
             const settings = parse(sample);
 
-            expect(withoutAltAlert(settings)).toEqual(withField('input.electricitySimVar', 'CIRCUIT ON:1'));
+            expect(settings).toEqual(withField('input.electricitySimVar', 'CIRCUIT ON:1'));
             expect(typeof settings.input.obsSource).toBe('number');
         });
 
         it('disables the altitude alert, as the sample says', () => {
             expect(parse(sample).output.altitudeAlertEnabled).toBe(false);
+        });
+
+        // false is the parser default (#141), so the test above passes even if the sample loses or misspells the key.
+        // Setting the value in the sample's own text to true shows that the sample carries the key the parser reads
+        it('carries the AltitudeAlertEnabled key the parser reads', () => {
+            const tag = '<AltitudeAlertEnabled>false</AltitudeAlertEnabled>';
+            expect(sample.split(tag).length - 1).toBe(1);
+
+            expect(parse(sample.replace(tag, '<AltitudeAlertEnabled>true</AltitudeAlertEnabled>')).output.altitudeAlertEnabled).toBe(true);
         });
 
         it('writes the electricity index of the sample as 1', () => {
@@ -96,7 +99,7 @@ describe('panel.xml parser', () => {
     // Contract: what an aircraft gets for every key it omits (wiki: panel.xml customization)
     describe('defaults', () => {
         it('are all defaults for an empty PlaneHTMLConfig', () => {
-            expect(withoutAltAlert(parse('<PlaneHTMLConfig></PlaneHTMLConfig>'))).toEqual(DEFAULTS);
+            expect(parse('<PlaneHTMLConfig></PlaneHTMLConfig>')).toEqual(DEFAULTS);
             expectDefaultLVars();
         });
 
@@ -104,12 +107,12 @@ describe('panel.xml parser', () => {
             const xml = '<PlaneHTMLConfig><Instrument><Name>AS530</Name><VFROnly>true</VFROnly>'
                 + '<Input><ObsSource>2</ObsSource></Input><Output><WriteGPSSimVars>false</WriteGPSSimVars></Output></Instrument></PlaneHTMLConfig>';
 
-            expect(withoutAltAlert(parse(xml))).toEqual(DEFAULTS);
+            expect(parse(xml)).toEqual(DEFAULTS);
             expectDefaultLVars();
         });
 
         it('are all defaults for a KLN90B instrument without keys', () => {
-            expect(withoutAltAlert(parse(kln('')))).toEqual(DEFAULTS);
+            expect(parse(kln(''))).toEqual(DEFAULTS);
             expectDefaultLVars();
         });
 
@@ -117,7 +120,7 @@ describe('panel.xml parser', () => {
             const xml = '<PlaneHTMLConfig><Instrument><Name>AS530</Name><VFROnly>true</VFROnly></Instrument>'
                 + '<Instrument><Name>KLN90B</Name><Input><ObsSource>2</ObsSource></Input></Instrument></PlaneHTMLConfig>';
 
-            expect(withoutAltAlert(parse(xml))).toEqual(withField('input.obsSource', 2));
+            expect(parse(xml)).toEqual(withField('input.obsSource', 2));
             expect(simEnv().sim.lastWrite('L:KLN90B_ObsSource')!.value).toBe(2);
         });
     });
@@ -144,21 +147,10 @@ describe('panel.xml parser', () => {
             ['Input.ExternalSwitches.LegObsSwitchInstalled', '<Input><ExternalSwitches><LegObsSwitchInstalled>true</LegObsSwitchInstalled></ExternalSwitches></Input>', 'input.externalSwitches.legObsSwitchInstalled', true],
             ['Input.ExternalSwitches.AppArmSwitchInstalled', '<Input><ExternalSwitches><AppArmSwitchInstalled>true</AppArmSwitchInstalled></ExternalSwitches></Input>', 'input.externalSwitches.appArmSwitchInstalled', true],
             ['Output.ObsTarget', '<Output><ObsTarget>2</ObsTarget></Output>', 'output.obsTarget', 2],
+            ['Output.AltitudeAlertEnabled', '<Output><AltitudeAlertEnabled>true</AltitudeAlertEnabled></Output>', 'output.altitudeAlertEnabled', true],
             ['Output.WriteGPSSimVars', '<Output><WriteGPSSimVars>false</WriteGPSSimVars></Output>', 'output.writeGPSSimVars', false],
         ])('%s is read and nothing else changes', (_key, inner, path, value) => {
-            expect(withoutAltAlert(parse(kln(inner)))).toEqual(withField(path, value));
-        });
-
-        // The default of this key is pinned separately (#141), so both values are compared on that field alone.
-        // The `true` row equals the code default, so it cannot fail while that is true; it bites once the default is fixed.
-        it.each([
-            ['false', false],
-            ['true', true],
-        ])('Output.AltitudeAlertEnabled %s is read and nothing else changes', (text, value) => {
-            const settings = parse(kln(`<Output><AltitudeAlertEnabled>${text}</AltitudeAlertEnabled></Output>`));
-
-            expect(settings.output.altitudeAlertEnabled).toBe(value);
-            expect(withoutAltAlert(settings)).toEqual(DEFAULTS);
+            expect(parse(kln(inner))).toEqual(withField(path, value));
         });
     });
 
@@ -237,7 +229,7 @@ describe('panel.xml parser', () => {
             const {settings, problems} = parseWithProblems(kln(inner));
 
             expect(problems).toEqual([]);
-            expect(withoutAltAlert(settings)).toEqual(withField(path, value));
+            expect(settings).toEqual(withField(path, value));
         });
 
         it.each([
@@ -255,17 +247,17 @@ describe('panel.xml parser', () => {
         ])('uses the default for %s and records the problem', (inner, problem) => {
             const {settings, problems} = parseWithProblems(kln(inner));
 
-            expect(withoutAltAlert(settings)).toEqual(DEFAULTS);
+            expect(settings).toEqual(DEFAULTS);
             expect(problems).toEqual([problem]);
             expectDefaultLVars();
         });
 
-        // The default of this key is the pinned bug #141, so only the field is compared
+        // #141: the default is false
         it('uses the default for an invalid AltitudeAlertEnabled and records the problem', () => {
             const {settings, problems} = parseWithProblems(kln('<Output><AltitudeAlertEnabled>no</AltitudeAlertEnabled></Output>'));
 
-            expect(settings.output.altitudeAlertEnabled).toBe(true);
-            expect(problems).toEqual(['Output.AltitudeAlertEnabled: "no" is not true or false. The default true is used.']);
+            expect(settings).toEqual(DEFAULTS);
+            expect(problems).toEqual(['Output.AltitudeAlertEnabled: "no" is not true or false. The default false is used.']);
         });
 
         it('records every problem, in the order of the keys, and keeps the valid keys', () => {
@@ -278,7 +270,7 @@ describe('panel.xml parser', () => {
             ]);
             const expected = withField('input.headingInput', true);
             expected.output.obsTarget = 2;
-            expect(withoutAltAlert(settings)).toEqual(expected);
+            expect(settings).toEqual(expected);
         });
 
         // Installation Manual 2-6: the approach arm select pin is strapped for VFR only, so a VFR only unit has no
@@ -287,7 +279,7 @@ describe('panel.xml parser', () => {
             const {settings, problems} = parseWithProblems(kln('<VFROnly>true</VFROnly>'
                 + '<Input><ExternalSwitches><AppArmSwitchInstalled>true</AppArmSwitchInstalled></ExternalSwitches></Input>'));
 
-            expect(withoutAltAlert(settings)).toEqual(withField('vfrOnly', true));
+            expect(settings).toEqual(withField('vfrOnly', true));
             expect(problems).toEqual(['Input.ExternalSwitches.AppArmSwitchInstalled: a VFR only unit (VFROnly true) has no approach arm switch. The default false is used.']);
         });
 
@@ -297,9 +289,9 @@ describe('panel.xml parser', () => {
         });
     });
 
-    // The maintainer's ruling: false is intended, and the sample, the wiki sample and cfg/panel.xml all show false.
-    // The code defaults to true today, so every aircraft that omits the key gets an enabled alert.
-    it.fails('defaults AltitudeAlertEnabled to false (#141)', () => {
+    // The maintainer's ruling (#141): false is intended, as the wiki sample and cfg/panel.xml show. An aircraft that
+    // omits the key gets no altitude alerter, and SET 9 shows FEATURE DISABLED
+    it('defaults AltitudeAlertEnabled to false (#141)', () => {
         expect(parse('<PlaneHTMLConfig></PlaneHTMLConfig>').output.altitudeAlertEnabled).toBe(false);
     });
 });

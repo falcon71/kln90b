@@ -2,6 +2,10 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {storedSetting} from '../../../harness/storage';
+import {ALTITUDE_ALERT, panelXml} from '../../../harness/panelXml';
+
+// #141: the parser default of Output.AltitudeAlertEnabled is false, so a test that needs the altitude alerter states it
+const ALERT_INSTALLED = panelXml(ALTITUDE_ALERT(true));
 
 // SelectField is the cell of every fieldset: one value of a fixed list per cell, the inner knob steps through the list,
 // the outer knob moves the cursor on. Its host here is the alert volume of SET 9, two digit cells and nothing else
@@ -9,7 +13,7 @@ import {storedSetting} from '../../../harness/storage';
 
 /** SET 9 with the left cursor on the tens of the volume, stored as `volume` */
 async function onVolume(volume: number): Promise<HeadlessUnit> {
-    const unit = await bootUnit({storage: {altAlertVolume: volume}});
+    const unit = await bootUnit({panelXml: ALERT_INSTALLED, storage: {altAlertVolume: volume}});
     await unit.panel.selectPage('L', 'SET 9');
     await unit.panel.cursor('L');
     expect(unit.panel.focused('L')).toEqual({row: 4, col: 4, text: String(volume).padStart(2, '0')[0]});
