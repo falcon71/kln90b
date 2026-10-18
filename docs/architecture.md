@@ -908,8 +908,10 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - **Order of precedence for knobs:** overlay page → cursor-active page → tree navigation. The MSG page is the
   exception: the knobs and CRSR close it first and act on the page beneath, and CLR on it is ignored (#333).
 - Outer knob with cursor off: on the base page → `treeController.movePage(±1)`. On a pushed page (DCT, confirm, ...) → *
-  *pop it and re-dispatch the same event** (KLN 89 trainer behaviour). The same holds for overlays when their cursor
-  controller returns false.
+  *pop it and re-dispatch the same event** (KLN 89 trainer behaviour). An overlay is never popped that way: with its
+  cursor on, the knob goes to its cursor controller, and a knob that the focused field refuses does nothing (#336; the
+  KLN 89 trainer, 2026-10-09, T5, checked the inner knob on a prompt). With its cursor off, the MSG page closes and the
+  knob acts on the page beneath (the MSG exception above, #56), and a super page passes the knob to the tree controller of its side.
 - Inner knob with cursor off: `isCustomPageTreeController(page)` → `page.pageTreeController.moveSubpage`. Otherwise base
   page → `moveSubpage`, otherwise pop and re-dispatch.
 - `EVT_R_SCAN_*`: with the right cursor off → `page.scanLeft/Right()`. With the cursor on it *falls through* to

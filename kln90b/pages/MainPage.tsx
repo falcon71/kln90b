@@ -384,13 +384,10 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
             case EVT_L_OUTER_LEFT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.lCursorController.cursorActive) {
-                        if (this.getOverlayPage()!.lCursorController.outerLeft()) {
-                            return true;
-                        } else {
-                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
-                            this.popOverlayPage();
-                            return this.onInteractionEvent(evt);
-                        }
+                        //#336: with the cursor on, a knob its field refuses does nothing (the KLN 89 trainer, 2026-10-09,
+                        //T5, checked the inner knob on a prompt)
+                        this.getOverlayPage()!.lCursorController.outerLeft();
+                        return true;
                     } else if (this.isSuperPageShown()) {
                         this.leftTreeController.movePage(-1);
                     }
@@ -409,13 +406,8 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
             case EVT_L_OUTER_RIGHT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.lCursorController.cursorActive) {
-                        if (this.getOverlayPage()!.lCursorController.outerRight()) {
-                            return true;
-                        } else {
-                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
-                            this.popOverlayPage();
-                            return this.onInteractionEvent(evt);
-                        }
+                        this.getOverlayPage()!.lCursorController.outerRight();
+                        return true;
                     } else if (this.isSuperPageShown()) {
                         this.leftTreeController.movePage(1);
                     }
@@ -434,13 +426,8 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
             case EVT_R_OUTER_LEFT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.rCursorController.cursorActive) {
-                        if (this.getOverlayPage()!.rCursorController.outerLeft()) {
-                            return true;
-                        } else {
-                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
-                            this.popOverlayPage();
-                            return this.onInteractionEvent(evt);
-                        }
+                        this.getOverlayPage()!.rCursorController.outerLeft();
+                        return true;
                     } else if (this.isSuperPageShown()) {
                         this.rightTreeController.movePage(-1);
                     }
@@ -459,13 +446,8 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
             case EVT_R_OUTER_RIGHT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.rCursorController.cursorActive) {
-                        if (this.getOverlayPage()!.rCursorController.outerRight()) {
-                            return true;
-                        } else {
-                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
-                            this.popOverlayPage();
-                            return this.onInteractionEvent(evt);
-                        }
+                        this.getOverlayPage()!.rCursorController.outerRight();
+                        return true;
                     } else if (this.isSuperPageShown()) {
                         this.rightTreeController.movePage(1);
                     }
@@ -484,13 +466,10 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
             case EVT_L_INNER_LEFT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.lCursorController.cursorActive) {
-                        if (this.getOverlayPage()!.lCursorController.innerLeft()) {
-                            return true;
-                        } else {
-                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
-                            this.popOverlayPage();
-                            return this.onInteractionEvent(evt);
-                        }
+                        //#336: with the cursor on, a knob its field refuses does nothing (the KLN 89 trainer, 2026-10-09,
+                        //T5, checked the inner knob on a prompt)
+                        this.getOverlayPage()!.lCursorController.innerLeft();
+                        return true;
                     } else if (this.isSuperPageShown()) {
                         this.leftTreeController.moveSubpage(-1);
                     }
@@ -512,13 +491,8 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
             case EVT_L_INNER_RIGHT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.lCursorController.cursorActive) {
-                        if (this.getOverlayPage()!.lCursorController.innerRight()) {
-                            return true;
-                        } else {
-                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
-                            this.popOverlayPage();
-                            return this.onInteractionEvent(evt);
-                        }
+                        this.getOverlayPage()!.lCursorController.innerRight();
+                        return true;
                     } else if (this.isSuperPageShown()) {
                         this.leftTreeController.moveSubpage(1);
                     }
@@ -548,13 +522,8 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
             case EVT_R_INNER_LEFT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.rCursorController.cursorActive) {
-                        if (this.getOverlayPage()!.rCursorController.innerLeft()) {
-                            return true;
-                        } else {
-                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
-                            this.popOverlayPage();
-                            return this.onInteractionEvent(evt);
-                        }
+                        this.getOverlayPage()!.rCursorController.innerLeft();
+                        return true;
                     } else if (this.isSuperPageShown()) {
                         this.rightTreeController.moveSubpage(-1);
                     }
@@ -584,13 +553,8 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
             case EVT_R_INNER_RIGHT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.rCursorController.cursorActive) {
-                        if (this.getOverlayPage()!.rCursorController.innerRight()) {
-                            return true;
-                        } else {
-                            //The KLN 89 trainer closes the page and then sends the event to the previos page, until it is handled
-                            this.popOverlayPage();
-                            return this.onInteractionEvent(evt);
-                        }
+                        this.getOverlayPage()!.rCursorController.innerRight();
+                        return true;
                     } else if (this.isSuperPageShown()) {
                         this.rightTreeController.moveSubpage(1);
                     }
