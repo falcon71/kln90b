@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {BootOptions, bootToSelfTest, HeadlessUnit} from '../../../harness/boot';
+import {BootOptions, bootToSelfTest, HeadlessUnit, untilCalcTick} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {recordSounds} from '../../../harness/sounds';
 import {AIRDATA, ALTITUDE_ALERT, NO_ALTIMETER, panelXml} from '../../../harness/panelXml';
@@ -286,6 +286,27 @@ describe('self-test right page time entry (spec)', () => {
         await unit.panel.ent();
 
         expect(Screen.read().rows('R')[2].slice(6, 8)).toBe('00');
+    });
+});
+
+// The maintainer's ruling, #125: the self-test page keeps its date and time editable while the GPS is valid, and SET 2
+// keeps its lock (3-53). The KLN 89 trainer kept the date of its initialization page editable (checked in the KLN 89
+// trainer, 2026-10-18), and the AVsoftech trainer (unreliable) kept its self-test date and time editable. With a valid GPS
+// the next calculation tick puts the satellite time back
+describe('self-test right page entries while the GPS is valid (characterization)', () => {
+    it('takes a time entry, which the GPS time replaces at the next calculation tick, and offers the date (#125) (characterization)', async () => {
+        const unit = await onSelfTestPage();
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true); // Precondition: the fast acquisition has a fix by now
+        await enterTime1627(unit);
+        await untilCalcTick(unit); // The next calculation tick is 750 to 1000 ms away, past the display tick of ENT
+
+        await unit.panel.ent();
+        expect(Screen.read().rows('R')[2].slice(0, 5)).toBe('16:27');
+
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('R')[2].slice(0, 5)).toBe('12:00');
+        await backTo(unit, '01 JUN 26'); // The date is a cursor field too
+        expect(unit.errors).toEqual([]);
     });
 });
 
