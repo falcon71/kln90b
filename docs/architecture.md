@@ -363,8 +363,9 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
       is DF legs and plan 1 is a direct-to plan "like the Garmins". Data stops after the MAP or an arc ("Install manual:
       We do not return data after a fence"). This happens only when `writeGPSSimVars` is set, and `SimVarSync` calls `WTFlightplanSync.sync()` once when
       `L:KLN90B_WriteGpsSimvars` switches it on at runtime.
-    - `KlnEfbSaver` answers EFB `avionicsRouteRequested`; `KlnEfbLoader` loads `syncedAvionicsRoute` into FPL 0 (lat/lon
-      legs become temporary user waypoints in region `XY`).
+    - `KlnEfbSaver` answers EFB `avionicsRouteRequested` (only with `writeGPSSimVars` set); `KlnEfbLoader` loads
+      `syncedAvionicsRoute` into FPL 0 (lat/lon legs become temporary user waypoints in region `XY`). While
+      `Hardware.isDisabled` is set the request goes unanswered (#353) and the synced route is dropped (#188).
 - The ticks that write the L:KLN90B_* outputs stop with the power, so `SensorsOut.setPoweredOff()` writes their zero
   state once on a power-off: `L:KLN90B_RollCommand` 0, `L:KLN90B_HSI_TF_FLAGS` 0 (flagged) and the MSG, WPT and annunciator
   test lights false, `L:KLN90B_IntegrityWarn` 0, `L:KLN90B_GPS_WP_BEARING` 0 and `L:KLN90B_XTK` 0, whatever `writeGPSSimVars` says. It also discharges the D-bar filter, so `GPS WP CROSS TRK` starts from 0 after the next power-on. A unit that is only disabled for hot swapping keeps its values, but a power-off while disabled zeroes them too.

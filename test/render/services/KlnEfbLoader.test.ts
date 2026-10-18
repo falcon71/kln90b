@@ -303,6 +303,22 @@ describe('EFB route import while the unit is disabled for hot swapping (public c
         expect(Screen.read().rows('L')).toEqual(rowsBefore);
     });
 
+    // The maintainer's ruling (#138): L:KLN90B_Disabled is read only by the 100 ms poll of SimVarSync, which keeps the
+    // state on Hardware; the EFB gates read the kept state (#353), because reading the LVar is expensive. Ten polls in a
+    // second, whatever the EFB sends
+    it('reads L:KLN90B_Disabled only in the poll, also while the EFB requests and syncs routes (#353)', async () => {
+        const unit = await disabledUnit(true);
+        const read = vi.spyOn(SimVar, 'GetSimVarValue');
+
+        unit.efb!.request();
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
+        unit.efb!.request();
+        unit.efb!.sync(efbRoute({departure: kbbb, destination: kaaa}));
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(read.mock.calls.filter(c => c[0] === 'L:KLN90B_Disabled').length).toBe(10);
+    });
+
     // After the resume the next synced route is imported again: the disabled state does not stick
     it('imports a route synced after the unit resumed (#188)', async () => {
         const unit = await disabledUnit(true);
