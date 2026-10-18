@@ -369,7 +369,9 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
       `L:KLN90B_WriteGpsSimvars` switches it on at runtime. While `Hardware.isDisabled` is set nothing is written,
       whatever asks for the sync, and `SimVarSync.setDisabled` syncs once on the resume (#398).
     - `KlnEfbSaver` answers EFB `avionicsRouteRequested` (only with `writeGPSSimVars` set); `KlnEfbLoader` loads
-      `syncedAvionicsRoute` into FPL 0 (lat/lon legs become temporary user waypoints in region `XY`). While
+      `syncedAvionicsRoute` into FPL 0 (lat/lon legs become temporary user waypoints in region `XY`, except a leg whose
+      `fixIcao` names, by region and ident, a user or temporary waypoint the unit holds: the saver sends those as lat/lon
+      legs of type U, and they come back as themselves with the stored position, #187). While
       `Hardware.isDisabled` is set the request goes unanswered (#353) and the synced route is dropped (#188).
 - The ticks that write the L:KLN90B_* outputs stop with the power, so `SensorsOut.setPoweredOff()` writes their zero
   state once on a power-off: `L:KLN90B_RollCommand` 0, `L:KLN90B_HSI_TF_FLAGS` 0 (flagged) and the MSG, WPT and annunciator

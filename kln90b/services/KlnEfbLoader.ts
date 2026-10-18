@@ -1,6 +1,7 @@
 import {
     DeepReadonly,
     EventBus,
+    Facility,
     FacilityClient,
     FlightPlanRouteEnrouteLeg,
     FlightPlanRouteManager,
@@ -84,6 +85,11 @@ export class KlnEfbLoader extends Flightplanloader {
 
     private async loadLeg(enroute: DeepReadonly<FlightPlanRouteEnrouteLeg>): Promise<IcaoValue | null> {
         if (enroute.hasLatLon) {
+            const held = this.findHeldWaypoint(enroute.fixIcao);
+            if (held !== undefined) {
+                return held.icaoStruct;
+            }
+
             let ident = "CUST";
             if (!ICAO.isValueEmpty(enroute.fixIcao)) {
                 ident = enroute.fixIcao.ident;
@@ -125,5 +131,20 @@ export class KlnEfbLoader extends Flightplanloader {
         return null;
     }
 
+    /**
+     * #187, the maintainer's ruling: KlnEfbSaver sends a user (region XX) or temporary (region XY) waypoint as a lat/lon
+     * leg whose fixIcao names it, always with the type U. When the EFB syncs that leg back and the unit still holds the
+     * waypoint, the leg is that waypoint, matched by region and ident whatever its type, with the position the unit
+     * holds. The repository holds only user and temporary waypoints, so a database fix never matches
+     */
+    private findHeldWaypoint(fixIcao: DeepReadonly<IcaoValue>): Facility | undefined {
+        let held: Facility | undefined = undefined;
+        this.facilityRepository.forEach(fac => {
+            if (fac.icaoStruct.region === fixIcao.region && fac.icaoStruct.ident === fixIcao.ident) {
+                held = fac;
+            }
+        });
+        return held;
+    }
 
 }

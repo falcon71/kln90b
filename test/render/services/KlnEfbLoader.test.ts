@@ -334,24 +334,47 @@ describe('EFB route import while the unit is disabled for hot swapping (public c
     });
 });
 
-// Public contract (CLAUDE.md "Public contract with aircraft": the EFB route sync). The saver sends a user waypoint as a
-// lat/lon leg named by its user ICAO (U, XX, ident). When the EFB syncs that route back, the loader makes every lat/lon
-// leg a new temporary waypoint, so FARM comes back as FARMA in region XY next to FARM
+// Public contract (CLAUDE.md "Public contract with aircraft": the EFB route sync). The saver sends a user (XX) or
+// temporary (XY) waypoint as a lat/lon leg named by its ICAO, always with the type U. The maintainer's ruling (#187): when
+// the EFB syncs that leg back and the unit still holds the waypoint, it comes back as that waypoint, matched by region and
+// ident whatever its type, with the position the unit holds; one it no longer holds is created anew as a temporary
+// waypoint. The tests sync back exactly what the unit sent (whether the sim's EFB keeps the fixIcao is not known)
 describe('EFB round trip of a user waypoint', () => {
-    /** FPL 0 KAAA, FARM (a user waypoint), KBBB; the route the unit answers with is synced back as the EFB got it */
-    async function roundTrip(): Promise<HeadlessUnit> {
-        const farm = {icaoStruct: ICAO.value('U', 'XX', '', 'FARM')} as unknown as Facility;
+    const farm = {icaoStruct: ICAO.value('U', 'XX', '', 'FARM')} as unknown as Facility;
+
+    /** The route the unit answers the next request with, as a copy the EFB could sync back */
+    function requestRoute(unit: HeadlessUnit): FlightPlanRoute {
+        const before = unit.efb!.replies.length;
+        unit.efb!.request();
+        expect(unit.efb!.replies.length).toBe(before + 1);
+        return JSON.parse(JSON.stringify(unit.efb!.replies[before].route));
+    }
+
+    async function syncBack(unit: HeadlessUnit, route: FlightPlanRoute): Promise<void> {
+        unit.efb!.sync(route);
+        await vi.advanceTimersByTimeAsync(2000);
+    }
+
+    /** FPL 0 KAAA, FARM (a user waypoint at 47.2 N 8.1 E), KBBB */
+    async function bootWithFarm(): Promise<HeadlessUnit> {
         const unit = await bootUnit({
             facilities: [kaaa, kbbb], efb: true,
             storage: {...savedUserWaypoints([{kind: 'sup', ident: 'FARM', lat: 47.2, lon: 8.1}]), ...savedFlightplan(0, [kaaa, farm, kbbb])},
         });
         await settle(unit);
-        unit.efb!.request();
-        expect(unit.efb!.replies.length).toBe(1);
-        unit.efb!.sync(JSON.parse(JSON.stringify(unit.efb!.replies[0].route)));
-        await vi.advanceTimersByTimeAsync(2000);
         return unit;
     }
+
+    /** FPL 0 KAAA, FARM, KBBB; the route the unit answers with is synced back as the EFB got it */
+    async function roundTrip(): Promise<HeadlessUnit> {
+        const unit = await bootWithFarm();
+        await syncBack(unit, requestRoute(unit));
+        return unit;
+    }
+
+    /** The ICAO of each leg of FPL 0 in the SDK's V2 string form */
+    const fpl0Icaos = (unit: HeadlessUnit) =>
+        unit.props.memory.fplPage.flightplans[0].getLegs().map(l => ICAO.valueToStringV2(l.wpt.icaoStruct));
 
     // The setup of the pin: the route comes back with its three waypoints, the airports by their ICAO
     it('loads the route the unit sent with its three waypoints (the setup of #187)', async () => {
@@ -361,12 +384,112 @@ describe('EFB round trip of a user waypoint', () => {
         expect([fplIdents(unit)[0], fplIdents(unit)[2]]).toEqual(['KAAA', 'KBBB']);
     });
 
-    it.fails('loads a user waypoint that comes back from the EFB as that waypoint (#187)', async () => {
+    it('loads a user waypoint that comes back from the EFB as that waypoint (#187)', async () => {
         const unit = await roundTrip();
 
         expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => ICAO.valueToStringV2(l.wpt.icaoStruct)))
             .toEqual(['A          KAAA    ', 'UXX        FARM    ', 'A          KBBB    ']);
         expect(userWaypoints(unit, FacilityType.USR).map(f => f.icaoStruct.ident)).toEqual(['FARM']);
+    });
+
+    // Each leg is matched by its own ident: two user waypoints of the same region come back as themselves
+    it('loads two user waypoints that come back from the EFB each as itself (#187)', async () => {
+        const lake = {icaoStruct: ICAO.value('U', 'XX', '', 'LAKE')} as unknown as Facility;
+        const unit = await bootUnit({
+            facilities: [kaaa, kbbb], efb: true,
+            storage: {
+                ...savedUserWaypoints([{kind: 'sup', ident: 'FARM', lat: 47.2, lon: 8.1}, {kind: 'sup', ident: 'LAKE', lat: 47.3, lon: 8.2}]),
+                ...savedFlightplan(0, [kaaa, farm, lake, kbbb]),
+            },
+        });
+        await settle(unit);
+
+        await syncBack(unit, requestRoute(unit));
+
+        expect(fpl0Icaos(unit)).toEqual(['A          KAAA    ', 'UXX        FARM    ', 'UXX        LAKE    ', 'A          KBBB    ']);
+    });
+
+    // The saver sends the user VOR UVR as U XX UVR (KlnEfbSaver.toEnrouteSegment), so the type of the leg is not the type
+    // of the waypoint
+    it('loads a user VOR that comes back from the EFB as that VOR (#187)', async () => {
+        const uvr = {icaoStruct: ICAO.value('V', 'XX', '', 'UVR')} as unknown as Facility;
+        const unit = await bootUnit({
+            facilities: [kaaa, kbbb], efb: true,
+            storage: {
+                ...savedUserWaypoints([{kind: 'vor', ident: 'UVR', lat: 47.2, lon: 8.1, freqMHz: 112.5, magvar: 2}]),
+                ...savedFlightplan(0, [kaaa, uvr, kbbb]),
+            },
+        });
+        await settle(unit);
+        const route = requestRoute(unit);
+        expect(route.enroute.map(l => ICAO.valueToStringV2(l.fixIcao))).toEqual(['UXX        UVR     ']); // Precondition: sent as U
+
+        await syncBack(unit, route);
+
+        expect(fpl0Icaos(unit)).toEqual(['A          KAAA    ', 'VXX        UVR     ', 'A          KBBB    ']);
+        expect(userWaypoints(unit).map(f => f.icaoStruct.ident)).toEqual(['UVR']);
+    });
+
+    // A lat/lon leg of the EFB becomes the temporary waypoint CUST (region XY); the unit sends it back as U XY CUST
+    it('loads a temporary waypoint that comes back from the EFB as that waypoint, over two round trips (#187)', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
+        await settle(unit);
+        await syncBack(unit, efbRoute({departure: kaaa, destination: kbbb, enroute: [{lat: 47.2, lon: 8.1}]}));
+        expect(fpl0Icaos(unit)).toEqual(['A          KAAA    ', 'UXY        CUST    ', 'A          KBBB    ']); // Precondition
+
+        await syncBack(unit, requestRoute(unit));
+        await syncBack(unit, requestRoute(unit));
+
+        expect(fpl0Icaos(unit)).toEqual(['A          KAAA    ', 'UXY        CUST    ', 'A          KBBB    ']);
+        expect(userWaypoints(unit).map(f => f.icaoStruct.ident)).toEqual(['CUST']);
+    });
+
+    // The waypoint the unit holds wins: a position changed on the way through the EFB is dropped
+    it('keeps the position the unit holds when the EFB sends the user waypoint back elsewhere (#187)', async () => {
+        const unit = await bootWithFarm();
+        const route = requestRoute(unit);
+        route.enroute[0].lat = 47.3;
+
+        await syncBack(unit, route);
+
+        const leg = unit.props.memory.fplPage.flightplans[0].getLegs()[1];
+        expect(ICAO.valueToStringV2(leg.wpt.icaoStruct)).toBe('UXX        FARM    ');
+        expect(leg.wpt.lat).toBeCloseTo(47.2, 6);
+        expect(userWaypoints(unit).map(f => f.icaoStruct.ident)).toEqual(['FARM']);
+    });
+
+    // A user waypoint the unit no longer holds (deleted after the route went to the EFB) is created anew, as before the
+    // fix: a temporary waypoint in region XY at the position of the leg, named after it because the ident is free
+    it('creates a temporary waypoint for a user waypoint the unit no longer holds (#187)', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
+        await settle(unit);
+        const route = efbRoute({departure: kaaa, destination: kbbb, enroute: [{lat: 47.2, lon: 8.1}]});
+        route.enroute[0].fixIcao = ICAO.value('U', 'XX', '', 'FARM'); // As the unit sent it before FARM was deleted
+
+        await syncBack(unit, route);
+
+        const leg = unit.props.memory.fplPage.flightplans[0].getLegs()[1];
+        expect(ICAO.valueToStringV2(leg.wpt.icaoStruct)).toBe('UXY        FARM    ');
+        expect(leg.wpt.lat).toBeCloseTo(47.2, 6);
+        expect(leg.wpt.lon).toBeCloseTo(8.1, 6);
+    });
+
+    // The match is by region and ident: a lat/lon leg that names a fix of the data base (an airport FARM, no user region)
+    // is not the user waypoint FARM, and a leg in region XY is not the user waypoint FARM in region XX. Both become new
+    // temporary waypoints with a unique name
+    it('does not take a lat/lon leg of another region with the same ident for the user waypoint (#187)', async () => {
+        const unit = await bootUnit({
+            facilities: [kaaa, kbbb], efb: true,
+            storage: savedUserWaypoints([{kind: 'sup', ident: 'FARM', lat: 47.2, lon: 8.1}]),
+        });
+        await settle(unit);
+        const route = efbRoute({departure: kaaa, destination: kbbb, enroute: [{lat: 47.1, lon: 8.2}, {lat: 47.3, lon: 8.3}]});
+        route.enroute[0].fixIcao = ICAO.value('A', '', '', 'FARM');
+        route.enroute[1].fixIcao = ICAO.value('U', 'XY', '', 'FARM');
+
+        await syncBack(unit, route);
+
+        expect(fpl0Icaos(unit)).toEqual(['A          KAAA    ', 'UXY        FARMA   ', 'UXY        FARMB   ', 'A          KBBB    ']);
     });
 });
 
