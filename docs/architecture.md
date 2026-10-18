@@ -1288,7 +1288,10 @@ export class Set3Page extends SixLineHalfPage {
     - outer knob closing temporary pages;
     - SCAN acceleration by event rate (`ScanHandler`, `SPEEDSTEP`);
     - the ACT page shows the last active waypoint or "NO ACTIVE WAYPOINT", and SCAN moves along FPL 0;
-    - comments flag invented values ("I have no idea, which ranges the device supports" for the NAV 5 ranges).
+    - comments flag values that no manual page gives: the map scales of NAV 5 and Super NAV 5 are `MAP_RANGES`
+      (`data/MapRanges.ts`), where 3-35 gives only the end points, 1 and 1000 NM, and the steps between are those of
+      the AVsoftech KLN 90B trainer (unreliable), which the maintainer adopted (#236). A saved range that is not in the
+      list loads as 40 NM (`knownMapRange`, the default of both settings).
 - Formatting helpers: `format()` from npm `numerable` (`"000"`, `"0.0"`, `"00000"`, `"+00"`) plus `padStart`/`padEnd`.
   The display classes own the formatting rules. `Utils.Clamp` and `Utils.Translate` are MSFS globals. Unit type aliases
   come from `data/Units.ts` (`Feet`, `NauticalMiles`, `Degrees`). Magnetic conversion goes through

@@ -94,11 +94,9 @@ describe('Super NAV 5 page (characterization)', () => {
         await expect(downsampled(ascii)).toMatchFileSnapshot('./__snapshots__/superNav5Route.txt');
     });
 
-    // The scales between 1 and 1000 NM are not known to be those of the real unit (the code says so itself), so this
-    // pins the list the inner knob offers today, in its order, and claims nothing about the real unit.
-    // the scales between 1 and 1000 NM are a question: #236
-    // The list has no 7 NM scale, although a figure of the guide's approach chapter shows AUTO at 7 NM; that goes into
-    // the question as well.
+    // 3-35 gives only the end points, 1 and 1000 NM. The steps between them are those of the AVsoftech trainer
+    // (unreliable), as the maintainer reported them on #236 and adopted them; the list has the 7 NM scale that figure
+    // 6-15 shows. This pins the list the inner knob offers, in its order, and claims nothing about the real unit.
     it('Super NAV 5 range scales (characterization)', async () => {
         const {unit} = await superNav5OnRoute({storage: {superNav5MapRange: 0}});
         await unit.panel.cursor('L');
@@ -109,9 +107,18 @@ describe('Super NAV 5 page (characterization)', () => {
             await unit.panel.inner('L', 1);
         }
         expect(seen).toEqual([
-            'AUTO', '1', '2', '3', '5', '10', '15', '20', '25', '30', '40', '60', '80', '100', '120', '160', '240', '320', '480', '1000',
+            'AUTO', '1', '2', '3', '5', '7', '10', '15', '20', '30', '40', '60', '80', '120', '160', '240', '320', '480', '640', '1000',
             'AUTO',
         ]);
+    });
+
+    // #236, the maintainer's ruling: a saved range that is not in the list loads as 40 NM
+    it('loads a saved range of 100 NM, which the list does not have, as 40 NM (#236)', async () => {
+        const {unit} = await superNav5OnRoute({storage: {superNav5MapRange: 100}});
+
+        expect(SuperNav5.read().range.trim()).toBe('40');
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(storedSetting(unit, 'superNav5MapRange')).toBe(40);
     });
 
     // The fourth row of the right menu shows 000 and N^ with north up. The menu figures only show a track value there,
@@ -471,9 +478,9 @@ describe('Super NAV 5 page', () => {
 
 describe('Super NAV 5 AUTO scale', () => {
     // The scales 5 and 15 are shown in figures of the Pilot's Guide (5 NM on 6-8, 6-12 and 6-17; 15 NM in figure 3-116 on
-    // 3-35), and 10 and 20 on photos of real units, so they are scales of the real unit. The list between them is not
-    // known (the code's own list is a guess), so the distances below sit just under a scale (9.5 and 19.5 NM): the
-    // expected scale then holds whether or not the real unit has a scale between.
+    // 3-35), and 10 and 20 on photos of real units, so they are scales of the real unit. The list between them is the
+    // AVsoftech trainer's (the maintainer's ruling, #236; unreliable), so the distances below sit just under a scale
+    // (9.5 and 19.5 NM): the expected scale then holds whether or not the real unit has a scale between.
     const P = {lat: 47.0, lon: 8.0};
     const at = (bearing: number, nm: number) => pointFrom(P, bearing, nm);
     const fix = (ident: string, bearing: number, nm: number) => intersection(ident, at(bearing, nm).lat, at(bearing, nm).lon);
@@ -516,6 +523,18 @@ describe('Super NAV 5 AUTO scale', () => {
         const star = map.pixels.find(p => p[0] === '%')!;
         expect(Math.abs(star[1] - 74)).toBeLessThanOrEqual(1);
         expect(Math.abs(star[2] - 2.3)).toBeLessThanOrEqual(1);
+    });
+
+    // 3-36: AUTO takes the smallest scale that shows the Direct To waypoint; figure 6-15 shows the 7 NM scale, which the
+    // waypoint 6.5 NM north needs (without it, 10)
+    it('takes the 7 NM scale for a Direct To waypoint 6.5 NM away (3-36, figure 6-15)', async () => {
+        const dct = fix('AAAE', 0, 6.5);
+        const unit = await bootUnit({facilities: [dct], position: P, storage: {superNav5MapRange: 0}});
+        await settle(unit);
+        await unit.panel.directTo('AAAE', {waitMs: 2000});
+        await showSuperNav5(unit);
+
+        expect(SuperNav5.read().range.trim()).toBe('7');
     });
 
     // The sibling of the test below: the active waypoint is A1, 19.5 NM north, and A2 4 NM north-east comes after it.

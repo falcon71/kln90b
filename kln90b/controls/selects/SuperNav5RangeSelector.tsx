@@ -2,8 +2,9 @@ import {FSComponent, UserSetting} from "@microsoft/msfs-sdk";
 import {SelectField} from "./SelectField";
 import {TickController} from "../../TickController";
 import {NavPageState} from "../../data/VolatileMemory";
+import {knownMapRange, MAP_RANGES} from "../../data/MapRanges";
 
-const RANGES = ["AUTO", "1   ", "2   ", "3   ", "5   ", "10  ", "15  ", "20  ", "25  ", "30  ", "40  ", "60  ", "80  ", "100 ", "120 ", "160 ", "240 ", "320 ", "480 ", "1000"]; //I have no idea, which ranges the device supports
+const RANGES = ["AUTO", ...MAP_RANGES.map(r => r.toString().padEnd(4, " "))];
 
 export class SuperNav5RangeSelector extends SelectField {
 
@@ -13,6 +14,9 @@ export class SuperNav5RangeSelector extends SelectField {
     }
 
     public static build(rangeSetting: UserSetting<number>, navState: NavPageState): SuperNav5RangeSelector {
+        if (rangeSetting.get() !== 0) {
+            rangeSetting.set(knownMapRange(rangeSetting.get())); //#236, 0 is AUTO
+        }
         return new SuperNav5RangeSelector(rangeSetting, navState, (range) => this.saveRange(rangeSetting, range));
     }
 

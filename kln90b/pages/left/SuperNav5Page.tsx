@@ -28,6 +28,7 @@ import {SuperNav5Right} from "../../controls/SuperNav5Right";
 import {NearestWpt} from '../../data/navdata/NearestList';
 import {SuperNav5DirectToSelector} from "../../controls/selects/SuperNav5DirectToSelector";
 import {NauticalMiles} from "../../data/Units";
+import {MAP_RANGES} from "../../data/MapRanges";
 
 type SuperNav5PageTypes = {
     canvas: Canvas,
@@ -35,7 +36,6 @@ type SuperNav5PageTypes = {
     right: SuperNav5Right,
     directTo: SuperNav5DirectToSelector,
 }
-const RANGES = [1, 2, 3, 5, 10, 15, 20, 25, 30, 40, 60, 80, 100, 120, 160, 240, 320, 480, 1000]; //I have no idea, which ranges the device supports
 
 
 export class SuperNav5Page extends SevenLinePage {
@@ -222,7 +222,7 @@ export class SuperNav5Page extends SevenLinePage {
             distance = Math.max(distToActive ?? 0, distanceToFollowing);
         }
 
-        return RANGES.find((r) => r >= distance) ?? 1000;
+        return MAP_RANGES.find((r) => r >= distance) ?? 1000;
     }
 
     private drawFlightplan(ctx: CoordinateCanvasDrawContext, legs: KLNFlightplanLeg[], activeWaypoint: ActiveWaypoint) {
