@@ -140,11 +140,17 @@ class ArmGPSApproachMessage implements Message {
     }
 }
 
+/**
+ * B-2: posted when the data base becomes out of date while the unit is on: a date entered on SET 2 or the self-test
+ * page, the GPS correcting the date, or the end of the data base passing in flight. It is the only source of this
+ * message (#175).
+ */
 class DatabaseOutOfDateMessage implements Message {
 
     public message: string[] = ["DATA BASE OUT OF DATE", "ALL DATA MUST BE", "CONFIRMED BEFORE USE"];
     public seen: boolean = false;
     private wasValid: boolean = false;
+    private latched: boolean = false;
 
     constructor(private readonly daabase: Database) {
     }
@@ -152,11 +158,26 @@ class DatabaseOutOfDateMessage implements Message {
 
     public isConditionValid(): boolean {
         const dbValidNow = this.daabase.isAiracCurrent();
-        const showMessage = this.wasValid && !dbValidNow;
-
+        if (this.wasValid && !dbValidNow) {
+            //3-16: it stays until the pilot has read it. MessageHandler.tick asks a listed message twice per tick, so the
+            //change from current to expired sets a latch instead of being the condition itself (#175)
+            this.latched = true;
+        }
         this.wasValid = dbValidNow;
 
-        return showMessage;
+        if (this.seen) {
+            //Gone once read; only a new change from current to expired brings it back (KLN 89 trainer, 2026-10-18)
+            this.latched = false;
+        }
+
+        return this.latched;
+    }
+
+    public onPowerOff(): void {
+        //A date already past the end at power-up posts nothing (KLN 89 trainer, 2026-10-18), so the next power-on
+        //starts as the first one did (#175)
+        this.latched = false;
+        this.wasValid = false;
     }
 }
 

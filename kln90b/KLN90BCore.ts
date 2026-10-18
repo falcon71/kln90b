@@ -394,7 +394,7 @@ export class KLN90BCore {
                 msa: msa,
                 vnav: vnav,
                 modeController: modeController,
-                database: new Database(this.bus, sensors, this.messageHandler),
+                database: new Database(sensors),
                 magvar: magvar,
                 sidstar: sidstar,
             };

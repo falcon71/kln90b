@@ -387,16 +387,75 @@ describe('DATA BASE OUT OF DATE', () => {
         expect(h.tick()).toEqual([]);
     });
 
-    // B-2, 3-16: a message is there for the pilot to read. Today the condition is true for one calculation tick only, so
-    // the message is gone a second later, unread, and the MSG prompt with it.
-    // This pin is bound to the persistent DatabaseOutOfDateMessage class (PersistentMessages.ts). If the fix deletes that
-    // class, delete this pin with it: the render pin below ("lists the message once") then carries the bug.
-    it.fails('stays until it is read (B-2, 3-16) (#175)', () => {
+    // B-2, 3-16: a message is there for the pilot to read. Before #175 the condition was true for one calculation tick
+    // only, so the message was gone a second later, unread, and the MSG prompt with it. The data base expiring while the
+    // unit runs is this path: the stub turns from current to expired between two ticks
+    it('stays until it is read (B-2, 3-16) (#175)', () => {
         const w = quietWorld();
         const h = harness(w);
         h.tick();
         w.dbCurrent = false;
         h.tick();
+        expect(h.tick()).toEqual([DB_TEXT]);
+        expect(h.handler.hasUnreadMessages()).toBe(true);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-18: after the message was read, the prompt was gone and the message page
+    // showed no message. The data base stays out of date, so only the read ends it
+    it('is gone once it is read, while the data base stays out of date (checked in the KLN 89 trainer, 2026-10-18) (#175)', () => {
+        const w = quietWorld();
+        const h = harness(w);
+        h.tick();
+        w.dbCurrent = false;
+        expect(h.tick()).toEqual([DB_TEXT]);
+        h.handler.getMessages()[0].seen = true; // What the MSG page does when it shows the message
+
+        expect(h.tick()).toEqual([]);
+        expect(h.tick()).toEqual([]);
+    });
+
+    // The maintainer's ruling (#176): the unit loses its messages at the power-off, and MessageHandler.clear is the
+    // power-off. The KLN 89 check of 2026-10-18 showed no message at a power-up with the date already past the end; it
+    // did not try an unread message over the power cycle, so the title cites the issues only
+    it('is not listed again after a power cycle with the message unread (#175, #176)', () => {
+        const w = quietWorld();
+        const h = harness(w);
+        h.tick();
+        w.dbCurrent = false;
+        expect(h.tick()).toEqual([DB_TEXT]); // Precondition: listed, unread
+        h.handler.clear();
+
+        expect(h.tick()).toEqual([]);
+        expect(h.tick()).toEqual([]);
+    });
+
+    // Checked in the KLN 89 trainer, 2026-10-18: with the date already past the end at power-up there was no message.
+    // Here the data base expires while the unit is off, so the last tick before the power-off saw it current. That the
+    // same holds for this case is our reading of that observation, not a trainer result
+    it('is not posted at a power-on after the data base expired while the unit was off (#175)', () => {
+        const w = quietWorld();
+        const h = harness(w);
+        expect(h.tick()).toEqual([]);
+        h.handler.clear();
+        w.dbCurrent = false;
+
+        expect(h.tick()).toEqual([]);
+        expect(h.tick()).toEqual([]);
+    });
+
+    // The maintainer's ruling (#175): a new change from current to expired after the read posts it again, once
+    it('is posted again when the data base becomes out of date again after the read (#175)', () => {
+        const w = quietWorld();
+        const h = harness(w);
+        h.tick();
+        w.dbCurrent = false;
+        h.tick();
+        h.handler.getMessages()[0].seen = true;
+        expect(h.tick()).toEqual([]); // Precondition: gone once read
+        w.dbCurrent = true;
+        h.tick();
+        w.dbCurrent = false;
+
         expect(h.tick()).toEqual([DB_TEXT]);
         expect(h.handler.hasUnreadMessages()).toBe(true);
     });

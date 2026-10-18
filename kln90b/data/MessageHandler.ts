@@ -7,6 +7,11 @@ export interface Message {
     seen: boolean;
     readonly message: string[];
     isConditionValid: () => boolean;
+    /**
+     * Called by MessageHandler.clear when the unit is switched off, for a persistent message that keeps state of the
+     * power-on in which it was posted
+     */
+    onPowerOff?: () => void;
 }
 
 /**
@@ -56,6 +61,7 @@ export class MessageHandler implements CalcTickable {
         this.activeMessages = [];
         for (const message of this.persistentMessages) {
             message.seen = false;
+            message.onPowerOff?.();
         }
     }
 

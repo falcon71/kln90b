@@ -764,10 +764,28 @@ describe('DATA BASE OUT OF DATE after the GPS sets the date (B-2)', () => {
         gps.timeZulu = TimeStamp.create(gps.timeZulu.getTimestamp() - 30 * DAY);
         await unit.panel.powerOn();
         expect(await secondsToFix(unit, 60)).toBeLessThan(60);
-        // #175: for one tick the message is listed twice (Database.onGPSAcquired and the persistent message); after it, once
         await vi.advanceTimersByTimeAsync(5000);
 
         expect(messages(unit).filter(m => m === TEXT)).toHaveLength(1);
+    });
+
+    // B-2 names one message, and 3-16 keeps it until read. Before #175 the one-time message of Database.onGPSAcquired and
+    // the persistent message were both listed at the fix
+    it('lists it once at every display tick from the fix on, unread (B-2, 3-16) (#175)', async () => {
+        const unit = await bootUnit({engineRunning: false, start: AFTER_CYCLE, storage: {lastLatitude: 47, lastLongitude: 8}});
+        const gps = unit.props.sensors.in.gps;
+        gps.timeZulu = TimeStamp.create(gps.timeZulu.getTimestamp() - 30 * DAY);
+        await unit.panel.powerOn();
+        expect(await secondsToFix(unit, 60)).toBeLessThan(60);
+
+        const counts: number[] = [];
+        for (let i = 0; i < 20; i++) {
+            counts.push(messages(unit).filter(m => m === TEXT).length);
+            await vi.advanceTimersByTimeAsync(250);
+        }
+
+        expect(counts).toEqual(new Array(20).fill(1));
+        expect(unit.props.messageHandler.getMessages().find(m => m.message.join(' ') === TEXT)!.seen).toBe(false);
     });
 
     it('does not post when the GPS leaves the date as it was (B-2)', async () => {

@@ -287,8 +287,8 @@ main computer; RAIM failures are still not modeled.
   `lastAlmanacDownload` and `lastEphemeris` (`"prn:time,prn:time"`, restored into the SDK satellites at boot, so a new
   session within the 2 h of the ephemeris is a hot start).
 - `gpsAcquired()` can post `POSITION DIFFERS FROM LAST POSITION BY >2NM`. If the time error is over 10 minutes it posts
-  `SYSTEM TIME UPDATED TO GPS TIME` and publishes **`timeUpdatedEvent`**; `Database` listens and posts the AIRAC-expired
-  message.
+  `SYSTEM TIME UPDATED TO GPS TIME` and publishes **`timeUpdatedEvent`** (SET 2 publishes it too; nothing subscribes
+  since #175). The AIRAC-expired message is the persistent `DatabaseOutOfDateMessage` alone (Core 9).
 - Internal clock `timeZulu` (`data/Time.ts TimeStamp`):
     - At construction it is set from `E:ABSOLUTE TIME` plus a random ±2.5 s. No hour is subtracted, and the hour
       `PowerButton` assumes for the CRT warm-up is not used.
@@ -693,7 +693,12 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       `persistentMessages` whose condition becomes true, and resets their `seen` flag when the condition goes false.
       `KLN90BCore` calls `clear()` at every power-off (also a loss of electricity): the active messages go and the
       persistent ones return once their condition holds. They return unread, which is this project's choice and not a
-      fact from the manuals.
+      fact from the manuals. `clear()` also calls the optional `onPowerOff()` of each persistent message, for one that
+      keeps state of the power-on in which it was posted.
+    - `DatabaseOutOfDateMessage` latches at the change from current to expired (a SET 2 or self-test date, the GPS
+      correcting the date, the end passing in flight) and holds until it is seen; its `onPowerOff()` drops the latch and
+      the last validity, so a power-up with the date already past the end posts nothing (#175; KLN 89 trainer,
+      2026-10-18).
     - Messages are added with `messageHandler.addMessage(new OneTimeMessage(["LINE1","LINE2"]))`; each line holds at
       most about 22 to 23 characters.
 - `buildPersistentMessages(props)` creates: `AltitudeFailMessage`, `ArmGPSApproachMessage`, `DatabaseOutOfDateMessage`,
