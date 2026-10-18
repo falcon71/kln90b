@@ -125,6 +125,33 @@ describe('Super NAV 5 mode row in the OBS modes (characterization)', () => {
     });
 });
 
+// 5-35: a colon after OBS means the course can be entered on the unit; figures 6-20 and 6-22 (6-12, 6-14) show the
+// field where the course is set on the external indicator: OBS, the course and its degree sign, no colon
+describe('Super NAV 5 OBS field (5-35, 6-12, 6-14)', () => {
+    // The figures' case: the approach-arm OBS mode with the course from the external indicator (armed() keeps the
+    // default OBS source, Nav OBS:1), as in the mode row test above
+    it('shows OBS, the course and its degree sign without a colon where the course comes from the external indicator (5-35, 6-12, 6-14)', async () => {
+        const {unit} = await armed();
+        unit.env.sim.set('Nav OBS:1', 'degrees', 180);
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(1000);
+        await showSuperNav5(unit);
+
+        expect(SuperNav5.read().left[5]).toBe('Ù180°');
+    });
+});
+
+// The maintainer's reading of 5-35 (#396): where the course can be entered, the colon follows OBS; the six cells of the
+// column leave no room for the degree sign then. No figure shows this case
+describe('Super NAV 5 OBS field (characterization)', () => {
+    it('characterization: shows OBS: and the course without a degree sign where the course can be entered (#396)', async () => {
+        const {unit} = await enrouteObs(); // NO_OBS
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(SuperNav5.read().left[5]).toBe('Ù:051');
+    });
+});
+
 // The Super NAV 5 mode row is the 90B's own. The KLN 89 trainer (2026-10-07) shows the OBS course at north as 000, never
 // 360; that rule is applied to this row by analogy
 describe('Super NAV 5 mode row at north (characterization)', () => {

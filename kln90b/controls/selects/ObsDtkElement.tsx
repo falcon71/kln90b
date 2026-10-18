@@ -24,10 +24,15 @@ export class ObsDtkElement implements Field {
     protected readonly ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
 
+    /**
+     * @param withoutDegreeWhenEditable Super NAV 5 (#396): where the course can be entered, the colon after OBS takes the
+     * cell of the degree sign
+     */
     constructor(private readonly planeSettings: KLN90PlaneSettings,
                 private readonly sensors: Sensors,
                 private readonly navState: NavPageState,
-                private readonly modeController: ModeController) {
+                private readonly modeController: ModeController,
+                private readonly withoutDegreeWhenEditable: boolean = false) {
     }
 
     public clear(): boolean {
@@ -103,10 +108,11 @@ export class ObsDtkElement implements Field {
 
     private getDisplayValue(): string {
         const dtk = this.modeController.getDtkOrObsMagnetic();
-        return dtk === null ? "---°" : `${format(roundBearing(dtk), "000")}°`;
+        const degree = this.withoutDegreeWhenEditable && this.canObsBeEntered() ? "" : "°";
+        return dtk === null ? `---${degree}` : `${format(roundBearing(dtk), "000")}${degree}`;
     }
 
-    private canObsBeEntered(): boolean {
+    public canObsBeEntered(): boolean {
         return this.modeController.isObsModeActive() &&
             (this.planeSettings.output.obsTarget !== 0 || this.sensors.in.obsMag === null);
     }
