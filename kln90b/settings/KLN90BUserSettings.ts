@@ -76,6 +76,8 @@ export type KLN90BUserSettingsTypes = {
     airspaceAlertEnabled: boolean;
     airspaceAlertBuffer: number;
     altAlertVolume: number;
+    altAlertEnabled: boolean;
+    altAlertWarn: number;
     htAboveAptEnabled: boolean;
     htAboveAptOffset: number;
     turnAnticipation: boolean;
@@ -195,6 +197,16 @@ export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSett
             {
                 name: "altAlertVolume",
                 defaultValue: 99,
+            },
+            {
+                //ALT page ALERT ON/OFF, kept over a power cycle (the maintainer's ruling, #259)
+                name: "altAlertEnabled",
+                defaultValue: false,
+            },
+            {
+                //ALT page WARN in ft; 3-55: entered only the first time altitude alerting is used, so it is kept (#259)
+                name: "altAlertWarn",
+                defaultValue: 300,
             },
             {
                 name: "htAboveAptEnabled",

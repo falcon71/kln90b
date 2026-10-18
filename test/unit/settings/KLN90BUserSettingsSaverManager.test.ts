@@ -33,6 +33,8 @@ const DEFAULTS: Record<string, unknown> = {
     airspaceAlertEnabled: true,
     airspaceAlertBuffer: 500,
     altAlertVolume: 99,
+    altAlertEnabled: false, // #259
+    altAlertWarn: 300, // #259
     htAboveAptEnabled: false,
     htAboveAptOffset: 800,
     turnAnticipation: true,

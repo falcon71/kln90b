@@ -32,11 +32,6 @@ export interface WaypointPageState<T extends Facility> {
     lastMatch: T | null,
 }
 
-export interface AltPageState {
-    alertEnabled: boolean;
-    alertWarn: number;
-}
-
 export interface FplPageState {
     flightplans: Flightplan[];
 }
@@ -186,11 +181,6 @@ export class VolatileMemory {
         lastMatch: null,
     };
 
-    public readonly altPage: AltPageState = {
-        alertEnabled: false,
-        alertWarn: 300,
-    };
-
     public readonly dtPage: DtPageState = {
         flightTimer: 0,
         departureTime: null,
@@ -259,8 +249,6 @@ export class VolatileMemory {
         this.ndbPage.lastMatch = null;
         this.intPage.lastMatch = null;
         this.supPage.lastMatch = null;
-        this.altPage.alertEnabled = false;
-        this.altPage.alertWarn = 300;
 
         if (evt.timeSincePowerChange > RESET_TIME) {
             this.fplPage.flightplans[0].removeProcedures();

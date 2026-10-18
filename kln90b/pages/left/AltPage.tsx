@@ -30,14 +30,14 @@ export class AltPage extends SixLineHalfPage {
 
         this.children = new UIElementChildren<AltPageTypes>({
             baro: BaroFieldsetFactory.createBaroFieldSet(this.props.sensors.in.airdata.barometer, this.props.userSettings, this.saveBaro.bind(this)),
-            alert: new SelectField([" OFF", "ON ›"], this.props.memory.altPage.alertEnabled ? 1 : 0, this.setAlertEnabled.bind(this)),
-            warn: new SelectField(["2", "3", "4", "5", "6", "7", "8", "9"], this.props.memory.altPage.alertWarn / 100 - 2, this.setAlertWarn.bind(this)),
+            alert: new SelectField([" OFF", "ON ›"], this.isAlertOn() ? 1 : 0, this.setAlertEnabled.bind(this)),
+            warn: new SelectField(["2", "3", "4", "5", "6", "7", "8", "9"], this.props.userSettings.getSetting("altAlertWarn").get() / 100 - 2, this.setAlertWarn.bind(this)),
         });
 
         this.children.get("baro").setReadonly(isBaroTransmitted(this.props.planeSettings));
 
         this.children.get("alert").isReadonly = !this.props.planeSettings.output.altitudeAlertEnabled;
-        this.children.get("warn").isReadonly = !this.props.memory.altPage.alertEnabled;
+        this.children.get("warn").isReadonly = !this.isAlertOn();
 
         this.cursorController = new CursorController(this.children);
         this.cursorController.setCursorActive(true);
@@ -66,9 +66,7 @@ export class AltPage extends SixLineHalfPage {
     protected redraw() {
         super.redraw();
 
-        const enabled = this.props.memory.altPage.alertEnabled;
-
-        if (enabled) {
+        if (this.isAlertOn()) {
             this.brRef.instance.classList.remove("d-none");
             this.warnRef.instance.classList.remove("d-none");
         } else {
@@ -81,13 +79,21 @@ export class AltPage extends SixLineHalfPage {
         this.props.sensors.in.airdata.barometer = baro;
     }
 
+    /**
+     * ALERT ON/OFF is a user setting (#259). 3-57: an installation without altitude alerting shows OFF, whatever was
+     * stored while it had it
+     */
+    private isAlertOn(): boolean {
+        return this.props.planeSettings.output.altitudeAlertEnabled && this.props.userSettings.getSetting("altAlertEnabled").get();
+    }
+
     private setAlertEnabled(enabled: number) {
-        this.props.memory.altPage.alertEnabled = enabled === 1;
-        this.children.get("warn").isReadonly = !this.props.memory.altPage.alertEnabled;
+        this.props.userSettings.getSetting("altAlertEnabled").set(enabled === 1);
+        this.children.get("warn").isReadonly = !this.isAlertOn();
         this.requiresRedraw = true;
     }
 
     private setAlertWarn(warn: number) {
-        this.props.memory.altPage.alertWarn = (warn + 2) * 100;
+        this.props.userSettings.getSetting("altAlertWarn").set((warn + 2) * 100);
     }
 }

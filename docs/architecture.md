@@ -589,8 +589,9 @@ written then, on purpose: the default autopilot reads it.
 Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (DataStore) under the key
 `"<ATC MODEL>.profile_1"`. `KLN90BSettingSaveManager` concatenates four managers:
 
-- `KLN90BUserSettings`: about 55 typed keys. These include `welcome1..4`, `powercycles`, `totalTime`, `timezone`, baro,
-  `lastLatitude/Longitude`, `lastAlmanacDownload`, `lastEphemeris`, `activeWaypoint` (ICAO **V1** string), alert settings,
+- `KLN90BUserSettings`: the typed keys that `KLN90BUserSettingsTypes` declares. These include `welcome1..4`, `powercycles`, `totalTime`, `timezone`, baro,
+  `lastLatitude/Longitude`, `lastAlmanacDownload`, `lastEphemeris`, `activeWaypoint` (ICAO **V1** string), alert settings
+  (the ALT page's `altAlertEnabled` and `altAlertWarn` since #259, which a power cycle keeps),
   `turnAnticipation`, the NAV 5 and Super NAV 5 layout, CAL page inputs, `fastGpsAcquisition` and `userDataFormat`.
 - `KLN90BUserWaypointsSettings`: `wpt0..wpt249` (`MAX_USER_WAYPOINTS=250`).
 - `KLN90BUserFlightplansSettings`: `fpl0..fpl25` (`NUM_FLIGHTPLANS=25`, inclusive loop).
@@ -625,7 +626,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - Remarks (`settings/RemarksManager.ts`): stored as `ident(blank-padded to 4 chars) + 3×11 chars`, keyed by airport ident; publishes
   `changed` (`RemarksChangedEvent`).
 - **`VolatileMemory`** (`data/VolatileMemory.ts`) is not persisted. It holds RAM state for each page group:
-  `aptPage/vorPage/ndbPage/intPage/supPage` (`WaypointPageState`), `altPage`, `dtPage`, `fplPage {flightplans}`, *
+  `aptPage/vorPage/ndbPage/intPage/supPage` (`WaypointPageState`), `dtPage`, `fplPage {flightplans}`, *
   *`navPage: NavPageState`** (the hub for nav results, mode, `activeWaypoint`, `isSelfTestActive`, NAV 4 VNAV inputs,
   `userMagvar`), `triPage`, `calPage`, `ctrPage` and `othPage`.
     - `reset()` runs on every power-on. It resets these fields, **removes procedures from FPL 0 when the unit was off
@@ -852,7 +853,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - `subPageIndices` remembers the last sub-page per group.
 - `createPage(type)` = `new type(this.props)`. **Pages are recreated on every knob step.** Instance state is lost, so
   durable state lives in `props.memory` (`VolatileMemory`: `aptPage`, `vorPage`, `ndbPage`, `intPage`, `supPage`,
-  `navPage`, `fplPage`, `dtPage`, `triPage`, `altPage`, ...) or in `userSettings`.
+  `navPage`, `fplPage`, `dtPage`, `triPage`, ...) or in `userSettings` (the ALT page's ALERT and WARN, #259).
 - The tree position is found with `instanceof` (`getPageIndices`). Every slot must therefore be a *distinct class*. That
   is why `Fpl0Page...Fpl25Page` are trivial subclasses of `FplPage({page:n})`, and why NAV 4 is split into
   `Nav4LeftPage`/`Nav4RightPage` (they differ in `getPageSide()`). Nav1/2/3/5 are the same classes in both trees.

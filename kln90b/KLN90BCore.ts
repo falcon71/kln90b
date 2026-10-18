@@ -348,7 +348,7 @@ export class KLN90BCore {
                 new NavCalculator(sensors, memory, magvar, this.userSettings, modeController, this.planeSettings),
                 airspaceAlert,
                 new HtAboveAirportAlert(memory.navPage, this.planeSettings, sensors, this.userSettings),
-                new AltAlert(memory, this.planeSettings, sensors),
+                new AltAlert(memory, this.planeSettings, sensors, this.userSettings),
                 new Timers(sensors, this.userSettings, memory.dtPage),
                 vnav,
                 this.messageHandler,

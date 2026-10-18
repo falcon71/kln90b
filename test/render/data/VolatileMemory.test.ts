@@ -192,9 +192,8 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
         const unit = await bootOnStandardRoute();
         const m = unit.props.memory;
         // Every field reset() lists, set to a value other than its default. nav4VnavWpt is a waypoint ahead in FPL 0, so
-        // that Vnav.tick keeps it (it drops an invalid one itself)
-        m.altPage.alertEnabled = true;
-        m.altPage.alertWarn = 500;
+        // that Vnav.tick keeps it (it drops an invalid one itself). The ALT page's ALERT and WARN are user settings since
+        // #259, which reset() does not touch (the test below)
         m.dtPage.flightTimer = 1234;
         m.dtPage.departureTime = TimeStamp.create(0);
         m.triPage.tas = 99;
@@ -224,7 +223,6 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
 
         await cycle(unit);
 
-        expect(m.altPage.alertEnabled).toBe(false); // Whether the on/off switch survives is not settled
         expect(m.dtPage.departureTime).toBeNull();
         expect(m.triPage).toMatchObject({tas: 150, windSpeed: 0, windDirTrue: 0, tri1To: null, tri3From: null, tri3To: null, tri5Fpl: 0});
         expect(m.navPage.nav4VnavWpt).toBeNull();
@@ -278,20 +276,19 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
 });
 
 // 3-55 step 4: the pilot normally enters the warn altitude only the first time altitude alerting is used, so the unit
-// keeps it. The sibling is 'puts the page state back to its defaults at the power-on (characterization)' above: it sets
-// the same state and runs the same power cycle, and passes
+// keeps it. Since #259 it is the user setting altAlertWarn, which the power-on leaves alone; the ALT page tests show it
 describe('the ALT warn altitude over a power cycle', () => {
-    it.fails('keeps the ALT warn altitude over a power cycle (3-55, #259)', async () => {
+    it('keeps the ALT warn altitude over a power cycle (3-55, #259)', async () => {
         const unit = await bootUnit();
         await settle(unit);
-        const m = unit.props.memory;
-        m.altPage.alertWarn = 500;
+        const warn = unit.props.userSettings.getSetting('altAlertWarn');
+        warn.set(500);
         await vi.advanceTimersByTimeAsync(2000);
-        expect(m.altPage.alertWarn).toBe(500); // The precondition: nothing else resets it
+        expect(warn.get()).toBe(500); // The precondition: nothing else resets it
 
         await cycle(unit);
 
-        expect(m.altPage.alertWarn).toBe(500);
+        expect(warn.get()).toBe(500);
     });
 });
 
