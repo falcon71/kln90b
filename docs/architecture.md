@@ -131,8 +131,9 @@ arrives.
 **Hot-swap disable**: the 100 ms poll of `SimVarSync` is the only reader of `L:KLN90B_Disabled`. `setDisabled` keeps
 the state in `Hardware.isDisabled` (a unit taken out of the aircraft, not one switched off; its doc comment lists what a
 disabled unit does), calls `tickController.setEnabled(false)` and `pageManager.resetKeyboard()`, and if
-`writeGPSSimVars` is set it toggles `GPS OVERRIDDEN`. The gates read `Hardware.isDisabled`, never the LVar, so they lag
-it by at most one poll.
+`writeGPSSimVars` is set it releases `GPS OVERRIDDEN` on the disable and claims it again on the resume. While
+disabled nothing claims it, since `SensorsOut.reset()` skips its claim on a power change then (#350). The gates read
+`Hardware.isDisabled`, never the LVar, so they lag it by at most one poll.
 
 **Input routing**: the sim delivers H events as `BaseInstrument.onInteractionEvent(args)`.
 

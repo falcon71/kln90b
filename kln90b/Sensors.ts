@@ -31,6 +31,7 @@ import {
     LVAR_XTK,
 } from "./LVars";
 import {GPS} from "./Gps";
+import {Hardware} from "./Hardware";
 import {SignalOutputFilter} from "./services/SignalOutputFilter";
 
 
@@ -258,7 +259,7 @@ export class SensorsOut {
 
     private xtkFilter = new SignalOutputFilter();
 
-    constructor(private readonly options: KLN90PlaneSettings, public readonly audioGenerator: AudioGenerator) {
+    constructor(private readonly options: KLN90PlaneSettings, public readonly audioGenerator: AudioGenerator, private readonly hardware: Hardware) {
         this.reset();
     }
 
@@ -596,7 +597,9 @@ export class SensorsOut {
     }
 
     public reset() {
-        if (!this.options.output.writeGPSSimVars) {
+        //#350: a unit disabled for hot swapping has released the GPS to the unit that replaced it, so a power change does
+        //not claim it. SimVarSync.setDisabled claims it again on the resume
+        if (!this.options.output.writeGPSSimVars || this.hardware.isDisabled) {
             return;
         }
 
@@ -635,9 +638,9 @@ export class Sensors implements CalcTickable {
     public out: SensorsOut;
 
 
-    constructor(bus: EventBus, userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, audioGenerator: AudioGenerator, messageHandler: MessageHandler) {
+    constructor(bus: EventBus, userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, audioGenerator: AudioGenerator, messageHandler: MessageHandler, hardware: Hardware) {
         this.in = new SensorsIn(bus, userSettings, options, messageHandler);
-        this.out = new SensorsOut(options, audioGenerator);
+        this.out = new SensorsOut(options, audioGenerator, hardware);
 
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.reset.bind(this));
     }

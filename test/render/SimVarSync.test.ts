@@ -1,4 +1,4 @@
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, onTestFinished, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../harness/boot';
 import {Screen} from '../harness/render/screen';
 import {standardRoute} from '../harness/fixtures';
@@ -287,7 +287,7 @@ describe('L:KLN90B_WriteGpsSimvars (public contract)', () => {
 });
 
 // The Hot Swapping wiki page: a disabled unit does not claim the GPS (GPS OVERRIDDEN 0, see SensorsOut.test.ts #24), and
-// toggling WriteGpsSimvars does not change that (#137).
+// neither toggling WriteGpsSimvars (#137) nor a power change (#350) changes that.
 describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
     it('the sibling: the disabled unit has released GPS OVERRIDDEN', async () => {
         const unit = await bootOnStandardRoute();
@@ -357,6 +357,72 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
         await vi.advanceTimersByTimeAsync(300);
 
         expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
+    });
+
+    // A power change claims the GPS at once (SensorsOut.reset). The aircraft power is Input.ElectricitySimVar; a disabled
+    // unit ignores the power H events (#138), so the circuit is its only power path
+    const onCircuit = () => bootOnStandardRoute({panelXml: CIRCUIT_XML, simVars: [{name: 'CIRCUIT ON:1', unit: 'bool', value: 1}]});
+
+    it('the sibling: a loss of the aircraft power claims the GPS of an enabled unit at once', async () => {
+        const unit = await onCircuit();
+        const sim = unit.env.sim;
+        sim.set('GPS OVERRIDDEN', 'bool', false); // As another device would
+
+        sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
+    });
+
+    it('stays released when the aircraft power goes off and comes back (#350)', async () => {
+        const unit = await onCircuit();
+        const sim = unit.env.sim;
+        sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
+        sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
+    });
+
+    it('claims the GPS on the resume after the aircraft power went off and came back while disabled (#350)', async () => {
+        const unit = await onCircuit();
+        const sim = unit.env.sim;
+        sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(3000);
+        sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        sim.set('L:KLN90B_Disabled', 'bool', false);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
+    });
+
+    // The maintainer's ruling: the gates read Hardware.isDisabled, never the LVar (see the read count of #138 below). The
+    // gate of the power change (SensorsOut.reset) runs on each of the two circuit changes: two seconds of polls, ten per
+    // second, and no read of its own
+    it('reads L:KLN90B_Disabled only in the poll, also when the aircraft power changes (#350)', async () => {
+        const unit = await onCircuit();
+        const sim = unit.env.sim;
+        sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        const read = vi.spyOn(SimVar, 'GetSimVarValue');
+        onTestFinished(() => read.mockRestore()); // A second spyOn on the method would return this one with its calls
+
+        sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(1000);
+        sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(read.mock.calls.filter(c => c[0] === 'L:KLN90B_Disabled').length).toBe(20);
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0); // Precondition: the power change did not claim the GPS
     });
 });
 
