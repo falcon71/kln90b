@@ -11,6 +11,7 @@ import {showSuperNav5, SuperNav5} from '../../harness/render/superNav5';
 import {savedFlightplan} from '../../harness/storage';
 import {APR_ARM_SWITCH, NO_OBS, panelXml, PanelOptions} from '../../harness/panelXml';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
+import {NavMode} from '../../../kln90b/data/VolatileMemory';
 
 /**
  * The mode glyphs of the KLN font (kln90b.ttf), read by drawing each code point: Ê is ENR, Ë is LEG, Í is ARM and Ì is
@@ -73,18 +74,7 @@ describe('Super NAV 5 mode row (5-32)', () => {
         expect(SuperNav5.read().left[2]).toBe(`${APR}-${LEG}`);
     });
 
-    // 5-32: ARM:259, the selected magnetic course after a colon. The final course of approachWorld() is 180 and the
-    // variation 0. Without an OBS input the unit picks the course that leaves the deviation unchanged (5-36); the
-    // aircraft is on the final course, so that is the DTK, 180
-    it('shows ARM: and the OBS course in the approach-arm OBS mode (5-32)', async () => {
-        const {unit} = await armed(NO_OBS);
-        await unit.panel.obsMode();
-        await showSuperNav5(unit);
-
-        expect(SuperNav5.read().left[2]).toBe(`${ARM}:180`);
-    });
-
-    // 5-32: the preconditions of the pin below, ENR and the course 051
+    // 5-32: ENR and the course 051, the course of the active leg
     it('shows ENR and the OBS course in the enroute OBS mode (sibling of #321) (5-32)', async () => {
         const {unit, course} = await enrouteObs();
 
@@ -96,12 +86,42 @@ describe('Super NAV 5 mode row (5-32)', () => {
         expect(mode.startsWith(ENR)).toBe(true);
         expect(mode.endsWith('051')).toBe(true);
     });
+});
 
-    // 5-32: ENR:274, the colon between the mode and the course, as ARM:259 has it (and the code has it for ARM)
-    it.fails('shows ENR: and the OBS course in the enroute OBS mode (5-32, #321)', async () => {
+// 6-12 and 6-14, figures 6-20 and 6-22: Super NAV 5 in the approach-arm OBS mode with the course set on the external
+// indicator shows ARM and the course with no colon and no space (the 5-32 table is the status line's form)
+describe('Super NAV 5 mode row in the OBS modes (6-12, 6-14)', () => {
+    it('shows ARM and the course without a colon in the approach-arm OBS mode (6-12, 6-14, figures 6-20 and 6-22)', async () => {
+        const {unit} = await armed();
+        unit.env.sim.set('Nav OBS:1', 'degrees', 180); // the final course of approachWorld(), magvar 0
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(1000);
+        await showSuperNav5(unit);
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ARM_OBS); // Precondition
+        expect(SuperNav5.read().left[2]).toBe(`${ARM}180`);
+    });
+});
+
+// The row has no colon in either OBS mode (the maintainer's ruling, #321), also where the course can be entered on the
+// unit (NO_OBS), a case no figure shows. The AVsoftech trainer is never a spec source for this row
+describe('Super NAV 5 mode row in the OBS modes (characterization)', () => {
+    // Without an OBS input the unit picks the course that leaves the deviation unchanged (5-36); the aircraft is on the
+    // final course, so that is the DTK, 180. The final course of approachWorld() is 180 and the variation 0
+    it('characterization: shows ARM and the course without a colon without an OBS input (#321)', async () => {
+        const {unit} = await armed(NO_OBS);
+        await unit.panel.obsMode();
+        await showSuperNav5(unit);
+
+        expect(SuperNav5.read().left[2]).toBe(`${ARM}180`);
+    });
+
+    // The AVsoftech trainer (unreliable) shows ENR300 in the enroute OBS mode; by analogy with figures 6-20 and 6-22
+    // (#321, which expected ENR:)
+    it('characterization: shows ENR and the course without a colon or a space in the enroute OBS mode (#321)', async () => {
         const {unit} = await enrouteObs();
 
-        expect(SuperNav5.read().left[2]).toBe(`${ENR}:051`);
+        expect(SuperNav5.read().left[2]).toBe(`${ENR}051`);
     });
 });
 
