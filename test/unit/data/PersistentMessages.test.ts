@@ -32,6 +32,7 @@ interface World {
     obsTarget: number;
     airdataInterfaced: boolean;
     baroSource: number;
+    selfTestApproved: boolean;
 }
 
 /** A page object that passes the instanceof checks of PersistentMessages without being rendered */
@@ -56,6 +57,7 @@ function quietWorld(): World {
         obsTarget: 0,
         airdataInterfaced: false,
         baroSource: 0,
+        selfTestApproved: true,
     };
 }
 
@@ -73,6 +75,9 @@ function harness(w: World) {
         },
         get userMagvar() {
             return w.userMagvar;
+        },
+        get isSelfTestApproved() {
+            return w.selfTestApproved;
         },
     };
     const mainPage = Object.create(MainPage.prototype);
@@ -507,7 +512,7 @@ describe('ADJ NAV IND CRS TO nnn, a readable indicator', () => {
         w.dtkMag = 46;
         w.obsIn = 46;
         const h = harness(w);
-        h.tick(); // The first DTK opens the force window; 31 s is past its 30 s
+        h.tick(); // The first DTK is the start-up course and opens no force window (#330); 31 s keep a window closed anyway
         vi.advanceTimersByTime(31_000);
         return {w, h};
     };
@@ -622,18 +627,110 @@ describe('ADJ NAV IND CRS TO nnn, a readable indicator', () => {
         expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 040°']);
     });
 
+    // Since #330 the course at the first evaluation after the approval is the start-up course and opens no window, so
+    // the first DTK here comes after a start-up without one, as at a Direct To after a start-up without a flight plan
     it('opens the window at the first DTK, even on course (characterization)', () => {
         vi.useFakeTimers({toFake: ['Date']});
         vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
         const w = quietWorld();
+        const h = harness(w);
+        expect(h.tick()).toEqual([]); // The start-up, without a DTK
         w.dtkMag = 3;
         w.obsIn = 3;
-        expect(harness(w).tick()).toEqual(['ADJ NAV IND CRS TO 003°']);
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 003°']);
     });
 
     it('does not show without a course read back from the indicator (characterization)', () => {
         const {w, h} = readable();
         w.obsIn = null;
+        expect(h.tick()).toEqual([]);
+    });
+});
+
+describe('ADJ NAV IND CRS TO nnn before the self-test is approved', () => {
+    const atNoon = () => {
+        vi.useFakeTimers({toFake: ['Date']});
+        vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
+    };
+
+    // Figure 3-4: the self-test page with the indicator on 242° against the fixed course of 315° and no message prompt.
+    // The maintainer's ruling (#330) widens this to the whole time before the approval, the Turn-On page included. The
+    // same world after the approval shows the message, so the approval is what lets it through
+    it('is not evaluated before the approval, with the indicator off the course (figure 3-4) (#330)', () => {
+        atNoon();
+        const w = quietWorld();
+        w.dtkMag = 315;
+        w.obsIn = 242;
+        w.selfTestApproved = false;
+        const h = harness(w);
+        expect(h.tick()).toEqual([]);
+        expect(h.tick()).toEqual([]);
+
+        w.selfTestApproved = true;
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 315°']);
+    });
+
+    // #330: the start-up is no DTK change. The DTK of 046° at the approval opens no 30 s window (#177) for a pilot whose
+    // indicator is already on it
+    it('takes the course at the approval as no DTK change, so it opens no 30 s window (#330)', () => {
+        atNoon();
+        const w = quietWorld();
+        w.selfTestApproved = false;
+        const h = harness(w);
+        expect(h.tick()).toEqual([]);
+        w.selfTestApproved = true;
+        w.dtkMag = 46;
+        w.obsIn = 46;
+
+        expect(h.tick()).toEqual([]);
+    });
+
+    // #330: the engine-running start skips the self-test and counts as approved; its first course is the start-up
+    // course as well
+    it('takes the first course of a start that skips the self-test as no DTK change (#330)', () => {
+        atNoon();
+        const w = quietWorld();
+        w.dtkMag = 46;
+        w.obsIn = 46;
+
+        expect(harness(w).tick()).toEqual([]);
+    });
+
+    // #330: every power-on starts anew. The last course of the previous power-on (046°) is not compared with the DTK at
+    // the next approval (100°), so that DTK opens no window either
+    it('takes the course at the approval after a power cycle as no DTK change (#330)', () => {
+        atNoon();
+        const w = quietWorld();
+        w.dtkMag = 46;
+        w.obsIn = 46;
+        const h = harness(w);
+        expect(h.tick()).toEqual([]); // Precondition: the start-up course opens no window
+        w.selfTestApproved = false; // The next power-on
+        expect(h.tick()).toEqual([]);
+        w.dtkMag = 100;
+        w.obsIn = 100;
+        w.selfTestApproved = true;
+
+        expect(h.tick()).toEqual([]);
+    });
+
+    // #330: a window opened by a DTK change before a power-off does not show after the approval of the next power-on,
+    // although its 30 s have not run out
+    it('ends a window from before the power-off at the approval (#330)', () => {
+        atNoon();
+        const w = quietWorld();
+        w.dtkMag = 46;
+        w.obsIn = 46;
+        const h = harness(w);
+        h.tick();
+        w.dtkMag = 100;
+        w.obsIn = 100;
+        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']); // Precondition: the DTK change opened the window
+        w.selfTestApproved = false; // The next power-on
+        expect(h.tick()).toEqual([]);
+        vi.advanceTimersByTime(5_000);
+        w.selfTestApproved = true;
+
         expect(h.tick()).toEqual([]);
     });
 });

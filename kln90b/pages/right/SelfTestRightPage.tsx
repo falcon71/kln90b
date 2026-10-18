@@ -144,6 +144,7 @@ export class SelfTestRightPage extends SixLineHalfPage {
 
     private approve(): void {
         this.props.memory.navPage.isSelfTestActive = false;
+        this.props.memory.navPage.isSelfTestApproved = true;
 
         this.props.sensors.out.audioGenerator.shortBeeps(5);
         if (this.props.planeSettings.vfrOnly) {

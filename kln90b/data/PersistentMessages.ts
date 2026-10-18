@@ -32,9 +32,9 @@ export function buildPersistentMessages(props: PageProps): Message[] {
     ];
 
     if (props.planeSettings.output.obsTarget === 0) {
-        messages.push(new AdjustCourseToWithObsReadingMessage(props.sensors, props.modeController));
+        messages.push(new AdjustCourseToWithObsReadingMessage(props.sensors, props.modeController, props.memory.navPage));
     } else {
-        messages.push(new AdjustCourseMessage(props.sensors));
+        messages.push(new AdjustCourseMessage(props.sensors, props.memory.navPage));
     }
 
     return messages;
@@ -49,15 +49,30 @@ class AdjustCourseToWithObsReadingMessage implements Message {
 
     private lastCourse: number | null = null;
     private validUntil: number = 0;
+    private atStartUp = true; //Until the first evaluation after the self-test is approved (#330)
 
 
-    constructor(private readonly sensors: Sensors, private readonly modeController: ModeController) {
+    constructor(private readonly sensors: Sensors, private readonly modeController: ModeController, private readonly navState: NavPageState) {
     }
 
 
     public isConditionValid(): boolean {
+        if (!this.navState.isSelfTestApproved) {
+            //#330: not evaluated before the self-test is approved, neither on the Turn-On page nor on the self-test page,
+            //whose fixed course is part of the check and not a course to set (figure 3-4)
+            this.atStartUp = true;
+            return false;
+        }
+
         //This message has two conditions. They must both be here, otherwise this message could be shown twice
         const dtk = this.modeController.getDtkOrObsMagnetic();
+        if (this.atStartUp) {
+            //#330: the course at the approval is where the unit starts, not a DTK change, so it opens no 30 s window,
+            //and a window from before the power-off is over
+            this.atStartUp = false;
+            this.forceShow = false;
+            this.lastCourse = dtk;
+        }
         if (dtk === null || this.modeController.isObsModeActive()) {
             return false;
         }
@@ -95,10 +110,16 @@ class AdjustCourseMessage implements Message {
     public seen: boolean = false;
 
 
-    constructor(private readonly sensors: Sensors) {
+    constructor(private readonly sensors: Sensors, private readonly navState: NavPageState) {
     }
 
     public isConditionValid(): boolean {
+        if (!this.navState.isSelfTestApproved) {
+            //#330: not evaluated before the self-test is approved, as for the readable indicator. The self-test page
+            //sends its fixed course (figure 3-4) to a driven indicator, which reads it back one tick later
+            return false;
+        }
+
         if (this.sensors.out.obsOut === null || this.sensors.in.obsMag === null) {
             return false;
         }

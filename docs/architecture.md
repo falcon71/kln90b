@@ -117,10 +117,14 @@ arrives.
 - Welcome and self-test flow (lives in pages, summarised here for wiring): `WelcomePage.tick` waits `TEST_TIME=17000`
   ms, a free cursor and `memory.isReady`. It then goes to:
     - `FiveSegmentPage(SelfTestLeftPage, SelfTestRightPage)` normally. `SelfTestLeftPage` sets
-      `navPage.isSelfTestActive = true` and `SelfTestRightPage` clears it.
+      `navPage.isSelfTestActive = true` and `SelfTestRightPage` clears it at the approval, where it also sets
+      `navPage.isSelfTestApproved`.
     - `TakehomePage` if `takeHomeMode` is set.
     - `pageManager.startMainPage(props)` directly if `forceReadyToUse` is set. This also calls
-      `gpsSatComputer.acquireAndUseSatellites()`.
+      `gpsSatComputer.acquireAndUseSatellites()` and sets `navPage.isSelfTestApproved` (a skipped self-test counts as
+      approved).
+- `navPage.isSelfTestApproved` is false from every power-on (`VolatileMemory.reset`) until then. Unlike
+  `isSelfTestActive` it also covers the Turn-On page; ADJ NAV IND CRS is not evaluated before it (#330).
 - While `isSelfTestActive` is set:
     - `NavCalculator` outputs fixed test values (XTK -2.5, DIS 34.5, DTK 315 mag, FROM, waypoint alert on).
     - `RollSteeringController` sweeps 0 to -5 degrees of bank, but only with a heading input (without one the roll
@@ -706,7 +710,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - `buildPersistentMessages(props)` creates: `AltitudeFailMessage`, `ArmGPSApproachMessage`, `DatabaseOutOfDateMessage`,
   `IfRequiredSelectObsMessage`, `MagvarMessage`, `Obs200NMMessage`, `PressAltToSetBaroMessage`, `VnavAlertMessage`, plus
   `AdjustCourseToWithObsReadingMessage` (`ADJ NAV IND CRS TO xxx°`) when `obsTarget===0`, otherwise
-  `AdjustCourseMessage`.
+  `AdjustCourseMessage`. The former is not evaluated before the self-test is approved, and it takes the course at its
+  first evaluation after the approval as the start, not as a DTK change that opens its 30 s window (#330).
 - The MSG page (`controls/MessagePage.tsx`) shows newest first. `controls/StatusLine.tsx` shows the `MSG` indicator and
   drives `L:KLN90B_MsgLight` in the display tick: flashing while unread, steady while read, off when empty.
 - **Status-line transient messages** are a separate channel. Publish `statusLineMessage` (`StatusLineMessageEvents`)

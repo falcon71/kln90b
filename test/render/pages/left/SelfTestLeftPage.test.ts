@@ -1,7 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootToSelfTest} from '../../../harness/boot';
+import {BootOptions, bootToSelfTest, bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {HEADING_INPUT, NO_OBS, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
+import {messages} from '../../../harness/readers';
+import {standardRoute} from '../../../harness/fixtures';
+import {savedFlightplan} from '../../../harness/storage';
 
 describe('self-test page', () => {
     it('outputs a course of 315° and an RMI bearing of 130° during the self-test (955b535)', async () => {
@@ -283,13 +286,145 @@ describe('self-test page status line (spec)', () => {
         expect(Screen.read().status().right).toBe('CRSR');
     });
 
-    // The persistent ADJ NAV IND CRS TO 315° compares the fixed self-test course with the indicator and posts during
-    // the self-test, so msg follows enr-leg. The KLN 89 trainer showed no message prompt on its self-test page (T8); it
-    // has no readable course there and no status line, so this is its rule and not its readable-course case
-    it.fails('shows enr-leg without msg (figure 3-4; checked in the KLN 89 trainer, 2026-10-09, T8) '
+    // Before #330 the persistent ADJ NAV IND CRS TO 315° compared the fixed self-test course with the indicator and
+    // posted during the self-test, so msg followed enr-leg. The KLN 89 trainer showed no message prompt on its self-test
+    // page (T8); it has no readable course there and no status line, so this is its rule and not its readable-course
+    // case. The AVsoftech trainer (unreliable) showed no prompt either with its course well away from 315°
+    it('shows enr-leg without msg (figure 3-4; checked in the KLN 89 trainer, 2026-10-09, T8) '
         + '(#330)', async () => {
         await selfTestAsFigure();
 
         expect(Screen.read().status().mode).toBe('enr-leg');
+    });
+
+    // T8's own case: the 89 reads no course. Before #330 the first self-test course opened the 30 s window of the
+    // message (#177), so msg showed for most of the first half minute of the page
+    it('shows enr-leg without msg without a readable indicator (checked in the KLN 89 trainer, 2026-10-09, T8) (#330)', async () => {
+        const unit = await bootToSelfTest({magvar: 0, storage: {lastLatitude: 47, lastLongitude: 8}, panelXml: panelXml(NO_OBS)});
+        const modes: string[] = [];
+        for (let i = 0; i < 30; i++) {
+            modes.push(Screen.read().status().mode);
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+
+        expect(new Set(modes)).toEqual(new Set(['enr-leg']));
+        expect(messages(unit)).toEqual([]);
+    });
+});
+
+/**
+ * A unit at KAAA with the standard route KAAA, ABC, KBBB as FPL 0 (DTK 050°, magvar 0) and an indicator it reads on
+ * `obsIn`
+ */
+function onStandardRoute(obsIn: number): BootOptions {
+    const {kaaa, abc, kbbb} = standardRoute();
+    return {
+        magvar: 0,
+        facilities: [kaaa, abc, kbbb],
+        storage: {lastLatitude: 47, lastLongitude: 8, ...savedFlightplan(0, [kaaa, abc, kbbb])},
+        simVars: [{name: 'Nav OBS:1', unit: 'degrees', value: obsIn}],
+    };
+}
+
+/** The self-test page of `onStandardRoute(obsIn)`, approved at once */
+async function approvedOnStandardRoute(obsIn: number): Promise<HeadlessUnit> {
+    const unit = await bootToSelfTest(onStandardRoute(obsIn));
+    await unit.panel.approveSelfTest();
+    await vi.advanceTimersByTimeAsync(2000); // Two calculation ticks: the self-test course gives way to the DTK
+    expect(Math.round(unit.props.modeController.getDtkOrObsMagnetic()!)).toBe(50); // Precondition: the leg to ABC
+    return unit;
+}
+
+/** The ADJ NAV IND CRS messages listed at every second for the next `seconds` */
+async function adjustMessagesFor(unit: HeadlessUnit, seconds: number): Promise<string[]> {
+    const seen = new Set<string>();
+    for (let i = 0; i < seconds; i++) {
+        messages(unit).filter(m => m.startsWith('ADJ NAV IND CRS')).forEach(m => seen.add(m));
+        await vi.advanceTimersByTimeAsync(1000);
+    }
+    return [...seen];
+}
+
+const approveShows = () => Screen.read().rows('R').some(r => r.trim() === 'APPROVE?');
+
+describe('ADJ NAV IND CRS around the self-test', () => {
+    // The maintainer's ruling (#330): the message is not evaluated before the self-test is approved, on the Turn-On page
+    // as well as on the self-test page. Before, the Turn-On page computed the DTK of 050° and listed the message from
+    // about 13 s after the power-on
+    it('is not listed from the power-on until the approval, with the indicator off the DTK (#330)', async () => {
+        const unit = await bootUnit({...onStandardRoute(242), engineRunning: false});
+        await unit.panel.powerOn();
+
+        expect(await adjustMessagesFor(unit, 30)).toEqual([]);
+        expect(approveShows()).toBe(true); // Precondition: not yet approved
+    });
+
+    // #330 for the indicator the unit drives (ObsTarget 1): the self-test page sends its fixed course of 315° to the
+    // indicator and reads it back one tick later, so the driven variant of the message saw the two differ and listed
+    // before the approval. It samples every display tick, because the difference lasts less than a second
+    it('is not listed on the Turn-On or the self-test page with an indicator the unit drives (#330)', async () => {
+        const unit = await bootUnit({
+            ...onStandardRoute(50), panelXml: panelXml({'Output.ObsTarget': 1}), engineRunning: false,
+        });
+        unit.env.sim.applyObsKeyEvents = true;
+        await unit.panel.powerOn();
+
+        const seen: string[] = [];
+        for (let i = 0; i < 120; i++) {
+            messages(unit).filter(m => m.startsWith('ADJ NAV IND CRS')).forEach(m => seen.push(m));
+            await vi.advanceTimersByTimeAsync(250);
+        }
+
+        expect(seen).toEqual([]);
+        expect(approveShows()).toBe(true); // Precondition: still on the self-test page, not yet approved
+        expect(unit.env.sim.keyEvents.some(k => k.name === 'K:VOR1_SET' && k.value === 315)).toBe(true); // The course was slewed
+    });
+
+    // B-1: with a readable indicator the message shows while the course differs from the DTK by more than 5°
+    it('shows ADJ NAV IND CRS TO 050° right after the approval with the indicator off the DTK (B-1)', async () => {
+        const unit = await approvedOnStandardRoute(242);
+
+        expect(await adjustMessagesFor(unit, 40)).toEqual(['ADJ NAV IND CRS TO 050°']);
+        expect(messages(unit)).toContain('ADJ NAV IND CRS TO 050°'); // Still there after 40 s: the course differs
+    });
+
+    // #330: the start-up is no DTK change, so the DTK at the approval opens no 30 s window (#177) for a pilot whose
+    // indicator is already on it
+    it('shows no ADJ NAV IND CRS right after the approval with the indicator on the DTK (#330)', async () => {
+        const unit = await approvedOnStandardRoute(50);
+
+        expect(await adjustMessagesFor(unit, 40)).toEqual([]);
+    });
+
+    // #330: every power-on waits for its own approval. The listed message goes with the power-off (MessageHandler.clear)
+    // and does not come back on the Turn-On page or the self-test page of the next power-on, only after its approval
+    it('is not listed again before the approval of the next power-on (#330)', async () => {
+        const unit = await approvedOnStandardRoute(242);
+        expect(messages(unit)).toContain('ADJ NAV IND CRS TO 050°'); // Precondition: listed after the first approval
+
+        await unit.panel.powerCycle();
+        expect(await adjustMessagesFor(unit, 25)).toEqual([]);
+        expect(approveShows()).toBe(true); // Precondition: not yet approved
+
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(messages(unit)).toContain('ADJ NAV IND CRS TO 050°');
+    });
+
+    // #330: the engine-running start skips the Turn-On and self-test pages (WelcomePage, forceReadyToUse), and a
+    // skipped self-test counts as approved
+    it('shows ADJ NAV IND CRS TO 050° on an engine-running start, which skips the self-test (#330)', async () => {
+        const unit = await bootUnit(onStandardRoute(242));
+
+        expect(await adjustMessagesFor(unit, 10)).toEqual(['ADJ NAV IND CRS TO 050°']);
+    });
+
+    // #330: on the engine-running start too, the first DTK is the start-up course and opens no 30 s window (#177)
+    it('shows no ADJ NAV IND CRS on an engine-running start with the indicator on the DTK (#330)', async () => {
+        const unit = await bootUnit(onStandardRoute(50));
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(Math.round(unit.props.modeController.getDtkOrObsMagnetic()!)).toBe(50); // Precondition: the leg to ABC
+
+        expect(await adjustMessagesFor(unit, 40)).toEqual([]);
     });
 });

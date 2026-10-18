@@ -64,6 +64,11 @@ export function isObsMode(mode: NavMode): boolean {
 export class NavPageState {
 
     public isSelfTestActive: boolean = false;
+    /**
+     * False from the power-on until the self-test is approved. The start-ups that skip the self-test (the
+     * engine-running boot, debugMode) count as approved. ADJ NAV IND CRS is not evaluated before (#330)
+     */
+    public isSelfTestApproved: boolean = false;
     public activeWaypoint: ActiveWaypoint;
     public navmode: NavMode = NavMode.ENR_LEG;
 
@@ -275,6 +280,7 @@ export class VolatileMemory {
         this.navPage.aprActivationDist = 2;
         this.navPage.aprActivationScale = 1;
         this.navPage.userMagvar = 0;
+        this.navPage.isSelfTestApproved = false; //Every power-on runs the self-test again (#330)
 
         this.calPage.cal6TimeZ = null;
         this.calPage.cal6FromTimezone = null;
