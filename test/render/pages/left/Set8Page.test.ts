@@ -2,6 +2,10 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {storedSetting} from '../../../harness/storage';
+import {ALTITUDE_ALERT, panelXml} from '../../../harness/panelXml';
+
+// #141: the parser default of Output.AltitudeAlertEnabled is false, so a test that needs the altitude alerter states it
+const ALERT_INSTALLED = panelXml(ALTITUDE_ALERT(true));
 
 describe('SET 8 page (characterization)', () => {
     it('shows the alert enabled with the default buffer and the cursor off', async () => {
@@ -106,7 +110,7 @@ describe('SET 8 airspace alert (3-41)', () => {
     // The buffer is its own setting, airspaceAlertBuffer: changing it leaves the SET 5 offset of the height above airport
     // alert (htAboveAptOffset) as it was (#89)
     it('leaves the SET 5 offset alone when the buffer changes (#89)', async () => {
-        const unit = await bootUnit({storage: {htAboveAptEnabled: true, htAboveAptOffset: 1200}});
+        const unit = await bootUnit({panelXml: ALERT_INSTALLED, storage: {htAboveAptEnabled: true, htAboveAptOffset: 1200}});
         await unit.panel.selectPage('L', 'SET 8');
         await unit.panel.cursor('L');
         await unit.panel.outer('L', 3); // the hundreds digit

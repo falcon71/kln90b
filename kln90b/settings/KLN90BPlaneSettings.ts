@@ -107,7 +107,7 @@ export class KLN90BPlaneSettingsParser {
             },
             output: {
                 obsTarget: this.getChoice(instrumentsTag, "Output.ObsTarget", OBS_DEVICES, 0),
-                altitudeAlertEnabled: this.getBoolean(instrumentsTag, "Output.AltitudeAlertEnabled", true),
+                altitudeAlertEnabled: this.getBoolean(instrumentsTag, "Output.AltitudeAlertEnabled", false),
                 writeGPSSimVars: this.getBoolean(instrumentsTag, "Output.WriteGPSSimVars", true),
             },
             debugMode: false,

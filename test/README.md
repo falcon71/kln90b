@@ -434,8 +434,8 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   not cached, so a recorder installed later starts empty. The sim plays one tone at a time and reports its end
   (`KLN90B.onSoundEnd`), which asks for the next, so a pattern is one id until the end is reported:
   `finishAll()` reports the end of the playing sound until no new one is requested (at most 20 times). The unit asks
-  for sounds unless the panel.xml of the boot sets `Output.AltitudeAlertEnabled` to false (it defaults to true); a test
-  of the sounds still sets it, so that the precondition is in the test.
+  for sounds only when the panel.xml of the boot sets `Output.AltitudeAlertEnabled` to true (it defaults to false,
+  #141), so a test of the sounds states `ALTITUDE_ALERT(true)`.
 - **`moveAircraft(unit, point, {groundspeedKt, trackTrue?})`** (`boot.ts`) moves the aircraft so that the GPS computes a
   track, which it takes from the last two positions once the ground speed is at least 2 kt (3-35). The helper sets
   `GROUND VELOCITY`, jumps to the point and runs one calculation tick, so the track is that of the jump from the present
@@ -481,8 +481,9 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   default: the parser falls back to its default for a tag it does not find, so a misspelled tag in a hand-written
   document tests the default and passes. `panelXml` throws on a key outside the list, and
   `test/unit/harness/panelXml.test.ts` parses every key through the real parser and asserts the parsed setting differs
-  from the default, so a misspelled entry of the list fails there. The altitude alert is a function because its parser
-  default (true) is the open question #141: a test that depends on it states it.
+  from the default, so a misspelled entry of the list fails there. The altitude alert is a function so that a test
+  states either value: the parser default is false (#141), and a test that needs the alerter states
+  `ALTITUDE_ALERT(true)`.
 - **Readers of the unit's state** (`readers.ts`). `userWaypoints(unit, type?)` lists the user waypoints of the facility
   repository in repository order, and the type is stated at the call: without it airports, VORs, NDBs and intersections
   of the user are in too, and `FacilityType.USR` is the supplementary waypoints only, so a local loop that forgets the

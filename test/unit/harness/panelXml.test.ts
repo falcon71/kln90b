@@ -32,7 +32,7 @@ const CASES: Record<PanelKey, [string | number | boolean, (s: KLN90PlaneSettings
     'Input.ExternalSwitches.LegObsSwitchInstalled': [true, s => s.input.externalSwitches.legObsSwitchInstalled],
     'Input.ExternalSwitches.AppArmSwitchInstalled': [true, s => s.input.externalSwitches.appArmSwitchInstalled],
     'Output.ObsTarget': [1, s => s.output.obsTarget],
-    'Output.AltitudeAlertEnabled': [false, s => s.output.altitudeAlertEnabled],
+    'Output.AltitudeAlertEnabled': [true, s => s.output.altitudeAlertEnabled],
     'Output.WriteGPSSimVars': [false, s => s.output.writeGPSSimVars],
 };
 
@@ -57,6 +57,7 @@ describe('panelXml (harness)', () => {
         expect(parse(panelXml(LEG_OBS_SWITCH)).input.externalSwitches.legObsSwitchInstalled).toBe(true);
         expect(parse(panelXml(VFR_ONLY)).vfrOnly).toBe(true);
         expect(parse(panelXml(AIRDATA)).input.airdata.isInterfaced).toBe(true);
+        expect(parse(panelXml(ALTITUDE_ALERT(true))).output.altitudeAlertEnabled).toBe(true);
         expect(parse(panelXml(ALTITUDE_ALERT(false))).output.altitudeAlertEnabled).toBe(false);
         const fuel = parse(panelXml(fuelComputer({unit: 'IMP', type: 'JetB', fob: false, fuelUsed: false}))).input.fuelComputer;
         expect(fuel).toEqual({isInterfaced: true, unit: 'IMP', type: 'JetB', fobTransmitted: false, fuelUsedTransmitted: false});

@@ -56,7 +56,10 @@ export const APR_ARM_SWITCH = {'Input.ExternalSwitches.AppArmSwitchInstalled': t
 export const NO_ALTIMETER = {'Input.AltimeterInterfaced': false} as const;
 export const VFR_ONLY = {'VFROnly': true} as const;
 export const AIRDATA = {'Input.Airdata.IsInterfaced': true} as const;
-/** Explicit, because the parser default (true) is the open question #141 */
+/**
+ * The parser default is false (#141). A test that needs the alerter states ALTITUDE_ALERT(true), and one of an
+ * installation without it states false, so that the precondition is in the test
+ */
 export const ALTITUDE_ALERT = (enabled: boolean) => ({'Output.AltitudeAlertEnabled': enabled}) as const;
 
 /** An interfaced fuel computer; the rest of its keys only when given */

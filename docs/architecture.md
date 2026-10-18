@@ -679,9 +679,11 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `Input.Airdata.{IsInterfaced=false, BaroSource=0}`
     - `Input.FuelComputer.{IsInterfaced=false, Unit=GAL, Type=AVGAS, FOBTransmitted=true, FuelUsedTransmitted=true}`
     - `Input.ExternalSwitches.{LegObsSwitchInstalled=false, AppArmSwitchInstalled=false}`
-    - `Output.{ObsTarget=0, AltitudeAlertEnabled=true, WriteGPSSimVars=true}`
+    - `Output.{ObsTarget=0, AltitudeAlertEnabled=false, WriteGPSSimVars=true}` (`AltitudeAlertEnabled` was true before
+      #141)
     - `debugMode` = false (hard-coded)
-- Note that the sample `cfg/panel.xml` sets `AltitudeAlertEnabled=false`, while the code default is true.
+- The sample `cfg/panel.xml` sets `AltitudeAlertEnabled=false`, the default. An aircraft that wants the altitude alerter
+  sets it to true and declares the `kln_short_beep` and `kln_long_beep` sounds.
 - After parsing it writes the runtime-override LVars (Core 4). An `ElectricitySimVar` like `CIRCUIT ON:1` has its
   index replaced every 100 ms by `L:KLN90B_ElectricitySimVarIndex`.
 - `KLN90PlaneSettings` is **mutable at runtime** through `SimVarSync`; code reads `planeSettings.input/output.*` live.

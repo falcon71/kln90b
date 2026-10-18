@@ -4,9 +4,12 @@ import {ALTITUDE_ALERT, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
 import {storedSetting} from '../../../harness/storage';
 
+// #141: the parser default of Output.AltitudeAlertEnabled is false, so a test that needs the altitude alerter states it
+const ALERT_INSTALLED = panelXml(ALTITUDE_ALERT(true));
+
 describe('SET 9 page (characterization)', () => {
-    it('characterization: the alert volume with the alert enabled by default', async () => {
-        const unit = await bootUnit();
+    it('characterization: the alert volume with the alert enabled', async () => {
+        const unit = await bootUnit({panelXml: ALERT_INSTALLED});
         await unit.panel.selectPage('L', 'SET 9');
 
         expect(Screen.read().half('L')).toMatchInlineSnapshot(`
@@ -39,8 +42,8 @@ describe('SET 9 page and Output.AltitudeAlertEnabled (contract)', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // The explicit true equals the code default (#141), so this cannot fail if the key stops being read; it bites
-    // once that default is fixed to false. The volume 99 is the default of the altAlertVolume setting.
+    // The explicit true is not the parser default (false, #141), so this fails if the key stops being read. The volume
+    // 99 is the default of the altAlertVolume setting.
     it('shows the volume instead when the alert is enabled', async () => {
         const unit = await bootUnit({panelXml: panelXml(ALTITUDE_ALERT(true))});
         await unit.panel.selectPage('L', 'SET 9');
@@ -62,7 +65,7 @@ describe('SET 9 page and Output.AltitudeAlertEnabled (contract)', () => {
 // the persisted setting altAlertVolume (CLAUDE.md "Public contract with aircraft": setting keys).
 describe('SET 9 alert volume (3-57)', () => {
     it('sets the volume 02 digit by digit (3-57)', async () => {
-        const unit = await bootUnit();
+        const unit = await bootUnit({panelXml: ALERT_INSTALLED});
         await unit.panel.selectPage('L', 'SET 9');
         await unit.panel.cursor('L'); // the tens digit of 99
         // The wraps of 9 to 0 below: checked in the KLN 89 trainer, 2026-10-08 (3-57 does not speak of the wrap)

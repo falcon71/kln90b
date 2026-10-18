@@ -367,7 +367,7 @@ describe('approving the self-test page (spec)', () => {
     // tones are requested one at a time on the bus (AudioGenerator.test.ts); kln_short_beep is the id the aircraft
     // declares (public contract). The recorder reports the end of each tone as the sim does
     it('plays five short beeps (3-7)', async () => {
-        const unit = await onSelfTestPage();
+        const unit = await onSelfTestPage({panelXml: panelXml(ALTITUDE_ALERT(true))}); // #141: the alert audio is off by default
         const sounds = recordSounds(unit);
         await unit.panel.cursorTo('R', 'APPROVE?');
         expect(sounds.ids).toEqual([]);

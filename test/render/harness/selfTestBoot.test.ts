@@ -4,7 +4,7 @@ import {Screen} from '../../harness/render/screen';
 import {recordSounds} from '../../harness/sounds';
 import {ALTITUDE_ALERT, panelXml} from '../../harness/panelXml';
 
-const ALERT_OFF_XML = panelXml(ALTITUDE_ALERT(false));
+const ALERT_ON_XML = panelXml(ALTITUDE_ALERT(true));
 
 describe('bootToSelfTest', () => {
     // 3-4: the self-test page shows OBS out 315° on the left, 3-7: APPROVE? waits for ENT on the right
@@ -26,10 +26,10 @@ describe('bootToSelfTest', () => {
         expect(unit.errors).toEqual([]);
     });
 
-    // The options reach the boot: with the alert output off in the panel.xml, ENT on APPROVE? sounds nothing, which
-    // the default (alert output on, see sounds.test.ts) does
-    it('passes its options on to the boot (panelXml: no beeps with the alert output off)', async () => {
-        const unit = await bootToSelfTest({panelXml: ALERT_OFF_XML});
+    // The options reach the boot: the parser default is the alert output off (#141), so the five tones of ENT on APPROVE?
+    // (3-7 step 11) sound only when the panel.xml given here, with the alert output on, is the one that boots
+    it('passes its options on to the boot (panelXml: the tones sound with the alert output on)', async () => {
+        const unit = await bootToSelfTest({panelXml: ALERT_ON_XML});
         const sounds = recordSounds(unit);
 
         await unit.panel.cursorTo('R', 'APPROVE?');
@@ -37,7 +37,7 @@ describe('bootToSelfTest', () => {
         sounds.finishAll();
 
         expect(Screen.read().rows('R').map(r => r.trim())).not.toContain('APPROVE?');
-        expect(sounds.ids).toEqual([]);
+        expect(sounds.ids).toEqual(Array(5).fill('kln_short_beep'));
         expect(unit.errors).toEqual([]);
     });
 
