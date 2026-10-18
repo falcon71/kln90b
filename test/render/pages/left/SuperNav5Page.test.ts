@@ -122,6 +122,47 @@ describe('Super NAV 5 page (characterization)', () => {
 
         expect(SuperNav5.read().right![3]).toBe(' 000° N^');
     });
+
+    // 3-37 shows a route VOR only; an NDB of FPL 0 is drawn once by analogy (#233). No trainer drew one
+    it('labels an NDB of FPL 0 once with the NDBs on (characterization, #233)', async () => {
+        const w = world();
+        const map = recordMap({KAAA: w.kaaa, AB: w.ab, KBBB: w.kbbb});
+        const unit = await bootUnit({
+            facilities: w.facilities, position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
+            storage: {...savedFlightplan(0, [w.kaaa, w.ab, w.kbbb]), superNav5Ndb: true},
+        });
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await showSuperNav5(unit);
+
+        expect(labels(map.drawn).filter(l => l === 'AB')).toEqual(['AB']);
+        expect(map.drawn).not.toContain('icon ( AB');
+    });
+
+    // By analogy with the KLN 89's NAV 4 map, checked in the KLN 89 trainer, 2026-10-17 (#233): with the VORs on, a VOR
+    // of FPL 0 gets no VOR symbol, only the route's square. No Super NAV 5 page shows it
+    it('characterization: draws no VOR symbol at a VOR of FPL 0 with VOR: H (#233)', async () => {
+        const {map} = await superNav5OnRoute({storage: {superNav5Vor: 1}}); // 1 = H, which selects ABC
+
+        expect(map.drawn).toContain('icon ) HIG'); // Precondition: the VORs are drawn
+        expect(map.drawn).not.toContain('icon ) ABC');
+        expect(map.drawn).toContain('icon @ ABC');
+    });
+
+    // #233: the plan's waypoint is skipped by its ICAO, which holds the facility type, not by its identifier, so an NDB
+    // named like the route VOR ABC is another facility and is drawn. No manual page shows it
+    it('draws an NDB named like a VOR of FPL 0 (characterization, #233)', async () => {
+        const w = standardRoute();
+        const ndbAbc = ndb('ABC', 47.05, 8.1);
+        const map = recordMap({ABC: ndbAbc, VORABC: w.abc});
+        const unit = await bootOnStandardRoute({facilities: [ndbAbc], storage: {superNav5Ndb: true}});
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await showSuperNav5(unit);
+
+        expect(map.drawn).toContain('icon ( ABC');
+        expect(map.drawn).toContain('label ABC ABC');
+        expect(map.drawn).toContain('label ABC VORABC'); // the route's label of the VOR
+    });
 });
 
 describe('Super NAV 5 page', () => {
@@ -240,7 +281,7 @@ describe('Super NAV 5 page', () => {
 
     // 3-37: H draws only high altitude VORs, LH low and high altitude VORs, OFF none. (TLH and terminal VORs: #204 in
     // NearestList.test.ts.) The VOR symbol is ")" in the map font (a circle with a dot), and each VOR is labeled with
-    // its identifier.
+    // its identifier. ABC, a VOR of FPL 0, is left to the route (the characterization of #233 above).
     it.each([
         ['OFF', 0, []],
         ['H', 1, ['HIG']],
@@ -249,7 +290,7 @@ describe('Super NAV 5 page', () => {
         const {map} = await superNav5OnRoute({storage: {superNav5Vor: setting}});
 
         const vors = map.drawn.filter(d => d.startsWith('icon )')).map(d => d.split(' ')[2]).sort();
-        expect(vors).toEqual([...idents, ...(setting === 0 ? [] : ['ABC'])].sort());
+        expect(vors).toEqual([...idents].sort());
     });
 
     // 3-37: NDB: ON draws the nearest NDBs (the smaller circle, "(" in the map font) and APT: ON the nearest airports
@@ -302,8 +343,8 @@ describe('Super NAV 5 page', () => {
         expect(Math.abs(squares[1][2] - 13.65)).toBeLessThanOrEqual(1);
     });
 
-    // The sibling of the pin below: with VOR: OFF the route labels ABC once, and with VOR: H ABC is a nearest VOR
-    it('labels a VOR of FPL 0 with the VORs off, and draws it as a nearest VOR with VOR: H (3-37)', async () => {
+    // 3-37: the route labels ABC, a VOR of FPL 0, once with the VORs off, and once with VOR: H, which selects ABC
+    it('labels a VOR of FPL 0 once, with the VORs off and with VOR: H (3-37)', async () => {
         const off = await superNav5OnRoute();
         expect(labels(off.map.drawn).filter(l => l === 'ABC')).toEqual(['ABC']);
         await off.unit.panel.cursor('R');
@@ -311,12 +352,23 @@ describe('Super NAV 5 page', () => {
         await off.unit.panel.cursor('R');
         await vi.advanceTimersByTimeAsync(500);
 
-        expect(off.map.drawn).toContain('icon ) ABC');
+        expect(labels(off.map.drawn).filter(l => l === 'ABC')).toEqual(['ABC']);
     });
 
     // 3-37 (figures 3-121 and 3-122): with the VORs on, the flight plan VOR LRP is labeled once
-    it.fails('labels a VOR of FPL 0 once with the VORs on (3-37, #233)', async () => {
+    it('labels a VOR of FPL 0 once with the VORs on (3-37, #233)', async () => {
         const {map} = await superNav5OnRoute({storage: {superNav5Vor: 1}});
+
+        expect(labels(map.drawn).filter(l => l === 'ABC')).toEqual(['ABC']);
+    });
+
+    // #233: the plan and the nearest list can hold different objects for the same facility (they are loaded at
+    // different times), so the plan's VOR is found by its ICAO. Here the plan holds a copy of ABC
+    it('labels a VOR of FPL 0 once when the plan holds another object for it (#233)', async () => {
+        const {unit, map} = await superNav5OnRoute({storage: {superNav5Vor: 1}});
+        const leg = unit.props.memory.fplPage.flightplans[0].getLegs().find(l => l.wpt.icaoStruct.ident === 'ABC')!;
+        leg.wpt = {...leg.wpt};
+        await vi.advanceTimersByTimeAsync(500);
 
         expect(labels(map.drawn).filter(l => l === 'ABC')).toEqual(['ABC']);
     });

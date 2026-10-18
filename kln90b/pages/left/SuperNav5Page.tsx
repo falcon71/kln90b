@@ -173,10 +173,10 @@ export class SuperNav5Page extends SevenLinePage {
         }
 
         if (!this.isDecluttered && this.vorSetting.get() !== SuperNav5VOR.OFF) {
-            this.drawNearestList(ctx, this.props.nearestLists.vorNearestList.getNearestList().filter(this.filterNearestVor.bind(this)), ")")
+            this.drawNearestList(ctx, this.props.nearestLists.vorNearestList.getNearestList().filter(this.filterNearestVor.bind(this)), ")", legs);
         }
         if (!this.isDecluttered && this.ndbSetting.get()) {
-            this.drawNearestList(ctx, this.props.nearestLists.ndbNearestList.getNearestList(), "(")
+            this.drawNearestList(ctx, this.props.nearestLists.ndbNearestList.getNearestList(), "(", legs);
         }
         if (!this.isDecluttered && this.aptSetting.get()) {
             this.drawAirports(ctx, legs, range)
@@ -374,8 +374,13 @@ export class SuperNav5Page extends SevenLinePage {
         }
     }
 
-    private drawNearestList(ctx: CoordinateCanvasDrawContext, waypoints: NearestWpt<Facility>[], icon: string) {
+    private drawNearestList(ctx: CoordinateCanvasDrawContext, waypoints: NearestWpt<Facility>[], icon: string, legs: KLNFlightplanLeg[]) {
         for (const wpt of waypoints) {
+            //3-37, figures 3-121 and 3-122, #233: a waypoint of FPL 0 is drawn and labeled once, by the flight plan, as
+            //drawAirports does for airports. By ICAO: the plan and the nearest list load their facilities separately
+            if (legs.some(leg => ICAO.valueEquals(leg.wpt.icaoStruct, wpt.facility.icaoStruct))) {
+                continue;
+            }
             ctx.drawIcon(wpt.facility, icon);
             ctx.drawLabel(wpt.facility, wpt.facility.icaoStruct.ident);
         }
