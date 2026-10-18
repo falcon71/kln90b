@@ -73,18 +73,26 @@ describe('NAV 3 page (characterization)', () => {
             'KAAA ›KDDD ',
             'DTK    089°',
             'TK     090°',
-            'FLY L 0.3nm',
+            'FLY L0.30nm',
             'MSA 15900ft',
             'ESA 15900ft',
         ]);
     });
+});
 
-    // The code shows the cross track below 1 NM in tenths; the test holds that and claims nothing about the real unit.
-    // tenths or hundredths below 1 NM is a question: #231
-    it('reads FLY L 0.3nm 0.3 NM right of the course (characterization)', async () => {
+describe('NAV 3 page, the cross track below 1 NM (#231)', () => {
+    // A photo of a real unit (TCAS,_GPS_and_Altitude_Alerter_(250504914).jpg) shows FLY R0.09NM: hundredths with a zero
+    // in front and no blank after R. Figure 3-105 (3-32) shows tenths; the maintainer ruled for the photo (#231)
+    it('reads FLY R0.09nm 0.09 NM left of the course (#231)', async () => {
+        await nav3OnLeg(-0.09);
+
+        expect(Screen.read().rows('L')[3]).toBe('FLY R0.09nm');
+    });
+
+    it('reads FLY L0.30nm 0.3 NM right of the course (#231)', async () => {
         await nav3OnLeg(0.3);
 
-        expect(Screen.read().rows('L')[3]).toBe('FLY L 0.3nm');
+        expect(Screen.read().rows('L')[3]).toBe('FLY L0.30nm');
     });
 });
 
