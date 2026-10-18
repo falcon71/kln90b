@@ -1,4 +1,4 @@
-import {Facility, FacilityType, FSComponent, ICAO, VNode} from '@microsoft/msfs-sdk';
+import {Facility, FacilityType, FSComponent, ICAO, Subscription, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
@@ -21,6 +21,7 @@ export class Oth3Page extends SixLineHalfPage {
 
     public readonly cursorController;
     readonly children: UIElementChildren<Oth3PageTypes>;
+    private readonly subscription: Subscription;
 
     readonly name: string = "OTH 3";
 
@@ -34,7 +35,12 @@ export class Oth3Page extends SixLineHalfPage {
         this.cursorController.setStartFieldProvider(() => this.children.get("wptList").topVisibleField());
 
 
-        this.props.bus.getSubscriber<any>().on(KLNFacilityRepository.SYNC_TOPIC).handle(this.refreshList.bind(this));
+        this.subscription = this.props.bus.getSubscriber<any>().on(KLNFacilityRepository.SYNC_TOPIC).handle(this.refreshList.bind(this));
+    }
+
+    public destroy(): void {
+        this.subscription.destroy(); //#96
+        super.destroy();
     }
 
     public render(): VNode {

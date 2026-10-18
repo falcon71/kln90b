@@ -51,10 +51,13 @@ class PageStack {
         if (this.isBasePageShown()) {
             throw new Error("Cannot pop the base page");
         }
-        return this.stack.pop()!.page;
+        const page = this.stack.pop()!.page;
+        page.destroy(); //#96
+        return page;
     }
 
     public setCurrentPage(page: SixLineHalfPage): void {
+        this.stack[this.stack.length - 1].page.destroy(); //#96: every caller passes a new page
         this.stack[this.stack.length - 1] = {page, parent: null};
     }
 
@@ -84,10 +87,16 @@ class PageStack {
      */
     public parentRemoved(parent: SixLineHalfPage): boolean {
         const lengthBefore = this.stack.length;
+        this.stack.filter(p => p.parent === parent).forEach(p => p.page.destroy()); //#96
         this.stack = this.stack.filter(p => p.parent !== parent);
         return this.stack.length !== lengthBefore;
     }
 
+    /** Power off (#96) */
+    public destroyAll(): void {
+        this.stack.forEach(p => p.page.destroy());
+        this.stack = [];
+    }
 
 }
 
@@ -103,7 +112,9 @@ class OverlayStack {
         if (this.stack.length === 0) {
             throw new Error("No pages left to pop");
         }
-        return this.stack.pop()!;
+        const page = this.stack.pop()!;
+        page.destroy(); //#96
+        return page;
     }
 
     /**
@@ -112,8 +123,15 @@ class OverlayStack {
     public remove(type: typeof SuperNav1Page | typeof SuperNav5Page | typeof Set0Page): void {
         const idx = this.stack.findIndex(page => page instanceof type);
         if (idx !== -1) {
+            this.stack[idx].destroy(); //#96
             this.stack.splice(idx, 1);
         }
+    }
+
+    /** Power off (#96) */
+    public destroyAll(): void {
+        this.stack.forEach(p => p.destroy());
+        this.stack = [];
     }
 
     public getCurrentPage(): SixLinePage | SevenLinePage | null {
@@ -783,6 +801,10 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
     }
 
     public destroy(): void {
+        //#96 power off
+        this.leftPageStack.destroyAll();
+        this.rightPageStack.destroyAll();
+        this.overlayPageStack.destroyAll();
         this.statusLine.destroy();
         super.destroy();
     }

@@ -266,8 +266,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - `platform.getRouteManager().then(...)` in `KLN90BCore` has no catch; a rejection is an unhandled rejection
       (`bootFailure.test.ts` takes it), not an error-page error.
 - **Leads** (seen and not confirmed or not filed):
-    - Start-up pages: `WelcomePage` subscribes to `propsReady` in its constructor and never unsubscribes (the pattern of
-      #96); `docs/architecture.md` (UI 0) says the Turn-On page waits about 15 s, the code 17 s (the tests hold 14 to
+    - Start-up pages: `docs/architecture.md` (UI 0) says the Turn-On page waits about 15 s, the code 17 s (the tests hold 14 to
       19 s), and the code comment "page 84" is the V2 maintenance manual's numbering of the printed page 1011;
       `VFROnlyPage` renders a `<div>` where the other start-up pages use `<pre>`; figure 3-22 shows the VFR page's status
       line without a mode, the code `enr-leg ent`; `VFROnlyPage.acknowledge` taking the OBS branch always is an
@@ -292,11 +291,8 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 ## Across the suite
 
 - **Flip the pins when the bugs are fixed:** remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each
-  of which names its issue. Fixes that touch other tests:
-    - the fix of #96 needs `PageStack` in `MainPage.tsx` to destroy the half page it replaces (`setCurrentPage`, `pop`,
-      `parentRemoved`) besides the pages unsubscribing; the pages' `destroy()` alone leaves both handler counts
-      unchanged, and OTH 4 counts the `changed` topic of the remarks manager;
-    - a fix of #332 with a ride-through above about 1.5 s needs the 3 s waits of the circuit tests raised.
+  of which names its issue. A fix that touches other tests: a fix of #332 with a ride-through above about 1.5 s needs
+  the 3 s waits of the circuit tests raised.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): duplicate idents on a waypoint
   page (2026-10-08, T20, not done), and the empty top row of FPL 0 with the first waypoint active (above). #162 and
   #163 are no open questions: the trainer shows neither ARM nor ACTV, so the maintainer's rulings settle them and the

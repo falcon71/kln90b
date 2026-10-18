@@ -1,4 +1,4 @@
-import {FSComponent, VNode} from '@microsoft/msfs-sdk';
+import {FSComponent, Subscription, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
@@ -15,6 +15,7 @@ export class Oth4Page extends SixLineHalfPage {
 
     public readonly cursorController;
     readonly children: UIElementChildren<Oth4PageTypes>;
+    private readonly subscription: Subscription;
 
     readonly name: string = "OTH 4";
 
@@ -34,7 +35,12 @@ export class Oth4Page extends SixLineHalfPage {
         this.cursorController = new CursorController(this.children);
         this.cursorController.setStartFieldProvider(() => this.children.get("rmksList").topVisibleField());
 
-        this.props.bus.getSubscriber<RemarksChangedEvent>().on("changed").handle(this.refreshList.bind(this));
+        this.subscription = this.props.bus.getSubscriber<RemarksChangedEvent>().on("changed").handle(this.refreshList.bind(this));
+    }
+
+    public destroy(): void {
+        this.subscription.destroy(); //#96
+        super.destroy();
     }
 
     public render(): VNode {

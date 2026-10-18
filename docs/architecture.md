@@ -1030,10 +1030,15 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - Lifecycle:
     - `render()` builds the VNode, which may be called multiple times. `tick(blink)` handles updates. `redraw()` (
       SixLineHalfPage) handles flagged updates.
-    - `destroy()` exists only on `DisplayComponent` Pages (`MainPage`, `FiveSegmentPage`, `FourSegmentPage`,
-      `StatusLine`). Half pages are never destroyed; they are just dropped.
-    - Half pages that subscribe to the bus (`Oth3Page`, `Oth4Page`) never unsubscribe. Each recreation adds a
-      subscription, so this is a likely leak; avoid copying it.
+    - Every page is a `DisplayComponent`, and every way a page leaves calls its `destroy()` (#96): in `MainPage`,
+      `PageStack.setCurrentPage` (the page it replaces), `pop` and `parentRemoved` (the pushed pages of a removed
+      parent), `OverlayStack.pop` and `remove`, and `MainPage.destroy` at power-off, which destroys every page of the
+      three stacks. `PageContainer.setCurrentPage` destroys the full page it replaces (the welcome page, the main
+      page). `MainPage`, `FiveSegmentPage`, `FourSegmentPage` and `StatusLine` override it to destroy their
+      children.
+    - A page that subscribes to the bus keeps the `Subscription` and drops it in its `destroy()` (`Oth3Page`,
+      `Oth4Page`, `WelcomePage`), so the page's recreation on every knob step adds no handler. Follow that pattern in a
+      new page that subscribes.
     - No `onAfterRender` is used, except in `ErrorPage` and `PanelXmlErrorPage`.
 
 ### Element catalogue (`controls/`)

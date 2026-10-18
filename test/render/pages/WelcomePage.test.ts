@@ -117,3 +117,19 @@ describe('Turn-On page (characterization)', () => {
         expect(unit.errors).toEqual([]);
     });
 });
+
+// #96: every power-on builds a new welcome page, which subscribes to propsReady; the page it replaces must leave no
+// handler behind. A property of the code; no manual page applies
+describe('welcome page subscription (#96)', () => {
+    it('leaves the propsReady handler count unchanged from one power cycle to the next (#96)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.powerCycle();
+        await unit.panel.approveSelfTest();
+        const afterFirst = unit.props.bus.getTopicSubscriberCount('propsReady');
+
+        await unit.panel.powerCycle();
+        await unit.panel.approveSelfTest();
+
+        expect(unit.props.bus.getTopicSubscriberCount('propsReady')).toBe(afterFirst);
+    });
+});
