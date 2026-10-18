@@ -1,7 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {approachWorld, standardRoute} from '../../harness/fixtures';
-import {finalCourseDeg} from '../../harness/flight/geo';
+import {courseDeg, finalCourseDeg} from '../../harness/flight/geo';
+import {messages} from '../../harness/readers';
+import {TICK_TIME_DISPLAY} from '../../../kln90b/TickController';
+import {OneTimeMessage} from '../../../kln90b/data/MessageHandler';
 import {blinkCycle} from '../../harness/render/blink';
 import {readRows} from '../../harness/render/screen';
 import {showSuperNav5, SuperNav5} from '../../harness/render/superNav5';
@@ -146,5 +149,59 @@ describe('Super NAV 5 message prompt (3-16, 3-36)', () => {
 
         const [first, second] = await mapPromptCycles();
         expect(new Set([...first, ...second])).toEqual(new Set(['    ...']));
+    });
+
+    // A pilot reaches this state: the ADJ NAV IND CRS message is read and Super NAV 5 shows, then a new message is
+    // posted whose condition lapses before it is read (the shape of InsideAirspaceMessage). When the lapse falls between
+    // a flashing tick and the next display tick, the element that flashed is the one that must turn steady; whether it
+    // does so depends on the timing, so the test calls the message handler's tick itself, right after the flashing tick
+    // (the maintainer's ruling, #326)
+    it('keeps msg steady when the unread message lapses after a flashing tick (3-16, 3-36, #326)', async () => {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({magvar: 4});
+        unit.env.sim.set('Nav OBS:1', 'degrees', courseDeg(kaaa, abc) - 4 + 30);
+        await vi.advanceTimersByTimeAsync(15000); // Past the 10 s in which the message shows whatever the course is
+        await unit.panel.readMessages();
+        expect(messages(unit)).toEqual(['ADJ NAV IND CRS TO 046°']); // Preconditions
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
+        await showSuperNav5(unit);
+        const lapsing = new class extends OneTimeMessage {
+            public valid = true;
+
+            public isConditionValid(): boolean {
+                return this.valid && super.isConditionValid();
+            }
+        }(['NEW MESSAGE']);
+        unit.props.messageHandler.addMessage(lapsing);
+        for (let i = 0; i < 8 && mapPrompt() !== 'msg FFF'; i++) {
+            await vi.advanceTimersByTimeAsync(TICK_TIME_DISPLAY);
+        }
+        expect(mapPrompt()).toBe('msg FFF'); // Precondition: the prompt is unread and in its flashing phase
+
+        lapsing.valid = false;
+        unit.props.messageHandler.tick();
+        expect(messages(unit)).toEqual(['ADJ NAV IND CRS TO 046°']); // Precondition: only the read message is left
+        await vi.advanceTimersByTimeAsync(TICK_TIME_DISPLAY);
+
+        expect(mapPrompt()).toBe('msg III');
+        const [first, second] = await mapPromptCycles();
+        expect(new Set([...first, ...second])).toEqual(new Set(['msg III']));
+    });
+
+    // 3-16: a message whose condition needs action keeps the prompt on, not flashing, once it is read; 3-36 puts the same
+    // prompt on the map. The condition is a wrong external course, as in the status line test (StatusLine.test.ts). The
+    // steady inverse once read is the maintainer's ruling (#326)
+    it('keeps msg steady in inverse video once read while the condition stays (3-16, 3-36, #326)', async () => {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({magvar: 4});
+        unit.env.sim.set('Nav OBS:1', 'degrees', courseDeg(kaaa, abc) - 4 + 30);
+        await vi.advanceTimersByTimeAsync(15000); // Past the 10 s in which the message shows whatever the course is
+        await unit.panel.readMessages();
+        expect(messages(unit)).toEqual(['ADJ NAV IND CRS TO 046°']); // Preconditions
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
+        await showSuperNav5(unit);
+
+        const [first, second] = await mapPromptCycles();
+        expect(new Set([...first, ...second])).toEqual(new Set(['msg III']));
     });
 });

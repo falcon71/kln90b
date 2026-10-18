@@ -298,8 +298,8 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   #163 are no open questions: the trainer shows neither ARM nor ACTV, so the maintainer's rulings settle them and the
   tests hold them as characterizations.
   What the 90B shows on an empty MSG page (#325), the prompt while the MSG page shows and an airport below sea level
-  cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is
-  the question #326.
+  cannot be asked on the 89. The Super NAV 5 prompt once all messages are read is no open question: the maintainer
+  ruled it steady in inverse video (#326), and `SuperNav5Left.test.ts` holds it.
 - **Debug `console.log` calls** left in the code: `Apt3MapPage.tsx:30`, `TemporaryWaypointDeleter.ts:27` and `:32`,
   `WaypointPage.tsx:46` and `WaypointPage.getScrollSpeed`, `SupPage.tsx`, the constructors of the waypoint pages
   (`ActPage.tsx:43`, `Apt1Page.tsx:78`, `Apt6Page.tsx:43`, `IntPage.tsx:71`, `NdbPage.tsx:55`, `VorPage.tsx:58`,

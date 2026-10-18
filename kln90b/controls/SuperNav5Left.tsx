@@ -82,7 +82,9 @@ export class SuperNav5Left implements UiElement {
                     this.msgRef.instance.classList.remove("inverted-blink");
                 }
             } else {
-                this.msgRef.instance.classList.remove("inverted", "inverted-blink");
+                //3-16, #326: once read, the prompt stays on in inverse video without flashing, as on the status line
+                this.msgRef.instance.classList.add("inverted");
+                this.msgRef.instance.classList.remove("inverted-blink");
             }
         } else {
             this.msgRef.instance.classList.remove("inverted", "inverted-blink");
