@@ -4,7 +4,7 @@ import {KLN90BUserSettings} from '../../../kln90b/settings/KLN90BUserSettings';
 import {KLN90BUserRemarkSettings} from '../../../kln90b/settings/KLN90BUserRemarkSettings';
 import {RemarksManager} from '../../../kln90b/settings/RemarksManager';
 
-// Persisted user data, docs/architecture.md Core 7: an airport's remarks are stored in the slots rmk0 to rmk9 as the
+// Persisted user data, docs/architecture.md Core 7: an airport's remarks are stored in the slots rmk0 to rmk99 as the
 // ident (4 characters) followed by three lines of 11 characters. The page behavior (three lines of 11, at most 100
 // airports) is 3-47. Users keep their remarks across versions, so the format is a contract (CLAUDE.md "Public
 // contract with aircraft", persisted user data).
@@ -79,7 +79,7 @@ describe('remarks of a deleted airport and of many airports (#92)', () => {
         expect(manager.getRemarks('KAAA')).toEqual(EMPTY_LINES);
     });
 
-    it.fails('does not bring a deleted remark back after a reload (#92)', () => {
+    it('does not bring a deleted remark back after a reload (#92)', () => {
         const manager = new RemarksManager(bus, userSettings);
         manager.saveRemarks('KAAA', ['A          ', '           ', '           ']);
         manager.deleteRemarks('KAAA');
@@ -87,7 +87,7 @@ describe('remarks of a deleted airport and of many airports (#92)', () => {
         expect(new RemarksManager(bus, userSettings).getAirportsWithRemarks()).toEqual([]);
     });
 
-    // The sibling of the pin below: ten airports fill every slot there is and survive a reload
+    // Ten airports were all the slots there were before #92
     it('keeps the remarks of ten airports after a reload', () => {
         const manager = new RemarksManager(bus, userSettings);
         for (let i = 0; i < 10; i++) {
@@ -99,7 +99,7 @@ describe('remarks of a deleted airport and of many airports (#92)', () => {
     });
 
     // 3-47: the unit holds the remarks of up to 100 airports
-    it.fails('keeps the remarks of an 11th airport after a reload (#92)', () => {
+    it('keeps the remarks of an 11th airport after a reload (#92)', () => {
         const manager = new RemarksManager(bus, userSettings);
         for (let i = 0; i < 11; i++) {
             manager.saveRemarks(`K${String.fromCharCode(65 + i)}AA`, ['X          ', '           ', '           ']);
@@ -160,19 +160,15 @@ describe('remarks of an airport with a three-character ident (#140)', () => {
     });
 });
 
-describe('remarks of a 101st airport (3-47, C-2)', () => {
-    /** A manager that holds the remarks of 100 airports. The slots cannot hold them (#92), so the manager's own map is filled. */
-    function managerWith100Airports(): RemarksManager {
-        const manager = new RemarksManager(bus, userSettings);
-        // Reaches the private remarks of RemarksManager: the public saveRemarks writes through the slots, which cannot hold
-        // 100 airports (#92), so there is no public seam to fill the map; a rename there breaks this test
-        const remarks = (manager as unknown as { remarks: Record<string, [string, string, string]> }).remarks;
-        for (let i = 0; i < 100; i++) {
-            remarks[`K${String(i).padStart(3, '0')}`] = ['X          ', '           ', '           '];
-        }
-        return manager;
+/** A manager loaded from 100 stored slots, the airports K000 to K099, laid out by hand from the format (Core 7) */
+function managerWith100Airports(): RemarksManager {
+    for (let i = 0; i < 100; i++) {
+        setSlot(i, `K${String(i).padStart(3, '0')}X          ${' '.repeat(22)}`);
     }
+    return new RemarksManager(bus, userSettings);
+}
 
+describe('remarks of a 101st airport (3-47, C-2)', () => {
     // 3-47: the unit holds the remarks of up to 100 airports. This is the sibling of the pin below: the same manager
     it('holds the remarks of 100 airports (3-47)', () => {
         const manager = managerWith100Airports();
@@ -181,11 +177,59 @@ describe('remarks of a 101st airport (3-47, C-2)', () => {
         expect(manager.getRemarks('K099')).toEqual(['X          ', '           ', '           ']);
     });
 
-    // C-2: the message RMKS FULL says that the remarks of another airport do not fit. Today the guard reads the length
-    // of an object that has none, so it never fires and the save goes on to a slot that does not exist
-    it.fails('refuses the remarks of a 101st airport with RMKS FULL (3-47, C-2, #92)', () => {
+    // C-2: the message RMKS FULL says that the remarks of another airport do not fit. Before #92 the guard read the
+    // length of an object that has none, so it never fired and the save went on to a slot that did not exist
+    it('refuses the remarks of a 101st airport with RMKS FULL (3-47, C-2, #92)', () => {
         const manager = managerWith100Airports();
 
         expect(() => manager.saveRemarks('KZZA', ['X          ', '           ', '           '])).toThrow('RMKS FULL');
+        expect(manager.getAirportsWithRemarks()).toHaveLength(100);
+        expect(manager.getAirportsWithRemarks()).not.toContain('KZZA');
+    });
+});
+
+// 3-47 gives room for the remarks of 100 airports and C-2 names RMKS FULL for one more. A change or a delete of an
+// airport that is listed adds no airport, so it fits a full list (the note on #92)
+describe('remarks of an airport in a full list (#92)', () => {
+    it('changes the remarks of an airport in a full list, and keeps the change after a reload (#92)', () => {
+        const manager = managerWith100Airports();
+
+        manager.saveRemarks('K050', ['CHANGED    ', '           ', '           ']);
+
+        expect(new RemarksManager(bus, userSettings).getRemarks('K050')).toEqual(['CHANGED    ', '           ', '           ']);
+    });
+
+    it('deletes the remarks of an airport in a full list, which makes room for another (#92)', () => {
+        const manager = managerWith100Airports();
+
+        manager.deleteRemarks('K050');
+        manager.saveRemarks('KZZA', ['X          ', '           ', '           ']);
+
+        const reloaded = new RemarksManager(bus, userSettings).getAirportsWithRemarks();
+        expect(reloaded).toHaveLength(100);
+        expect(reloaded).not.toContain('K050');
+        expect(reloaded).toContain('KZZA');
+    });
+
+    // The last slot is emptied too: the airport stored in rmk99 does not come back after a reload once it is deleted
+    it('empties the last slot when the airport stored in it is deleted, and does not bring it back (#92)', () => {
+        const manager = managerWith100Airports();
+        expect(slot(99)).toBe(`K099X          ${' '.repeat(22)}`);
+
+        manager.deleteRemarks('K099');
+
+        expect(slot(99)).toBe('');
+        const reloaded = new RemarksManager(bus, userSettings).getAirportsWithRemarks();
+        expect(reloaded).toHaveLength(99);
+        expect(reloaded).not.toContain('K099');
+    });
+
+    // OTH 4 deletes only listed airports and APT 5 always saves its three lines, so a pilot cannot reach this; the
+    // method is public, and a delete never overflows the list
+    it('accepts the delete of an airport without remarks in a full list (#92)', () => {
+        const manager = managerWith100Airports();
+
+        expect(() => manager.deleteRemarks('KZZA')).not.toThrow();
+        expect(manager.getAirportsWithRemarks()).toHaveLength(100);
     });
 });

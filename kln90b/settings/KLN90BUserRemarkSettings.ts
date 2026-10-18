@@ -6,7 +6,8 @@ export type KLN90BUserRemarkTypes = {
     [key: string]: string;
 };
 
-export const NUM_REMARKS = 10;
+//3-47: the remarks of up to 100 airports, one slot each. rmk10 to rmk99 were added for #92 and default to ""
+export const NUM_REMARKS = 100;
 
 type Def = UserSettingDefinition<KLN90BUserRemarkTypes[keyof KLN90BUserRemarkTypes]>;
 

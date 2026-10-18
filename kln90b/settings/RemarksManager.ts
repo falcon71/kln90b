@@ -25,10 +25,13 @@ export class RemarksManager {
     }
 
     public saveRemarks(ident: string, remarks: [string, string, string]) {
-        if (Object(this.remarks).length >= 100) {
+        const hasRemarks = remarks[0] || remarks[1] || remarks[2];
+        //3-47, C-2: the remarks of up to 100 airports. Only a new airport can overflow the list; a change or a delete of
+        //an airport in a full list always fits (#92)
+        if (hasRemarks && !this.remarks.hasOwnProperty(ident) && Object.keys(this.remarks).length >= NUM_REMARKS) {
             throw new Error("RMKS FULL");
         }
-        if (remarks[0] || remarks[1] || remarks[2]) {
+        if (hasRemarks) {
             this.remarks[ident] = remarks;
         } else {
             delete this.remarks[ident];
@@ -73,6 +76,10 @@ export class RemarksManager {
             const joinedText = this.remarks[ident].join("");
             this.manager.getSetting(`rmk${i}`).set(ident.padEnd(4, " ") + joinedText);
             i++;
+        }
+        //#92: the slots after the last airport are emptied, or a deleted airport's remarks come back at the next load
+        for (; i < NUM_REMARKS; i++) {
+            this.manager.getSetting(`rmk${i}`).set("");
         }
     }
 

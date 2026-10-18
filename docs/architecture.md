@@ -589,7 +589,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   `turnAnticipation`, the NAV 5 and Super NAV 5 layout, CAL page inputs, `fastGpsAcquisition` and `userDataFormat`.
 - `KLN90BUserWaypointsSettings`: `wpt0..wpt249` (`MAX_USER_WAYPOINTS=250`).
 - `KLN90BUserFlightplansSettings`: `fpl0..fpl25` (`NUM_FLIGHTPLANS=25`, inclusive loop).
-- `KLN90BUserRemarkSettings`: `rmk0..rmk9` (`NUM_REMARKS=10`).
+- `KLN90BUserRemarkSettings`: `rmk0..rmk99` (`NUM_REMARKS=100`, the 100 airports of 3-47; `rmk10` and up since #92).
+  `RemarksManager` writes the airports into the first slots on every save and empties the rest.
 - The setting key names and value formats are **backward-compatibility-critical**. Users keep data across versions. Add
   new keys with defaults; never repurpose old ones.
 
