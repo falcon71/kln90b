@@ -366,7 +366,8 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
     - `WTFlightplanSync` mirrors FPL 0 into an SDK `FlightPlanner` with id `"kln90b"` (`initSyncRole:'primary'`): plan 0
       is DF legs and plan 1 is a direct-to plan "like the Garmins". Data stops after the MAP or an arc ("Install manual:
       We do not return data after a fence"). This happens only when `writeGPSSimVars` is set, and `SimVarSync` calls `WTFlightplanSync.sync()` once when
-      `L:KLN90B_WriteGpsSimvars` switches it on at runtime.
+      `L:KLN90B_WriteGpsSimvars` switches it on at runtime. While `Hardware.isDisabled` is set nothing is written,
+      whatever asks for the sync, and `SimVarSync.setDisabled` syncs once on the resume (#398).
     - `KlnEfbSaver` answers EFB `avionicsRouteRequested` (only with `writeGPSSimVars` set); `KlnEfbLoader` loads
       `syncedAvionicsRoute` into FPL 0 (lat/lon legs become temporary user waypoints in region `XY`). While
       `Hardware.isDisabled` is set the request goes unanswered (#353) and the synced route is dropped (#188).

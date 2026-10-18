@@ -76,6 +76,9 @@ export class SimVarSync {
 
         if (this.settings.output.writeGPSSimVars) {
             SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, !disabled); //Allows other devices to write GPS vars
+            if (!disabled) {
+                this.wtFlightplanSync.sync(); //#398: the planner was not written while the unit was disabled
+            }
         }
 
     }

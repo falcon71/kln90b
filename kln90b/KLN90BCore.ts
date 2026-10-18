@@ -327,7 +327,7 @@ export class KLN90BCore {
 
         const memory = new VolatileMemory(this.bus, this.userSettings, facilityLoader, sensors, scanlists, flightplans, lastActiveWaypoint);
 
-        this.wtFlightplanSync = new WTFlightplanSync(this.bus, facilityLoader, this.planeSettings, memory.navPage.activeWaypoint);
+        this.wtFlightplanSync = new WTFlightplanSync(this.bus, facilityLoader, this.planeSettings, memory.navPage.activeWaypoint, this.hardware);
 
         const airspaceAlert = new AirspaceAlert(this.userSettings, sensors, this.messageHandler, facilityLoader, memory.navPage);
         const vnav = new Vnav(memory.navPage, sensors, flightplans[0]);
