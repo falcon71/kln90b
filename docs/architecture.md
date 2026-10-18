@@ -816,7 +816,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       `SuperNav1Page`, `SuperNav5Page`, `Set0Page`. While shown, `leftRef`/`rightRef` get `d-none`.
     - `leftTreeController` / `rightTreeController` (`PageTreeController`).
 - API used by pages: `getLeftPage/getRightPage/getOverlayPage`, `setLeftPage/setRightPage` (replace the base page and
-  sync the tree), `pushLeftPage/pushRightPage/pushPage(page,parent,side)`, `popLeftPage/popRightPage/popPage(side)`,
+  sync the tree), `replaceLeftBasePage(page)` (the EFB load of FPL 0, #395: closes every page pushed on the left and
+  the right-side children of the old base page, then sets the page as the left base page),
+  `pushLeftPage/pushRightPage/pushPage(page,parent,side)`, `popLeftPage/popRightPage/popPage(side)`,
   `pushOverlayPage/popOverlayPage`. Pages reach MainPage with `this.props.pageManager.getCurrentPage() as MainPage`.
   This cast is everywhere.
 - Super pages, in `checkIfSuperPageIsShown()` (runs on every set/push/pop):

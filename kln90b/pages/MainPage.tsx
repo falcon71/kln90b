@@ -242,6 +242,18 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         this.checkIfSuperPageIsShown();
     }
 
+    /**
+     * #395, the maintainer's ruling: the EFB load always wins. Every page pushed on the left closes (with its right-side
+     * children), the right-side children of the old base page go too, and the page becomes the left base page
+     */
+    public replaceLeftBasePage(page: SixLineHalfPage): void {
+        while (!this.leftPageStack.isBasePageShown()) {
+            this.popLeftPage();
+        }
+        this.rerenderRightPage = this.rightPageStack.parentRemoved(this.leftPageStack.getCurrentPage()) || this.rerenderRightPage;
+        this.setLeftPage(page);
+    }
+
     public setRightPage(page: SixLineHalfPage) {
         this.rightPageStack.setCurrentPage(page);
         this.rightTreeController.setPage(page);
@@ -288,7 +300,8 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
     public popLeftPage(): SixLineHalfPage {
         const oldPage = this.leftPageStack.pop();
 
-        this.rerenderRightPage = this.rerenderRightPage || this.rightPageStack.parentRemoved(oldPage);
+        //#395: parentRemoved first, so that a flag already set by an earlier pop does not skip the children of this page
+        this.rerenderRightPage = this.rightPageStack.parentRemoved(oldPage) || this.rerenderRightPage;
 
         this.rerenderLeftPage = true;
         this.checkIfSuperPageIsShown();
@@ -306,7 +319,8 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
     public popRightPage(): SixLineHalfPage {
         const oldPage = this.rightPageStack.pop();
 
-        this.rerenderLeftPage = this.rerenderLeftPage || this.leftPageStack.parentRemoved(oldPage);
+        //#395: the same order as in popLeftPage
+        this.rerenderLeftPage = this.leftPageStack.parentRemoved(oldPage) || this.rerenderLeftPage;
 
         this.rerenderRightPage = true;
         this.checkIfSuperPageIsShown();

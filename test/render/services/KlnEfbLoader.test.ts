@@ -8,6 +8,8 @@ import {savedFlightplan, savedUserWaypoints} from '../../harness/storage';
 import {NO_GPS_SIMVARS, panelXml} from '../../harness/panelXml';
 import {fplIdents, messages, userWaypoints} from '../../harness/readers';
 import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
+import {showSuperNav5} from '../../harness/render/superNav5';
+import {MessagePage} from '../../../kln90b/controls/MessagePage';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
 const kbbb = airport('KBBB', 47.4, 8.0);
@@ -349,5 +351,209 @@ describe('EFB round trip of a user waypoint', () => {
         expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => ICAO.valueToStringV2(l.wpt.icaoStruct)))
             .toEqual(['A          KAAA    ', 'UXX        FARM    ', 'A          KBBB    ']);
         expect(userWaypoints(unit, FacilityType.USR).map(f => f.icaoStruct.ident)).toEqual(['FARM']);
+    });
+});
+
+// #395, the maintainer's ruling: the EFB load always wins. Every page pushed on the left closes with its right-side
+// children, FPL 0 becomes the left base page with the cursor off, and an unfinished left entry is dropped; the right
+// page keeps its own cursor and edits; only the MSG page stays on top. The EFB sync is part of the public contract, not
+// of the real unit, so no manual page applies
+describe('EFB route import over open pages (#395)', () => {
+    /** The right half after the load: NAV 1 for the route KAAA-KBBB, the aircraft at the origin of the harness */
+    const NAV1_ROWS = ['KAAA ›KBBB ', 'ηηηηηΟηηηηη', 'DIS  24.0nm', 'GS      0kt', 'ETE   --:--', 'BRG    000°'];
+
+    async function boot(extra: Facility[] = []): Promise<HeadlessUnit> {
+        const unit = await bootUnit({facilities: [kaaa, kbbb, ...extra], efb: true});
+        await settle(unit);
+        return unit;
+    }
+
+    async function sync(unit: HeadlessUnit): Promise<void> {
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
+        await vi.advanceTimersByTimeAsync(2000);
+    }
+
+    it('closes the creation page of an unknown D-> ident on the right (#395)', async () => {
+        const unit = await boot();
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.dct();
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+        expect(Screen.read().rows('R')[2]).toBe('CREATE NEW '); // Precondition
+
+        await sync(unit);
+
+        expect(Screen.read().status()).toEqual({left: 'FPL 0', mode: 'enr-leg msg', right: 'NAV 1'});
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
+        expect(Screen.read().rows('R')).toEqual(NAV1_ROWS); // The right half is drawn again
+    });
+
+    it('closes the ALT page and the NAV 4 page it pushed on the right (#395)', async () => {
+        const unit = await boot();
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.alt();
+
+        await sync(unit);
+
+        expect(Screen.read().status()).toEqual({left: 'FPL 0', mode: 'enr-leg msg', right: 'NAV 1'});
+        await unit.panel.alt();
+        await unit.panel.alt(); // one pair is pushed and closed again
+        expect(Screen.read().status().right).toBe('NAV 1');
+    });
+
+    it('closes the creation page of an FPL 0 insert, whose parent is the left base page (#395)', async () => {
+        const unit = await boot();
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+        expect(Screen.read().rows('R')[2]).toBe('CREATE NEW '); // Precondition
+
+        await sync(unit);
+
+        expect(Screen.read().status()).toEqual({left: 'FPL 0', mode: 'enr-leg msg', right: 'NAV 1'});
+        expect(Screen.read().rows('R')).toEqual(NAV1_ROWS);
+    });
+
+    // The pin of the order in replaceLeftBasePage: closing ALT removes its NAV 4 on the right and sets the flag to draw
+    // the right half again. That flag must not keep the creation page, the child of the old base page FPL 0, from going
+    it('closes the creation page of an FPL 0 insert with ALT open over it (#395)', async () => {
+        const unit = await boot();
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+        expect(Screen.read().rows('R')[2]).toBe('CREATE NEW '); // Precondition
+        await unit.panel.alt();
+        expect(Screen.read().rows('R')[0]).toBe('VNV INACTV '); // Precondition: ALT pushed NAV 4 over the creation page
+
+        await sync(unit);
+
+        expect(Screen.read().status()).toEqual({left: 'FPL 0', mode: 'enr-leg msg', right: 'NAV 1'});
+        expect(Screen.read().rows('R')).toEqual(NAV1_ROWS);
+    });
+
+    // Holds on today's code too: the D-> page is replaced by FPL 0 with the cursor off
+    it('replaces the D-> page with FPL 0, the cursor off (#395)', async () => {
+        const unit = await boot();
+        await unit.panel.dct();
+
+        await sync(unit);
+
+        expect(Screen.read().status().left).toBe('FPL 0');
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['Á 1:KAAA   ', 'À 2:KBBB   ']);
+    });
+
+    it('makes FPL 0 the base of the left stack, not a page over the old base page (#395)', async () => {
+        const unit = await boot();
+        await unit.panel.selectPage('L', 'FPL 3');
+        await unit.panel.cursor('L');
+        await unit.panel.dct();
+        await sync(unit);
+        expect(Screen.read().status().left).toBe('FPL 0'); // Precondition
+
+        await unit.panel.outer('L', 1);
+
+        // The turn leaves FPL 0 for the next page group. Were the old base page (FPL 3, its cursor on) still beneath
+        // FPL 0, the knob would pop FPL 0 and that page would take it (status left CRSR)
+        expect(Screen.read().status().left).toBe('NAV 2');
+    });
+
+    // The pin of the loop count: two pages are pushed over the base page (D-> and the Duplicate Waypoint page it pushes
+    // for the ident ABD), and both must close. With one pop only, the old base page (FPL 3, its cursor on) stays beneath
+    // FPL 0, and the knob would pop FPL 0 and give the turn to that page
+    it('closes two pushed left pages, D-> and its Duplicate Waypoint page (#395)', async () => {
+        const unit = await boot([vor('ABD', 47.3, 8.1, {region: 'LS'}), vor('ABD', 48.5, 8.5, {region: 'ED'})]);
+        await unit.panel.selectPage('L', 'FPL 3');
+        await unit.panel.cursor('L');
+        await unit.panel.dct();
+        await unit.panel.enterIdent('L', 'ABD');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+        expect(Screen.read().rows('L')[0]).toBe(' ABD      2'); // Precondition: the Duplicate Waypoint page
+
+        await sync(unit);
+        expect(Screen.read().status().left).toBe('FPL 0');
+        await unit.panel.outer('L', 1);
+
+        expect(Screen.read().status().left).toBe('NAV 2');
+    });
+
+    // The pin of the order in popLeftPage: ALT pushes NAV 4 on the right as its child, D-> over ALT pushes the creation
+    // page of an unknown ident as its own child. The first pop (D->) must not keep the second pop (ALT) from removing
+    // NAV 4
+    it('closes the right-side children of every page pushed on the left, ALT and D-> over it (#395)', async () => {
+        const unit = await boot();
+        await unit.panel.selectPage('R', 'NAV 1');
+        await unit.panel.alt();
+        await unit.panel.dct();
+        await unit.panel.enterIdent('L', 'QQQQ');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+        expect(Screen.read().rows('R')[2]).toBe('CREATE NEW '); // Precondition
+
+        await sync(unit);
+
+        expect(Screen.read().status()).toEqual({left: 'FPL 0', mode: 'enr-leg msg', right: 'NAV 1'});
+        expect(Screen.read().rows('R')).toEqual(NAV1_ROWS);
+    });
+
+    // Holds on today's code too: an unfinished insert on FPL 0 is dropped
+    it('drops an unfinished entry on the left base page (#395)', async () => {
+        const unit = await boot();
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.inner('L', 1); // starts an insert: 1:A
+        expect(Screen.read().rows('L')[1]).toBe('  1:A      '); // Precondition
+
+        await sync(unit);
+
+        expect(Screen.read().status().left).toBe('FPL 0');
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['Á 1:KAAA   ', 'À 2:KBBB   ']);
+    });
+
+    // Holds on today's code too: the right page keeps its cursor and the character being edited
+    it('keeps the cursor and the edit of the right page (#395)', async () => {
+        const unit = await boot();
+        await unit.panel.selectPage('R', 'APT 1');
+        await unit.panel.cursor('R');
+        await unit.panel.inner('R', 1);
+        const edited = Screen.read().rows('R')[0];
+
+        await sync(unit);
+
+        expect(Screen.read().status()).toMatchObject({left: 'FPL 0', right: 'CRSR'});
+        expect(Screen.read().rows('R')[0]).toBe(edited);
+    });
+
+    // Holds on today's code too: the MSG page stays on top, and FPL 0 is beneath it
+    it('keeps the MSG page on top with FPL 0 beneath it (#395)', async () => {
+        const unit = await boot();
+        await unit.panel.msg();
+
+        await sync(unit);
+
+        expect(unit.overlay()).toBeInstanceOf(MessagePage);
+        await unit.panel.msg();
+        expect(Screen.read().status().left).toBe('FPL 0');
+    });
+
+    // Holds on today's code too: a super page shows only while its left page shows (MainPage.checkIfSuperPageIsShown)
+    it('ends Super NAV 5 and SET 0 (#395)', async () => {
+        const unit = await boot();
+        await showSuperNav5(unit);
+        await sync(unit);
+        expect(unit.overlay()).toBeNull();
+        expect(Screen.read().status().left).toBe('FPL 0');
+
+        await unit.panel.selectPage('L', 'SET 0');
+        await sync(unit);
+        expect(unit.overlay()).toBeNull();
+        expect(Screen.read().status().left).toBe('FPL 0');
     });
 });
