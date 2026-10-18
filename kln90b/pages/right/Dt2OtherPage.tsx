@@ -57,12 +57,12 @@ export class Dt2OtherPage extends SixLineHalfPage {
             activeIdx: new TextDisplay(activeIdx === -1 ? "  " : (activeIdx + 1).toString().padStart(2, " ")),
             activeIdent: new TextDisplay(IcaoFixedLength.getIdentFromFacility(to)),
             activeDis: new RoundedDistanceDisplay(Alignment.right, navState.distToActive),
-            activeEta: new TimeDisplay(navState.eteToActive ? now.addSeconds(navState.eteToActive) : null),
+            activeEta: new TimeDisplay(navState.eteToActive !== null ? now.addSeconds(navState.eteToActive) : null), //#393: 0 is a value
             timezone: new SelectField(TIMEZONES.map(t => t.code), this.timezoneSetting.get(), this.saveTimezone.bind(this)),
             destIdx: new TextDisplay(""),
             destIdent: new TextDisplay(""),
             destDis: new RoundedDistanceDisplay(Alignment.right, this.props.memory.navPage.distToDest),
-            destEta: new TimeDisplay(navState.eteToDest ? now.addSeconds(navState.eteToDest) : null),
+            destEta: new TimeDisplay(navState.eteToDest !== null ? now.addSeconds(navState.eteToDest) : null), //#393: 0 is a value
             destTimezone: new TextDisplay(TIMEZONES[this.timezoneSetting.get()].code),
         });
 
@@ -106,7 +106,7 @@ export class Dt2OtherPage extends SixLineHalfPage {
         this.children.get("activeIdx").text = activeIdx === -1 ? "  " : (activeIdx + 1).toString().padStart(2, " ");
         this.children.get("activeIdent").text = IcaoFixedLength.getIdentFromFacility(to);
         this.children.get("activeDis").distance = navState.distToActive;
-        this.children.get("activeEta").time = navState.eteToActive ? now.addSeconds(navState.eteToActive) : null;
+        this.children.get("activeEta").time = navState.eteToActive !== null ? now.addSeconds(navState.eteToActive) : null; //#393: 0 is a value
 
         if (destLeg === null) {
             this.lastRef.instance.classList.add("d-none");
@@ -114,7 +114,7 @@ export class Dt2OtherPage extends SixLineHalfPage {
             this.children.get("destIdx").text = (legs.indexOf(destLeg) + 1).toString().padStart(2, " ");
             this.children.get("destIdent").text = IcaoFixedLength.getIdentFromFacility(destLeg.wpt);
             this.children.get("destDis").distance = this.props.memory.navPage.distToDest;
-            this.children.get("destEta").time = this.props.memory.navPage.eteToDest ? now.addSeconds(this.props.memory.navPage.eteToDest) : null;
+            this.children.get("destEta").time = this.props.memory.navPage.eteToDest !== null ? now.addSeconds(this.props.memory.navPage.eteToDest) : null; //#393: 0 is a value
             this.children.get("destTimezone").text = TIMEZONES[this.timezoneSetting.get()].code;
             this.lastRef.instance.classList.remove("d-none");
         }

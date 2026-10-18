@@ -8,6 +8,7 @@ import {bootOnDtWorld} from '../../../harness/worldBoot';
 import {panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
 import {activeIdent, fplIdents} from '../../../harness/readers';
+import {hold} from '../../../harness/navState';
 
 // The world of the D/T tests is dtWorld() (see Dt1Page.test.ts): along 10 E, the aircraft 0.1 degree north of KAAA at 120
 // kt due north; KBBB, the last waypoint, 84.15 NM away (42.1 min). The fake clock starts at 12:00:00 UTC (DEFAULT_START)
@@ -262,4 +263,16 @@ describe('D/T 4 page with RUN WHEN POWER IS ON (4-13)', () => {
         expect(rows[1]).toBe('DEP   12:00');
         expect(rows[2]).toBe(`TIME  ${utcNow()}`);
     }, 30_000);
+});
+
+// #393: an ETE of exactly 0 is a value, so the ETA of the destination is the current time. The clock starts at 12:00:00 UTC
+// and the page is read within the first minute, so the ETA shows 12:00
+describe('D/T 4 page, an ETE of exactly 0 (#393)', () => {
+    it('characterization: shows the current time as the ETA of an ETE of exactly 0 (#393)', async () => {
+        const {kaaa, abc, def, kbbb} = dtWorld();
+        const unit = await bootMoving([kaaa, abc, def, kbbb]);
+        hold(unit.props.memory.navPage, 'eteToDest', 0);
+
+        expect((await show(unit, 'FPL 0'))[3]).toBe('ETA   12:00');
+    });
 });

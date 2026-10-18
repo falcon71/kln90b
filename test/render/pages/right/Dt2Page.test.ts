@@ -5,6 +5,8 @@ import {dtWorld} from '../../../harness/fixtures';
 import {savedFlightplan, storedSetting} from '../../../harness/storage';
 import {bootOnDtWorld} from '../../../harness/worldBoot';
 import {Screen} from '../../../harness/render/screen';
+import {hold} from '../../../harness/navState';
+import {Dt2OtherPage} from '../../../../kln90b/pages/right/Dt2OtherPage';
 
 // The world of the D/T tests is dtWorld() (see Dt1Page.test.ts): along 10 E, the aircraft 0.1 degree north of KAAA at 120
 // kt due north; ABC 24.04 NM (12.0 min), DEF 54.10 NM (27.1 min), KBBB 84.15 NM (42.1 min). The fake clock starts at
@@ -180,5 +182,68 @@ describe('D/T 2 page (characterization)', () => {
             "           ",
           ]
         `);
+    });
+});
+
+// #393: an ETE of exactly 0 is a value, so the ETA of the active waypoint is the current time. The clock starts at 12:00:00
+// UTC and the page is read within the first minute, so the ETA shows 12:00
+describe('D/T 2 page, an ETE of exactly 0 (#393)', () => {
+    it('characterization: shows the current time as the ETA of an ETE of exactly 0 (#393)', async () => {
+        const unit = await bootOnDtWorld();
+        hold(unit.props.memory.navPage, 'eteToActive', 0);
+
+        expect((await show(unit, 'NAV 2'))[2]).toBe('   12:00UTC');
+    });
+
+    // The first frame after D/T 2 is selected beside NAV 2. The page takes the ETE when it is built, but the selection also
+    // runs a display tick, which redraws it, so this test does not isolate the constructor site (see the test below)
+    it('characterization: shows the current time on the first frame of an ETE of exactly 0 (#393)', async () => {
+        const unit = await bootOnDtWorld();
+        await unit.panel.selectPage('L', 'NAV 2');
+        await unit.panel.selectPage('R', 'D/T 1');
+        hold(unit.props.memory.navPage, 'eteToActive', 0);
+        await unit.panel.selectPage('R', 'D/T 2');
+
+        expect(Screen.read().rows('R')[2]).toBe('   12:00UTC');
+    });
+
+    // The constructor site read directly, for the reason of the NAV 3 test: a selection runs a display tick after the page
+    // is built. The screen shows UTC, so the ETA child is read in UTC
+    it('characterization: builds the ETA of an ETE of exactly 0 as the current time (#393)', async () => {
+        const unit = await bootOnDtWorld();
+        hold(unit.props.memory.navPage, 'eteToActive', 0);
+        const page = new Dt2OtherPage(unit.props);
+
+        const eta = page.children.get('activeEta').time;
+        expect(eta).not.toBeNull();
+        expect([eta!.getHours(), eta!.getMinutes()]).toEqual([12, 0]);
+    });
+
+    // The FPL 0 page (Dt2FplPage): the active leg, ABC, takes the ETE of the active waypoint, so its ETA is the current time.
+    // The row is the third one, the ABC row of the FPL 0 test above (24 NM, 12:12 at 120 kt)
+    it('characterization: shows the current time as the ETA of the active leg of an ETE of exactly 0 beside FPL 0 (#393)', async () => {
+        const unit = await bootOnDtWorld();
+        hold(unit.props.memory.navPage, 'eteToActive', 0);
+
+        expect((await show(unit, 'FPL 0'))[2]).toBe(' 24   12:00');
+    });
+
+    // The redraw site of the destination ETA: beside NAV 2 the last waypoint, KBBB, is the fifth row (its ETA is 12:42 above)
+    it('characterization: shows the current time as the ETA of the destination of an ETE of exactly 0 (#393)', async () => {
+        const unit = await bootOnDtWorld();
+        hold(unit.props.memory.navPage, 'eteToDest', 0);
+
+        expect((await show(unit, 'NAV 2'))[5]).toBe('   12:00UTC');
+    });
+
+    // The constructor site of the destination ETA, read directly for the reason of the active ETA test above
+    it('characterization: builds the ETA of the destination of an ETE of exactly 0 as the current time (#393)', async () => {
+        const unit = await bootOnDtWorld();
+        hold(unit.props.memory.navPage, 'eteToDest', 0);
+        const page = new Dt2OtherPage(unit.props);
+
+        const eta = page.children.get('destEta').time;
+        expect(eta).not.toBeNull();
+        expect([eta!.getHours(), eta!.getMinutes()]).toEqual([12, 0]);
     });
 });

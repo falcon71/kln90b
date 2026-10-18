@@ -91,7 +91,7 @@ export class Dt4Page extends SixLineHalfPage {
         this.children.get("timezone").value = this.timezoneSetting.get();
         this.children.get("depTime").time = this.props.memory.dtPage.departureTime?.atTimezone(TIMEZONES[this.timezoneSetting.get()]) ?? null;
         this.children.get("time").time = now;
-        this.children.get("eta").time = this.props.memory.navPage.eteToDest ? now.addSeconds(this.props.memory.navPage.eteToDest) : null;
+        this.children.get("eta").time = this.props.memory.navPage.eteToDest !== null ? now.addSeconds(this.props.memory.navPage.eteToDest) : null; //#393: 0 is a value
         this.children.get("flightTime").time = this.props.memory.dtPage.flightTimer;
         this.children.get("ete").time = this.props.memory.navPage.eteToDest;
     }

@@ -6,7 +6,9 @@ import {savedFlightplan} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
 import {NO_OBS, panelXml} from '../../../harness/panelXml';
 import {activeIdent} from '../../../harness/readers';
+import {hold} from '../../../harness/navState';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
+import {Nav3Page} from '../../../../kln90b/pages/left/Nav3Page';
 
 describe('NAV 3 page', () => {
     // The same waypoint twice in a row (#19, #8) gives a route leg without length. The ESA is the highest MSA along the
@@ -93,6 +95,46 @@ describe('NAV 3 page, the cross track below 1 NM (#231)', () => {
         await nav3OnLeg(0.3);
 
         expect(Screen.read().rows('L')[3]).toBe('FLY L0.30nm');
+    });
+});
+
+describe('NAV 3 page, a cross track of exactly 0 (characterization)', () => {
+    // #393: 0 is a cross track, not a missing one. The form is #231's; the AVsoftech trainer (unreliable) shows FLY L0.00NM
+    // on the course
+    it('characterization: reads FLY L0.00nm with a cross track of exactly 0 (#393)', async () => {
+        const unit = await nav3OnLeg(0.3);
+        hold(unit.props.memory.navPage, 'xtkToActive', 0);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L')[3]).toBe('FLY L0.00nm');
+    });
+
+    // #393: the first frame after NAV 3 is selected. The page takes the cross track when it is built, but the selection also
+    // runs a display tick, which redraws it, so this test does not isolate the constructor site (see the test below)
+    it('characterization: reads FLY L0.00nm on the first frame of a cross track of exactly 0 (#393)', async () => {
+        const unit = await bootUnit({
+            facilities: [KAAA, KDDD, KEEE], position: west(30), panelXml: OBS_SOURCE_OFF,
+            storage: savedFlightplan(0, [KAAA, KDDD, KEEE]),
+        });
+        await settle(unit);
+        hold(unit.props.memory.navPage, 'xtkToActive', 0);
+        await unit.panel.selectPage('L', 'NAV 3');
+
+        expect(Screen.read().rows('L')[3]).toBe('FLY L0.00nm');
+    });
+
+    // #393, the constructor site read directly: a selection runs a display tick after the page is built (CLICK_MS is 250 ms),
+    // which would redraw the value, so this builds the page with the held cross track and reads its FLY distance child
+    it('characterization: builds the FLY distance of a cross track of exactly 0 (#393)', async () => {
+        const unit = await bootUnit({
+            facilities: [KAAA, KDDD, KEEE], position: west(30), panelXml: OBS_SOURCE_OFF,
+            storage: savedFlightplan(0, [KAAA, KDDD, KEEE]),
+        });
+        await settle(unit);
+        hold(unit.props.memory.navPage, 'xtkToActive', 0);
+        const page = new Nav3Page(unit.props);
+
+        expect(page.children.get('flyDist').distance).toBe(0);
     });
 });
 
