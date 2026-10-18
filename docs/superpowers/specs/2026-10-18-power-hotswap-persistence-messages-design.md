@@ -67,6 +67,12 @@ is the device's physical state, and `Hardware` exists from the construction of `
 stays the only reader of `L:KLN90B_Disabled`. The gates lag the LVar by at most one 100 ms poll, as the tick
 controller and the GPS release already do. Introduced in the #138 commit.
 
+The field's doc comment states the interpretation (the maintainer's request): a disabled unit is one that has been
+taken out of the aircraft, not one that is switched off, so the flag is physical device state and belongs on
+`Hardware`. It also says what to expect while the flag is set: the unit takes no input (no H event, the power and
+brightness events included), writes no outputs (no GPS SimVars, no `GPS OVERRIDDEN` claim, no flight planner, no EFB
+reply or route import), runs no ticks, and resumes where it left off when it is put back.
+
 **B. H events (#138).** `KLN90BCore.onInteractionEvent` returns first thing while `hardware.isDisabled`: no scan
 remap, no `hEvent` publish, no `PageManager`. The pin becomes a spec test of the public contract (the maintainer's
 ruling). New tests: a `Power_Off` H event while disabled leaves the unit on after the resume; the scan toggle while
