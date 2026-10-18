@@ -67,7 +67,7 @@ export class SuperNav5Page extends SevenLinePage {
             canvas: new Canvas(CanvasSize.FULLPAGE),
             left: new SuperNav5Left(props),
             right: new SuperNav5Right(props, this.rCursorController),
-            directTo: new SuperNav5DirectToSelector(this.props.bus, this.props.hardware, this.props.memory.fplPage.flightplans[0], this.props.memory.navPage.activeWaypoint, this.props.sensors),
+            directTo: new SuperNav5DirectToSelector(this.props.bus, this.props.hardware, this.props.memory.fplPage.flightplans[0], this.props.memory.navPage.activeWaypoint, this.props.sensors, () => this.isScanWindowShown()),
         });
 
         this.lCursorController = new CursorController(this.children.get("left").children);
@@ -90,8 +90,16 @@ export class SuperNav5Page extends SevenLinePage {
         this.redraw();
     }
 
+    /**
+     * 3-38: the scan window shows while the right inner knob is pulled. #394: the open menu takes its place, and a
+     * hidden window takes neither DCT, CLR nor ENT; it keeps its waypoint for when the menu closes
+     */
+    private isScanWindowShown(): boolean {
+        return this.props.hardware.isScanPulled && !this.rCursorController.cursorActive;
+    }
+
     public clear(): boolean {
-        if (this.props.hardware.isScanPulled) {
+        if (this.isScanWindowShown()) {
             const didSomething = this.children.get("directTo").clear();
             if (!didSomething) {
                 this.isDecluttered = !this.isDecluttered;
@@ -102,6 +110,16 @@ export class SuperNav5Page extends SevenLinePage {
         return true;
     }
 
+    /**
+     * #394, the maintainer's own check on the KLN 89 trainer (2026-10-17): pulling the right knob while the menu is open
+     * closes the menu, and the scan window shows. Pushing it in changes nothing (the maintainer's ruling, #394)
+     */
+    public scanPulledChanged(): void {
+        if (this.props.hardware.isScanPulled && this.rCursorController.cursorActive) {
+            this.rCursorController.setCursorActive(false);
+        }
+    }
+
     public scanRight(): boolean {
         return this.children.get("directTo").scanRight();
     }
@@ -110,12 +128,13 @@ export class SuperNav5Page extends SevenLinePage {
         return this.children.get("directTo").scanLeft();
     }
 
+    /** 3-27 rule 2: the waypoint of the scan window, null while the window is not shown (#394) */
     public getDirectToTarget(): Facility | null {
         return this.children.get("directTo").getDirectToTarget();
     }
 
     public enter(): boolean {
-        if (this.props.hardware.isScanPulled && this.children.get("directTo").enter()) {
+        if (this.isScanWindowShown() && this.children.get("directTo").enter()) {
             return true;
         }
         return super.enter();

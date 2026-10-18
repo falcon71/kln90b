@@ -915,7 +915,14 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - Inner knob with cursor off: `isCustomPageTreeController(page)` → `page.pageTreeController.moveSubpage`. Otherwise base
   page → `moveSubpage`, otherwise pop and re-dispatch.
 - `EVT_R_SCAN_*`: with the right cursor off → `page.scanLeft/Right()`. With the cursor on it *falls through* to
-  inner-knob behaviour.
+  inner-knob behaviour. The cursor is the one the pilot sees (`isRightCursorActive()`): with an overlay shown, the
+  overlay's own right cursor decides, not that of the right page beneath (#394).
+- `EVT_R_SCAN` (the pull or push itself; `hardware.isScanPulled` is already toggled) →
+  `SuperNav5Page.scanPulledChanged()` when Super NAV 5 shows, and not handled otherwise. On Super NAV 5 (#394): a pull
+  with the menu open (its right cursor on) closes the menu and shows the scan window; CRSR while pulled opens the
+  menu, the pulled knob then changes the menu's fields, and CRSR again closes it and shows the window; a push with the
+  menu open changes nothing. While the menu hides the window (`SuperNav5Page.isScanWindowShown()` is false), the
+  window keeps its waypoint but takes neither DCT (no Direct To suggestion), CLR (the map declutters instead) nor ENT.
 - `EVT_ENT` → `handleEnter()`:
     1. If left `isEnterAccepted()` → left.enter; else if right accepts → right.enter. A waypoint editor that waits for
        its creation page on the right does not accept ENT, so ENT reaches that page (#262).

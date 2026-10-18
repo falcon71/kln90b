@@ -6,11 +6,11 @@ import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures
 import {canvasToAscii, downsampled} from '../../../harness/render/canvas';
 import {APR_ARM_SWITCH, HEADING_INPUT, NO_OBS, panelXml} from '../../../harness/panelXml';
 import {activeIdent} from '../../../harness/readers';
-import {showSuperNav5, SuperNav5} from '../../../harness/render/superNav5';
+import {showSuperNav5, SuperNav5, superNav5OnArc} from '../../../harness/render/superNav5';
 import {recordMap} from '../../../harness/render/mapRecorder';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan, storedSetting} from '../../../harness/storage';
-import {standardRoute} from '../../../harness/fixtures';
+import {arcWorld, standardRoute} from '../../../harness/fixtures';
 import {courseDeg, pointFrom} from '../../../harness/flight/geo';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {SuperNav5Page} from '../../../../kln90b/pages/left/SuperNav5Page';
@@ -473,6 +473,151 @@ describe('Super NAV 5 page', () => {
             await vi.advanceTimersByTimeAsync(250);
         }
         expect(idents).toEqual(new Set(['ABC', '']));
+    });
+});
+
+// #394: pulling the knob with the menu open closes the menu and shows the scan window, by analogy with the KLN 89's map
+// page, the maintainer's check (the KLN 89 trainer, 2026-10-17, docs/kln89-trainer-record.md). The CRSR transitions and
+// the push are the maintainer's ruling (#394). A cursor field takes the pulled knob like the pushed-in one (by analogy
+// with CAL 1 of the KLN 89, checked in the KLN 89 trainer, 2026-10-17). While the menu hides the scan window, the
+// window takes neither DCT, CLR nor ENT (the ruling on #394)
+describe('Super NAV 5 menu and the pulled right knob (#394)', () => {
+    const menuValue = () => focusedRight().join('').trim();
+
+    it('closes the menu and shows the scan window when the knob is pulled with the menu open (#394)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.cursor('R');
+        expect(SuperNav5.read().right).not.toBeNull(); // Precondition
+
+        await unit.panel.scan();
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(SuperNav5.read().right).toBeNull();
+        expect(SuperNav5.read().directTo).toBe('ABC   ');
+    });
+
+    it('opens the menu with CRSR while pulled, and the pulled knob changes its field (#394)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.scan();
+        await unit.panel.cursor('R');
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBeNull();
+        expect(menuValue()).toBe('OFF');
+
+        await unit.panel.inner('R', 1);
+
+        expect(menuValue()).toBe('H');
+    });
+
+    it('changes the menu field with the pulled knob turned left (#394)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.scan();
+        await unit.panel.cursor('R');
+        expect(menuValue()).toBe('OFF'); // Precondition
+
+        await unit.panel.inner('R', -1);
+
+        expect(menuValue()).toBe('TLH');
+    });
+
+    it('closes the menu again with CRSR while pulled and shows the scan window (#394)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.scan();
+        await unit.panel.cursor('R');
+        await unit.panel.cursor('R');
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(SuperNav5.read().right).toBeNull();
+        expect(SuperNav5.read().directTo).toBe('ABC   ');
+    });
+
+    it('keeps the menu open when the knob is pushed in, and closes it when it is pulled again (#394)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.scan();
+        await unit.panel.cursor('R');
+        await unit.panel.scan(); // pushed in
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().right).not.toBeNull();
+        await unit.panel.inner('R', 1);
+        expect(menuValue()).toBe('H'); // the cursor is still on the field
+
+        await unit.panel.scan(); // pulled again
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(SuperNav5.read().right).toBeNull();
+        expect(SuperNav5.read().directTo).not.toBeNull();
+    });
+
+    // Without a waypoint in the scan window, the DIRECT TO page suggests the active waypoint, ABC (3-27 rule 4); the
+    // window scanned to KBBB is hidden by the menu and offers nothing
+    it('suggests the active waypoint and not the hidden scan window on the DIRECT TO page with the menu open (#394)', async () => {
+        const {unit} = await superNav5OnRoute();
+        await unit.panel.scan();
+        await unit.panel.inner('R', 1);
+        expect(SuperNav5.read().directTo).toBe('KBBB  '); // Precondition
+        await unit.panel.cursor('R');
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBeNull(); // Precondition: the menu hides the window
+
+        await unit.panel.dct();
+        await vi.advanceTimersByTimeAsync(250);
+
+        const rows = Screen.read().rows('L');
+        expect(rows[0].trim()).toBe('DIRECT TO:');
+        expect(rows[2].trim()).toBe('ABC');
+    });
+
+    /** On the arc of arcWorld(), the knob pulled and the window scanned back to the arc's entry D225J */
+    async function onArcEntry() {
+        const w = arcWorld();
+        const map = recordMap({ABC: w.abc});
+        const unit = await superNav5OnArc({storage: {superNav5Vor: 3}}); // 3 = TLH: ABC, the arc's center, is drawn
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.scan();
+        await unit.panel.inner('R', -1);
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBe('D225Jà'); // Precondition: the entry, with the IAF symbol
+        return {unit, map};
+    }
+
+    // CLR with the menu open declutters the map (3-38), as without the knob pulled; the hidden window does not take it
+    // to MOVE ? (6-17)
+    it('declutters with CLR and leaves the hidden scan window on the arc entry with the menu open (#394)', async () => {
+        const {unit, map} = await onArcEntry();
+        expect(map.drawn).toContain('icon ) ABC'); // Precondition
+        await unit.panel.cursor('R');
+
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(map.drawn).not.toContain('icon ) ABC');
+        await unit.panel.cursor('R'); // closes the menu
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBe('D225Jà');
+    });
+
+    // ENT with the menu open does not move the arc entry, although the hidden window shows MOVE ?. The aircraft flies a
+    // track that meets the arc (as in SuperNav5DirectToSelector.test.ts), so that ENT in the window would move it
+    it('leaves the arc entry unchanged on ENT with the menu open over MOVE ? (#394)', async () => {
+        const {unit} = await onArcEntry();
+        const w = arcWorld();
+        const start = w.at(200, 15);
+        await moveAircraft(unit, start, {groundspeedKt: 0});
+        await moveAircraft(unit, pointFrom(start, 10, 0.05), {groundspeedKt: 120});
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBe('MOVE ?'); // Precondition
+        const [entry] = unit.props.memory.fplPage.flightplans[0].getLegs();
+        const arcData = entry.arcData;
+        expect(arcData).toBeDefined(); // Precondition: the entry of the arc
+        await unit.panel.cursor('R');
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        const [after] = unit.props.memory.fplPage.flightplans[0].getLegs();
+        expect(after.wpt.icaoStruct.ident).toBe('D225J');
+        expect(after.arcData).toBe(arcData);
     });
 });
 

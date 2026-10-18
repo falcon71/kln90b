@@ -16,6 +16,7 @@ import {
     EVT_R_INNER_RIGHT,
     EVT_R_OUTER_LEFT,
     EVT_R_OUTER_RIGHT,
+    EVT_R_SCAN,
     EVT_R_SCAN_LEFT,
     EVT_R_SCAN_RIGHT,
 } from "../HEvents";
@@ -511,8 +512,18 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                     return this.onInteractionEvent(evt);
                 }
                 return true;
+            case EVT_R_SCAN: {
+                //#394: Super NAV 5 closes its menu when the knob is pulled
+                const overlay = this.getOverlayPage();
+                if (overlay instanceof SuperNav5Page) {
+                    overlay.scanPulledChanged();
+                    return true;
+                }
+                return false;
+            }
             case EVT_R_SCAN_LEFT:
-                if (!this.getRightPage().getCursorController().cursorActive) {
+                //#394: with an overlay shown, its own right cursor decides
+                if (!this.isRightCursorActive()) {
                     if (this.overlayPageStack.isShown()) {
                         return this.getOverlayPage()!.scanLeft();
                     }
@@ -543,7 +554,8 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                 }
                 return true;
             case EVT_R_SCAN_RIGHT:
-                if (!this.getRightPage().getCursorController().cursorActive) {
+                //#394: with an overlay shown, its own right cursor decides
+                if (!this.isRightCursorActive()) {
                     if (this.overlayPageStack.isShown()) {
                         return this.getOverlayPage()!.scanRight();
                     }

@@ -283,10 +283,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       `memory.<x>Page.ident` writes of `PageManager.startMainPage` are equivalent, because `WaypointPage` uses the ident
       only when the facility cannot be read.
     - Overlays: a last active waypoint of a facility type `PageManager.ts:100` does not handle (a VIS fix of an approach)
-      would throw at power-on, if it can be stored at all; the right scan branches read the base right page's cursor
-      while an overlay shows; the overlay orders without MSG (ALT over DIR, DIR over ALT, ALT twice) have no source and
-      are not frozen; the error page lives outside the overlay stack, so a knob turned while it shows reaches the page
-      beneath, and it stays over a power cycle.
+      would throw at power-on, if it can be stored at all; the overlay orders without MSG (ALT over DIR, DIR over ALT,
+      ALT twice) have no source and are not frozen; the error page lives outside the overlay stack, so a knob turned
+      while it shows reaches the page beneath, and it stays over a power cycle.
 
 ## Across the suite
 
