@@ -117,6 +117,17 @@ export class TimeStamp {
 
         return new TimeStamp(new Date(datePortion + timePortion), this.tz)
     }
+
+    /**
+     * The clock after a time entry of the pilot (3-6; #331, #397): the date stays, the hours and minutes are the entered ones,
+     * and the clock starts at the full minute, with the seconds and milliseconds at zero (KLN 89 trainer, 2026-10-09,
+     * T11) (#331)
+     */
+    public withEnteredTime(hours: number, minutes: number): TimeStamp {
+        const datePortion = this.getTimestamp() - (this.getTimestamp() % DAY);
+
+        return new TimeStamp(new Date(datePortion + hours * HOUR + minutes * MINUTE), this.tz);
+    }
 }
 
 //5-15 Maximumum Date ist 2087

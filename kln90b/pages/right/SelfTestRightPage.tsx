@@ -136,7 +136,7 @@ export class SelfTestRightPage extends SixLineHalfPage {
         const timezone = this.props.userSettings.getSetting("timezone").get();
 
         const oldDate = this.props.sensors.in.gps.timeZulu.atTimezone(TIMEZONES[timezone]);
-        const newDate = oldDate.withTime(date.getHours(), date.getMinutes());
+        const newDate = oldDate.withEnteredTime(date.getHours(), date.getMinutes()); //3-6: the pilot enters hours and minutes; the seconds start at 00 (checked in the KLN 89 trainer, 2026-10-09, T11; #331)
 
         this.props.sensors.in.gps.timeZulu = newDate.atTimezone(UTC);
         this.props.sensors.in.gps.reinitializeSearch(); //3-5, 3-17: the time entered during a search speeds it up (#357)

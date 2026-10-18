@@ -63,6 +63,18 @@ describe('TimeStamp', () => {
         expect(t.withTime(23, 5).getTimestamp()).toBe(Date.UTC(1994, 7, 3, 23, 5, 14, 500));
     });
 
+    // 3-6: the pilot enters hours and minutes only. The KLN 89 started its clock at the entered hour and minute
+    // with the seconds at zero (checked in the KLN 89 trainer, 2026-10-09, T11; on SET 2, 2026-10-18). The zone is kept,
+    // as withTime keeps it
+    it('withEnteredTime keeps the date and the zone and starts at the full minute (3-6; checked in the KLN 89 trainer, 2026-10-09, T11) (#331)', () => {
+        const t = TimeStamp.create(Date.UTC(1994, 7, 3, 8, 10, 14, 500), zone('CST'));
+        const entered = t.withEnteredTime(23, 5);
+
+        expect(entered.getTimestamp()).toBe(Date.UTC(1994, 7, 3, 23, 5, 0, 0));
+        expect(entered.tz.code).toBe('CST');
+        expect(t.getTimestamp()).toBe(Date.UTC(1994, 7, 3, 8, 10, 14, 500)); // A new stamp; the old one is unchanged
+    });
+
     it('addSeconds and getSecondsSinceMidnight count seconds (characterization)', () => {
         const t = TimeStamp.create(Date.UTC(1994, 7, 3, 23, 59, 30));
         expect(t.getSecondsSinceMidnight()).toBe(23 * 3600 + 59 * 60 + 30);
