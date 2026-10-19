@@ -407,3 +407,58 @@ afterwards)
   - The self-test date and time are editable; that page shows no GPS state (#125).
   - With a readable course off the desired track, `ADJ NAV IND CRS TO 224°` appeared about 6 s after the aircraft
     started moving and came back as new 2 to 3 s after it was read.
+
+**2026-10-19** (an agent check; how the trainer's own moving aircraft intercepts and tracks the route; SET 1 take-home
+with GS and HDG making the aircraft fly; FPL 0 BAE, C29, DLL, KMSN, BAE)
+- Method: the unit's screen was recorded once a second and read into series of distance, GS, XTK, DTK or OBS course, TK
+  and bearing. TK and DTK read to 1°, XTK to 0.1 NM from 1 NM and to 0.01 NM below. An offset was made with the OBS
+  geometry: turning the OBS course by n° at distance D gives an XTK of D sin n. Big course changes were made with GS 0,
+  because an OBS change at GS 0 does not move the aircraft. Medium-high confidence in the numbers (#100).
+- Caveat for all of it: the moving aircraft is the trainer's own model, not necessarily what the roll steering output
+  would make a real autopilot do. What the aircraft flew is recorded here apart from what it may mean.
+- OBS-mode steering looked the same as Leg-mode steering: a Leg run (DTK 276, 6.0 NM right of the course) and an OBS run
+  (5.4 NM left of it) were mirror images.
+- From far off, starting parallel to the course, the intercept angle builds up to about 45° and does not exceed it:
+  44° to 45° from 5 to 6 NM at 119 kt, held for the whole approach; 41° from 3.8 NM at 239 kt, held, never 45°. This is
+  for the parallel starts only; the converging start below began steeper than 45°.
+- The build-up from a parallel start is slow: a fast turn to about 25° (about 1.5° to 2° per second, ending abruptly),
+  then 60 to 80 s more at about 0.5° per second to the 45°.
+- The join: the roll-in began at about 50 s of closure before the course, at 1.1 NM at 119 kt and at 2.2 NM at 239 kt. It
+  then closed without overshoot, the XTK keeping its sign down to 0.01 NM. In the join the track error fit
+  atan(XTK / (GS × 30 s)): at 119 kt 0.99 NM gave 42° (formula 45°), 0.6 NM 31° (31°), 0.3 NM 17° (17°), 0.1 NM 6° (6°);
+  at 239 kt 1.0 NM gave 27° (27°), 0.6 NM 17° (17°), 0.2 NM 6° (6°). The XTK halved about every 27 s at both speeds, so
+  the join scales with time, not with distance.
+- Small offsets gave shallow intercepts that depend on the history, not on the XTK alone: 0.51 NM at 121 kt peaked at 10°
+  (built at about 0.3° per second, held while the XTK fell from 0.36 to 0.22 NM, no overshoot, 0.05 NM about 130 s after
+  the offset); 0.31 NM at 239 kt reached only 2° to 3°. The 0.5 NM point of the far-off join run had 26°, and the 0.3 NM
+  point of the 239 kt run 9°.
+- Turn rates followed the speed: about 3° per second at 119 kt, about 2° per second at 239 kt, 4° to 5° per second in the
+  reversal at 120 kt. That fits a rate limited near 25° of bank, with standard rate below it (standard rate at 239 kt
+  would need about 33°).
+- The course behind the aircraft (GS 0, OBS turned to the reciprocal, the aircraft 0.29 NM left of the new course, then
+  GS 120): one continuous turn of about 200° toward the course line, with no change of direction. It crossed the line
+  during the turn, overshot to 0.74 NM on the far side, and came back at about 15°, converging slowly (0.40 NM at 123 s and
+  0.23 NM at 150 s after the start).
+- Converging at 60° from 1.6 NM at 120 kt (the heading changed at once to 67° of convergence): it then turned right,
+  shallowing the intercept at about 1° per second (51° at 0.95 NM, 33° at 0.6 NM, 17° at 0.3 NM, 8° at 0.1 NM), and did
+  not cross; the XTK stayed one-signed. The track was steeper than 45° for a while, so no 45° cap was seen here.
+- Turn anticipation (SET 4 on), DTK switch distance, then the delay before the aircraft turned:
+  - C29, 70° right, 119 kt: the DTK switched at 0.5 NM; the turn began about 6 s later at 2.5° to 3° per second; the
+    track overshot by 4°, decaying over about 60 s; XTK at most 0.15 NM; sequenced at 0.0 NM.
+  - DLL, 164° right, 239 kt: the DTK switched at 4.0 NM; the turn began 4 to 7 s later at a steady 2° per second for
+    76 s; it kept turning to 26° past the new course, 2.5 NM outside it, and took about 4.5 min to join; sequenced 2.9 NM
+    before DLL.
+  - KMSN, 51° left, 239 kt: the DTK switched at 0.9 to 1.0 NM; the turn began 4 to 6 s later at about 2° per second;
+    sequenced at 0.2 NM; XTK at most 0.08 NM outside.
+  - The turn began 4 to 7 s after the DTK switch in all three.
+- Direct To snaps the heading: with 117° to turn at 239 kt, TK went from 093 to 335 within about 3 s, and with the
+  waypoint 180° behind it flipped between two 1 s samples, the GS dipping briefly; no turn is modeled. Leg to OBS also
+  snapped the track. The trainer therefore says nothing about the direction or rate of a Direct To turn.
+- Probably the trainer's aircraft model and not the unit's steering: the slow build-up of the intercept and the 4 to 7 s
+  delay before a turn (the history dependence points to a lagged aircraft, not to a fixed law of the XTK). Not settled.
+  Artifacts: a one-sample jump of 8° to 12° in the TK 5 to 20 s into most turns, a 1° to 2° wrong-way drift at the start
+  of the OBS run, and a few degrees of heading jump when SET 1 was restarted. No turn angle was flown at both speeds.
+  The third-party AVsoftech trainer was not used.
+- Left behind in the trainer: it is still running and flying GS 120 in OBS mode, OBS 151 to BAE, NAV 1 shown, one
+  message pending unread. FPL 0 holds BAE, C29, DLL, KMSN, BAE, and SET 4 turn anticipation is now on (it was off). No
+  user waypoints and no numbered flight plan were changed.
