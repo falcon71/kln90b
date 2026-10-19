@@ -18,7 +18,7 @@ Comments such as `3-29` in the code are page numbers in the KLN 90B Pilot's Guid
 - Debug hooks:
     - `KLN90PlaneSettings.debugMode` is hard-coded to `false` in `KLN90BPlaneSettingsParser`; set it to true by hand. It
       skips the test pages, gives instant brightness and makes `AudioGenerator` show `BEEP: n` on the status line.
-    - `loggingEnabled = false` flags exist in `Scanlist.ts` and `RollSteeringController.ts`.
+    - A `loggingEnabled = false` flag exists in `Scanlist.ts`.
     - There is a commented-out `this.bus.onAll(console.log)` in `KLN90BCore.ts`.
     - There is a lot of `console.log`.
     - The user setting `fastGpsAcquisition` (SET 10 page) **defaults to true** (`GPS_ACQUISITION_FAST`).
@@ -347,7 +347,7 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
     - `GPS WP DESIRED TRACK`, `GPS WP TRACK ANGLE ERROR`, `GPS WP BEARING` (+TRUE), `GPS WP DISTANCE`, `GPS WP ETE`,
       `GPS WP ETA`, `GPS ETE`, `GPS ETA`
     - `GPS COURSE TO STEER` (radians; "real KLN does not have this"; `setRollCommand` writes the roll command LVar
-      regardless; the course is written without a heading input too, on purpose, #143)
+      regardless; the course is 0 without a heading input, and without a path, #143)
     - `GPS MAGVAR`, `GPS POSITION LAT/LON`, `GPS GROUND SPEED`, `GPS GROUND TRUE/MAGNETIC TRACK`
     - `GPS FLIGHT PLAN WP COUNT/INDEX`, `GPS WP NEXT/PREV ID/LAT/LON`, `GPS WP PREV VALID`
     - `GPS IS APPROACH ACTIVE`, `GPS APPROACH MODE` (0 = ENR, 1 = ARM, 2 = APR, 3 = self-test)
@@ -475,6 +475,11 @@ sim.
   turn 15 s with turn anticipation on (`WPT_ALERT_NO_TURN_WITH_TURN_ANTI`, #372, measured in the KLN 89 trainer) or 36 s
   with it off (`WPT_ALERT_WITHOUT_TURN_ANTI`). The alert of a waypoint without a turn ends once the waypoint is behind
   (FROM), unless a turn is still being flown.
+- At the end of the tick, after the sequencing, it publishes `navPage.steeringPath`, the path roll steering follows: the
+  leg path without a turn (also the OBS leg, an arc's circle and, past a final leg without length, the leg before it),
+  the turn circle (`turnStack[0]`) from the start of the lead-in, or the next leg (`pathForDtk`) once the aircraft was
+  farther from the circle than its radius (`TurnStackEntry.steerOnPathForDtk`, kept until the entry pops). Null where
+  XTK is null (#373, #100).
 - `MAX_BANK_ANGLE = 25`. `HOURS_TO_SECONDS` is exported from here and widely imported.
 
 **`ModeController`** (`services/ModeController.ts`, manual 5-36):
@@ -499,13 +504,29 @@ sim.
   the magvar service").
 - Status-line feedback: `NO APPROACH`, `NO ACTV WPT`.
 
-**`RollSteeringController`** (1 Hz) is adapted from WT `LNavComputer`. It writes `L:KLN90B_RollCommand` and,
-only with `writeGPSSimVars`, `GPS COURSE TO STEER`. Without a heading input (`Input.HeadingInput`, also switched by
-`L:KLN90B_HeadingInput`) the roll command is 0 (2-69, #143), also during the self-test. `GPS COURSE TO STEER` is still
-written then, on purpose: the default autopilot reads it.
+**`RollSteeringController`** (1 Hz, after `NavCalculator`) applies one control law, `rollSteeringCommand` in
+`services/RollSteeringLaw.ts`, to `navPage.steeringPath` (the roll steering design,
+`docs/superpowers/specs/2026-10-19-roll-steering-design.md`). It writes `L:KLN90B_RollCommand` and, only with
+`writeGPSSimVars`, `GPS COURSE TO STEER`. Without a heading input (`Input.HeadingInput`, also switched by
+`L:KLN90B_HeadingInput`) the roll command is 0 (2-69, #143), also during the self-test, and so is
+`GPS COURSE TO STEER` (the maintainer's decision, 2026-10-19: he held it at 0 in the sim and the default autopilot still
+tracked the flight plan, so the sim's autopilot does not read it; the DTK goes to `GPS WP DESIRED TRACK`). Its class
+comment gives the sources for the 1 Hz rate.
 
-- Cases: on track (proportional), no intercept (45-degree intercept), or optimal-bank intercept (at most 30 degrees).
-- `adjustBankAngleForArc` and `ArcTurnController` exist but are unused.
+- The law (true angles, a left bank positive): XTK and the DTK abeam come from the path itself; the intercept is
+  `atan(|XTK| / L)` with the look-ahead `L = GS x 30 s`, at most 45 degrees (both checked in the KLN 89 trainer,
+  2026-10-19); the course to steer is the DTK less the intercept toward the path; the bank is 1.25 times the track
+  error (the framework's `LNavRollSteerComputer`), at most `MAX_BANK_ANGLE` (25).
+- On a curved path (turn circle, DME arc) the bank the circle needs at the ground speed is added, in full on the path
+  and fading out within one turn radius at 25 degrees of bank.
+- On the circle of an anticipated turn (`turnStack[0].path`, not a DME arc) the command never banks against the turn;
+  that side is held at 0, so an aircraft inside the turn near its start gets no wrong-way bank (#100).
+- Beyond 150 degrees of track error the turn direction is latched: the shorter way when the error first exceeds 150
+  (`navPage.rollSteeringLatch`, with a copy of the path it was chosen on), so a turn does not reverse while the error
+  passes 180 and XTK changes sign. It is cleared on another path, without a
+  command and on a power cycle (`VolatileMemory.reset`).
+- No command (0) without a steering path or an XTK, below 5 kt of ground speed (2-70), or without a heading input. The
+  output is raw; the aircraft smooth it.
 
 **`Vnav`** (`services/Vnav.ts`): NAV 4 advisory VNAV with the state machine `Inactive/Armed/Active`. It uses
 `navPage.nav4*` fields and has no sim output.

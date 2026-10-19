@@ -1,7 +1,7 @@
 import {CalcTickable, TICK_TIME_CALC} from "../../TickController";
 import {Sensors} from "../../Sensors";
 import {FROM, TO, VolatileMemory} from "../VolatileMemory";
-import {GeoCircle, GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
+import {FlightPathUtils, GeoCircle, GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Degrees, NauticalMiles, Seconds} from "../Units";
 import {ModeController} from "../../services/ModeController";
@@ -48,6 +48,7 @@ export class NavCalculator implements CalcTickable {
         const nav = this.memory.navPage;
         if (nav.isSelfTestActive) {
             nav.xtkToActive = -2.5;
+            nav.steeringPath = null;
             nav.distToActive = 34.5;
             nav.desiredTrack = this.magvar.magToTrue(315);
             nav.eteToActive = null;
@@ -117,6 +118,7 @@ export class NavCalculator implements CalcTickable {
             const incoming = this.getIncomingPath(idx);
             if (incoming === null) {
                 nav.xtkToActive = null;
+                nav.steeringPath = null;
                 nav.desiredTrack = null;
                 nav.toFrom = null;
                 nav.bearingForAP = nav.bearingToActive;
@@ -273,7 +275,47 @@ export class NavCalculator implements CalcTickable {
             nav.waypointAlert = false;
         }
 
+        //#373, #100: the path roll steering follows, taken after the sequencing of this tick (which may have changed the
+        //leg), so that a turn pushed in this tick is steered in this tick
+        nav.steeringPath = this.steeringPath(this.activeLegPath() ?? legPath);
+
         this.setOutput();
+    }
+
+    /**
+     * The path of the active leg as tick() takes it at its start: the path of the from leg, or past a leg without length
+     * the leg before it (#120). Null without a leg, or without a leg before one without length
+     */
+    private activeLegPath(): GeoCircle | null {
+        const activeWaypoint = this.memory.navPage.activeWaypoint;
+        const fromLeg = activeWaypoint.getFromLeg();
+        if (fromLeg === null) {
+            return null;
+        }
+        if (!this.modeController.isObsModeActive() && isNaN(fromLeg.path.center[0])) {
+            return this.getIncomingPath(activeWaypoint.getActiveFplIdx());
+        }
+        return fromLeg.path;
+    }
+
+    /**
+     * The path roll steering follows (the roll steering design, docs/superpowers/specs/2026-10-19-roll-steering-design.md,
+     * section 4A). Without a turn it is the leg path. During a turn, including the lead-in before it, it is the turn
+     * circle (turnStack[0]), so that the bank is established when the circle begins. More than one radius from the circle
+     * the turn is no path to follow: beyond its center the closest point lies on the far side, where the circle runs
+     * backward, and farther outside the circle steering back to it is a detour. The aircraft then steers on the next leg
+     * (pathForDtk) until the turn ends
+     */
+    private steeringPath(legPath: GeoCircle): GeoCircle {
+        const turnStack = this.memory.navPage.activeWaypoint.turnStack;
+        if (turnStack.length === 0) {
+            return legPath;
+        }
+        const turn = turnStack[0];
+        if (Math.abs(turn.path.distance(this.sensors.in.gps.coords)) > FlightPathUtils.getTurnRadiusFromCircle(turn.path)) {
+            turn.steerOnPathForDtk = true;
+        }
+        return turn.steerOnPathForDtk ? turn.pathForDtk : turn.path;
     }
 
     /**
@@ -333,6 +375,7 @@ export class NavCalculator implements CalcTickable {
     private setFlag() {
         const nav = this.memory.navPage;
         nav.xtkToActive = null;
+        nav.steeringPath = null;
         nav.distToActive = null;
         nav.distToDest = null;
         nav.desiredTrack = null;

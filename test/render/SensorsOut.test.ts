@@ -518,9 +518,11 @@ describe('GPS SimVars with Output.WriteGPSSimVars off (public contract) (#126)',
     });
 
     // No contract source beyond the unit, radians (written as a plain number): this is what the code writes today. The
-    // roll steering intercepts a leg it is 1 NM right of at 45 degrees, so the course is the leg's 50.75 less 45.
+    // roll steering intercepts a leg it is 1 NM right of at 45 degrees, so the course is the leg's 50.75 less 45. It boots
+    // with the heading input, because without one the course is 0 (the maintainer's decision, 2026-10-19, #143; held in
+    // RollSteeringController.test.ts)
     it('writes GPS COURSE TO STEER as the intercept course in radians (characterization)', async () => {
-        const unit = await bootMovingOnRoute();
+        const unit = await bootMovingOnRoute(panelXml(HEADING_INPUT));
 
         const {kaaa, abc} = standardRoute();
         const legCourse = courseDeg(pointBefore(kaaa, abc, 20), abc);

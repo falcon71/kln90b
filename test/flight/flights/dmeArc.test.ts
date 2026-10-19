@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {FixTypeFlags, GeoCircle, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {Flight} from '../../harness/flight/Flight';
+import {ManualPilot} from '../../harness/flight/pilots';
 import {World} from '../../harness/flight/World';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
@@ -61,6 +62,19 @@ async function loadedOnArc(turn: LegTurnDirection, radial: number, o: { radiusNm
     await flight.fly(2);
     return {flight, ...w};
 }
+
+/**
+ * Recorded by the 326da1a flight below and judged by the baseline test after it, so the flight is flown once: the
+ * largest distance past the FAF leg (north of it) from the start of the turn at the arc end until 30 s after the track
+ * is on the leg's course (#100)
+ */
+const arcEnd: { overshootNm: number | null } = {overshootNm: null};
+
+/**
+ * That overshoot as the old RollSteeringController flew it as of 15b5ddd, measured on 2026-10-19 (the appendix of
+ * docs/superpowers/specs/2026-10-19-roll-steering-design.md): the bound of the test below
+ */
+const ARC_END_OVERSHOOT_NM = 0.688;
 
 describe('DME arc flown', () => {
     // Spec: Pilot's Guide 6-16 to 6-18 (a DME arc is flown around its VOR in the direction of the procedure, from the
@@ -144,7 +158,7 @@ describe('DME arc flown', () => {
 
         // Flown through, the aircraft is on the FAF leg and never passes it by more than one turn radius. That is what
         // a turn that starts at the waypoint, without any lead, would give; the turn flown here stays inside it
-        // (measured 0.65 NM).
+        // (measured 0.69 NM on 2026-10-19 at 15b5ddd).
         let northOfLeg = 0;
         flight.monitor('beyond the FAF leg', f => {
             const off = crossTrackNm(f.aircraft, arcen, nextCourse);
@@ -152,10 +166,59 @@ describe('DME arc flown', () => {
             return true;
         });
         await flight.flyUntil(
-            () => angleBetween(flight.sim.get('GPS GROUND TRUE TRACK', 'degrees'), nextCourse) < 1,
+            // The aircraft's own track, not the GPS GROUND TRUE TRACK output: the unit writes that once a second, and the
+            // aircraft sweeps through the 2 degree window at 3 degrees per second, so a sample could miss it (#373 moved the
+            // phase of the roll steering by one tick, and the old condition then never held)
+            () => angleBetween(flight.aircraft.trackTrue, nextCourse) < 1,
             {timeout: 120, description: 'established on the FAF leg course'});
         expect(flight.nav.activeIdent).toBe('FAFAA');
         expect(northOfLeg).toBeLessThan(radius);
+
+        // The farthest point past the leg comes when the track turns back through the leg's course, which can fall just
+        // after the 1 degree window above, so the monitor keeps measuring for 30 s more (the leg goes on to FAFAA and
+        // MAPAA on the same radial, 2.5 NM and 4 NM from ARCEN)
+        await flight.fly(30);
+        arcEnd.overshootNm = northOfLeg;
+    });
+
+    // The roll steering design, section 6: the new control law is not worse than the old one at the arc end, where the
+    // old bank collapsed to about 4 degrees between the start of the turn and the sequencing to FAFAA (#100)
+    it('overshoots the FAF leg at the arc end by no more than the old controller (#100)', () => {
+        expect(arcEnd.overshootNm).not.toBeNull();
+        expect(arcEnd.overshootNm!).toBeLessThanOrEqual(ARC_END_OVERSHOOT_NM);
+    });
+});
+
+// The roll steering design (docs/superpowers/specs/2026-10-19-roll-steering-design.md, section 4B): on a DME arc the unit
+// steers on the arc's circle. Near its VOR the closest point of the circle is still defined, and the command must turn
+// the aircraft out toward the arc. The old controller's arc code (ArcTurnController) is gone (#100)
+describe('roll steering near the VOR of a DME arc (#100)', () => {
+    it('gives a finite command toward the arc near its VOR', async () => {
+        const {flight, abc} = await loadedOnArc(LegTurnDirection.Right, 190);
+        expect(flight.nav.activeIdent).toBe('ARCEN');
+        // 0.5 NM from ABC on its 225 radial, flying the arc's direction (clockwise: the radial plus 90). The aircraft is
+        // set 2 s before that point and flown there wings level, so that the unit's track (taken from two successive
+        // positions) is the true one when the command is read (as place() in rollSteering.test.ts)
+        const radial = 225;
+        const track = radial + 90;
+        const at = pointFrom(abc, radial, 0.5);
+        const runUp = pointFrom(at, track + 180, 120 * 2 / 3600);
+        const autopilot = flight.pilot;
+        flight.pilot = new ManualPilot();
+        Object.assign(flight.aircraft, {lat: runUp.lat, lon: runUp.lon, trackTrue: track, bankDeg: 0});
+        flight.aircraft.writeTo(flight.sim, 0);
+        await flight.fly(2);
+        flight.pilot = autopilot;
+        expect(flight.nav.activeIdent).toBe('ARCEN');
+
+        const roll = flight.sim.get('L:KLN90B_RollCommand', 'degrees') as number;
+        const cts = (flight.sim.lastWrite('GPS COURSE TO STEER')!.value as number) * 180 / Math.PI;
+        expect(Number.isFinite(roll)).toBe(true);
+        expect(Number.isFinite(cts)).toBe(true);
+        // The arc lies 9.5 NM out along the radial, to the left of the track: the bank is left, and the course to steer
+        // leads away from the VOR, within 90 degrees of the radial
+        expect(roll).toBeGreaterThan(0);
+        expect(angleBetween(cts, radial)).toBeLessThan(90);
     });
 });
 

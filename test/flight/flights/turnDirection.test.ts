@@ -48,9 +48,11 @@ describe('turn direction at ABC', () => {
         expect(maxLeftBank).toBeGreaterThan(15);
     });
 
-    // #100: during the roll-in the unit steers against the inbound leg with the outbound DTK, and the sign of a cross
-    // track of about zero picks the side, so it can command a right bank at the start of a left turn
-    it.fails('banks into the turn when turn anticipation starts (#100)', () => {
+    // #100: the old controller steered against the inbound leg with the outbound DTK during the roll-in, and the sign of a
+    // cross track of about zero picked the side, so it commanded a right bank at the start of this left turn. The unit
+    // steers on the turn circle from the DTK switch on (the roll steering design,
+    // docs/superpowers/specs/2026-10-19-roll-steering-design.md, section 4A), so every command is a left bank
+    it('banks into the turn when turn anticipation starts (#100)', () => {
         expect(rollAfterTurnStart).toHaveLength(3);
         for (const roll of rollAfterTurnStart) expect(roll).toBeGreaterThan(0);
     });

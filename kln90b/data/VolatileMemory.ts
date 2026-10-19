@@ -4,6 +4,7 @@ import {
     Facility,
     FacilityClient,
     FacilityType,
+    GeoCircle,
     IntersectionFacility,
     NdbFacility,
     RunwayFacility,
@@ -80,6 +81,20 @@ export class NavPageState {
     public bearingToActive: Degrees | null = null; //true, based on appendix A of the manual
     public bearingForAP: Degrees | null = null; //true. Will be set to desiredTrack in DME arcs to improve autopilot tracking
     public desiredTrack: Degrees | null = null;  //true
+    /**
+     * The path roll steering follows (#373); null when there is nothing to steer on. Without a turn it is the leg path of
+     * NavCalculator, so a final leg without length gives the path of the leg before it (#120). During a turn it is the
+     * turn circle, or the next leg once the aircraft was farther from the circle than its radius (#100, the roll steering
+     * design, docs/superpowers/specs/2026-10-19-roll-steering-design.md, section 4A).
+     */
+    public steeringPath: GeoCircle | null = null;
+    /**
+     * The turn direction roll steering keeps while the course to steer is far behind the track, with a copy of the path
+     * it was chosen on: it applies only while the steering path still has that geometry (RollSteeringLaw.ts, #100). The
+     * latch is keyed by a copy of the geometry, not by the object, because ActiveWaypoint reuses one GeoCircle for every
+     * great-circle leg and rewrites it in place (the roll steering design, section 4B (amended 2026-10-19))
+     */
+    public rollSteeringLatch: { turn: 'left' | 'right', path: GeoCircle } | null = null;
     public obsMag: Degrees = 0; //Magnetic!!
     public toFrom: ToFrom | null = null;
     public xtkScale: number = 5;
@@ -281,6 +296,7 @@ export class VolatileMemory {
         this.navPage.aprActivationScale = 1;
         this.navPage.userMagvar = 0;
         this.navPage.isSelfTestApproved = false; //Every power-on runs the self-test again (#330)
+        this.navPage.rollSteeringLatch = null; //A turn chosen before the power-off is not kept (#100)
 
         this.calPage.cal6TimeZ = null;
         this.calPage.cal6FromTimezone = null;
