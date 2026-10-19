@@ -111,16 +111,32 @@ describe('L:KLN90B_RollCommand without a heading input (public contract)', () =>
         expect(unit.env.sim.lastWrite('L:KLN90B_RollCommand')?.value).toBe(0);
     });
 
-    // GPS COURSE TO STEER is not an output of the real unit (the code adds it), and the default autopilot reads it. The
-    // maintainer decided to keep writing it without a heading input (characterization): the 45° intercept course of the
-    // leg, as in SensorsOut.test.ts
-    it('still writes GPS COURSE TO STEER, the intercept course (characterization, #143)', async () => {
+    // GPS COURSE TO STEER is not an output of the real unit (the code adds it). The maintainer held it at 0 in the sim
+    // on 2026-10-19 and the default autopilot still tracked the flight plan perfectly, so the sim's autopilot does not
+    // read it. Without a heading input it is 0 like the roll command, 2 NM off the leg too (the maintainer's decision,
+    // 2026-10-19, reversing the #143 exemption)
+    it('writes GPS COURSE TO STEER as 0 without a heading input (#143)', async () => {
         const {unit, mid, dtk} = await onRoute();
 
         await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});
 
-        const cts = unit.env.sim.lastWrite('GPS COURSE TO STEER')!.value as number;
-        expect(cts).toBeCloseTo(((dtk - 45 + 360) % 360) * Math.PI / 180, 2);
+        expect(unit.env.sim.lastWrite('GPS COURSE TO STEER')!.value).toBe(0);
+    });
+
+    // Without a heading input the unit calculates no command, so it keeps no turn latch either (the roll steering design,
+    // section 4B step 6): when an aircraft switches the input back on at runtime (L:KLN90B_HeadingInput, #368), the first
+    // command starts fresh. 0.3 NM right of the leg with the leg behind, the track error is about 163 degrees, beyond the
+    // latch angle, so with the input on the latch is set; switched off, it goes
+    it('keeps no turn latch without a heading input (#143)', async () => {
+        const {unit, mid, dtk} = await onRoute(HEADING_INPUT_XML);
+        await moveAircraft(unit, pointFrom(mid, dtk + 90, 0.3), {groundspeedKt: 120, trackTrue: (dtk + 180) % 360});
+        expect(unit.props.memory.navPage.rollSteeringLatch?.turn).toBe('right'); // Precondition: latched with the input on
+
+        unit.env.sim.set('L:KLN90B_HeadingInput', 'bool', 0);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.planeSettings.input.headingInput).toBe(false);
+        expect(unit.props.memory.navPage.rollSteeringLatch).toBeNull();
     });
 });
 

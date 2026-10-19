@@ -554,7 +554,7 @@ export class SensorsOut {
         }
     }
 
-    public setRollCommand(bankAngle: number | null, desiredHeading: number | null) {
+    public setRollCommand(bankAngle: number | null, courseToSteer: number | null) {
         if (bankAngle === null) {
             SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
         } else {
@@ -565,10 +565,14 @@ export class SensorsOut {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
-        if (desiredHeading === null) {
+        //The maintainer held GPS COURSE TO STEER at 0 in the sim on 2026-10-19 and the default autopilot still tracked the
+        //flight plan perfectly, so the sim's autopilot does not read it. It carries the course to steer of the roll
+        //steering law, and 0 without a heading input or without a path (the maintainer's decision, 2026-10-19, reversing
+        //the #143 exemption). The DTK goes to GPS WP DESIRED TRACK (setDesiredTrack), not here
+        if (courseToSteer === null) {
             SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Number, 0);
         } else {
-            SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Number, UnitType.DEGREE.convertTo(desiredHeading, UnitType.RADIAN));
+            SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Number, UnitType.DEGREE.convertTo(courseToSteer, UnitType.RADIAN));
         }
     }
 

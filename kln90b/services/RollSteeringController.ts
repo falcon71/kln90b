@@ -40,20 +40,29 @@ export class RollSteeringController implements CalcTickable {
 
     public tick(): void {
         const nav = this.memory.navPage;
-        if (nav.isSelfTestActive) {
-            this.setOutput(this.selfTest(), null);
+        //Installation Manual 2-69: without a heading input the unit gives no roll steering, so L:KLN90B_RollCommand is 0,
+        //also during the self-test (#143). GPS COURSE TO STEER is 0 then too (the maintainer's decision, 2026-10-19, see
+        //Sensors.setRollCommand). Nothing is calculated, so no latch or self-test state is left over for the moment the input
+        //is switched on (L:KLN90B_HeadingInput, #368)
+        if (!this.planeSettings.input.headingInput) {
+            this.resetSelfTest();
+            nav.rollSteeringLatch = null;
+            this.sensors.out.setRollCommand(null, null);
             return;
-        } else {
-            this.selfTestBank = 0;
-            this.selfTestDirection = SELF_TEST_DIR_RIGHT;
         }
+
+        if (nav.isSelfTestActive) {
+            this.sensors.out.setRollCommand(this.selfTest(), null);
+            return;
+        }
+        this.resetSelfTest();
 
         //#373: without a path or an XTK there is nothing to steer on. 2-70: roll steering needs a ground speed
         const path = nav.steeringPath;
         const gps = this.sensors.in.gps;
         if (path === null || nav.xtkToActive === null || gps.groundspeed < 5) {
             nav.rollSteeringLatch = null;
-            this.setOutput(null, null);
+            this.sensors.out.setRollCommand(null, null);
             return;
         }
 
@@ -67,16 +76,12 @@ export class RollSteeringController implements CalcTickable {
         const command = rollSteeringCommand(path, gps.coords, gps.groundspeed, gps.getTrackTrueRespectingGroundspeed()!,
             latch !== null && isSamePath(latch.path, path) ? latch.turn : null, turnCircle);
         nav.rollSteeringLatch = command.latch === null ? null : {turn: command.latch, path: new GeoCircle(path.center, path.radius)};
-        this.setOutput(command.bankAngle, command.courseToSteer);
+        this.sensors.out.setRollCommand(command.bankAngle, command.courseToSteer);
     }
 
-    /**
-     * Installation Manual 2-69: without a heading input the unit gives no roll steering, so L:KLN90B_RollCommand is 0,
-     * also during the self-test (#143). GPS COURSE TO STEER is written either way: a deliberate decision, because the
-     * default autopilot reads it and holding it at 0 has unknown side effects
-     */
-    private setOutput(bankAngle: number | null, desiredTrack: number | null): void {
-        this.sensors.out.setRollCommand(this.planeSettings.input.headingInput ? bankAngle : null, desiredTrack);
+    private resetSelfTest(): void {
+        this.selfTestBank = 0;
+        this.selfTestDirection = SELF_TEST_DIR_RIGHT;
     }
 
     /**

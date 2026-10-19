@@ -347,7 +347,7 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
     - `GPS WP DESIRED TRACK`, `GPS WP TRACK ANGLE ERROR`, `GPS WP BEARING` (+TRUE), `GPS WP DISTANCE`, `GPS WP ETE`,
       `GPS WP ETA`, `GPS ETE`, `GPS ETA`
     - `GPS COURSE TO STEER` (radians; "real KLN does not have this"; `setRollCommand` writes the roll command LVar
-      regardless; the course is written without a heading input too, on purpose, #143)
+      regardless; the course is 0 without a heading input, and without a path, #143)
     - `GPS MAGVAR`, `GPS POSITION LAT/LON`, `GPS GROUND SPEED`, `GPS GROUND TRUE/MAGNETIC TRACK`
     - `GPS FLIGHT PLAN WP COUNT/INDEX`, `GPS WP NEXT/PREV ID/LAT/LON`, `GPS WP PREV VALID`
     - `GPS IS APPROACH ACTIVE`, `GPS APPROACH MODE` (0 = ENR, 1 = ARM, 2 = APR, 3 = self-test)
@@ -508,8 +508,10 @@ sim.
 `services/RollSteeringLaw.ts`, to `navPage.steeringPath` (the roll steering design,
 `docs/superpowers/specs/2026-10-19-roll-steering-design.md`). It writes `L:KLN90B_RollCommand` and, only with
 `writeGPSSimVars`, `GPS COURSE TO STEER`. Without a heading input (`Input.HeadingInput`, also switched by
-`L:KLN90B_HeadingInput`) the roll command is 0 (2-69, #143), also during the self-test. `GPS COURSE TO STEER` is still
-written then, on purpose: the default autopilot reads it. Its class comment gives the sources for the 1 Hz rate.
+`L:KLN90B_HeadingInput`) the roll command is 0 (2-69, #143), also during the self-test, and so is
+`GPS COURSE TO STEER` (the maintainer's decision, 2026-10-19: he held it at 0 in the sim and the default autopilot still
+tracked the flight plan, so the sim's autopilot does not read it; the DTK goes to `GPS WP DESIRED TRACK`). Its class
+comment gives the sources for the 1 Hz rate.
 
 - The law (true angles, a left bank positive): XTK and the DTK abeam come from the path itself; the intercept is
   `atan(|XTK| / L)` with the look-ahead `L = GS x 30 s`, at most 45 degrees (both checked in the KLN 89 trainer,
