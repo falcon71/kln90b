@@ -48,6 +48,7 @@ export class NavCalculator implements CalcTickable {
         const nav = this.memory.navPage;
         if (nav.isSelfTestActive) {
             nav.xtkToActive = -2.5;
+            nav.steeringPath = null;
             nav.distToActive = 34.5;
             nav.desiredTrack = this.magvar.magToTrue(315);
             nav.eteToActive = null;
@@ -117,6 +118,7 @@ export class NavCalculator implements CalcTickable {
             const incoming = this.getIncomingPath(idx);
             if (incoming === null) {
                 nav.xtkToActive = null;
+                nav.steeringPath = null;
                 nav.desiredTrack = null;
                 nav.toFrom = null;
                 nav.bearingForAP = nav.bearingToActive;
@@ -126,6 +128,8 @@ export class NavCalculator implements CalcTickable {
             }
             legPath = incoming;
         }
+        //#373: roll steering follows XTK, so it steers on this path, also on the course of the leg before a leg without length
+        nav.steeringPath = legPath;
 
         //Special handling for turns
         if (nav.activeWaypoint.turnStack.length > 0) {
@@ -333,6 +337,7 @@ export class NavCalculator implements CalcTickable {
     private setFlag() {
         const nav = this.memory.navPage;
         nav.xtkToActive = null;
+        nav.steeringPath = null;
         nav.distToActive = null;
         nav.distToDest = null;
         nav.desiredTrack = null;

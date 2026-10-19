@@ -152,7 +152,10 @@ describe('DME arc flown', () => {
             return true;
         });
         await flight.flyUntil(
-            () => angleBetween(flight.sim.get('GPS GROUND TRUE TRACK', 'degrees'), nextCourse) < 1,
+            // The aircraft's own track, not the GPS GROUND TRUE TRACK output: the unit writes that once a second, and the
+            // aircraft sweeps through the 2 degree window at 3 degrees per second, so a sample could miss it (#373 moved the
+            // phase of the roll steering by one tick, and the old condition then never held)
+            () => angleBetween(flight.aircraft.trackTrue, nextCourse) < 1,
             {timeout: 120, description: 'established on the FAF leg course'});
         expect(flight.nav.activeIdent).toBe('FAFAA');
         expect(northOfLeg).toBeLessThan(radius);

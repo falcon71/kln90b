@@ -1,9 +1,13 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
+import {GeoCircle, GeoPoint} from '@microsoft/msfs-sdk';
 import {standardRoute} from '../../harness/fixtures';
 import {HEADING_INPUT, panelXml} from '../../harness/panelXml';
 import {activeIdent} from '../../harness/readers';
+import {RollSteeringController} from '../../../kln90b/services/RollSteeringController';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
+import {savedFlightplan} from '../../harness/storage';
+import {airport} from '../../harness/navdata/builders';
 import {angleDiff, courseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
 
 const HEADING_INPUT_XML = panelXml(HEADING_INPUT);
@@ -154,5 +158,98 @@ describe('L:KLN90B_RollCommand far left of the leg on a parallel track (#100)', 
         const offTrack = angleDiff(cts, dtk);
         expect(offTrack).toBeGreaterThan(0);
         expect(offTrack).toBeLessThan(90);
+    });
+});
+
+// #373: with a plan whose only leg has no length, [KAAA, KAAA], NavCalculator has no leg before it to navigate on (#120),
+// so DTK and XTK are null. The unit then has nothing to steer on and the roll command is 0 (the roll steering design,
+// docs/superpowers/specs/2026-10-19-roll-steering-design.md, section 3 and section 5 item 2; the 0 output is an analogy to
+// the case without a heading input, Installation Manual 2-69, which is about a missing input, not a missing path). The old
+// controller steered on the degenerate path with null coerced to 0. GPS COURSE TO STEER is written as 0 in the same case (see the
+// comment on setOutput in RollSteeringController.ts). HeadingInput is on.
+describe('L:KLN90B_RollCommand with a plan without a leg before the zero-length one (#373)', () => {
+    it('is 0 and GPS COURSE TO STEER 0 with KAAA, KAAA, where there is no DTK (#373)', async () => {
+        const kaaa = airport('KAAA', 47.0, 8.0);
+        const unit = await bootUnit({
+            panelXml: HEADING_INPUT_XML, facilities: [kaaa], storage: savedFlightplan(0, [kaaa, kaaa]),
+            position: pointFrom(kaaa, 270, 2),
+        });
+        await settle(unit);
+        // A leftover path would have to be cleared by NavCalculator; the sentinel is the path of an earlier tick
+        unit.props.memory.navPage.steeringPath = GeoCircle.createGreatCircle(new GeoPoint(0, 0), new GeoPoint(0, 1));
+
+        await moveAircraft(unit, pointFrom(kaaa, 270, 2), {groundspeedKt: 120, trackTrue: 90});
+
+        const nav = unit.props.memory.navPage;
+        expect(nav.desiredTrack).toBeNull();
+        expect(nav.xtkToActive).toBeNull();
+        expect(nav.steeringPath).toBeNull();
+        expect(unit.errors).toEqual([]); // a controller that reads the missing path fails with an exception, caught by the tick
+        expect(unit.props.planeSettings.input.headingInput).toBe(true);
+        expect(unit.env.sim.lastWrite('L:KLN90B_RollCommand')?.value).toBe(0);
+        expect(unit.env.sim.lastWrite('GPS COURSE TO STEER')?.value).toBe(0);
+    });
+});
+
+// #373: NavPageState.steeringPath is the path XTK is measured on (NavCalculator) and null where there is none. The
+// sentinel is a path left by an earlier tick; each state below has to clear it.
+describe('NavPageState.steeringPath (#373)', () => {
+    const sentinel = () => GeoCircle.createGreatCircle(new GeoPoint(0, 0), new GeoPoint(0, 1));
+
+    it('is the leg KAAA to ABC on the standard route, the path of its XTK (#373)', async () => {
+        const {unit, kaaa, abc, mid} = await onRoute(HEADING_INPUT_XML);
+
+        await moveAircraft(unit, pointFrom(mid, courseDeg(mid, abc) + 90, 2), {groundspeedKt: 120});
+
+        const path = unit.props.memory.navPage.steeringPath!;
+        expect(path).not.toBeNull();
+        // Both ends lie on the path, and the aircraft is 2 NM off it
+        expect(path.distance(new GeoPoint(kaaa.lat, kaaa.lon))).toBeLessThan(1e-6);
+        expect(path.distance(new GeoPoint(abc.lat, abc.lon))).toBeLessThan(1e-6);
+        expect(Math.abs(unit.props.memory.navPage.xtkToActive!)).toBeCloseTo(2, 1);
+    });
+
+    it('is null without a flight plan (#373)', async () => {
+        const unit = await bootUnit({panelXml: HEADING_INPUT_XML});
+        await settle(unit);
+        unit.props.memory.navPage.steeringPath = sentinel();
+
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.memory.navPage.steeringPath).toBeNull();
+    });
+
+    it('is null during the self-test, which has its own roll command (#373)', async () => {
+        const {unit} = await onRoute(HEADING_INPUT_XML);
+        unit.props.memory.navPage.steeringPath = sentinel();
+        unit.props.memory.navPage.isSelfTestActive = true;
+
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.memory.navPage.steeringPath).toBeNull();
+    });
+});
+
+// #373: the controller steers on NavPageState.steeringPath and not on the path of the from leg (the roll steering design,
+// docs/superpowers/specs/2026-10-19-roll-steering-design.md, section 5 item 2). NavCalculator rewrites the field every
+// tick, so the test sets it and ticks a controller itself. The aircraft is 0.3 NM right of the leg flying at it at 200 kt,
+// where the real path gives the -30 degree cap (case 4 of updateBankAngle, as in the test above). A path whose
+// intersections with the aircraft's track lie more than 100 NM away leaves only the 45 degree intercept (case 2): 25
+// degrees of bank and the course to steer 45 degrees from the DTK. Task 5 replaces the algorithm and may update the
+// literals; what must stay is that the output follows the field.
+describe('RollSteeringController steers on NavPageState.steeringPath (#373)', () => {
+    it('banks 25 degrees on the 45 degree intercept when the path is out of reach, where the leg gives 30 (#373)', async () => {
+        const {unit, mid, dtk} = await onRoute(HEADING_INPUT_XML);
+        await moveAircraft(unit, pointFrom(mid, dtk + 90, 0.3), {groundspeedKt: 200, trackTrue: (dtk + 270) % 360});
+        const nav = unit.props.memory.navPage;
+        expect(roll(unit)).toBeCloseTo(-30, 6); // Precondition: the leg itself gives the cap
+        nav.steeringPath = GeoCircle.createGreatCircle(new GeoPoint(0, 100), new GeoPoint(1, 100)); // a meridian 100 degrees east
+
+        new RollSteeringController(unit.props.sensors, unit.props.memory, unit.props.planeSettings).tick();
+
+        expect(roll(unit)).toBeCloseTo(-25, 6);
+        // XTK is positive: the intercept course is 45 degrees left of the DTK
+        const cts = (unit.env.sim.lastWrite('GPS COURSE TO STEER')!.value as number) * 180 / Math.PI;
+        expect(Math.abs(angleDiff(cts, nav.desiredTrack! - 45))).toBeLessThan(0.01);
     });
 });

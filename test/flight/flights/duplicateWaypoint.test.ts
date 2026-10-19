@@ -1,11 +1,11 @@
 import {describe, expect, it} from 'vitest';
-import {Facility} from '@microsoft/msfs-sdk';
+import {Facility, GeoPoint} from '@microsoft/msfs-sdk';
 import {Flight} from '../../harness/flight/Flight';
 import {World} from '../../harness/flight/World';
 import {vor} from '../../harness/navdata/builders';
 import {standardRoute} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
-import {angleBetween, courseDeg, distanceNm, finalCourseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
+import {angleBetween, courseDeg, crossTrackNm, distanceNm, finalCourseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
 import {turnStackLength} from '../../harness/readers';
 
 /** The standard world of the proof flight: KAAA - ABC - KBBB, with the aircraft 3 NM before ABC on the first leg */
@@ -132,5 +132,49 @@ describe('a plan whose only leg has no length (#120)', () => {
         expect(recorded.moved).toBeGreaterThan(0.5);
         expect(recorded.outputLagNm).not.toBeNull();
         expect(recorded.outputLagNm!).toBeLessThan(0.1);
+    });
+});
+
+// #373: on a final leg whose end repeats the waypoint before it, [KAAA, ABC, ABC], the unit keeps navigating on the course
+// of the leg before it (#120, checked in the KLN 89 trainer, 2026-10-14), so XTK follows the extended course. Roll
+// steering follows XTK and without a path it gives no command (the roll steering design, docs/superpowers/specs/2026-10-19-roll-steering-design.md,
+// section 3 and section 5 item 2). The coupled autopilot flies the roll command of the unit.
+describe('roll steering on a final leg that repeats the waypoint before it (#373)', () => {
+    it('turns back onto the extended course past ABC and holds it (#373)', async () => {
+        const {flight, kaaa, abc} = await flyToward((kaaa, abc) => [kaaa, abc, abc], {});
+        const course = finalCourseDeg(kaaa, abc);
+        const activeIdx = () => flight.unit.props.memory.navPage.activeWaypoint.getActiveFplIdx();
+        await flight.flyUntil(() => activeIdx() === 2 && distanceNm(flight.aircraft, abc) > 1, {timeout: 150, description: 'past ABC on the leg ABC to ABC'});
+
+        // The path the unit steers on is the one XTK is measured on: the great circle KAAA to ABC, not the path of the leg
+        // ABC to ABC, which has no center
+        const path = flight.unit.props.memory.navPage.steeringPath!;
+        expect(path).not.toBeNull();
+        expect(Number.isFinite(path.center[0])).toBe(true);
+        expect(path.distance(new GeoPoint(abc.lat, abc.lon))).toBeLessThan(1e-6);
+        expect(angleBetween(path.bearingAt(new GeoPoint(abc.lat, abc.lon)), course)).toBeLessThan(0.5);
+
+        // Displaced 1 NM right of the extended course, flying the course's track; the aircraft is set directly, because
+        // Flight.jump moves along the aircraft's track only
+        const onCourse = pointFrom(abc, course, 4);
+        const displaced = pointFrom(onCourse, course + 90, 1);
+        Object.assign(flight.aircraft, {lat: displaced.lat, lon: displaced.lon, trackTrue: course, bankDeg: 0});
+        flight.aircraft.writeTo(flight.sim, 0);
+        expect(crossTrackNm(flight.aircraft, abc, course)).toBeGreaterThan(0.9);
+        const rolls: number[] = [];
+        const lateOffsets: number[] = [];
+        const t0 = flight.t;
+        flight.monitor('roll and offset after the displacement', f => {
+            rolls.push(f.sim.get('L:KLN90B_RollCommand', 'degrees'));
+            if (f.t - t0 > 180) lateOffsets.push(Math.abs(crossTrackNm(f.aircraft, abc, course)));
+            return true;
+        });
+
+        await flight.fly(240);
+
+        // L:KLN90B_RollCommand is positive for a left bank, toward the course
+        expect(rolls.find(r => Math.abs(r) >= 2)).toBeGreaterThan(0);
+        expect(lateOffsets.length).toBeGreaterThanOrEqual(55);
+        expect(Math.max(...lateOffsets)).toBeLessThan(0.1);
     });
 });

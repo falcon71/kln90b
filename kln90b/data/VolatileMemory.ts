@@ -4,6 +4,7 @@ import {
     Facility,
     FacilityClient,
     FacilityType,
+    GeoCircle,
     IntersectionFacility,
     NdbFacility,
     RunwayFacility,
@@ -80,6 +81,12 @@ export class NavPageState {
     public bearingToActive: Degrees | null = null; //true, based on appendix A of the manual
     public bearingForAP: Degrees | null = null; //true. Will be set to desiredTrack in DME arcs to improve autopilot tracking
     public desiredTrack: Degrees | null = null;  //true
+    /**
+     * The path XTK is measured on, which roll steering follows (#373); null when there is nothing to steer on. It is
+     * the leg path of NavCalculator, so a final leg without length gives the path of the leg before it (#120). Never the
+     * turn circle yet.
+     */
+    public steeringPath: GeoCircle | null = null;
     public obsMag: Degrees = 0; //Magnetic!!
     public toFrom: ToFrom | null = null;
     public xtkScale: number = 5;

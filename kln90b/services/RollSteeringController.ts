@@ -55,14 +55,16 @@ export class RollSteeringController implements CalcTickable {
             this.selfTestDirection = SELF_TEST_DIR_RIGHT;
         }
 
-        const fromLeg = nav.activeWaypoint.getFromLeg();
-        if (fromLeg == null || this.sensors.in.gps.groundspeed < 5) {
+        //#373: the path XTK is measured on (NavCalculator), not the path of the from leg, which has no center on a leg without
+        //length. Without a path or an XTK there is nothing to steer on
+        const steeringPath = nav.steeringPath;
+        if (steeringPath === null || nav.xtkToActive === null || this.sensors.in.gps.groundspeed < 5) {
             this.setOutput(null, null);
             this.arcController.reset();
             return;
         }
 
-        this.updateBankAngle(fromLeg.path, nav.desiredTrack!, nav.xtkToActive!);
+        this.updateBankAngle(steeringPath, nav.desiredTrack!, nav.xtkToActive);
 
 
     }
