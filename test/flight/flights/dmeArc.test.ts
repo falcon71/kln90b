@@ -62,6 +62,16 @@ async function loadedOnArc(turn: LegTurnDirection, radial: number, o: { radiusNm
     return {flight, ...w};
 }
 
+/**
+ * Recorded by the 326da1a flight below and judged by the baseline test after it, so the flight is flown once: the
+ * largest distance past the FAF leg (north of it) from the start of the turn at the arc end until 30 s after the track
+ * is on the leg's course (#100)
+ */
+const arcEnd: { overshootNm: number | null } = {overshootNm: null};
+
+/** That overshoot as the old controller flew it (the baseline test below) */
+const ARC_END_OVERSHOOT_NM = 0.688;
+
 describe('DME arc flown', () => {
     // Spec: Pilot's Guide 6-16 to 6-18 (a DME arc is flown around its VOR in the direction of the procedure, from the
     // entry to the end fix). 15d9b35 reverses the SDK circle for right-hand arcs: an SDK GeoCircle runs
@@ -144,7 +154,7 @@ describe('DME arc flown', () => {
 
         // Flown through, the aircraft is on the FAF leg and never passes it by more than one turn radius. That is what
         // a turn that starts at the waypoint, without any lead, would give; the turn flown here stays inside it
-        // (measured 0.65 NM).
+        // (measured 0.69 NM on 2026-10-19 at 15b5ddd).
         let northOfLeg = 0;
         flight.monitor('beyond the FAF leg', f => {
             const off = crossTrackNm(f.aircraft, arcen, nextCourse);
@@ -159,6 +169,21 @@ describe('DME arc flown', () => {
             {timeout: 120, description: 'established on the FAF leg course'});
         expect(flight.nav.activeIdent).toBe('FAFAA');
         expect(northOfLeg).toBeLessThan(radius);
+
+        // The farthest point past the leg comes when the track turns back through the leg's course, which can fall just
+        // after the 1 degree window above, so the monitor keeps measuring for 30 s more (the leg goes on to FAFAA and
+        // MAPAA on the same radial, 2.5 NM and 4 NM from ARCEN)
+        await flight.fly(30);
+        arcEnd.overshootNm = northOfLeg;
+    });
+
+    // Characterization: the old RollSteeringController as of 15b5ddd, measured on 2026-10-19 (the appendix of
+    // docs/superpowers/specs/2026-10-19-roll-steering-design.md). The literal is the measured value, with the margin of
+    // the other baseline flights (rollSteering.test.ts): 10 % or 0.02 NM, whichever is larger. It is the overshoot of
+    // the #100 report of the turn at the arc end, which the new control law must not exceed.
+    it('overshoots the FAF leg at the arc end by the measured amount (baseline, characterization, #100)', () => {
+        expect(arcEnd.overshootNm).not.toBeNull();
+        expect(Math.abs(arcEnd.overshootNm! - ARC_END_OVERSHOOT_NM)).toBeLessThanOrEqual(Math.max(0.1 * ARC_END_OVERSHOOT_NM, 0.02));
     });
 });
 

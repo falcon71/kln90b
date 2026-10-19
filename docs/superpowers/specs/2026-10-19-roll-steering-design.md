@@ -262,3 +262,63 @@ line (−30 to 30) stays true; the command now peaks at 25°.
 - Turn anticipation geometry, for example the long lead of a 164° turn seen in the trainer.
 - Direct To turn behavior beyond what the law gives.
 - The XTK output filter (#158).
+
+## Appendix: Baseline, 2026-10-19
+
+Measured on 2026-10-19 on commit 15b5ddd (the old `RollSteeringController` after the #373 and #403 fixes) with the
+flight harness: coupled autopilot, the aircraft rolling at 5°/s and capped at 25°, no wind, magnetic variation 0. The
+scenarios and the metric code are in `test/flight/flights/rollSteering.test.ts` (`flyScenario`, `BASELINE`), the
+arc-end turn in `test/flight/flights/dmeArc.test.ts`. This is a dated record; the tests hold the same numbers.
+
+How the metrics were taken (one sample at the start event and one per second after it; XTK against the target leg with
+`crossTrackNm`, positive right):
+- *First bank*: the sign of the first `L:KLN90B_RollCommand` of at least 2° from the start event on. L is left
+  (positive), R right.
+- *Reversals*: sign changes between successive commands of at least 2° given while the track was more than 90° off the
+  target course.
+- *Overshoot*: the largest XTK on the far side after the first crossing. The starting side is that of the first sample
+  at least 0.01 NM off the leg.
+- *Max XTK*: the largest |XTK| from the capture to the end of the scenario.
+- *Capture*: seconds to the first |XTK| below 0.1 NM; "none" if that never happened.
+- A placed aircraft is set 2 s before its point and flown there wings level, because the unit takes its track from two
+  successive GPS positions. The first command after a jump in position is an artifact of the harness.
+
+| Scenario | Geometry | First bank | Reversals | Overshoot NM | Max XTK NM | Capture s | Duration s |
+|---|---|---|---|---|---|---|---|
+| S1 | parallel, 5 NM left, 120 kt | L (away) | 0 | 0 | 0 | none | 600 |
+| S2 | parallel, 5 NM right, 120 kt | L | 0 | 0.005 | 0.090 | 218 | 600 |
+| S3 | parallel, 2 NM right, 240 kt | L | 0 | 0.034 | 0.088 | 60 | 400 |
+| S4 | parallel, 0.5 NM right, 120 kt | L | 0 | 0.005 | 0.087 | 27 | 400 |
+| S5 | converging 60° from 1.6 NM left, 120 kt | L | 0 | 0 | 0.099 | 77 | 400 |
+| S6 | leg behind (track reversed), 0.3 NM right, 120 kt | R | 0 | 0.603 | 0.603 | 16 | 500 |
+| S7 | leg behind (track reversed), on it, 120 kt | R | 3 | 0.154 | 0.745 | 0 | 500 |
+| S8a | 34° left turn (standard route at ABC), 120 kt | L | 0 | 0.089 | 0.089 | 5 | 240 |
+| S8b | 34° left turn (standard route at ABC), 240 kt | L | 0 | 0.421 | 0.421 | 12 | 300 |
+| S8c | 90° right turn, 120 kt | R | 0 | 0 | 0.084 | 24 | 240 |
+| S8d | 90° right turn, 240 kt | R | 0 | 0.240 | 0.240 | 35 | 300 |
+| S8e | 150° left turn, 120 kt | L | 0 | 0.003 | 0.094 | 46 | 240 |
+| S8f | 150° left turn, 240 kt | L | 0 | 0.031 | 0.085 | 67 | 300 |
+| S9 | Direct To 10 NM away, 120° right of the track, 120 kt | R | 0 | 0 | 0.779 | 0 | 240 |
+| S10 | 150° right turn starting on a 45° intercept about 2 NM inside the inbound leg, 120 kt | L | 4 | 0.238 | 0.238 | 45 | 300 |
+| Arc end | 326da1a flight: 5 NM right arc, 180 kt, 90° right turn onto ARCEN - FAFAA | | | 0.688 | | | |
+
+Notes on what the old code did:
+- S1: the first bank is away from the leg. The aircraft weaves for several minutes and settles parallel 7.2 NM left of
+  the leg. On the left side the on-track case applies (`xtk < 0.1` without `abs`), and its course `DTK - 50 × XTK` comes back
+  round to the DTK at 7.2 NM. It never captures.
+- S6: one continuous right turn across the leg (no reversal), like the trainer's one turn of about 200°. The capture
+  counts the pass through the leg, so the max XTK after it is the overshoot.
+- S7: right 1 s, left 4 s, right 11 s, then a full left turn (the pattern of the video in section 1). It starts on
+  the leg, so the capture is at 0 s and the max XTK is the swing of the turn.
+- S8a and S8b: the first commands after the DTK switch are left (4° at 120 kt; 8.6° and then 30° for 2 s at 240 kt),
+  followed by a wrong-way right bank: -12.5° to -13° for 3 s at 120 kt, and -14° to -17° for 7 s at 240 kt. At 240 kt the aircraft then flies on past ABC and turns only
+  once KBBB is active, which is where its overshoot comes from. These metrics do not see the wrong-way bank, because the
+  first command is in the turn's direction and a turn of less than 90° gives no reversal.
+- S9: the turn starts on the Direct To leg, so the capture is at 0 s and the max XTK is the swing of the turn.
+- S10: at the DTK switch the next leg's course (200) lies 165° left of the track (005). The command starts left
+  (+29.7°), changes direction four times, and the aircraft joins with a left turn. At the switch the aircraft was
+  farther from the turn circle than its radius (the fallback of section 4A).
+- Arc end: the bank collapses to about 4° between the start of the turn and the sequencing to FAFAA, then goes to 25°.
+  The farthest point past the leg comes about 1 s after the track first reaches the leg's course, so the test measures
+  until 30 s after that. Earlier measurements had 0.65 NM (the #100 comment and the test's comment); the difference was
+  not investigated.
