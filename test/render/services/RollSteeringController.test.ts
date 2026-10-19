@@ -2,7 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {GeoCircle, GeoPoint} from '@microsoft/msfs-sdk';
 import {standardRoute} from '../../harness/fixtures';
-import {HEADING_INPUT, panelXml} from '../../harness/panelXml';
+import {HEADING_INPUT, NO_OBS, panelXml} from '../../harness/panelXml';
 import {activeIdent} from '../../harness/readers';
 import {RollSteeringController} from '../../../kln90b/services/RollSteeringController';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
@@ -251,5 +251,64 @@ describe('RollSteeringController steers on NavPageState.steeringPath (#373)', ()
         // XTK is positive: the intercept course is 45 degrees left of the DTK
         const cts = (unit.env.sim.lastWrite('GPS COURSE TO STEER')!.value as number) * 180 / Math.PI;
         expect(Math.abs(angleDiff(cts, nav.desiredTrack! - 45))).toBeLessThan(0.01);
+    });
+});
+
+// #403: in OBS mode NavCalculator sets NavPageState.desiredTrack to null and the XTK is measured to the OBS leg
+// (NavPageState.steeringPath). The controller passed that null on as 0, so it steered on a DTK of 000 with the right XTK.
+// The expected 45 degree intercept from far off was checked in the KLN 89 trainer, 2026-10-19 (OBS and Leg steering looked
+// alike; the intercept builds up to about 45 degrees and does not exceed it, from parallel starts only). The course to
+// steer is read from GPS COURSE TO STEER (Output.WriteGPSSimVars defaults to on, KLN90BPlaneSettings.ts), HeadingInput is
+// on, and the OBS source is off so that OBS mode starts on the leg's course.
+
+/** On the standard route 10 NM before ABC in OBS mode, then moved to the given side of the OBS course at 120 kt */
+async function inObsMode(sideOffsetNm: number, trackOffsetDeg: number) {
+    const {unit, mid} = await onRoute(panelXml({...HEADING_INPUT, ...NO_OBS}));
+    await unit.panel.obsMode();
+    const obsTrue = unit.props.modeController.getObsTrue();
+    // sideOffsetNm is positive to the right of the course, trackOffsetDeg positive turns the track right of it
+    await moveAircraft(unit, pointFrom(mid, obsTrue + 90, sideOffsetNm), {groundspeedKt: 120, trackTrue: (obsTrue + trackOffsetDeg + 360) % 360});
+    await vi.advanceTimersByTimeAsync(1000);
+    const cts = (unit.env.sim.lastWrite('GPS COURSE TO STEER')!.value as number) * 180 / Math.PI;
+    return {unit, obsTrue, cts};
+}
+
+describe('L:KLN90B_RollCommand in OBS mode (#403)', () => {
+    // The sibling: the setup works. OBS mode is active on the leg's course (about 051) and the desired track is null.
+    it('the setup: OBS mode is active, the OBS course is that of the leg and the desired track is null', async () => {
+        const {unit, obsTrue} = await inObsMode(2, 0);
+        const nav = unit.props.memory.navPage;
+
+        expect(unit.props.modeController.isObsModeActive()).toBe(true);
+        expect(unit.props.planeSettings.input.headingInput).toBe(true);
+        expect(obsTrue).toBeGreaterThan(50.5);
+        expect(obsTrue).toBeLessThan(51.5);
+        expect(nav.desiredTrack).toBeNull();
+        expect(nav.xtkToActive).toBeCloseTo(2, 1);
+        expect(unit.props.sensors.in.gps.groundspeed).toBeCloseTo(120, 6);
+    });
+
+    // Spec: the 45 degree intercept from a parallel start (trainer, 2026-10-19).
+    it('banks left and steers 45 degrees left of the course from 2 NM right, parallel (#403)', async () => {
+        const {unit, obsTrue, cts} = await inObsMode(2, 0);
+
+        expect(roll(unit)).toBeGreaterThan(0);
+        expect(Math.abs(angleDiff(cts, obsTrue) - -45)).toBeLessThan(0.5);
+    });
+});
+
+// The trainer recorded parallel starts only, so the track that diverges by 30 degrees, from the left, is not a trainer
+// fact: nothing but the old controller's case 2 says 45 degrees there (the track does not meet the leg ahead, so it
+// intercepts at 45 degrees). The new law of the roll steering design keeps the value (L = 1 NM at 120 kt, atan(2) is more
+// than 45 degrees, so its 45 degree cap holds from any track). The diverging track also avoids the #100 case 1 bug (a
+// negative XTK with a track within 10 degrees of the DTK) that a parallel start from the left would hit; a converging 30
+// degree start from the left gives the join (course to steer = DTK) in the old controller, whose far-away branch only
+// takes a positive XTK.
+describe('L:KLN90B_RollCommand in OBS mode, diverging from the left (characterization, #403)', () => {
+    it('banks right and steers 45 degrees right of the course from 2 NM left, diverging at 30 degrees (characterization, #403)', async () => {
+        const {unit, obsTrue, cts} = await inObsMode(-2, -30);
+
+        expect(roll(unit)).toBeLessThan(0);
+        expect(Math.abs(angleDiff(cts, obsTrue) - 45)).toBeLessThan(0.5);
     });
 });

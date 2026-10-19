@@ -37,6 +37,7 @@ export class RollSteeringController implements CalcTickable {
 
     private readonly CACHED_POINT = new GeoPoint(0, 0);
     private readonly CACHED_CIRCLE = new GeoCircle(new Float64Array(3), 0);
+    private readonly CACHED_VEC3 = new Float64Array(3);
 
 
     private readonly loggingEnabled: boolean = false;
@@ -64,7 +65,10 @@ export class RollSteeringController implements CalcTickable {
             return;
         }
 
-        this.updateBankAngle(steeringPath, nav.desiredTrack!, nav.xtkToActive);
+        //#403: with a path, desiredTrack is null only in OBS mode (NavCalculator), where the steering path is the OBS leg. The
+        //DTK then is the course of that leg at the aircraft, which is the OBS course for a great circle leg
+        const dtk = nav.desiredTrack ?? steeringPath.bearingAt(steeringPath.closest(this.sensors.in.gps.coords, this.CACHED_VEC3));
+        this.updateBankAngle(steeringPath, dtk, nav.xtkToActive);
 
 
     }
