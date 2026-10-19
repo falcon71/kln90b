@@ -23,6 +23,12 @@ const ARC_FROM_CACHE = new GeoPoint(0, 0);
 const ARC_TO_CACHE = new GeoPoint(0, 0);
 
 export class TurnStackEntry {
+    /**
+     * Roll steering steers on pathForDtk instead of the turn circle: set once the aircraft was farther from the circle
+     * than its radius, and kept until the entry pops (NavCalculator, the roll steering design,
+     * docs/superpowers/specs/2026-10-19-roll-steering-design.md, section 4A)
+     */
+    public steerOnPathForDtk = false;
 
     constructor(public path: GeoCircle, //The path of the turn itself
                 public switchPoint: GeoPoint, //The part when to switch to the next TurnStackEntry or the next leg if the stack is empty

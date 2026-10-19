@@ -7,7 +7,7 @@ import {World} from '../../harness/flight/World';
 import {airport, vor} from '../../harness/navdata/builders';
 import {standardRoute} from '../../harness/fixtures';
 import {savedFlightplan} from '../../harness/storage';
-import {angleBetween, courseDeg, crossTrackNm, distanceNm, finalCourseDeg, LatLon, norm360, pointBefore, pointFrom} from '../../harness/flight/geo';
+import {angleBetween, courseDeg, crossTrackNm, distanceNm, EARTH_RADIUS_NM, finalCourseDeg, LatLon, norm360, pointBefore, pointFrom} from '../../harness/flight/geo';
 
 /**
  * How the roll steering flies the situations of section 6 of the roll steering design
@@ -41,7 +41,7 @@ interface Target {
 
 interface Scenario {
     /** Boots the unit and flies up to the start event (the placement, the DTK switch of a turn, the Direct To) */
-    start: () => Promise<{ flight: Flight; target: Target }>;
+    start: () => Promise<{ flight: Flight; target: Target; fallback?: boolean }>;
     /** Seconds flown after the start event */
     durationS: number;
 }
@@ -51,6 +51,8 @@ interface Sample {
     roll: number;
     xtkNm: number;
     trackTrue: number;
+    /** The unit's DTK, the course the trainer record compares the track with */
+    dtkTrue: number | null;
 }
 
 const roll = (flight: Flight) => flight.sim.get(LVAR_ROLL_COMMAND, 'degrees');
@@ -64,18 +66,19 @@ const roll = (flight: Flight) => flight.sim.get(LVAR_ROLL_COMMAND, 'degrees');
  * leg; the track is compared with the target course at `through`, which differs from the local course by less than a
  * degree within the scenarios' distances.
  */
-async function flyScenario(s: Scenario): Promise<Metrics> {
-    const {flight, target} = await s.start();
+async function flyScenario(s: Scenario): Promise<{ metrics: Metrics; samples: Sample[]; courseTrue: number; fallback?: boolean }> {
+    const {flight, target, fallback} = await s.start();
     const samples: Sample[] = [];
     const record = (t: number) => samples.push({
         t, roll: roll(flight), xtkNm: crossTrackNm(flight.aircraft, target.through, target.courseTrue), trackTrue: flight.aircraft.trackTrue,
+        dtkTrue: flight.nav.dtkTrue,
     });
     record(0);
     for (let t = 1; t <= s.durationS; t++) {
         await flight.fly(1);
         record(t);
     }
-    return metricsOf(samples, target.courseTrue);
+    return {metrics: metricsOf(samples, target.courseTrue), samples, courseTrue: target.courseTrue, fallback};
 }
 
 function metricsOf(samples: Sample[], courseTrue: number): Metrics {
@@ -237,27 +240,35 @@ const BASELINE: Record<string, Metrics> = {
     S10: {firstBankSign: 1, reversals: 4, overshootNm: 0.238, maxXtkEstablishedNm: 0.238, captureS: 45},
 };
 
-const NM_FLOOR = 0.02;
-const S_FLOOR = 2;
+/**
+ * The largest angle between the track and the unit's DTK while the aircraft closes on the leg (|XTK| falling) before the
+ * capture: the intercept angle flown. The DTK is the local course of the leg; the target course at ABC differs from it by
+ * up to half a degree in the scenarios that start 35 NM before ABC
+ */
+function maxInterceptDeg(samples: Sample[]): number {
+    const captureIdx = samples.findIndex(s => Math.abs(s.xtkNm) < 0.1);
+    const end = captureIdx < 0 ? samples.length : captureIdx;
+    let max = 0;
+    for (let i = 1; i < end; i++) {
+        if (Math.abs(samples[i].xtkNm) < Math.abs(samples[i - 1].xtkNm)) max = Math.max(max, angleBetween(samples[i].trackTrue, samples[i].dtkTrue!));
+    }
+    return max;
+}
+
+/** Seconds from the first sample with |XTK| at or below `fromNm` to the first at or below half of it; null if either is missing */
+function halvingTimeS(samples: Sample[], fromNm: number): number | null {
+    const from = samples.find(s => Math.abs(s.xtkNm) <= fromNm);
+    const half = samples.find(s => Math.abs(s.xtkNm) <= fromNm / 2);
+    return from === undefined || half === undefined ? null : half.t - from.t;
+}
 
 /**
- * Each metric against its baseline: firstBankSign and reversals exactly, the distances and the capture time within
- * 10 % of the measured value or 0.02 NM / 2 s, whichever is larger. The failure message carries all measured metrics.
+ * The commands of at least 2° against the direction `turnSign` (1 left, -1 right, the LVar's sign) from the start event
+ * until the track is first within 10° of the target course
  */
-function expectBaseline(m: Metrics, b: Metrics): void {
-    const all = `measured ${JSON.stringify(m)}`;
-    expect(m.firstBankSign, all).toBe(b.firstBankSign);
-    expect(m.reversals, all).toBe(b.reversals);
-    const within = (name: string, actual: number, baseline: number, floor: number) =>
-        expect(Math.abs(actual - baseline), `${name} ${actual} against ${baseline}; ${all}`).toBeLessThanOrEqual(Math.max(0.1 * Math.abs(baseline), floor));
-    within('overshootNm', m.overshootNm, b.overshootNm, NM_FLOOR);
-    within('maxXtkEstablishedNm', m.maxXtkEstablishedNm, b.maxXtkEstablishedNm, NM_FLOOR);
-    if (b.captureS === null) {
-        expect(m.captureS, all).toBeNull();
-    } else {
-        expect(m.captureS, all).not.toBeNull();
-        within('captureS', m.captureS!, b.captureS, S_FLOOR);
-    }
+function wrongWayCommands(samples: Sample[], courseTrue: number, turnSign: 1 | -1): number[] {
+    const endIdx = samples.findIndex(s => angleBetween(s.trackTrue, courseTrue) < 10);
+    return samples.slice(0, endIdx < 0 ? samples.length : endIdx).filter(s => Math.abs(s.roll) >= 2 && Math.sign(s.roll) === -turnSign).map(s => s.roll);
 }
 
 /**
@@ -287,12 +298,13 @@ function directTo120Right(durationS: number): Scenario {
 /**
  * S10: turn anticipation starting on a 45° intercept more than one turn radius inside the turn (the fallback of section
  * 4A). A 150° right turn at ABC at 120 kt. Its anticipation distance is about R tan(75°) = 2.4 NM with the standard-rate
- * radius R = 0.64 NM (3°/s at 120 kt), so the turn starts about 2.5 NM from ABC. The aircraft is put on a 045 track (the
+ * radius R = 0.64 NM (3°/s at 120 kt), so the turn starts about 2.5 NM from ABC. The aircraft is put on a 005 track (the
  * inbound 050 less 45°, closing from the right, the inside of the turn) aimed at the point 2.0 NM right of the leg and
- * 1.5 NM before ABC, 2.5 NM from it, and placed 2 NM before that point. The old controller holds a 45° intercept from
- * the right while it is far off (the far-away branch of RollSteeringController), so the turn starts with the aircraft
- * about 2 NM inside the inbound leg, outside the turn circle on its far side by more than R. The start event is the DTK
- * switch, the target the leg ABC - KBBB.
+ * 1.5 NM before ABC, 2.5 NM from it, and placed 2 NM before that point. Both the old controller (its far-away branch)
+ * and the new law (atan(XTK / 1 NM) is more than 45° there) hold the 45° intercept from the right while the aircraft is
+ * far off, so the turn starts with the aircraft about 2 NM inside the inbound leg, outside the turn circle on its far
+ * side by more than R. The start event is the DTK switch, the target the leg ABC - KBBB. `fallback` reports whether
+ * NavCalculator steers on the next leg at the start event (the roll steering design, section 4A).
  */
 function turnStartOnInterceptInside(durationS: number): Scenario {
     return {
@@ -321,6 +333,45 @@ function turnStartOnInterceptInside(durationS: number): Scenario {
             const r = 120 * 1852 / 3600 / (3 * Math.PI / 180) / 1852;
             const center = pointFrom(pointBefore(kaaa, abc, r * Math.tan(75 * Math.PI / 180)), inbound + 90, r);
             expect(Math.abs(distanceNm(flight.aircraft, center) - r)).toBeGreaterThan(r);
+            const nav = flight.unit.props.memory.navPage;
+            const turn = nav.activeWaypoint.turnStack[0];
+            const fallback = turn.steerOnPathForDtk && nav.steeringPath === turn.pathForDtk;
+            return {flight, target: {through: abc, courseTrue: next}, fallback};
+        },
+    };
+}
+
+/**
+ * S11: an anticipated 150° right turn at ABC at 120 kt, started with the aircraft inside the turn. The aircraft is put
+ * parallel to the inbound leg 0.5 NM to its right (the inside of the turn), 0.1 NM before the start of the turn plus 6 s
+ * of flight, and flown with the coupled autopilot until the DTK switches. The law closes on the leg meanwhile, so at the
+ * switch the aircraft is about 0.4 NM inside: inside the turn circle near its start, less than one radius from it (no
+ * fallback). The start event is the DTK switch, the target the leg ABC - KBBB. `xtkInsideNm` is the cross track to the
+ * inbound leg at the switch (positive right, the inside).
+ */
+function turnStartInside(durationS: number, report: { xtkInsideNm?: number; fallback?: boolean }): Scenario {
+    return {
+        durationS,
+        start: async () => {
+            const {kaaa, abc, kbbb} = turnWorld(150);
+            const world = new World({magvar: 0}).add(kaaa, abc, kbbb);
+            const inbound = finalCourseDeg(kaaa, abc);
+            const boot = pointBefore(kaaa, abc, 10);
+            const flight = await Flight.start({
+                world, storage: savedFlightplan(0, [kaaa, abc, kbbb]),
+                aircraft: {lat: boot.lat, lon: boot.lon, altitudeFt: 3000, groundspeedKt: 120, trackTrue: courseDeg(boot, abc)},
+            });
+            await flight.flyUntilActive('ABC', {timeout: 30});
+            // The turn starts R tan(75°) before ABC, with R = 0.64 NM the standard-rate radius at 120 kt (as for S10)
+            const r = 120 * 1852 / 3600 / (3 * Math.PI / 180) / 1852;
+            const aim = pointFrom(pointBefore(kaaa, abc, r * Math.tan(75 * Math.PI / 180) + 0.22), inbound + 90, 0.5);
+            await place(flight, pointFrom(aim, inbound + 180, 120 * 6 / 3600), inbound);
+            const next = courseDeg(abc, kbbb);
+            await flight.flyUntil(() => flight.nav.activeIdent !== 'ABC' || angleBetween(flight.nav.dtkTrue, next) < 1,
+                {timeout: 60, description: 'start of the turn at ABC'});
+            expect(flight.nav.activeIdent).toBe('ABC');
+            report.xtkInsideNm = crossTrackNm(flight.aircraft, abc, inbound);
+            report.fallback = flight.unit.props.memory.navPage.activeWaypoint.turnStack[0].steerOnPathForDtk;
             return {flight, target: {through: abc, courseTrue: next}};
         },
     };
@@ -345,14 +396,168 @@ const SCENARIOS: { id: string; title: string; scenario: Scenario }[] = [
     {id: 'S10', title: 'S10 a 150° right turn starting on a 45° intercept more than one turn radius inside it at 120 kt', scenario: turnStartOnInterceptInside(300)},
 ];
 
-// Characterization: the old RollSteeringController as of 15b5ddd, measured on 2026-10-19. The literals in BASELINE are
-// the measured values; the margins are those of the plan (10 % or 0.02 NM / 2 s, whichever is larger; the sign and the
-// reversals exactly). They claim nothing about the real unit: they are the baseline the new control law must not fall
-// behind (design section 6, #100).
-describe('roll steering baseline flights (characterization, #100)', () => {
+/**
+ * The overshoot that counts as none: numerical noise of an asymptotic join (the roll steering design, section 6
+ * (amended 2026-10-19))
+ */
+const OVERSHOOT_TOLERANCE_NM = 0.001;
+/** The capture band of the metrics: |XTK| below 0.1 NM */
+const CAPTURE_NM = 0.1;
+
+/**
+ * What each scenario must show besides "not worse" (the roll steering design, section 6):
+ * - `firstBank`: the first bank toward the path or into the turn (1 left, -1 right); null where either way is toward
+ *   the path (S7 starts on the leg with the leg behind, so the side is rounding noise);
+ * - `established`: whether the maximum |XTK| after the capture is compared with the baseline; not where the scenario
+ *   starts on or crosses the leg (S6, S7, S9), where that maximum is the swing of the turn and not the tracking;
+ * - `turn`: the direction of an anticipated turn, against which no command may point until the track is within 10° of
+ *   the new course;
+ * - `halving`: the |XTK| at which the trainer's halving time is measured, the look-ahead distance L = GS x 30 s halved
+ *   (0.5 NM at 120 kt, 1.0 NM at 240 kt)
+ */
+const EXPECTED: Record<string, { firstBank: 1 | -1 | null; established: boolean; turn?: 1 | -1; halving?: number }> = {
+    // The baseline never captured, so it has no maximum XTK once established (its 0 means no capture)
+    S1: {firstBank: -1, established: false, halving: 0.5},
+    S2: {firstBank: 1, established: true, halving: 0.5},
+    S3: {firstBank: 1, established: true, halving: 1.0},
+    S4: {firstBank: 1, established: true},
+    // Converging at 60° from the left, the 45° cap first takes 15° out of the intercept: a left bank. From a 60°
+    // convergence at 1.6 NM the trainer shallowed the intercept and did not cross (checked in the KLN 89 trainer, 2026-10-19)
+    S5: {firstBank: 1, established: true},
+    S6: {firstBank: -1, established: false},
+    S7: {firstBank: null, established: false},
+    S8a: {firstBank: 1, established: true, turn: 1},
+    S8b: {firstBank: 1, established: true, turn: 1},
+    S8c: {firstBank: -1, established: true, turn: -1},
+    S8d: {firstBank: -1, established: true, turn: -1},
+    S8e: {firstBank: 1, established: true, turn: 1},
+    S8f: {firstBank: 1, established: true, turn: 1},
+    S9: {firstBank: -1, established: false},
+    // The next leg lies to the left of the aircraft (east of it, the leg running 200): the fallback steers on it with a
+    // left turn, and the turn toward it is the turn checked
+    S10: {firstBank: 1, established: true, turn: 1},
+};
+
+// The new control law (RollSteeringLaw.ts) against the old RollSteeringController's BASELINE, flown with the coupled
+// autopilot (the roll steering design, docs/superpowers/specs/2026-10-19-roll-steering-design.md, section 6): no turn
+// reversal, the first bank toward the path or into the turn, and an overshoot and a maximum XTK once established that are
+// no larger than the baseline's. The capture time is not bounded against the baseline (the maintainer's decision,
+// 2026-10-19: the trainer's look-ahead joins more slowly), only logged; S1 never captured in the baseline, so there it
+// must capture at all.
+describe('roll steering flights (#100)', () => {
     for (const {id, title, scenario} of SCENARIOS) {
-        it(`${title} (baseline, characterization, #100)`, async () => {
-            expectBaseline(await flyScenario(scenario), BASELINE[id]);
+        it(`${title} (#100)`, async () => {
+            const {metrics: m, samples, courseTrue, fallback} = await flyScenario(scenario);
+            const b = BASELINE[id];
+            const e = EXPECTED[id];
+            const all = `measured ${JSON.stringify(m)}`;
+            // The capture time is only logged (KLN_TEST_LOG=1 shows it): it is judged against the trainer, not the baseline
+            console.log(`${id} capture after ${m.captureS} s (the old controller: ${b.captureS} s); ${all}`);
+
+            expect(m.reversals, all).toBe(0);
+            // L:KLN90B_RollCommand stays within the 25 degree peak of the design (section 4B, within the +-30 range of
+            // LVars.ts and the wiki page Autopilot). The harness aircraft caps its own bank at 25, so only the command
+            // shows a breach
+            expect(Math.max(...samples.map(s => Math.abs(s.roll))), all).toBeLessThanOrEqual(25);
+            if (e.firstBank === null) {
+                expect(m.firstBankSign, all).not.toBe(0);
+            } else {
+                expect(m.firstBankSign, all).toBe(e.firstBank);
+            }
+            // The roll steering design, section 6 (amended 2026-10-19): 0.001 NM of tolerance, because an asymptotic
+            // join can cross a leg by numerical noise (8e-6 NM in S1 and S5) where the baseline is exactly 0
+            expect(m.overshootNm, all).toBeLessThanOrEqual(b.overshootNm + OVERSHOOT_TOLERANCE_NM);
+            if (e.established) {
+                // The roll steering design, section 6 (amended 2026-10-19): at least the capture band. The first sample
+                // under 0.1 NM of an asymptotic join lies just under 0.1 (0.092 to 0.0996 measured), which is no
+                // excursion; the bound guards against leaving the capture band after the capture
+                expect(m.maxXtkEstablishedNm, all).toBeLessThanOrEqual(Math.max(b.maxXtkEstablishedNm, CAPTURE_NM));
+            }
+            if (b.captureS === null) {
+                expect(m.captureS, all).not.toBeNull();
+            }
+            if (e.turn !== undefined) {
+                expect(wrongWayCommands(samples, courseTrue, e.turn), all).toEqual([]);
+            }
+            if (id === 'S10') {
+                // The roll steering design, section 4A: farther from the turn circle than its radius at the DTK switch, the
+                // unit steers on the next leg
+                expect(fallback).toBe(true);
+            }
+            if (e.halving !== undefined) {
+                // Checked in the KLN 89 trainer, 2026-10-19: from far off the intercept builds up to about 45° and does not
+                // exceed it, and inside the look-ahead distance the XTK halves in about 27 s at 119 and 239 kt. The design
+                // (section 6) asks for an intercept that reaches 40° to 45.5° and a halving in roughly 20 to 35 s
+                const intercept = maxInterceptDeg(samples);
+                const halving = halvingTimeS(samples, e.halving);
+                console.log(`${id} intercept ${intercept.toFixed(1)} deg, XTK halved in ${halving} s`);
+                // The roll steering design, section 6 (amended 2026-10-19): S3 checks only the upper bound. The 40° came
+                // from the trainer's 3.8 NM start; S3 starts 2 NM off at 240 kt, inside the look-ahead distance (measured
+                // 35.3°; S1 and S2 45.0°)
+                if (id !== 'S3') {
+                    expect(intercept, all).toBeGreaterThanOrEqual(40);
+                }
+                expect(intercept, all).toBeLessThanOrEqual(45.5);
+                expect(halving, all).not.toBeNull();
+                // The roll steering design, section 6 (amended 2026-10-19): from 15 s, because the harness autopilot flies
+                // a few degrees steeper than the course to steer (measured 19 s in S1 and S2, 16 s in S3)
+                expect(halving!, all).toBeGreaterThanOrEqual(15);
+                expect(halving!, all).toBeLessThanOrEqual(35);
+            }
         });
     }
+});
+
+// The roll steering design, section 4B (amended 2026-10-19): on the circle of an anticipated turn the command never
+// banks against the turn. Inside the circle near its start the law alone would steer out to the circle first, a wrong-way
+// bank at the start of the turn (#100). The old controller was not measured here, so there is no baseline: the checks are
+// those of the anticipated turns S8a to S8f (no reversal, the first bank into the turn, no command against it).
+describe('an anticipated turn started inside the turn (#100)', () => {
+    it('S11 a 150° right turn starting about 0.4 NM inside the turn at 120 kt gives no command against the turn (#100)', async () => {
+        const report: { xtkInsideNm?: number; fallback?: boolean } = {};
+        const {metrics: m, samples, courseTrue} = await flyScenario(turnStartInside(240, report));
+        const all = `measured ${JSON.stringify(m)}, inside ${report.xtkInsideNm}`;
+
+        // Preconditions: inside the turn by about 0.4 NM at the DTK switch, and steering on the circle (no fallback)
+        expect(report.xtkInsideNm!, all).toBeGreaterThan(0.3);
+        expect(report.xtkInsideNm!, all).toBeLessThan(0.5);
+        expect(report.fallback, all).toBe(false);
+
+        expect(m.reversals, all).toBe(0);
+        expect(m.firstBankSign, all).toBe(-1);
+        expect(wrongWayCommands(samples, courseTrue, -1), all).toEqual([]);
+        expect(Math.max(...samples.map(s => Math.abs(s.roll))), all).toBeLessThanOrEqual(25);
+        console.log(`S11 ${all}`);
+    });
+});
+
+// The roll steering design, section 4A: once the aircraft was farther from the turn circle than its radius, the unit
+// steers on the next leg (TurnStackEntry.steerOnPathForDtk) until the turn ends, also when the aircraft comes back within
+// one radius of the circle. Flown in S10, where the fallback is taken at the DTK switch
+describe('the next-leg fallback of a turn (#100)', () => {
+    it('keeps the next-leg fallback once taken until the turn ends', async () => {
+        const {flight} = await turnStartOnInterceptInside(0).start();
+        const nav = flight.unit.props.memory.navPage;
+        const turn = nav.activeWaypoint.turnStack[0];
+        // The circle's radius, as for the precondition of S10: the standard-rate radius at 120 kt, 0.64 NM
+        const radiusNm = 120 / 3600 / (3 * Math.PI / 180);
+        expect(turn.steerOnPathForDtk).toBe(true);
+
+        // Each second while the turn is on the stack: the flag, the steering path and the distance from the circle
+        const seconds: { flag: boolean; onNextLeg: boolean; distNm: number }[] = [];
+        while (nav.activeWaypoint.turnStack[0] === turn) {
+            seconds.push({
+                flag: turn.steerOnPathForDtk,
+                onNextLeg: nav.steeringPath === turn.pathForDtk,
+                distNm: Math.abs(turn.path.distance(flight.unit.props.sensors.in.gps.coords)) * EARTH_RADIUS_NM,
+            });
+            expect(seconds.length, 'the turn ends').toBeLessThan(300);
+            await flight.fly(1);
+        }
+
+        // The aircraft came back within one radius of the circle while the turn was still on the stack, which is when
+        // the fallback would end if it were decided anew each second
+        expect(seconds.some(s => s.distNm < radiusNm), JSON.stringify(seconds.map(s => s.distNm.toFixed(2)))).toBe(true);
+        expect(seconds.every(s => s.flag && s.onNextLeg)).toBe(true);
+    });
 });

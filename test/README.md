@@ -705,8 +705,8 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
   KBBB. At 5 NM to go, both the model's DIS and the SimVar `GPS WP DISTANCE` match it. Both checks use 0.04 NM, one
   calculation tick at 120 kt. The NAV 1 page's DIS row is then compared with the model's calculated distance.
 
-`turnDirection.test.ts` shows how to pin a bug that needs a flight: one test flies and records, a second `it.fails`
-judges the recording, so a broken flight cannot be mistaken for the bug.
+`turnDirection.test.ts` shows how to pin a bug that needs a flight: one test flies and records, a second judges the
+recording (an `it.fails` until #100 was fixed), so a broken flight cannot be mistaken for the bug.
 
 # 5. Conventions
 
@@ -745,13 +745,13 @@ judges the recording, so a broken flight cannot be mistaken for the bug.
   triangle as a vector sum (`Wind.test.ts`), the USNO almanac with its URL (`Sun.test.ts`). The code's own source never
   is: `Conversions.ts` and `Wind.ts` follow avform, and an expectation computed from avform restates the code.
 - **Pin known bugs with `it.fails('... (#NN)')`.** The test states the correct behavior, fails today, and turns red when
-  someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See
-  `turnDirection.test.ts` (#100).
+  someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See the #157 pin in
+  `test/render/data/navdata/NavCalculator.test.ts` (`passing a waypoint off course`).
 - **Prove a pin by fixing the bug, and keep heavy setup out of it.** An `it.fails` test passes on *any* failure, so a
   broken precondition inside it (a boot that threw, a wrong key sequence) is invisible: the pin stays green for the
   wrong reason. Prove a pin by fixing the bug temporarily and seeing the test turn red, then restore. Where it is cheap,
   keep the heavy preconditions in a sibling test that passes today and asserts them, so that a broken setup fails
-  there; `turnDirection.test.ts` is the pattern.
+  there; the control test beside the #157 pin is the pattern, and `turnDirection.test.ts` shows it for a flight.
 - **Keep runs deterministic.** The harness fixes the clock and the random seed. Do not read the wall clock in an
   assertion (`performance.now` is the wall clock, because the fake clock does not fake it).
 - **Never commit manual content or navdata recorded from the sim.** The manuals are copyrighted: cite page numbers,

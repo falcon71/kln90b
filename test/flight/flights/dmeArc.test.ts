@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {FixTypeFlags, GeoCircle, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {Flight} from '../../harness/flight/Flight';
+import {ManualPilot} from '../../harness/flight/pilots';
 import {World} from '../../harness/flight/World';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
@@ -69,7 +70,10 @@ async function loadedOnArc(turn: LegTurnDirection, radial: number, o: { radiusNm
  */
 const arcEnd: { overshootNm: number | null } = {overshootNm: null};
 
-/** That overshoot as the old controller flew it (the baseline test below) */
+/**
+ * That overshoot as the old RollSteeringController flew it as of 15b5ddd, measured on 2026-10-19 (the appendix of
+ * docs/superpowers/specs/2026-10-19-roll-steering-design.md): the bound of the test below
+ */
 const ARC_END_OVERSHOOT_NM = 0.688;
 
 describe('DME arc flown', () => {
@@ -177,13 +181,44 @@ describe('DME arc flown', () => {
         arcEnd.overshootNm = northOfLeg;
     });
 
-    // Characterization: the old RollSteeringController as of 15b5ddd, measured on 2026-10-19 (the appendix of
-    // docs/superpowers/specs/2026-10-19-roll-steering-design.md). The literal is the measured value, with the margin of
-    // the other baseline flights (rollSteering.test.ts): 10 % or 0.02 NM, whichever is larger. It is the overshoot of
-    // the #100 report of the turn at the arc end, which the new control law must not exceed.
-    it('overshoots the FAF leg at the arc end by the measured amount (baseline, characterization, #100)', () => {
+    // The roll steering design, section 6: the new control law is not worse than the old one at the arc end, where the
+    // old bank collapsed to about 4 degrees between the start of the turn and the sequencing to FAFAA (#100)
+    it('overshoots the FAF leg at the arc end by no more than the old controller (#100)', () => {
         expect(arcEnd.overshootNm).not.toBeNull();
-        expect(Math.abs(arcEnd.overshootNm! - ARC_END_OVERSHOOT_NM)).toBeLessThanOrEqual(Math.max(0.1 * ARC_END_OVERSHOOT_NM, 0.02));
+        expect(arcEnd.overshootNm!).toBeLessThanOrEqual(ARC_END_OVERSHOOT_NM);
+    });
+});
+
+// The roll steering design (docs/superpowers/specs/2026-10-19-roll-steering-design.md, section 4B): on a DME arc the unit
+// steers on the arc's circle. Near its VOR the closest point of the circle is still defined, and the command must turn
+// the aircraft out toward the arc. The old controller's arc code (ArcTurnController) is gone (#100)
+describe('roll steering near the VOR of a DME arc (#100)', () => {
+    it('gives a finite command toward the arc near its VOR', async () => {
+        const {flight, abc} = await loadedOnArc(LegTurnDirection.Right, 190);
+        expect(flight.nav.activeIdent).toBe('ARCEN');
+        // 0.5 NM from ABC on its 225 radial, flying the arc's direction (clockwise: the radial plus 90). The aircraft is
+        // set 2 s before that point and flown there wings level, so that the unit's track (taken from two successive
+        // positions) is the true one when the command is read (as place() in rollSteering.test.ts)
+        const radial = 225;
+        const track = radial + 90;
+        const at = pointFrom(abc, radial, 0.5);
+        const runUp = pointFrom(at, track + 180, 120 * 2 / 3600);
+        const autopilot = flight.pilot;
+        flight.pilot = new ManualPilot();
+        Object.assign(flight.aircraft, {lat: runUp.lat, lon: runUp.lon, trackTrue: track, bankDeg: 0});
+        flight.aircraft.writeTo(flight.sim, 0);
+        await flight.fly(2);
+        flight.pilot = autopilot;
+        expect(flight.nav.activeIdent).toBe('ARCEN');
+
+        const roll = flight.sim.get('L:KLN90B_RollCommand', 'degrees') as number;
+        const cts = (flight.sim.lastWrite('GPS COURSE TO STEER')!.value as number) * 180 / Math.PI;
+        expect(Number.isFinite(roll)).toBe(true);
+        expect(Number.isFinite(cts)).toBe(true);
+        // The arc lies 9.5 NM out along the radial, to the left of the track: the bank is left, and the course to steer
+        // leads away from the VOR, within 90 degrees of the radial
+        expect(roll).toBeGreaterThan(0);
+        expect(angleBetween(cts, radial)).toBeLessThan(90);
     });
 });
 

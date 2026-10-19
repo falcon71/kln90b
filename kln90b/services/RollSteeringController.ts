@@ -1,18 +1,9 @@
 import {CalcTickable} from "../TickController";
 import {Sensors} from "../Sensors";
-import {MAX_BANK_ANGLE} from "../data/navdata/NavCalculator";
 import {VolatileMemory} from "../data/VolatileMemory";
-import {
-    ArcTurnController,
-    FlightPathUtils,
-    GeoCircle,
-    GeoPoint,
-    MathUtils,
-    NavMath,
-    UnitType,
-} from "@microsoft/msfs-sdk";
-import {bankeAngleForStandardTurn, distanceToAchieveBankAngleChange} from "./KLNNavmath";
+import {GeoCircle} from "@microsoft/msfs-sdk";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
+import {rollSteeringCommand} from "./RollSteeringLaw";
 
 /**
  * How long it takes for the bank to switch between 0 and 5° on the selft test page.
@@ -22,26 +13,27 @@ const SELF_TEST_TIME_SEC = 5;
 const SELF_TEST_DIR_RIGHT = -1;
 const SELF_TEST_DIR_LEFT = 1;
 
-const HYPOTENUSE_TO_SIDE = Math.SQRT1_2;
-//Saves some calculations. This factor is the distance between the leg and the point 45° offset on the circle
-const MAX_XTK_INTECEPT_FACTOR = 1 - HYPOTENUSE_TO_SIDE;
-
 /**
- * Calculates the roll command for the autopilot
- * Code was adapted from Working Titles LNavComputer
+ * Calculates the roll command for the autopilot (L:KLN90B_RollCommand, ARINC 429 label 121 on the real unit) and the
+ * course to steer, with the law of RollSteeringLaw.ts on the path NavCalculator publishes (NavPageState.steeringPath).
+ * The law follows the roll steering design (docs/superpowers/specs/2026-10-19-roll-steering-design.md, section 4): the
+ * 30 s look-ahead and the 45 degree intercept cap as checked in the KLN 89 trainer, 2026-10-19, the bank from
+ * autopilot/lnav/LNavRollSteerComputer.ts and the course to steer from autopilot/lnav/LNavComputer.ts of the MSFS
+ * avionics framework.
+ *
+ * The command is calculated once a second, in the 1 Hz calculation tick (the maintainer's decision, 2026-10-19):
+ * - Installation Manual 1-1 only says that the ARINC 429 labels follow the GAMA format; no KLN document gives a bus
+ *   speed or a label rate.
+ * - GAMA Publication 11 (v6.0, 2016, not necessarily the edition the unit was built to) sends label 121 every 50 to
+ *   100 ms.
+ * - TSO-C129a asks for navigation data at least once a second, and the maintainer's note on the Tu-154 video (35:15)
+ *   shows a calculation rate of 1 Hz.
+ * - So the unit computes the command once a second and the bus repeats the held value in between.
+ * - The output is raw, without rate limiting: the aircraft that read the command smooth it themselves.
  */
 export class RollSteeringController implements CalcTickable {
-    private readonly arcController = new ArcTurnController();
     private selfTestBank = 0;
     private selfTestDirection: -1 | 1 = SELF_TEST_DIR_RIGHT;
-
-    private readonly CACHED_POINT = new GeoPoint(0, 0);
-    private readonly CACHED_CIRCLE = new GeoCircle(new Float64Array(3), 0);
-    private readonly CACHED_VEC3 = new Float64Array(3);
-
-
-    private readonly loggingEnabled: boolean = false;
-
 
     constructor(private readonly sensors: Sensors, private readonly memory: VolatileMemory, private readonly planeSettings: KLN90PlaneSettings) {
     }
@@ -56,23 +48,27 @@ export class RollSteeringController implements CalcTickable {
             this.selfTestDirection = SELF_TEST_DIR_RIGHT;
         }
 
-        //#373: the path XTK is measured on (NavCalculator), not the path of the from leg, which has no center on a leg without
-        //length. Without a path or an XTK there is nothing to steer on
-        const steeringPath = nav.steeringPath;
-        if (steeringPath === null || nav.xtkToActive === null || this.sensors.in.gps.groundspeed < 5) {
+        //#373: without a path or an XTK there is nothing to steer on. 2-70: roll steering needs a ground speed
+        const path = nav.steeringPath;
+        const gps = this.sensors.in.gps;
+        if (path === null || nav.xtkToActive === null || gps.groundspeed < 5) {
+            nav.rollSteeringLatch = null;
             this.setOutput(null, null);
-            this.arcController.reset();
             return;
         }
 
-        //#403: with a path, desiredTrack is null only in OBS mode (NavCalculator), where the steering path is the OBS leg. The
-        //DTK then is the course of that leg at the aircraft, which is the OBS course for a great circle leg
-        const dtk = nav.desiredTrack ?? steeringPath.bearingAt(steeringPath.closest(this.sensors.in.gps.coords, this.CACHED_VEC3));
-        this.updateBankAngle(steeringPath, dtk, nav.xtkToActive);
-
-
+        //The latch belongs to the path it was chosen on. The from leg's path is one object that ActiveWaypoint rewrites for
+        //every leg, so the latch keeps a copy and compares the geometry
+        const latch = nav.rollSteeringLatch;
+        //The circle of an anticipated turn is the bottom entry of the turn stack (NavCalculator.steeringPath); a DME arc is a
+        //leg path and never lies there
+        const turnStack = nav.activeWaypoint.turnStack;
+        const turnCircle = turnStack.length > 0 && turnStack[0].path === path;
+        const command = rollSteeringCommand(path, gps.coords, gps.groundspeed, gps.getTrackTrueRespectingGroundspeed()!,
+            latch !== null && isSamePath(latch.path, path) ? latch.turn : null, turnCircle);
+        nav.rollSteeringLatch = command.latch === null ? null : {turn: command.latch, path: new GeoCircle(path.center, path.radius)};
+        this.setOutput(command.bankAngle, command.courseToSteer);
     }
-
 
     /**
      * Installation Manual 2-69: without a heading input the unit gives no roll steering, so L:KLN90B_RollCommand is 0,
@@ -96,142 +92,8 @@ export class RollSteeringController implements CalcTickable {
         }
         return this.selfTestBank;
     }
+}
 
-    /**
-     * Updates a bank angle state for a tracked flight path vector.
-     * @param leg The tracked flight path vector.
-     * @param dtk The desired track, in degrees true.
-     * @param xtk The cross-track error, in nautical miles.
-     * @returns The updated bank angle.
-     */
-    private updateBankAngle(leg: GeoCircle, dtk: number, xtk: number): number {
-        //Bank angle: Right negative, left positive
-
-        const track = this.sensors.in.gps.getTrackTrueRespectingGroundspeed()!;
-        const absTrackDiff = Math.abs(NavMath.diffAngle(track, dtk));
-
-        //Case 1, we are on track, only minimal corrections needed
-        if (xtk < 0.1 && absTrackDiff < 10) {
-            //It currently does overshoot a little, might need some small adjustments
-            const desiredTrack = dtk - xtk * 50;
-            const desiredBankAngle = this.desiredBank(track, desiredTrack, NavMath.getTurnDirection(track, desiredTrack));
-            this.log(`On track, XKT:${xtk} DTK:${dtk} bank:${desiredBankAngle} courseToSteer:${desiredTrack}`);
-            this.setOutput(desiredBankAngle, desiredTrack);
-            return desiredBankAngle;
-        }
-
-        //This is a 45° intercept track towards the leg
-        const interceptAngle = 45 * (xtk < 0 ? 1 : -1);
-        const interceptTrack = NavMath.normalizeHeading(dtk + interceptAngle);
-
-
-        //We are not on track and need to calculate our turn to the track
-        //First we calcuate the interception point between the aircraft and the leg
-        this.CACHED_POINT.set(this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon);
-        this.CACHED_POINT.offset(track, UnitType.NMILE.convertTo(1000, UnitType.GA_RADIAN));
-        this.CACHED_CIRCLE.setAsGreatCircle(this.sensors.in.gps.coords, this.CACHED_POINT);
-
-        const intersectionsCurrentTrackLeg: Float64Array[] = [];
-        leg.intersection(this.CACHED_CIRCLE, intersectionsCurrentTrackLeg);
-        const intersectionsCurrentTrackLegPoints = intersectionsCurrentTrackLeg.map(int => {
-            const p = new GeoPoint(0, 0);
-            return p.setFromCartesian(int);
-        })
-            .filter(p => Math.abs(NavMath.diffAngle(this.sensors.in.gps.coords.bearingTo(p), track)) <= 90) //We look at the intersections of two great circles. The closest intersection may actually be behind the plane
-            .filter(p => UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(p), UnitType.NMILE) <= 100) //Let's ignore the interception on the other side of the planet
-            .sort((a, b) => a.distance(this.sensors.in.gps.coords) - b.distance(this.sensors.in.gps.coords)); //Max two, we want the closest one in front of the plane
-
-
-        //Case 2 We don't intercept the leg, lets turn 45° towards it
-        if (intersectionsCurrentTrackLegPoints.length === 0) {
-            const desiredBankAngle = this.desiredBank(track, interceptTrack, NavMath.getTurnDirection(track, interceptTrack));
-            this.log(`Track does not intercept leg, intercept with 45 degrees: bank:${desiredBankAngle} courseToSteer:${interceptTrack}`);
-            this.setOutput(desiredBankAngle, interceptTrack);
-            return desiredBankAngle;
-        }
-
-        const distToIntersection = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(intersectionsCurrentTrackLegPoints[0]), UnitType.NMILE);
-        this.log(`Inteception bearing:${NavMath.diffAngle(this.sensors.in.gps.coords.bearingTo(intersectionsCurrentTrackLegPoints[0]), track)} distance:${distToIntersection}`);
-
-        //Case 4, We calculate the optimal bank angle required for a smooth turn towards the leg
-        //This function allows up to 30° to correct for lag when turning
-        //We are calculating the distance between the GPS position and the position where we intend to acutally intercept the leg
-        //This is an isosceles triangle. The distance to the interception is the length of the sides and here we calculate the base
-        const distCurrentPosActualInterception = 2 * distToIntersection * Math.cos(absTrackDiff / 2 * Avionics.Utils.DEG2RAD);
-        //Another isosceles triangle. Knowing the base, we can calculate the sides again, those are turn radius
-        const requiredTurnRadius = distCurrentPosActualInterception / (2 * Math.cos((90 - (absTrackDiff / 2)) * Avionics.Utils.DEG2RAD));
-
-        const absDesiredBankAngle = Math.min(NavMath.bankAngle(this.sensors.in.gps.groundspeed, UnitType.NMILE.convertTo(requiredTurnRadius, UnitType.METER)), 30);
-
-        const desiredTurnRadius = UnitType.METER.convertTo(NavMath.turnRadius(this.sensors.in.gps.groundspeed, bankeAngleForStandardTurn(this.sensors.in.gps.groundspeed)), UnitType.NMILE);
-        const distForBankAngleChange = distanceToAchieveBankAngleChange(25, this.sensors.in.gps.groundspeed);
-        //This is the distance on the 45° edge on the circle to the leg. If we are farther away then the 45° degree intercept point, then we want to fly with 45° towards the leg, unless we require a stronger bank angle already
-        const maxXtkForTracking = desiredTurnRadius * MAX_XTK_INTECEPT_FACTOR + distForBankAngleChange * HYPOTENUSE_TO_SIDE;
-
-        //Less than 25° of bank angle is required and we are still far away from the leg, let's continue closing in on an intercept track
-        if (absDesiredBankAngle < 25 //If we need more than 25° bank, then this has priority
-            && xtk > maxXtkForTracking) {
-            const desiredBankAngle = this.desiredBank(track, interceptTrack, NavMath.getTurnDirection(track, interceptTrack));
-            this.log(`Too far away, XTK ${xtk}>${maxXtkForTracking}, intercept with 45 degrees: bank:${desiredBankAngle} courseToSteer:${interceptTrack}`);
-            this.setOutput(desiredBankAngle, interceptTrack);
-            return desiredBankAngle;
-        }
-
-        //We are now ready to intercept the leg with the optimal bank angle
-        const desiredBankAngle = absDesiredBankAngle * (NavMath.getTurnDirection(track, dtk) == 'left' ? 1 : -1);
-
-        this.log(`Intercepting leg: radius:${requiredTurnRadius} bank:${desiredBankAngle} courseToSteer:${dtk}`);
-
-        this.setOutput(desiredBankAngle, dtk);
-        return desiredBankAngle;
-    }
-
-    /**
-     * Calculates a desired bank angle from a desired track.
-     * @param desiredTrack The desired track, in degrees true.
-     * @param turnDirection
-     * @returns The desired bank angle, in degrees. Positive values indicate left bank.
-     */
-    private desiredBank(track: number, desiredTrack: number, turnDirection: "left" | "right"): number {
-        const headingDiff = Math.abs(NavMath.diffAngle(track, desiredTrack));
-        let baseBank = Math.min(1.25 * headingDiff, MAX_BANK_ANGLE);
-        // baseBank = 25;
-        baseBank *= (turnDirection === 'left' ? 1 : -1);
-
-        return baseBank;
-    }
-
-    /**
-     * Adjusts a bank angle state's desired bank angle for arc vectors.
-     * @param circle
-     * @param desiredBankAngle
-     * @returns The adjusted bank angle state.
-     */
-    private adjustBankAngleForArc(circle: GeoCircle, desiredBankAngle: number): number {
-        const nav = this.memory.navPage;
-        const turnDirection = FlightPathUtils.getTurnDirectionFromCircle(circle);
-        const radius = UnitType.GA_RADIAN.convertTo(FlightPathUtils.getTurnRadiusFromCircle(circle), UnitType.METER);
-
-        const distance = UnitType.GA_RADIAN.convertTo(circle.distance(this.sensors.in.gps.coords), UnitType.METER);
-        const bankAdjustment = this.arcController.getOutput(distance);
-
-        const turnBankAngle = NavMath.bankAngle(this.sensors.in.gps.groundspeed, radius) * (turnDirection === 'left' ? 1 : -1);
-        const turnRadius = NavMath.turnRadius(this.sensors.in.gps.groundspeed, 25);
-
-        const bankBlendFactor = Math.max(1 - (Math.abs(UnitType.NMILE.convertTo(nav.xtkToActive!, UnitType.METER)) / turnRadius), 0);
-
-        desiredBankAngle = MathUtils.clamp(
-            (desiredBankAngle * (1 - bankBlendFactor)) + (turnBankAngle * bankBlendFactor) + bankAdjustment,
-            -MAX_BANK_ANGLE,
-            MAX_BANK_ANGLE,
-        );
-
-        return desiredBankAngle;
-    }
-
-    private log(message?: any, ...optionalParams: any[]): void {
-        if (this.loggingEnabled) {
-            console.debug(message, optionalParams);
-        }
-    }
+function isSamePath(a: GeoCircle, b: GeoCircle): boolean {
+    return a.radius === b.radius && a.center[0] === b.center[0] && a.center[1] === b.center[1] && a.center[2] === b.center[2];
 }

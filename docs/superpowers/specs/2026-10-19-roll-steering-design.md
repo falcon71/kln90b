@@ -127,6 +127,10 @@ tick, and roll steering reads it instead of `getFromLeg().path`. Services keep n
     `pathForDtk`) instead. This happens when turn anticipation starts while the aircraft is still well off the
     inbound leg, for example a 45° intercept that joins close to the waypoint. *My call.* Section 6 has a scenario
     for it.
+  - *Amendment (2026-10-19, during implementation).* The reason above holds only beyond the circle's center. More
+    than one radius from the circle the aircraft is either beyond the center, where the closest point lies on the far
+    side and the circle runs backward there, or outside the circle by more than a radius, where steering back to the
+    circle is a detour. The fallback is the same in both cases.
 - Null whenever `NavCalculator` sets XTK or DTK null (flag, a zero-length leg with no leg before it, self-test).
 
 Roll steering computes XTK and the local DTK from the published path itself: XTK = the signed distance from the path
@@ -152,6 +156,20 @@ All angles are true. Positive bank is left.
      already gives that the shorter way in nearly all cases. The latch only holds the choice while XTK changes sign
      during the turn.
    - The latch is state, so it lives on `NavPageState` and is reset in `VolatileMemory.reset`.
+   - *Amendment (2026-10-19, during implementation).* The direction latched is the sign of `e` when `|e|` first
+     exceeds the threshold (150°), that is the shorter way to the course to steer with the intercept offset already in
+     it, and not the turn toward the side of the path. Why: after a Direct To to a waypoint behind, the aircraft starts
+     on the new path, drifts a few hundredths of a mile to one side within a second, and the turn toward that side is
+     the long way round. In the leg-behind case the sign of `e` gives the same turn as the trainer's. The latch is kept
+     with a copy of the path's geometry and compared by geometry, not by object, because `ActiveWaypoint` reuses one
+     circle object for every great-circle leg. These are design calls, not the maintainer's decisions.
+   - *Amendment (2026-10-19, during implementation), a no-opposing-bank rule.* While the steering path is the circle of
+     an anticipated turn (`turnStack[0]`, never a DME arc, which is a leg path), the command never banks against the
+     circle's turn direction: that side is held at 0. Why: an aircraft inside a large turn near its start lies inside
+     the circle, less than one radius from it (so no fallback), and the law alone steers it out to the circle first, a
+     wrong-way bank at the start of the turn (the #100 symptom; the final review measured up to 25° for a second in a
+     150° turn at 120 kt). Held at 0, the aircraft flies on until the turning circle comes to it. The fallback path
+     (the next leg) and DME arcs are not affected. A design call, not the maintainer's decision.
 
 The constants (30 s, 45°, 1.25, 25°) are named and cite their sources: the trainer record for 30 s and 45°, the
 framework for 1.25, `MAX_BANK_ANGLE` for 25°.
@@ -240,6 +258,42 @@ The capture time is not compared with the baseline (maintainer's decision, 2026-
 checked against the trainer instead: the intercept reaches but does not exceed 45° from far off, and XTK halves in
 roughly 20-35 s once inside the look-ahead distance, at 120 and 240 kt. The builder records the measured times next
 to the baseline's for the record.
+
+*Amendment (2026-10-19, during implementation).* Design calls, not the maintainer's decisions; the tests cite them as
+"the roll steering design, section 6 (amended 2026-10-19)":
+- The maximum |XTK| once established is compared as at most the larger of the baseline and 0.1 NM. Why: the new law
+  joins asymptotically, so its first sample under the 0.1 NM capture threshold lies just under it (0.092-0.0996 NM),
+  which is no excursion; the bound guards against leaving the capture band after the capture.
+- The overshoot is compared with 0.001 NM of tolerance. Why: an asymptotic join can cross the leg by numerical noise
+  (8e-6 NM) where the baseline is exactly 0.
+- The XTK halving window is 15-35 s. Why: the harness autopilot flies a few degrees steeper than the course to steer
+  (the steady error of a proportional bank), so the join closes faster than the law (measured 19 s at 120 kt, 16 s at
+  240 kt).
+- S3 checks only the upper bound of 45.5° on the intercept. Why: the 40° lower bound came from the trainer's 3.8 NM
+  start; S3 starts 2 NM off at 240 kt, inside the look-ahead distance, and peaks at 35.3°.
+- The maximum |XTK| once established is not compared for S6, S7 and S9. Why: they start on the leg or cross it, so the
+  maximum after the capture is the swing of the turn, not the tracking. S7 measured 0.903 NM against the baseline's
+  0.745: one continuous turn at 25° instead of the old controller's three reversals.
+- S11 is added: an anticipated 150° right turn at 120 kt started about 0.4 NM inside the turn (measured 0.43 NM at the
+  DTK switch). The old controller was not measured there, so it has no baseline; it is checked like the anticipated
+  turns: no reversal, the first bank into the turn and no command of 2° or more against it.
+
+Measured with the new law on 2026-10-19 (the flight harness of the appendix), next to the baseline's capture times.
+A dated record: the appendix stays as it was measured.
+
+| Scenario | Capture s, new law | Capture s, baseline |
+|---|---|---|
+| S1 | 244 | none |
+| S2 | 244 | 218 |
+| S3 | 83 | 60 |
+| S4 | 50 | 27 |
+| S5 | 91 | 77 |
+| S8b | 15 | 12 |
+| S8d | 39 | 35 |
+| S10 | 36 | 45 |
+| S11 | 34 | (not measured) |
+
+The overshoot of the turn at the DME arc end is 0.094 NM with the new law, against 0.688 NM for the baseline.
 
 ## 7. Documentation outside the repository (for the maintainer)
 

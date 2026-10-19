@@ -1,13 +1,14 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
-import {GeoCircle, GeoPoint} from '@microsoft/msfs-sdk';
+import {GeoCircle, GeoPoint, UnitType} from '@microsoft/msfs-sdk';
 import {standardRoute} from '../../harness/fixtures';
 import {HEADING_INPUT, NO_OBS, panelXml} from '../../harness/panelXml';
 import {activeIdent} from '../../harness/readers';
 import {RollSteeringController} from '../../../kln90b/services/RollSteeringController';
+import {TurnStackEntry} from '../../../kln90b/data/flightplan/ActiveWaypoint';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {savedFlightplan} from '../../harness/storage';
-import {airport} from '../../harness/navdata/builders';
+import {airport, vor} from '../../harness/navdata/builders';
 import {angleDiff, courseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
 
 const HEADING_INPUT_XML = panelXml(HEADING_INPUT);
@@ -63,20 +64,24 @@ describe('L:KLN90B_RollCommand (public contract)', () => {
         expect(roll(unit)).toBeLessThan(0);
     });
 
-    // Autopilot wiki: at most 30 degrees once the aircraft is in range of the leg. 0.3 NM right of the course, flying
-    // straight at the leg at 200 kt, needs more than that, so the cap decides
-    it('is -30 degrees, the cap, when more is needed to join the leg', async () => {
+    // The wiki range is +-30; the command now peaks at MAX_BANK_ANGLE, 25 degrees (the roll steering design,
+    // docs/superpowers/specs/2026-10-19-roll-steering-design.md, sections 4B and 8). 0.3 NM right of the course, flying
+    // straight at the leg at 200 kt: L = 200 x 30 / 3600 = 1.67 NM, the intercept atan(0.3 / 1.67) = 10.2 degrees, so the
+    // course to steer is DTK - 10.2 and lies 79.8 degrees right of the track (DTK - 90); 1.25 x 79.8 is more than 25
+    it('is 25 degrees, the cap, when more is needed to join the leg', async () => {
         const {unit, mid, dtk} = await onRoute(HEADING_INPUT_XML);
 
         await moveAircraft(unit, pointFrom(mid, dtk + 90, 0.3), {groundspeedKt: 200, trackTrue: (dtk + 270) % 360});
 
         // Flying at the leg from its right with the course ahead and to the right: the turn onto it is a right bank, and
         // the cap is the value
-        expect(roll(unit)).toBeCloseTo(-30, 6);
+        expect(roll(unit)).toBeCloseTo(-25, 6);
     });
 
-    // The wiki names no value for the intercept of a far leg; the code banks 25 degrees (MAX_BANK_ANGLE)
-    it('is 25 degrees on a 45 degree intercept (characterization)', async () => {
+    // The roll steering design, section 4B: 2 NM right at 120 kt, L = 1 NM and atan(2 / 1) = 63.4 degrees, so the 45
+    // degree cap holds (from far off the intercept builds up to about 45 degrees and does not exceed it, checked in the
+    // KLN 89 trainer, 2026-10-19, parallel starts). The course to steer is DTK - 45, and 1.25 x 45 is capped at 25
+    it('is 25 degrees on a 45 degree intercept', async () => {
         const {unit, mid, dtk} = await onRoute(HEADING_INPUT_XML);
 
         await moveAircraft(unit, pointFrom(mid, dtk + 90, 2), {groundspeedKt: 120, trackTrue: dtk});
@@ -119,9 +124,9 @@ describe('L:KLN90B_RollCommand without a heading input (public contract)', () =>
     });
 });
 
-// #100 (its comment of 2026-10-05): far left of the leg on a track parallel to it, case 1 ("on track") of
-// RollSteeringController.updateBankAngle takes any negative XTK, and its course to steer DTK - 50 x XTK passes 180 degrees
-// off the DTK beyond about 3.6 NM, so the unit banks away from the leg. HeadingInput is on, because the unit gives roll
+// #100 (its comment of 2026-10-05): far left of the leg on a track parallel to it, case 1 ("on track") of the old
+// controller's updateBankAngle took any negative XTK, and its course to steer DTK - 50 x XTK passed 180 degrees off the
+// DTK beyond about 3.6 NM, so the unit banked away from the leg. HeadingInput is on, because the unit gives roll
 // steering only with it (2-69, #143).
 describe('L:KLN90B_RollCommand far left of the leg on a parallel track (#100)', () => {
     /** Abeam the point 20 NM before ABC, 5 NM left of the leg KAAA - ABC, flying the leg's course at 120 kt */
@@ -150,7 +155,7 @@ describe('L:KLN90B_RollCommand far left of the leg on a parallel track (#100)', 
 
     // Autopilot wiki: far from the leg the unit turns toward it to a 45 degree intercept, from either side. The leg is to
     // the right, so the bank is right (negative) and the course to steer lies right of the track, less than 90 off it.
-    it.fails('banks right, toward the leg (#100)', async () => {
+    it('banks right, toward the leg (#100)', async () => {
         const {unit, dtk} = await farLeftParallel();
 
         expect(roll(unit)).toBeLessThan(0);
@@ -233,24 +238,27 @@ describe('NavPageState.steeringPath (#373)', () => {
 // #373: the controller steers on NavPageState.steeringPath and not on the path of the from leg (the roll steering design,
 // docs/superpowers/specs/2026-10-19-roll-steering-design.md, section 5 item 2). NavCalculator rewrites the field every
 // tick, so the test sets it and ticks a controller itself. The aircraft is 0.3 NM right of the leg flying at it at 200 kt,
-// where the real path gives the -30 degree cap (case 4 of updateBankAngle, as in the test above). A path whose
-// intersections with the aircraft's track lie more than 100 NM away leaves only the 45 degree intercept (case 2): 25
-// degrees of bank and the course to steer 45 degrees from the DTK. Task 5 replaces the algorithm and may update the
-// literals; what must stay is that the output follows the field.
+// where the leg gives the 25 degree cap to the right (as in the test above). The path set instead is the meridian 10 NM
+// west of the aircraft, running north: the aircraft is 10 NM right of it, so the law steers 45 degrees left of 000
+// (atan(10 / 1.67) is more than 45), and the bank is 1.25 x the angle from the track to 315, a left bank (section 4B).
 describe('RollSteeringController steers on NavPageState.steeringPath (#373)', () => {
-    it('banks 25 degrees on the 45 degree intercept when the path is out of reach, where the leg gives 30 (#373)', async () => {
+    it('steers 45 degrees left of a meridian 10 NM to the left, where the leg gives the right cap (#373)', async () => {
         const {unit, mid, dtk} = await onRoute(HEADING_INPUT_XML);
-        await moveAircraft(unit, pointFrom(mid, dtk + 90, 0.3), {groundspeedKt: 200, trackTrue: (dtk + 270) % 360});
+        const at = pointFrom(mid, dtk + 90, 0.3);
+        const track = (dtk + 270) % 360;
+        await moveAircraft(unit, at, {groundspeedKt: 200, trackTrue: track});
         const nav = unit.props.memory.navPage;
-        expect(roll(unit)).toBeCloseTo(-30, 6); // Precondition: the leg itself gives the cap
-        nav.steeringPath = GeoCircle.createGreatCircle(new GeoPoint(0, 100), new GeoPoint(1, 100)); // a meridian 100 degrees east
+        expect(roll(unit)).toBeCloseTo(-25, 6); // Precondition: the leg itself gives the right cap
+        const west = pointFrom(at, 270, 10);
+        nav.steeringPath = GeoCircle.createGreatCircle(new GeoPoint(west.lat, west.lon), new GeoPoint(west.lat + 1, west.lon));
 
         new RollSteeringController(unit.props.sensors, unit.props.memory, unit.props.planeSettings).tick();
 
-        expect(roll(unit)).toBeCloseTo(-25, 6);
-        // XTK is positive: the intercept course is 45 degrees left of the DTK
         const cts = (unit.env.sim.lastWrite('GPS COURSE TO STEER')!.value as number) * 180 / Math.PI;
-        expect(Math.abs(angleDiff(cts, nav.desiredTrack! - 45))).toBeLessThan(0.01);
+        expect(Math.abs(angleDiff(cts, 315))).toBeLessThan(0.01);
+        // The track is about 320.5, so 315 lies about 5.5 degrees to the left: a left bank of 1.25 x that
+        expect(roll(unit)).toBeCloseTo(-1.25 * angleDiff(315, track), 1);
+        expect(roll(unit)).toBeGreaterThan(0);
     });
 });
 
@@ -295,6 +303,16 @@ describe('L:KLN90B_RollCommand in OBS mode (#403)', () => {
         expect(roll(unit)).toBeGreaterThan(0);
         expect(Math.abs(angleDiff(cts, obsTrue) - -45)).toBeLessThan(0.5);
     });
+
+    // The roll steering design, section 4B: 2 NM left at 120 kt, L = 1 NM and atan(2 / 1) is more than 45 degrees, so
+    // the course to steer is the OBS course + 45; from a track of OBS + 30 that is 15 degrees to the right. The trainer
+    // recorded the 45 degree cap from parallel starts only (2026-10-19)
+    it('banks right and steers 45 degrees right of the course from 2 NM left, converging at 30 degrees (#403)', async () => {
+        const {unit, obsTrue, cts} = await inObsMode(-2, 30);
+
+        expect(roll(unit)).toBeLessThan(0);
+        expect(Math.abs(angleDiff(cts, obsTrue) - 45)).toBeLessThan(0.5);
+    });
 });
 
 // The trainer recorded parallel starts only, so the track that diverges by 30 degrees, from the left, is not a trainer
@@ -310,5 +328,112 @@ describe('L:KLN90B_RollCommand in OBS mode, diverging from the left (characteriz
 
         expect(roll(unit)).toBeLessThan(0);
         expect(Math.abs(angleDiff(cts, obsTrue) - 45)).toBeLessThan(0.5);
+    });
+});
+
+// The roll steering design, section 4B step 6: beyond 150 degrees of track error the turn direction is latched on
+// NavPageState (RollSteeringLaw.TURN_LATCH_ANGLE). The latch belongs to the path it was chosen on and to the time the unit
+// steers. The setup puts the aircraft 0.3 NM right of the leg KAAA - ABC flying it backward at 120 kt: L = 1 NM,
+// atan(0.3) = 16.7, so the course to steer is DTK - 16.7, 163.3 degrees right of the track (DTK + 180): the shorter way is
+// right, so the latch is right.
+describe('the turn latch of L:KLN90B_RollCommand (#100)', () => {
+    /** On the standard route with DTO 10 NM from the setup point, 160 degrees left of the reversed track */
+    async function latchedRight() {
+        const {kaaa, abc} = standardRoute();
+        const mid = pointBefore(kaaa, abc, 10);
+        const dtk = courseDeg(mid, abc);
+        const at = pointFrom(mid, dtk + 90, 0.3);
+        const track = (dtk + 180) % 360;
+        const dtoAt = pointFrom(at, track - 160, 10);
+        const unit = await bootOnStandardRoute({panelXml: HEADING_INPUT_XML, magvar: 0, facilities: [vor('DTO', dtoAt.lat, dtoAt.lon)]});
+        await moveAircraft(unit, at, {groundspeedKt: 120, trackTrue: track});
+        return {unit, nav: unit.props.memory.navPage, mid, dtk};
+    }
+
+    it('the setup: the latch is right and the bank is the right cap', async () => {
+        const {unit, nav} = await latchedRight();
+
+        expect(activeIdent(unit)).toBe('ABC');
+        expect(nav.rollSteeringLatch?.turn).toBe('right');
+        expect(roll(unit)).toBeCloseTo(-25, 6);
+    });
+
+    // On the same leg, 0.3 NM left of it with the track DTK + 190: the course to steer is DTK + 16.7, e = 16.7 - 190 =
+    // -173.3, still beyond 150 but now the shorter way left. The latch of the same path holds the right turn, so the
+    // command stays the right cap (the turn does not reverse while XTK changes sign). The calculation tick would see a
+    // track from the jump between the two positions, so the GPS is set and one controller tick is run, as in the #373
+    // test above
+    it('holds the latched turn on the same path when the shorter way flips', async () => {
+        const {unit, nav, mid, dtk} = await latchedRight();
+        const gps = unit.props.sensors.in.gps;
+        const left = pointFrom(mid, dtk - 90, 0.3);
+        gps.coords = new GeoPoint(left.lat, left.lon);
+        gps.trackTrue = (dtk + 190) % 360;
+
+        new RollSteeringController(unit.props.sensors, unit.props.memory, unit.props.planeSettings).tick();
+
+        expect(roll(unit)).toBeCloseTo(-25, 6);
+        expect(nav.rollSteeringLatch?.turn).toBe('right');
+    });
+
+    // A Direct To from the present position to DTO, 160 degrees left of the track: the aircraft is on the new leg, the
+    // course to steer is the leg's course and the shorter way is left, and |e| = 160 is beyond the latch angle, so a latch
+    // kept from the old leg would turn right. The from leg's path is one object that ActiveWaypoint rewrites for every
+    // leg, so the latch must compare the geometry, not the object
+    it('a Direct To clears the turn latch of the old path', async () => {
+        const {unit, nav} = await latchedRight();
+
+        await unit.panel.directTo('DTO');
+
+        expect(activeIdent(unit)).toBe('DTO');
+        expect(roll(unit)).toBeCloseTo(25, 6);
+        expect(nav.rollSteeringLatch?.turn).toBe('left');
+    });
+
+    it('is 0 below 5 kt and clears the latch', async () => {
+        const {unit, nav} = await latchedRight();
+
+        unit.env.sim.set('GROUND VELOCITY', 'knots', 4);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        // 2-70: roll steering needs a ground speed
+        expect(unit.env.sim.lastWrite('L:KLN90B_RollCommand')?.value).toBe(0);
+        // The design, section 4B step 6: without a command the latch is cleared
+        expect(nav.rollSteeringLatch).toBeNull();
+    });
+
+    it('a power cycle clears the turn latch', async () => {
+        const {unit, nav} = await latchedRight();
+
+        await unit.panel.powerCycle();
+
+        expect(nav.rollSteeringLatch).toBeNull();
+    });
+});
+
+// The roll steering design, sections 4A and 4B (amended 2026-10-19): the rule that never banks against an anticipated
+// turn applies on the turn circle only. In the next-leg fallback (TurnStackEntry.steerOnPathForDtk) the steering path is
+// the next leg, a great circle, and the law must bank either way on it. NavCalculator rebuilds the stack and the path
+// every tick, so the test sets them and ticks a controller itself, as in the #373 test above. The aircraft is 2 NM left
+// of the leg, parallel to it, at 120 kt: atan(2 / 1) is capped at 45, the course to steer is DTK + 45 and the bank the
+// right cap, -25 (section 4B). A great circle reads as a left turn to FlightPathUtils, so applying the rule there would
+// hold that right bank at 0.
+describe('the next-leg fallback of an anticipated turn (the roll steering design, sections 4A and 4B, amended)', () => {
+    it('banks right toward the next leg, which is no turn circle', async () => {
+        const {unit, mid, dtk} = await onRoute(HEADING_INPUT_XML);
+        await moveAircraft(unit, pointFrom(mid, dtk - 90, 2), {groundspeedKt: 120, trackTrue: dtk});
+        const nav = unit.props.memory.navPage;
+        expect(roll(unit)).toBeCloseTo(-25, 6); // Precondition: the leg itself gives the right cap
+        const leg = nav.steeringPath!;
+        // A left turn circle of 1 NM radius around ABC, with the leg as its next path, in the fallback
+        const abc = standardRoute().abc;
+        const entry = new TurnStackEntry(GeoCircle.createFromPoint(new GeoPoint(abc.lat, abc.lon), UnitType.NMILE.convertTo(1, UnitType.GA_RADIAN)),
+            new GeoPoint(abc.lat, abc.lon), leg);
+        entry.steerOnPathForDtk = true;
+        nav.activeWaypoint.turnStack.push(entry);
+
+        new RollSteeringController(unit.props.sensors, unit.props.memory, unit.props.planeSettings).tick();
+
+        expect(roll(unit)).toBeCloseTo(-25, 6);
     });
 });
