@@ -510,8 +510,11 @@ sim.
       Past the midpoint means on the next leg's side of the bisector, with the GPS track within 90° of the next leg.
     - It also ends when the aircraft is more than `OFF_LEG_XTK` (4.0 NM) from the active leg: the inbound leg until the
       waypoint is sequenced, the next leg afterwards.
-    - The midpoint condition keeps a turn near 180° from ending where it starts. At 180° the bisector runs along both
-      legs, which is why the track is also checked.
+    - The midpoint condition keeps a turn near 180° from ending where it starts, where the start lies barely before the
+      end point along the next leg. At 180° the start is the end point and the bisector runs along both legs: in the
+      first calculations of the circle the aircraft is at the end point and not on the inbound side of the bisector, and
+      only the track, still opposite the next leg, keeps the turn. After that the aircraft moves away from the end point
+      along the next leg until the turn is nearly complete.
     - The end-point condition keeps a lagging aircraft from ending the turn as it moves away from the end point at first.
     - Measuring the 4.0 NM to the active leg keeps a fast aircraft, which starts the turn lead · sin θ from the next leg,
       from ending it at once.

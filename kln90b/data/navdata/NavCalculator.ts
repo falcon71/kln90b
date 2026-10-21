@@ -509,10 +509,14 @@ export class NavCalculator implements CalcTickable {
     /**
      * #404: the turn circle ends once the aircraft is past its end point along the next leg (within the tick ahead), but
      * only past its midpoint: on the next leg's side of the turn's bisector and with the track within 90° of the next
-     * leg. Near 180° the start of the turn lies barely before its end point along the next leg (lead · (1 + cos θ)), and
-     * at 180° the bisector runs along both legs, so without these conditions the turn would end where it starts. A
-     * capped turn is tighter than the aircraft can fly, so the aircraft moves away from the end point at first: the
-     * distance to it, which ends the roll-in, would end the turn as soon as it began.
+     * leg. Near 180° the start of the turn lies barely before its end point along the next leg (lead · (1 + cos θ)), so
+     * the end point alone would end the turn where it starts; short of 180° the aircraft is still on the inbound side of
+     * the bisector there. At 180° the start is the end point and the bisector runs along both legs, so in the first
+     * calculations of the circle the aircraft is at the end point, within the tick ahead, and not on the inbound side of
+     * the bisector: only the track, still the inbound course and opposite the next leg, shows that the turn has not been
+     * flown (turnLead.test.ts, the 180° turn). After that the aircraft moves away from the end point along the next leg
+     * until the turn is nearly complete. A capped turn is tighter than the aircraft can fly, so the aircraft moves away
+     * from the end point at first: the distance to it, which ends the roll-in, would end the turn as soon as it began.
      * The turn also ends when the aircraft is more than OFF_LEG_XTK from the active leg: the inbound leg until the
      * waypoint is sequenced, the next leg afterwards (the spec's section 3.2; for the waypoint's own turn tickOffLeg
      * drops the rest of it in the same calculation). Measured to the next leg instead, a fast

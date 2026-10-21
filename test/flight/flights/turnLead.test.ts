@@ -225,6 +225,10 @@ describe('the end of an anticipated turn (#404)', () => {
             expect(end.remaining, all).toBeLessThanOrEqual(tickNm(groundspeedKt) + POSITION_TOLERANCE_NM);
             expect(end.remaining, all).toBeGreaterThanOrEqual(-POSITION_TOLERANCE_NM);
             expect(samples.slice(0, -1).every(s => s.stack > 0), all).toBe(true);
+            // And the turn has been flown by then: the circle meets the next leg at the end point on the next leg's course,
+            // and the aircraft, lagging a capped circle, reaches it still turning. At 180° the end point is also where the
+            // turn starts (lead · (1 + cos θ) is 0 along the next leg), which the aircraft passes on the inbound course
+            expect(angleBetween(flight.aircraft.trackTrue, next), all).toBeLessThan(45);
         });
     }
 
