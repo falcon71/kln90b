@@ -1,0 +1,121 @@
+import {describe, expect, it} from 'vitest';
+import {GeoCircle, UnitType} from '@microsoft/msfs-sdk';
+import {
+    alongTrackDistance,
+    bisectorSide,
+    LEAD_CAP_TIME,
+    segmentDistance,
+    turnLead,
+} from '../../../../kln90b/data/navdata/SequencingGeometry';
+import {courseDeg, distanceNm, pointFrom} from '../../../harness/flight/geo';
+
+// Positions are placed with the harness geometry (independent haversine and destination formula); the expectations
+// are literals worked out by hand from the textbook formulas.
+const W = {lat: 47, lon: 9};
+
+describe('turnLead (KLN 89 trainer, 2026-10-20)', () => {
+    it('caps the lead at 60 s', () => {
+        expect(LEAD_CAP_TIME).toBe(60);
+    });
+
+    it('is r·tan(θ/2) below the caps: 120° at 239 kt', () => {
+        const t = turnLead(239, 120, 30);
+        // 25° bank radius: 239² / (11.26 · tan 25°) ft ÷ 3.2808 = 3316 m = 1.790 NM (the constants of NavMath.turnRadius)
+        expect(t.lead).toBeCloseTo(3.10, 2);   // 1.790 NM × tan 60°
+        expect(t.radius).toBeCloseTo(1.790, 2);
+    });
+
+    it('caps the lead at 60 s of ground speed: 150° at 239 kt', () => {
+        const t = turnLead(239, 150, 30);
+        expect(t.lead).toBeCloseTo(3.983, 2);  // 239 / 60; uncapped 6.66
+        expect(t.radius).toBeCloseTo(3.983 / Math.tan(75 * Math.PI / 180), 2);  // 1.067, tangent to both legs
+    });
+
+    it('caps the lead at half the inbound leg: 171° after 2.0 NM at 119 kt', () => {
+        const t = turnLead(119, 171, 2.0);
+        expect(t.lead).toBeCloseTo(1.0, 2);
+        expect(t.radius).toBeCloseTo(1.0 / Math.tan(85.5 * Math.PI / 180), 3);
+    });
+
+    it('uses the standard-rate radius below 25° of bank: 120° at 119 kt', () => {
+        expect(turnLead(119, 120, 30).lead).toBeCloseTo(1.09, 1);  // 0.628 NM × tan 60°
+    });
+
+    it('has no lead for a straight-on course, but keeps the radius: 0° at 239 kt', () => {
+        const t = turnLead(239, 0, 30);
+        expect(t.lead).toBe(0);
+        expect(t.radius).toBeCloseTo(1.790, 2);
+    });
+});
+
+describe('alongTrackDistance', () => {
+    const path = GeoCircle.createGreatCircle(W, 90);
+
+    it('is the distance still to fly to the waypoint: 3 NM before it and 2 NM to the side', () => {
+        const pos = pointFrom(pointFrom(W, 270, 3), 0, 2);
+        expect(alongTrackDistance(path, W, pos)).toBeCloseTo(3.0, 2);
+    });
+
+    it('is negative past the waypoint: 1 NM past it', () => {
+        expect(alongTrackDistance(path, W, pointFrom(W, 90, 1))).toBeCloseTo(-1.0, 2);
+    });
+
+    it('is zero abeam the waypoint', () => {
+        expect(alongTrackDistance(path, W, pointFrom(W, 0, 2))).toBeCloseTo(0, 2);
+    });
+});
+
+describe('bisectorSide', () => {
+    // Inbound 090, next leg 000: a 90° left turn, the bisector runs on bearing 135/315 through W
+    it('is negative on the inbound side: 1 NM back along the inbound leg', () => {
+        expect(bisectorSide(W, 90, 0, pointFrom(W, 270, 1))).toBeCloseTo(-0.707, 2);
+    });
+
+    it('is positive on the far side: 1 NM out along the next leg', () => {
+        expect(bisectorSide(W, 90, 0, pointFrom(W, 0, 1))).toBeCloseTo(0.707, 2);
+    });
+
+    it('is zero on the line: on bearing 315 from the waypoint', () => {
+        expect(bisectorSide(W, 90, 0, pointFrom(W, 315, 2))).toBeCloseTo(0, 2);
+    });
+
+    it('bisects a right turn the same way: inbound 090, next 180', () => {
+        expect(bisectorSide(W, 90, 180, pointFrom(W, 270, 1))).toBeCloseTo(-0.707, 2);
+        expect(bisectorSide(W, 90, 180, pointFrom(W, 180, 1))).toBeCloseTo(0.707, 2);
+    });
+});
+
+describe('segmentDistance', () => {
+    const A = {lat: 47, lon: 8};
+    const B = {lat: 47, lon: 9};
+    const mid = pointFrom(A, courseDeg(A, B), distanceNm(A, B) / 2);
+
+    it('is the perpendicular distance while the foot lies on the leg: 2 NM north of the midpoint', () => {
+        expect(segmentDistance(A, B, undefined, pointFrom(mid, 0, 2))).toBeCloseTo(2.0, 2);
+    });
+
+    it('is the distance to the from waypoint when the foot lies past the leg: 3 NM east of B', () => {
+        const pos = pointFrom(B, 90, 3);
+        expect(segmentDistance(A, B, undefined, pos)).toBeCloseTo(distanceNm(A, pos), 2);
+        expect(segmentDistance(A, B, undefined, pos)).toBeGreaterThan(43);
+    });
+
+    it('is the distance to the from waypoint when the foot lies before the leg: 3 NM west of A', () => {
+        expect(segmentDistance(A, B, undefined, pointFrom(A, 270, 3))).toBeCloseTo(3.0, 2);
+    });
+
+    describe('on a DME arc of 10 NM around (47 N, 9 E), counterclockwise from the east to the north point', () => {
+        const center = {lat: 47, lon: 9};
+        const arc = GeoCircle.createFromPoint(center, UnitType.NMILE.convertTo(10, UnitType.GA_RADIAN));
+        const from = pointFrom(center, 90, 10);
+        const to = pointFrom(center, 0, 10);
+
+        it('is the radial offset while the foot lies on the arc: 2 NM outside on bearing 045', () => {
+            expect(segmentDistance(from, to, arc, pointFrom(center, 45, 12))).toBeCloseTo(2.0, 2);
+        });
+
+        it('is the distance to the from waypoint past the arc: on the south point', () => {
+            expect(segmentDistance(from, to, arc, pointFrom(center, 180, 10))).toBeCloseTo(14.14, 1);  // 10 NM × √2
+        });
+    });
+});

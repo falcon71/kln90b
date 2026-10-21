@@ -4,13 +4,13 @@ import {
     GeoCircle,
     GeoPoint,
     ICAO,
-    LatLonInterface,
     Publisher,
     UserSetting,
 } from "@microsoft/msfs-sdk";
 import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "./Flightplan";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Sensors} from "../../Sensors";
+import {segmentDistance} from "../navdata/SequencingGeometry";
 
 
 export interface FromLeg {
@@ -19,8 +19,6 @@ export interface FromLeg {
 }
 
 const CACHED_CIRCLE = new GeoCircle(new Float64Array(3), 0);
-const ARC_FROM_CACHE = new GeoPoint(0, 0);
-const ARC_TO_CACHE = new GeoPoint(0, 0);
 
 export class TurnStackEntry {
     /**
@@ -302,68 +300,20 @@ export class ActiveWaypoint {
      * @private
      */
     private findClosestLegIdx(legs: KLNFlightplanLeg[]): number {
-        const CACHED_CIRCLE = new GeoCircle(new Float64Array(3), 0);
-        const tempFromGeoPoint = new GeoPoint(0, 0);
-        const tempClosestGeoPoint = new GeoPoint(0, 0);
-        let distMin = 99999; //This is GA Radians!
+        let distMin = Infinity;
         let closestIdx = -1;
         for (let i = 1; i < legs.length; i++) {
             const from = legs[i - 1];
             const to = legs[i].wpt;
-            tempFromGeoPoint.set(from.wpt);
-            let circle: GeoCircle;
-            if (from.arcData === undefined) {
-                CACHED_CIRCLE.setAsGreatCircle(from.wpt, to);
-                circle = CACHED_CIRCLE;
-            } else {
-                circle = from.arcData.circle;
-            }
-            circle.closest(this.sensors.in.gps.coords, tempClosestGeoPoint);
+            const dist = segmentDistance(from.wpt, to, from.arcData?.circle, this.sensors.in.gps.coords);
 
-            let distGPSClosestWpt: number;
-            const between = from.arcData === undefined
-                ? this.isPointOnCircleBetween(tempFromGeoPoint, to, tempClosestGeoPoint)
-                : this.isPointOnArcBetween(circle, from.wpt, to, tempClosestGeoPoint);
-            if (between) {
-                distGPSClosestWpt = tempClosestGeoPoint.distance(this.sensors.in.gps.coords)
-            } else {
-                //The closest point is not between from and to, so lets use the distance between GPS and from instead
-                distGPSClosestWpt = tempFromGeoPoint.distance(this.sensors.in.gps.coords);
-            }
-
-            if (distGPSClosestWpt < distMin) {
-                distMin = distGPSClosestWpt;
+            if (dist < distMin) {
+                distMin = dist;
                 closestIdx = i;
             }
         }
 
         return closestIdx;
-    }
-
-    /**
-     * Checks if the point is located between from and to. All points must be located on the same great circle
-     * @param from
-     * @param to
-     * @param pointToCheck
-     * @private
-     */
-    private isPointOnCircleBetween(from: GeoPoint, to: LatLonInterface, pointToCheck: GeoPoint): boolean {
-        const distFromTo = from.distance(to);
-        const distPointFrom = pointToCheck.distance(from);
-        const distPointTo = pointToCheck.distance(to);
-        //If the distance between A & C and B & C is the same as A & B, then C lies between A & B, otherwise it is outside
-        return distPointFrom + distPointTo <= distFromTo + GeoCircle.ANGULAR_TOLERANCE;
-    }
-
-    /**
-     * #121: checks if a point of a DME arc lies between from and to, by the angle along the arc's circle in its own
-     * direction. The chord test of isPointOnCircleBetween needs a great circle; the ends need not lie exactly on the
-     * arc's circle, so they are projected onto it first
-     */
-    private isPointOnArcBetween(circle: GeoCircle, from: LatLonInterface, to: LatLonInterface, pointToCheck: GeoPoint): boolean {
-        circle.closest(from, ARC_FROM_CACHE);
-        circle.closest(to, ARC_TO_CACHE);
-        return circle.angleAlong(ARC_FROM_CACHE, pointToCheck, Math.PI) <= circle.angleAlong(ARC_FROM_CACHE, ARC_TO_CACHE, Math.PI) + GeoCircle.ANGULAR_TOLERANCE;
     }
 
     private assertToMatchesFplIdx(): void {
