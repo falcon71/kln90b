@@ -745,13 +745,15 @@ recording (an `it.fails` until #100 was fixed), so a broken flight cannot be mis
   triangle as a vector sum (`Wind.test.ts`), the USNO almanac with its URL (`Sun.test.ts`). The code's own source never
   is: `Conversions.ts` and `Wind.ts` follow avform, and an expectation computed from avform restates the code.
 - **Pin known bugs with `it.fails('... (#NN)')`.** The test states the correct behavior, fails today, and turns red when
-  someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See the #157 pin in
-  `test/render/data/navdata/NavCalculator.test.ts` (`passing a waypoint off course`).
+  someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. See the #189 pin in
+  `test/render/data/navdata/AirspaceAlert.test.ts`.
 - **Prove a pin by fixing the bug, and keep heavy setup out of it.** An `it.fails` test passes on *any* failure, so a
   broken precondition inside it (a boot that threw, a wrong key sequence) is invisible: the pin stays green for the
   wrong reason. Prove a pin by fixing the bug temporarily and seeing the test turn red, then restore. Where it is cheap,
   keep the heavy preconditions in a sibling test that passes today and asserts them, so that a broken setup fails
-  there; the control test beside the #157 pin is the pattern, and `turnDirection.test.ts` shows it for a flight.
+  there. The pair in `passing a waypoint off course` (`test/render/data/navdata/NavCalculator.test.ts`) is the
+  pattern: the control without turn anticipation beside the test with it, which was the #157 pin until the off-course turn
+  start made it pass. `turnDirection.test.ts` shows it for a flight.
 - **Keep runs deterministic.** The harness fixes the clock and the random seed. Do not read the wall clock in an
   assertion (`performance.now` is the wall clock, because the fake clock does not fake it).
 - **Never commit manual content or navdata recorded from the sim.** The manuals are copyrighted: cite page numbers,

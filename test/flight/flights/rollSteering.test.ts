@@ -322,11 +322,15 @@ const CAPPED_150_RADIUS_NM = CAPPED_150_LEAD_NM / Math.tan(75 * Math.PI / 180);
  * (3°/s at 120 kt), is capped at 60 s of ground speed, 2.0 NM (#404), so the turn starts about 2.1 NM from ABC on the
  * tighter circle tangent to both legs at the lead, of radius 2.0 NM / tan(75°) = 0.54 NM (checked in the KLN 89 trainer,
  * 2026-10-20). The aircraft is put on a 005 track (the inbound 050 less 45°, closing from the right, the inside of the
- * turn) aimed at the point 2.0 NM right of the leg and 1.5 NM before ABC, 2.5 NM from it, and placed 2 NM before that
- * point. Both the old controller (its far-away branch) and the new law (atan(XTK / 1 NM) is more than 45° there) hold
- * the 45° intercept from the right while the aircraft is far off, so the turn starts with the aircraft about 2 NM inside
- * the inbound leg, outside the turn circle on its far side by more than its radius. The start event is the DTK switch, the target the leg ABC - KBBB. `fallback` reports whether
- * NavCalculator steers on the next leg at the start event (the roll steering design, section 4A).
+ * turn) aimed at the point 2.0 NM right of the leg and 1.5 NM before ABC, 2.5 NM from it, and placed 0.6 NM before that
+ * point: about 2.0 NM before ABC along the leg and 2.5 NM right of it. That is past the decision point of the turn
+ * (20 s before its turn point, 2.8 NM before ABC) and inside its turn point, so the unit decides at once and, with at
+ * most 2.8 NM of cross track, on the turn plan: the turn starts at once (checked in the KLN 89 trainer, 2026-10-20,
+ * #157), with the aircraft about 2.5 NM inside the inbound leg, outside the turn circle on its far side by more than its
+ * radius. Placed 2 NM before the aim point, as before #157, the aircraft would pass the decision point 3.3 NM right of
+ * the leg and take the abeam plan; inside this turn it is past the bisector there, so ABC would be sequenced without a
+ * turn. The start event is the DTK switch, the target the leg ABC - KBBB. `fallback` reports whether NavCalculator
+ * steers on the next leg at the start event (the roll steering design, section 4A).
  */
 function turnStartOnInterceptInside(durationS: number): Scenario {
     return {
@@ -343,12 +347,12 @@ function turnStartOnInterceptInside(durationS: number): Scenario {
             await flight.flyUntilActive('ABC', {timeout: 30});
             const aim = pointFrom(pointBefore(kaaa, abc, 1.5), inbound + 90, 2.0);
             const track = inbound - 45;
-            await place(flight, pointFrom(aim, track + 180, 2.0), track);
+            await place(flight, pointFrom(aim, track + 180, 0.6), track);
             const next = courseDeg(abc, kbbb);
             await flight.flyUntil(() => angleBetween(flight.nav.dtkTrue, next) < 1,
                 {timeout: 120, description: 'start of the turn at ABC'});
             // #375: a turn is sequenced where the aircraft passes its bisector (checked in the KLN 89 trainer, 2026-10-20,
-            // docs/kln89-trainer-record.md), a state armed by the turn start. 2 NM inside the turn the aircraft is past the
+            // docs/kln89-trainer-record.md), a state armed by the turn start. 2.5 NM inside the turn the aircraft is past the
             // bisector when the turn starts, so ABC is sequenced in that calculation; the turn stays on the stack and is
             // flown, and the roll steering checks below are unchanged
             expect(flight.nav.activeIdent).toBe('KBBB');

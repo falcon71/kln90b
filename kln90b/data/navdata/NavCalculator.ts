@@ -10,7 +10,7 @@ import {KLNMagvar} from "./KLNMagvar";
 import {calcDistToDestination} from "../../services/FlightplanUtils";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {bankeAngleForStandardTurn, distanceToAchieveBankAngleChange} from "../../services/KLNNavmath";
-import {FromLeg, TurnBisector, TurnStackEntry} from "../flightplan/ActiveWaypoint";
+import {FromLeg, TurnBisector, TurnPlan, TurnStackEntry} from "../flightplan/ActiveWaypoint";
 import {alongTrackDistance, bisectorSide, turnLead} from "./SequencingGeometry";
 
 
@@ -36,13 +36,32 @@ export const MAX_BANK_ANGLE = 25;
  */
 export const OFF_LEG_XTK: NauticalMiles = 4.0;
 
+/**
+ * The unit decides where an anticipated turn starts (ActiveWaypoint.turnPlan) this long before the turn point, at the
+ * ground speed: where the waypoint alert of a turn flown on course is due (4-8). Checked in the KLN 89 trainer, 2026-10-20:
+ * the moment is known to a few seconds
+ */
+export const TURN_DECISION_TIME: Seconds = WPT_ALERT_WITH_TURN_ANTI;
+
+/**
+ * Up to this cross track to the leg at the decision the turn starts at the lead (TurnPlan.AT_LEAD), beyond it at the
+ * abeam line (TurnPlan.AT_ABEAM). Checked in the KLN 89 trainer, 2026-10-20, with medium confidence: the gate lies
+ * between 2.69 and 2.93 NM, the same at 119 and 239 kt
+ */
+export const TURN_PLAN_MAX_XTK: NauticalMiles = 2.8;
+
+/**
+ * On the abeam plan the waypoint alert starts this long before the abeam line, at the along-track closure rate, and not
+ * at the decision (checked in the KLN 89 trainer, 2026-10-20: 14 to 16 s)
+ */
+export const WPT_ALERT_ABEAM_TURN: Seconds = 15;
+
 
 /**
  * This class updates all navigation variables
  */
 export class NavCalculator implements CalcTickable {
     private readonly turnAnticipation: UserSetting<boolean>;
-    private lastDistanceToTurn = 9999;
 
     private lastTurnStackDistance: NauticalMiles | null = null;
 
@@ -68,7 +87,6 @@ export class NavCalculator implements CalcTickable {
             nav.waypointAlert = true;
             nav.xtkScale = 5;
             nav.activeWaypoint.clearTurnStack();
-            this.lastDistanceToTurn = 9999;
             this.setOutput();
             return;
         } else if (!this.sensors.in.gps.isValid()) {
@@ -136,13 +154,16 @@ export class NavCalculator implements CalcTickable {
             legPath = incoming;
         }
 
+        //The distance flown in one calculation tick
+        const tickDistance = this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC;
+
         //Special handling for turns
         if (nav.activeWaypoint.turnStack.length > 0) {
             const turnStackEntry = nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1];
-            const tickDistance = this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC;
             const distFromCurrent = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(turnStackEntry.switchPoint), UnitType.NMILE);
-            if (turnStackEntry.turnBisector !== undefined ? this.isPastEndOfTurn(turnStackEntry, turnStackEntry.turnBisector, tickDistance, legPath)
-                : distFromCurrent <= tickDistance || distFromCurrent > this.lastTurnStackDistance!) {
+            //The abeam turn has no end of its own: it ends with its waypoint (ActiveWaypoint.setActiveIdx)
+            if (turnStackEntry.abeamTurnSign === null && (turnStackEntry.turnBisector !== undefined ? this.isPastEndOfTurn(turnStackEntry, turnStackEntry.turnBisector, tickDistance, legPath)
+                : distFromCurrent <= tickDistance || distFromCurrent > this.lastTurnStackDistance!)) {
                 console.debug("Reached end of turn", distFromCurrent, this.lastTurnStackDistance, nav.activeWaypoint.turnStack);
                 //We have reached the end of the turn, XTK will now use the normal leg again
                 nav.activeWaypoint.turnStack.pop();
@@ -161,7 +182,8 @@ export class NavCalculator implements CalcTickable {
         if (nav.activeWaypoint.turnStack.length > 0) {
             //4-8 XTK will be based on a smooth turn
             const turnStackEntry = nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1];
-            nav.xtkToActive = UnitType.GA_RADIAN.convertTo(turnStackEntry.path.distance(this.sensors.in.gps.coords), UnitType.NMILE);
+            nav.xtkToActive = turnStackEntry.abeamTurnSign !== null ? turnStackEntry.abeamTurnSign * nav.distToActive
+                : UnitType.GA_RADIAN.convertTo(turnStackEntry.path.distance(this.sensors.in.gps.coords), UnitType.NMILE);
         } else {
             nav.xtkToActive = UnitType.GA_RADIAN.convertTo(legPath.distance(this.sensors.in.gps.coords), UnitType.NMILE);
         }
@@ -225,11 +247,12 @@ export class NavCalculator implements CalcTickable {
                 //calculates at 1 Hz and can start a turn up to a second late, and the sim's autopilot and aircraft need
                 //time to roll in. Users reported overshoots before it was added, and the default autopilot follows the GPS
                 //SimVars, so the displayed and the commanded turn start cannot be split
-                const distanceToTurn = nav.distToActive - lead - distanceToAchieveBankAngleChange(desiredBankAngle, this.sensors.in.gps.groundspeed);
-                const timeToTurn = distanceToTurn / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
-
-                nav.waypointAlert = timeToTurn <= WPT_ALERT_WITH_TURN_ANTI || nav.activeWaypoint.turnStack.length > 0; //Arrow flashes until end of turn and the light remains on until end of turn: https://youtu.be/S1lt2W95bLA?si=C45kt8pik15Iodoy&t=2245
-                //console.log(nav.distToActive, lead, nav.waypointAlert, timeToTurn, toWpt);
+                const turnPoint = lead + distanceToAchieveBankAngleChange(desiredBankAngle, this.sensors.in.gps.groundspeed);
+                //The turn starts at an along-track distance, measured along the inbound leg: on course it is the straight
+                //distance, off course it is not (checked in the KLN 89 trainer, 2026-10-20)
+                const along = alongTrackDistance(legPath, toLeg.wpt, this.sensors.in.gps.coords);
+                const activeWaypoint = nav.activeWaypoint;
+                this.decideTurnPlan(legPath, along, turnPoint);
 
                 //We have reached the start of the turn but not the waypoint yet. XTK will now follow a curved path and DTK will indicate the next path
                 //#404: also when the leg became active with the aircraft already inside the lead (a Direct To, a short
@@ -237,41 +260,56 @@ export class NavCalculator implements CalcTickable {
                 //2026-10-20; this replaces the skip of #76)
                 //#375: the waypoint's own turn is started once. A turn that ended while the waypoint is still active (by
                 //the escape of isPastEndOfTurn) is not started again, which flipped the DTK between the legs every tick
-                if (toLeg.fixType !== KLNFixType.MAP && nav.activeWaypoint.turnStack.length === 0 && !nav.activeWaypoint.ownTurnStarted &&
-                    (distanceToTurn <= this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC //Distance is within the next tick, we rather start the turn a little too early than too late
-                        || (nav.waypointAlert && distanceToTurn >= this.lastDistanceToTurn))) {
-                    const fromPath = new GeoCircle(fromLeg.path.center, fromLeg.path.radius);
+                if (toLeg.fixType !== KLNFixType.MAP && activeWaypoint.turnStack.length === 0 && !activeWaypoint.ownTurnStarted) {
+                    if (activeWaypoint.turnPlan === TurnPlan.AT_LEAD
+                        && along <= turnPoint + tickDistance) { //Distance is within the next tick, we rather start the turn a little too early than too late
+                        const fromPath = new GeoCircle(fromLeg.path.center, fromLeg.path.radius);
 
-                    //4-8 We save information on how this turn was calculated
-                    const startOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
-                    startOfTurn.offset(NavMath.reciprocateHeading(fromDtk), UnitType.NMILE.convertTo(lead, UnitType.GA_RADIAN));
+                        //4-8 We save information on how this turn was calculated
+                        const startOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
+                        startOfTurn.offset(NavMath.reciprocateHeading(fromDtk), UnitType.NMILE.convertTo(lead, UnitType.GA_RADIAN));
 
-                    const turnCircle = this.calculateTurnCircle(turnRadius, startOfTurn, fromDtk, NavMath.getTurnDirection(fromDtk, nextDtk));
-                    const endOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
-                    endOfTurn.offset(nextDtk, UnitType.NMILE.convertTo(lead, UnitType.GA_RADIAN));
-                    nav.activeWaypoint.turnStack.push(new TurnStackEntry(turnCircle, endOfTurn, nextPath, {wpt: new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon), inboundDtk: fromDtk, nextDtk: nextDtk}));
-                    console.log("turn: moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt(), distanceToTurn, this.lastDistanceToTurn);
+                        const turnCircle = this.calculateTurnCircle(turnRadius, startOfTurn, fromDtk, NavMath.getTurnDirection(fromDtk, nextDtk));
+                        const endOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
+                        endOfTurn.offset(nextDtk, UnitType.NMILE.convertTo(lead, UnitType.GA_RADIAN));
+                        activeWaypoint.turnStack.push(new TurnStackEntry(turnCircle, endOfTurn, nextPath, {wpt: new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon), inboundDtk: fromDtk, nextDtk: nextDtk}));
+                        console.log("turn: moving to next wpt", toLeg.wpt, activeWaypoint.getActiveWpt(), along, turnPoint);
 
-                    //Since we add a few seconds before the turn to reach the desired bank angle, we need to keep the old path for a short moment
-                    this.lastTurnStackDistance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(startOfTurn), UnitType.NMILE);
-                    nav.activeWaypoint.turnStack.push(new TurnStackEntry(fromPath, startOfTurn, nextPath));
-                    nav.activeWaypoint.ownTurnStarted = true;
+                        //Since we add a few seconds before the turn to reach the desired bank angle, we need to keep the old path for a short moment
+                        this.lastTurnStackDistance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(startOfTurn), UnitType.NMILE);
+                        activeWaypoint.turnStack.push(new TurnStackEntry(fromPath, startOfTurn, nextPath));
+                        activeWaypoint.ownTurnStarted = true;
+                    } else if (activeWaypoint.turnPlan === TurnPlan.AT_ABEAM && nav.toFrom === FROM) {
+                        //The abeam turn reproduces the real unit: on the abeam plan the turn starts at the abeam line as a
+                        //turn of no size at the waypoint, XTK is the distance to the waypoint with the sign of the side the
+                        //turn goes to, and DTK is the next leg's, until the bisector (line 2 equal to the distance for 35 to
+                        //115 s, checked in the KLN 89 trainer, 2026-10-20). It only happens when a waypoint is passed up to
+                        //4 NM off course, in practice when hand flying; a default autopilot coupled at that moment steers
+                        //back toward the waypoint until the bisector. Roll steering steers on the next leg at once, because
+                        //the aircraft is farther from a circle of no size than its radius (steeringPath)
+                        const wpt = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
+                        const sign = NavMath.getTurnDirection(fromDtk, nextDtk) === "left" ? 1 : -1;
+                        activeWaypoint.turnStack.push(new TurnStackEntry(GeoCircle.createFromPoint(wpt, 0), wpt, nextPath, undefined, sign));
+                        console.log("abeam turn: moving to next wpt", toLeg.wpt, activeWaypoint.getActiveWpt());
+                        activeWaypoint.ownTurnStarted = true;
+                    }
                 }
+
+                nav.waypointAlert = this.isAlertWithTurn(legPath, along); //Arrow flashes until end of turn and the light remains on until end of turn: https://youtu.be/S1lt2W95bLA?si=C45kt8pik15Iodoy&t=2245
 
                 //#375: sequenced where the aircraft crosses the bisector of the turn, the line through the waypoint that
                 //halves the angle between the legs: on course the middle of the turn, for a big turn well before the
                 //waypoint (3.2 NM for 171° at 239 kt, checked in the KLN 89 trainer, 2026-10-20). The test is a state,
-                //armed once the waypoint's own turn has started, so an aircraft already past the line then sequences at
-                //once. It does not read the waypoint alert: a turn still on the stack from the previous waypoint keeps the
-                //alert on, and the abeam test that read it sequenced a waypoint 13 NM away
+                //armed once the waypoint's own turn has started or on the abeam plan, so an aircraft already past the line
+                //then sequences at once. On the inside of a turn on the abeam plan that can be before the abeam line,
+                //where no turn has started (the design, section 3.3, the maintainer's lead's call; not observed in the
+                //trainer). It does not read the waypoint alert: a turn still on the stack from the previous waypoint keeps
+                //the alert on, and the abeam test that read it sequenced a waypoint 13 NM away
                 if (toLeg.fixType !== KLNFixType.MAP //don't move missed approach waypoint!
-                    && nav.activeWaypoint.ownTurnStarted
+                    && (activeWaypoint.ownTurnStarted || activeWaypoint.turnPlan === TurnPlan.AT_ABEAM)
                     && bisectorSide(toLeg.wpt, fromDtk, nextDtk, this.sensors.in.gps.coords) >= 0) {
-                    nav.activeWaypoint.sequenceToNextWaypoint();
-                    console.log("moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt());
-                    this.lastDistanceToTurn = 9999;
-                } else {
-                    this.lastDistanceToTurn = distanceToTurn;
+                    activeWaypoint.sequenceToNextWaypoint();
+                    console.log("moving to next wpt", toLeg.wpt, activeWaypoint.getActiveWpt());
                 }
 
 
@@ -338,6 +376,50 @@ export class NavCalculator implements CalcTickable {
         const nav = this.memory.navPage;
         const alertTime = this.turnAnticipation.get() ? WPT_ALERT_NO_TURN_WITH_TURN_ANTI : WPT_ALERT_WITHOUT_TURN_ANTI;
         return (nav.toFrom === TO && nav.eteToActive! <= alertTime) || nav.activeWaypoint.turnStack.length > 0;
+    }
+
+    /**
+     * Decides once where the anticipated turn of the active waypoint starts, at the first calculation with the aircraft
+     * at most TURN_DECISION_TIME of ground speed before the turn point along the track: at the lead (TurnPlan.AT_LEAD)
+     * with at most TURN_PLAN_MAX_XTK of cross track to the leg then, otherwise at the abeam line (TurnPlan.AT_ABEAM). The
+     * decision is latched until the active waypoint changes (ActiveWaypoint.clearTurnState): in the KLN 89 trainer,
+     * 2026-10-20, the cross track fell to 0.7 to 0.9 NM after the decision and the unit still waited for the abeam line.
+     * The gate (2.8 NM, between 2.69 and 2.93 in the trainer) and the moment of the decision are known with medium
+     * confidence. A leg that becomes active past the decision point (a Direct To, a power-up) is decided at once
+     * @param legPath the path of the active leg
+     * @param along the along-track distance to the active waypoint
+     * @param turnPoint the along-track distance at which the turn of the turn plan starts
+     */
+    private decideTurnPlan(legPath: GeoCircle, along: NauticalMiles, turnPoint: NauticalMiles): void {
+        const activeWaypoint = this.memory.navPage.activeWaypoint;
+        if (activeWaypoint.turnPlan !== null
+            || along > turnPoint + this.sensors.in.gps.groundspeed * TURN_DECISION_TIME / HOURS_TO_SECONDS) {
+            return;
+        }
+        const legXtk = Math.abs(UnitType.GA_RADIAN.convertTo(legPath.distance(this.sensors.in.gps.coords), UnitType.NMILE));
+        activeWaypoint.turnPlan = legXtk <= TURN_PLAN_MAX_XTK ? TurnPlan.AT_LEAD : TurnPlan.AT_ABEAM;
+    }
+
+    /**
+     * The waypoint alert of a waypoint with a turn to anticipate (4-8). On the turn plan it starts at the decision, about
+     * 20 s before the turn starts. On the abeam plan it starts WPT_ALERT_ABEAM_TURN before the abeam line, at the closure
+     * rate along the leg, and not while the aircraft does not close on the line (checked in the KLN 89 trainer,
+     * 2026-10-20). It stays on while a turn is flown, also a turn of the previous waypoint (#156)
+     * @param legPath the path of the active leg
+     * @param along the along-track distance to the active waypoint
+     */
+    private isAlertWithTurn(legPath: GeoCircle, along: NauticalMiles): boolean {
+        const activeWaypoint = this.memory.navPage.activeWaypoint;
+        if (activeWaypoint.turnStack.length > 0 || activeWaypoint.turnPlan === TurnPlan.AT_LEAD) {
+            return true;
+        }
+        const track = this.sensors.in.gps.getTrackTrueRespectingGroundspeed();
+        if (activeWaypoint.turnPlan !== TurnPlan.AT_ABEAM || track === null) {
+            return false;
+        }
+        const legDtk = legPath.bearingAt(legPath.closest(this.sensors.in.gps.coords, VEC3_CACHE));
+        const closure = this.sensors.in.gps.groundspeed * Math.cos(UnitType.DEGREE.convertTo(NavMath.diffAngle(legDtk, track), UnitType.RADIAN)) / HOURS_TO_SECONDS;
+        return closure > 0 && along / closure <= WPT_ALERT_ABEAM_TURN;
     }
 
     /**
@@ -438,7 +520,6 @@ export class NavCalculator implements CalcTickable {
         nav.bearingForAP = null;
         nav.toFrom = null;
         nav.waypointAlert = false;
-        this.lastDistanceToTurn = 9999;
     }
 
     private setOutput() {

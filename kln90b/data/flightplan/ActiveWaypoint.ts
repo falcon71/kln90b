@@ -35,9 +35,16 @@ export class TurnStackEntry {
                 /**
                  * Set on the turn circle itself, which ends once the aircraft is past the bisector of the turn and past
                  * switchPoint along pathForDtk (#404). Absent on the stretch of the inbound leg before it, the roll-in,
-                 * which ends at switchPoint
+                 * which ends at switchPoint, and on the abeam turn
                  */
-                public readonly turnBisector?: TurnBisector) {
+                public readonly turnBisector?: TurnBisector,
+                /**
+                 * Non-null marks the abeam turn, a turn of no size at the waypoint (the design,
+                 * docs/superpowers/specs/2026-10-20-waypoint-sequencing-design.md, section 3.3): XTK is abeamTurnSign times
+                 * the distance to the waypoint, -1 for a right turn and +1 for a left turn. No end-of-turn test pops it;
+                 * ActiveWaypoint drops it when the active waypoint changes
+                 */
+                public readonly abeamTurnSign: number | null = null) {
     }
 }
 
@@ -219,6 +226,8 @@ export class ActiveWaypoint {
         if (this.fplIdx !== activeIdx) {
             this.fplIdx = activeIdx;
             this.clearTurnState();
+            //The abeam turn ends with its waypoint, unlike a turn circle, which is still flown onto the next leg
+            this.turnStack = this.turnStack.filter(entry => entry.abeamTurnSign === null);
         }
     }
 

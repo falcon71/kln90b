@@ -755,10 +755,12 @@ describe('a NAV flag and a power-up keep the CDI scale (characterization, #159)'
 });
 
 // 5-33 (item 3): in flight plan operation the next leg becomes active as the aircraft reaches a waypoint; 4-8: with turn
-// anticipation it sequences after the midpoint of the transition. Passing ABC 1.5 NM to the right of the leg, the
-// aircraft never comes within the 20 s alert range of the turn (about 1 NM at 120 kt), and the sequencing with turn
-// anticipation requires the alert. Held positions along a line parallel to the leg, 1.5 NM right of it. Checked in the
-// KLN 89 trainer: a waypoint passed 3.5 NM abeam was sequenced.
+// anticipation it sequences after the midpoint of the transition. Held positions along a line parallel to the leg, 1.5 NM
+// right of it. With turn anticipation the unit decides on the turn plan once the aircraft is past the decision point (20 s
+// before the turn point along the track), because 1.5 NM is within 2.8 NM of the leg, starts the turn at the turn point
+// along the track and sequences past the bisector of the turn, about 0.5 NM past abeam (checked in the KLN 89 trainer,
+// 2026-10-20, #157). Before that, the straight distance to ABC never came within the alert range of the turn
+// (about 1 NM at 120 kt), and the waypoint was never sequenced.
 describe('passing a waypoint off course', () => {
     const abeamPositions = async (unit: HeadlessUnit, kaaa: Facility, abc: Facility) => {
         const leg1 = finalCourseDeg(kaaa, abc);
@@ -775,7 +777,7 @@ describe('passing a waypoint off course', () => {
         expect(activeIdent(unit)).toBe('KBBB');
     });
 
-    it.fails('with turn anticipation the unit sequences to KBBB once ABC is behind (#157)', async () => {
+    it('with turn anticipation the unit sequences to KBBB once ABC is behind (#157)', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
         await abeamPositions(unit, kaaa, abc);
 

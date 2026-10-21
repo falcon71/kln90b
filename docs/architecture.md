@@ -471,12 +471,26 @@ sim.
       standard-rate radius with the bank limited to 25° (`bankeAngleForStandardTurn(gs)`, `services/KLNNavmath.ts`). It
       is capped at 60 s of ground speed (`LEAD_CAP_TIME`) and at half the inbound leg. The inbound leg is the distance
       between the waypoints, along the arc for a DME arc, and from where a Direct To was activated.
-    - The turn starts at the lead plus the roll-in (`distanceToAchieveBankAngleChange`, the bank at 5 deg/s). The trainer
-      adds no roll-in, so this is a deliberate departure: a 1 Hz calculation, autopilot lag, and SimVars that the
-      display shares.
+    - The turn point is the lead plus the roll-in (`distanceToAchieveBankAngleChange`, the bank at 5 deg/s), measured
+      along the track: the along-track distance to the waypoint (`alongTrackDistance`), which on course is the straight
+      distance. The trainer adds no roll-in, so this is a deliberate departure: a 1 Hz calculation, autopilot lag, and
+      SimVars that the display shares.
+    - The turn plan (`ActiveWaypoint.turnPlan`, #157, checked in the KLN 89 trainer, 2026-10-20) is decided once, at the
+      first calculation within `TURN_DECISION_TIME` (20 s) of ground speed before the turn point along the track: with
+      at most `TURN_PLAN_MAX_XTK` (2.8 NM) of cross track to the leg `AT_LEAD`, otherwise `AT_ABEAM`. It is latched
+      until the active waypoint changes, and a leg that becomes active past the decision point is decided at once. The
+      gate and the moment of the decision are known with medium confidence.
+    - On `AT_LEAD` the turn starts at the turn point along the track, whatever the cross track is by then.
+    - On `AT_ABEAM` it starts at the abeam line (TO turns FROM) as the abeam turn, a turn of no size: one
+      `TurnStackEntry` with `abeamTurnSign` set, whose XTK is that sign times the distance to the waypoint (FLY L for a
+      left turn) and whose DTK is the next leg's. No end-of-turn test pops it; `ActiveWaypoint.setActiveIdx` drops it
+      when the active waypoint changes. Roll steering steers on the next leg at once (the aircraft is farther from a
+      circle of no size than its radius). This is the real unit's dogleg: it only happens when a waypoint is passed up
+      to 4 NM off course, and a default autopilot coupled then steers back toward the waypoint until the bisector.
     - A capped turn is flown on the tighter circle that is tangent to both legs at the lead (radius lead / tan(θ/2)). The
       aircraft cannot fly that circle at 25° of bank, so it lags it. An uncapped turn uses the circle of radius r.
-    - At the turn start it pushes two `TurnStackEntry`s: the pre-turn straight segment (the roll-in) and the turn circle.
+    - At the start of the turn plan's turn it pushes two `TurnStackEntry`s: the pre-turn straight segment (the roll-in)
+      and the turn circle.
     - A leg that becomes active inside the lead (a Direct To, a short leg) starts its turn at once and flies it. The
       waypoint is no longer skipped; the #76 skip is gone.
     - The pre-turn segment ends at its switch point: within the tick ahead, or once the distance to the point grows.
@@ -493,17 +507,21 @@ sim.
     - The turn is pushed once per active waypoint: pushing it sets `ActiveWaypoint.ownTurnStarted`, and a turn that
       ended while its waypoint is still active (by the 4.0 NM escape) is not started again (#375).
     - It sequences when the aircraft is past the bisector of the turn (`bisectorSide >= 0`), armed by
-      `ownTurnStarted` (#375, checked in the KLN 89 trainer, 2026-10-20). On course that is the middle of the turn; for a
-      big turn it lies well before the waypoint. It is a state, not a crossing, so an aircraft already past the line when
-      its turn starts sequences at once. It does not read the waypoint alert, so a turn still on the stack from the
-      previous waypoint cannot sequence the next one. Since a turn ends only past the bisector, a turn's normal end comes
-      in or after the calculation that sequences its waypoint.
+      `ownTurnStarted` or the plan `AT_ABEAM` (#375, checked in the KLN 89 trainer, 2026-10-20). On course that is the
+      middle of the turn; for a big turn it lies well before the waypoint. It is a state, not a crossing, so an aircraft
+      already past the line when the test arms sequences at once. On the inside of a turn on the abeam plan that can be
+      before the abeam line, with no turn started (the design's call; not observed in the trainer). It does not read the
+      waypoint alert, so a turn still on the stack from the previous waypoint cannot sequence the next one. Since a turn
+      ends only past the bisector, a turn's normal end comes in or after the calculation that sequences its waypoint.
 - Without turn anticipation, it sequences on FROM.
 - **The MAP is never auto-sequenced.**
-- Waypoint alert thresholds: 20 s before an anticipated turn (`WPT_ALERT_WITH_TURN_ANTI`); before a waypoint without a
-  turn 15 s with turn anticipation on (`WPT_ALERT_NO_TURN_WITH_TURN_ANTI`, #372, measured in the KLN 89 trainer) or 36 s
-  with it off (`WPT_ALERT_WITHOUT_TURN_ANTI`). The alert of a waypoint without a turn ends once the waypoint is behind
-  (FROM), unless a turn is still being flown.
+- Waypoint alert thresholds: on the turn plan from the decision, 20 s before the turn point along the track
+  (`WPT_ALERT_WITH_TURN_ANTI`, which `TURN_DECISION_TIME` equals); on the abeam plan `WPT_ALERT_ABEAM_TURN` (15 s)
+  before the abeam line at the along-track closure rate, none at the decision (checked in the KLN 89 trainer,
+  2026-10-20). Both stay on while a turn is on the stack. Before a waypoint without a turn 15 s with turn anticipation
+  on (`WPT_ALERT_NO_TURN_WITH_TURN_ANTI`, #372, measured in the KLN 89 trainer) or 36 s with it off
+  (`WPT_ALERT_WITHOUT_TURN_ANTI`). The alert of a waypoint without a turn ends once the waypoint is behind (FROM),
+  unless a turn is still being flown.
 - At the end of the tick, after the sequencing, it publishes `navPage.steeringPath`, the path roll steering follows: the
   leg path without a turn (also the OBS leg, an arc's circle and, past a final leg without length, the leg before it),
   the turn circle (`turnStack[0]`) from the start of the lead-in, or the next leg (`pathForDtk`) once the aircraft was
