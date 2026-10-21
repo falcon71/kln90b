@@ -1,7 +1,6 @@
 # Waypoint sequencing and turn anticipation: design
 
-Date: 2026-10-20. Issues: #375, #157, and a new issue for the lead limits (a follow-up of the closed #76, filed once this
-design is approved). Branch: `investigate-375-157`.
+Date: 2026-10-20. Issues: #375, #157 and #404 (the lead limits, a follow-up of the closed #76). Branch: `investigate-375-157`.
 
 This document says how the unit decides when to start an anticipated turn and when to change the active waypoint, so
 that it matches the KLN 89 trainer, and why. It replaces the sequencing part of `NavCalculator.tick`.
@@ -119,8 +118,10 @@ What a flip does to a turn already in progress (the maintainer's lead's calls; t
 - **Sequencing** (the active waypoint changes): when the aircraft **crosses the bisector** of the turn, the line
   through the waypoint that halves the angle between the two legs, from either side. On course this is the midpoint of
   the turn, as today; for big turns it is well before the waypoint (3.2 NM for 171° at 239 kt in the trainer). The
-  crossing is the change of sign of the aircraft's signed distance to that line between two ticks. If the aircraft
-  crosses the bisector before a turn has started (possible on the inside of a turn on the abeam plan, not observed in
+  test is a state, not a change between two ticks: the aircraft's signed distance to that line is at least 0. It is
+  armed once the waypoint's own turn has started, or on the abeam plan, so an aircraft already past the line when the
+  test arms sequences at once instead of never (written in the plan, 2026-10-21). If the aircraft crosses the bisector
+  before a turn has started (possible on the inside of a turn on the abeam plan, not observed in
   the trainer; its one inside pass within 4 NM, T2, took the turn plan), it sequences there too, the same as off the
   leg (the maintainer's lead's call).
 - This replaces the abeam test "alert on and distance no longer falling", which is what #375 trips over. The new test
@@ -165,7 +166,7 @@ radius, it steers on the next leg (`steerOnPathForDtk`); a zero-radius circle th
   issues are intertwined: the fixes may land in a single commit, or in several commits that each reference any of the
   issues (`references #NN`). Each issue still gets its `fixes #NN` in the commit that completes its fix, so that
   GitHub closes it. Every commit carries its tests and doc changes and leaves the suite green. A sensible split, if
-  the builder wants one, follows the dependencies: the lead limits (section 3.1), then the bisector sequencing (#375),
+  the builder wants one, follows the dependencies: the lead limits (#404, section 3.1), then the bisector sequencing (#375),
   then the off-course rules and alerts (#157), each building on the one before.
 
   The pinned test `skippedLeg.test.ts` (#375) and the #157 pin in `test/render/data/navdata/NavCalculator.test.ts`
