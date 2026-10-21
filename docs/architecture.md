@@ -516,7 +516,8 @@ sim.
 - Without turn anticipation, it sequences on FROM.
 - **The MAP is never auto-sequenced.**
 - Waypoint alert thresholds: on the turn plan from the decision, 20 s before the turn point along the track
-  (`WPT_ALERT_WITH_TURN_ANTI`, which `TURN_DECISION_TIME` equals); on the abeam plan `WPT_ALERT_ABEAM_TURN` (15 s)
+  (`WPT_ALERT_WITH_TURN_ANTI`, which `TURN_DECISION_TIME` equals), while the aircraft is TO the waypoint (so it ends
+  past the MAP, where no turn is started); on the abeam plan `WPT_ALERT_ABEAM_TURN` (15 s)
   before the abeam line at the along-track closure rate, none at the decision (checked in the KLN 89 trainer,
   2026-10-20). Both stay on while a turn is on the stack. Before a waypoint without a turn 15 s with turn anticipation
   on (`WPT_ALERT_NO_TURN_WITH_TURN_ANTI`, #372, measured in the KLN 89 trainer) or 36 s with it off

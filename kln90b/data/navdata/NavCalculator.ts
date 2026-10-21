@@ -402,7 +402,9 @@ export class NavCalculator implements CalcTickable {
 
     /**
      * The waypoint alert of a waypoint with a turn to anticipate (4-8). On the turn plan it starts at the decision, about
-     * 20 s before the turn starts. On the abeam plan it starts WPT_ALERT_ABEAM_TURN before the abeam line, at the closure
+     * 20 s before the turn starts, and holds while the aircraft is TO the waypoint: without a turn (at the MAP, or when
+     * the aircraft turned away before the turn point) it ends once the waypoint is behind, as before the plan. On the
+     * abeam plan it starts WPT_ALERT_ABEAM_TURN before the abeam line, at the closure
      * rate along the leg, and not while the aircraft does not close on the line (checked in the KLN 89 trainer,
      * 2026-10-20). It stays on while a turn is flown, also a turn of the previous waypoint (#156)
      * @param legPath the path of the active leg
@@ -410,8 +412,11 @@ export class NavCalculator implements CalcTickable {
      */
     private isAlertWithTurn(legPath: GeoCircle, along: NauticalMiles): boolean {
         const activeWaypoint = this.memory.navPage.activeWaypoint;
-        if (activeWaypoint.turnStack.length > 0 || activeWaypoint.turnPlan === TurnPlan.AT_LEAD) {
+        if (activeWaypoint.turnStack.length > 0) {
             return true;
+        }
+        if (activeWaypoint.turnPlan === TurnPlan.AT_LEAD) {
+            return this.memory.navPage.toFrom === TO;
         }
         const track = this.sensors.in.gps.getTrackTrueRespectingGroundspeed();
         if (activeWaypoint.turnPlan !== TurnPlan.AT_ABEAM || track === null) {

@@ -36,6 +36,11 @@ const DP = TP + GS * 20 / 3600;
 const TICK_NM = GS / 3600;
 /** The aircraft's position against the GPS position the calculation used */
 const POSITION_TOLERANCE_NM = 0.02;
+/**
+ * The along-track distance measured at the GPS position the last calculation used, which the sensors read first in each
+ * calculation tick and keep until the next: its tolerance is that of the planar measure only
+ */
+const GPS_TOLERANCE_NM = 0.003;
 
 const W_POS: LatLon = {lat: 47.5, lon: 8.9};
 
@@ -50,6 +55,8 @@ function at(alongBeforeNm: number, xtkRightNm: number): LatLon {
 
 /** The distance before WWW along the inbound course, measured in the plane (negative past WWW) */
 const alongBefore = (pos: LatLon) => -distanceNm(W_POS, pos) * Math.cos((courseDeg(W_POS, pos) - INBOUND) * DEG);
+/** alongBefore at the GPS position the unit's last calculation used */
+const gpsAlongBefore = (flight: Flight) => alongBefore(flight.unit.props.sensors.in.gps.coords);
 /** The cross track to the inbound leg, positive right of it (the outside of the turn) */
 const xtkRight = (pos: LatLon) => crossTrackNm(pos, W_POS, INBOUND);
 /**
@@ -176,9 +183,11 @@ describe('the turn start off course on the leg (#157)', () => {
             return flight.nav.waypointAlert || flight.nav.activeIdent !== 'WWW';
         }, {timeout: 120, description: 'the alert at WWW'});
         expect(flight.nav.activeIdent).toBe('WWW');
-        const alertAlong = alongBefore(flight.aircraft);
-        expect(alertAlong).toBeGreaterThanOrEqual(0.93);
-        expect(alertAlong).toBeLessThanOrEqual(1.06);
+        // Within the calculation tick after the along-track distance came within 15 s, measured at the GPS position the
+        // calculation used: (15 - 1) s to 15 s of flight before the abeam line on the parallel
+        const alertAlong = gpsAlongBefore(flight);
+        expect(alertAlong).toBeGreaterThanOrEqual(15 * TICK_NM - TICK_NM - GPS_TOLERANCE_NM);
+        expect(alertAlong).toBeLessThanOrEqual(15 * TICK_NM + GPS_TOLERANCE_NM);
         expect(Math.abs(xtkRight(flight.aircraft)), 'well below the gate at the alert').toBeLessThan(1.0);
 
         // The turn starts at the abeam line, within one calculation of it. It is measured where the turn goes onto the
@@ -230,9 +239,10 @@ describe('the turn start off course on the leg (#157)', () => {
         expect(flight.nav.activeIdent).toBe('WWW');
         expect(aw.turnPlan).toBe(TurnPlan.AT_ABEAM);
         const closureNm = GS * Math.cos(30 * DEG) / 3600;
-        const alertAlong = alongBefore(flight.aircraft);
-        expect(alertAlong).toBeGreaterThanOrEqual(15 * closureNm - closureNm - POSITION_TOLERANCE_NM);
-        expect(alertAlong).toBeLessThanOrEqual(15 * closureNm + POSITION_TOLERANCE_NM);
+        // Measured at the GPS position the calculation used, as in the previous test
+        const alertAlong = gpsAlongBefore(flight);
+        expect(alertAlong).toBeGreaterThanOrEqual(15 * closureNm - closureNm - GPS_TOLERANCE_NM);
+        expect(alertAlong).toBeLessThanOrEqual(15 * closureNm + GPS_TOLERANCE_NM);
     });
 
     it('gives the abeam turn of a right turn the FLY R sign', async () => {
@@ -246,6 +256,28 @@ describe('the turn start off course on the leg (#157)', () => {
         expect(flight.nav.activeIdent).toBe('WWW');
         expect(flight.nav.xtkNm!).toBeLessThan(0);
         expect(Math.abs(flight.nav.xtkNm! + distanceNm(flight.aircraft, W_POS))).toBeLessThan(0.02);
+    });
+
+    it('arms the bisector of the turn plan only once its turn has started (the design, section 3.3)', async () => {
+        // A 150° left turn (onto 275) at 239 kt, passed parallel 2.0 NM inside: the turn plan. The lead is capped at 60 s,
+        // 3.98 NM, so the turn point is 4.31 NM and the decision point 5.64 NM before WWW. The inside bisector ray (260)
+        // lies a · tan 15° from the leg, 1.51 NM at the decision point and 1.16 NM at the turn point, so the aircraft is
+        // past it from 7.5 NM before WWW on: WWW is sequenced where the turn starts, not at the decision
+        const lead = GS * 60 / 3600;
+        const tp = lead + rollInNm(GS);
+        expect(lead).toBeLessThan(leadNm(GS, 150)); // Precondition: capped
+        const {flight, aw} = await boot([at(12, -2.0), at(-20, -2.0)], trackPilot(-100, INBOUND, INBOUND), INBOUND - 150 + 360);
+        await flight.flyUntil(() => aw.turnPlan !== null || flight.nav.activeIdent !== 'WWW', {timeout: 300, description: 'the decision at WWW'});
+        expect(flight.nav.activeIdent).toBe('WWW');
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
+
+        await flight.flyUntil(() => flight.nav.activeIdent !== 'WWW', {timeout: 120, description: 'WWW sequenced'});
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        const along = gpsAlongBefore(flight);
+        expect(along).toBeGreaterThanOrEqual(tp - GPS_TOLERANCE_NM);
+        expect(along).toBeLessThanOrEqual(tp + TICK_NM + GPS_TOLERANCE_NM);
+        // The turn was started: it is on the stack and flown onto the leg to KBBB
+        expect(turnStackLength(flight.unit)).toBeGreaterThan(0);
     });
 
     it('sequences on the abeam plan on the inside past the bisector, before the abeam line (the maintainer\'s lead\'s call)', async () => {

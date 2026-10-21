@@ -236,7 +236,10 @@ const BASELINE: Record<string, Metrics> = {
     S9: {firstBankSign: -1, reversals: 0, overshootNm: 0, maxXtkEstablishedNm: 0.779, captureS: 0},
     // At the DTK switch the next leg's course (200) lies 165° left of the track (005): the turn at ABC is to the right,
     // the shorter way from the track to the left. The command starts left (+29.7) and changes direction four times
-    // before a left turn onto the leg
+    // before a left turn onto the leg. Flown with the old controller from the old placement, 2.0 NM before the aim point,
+    // where the old rule started the turn by the straight distance about 1.7 NM inside the leg; S10 is now placed 0.6 NM
+    // before it (#157, see turnStartOnInterceptInside), and its turn starts about 2.5 NM inside. The bounds are still
+    // these numbers
     S10: {firstBankSign: 1, reversals: 4, overshootNm: 0.238, maxXtkEstablishedNm: 0.238, captureS: 45},
 };
 
@@ -329,7 +332,9 @@ const CAPPED_150_RADIUS_NM = CAPPED_150_LEAD_NM / Math.tan(75 * Math.PI / 180);
  * #157), with the aircraft about 2.5 NM inside the inbound leg, outside the turn circle on its far side by more than its
  * radius. Placed 2 NM before the aim point, as before #157, the aircraft would pass the decision point 3.3 NM right of
  * the leg and take the abeam plan; inside this turn it is past the bisector there, so ABC would be sequenced without a
- * turn. The start event is the DTK switch, the target the leg ABC - KBBB. `fallback` reports whether NavCalculator
+ * turn. The stored BASELINE of S10 was flown from that old placement with the old controller; the placement moved
+ * because the old one no longer starts a turn, and the comparison keeps the baseline's numbers (the controller's ruling,
+ * 2026-10-21). The start event is the DTK switch, the target the leg ABC - KBBB. `fallback` reports whether NavCalculator
  * steers on the next leg at the start event (the roll steering design, section 4A).
  */
 function turnStartOnInterceptInside(durationS: number): Scenario {

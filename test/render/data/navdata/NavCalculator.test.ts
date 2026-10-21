@@ -491,6 +491,23 @@ describe('no sequencing past the MAP (6-7)', () => {
         expect(activeIdent(unit)).toBe('MAPAA');
     });
 
+    // The alert of the turn plan holds while the aircraft is TO the waypoint or a turn is flown. No turn is ever started at
+    // the MAP, so past it (FROM) the alert ends, as it did before the turn plan (4-8, #157): it stayed on for the whole
+    // missed approach while the plan decided for the MAP was latched
+    it('with turn anticipation: the waypoint alert ends past the MAP', async () => {
+        const {unit, mapaa} = await onFinal({});
+
+        await moveAircraft(unit, pointFrom(mapaa, 0, 0.7), {groundspeedKt: 120, trackTrue: 180});
+        expect(nav(unit).waypointAlert).toBe(true); // Precondition: the alert of the turn at the MAP
+
+        for (const pastNm of [2, 5]) {
+            await moveAircraft(unit, pointFrom(mapaa, 180, pastNm), {groundspeedKt: 120, trackTrue: 180});
+            expect(activeIdent(unit)).toBe('MAPAA');
+            expect(nav(unit).toFrom).toBe(false); // FROM
+            expect(nav(unit).waypointAlert, `${pastNm} NM past the MAP`).toBe(false);
+        }
+    });
+
     it('without turn anticipation: MAPAA stays active past the MAP', async () => {
         const {unit, mapaa} = await onFinal({turnAnticipation: false});
 
