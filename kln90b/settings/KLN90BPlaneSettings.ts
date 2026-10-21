@@ -7,6 +7,12 @@ import {LVAR_ELECTRICITY_INDEX, LVAR_GPS_SIMVARS, LVAR_HEADING_INPUT, LVAR_OBS_S
  */
 export const ELECTRICITY_INDEX = /:(\d+)$/;
 
+/**
+ * The heading SimVar of Input.HeadingInput true. A string in the key names another one, for aircraft with their own gyro
+ * simulation (#405)
+ */
+export const DEFAULT_HEADING_SIMVAR = 'PLANE HEADING DEGREES GYRO';
+
 export const enum FuelUnit {
     GAL = "GAL",
     IMP = "IMP",
@@ -30,6 +36,7 @@ export interface KLN90PlaneSettings {
         altimeterInterfaced: boolean; //example for no input: https://youtu.be/S1lt2W95bLA?t=176
         obsSource: number;
         headingInput: boolean;
+        headingSimVar: string; //Read in degrees while headingInput is set
         electricitySimVar: string,
         airdata: {
             isInterfaced: boolean,
@@ -79,6 +86,7 @@ export class KLN90BPlaneSettingsParser {
         this.problems = [];
 
         const instrumentsTag = this.getKLNInstrumentsTag(xmlConfig);
+        const headingSimVar = this.getHeadingSimVar(instrumentsTag, "Input.HeadingInput");
 
         const options: KLN90PlaneSettings = {
             takeHomeMode: this.getBoolean(instrumentsTag, "TakeHomeMode", false),
@@ -87,7 +95,8 @@ export class KLN90BPlaneSettingsParser {
             input: {
                 altimeterInterfaced: this.getBoolean(instrumentsTag, "Input.AltimeterInterfaced", true),
                 obsSource: this.getChoice(instrumentsTag, "Input.ObsSource", OBS_DEVICES, 1),
-                headingInput: this.getBoolean(instrumentsTag, "Input.HeadingInput", false),
+                headingInput: headingSimVar !== null,
+                headingSimVar: headingSimVar ?? DEFAULT_HEADING_SIMVAR,
                 electricitySimVar: this.getString(instrumentsTag, "Input.ElectricitySimVar", "").trim(), //A pretty-printed element ends in whitespace, which would hide the index
                 airdata: {
                     isInterfaced: this.getBoolean(instrumentsTag, "Input.Airdata.IsInterfaced", false),
@@ -172,6 +181,30 @@ export class KLN90BPlaneSettingsParser {
             default:
                 return this.reject(key, text, "true or false", defaultvalue);
         }
+    }
+
+    /**
+     * true for the default heading SimVar, false for none, or the name of a SimVar (#405). A name starts with a letter
+     * and has a space (HEADING INDICATOR) or a prefix (L:MY_HEADING), so a misspelled boolean like True, flase or 1 is
+     * still rejected instead of switching the input on. A name may not end in a colon (L:)
+     * @returns The SimVar, or null without a heading input
+     */
+    private getHeadingSimVar(element: Element | null, key: string): string | null {
+        const text = this.getText(element, key)?.trim();
+        if (text === undefined) {
+            return null;
+        }
+        switch (text) {
+            case "true":
+                return DEFAULT_HEADING_SIMVAR;
+            case "false":
+                return null;
+        }
+        if (!/^[A-Za-z]/.test(text) || !/[ :]/.test(text) || text.endsWith(":")) {
+            this.reject(key, text, "true, false or a SimVar", false);
+            return null;
+        }
+        return text;
     }
 
     /**

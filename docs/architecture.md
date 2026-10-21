@@ -192,8 +192,9 @@ calls `in.reset()` and `out.reset()`, and on a power-off also `out.setPoweredOff
 
 - `GPS DRIVES NAV1`. When it is true, it reads `Nav OBS:{1|2}` according to `Input.ObsSource`. When it is false,
   `obsMag = null` ("the manual implies" OBS can only be read when the GPS is the nav source).
-- `PLANE HEADING DEGREES GYRO` while `input.headingInput` is set (`Input.HeadingInput` or `L:KLN90B_HeadingInput`), null
-  otherwise (#368).
+- `input.headingSimVar` while `input.headingInput` is set (`Input.HeadingInput` or `L:KLN90B_HeadingInput`), null
+  otherwise (#368). It is `PLANE HEADING DEGREES GYRO` for `Input.HeadingInput` true, or the SimVar an aircraft with
+  its own gyro names in the key instead (#405); the LVar switches the input but keeps the SimVar.
 - Then `gps.tick()`, `fuelComputer.tick()` and `airdata.tick()`.
 
 `FuelComputer` (only if `Input.FuelComputer.IsInterfaced`) reads `FUEL TOTAL QUANTITY WEIGHT EX1`, `ENG FUEL FLOW PPH:n`
@@ -752,7 +753,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - It finds the `<Instrument>` whose `<Name>` is `KLN90B` and reads dotted paths with `getBoolean`, `getChoice` or
   `getString(tag, "Input.Airdata.IsInterfaced", default)`. A boolean must be exactly `true` or `false`, and a choice key
   (`ObsSource`, `ObsTarget`, `BaroSource`, `Unit`, `Type`) one of its documented values, both after trimming the
-  whitespace around them. `BasePath` and `ElectricitySimVar` are free text.
+  whitespace around them. `BasePath` and `ElectricitySimVar` are free text. `Input.HeadingInput` (`getHeadingSimVar`)
+  is `true`, `false` or a SimVar name (#405): a name starts with a letter, has a space or a colon and does not end in a
+  colon, so a misspelled boolean is still rejected.
 - An invalid value is never used (#145): the key gets its default, and the parser records one line in `problems`. So
   does `AppArmSwitchInstalled=true` on a `VFROnly` unit, which cannot have the switch (Installation Manual 2-6); the
   switch falls back to false. `KLN90BCore` publishes the lines as `panelXmlErrors`, and `controls/PanelXmlErrorPage`
@@ -766,7 +769,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `VFROnly` = false
     - `Input.AltimeterInterfaced` = true
     - `Input.ObsSource` = 1
-    - `Input.HeadingInput` = false
+    - `Input.HeadingInput` = false (true reads `PLANE HEADING DEGREES GYRO`; a SimVar name reads that SimVar, #405)
     - `Input.ElectricitySimVar` = `""`
     - `Input.Airdata.{IsInterfaced=false, BaroSource=0}`
     - `Input.FuelComputer.{IsInterfaced=false, Unit=GAL, Type=AVGAS, FOBTransmitted=true, FuelUsedTransmitted=true}`

@@ -32,7 +32,7 @@ export const LVAR_DISABLE = "L:KLN90B_Disabled"; // Set to 1 to disable this dev
 export const LVAR_OBS_SOURCE = "L:KLN90B_ObsSource"; // Changes Input.ObsSource from the panel.xml on the fly
 export const LVAR_ELECTRICITY_INDEX = "L:KLN90B_ElectricitySimVarIndex"; // Changes the index of Input.ElectricitySimVar from the panel.xml on the fly
 export const LVAR_OBS_TARGET = "L:KLN90B_ObsTarget"; // Changes Output.ObsTarget from the panel.xml on the fly
-export const LVAR_HEADING_INPUT = "L:KLN90B_HeadingInput"; // Changes Input.HeadingInput from the panel.xml on the fly. Roll steering and HDG up on NAV 5 and Super NAV 5 need it
+export const LVAR_HEADING_INPUT = "L:KLN90B_HeadingInput"; // Changes Input.HeadingInput from the panel.xml on the fly. Roll steering and HDG up on NAV 5 and Super NAV 5 need it. The heading SimVar named in Input.HeadingInput is kept
 export const LVAR_GPS_SIMVARS = "L:KLN90B_WriteGpsSimvars"; // Changes Output.WriteGPSSimVars from the panel.xml on the fly
 
 

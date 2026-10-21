@@ -7,6 +7,7 @@ import {showSuperNav5, SuperNav5} from '../harness/render/superNav5';
 import {bootOnStandardRoute} from '../harness/worldBoot';
 import {standardRoute} from '../harness/fixtures';
 import {courseDeg, pointBefore, pointFrom} from '../harness/flight/geo';
+import {panelXml} from '../harness/panelXml';
 
 // Public contract (LVars.ts, the wiki page panel.xml customization): L:KLN90B_HeadingInput is the runtime override of
 // Input.HeadingInput, synced like L:KLN90B_ObsSource (SimVarSync.test.ts)
@@ -42,6 +43,45 @@ describe('L:KLN90B_HeadingInput (public contract)', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBeGreaterThan(0); // left bank, toward the leg
+    });
+});
+
+// #405: an aircraft with its own gyro simulation names the heading SimVar in Input.HeadingInput instead of true. The
+// unit reads that one and not PLANE HEADING DEGREES GYRO, also after L:KLN90B_HeadingInput switched the input off and on
+describe('Input.HeadingInput with a SimVar (public contract, #405)', () => {
+    it('reads the heading from the named SimVar', async () => {
+        const unit = await bootUnit({panelXml: panelXml({'Input.HeadingInput': 'L:MY_GYRO_HEADING'})});
+        await settle(unit);
+        unit.env.sim.set('PLANE HEADING DEGREES GYRO', 'degrees', 123);
+        unit.env.sim.set('L:MY_GYRO_HEADING', 'degrees', 77);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.sensors.in.headingGyro).toBe(77);
+    });
+
+    it('keeps the named SimVar when the input is switched off and on at runtime (#368)', async () => {
+        const unit = await bootUnit({panelXml: panelXml({'Input.HeadingInput': 'L:MY_GYRO_HEADING'})});
+        await settle(unit);
+        unit.env.sim.set('PLANE HEADING DEGREES GYRO', 'degrees', 123);
+        unit.env.sim.set('L:MY_GYRO_HEADING', 'degrees', 77);
+        unit.env.sim.set('L:KLN90B_HeadingInput', 'bool', 0);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(unit.props.sensors.in.headingGyro).toBeNull();
+
+        unit.env.sim.set('L:KLN90B_HeadingInput', 'bool', 1);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.sensors.in.headingGyro).toBe(77);
+    });
+
+    it('still reads PLANE HEADING DEGREES GYRO for true', async () => {
+        const unit = await bootUnit({panelXml: panelXml({'Input.HeadingInput': true})});
+        await settle(unit);
+        unit.env.sim.set('PLANE HEADING DEGREES GYRO', 'degrees', 123);
+        unit.env.sim.set('L:MY_GYRO_HEADING', 'degrees', 77);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.sensors.in.headingGyro).toBe(123);
     });
 });
 

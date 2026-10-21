@@ -16,7 +16,7 @@ const sample = readFileSync('cfg/panel.xml', 'utf8');
 const DEFAULTS = {
     takeHomeMode: false, basePath: 'html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B', debugMode: false, vfrOnly: false,
     input: {
-        altimeterInterfaced: true, obsSource: 1, headingInput: false, electricitySimVar: '',
+        altimeterInterfaced: true, obsSource: 1, headingInput: false, headingSimVar: 'PLANE HEADING DEGREES GYRO', electricitySimVar: '',
         airdata: {isInterfaced: false, baroSource: 0},
         fuelComputer: {isInterfaced: false, unit: 'GAL', type: 'Avgas', fobTransmitted: true, fuelUsedTransmitted: true},
         externalSwitches: {legObsSwitchInstalled: false, appArmSwitchInstalled: false},
@@ -154,6 +154,27 @@ describe('panel.xml parser', () => {
         });
     });
 
+    // #405: Input.HeadingInput takes the name of a SimVar instead of true, for aircraft with their own gyro simulation.
+    // true keeps PLANE HEADING DEGREES GYRO (DEFAULTS, so the table above holds it), and a name switches the input on
+    describe('Input.HeadingInput with a SimVar (#405)', () => {
+        it.each(['L:MY_GYRO_HEADING', 'HEADING INDICATOR:2', 'A:PLANE HEADING DEGREES MAGNETIC'])('reads %s as the heading SimVar', name => {
+            const expected = withField('input.headingInput', true);
+            expected.input.headingSimVar = name;
+
+            expect(parse(kln(`<Input><HeadingInput>${name}</HeadingInput></Input>`))).toEqual(expected);
+            expect(simEnv().sim.lastWrite('L:KLN90B_HeadingInput')!.value).toBe(1);
+        });
+
+        it('trims the whitespace around the name', () => {
+            expect(parse(kln('<Input><HeadingInput>\n    L:MY_GYRO_HEADING\n</HeadingInput></Input>')).input.headingSimVar).toBe('L:MY_GYRO_HEADING');
+        });
+
+        it('keeps the default SimVar for false', () => {
+            expect(parse(kln('<Input><HeadingInput>false</HeadingInput></Input>'))).toEqual(DEFAULTS);
+            expect(simEnv().sim.lastWrite('L:KLN90B_HeadingInput')!.value).toBe(0);
+        });
+    });
+
     // Contract: LVars.ts doc comments ("Changes ... from the panel.xml on the fly") and the wiki's "synced with" notes.
     // The parser seeds these LVars, which aircraft may then override at runtime.
     describe('LVar writes', () => {
@@ -234,7 +255,15 @@ describe('panel.xml parser', () => {
 
         it.each([
             ['<VFROnly>True</VFROnly>', 'VFROnly: "True" is not true or false. The default false is used.'],
-            ['<Input><HeadingInput>1</HeadingInput></Input>', 'Input.HeadingInput: "1" is not true or false. The default false is used.'],
+            ['<Input><HeadingInput>1</HeadingInput></Input>', 'Input.HeadingInput: "1" is not true, false or a SimVar. The default false is used.'],
+            ['<Input><HeadingInput>True</HeadingInput></Input>', 'Input.HeadingInput: "True" is not true, false or a SimVar. The default false is used.'],
+            ['<Input><HeadingInput>FALSE</HeadingInput></Input>', 'Input.HeadingInput: "FALSE" is not true, false or a SimVar. The default false is used.'],
+            ['<Input><HeadingInput></HeadingInput></Input>', 'Input.HeadingInput: "" is not true, false or a SimVar. The default false is used.'],
+            ['<Input><HeadingInput>:MY_GYRO</HeadingInput></Input>', 'Input.HeadingInput: ":MY_GYRO" is not true, false or a SimVar. The default false is used.'],
+            ['<Input><HeadingInput>flase</HeadingInput></Input>', 'Input.HeadingInput: "flase" is not true, false or a SimVar. The default false is used.'],
+            ['<Input><HeadingInput>no</HeadingInput></Input>', 'Input.HeadingInput: "no" is not true, false or a SimVar. The default false is used.'],
+            ['<Input><HeadingInput>L:</HeadingInput></Input>', 'Input.HeadingInput: "L:" is not true, false or a SimVar. The default false is used.'],
+            ['<Input><HeadingInput>HEADING INDICATOR:</HeadingInput></Input>', 'Input.HeadingInput: "HEADING INDICATOR:" is not true, false or a SimVar. The default false is used.'],
             ['<Input><AltimeterInterfaced></AltimeterInterfaced></Input>', 'Input.AltimeterInterfaced: "" is not true or false. The default true is used.'],
             ['<Output><WriteGPSSimVars>yes</WriteGPSSimVars></Output>', 'Output.WriteGPSSimVars: "yes" is not true or false. The default true is used.'],
             ['<Input><ObsSource>one</ObsSource></Input>', 'Input.ObsSource: "one" is not one of 0, 1, 2. The default 1 is used.'],

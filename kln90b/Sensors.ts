@@ -236,7 +236,7 @@ export class SensorsIn implements CalcTickable {
         }
 
         if (this.options.input.headingInput) {
-            this.headingGyro = SimVar.GetSimVarValue('PLANE HEADING DEGREES GYRO', SimVarValueType.Degree);
+            this.headingGyro = SimVar.GetSimVarValue(this.options.input.headingSimVar, SimVarValueType.Degree); //PLANE HEADING DEGREES GYRO unless the aircraft names its own (#405)
         } else {
             this.headingGyro = null; //The input can be switched off at runtime (#368)
         }
