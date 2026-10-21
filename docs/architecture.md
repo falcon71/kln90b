@@ -463,12 +463,26 @@ sim.
 - In OBS mode there is no sequencing (5-35); the waypoint alert is still computed, as for a waypoint without a turn
   (#147).
 - Sequencing (not in OBS mode, GS > 2):
-    - With `turnAnticipation` on and the waypoint not fly-over or duplicated, it computes the turn radius from
-      `bankeAngleForStandardTurn(gs)` (`services/KLNNavmath.ts`; it assumes 5 deg/s roll rate,
-      `distanceToAchieveBankAngleChange`).
-    - At the turn start it pushes two `TurnStackEntry`s (the pre-turn straight segment and the turn circle).
+    - With `turnAnticipation` on and the waypoint not fly-over or duplicated, it takes the lead from `turnLead`
+      (`SequencingGeometry.ts`, #404, checked in the KLN 89 trainer, 2026-10-20). The lead is r·tan(θ/2), where r is the
+      standard-rate radius with the bank limited to 25° (`bankeAngleForStandardTurn(gs)`, `services/KLNNavmath.ts`). It
+      is capped at 60 s of ground speed (`LEAD_CAP_TIME`) and at half the inbound leg. The inbound leg is the distance
+      between the waypoints, along the arc for a DME arc, and from where a Direct To was activated.
+    - The turn starts at the lead plus the roll-in (`distanceToAchieveBankAngleChange`, the bank at 5 deg/s). The trainer
+      adds no roll-in, so this is a deliberate departure: a 1 Hz calculation, autopilot lag, and SimVars that the
+      display shares.
+    - A capped turn is flown on the tighter circle that is tangent to both legs at the lead (radius lead / tan(θ/2)). The
+      aircraft cannot fly that circle at 25° of bank, so it lags it. An uncapped turn uses the circle of radius r.
+    - At the turn start it pushes two `TurnStackEntry`s: the pre-turn straight segment (the roll-in) and the turn circle.
+    - A leg that becomes active inside the lead (a Direct To, a short leg) starts its turn at once and flies it. The
+      waypoint is no longer skipped; the #76 skip is gone.
+    - The pre-turn segment ends at its switch point: within the tick ahead, or once the distance to the point grows.
+    - The turn circle carries the turn's bisector (`TurnStackEntry.turnBisector`). It ends once the aircraft is on the
+      next leg's side of the bisector and past the circle's end point (the lead past the waypoint) along the next leg,
+      within the tick ahead. It also ends when the aircraft is more than `OFF_LEG_XTK` (4.0 NM) from the next leg.
+    - The bisector condition keeps a turn near 180° from ending where it starts, and the end-point condition keeps a
+      lagging aircraft from ending the turn as it moves away from the end point at first.
     - It sequences when the plane is abeam (the distance starts increasing).
-    - If the turn is too tight, it sequences immediately ("like KLN 89 trainer", fix #76).
 - Without turn anticipation, it sequences on FROM.
 - **The MAP is never auto-sequenced.**
 - Waypoint alert thresholds: 20 s before an anticipated turn (`WPT_ALERT_WITH_TURN_ANTI`); before a waypoint without a

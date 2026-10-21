@@ -1,7 +1,7 @@
 import {CalcTickable, TICK_TIME_CALC} from "../../TickController";
 import {Sensors} from "../../Sensors";
 import {FROM, TO, VolatileMemory} from "../VolatileMemory";
-import {FlightPathUtils, GeoCircle, GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
+import {FlightPathUtils, GeoCircle, GeoPoint, LatLonInterface, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Degrees, NauticalMiles, Seconds} from "../Units";
 import {ModeController} from "../../services/ModeController";
@@ -10,7 +10,8 @@ import {KLNMagvar} from "./KLNMagvar";
 import {calcDistToDestination} from "../../services/FlightplanUtils";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {bankeAngleForStandardTurn, distanceToAchieveBankAngleChange} from "../../services/KLNNavmath";
-import {TurnStackEntry} from "../flightplan/ActiveWaypoint";
+import {FromLeg, TurnBisector, TurnStackEntry} from "../flightplan/ActiveWaypoint";
+import {alongTrackDistance, bisectorSide, turnLead} from "./SequencingGeometry";
 
 
 //4-8
@@ -24,8 +25,16 @@ export const HOURS_TO_SECONDS = 3600;
 
 const VEC3_CACHE = new Float64Array(3);
 const TO_GEOPOINT_CACHE = new GeoPoint(0, 0);
+const ARC_FROM_CACHE = new GeoPoint(0, 0);
+const ARC_TO_CACHE = new GeoPoint(0, 0);
 
 export const MAX_BANK_ANGLE = 25;
+
+/**
+ * The cross track to a leg beyond which the aircraft counts as off the leg (checked in the KLN 89 trainer, 2026-10-20:
+ * the unit compares |XTK| to the active leg against a fixed 4.0 NM at both speeds)
+ */
+export const OFF_LEG_XTK: NauticalMiles = 4.0;
 
 
 /**
@@ -132,9 +141,10 @@ export class NavCalculator implements CalcTickable {
         //Special handling for turns
         if (nav.activeWaypoint.turnStack.length > 0) {
             const turnStackEntry = nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1];
+            const tickDistance = this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC;
             const distFromCurrent = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(turnStackEntry.switchPoint), UnitType.NMILE);
-            if (distFromCurrent <= this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC
-                || distFromCurrent > this.lastTurnStackDistance!) {
+            if (turnStackEntry.turnBisector !== undefined ? this.isPastEndOfTurn(turnStackEntry, turnStackEntry.turnBisector, tickDistance)
+                : distFromCurrent <= tickDistance || distFromCurrent > this.lastTurnStackDistance!) {
                 console.debug("Reached end of turn", distFromCurrent, this.lastTurnStackDistance, nav.activeWaypoint.turnStack);
                 //We have reached the end of the turn, XTK will now use the normal leg again
                 nav.activeWaypoint.turnStack.pop();
@@ -198,7 +208,6 @@ export class NavCalculator implements CalcTickable {
                 && !TO_GEOPOINT_CACHE.equals(followingLeg.wpt))  //Based on the KLN 89 trainer, it will overfly the waypoint, if it is duplicated
             {
                 const desiredBankAngle = bankeAngleForStandardTurn(this.sensors.in.gps.groundspeed);
-                const turnRadius = UnitType.METER.convertTo(NavMath.turnRadius(this.sensors.in.gps.groundspeed, desiredBankAngle), UnitType.NMILE);
                 const fromDtk = fromLeg.path.bearingAt(fromLeg.path.closest(toLeg.wpt, VEC3_CACHE)); //Important for DME arcs, we need the DTK at the end of the arc, not the current one. Also helps for very long GC legs
 
                 let nextDtk: number;
@@ -211,42 +220,41 @@ export class NavCalculator implements CalcTickable {
                     nextDtk = toLeg.arcData.circle.bearingAt(toLeg.arcData.entryFacility);
                 }
                 const turnAngle = Math.abs(NavMath.diffAngle(fromDtk, nextDtk));
-                const turnAnticipationDistance = turnRadius * Math.tan((turnAngle / 2) * Avionics.Utils.DEG2RAD);
-                const distanceToTurn = nav.distToActive - turnAnticipationDistance - distanceToAchieveBankAngleChange(desiredBankAngle, this.sensors.in.gps.groundspeed);
+                //#404: the lead is capped at 60 s of ground speed and half the inbound leg, and a capped turn is flown on
+                //the tighter circle tangent to both legs (checked in the KLN 89 trainer, 2026-10-20)
+                const {lead, radius: turnRadius} = turnLead(this.sensors.in.gps.groundspeed, turnAngle, this.inboundLegLength(fromLeg, toLeg.wpt));
+                //The roll-in on top of the lead is a deliberate departure from the trainer, which adds none: the unit
+                //calculates at 1 Hz and can start a turn up to a second late, and the sim's autopilot and aircraft need
+                //time to roll in. Users reported overshoots before it was added, and the default autopilot follows the GPS
+                //SimVars, so the displayed and the commanded turn start cannot be split
+                const distanceToTurn = nav.distToActive - lead - distanceToAchieveBankAngleChange(desiredBankAngle, this.sensors.in.gps.groundspeed);
                 const timeToTurn = distanceToTurn / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
 
                 nav.waypointAlert = timeToTurn <= WPT_ALERT_WITH_TURN_ANTI || nav.activeWaypoint.turnStack.length > 0; //Arrow flashes until end of turn and the light remains on until end of turn: https://youtu.be/S1lt2W95bLA?si=C45kt8pik15Iodoy&t=2245
-                //console.log(nav.distToActive, turnAnticipationDistance, nav.waypointAlert, timeToTurn, toWpt);
+                //console.log(nav.distToActive, lead, nav.waypointAlert, timeToTurn, toWpt);
 
                 //We have reached the start of the turn but not the waypoint yet. XTK will now follow a curved path and DTK will indicate the next path
+                //#404: also when the leg became active with the aircraft already inside the lead (a Direct To, a short
+                //leg): the turn is started at once and flown, the waypoint is not skipped (checked in the KLN 89 trainer,
+                //2026-10-20; this replaces the skip of #76)
                 if (toLeg.fixType !== KLNFixType.MAP && nav.activeWaypoint.turnStack.length === 0 &&
                     (distanceToTurn <= this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC //Distance is within the next tick, we rather start the turn a little too early than too late
                         || (nav.waypointAlert && distanceToTurn >= this.lastDistanceToTurn))) {
-                    if (turnAnticipationDistance > nav.distToActive) {
-                        //We already added some extra distance to account for the bank angle change. This can only happen for very tight turns where the distance to the next waypoint is already too short
-                        //The KLN 89 trainer skips these type of legs immediatly, so do we
+                    const fromPath = new GeoCircle(fromLeg.path.center, fromLeg.path.radius);
 
-                        nav.activeWaypoint.sequenceToNextWaypoint();
-                        console.log("already behind start of turn, skipping turn calculation, switching to next wpt", turnAnticipationDistance, nav.distToActive, toLeg.wpt, nav.activeWaypoint.getActiveWpt());
-                        this.lastDistanceToTurn = 9999;
-                        this.lastDistanceToActive = 9999;
-                    } else {
-                        const fromPath = new GeoCircle(fromLeg.path.center, fromLeg.path.radius);
+                    //4-8 We save information on how this turn was calculated
+                    const startOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
+                    startOfTurn.offset(NavMath.reciprocateHeading(fromDtk), UnitType.NMILE.convertTo(lead, UnitType.GA_RADIAN));
 
-                        //4-8 We save information on how this turn was calculated
-                        const startOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
-                        startOfTurn.offset(NavMath.reciprocateHeading(fromDtk), UnitType.NMILE.convertTo(turnAnticipationDistance, UnitType.GA_RADIAN));
+                    const turnCircle = this.calculateTurnCircle(turnRadius, startOfTurn, fromDtk, NavMath.getTurnDirection(fromDtk, nextDtk));
+                    const endOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
+                    endOfTurn.offset(nextDtk, UnitType.NMILE.convertTo(lead, UnitType.GA_RADIAN));
+                    nav.activeWaypoint.turnStack.push(new TurnStackEntry(turnCircle, endOfTurn, nextPath, {wpt: new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon), inboundDtk: fromDtk, nextDtk: nextDtk}));
+                    console.log("turn: moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt(), distanceToTurn, this.lastDistanceToTurn);
 
-                        const turnCircle = this.calculateTurnCircle(turnRadius, startOfTurn, fromDtk, NavMath.getTurnDirection(fromDtk, nextDtk));
-                        const endOfTurn = new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon);
-                        endOfTurn.offset(nextDtk, UnitType.NMILE.convertTo(turnAnticipationDistance, UnitType.GA_RADIAN));
-                        nav.activeWaypoint.turnStack.push(new TurnStackEntry(turnCircle, endOfTurn, nextPath));
-                        console.log("turn: moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt(), distanceToTurn, this.lastDistanceToTurn);
-
-                        //Since we add a few seconds before the turn to reach the desired bank angle, we need to keep the old path for a short moment
-                        this.lastTurnStackDistance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(startOfTurn), UnitType.NMILE);
-                        nav.activeWaypoint.turnStack.push(new TurnStackEntry(fromPath, startOfTurn, nextPath));
-                    }
+                    //Since we add a few seconds before the turn to reach the desired bank angle, we need to keep the old path for a short moment
+                    this.lastTurnStackDistance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(startOfTurn), UnitType.NMILE);
+                    nav.activeWaypoint.turnStack.push(new TurnStackEntry(fromPath, startOfTurn, nextPath));
                 }
 
                 //We are now abeam the waypoint
@@ -327,6 +335,34 @@ export class NavCalculator implements CalcTickable {
         const nav = this.memory.navPage;
         const alertTime = this.turnAnticipation.get() ? WPT_ALERT_NO_TURN_WITH_TURN_ANTI : WPT_ALERT_WITHOUT_TURN_ANTI;
         return (nav.toFrom === TO && nav.eteToActive! <= alertTime) || nav.activeWaypoint.turnStack.length > 0;
+    }
+
+    /**
+     * #404: the turn circle ends once the aircraft is past its end point along the next leg (within the tick ahead),
+     * but only on the next leg's side of the turn's bisector: a turn cannot end before its midpoint. Near 180° the start
+     * of the turn lies barely before its end point along the next leg (lead · (1 + cos θ)), so without the bisector the
+     * turn would end where it starts. It also ends when the aircraft is more than OFF_LEG_XTK from the next leg. A
+     * capped turn is tighter than the aircraft can fly, so the aircraft moves away from the end point at first: the
+     * distance to it, which ends the roll-in, would end the turn as soon as it began
+     */
+    private isPastEndOfTurn(entry: TurnStackEntry, bisector: TurnBisector, tickDistance: NauticalMiles): boolean {
+        const pos = this.sensors.in.gps.coords;
+        return (bisectorSide(bisector.wpt, bisector.inboundDtk, bisector.nextDtk, pos) >= 0
+                && alongTrackDistance(entry.pathForDtk, entry.switchPoint, pos) <= tickDistance)
+            || Math.abs(UnitType.GA_RADIAN.convertTo(entry.pathForDtk.distance(pos), UnitType.NMILE)) > OFF_LEG_XTK;
+    }
+
+    /**
+     * #404: the length of the leg flown into the waypoint, for the cap of the lead at half of it: the distance between
+     * the waypoints, or for a DME arc the length along the arc. For a Direct To the leg starts where it was activated
+     */
+    private inboundLegLength(fromLeg: FromLeg, to: LatLonInterface): NauticalMiles {
+        if (fromLeg.path.isGreatCircle()) {
+            return UnitType.GA_RADIAN.convertTo(GeoPoint.distance(fromLeg.wpt, to), UnitType.NMILE);
+        }
+        fromLeg.path.closest(fromLeg.wpt, ARC_FROM_CACHE);
+        fromLeg.path.closest(to, ARC_TO_CACHE);
+        return UnitType.GA_RADIAN.convertTo(fromLeg.path.distanceAlong(ARC_FROM_CACHE, ARC_TO_CACHE, Math.PI), UnitType.NMILE);
     }
 
     /**

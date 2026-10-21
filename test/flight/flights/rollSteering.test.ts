@@ -241,6 +241,19 @@ const BASELINE: Record<string, Metrics> = {
 };
 
 /**
+ * #404: S8f's lead is capped at 60 s of ground speed, 4.0 NM instead of R tan(75°) = 6.7 NM, and its turn circle is the
+ * tighter one tangent to both legs at that lead (radius 1.07 NM), the trainer's (checked in the KLN 89 trainer,
+ * 2026-10-20, docs/kln89-trainer-record.md). The harness aircraft cannot fly it at 25° of bank (its radius at 240 kt is
+ * 1.79 NM), so it overshoots the next leg by design, geometrically by about (6.7 - 4.3) NM × sin(150°) = 1.2 NM. These
+ * bounds, measured on 2026-10-21 (1.268 NM for both) and rounded up to 0.001 NM, replace the baseline's overshoot
+ * (0.031 NM) and maximum XTK once established (0.085 NM) for it; the qualitative checks are unchanged. The capped 150°
+ * turns at 120 kt (S8e, S10, S11) stay within the baseline's bounds
+ */
+const CAPPED_TURN_BOUNDS: Record<string, Pick<Metrics, 'overshootNm' | 'maxXtkEstablishedNm'>> = {
+    S8f: {overshootNm: 1.269, maxXtkEstablishedNm: 1.269},
+};
+
+/**
  * The largest angle between the track and the unit's DTK while the aircraft closes on the leg (|XTK| falling) before the
  * capture: the intercept angle flown. The DTK is the local course of the leg; the target course at ABC differs from it by
  * up to half a degree in the scenarios that start 35 NM before ABC
@@ -296,14 +309,23 @@ function directTo120Right(durationS: number): Scenario {
 }
 
 /**
+ * #404: the lead of the 150° turns at 120 kt (S10, S11), capped at 60 s of ground speed (120 kt × 60 s = 2.0 NM; the
+ * uncapped 0.64 NM × tan(75°) = 2.4 NM is longer), and the radius of the circle tangent to both legs at that lead
+ * (checked in the KLN 89 trainer, 2026-10-20)
+ */
+const CAPPED_150_LEAD_NM = 120 * 60 / 3600;
+const CAPPED_150_RADIUS_NM = CAPPED_150_LEAD_NM / Math.tan(75 * Math.PI / 180);
+
+/**
  * S10: turn anticipation starting on a 45° intercept more than one turn radius inside the turn (the fallback of section
- * 4A). A 150° right turn at ABC at 120 kt. Its anticipation distance is about R tan(75°) = 2.4 NM with the standard-rate
- * radius R = 0.64 NM (3°/s at 120 kt), so the turn starts about 2.5 NM from ABC. The aircraft is put on a 005 track (the
- * inbound 050 less 45°, closing from the right, the inside of the turn) aimed at the point 2.0 NM right of the leg and
- * 1.5 NM before ABC, 2.5 NM from it, and placed 2 NM before that point. Both the old controller (its far-away branch)
- * and the new law (atan(XTK / 1 NM) is more than 45° there) hold the 45° intercept from the right while the aircraft is
- * far off, so the turn starts with the aircraft about 2 NM inside the inbound leg, outside the turn circle on its far
- * side by more than R. The start event is the DTK switch, the target the leg ABC - KBBB. `fallback` reports whether
+ * 4A). A 150° right turn at ABC at 120 kt. Its lead, R tan(75°) = 2.4 NM with the standard-rate radius R = 0.64 NM
+ * (3°/s at 120 kt), is capped at 60 s of ground speed, 2.0 NM (#404), so the turn starts about 2.1 NM from ABC on the
+ * tighter circle tangent to both legs at the lead, of radius 2.0 NM / tan(75°) = 0.54 NM (checked in the KLN 89 trainer,
+ * 2026-10-20). The aircraft is put on a 005 track (the inbound 050 less 45°, closing from the right, the inside of the
+ * turn) aimed at the point 2.0 NM right of the leg and 1.5 NM before ABC, 2.5 NM from it, and placed 2 NM before that
+ * point. Both the old controller (its far-away branch) and the new law (atan(XTK / 1 NM) is more than 45° there) hold
+ * the 45° intercept from the right while the aircraft is far off, so the turn starts with the aircraft about 2 NM inside
+ * the inbound leg, outside the turn circle on its far side by more than its radius. The start event is the DTK switch, the target the leg ABC - KBBB. `fallback` reports whether
  * NavCalculator steers on the next leg at the start event (the roll steering design, section 4A).
  */
 function turnStartOnInterceptInside(durationS: number): Scenario {
@@ -327,11 +349,11 @@ function turnStartOnInterceptInside(durationS: number): Scenario {
                 {timeout: 120, description: 'start of the turn at ABC'});
             expect(flight.nav.activeIdent).toBe('ABC');
             // Preconditions: still on the 45° intercept, and farther from the turn circle than its radius. The circle is
-            // derived here from the standard-rate radius at 120 kt, R = v / (3°/s) = 61.73 m/s / 0.05236 rad/s = 0.64 NM,
-            // tangent to the inbound leg R tan(75°) before ABC, its center R to the right
+            // derived here from the lead capped at 60 s of ground speed, 120 kt × 60 s = 2.0 NM (#404): tangent to the
+            // inbound leg 2.0 NM before ABC, of radius 2.0 NM / tan(75°), its center that radius to the right
             expect(angleBetween(flight.aircraft.trackTrue, track)).toBeLessThan(2);
-            const r = 120 * 1852 / 3600 / (3 * Math.PI / 180) / 1852;
-            const center = pointFrom(pointBefore(kaaa, abc, r * Math.tan(75 * Math.PI / 180)), inbound + 90, r);
+            const r = CAPPED_150_RADIUS_NM;
+            const center = pointFrom(pointBefore(kaaa, abc, CAPPED_150_LEAD_NM), inbound + 90, r);
             expect(Math.abs(distanceNm(flight.aircraft, center) - r)).toBeGreaterThan(r);
             const nav = flight.unit.props.memory.navPage;
             const turn = nav.activeWaypoint.turnStack[0];
@@ -345,8 +367,8 @@ function turnStartOnInterceptInside(durationS: number): Scenario {
  * S11: an anticipated 150° right turn at ABC at 120 kt, started with the aircraft inside the turn. The aircraft is put
  * parallel to the inbound leg 0.5 NM to its right (the inside of the turn), 0.1 NM before the start of the turn plus 6 s
  * of flight, and flown with the coupled autopilot until the DTK switches. The law closes on the leg meanwhile, so at the
- * switch the aircraft is about 0.4 NM inside: inside the turn circle near its start, less than one radius from it (no
- * fallback). The start event is the DTK switch, the target the leg ABC - KBBB. `xtkInsideNm` is the cross track to the
+ * switch the aircraft is about 0.4 NM inside: inside the turn circle (of radius 0.54 NM, capped as for S10) near its
+ * start, less than one radius from it (no fallback). The start event is the DTK switch, the target the leg ABC - KBBB. `xtkInsideNm` is the cross track to the
  * inbound leg at the switch (positive right, the inside).
  */
 function turnStartInside(durationS: number, report: { xtkInsideNm?: number; fallback?: boolean }): Scenario {
@@ -362,9 +384,8 @@ function turnStartInside(durationS: number, report: { xtkInsideNm?: number; fall
                 aircraft: {lat: boot.lat, lon: boot.lon, altitudeFt: 3000, groundspeedKt: 120, trackTrue: courseDeg(boot, abc)},
             });
             await flight.flyUntilActive('ABC', {timeout: 30});
-            // The turn starts R tan(75°) before ABC, with R = 0.64 NM the standard-rate radius at 120 kt (as for S10)
-            const r = 120 * 1852 / 3600 / (3 * Math.PI / 180) / 1852;
-            const aim = pointFrom(pointBefore(kaaa, abc, r * Math.tan(75 * Math.PI / 180) + 0.22), inbound + 90, 0.5);
+            // The turn starts at the lead capped at 60 s of ground speed, 2.0 NM before ABC (as for S10), plus the roll-in
+            const aim = pointFrom(pointBefore(kaaa, abc, CAPPED_150_LEAD_NM + 0.22), inbound + 90, 0.5);
             await place(flight, pointFrom(aim, inbound + 180, 120 * 6 / 3600), inbound);
             const next = courseDeg(abc, kbbb);
             await flight.flyUntil(() => flight.nav.activeIdent !== 'ABC' || angleBetween(flight.nav.dtkTrue, next) < 1,
@@ -449,6 +470,7 @@ describe('roll steering flights (#100)', () => {
         it(`${title} (#100)`, async () => {
             const {metrics: m, samples, courseTrue, fallback} = await flyScenario(scenario);
             const b = BASELINE[id];
+            const bound = {...b, ...CAPPED_TURN_BOUNDS[id]};
             const e = EXPECTED[id];
             const all = `measured ${JSON.stringify(m)}`;
             // The capture time is only logged (KLN_TEST_LOG=1 shows it): it is judged against the trainer, not the baseline
@@ -466,12 +488,12 @@ describe('roll steering flights (#100)', () => {
             }
             // The roll steering design, section 6 (amended 2026-10-19): 0.001 NM of tolerance, because an asymptotic
             // join can cross a leg by numerical noise (8e-6 NM in S1 and S5) where the baseline is exactly 0
-            expect(m.overshootNm, all).toBeLessThanOrEqual(b.overshootNm + OVERSHOOT_TOLERANCE_NM);
+            expect(m.overshootNm, all).toBeLessThanOrEqual(bound.overshootNm + OVERSHOOT_TOLERANCE_NM);
             if (e.established) {
                 // The roll steering design, section 6 (amended 2026-10-19): at least the capture band. The first sample
                 // under 0.1 NM of an asymptotic join lies just under 0.1 (0.092 to 0.0996 measured), which is no
                 // excursion; the bound guards against leaving the capture band after the capture
-                expect(m.maxXtkEstablishedNm, all).toBeLessThanOrEqual(Math.max(b.maxXtkEstablishedNm, CAPTURE_NM));
+                expect(m.maxXtkEstablishedNm, all).toBeLessThanOrEqual(Math.max(bound.maxXtkEstablishedNm, CAPTURE_NM));
             }
             if (b.captureS === null) {
                 expect(m.captureS, all).not.toBeNull();
@@ -539,8 +561,8 @@ describe('the next-leg fallback of a turn (#100)', () => {
         const {flight} = await turnStartOnInterceptInside(0).start();
         const nav = flight.unit.props.memory.navPage;
         const turn = nav.activeWaypoint.turnStack[0];
-        // The circle's radius, as for the precondition of S10: the standard-rate radius at 120 kt, 0.64 NM
-        const radiusNm = 120 / 3600 / (3 * Math.PI / 180);
+        // The circle's radius, as for the precondition of S10: the capped circle, 0.54 NM
+        const radiusNm = CAPPED_150_RADIUS_NM;
         expect(turn.steerOnPathForDtk).toBe(true);
 
         // Each second while the turn is on the stack: the flag, the steering path and the distance from the circle

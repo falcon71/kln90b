@@ -11,6 +11,7 @@ import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from "./Flightplan
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Sensors} from "../../Sensors";
 import {segmentDistance} from "../navdata/SequencingGeometry";
+import {Degrees} from "../Units";
 
 
 export interface FromLeg {
@@ -30,8 +31,24 @@ export class TurnStackEntry {
 
     constructor(public path: GeoCircle, //The path of the turn itself
                 public switchPoint: GeoPoint, //The part when to switch to the next TurnStackEntry or the next leg if the stack is empty
-                public pathForDtk: GeoCircle) { //The DTK calculation does not follow a curved path, so we save the great circle of the normal legs for the DTK calculation
+                public pathForDtk: GeoCircle, //The DTK calculation does not follow a curved path, so we save the great circle of the normal legs for the DTK calculation
+                /**
+                 * Set on the turn circle itself, which ends once the aircraft is past the bisector of the turn and past
+                 * switchPoint along pathForDtk (#404). Absent on the stretch of the inbound leg before it, the roll-in,
+                 * which ends at switchPoint
+                 */
+                public readonly turnBisector?: TurnBisector) {
     }
+}
+
+/**
+ * The bisector of a turn at a waypoint: the line through the waypoint between the inbound and the next course
+ * (SequencingGeometry.bisectorSide)
+ */
+export interface TurnBisector {
+    readonly wpt: GeoPoint,
+    readonly inboundDtk: Degrees,
+    readonly nextDtk: Degrees,
 }
 
 export interface ActiveWaypointChangedEvents {
