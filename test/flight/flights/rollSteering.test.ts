@@ -345,9 +345,14 @@ function turnStartOnInterceptInside(durationS: number): Scenario {
             const track = inbound - 45;
             await place(flight, pointFrom(aim, track + 180, 2.0), track);
             const next = courseDeg(abc, kbbb);
-            await flight.flyUntil(() => flight.nav.activeIdent !== 'ABC' || angleBetween(flight.nav.dtkTrue, next) < 1,
+            await flight.flyUntil(() => angleBetween(flight.nav.dtkTrue, next) < 1,
                 {timeout: 120, description: 'start of the turn at ABC'});
-            expect(flight.nav.activeIdent).toBe('ABC');
+            // #375: a turn is sequenced where the aircraft passes its bisector (checked in the KLN 89 trainer, 2026-10-20,
+            // docs/kln89-trainer-record.md), a state armed by the turn start. 2 NM inside the turn the aircraft is past the
+            // bisector when the turn starts, so ABC is sequenced in that calculation; the turn stays on the stack and is
+            // flown, and the roll steering checks below are unchanged
+            expect(flight.nav.activeIdent).toBe('KBBB');
+            expect(flight.unit.props.memory.navPage.activeWaypoint.turnStack.length).toBeGreaterThan(0);
             // Preconditions: still on the 45° intercept, and farther from the turn circle than its radius. The circle is
             // derived here from the lead capped at 60 s of ground speed, 120 kt × 60 s = 2.0 NM (#404): tangent to the
             // inbound leg 2.0 NM before ABC, of radius 2.0 NM / tan(75°), its center that radius to the right

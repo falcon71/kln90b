@@ -43,7 +43,6 @@ export const OFF_LEG_XTK: NauticalMiles = 4.0;
 export class NavCalculator implements CalcTickable {
     private readonly turnAnticipation: UserSetting<boolean>;
     private lastDistanceToTurn = 9999;
-    private lastDistanceToActive = 9999;
 
     private lastTurnStackDistance: NauticalMiles | null = null;
 
@@ -70,7 +69,6 @@ export class NavCalculator implements CalcTickable {
             nav.xtkScale = 5;
             nav.activeWaypoint.clearTurnStack();
             this.lastDistanceToTurn = 9999;
-            this.lastDistanceToActive = 9999;
             this.setOutput();
             return;
         } else if (!this.sensors.in.gps.isValid()) {
@@ -237,7 +235,9 @@ export class NavCalculator implements CalcTickable {
                 //#404: also when the leg became active with the aircraft already inside the lead (a Direct To, a short
                 //leg): the turn is started at once and flown, the waypoint is not skipped (checked in the KLN 89 trainer,
                 //2026-10-20; this replaces the skip of #76)
-                if (toLeg.fixType !== KLNFixType.MAP && nav.activeWaypoint.turnStack.length === 0 &&
+                //#375: the waypoint's own turn is started once. A turn that ended while the waypoint is still active (by
+                //the escape of isPastEndOfTurn) is not started again, which flipped the DTK between the legs every tick
+                if (toLeg.fixType !== KLNFixType.MAP && nav.activeWaypoint.turnStack.length === 0 && !nav.activeWaypoint.ownTurnStarted &&
                     (distanceToTurn <= this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC //Distance is within the next tick, we rather start the turn a little too early than too late
                         || (nav.waypointAlert && distanceToTurn >= this.lastDistanceToTurn))) {
                     const fromPath = new GeoCircle(fromLeg.path.center, fromLeg.path.radius);
@@ -255,20 +255,23 @@ export class NavCalculator implements CalcTickable {
                     //Since we add a few seconds before the turn to reach the desired bank angle, we need to keep the old path for a short moment
                     this.lastTurnStackDistance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(startOfTurn), UnitType.NMILE);
                     nav.activeWaypoint.turnStack.push(new TurnStackEntry(fromPath, startOfTurn, nextPath));
+                    nav.activeWaypoint.ownTurnStarted = true;
                 }
 
-                //We are now abeam the waypoint
-                if (toLeg.fixType !== KLNFixType.MAP &&
-                    (nav.waypointAlert && nav.distToActive >= this.lastDistanceToActive)) {
-
-                    //don't move missed approach waypoint!
+                //#375: sequenced where the aircraft crosses the bisector of the turn, the line through the waypoint that
+                //halves the angle between the legs: on course the middle of the turn, for a big turn well before the
+                //waypoint (3.2 NM for 171° at 239 kt, checked in the KLN 89 trainer, 2026-10-20). The test is a state,
+                //armed once the waypoint's own turn has started, so an aircraft already past the line then sequences at
+                //once. It does not read the waypoint alert: a turn still on the stack from the previous waypoint keeps the
+                //alert on, and the abeam test that read it sequenced a waypoint 13 NM away
+                if (toLeg.fixType !== KLNFixType.MAP //don't move missed approach waypoint!
+                    && nav.activeWaypoint.ownTurnStarted
+                    && bisectorSide(toLeg.wpt, fromDtk, nextDtk, this.sensors.in.gps.coords) >= 0) {
                     nav.activeWaypoint.sequenceToNextWaypoint();
                     console.log("moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt());
                     this.lastDistanceToTurn = 9999;
-                    this.lastDistanceToActive = 9999;
                 } else {
                     this.lastDistanceToTurn = distanceToTurn;
-                    this.lastDistanceToActive = nav.distToActive;
                 }
 
 

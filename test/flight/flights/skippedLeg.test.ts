@@ -8,7 +8,7 @@ import {scriptedPath} from '../../harness/flight/pilots';
 
 const dms = (d: number, m: number, s: number) => d + m / 60 + s / 3600;
 
-/** The active waypoint once per second for 60 s after EDSZ was sequenced, with the distance to EDTW */
+/** The active waypoint once per second for 60 s after the closest approach to EDSZ, with the distance to EDTW */
 const afterEdsz: { ident: string | null; distEdtw: number }[] = [];
 
 /**
@@ -18,11 +18,17 @@ const afterEdsz: { ident: string | null; distEdtw: number }[] = [];
  * 030° to about 080° and passed 0.2 NM south of EDSZ. The unit then showed EDSZ - EDTW (13.2 NM) and two seconds later
  * EDTW - EDNN. The track below is rebuilt from those readings.
  *
- * The first test flies and records and the second only judges what was recorded, so a broken flight fails the first
+ * Since #375 an anticipated turn is sequenced where the aircraft passes the bisector of the turn, once the turn has
+ * started (checked in the KLN 89 trainer, 2026-10-20, docs/kln89-trainer-record.md). On this track the aircraft flies
+ * away while still TO EDSZ and never passes the bisector of the 36° left turn at EDSZ, so EDSZ stays active. The bug of
+ * the report, EDNN taken while EDTW was 13 NM away, cannot happen either way: a waypoint is sequenced only by its own
+ * turn, not by the turn of the waypoint before it.
+ *
+ * The first test flies and records and the others only judge what was recorded, so a broken flight fails the first
  * and cannot be mistaken for the bug.
  */
 describe('a waypoint passed while flying away from the next one (#375)', () => {
-    it('sequences EDSZ to EDTW on the track of the report', async () => {
+    it('flies the track of the report past EDSZ and away from EDTW', async () => {
         const edtz = airport('EDTZ', 47.6814, 9.1372);
         const edsz = airport('EDSZ', dms(48, 11, 11.4), dms(8, 43, 16.2));
         const edtw = airport('EDTW', dms(48, 16, 45.0), dms(8, 25, 42.0));
@@ -45,10 +51,17 @@ describe('a waypoint passed while flying away from the next one (#375)', () => {
         });
         await flight.flyUntilActive('EDSZ', {timeout: 5});
 
-        await flight.flyUntil(() => flight.nav.activeIdent !== 'EDSZ', {timeout: 5 * 60, description: 'sequencing EDSZ'});
-        expect(flight.nav.activeIdent).toBe('EDTW');
-        // Sequenced while passing EDSZ, not somewhere else
-        expect(distanceNm(flight.aircraft, edsz)).toBeLessThan(0.5);
+        // The closest approach to EDSZ: the first second in which the distance grows
+        let closest = distanceNm(flight.aircraft, edsz);
+        for (let s = 0; ; s++) {
+            expect(s, 'the closest approach to EDSZ').toBeLessThan(5 * 60);
+            await flight.fly(1);
+            const d = distanceNm(flight.aircraft, edsz);
+            if (d > closest) break;
+            closest = d;
+        }
+        // The geometry of the report: the aircraft passes EDSZ, within 0.5 NM of it
+        expect(closest).toBeLessThan(0.5);
         for (let s = 0; s < 60; s++) {
             await flight.fly(1);
             afterEdsz.push({ident: flight.nav.activeIdent, distEdtw: distanceNm(flight.aircraft, edtw)});
@@ -59,12 +72,21 @@ describe('a waypoint passed while flying away from the next one (#375)', () => {
         expect(Math.min(...afterEdsz.map(s => s.distEdtw))).toBeGreaterThan(12);
     });
 
-    // 4-8, 5-33: a waypoint is sequenced as it is passed, or at the start of the anticipated turn just before it. EDTW is
-    // 13 NM away and moving farther, so it stays the active waypoint. The unit instead takes EDNN two seconds later: the
-    // turn at EDSZ is still on the turn stack, which keeps the waypoint alert on for EDTW, and the abeam test (alert on
-    // and the distance to the active waypoint no longer falling) then fires for EDTW
-    it.fails('keeps EDTW active while the aircraft is 13 NM from it (#375)', () => {
+    // 4-8, 5-33: a waypoint is sequenced as it is passed, or within the anticipated turn just before it. EDTW is 13 NM
+    // away and moving farther, so neither is due and EDNN, the waypoint after EDTW, cannot become active. The unit took
+    // EDNN two seconds after EDTW: the turn at EDSZ was still on the turn stack, which kept the waypoint alert on for
+    // EDTW, and the old abeam test (alert on and the distance to the active waypoint no longer falling) fired for EDTW
+    it('does not take EDNN while the aircraft is 13 NM from EDTW (#375)', () => {
         expect(afterEdsz).toHaveLength(60);
-        expect(afterEdsz.map(s => s.ident)).toEqual(afterEdsz.map(() => 'EDTW'));
+        expect(afterEdsz.filter(s => s.ident === 'EDNN')).toEqual([]);
+    });
+
+    // EDSZ stays active: this follows the bisector rule of the trainer checks of 2026-10-20 (docs/kln89-trainer-record.md),
+    // since the aircraft never passes the bisector of the turn at EDSZ. The trainer cannot fly this case, because its
+    // aircraft always steers onto the active leg, so nothing confirms it. The sim's earlier sequencing on "the distance
+    // grows" took EDSZ here, as the real unit did in the video
+    it('keeps EDSZ active in the minute after passing it (characterization)', () => {
+        expect(afterEdsz).toHaveLength(60);
+        expect(afterEdsz.map(s => s.ident)).toEqual(afterEdsz.map(() => 'EDSZ'));
     });
 });

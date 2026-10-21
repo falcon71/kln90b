@@ -482,6 +482,13 @@ describe('no sequencing past the MAP (6-7)', () => {
         await moveAircraft(unit, pointFrom(mapaa, 180, 0.3), {groundspeedKt: 120, trackTrue: 180});
         expect(activeIdent(unit)).toBe('MAPAA');
         expect(nav(unit).toFrom).toBe(false); // FROM
+
+        // The sequencing at the bisector (#375) has its own MAP check: no turn is ever started at the MAP, so with one
+        // marked as started, 0.3 NM past the MAP and past the bisector of the turn to MAHAA, MAPAA still stays active
+        nav(unit).activeWaypoint.ownTurnStarted = true;
+        await moveAircraft(unit, pointFrom(mapaa, 180, 0.35), {groundspeedKt: 120, trackTrue: 180});
+        expect(nav(unit).activeWaypoint.ownTurnStarted).toBe(true); // Precondition: nothing cleared it
+        expect(activeIdent(unit)).toBe('MAPAA');
     });
 
     it('without turn anticipation: MAPAA stays active past the MAP', async () => {

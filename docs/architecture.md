@@ -435,7 +435,10 @@ Flightplan really is dead simple".
 **`ActiveWaypoint`** (`data/flightplan/ActiveWaypoint.ts`, owned by `VolatileMemory.navPage.activeWaypoint`):
 
 - It holds `from: {wpt, path: GeoCircle}`, `to: KLNFlightplanLeg`, `fplIdx` (-1 means a random direct-to or none),
-  `isDirectTo` and `turnStack: TurnStackEntry[]`.
+  `isDirectTo` and `turnStack: TurnStackEntry[]`. `ownTurnStarted` (the active waypoint's own turn was pushed) and
+  `turnPlan` (`TurnPlan.AT_LEAD`/`AT_ABEAM`, the decided turn start) belong to the active waypoint: they are cleared when
+  the active index changes, by `clearTurnStack()` and by `VolatileMemory.reset`. The turn stack itself survives the
+  sequencing, because the turn onto the next leg is still being flown.
 - API: `directTo`, `directToFlightplanIndex`, `cancelDirectTo`, `activateFpl0()` (chooses the *closest* leg to the
   plane, as checked against the KLN 89 trainer), `sequenceToNextWaypoint`, `getFutureLegs`/`getDestination` (stop at the
   MAP, 6-20), `getFollowingLeg`, `recalculatePath`.
@@ -487,7 +490,14 @@ sim.
     - The end-point condition keeps a lagging aircraft from ending the turn as it moves away from the end point at first.
     - Measuring the 4.0 NM to the active leg keeps a fast aircraft, which starts the turn lead · sin θ from the next leg,
       from ending it at once.
-    - It sequences when the plane is abeam (the distance starts increasing).
+    - The turn is pushed once per active waypoint: pushing it sets `ActiveWaypoint.ownTurnStarted`, and a turn that
+      ended while its waypoint is still active (by the 4.0 NM escape) is not started again (#375).
+    - It sequences when the aircraft is past the bisector of the turn (`bisectorSide >= 0`), armed by
+      `ownTurnStarted` (#375, checked in the KLN 89 trainer, 2026-10-20). On course that is the middle of the turn; for a
+      big turn it lies well before the waypoint. It is a state, not a crossing, so an aircraft already past the line when
+      its turn starts sequences at once. It does not read the waypoint alert, so a turn still on the stack from the
+      previous waypoint cannot sequence the next one. Since a turn ends only past the bisector, a turn's normal end comes
+      in or after the calculation that sequences its waypoint.
 - Without turn anticipation, it sequences on FROM.
 - **The MAP is never auto-sequenced.**
 - Waypoint alert thresholds: 20 s before an anticipated turn (`WPT_ALERT_WITH_TURN_ANTI`); before a waypoint without a

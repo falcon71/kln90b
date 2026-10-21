@@ -14,6 +14,7 @@ import {CtrState, NavMode} from '../../../kln90b/data/VolatileMemory';
 import {TimeStamp} from '../../../kln90b/data/Time';
 import {CenterWaypoint} from '../../../kln90b/pages/right/Ctr1Page';
 import {FplPage} from '../../../kln90b/pages/left/FplPage';
+import {TurnPlan} from '../../../kln90b/data/flightplan/ActiveWaypoint';
 
 /** hh:mm of the simulated UTC clock, read from the fake Date and not from the unit */
 const utcNow = () => new Date(Date.now()).toISOString().slice(11, 16);
@@ -272,6 +273,25 @@ describe('VolatileMemory over a power cycle (characterization)', () => {
         expect(m.navPage.nav4SelectedAltitude).toBe(8000);
         expect(m.triPage.ff).toBe(12);
         expect(m.triPage.reserve).toBe(30);
+    });
+});
+
+// A turn started before the power-off is not kept: the turn plan of the active waypoint and the flag that its own turn
+// has started are cleared with the turn stack (#375). The power-on is VolatileMemory.reset alone, without the ticks of a
+// whole power cycle: the calculations during the self-test clear the turn stack as well, so a full cycle would not show
+// what reset does
+describe('the turn state over a power cycle (#375)', () => {
+    it('a power cycle clears the turn plan and the own-turn flag', async () => {
+        const unit = await bootOnStandardRoute();
+        const aw = unit.props.memory.navPage.activeWaypoint;
+        aw.ownTurnStarted = true;
+        aw.turnPlan = TurnPlan.AT_LEAD;
+
+        unit.props.memory.reset({isPowered: true, timeSincePowerChange: 1000});
+
+        expect(aw.ownTurnStarted).toBe(false);
+        expect(aw.turnPlan).toBeNull();
+        expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('ABC'); // The precondition: the active waypoint did not change
     });
 });
 

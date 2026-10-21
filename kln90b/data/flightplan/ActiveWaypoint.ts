@@ -51,6 +51,17 @@ export interface TurnBisector {
     readonly nextDtk: Degrees,
 }
 
+/**
+ * Where the anticipated turn of the active waypoint starts, decided once per waypoint (the design,
+ * docs/superpowers/specs/2026-10-20-waypoint-sequencing-design.md, section 3.3)
+ */
+export enum TurnPlan {
+    /** At the lead plus the roll-in before the waypoint */
+    AT_LEAD,
+    /** Where the aircraft crosses the abeam line of the waypoint */
+    AT_ABEAM,
+}
+
 export interface ActiveWaypointChangedEvents {
     activeWaypointChanged: number;
 }
@@ -67,6 +78,13 @@ export class ActiveWaypoint {
     private fplIdx: number = -1; //The index of the active waypoint (to) in the flightplan
 
     public turnStack: TurnStackEntry[] = []; //This is a stack, because for each turn, we keep two entries: One before the start of the turn (to account for the bank angle change) and the turn itself up to the end of the turn
+    /**
+     * #375: the active waypoint's own anticipated turn has been pushed onto the turn stack. It arms the sequencing at the
+     * bisector, and the turn is not started again once it has ended while the waypoint is still active
+     */
+    public ownTurnStarted: boolean = false;
+    /** The decided turn plan of the active waypoint, null while undecided */
+    public turnPlan: TurnPlan | null = null;
     private publisher: Publisher<ActiveWaypointChangedEvents>;
 
     constructor(bus: EventBus, userSettings: KLN90BUserSettings, private readonly sensors: Sensors, public readonly fpl0: Flightplan, public lastactiveWaypoint: Facility | null) {
@@ -200,6 +218,7 @@ export class ActiveWaypoint {
     private setActiveIdx(activeIdx: number) {
         if (this.fplIdx !== activeIdx) {
             this.fplIdx = activeIdx;
+            this.clearTurnState();
         }
     }
 
@@ -359,6 +378,16 @@ export class ActiveWaypoint {
      */
     public clearTurnStack(): void {
         this.turnStack = [];
+        this.clearTurnState();
+    }
+
+    /**
+     * The turn state that belongs to the active waypoint. The turn stack is kept when the waypoint is sequenced, because
+     * the turn onto the next leg is still being flown
+     */
+    private clearTurnState(): void {
+        this.ownTurnStarted = false;
+        this.turnPlan = null;
     }
 
 }

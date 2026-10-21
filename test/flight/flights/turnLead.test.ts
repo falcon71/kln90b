@@ -206,9 +206,16 @@ describe('the end of an anticipated turn (#404)', () => {
             } while (samples[samples.length - 1].stack > 0);
             const all = JSON.stringify(samples.map(s => `${s.ident}:${s.stack}:${s.dtk?.toFixed(0)}:${s.remaining.toFixed(2)}`));
 
-            // ABC is sequenced while the turn is flown, and KBBB stays active
+            // ABC is sequenced while the turn is flown, and KBBB stays active. It is sequenced where the aircraft passes
+            // the bisector of the turn (#375, checked in the KLN 89 trainer, 2026-10-20, docs/kln89-trainer-record.md). At
+            // 180° the bisector runs along both legs: the aircraft is on it at the turn start and past it as soon as it
+            // turns, so ABC is sequenced in the first second of the turn
             const kbbbFrom = samples.findIndex(s => s.ident === 'KBBB');
-            expect(kbbbFrom, all).toBeGreaterThan(0);
+            if (turnDeg === 180) {
+                expect(kbbbFrom, all).toBe(0);
+            } else {
+                expect(kbbbFrom, all).toBeGreaterThan(0);
+            }
             expect(samples.slice(kbbbFrom).every(s => s.ident === 'KBBB'), all).toBe(true);
             // The DTK is the next leg's in every second, before and after the sequencing: no flip back to the inbound leg
             expect(samples.filter(s => angleBetween(s.dtk, next) >= 1), all).toEqual([]);
@@ -224,10 +231,10 @@ describe('the end of an anticipated turn (#404)', () => {
     it('ends a turn the aircraft leaves by more than 4.0 NM from the active leg (KLN 89 trainer, 2026-10-20, #404)', async () => {
         // The off-the-leg threshold of the trainer record: |XTK| to the active leg against a fixed 4.0 NM. Hand flown, the
         // aircraft turns away from the 171° right turn (left, to north) once the turn has started, and flies on north,
-        // away from both legs and never past the turn's bisector, so the turn can only end by that distance. Turning away,
-        // the aircraft passes abeam ABC and the unit sequences it, so the active leg is the next leg here; that the
-        // distance is measured to the inbound leg before the sequencing is held by the 120° turn at 300 kt above
-        const {flight, w, next} = await bootBeforeCappedTurn(171);
+        // away from both legs and never past the turn's bisector, so the turn can only end by that distance. ABC is
+        // sequenced only at the bisector (#375), so it stays active and the distance is the one to the inbound leg. Once
+        // the turn has ended it is not started again while ABC is active (#375): the DTK stays on the inbound leg
+        const {flight, w} = await bootBeforeCappedTurn(171);
         await flight.flyUntil(() => flight.nav.activeIdent !== 'ABC' || turnStackLength(flight.unit) > 0, {timeout: 300, description: 'start of the turn at ABC'});
         expect(flight.nav.activeIdent).toBe('ABC');
         const pilot = new ManualPilot();
@@ -236,18 +243,28 @@ describe('the end of an anticipated turn (#404)', () => {
         await flight.flyUntil(() => angleBetween(flight.aircraft.trackTrue, 0) < 5, {timeout: 120, description: 'heading north'});
         pilot.bank = 0;
 
-        const offActiveLeg = () => Math.abs(flight.nav.activeIdent === 'ABC' ? crossTrackNm(flight.aircraft, w, 90) : crossTrackNm(flight.aircraft, w, next));
-        const samples: { ident: string | null; offNm: number; stack: number }[] = [];
+        const samples: { ident: string | null; offNm: number; stack: number; dtk: number | null }[] = [];
         do {
             await flight.fly(1);
-            samples.push({ident: flight.nav.activeIdent, offNm: offActiveLeg(), stack: turnStackLength(flight.unit)});
-            expect(samples.length, 'more than 4.2 NM from the active leg').toBeLessThan(300);
+            samples.push({ident: flight.nav.activeIdent, offNm: Math.abs(crossTrackNm(flight.aircraft, w, 90)), stack: turnStackLength(flight.unit), dtk: flight.nav.dtkTrue});
+            expect(samples.length, 'more than 4.2 NM from the inbound leg').toBeLessThan(300);
         } while (samples[samples.length - 1].offNm <= 4.2);
-        const all = JSON.stringify(samples.map(s => `${s.ident}:${s.offNm.toFixed(2)}:${s.stack}`));
+        // And 20 s more, flying on north
+        for (let s = 0; s < 20; s++) {
+            await flight.fly(1);
+            samples.push({ident: flight.nav.activeIdent, offNm: Math.abs(crossTrackNm(flight.aircraft, w, 90)), stack: turnStackLength(flight.unit), dtk: flight.nav.dtkTrue});
+        }
+        const all = JSON.stringify(samples.map(s => `${s.ident}:${s.offNm.toFixed(2)}:${s.stack}:${s.dtk?.toFixed(0)}`));
+        expect(samples.every(s => s.ident === 'ABC'), all).toBe(true);
         // On the stack while within 4.0 NM (less a display tick of rounding), off it beyond 4.0 NM plus the tick ahead
         // (0.066 NM at 239 kt) and the rounding
         expect(samples.filter(s => s.offNm < 4.0 - POSITION_TOLERANCE_NM).every(s => s.stack > 0), all).toBe(true);
-        expect(samples.filter(s => s.offNm > 4.0 + tickNm(239) + POSITION_TOLERANCE_NM).every(s => s.stack === 0), all).toBe(true);
+        const beyond = samples.filter(s => s.offNm > 4.0 + tickNm(239) + POSITION_TOLERANCE_NM);
+        expect(beyond.every(s => s.stack === 0), all).toBe(true);
         expect(samples.some(s => s.offNm < 4.0 - POSITION_TOLERANCE_NM), all).toBe(true);
+        // Beyond 4.0 NM the DTK is the inbound leg's in every second: the turn is not started again (the DTK follows the
+        // end of the turn one calculation later, so the first second beyond is left out)
+        expect(beyond.slice(1).filter(s => angleBetween(s.dtk, 90) >= 1), all).toEqual([]);
+        expect(beyond.length, all).toBeGreaterThan(20);
     });
 });

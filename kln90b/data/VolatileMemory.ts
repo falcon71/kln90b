@@ -297,6 +297,7 @@ export class VolatileMemory {
         this.navPage.userMagvar = 0;
         this.navPage.isSelfTestApproved = false; //Every power-on runs the self-test again (#330)
         this.navPage.rollSteeringLatch = null; //A turn chosen before the power-off is not kept (#100)
+        this.navPage.activeWaypoint.clearTurnStack(); //Nor a turn started before it, its plan or its own-turn flag (#375)
 
         this.calPage.cal6TimeZ = null;
         this.calPage.cal6FromTimezone = null;
