@@ -110,6 +110,9 @@ describe('the sequencing of an anticipated turn at its bisector (#375)', () => {
         const kbbbFrom = samples.findIndex(s => s.ident === 'KBBB');
         expect(kbbbFrom, all).toBeGreaterThan(0);
         expect(samples.slice(kbbbFrom).every(s => s.ident === 'KBBB'), all).toBe(true);
+        // The turn ended in the calculation that sequenced ABC and is not started again for ABC before the sequencing:
+        // KBBB has no turn of ABC's on the stack
+        expect(samples.slice(kbbbFrom).every(s => s.stack === 0), all).toBe(true);
         // While ABC is active the turn is on the stack, and the DTK is the next leg's in every second but one. ABC is
         // sequenced at the bisector (KLN 89 trainer, 2026-10-20, docs/kln89-trainer-record.md), and here the turn ends
         // in the calculation that sequences ABC (the aircraft is past the bisector and already past the end

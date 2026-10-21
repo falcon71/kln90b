@@ -13,7 +13,7 @@ const afterEdsz: { ident: string | null; distEdtw: number }[] = [];
 
 /**
  * #375, reported from the sim: the flight plan of the report (its .pln; EDTZ and EDPT approximate, they are not on the
- * route that matters). In the video (45:20 to 45:46) the pilot flies VFR towards EDNN, not the EDSZ - EDTW leg: the
+ * route that matters). The video of the report shows this simulator (v2.2), not a real KLN 90B. In it (45:20 to 45:46) the pilot flies VFR towards EDNN, not the EDSZ - EDTW leg: the
  * KLN shows EDSZ at 1.2 NM bearing 036°, 0.5 NM 047°, 0.2 NM 027° and 358°, so the aircraft turned right from about
  * 030° to about 080° and passed 0.2 NM south of EDSZ. The unit then showed EDSZ - EDTW (13.2 NM) and two seconds later
  * EDTW - EDNN. The track below is rebuilt from those readings.
@@ -22,7 +22,9 @@ const afterEdsz: { ident: string | null; distEdtw: number }[] = [];
  * started (checked in the KLN 89 trainer, 2026-10-20, docs/kln89-trainer-record.md). On this track the aircraft flies
  * away while still TO EDSZ and never passes the bisector of the 36° left turn at EDSZ, so EDSZ stays active. The bug of
  * the report, EDNN taken while EDTW was 13 NM away, cannot happen either way: a waypoint is sequenced only by its own
- * turn, not by the turn of the waypoint before it.
+ * turn, not by the turn of the waypoint before it. That mechanism, a previous turn still on the stack while the next
+ * waypoint is active, is held by the corner-cutting test in bisectorSequencing.test.ts and the 2.0 NM leg test in
+ * turnLead.test.ts.
  *
  * The first test flies and records and the others only judge what was recorded, so a broken flight fails the first
  * and cannot be mistaken for the bug.
@@ -83,8 +85,8 @@ describe('a waypoint passed while flying away from the next one (#375)', () => {
 
     // EDSZ stays active: this follows the bisector rule of the trainer checks of 2026-10-20 (docs/kln89-trainer-record.md),
     // since the aircraft never passes the bisector of the turn at EDSZ. The trainer cannot fly this case, because its
-    // aircraft always steers onto the active leg, so nothing confirms it. The sim's earlier sequencing on "the distance
-    // grows" took EDSZ here, as the real unit did in the video
+    // aircraft always steers onto the active leg, so nothing confirms it. The sim's earlier abeam sequencing on "the
+    // distance grows" (v2.2, the video of the report) took EDSZ here; there is no real-unit evidence for this case
     it('keeps EDSZ active in the minute after passing it (characterization)', () => {
         expect(afterEdsz).toHaveLength(60);
         expect(afterEdsz.map(s => s.ident)).toEqual(afterEdsz.map(() => 'EDSZ'));
