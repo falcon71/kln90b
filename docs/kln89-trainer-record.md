@@ -462,3 +462,39 @@ with GS and HDG making the aircraft fly; FPL 0 BAE, C29, DLL, KMSN, BAE)
 - Left behind in the trainer: it is still running and flying GS 120 in OBS mode, OBS 151 to BAE, NAV 1 shown, one
   message pending unread. FPL 0 holds BAE, C29, DLL, KMSN, BAE, and SET 4 turn anticipation is now on (it was off). No
   user waypoints and no numbered flight plan were changed.
+
+**2026-10-20** (three agent checks; waypoint sequencing and turn anticipation for #375, #157 and #76; SET 1 take-home
+flying, SET 4 turn anticipation on unless noted; raw data and the reports in
+[kln89-trainer-data/2026-10-20](kln89-trainer-data/2026-10-20/README.md))
+- The turn starts (DTK switches to the next leg, the message prompt appears the same second) at a straight distance of
+  r × tan(turn/2), r being the standard-rate radius with the bank limited to 25° (0.63 NM at 119 kt, 1.79 NM at 239 kt).
+  No margin for the roll-in is added. Twelve on-course turns of 31° to 171° at both speeds.
+- That distance is capped at 60 s of ground speed (4.0 NM at 239 kt, 2.0 NM at 119 kt, for 150° and 171°) and, after a
+  short inbound leg, at half that leg (171° after 2.0 and 3.0 NM legs; medium). The turn is then flown; the waypoint is
+  not skipped. This replaces the "uncapped" observation behind #76.
+- The active waypoint changes when the aircraft crosses the bisector of the turn: for big turns well before the waypoint
+  (3.2 NM before it for 171° at 239 kt). This is the "early skip" seen on large turns.
+- The waypoint alert starts about 20 s (21 to 24 trainer s) before the turn start and keeps flashing until the turn is
+  nearly complete.
+- Off course (#157), all passes converging at 40° to 70°: the trainer always sequenced, up to 11 NM from the waypoint.
+  What it does depends on the cross track to the active leg, against a fixed 4.0 NM at both speeds, evaluated every
+  second (two direct transitions at 4.0 NM). Up to 4.0 NM the unit decides once, about 20 s before the turn point (the
+  point at the lead distance before the waypoint on the inbound course), and keeps the decision. With the cross track
+  at most about 2.8 NM then (medium: 2.69 and 2.83 NM turned there, 2.80 and 2.93 NM did not, at both speeds), the
+  turn starts when the along-track distance to the waypoint equals the lead, whatever the cross track is by then, on
+  either side of the turn; the on-course start above is the case without cross track. Otherwise, also when the
+  aircraft was beyond 4.0 NM then, the turn starts when the waypoint is abeam, even after the cross track has fallen
+  to 0.7 NM (third check, 12 runs). In the abeam case line 2 shows the distance to the waypoint as the cross track until the
+  aircraft crosses the bisector, where the waypoint is sequenced 35 to 115 s later. The alert comes about 15 s before
+  that abeam turn start. Beyond 4.0 NM there is no anticipation: the unit sequences once the next leg's segment is at
+  least as close as the active one's, which is the abeam line on the outside of the turn and the bisector on the inside
+  (medium-high), with the 36 s alert before an abeam sequencing and none before an inside one.
+- Turn anticipation off: sequenced at the abeam line (1.2 NM off course).
+- #375 (low to medium; the take-home aircraft cannot be flown past a waypoint toward the one after the next): after big
+  turns the new waypoint stayed active while its distance grew during the flashing, as expected.
+- Not settled: a parallel pass (the take-home aircraft always intercepts), the exact 2.8 NM gate and the moment of the
+  decision, an inside pass that takes the abeam plan, whether the 4.0 NM depends on the CDI scale. The AVsoftech trainer was not used.
+- Left behind in the trainer: it is still running, flying GS 120 on 8T to 8P, NAV 1 shown, several messages pending,
+  SET 4 turn anticipation on.
+  FPL 0 is now 8Z 8Y 8X 8V 8U 8T 8P 8S 8R (the old BAE, C29, DLL, KMSN, BAE was deleted), and the user waypoints 8P to
+  8Z exist (8W skipped; 8Q is in no plan).
