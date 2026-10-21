@@ -83,6 +83,18 @@ describe('bisectorSide', () => {
         expect(bisectorSide(W, 90, 180, pointFrom(W, 270, 1))).toBeCloseTo(-0.707, 2);
         expect(bisectorSide(W, 90, 180, pointFrom(W, 180, 1))).toBeCloseTo(0.707, 2);
     });
+    // The courses straddle north, where the plain mean of the two numbers is 180 and not the bisector direction 000.
+    // Mean direction m = 000, so the bisector runs east-west and a point at an angle a from m is cos(a) NM out: 1 NM
+    // back on bearing 170 (or 190) is at 170 degrees from m, cos 170 = -0.985; 1 NM out on bearing 010 (or 350) is +0.985
+    it('crosses north to the right: inbound 350, next 010', () => {
+        expect(bisectorSide(W, 350, 10, pointFrom(W, 170, 1))).toBeCloseTo(-0.985, 2);
+        expect(bisectorSide(W, 350, 10, pointFrom(W, 10, 1))).toBeCloseTo(0.985, 2);
+    });
+
+    it('crosses north to the left: inbound 010, next 350', () => {
+        expect(bisectorSide(W, 10, 350, pointFrom(W, 190, 1))).toBeCloseTo(-0.985, 2);
+        expect(bisectorSide(W, 10, 350, pointFrom(W, 350, 1))).toBeCloseTo(0.985, 2);
+    });
 });
 
 describe('segmentDistance', () => {

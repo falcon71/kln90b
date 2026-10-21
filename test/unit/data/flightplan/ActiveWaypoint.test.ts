@@ -153,6 +153,18 @@ describe('ActiveWaypoint.activateFpl0 on a DME arc', () => {
         expect(aw.activateFpl0()).not.toBeNull();
         expect(aw.getActiveFplIdx()).toBe(2);
     });
+
+    // The arc must reach the leg search as an arc. Treated as the great circle P to Q (the chord), this position inside
+    // the circle, 3 NM out on the 040 radial, is about 6.8 NM from the chord with its foot inside the chord, against
+    // about 7.7 NM from the leg Q to R, so the chord would win. On the arc it lies on the radial beyond the arc's end
+    // at Q, so its foot is outside the arc and the distance to P, about 12 NM, loses against Q to R (#121)
+    it('activates the leg Q to R for an aircraft inside the DME circle beyond the end of the arc, at the 040 radial (#121)', () => {
+        const {station, legs} = arcPlan();
+        const aw = activeWaypointOver(legs, pointFrom(station, 40, 3));
+
+        expect(aw.activateFpl0()).not.toBeNull();
+        expect(aw.getActiveFplIdx()).toBe(2);
+    });
 });
 
 const fromHere = (p: { lat: number; lon: number }) => intersection('PPOS', p.lat, p.lon);
