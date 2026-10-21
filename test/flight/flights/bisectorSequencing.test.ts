@@ -236,6 +236,9 @@ describe('a turn left over from the previous waypoint at the turn point (2026-10
             const bearing = courseDeg(w2, flight.aircraft);
             expect(angleBetween(bearing, bisectorRay), `bearing from DEF ${bearing.toFixed(1)}, ray ${bisectorRay.toFixed(1)}`).toBeLessThan(3);
             expect(alongBeforeDef(), 'sequenced before DEF').toBeGreaterThan(0);
+
+            // Nothing of ABC's turn is left under DEF's: the DTK stays on DEF's next leg until the turn stack is empty
+            await expectDtkUntilStackEmpty(flight, next);
         });
     }
 
@@ -264,5 +267,22 @@ describe('a turn left over from the previous waypoint at the turn point (2026-10
         await flight.fly(1);
         expect(angleBetween(flight.nav.dtkTrue, next)).toBeLessThan(1);
         expect(turnStackLength(flight.unit)).toBeGreaterThan(0);
+        // And nothing of ABC's turn is left under it
+        await expectDtkUntilStackEmpty(flight, next);
     });
 });
+
+/**
+ * Flies each second until the turn stack is empty and expects the DTK on `course` in every second, so that a turn entry
+ * that surfaces once the top one has ended shows
+ */
+async function expectDtkUntilStackEmpty(flight: Flight, course: number) {
+    const samples: { stack: number; dtk: number | null }[] = [];
+    while (turnStackLength(flight.unit) > 0) {
+        expect(samples.length, 'the turn stack empties').toBeLessThan(180);
+        await flight.fly(1);
+        samples.push({stack: turnStackLength(flight.unit), dtk: flight.nav.dtkTrue});
+    }
+    const all = JSON.stringify(samples.map(s => `${s.stack}:${s.dtk?.toFixed(0)}`));
+    expect(samples.filter(s => angleBetween(s.dtk, course) >= 1), all).toEqual([]);
+}
