@@ -3,6 +3,7 @@ import {GeoCircle, UnitType} from '@microsoft/msfs-sdk';
 import {
     alongTrackDistance,
     bisectorSide,
+    inboundLegLength,
     LEAD_CAP_TIME,
     segmentDistance,
     turnLead,
@@ -128,6 +129,28 @@ describe('segmentDistance', () => {
 
         it('is the distance to the from waypoint past the arc: on the south point', () => {
             expect(segmentDistance(from, to, arc, pointFrom(center, 180, 10))).toBeCloseTo(14.14, 1);  // 10 NM × √2
+        });
+    });
+});
+
+describe('inboundLegLength (#404)', () => {
+    it('is the great-circle distance between the ends of a great-circle leg: 47 N from 8 E to 9 E', () => {
+        const A = {lat: 47, lon: 8};
+        const B = {lat: 47, lon: 9};
+        expect(inboundLegLength(A, GeoCircle.createGreatCircle(A, B), B)).toBeCloseTo(distanceNm(A, B), 3);
+        expect(inboundLegLength(A, GeoCircle.createGreatCircle(A, B), B)).toBeCloseTo(40.99, 2);  // 60 arcmin × cos 47°, at 1.0018 NM per arcmin on the SDK's sphere
+    });
+
+    describe('on a DME arc of 10 NM around (47 N, 9 E), counterclockwise from the east to the north point', () => {
+        const center = {lat: 47, lon: 9};
+        const arc = GeoCircle.createFromPoint(center, UnitType.NMILE.convertTo(10, UnitType.GA_RADIAN));
+
+        it('is the length along the arc, a quarter circle of 15.71 NM, not the 14.14 NM chord', () => {
+            expect(inboundLegLength(pointFrom(center, 90, 10), arc, pointFrom(center, 0, 10))).toBeCloseTo(15.71, 2);  // 10 NM × π / 2
+        });
+
+        it('counts an end off the arc at its radial: the start 1 NM outside it', () => {
+            expect(inboundLegLength(pointFrom(center, 90, 11), arc, pointFrom(center, 0, 10))).toBeCloseTo(15.71, 2);
         });
     });
 });

@@ -7,9 +7,9 @@ import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {savedFlightplan} from '../../../harness/storage';
 import {activeIdent, fplIdents, messageLines, turnStackLength} from '../../../harness/readers';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
-import {angleBetween, courseDeg, distanceNm, finalCourseDeg, pointBefore, pointFrom} from '../../../harness/flight/geo';
+import {angleBetween, courseDeg, crossTrackNm, distanceNm, finalCourseDeg, pointBefore, pointFrom} from '../../../harness/flight/geo';
 import {Screen} from '../../../harness/render/screen';
-import {approachWorld, standardRoute} from '../../../harness/fixtures';
+import {approachWorld, arcWorld, standardRoute} from '../../../harness/fixtures';
 import {KLNFixType} from '../../../../kln90b/data/flightplan/Flightplan';
 
 const fpl0 = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs();
@@ -845,6 +845,64 @@ describe('passing a waypoint off course', () => {
         await abeamPositions(unit, kaaa, abc);
 
         expect(activeIdent(unit)).toBe('KBBB');
+    });
+});
+
+// #157: off the leg (more than 4.0 NM from it) the unit sequences as soon as the next leg's segment is at least as close
+// as the active one (checked in the KLN 89 trainer, 2026-10-20), and on a DME arc the active leg is the arc, as for the
+// leg search of findClosestLegIdx (#121): the distance to it is the radial offset while the foot lies on the arc and
+// otherwise the distance to its start. The arc world's left arc of 10 NM around ABC ends at ARCEN on the 180 radial, and
+// loaded with the aircraft on the arc at the 260 radial the active leg starts at the arc intercept there (6-17). The leg
+// after it runs east to FAFAA, so from these positions its nearest point is ARCEN. The chord from the intercept to ARCEN
+// would give the opposite answer at both positions
+describe('passing a DME arc off the leg (#157, #121)', () => {
+    const loadedOnArc = async () => {
+        const w = arcWorld();
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.at(260, 10), storage: savedFlightplan(0, [w.kprc]),
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(activeIdent(unit)).toBe('ARCEN'); // Precondition: the arc leg is active
+        const start = activeWaypoint(unit).getFromWpt()!;
+        // Precondition: it starts on the arc at the 260 radial
+        expect(distanceNm(w.abc, start)).toBeCloseTo(10, 1);
+        expect(angleBetween(courseDeg(w.abc, start), 260)).toBeLessThan(1);
+        /** The distance to the chord from the start to ARCEN, or to the start where the foot lies outside the chord */
+        const chordDistance = (pos: { lat: number; lon: number }) => {
+            const course = courseDeg(start, w.arcen);
+            const along = distanceNm(start, pos) * Math.cos((courseDeg(start, pos) - course) * Math.PI / 180);
+            return along >= 0 && along <= distanceNm(start, w.arcen) ? Math.abs(crossTrackNm(pos, start, course)) : distanceNm(start, pos);
+        };
+        return {unit, start, chordDistance, ...w};
+    };
+
+    it('sequences 5 NM inside the arc past its end, where ARCEN is closer than the arc', async () => {
+        const {unit, start, chordDistance, ...w} = await loadedOnArc();
+        // On the 175 radial the foot lies past the arc's end, so the arc is measured to its start, 10.8 NM away; ARCEN is
+        // 5.0 NM away. The chord would be 4.1 NM away
+        const pos = w.at(175, 5);
+        expect(distanceNm(pos, w.abc)).toBeLessThan(10 - 4); // off the leg
+        expect(distanceNm(pos, w.arcen)).toBeLessThan(distanceNm(pos, start) - 5);
+        expect(chordDistance(pos)).toBeLessThan(distanceNm(pos, w.arcen) - 0.5);
+
+        await moveAircraft(unit, pos, {groundspeedKt: 120, trackTrue: 90});
+        expect(activeIdent(unit)).toBe('FAFAA');
+    });
+
+    it('keeps ARCEN 5 NM outside the arc short of its end, where the arc is closer than ARCEN', async () => {
+        const {unit, chordDistance, ...w} = await loadedOnArc();
+        // On the 190 radial the foot lies on the arc, 5.0 NM away; ARCEN is 5.4 NM away. The chord's foot would lie past
+        // ARCEN, so it would be measured to the start, 14.9 NM away
+        const pos = w.at(190, 15);
+        expect(distanceNm(pos, w.abc)).toBeGreaterThan(10 + 4); // off the leg
+        expect(distanceNm(pos, w.abc) - 10).toBeLessThan(distanceNm(pos, w.arcen) - 0.3);
+        expect(chordDistance(pos)).toBeGreaterThan(distanceNm(pos, w.arcen) + 5);
+
+        await moveAircraft(unit, pos, {groundspeedKt: 120, trackTrue: 90});
+        expect(activeIdent(unit)).toBe('ARCEN');
     });
 });
 

@@ -469,8 +469,9 @@ sim.
     - With `turnAnticipation` on and the waypoint not fly-over or duplicated, it takes the lead from `turnLead`
       (`SequencingGeometry.ts`, #404, checked in the KLN 89 trainer, 2026-10-20). The lead is r·tan(θ/2), where r is the
       standard-rate radius with the bank limited to 25° (`bankeAngleForStandardTurn(gs)`, `services/KLNNavmath.ts`). It
-      is capped at 60 s of ground speed (`LEAD_CAP_TIME`) and at half the inbound leg. The inbound leg is the distance
-      between the waypoints, along the arc for a DME arc, and from where a Direct To was activated.
+      is capped at 60 s of ground speed (`LEAD_CAP_TIME`) and at half the inbound leg. The inbound leg
+      (`inboundLegLength`) is the distance between the waypoints, along the arc for a DME arc, and from where a Direct To
+      was activated.
     - The turn point is the lead plus the roll-in (`distanceToAchieveBankAngleChange`, the bank at 5 deg/s), measured
       along the track: the along-track distance to the waypoint (`alongTrackDistance`), which on course is the straight
       distance. The trainer adds no roll-in, so this is a deliberate departure: a 1 Hz calculation, autopilot lag, and

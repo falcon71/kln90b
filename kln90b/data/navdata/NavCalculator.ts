@@ -1,7 +1,7 @@
 import {CalcTickable, TICK_TIME_CALC} from "../../TickController";
 import {Sensors} from "../../Sensors";
 import {FROM, TO, VolatileMemory} from "../VolatileMemory";
-import {FlightPathUtils, GeoCircle, GeoPoint, LatLonInterface, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
+import {FlightPathUtils, GeoCircle, GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Degrees, NauticalMiles, Seconds} from "../Units";
 import {ModeController} from "../../services/ModeController";
@@ -11,7 +11,7 @@ import {calcDistToDestination} from "../../services/FlightplanUtils";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {bankeAngleForStandardTurn, distanceToAchieveBankAngleChange} from "../../services/KLNNavmath";
 import {FromLeg, TurnBisector, TurnPlan, TurnStackEntry} from "../flightplan/ActiveWaypoint";
-import {alongTrackDistance, bisectorSide, segmentDistance, turnLead} from "./SequencingGeometry";
+import {alongTrackDistance, bisectorSide, inboundLegLength, segmentDistance, turnLead} from "./SequencingGeometry";
 
 
 //4-8
@@ -25,8 +25,6 @@ export const HOURS_TO_SECONDS = 3600;
 
 const VEC3_CACHE = new Float64Array(3);
 const TO_GEOPOINT_CACHE = new GeoPoint(0, 0);
-const ARC_FROM_CACHE = new GeoPoint(0, 0);
-const ARC_TO_CACHE = new GeoPoint(0, 0);
 
 export const MAX_BANK_ANGLE = 25;
 
@@ -251,7 +249,7 @@ export class NavCalculator implements CalcTickable {
                 const turnDirection = NavMath.getTurnDirection(fromDtk, nextDtk);
                 //#404: the lead is capped at 60 s of ground speed and half the inbound leg, and a capped turn is flown on
                 //the tighter circle tangent to both legs (checked in the KLN 89 trainer, 2026-10-20)
-                const {lead, radius: turnRadius} = turnLead(this.sensors.in.gps.groundspeed, turnAngle, this.inboundLegLength(fromLeg, toLeg.wpt));
+                const {lead, radius: turnRadius} = turnLead(this.sensors.in.gps.groundspeed, turnAngle, inboundLegLength(fromLeg.wpt, fromLeg.path, toLeg.wpt));
                 //The roll-in on top of the lead is a deliberate departure from the trainer, which adds none: the unit
                 //calculates at 1 Hz and can start a turn up to a second late, and the sim's autopilot and aircraft need
                 //time to roll in. Users reported overshoots before it was added, and the default autopilot follows the GPS
@@ -538,19 +536,6 @@ export class NavCalculator implements CalcTickable {
         const nextDtk = entry.pathForDtk.bearingAt(entry.pathForDtk.closest(pos, VEC3_CACHE));
         return Math.abs(NavMath.diffAngle(track, nextDtk)) < 90
             && alongTrackDistance(entry.pathForDtk, entry.switchPoint, pos) <= tickDistance;
-    }
-
-    /**
-     * #404: the length of the leg flown into the waypoint, for the cap of the lead at half of it: the distance between
-     * the waypoints, or for a DME arc the length along the arc. For a Direct To the leg starts where it was activated
-     */
-    private inboundLegLength(fromLeg: FromLeg, to: LatLonInterface): NauticalMiles {
-        if (fromLeg.path.isGreatCircle()) {
-            return UnitType.GA_RADIAN.convertTo(GeoPoint.distance(fromLeg.wpt, to), UnitType.NMILE);
-        }
-        fromLeg.path.closest(fromLeg.wpt, ARC_FROM_CACHE);
-        fromLeg.path.closest(to, ARC_TO_CACHE);
-        return UnitType.GA_RADIAN.convertTo(fromLeg.path.distanceAlong(ARC_FROM_CACHE, ARC_TO_CACHE, Math.PI), UnitType.NMILE);
     }
 
     /**

@@ -48,6 +48,22 @@ export function turnLead(groundspeed: Knots, turnAngle: Degrees, inboundLeg: Nau
 }
 
 /**
+ * #404: the length of the leg flown into the waypoint, for the cap of the lead at half of it: the distance between its
+ * ends, or for a DME arc the length along the arc in its own direction, an end off the circle counting at its radial
+ * @param from the start of the leg; for a Direct To where it was activated
+ * @param path the path of the leg: its great circle, or the circle of the DME arc
+ * @param to the waypoint at its end
+ */
+export function inboundLegLength(from: LatLonInterface, path: GeoCircle, to: LatLonInterface): NauticalMiles {
+    if (path.isGreatCircle()) {
+        return UnitType.GA_RADIAN.convertTo(GeoPoint.distance(from, to), UnitType.NMILE);
+    }
+    path.closest(from, ARC_FROM_CACHE);
+    path.closest(to, ARC_TO_CACHE);
+    return UnitType.GA_RADIAN.convertTo(path.distanceAlong(ARC_FROM_CACHE, ARC_TO_CACHE, Math.PI), UnitType.NMILE);
+}
+
+/**
  * The distance along the path from the position to the waypoint: positive before the waypoint, negative past it.
  * Both are projected onto the path first.
  * @param path the leg, directed from its start towards the waypoint
