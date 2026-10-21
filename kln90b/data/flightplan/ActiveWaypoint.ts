@@ -391,6 +391,17 @@ export class ActiveWaypoint {
     }
 
     /**
+     * #157: off the leg (more than 4.0 NM from it) the active waypoint has no anticipated turn, so a turn of its own that
+     * has started is dropped (the design, docs/superpowers/specs/2026-10-20-waypoint-sequencing-design.md, section 3.2).
+     * While ownTurnStarted the stack holds only that turn, because it is pushed onto an empty stack. The decided turnPlan
+     * is kept and applies again when the aircraft comes back on the leg
+     */
+    public dropOwnTurn(): void {
+        this.turnStack = [];
+        this.ownTurnStarted = false;
+    }
+
+    /**
      * The turn state that belongs to the active waypoint. The turn stack is kept when the waypoint is sequenced, because
      * the turn onto the next leg is still being flown
      */
