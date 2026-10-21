@@ -463,14 +463,16 @@ export class NavCalculator implements CalcTickable {
     /**
      * Whether the aircraft will cross the abeam line of the active waypoint within the time, at the closure rate along
      * the leg: the ground speed times the cosine of the angle between the track and the leg. False while the aircraft
-     * does not close on the line
+     * does not close on the line, and once it is past the line: there the waypoint is sequenced off the leg on the
+     * outside, and the abeam turn is on the stack on the abeam plan, but at the MAP neither happens, and the alert would
+     * otherwise stay on through the whole missed approach (#157)
      * @param legPath the path of the active leg
      * @param along the along-track distance to the active waypoint
      * @param time
      */
     private isWithinTimeOfAbeam(legPath: GeoCircle, along: NauticalMiles, time: Seconds): boolean {
         const track = this.sensors.in.gps.getTrackTrueRespectingGroundspeed();
-        if (track === null) {
+        if (track === null || along < 0) {
             return false;
         }
         const legDtk = legPath.bearingAt(legPath.closest(this.sensors.in.gps.coords, VEC3_CACHE));

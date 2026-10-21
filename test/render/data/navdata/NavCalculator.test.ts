@@ -508,6 +508,52 @@ describe('no sequencing past the MAP (6-7)', () => {
         }
     });
 
+    // #157: the alerts timed to the abeam line, off the leg (36 s on the outside of the turn) and on the abeam plan (15 s),
+    // hold only before the abeam line. Past it a waypoint off the leg on the outside is sequenced and the abeam plan has
+    // its abeam turn on the stack, but at the MAP neither happens, so the alert ends there. West of the final is the
+    // outside of the left turn to MAHAA. Placed 3 NM west the aircraft is on the leg with the abeam plan (more than 2.8
+    // NM off at the decision), 5 NM west it is off the leg
+    for (const {westNm, alertBeforeNm, regime} of [
+        {westNm: 5, alertBeforeNm: 1.0, regime: 'off the leg'}, // 30 s before the abeam line at 120 kt, within 36 s
+        {westNm: 3, alertBeforeNm: 0.4, regime: 'on the abeam plan'}, // 12 s, within 15 s
+    ]) {
+        it(`with turn anticipation ${regime}: the waypoint alert ends past the MAP (#157)`, async () => {
+            const {unit, mapaa} = await onFinal({});
+
+            await moveAircraft(unit, pointFrom(pointFrom(mapaa, 0, alertBeforeNm), 270, westNm), {groundspeedKt: 120, trackTrue: 180});
+            expect(activeIdent(unit)).toBe('MAPAA');
+            expect(nav(unit).waypointAlert).toBe(true); // Precondition: the alert before the abeam line of the MAP
+
+            for (const pastNm of [1, 2, 5, 8]) {
+                await moveAircraft(unit, pointFrom(pointFrom(mapaa, 180, pastNm), 270, westNm), {groundspeedKt: 120, trackTrue: 180});
+                expect(activeIdent(unit)).toBe('MAPAA');
+                expect(nav(unit).toFrom).toBe(false); // FROM
+                expect(turnStackLength(unit)).toBe(0);
+                expect(nav(unit).waypointAlert, `${pastNm} NM past the MAP`).toBe(false);
+            }
+        });
+    }
+
+    // #157: off the leg the unit sequences as soon as the next leg's segment is at least as close as the active one, but
+    // not at the MAP. Past the MAP the final's segment is measured to FAFAA, 6 NM away or more, while the leg to MAHAA is
+    // closer: on the outside (west) its end MAPAA, on the inside (east) the leg itself
+    it('with turn anticipation off the leg: MAPAA stays active past the MAP where the missed approach leg is closer (#157)', async () => {
+        const {unit, mapaa, fafaa} = await onFinal({});
+        const mahaa = pointFrom(mapaa, 90, 5);
+
+        for (const [pastNm, eastNm] of [[1, -5], [3, -5], [1, 4.5]]) {
+            const pos = pointFrom(pointFrom(mapaa, 180, pastNm), eastNm > 0 ? 90 : 270, Math.abs(eastNm));
+            // Preconditions, in the plane: off the leg, and the missed approach leg closer than FAFAA
+            const missedLegNm = eastNm > 0 ? pastNm : distanceNm(pos, mapaa);
+            expect(Math.abs(eastNm)).toBeGreaterThan(4);
+            expect(missedLegNm).toBeLessThan(distanceNm(pos, fafaa) - 1);
+            expect(eastNm).toBeLessThan(distanceNm(mapaa, mahaa));
+
+            await moveAircraft(unit, pos, {groundspeedKt: 120, trackTrue: 180});
+            expect(activeIdent(unit), `${pastNm} NM past the MAP, ${eastNm} NM east`).toBe('MAPAA');
+        }
+    });
+
     it('without turn anticipation: MAPAA stays active past the MAP', async () => {
         const {unit, mapaa} = await onFinal({turnAnticipation: false});
 

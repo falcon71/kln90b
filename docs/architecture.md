@@ -532,7 +532,8 @@ sim.
   before the abeam line at the along-track closure rate, none at the decision (checked in the KLN 89 trainer,
   2026-10-20); off the leg `WPT_ALERT_OFF_LEG` (36 s) before the abeam line at the closure rate on the outside of the
   turn and none on the inside, where the inside bisector sequences first (#157, checked in the KLN 89 trainer,
-  2026-10-20). All stay on while a turn is on the stack. Before a waypoint without a turn 15 s with turn anticipation
+  2026-10-20). These two hold only before the abeam line, so they end past the MAP, where nothing is sequenced and no
+  turn is started. All stay on while a turn is on the stack. Before a waypoint without a turn 15 s with turn anticipation
   on (`WPT_ALERT_NO_TURN_WITH_TURN_ANTI`, #372, measured in the KLN 89 trainer) or 36 s with it off
   (`WPT_ALERT_WITHOUT_TURN_ANTI`). The alert of a waypoint without a turn ends once the waypoint is behind (FROM),
   unless a turn is still being flown.
