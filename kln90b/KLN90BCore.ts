@@ -258,7 +258,7 @@ export class KLN90BCore {
         //Lots of coherent calls, might take a while
 
 
-        this.audioGenerator = new AudioGenerator(this.bus, this.planeSettings);
+        this.audioGenerator = new AudioGenerator(this.bus, this.planeSettings, this.userSettings);
         const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, this.audioGenerator, this.messageHandler, this.hardware);
 
         this.hEventPublisher.startPublish();

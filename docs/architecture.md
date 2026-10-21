@@ -326,9 +326,11 @@ on them.
         - `L:KLN90B_HSI_TF_FLAGS`: 0 = off, 1 = TO, 2 = FROM.
         - `L:KLN90B_RollCommand`: degrees, positive = left.
         - `L:KLN90B_IntegrityWarn` (#87): true when the GPS is not valid.
-        - `L:KLN90B_XTK`: newest (#158); the ARINC 429 label 116 cross track in NM, positive = fly left, 0 without an
+        - `L:KLN90B_XTK` (#158): the ARINC 429 label 116 cross track in NM, positive = fly left, 0 without an
           active waypoint. Not smoothed, unlike `GPS WP CROSS TRK`.
         - `L:KLN90B_MsgLight`, `L:KLN90B_WptLight`, `L:KLN90B_AnnunTest`.
+        - `L:KLN90B_AlertVolume` (#197): the SET 9 alert volume, 0 to 99, written by `AudioGenerator` at boot and on
+          every change of `altAlertVolume`.
     - Writable by aircraft:
         - `L:KLN90B_Brightness` (0 to 1)
         - `L:KLN90B_Disabled` (hot swap)
@@ -634,7 +636,9 @@ comment gives the sources for the 1 Hz rate.
 - `services/AirspacesAlongRoute` is used by pages.
 - `AltAlert` (3-56) and `HtAboveAirportAlert` (3-58) beep through `AudioGenerator`, which uses SDK `SoundServer` with
   `kln_short_beep` / `kln_long_beep`. The aircraft `sound.xml` must define these, and they only work if
-  `Output.AltitudeAlertEnabled` is set. `BaseInstrument.onSoundEnd` forwards to `AudioGenerator`.
+  `Output.AltitudeAlertEnabled` is set. `BaseInstrument.onSoundEnd` forwards to `AudioGenerator`. The SDK has no call
+  that sets the volume of an instrument sound, so the SET 9 volume only reaches the sound if the aircraft maps
+  `L:KLN90B_AlertVolume` to a Wwise RTPC on both sounds (#197).
 - `MSA` is a lat/lon 1-degree grid from `Assets/msa.json` (`[lat+56][lon+180]`); `getMSAForRoute` gives the ESA.
 - `Timers` keeps the flight timer (GS >= 30 kt or power-on, depending on the `flightTimer` setting) and the persisted
   `totalTime`.

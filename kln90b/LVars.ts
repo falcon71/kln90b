@@ -24,6 +24,11 @@ export const LVAR_MSG_LIGHT = "L:KLN90B_MsgLight"; //Boolean. true whenever the 
 export const LVAR_WPT_LIGHT = "L:KLN90B_WptLight"; //Boolean. true if the waypoint alert is active
 export const LVAR_ANNUN_TEST = "L:KLN90B_AnnunTest"; //Boolean. true if the self-test is shown and all external annunciator lights should light up
 
+// Number, 0 to 99. The altitude alert volume of SET 9 (3-57). The unit cannot set the loudness of kln_short_beep and
+// kln_long_beep itself; an aircraft that wants it maps this LVar to a Wwise RTPC on both sounds in its sound.xml. Please
+// see https://github.com/falcon71/kln90b/wiki/panel.xml-customization for details
+export const LVAR_ALERT_VOLUME = "L:KLN90B_AlertVolume";
+
 //##############
 //###Writable###
 //##############

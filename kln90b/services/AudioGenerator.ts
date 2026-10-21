@@ -1,13 +1,16 @@
-import {EventBus, SoundServer, SoundServerController} from "@microsoft/msfs-sdk";
+import {EventBus, SimVarValueType, SoundServer, SoundServerController} from "@microsoft/msfs-sdk";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {StatusLineMessageEvents} from "../controls/StatusLine";
+import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
+import {LVAR_ALERT_VOLUME} from "../LVars";
 
 export const SHORT_BEEP_ID = "kln_short_beep";
 export const LONG_BEEP_ID = "kln_long_beep";
 
 
 /**
- * For this to work, the aircraft must have an entry with "tone_altitude_alert_default" defined in the section AvionicSounds of the sound.xml!
+ * For this to work, the aircraft must have entries for kln_short_beep and kln_long_beep defined in the section AvionicSounds of the sound.xml!
+ * The instrument cannot set the volume of a sound, so the SET 9 volume is only mirrored to L:KLN90B_AlertVolume (#197).
  */
 export class AudioGenerator {
 
@@ -17,9 +20,10 @@ export class AudioGenerator {
 
     private beeps: string[] = [];
 
-    constructor(private bus: EventBus, private settings: KLN90PlaneSettings) {
+    constructor(private bus: EventBus, private settings: KLN90PlaneSettings, userSettings: KLN90BUserSettings) {
         this.soundController = new SoundServerController(bus);
         this.soundServer = new SoundServer(bus);
+        userSettings.getSetting("altAlertVolume").sub(volume => SimVar.SetSimVarValue(LVAR_ALERT_VOLUME, SimVarValueType.Number, volume), true);
     }
 
     /**

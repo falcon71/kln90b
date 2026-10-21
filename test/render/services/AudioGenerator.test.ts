@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {EventBus} from '@microsoft/msfs-sdk';
 import {AudioGenerator, LONG_BEEP_ID, SHORT_BEEP_ID} from '../../../kln90b/services/AudioGenerator';
 import {KLN90PlaneSettings} from '../../../kln90b/settings/KLN90BPlaneSettings';
+import {KLN90BUserSettings} from '../../../kln90b/settings/KLN90BUserSettings';
 
 // What the unit asks the sim to play. AudioGenerator asks the SDK sound server through the bus topic
 // 'sound_server_play_sound' (SoundServerController.playSound); the server turns each request into
@@ -18,7 +19,7 @@ function generator(opts: { altitudeAlertEnabled?: boolean, debugMode?: boolean }
         output: {altitudeAlertEnabled: opts.altitudeAlertEnabled ?? true},
         debugMode: opts.debugMode ?? false,
     } as unknown as KLN90PlaneSettings;
-    const audio = new AudioGenerator(bus, settings);
+    const audio = new AudioGenerator(bus, settings, new KLN90BUserSettings(bus));
     const played: string[] = [];
     bus.getSubscriber<any>().on('sound_server_play_sound').handle((id: string) => played.push(id));
     const statusLine: string[] = [];

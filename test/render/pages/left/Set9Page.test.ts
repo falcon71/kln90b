@@ -79,3 +79,31 @@ describe('SET 9 alert volume (3-57)', () => {
         expect(storedSetting(unit, 'altAlertVolume')).toBe(2);
     });
 });
+
+// Public contract (LVars.ts, the wiki page panel.xml customization): the instrument cannot set the loudness of a sound,
+// so L:KLN90B_AlertVolume mirrors the SET 9 volume (3-57) for aircraft that map it to a Wwise RTPC (#197). It is written
+// at boot and on every change
+describe('L:KLN90B_AlertVolume (public contract, #197)', () => {
+    it('is the stored volume at boot', async () => {
+        const unit = await bootUnit({panelXml: ALERT_INSTALLED, storage: {altAlertVolume: 37}});
+
+        expect(unit.env.sim.lastWrite('L:KLN90B_AlertVolume')!.value).toBe(37);
+    });
+
+    it('is 99 at boot without a stored volume, the default of the setting', async () => {
+        const unit = await bootUnit({panelXml: ALERT_INSTALLED});
+
+        expect(unit.env.sim.lastWrite('L:KLN90B_AlertVolume')!.value).toBe(99);
+    });
+
+    it('follows a change on SET 9', async () => {
+        const unit = await bootUnit({panelXml: ALERT_INSTALLED, storage: {altAlertVolume: 37}});
+        await unit.panel.selectPage('L', 'SET 9');
+        await unit.panel.cursor('L');
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'altAlertVolume')).toBe(47);
+        expect(unit.env.sim.lastWrite('L:KLN90B_AlertVolume')!.value).toBe(47);
+    });
+});
