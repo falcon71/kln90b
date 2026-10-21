@@ -4,6 +4,7 @@ import {
     GeoCircle,
     GeoPoint,
     ICAO,
+    LatLonInterface,
     Publisher,
     UserSetting,
 } from "@microsoft/msfs-sdk";
@@ -45,6 +46,18 @@ export class TurnStackEntry {
                  * ActiveWaypoint drops it when the active waypoint changes
                  */
                 public readonly abeamTurnSign: number | null = null) {
+    }
+
+    /**
+     * The abeam turn at the waypoint: a circle of no size there, whose XTK is the distance to the waypoint with the sign
+     * of the side the turn goes to and whose DTK is the next leg's (abeamTurnSign)
+     * @param wpt the waypoint
+     * @param nextPath the path of the next leg
+     * @param turnDirection the direction of the turn at the waypoint
+     */
+    public static abeamTurn(wpt: LatLonInterface, nextPath: GeoCircle, turnDirection: "left" | "right"): TurnStackEntry {
+        const point = new GeoPoint(wpt.lat, wpt.lon);
+        return new TurnStackEntry(GeoCircle.createFromPoint(point, 0), point, nextPath, undefined, turnDirection === "left" ? 1 : -1);
     }
 }
 
@@ -391,12 +404,24 @@ export class ActiveWaypoint {
     }
 
     /**
+     * Starts the active waypoint's own anticipated turn: the entries, bottom first, replace the stack and ownTurnStarted
+     * is set. The stack is empty here, or holds what is left of the previous waypoint's turn, which the own turn
+     * supersedes (NavCalculator)
+     */
+    public startOwnTurn(...entries: TurnStackEntry[]): void {
+        this.turnStack = entries;
+        this.ownTurnStarted = true;
+    }
+
+    /**
      * #157: off the leg (more than 4.0 NM from it) the active waypoint has no anticipated turn, so a turn of its own that
      * has started is dropped (the design, docs/superpowers/specs/2026-10-20-waypoint-sequencing-design.md, section 3.2).
-     * While ownTurnStarted the stack holds only that turn, because it is pushed onto an empty stack. The decided turnPlan
+     * While ownTurnStarted the stack holds only that turn, because startOwnTurn replaces the stack. The decided turnPlan
      * is kept and applies again when the aircraft comes back on the leg
      */
     public dropOwnTurn(): void {
+        //A circle on top of the stack was normally popped earlier in the same calculation by its 4.0 NM end
+        //(NavCalculator.isPastEndOfTurn); this clears what is left, such as the roll-in before the circle
         this.turnStack = [];
         this.ownTurnStarted = false;
     }

@@ -3,7 +3,7 @@ import {Flight} from '../../harness/flight/Flight';
 import {World} from '../../harness/flight/World';
 import {airport, vor} from '../../harness/navdata/builders';
 import {savedFlightplan} from '../../harness/storage';
-import {angleBetween, courseDeg, crossTrackNm, distanceNm, LatLon, pointBefore, pointFrom} from '../../harness/flight/geo';
+import {angleBetween, courseDeg, crossTrackNm, distanceNm, finalCourseDeg, LatLon, pointBefore, pointFrom} from '../../harness/flight/geo';
 import {turnStackLength} from '../../harness/readers';
 import {ManualPilot, Pilot} from '../../harness/flight/pilots';
 
@@ -142,3 +142,127 @@ async function bootBeforeTurnAt(start: LatLon, trackTrue: number, groundspeedKt:
     expect(flight.nav.activeIdent).toBe('ABC');
     return {flight, w};
 }
+
+/**
+ * The distance the sim adds on top of the lead so that the aircraft is banked when the turn begins (NavCalculator, the
+ * roll-in), derived from its definition: the standard-rate bank atan(GS / 362.1) limited to 25°, reached at 5°/s, flown
+ * at the ground speed (the derivation of turnLead.test.ts)
+ */
+function rollInNm(groundspeedKt: number): number {
+    const bank = Math.min(Math.atan(groundspeedKt / 362.1) / DEG, 25);
+    return bank / 5 * groundspeedKt / 3600;
+}
+
+/**
+ * The lead of a turn, derived from its definition: r·tan(θ/2) with r the radius at the standard-rate bank limited to 25°
+ * (r = V² / (11.26 · tan(bank)) ft, V in knots), capped at 60 s of ground speed and at half the inbound leg (checked in
+ * the KLN 89 trainer, 2026-10-20, docs/kln89-trainer-record.md)
+ */
+function leadNm(groundspeedKt: number, turnDeg: number, inboundNm: number): number {
+    const bank = Math.min(Math.atan(groundspeedKt / 362.1) / DEG, 25);
+    const r = groundspeedKt ** 2 / (11.26 * Math.tan(bank * DEG)) / 6076.12;
+    return Math.min(r * Math.tan(turnDeg / 2 * DEG), groundspeedKt * 60 / 3600, inboundNm / 2);
+}
+
+/** The rounding of the aircraft's position against the GPS position the calculation used: a display tick of flight */
+const POSITION_TOLERANCE_NM = 0.02;
+
+/**
+ * KAAA 28 NM west of ABC, a right turn of 120° at ABC onto the `legNm` leg to DEF on 210, and a right turn of 120° at
+ * DEF onto the 20 NM leg to KBBB on 330, flown by the coupled autopilot at `groundspeedKt` from 8 NM before ABC. Returns
+ * the courses at DEF, the ray of DEF's bisector on the inside of the turn and the along-track distance before DEF on the
+ * leg from ABC (in the plane, negative past DEF)
+ */
+async function bootShortLegAfterTurn(groundspeedKt: number, legNm: number) {
+    const p = abcPosition();
+    const w1 = vor('ABC', p.lat, p.lon);
+    const a0 = pointFrom(w1, 270, 28);
+    const a = airport('KAAA', a0.lat, a0.lon);
+    const w20 = pointFrom(w1, 210, legNm);
+    const w2 = vor('DEF', w20.lat, w20.lon);
+    const c0 = pointFrom(w2, 330, 20);
+    const c = airport('KBBB', c0.lat, c0.lon);
+    const world = new World({magvar: 0}).add(a, w1, w2, c);
+    const start = pointBefore(a, w1, 8);
+    const flight = await Flight.start({
+        world, storage: savedFlightplan(0, [a, w1, w2, c]),
+        aircraft: {lat: start.lat, lon: start.lon, altitudeFt: 3000, groundspeedKt, trackTrue: courseDeg(start, w1)},
+    });
+    await flight.flyUntilActive('ABC', {timeout: 30});
+    const inbound = finalCourseDeg(w1, w2);
+    const next = courseDeg(w2, c);
+    // Halfway between the course back along the inbound leg and the next leg
+    const back = (inbound + 180) % 360;
+    const bisectorRay = (back + angleDiffSigned(back, next) / 2 + 360) % 360;
+    const alongBeforeDef = () => -distanceNm(w2, flight.aircraft) * Math.cos((courseDeg(w2, flight.aircraft) - inbound) * DEG);
+    return {flight, w2, inbound, next, bisectorRay, alongBeforeDef};
+}
+
+// The final review of the waypoint sequencing, 2026-10-21: DEF's own turn could not start while ABC's turn circle was
+// still on the turn stack, and DEF's sequencing at its bisector is armed by DEF's own turn. A leg to DEF shorter than
+// ABC's lead plus DEF's turn point therefore delayed DEF's turn until ABC's circle ended (the lead past ABC), and on a
+// leg shorter than ABC's lead DEF was sequenced past DEF. A waypoint's own turn now supersedes the leftover at its own
+// turn point. No trainer check covers this case; the expectations are the rules of the trainer record
+// (docs/kln89-trainer-record.md, 2026-10-20) applied to DEF: the turn at its turn point, the sequencing at its bisector
+describe('a turn left over from the previous waypoint at the turn point (2026-10-21 review, #375, #404)', () => {
+    for (const {groundspeedKt, legNm} of [{groundspeedKt: 120, legNm: 2.0}, {groundspeedKt: 239, legNm: 5.0}]) {
+        it(`starts DEF's turn at its own turn point and sequences DEF at its bisector, a ${legNm} NM leg at ${groundspeedKt} kt`, async () => {
+            const {flight, w2, next, bisectorRay, alongBeforeDef} = await bootShortLegAfterTurn(groundspeedKt, legNm);
+            const aw = flight.unit.props.memory.navPage.activeWaypoint;
+            // DEF's lead is capped at half the leg, and the roll-in comes on top. ABC's lead (120°, not capped by the 28 NM
+            // leg) reaches past DEF's turn point: ABC's circle ends that far past ABC
+            const turnPoint = leadNm(groundspeedKt, 120, legNm) + rollInNm(groundspeedKt);
+            expect(leadNm(groundspeedKt, 120, legNm)).toBeCloseTo(legNm / 2, 6);
+            expect(leadNm(groundspeedKt, 120, 28), 'ABC\'s circle ends inside DEF\'s turn point').toBeGreaterThan(legNm - turnPoint + 0.1);
+
+            await flight.flyUntilActive('DEF', {timeout: 300});
+            // Preconditions: DEF becomes active (at ABC's bisector) before its turn point, with ABC's turn on the stack
+            expect(alongBeforeDef()).toBeGreaterThan(turnPoint + groundspeedKt / 3600);
+            expect(turnStackLength(flight.unit)).toBeGreaterThan(0);
+
+            await flight.flyUntil(() => flight.nav.activeIdent !== 'DEF' || aw.ownTurnStarted, {timeout: 120, description: 'the start of the turn at DEF'});
+            expect(flight.nav.activeIdent).toBe('DEF');
+            // The turn starts within the calculation tick before the turn point (GS / 3600 NM), and the aircraft's position
+            // is that of the calculation within a display tick
+            const along = alongBeforeDef();
+            expect(along, 'along-track distance before DEF at its turn start').toBeLessThanOrEqual(turnPoint + groundspeedKt / 3600 + POSITION_TOLERANCE_NM);
+            expect(along, 'along-track distance before DEF at its turn start').toBeGreaterThanOrEqual(turnPoint - POSITION_TOLERANCE_NM);
+            await flight.fly(1);
+            expect(flight.nav.activeIdent).toBe('DEF');
+            expect(angleBetween(flight.nav.dtkTrue, next), 'DTK on the next leg one second after the turn start').toBeLessThan(1);
+
+            await flight.flyUntil(() => flight.nav.activeIdent !== 'DEF', {timeout: 120, description: 'DEF sequenced'});
+            expect(flight.nav.activeIdent).toBe('KBBB');
+            const bearing = courseDeg(w2, flight.aircraft);
+            expect(angleBetween(bearing, bisectorRay), `bearing from DEF ${bearing.toFixed(1)}, ray ${bisectorRay.toFixed(1)}`).toBeLessThan(3);
+            expect(alongBeforeDef(), 'sequenced before DEF').toBeGreaterThan(0);
+        });
+    }
+
+    it('starts DEF\'s turn and sequences DEF at once when DEF becomes active past both, before DEF, a 1.0 NM leg at 120 kt', async () => {
+        // The reviewer's probe: ABC's lead is 1.10 NM, longer than the 1.0 NM leg, so ABC's circle ends 0.1 NM past DEF.
+        // DEF becomes active at ABC's bisector, already inside DEF's turn point (0.5 NM, half the leg, plus the roll-in)
+        // and already past DEF's bisector: after two right turns the middle of ABC's turn lies beyond it. DEF's turn then
+        // starts at once, and DEF is sequenced at once by it, before DEF. Before the fix DEF was sequenced 0.1 NM past
+        // DEF, when ABC's circle ended, and its turn was flown from behind
+        const {flight, w2, next, inbound, alongBeforeDef} = await bootShortLegAfterTurn(120, 1.0);
+        const turnPoint = leadNm(120, 120, 1.0) + rollInNm(120);
+        expect(leadNm(120, 120, 28)).toBeGreaterThan(1.0 + 0.05);
+
+        await flight.flyUntilActive('DEF', {timeout: 300});
+        // Preconditions: inside DEF's turn point, and on the next leg's side of DEF's bisector, the line through DEF on the
+        // mean course plus 90° (000 for the right turn from 210 to 330), whose next leg's side is its left
+        expect(alongBeforeDef()).toBeLessThan(turnPoint);
+        expect(alongBeforeDef()).toBeGreaterThan(0.3);
+        const mean = inbound + angleDiffSigned(inbound, next) / 2;
+        expect(crossTrackNm(flight.aircraft, w2, mean + 90), 'past DEF\'s bisector').toBeLessThan(0);
+
+        await flight.flyUntil(() => flight.nav.activeIdent !== 'DEF', {timeout: 30, description: 'DEF sequenced'});
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(alongBeforeDef(), 'sequenced before DEF').toBeGreaterThan(0.3);
+        // By DEF's own turn, which is on the stack: the DTK is DEF's next leg's from the calculation after
+        await flight.fly(1);
+        expect(angleBetween(flight.nav.dtkTrue, next)).toBeLessThan(1);
+        expect(turnStackLength(flight.unit)).toBeGreaterThan(0);
+    });
+});

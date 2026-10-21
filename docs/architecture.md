@@ -474,7 +474,7 @@ sim.
     - The turn point is the lead plus the roll-in (`distanceToAchieveBankAngleChange`, the bank at 5 deg/s), measured
       along the track: the along-track distance to the waypoint (`alongTrackDistance`), which on course is the straight
       distance. The trainer adds no roll-in, so this is a deliberate departure: a 1 Hz calculation, autopilot lag, and
-      SimVars that the display shares.
+      SimVars that the display shares. Users reported overshoots before the roll-in was added.
     - Two regimes, chosen in every calculation by the cross track to the active leg's own path (not a turn circle)
       against `OFF_LEG_XTK` (4.0 NM, #157, checked in the KLN 89 trainer, 2026-10-20; not latched, so the regime can
       change from one calculation to the next). On the leg (|XTK| ≤ 4.0 NM) the turn plan, the turn start and the
@@ -515,8 +515,13 @@ sim.
     - The end-point condition keeps a lagging aircraft from ending the turn as it moves away from the end point at first.
     - Measuring the 4.0 NM to the active leg keeps a fast aircraft, which starts the turn lead · sin θ from the next leg,
       from ending it at once.
-    - The turn is pushed once per active waypoint: pushing it sets `ActiveWaypoint.ownTurnStarted`, and a turn that
-      ended while its waypoint is still active is not started again (#375), except one dropped off the leg (#157).
+    - The turn is pushed once per active waypoint: pushing it (`ActiveWaypoint.startOwnTurn`) sets `ownTurnStarted`, and
+      a turn that ended while its waypoint is still active is not started again (#375), except one dropped off the leg
+      (#157).
+    - The waypoint's own turn supersedes a turn left over from the previous waypoint: at its turn point (by the plan) it
+      replaces whatever is still on the stack. A leg shorter than the previous turn's lead plus this turn point otherwise
+      delayed the turn, and the bisector sequencing it arms, until the previous circle ended (the final review of
+      2026-10-21; no trainer evidence).
     - On the leg it sequences when the aircraft is past the bisector of the turn (`bisectorSide >= 0`), armed by
       `ownTurnStarted` or the plan `AT_ABEAM` (#375, checked in the KLN 89 trainer, 2026-10-20). On course that is the
       middle of the turn; for a big turn it lies well before the waypoint. It is a state, not a crossing, so an aircraft
