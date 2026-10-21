@@ -51,11 +51,11 @@ async function flyToTurnStart(flight: Flight, ident: string, wpt: { lat: number;
 const ENTRY_START_NM = 0.19;
 
 /**
- * A 28 NM leg arriving at ABC on 090 and a right turn of `turnDeg` there onto the leg to KBBB, flown at 239 kt from 12 NM
- * before ABC. 12 NM before ABC the turn is not due yet, so ABC is the waypoint the plan activates. `next` is the course
- * of the next leg at ABC
+ * A 28 NM leg arriving at ABC on 090 and a right turn of `turnDeg` there onto the leg to KBBB, flown at `groundspeedKt`
+ * from 12 NM before ABC. 12 NM before ABC the turn is not due yet, so ABC is the waypoint the plan activates. `next` is
+ * the course of the next leg at ABC
  */
-async function bootBeforeCappedTurn(turnDeg: number) {
+async function bootBeforeCappedTurn(turnDeg: number, groundspeedKt = 239) {
     const w = vor('ABC', 47.5, 8.9);
     const a0 = pointFrom(w, 270, 28);
     const a = airport('KAAA', a0.lat, a0.lon);
@@ -65,7 +65,7 @@ async function bootBeforeCappedTurn(turnDeg: number) {
     const start = pointBefore(a, w, 12);
     const flight = await Flight.start({
         world, storage: savedFlightplan(0, [a, w, c]),
-        aircraft: {lat: start.lat, lon: start.lon, altitudeFt: 3000, groundspeedKt: 239, trackTrue: courseDeg(start, w)},
+        aircraft: {lat: start.lat, lon: start.lon, altitudeFt: 3000, groundspeedKt, trackTrue: courseDeg(start, w)},
     });
     await flight.flyUntil(() => flight.nav.activeIdent !== null, {timeout: 30, description: 'a waypoint active'});
     await flight.fly(1);
@@ -164,15 +164,29 @@ describe('the turn anticipation distance (#404)', () => {
     });
 });
 
+/**
+ * The lead of a turn, derived from its definition: r·tan(θ/2) with r the radius at the standard-rate bank limited to 25°
+ * (the pilot's formula r = V² / (11.26 · tan(bank)) ft, V in knots), capped at 60 s of ground speed. The 28 NM inbound
+ * leg of these flights is too long for its cap at half the leg to apply
+ */
+function leadNm(groundspeedKt: number, turnDeg: number): number {
+    const bank = Math.min(Math.atan(groundspeedKt / 362.1) / DEG, 25);
+    const r = groundspeedKt ** 2 / (11.26 * Math.tan(bank * DEG)) / 6076.12;
+    return Math.min(r * Math.tan(turnDeg / 2 * DEG), groundspeedKt * 60 / 3600);
+}
+
 // #404: a capped turn is tighter than the aircraft can fly at 25° of bank, so the aircraft lags its circle and moves away
-// from the circle's end point at first. The turn ends only once the aircraft is past the bisector of the turn and past
-// the end point along the next leg, so near 180° (where the start of the turn lies barely before its end point along
-// the next leg) it does not end where it starts, and it is not started over and over again either
-describe('the end of a capped turn close to 180° (#404)', () => {
-    for (const turnDeg of [171, 179]) {
-        it(`keeps the DTK on the next leg from the start of a ${turnDeg}° turn at 239 kt until the aircraft is past its end point (#404)`, async () => {
-            const {flight, w, next} = await bootBeforeCappedTurn(turnDeg);
-            const lead = 239 * 60 / 3600;
+// from the circle's end point at first. The turn ends only once the aircraft is past the bisector of the turn, flying
+// along the next leg, and past the end point along the next leg, so near 180° (where the start of the turn lies barely
+// before its end point along the next leg, at 180° on it) it does not end where it starts, and it is not started over
+// and over again either. At a high ground speed the aircraft starts the turn far from the next leg (lead · sin θ, more
+// than 4.0 NM for 120° at 300 kt): the off-the-leg end is measured to the active leg, so that does not end the turn
+describe('the end of an anticipated turn (#404)', () => {
+    for (const {turnDeg, groundspeedKt} of [{turnDeg: 171, groundspeedKt: 239}, {turnDeg: 179, groundspeedKt: 239},
+        {turnDeg: 180, groundspeedKt: 239}, {turnDeg: 120, groundspeedKt: 300}]) {
+        it(`keeps the DTK on the next leg from the start of a ${turnDeg}° turn at ${groundspeedKt} kt until the aircraft is past its end point (#404)`, async () => {
+            const {flight, w, next} = await bootBeforeCappedTurn(turnDeg, groundspeedKt);
+            const lead = leadNm(groundspeedKt, turnDeg);
             // The end of the turn: the lead past ABC on the next leg. The distance along the next leg that remains to it is
             // measured in the plane, which over these few NM differs from the sphere by far less than the tolerances
             const remainingToEnd = () => {
@@ -201,16 +215,18 @@ describe('the end of a capped turn close to 180° (#404)', () => {
             // The turn leaves the stack once the aircraft is past the end point along the next leg (within the tick before,
             // 0.066 NM at 239 kt, and a display tick of rounding), never before
             const end = samples[samples.length - 1];
-            expect(end.remaining, all).toBeLessThanOrEqual(tickNm(239) + POSITION_TOLERANCE_NM);
+            expect(end.remaining, all).toBeLessThanOrEqual(tickNm(groundspeedKt) + POSITION_TOLERANCE_NM);
             expect(end.remaining, all).toBeGreaterThanOrEqual(-POSITION_TOLERANCE_NM);
             expect(samples.slice(0, -1).every(s => s.stack > 0), all).toBe(true);
         });
     }
 
-    it('ends a turn the aircraft leaves by more than 4.0 NM from the next leg (KLN 89 trainer, 2026-10-20, #404)', async () => {
-        // The off-the-leg threshold of the trainer record: |XTK| against a fixed 4.0 NM. Hand flown, the aircraft turns
-        // away from the 171° right turn (left, to north) once the turn has started, and flies on north, away from the next
-        // leg and never past the turn's bisector, so the turn can only end by that distance
+    it('ends a turn the aircraft leaves by more than 4.0 NM from the active leg (KLN 89 trainer, 2026-10-20, #404)', async () => {
+        // The off-the-leg threshold of the trainer record: |XTK| to the active leg against a fixed 4.0 NM. Hand flown, the
+        // aircraft turns away from the 171° right turn (left, to north) once the turn has started, and flies on north,
+        // away from both legs and never past the turn's bisector, so the turn can only end by that distance. Turning away,
+        // the aircraft passes abeam ABC and the unit sequences it, so the active leg is the next leg here; that the
+        // distance is measured to the inbound leg before the sequencing is held by the 120° turn at 300 kt above
         const {flight, w, next} = await bootBeforeCappedTurn(171);
         await flight.flyUntil(() => flight.nav.activeIdent !== 'ABC' || turnStackLength(flight.unit) > 0, {timeout: 300, description: 'start of the turn at ABC'});
         expect(flight.nav.activeIdent).toBe('ABC');
@@ -220,15 +236,16 @@ describe('the end of a capped turn close to 180° (#404)', () => {
         await flight.flyUntil(() => angleBetween(flight.aircraft.trackTrue, 0) < 5, {timeout: 120, description: 'heading north'});
         pilot.bank = 0;
 
-        const samples: { offNm: number; stack: number }[] = [];
+        const offActiveLeg = () => Math.abs(flight.nav.activeIdent === 'ABC' ? crossTrackNm(flight.aircraft, w, 90) : crossTrackNm(flight.aircraft, w, next));
+        const samples: { ident: string | null; offNm: number; stack: number }[] = [];
         do {
             await flight.fly(1);
-            samples.push({offNm: Math.abs(crossTrackNm(flight.aircraft, w, next)), stack: turnStackLength(flight.unit)});
-            expect(samples.length, 'more than 4.2 NM from the next leg').toBeLessThan(300);
+            samples.push({ident: flight.nav.activeIdent, offNm: offActiveLeg(), stack: turnStackLength(flight.unit)});
+            expect(samples.length, 'more than 4.2 NM from the active leg').toBeLessThan(300);
         } while (samples[samples.length - 1].offNm <= 4.2);
-        const all = JSON.stringify(samples.map(s => `${s.offNm.toFixed(2)}:${s.stack}`));
+        const all = JSON.stringify(samples.map(s => `${s.ident}:${s.offNm.toFixed(2)}:${s.stack}`));
         // On the stack while within 4.0 NM (less a display tick of rounding), off it beyond 4.0 NM plus the tick ahead
-        // (0.066 NM at 239 kt, flown north at about 81° to the next leg) and the rounding
+        // (0.066 NM at 239 kt) and the rounding
         expect(samples.filter(s => s.offNm < 4.0 - POSITION_TOLERANCE_NM).every(s => s.stack > 0), all).toBe(true);
         expect(samples.filter(s => s.offNm > 4.0 + tickNm(239) + POSITION_TOLERANCE_NM).every(s => s.stack === 0), all).toBe(true);
         expect(samples.some(s => s.offNm < 4.0 - POSITION_TOLERANCE_NM), all).toBe(true);

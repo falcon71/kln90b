@@ -143,7 +143,7 @@ export class NavCalculator implements CalcTickable {
             const turnStackEntry = nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1];
             const tickDistance = this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC;
             const distFromCurrent = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(turnStackEntry.switchPoint), UnitType.NMILE);
-            if (turnStackEntry.turnBisector !== undefined ? this.isPastEndOfTurn(turnStackEntry, turnStackEntry.turnBisector, tickDistance)
+            if (turnStackEntry.turnBisector !== undefined ? this.isPastEndOfTurn(turnStackEntry, turnStackEntry.turnBisector, tickDistance, legPath)
                 : distFromCurrent <= tickDistance || distFromCurrent > this.lastTurnStackDistance!) {
                 console.debug("Reached end of turn", distFromCurrent, this.lastTurnStackDistance, nav.activeWaypoint.turnStack);
                 //We have reached the end of the turn, XTK will now use the normal leg again
@@ -338,18 +338,32 @@ export class NavCalculator implements CalcTickable {
     }
 
     /**
-     * #404: the turn circle ends once the aircraft is past its end point along the next leg (within the tick ahead),
-     * but only on the next leg's side of the turn's bisector: a turn cannot end before its midpoint. Near 180° the start
-     * of the turn lies barely before its end point along the next leg (lead · (1 + cos θ)), so without the bisector the
-     * turn would end where it starts. It also ends when the aircraft is more than OFF_LEG_XTK from the next leg. A
+     * #404: the turn circle ends once the aircraft is past its end point along the next leg (within the tick ahead), but
+     * only past its midpoint: on the next leg's side of the turn's bisector and with the track within 90° of the next
+     * leg. Near 180° the start of the turn lies barely before its end point along the next leg (lead · (1 + cos θ)), and
+     * at 180° the bisector runs along both legs, so without these conditions the turn would end where it starts. A
      * capped turn is tighter than the aircraft can fly, so the aircraft moves away from the end point at first: the
-     * distance to it, which ends the roll-in, would end the turn as soon as it began
+     * distance to it, which ends the roll-in, would end the turn as soon as it began.
+     * The turn also ends when the aircraft is more than OFF_LEG_XTK from the active leg: the inbound leg until the
+     * waypoint is sequenced, the next leg afterwards (the spec's section 3.2). Measured to the next leg instead, a fast
+     * aircraft would be off it at the start of the turn already (lead · sin θ)
+     * @param entry the turn circle
+     * @param bisector its turnBisector
+     * @param tickDistance the distance flown in one calculation tick
+     * @param activeLegPath the path of the active leg
      */
-    private isPastEndOfTurn(entry: TurnStackEntry, bisector: TurnBisector, tickDistance: NauticalMiles): boolean {
+    private isPastEndOfTurn(entry: TurnStackEntry, bisector: TurnBisector, tickDistance: NauticalMiles, activeLegPath: GeoCircle): boolean {
         const pos = this.sensors.in.gps.coords;
-        return (bisectorSide(bisector.wpt, bisector.inboundDtk, bisector.nextDtk, pos) >= 0
-                && alongTrackDistance(entry.pathForDtk, entry.switchPoint, pos) <= tickDistance)
-            || Math.abs(UnitType.GA_RADIAN.convertTo(entry.pathForDtk.distance(pos), UnitType.NMILE)) > OFF_LEG_XTK;
+        if (Math.abs(UnitType.GA_RADIAN.convertTo(activeLegPath.distance(pos), UnitType.NMILE)) > OFF_LEG_XTK) {
+            return true;
+        }
+        const track = this.sensors.in.gps.getTrackTrueRespectingGroundspeed();
+        if (track === null || bisectorSide(bisector.wpt, bisector.inboundDtk, bisector.nextDtk, pos) < 0) {
+            return false;
+        }
+        const nextDtk = entry.pathForDtk.bearingAt(entry.pathForDtk.closest(pos, VEC3_CACHE));
+        return Math.abs(NavMath.diffAngle(track, nextDtk)) < 90
+            && alongTrackDistance(entry.pathForDtk, entry.switchPoint, pos) <= tickDistance;
     }
 
     /**

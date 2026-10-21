@@ -477,11 +477,16 @@ sim.
     - A leg that becomes active inside the lead (a Direct To, a short leg) starts its turn at once and flies it. The
       waypoint is no longer skipped; the #76 skip is gone.
     - The pre-turn segment ends at its switch point: within the tick ahead, or once the distance to the point grows.
-    - The turn circle carries the turn's bisector (`TurnStackEntry.turnBisector`). It ends once the aircraft is on the
-      next leg's side of the bisector and past the circle's end point (the lead past the waypoint) along the next leg,
-      within the tick ahead. It also ends when the aircraft is more than `OFF_LEG_XTK` (4.0 NM) from the next leg.
-    - The bisector condition keeps a turn near 180° from ending where it starts, and the end-point condition keeps a
-      lagging aircraft from ending the turn as it moves away from the end point at first.
+    - The turn circle carries the turn's bisector (`TurnStackEntry.turnBisector`). It ends once the aircraft is past its
+      midpoint and past the circle's end point (the lead past the waypoint) along the next leg, within the tick ahead.
+      Past the midpoint means on the next leg's side of the bisector, with the GPS track within 90° of the next leg.
+    - It also ends when the aircraft is more than `OFF_LEG_XTK` (4.0 NM) from the active leg: the inbound leg until the
+      waypoint is sequenced, the next leg afterwards.
+    - The midpoint condition keeps a turn near 180° from ending where it starts. At 180° the bisector runs along both
+      legs, which is why the track is also checked.
+    - The end-point condition keeps a lagging aircraft from ending the turn as it moves away from the end point at first.
+    - Measuring the 4.0 NM to the active leg keeps a fast aircraft, which starts the turn lead · sin θ from the next leg,
+      from ending it at once.
     - It sequences when the plane is abeam (the distance starts increasing).
 - Without turn anticipation, it sequences on FROM.
 - **The MAP is never auto-sequenced.**
