@@ -49,7 +49,10 @@ type Apt7PageTypes = {
 /**
  * 3-49, 6-4
  *
- * Yes, it is impossible not to select an approach transition!
+ * Yes, it is impossible not to select a transition!
+ *
+ * In the AVsoftech KLN 90B trainer (2026-10-22, third-party) the STAR CHINS 5 does not offer CHINS itself as a
+ * transition: when a STAR has transitions, one must be selected.
  */
 export class Apt7Page extends WaypointPage<AirportFacility> {
 

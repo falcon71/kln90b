@@ -948,39 +948,122 @@ const sidStar = (facs: Facility[] = WORLD) =>
 const convertApp = (app: ApproachProcedure, iafIdx: number | null = 0, apt: AirportFacility = kprc) =>
     sidStar().getKLNApproachLegList(apt, app, iafIdx === null ? null : app.transitions[iafIdx]);
 
-describe('SidStar.formatApproachName', () => {
-    const name = (type: ApproachType, runway: string, suffix?: string) =>
-        SidStar.formatApproachName(approach({type, runway, suffix, final: [Leg.IF(fafaa)]}), kprc);
+describe('SidStar approach names', () => {
+    const RNAV = ApproachType.APPROACH_TYPE_RNAV, GPS = ApproachType.APPROACH_TYPE_GPS, VOR = ApproachType.APPROACH_TYPE_VOR,
+        VORDME = ApproachType.APPROACH_TYPE_VORDME, NDB = ApproachType.APPROACH_TYPE_NDB, NDBDME = ApproachType.APPROACH_TYPE_NDBDME;
+    const app = (type: ApproachType, runway: string, suffix?: string) => approach({type, runway, suffix, final: [Leg.IF(fafaa)]});
+    const listName = (type: ApproachType, runway: string, suffix?: string) => SidStar.formatApproachListName(app(type, runway, suffix));
+    const header = (type: ApproachType, runway: string, suffix?: string, apt = kprc) => SidStar.formatApproachName(app(type, runway, suffix), apt);
+    // Invented positions; the idents are the airports the evidence names
+    const krno = airport('KRNO', 39.5, -119.8), ksmo = airport('KSMO', 34.0, -118.5),
+        kaas = airport('KAAS', 46.0, -100.0), ktrk = airport('KTRK', 39.3, -120.1);
 
-    // 6-5: the approach header is the first letter of the approach type, the runway, a dash and the airport (figure 6-8
-    // shows V25R-KLAX, figure 6-24 V12-KOWA). 3-49 lists the RNAV approaches as RNAV.
-    it.each([
-        ['VOR 25R', ApproachType.APPROACH_TYPE_VOR, '25R', 'V25R-KPRC'],
-        ['VOR/DME 12', ApproachType.APPROACH_TYPE_VORDME, '12', 'V12-KPRC'],
-        ['NDB 24L', ApproachType.APPROACH_TYPE_NDB, '24L', 'N24L-KPRC'],
-        ['NDB/DME 33', ApproachType.APPROACH_TYPE_NDBDME, '33', 'N33-KPRC'],
-        ['RNAV 15C', ApproachType.APPROACH_TYPE_RNAV, '15C', 'R15C-KPRC'],
-    ])('names the %s approach', (_n, type, runway, expected) => {
-        expect(name(type, runway)).toBe(expected);
+    // krno-iap-list.jpg (photo of a real unit, maintainer's "gps search" folder): the APT 8 list of KRNO shows RNAV 17L,
+    // 17R, 35L and 35R. These are the X approaches, the only ones the unit can fly; the others are filtered out. The
+    // suffix is not shown.
+    it('lists an RNAV approach with a runway without its suffix', () => {
+        expect(['17L', '17R', '35L', '35R'].map(r => listName(RNAV, r, 'X'))).toEqual(['RNAV 17L', 'RNAV 17R', 'RNAV 35L', 'RNAV 35R']);
     });
 
-    // The manual shows no header for a GPS approach, a runway below 10, a circling approach or a suffix; these are the
-    // code's forms.
-    describe('(characterization)', () => {
-        it('names a GPS approach like an RNAV approach', () => {
-            expect(name(ApproachType.APPROACH_TYPE_GPS, '27')).toBe('R27-KPRC');
+    // krno-r35l-list.jpg (photo of a real unit): the header of RNAV 35L at KRNO is R35L-KRNO, without the suffix.
+    it('titles an RNAV approach with a runway without its suffix', () => {
+        expect(header(RNAV, '35L', 'X', krno)).toBe('R35L-KRNO');
+    });
+
+    // 6-5: the approach header is the first letter of the approach type, the runway, a dash and the airport (figure 6-8
+    // shows V25R-KLAX, figure 6-24 is a VOR RWY 12 approach).
+    it.each([
+        ['VOR 25R', VOR, '25R', 'V25R-KPRC'],
+        ['NDB 24L', NDB, '24L', 'N24L-KPRC'],
+        ['RNAV 15C', RNAV, '15C', 'R15C-KPRC'],
+    ])('names the %s approach', (_n, type, runway, expected) => {
+        expect(header(type, runway)).toBe(expected);
+    });
+
+    // 3-49, figure 3-149: an approach without a runway is listed as VOR-A.
+    it('lists a VOR approach without a runway with its suffix', () => {
+        expect(listName(VOR, '', 'A')).toBe('VOR-A   ');
+    });
+
+    // AVsoftech KLN 90B trainer, checked by the maintainer on 2026-10-22. It is third-party and does not count as
+    // evidence (test/README.md).
+    describe('(characterization, AVsoftech KLN 90B trainer, 2026-10-22)', () => {
+        it('names a GPS approach with G', () => {
+            expect(listName(GPS, '27')).toBe('GPS  27 ');
+            expect(header(GPS, '27')).toBe('G27-KPRC');
         });
 
-        it('pads a runway below 10 with a zero', () => {
-            expect(name(ApproachType.APPROACH_TYPE_VOR, '09')).toBe('V09-KPRC');
+        it('names a VOR/DME approach with a runway VORD and D', () => {
+            expect(listName(VORDME, '12')).toBe('VORD 12 ');
+            expect(header(VORDME, '12')).toBe('D12-KPRC');
         });
 
-        it('names a circling approach with a dash for the runway', () => {
-            expect(name(ApproachType.APPROACH_TYPE_VOR, '', 'A')).toBe('V-A-KPRC');
+        it('names a VOR/DME approach without a runway like a VOR approach (KAAS VOR/DME-A)', () => {
+            expect(listName(VORDME, '', 'A')).toBe('VOR-A   ');
+            expect(header(VORDME, '', 'A', kaas)).toBe('VOR-A-KAAS');
         });
 
-        it('puts the suffix after the runway', () => {
-            expect(name(ApproachType.APPROACH_TYPE_RNAV, '27', 'Y')).toBe('R27Y-KPRC');
+        it('names an RNAV approach without a runway RNV and the suffix, without a dash (KTRK RNAV-A)', () => {
+            expect(listName(RNAV, '', 'A')).toBe('RNVA    ');
+            expect(header(RNAV, '', 'A', ktrk)).toBe('RNVA-KTRK');
+        });
+
+        it('names an NDB approach without a runway NDB-B', () => {
+            expect(listName(NDB, '', 'B')).toBe('NDB-B   ');
+        });
+    });
+
+    describe('(characterization, no source)', () => {
+        // The trainer showed only the list name NDB-B; the header is by analogy with VOR-A-KAAS
+        it('titles an NDB approach without a runway NDB-B and the airport', () => {
+            expect(header(NDB, '', 'B')).toBe('NDB-B-KPRC');
+        });
+
+        // Only RNAV has a photo (krno-r35l-list.jpg); the drop of the suffix for the other types follows the rule
+        it('drops the suffix of a VOR approach with a runway', () => {
+            expect(listName(VOR, '25R', 'Y')).toBe('VOR  25R');
+            expect(header(VOR, '25R', 'Y')).toBe('V25R-KPRC');
+        });
+
+        // What the code does: isApproachRecognized filters such a type out before any caller, so this is no claim about
+        // the real unit
+        it('throws for a type it does not name', () => {
+            expect(() => listName(ApproachType.APPROACH_TYPE_ILS, '27')).toThrow();
+            expect(() => header(ApproachType.APPROACH_TYPE_ILS, '27')).toThrow();
+        });
+
+        it('keeps the zero of a runway below 10', () => {
+            // No source for the zero
+            expect(listName(VOR, '09')).toBe('VOR  09 ');
+            expect(header(VOR, '09')).toBe('V09-KPRC');
+        });
+
+        // By analogy with RNVA; no runway-less GPS approach is in the trainer's database
+        it('names a GPS approach without a runway GPS and the suffix, without a dash', () => {
+            expect(listName(GPS, '', 'A')).toBe('GPSA    ');
+            expect(header(GPS, '', 'A')).toBe('GPSA-KPRC');
+        });
+
+        // The maintainer's ruling (#60): NDB/DME is named like NDB
+        it('names an NDB/DME approach like an NDB approach', () => {
+            expect(listName(NDBDME, '33')).toBe('NDB  33 ');
+            expect(header(NDBDME, '33')).toBe('N33-KPRC');
+            expect(listName(NDBDME, '', 'C')).toBe('NDB-C   ');
+        });
+
+        // Nobody knows what the real unit shows for such a pair. This is only what the rule produces, a guess with no
+        // evidence, and the pilot cannot tell the two apart.
+        it('names KSMO RNAV 03 Y and Z alike', () => {
+            expect([listName(RNAV, '03', 'Y'), listName(RNAV, '03', 'Z')]).toEqual(['RNAV 03 ', 'RNAV 03 ']);
+            expect([header(RNAV, '03', 'Y', ksmo), header(RNAV, '03', 'Z', ksmo)]).toEqual(['R03-KSMO', 'R03-KSMO']);
+        });
+
+        it('names an approach without a runway and without a suffix by its type word alone', () => {
+            expect(listName(VOR, '')).toBe('VOR     ');
+            expect(header(VOR, '')).toBe('VOR-KPRC');
+            expect(listName(RNAV, '')).toBe('RNV     ');
+            expect(listName(NDB, '')).toBe('NDB     ');
+            expect(listName(GPS, '')).toBe('GPS     ');
         });
     });
 });
@@ -1009,12 +1092,13 @@ describe('SidStar.getKLNApproachLegList', () => {
     });
 
     // 6-5: the header V25R-KLAX stands above the approach waypoints on FPL 0 (figure 6-8); 6-7: approach waypoints cannot
-    // be added or deleted (no colon). FlightplanList draws the header from procedure.displayName.
+    // be added or deleted (no colon). FlightplanList draws the header from procedure.displayName. An approach with a
+    // runway shows no suffix (krno-r35l-list.jpg).
     it('marks every waypoint as an approach waypoint of the airport under the approach header', async () => {
         const legs = await convertApp(rnav27(), 1);
         expect(legs.map(l => l.type)).toEqual(Array(6).fill(KLNLegType.APP));
         expect(legs.every(l => l.parentFacility === kprc)).toBe(true);
-        expect(legs.map(l => l.procedure!.displayName)).toEqual(Array(6).fill('R27LY-KPRC'));
+        expect(legs.map(l => l.procedure!.displayName)).toEqual(Array(6).fill('R27L-KPRC'));
     });
 
     // The EFB route sync answers the route request from these fields (KlnEfbSaver; CLAUDE.md "Public contract with

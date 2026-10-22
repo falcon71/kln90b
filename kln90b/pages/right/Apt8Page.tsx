@@ -5,7 +5,6 @@ import {
     FSComponent,
     ICAO,
     NodeReference,
-    RunwayUtils,
     VNode,
 } from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
@@ -40,6 +39,9 @@ type Apt8PageTypes = {
  * 3-49, 6-4
  *
  * Yes, it is impossible not to select an approach transition!
+ *
+ * A photo of a real unit (krno-r35l-list.jpg) lists only the IAFs of R35L-KRNO, so only an IAF can be selected and an
+ * approach cannot be started at the IF.
  */
 export class Apt8Page extends WaypointPage<AirportFacility> {
 
@@ -395,7 +397,7 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
             const approaches = recognized.map((app, idx) => new SimpleListItem<ApproachProcedure>({
                 bus: this.props.bus,
                 value: app,
-                fulltext: (idx + 1).toString().padStart(2, " ") + " " + this.formatApproachName(app),
+                fulltext: (idx + 1).toString().padStart(2, " ") + " " + SidStar.formatApproachListName(app),
                 onEnter: this.selectApproach,
             }));
 
@@ -435,39 +437,6 @@ class Apt8IAPPage extends WaypointPage<AirportFacility> {
 
     protected getNearestList(): AirportNearestList {
         return this.props.nearestLists.aptNearestList;
-    }
-
-    private formatApproachName(app: ApproachProcedure): string {
-        let prefix: string;
-
-        switch (app.approachType) {
-            case ApproachType.APPROACH_TYPE_GPS:
-            case ApproachType.APPROACH_TYPE_RNAV:
-                prefix = "RNAV";
-                break;
-            case ApproachType.APPROACH_TYPE_VOR:
-            case ApproachType.APPROACH_TYPE_VORDME:
-                prefix = "VOR";
-                break;
-            case ApproachType.APPROACH_TYPE_NDB:
-            case ApproachType.APPROACH_TYPE_NDBDME:
-                prefix = "NDB";
-                break;
-            default:
-                throw new Error(`Unsupported approachtype: ${app}`);
-        }
-
-        let suffix = "";
-        if (app.approachSuffix !== "") {
-            suffix = `-${app.approachSuffix}`;
-        }
-
-        let runway = "   ";
-        if (app.runway !== "") {
-            runway = RunwayUtils.getRunwayNameString(app.runwayNumber, app.runwayDesignator, true).padEnd(3, " ");
-        }
-
-        return (prefix + suffix).padEnd(5, " ") + runway.padEnd(3, " ");
     }
 }
 

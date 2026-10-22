@@ -745,7 +745,8 @@ function iapWorld(o: { extraApproaches?: number, circlingFirst?: boolean, single
     const w = approachWorld();
     const iafab = intersection('IAFAB', pointFrom(w.iafaa, 270, 5).lat, pointFrom(w.iafaa, 270, 5).lon);
     const rnav18 = approach({
-        type: ApproachType.APPROACH_TYPE_RNAV, runway: '18',
+        // The suffix must show neither in the list nor in the header of an approach with a runway (#60)
+        type: ApproachType.APPROACH_TYPE_RNAV, runway: '18', suffix: 'Y',
         transitions: [
             {name: 'IAFAA', legs: [Leg.IF(w.iafaa, FixTypeFlags.IAF), Leg.TF(w.ifaaa)]},
             {name: 'IAFAB', legs: [Leg.IF(iafab, FixTypeFlags.IAF), Leg.TF(w.ifaaa)]},
@@ -1110,13 +1111,15 @@ describe('APT 8 page (characterization)', () => {
         expect(unit.panel.focused('R').row).toBe(4);
     });
 
-    it('titles a circling approach with the type letter, a dash and its suffix', async () => {
+    // AVsoftech KLN 90B trainer, 2026-10-22 (third-party, so no evidence): KAAS showed
+    // VOR-A-KAAS for a VOR/DME-A; the header of a plain VOR follows it
+    it('titles a circling approach with its name, a dash and the airport', async () => {
         const unit = await bootOnApt8();
         await unit.panel.cursor('R');
         await unit.panel.outer('R', 1);
 
         await unit.panel.ent(); // VOR-A: its only transition is taken without a question
 
-        expect(rows('R')[0]).toBe('V-A-KPRC');
+        expect(rows('R')[0]).toBe('VOR-A-KPRC');
     });
 });

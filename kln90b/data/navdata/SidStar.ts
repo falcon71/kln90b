@@ -90,35 +90,109 @@ export class SidStar {
         }
     }
 
-    public static formatApproachName(app: ApproachProcedure, facility: AirportFacility): string {
-        let prefix: string;
+    /**
+     * The name of the approach in the APT 8 list, always 8 characters: the type word padded to 5, the runway padded to 3.
+     * An approach with a runway never shows its suffix (krno-iap-list.jpg, a photo of a real unit: KRNO lists its X
+     * approaches as RNAV 17L, 17R, 35L and 35R). An approach without a runway shows the runway-less name instead
+     * (3-49, figure 3-149: VOR-A).
+     */
+    public static formatApproachListName(app: ApproachProcedure): string {
+        if (app.runway === "") {
+            return SidStar.getRunwaylessApproachName(app).padEnd(8, " ");
+        }
 
+        let word: string;
         switch (app.approachType) {
-            case ApproachType.APPROACH_TYPE_GPS:
             case ApproachType.APPROACH_TYPE_RNAV:
-                prefix = "R";
+                word = "RNAV";
+                break;
+            case ApproachType.APPROACH_TYPE_GPS: //AVsoftech KLN 90B trainer, 2026-10-22 (third-party)
+                word = "GPS";
                 break;
             case ApproachType.APPROACH_TYPE_VOR:
-            case ApproachType.APPROACH_TYPE_VORDME:
-                prefix = "V";
+                word = "VOR";
+                break;
+            case ApproachType.APPROACH_TYPE_VORDME: //AVsoftech KLN 90B trainer, 2026-10-22 (third-party)
+                word = "VORD";
                 break;
             case ApproachType.APPROACH_TYPE_NDB:
-            case ApproachType.APPROACH_TYPE_NDBDME:
-                prefix = "N";
+            case ApproachType.APPROACH_TYPE_NDBDME: //Grouped with NDB, maintainer's ruling (#60)
+                word = "NDB";
                 break;
             default:
                 throw new Error(`Unsupported approachtype: ${app}`);
         }
 
-        let runway: string;
-        //Figure 6-18, no padding with spaces in the name
+        return word.padEnd(5, " ") + SidStar.getApproachRunway(app).padEnd(3, " ");
+    }
+
+    /**
+     * The header of an approach: the first row of the APT 8 pages and the procedure header in the flight plan.
+     * 6-5: the first letter of the approach type, the runway, a dash and the airport. The suffix is not shown for an
+     * approach with a runway (krno-r35l-list.jpg, a photo of a real unit: R35L-KRNO). An approach without a runway
+     * shows the runway-less name (3-49, figure 3-149).
+     */
+    public static formatApproachName(app: ApproachProcedure, facility: AirportFacility): string {
+        let name: string;
+
         if (app.runway === "") {
-            runway = "-"; //See figure 3-149 -A or -B
+            name = SidStar.getRunwaylessApproachName(app);
         } else {
-            runway = RunwayUtils.getRunwayNameString(app.runwayNumber, app.runwayDesignator, true);
+            let letter: string;
+            switch (app.approachType) {
+                case ApproachType.APPROACH_TYPE_RNAV:
+                    letter = "R";
+                    break;
+                case ApproachType.APPROACH_TYPE_GPS: //AVsoftech KLN 90B trainer, 2026-10-22 (third-party)
+                    letter = "G";
+                    break;
+                case ApproachType.APPROACH_TYPE_VOR:
+                    letter = "V";
+                    break;
+                case ApproachType.APPROACH_TYPE_VORDME: //AVsoftech KLN 90B trainer, 2026-10-22 (third-party)
+                    letter = "D";
+                    break;
+                case ApproachType.APPROACH_TYPE_NDB:
+                case ApproachType.APPROACH_TYPE_NDBDME: //Grouped with NDB, maintainer's ruling (#60)
+                    letter = "N";
+                    break;
+                default:
+                    throw new Error(`Unsupported approachtype: ${app}`);
+            }
+            name = letter + SidStar.getApproachRunway(app);
         }
 
-        return prefix + runway + app.approachSuffix + "-" + facility.icaoStruct.ident;
+        //Figure 6-18, no padding with spaces in the name
+        return name + "-" + facility.icaoStruct.ident;
+    }
+
+    private static getApproachRunway(app: ApproachProcedure): string {
+        return RunwayUtils.getRunwayNameString(app.runwayNumber, app.runwayDesignator, true);
+    }
+
+    /**
+     * The name of an approach without a runway, shared by the list and the header so that they cannot drift apart.
+     * AVsoftech KLN 90B trainer, 2026-10-22 (third-party): VOR and VOR/DME are VOR-A, NDB is NDB-B and RNAV is RNVA,
+     * without a dash. The GPS form follows RNAV and NDB/DME follows NDB, both without a source. The trainer shows the
+     * KAAS VOR/DME-A as VOR-A; presumably the unit has no room for a six-character name. An empty suffix leaves the type
+     * word alone.
+     */
+    private static getRunwaylessApproachName(app: ApproachProcedure): string {
+        const suffix = app.approachSuffix;
+        switch (app.approachType) {
+            case ApproachType.APPROACH_TYPE_RNAV:
+                return "RNV" + suffix;
+            case ApproachType.APPROACH_TYPE_GPS:
+                return "GPS" + suffix;
+            case ApproachType.APPROACH_TYPE_VOR:
+            case ApproachType.APPROACH_TYPE_VORDME:
+                return suffix === "" ? "VOR" : "VOR-" + suffix;
+            case ApproachType.APPROACH_TYPE_NDB:
+            case ApproachType.APPROACH_TYPE_NDBDME:
+                return suffix === "" ? "NDB" : "NDB-" + suffix;
+            default:
+                throw new Error(`Unsupported approachtype: ${app}`);
+        }
     }
 
     /**
