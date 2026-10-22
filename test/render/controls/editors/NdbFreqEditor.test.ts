@@ -169,10 +169,9 @@ describe('NdbFreqEditor range (characterization)', () => {
 });
 
 describe('NdbFreqEditor keyboard', () => {
-    // #109's suggested fix maps a typed 0 to the blank of a cell whose charset has a blank instead of a 0 (the
-    // keyboard is the project's own feature, so the expectation is that issue's, not the guide's). Today the 0 is
-    // refused, the cursor stays on the thousands cell, and so are 3, 5 and 0 after it
-    it.fails('types a frequency below 1000 kHz with a leading 0 (#109)', async () => {
+    // #109: a typed 0 selects the blank of a cell whose charset has a blank instead of a 0 (the keyboard is the
+    // project's own feature, so the expectation is that issue's, not the guide's)
+    it('types a frequency below 1000 kHz with a leading 0 (#109)', async () => {
         const unit = await onFreq();
         await unit.panel.type('R', '03500');
 

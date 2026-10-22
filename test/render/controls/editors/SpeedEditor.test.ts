@@ -109,8 +109,8 @@ describe('SpeedEditor on SET 1 (characterization)', () => {
 });
 
 describe('SpeedEditor keyboard', () => {
-    // The hundreds cell has a 0 since #245, so the keyboard can type it (the ground speed half of #109; the date,
-    // runway surface and NDB frequency halves stay open, the last one pinned in NdbFreqEditor.test.ts). The open field
+    // The hundreds cell has a 0 since #245, so the keyboard can type it (the ground speed part of #109; the NDB
+    // frequency and the runway surface followed, the date stays with the knobs by decision). The open field
     // shows its zeros (T11, checked in the KLN 89 trainer, 2026-10-08)
     it('types a ground speed below 100 KT with a leading 0 (#109)', async () => {
         const unit = await onGroundspeed();

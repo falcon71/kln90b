@@ -86,7 +86,12 @@ export abstract class EditorField implements UiElement {
     }
 
     public keyboard(key: string): boolean {
-        const idx = this.charset.indexOf(key);
+        let idx = this.charset.indexOf(key);
+        if (idx == -1 && key === "0" && this.charset[0].trim() === "") {
+            //#109: a cell with a blank instead of a 0 (the NDB frequency's thousands, the magnetic variation's tens)
+            //takes a typed 0 as the blank. A cell that has a 0 of its own keeps it, as the idents do
+            idx = 0;
+        }
         if (idx == -1) {
             return false;
         }
@@ -203,4 +208,16 @@ export class EastWestEditorField extends EditorField {
 
 export class RunwaySurfaceEditorField extends EditorField {
     charset = ["HRD", "SFT"];
+
+    /**
+     * #109: the keyboard is the project's own feature; H selects HRD and S selects SFT
+     */
+    public keyboard(key: string): boolean {
+        const idx = this.charset.findIndex(surface => surface[0] === key);
+        if (idx === -1) {
+            return super.keyboard(key);
+        }
+        this.value = idx;
+        return true;
+    }
 }

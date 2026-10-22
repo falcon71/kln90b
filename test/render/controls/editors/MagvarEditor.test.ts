@@ -64,6 +64,19 @@ describe('magnetic variation editor (5-44)', () => {
     });
 });
 
+describe('magnetic variation editor keyboard (#109)', () => {
+    // The tens place has a blank instead of a 0, so a typed 0 selects the blank
+    it('types 09E as a variation of +9, the 0 taking the blank tens (#109)', async () => {
+        const unit = await onSet2Magvar();
+        await unit.panel.type('L', '09E');
+        await unit.panel.ent();
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.props.memory.navPage.userMagvar).toBe(9);
+        expect(line6().slice(7)).toBe(' 9°E');
+    });
+});
+
 describe('magnetic variation editor (characterization)', () => {
     // The unit's pages disagree on the display form of a variation below 10 degrees, so the code's form is only
     // recorded: a blank in the tens place, ` 9°E`

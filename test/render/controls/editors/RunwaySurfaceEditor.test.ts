@@ -79,6 +79,27 @@ describe('runway surface editor (5-17)', () => {
     }
 });
 
+describe('runway surface editor keyboard (#109)', () => {
+    // The keyboard is the project's own feature: the first letter of the surface selects it. Each case starts from the
+    // other surface, selected with the knob, so that the key has to change it (an edit opened by a key shows HRD)
+    for (const [clicks, key, shown, stored] of [[2, 'H', 'HRD', 'H'], [1, 'S', 'SFT', 'S']] as const) {
+        it(`types ${key} for ${shown} (#109)`, async () => {
+            const unit = await farmOnApt3();
+            await unit.panel.cursorTo('R', '___');
+            await unit.panel.inner('R', clicks);
+            expect(surface()).not.toBe(shown); // Precondition
+            await unit.panel.type('R', key);
+            expect(surface()).toBe(shown);
+            await unit.panel.ent();
+            await unit.panel.cursor('R');
+            await vi.advanceTimersByTimeAsync(1000);
+
+            expect(unit.errors).toEqual([]);
+            expect(String(storedSetting(unit, 'wpt0')).slice(-1)).toBe(stored);
+        });
+    }
+});
+
 describe('runway surface editor (characterization)', () => {
     // The cursor turned off during a surface edit drops it: the dashes come back
     it('drops a surface edit when the cursor is turned off', async () => {

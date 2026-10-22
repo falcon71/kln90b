@@ -38,6 +38,7 @@ Mapping:
 * Enter: ENT
 * Delete: CLR
 * A-Z, 0-9 and backspace work in certain text and number fields
+* 0 also types a blank digit, for example the thousands of an NDB frequency below 1000 kHz
 * Escape: Leave keyboard mode
 
 ## FAQ

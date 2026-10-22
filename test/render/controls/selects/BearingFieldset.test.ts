@@ -5,8 +5,8 @@ import {Screen} from '../../../harness/render/screen';
 // BearingFieldset: a direction of 000 to 359 in two cells, the first two digits as one cell (00 to 35) and the last
 // digit. Its host here is the wind direction of TRI 0 (row 4, after the three TAS digits; navPage memory
 // triPage.windDirTrue). CAL 3 uses it for the heading (Cal3Page.test.ts). The keyboard cannot type the first cell (its
-// entries are two characters long): that is #109, whose typing rule is a design decision still open, so no test here
-// holds either behavior.
+// entries are two characters long): #109 left such cells to the knobs by decision, so no test here holds either
+// behavior.
 
 /** TRI 0 with the wind direction stored as `dir` and the left cursor on its first two digits */
 async function onWindDir(dir: number): Promise<HeadlessUnit> {

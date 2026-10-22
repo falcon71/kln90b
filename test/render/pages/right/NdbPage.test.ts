@@ -183,9 +183,8 @@ describe('user NDB (5-18)', () => {
     }
 
     /**
-     * Enters a frequency below 1000 kHz into the open frequency field: the thousands cell shows a blank only with the
-     * inner knob, because a pilot cannot type a blank (the PC keyboard sends A to Z and 0 to 9,
-     * KLN90BCore.handleKeyboardEvent, #109). The first click opens the edit on the blank, the outer knob moves to the
+     * Enters a frequency below 1000 kHz into the open frequency field: the thousands cell is set to its blank with the
+     * inner knob (a typed 0 gives the same blank since #109, NdbFreqEditor.test.ts). The first click opens the edit on the blank, the outer knob moves to the
      * hundreds cell, and the digits are typed from there.
      */
     async function typeBelow1000(unit: HeadlessUnit, digits: string): Promise<void> {
@@ -214,8 +213,7 @@ describe('user NDB (5-18)', () => {
     });
 
     // 5-18: the latitude and longitude complete the waypoint; it is stored as a user NDB, and the page shows it with the
-    // cursor off (the page name NDB on the status line, as figure 5-66). The longitude is 100 E: the keyboard cannot
-    // type a leading zero there (#109).
+    // cursor off (the page name NDB on the status line, as figure 5-66). The longitude is 100 E.
     it('creates the user NDB from the latitude and longitude (5-18)', async () => {
         const unit = await undefinedNdb();
         await unit.panel.outer('R', 1); // from the ident to the frequency (5-16, 5-17)

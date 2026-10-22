@@ -76,8 +76,8 @@ describe('keyboard input of a longitude (3-18, #109)', () => {
     });
 
     // The hundreds cell of the longitude offers 0 and 1 (#304), so the key "0" is accepted and a longitude below 100
-    // degrees can be typed (the longitude half of #109; the date, runway surface and NDB frequency halves stay open, the
-    // last one pinned in NdbFreqEditor.test.ts). The test asserts
+    // degrees can be typed (the longitude part of #109; the NDB frequency and the runway surface followed, and the cells
+    // whose entries are two characters long, such as the date, stay with the knobs by decision). The test asserts
     // the stored longitude, 8.5 degrees east, and the cells of the entered row: the hundreds and tens are blank once
     // entered (#230), and 3-18, figure 3-57 shows the entered value with a blank in the hundreds place and its degrees
     // right-aligned.
