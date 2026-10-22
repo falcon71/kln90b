@@ -25,7 +25,7 @@ You can join our Discord community here:
 
 When a cursor is active, left click on the CRSR indication to switch to keyboard mode. While KYBD is flashing, the
 simulator will disable all inputs, including joystick inputs. To leave keyboard mode, right click anywhere on the
-screen.
+screen or press Escape.
 
 Mapping:
 
@@ -34,6 +34,7 @@ Mapping:
 * Enter: ENT
 * Delete: CLR
 * A-Z, 0-9 and backspace work in certain text and number fields
+* Escape: Leave keyboard mode
 
 ## FAQ
 
