@@ -29,7 +29,11 @@ export const EVT_R_INNER_LEFT = "KLN90B_RightSmallKnob_Left";
 export const EVT_R_INNER_RIGHT = "KLN90B_RightSmallKnob_Right";
 export const EVT_R_SCAN = "KLN90B_RightScan_Toggle";
 
-
+//KEYBOARD
+//#83: enter and leave keyboard mode on that side, for hardware such as a Stream Deck. The cursor comes on first if it
+//is off; pressed again, keyboard mode ends and the cursor stays on
+export const EVT_L_KEYBOARD = "KLN90B_LeftKeyboard_Toggle";
+export const EVT_R_KEYBOARD = "KLN90B_RightKeyboard_Toggle";
 
 //External Devices
 export const EVT_APPR_ARM = "KLN90B_ApprArm_Push";

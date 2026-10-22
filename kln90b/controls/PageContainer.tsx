@@ -11,7 +11,7 @@ import {
 import {DisplayTickable, TickController} from "../TickController";
 import {Page, PageProps} from "../pages/Page";
 import {CHAR_HEIGHT, CHAR_WIDTH, MARGIN_X, MARGIN_Y, ZOOM_FACTOR} from "../data/Constants";
-import {KeyboardEvent} from "./StatusLine";
+import {KeyboardEvent, KeyboardEventData} from "./StatusLine";
 import {PowerEvent} from "../PowerButton";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 import {ErrorPage} from "./ErrorPage";
@@ -19,6 +19,8 @@ import {PanelXmlErrorPage} from "./PanelXmlErrorPage";
 import KEY_ENTER = KeyCode.KEY_ENTER;
 import KEY_ESCAPE = KeyCode.KEY_ESCAPE;
 
+
+export type KeyboardSide = KeyboardEventData['side'];
 
 export interface PageContainerProps extends ComponentProps {
     bus: EventBus;
@@ -124,6 +126,47 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
         this.keyboardRef.instance.blur();
     }
 
+    /**
+     * #83: the H event of a side. Leaves keyboard mode when that side is in it, and otherwise enters it under the rules
+     * of the left click on the CRSR field
+     */
+    public toggleKeyboard(side: KeyboardSide) {
+        if (this.isKeyboardActive(side)) {
+            this.resetKeyboard();
+        } else if (this.canEnterKeyboard(side)) {
+            this.enterKeyboard(side);
+        }
+    }
+
+    private isKeyboardActive(side: KeyboardSide): boolean {
+        return side === 'LEFT' ? this._isLeftKeyboardActive : this._isRightKeyboardActive;
+    }
+
+    private canEnterKeyboard(side: KeyboardSide): boolean {
+        const cursorActive = side === 'LEFT' ? this.currentPage!.isLeftCursorActive() : this.currentPage!.isRightCursorActive();
+        return cursorActive && this.currentPage!.hasStatusline();
+    }
+
+    private enterKeyboard(side: KeyboardSide) {
+        this.keyboardRef.instance.value = "";
+
+        if (this.isKeyboardActive(side === 'LEFT' ? 'RIGHT' : 'LEFT')) {
+            this.resetKeyboard();
+        }
+
+        if (side === 'LEFT') {
+            this._isLeftKeyboardActive = true;
+        } else {
+            this._isRightKeyboardActive = true;
+        }
+        this.keyboardRef.instance.focus(); //A click focuses the input itself, the H event does not (#83)
+        Coherent.trigger('FOCUS_INPUT_FIELD', this.keyboardId, '', '', '', false);
+        Coherent.on('mousePressOutsideView', () => {
+            console.log('mousePressOutsideView');
+            this.resetKeyboard();
+        });
+    }
+
     private setupKeyboard() {
         /**
          * The keyboard works like this:
@@ -181,34 +224,12 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
         this.keyboardRef.instance.onmousedown = (event) => {
             console.log(event);
             if (event.button == 0) { //Left Click
-                if (this.currentPage!.isLeftCursorActive() && this.currentPage!.hasStatusline() && !this._isLeftKeyboardActive && this.isWithinX(event.screenX, 1, 5) && this.isWithinY(event.screenY, 6)) {
-                    this.keyboardRef.instance.value = "";
-
-                    if (this._isRightKeyboardActive) {
-                        this.resetKeyboard();
-                    }
-
-                    this._isLeftKeyboardActive = true;
-                    Coherent.trigger('FOCUS_INPUT_FIELD', this.keyboardId, '', '', '', false);
-                    Coherent.on('mousePressOutsideView', () => {
-                        console.log('mousePressOutsideView');
-                        this.resetKeyboard();
-                    });
+                if (this.canEnterKeyboard('LEFT') && !this._isLeftKeyboardActive && this.isWithinX(event.screenX, 1, 5) && this.isWithinY(event.screenY, 6)) {
+                    this.enterKeyboard('LEFT');
                 }
 
-                if (this.currentPage!.isRightCursorActive() && this.currentPage!.hasStatusline() && !this._isRightKeyboardActive && this.isWithinX(event.screenX, 18, 22) && this.isWithinY(event.screenY, 6)) {
-                    this.keyboardRef.instance.value = "";
-
-                    if (this._isLeftKeyboardActive) {
-                        this.resetKeyboard();
-                    }
-
-                    this._isRightKeyboardActive = true;
-                    Coherent.trigger('FOCUS_INPUT_FIELD', this.keyboardId, '', '', '', false);
-                    Coherent.on('mousePressOutsideView', () => {
-                        console.log('mousePressOutsideView');
-                        this.resetKeyboard();
-                    });
+                if (this.canEnterKeyboard('RIGHT') && !this._isRightKeyboardActive && this.isWithinX(event.screenX, 18, 22) && this.isWithinY(event.screenY, 6)) {
+                    this.enterKeyboard('RIGHT');
                 }
             } else if (event.button == 2) {  //Right click
                 if ((this._isLeftKeyboardActive || this._isRightKeyboardActive)) {

@@ -48,12 +48,16 @@ import {
     EVT_CLR,
     EVT_ENT,
     EVT_KEY,
+    EVT_L_CURSOR,
     EVT_L_INNER_LEFT,
+    EVT_L_KEYBOARD,
     EVT_L_INNER_RIGHT,
     EVT_L_OUTER_LEFT,
     EVT_L_OUTER_RIGHT,
+    EVT_R_CURSOR,
     EVT_R_INNER_LEFT,
     EVT_R_INNER_RIGHT,
+    EVT_R_KEYBOARD,
     EVT_R_OUTER_LEFT,
     EVT_R_OUTER_RIGHT,
     EVT_R_SCAN,
@@ -81,6 +85,7 @@ import {Flightplan} from "./data/flightplan/Flightplan";
 import {SidStar} from "./data/navdata/SidStar";
 import {SimVarSync} from "./SimVarSync";
 import {KeyboardEvent, KeyboardEventData} from "./controls/StatusLine";
+import {KeyboardSide} from "./controls/PageContainer";
 import {ErrorEvent} from "./controls/ErrorPage";
 import {PanelXmlErrorEvent} from "./controls/PanelXmlErrorPage";
 import {SignalOutputFillterTick} from "./services/SignalOutputFillterTick";
@@ -219,6 +224,14 @@ export class KLN90BCore {
             console.log(args[0], evt);
 
             this.hEventPublisher.dispatchHEvent([evt]);
+            switch (evt) {
+                case EVT_L_KEYBOARD:
+                    this.toggleKeyboard('LEFT');
+                    return;
+                case EVT_R_KEYBOARD:
+                    this.toggleKeyboard('RIGHT');
+                    return;
+            }
             this.pageManager.onInteractionEvent(evt);
         } catch (e) {
             console.error(e);
@@ -409,6 +422,21 @@ export class KLN90BCore {
         }).catch(e => {
             this.bus.getPublisher<ErrorEvent>().pub("error", e);
         });
+    }
+
+    /**
+     * #83: the keyboard H event of a side. A cursor that is off is turned on first with that side's CRSR, under its
+     * rules, then keyboard mode is entered under the rules of the left click on the CRSR field, or left when it is on.
+     * The MSG page is closed first: the cursor beneath it decides, and one that is on stays on
+     */
+    private toggleKeyboard(side: KeyboardSide) {
+        this.pageManager.closeMessagePage();
+        const page = this.pageManager.getCurrentPage();
+        const cursorActive = side === 'LEFT' ? page.isLeftCursorActive() : page.isRightCursorActive();
+        if (!cursorActive) {
+            this.pageManager.onInteractionEvent(side === 'LEFT' ? EVT_L_CURSOR : EVT_R_CURSOR);
+        }
+        this.pageManager.toggleKeyboard(side);
     }
 
     private handleKeyboardEvent(data: KeyboardEventData) {

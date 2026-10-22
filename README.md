@@ -27,6 +27,10 @@ When a cursor is active, left click on the CRSR indication to switch to keyboard
 simulator will disable all inputs, including joystick inputs. To leave keyboard mode, right click anywhere on the
 screen or press Escape.
 
+Hardware such as a Stream Deck can use the H events `KLN90B_LeftKeyboard_Toggle` and `KLN90B_RightKeyboard_Toggle`
+instead of the click. They turn the cursor on if it is off and switch that side to keyboard mode. Pressed again, they
+leave keyboard mode and the cursor stays on.
+
 Mapping:
 
 * Home, End: Outer knob

@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit} from '../../harness/boot';
+import {bootUnit, settle} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {showSuperNav5} from '../../harness/render/superNav5';
 import {fplIdents} from '../../harness/readers';
@@ -165,4 +165,147 @@ describe('keyboard mode, the click and the keys (characterization)', () => {
             await tick();
             expect(fplIdents(unit, 3)).toEqual(['KBBB']);
         });
+});
+
+// #83: hardware such as a Stream Deck enters and leaves keyboard mode with an H event per side. The event does what
+// CRSR and then the left click on the CRSR field do, under their rules; pressed again it leaves keyboard mode and the
+// cursor stays on. The names are public, so the tests spell them out. The tests do not focus the input themselves:
+// the event has to
+describe('keyboard mode H events (#83)', () => {
+    const L_KEYBOARD = 'KLN90B_LeftKeyboard_Toggle';
+    const R_KEYBOARD = 'KLN90B_RightKeyboard_Toggle';
+
+    const input = () => document.querySelector('input.keyboard') as HTMLInputElement;
+    const tick = () => vi.advanceTimersByTimeAsync(250);
+
+    async function key(keyCode: number) {
+        input().dispatchEvent(new KeyboardEvent('keydown', {keyCode}));
+        await tick();
+    }
+
+    /** FPL 0 on the left, empty, with the cursor on the blank first waypoint */
+    async function emptyFpl0() {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        expect(unit.panel.focused('L').text).toBe('     '); // Precondition
+        return unit;
+    }
+
+    it('characterization: with the cursor off, the H event turns the cursor on and enters keyboard mode (#83)',
+        async () => {
+            const unit = await bootUnit();
+            await unit.panel.selectPage('L', 'FPL 0');
+            expect(Screen.read().status().left).toBe('FPL 0'); // Precondition: the cursor is off
+
+            await unit.panel.press(L_KEYBOARD);
+
+            expect(unit.errors).toEqual([]);
+            expect(unit.props.pageManager.isLeftKeyboardActive()).toBe(true);
+            expect(Screen.read().status().left).toBe('KYBD');
+            expect(document.activeElement).toBe(input());
+            await key(75); // K
+            expect(unit.panel.focused('L').text[0]).toBe('K');
+        });
+
+    it('characterization: with the cursor on, the H event enters keyboard mode and keeps the cursor on (#83)',
+        async () => {
+            const unit = await emptyFpl0();
+
+            await unit.panel.press(L_KEYBOARD);
+
+            expect(unit.props.pageManager.isLeftKeyboardActive()).toBe(true);
+            expect(Screen.read().status().left).toBe('KYBD');
+        });
+
+    it('characterization: pressed again, the H event leaves keyboard mode and the cursor stays on (#83)', async () => {
+        const unit = await emptyFpl0();
+        await unit.panel.press(L_KEYBOARD);
+        expect(unit.props.pageManager.isLeftKeyboardActive()).toBe(true); // Precondition
+
+        await unit.panel.press(L_KEYBOARD);
+
+        expect(unit.props.pageManager.isLeftKeyboardActive()).toBe(false);
+        expect(Screen.read().status().left).toBe('CRSR');
+        expect(document.activeElement).not.toBe(input());
+    });
+
+    it('characterization: the other side\'s H event moves keyboard mode across, both cursors stay on (#83)',
+        async () => {
+            const unit = await emptyFpl0();
+            await unit.panel.press(L_KEYBOARD);
+            expect(unit.props.pageManager.isLeftKeyboardActive()).toBe(true); // Precondition
+
+            await unit.panel.press(R_KEYBOARD);
+
+            expect(unit.props.pageManager.isLeftKeyboardActive()).toBe(false);
+            expect(unit.props.pageManager.isRightKeyboardActive()).toBe(true);
+            expect(Screen.read().status()).toMatchObject({left: 'CRSR', right: 'KYBD'});
+            expect(document.activeElement).toBe(input());
+        });
+
+    // CRSR closes the MSG page and acts on the page beneath (#56, #333), so the H event does too
+    it('characterization: the H event closes the MSG page like CRSR and enters keyboard mode beneath (#83)',
+        async () => {
+            const unit = await bootUnit({position: {lat: 74.5, lon: 8.0}}); // MAGNETIC VAR INVALID
+            await settle(unit);
+            await unit.panel.selectPage('R', 'APT 1');
+            await unit.panel.msg();
+            const main = unit.props.pageManager.getCurrentPage() as MainPage;
+            expect(main.isMessagePageShown()).toBe(true); // Precondition
+
+            await unit.panel.press(R_KEYBOARD);
+
+            expect(unit.errors).toEqual([]);
+            expect(main.isMessagePageShown()).toBe(false);
+            expect(unit.props.pageManager.isRightKeyboardActive()).toBe(true);
+            expect(Screen.read().status().right).toBe('KYBD');
+        });
+
+    // The MSG page has no cursor of its own, but the cursor beneath it decides: one that is on stays on, as on any page
+    it('characterization: the H event closes the MSG page over a cursor that is on, keeps it on and enters keyboard ' +
+        'mode (#83)',
+        async () => {
+            const unit = await bootUnit({position: {lat: 74.5, lon: 8.0}}); // MAGNETIC VAR INVALID
+            await settle(unit);
+            await unit.panel.selectPage('R', 'APT 1');
+            await unit.panel.cursor('R');
+            expect(Screen.read().status().right).toBe('CRSR'); // Precondition
+            await unit.panel.msg();
+            const main = unit.props.pageManager.getCurrentPage() as MainPage;
+            expect(main.isMessagePageShown()).toBe(true); // Precondition
+
+            await unit.panel.press(R_KEYBOARD);
+
+            expect(unit.errors).toEqual([]);
+            expect(main.isMessagePageShown()).toBe(false);
+            expect(main.isRightCursorActive()).toBe(true);
+            expect(unit.props.pageManager.isRightKeyboardActive()).toBe(true);
+            expect(Screen.read().status().right).toBe('KYBD');
+        });
+
+    // Super NAV 5 has no status line, so the click rule refuses keyboard mode there
+    it('characterization: the H event does not enter keyboard mode on Super NAV 5 (#83)', async () => {
+        const unit = await bootUnit();
+        await showSuperNav5(unit, {waitMs: 0}); // Precondition: Super NAV 5 is the overlay
+
+        await unit.panel.press(L_KEYBOARD);
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.props.pageManager.isLeftKeyboardActive()).toBe(false);
+        expect(document.activeElement).not.toBe(input());
+    });
+
+    // The input keeps the sim's keyboard while it has the focus, and no display tick runs while the unit is off to
+    // give it back
+    it('characterization: the H event does nothing while the unit is off (#83)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.powerOff();
+
+        await unit.panel.press(L_KEYBOARD);
+
+        expect(unit.errors).toEqual([]);
+        expect(unit.props.pageManager.isLeftKeyboardActive()).toBe(false);
+        expect(document.activeElement).not.toBe(input());
+    });
 });

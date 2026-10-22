@@ -25,7 +25,7 @@ import {NdbPage} from "./right/NdbPage";
 import {IntPage} from "./right/IntPage";
 import {DisplayTickable} from "../TickController";
 import {OneTimeMessage} from "../data/MessageHandler";
-import {PageContainer} from "../controls/PageContainer";
+import {KeyboardSide, PageContainer} from "../controls/PageContainer";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 
 export class PageManager implements DisplayTickable {
@@ -121,6 +121,20 @@ export class PageManager implements DisplayTickable {
 
     public resetKeyboard() {
         this.container!.resetKeyboard();
+    }
+
+    public toggleKeyboard(side: KeyboardSide) {
+        this.container!.toggleKeyboard(side);
+    }
+
+    /**
+     * #83: closes the MSG page, as CRSR does (#56), so that the cursor of the page beneath can be read
+     */
+    public closeMessagePage() {
+        const page = this.getCurrentPage();
+        if (page instanceof MainPage && page.isMessagePageShown()) {
+            page.popOverlayPage();
+        }
     }
 
     tick(blink: boolean): void {
