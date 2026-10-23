@@ -494,6 +494,8 @@ export class SidStar {
     private filterOutDuplicates(legs: FlightPlanLeg[]): { legs: FlightPlanLeg[], askObsLegs: Set<FlightPlanLeg> } {
         const filtered: FlightPlanLeg[] = [];
         const askObsLegs = new Set<FlightPlanLeg>();
+        //A dropped hold or procedure turn whose reminder the next leg to its fix keeps (#384)
+        let obsAtNextKept: FlightPlanLeg | null = null;
 
         for (let i = 0; i < legs.length; i++) {
             const leg = legs[i];
@@ -504,6 +506,7 @@ export class SidStar {
                     this.keepObsOfArcInPlaceOf(leg, modifiedLeg, askObsLegs);
                 }
                 this.mergeAFsIfNecessary(modifiedLeg, legs, i);
+                obsAtNextKept = this.keepObsOfDroppedLeg(obsAtNextKept, leg, modifiedLeg, askObsLegs);
                 filtered.push(modifiedLeg);
             } else {
                 const next = legs[i + 1];
@@ -518,16 +521,37 @@ export class SidStar {
                         this.keepObsOfArcInPlaceOf(leg, modifiedLeg, askObsLegs);
                     }
                     this.mergeAFsIfNecessary(modifiedLeg, legs, i);
+                    obsAtNextKept = this.keepObsOfDroppedLeg(obsAtNextKept, leg, modifiedLeg, askObsLegs);
                     filtered.push(modifiedLeg);
                 } else if (isAlreadyLastInList && this.shouldAskObs(leg.type)) {
                     //#219 B-2, 6-10: the dropped hold or procedure turn leaves its OBS reminder on the kept leg, which
                     //keeps its own type (an arc stays an arc)
                     askObsLegs.add(filtered[filtered.length - 1]);
+                } else if (nextIsSameWpt && this.shouldAskObs(leg.type)) {
+                    //#384 B-2, 6-10: the hold is dropped for the next leg to the same fix, which is kept and takes the
+                    //reminder
+                    obsAtNextKept = leg;
                 }
             }
         }
 
         return {legs: filtered, askObsLegs: askObsLegs};
+    }
+
+    /**
+     * #384 B-2, 6-10: the kept leg to the fix of a dropped hold or procedure turn asks for OBS in its place
+     * @param obsAtNextKept the dropped leg waiting for its kept leg, or null
+     * @param leg the leg the conversion keeps
+     * @param modifiedLeg what addArcInfoIfPrevIsSame returned for it: the leg itself, or the arc before it (#381)
+     * @param askObsLegs
+     * @return what is still waiting for its kept leg
+     */
+    private keepObsOfDroppedLeg(obsAtNextKept: FlightPlanLeg | null, leg: FlightPlanLeg, modifiedLeg: FlightPlanLeg, askObsLegs: Set<FlightPlanLeg>): FlightPlanLeg | null {
+        if (obsAtNextKept === null || !ICAO.valueEquals(obsAtNextKept.fixIcaoStruct, leg.fixIcaoStruct)) {
+            return obsAtNextKept;
+        }
+        askObsLegs.add(modifiedLeg);
+        return null;
     }
 
     /**

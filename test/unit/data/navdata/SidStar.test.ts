@@ -1228,17 +1228,16 @@ describe('the OBS reminder of a dropped leg (characterization, #219)', () => {
             final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
         });
         const legs = await convertApp(app);
-        // The HLDAA row is left out: whether the kept leg there asks for OBS is the bug #384 (pinned below)
-        expect(legs.filter(l => l.wpt.icaoStruct.ident !== 'HLDAA').map(l => [l.wpt.icaoStruct.ident, l.askObs])).toEqual([
-            ['IAFAA', false], ['IFAAA', false], ['FAFAA', false], ['MAPAA', false],
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.askObs])).toEqual([
+            ['IAFAA', false], ['IFAAA', false], ['HLDAA', true], ['FAFAA', false], ['MAPAA', false],
         ]);
     });
 });
 
 // 6-10, B-2: the reminder to select OBS comes before a waypoint that is the basis of a hold or a course reversal. The
-// hold is dropped here because the next leg goes to the same fix, and the kept leg asks for nothing (#384)
+// hold is dropped here because the next leg goes to the same fix, and the kept leg asks for OBS (#384)
 describe('the OBS reminder of a hold dropped for the next leg to the same fix (B-2, 6-10)', () => {
-    it.fails('asks for OBS at a hold dropped because the next leg goes to the same fix (B-2, 6-10, #384)', async () => {
+    it('asks for OBS at a hold dropped because the next leg goes to the same fix (B-2, 6-10, #384)', async () => {
         const app = approach({
             type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
             transitions: [{name: 'IAFAA', legs: [Leg.IF(iafaa, FixTypeFlags.IAF), Leg.TF(ifaaa), Leg.HF(hldaa, 90), Leg.TF(hldaa)]}],
@@ -1246,6 +1245,45 @@ describe('the OBS reminder of a hold dropped for the next leg to the same fix (B
         });
         const legs = await convertApp(app);
         expect(legs.filter(l => l.wpt.icaoStruct.ident === 'HLDAA').map(l => l.askObs)).toEqual([true]);
+    });
+
+    // The real form of the shape: a hold in lieu of a procedure turn ends the transition and the final starts at its fix
+    it('asks for OBS at the IF that follows a hold at the same fix (B-2, 6-10, #384)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'IAFAA', legs: [Leg.IF(iafaa, FixTypeFlags.IAF), Leg.TF(ifaaa), Leg.HF(hldaa, 90)]}],
+            final: [Leg.IF(hldaa), Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.askObs])).toEqual([
+            ['IAFAA', false], ['IFAAA', false], ['HLDAA', true], ['FAFAA', false], ['MAPAA', false],
+        ]);
+    });
+
+    // The kept leg is flagged, so the keep branch of filterOutDuplicates takes it, not the branch for unflagged legs
+    it('asks for OBS at a flagged leg that follows a hold at the same fix (B-2, 6-10, #384)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'IAFAA', legs: [Leg.IF(iafaa, FixTypeFlags.IAF), Leg.HF(fafaa, 90)]}],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertApp(app);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.askObs])).toEqual([
+            ['IAFAA', false], ['FAFAA', true], ['MAPAA', false],
+        ]);
+    });
+
+    // The last leg is kept whatever its flags
+    it('asks for OBS at the last leg that follows a hold at the same fix (B-2, 6-10, #384)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{name: 'IAFAA', legs: [Leg.IF(iafaa, FixTypeFlags.IAF)]}],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.HF(mapaa, 90), Leg.TF(mapaa)],
+        });
+        const legs = await convertApp(app);
+        expect(legs.map(l => [l.wpt.icaoStruct.ident, l.askObs])).toEqual([
+            ['IAFAA', false], ['FAFAA', false], ['MAPAA', true],
+        ]);
     });
 });
 
@@ -1534,6 +1572,28 @@ describe('DME arcs in the conversion', () => {
         const end = legs.find(l => l.wpt.icaoStruct.ident.trim() === 'HLDFX')!;
         expect(legs.some(l => l.arcData?.endFacility.icaoStruct.ident.trim() === 'HLDFX')).toBe(true);
         expect(end.askObs).toBe(false);
+    });
+
+    // addArcInfoIfPrevIsSame takes the arc in place of the kept leg (#381); the reminder belongs to what the unit lists
+    it('asks for OBS at the arc that is taken in place of the leg that follows a hold at the same fix (B-2, 6-10, #384)', async () => {
+        const app = approach({
+            type: ApproachType.APPROACH_TYPE_VOR, runway: '27',
+            transitions: [{
+                name: 'ARCBG',
+                legs: [
+                    Leg.IF(arcbg),
+                    Leg.HF(hldfx, 90),
+                    Leg.AF(hldfx, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: L}),
+                    Leg.TF(hldfx),
+                ],
+            }],
+            final: [Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const legs = await convertAt(app, 260);
+        const end = legs.find(l => l.wpt.icaoStruct.ident.trim() === 'HLDFX')!;
+        expect(legs.some(l => l.arcData?.endFacility.icaoStruct.ident.trim() === 'HLDFX')).toBe(true);
+        expect(end.askObs).toBe(true);
+        expect(legs[0].askObs).toBeUndefined();
     });
 });
 
