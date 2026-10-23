@@ -846,7 +846,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - only `A-Z0-9 -` can be displayed
 - **Deliberate non-real additions:** `GPS COURSE TO STEER`, the roll-steering LVar for the autopilot, `bearingForAP` on
   arcs, the fast GPS acquisition setting (default on) and keyboard mode. Missing on purpose or not implemented: RAIM,
-  failures, 3-satellite plus altitude solutions, and CTA/TMA in the SUA filter (TODO).
+  failures, 3-satellite plus altitude solutions, CTA/TMA in the SUA filter (TODO), and the third line of the SUA
+  messages (the APT 4 reference for Class B/C and the controlling agency, #210: the sim's data has neither).
 - **Event bus topics** are typed by interfaces declared next to their owner. There is no central file:
     - `PowerEvent.powerEvent` (`PowerButton.ts`)
     - `PropsReadyEvent.propsReady` (`KLN90BCore.ts`)
