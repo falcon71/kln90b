@@ -186,18 +186,53 @@ describe('AIRSPACE ALERT ahead on the track', () => {
 describe('AIRSPACE ALERT within 2 NM (3-40, B-1)', () => {
     const beside = () => airspace('R-BESIDE', BoundaryType.Restricted, box(47 - 12 * NM_LAT, 47 + 12 * NM_LAT, 8 + NM_LON, 8 + 10 * NM_LON), LIMITS);
 
-    // The passing sibling of the pin: the same area and position, turned toward the area, alerts today (the 10-minute
-    // rule), so the setup holds
+    // The sibling of the next test: the same area and position, turned toward the area, alerts by the 10-minute rule, so
+    // the setup holds
     it('alerts when the track turns toward the area 1 NM away (3-40, B-1)', async () => {
         const unit = await flying(90, [beside()]);
 
         expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-BESIDE          REST 1000ft to 18000ft']);
     });
 
-    it.fails('alerts on a track along the area 1 NM away (3-40, B-1, #189)', async () => {
+    it('alerts on a track along the area 1 NM away (3-40, B-1, #189)', async () => {
         const unit = await flying(0, [beside()]);
 
         expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-BESIDE          REST 1000ft to 18000ft']);
+    });
+
+    // The same area 3 NM away: beyond 2 NM, and the track never meets it
+    it('does not alert on a track along an area 3 NM away (3-40, B-1)', async () => {
+        const unit = await flying(0, [airspace('R-FAR', BoundaryType.Restricted, box(47 - 12 * NM_LAT, 47 + 12 * NM_LAT, 8 + 3 * NM_LON, 8 + 10 * NM_LON), LIMITS)]);
+
+        expect(sua(unit)).toEqual([]);
+    });
+
+    // 3-39, 3-40: the alert is three-dimensional, so the 2 NM rule checks the altitude too: the floor of 5000 ft and its
+    // buffer are above the aircraft at 1200 ft
+    it('does not alert along an area 1 NM away whose floor is above the aircraft and the buffer (3-39, 3-40)', async () => {
+        const unit = await flying(0, [airspace('R-HIGH', BoundaryType.Restricted, box(47 - 12 * NM_LAT, 47 + 12 * NM_LAT, 8 + NM_LON, 8 + 10 * NM_LON), {minFt: 5000, maxFt: 18000})]);
+
+        expect(sua(unit)).toEqual([]);
+    });
+
+    // The edge of a circle is a curve: the aircraft is 1 NM from it, 11 NM from the center of a circle of 10 NM
+    it('alerts beside a circular area 1 NM away (3-40, B-1, #189)', async () => {
+        const unit = await flying(0, [circularAirspace('R-CIRCLE', BoundaryType.Restricted, [47.0, 8 + 11 * NM_LON], 10, LIMITS)]);
+
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-CIRCLE          REST 1000ft to 18000ft']);
+    });
+});
+
+// The guide gives the distance as about 2 NM; these two rows hold the code's reading of it, ALERT_DISTANCE_NM = 2, not the
+// real unit: an edge 1.8 NM away alerts, an edge 2.2 NM away does not. The area is that of the describe above, moved east.
+describe('AIRSPACE ALERT at the 2 NM threshold (characterization)', () => {
+    it.each([
+        [1.8, ['AIRSPACE ALERT: R-EDGE            REST 1000ft to 18000ft']],
+        [2.2, []],
+    ])('on a track along an area %s NM away the alert is: %j (characterization)', async (nm, expected) => {
+        const unit = await flying(0, [airspace('R-EDGE', BoundaryType.Restricted, box(47 - 12 * NM_LAT, 47 + 12 * NM_LAT, 8 + nm * NM_LON, 8 + 10 * NM_LON), LIMITS)]);
+
+        expect(sua(unit)).toEqual(expected);
     });
 });
 

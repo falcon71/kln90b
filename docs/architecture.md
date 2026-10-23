@@ -631,11 +631,14 @@ comment gives the sources for the 1 Hz rate.
 **Alerts:**
 
 - `AirspaceAlert` (3-39) uses `NearestLodBoundarySearchSession` every 10 s with `SPECIAL_USE_AIRSPACE_FILTER`. It is
-  inhibited in ARM/APR modes and posts `AirspaceAlertMessage` / `InsideAirspaceMessage`.
-- `BoundaryUtils` (`isInside`, `intersects`, `getIntersections`) works on a polyline per boundary, built once on first
-  use and cached per `LodBoundary`, over every shape of LOD 0. Lines stay single segments; arcs and circles are cut into
-  chords at most `ARC_CHORD_TOLERANCE_NM` off the curve (#209). The point-in-polygon and the segment crossings are
-  hand-written in the flat lat/lon plane, with date-line handling (#9, #106).
+  inhibited in ARM/APR modes and posts `AirspaceAlertMessage` / `InsideAirspaceMessage`. It warns when the 10-minute
+  projection of the track meets the area or the area is within 2 NM (`ALERT_DISTANCE_NM`, 3-40, B-1, #189), with the
+  vertical check applied to both.
+- `BoundaryUtils` (`isInside`, `intersects`, `getIntersections`, `distanceToBoundaryNm`) works on a polyline per
+  boundary, built once on first use and cached per `LodBoundary`, over every shape of LOD 0. Lines stay single segments;
+  arcs and circles are cut into chords at most `ARC_CHORD_TOLERANCE_NM` off the curve (#209). The point-in-polygon and
+  the segment crossings are hand-written in the flat lat/lon plane, with date-line handling (#9, #106). The edge
+  distance is measured in a flat plane around the point.
 - `services/AirspacesAlongRoute` is used by pages.
 - `AltAlert` (3-56) and `HtAboveAirportAlert` (3-58) beep through `AudioGenerator`, which uses SDK `SoundServer` with
   `kln_short_beep` / `kln_long_beep`. The aircraft `sound.xml` must define these, and they only work if

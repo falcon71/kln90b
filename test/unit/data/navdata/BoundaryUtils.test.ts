@@ -305,3 +305,72 @@ describe('circles and arcs (#209)', () => {
         expect(BoundaryUtils.intersects(two, 47, 8.8, 47, 9.2)).toBe(true);
     });
 });
+
+// #189: the lateral distance from a point to the nearest edge of an area, for the alert within 2 NM. The expectations are
+// geometry: NM of latitude are 60 per degree, the points come from flight/geo.ts. There is no manual page for this helper.
+describe('distanceToBoundaryNm (#189)', () => {
+    const C: LatLon = {lat: 47, lon: 8};
+    const NM_LON = 1 / (60 * Math.cos(47 * Math.PI / 180));
+
+    // The square 46.9 to 47.1 N, 7.9 to 8.1 E
+    const square = new LodBoundary(airspace('SQUARE', BoundaryType.Restricted, [[47.1, 7.9], [47.1, 8.1], [46.9, 8.1], [46.9, 7.9]]));
+
+    it('gives the distance to the nearest edge from outside a square (#189)', () => {
+        // 1 NM west of the west edge, and 2 NM south of the south edge
+        expect(BoundaryUtils.distanceToBoundaryNm(square, 47, 7.9 - NM_LON)).toBeCloseTo(1, 1);
+        expect(BoundaryUtils.distanceToBoundaryNm(square, 46.9 - 2 / 60, 8)).toBeCloseTo(2, 1);
+    });
+
+    it('gives the distance to the nearest corner from beside a square (#189)', () => {
+        // 3 NM west and 4 NM south of the south-west corner
+        expect(BoundaryUtils.distanceToBoundaryNm(square, 46.9 - 4 / 60, 7.9 - 3 * NM_LON)).toBeCloseTo(5, 1);
+    });
+
+    it('gives 0 inside a square (#189)', () => {
+        expect(BoundaryUtils.distanceToBoundaryNm(square, 47, 8)).toBe(0);
+    });
+
+    // The circle's edge is 10 NM from the center; a chord of the 90 degree arc would pass 7.07 NM from the center
+    it('measures to the curve of a circle (#189)', () => {
+        const circle = new LodBoundary(circularAirspace('CIRC', BoundaryType.Restricted, [47, 8], 10));
+        const outside = pointFrom(C, 100, 12);
+
+        expect(Math.abs(BoundaryUtils.distanceToBoundaryNm(circle, outside.lat, outside.lon) - 2)).toBeLessThan(0.06);
+    });
+
+    it('measures to the curve of an arc, not to its chord (#189)', () => {
+        const sector = new LodBoundary(arcSectorAirspace('SECTOR', BoundaryType.Restricted, [47, 8], 10, 0, 90));
+        const outside = pointFrom(C, 45, 11);
+
+        expect(Math.abs(BoundaryUtils.distanceToBoundaryNm(sector, outside.lat, outside.lon) - 1)).toBeLessThan(0.06);
+    });
+
+    // The date line box of the top of the file: 179E to 179W, 10N to 20N
+    it('measures across the date line (#189)', () => {
+        expect(Math.abs(BoundaryUtils.distanceToBoundaryNm(dateLineBox, 15, 178.9) - 0.1 * 60 * Math.cos(15 * Math.PI / 180))).toBeLessThan(0.1);
+        expect(BoundaryUtils.distanceToBoundaryNm(dateLineBox, 15, -179.5)).toBe(0);
+        // 0.1 degree west of the east edge, seen from the western hemisphere: the nearest edge is the one at 179W
+        expect(Math.abs(BoundaryUtils.distanceToBoundaryNm(dateLineBox, 15, -178.9) - 0.1 * 60 * Math.cos(15 * Math.PI / 180))).toBeLessThan(0.1);
+    });
+
+    // North of the box, on the date line: the nearest edge is the north edge (20N), which runs from 179E to 179W across
+    // the date line, 5 degrees of latitude (300 NM) away
+    it('measures to an edge that runs across the date line (#189)', () => {
+        expect(BoundaryUtils.distanceToBoundaryNm(dateLineBox, 25, 180)).toBeCloseTo(300, 1);
+        expect(BoundaryUtils.distanceToBoundaryNm(dateLineBox, 25, -180)).toBeCloseTo(300, 1);
+    });
+
+    it('gives infinity for a boundary without shapes (#189)', () => {
+        const empty = new LodBoundary({...airspace('EMPTY', BoundaryType.Restricted, [[47.1, 7.9], [47.1, 8.1], [46.9, 8.1]]), vectors: []});
+
+        expect(BoundaryUtils.distanceToBoundaryNm(empty, 47, 8)).toBe(Infinity);
+    });
+
+    it('measures to the nearest of several shapes (#189)', () => {
+        // A square of 0.1 degree around 47 N 8 E, then a circle of 5 NM around 47 N 9 E; 47 N 8.5 E is beside the square
+        const two = new LodBoundary(multiShapeAirspace('TWO', BoundaryType.Restricted, [[47.1, 7.9], [47.1, 8.1], [46.9, 8.1], [46.9, 7.9]], [47, 9], 5));
+        const nearCircle = pointFrom({lat: 47, lon: 9}, 270, 6);
+
+        expect(Math.abs(BoundaryUtils.distanceToBoundaryNm(two, nearCircle.lat, nearCircle.lon) - 1)).toBeLessThan(0.06);
+    });
+});

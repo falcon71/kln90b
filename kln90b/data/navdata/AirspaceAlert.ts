@@ -23,6 +23,9 @@ import {NavMode, NavPageState} from "../VolatileMemory";
 
 const ALERT_TICK_TIME = 10000;
 
+/** 3-40, B-1: the alert is also given when the aircraft is this close to the area, in NM */
+const ALERT_DISTANCE_NM = 2;
+
 export const SPECIAL_USE_AIRSPACE_FILTER: number = BitFlags.union(
     BitFlags.createFlag(BoundaryType.ClassB),
     BitFlags.createFlag(BoundaryType.ClassC),
@@ -122,8 +125,11 @@ export class AirspaceAlert implements CalcTickable {
                 }
 
 
-                //TODO this is only the 10 minute rule. We should also check if we are within 2NM
-                const warn = isVerticallyInside && BoundaryUtils.intersects(airspace, this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, posIn10Min.lat, posIn10Min.lon);
+                //3-40, B-1: the alert comes when the track of the next 10 minutes meets the area, or when the area is within 2 NM
+                const warn = isVerticallyInside && (
+                    BoundaryUtils.intersects(airspace, this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, posIn10Min.lat, posIn10Min.lon)
+                    || BoundaryUtils.distanceToBoundaryNm(airspace, this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon) <= ALERT_DISTANCE_NM
+                );
                 //console.log("checking airspace warning", airspace, isVerticallyInside, warn);
 
                 if (warn) {

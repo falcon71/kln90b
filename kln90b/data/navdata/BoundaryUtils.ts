@@ -97,6 +97,50 @@ export class BoundaryUtils {
     }
 
     /**
+     * The lateral distance from the point to the nearest edge of the boundary in NM: 0 inside, Infinity for a boundary
+     * without shapes (#189). The edges are measured in a flat plane around the point (x = longitude difference times
+     * cos(lat), y = latitude difference, 60 NM per degree), which is exact enough for the 2 NM of the alert. Arcs and
+     * circles are measured along the chords of their polyline (#209).
+     * @param boundary
+     * @param lat
+     * @param lon
+     */
+    public static distanceToBoundaryNm(boundary: LodBoundary, lat: number, lon: number): number {
+        if (this.isInside(boundary, lat, lon)) {
+            return 0;
+        }
+
+        const kLon = 60 * Math.cos(lat * Math.PI / 180);
+        // The difference of two longitudes in degrees, taken the short way round the globe, so that the date line splits
+        // neither the point from the ring nor an edge from itself (#9)
+        const wrap = (degrees: number) => degrees - 360 * Math.round(degrees / 360);
+
+        let nearestSquared = Infinity;
+        for (const ring of this.rings(boundary)) {
+            // The ring is closed (the last point equals the first), so the edges run from point 0 to the last point
+            let x1 = wrap(ring[0].lon - lon) * kLon;
+            let y1 = (ring[0].lat - lat) * 60;
+            for (let i = 1; i < ring.length; i++) {
+                const x2 = x1 + wrap(ring[i].lon - ring[i - 1].lon) * kLon;
+                const y2 = (ring[i].lat - lat) * 60;
+
+                // The point is the origin: the closest point of the edge is the one along it closest to 0, 0
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const lengthSquared = dx * dx + dy * dy;
+                const t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, -(x1 * dx + y1 * dy) / lengthSquared));
+                const px = x1 + t * dx;
+                const py = y1 + t * dy;
+                nearestSquared = Math.min(nearestSquared, px * px + py * py);
+
+                x1 = x2;
+                y1 = y2;
+            }
+        }
+        return Math.sqrt(nearestSquared);
+    }
+
+    /**
      * The ray cast of isInside over one closed ring. lon is already shifted for a boundary across the date line.
      */
     private static isInsideRing(ring: readonly LatLonInterface[], lat: number, lon: number, isCrossingDateLine: boolean): boolean {
