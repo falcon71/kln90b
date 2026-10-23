@@ -510,7 +510,7 @@ export class SidStar {
                     modifiedLeg = this.addArcInfoIfPrevIsSame(legs[i - 1], leg);
                     this.keepObsOfArcInPlaceOf(leg, modifiedLeg, askObsLegs);
                 }
-                this.mergeAFsIfNecessary(modifiedLeg, legs, i);
+                this.mergeAFsIfNecessary(modifiedLeg, legs, SidStar.indexOfKeptLeg(leg, modifiedLeg, i));
                 obsAtNextKept = this.keepObsOfDroppedLeg(obsAtNextKept, leg, modifiedLeg, askObsLegs);
                 iafAtNextArc = SidStar.keepIafOfDroppedArcLeg(iafAtNextArc, modifiedLeg, iafArcLegs);
                 filtered.push(modifiedLeg);
@@ -526,7 +526,7 @@ export class SidStar {
                         modifiedLeg = this.addArcInfoIfPrevIsSame(legs[i - 1], leg);
                         this.keepObsOfArcInPlaceOf(leg, modifiedLeg, askObsLegs);
                     }
-                    this.mergeAFsIfNecessary(modifiedLeg, legs, i);
+                    this.mergeAFsIfNecessary(modifiedLeg, legs, SidStar.indexOfKeptLeg(leg, modifiedLeg, i));
                     obsAtNextKept = this.keepObsOfDroppedLeg(obsAtNextKept, leg, modifiedLeg, askObsLegs);
                     iafAtNextArc = SidStar.keepIafOfDroppedArcLeg(iafAtNextArc, modifiedLeg, iafArcLegs);
                     filtered.push(modifiedLeg);
@@ -608,6 +608,18 @@ export class SidStar {
      */
     private static sameArc(a: FlightPlanLeg, b: FlightPlanLeg): boolean {
         return ICAO.valueEquals(a.originIcaoStruct, b.originIcaoStruct) && Math.abs(a.rho - b.rho) <= UnitType.NMILE.convertTo(0.1, UnitType.METER);
+    }
+
+    /**
+     * #413 6-16, 6-18: the index of the leg the conversion keeps. When addArcInfoIfPrevIsSame returned the arc before
+     * the leg (the arc's end fix is also the IF of the final), the arc is merged from there, not from the leg after it,
+     * otherwise its first segment is lost.
+     * @param leg the leg at index i
+     * @param modifiedLeg what addArcInfoIfPrevIsSame returned for it: the leg itself, or the arc before it (#381)
+     * @param i
+     */
+    private static indexOfKeptLeg(leg: FlightPlanLeg, modifiedLeg: FlightPlanLeg, i: number): number {
+        return modifiedLeg !== leg ? i - 1 : i;
     }
 
     private mergeAFsIfNecessary(leg: FlightPlanLeg, legs: FlightPlanLeg[], i: number) {

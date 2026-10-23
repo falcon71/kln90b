@@ -771,8 +771,8 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             ]);
         });
 
-        // #413: with the arc's end fix also the final's IF (the PHNY shape), the merged arc loses its first segment
-        it.fails('starts the merged arc at the first segment when the arc\'s end fix is also the final\'s IF (6-16, #413)', async () => {
+        // #413: with the arc's end fix also the final's IF (the PHNY shape), the merged arc starts at its first segment
+        it('starts the merged arc at the first segment when the arc\'s end fix is also the final\'s IF (6-16, #413)', async () => {
             const app = approach({
                 type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
                 transitions: [{
@@ -787,8 +787,53 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             });
             const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, app);
 
-            expect(legs[0].wpt.icaoStruct.ident).toBe('D260J');
+            expect(legs.map(l => l.wpt.icaoStruct.ident)).toEqual(['D260J', 'ARCEN', 'FAFAA', 'MAPAA']);
             expect(legs[0].arcData!.beginRadial).toBe(270);
+            expect(legs[0].arcData!.endRadial).toBe(180);
+        });
+
+        // #413, #382: the same with the step-down flagged IAF (MDST/WMKP), the entry takes the IAF
+        it('starts the merged arc at the first segment when its end fix is also the final\'s IF and a step-down is an IAF (6-16, 6-17, #413, #382)', async () => {
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{
+                    name: 'ARCBG',
+                    legs: [
+                        Leg.IF(arcbg),
+                        Leg.AF(step, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT, flags: FixTypeFlags.IAF}),
+                        Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                    ],
+                }],
+                final: [Leg.IF(arcen), Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            });
+            const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, app);
+
+            expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+                ['D260J', KLNFixType.IAF], ['ARCEN', undefined], ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+            ]);
+            expect(legs[0].arcData!.beginRadial).toBe(270);
+            expect(legs[0].arcData!.endRadial).toBe(180);
+        });
+
+        // #413: the final's IF is flagged IAF itself, so the flag rule keeps it (the first place the arc is merged)
+        it('starts the merged arc at the first segment when the final\'s IF at the arc\'s end fix is an IAF (6-16, #413)', async () => {
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{
+                    name: 'ARCBG',
+                    legs: [
+                        Leg.IF(arcbg),
+                        Leg.AF(step, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT}),
+                        Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                    ],
+                }],
+                final: [Leg.IF(arcen, FixTypeFlags.IAF), Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            });
+            const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, app);
+
+            expect(legs.map(l => l.wpt.icaoStruct.ident)).toEqual(['D260J', 'ARCEN', 'FAFAA', 'MAPAA']);
+            expect(legs[0].arcData!.beginRadial).toBe(270);
+            expect(legs[0].arcData!.endRadial).toBe(180);
         });
     });
 
