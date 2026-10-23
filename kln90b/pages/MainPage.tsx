@@ -376,12 +376,12 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                 if (this.overlayPageStack.isShown()) {
                     return this.getOverlayPage()!.lCursorController.toggleCursor();
                 }
-                return this.getLeftPage().getCursorController().toggleCursor();
+                return this.getLeftPage().cursorPressed();
             case EVT_R_CURSOR:
                 if (this.overlayPageStack.isShown()) {
                     return this.getOverlayPage()!.rCursorController.toggleCursor();
                 }
-                return this.getRightPage().getCursorController().toggleCursor();
+                return this.getRightPage().cursorPressed();
             case EVT_L_OUTER_LEFT:
                 if (this.overlayPageStack.isShown()) {
                     if (this.getOverlayPage()!.lCursorController.cursorActive) {

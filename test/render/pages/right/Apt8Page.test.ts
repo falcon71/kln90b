@@ -595,9 +595,8 @@ describe('APT 8 loading an approach into a full FPL 0 that lacks its airport', (
         expect(legs.slice(-6).map(l => l[0])).toEqual(['IAFAA', 'IFAAA', 'FAFAA', 'SDFAA', 'MAPAA', 'KPRC']);
     });
 
-    // The maintainer's ruling: one question per waypoint. The waypoint number names the waypoint that will go, since
-    // nothing is deleted before the last ENT
-    it('asks once per waypoint it has to delete and deletes nothing before the last ENT (characterization, #222)', async () => {
+    /** 29 fillers and KPRC in FPL 0 (active leg 6); APT 8 loads an approach of 17 waypoints, which asks twice for room */
+    async function loadLongApproach() {
         const w = approachWorld();
         // An approach of 17 waypoints onto 29 fillers and KPRC: 47 legs, two over the 45
         const fixes = Array.from({length: 17}, (_, i) => intersection(`AP${String(i).padStart(3, '0')}`, 46.8, 7.5 + 0.02 * i));
@@ -617,6 +616,13 @@ describe('APT 8 loading an approach into a full FPL 0 that lacks its airport', (
         await unit.panel.cursor('R');
         await unit.panel.ent(); // the approach (no transition)
         await unit.panel.ent(); // LOAD IN FPL
+        return unit;
+    }
+
+    // The maintainer's ruling: one question per waypoint. The waypoint number names the waypoint that will go, since
+    // nothing is deleted before the last ENT
+    it('asks once per waypoint it has to delete and deletes nothing before the last ENT (characterization, #222)', async () => {
+        const unit = await loadLongApproach();
 
         expect(leftRows()[1]).toBe('WPT   1');
         await unit.panel.ent();
@@ -629,6 +635,18 @@ describe('APT 8 loading an approach into a full FPL 0 that lacks its airport', (
         expect(legs).toHaveLength(45);
         expect(legs[0][0]).toBe('FL02');
         expect(legs[44][0]).toBe('KPRC');
+    });
+
+    it('cancels a procedure load on CRSR at its second question (characterization, #385)', async () => {
+        const unit = await loadLongApproach();
+        const before = fpl0Legs(unit);
+        await unit.panel.ent(); // WPT 1
+        expect(leftRows()[1]).toBe('WPT   2'); // Precondition
+        await unit.panel.cursor('L');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fpl0Legs(unit)).toEqual(before);
+        expect(leftRows()[5]).not.toBe('CONTINUE?');
     });
 
     // A waypoint deleted to make room is no longer in FPL 0, so it does not make the approach redundant (6-5, B-3 name

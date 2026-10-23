@@ -399,7 +399,7 @@ Flightplan really is dead simple".
   legs without the procedure being replaced, with the airport the load adds as en-route and the procedure legs on top.
   No room is FPL FULL with FPL 0 unchanged. When waypoints must go, `pages/left/ProcedureMakeRoomPage` (a subclass of
   the abstract `MakeRoomPage`) asks on the left once per waypoint; ENT on the last question deletes them and loads,
-  CLR cancels. A load is one batch with one `flightplanChanged`, inserting with plain `insertLeg`.
+  CLR or CRSR cancels (#385). A load is one batch with one `flightplanChanged`, inserting with plain `insertLeg`.
 - An insert on the FPL 0 page asks before it makes room (#380). The inner-knob click, typed key or ENT (3-15, only
   when it takes the waypoint of the right page) that would open an insert row or the entry of the blank position first
   calls `EditableFlightplan.askRoom` through the row (`FlightplanListItem` prop `askRoom`). The added leg is a SID or
@@ -408,9 +408,11 @@ Flightplan really is dead simple".
   rebuilds the list with the cursor on the row the insert goes in front of (the new first waypoint when that one was
   deleted, #148) and repeats the action through the cursor controller, which asks again or opens the entry. A row not
   in the plan yet that asked (the en-route row an inner click on a procedure header creates, or the empty row of an
-  ENT) is made again there as it was, so a header's row stays an en-route leg in front of the procedure. CLR turns the
-  cursor off and rebuilds the list with FPL 0 unchanged. When room cannot be made (C-1) nothing is asked: the entry
-  opens and its ENT answers FPL FULL. The REF and CTR inserts keep the silent deletion of `insertLegIntoFpl`.
+  ENT) is made again there as it was, so a header's row stays an en-route leg in front of the procedure. CLR or CRSR
+  cancels: the list is rebuilt with FPL 0 unchanged. The cursor stays on under the question and the rebuilt list keeps
+  its index, so it stays on the waypoint, header or blank end where the insert was tried (checked in the KLN 89 trainer,
+  2026-10-23, #385). When room cannot be made (C-1) nothing is asked: the entry opens and its ENT answers FPL FULL.
+  The REF and CTR inserts keep the silent deletion of `insertLegIntoFpl`.
 - Before `load` runs, `loadIfFplContainsApt` of APT 7 and APT 8 chooses the question (#274). A procedure of the type being
   loaded in FPL 0 (any approach for APT 8, a SID for a SID, a STAR for a STAR; also the same one) shows the replace page
   (`Apt8ReplacePage`, `Apt7ReplacePage`: `PRESS ENT TO REPLACE EXISTING APPROACH/SID/STAR`, a flashing `APPROVE?`). It
@@ -1070,6 +1072,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   menu, the pulled knob then changes the menu's fields, and CRSR again closes it and shows the window; a push with the
   menu open changes nothing. While the menu hides the window (`SuperNav5Page.isScanWindowShown()` is false), the
   window keeps its waypoint but takes neither DCT (no Direct To suggestion), CLR (the map declutters instead) nor ENT.
+- `EVT_L_CURSOR`/`EVT_R_CURSOR` → with an overlay shown, `toggleCursor()` of the overlay's cursor controller of that
+  side. Otherwise `SixLineHalfPage.cursorPressed()` of that side, which toggles the cursor by default. `MakeRoomPage`
+  overrides it to cancel its question as CLR does (checked in the KLN 89 trainer, 2026-10-23, #385).
 - `EVT_ENT` → `handleEnter()`:
     1. If left `isEnterAccepted()` → left.enter; else if right accepts → right.enter. A waypoint editor that waits for
        its creation page on the right does not accept ENT, so ENT reaches that page (#262).

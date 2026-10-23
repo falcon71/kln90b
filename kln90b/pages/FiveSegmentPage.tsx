@@ -57,6 +57,13 @@ export abstract class SixLineHalfPage extends DisplayComponent<PageProps> implem
     }
 
     /**
+     * The CRSR button of this side while no full screen page is shown; by default it toggles the cursor (#385)
+     */
+    public cursorPressed(): boolean {
+        return this.getCursorController().toggleCursor();
+    }
+
+    /**
      * True while this page holds an open entry (an edit, a DEL question, a waypoint awaiting approval): it takes CLR
      * before the other side (#307, #359)
      */

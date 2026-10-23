@@ -506,3 +506,7 @@ flying, SET 4 turn anticipation on unless noted; raw data and the reports in
   cursor off on FPL 0 and with it on a waypoint of FPL 0; neither DELETE FPL? nor DEL came. Right CRSR on a step turned
   the cursor off and went back to the procedure list. On the bare approach list CLR turned the right cursor off; on
   the STAR list it did nothing; neither is used (#383).
+- KLN 89, full FPL 0 (20 en-route), the room question after an inner-knob click on waypoint 20: CRSR cancels it as CLR
+  does, with FPL 0 unchanged and no insert row; the cursor stays on, on that waypoint (an outer knob then moved it).
+  CLR gives the same. The outer and inner knobs do nothing while the question shows, and it has no timeout. Seen twice.
+  The STAR insert at 35 was not checked (#385).

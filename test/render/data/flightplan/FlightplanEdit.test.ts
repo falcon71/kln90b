@@ -9,6 +9,7 @@ import {activeIdent, fplIdents, messages} from '../../../harness/readers';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {Leg, sid, star, withProcedures} from '../../../harness/navdata/procedures';
 import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
+import {MainPage} from '../../../../kln90b/pages/MainPage';
 
 // Pilot's Guide 4-4 (adding a waypoint), 4-5 (deleting a waypoint and a plan), C-1 (FPL FULL)
 // A full FPL 0 of 30 legs along a line north from 47N 8E, FA00 at the start and 5 NM between the legs
@@ -234,12 +235,38 @@ describe('adding a waypoint to a full FPL 0', () => {
         expect(fplIdents(unit)).toEqual(FIXES.map(f => f.icaoStruct.ident));
     });
 
-    // The AVsoftech trainer turned the cursor off after CLR
-    it('turns the left cursor off after CLR on the question (characterization, #380)', async () => {
+    // Checked in the KLN 89 trainer, 2026-10-23: CLR and CRSR cancel the question alike, the cursor stays on the waypoint
+    // where the insert was tried (#385)
+    it('keeps the left cursor on the waypoint after CLR on the question (checked in the KLN 89 trainer, 2026-10-23, #385)', async () => {
         const unit = await clickInFrontOfSecondWaypoint();
         await unit.panel.clr();
 
-        expect(Screen.read().status().left).toBe('FPL 0');
+        expect(unit.panel.focused('L').text.trim()).toBe('FA01');
+        expect(fplIdents(unit)).toEqual(FIXES.map(f => f.icaoStruct.ident));
+    });
+
+    it('cancels on CRSR as on CLR, with the cursor on the waypoint (checked in the KLN 89 trainer, 2026-10-23, #385)', async () => {
+        const unit = await clickInFrontOfSecondWaypoint();
+        await unit.panel.cursor('L');
+
+        expect(leftRows()[5]).not.toBe('CONTINUE?');
+        expect(unit.panel.focused('L').text.trim()).toBe('FA01');
+        expect(fplIdents(unit)).toEqual(FIXES.map(f => f.icaoStruct.ident));
+        await unit.panel.outer('L', 1); // the cursor is live
+        expect(unit.panel.focused('L').text.trim()).toBe('FA02');
+    });
+
+    it.each([['outer', -1], ['outer', 1], ['inner', -1], ['inner', 1]] as const)(
+        'ignores the %s knob (%i) while the question shows (checked in the KLN 89 trainer, 2026-10-23, #385)', async (knob, clicks) => {
+        const unit = await clickInFrontOfSecondWaypoint();
+        const leftPage = () => (unit.props.pageManager.getCurrentPage() as MainPage).getLeftPage();
+        const question = leftPage();
+        await unit.panel[knob]('L', clicks);
+
+        // The same question: one that was closed and asked again by the knob on the FPL page would look alike
+        expect(leftPage()).toBe(question);
+        expect(leftRows()).toEqual(['DELETING', 'WPT   1', 'TO MAKE', 'ROOM IN', 'FLIGHTPLAN-', 'CONTINUE?']);
+        expect(fplIdents(unit)).toEqual(FIXES.map(f => f.icaoStruct.ident));
     });
 
     it('asks at the blank position after the 30th waypoint as well (checked in the KLN 89 trainer, 2026-10-15, #380)', async () => {
@@ -339,6 +366,16 @@ describe('adding a waypoint to a full FPL 0', () => {
         await vi.advanceTimersByTimeAsync(1500);
         expect(fplIdents(unit).slice(0, 2)).toEqual(['KNEW', 'FA01']);
         expect(fplIdents(unit)).toHaveLength(30);
+    });
+
+    // After an ENT that opened an empty row in front of FA01, a cancel removes the row; the cursor is on FA01, where the row was
+    it('removes the empty row and keeps the cursor on the waypoint after CRSR (characterization, #385)', async () => {
+        const unit = await entWithoutWaypointOnTheRight();
+        await unit.panel.inner('L', 1); // the question
+        await unit.panel.cursor('L');
+
+        expect(leftRows().slice(0, 2)).toEqual(['  1:FA00', '  2:FA01']);
+        expect(unit.panel.focused('L').text.trim()).toBe('FA01');
     });
 });
 
@@ -478,10 +515,17 @@ describe('adding a waypoint in front of the STAR header of a full FPL 0', () => 
         await unit.panel.clr();
         await vi.advanceTimersByTimeAsync(1500);
 
-        expect(Screen.read().status().left).toBe('FPL 0');
         expect(fpl0Legs(unit)).toHaveLength(32);
         // An empty row left in front of the header would number KPRC, the last row (4-8), 33
         expect(leftRows()[5]).toBe(' 32:KPRC');
+    });
+
+    it('keeps the cursor on the STAR header after CRSR on the question (characterization, #385)', async () => {
+        const unit = await clickOnStarHeader();
+        await unit.panel.cursor('L');
+
+        expect(unit.panel.focused('L').text).toContain('CHANGE');
+        expect(fpl0Legs(unit)).toHaveLength(32);
     });
 });
 

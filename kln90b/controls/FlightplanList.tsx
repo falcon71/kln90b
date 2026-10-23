@@ -441,9 +441,9 @@ class EditableFlightplan {
      * #380: an addition to a full FPL 0 asks before it deletes the first waypoint (checked in the KLN 89 trainer,
      * 2026-10-15). `idx` is the row the insert row would open at: in front of a waypoint, or the blank position at the
      * end. ENT deletes one step of roomSteps, puts the cursor back on the row the insert goes in front of and calls
-     * `retry`, which asks again while that is not enough, or opens the entry. CLR turns the cursor off and shows the plan
-     * as stored. When room cannot
-     * be made (C-1) nothing is asked: the entry opens and its ENT answers FPL FULL (insertLeg).
+     * `retry`, which asks again while that is not enough, or opens the entry. CLR or CRSR cancels: the plan is shown as
+     * stored and the cursor stays on, at the row where the insert was tried (checked in the KLN 89 trainer, 2026-10-23,
+     * #385). When room cannot be made (C-1) nothing is asked: the entry opens and its ENT answers FPL FULL (insertLeg).
      * @return true when the question is shown
      */
     private askRoom(idx: number, retry: () => void): boolean {
@@ -483,8 +483,10 @@ class EditableFlightplan {
             retry();
         };
         const cancel = () => {
-            this.cursorController.setCursorActive(false);
-            this.refreshFpl(); //A row a header or an ENT created goes; the plan is shown as stored
+            //A row a header or an ENT created goes; the plan is shown as stored. #385: the cursor stays on the row where
+            //the insert was tried. It stays on under the question, and the rebuilt list keeps its index, so the waypoint,
+            //header or blank end a removed pending row stood in front of takes the row's place under the cursor
+            this.refreshFpl();
         };
 
         const mainPage = this.props.pageManager.getCurrentPage() as MainPage;

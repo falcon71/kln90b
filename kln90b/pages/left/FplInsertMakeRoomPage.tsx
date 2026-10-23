@@ -5,7 +5,7 @@ import {MakeRoomPage} from "./MakeRoomPage";
 /**
  * #380: asked by the inner-knob click that would add a waypoint to a full FPL 0, before the insert row opens. ENT deletes
  * one waypoint from the front (one step of roomSteps) and hands back to the FPL page, which asks again or opens the row;
- * CLR cancels. Pushed on the left over the FPL 0 page (a context of its own, maintainer)
+ * CLR or CRSR cancels (#385). Pushed on the left over the FPL 0 page (a context of its own, maintainer)
  */
 export class FplInsertMakeRoomPage extends MakeRoomPage {
     constructor(props: PageProps, private readonly deleteAndContinue: () => void, private readonly cancel: () => void) {

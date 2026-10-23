@@ -14,7 +14,8 @@ type MakeRoomPageTypes = {
  * #222, #380: the question before waypoints are deleted from the front of FPL 0 to make room. The text follows the
  * AVsoftech 90B trainer (characterization). The KLN 89 asks one such question per waypoint for an FPL insert, on its
  * own screen (checked in its trainer, 2026-10-15); a procedure load that needs room was not seen there. The cursor is
- * on CONTINUE?, which flashes as every focused button does. Each context has its own subclass (maintainer).
+ * on CONTINUE?, which flashes as every focused button does. CRSR cancels as CLR does, and the knobs do nothing while it
+ * shows (checked in the KLN 89 trainer, 2026-10-23, #385). Each context has its own subclass (maintainer).
  */
 export abstract class MakeRoomPage extends SixLineHalfPage {
     public readonly cursorController: CursorController;
@@ -51,6 +52,11 @@ export abstract class MakeRoomPage extends SixLineHalfPage {
     }
 
     public clear(): boolean {
+        this.onCancel();
+        return true;
+    }
+
+    public cursorPressed(): boolean {
         this.onCancel();
         return true;
     }

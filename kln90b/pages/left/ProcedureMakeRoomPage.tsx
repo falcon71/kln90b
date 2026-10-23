@@ -4,8 +4,8 @@ import {MakeRoomPage} from "./MakeRoomPage";
 
 /**
  * #222: asks once per waypoint that a procedure load must delete from the front of FPL 0, numbering them from 1;
- * nothing is deleted before ENT on the last question, which calls `onContinue` of the load. CLR on any of them cancels.
- * Pushed on the left with the APT page as its parent.
+ * nothing is deleted before ENT on the last question, which calls `onContinue` of the load. CLR or CRSR on any of them
+ * cancels (#385). Pushed on the left with the APT page as its parent.
  */
 export class ProcedureMakeRoomPage extends MakeRoomPage {
     private asked = 1;
