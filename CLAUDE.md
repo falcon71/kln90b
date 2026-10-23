@@ -81,6 +81,13 @@ change what they mean; add new ones instead:
   hot-swap-disabled.
   **DOM changes happen only inside display ticks** (`tick(blink)`/`redraw()`); input handlers only change state. This
   emulates the slow CRT.
+- **Tick cost is the sim's frame time.** The sim stalls while instrument JS runs, so a long 1 Hz calculation tick is a
+  freeze the pilot feels every second. Users run much slower PCs than the maintainer's, and Xbox Series S and
+  PlayStation, none of which can be measured. The working bar: the worst case of one tick's work, assumed 10× slower
+  than Node on the maintainer's PC, stays well under one 30 fps frame (33 ms). Measure with a throwaway benchmark: in
+  Node, or injected temporarily into the self-test page, where the maintainer reads the result in the Coherent GT
+  debugger console. Throttle expensive work (the nearest and airspace searches run every 10 s), and reuse cached
+  objects in hot paths instead of allocating, as the SDK's geo classes do.
 - **GPS** (`Gps.ts`) wraps the SDK `GPSSatComputer`. It models hot, warm and almanac-search starts from the stored
   position, almanac, ephemeris and clock (`GpsSearch.ts`), and the GPS week rollover.
   Once there is a fix it uses the exact sim position; there is no noise. STA 5 predicts RAIM through an SDK prediction
