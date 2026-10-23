@@ -150,6 +150,15 @@ opens the row; inner knob; ENT): the new waypoint is an en-route leg at the fron
 header over it. A STAR-typed pending row whose STAR stays is unchanged. The AVsoftech bullets go into the 2026-10-23
 block of `docs/kln89-trainer-record.md`.
 
+## 6b. #413 The merged arc starts at its first segment when the arc's end fix is also the final's IF
+
+Added to this batch by the maintainer on 2026-10-23, after the #382 review found it (pinned there with `it.fails`).
+In the PHNY shape (the transition ends with an arc to X, the final starts with `IF X`) `filterOutDuplicates` keeps the
+IF, `addArcInfoIfPrevIsSame` replaces it with the transition's AF, and `mergeAFsIfNecessary` is called with the IF's
+index, so the walk never reaches the earlier segments of the arc. **One way:** start the walk at the AF leg actually
+kept (`i - 1` when `addArcInfoIfPrevIsSame` returned the previous leg). The pin becomes `it`. Real data: MDST D29 SGO,
+WMKP D22-Z KAPKO (with an IAF on the arc). Spec: 6-16, 6-18.
+
 ## 7. Order and constraints
 
 - Commits: #384, #382 (`SidStar.ts`), #383 (`Apt7Page`, `Apt8Page`, `test/README.md`), #385 then #386 (both in
