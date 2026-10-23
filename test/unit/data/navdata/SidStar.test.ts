@@ -770,6 +770,26 @@ describe('SidStar conversion of procedures to KLN legs', () => {
                 ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
             ]);
         });
+
+        // #413: with the arc's end fix also the final's IF (the PHNY shape), the merged arc loses its first segment
+        it.fails('starts the merged arc at the first segment when the arc\'s end fix is also the final\'s IF (6-16, #413)', async () => {
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{
+                    name: 'ARCBG',
+                    legs: [
+                        Leg.IF(arcbg),
+                        Leg.AF(step, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT}),
+                        Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                    ],
+                }],
+                final: [Leg.IF(arcen), Leg.TF(fafaa, FixTypeFlags.FAF), Leg.TF(mapaa, FixTypeFlags.MAP)],
+            });
+            const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, app);
+
+            expect(legs[0].wpt.icaoStruct.ident).toBe('D260J');
+            expect(legs[0].arcData!.beginRadial).toBe(270);
+        });
     });
 
     // 6-5, B-3: the unit tells the pilot that the enroute part of the flight plan already holds waypoints of the
