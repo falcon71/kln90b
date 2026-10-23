@@ -171,6 +171,15 @@ export class MemoryFacilityClient {
         this.airspaces.push(airspace);
     }
 
+    /** Removes the airspace with this id. A boundary session that had it in its last result reports the id as removed in its next search. */
+    public removeAirspace(id: number): void {
+        const at = this.airspaces.findIndex(a => a.id === id);
+        if (at < 0) {
+            throw new Error(`MemoryFacilityClient: no airspace with id ${id}`);
+        }
+        this.airspaces.splice(at, 1);
+    }
+
     /**
      * Adds facilities from plain JSON (an array of facility objects). icaoStruct may be given as a V2 ICAO string.
      * @param json

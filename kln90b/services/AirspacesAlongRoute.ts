@@ -2,6 +2,7 @@ import {GeoCircle, GeoPoint, LatLonInterface, LodBoundary, UnitType} from "@micr
 import {NearestUtils} from "../data/navdata/NearestUtils";
 import {SPECIAL_USE_AIRSPACE_FILTER} from "../data/navdata/AirspaceAlert";
 import {BoundaryUtils} from "../data/navdata/BoundaryUtils";
+import {airspaceAreaKey} from "../data/navdata/AirspaceAreas";
 import {NauticalMiles} from "../data/Units";
 
 
@@ -84,16 +85,20 @@ export async function airspacesAlongRoute(route: LatLonInterface[], utils: Neare
 
     console.log(route, airspaces);
     const foundAirspaces: LodBoundary[] = [];
+    //#410: an area is listed once, even if the searches of two legs hand out different copies of it
+    const foundKeys = new Set<string>();
 
     for (let i = 1; i < route.length; i++) {
         const from = route[i - 1];
         const to = route[i];
         const airspacesForLeg = airspaces[i - 1];
         for (const airspace of airspacesForLeg) {
-            if (!foundAirspaces.some(a => a.facility.id === airspace.facility.id)) {
+            const key = airspaceAreaKey(airspace.facility);
+            if (!foundKeys.has(key)) {
                 const intersects = BoundaryUtils.intersects(airspace, from.lat, from.lon, to.lat, to.lon);
                 if (intersects || (i == 1 && BoundaryUtils.isInside(airspace, from.lat, from.lon))) {
                     foundAirspaces.push(airspace);
+                    foundKeys.add(key);
                 }
             }
         }

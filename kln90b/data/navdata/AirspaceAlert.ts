@@ -8,7 +8,6 @@ import {
     FacilityClient,
     FacilitySearchType,
     GeoPoint,
-    LodBoundary,
     NearestBoundarySearchSession,
     NearestLodBoundarySearchSession,
     UnitType,
@@ -17,6 +16,7 @@ import {
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Sensors} from "../../Sensors";
 import {AirspaceAlertMessage, InsideAirspaceMessage, MessageHandler} from "../MessageHandler";
+import {AirspaceAreas} from "./AirspaceAreas";
 import {BoundaryUtils} from "./BoundaryUtils";
 import {Feet} from "../Units";
 import {NavMode, NavPageState} from "../VolatileMemory";
@@ -50,9 +50,9 @@ export class AirspaceAlert implements CalcTickable {
 
     private isSearching: boolean = false;
 
-    private readonly nearAirspaces = new Map<number, LodBoundary>(); //All airspaces, that are near the plane
-    private warnedAirspaces: LodBoundary[] = []; //All airspaces, the user have been warned of
-    private enteredAirspaces: LodBoundary[] = []; //All airspaces we are currently inside
+    private readonly nearAirspaces = new AirspaceAreas(); //All areas, that are near the plane, one per group of copies (#410)
+    private readonly warnedAirspaces = new Set<string>(); //The keys of all areas, the user have been warned of
+    private readonly enteredAirspaces = new Set<string>(); //The keys of all areas we are currently inside
 
 
     private tickTimer: number = 0;
@@ -94,10 +94,10 @@ export class AirspaceAlert implements CalcTickable {
         this.isSearching = true;
         const airspaces = await this.airspaceSession!.searchNearest(this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon, UnitType.METER.convertFrom(100, UnitType.NMILE), 100);
         for (const airspace of airspaces.added) {
-            this.nearAirspaces.set(airspace.facility.id, airspace);
+            this.nearAirspaces.add(airspace);
         }
         for (const id of airspaces.removed) {
-            this.nearAirspaces.delete(id);
+            this.nearAirspaces.remove(id);
         }
         this.isSearching = false;
 
@@ -108,21 +108,19 @@ export class AirspaceAlert implements CalcTickable {
         const posIn10Min = this.sensors.in.gps.coords.offset(this.sensors.in.gps.trackTrue, UnitType.NMILE.convertTo(this.sensors.in.gps.groundspeed / 6, UnitType.GA_RADIAN), new GeoPoint(0, 0));
         const indicatedAlt = this.sensors.in.airdata.getIndicatedAlt();
 
-        for (const airspace of this.nearAirspaces.values()) {
+        for (const airspace of this.nearAirspaces.areas()) {
+            const key = this.nearAirspaces.keyOf(airspace);
             const isVerticallyInside = this.isVerticallyInsideAirspace(airspace.facility, indicatedAlt);
             const isInside = isVerticallyInside && BoundaryUtils.isInside(airspace, this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon);
             //console.log("checking airspace inside", airspace, isVerticallyInside, isInside);
             if (isInside) {
-                if (!this.enteredAirspaces.includes(airspace)) {
-                    this.enteredAirspaces.push(airspace);
+                if (!this.enteredAirspaces.has(key)) {
+                    this.enteredAirspaces.add(key);
                     this.messageHandler.addMessage(new InsideAirspaceMessage(["INSIDE SPC USE AIRSPACE", ...this.formatAirspaceAlertMessage(airspace.facility)], airspace, this.sensors));
                 }
 
             } else {
-                const idxEntered = this.enteredAirspaces.indexOf(airspace);
-                if (idxEntered >= 0) {
-                    this.enteredAirspaces.splice(idxEntered, 1);
-                }
+                this.enteredAirspaces.delete(key);
 
 
                 //3-40, B-1: the alert comes when the track of the next 10 minutes meets the area, or when the area is within 2 NM
@@ -133,15 +131,12 @@ export class AirspaceAlert implements CalcTickable {
                 //console.log("checking airspace warning", airspace, isVerticallyInside, warn);
 
                 if (warn) {
-                    if (!this.warnedAirspaces.includes(airspace)) {
-                        this.warnedAirspaces.push(airspace);
+                    if (!this.warnedAirspaces.has(key)) {
+                        this.warnedAirspaces.add(key);
                         this.messageHandler.addMessage(new AirspaceAlertMessage(["AIRSPACE ALERT:", ...this.formatAirspaceAlertMessage(airspace.facility)], airspace, this.sensors));
                     }
                 } else {
-                    const idxWarn = this.warnedAirspaces.indexOf(airspace);
-                    if (idxWarn >= 0) {
-                        this.warnedAirspaces.splice(idxWarn, 1);
-                    }
+                    this.warnedAirspaces.delete(key);
                 }
             }
         }

@@ -201,7 +201,8 @@ and `runwayFix(apt, '27')` and `runwayFix(apt, '09')` both resolve, 27 with a co
 **Airspaces.** `airspace()`, `circularAirspace()`, `arcSectorAirspace()` and `multiShapeAirspace()`
 (`navdata/airspaces.ts`) build `BoundaryFacility` objects. Pass
 them as `BootOptions.airspaces`, add them to a flight with `World.addAirspace()`, or call
-`MemoryFacilityClient.addAirspace()`. The boundary session filters by the type mask (`1 << BoundaryType`), selects the
+`MemoryFacilityClient.addAirspace()`; `removeAirspace(id)` takes one out again, and the next search reports it as
+removed. The boundary session filters by the type mask (`1 << BoundaryType`), selects the
 airspaces whose bounding box meets the search circle, sorts them by distance to the box, cuts at `maxItems` and reports
 removed ones by id. The bounding-box selection is inferred from a comment in `NearestUtils.getAirspacesAt`, not observed
 in the sim. The SDK's `NearestLodBoundarySearchSession` builds the `LodBoundary` objects in a throttled queue on

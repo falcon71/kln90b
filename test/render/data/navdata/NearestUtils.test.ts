@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {BoundaryType} from '@microsoft/msfs-sdk';
+import {BitFlags, BoundaryType} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {airspace} from '../../../harness/navdata/airspaces';
 import {airport} from '../../../harness/navdata/builders';
@@ -161,7 +161,8 @@ describe('NearestUtils airspace searches run one at a time (#102)', () => {
     });
 
     it('answers with the current result of the session: what a search added stays, what it removed is gone (characterization)', async () => {
-        const area = (id: number) => ({facility: {id}});
+        // Each area has a shape of its own, so none of them is a copy of another (#410)
+        const area = (id: number) => ({facility: {...airspace(`AREA ${id}`, BoundaryType.Restricted, [[47 + id, 8], [47 + id, 9], [46 + id, 9]]), id}});
         const searchNearest = vi.fn()
             .mockImplementationOnce(() => Promise.resolve({added: [area(1), area(2)], removed: []}))
             .mockImplementationOnce(() => Promise.resolve({added: [area(3)], removed: [1]}));
@@ -169,5 +170,27 @@ describe('NearestUtils airspace searches run one at a time (#102)', () => {
 
         expect((await utils.getAirspaces(47, 8, 1000, 10, 0)).map(a => a.facility.id)).toEqual([1, 2]);
         expect((await utils.getAirspaces(47, 8, 1000, 10, 0)).map(a => a.facility.id)).toEqual([2, 3]);
+    });
+});
+
+// #410: the sim holds most areas as several boundaries with the same type, limits and vectors but other names; a list
+// shows the area once, under the shortest name. The copies are invented; there is no manual page for this.
+describe('NearestUtils airspace lists (#410)', () => {
+    it('lists two copies of an area once (#410)', async () => {
+        const unit = await bootUnit({
+            position: INSIDE, altitudeFt: 0,
+            airspaces: [
+                airspace('TEST CLASS B SEATTLE', BoundaryType.ClassB, TRI),
+                airspace('TEST B', BoundaryType.ClassB, TRI),
+            ],
+        });
+        await settle(unit);
+
+        // The SDK builds the boundaries of a search in a queue on the fake clock
+        const search = unit.props.nearestUtils.getAirspacesAt(INSIDE.lat, INSIDE.lon, 10, BitFlags.createFlag(BoundaryType.ClassB));
+        await vi.advanceTimersByTimeAsync(2000);
+        const found = await search;
+
+        expect(found.map(a => a.facility.name)).toEqual(['TEST B']);
     });
 });

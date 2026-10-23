@@ -10,12 +10,15 @@ import {Screen} from '../../../harness/render/screen';
 // center of the route search (they were written while #102 hid the areas that do not).
 const POS = {lat: 47.0, lon: 8.0};
 
-/** A restricted area of 5 NM by 5 NM around the present position */
-function areaAtPosition(name: string): BoundaryFacility {
-    const n = pointFrom(POS, 0, 2.5).lat;
-    const s = pointFrom(POS, 180, 2.5).lat;
-    const e = pointFrom(POS, 90, 2.5).lon;
-    const w = pointFrom(POS, 270, 2.5).lon;
+/**
+ * A restricted area of 5 NM by 5 NM around the present position. Areas of the same shape and limits are copies of one
+ * area to the unit (#410), so a test of several areas gives each its own half size.
+ */
+function areaAtPosition(name: string, halfSizeNm = 2.5): BoundaryFacility {
+    const n = pointFrom(POS, 0, halfSizeNm).lat;
+    const s = pointFrom(POS, 180, halfSizeNm).lat;
+    const e = pointFrom(POS, 90, halfSizeNm).lon;
+    const w = pointFrom(POS, 270, halfSizeNm).lon;
     return airspace(name, BoundaryType.Restricted, [[n, w], [n, e], [s, e], [s, w]]);
 }
 
@@ -67,7 +70,7 @@ describe('TRI 2 page (5-4)', () => {
     // 5-4, step 11: when the areas do not fit on one page there are several TRI 2 pages, shown as TRI+2. Three areas
     // take six rows besides the ESA line, one more than the five rows of a page
     it('spreads three areas over two pages named TRI+2, turned with the inner knob (5-4)', async () => {
-        const unit = await tri2After1([areaAtPosition('R-ONE'), areaAtPosition('R-TWO'), areaAtPosition('R-THREE')]);
+        const unit = await tri2After1([areaAtPosition('R-ONE'), areaAtPosition('R-TWO', 2.6), areaAtPosition('R-THREE', 2.7)]);
         const first = Screen.read();
         expect(first.status().left).toBe('TRI+2');
         const firstRows = first.rows('L');

@@ -633,7 +633,11 @@ comment gives the sources for the 1 Hz rate.
 - `AirspaceAlert` (3-39) uses `NearestLodBoundarySearchSession` every 10 s with `SPECIAL_USE_AIRSPACE_FILTER`. It is
   inhibited in ARM/APR modes and posts `AirspaceAlertMessage` / `InsideAirspaceMessage`. It warns when the 10-minute
   projection of the track meets the area or the area is within 2 NM (`ALERT_DISTANCE_NM`, 3-40, B-1, #189), with the
-  vertical check applied to both.
+  vertical check applied to both. The sim holds most areas two or three times, as boundaries with the same type, limits
+  and vectors but other names and ids, so the alert works on one area per group of copies (`AirspaceAreas`, #410): the
+  search session's per-id bookkeeping stays, `areas()` hands out the copy with the shortest name (ties by the lowest id),
+  and the warned and entered areas are remembered by key (`airspaceAreaKey`), so a change of the shown copy posts no
+  second message.
 - `BoundaryUtils` (`isInside`, `intersects`, `getIntersections`, `distanceToBoundaryNm`) works on a polyline per
   boundary, built once on first use and cached per `LodBoundary`, over every shape of LOD 0. Lines stay single segments;
   arcs and circles are cut into chords at most `ARC_CHORD_TOLERANCE_NM` off the curve (#209). The point-in-polygon and
@@ -680,10 +684,12 @@ comment gives the sources for the 1 Hz rate.
 - `NearestUtils`: nearest helpers for pages and airspaces. Every airspace search goes through one
   `NearestLodBoundarySearchSession`, which reports a result as the difference from its previous search. So the class
   mirrors the session in one map (every added airspace in, every removed one out) and runs the searches one at a time
-  in a FIFO queue; each queued run sets its own type mask first (#102). `getAirspacesAt` (OTH 2, the APT 1 airspace
-  row) searches at radius 0 and keeps only the airspaces that contain the point (`BoundaryUtils.isInside`), because
-  the SDK seems to only check the bounding box ("CANADA RVSM"). `getAirspaces` (TRI 2, 4 and 6, CTR 1) returns the
-  airspaces whose box meets the search circle and leaves the geometry to the caller. `getNearestLowHighVor` gives
+  in a FIFO queue; each queued run sets its own type mask first (#102). The map is an `AirspaceAreas`, so every list
+  holds one boundary per group of identical copies, under the shortest name (#410). `getAirspacesAt` (OTH 2, the APT 1
+  airspace row) searches at radius 0 and keeps only the airspaces that contain the point (`BoundaryUtils.isInside`),
+  because the SDK seems to only check the bounding box ("CANADA RVSM"). `getAirspaces` (TRI 2, 4 and 6, CTR 1) returns
+  the airspaces whose box meets the search circle and leaves the geometry to the caller; TRI 2, 4 and 6 list an area
+  once by its `airspaceAreaKey`, even when two leg searches hand out different copies of it. `getNearestLowHighVor` gives
   NAV 2 its low or high altitude VOR within 200 NM through a `NearestVorSearch` (`data/navdata/NearestVorSearch.ts`);
   NAV 2 calls it when it opens and every 10 s while it is shown, never while another page is (#204). OTH 2 looks up
   the Center of the present position through `getAirspacesAt` when it opens and every 10 s while it is shown, one

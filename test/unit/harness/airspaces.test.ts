@@ -70,6 +70,21 @@ describe('MemoryFacilityClient boundary session', () => {
         expect([again.added, again.removed]).toEqual([[], []]);
     });
 
+    it('lists an airspace taken out with removeAirspace as removed by id in the next search', async () => {
+        const client = new MemoryFacilityClient([], [restricted]);
+        const session = await client.startNearestSearchSessionWithIcaoStructs(FacilitySearchType.Boundary);
+        await session.searchNearest(47.0, 8.0, nm(10), 10);
+
+        client.removeAirspace(restricted.id);
+        const result = await session.searchNearest(47.0, 8.0, nm(10), 10);
+
+        expect([result.added, result.removed]).toEqual([[], [restricted.id]]);
+    });
+
+    it('refuses to remove an airspace it does not hold', () => {
+        expect(() => new MemoryFacilityClient().removeAirspace(-1)).toThrow('no airspace with id -1');
+    });
+
     it('lists an airspace hidden by a new type mask as removed', async () => {
         const session = await boundarySession(restricted);
         await session.searchNearest(47.0, 8.0, nm(10), 10);

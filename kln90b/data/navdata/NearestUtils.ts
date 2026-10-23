@@ -13,6 +13,7 @@ import {
     VorType,
 } from "@microsoft/msfs-sdk";
 import {Latitude, Longitude} from "../Units";
+import {AirspaceAreas} from "./AirspaceAreas";
 import {BoundaryUtils} from "./BoundaryUtils";
 import {NearestVorSearch} from "./NearestVorSearch";
 
@@ -35,7 +36,8 @@ export class NearestUtils {
     //searches run one at a time: the session reports each result as the difference from its previous search, and
     //NearestLodBoundarySearchSession builds the boundaries of a search in a throttled queue, so a large search can finish
     //after a later one
-    private readonly airspaceMap = new Map<number, LodBoundary>();
+    //#410: it hands out one boundary per group of identical copies
+    private readonly airspaceMap = new AirspaceAreas();
     private airspaceQueue: Promise<unknown> = Promise.resolve();
 
     public constructor(private readonly facilityLoader: FacilityClient) {
@@ -115,12 +117,12 @@ export class NearestUtils {
             this.airspaceSession!.setFilter(filter);
             const result = await this.airspaceSession!.searchNearest(lat, lon, radius, maxItems);
             for (const id of result.removed) {
-                this.airspaceMap.delete(id);
+                this.airspaceMap.remove(id);
             }
             for (const airspace of result.added) {
-                this.airspaceMap.set(airspace.facility.id, airspace);
+                this.airspaceMap.add(airspace);
             }
-            return [...this.airspaceMap.values()];
+            return this.airspaceMap.areas();
         };
         const search = this.airspaceQueue.then(run);
         this.airspaceQueue = search.catch(() => undefined);

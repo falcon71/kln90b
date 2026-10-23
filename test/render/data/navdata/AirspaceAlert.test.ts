@@ -534,3 +534,81 @@ describe('SUA alert in the approach active mode (3-41)', () => {
         expect(sua(unit)).toEqual([]);
     });
 });
+
+// #410: the sim holds most areas as several boundaries with the same type, limits and vectors but other names. They are
+// one area for the alert, under the shortest name. The copies are invented; there is no manual page for this.
+describe('copies of one area (#410)', () => {
+    const copies = () => [
+        airspace('R-4711 ALPHA', BoundaryType.Restricted, box(47 + 10 * NM_LAT, 47.4, 7.9, 8.1), LIMITS),
+        airspace('R-4711', BoundaryType.Restricted, box(47 + 10 * NM_LAT, 47.4, 7.9, 8.1), LIMITS),
+    ];
+
+    it('gives one AIRSPACE ALERT for two copies of an area, under the shortest name (#410)', async () => {
+        const unit = await flying(0, copies());
+
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-4711            REST 1000ft to 18000ft']);
+    });
+
+    it('gives one INSIDE SPC USE AIRSPACE for two copies of an area (#410)', async () => {
+        const unit = await bootUnit({
+            position: {lat: 47.0, lon: 8.0}, altitudeFt: 1200,
+            airspaces: [
+                airspace('R-4711 ALPHA', BoundaryType.Restricted, box(46.9, 47.1, 7.9, 8.1), LIMITS),
+                airspace('R-4711', BoundaryType.Restricted, box(46.9, 47.1, 7.9, 8.1), LIMITS),
+            ],
+        });
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-4711            REST 1000ft to 18000ft']);
+    });
+
+    // The inside twin of the next test: the shortest copy was the one the unit is inside of; when it leaves the search the
+    // other copy takes over, and the area is the same one, so there is no second message
+    it('gives no second INSIDE SPC USE AIRSPACE when the copy with the shortest name leaves the search (#410)', async () => {
+        const alpha = airspace('R-4711 ALPHA', BoundaryType.Restricted, box(46.9, 47.1, 7.9, 8.1), LIMITS);
+        const plain = airspace('R-4711', BoundaryType.Restricted, box(46.9, 47.1, 7.9, 8.1), LIMITS);
+        const unit = await bootUnit({position: {lat: 47.0, lon: 8.0}, altitudeFt: 1200, airspaces: [alpha, plain]});
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-4711            REST 1000ft to 18000ft']); // Precondition
+
+        unit.navdata.removeAirspace(plain.id);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-4711            REST 1000ft to 18000ft']);
+    });
+
+    // The shortest copy was the one warned of; when it leaves the search the other copy takes over, and the area is the
+    // same one, so there is no second message
+    it('gives no second AIRSPACE ALERT when the copy with the shortest name leaves the search (#410)', async () => {
+        const [alpha, plain] = copies();
+        const unit = await flying(0, [alpha, plain]);
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-4711            REST 1000ft to 18000ft']); // Precondition
+
+        unit.navdata.removeAirspace(plain.id);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-4711            REST 1000ft to 18000ft']);
+    });
+
+    // The area alerts again after the track turned away and back; by then only the longer-named copy is left, and the
+    // message shows its name
+    it('shows the name of the remaining copy when the area alerts again after the shortest copy left the search (#410)', async () => {
+        const [alpha, plain] = copies();
+        const unit = await flying(0, [alpha, plain]);
+        unit.navdata.removeAirspace(plain.id);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+        await unit.panel.msg();
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.msg();
+        await moveAircraft(unit, {lat: 47.0, lon: 8.0}, {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+        expect(sua(unit)).toEqual([]); // Precondition: read, and away from the area
+
+        await moveAircraft(unit, {lat: 47.0, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-4711 ALPHA      REST 1000ft to 18000ft']);
+    });
+});
