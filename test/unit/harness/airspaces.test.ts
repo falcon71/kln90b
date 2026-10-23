@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {BitFlags, BoundaryFacility, BoundaryType, DefaultLodBoundaryCache, FacilitySearchType, LodBoundary, UnitType} from '@microsoft/msfs-sdk';
-import {airspace, circularAirspace, distanceToBoxNm} from '../../harness/navdata/airspaces';
+import {airspace, arcSectorAirspace, circularAirspace, distanceToBoxNm, multiShapeAirspace} from '../../harness/navdata/airspaces';
+import {distanceNm} from '../../harness/flight/geo';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
 import {BoundaryUtils} from '../../../kln90b/data/navdata/BoundaryUtils';
 import {resetSingletons} from '../../harness/singletons';
@@ -170,15 +171,70 @@ describe('airspace builders and the SDK LodBoundary', () => {
         expect(BoundaryUtils.isInside(lod, 47.0, 8.4)).toBe(false);
     });
 
-    // The known gap: BoundaryUtils ignores circles (its TODO). The SDK turns the circle into a two-point shape, so even
-    // the center of a circular airspace is not inside. This characterizes the gap, it is not a spec.
-    it('builds a circular airspace that BoundaryUtils cannot see into (known gap)', () => {
+    // The SDK turns the circle into a two-point shape that carries the circle, and BoundaryUtils cuts it into a polyline
+    it('builds a circular airspace that BoundaryUtils sees as a circle (#209)', () => {
         const circle = circularAirspace('CIRC', BoundaryType.MOA, [47.0, 8.0], 10);
         const lod = new LodBoundary(circle);
 
         expect(lod.lods[0][0].length).toBe(2);
-        // circular airspaces are not implemented: #209
-        expect(BoundaryUtils.isInside(lod, 47.0, 8.0)).toBe(false);
+        expect(BoundaryUtils.isInside(lod, 47.0, 8.0)).toBe(true);
+    });
+
+    // The SDK reads the sector as one shape: the start, the line out, the arc (the Origin only names its center) and the
+    // line back. Its arc is a small circle, its lines are great circles.
+    it('builds an arc sector the SDK reads as a line, an arc and a line (#209)', () => {
+        const lod = new LodBoundary(arcSectorAirspace('SECTOR', BoundaryType.MOA, [47.0, 8.0], 10, 0, 90));
+        const shape = lod.lods[0][0];
+
+        expect(lod.lods[0]).toHaveLength(1);
+        expect(shape.map(v => v.circle === undefined ? 'start' : v.circle.isGreatCircle() ? 'line' : 'arc')).toEqual(['start', 'line', 'arc', 'line']);
+        expect(shape[0].end.lat).toBe(47.0);
+        expect(shape[0].end.lon).toBe(8.0);
+        // The line out ends 10 NM north, the arc ends 10 NM east
+        expect(distanceNm({lat: 47.0, lon: 8.0}, shape[1].end)).toBeCloseTo(10, 6);
+        expect(distanceNm({lat: 47.0, lon: 8.0}, shape[2].end)).toBeCloseTo(10, 6);
+        expect(shape[2].end.lat).toBeLessThan(47.0);
+        expect(shape[2].end.lon).toBeGreaterThan(8.1);
+    });
+
+    // The counterclockwise twin of the sector above, from bearing 90 to bearing 0: the SDK's arc runs on a circle of the
+    // opposite orientation, which it reads as a small circle with a radius below a quarter of the globe; the ArcCW above
+    // gets the reversed circle
+    it('builds a counterclockwise arc sector the SDK reads as an arc of the opposite orientation (#209)', () => {
+        const ccw = new LodBoundary(arcSectorAirspace('CCW', BoundaryType.MOA, [47.0, 8.0], 10, 90, 0, {counterClockwise: true})).lods[0][0];
+        const cw = new LodBoundary(arcSectorAirspace('CW', BoundaryType.MOA, [47.0, 8.0], 10, 0, 90)).lods[0][0];
+
+        expect(ccw.map(v => v.circle === undefined ? 'start' : v.circle.isGreatCircle() ? 'line' : 'arc')).toEqual(['start', 'line', 'arc', 'line']);
+        expect(ccw[2].circle!.radius).toBeLessThan(Math.PI / 2);
+        expect(cw[2].circle!.radius).toBeGreaterThan(Math.PI / 2);
+        // The line out ends 10 NM east, the arc ends 10 NM north
+        expect(ccw[1].end.lat).toBeLessThan(47.0);
+        expect(ccw[1].end.lon).toBeGreaterThan(8.1);
+        expect(distanceNm({lat: 47.0, lon: 8.0}, ccw[2].end)).toBeCloseTo(10, 6);
+        expect(ccw[2].end.lon).toBeCloseTo(8.0, 9);
+    });
+
+    it('moves the start of the arc outward by startOffsetNm (#209)', () => {
+        const lod = new LodBoundary(arcSectorAirspace('OFF', BoundaryType.MOA, [47.0, 8.0], 10, 0, 90, {startOffsetNm: 0.5}));
+
+        expect(distanceNm({lat: 47.0, lon: 8.0}, lod.lods[0][0][1].end)).toBeCloseTo(10.5, 6);
+        expect(distanceNm({lat: 47.0, lon: 8.0}, lod.lods[0][0][2].end)).toBeCloseTo(10, 6);
+    });
+
+    it('gives an arc sector the bounding box of its full circle (#209)', () => {
+        expect(arcSectorAirspace('SECTOR', BoundaryType.MOA, [47.0, 8.0], 60, 0, 90)).toMatchObject({
+            topLeft: circularAirspace('CIRC', BoundaryType.MOA, [47.0, 8.0], 60).topLeft,
+            bottomRight: circularAirspace('CIRC', BoundaryType.MOA, [47.0, 8.0], 60).bottomRight,
+        });
+    });
+
+    it('builds an airspace of a polygon and a circle as two shapes (#209)', () => {
+        const lod = new LodBoundary(multiShapeAirspace('TWO', BoundaryType.MOA, square(47.0, 8.0, 0.1), [47.0, 9.0], 5));
+
+        expect(lod.lods[0].map(s => s.length)).toEqual([5, 2]);
+        // The square reaches farther north, south and west than the circle; the circle reaches farther east
+        expect(lod.facility.topLeft).toEqual({lat: 47.1, long: 7.9});
+        expect(lod.facility.bottomRight).toEqual({lat: 46.9, long: circularAirspace('C', BoundaryType.MOA, [47.0, 9.0], 5).bottomRight.long});
     });
 
     it('gives a circular airspace a bounding box that contains the circle', () => {

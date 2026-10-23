@@ -1,4 +1,16 @@
-import {GeoPoint, LodBoundary} from "@microsoft/msfs-sdk";
+import {GeoPoint, LatLonInterface, LodBoundary, LodBoundaryShape, UnitType} from "@microsoft/msfs-sdk";
+
+/**
+ * The most a chord of an arc or a circle may lie off the curve, in NM. #209: the sim hands out true arcs and circles;
+ * they are cut into chords once per boundary, fine enough that the flat algorithms below read them as curves.
+ */
+export const ARC_CHORD_TOLERANCE_NM = 0.05;
+
+/** The closed rings of a boundary, built on first use and kept as long as the boundary lives */
+const ringCache = new WeakMap<LodBoundary, readonly (readonly LatLonInterface[])[]>();
+
+const projected = new GeoPoint(0, 0);
+const offset = new GeoPoint(0, 0);
 
 export class BoundaryUtils {
 
@@ -10,7 +22,8 @@ export class BoundaryUtils {
      * @param lon
      */
     public static isInside(boundary: LodBoundary, lat: number, lon: number): boolean {
-        if (boundary.lods.length <= 0 || boundary.lods[0].length <= 0) {
+        const rings = this.rings(boundary);
+        if (rings.length <= 0) {
             return false;
         }
 
@@ -19,15 +32,79 @@ export class BoundaryUtils {
             lon += 360; //If the airspace crosses the dateline, we shift the entire coordinate system of the left hemisphere to the right
         }
 
-        const lod = boundary.lods[0][0];
+        for (const ring of rings) {
+            if (this.isInsideRing(ring, lat, lon, isCrossingDateLine)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
+    /**
+     * Returns true, if the flightpath crosses the airspace boundary
+     * @param boundary
+     * @param lat1
+     * @param lon1
+     * @param lat2
+     * @param lon2
+     */
+    public static intersects(boundary: LodBoundary, lat1: number, lon1: number, lat2: number, lon2: number): boolean {
+        return this.getIntersections(boundary, lat1, lon1, lat2, lon2).length > 0;
+    }
 
+    /**
+     * Returns the points, where the flightpath crosses the airspace boundary
+     * @param boundary
+     * @param lat1
+     * @param lon1
+     * @param lat2
+     * @param lon2
+     */
+    public static getIntersections(boundary: LodBoundary, lat1: number, lon1: number, lat2: number, lon2: number): GeoPoint[] {
+        const rings = this.rings(boundary);
+        if (rings.length <= 0) {
+            return [];
+        }
+        const results: GeoPoint[] = [];
+
+        //#106: the path and the ring are unwrapped into one continuous longitude range around the box, so that neither
+        //the date line nor the prime meridian splits them. A box wider than 180 degrees is the code's sign of a box across
+        //the date line (#9); its reference is 180, otherwise the middle of the box. GeoPoint normalizes the results.
+        const left = boundary.facility.topLeft.long;
+        const right = boundary.facility.bottomRight.long;
+        const reference = right - left > 180 ? 180 : (left + right) / 2;
+        const unwrap = (lon: number) => lon + 360 * Math.round((reference - lon) / 360);
+        const pathLon1 = unwrap(lon1);
+        const pathLon2 = pathLon1 + (((lon2 - lon1) % 360 + 540) % 360 - 180);
+
+        for (const ring of rings) {
+            // The ring is closed (the last point equals the first), so the edges run from point 0 to the last point
+            for (let current = 0; current < ring.length - 1; current++) {
+                const next = current + 1;
+                const lat3 = ring[current].lat;
+                const lon3 = unwrap(ring[current].lon);
+                const lat4 = ring[next].lat;
+                const lon4 = unwrap(ring[next].lon);
+                const intersection = this.getIntersectionBetweenTwoLines(lat1, pathLon1, lat2, pathLon2, lat3, lon3, lat4, lon4);
+
+                if (intersection !== null) {
+                    results.push(intersection);
+                }
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * The ray cast of isInside over one closed ring. lon is already shifted for a boundary across the date line.
+     */
+    private static isInsideRing(ring: readonly LatLonInterface[], lat: number, lon: number, isCrossingDateLine: boolean): boolean {
         let intersections = 0;
-        const count = lod.length;
+        const count = ring.length;
 
-        let wpt1 = lod[0].end;
+        let wpt1 = ring[0];
 
-        //todo we are only calculating direct paths here and ignore the circle property. This means, we do not support any circular airspaces!
         for (let i = 1; i < count; i++) {
             let wpt1Lon = wpt1.lon;
             if (isCrossingDateLine && wpt1Lon <= 0) {
@@ -38,7 +115,7 @@ export class BoundaryUtils {
                 return true;
             }
 
-            const wpt2 = lod[i].end;
+            const wpt2 = ring[i];
             let wpt2Lon = wpt2.lon;
             if (isCrossingDateLine && wpt2Lon <= 0) {
                 wpt2Lon += 360; //If the airspace crosses the dateline, we shift the entire coordinate system of the left hemisphere to the right
@@ -65,58 +142,64 @@ export class BoundaryUtils {
     }
 
     /**
-     * Returns true, if the flightpath crosses the airspace boundary
+     * One closed ring (the last point equals the first) per shape of the boundary's LOD 0, built on first use and cached.
+     * Lines stay single segments; arcs and circles are cut into chords no more than ARC_CHORD_TOLERANCE_NM off the curve
+     * (#209).
      * @param boundary
-     * @param lat1
-     * @param lon1
-     * @param lat2
-     * @param lon2
      */
-    public static intersects(boundary: LodBoundary, lat1: number, lon1: number, lat2: number, lon2: number): boolean {
-        return this.getIntersections(boundary, lat1, lon1, lat2, lon2).length > 0;
+    private static rings(boundary: LodBoundary): readonly (readonly LatLonInterface[])[] {
+        let rings = ringCache.get(boundary);
+        if (rings === undefined) {
+            rings = boundary.lods.length > 0 ? boundary.lods[0].filter(shape => shape.length > 0).map(shape => this.ring(shape)) : [];
+            ringCache.set(boundary, rings);
+        }
+        return rings;
     }
 
     /**
-     * Returns the points, where the flightpath crosses the airspace boundary
-     * @param boundary
-     * @param lat1
-     * @param lon1
-     * @param lat2
-     * @param lon2
+     * The closed ring of one shape. A shape starts with an element that has only its end; every further element runs
+     * along its circle from the previous end to its own: a great circle for a line, a small circle for an arc or a full
+     * circle.
+     * @param shape
      */
-    public static getIntersections(boundary: LodBoundary, lat1: number, lon1: number, lat2: number, lon2: number): GeoPoint[] {
-        if (boundary.lods.length <= 0 || boundary.lods[0].length <= 0) {
-            return [];
-        }
-        const lod = boundary.lods[0][0];
-        const results: GeoPoint[] = [];
+    private static ring(shape: Readonly<LodBoundaryShape>): LatLonInterface[] {
+        const ring: LatLonInterface[] = [{lat: shape[0].end.lat, lon: shape[0].end.lon}];
 
-        //#106: the path and the ring are unwrapped into one continuous longitude range around the box, so that neither
-        //the date line nor the prime meridian splits them. A box wider than 180 degrees is the code's sign of a box across
-        //the date line (#9); its reference is 180, otherwise the middle of the box. GeoPoint normalizes the results.
-        const left = boundary.facility.topLeft.long;
-        const right = boundary.facility.bottomRight.long;
-        const reference = right - left > 180 ? 180 : (left + right) / 2;
-        const unwrap = (lon: number) => lon + 360 * Math.round((reference - lon) / 360);
-        const pathLon1 = unwrap(lon1);
-        const pathLon2 = pathLon1 + (((lon2 - lon1) % 360 + 540) % 360 - 180);
+        for (let i = 1; i < shape.length; i++) {
+            const prev = ring[ring.length - 1];
+            const {circle, end} = shape[i];
 
-        //todo we are only calculating direct paths here and ignore the circle property. This means, we do not support any circular airspaces!
-        // The ring is closed (the last point equals the first), so the edges run from point 0 to the last point
-        for (let current = 0; current < lod.length - 1; current++) {
-            const next = current + 1;
-            const lat3 = lod[current].end.lat;
-            const lon3 = unwrap(lod[current].end.lon);
-            const lat4 = lod[next].end.lat;
-            const lon4 = unwrap(lod[next].end.lon);
-            const intersection = this.getIntersectionBetweenTwoLines(lat1, pathLon1, lat2, pathLon2, lat3, lon3, lat4, lon4);
+            if (circle !== undefined && !circle.isGreatCircle()) {
+                //The SDK takes an arc's radius from its end point, so the start can lie off the circle: the curve starts at
+                //the point of the circle closest to it. A start at the center has no closest point; it gets a line.
+                circle.closest(prev, projected);
+                if (!isNaN(projected.lat)) {
+                    //A full circle starts and ends at the same point
+                    const sweep = projected.equals(end) ? 2 * Math.PI : circle.angleAlong(projected, end, Math.PI);
+                    //An ArcCW is a reversed circle, whose radius is measured from the antipode of the center
+                    const radiusNm = UnitType.GA_RADIAN.convertTo(Math.min(circle.radius, Math.PI - circle.radius), UnitType.NMILE);
+                    const step = 2 * Math.acos(Math.max(-1, 1 - ARC_CHORD_TOLERANCE_NM / radiusNm));
+                    const n = Math.max(1, Math.ceil(sweep / step));
 
-            if (intersection !== null) {
-                results.push(intersection);
+                    if (!projected.equals(prev)) {
+                        ring.push({lat: projected.lat, lon: projected.lon});
+                    }
+                    for (let k = 1; k < n; k++) {
+                        circle.offsetAngleAlong(projected, sweep * k / n, offset);
+                        ring.push({lat: offset.lat, lon: offset.lon});
+                    }
+                }
             }
+
+            ring.push({lat: end.lat, lon: end.lon});
         }
 
-        return results;
+        const first = ring[0];
+        const last = ring[ring.length - 1];
+        if (first.lat !== last.lat || first.lon !== last.lon) {
+            ring.push({lat: first.lat, lon: first.lon});
+        }
+        return ring;
     }
 
     private static getIntersectionBetweenTwoLines(lat1: number, lon1: number, lat2: number, lon2: number, lat3: number, lon3: number, lat4: number, lon4: number): GeoPoint | null {

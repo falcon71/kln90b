@@ -1,7 +1,8 @@
-import {describe, expect, it} from 'vitest';
-import {BoundaryType, LodBoundary} from '@microsoft/msfs-sdk';
-import {airspace} from '../../../harness/navdata/airspaces';
+import {describe, expect, it, vi} from 'vitest';
+import {BoundaryType, GeoCircle, LodBoundary} from '@microsoft/msfs-sdk';
+import {airspace, arcSectorAirspace, circularAirspace, multiShapeAirspace} from '../../../harness/navdata/airspaces';
 import {BoundaryUtils} from '../../../../kln90b/data/navdata/BoundaryUtils';
+import {distanceNm, LatLon, pointFrom} from '../../../harness/flight/geo';
 
 // An airspace from 179E across the date line to 179W, 10N to 20N. The code detects a crossing from the bounding box
 // (bottomRight.long - topLeft.long > 180), which is its own assumption about the sim's boundary data and has not been
@@ -172,5 +173,135 @@ describe('BoundaryUtils.getIntersections on hand-computed paths (characterizatio
 
     it('returns no point for a path beside the triangle', () => {
         expect(BoundaryUtils.getIntersections(TRIANGLE, 48, 9.5, 46.5, 9.5)).toEqual([]);
+    });
+});
+
+// #209: circles and arcs are read as curves. The expectations are geometry on the sphere: the points come from the
+// textbook destination formula in flight/geo.ts and the distances from its haversine, independent of the SDK's GeoCircle
+// that the code cuts the curves with. There is no manual page for this helper.
+describe('circles and arcs (#209)', () => {
+    const C: LatLon = {lat: 47, lon: 8};
+    const at = (p: LatLon): [number, number] => [p.lat, p.lon];
+    const path = (a: LatLon, b: LatLon): [number, number, number, number] => [a.lat, a.lon, b.lat, b.lon];
+
+    // A circle of 10 NM around 47 N 8 E, and the quarter of it from bearing 0 clockwise to bearing 90
+    const circle = new LodBoundary(circularAirspace('CIRC', BoundaryType.Restricted, [47, 8], 10));
+    const sector = new LodBoundary(arcSectorAirspace('SECTOR', BoundaryType.Restricted, [47, 8], 10, 0, 90));
+
+    /** The bearings from first to last (whole degrees) on which 9.94 NM is not inside or 10.01 NM is not outside */
+    const wrongAround = (boundary: LodBoundary, name: string, first: number, last: number): string[] => {
+        const wrong: string[] = [];
+        for (let bearing = first; bearing <= last; bearing++) {
+            if (!BoundaryUtils.isInside(boundary, ...at(pointFrom(C, bearing, 9.94)))) wrong.push(`${name} ${bearing} 9.94`);
+            if (BoundaryUtils.isInside(boundary, ...at(pointFrom(C, bearing, 10.01)))) wrong.push(`${name} ${bearing} 10.01`);
+        }
+        return wrong;
+    };
+
+    it('finds the center and a point just inside a circle inside, and a point just outside it outside (#209)', () => {
+        expect(BoundaryUtils.isInside(circle, 47, 8)).toBe(true);
+        expect(BoundaryUtils.isInside(circle, ...at(pointFrom(C, 45, 9.8)))).toBe(true);
+        expect(BoundaryUtils.isInside(circle, ...at(pointFrom(C, 45, 10.2)))).toBe(false);
+    });
+
+    // The chord of the 90 degree arc passes 7.07 NM from the center, so a chord would put 9.8 NM on bearing 45 outside
+    it('reads an arc as a curve, not as its chord (#209)', () => {
+        expect(BoundaryUtils.isInside(sector, ...at(pointFrom(C, 45, 9.8)))).toBe(true);
+        expect(BoundaryUtils.isInside(sector, ...at(pointFrom(C, 45, 10.2)))).toBe(false);
+        expect(BoundaryUtils.isInside(sector, ...at(pointFrom(C, 135, 5)))).toBe(false);
+    });
+
+    // The chords may cut 0.05 NM into the curve (ARC_CHORD_TOLERANCE_NM), wherever their corners fall: on every degree of
+    // bearing, a point 0.06 NM inside the curve is inside and a point 0.01 NM outside it is outside
+    it('cuts a circle and an arc within 0.06 NM inside the curve (#209)', () => {
+        expect([...wrongAround(circle, 'circle', 0, 359), ...wrongAround(sector, 'sector', 1, 89)]).toEqual([]);
+    });
+
+    // The same quarter as an ArcCCW, from bearing 90 counterclockwise to bearing 0, the other half of the arcs in real
+    // data. Run the wrong way, from 90 clockwise to 0, the arc would make the sector the other three quarters of the circle.
+    it('reads a counterclockwise arc as the curve between its ends (#209)', () => {
+        const ccw = new LodBoundary(arcSectorAirspace('CCW', BoundaryType.Restricted, [47, 8], 10, 90, 0, {counterClockwise: true}));
+
+        expect(BoundaryUtils.isInside(ccw, ...at(pointFrom(C, 45, 9.8)))).toBe(true);
+        expect(BoundaryUtils.isInside(ccw, ...at(pointFrom(C, 45, 10.2)))).toBe(false);
+        expect(BoundaryUtils.isInside(ccw, ...at(pointFrom(C, 225, 5)))).toBe(false);
+        expect(wrongAround(ccw, 'ccw', 1, 89)).toEqual([]);
+        expect(BoundaryUtils.intersects(ccw, ...path(pointFrom(C, 45, 9), pointFrom(C, 45, 11)))).toBe(true);
+    });
+
+    // A path from 9 to 11 NM on bearing 45 crosses the arc, not the chord
+    it('finds a path across an arc (#209)', () => {
+        expect(BoundaryUtils.intersects(sector, ...path(pointFrom(C, 45, 9), pointFrom(C, 45, 11)))).toBe(true);
+    });
+
+    // A path through the circle's center, 20 NM west to 20 NM east: two crossings, each 10 NM from the center. The same
+    // on bearings 100 and 280, away from where the corners of the chords are likely to fall.
+    it.each([
+        [270, 90],
+        [280, 100],
+    ])('returns both crossing points of a path through a circle from bearing %i to %i on the circle (#209)', (from, to) => {
+        const xs = BoundaryUtils.getIntersections(circle, ...path(pointFrom(C, from, 20), pointFrom(C, to, 20)));
+
+        expect(xs).toHaveLength(2);
+        for (const x of xs) {
+            expect(Math.abs(distanceNm(C, x) - 10)).toBeLessThan(0.06);
+        }
+    });
+
+    // The SDK takes the arc's radius from its end point; here the arc's start lies 0.5 NM outside that circle. The arc
+    // still runs on the circle from its very start, so the chord tolerance holds up to the first degree of bearing.
+    it('reads an arc whose start lies off its circle (#209)', () => {
+        const offCircle = new LodBoundary(arcSectorAirspace('OFF', BoundaryType.Restricted, [47, 8], 10, 0, 90, {startOffsetNm: 0.5}));
+
+        expect(BoundaryUtils.isInside(offCircle, ...at(pointFrom(C, 45, 9.8)))).toBe(true);
+        expect(wrongAround(offCircle, 'off', 1, 89)).toEqual([]);
+    });
+
+    // The polyline is built on first use and then kept: a second check cuts no arc again. The first cut of the 10 NM
+    // quarter arc needs few points: a chord sags r(1 - cos(a/2)) below the curve, so 0.05 NM on 10 NM allows chords of
+    // up to 11.5 degrees, 8 chords for 90 degrees, 7 points between the ends.
+    it('cuts the arcs of a boundary once (#209)', () => {
+        const fresh = new LodBoundary(arcSectorAirspace('ONCE', BoundaryType.Restricted, [47, 8], 10, 0, 90));
+        const spy = vi.spyOn(GeoCircle.prototype, 'offsetAngleAlong');
+        try {
+            BoundaryUtils.isInside(fresh, 47.1, 8.1);
+            const first = spy.mock.calls.length;
+            spy.mockClear();
+            BoundaryUtils.isInside(fresh, 47.1, 8.1);
+
+            expect(first).toBeGreaterThanOrEqual(7);
+            expect(first).toBeLessThan(12);
+            expect(spy).not.toHaveBeenCalled();
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    // The square 46.9 to 47.1 N, 7.9 to 8.1 E without its last vector, the west edge back to the start: the ring is
+    // closed anyway. West of the square, the eastward ray crosses the west and the east edge, so the point is outside;
+    // a path from there to the middle crosses the west edge.
+    it('closes a shape whose last vector does not return to its start (#209)', () => {
+        const closed = airspace('OPEN', BoundaryType.Restricted, [[47.1, 7.9], [47.1, 8.1], [46.9, 8.1], [46.9, 7.9]]);
+        const open = new LodBoundary({...closed, vectors: closed.vectors.slice(0, -1)});
+
+        expect(open.lods[0][0]).toHaveLength(4); // Precondition: the start and three lines
+        expect(BoundaryUtils.isInside(open, 47, 7.8)).toBe(false);
+        expect(BoundaryUtils.isInside(open, 47, 8)).toBe(true);
+        expect(BoundaryUtils.intersects(open, 47, 7.8, 47, 8)).toBe(true);
+    });
+
+    // A square of 0.1 degree around 47 N 8 E, then a circle of 5 NM around 47 N 9 E: two shapes in one boundary
+    it('reads every shape of a boundary (#209)', () => {
+        const two = new LodBoundary(multiShapeAirspace('TWO', BoundaryType.Restricted, [[47.1, 7.9], [47.1, 8.1], [46.9, 8.1], [46.9, 7.9]], [47, 9], 5));
+
+        expect(BoundaryUtils.isInside(two, 47, 9)).toBe(true);
+        expect(BoundaryUtils.isInside(two, 47, 8)).toBe(true);
+        // A path across the circle, the second shape: two crossings, each 5 NM from its center
+        const xs = BoundaryUtils.getIntersections(two, 47, 8.8, 47, 9.2);
+        expect(xs).toHaveLength(2);
+        for (const x of xs) {
+            expect(Math.abs(distanceNm({lat: 47, lon: 9}, x) - 5)).toBeLessThan(0.06);
+        }
+        expect(BoundaryUtils.intersects(two, 47, 8.8, 47, 9.2)).toBe(true);
     });
 });

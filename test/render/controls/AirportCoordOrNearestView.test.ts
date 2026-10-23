@@ -3,7 +3,7 @@ import {BoundaryFacility, BoundaryType} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {airport} from '../../harness/navdata/builders';
-import {airspace} from '../../harness/navdata/airspaces';
+import {airspace, circularAirspace} from '../../harness/navdata/airspaces';
 
 const POS = {lat: 47.0, lon: 12.0};
 
@@ -35,6 +35,13 @@ describe('APT 1 airspace row (3-42)', () => {
     // 3-42: an airport under the outer boundary of a Class C airspace shows CL C on the left side of the third row
     it('shows CL C for an airport under a Class C airspace (3-42)', async () => {
         const unit = await bootWith([triangle('TEST CLASS C', BoundaryType.ClassC)]);
+
+        expect((await showApt1(unit))[3]).toBe('CL C       ');
+    });
+
+    // 3-42: the same for a Class C whose boundary is a circle of 5 NM around KIN
+    it('shows CL C for an airport under a circular Class C airspace (3-42, #209)', async () => {
+        const unit = await bootWith([circularAirspace('TEST CLASS C', BoundaryType.ClassC, [47.1, 11.9], 5)]);
 
         expect((await showApt1(unit))[3]).toBe('CL C       ');
     });

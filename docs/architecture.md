@@ -632,7 +632,10 @@ comment gives the sources for the 1 Hz rate.
 
 - `AirspaceAlert` (3-39) uses `NearestLodBoundarySearchSession` every 10 s with `SPECIAL_USE_AIRSPACE_FILTER`. It is
   inhibited in ARM/APR modes and posts `AirspaceAlertMessage` / `InsideAirspaceMessage`.
-- `BoundaryUtils.isInside` is a hand-written point-in-polygon with dateline handling; it **ignores circular airspaces**.
+- `BoundaryUtils` (`isInside`, `intersects`, `getIntersections`) works on a polyline per boundary, built once on first
+  use and cached per `LodBoundary`, over every shape of LOD 0. Lines stay single segments; arcs and circles are cut into
+  chords at most `ARC_CHORD_TOLERANCE_NM` off the curve (#209). The point-in-polygon and the segment crossings are
+  hand-written in the flat lat/lon plane, with date-line handling (#9, #106).
 - `services/AirspacesAlongRoute` is used by pages.
 - `AltAlert` (3-56) and `HtAboveAirportAlert` (3-58) beep through `AudioGenerator`, which uses SDK `SoundServer` with
   `kln_short_beep` / `kln_long_beep`. The aircraft `sound.xml` must define these, and they only work if
@@ -843,7 +846,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - only `A-Z0-9 -` can be displayed
 - **Deliberate non-real additions:** `GPS COURSE TO STEER`, the roll-steering LVar for the autopilot, `bearingForAP` on
   arcs, the fast GPS acquisition setting (default on) and keyboard mode. Missing on purpose or not implemented: RAIM,
-  failures, 3-satellite plus altitude solutions, circular airspaces, and CTA/TMA in the SUA filter (TODO).
+  failures, 3-satellite plus altitude solutions, and CTA/TMA in the SUA filter (TODO).
 - **Event bus topics** are typed by interfaces declared next to their owner. There is no central file:
     - `PowerEvent.powerEvent` (`PowerButton.ts`)
     - `PropsReadyEvent.propsReady` (`KLN90BCore.ts`)

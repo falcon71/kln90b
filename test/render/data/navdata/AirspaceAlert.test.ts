@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {BoundaryAltitudeType, BoundaryType} from '@microsoft/msfs-sdk';
 import {BootOptions, bootUnit, HeadlessUnit, moveAircraft, NEAREST_SEARCH_WAIT_MS, settle} from '../../../harness/boot';
-import {airspace, AirspaceOptions} from '../../../harness/navdata/airspaces';
+import {airspace, AirspaceOptions, circularAirspace} from '../../../harness/navdata/airspaces';
 import {Screen} from '../../../harness/render/screen';
 import {approachWorld} from '../../../harness/fixtures';
 import {savedFlightplan} from '../../../harness/storage';
@@ -61,6 +61,21 @@ describe('SUA alert, vertical limits of an MSL airspace', () => {
 });
 
 const sua = (unit: HeadlessUnit) => messages(unit).filter(m => m.includes('AIRSPACE'));
+
+// 3-39, 3-40: inside the lateral boundary and between the limits the unit shows INSIDE SPC USE AIRSPACE, whatever the
+// shape of the boundary; here a circle of 5 NM around the aircraft
+describe('circular areas (3-39, 3-40, #209)', () => {
+    it('shows INSIDE SPC USE AIRSPACE in a circular restricted area (3-39, 3-40, #209)', async () => {
+        const unit = await bootUnit({
+            position: {lat: 47.0, lon: 8.0}, altitudeFt: 0,
+            airspaces: [circularAirspace('R-CIRCLE', BoundaryType.Restricted, [47.0, 8.0], 5, {minFt: 0, maxFt: 5000})],
+        });
+        await settle(unit);
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-CIRCLE          REST 0ft to 5000ft']);
+    });
+});
 
 /** NM of longitude at 47 N, flat over these few NM */
 const NM_LON = 1 / (60 * Math.cos(47 * Math.PI / 180));
