@@ -510,3 +510,8 @@ flying, SET 4 turn anticipation on unless noted; raw data and the reports in
   does, with FPL 0 unchanged and no insert row; the cursor stays on, on that waypoint (an outer knob then moved it).
   CLR gives the same. The outer and inner knobs do nothing while the question shows, and it has no timeout. Seen twice.
   The STAR insert at 35 was not checked (#385).
+- AVsoftech KLN 90B trainer (unreliable): FPL 0 = KAPA, the SID PIKES2, en-route waypoints up to its limit of 29
+  numbered waypoints plus the SID header. The inner knob on the first SID waypoint asked the room question (no FPL
+  FULL); ENT deleted only KAPA and left the SID without its airport; the insert row opened one waypoint later, and the
+  new waypoint became an en-route waypoint between two SID waypoints. Taken for a fault of that trainer; #148's rule
+  stays (maintainer), recorded on #148. A repeat on the resulting plan deleted the SID header instead (#386).

@@ -444,6 +444,290 @@ describe('adding a waypoint in front of a SID waypoint of a full FPL 0', () => {
     });
 });
 
+// FPL 0 of 45 legs: KPRC, the SID DEP1 (SD01 to SD15), then FL01 to FL29. ENT on SD01 opens an empty SID row in front of
+// it; the room for a SID leg is made by deleting KPRC, which takes its SID legs (#148). The row the insert was tried at
+// then belongs to no procedure in the plan any more and is remade as an en-route row (#386)
+describe('adding a waypoint in front of the first SID waypoint of an FPL 0 of 45 legs', () => {
+    const fpl0Legs = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs();
+    const leftRows = () => Screen.read().half('L').split('\n').map(r => r.trimEnd());
+
+    async function bootWith45Legs() {
+        const kprcBase = airport('KPRC', 47.0, 8.0);
+        const sidFixes = Array.from({length: 15}, (_, i) => {
+            const p = pointFrom(kprcBase, 90, 5 * (i + 1));
+            return intersection(`SD${String(i + 1).padStart(2, '0')}`, p.lat, p.lon);
+        });
+        const kprc = withProcedures(kprcBase, {
+            approaches: [],
+            departures: [sid('DEP1', {common: sidFixes.map((f, i) => i === 0 ? Leg.IF(f) : Leg.TF(f))})],
+        });
+        const fillers = Array.from({length: 30}, (_, i) => intersection(`FL${String(i).padStart(2, '0')}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [kprc, knew, ...sidFixes, ...fillers], position: {lat: 46.5, lon: 7.12},
+            storage: savedFlightplan(0, fillers),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 7', {ident: 'KPRC'});
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // APPROVE?
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.ent(); // CONTINUE? (#222)
+        await vi.advanceTimersByTimeAsync(1000);
+        // Preconditions: 45 legs, 30 of them en-route, KPRC in front of the SID
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(45);
+        expect(legs.filter(l => l.type === KLNLegType.USER)).toHaveLength(30);
+        expect(legs.slice(0, 2).map(l => [l.wpt.icaoStruct.ident, l.type])).toEqual([
+            ['KPRC', KLNLegType.USER], ['SD01', KLNLegType.SID],
+        ]);
+        return unit;
+    }
+
+    /** ENT on SD01 while the right side shows no waypoint page opens an empty SID row; the inner knob asks, ENT deletes */
+    async function insertInFrontOfFirstSidWaypoint() {
+        const unit = await bootWith45Legs();
+        await unit.panel.selectPage('R', 'NAV 2');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L'); // the cursor comes on at the top visible entry (#355)
+        await unit.panel.cursorTo('L', 'SD01');
+        await unit.panel.ent(); // an empty SID row in front of SD01
+        await unit.panel.inner('L', 1); // the question
+        expect(leftRows()[5]).toBe('CONTINUE?'); // Precondition
+        await unit.panel.ent();
+        return unit;
+    }
+
+    it('adds the waypoint as an en-route waypoint once the SID went with its airport (#148, #386)', async () => {
+        const unit = await insertInFrontOfFirstSidWaypoint();
+        await unit.panel.enterIdent('L', 'KNEW');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1500);
+
+        const legs = fpl0Legs(unit);
+        expect(legs.slice(0, 2).map(l => [l.wpt.icaoStruct.ident, l.type])).toEqual([['KNEW', KLNLegType.USER], ['FL01', KLNLegType.USER]]);
+        expect(legs).toHaveLength(30);
+        expect(legs.filter(l => l.type === KLNLegType.SID)).toEqual([]);
+        expect(legs[0].procedure).toBeUndefined();
+        expect(unit.errors).toEqual([]);
+    });
+
+    it('shows no SID header over the open insert row (#386)', async () => {
+        await insertInFrontOfFirstSidWaypoint();
+
+        expect(leftRows().slice(0, 2)).toEqual(['  1:A', '  2:FL01']);
+    });
+});
+
+// KPRC with the SID DEP1 (SD01 on, east) and the STAR ARR1 (ST01 to ST08, west); fillers along 46.5N
+function kprcWithSidAndStar(sidLength: number, fillerCount: number) {
+    const kprcBase = airport('KPRC', 47.0, 8.0);
+    const sidFixes = Array.from({length: sidLength}, (_, i) => {
+        const p = pointFrom(kprcBase, 90, 5 * (i + 1));
+        return intersection(`SD${String(i + 1).padStart(2, '0')}`, p.lat, p.lon);
+    });
+    const starFixes = Array.from({length: 8}, (_, i) => {
+        const p = pointFrom(kprcBase, 270, 5 * (8 - i));
+        return intersection(`ST${String(i + 1).padStart(2, '0')}`, p.lat, p.lon);
+    });
+    const kprc = withProcedures(kprcBase, {
+        approaches: [],
+        departures: [sid('DEP1', {common: sidFixes.map((f, i) => i === 0 ? Leg.IF(f) : Leg.TF(f))})],
+        arrivals: [star('ARR1', {common: starFixes.map((f, i) => i === 0 ? Leg.IF(f) : Leg.TF(f))})],
+    });
+    const fillers = Array.from({length: fillerCount}, (_, i) => intersection(`FL${String(i).padStart(2, '0')}`, 46.5, 7.0 + 0.02 * i));
+    return {kprc, fillers, facilities: [kprc, knew, ...sidFixes, ...starFixes, ...fillers]};
+}
+
+/** Loads the SID of KPRC on its APT 7 page (APT 7 shows the STAR on its second page): DEP1, LOAD IN FPL */
+async function loadKprcSid(unit: HeadlessUnit) {
+    await unit.panel.selectPage('R', 'APT 1');
+    await unit.panel.cursor('R');
+    await unit.panel.enterIdent('R', 'KPRC');
+    await unit.panel.cursor('R');
+    await unit.panel.selectPage('R', 'APT 6');
+    await unit.panel.inner('R', 1); // the SID page
+    await unit.panel.cursor('R');
+    await unit.panel.ent(); // DEP1: the waypoints
+    await unit.panel.ent(); // LOAD IN FPL
+    await vi.advanceTimersByTimeAsync(1000);
+}
+
+describe('adding a waypoint in front of a SID waypoint of an FPL 0 of 45 legs that also holds a STAR of the same airport', () => {
+    const fpl0Legs = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs();
+    const leftRows = () => Screen.read().half('L').split('\n').map(r => r.trimEnd());
+
+    /**
+     * A round trip of 45 legs: KPRC, DEP1 (SD01 to SD10), FL00 to FL24, ARR1 (ST01 to ST08), KPRC. Built as a pilot
+     * would: the STAR into [FL00..FL24, KPRC], KPRC added in front of FL00, then the SID, which follows the first KPRC
+     */
+    async function bootRoundTrip() {
+        const w = kprcWithSidAndStar(10, 25);
+        const unit = await bootUnit({facilities: w.facilities, position: {lat: 46.5, lon: 7.12}, storage: savedFlightplan(0, [...w.fillers, w.kprc])});
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 1');
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'KPRC');
+        await unit.panel.cursor('R');
+        await unit.panel.selectPage('R', 'APT 6');
+        await unit.panel.inner('R', 2); // the STAR page
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR1: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+        await vi.advanceTimersByTimeAsync(1000);
+
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        await unit.panel.cursorTo('L', 'FL00');
+        await unit.panel.inner('L', 1); // an insert row in front of FL00
+        await unit.panel.enterIdent('L', 'KPRC');
+        await unit.panel.ent(); // The waypoint page
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1500);
+        await unit.panel.cursor('L');
+
+        await loadKprcSid(unit);
+        // Preconditions: 45 legs, 27 of them en-route, the SID behind the first KPRC, the STAR in front of the last
+        const legs = fpl0Legs(unit);
+        expect(legs).toHaveLength(45);
+        expect(legs.filter(l => l.type === KLNLegType.USER)).toHaveLength(27);
+        expect(legs.slice(0, 2).map(l => [l.wpt.icaoStruct.ident, l.type])).toEqual([['KPRC', KLNLegType.USER], ['SD01', KLNLegType.SID]]);
+        expect(legs.slice(-2).map(l => [l.wpt.icaoStruct.ident, l.type])).toEqual([['ST08', KLNLegType.STAR], ['KPRC', KLNLegType.USER]]);
+        return unit;
+    }
+
+    // Making room for a SID leg deletes the first KPRC and its SID (#148); the STAR, whose airport is the same KPRC,
+    // stays. The pending row was copied from the SID, which is gone, so it is en-route
+    it('adds the waypoint as an en-route waypoint when the SID went and a STAR of its airport stays (#148, #386)', async () => {
+        const unit = await bootRoundTrip();
+        await unit.panel.selectPage('R', 'NAV 2');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        await unit.panel.cursorTo('L', 'SD01');
+        await unit.panel.ent(); // an empty SID row in front of SD01
+        await unit.panel.inner('L', 1); // the question
+        expect(leftRows()[5]).toBe('CONTINUE?'); // Precondition
+        await unit.panel.ent();
+        expect(leftRows().slice(0, 2)).toEqual(['  1:A', '  2:FL00']); // no SID header over the row
+
+        await unit.panel.enterIdent('L', 'KNEW');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1500);
+
+        const legs = fpl0Legs(unit);
+        expect(legs.slice(0, 2).map(l => [l.wpt.icaoStruct.ident, l.type])).toEqual([['KNEW', KLNLegType.USER], ['FL00', KLNLegType.USER]]);
+        expect(legs[0].procedure).toBeUndefined();
+        expect(legs.filter(l => l.type === KLNLegType.SID)).toEqual([]);
+        expect(legs.filter(l => l.type === KLNLegType.STAR).map(l => l.wpt.icaoStruct.ident))
+            .toEqual(['ST01', 'ST02', 'ST03', 'ST04', 'ST05', 'ST06', 'ST07', 'ST08']);
+        expect(legs).toHaveLength(35);
+        expect(unit.errors).toEqual([]);
+    });
+});
+
+// FPL 0 of 45 legs: FL00, KPRC, DEP1 (SD01 to SD15), FL01 to FL28. Making room for a SID leg deletes FL00 only, so the
+// SID the pending row was copied from stays, and the row keeps its type
+describe('adding a waypoint in front of a SID waypoint of an FPL 0 of 45 legs whose SID stays', () => {
+    const fpl0Legs = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs();
+    const leftRows = () => Screen.read().half('L').split('\n').map(r => r.trimEnd());
+
+    it('keeps the type of a SID row whose SID stays after making room (characterization, #386)', async () => {
+        const w = kprcWithSidAndStar(15, 29);
+        const unit = await bootUnit({
+            facilities: w.facilities, position: {lat: 46.5, lon: 7.12},
+            storage: savedFlightplan(0, [w.fillers[0], w.kprc, ...w.fillers.slice(1)]),
+        });
+        await settle(unit);
+        await loadKprcSid(unit);
+        // Preconditions: 45 legs, 30 of them en-route, the SID behind KPRC
+        const before = fpl0Legs(unit);
+        expect(before).toHaveLength(45);
+        expect(before.filter(l => l.type === KLNLegType.USER)).toHaveLength(30);
+        expect(before.slice(0, 4).map(l => [l.wpt.icaoStruct.ident, l.type])).toEqual([
+            ['FL00', KLNLegType.USER], ['KPRC', KLNLegType.USER], ['SD01', KLNLegType.SID], ['SD02', KLNLegType.SID],
+        ]);
+
+        await unit.panel.selectPage('R', 'NAV 2');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        await unit.panel.cursorTo('L', 'SD02');
+        await unit.panel.ent(); // an empty SID row in front of SD02
+        await unit.panel.inner('L', 1); // the question
+        expect(leftRows()[5]).toBe('CONTINUE?'); // Precondition
+        await unit.panel.ent(); // deletes FL00
+        await unit.panel.enterIdent('L', 'KNEW');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1500);
+
+        const legs = fpl0Legs(unit);
+        expect(legs.slice(0, 4).map(l => [l.wpt.icaoStruct.ident, l.type])).toEqual([
+            ['KPRC', KLNLegType.USER], ['SD01', KLNLegType.SID], ['KNEW', KLNLegType.SID], ['SD02', KLNLegType.SID],
+        ]);
+        expect(legs[2].procedure?.displayName).toBe('DEP1-SID');
+        expect(legs[2].parentFacility?.icaoStruct.ident).toBe('KPRC');
+        expect(legs).toHaveLength(45);
+        expect(unit.errors).toEqual([]);
+    });
+});
+
+// FPL 0 of 45 legs: FL00 to FL28, the STAR ARR1 (ST01 to ST15) and KPRC. Making room for a STAR leg deletes FL00 only, so
+// the STAR the pending row was copied from stays, and the row keeps its type
+describe('adding a waypoint in front of a STAR waypoint of an FPL 0 of 45 legs', () => {
+    const fpl0Legs = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => [l.wpt.icaoStruct.ident, l.type]);
+    const leftRows = () => Screen.read().half('L').split('\n').map(r => r.trimEnd());
+
+    it('keeps the type of a STAR row whose STAR stays after making room (characterization, #386)', async () => {
+        const kprcBase = airport('KPRC', 47.0, 8.0);
+        const starFixes = Array.from({length: 15}, (_, i) => {
+            const p = pointFrom(kprcBase, 90, 5 * (15 - i));
+            return intersection(`ST${String(i + 1).padStart(2, '0')}`, p.lat, p.lon);
+        });
+        const kprc = withProcedures(kprcBase, {
+            arrivals: [star('ARR1', {common: starFixes.map((f, i) => i === 0 ? Leg.IF(f) : Leg.TF(f))})],
+        });
+        const fillers = Array.from({length: 29}, (_, i) => intersection(`FL${String(i).padStart(2, '0')}`, 46.5, 7.0 + 0.02 * i));
+        const unit = await bootUnit({
+            facilities: [kprc, knew, ...starFixes, ...fillers], position: {lat: 46.5, lon: 7.12},
+            storage: savedFlightplan(0, [...fillers, kprc]),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 7', {ident: 'KPRC'});
+        // Preconditions: 45 legs, 30 of them en-route, the STAR in front of KPRC
+        expect(fpl0Legs(unit)).toHaveLength(45);
+        expect(fpl0Legs(unit).filter(l => l[1] === KLNLegType.USER)).toHaveLength(30);
+        expect(fpl0Legs(unit).slice(28, 31)).toEqual([
+            ['FL28', KLNLegType.USER], ['ST01', KLNLegType.STAR], ['ST02', KLNLegType.STAR],
+        ]);
+
+        await unit.panel.selectPage('R', 'NAV 2');
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        await unit.panel.cursorTo('L', 'ST02', 50);
+        await unit.panel.ent(); // an empty STAR row in front of ST02
+        await unit.panel.inner('L', 1); // the question
+        expect(leftRows()[5]).toBe('CONTINUE?'); // Precondition
+        await unit.panel.ent(); // deletes FL00
+        await unit.panel.enterIdent('L', 'KNEW');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1500);
+
+        const legs = fpl0Legs(unit);
+        expect(legs[0]).toEqual(['FL01', KLNLegType.USER]);
+        expect(legs.slice(27, 31)).toEqual([
+            ['FL28', KLNLegType.USER], ['ST01', KLNLegType.STAR], ['KNEW', KLNLegType.STAR], ['ST02', KLNLegType.STAR],
+        ]);
+        expect(legs).toHaveLength(45);
+        expect(unit.errors).toEqual([]);
+    });
+});
+
 // FPL 0 with 30 en-route waypoints and a STAR: FL00 to FL28, then ARR1 (STRAA, STRAB) and KPRC. An inner-knob click on
 // the procedure header opens an en-route insert row in front of the procedure (createLeg with a half index), which asks
 // as any en-route insert does

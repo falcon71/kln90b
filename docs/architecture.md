@@ -408,7 +408,9 @@ Flightplan really is dead simple".
   rebuilds the list with the cursor on the row the insert goes in front of (the new first waypoint when that one was
   deleted, #148) and repeats the action through the cursor controller, which asks again or opens the entry. A row not
   in the plan yet that asked (the en-route row an inner click on a procedure header creates, or the empty row of an
-  ENT) is made again there as it was, so a header's row stays an en-route leg in front of the procedure. CLR or CRSR
+  ENT) is made again there as it was, so a header's row stays an en-route leg in front of the procedure. A row copied
+  from a SID or STAR row is made again as an en-route row when that procedure went with the deleted legs (#386; an
+  airport deleted from the front takes its SID, #148), as an insert in front of the new first waypoint is. CLR or CRSR
   cancels: the list is rebuilt with FPL 0 unchanged. The cursor stays on under the question and the rebuilt list keeps
   its index, so it stays on the waypoint, header or blank end where the insert was tried (checked in the KLN 89 trainer,
   2026-10-23, #385). When room cannot be made (C-1) nothing is asked: the entry opens and its ENT answers FPL FULL.

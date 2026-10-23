@@ -1,4 +1,4 @@
-import {AirportFacility, Facility, FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
+import {AirportFacility, Facility, FSComponent, ICAO, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {PageProps, UiElement, UIElementChildren} from '../pages/Page';
 import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType, MAX_LEGS} from "../data/flightplan/Flightplan";
 import {List} from "./List";
@@ -474,7 +474,16 @@ class EditableFlightplan {
             //#148: when the waypoint the insert went in front of was deleted, it goes in front of the new first one
             const at = before === null ? this.legs.length - 1 : Math.max(this.flightplan.getLegs().indexOf(before), 0);
             if (remake) {
-                this.legs.splice(at, 0, {wpt: null, leg: pending.leg, origIdx: -1, focusMe: true});
+                //#386: a row copied from a SID or STAR the deletion took (an airport deleted from the front takes its SID
+                //legs, #148) is remade as an en-route row, as the insert in front of the new first waypoint is (6-23).
+                //Compared by name and airport rather than by object, so that a reload of the same procedure, which
+                //builds new objects, counts as the same
+                const procedureStays = pending.leg === undefined || this.flightplan.getLegs().some(l =>
+                    l.procedure?.displayName === pending.leg!.procedure?.displayName
+                    && l.parentFacility !== undefined && pending.leg!.parentFacility !== undefined
+                    && ICAO.valueEquals(l.parentFacility.icaoStruct, pending.leg!.parentFacility.icaoStruct));
+                const leg = procedureStays ? pending.leg : undefined;
+                this.legs.splice(at, 0, {wpt: null, leg: leg, origIdx: -1, focusMe: true});
             } else {
                 this.legs[at].focusMe = true;
             }
