@@ -619,7 +619,8 @@ comment gives the sources for the 1 Hz rate.
 - Converts SDK procedures into KLN legs. It keeps the IAF/FAF/MAP/MAHP and the last leg, drops step-downs, merges
   consecutive AF arcs around one navaid and radius (within 0.1 NM) and computes `ArcData` (VOR, radials, entry point,
   `GeoCircle`). Two arcs of different radius stay two arcs (#131): the first arc's end fix stays in the list and the
-  second arc starts at a generated entry at its published beginning.
+  second arc starts at a generated entry at its published beginning. An IAF on an arc that continues around the same
+  navaid and radius is dropped like a step-down, and the arc entry carries the IAF (#382, 6-16, 6-17).
 - The sim sets no MAHP flag, so the MAHP is derived: the hold (HA, HF or HM) that ends the missed approach gets the
   flag on the conversion's copy of the leg (#220). A missed approach that ends otherwise has none.
 - The arc entry point is created as a temporary user waypoint in `XY` and recalculated from the current position (

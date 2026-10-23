@@ -473,7 +473,7 @@ export class SidStar {
 
         legs.push(...app.finalLegs.map(leg => ({...leg})), ...missedLegs);
 
-        const {legs: cleaned, askObsLegs} = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
+        const {legs: cleaned, askObsLegs, iafArcLegs} = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
         const approachName = SidStar.formatApproachName(app, facility);
         return await this.convertToKLN(facility, {
             displayName: approachName,
@@ -483,23 +483,28 @@ export class SidStar {
             transition: iaf?.name,
             runwayNumber: app.runwayNumber,
             runwayDesignator: app.runwayDesignator,
-        }, KLNLegType.APP, cleaned, askObsLegs);
+        }, KLNLegType.APP, cleaned, askObsLegs, iafArcLegs);
     }
 
     /**
      * Filters out the legs the KLN does not list.
-     * Returns the kept legs, and the kept legs that ask for OBS because a hold or procedure turn at the same fix was
-     * dropped after them (#219)
+     * Returns the kept legs, the kept legs that ask for OBS because a hold or procedure turn at the same fix was
+     * dropped after them (#219), and the kept arcs that swallowed an IAF on them (#382)
      */
-    private filterOutDuplicates(legs: FlightPlanLeg[]): { legs: FlightPlanLeg[], askObsLegs: Set<FlightPlanLeg> } {
+    private filterOutDuplicates(legs: FlightPlanLeg[]): { legs: FlightPlanLeg[], askObsLegs: Set<FlightPlanLeg>, iafArcLegs: Set<FlightPlanLeg> } {
         const filtered: FlightPlanLeg[] = [];
         const askObsLegs = new Set<FlightPlanLeg>();
+        const iafArcLegs = new Set<FlightPlanLeg>();
         //A dropped hold or procedure turn whose reminder the next leg to its fix keeps (#384)
         let obsAtNextKept: FlightPlanLeg | null = null;
+        let iafAtNextArc = false; //an IAF dropped on an arc whose mark the next kept arc takes (#382)
 
         for (let i = 0; i < legs.length; i++) {
             const leg = legs[i];
-            if (i === legs.length - 1 || BitFlags.isAny(leg.fixTypeFlags, BitFlags.union(FixTypeFlags.IAF, FixTypeFlags.FAF, FixTypeFlags.MAP, FixTypeFlags.MAHP))) { //We always keep IAF, FAF, MAP!
+            //#382 6-16, 6-17: an IAF on an arc that goes on around the same navaid and radius is dropped like a step-down;
+            //the arc stays one arc, and its entry carries the IAF
+            const iafOnArc = i < legs.length - 1 && SidStar.isIafOnArc(leg, legs[i + 1]);
+            if (!iafOnArc && (i === legs.length - 1 || BitFlags.isAny(leg.fixTypeFlags, BitFlags.union(FixTypeFlags.IAF, FixTypeFlags.FAF, FixTypeFlags.MAP, FixTypeFlags.MAHP)))) { //We always keep IAF, FAF, MAP!
                 let modifiedLeg = leg;
                 if (i > 0) {
                     modifiedLeg = this.addArcInfoIfPrevIsSame(legs[i - 1], leg);
@@ -507,6 +512,7 @@ export class SidStar {
                 }
                 this.mergeAFsIfNecessary(modifiedLeg, legs, i);
                 obsAtNextKept = this.keepObsOfDroppedLeg(obsAtNextKept, leg, modifiedLeg, askObsLegs);
+                iafAtNextArc = SidStar.keepIafOfDroppedArcLeg(iafAtNextArc, modifiedLeg, iafArcLegs);
                 filtered.push(modifiedLeg);
             } else {
                 const next = legs[i + 1];
@@ -522,7 +528,10 @@ export class SidStar {
                     }
                     this.mergeAFsIfNecessary(modifiedLeg, legs, i);
                     obsAtNextKept = this.keepObsOfDroppedLeg(obsAtNextKept, leg, modifiedLeg, askObsLegs);
+                    iafAtNextArc = SidStar.keepIafOfDroppedArcLeg(iafAtNextArc, modifiedLeg, iafArcLegs);
                     filtered.push(modifiedLeg);
+                } else if (iafOnArc) {
+                    iafAtNextArc = true;
                 } else if (isAlreadyLastInList && this.shouldAskObs(leg.type)) {
                     //#219 B-2, 6-10: the dropped hold or procedure turn leaves its OBS reminder on the kept leg, which
                     //keeps its own type (an arc stays an arc)
@@ -535,7 +544,34 @@ export class SidStar {
             }
         }
 
-        return {legs: filtered, askObsLegs: askObsLegs};
+        return {legs: filtered, askObsLegs: askObsLegs, iafArcLegs: iafArcLegs};
+    }
+
+    /**
+     * #382 6-16, 6-17: an IAF on an arc that the next arc continues around the same navaid and radius. An arc fix that
+     * is also a FAF, MAP or MAHP is kept as before (the real data has none).
+     * @param leg
+     * @param next the leg after it
+     */
+    private static isIafOnArc(leg: FlightPlanLeg, next: FlightPlanLeg): boolean {
+        return leg.type === LegType.AF && next.type === LegType.AF && SidStar.sameArc(leg, next)
+            && BitFlags.isAll(leg.fixTypeFlags, FixTypeFlags.IAF)
+            && !BitFlags.isAny(leg.fixTypeFlags, BitFlags.union(FixTypeFlags.FAF, FixTypeFlags.MAP, FixTypeFlags.MAHP));
+    }
+
+    /**
+     * #382 6-16, 6-17: the next kept arc takes the IAF dropped on it, and its entry carries the mark
+     * @param iafAtNextArc whether an IAF dropped on an arc waits for its kept arc
+     * @param modifiedLeg the leg the conversion keeps, as addArcInfoIfPrevIsSame returned it
+     * @param iafArcLegs
+     * @return whether the IAF still waits
+     */
+    private static keepIafOfDroppedArcLeg(iafAtNextArc: boolean, modifiedLeg: FlightPlanLeg, iafArcLegs: Set<FlightPlanLeg>): boolean {
+        if (!iafAtNextArc || modifiedLeg.type !== LegType.AF) {
+            return iafAtNextArc;
+        }
+        iafArcLegs.add(modifiedLeg);
+        return false;
     }
 
     /**
@@ -642,7 +678,7 @@ export class SidStar {
             }
         }
 
-        const {legs: cleaned, askObsLegs} = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
+        const {legs: cleaned, askObsLegs, iafArcLegs} = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
         const procedureName = `${proc.name}-${type === KLNLegType.SID ? "SID" : "Æ"}`;
         return await this.convertToKLN(facility, {
             displayName: procedureName,
@@ -650,7 +686,7 @@ export class SidStar {
             transition: trans?.name,
             runwayNumber: rwy?.runwayNumber,
             runwayDesignator: rwy?.runwayDesignation as RunwayDesignator ?? null,
-        }, type, cleaned, askObsLegs);
+        }, type, cleaned, askObsLegs, iafArcLegs);
 
     }
 
@@ -662,9 +698,10 @@ export class SidStar {
      * @param legType
      * @param legs
      * @param askObsLegs the legs that ask for OBS besides those whose own type does (#219)
+     * @param iafArcLegs the arcs that swallowed an IAF on them; their entry is the IAF (#382)
      * @private
      */
-    private async convertToKLN(facility: AirportFacility, procedureInformation: ProcedureInformation, legType: KLNLegType, legs: FlightPlanLeg[], askObsLegs: Set<FlightPlanLeg>): Promise<KLNFlightplanLeg[]> {
+    private async convertToKLN(facility: AirportFacility, procedureInformation: ProcedureInformation, legType: KLNLegType, legs: FlightPlanLeg[], askObsLegs: Set<FlightPlanLeg>, iafArcLegs: Set<FlightPlanLeg>): Promise<KLNFlightplanLeg[]> {
         const promises = legs.map(leg =>
             this.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(leg.fixIcaoStruct), leg.fixIcaoStruct).then(fac => ({
                     leg: leg,
@@ -685,7 +722,9 @@ export class SidStar {
                 //#131: a second arc of another radius starts at its published beginning; the first arc's end stays
                 const prevArcEnd = klnLegs.length >= 2 ? klnLegs[klnLegs.length - 2].arcData?.endFacility : undefined;
                 //The identity comparison works because both facilities come from this one loader result. An arc of the same
-                //navaid and radius is a step-down of the arc before it (the filter kept it for its flag), so it stays one arc (a leg that is no arc has a radius of 0 and never matches)
+                //navaid and radius is a step-down of the arc before it, which the filter kept only for a FAF, MAP or MAHP
+                //on its fix (an IAF there is dropped, #382), so it stays one arc (a leg that is no arc has a radius of 0
+                //and never matches)
                 const afterArc = prevArcEnd !== undefined && prevArcEnd === klnLegs[klnLegs.length - 1].wpt
                     && !(prevEnriched !== undefined && SidStar.sameArc(prevEnriched.leg, enrichedLeg.leg));
                 const originalEntry = afterArc ? undefined : klnLegs.pop()!;
@@ -698,7 +737,8 @@ export class SidStar {
                     parentFacility: facility,
                     procedure: procedureInformation,
                     arcData: arcData,
-                    fixType: originalEntry?.fixType,
+                    //#382 6-16, 6-17: the entry takes the mark of the start fix it replaces, or the IAF dropped on the arc
+                    fixType: originalEntry?.fixType ?? (iafArcLegs.has(enrichedLeg.leg) ? KLNFixType.IAF : undefined),
                     flyOver: enrichedLeg.leg.flyOver,
                 });
             }

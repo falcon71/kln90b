@@ -635,15 +635,15 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             expect(radiusNm(legs[0])).toBeCloseTo(10, 2);
         });
 
-        // The filter keeps an arc that carries a flag, so the second arc still follows it in the conversion: the flagged
-        // step-down and the arc after it stay one arc. The doubled entry and the missing STEPD are bug #382, this holds
-        // the list as it is while the pin below is open.
-        const flaggedStepDown = () => approach({
+        // 6-16, 6-17: the arc stays one arc, joined on the aircraft's radial, and its entry carries the (i). An IAF on the
+        // arc that continues around the same navaid and radius is dropped like a step-down, and its IAF goes to the
+        // entry (#382).
+        const flaggedStepDown = (ifFlags = 0) => approach({
             type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
             transitions: [{
                 name: 'ARCBG',
                 legs: [
-                    Leg.IF(arcbg),
+                    Leg.IF(arcbg, ifFlags),
                     Leg.AF(step, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT, flags: FixTypeFlags.IAF}),
                     Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
                     Leg.TF(fafaa, FixTypeFlags.FAF),
@@ -652,18 +652,123 @@ describe('SidStar conversion of procedures to KLN legs', () => {
             final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
         });
 
-        it('keeps a flagged step-down on one arc as one arc (characterization, #131, #382)', async () => {
+        it('lists the arc once and gives its entry the IAF of a fix on it (6-16, 6-17, #382)', async () => {
             const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, flaggedStepDown());
 
-            expect(identsOf(legs)).toEqual(['D260J', 'D260J', 'ARCEN', 'FAFAA', 'MAPAA']);
+            expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+                ['D260J', KLNFixType.IAF], ['ARCEN', undefined], ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+            ]);
+            expect(legs[0].arcData!.beginRadial).toBe(270);
+            expect(legs[0].arcData!.endRadial).toBe(180);
+            expect(legs[0].arcData!.endFacility.icaoStruct.ident).toBe('ARCEN');
         });
 
-        // 6-5: the unit lists the IAF; 6-18: an arc has no step-down fixes of its own
-        it.fails('lists a flagged step-down fix on a DME arc once, after the arc entry (6-5, 6-18, #382)', async () => {
-            const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, flaggedStepDown());
+        it('joins the arc past the dropped IAF on the aircraft radial (6-16, #382)', async () => {
+            const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(200, 20), kprc, flaggedStepDown());
 
-            expect(identsOf(legs)).toEqual(['D260J', 'STEPD', 'ARCEN', 'FAFAA', 'MAPAA']);
-            expect(legs[1].fixType).toBe(KLNFixType.IAF);
+            expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType]).slice(0, 2)).toEqual([['D200J', KLNFixType.IAF], ['ARCEN', undefined]]);
+        });
+
+        it('merges a chain of three arcs with the IAF in the middle into one IAF entry (#382)', async () => {
+            const bodie = fixAt('BODIE', 240, 10);
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{
+                    name: 'ARCBG',
+                    legs: [
+                        Leg.IF(arcbg),
+                        Leg.AF(bodie, abc, {radiusNm: 10, fromRadial: 270, toRadial: 240, turn: LEFT}),
+                        Leg.AF(step, abc, {radiusNm: 10, fromRadial: 240, toRadial: 225, turn: LEFT, flags: FixTypeFlags.IAF}),
+                        Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                        Leg.TF(fafaa, FixTypeFlags.FAF),
+                    ],
+                }],
+                final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+            });
+            const legs = await convert([abc, arcbg, bodie, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, app);
+
+            expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+                ['D260J', KLNFixType.IAF], ['ARCEN', undefined], ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+            ]);
+            expect(legs[0].arcData!.beginRadial).toBe(270);
+        });
+
+        it('keeps the IAF of the arc\'s start fix on the entry when a fix on the arc is an IAF too (#382)', async () => {
+            const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, flaggedStepDown(FixTypeFlags.IAF));
+
+            expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+                ['D260J', KLNFixType.IAF], ['ARCEN', undefined], ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+            ]);
+        });
+
+        it('gives a clockwise arc\'s entry the IAF of a fix on it (#382)', async () => {
+            const arcbgSouth = fixAt('ARCBG', 180, 10);
+            const arcenWest = fixAt('ARCEN', 270, 10);
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{
+                    name: 'ARCBG',
+                    legs: [
+                        Leg.IF(arcbgSouth),
+                        Leg.AF(step, abc, {radiusNm: 10, fromRadial: 180, toRadial: 225, turn: RIGHT, flags: FixTypeFlags.IAF}),
+                        Leg.AF(arcenWest, abc, {radiusNm: 10, fromRadial: 225, toRadial: 270, turn: RIGHT}),
+                        Leg.TF(fafaa, FixTypeFlags.FAF),
+                    ],
+                }],
+                final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+            });
+            const legs = await convert([abc, arcbgSouth, step, arcenWest, fafaa, mapaa, kprc], at(200, 20), kprc, app);
+
+            expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+                ['D200J', KLNFixType.IAF], ['ARCEN', undefined], ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+            ]);
+        });
+
+        it('gives no IAF to the entry of an arc with an unflagged start and an unflagged step-down (control, #382)', async () => {
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{
+                    name: 'ARCBG',
+                    legs: [
+                        Leg.IF(arcbg),
+                        Leg.AF(step, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT}),
+                        Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                        Leg.TF(fafaa, FixTypeFlags.FAF),
+                    ],
+                }],
+                final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+            });
+            const legs = await convert([abc, arcbg, step, arcen, fafaa, mapaa, kprc], at(260, 20), kprc, app);
+
+            expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+                ['D260J', undefined], ['ARCEN', undefined], ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+            ]);
+        });
+
+        // #131: an arc of another radius after the arc with the IAF on it starts at its published beginning; only the
+        // first arc's entry takes the IAF
+        it('gives the IAF on an arc to its own entry only, not to the entry of a following arc of another radius (#131, #382)', async () => {
+            const arc2e = fixAt('ARC2E', 150, 13);
+            const app = approach({
+                type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+                transitions: [{
+                    name: 'ARCBG',
+                    legs: [
+                        Leg.IF(arcbg),
+                        Leg.AF(step, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LEFT, flags: FixTypeFlags.IAF}),
+                        Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LEFT}),
+                        Leg.AF(arc2e, abc, {radiusNm: 13, fromRadial: 180, toRadial: 150, turn: LEFT}),
+                        Leg.TF(fafaa, FixTypeFlags.FAF),
+                    ],
+                }],
+                final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+            });
+            const legs = await convert([abc, arcbg, step, arcen, arc2e, fafaa, mapaa, kprc], at(260, 20), kprc, app);
+
+            expect(legs.map(l => [l.wpt.icaoStruct.ident, l.fixType])).toEqual([
+                ['D260J', KLNFixType.IAF], ['ARCEN', undefined], ['D180M', undefined], ['ARC2E', undefined],
+                ['FAFAA', KLNFixType.FAF], ['MAPAA', KLNFixType.MAP],
+            ]);
         });
     });
 

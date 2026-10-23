@@ -9,6 +9,7 @@ import {fplIdents} from '../../../harness/readers';
 import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {savedFlightplan} from '../../../harness/storage';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
+import {KLNFixType} from '../../../../kln90b/data/flightplan/Flightplan';
 
 // A left arc around ABC from the 270 to the 180 radial through the south-west, then FAFAA and the MAP; or a right arc
 // from the 180 to the 270 radial through the same quarter, then FAFAA north of its end (#104)
@@ -98,6 +99,61 @@ describe.each([
         expect(courseDeg(abc, entry.wpt)).toBeCloseTo(205.05, 1);
         expect(distanceNm(abc, entry.wpt)).toBeCloseTo(10, 2);
         expect(fplIdents(unit)).toEqual(['D205J', endIdent, fafIdent, 'MAPAA', 'KPRC']);
+        expect(unit.errors).toEqual([]);
+    });
+});
+
+// The left arc of kprc with an IAF STEPD on its 225 radial and an unflagged start ARCBG: the conversion drops STEPD and
+// gives its IAF to the arc entry (#382)
+const stepd = intersection('STEPD', at(225, 10).lat, at(225, 10).lon);
+const kprcIafOnArc = withProcedures(airport('KPRC', 47.0, 8.0), {
+    approaches: [approach({
+        type: ApproachType.APPROACH_TYPE_RNAV, runway: '27',
+        transitions: [{
+            name: 'ARCBG', legs: [
+                Leg.IF(arcbg),
+                Leg.AF(stepd, abc, {radiusNm: 10, fromRadial: 270, toRadial: 225, turn: LegTurnDirection.Left, flags: FixTypeFlags.IAF}),
+                Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 225, toRadial: 180, turn: LegTurnDirection.Left}),
+                Leg.TF(fafaa, FixTypeFlags.FAF),
+            ],
+        }],
+        final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+    })],
+});
+
+describe('Super NAV 5 direct-to window on a DME arc with an IAF on it', () => {
+    // 6-17: MOVE ? moves the entry to the intercept of the present track with the arc; the entry stays the IAF that
+    // SidStar gave it in place of the dropped STEPD (6-16)
+    it('keeps the IAF mark on an entry moved past a dropped IAF (6-17, #382)', async () => {
+        const unit = await bootUnit({
+            facilities: [kprcIafOnArc, abc, arcbg, stepd, arcen, fafaa, mapaa], position: at(240, 10),
+            storage: savedFlightplan(0, [kprcIafOnArc]), panelXml: panelXml(APR_ARM_SWITCH),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        expect(fplIdents(unit)).toEqual(['D240J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+
+        // As in the test above: 15 NM out on the 200 radial, flying 010, the track meets the circle on the 205 radial,
+        // past STEPD on the 225 radial
+        const start = at(200, 15);
+        await moveAircraft(unit, start, {groundspeedKt: 0});
+        await moveAircraft(unit, pointFrom(start, 10, 0.05), {groundspeedKt: 120});
+
+        await showSuperNav5(unit, {waitMs: 0});
+        await unit.panel.scan();
+        await vi.advanceTimersByTimeAsync(250);
+        await unit.panel.inner('R', -1);
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBe('D240Jà');
+
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBe('MOVE ?');
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+        expect(SuperNav5.read().directTo).toBe('D205Jà'); // 6-17: the moved entry is still the IAF, past the dropped STEPD
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs()[0].fixType).toBe(KLNFixType.IAF);
         expect(unit.errors).toEqual([]);
     });
 });
