@@ -300,9 +300,9 @@ pages accept.
   question open, and the test answers it with `ent()` or `clr()`. A load of a procedure that FPL 0 holds one of the
   same type already asks first to replace it on the right page (#274): the helper leaves that question open too, with
   the cursor off, so the test turns the cursor on with `cursor('R')` and answers it with `ent()`. FPL 0 on the left
-  with its cursor off takes CLR for its DELETE FPL? question (4-5) before the right page sees it, which is the known
-  bug #383, not 4-5 behavior; until it is fixed a test that answers a question with CLR moves the left page away
-  first (`selectPage('L', 'NAV 1')`).
+  with its cursor off takes CLR for its DELETE FPL? question (4-5) unless the right side holds an open entry, and a
+  selection step of APT 7 or APT 8 (every step after the procedure list) counts as one (#383), so CLR reaches it first.
+  A test no longer needs `selectPage('L', 'NAV 1')` for that, though existing uses may stay.
   APT 8 (and ACT 8) exists only on a unit with the approach arm switch (3-49, #133), so a test that reaches it boots
   with `panelXml(APR_ARM_SWITCH)`; the harness default panel.xml has no switch, as the parser default.
   The APT pages open on the first airport of the scan list, so with more than one airport pass

@@ -1083,7 +1083,12 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   by the left page answering CLR (FPL with its cursor off asks DELETE FPL?). That priority applies only to the half pages, never to an overlay. It goes
   to the right page only when the right side holds an open entry and the left does not; otherwise the order is left,
   then right (`left.clear() || right.clear()`). When both sides hold an open entry the left goes first. `FiveSegmentPage`
-  does the same for its two halves (#307).
+  does the same for its two halves (#307). APT 7 and APT 8 count a selection step (every step after the procedure list)
+  as an open entry too, so it takes CLR before FPL 0's DELETE FPL? (#383). The room question on the left
+  (`MakeRoomPage`, #222, #380) always counts as an open entry, so CLR cancels it also while the right page is on such
+  a step (a procedure load into a full FPL 0 asks it from such a step; an FPL 0 insert can ask it next to one). The CLR of a
+  waypoint editor whose creation page is open (`WaypointEditor.clear`, which closes an open entry on the right first,
+  #307) asks `hasOpenEntry()` only of the creation page or a page pushed above it, so APT 7 and APT 8 never reach it.
 - `EVT_MSG` → push `MessagePage`, or call `MessagePage.msg()` to page through. It pops itself after the last page.
 - `EVT_DCT` → close the MSG page first if it is shown (#335), then push `DirectToPage` left, or `directToPressed()` if
   it is already shown (toggles ACTIVATE in OBS).

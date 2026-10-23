@@ -82,6 +82,14 @@ export class Apt8Page extends WaypointPage<AirportFacility> {
         return this.props.scanLists.aptScanlist;
     }
 
+    /**
+     * Every step after the approach list is a selection step, and CLR steps back through it before FPL 0 sees it
+     * (6-5; AVsoftech KLN 90B trainer, 2026-10-23, #383). These are the steps clear() answers.
+     */
+    public hasOpenEntry(): boolean {
+        return super.hasOpenEntry() || !(this.currentApt8Page instanceof Apt8IAPPage);
+    }
+
     public clear(): boolean {
         if (this.currentApt8Page instanceof Apt8IAPPage) {
             return false;

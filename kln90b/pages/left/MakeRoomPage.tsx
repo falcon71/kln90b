@@ -31,6 +31,14 @@ export abstract class MakeRoomPage extends SixLineHalfPage {
         this.cursorController.setCursorActive(true);
     }
 
+    /**
+     * The question is an open entry (#222, #380): it takes CLR before the right page, which holds an open entry itself
+     * while APT 7 or APT 8 is on a selection step (#383), so CLR cancels the question instead of stepping the load back
+     */
+    public hasOpenEntry(): boolean {
+        return true;
+    }
+
     public render(): VNode {
         return (<pre>
             DELETING<br/>

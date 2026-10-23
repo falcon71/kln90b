@@ -13,6 +13,7 @@ import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {EVT_CLR} from '../../../../kln90b/HEvents';
 import {MainPage} from '../../../../kln90b/pages/MainPage';
+import {MakeRoomPage} from '../../../../kln90b/pages/left/MakeRoomPage';
 import {blinkCycle} from '../../../harness/render/blink';
 
 const rows = (side: 'L' | 'R') => Screen.read().half(side).split('\n').map(r => r.trimEnd());
@@ -161,6 +162,19 @@ describe('APT 7 replacing a procedure', () => {
         return unit;
     }
 
+    /** bootWithStarLoaded() with FPL 0 left on the left side, its cursor off */
+    async function bootWithStarLoadedFplLeft() {
+        const unit = await bootUnit(worldWithKprc({sids: ['DEP1', 'DEP2'], stars: true}));
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 6');
+        await unit.panel.inner('R', 2); // the STAR page
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR1: the waypoints
+        await unit.panel.ent(); // LOAD IN FPL
+        await vi.advanceTimersByTimeAsync(1000);
+        return unit;
+    }
+
     const ARR1_IN_FPL_0 = [
         ['ENRAA', KLNLegType.USER], ['TRNAA', KLNLegType.STAR], ['SIDAB', KLNLegType.STAR], ['KPRC', KLNLegType.USER],
     ];
@@ -207,6 +221,34 @@ describe('APT 7 replacing a procedure', () => {
         await unit.panel.ent(); // TRNAB: the waypoints
         await unit.panel.ent(); // LOAD IN FPL
     }
+
+    // 6-5: CLR steps back through the selection at any time. AVsoftech KLN 90B trainer, 2026-10-23 (#383)
+    it('steps back from the STAR replace question with FPL 0 on the left, its cursor off (AVsoftech KLN 90B trainer, 2026-10-23, #383)', async () => {
+        const unit = await bootWithStarLoadedFplLeft();
+        await chooseArr2(unit);
+        const left = rows('L');
+        await unit.panel.clr();
+
+        expect(asksApprove(unit)).toBe(false);
+        expect(rows('R')[0]).toBe('ARR2-Æ');
+        expect(rows('R')[5]).toBe('LOAD IN FPL');
+        expect(rows('L')).toEqual(left);
+        expect(fpl0Legs(unit)).toEqual(ARR1_IN_FPL_0);
+    });
+
+    it('steps back from the STAR replace question with the left cursor on a waypoint of FPL 0 (AVsoftech KLN 90B trainer, 2026-10-23, #383)', async () => {
+        const unit = await bootWithStarLoadedFplLeft();
+        await chooseArr2(unit);
+        await unit.panel.cursor('L');
+        const left = rows('L');
+        await unit.panel.clr();
+
+        expect(asksApprove(unit)).toBe(false);
+        expect(rows('R')[0]).toBe('ARR2-Æ');
+        expect(rows('R')[5]).toBe('LOAD IN FPL');
+        expect(rows('L')).toEqual(left);
+        expect(fpl0Legs(unit)).toEqual(ARR1_IN_FPL_0);
+    });
 
     it('does not replace the STAR that FPL 0 holds without asking (checked in the KLN 89 trainer, 2026-10-15, #274)', async () => {
         const unit = await bootWithStarLoaded();
@@ -586,6 +628,22 @@ describe('APT 7 loading a SID into a full FPL 0 that lacks its airport', () => {
     it('leaves FPL 0 unchanged when the question is answered with CLR (characterization, #222)', async () => {
         const unit = await loadSidIntoFullPlan('clr');
 
+        expect(fpl0Legs(unit).map(l => l[0])).toEqual(Array.from({length: 30}, (_, i) => `FL${String(i).padStart(2, '0')}`));
+    });
+
+    // The question is an open entry and takes CLR before the add question of APT 7, a selection step that holds an open
+    // entry itself (#383); otherwise CLR steps the load back and leaves the question live for the next ENT
+    it('cancels the question on CLR and leaves APT 7 on its step (#222, #383)', async () => {
+        const unit = await loadSidIntoFullPlan(null);
+        const mainPage = unit.props.pageManager.getCurrentPage() as MainPage;
+        expect(mainPage.getLeftPage()).toBeInstanceOf(MakeRoomPage); // Precondition: the question shows
+        expect(mainPage.getRightPage().hasOpenEntry()).toBe(true); // Precondition: APT 7 is on a selection step
+        const right = rows('R');
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(mainPage.getLeftPage()).not.toBeInstanceOf(MakeRoomPage);
+        expect(rows('R')).toEqual(right);
         expect(fpl0Legs(unit).map(l => l[0])).toEqual(Array.from({length: 30}, (_, i) => `FL${String(i).padStart(2, '0')}`));
     });
 });
@@ -1210,5 +1268,120 @@ describe('APT 7 loading a second SID (characterization)', () => {
         expect(fpl0Legs(unit)).toEqual([
             ['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID], ['TRNAB', KLNLegType.SID],
         ]);
+    });
+});
+
+// 6-5: CLR steps back through the selection at any time, so every step after the procedure list takes CLR before FPL 0.
+// The STAR replace question is covered with the tests of #383 above. The trainer check of 2026-10-23 covered the STAR
+// and SID transition lists, the STAR waypoints and the SID add question (docs/kln89-trainer-record.md)
+describe('APT 7 selection steps with FPL 0 on the left, its cursor off (6-5, #383)', () => {
+    const TRAINER = 'AVsoftech KLN 90B trainer, 2026-10-23';
+
+    const SID_LIST = [' KPRC', 'SELECT SID', ' 1 DEP1', '', '', ''];
+    const SID_RUNWAYS = ['DEP1-SID', 'RUNWAY', ' 1 RW09', ' 2 RW27L', '', ''];
+    const SID_TRANSITIONS = ['DEP1-SID', 'TRANSITION', ' 1 TRNAA', ' 2 TRNAB', '', ''];
+    const SID_WAYPOINTS = ['DEP1-SID', ' 1 SIDAA', ' 2 SIDAB', ' 3 TRNAA', '', 'LOAD IN FPL'];
+    const STAR_LIST = [' KPRC', 'SELECT STAR', ' 1 ARR1', ' 2 ARR2', '', ''];
+    const STAR_TRANSITIONS = ['ARR2-Æ', 'TRANSITION', ' 1 TRNAA', ' 2 TRNAB', '', ''];
+    const STAR_RUNWAYS = ['ARR2-Æ', 'RUNWAY', ' 1 RW09', ' 2 RW27L', '', ''];
+    const STAR_WAYPOINTS = ['ARR2-Æ', ' 1 TRNAB', ' 2 SIDAB', ' 3 SIDAA', '', 'LOAD IN FPL'];
+
+    /** The SID of DEP1 by the runway 09 and TRNAA, as far as the step goes (the cursor is on at the SID list) */
+    async function toSidStep(unit: HeadlessUnit, steps: number) {
+        if (steps >= 1) await unit.panel.ent(); // DEP1: the runways
+        if (steps >= 2) await unit.panel.ent(); // 09: the transitions
+        if (steps >= 3) await unit.panel.ent(); // TRNAA: the waypoints
+        if (steps >= 4) await unit.panel.ent(); // LOAD IN FPL: KPRC is not in FPL 0, so the unit asks
+    }
+
+    /** The STAR ARR2 by TRNAB and the runway 09, as far as the step goes (the cursor is on at the STAR list) */
+    async function toStarStep(unit: HeadlessUnit, steps: number) {
+        await unit.panel.outer('R', 1); // ARR2
+        if (steps >= 1) await unit.panel.ent(); // the transitions
+        if (steps >= 2) {
+            await unit.panel.outer('R', 1);
+            await unit.panel.ent(); // TRNAB: the runways
+        }
+        if (steps >= 3) await unit.panel.ent(); // 09: the waypoints
+        if (steps >= 4) await unit.panel.ent(); // LOAD IN FPL: KPRC is not in FPL 0, so the unit asks
+    }
+
+    // FPL 0 holds two waypoints that are not KPRC, so the unit asks to add it at the end of each flow
+    it.each([
+        {name: 'SID runway list', type: 'SID', steps: 1, expected: SID_LIST, source: '6-5'},
+        {name: 'SID transition list', type: 'SID', steps: 2, expected: SID_RUNWAYS, source: TRAINER},
+        {name: 'SID waypoints', type: 'SID', steps: 3, expected: SID_TRANSITIONS, source: '6-5'},
+        {name: 'SID add question', type: 'SID', steps: 4, expected: SID_WAYPOINTS, source: TRAINER},
+        {name: 'STAR transition list', type: 'STAR', steps: 1, expected: STAR_LIST, source: TRAINER},
+        {name: 'STAR runway list', type: 'STAR', steps: 2, expected: STAR_TRANSITIONS, source: '6-5'},
+        {name: 'STAR waypoints', type: 'STAR', steps: 3, expected: STAR_RUNWAYS, source: TRAINER},
+        {name: 'STAR add question', type: 'STAR', steps: 4, expected: STAR_WAYPOINTS, source: '6-5'},
+    ])('steps back from the $name to the previous step ($source, #383)', async ({type, steps, expected}) => {
+        const w = sidStarWorld({sids: type === 'SID' ? ['DEP1'] : [], stars: type === 'STAR'});
+        const unit = await bootUnit({...w, storage: savedFlightplan(0, [w.facilities[1], w.facilities[2]])});
+        await settle(unit);
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.selectPage('R', 'APT 6');
+        await unit.panel.inner('R', 1);
+        await unit.panel.cursor('R');
+        if (type === 'SID') {
+            await toSidStep(unit, steps);
+        } else {
+            await toStarStep(unit, steps);
+        }
+        expect(Screen.read().status().left).toBe('FPL 0'); // Precondition: FPL 0, cursor off
+        expect(rows('R')).not.toEqual(expected); // Precondition: the step shows, not the one before it
+        const left = rows('L');
+        await unit.panel.clr();
+
+        expect(rows('R')).toEqual(expected);
+        expect(rows('L')).toEqual(left); // no DELETE FPL?
+    });
+});
+
+// The room question of an FPL 0 insert on the left while APT 7 is on a selection step on the right. Both hold an open
+// entry, and the left takes CLR first (#307): CLR cancels the question and APT 7 keeps its step (#380, #383)
+describe('APT 7 selection step on the right of the room question of an FPL 0 insert (#380, #383)', () => {
+    const leftRows = () => Screen.read().half('L').split('\n').map(r => r.trimEnd());
+    const FILLERS = Array.from({length: 30}, (_, i) => `FL${String(i).padStart(2, '0')}`);
+
+    it('cancels the question on CLR and leaves APT 7 on its step (#380, #383)', async () => {
+        const w = approachWorld();
+        const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
+        const sidaa = intersection('SIDAA', east(8).lat, east(8).lon);
+        const sidab = intersection('SIDAB', east(20).lat, east(20).lon);
+        const kprc = withProcedures(w.kprc, {
+            approaches: [],
+            departures: [sid('DEP1', {runways: [{runway: '09', legs: [Leg.CA(90), Leg.DF(sidaa)]}], common: [Leg.TF(sidab)]})],
+        });
+        const fillers = FILLERS.map((ident, i) => intersection(ident, 46.5, 7.0 + 0.02 * i));
+        // The aircraft on the way to the seventh filler, so the first waypoint can make room
+        const unit = await bootUnit({
+            facilities: [kprc, sidaa, sidab, ...fillers], position: {lat: 46.5, lon: 7.12},
+            storage: savedFlightplan(0, fillers),
+        });
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 1');
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'KPRC');
+        await unit.panel.cursor('R');
+        await unit.panel.selectPage('R', 'APT 7');
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP1: the next step of the selection
+        const mainPage = unit.props.pageManager.getCurrentPage() as MainPage;
+        expect(mainPage.getRightPage().hasOpenEntry()).toBe(true); // Precondition: APT 7 is on a selection step
+        const right = rows('R');
+
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        await unit.panel.outer('L', 1); // FL01
+        await unit.panel.inner('L', 1); // the insert asks for room
+        expect(leftRows()).toEqual(['DELETING', 'WPT   1', 'TO MAKE', 'ROOM IN', 'FLIGHTPLAN-', 'CONTINUE?']); // Precondition
+        await unit.panel.clr();
+
+        expect(mainPage.getLeftPage()).not.toBeInstanceOf(MakeRoomPage);
+        expect(rows('R')).toEqual(right);
+        expect(fplIdents(unit)).toEqual(FILLERS);
     });
 });

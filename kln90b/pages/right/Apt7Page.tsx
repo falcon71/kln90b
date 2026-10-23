@@ -127,6 +127,14 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         this.requiresRedraw = true;
     }
 
+    /**
+     * Every step after the procedure list is a selection step, and CLR steps back through it before FPL 0 sees it
+     * (6-5; AVsoftech KLN 90B trainer, 2026-10-23, #383). These are the steps clear() answers.
+     */
+    public hasOpenEntry(): boolean {
+        return super.hasOpenEntry() || !(this.currentApt7Page instanceof Apt7ProcedurePage);
+    }
+
     public clear(): boolean {
         const type = this.getProcedureType();
 

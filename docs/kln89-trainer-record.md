@@ -498,3 +498,11 @@ flying, SET 4 turn anticipation on unless noted; raw data and the reports in
   SET 4 turn anticipation on.
   FPL 0 is now 8Z 8Y 8X 8V 8U 8T 8P 8S 8R (the old BAE, C29, DLL, KMSN, BAE was deleted), and the user waypoints 8P to
   8Z exist (8W skipped; 8Q is in no plan).
+
+**2026-10-23** (agent checks; the KLN 89 trainer for #385, the third-party AVsoftech KLN 90B trainer for #383 and #386)
+- AVsoftech KLN 90B trainer (unreliable), KAPA (its approaches have one IAF each, so no IAF list): with the right cursor
+  on an APT 8 or APT 7 selection step (the approach waypoints, the approach and STAR replace questions, the STAR and SID
+  transition lists, the STAR waypoints, the SID add question), CLR stepped the right page back, both with the left
+  cursor off on FPL 0 and with it on a waypoint of FPL 0; neither DELETE FPL? nor DEL came. Right CRSR on a step turned
+  the cursor off and went back to the procedure list. On the bare approach list CLR turned the right cursor off; on
+  the STAR list it did nothing; neither is used (#383).

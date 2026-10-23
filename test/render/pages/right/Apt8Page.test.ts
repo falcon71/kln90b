@@ -13,6 +13,7 @@ import {KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {EVT_CLR} from '../../../../kln90b/HEvents';
 import {MainPage} from '../../../../kln90b/pages/MainPage';
+import {MakeRoomPage} from '../../../../kln90b/pages/left/MakeRoomPage';
 import {blinkCycle} from '../../../harness/render/blink';
 
 const rows = (side: 'L' | 'R') => Screen.read().half(side).split('\n').map(r => r.trimEnd());
@@ -124,6 +125,42 @@ describe('APT 8 putting an approach into FPL 0', () => {
         expect(rows('R')).toEqual(['V09-KPRC', ' 1 IAFBBà', ' 2 FAFBBá', ' 3 MAPAAã', '', 'LOAD IN FPL']);
         expect(unit.panel.focused('R')).toEqual({row: 5, col: 12, text: 'LOAD IN FPL'});
         expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0);
+    });
+
+    // 6-5: CLR steps back through the selection at any time. AVsoftech KLN 90B trainer, 2026-10-23: with the right cursor
+    // on a step, CLR stepped back with the left cursor off and with it on a waypoint of FPL 0 (#383)
+    it('steps back from the waypoints with FPL 0 on the left, its cursor off (AVsoftech KLN 90B trainer, 2026-10-23, #383)', async () => {
+        const unit = await bootWithFirstApproachLoaded();
+        expect(Screen.read().status().left).toBe('FPL 0'); // Precondition: FPL 0, cursor off
+        await unit.panel.ent(); // VOR 09: its waypoints
+        const left = rows('L');
+        await unit.panel.clr();
+
+        expect(rows('R').slice(0, 2)).toEqual([' KPRC IAP', ' 1 RNAV 18']);
+        expect(rows('L')).toEqual(left); // no DELETE FPL?
+    });
+
+    it('steps back from the replace question with the left cursor on a waypoint of FPL 0 (AVsoftech KLN 90B trainer, 2026-10-23, #383)', async () => {
+        const unit = await bootWithFirstApproachLoaded();
+        await unit.panel.ent(); // the waypoints
+        await unit.panel.ent(); // the replace question
+        await unit.panel.cursor('L');
+        const left = rows('L');
+        await unit.panel.clr();
+
+        expect(asksApprove(unit)).toBe(false);
+        expect(rows('R')).toEqual(['V09-KPRC', ' 1 IAFBBà', ' 2 FAFBBá', ' 3 MAPAAã', '', 'LOAD IN FPL']);
+        expect(rows('L')).toEqual(left); // no DEL on the waypoint
+        expect(fpl0Legs(unit)).toEqual(RNAV_18_IN_FPL_0);
+    });
+
+    // 4-5: the approach list is no selection step; CLR there reaches FPL 0 as before
+    it('leaves CLR on the approach list to the left page (4-5)', async () => {
+        const unit = await bootWithFirstApproachLoaded(); // the list, cursor on VOR 09
+        await unit.panel.clr();
+
+        expect(Screen.read().row(0).slice(0, 11)).toBe('DELETE FPL?');
+        await unit.panel.clr(); // cancel
     });
 
     // The 89 asks before it replaces the approach FPL 0 holds (checked in the KLN 89 trainer, 2026-10-07 and 2026-10-15);
@@ -525,6 +562,23 @@ describe('APT 8 loading an approach into a full FPL 0 that lacks its airport', (
 
         expect(Screen.read().status().mode).toBe('FPL FULL');
         expect(fpl0Legs(unit)).toHaveLength(30);
+    });
+
+    // The question is an open entry and takes CLR before the add question of APT 8, a selection step that holds an open
+    // entry itself (#383); otherwise CLR steps the load back and leaves the question live for the next ENT
+    it('cancels the question on CLR and leaves APT 8 on its step (#222, #383)', async () => {
+        const unit = await bootFullWithoutKprc({lat: 46.5, lon: 7.12});
+        const mainPage = unit.props.pageManager.getCurrentPage() as MainPage;
+        expect(mainPage.getLeftPage()).toBeInstanceOf(MakeRoomPage); // Precondition: the question shows
+        expect(mainPage.getRightPage().hasOpenEntry()).toBe(true); // Precondition: APT 8 is on a selection step
+        const before = fpl0Legs(unit);
+        const right = rows('R');
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(mainPage.getLeftPage()).not.toBeInstanceOf(MakeRoomPage);
+        expect(rows('R')).toEqual(right);
+        expect(fpl0Legs(unit)).toEqual(before);
     });
 
     // 6-5, 6-7: the approach goes in front of its airport, also when the airport is added at the end. C-1: the first
@@ -1121,5 +1175,42 @@ describe('APT 8 page (characterization)', () => {
         await unit.panel.ent(); // VOR-A: its only transition is taken without a question
 
         expect(rows('R')[0]).toBe('VOR-A-KPRC');
+    });
+});
+
+// 6-5: CLR steps back through the selection at any time, so every step after the approach list takes CLR before FPL 0.
+// The APPROVE? questions and the waypoints of the approach are covered with the tests of #383 above
+describe('APT 8 selection steps with FPL 0 on the left, its cursor off (6-5, #383)', () => {
+    const WAYPOINTS = ['R18-KPRC', ' 1 IAFAAà', ' 2 IFAAA', ' 3 FAFAAá', ' 4 MAPAAã', 'LOAD IN FPL'];
+    const APPROACHES = [' KPRC IAP', ' 1 RNAV 18', ' 2 VOR-A', '', '', ''];
+
+    /** FPL 0 holds two waypoints that are not KPRC, so the unit asks to add it; RNAV 18 is chosen with IAFAA as far as the step goes */
+    async function bootOnStep(step: 'IAFs' | 'add question') {
+        const w = iapWorld();
+        const unit = await bootUnit({...w, storage: savedFlightplan(0, [w.facilities[1], w.facilities[2]]), panelXml: panelXml(APR_ARM_SWITCH)});
+        await settle(unit);
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.selectPage('R', 'APT 8');
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // RNAV 18: the IAFs
+        if (step === 'add question') {
+            await unit.panel.ent(); // IAFAA: the waypoints
+            await unit.panel.ent(); // LOAD IN FPL: KPRC is not in FPL 0, so the unit asks
+        }
+        return unit;
+    }
+
+    it.each([
+        {step: 'IAFs' as const, expected: APPROACHES, source: '6-5'},
+        {step: 'add question' as const, expected: WAYPOINTS, source: '6-5'},
+    ])('steps back from the $step to the previous step ($source, #383)', async ({step, expected}) => {
+        const unit = await bootOnStep(step);
+        expect(Screen.read().status().left).toBe('FPL 0'); // Precondition: FPL 0, cursor off
+        expect(rows('R')).not.toEqual(expected); // Precondition: the step shows, not the one before it
+        const left = rows('L');
+        await unit.panel.clr();
+
+        expect(rows('R')).toEqual(expected);
+        expect(rows('L')).toEqual(left); // no DELETE FPL?
     });
 });
