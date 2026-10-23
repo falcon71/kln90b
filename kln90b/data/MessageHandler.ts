@@ -2,6 +2,7 @@ import {CalcTickable} from "../TickController";
 import {Sensors} from "../Sensors";
 import {BoundaryUtils} from "./navdata/BoundaryUtils";
 import {LodBoundary} from "@microsoft/msfs-sdk";
+import {NavPageState} from "./VolatileMemory";
 
 export interface Message {
     seen: boolean;
@@ -81,27 +82,43 @@ export class MessageHandler implements CalcTickable {
 }
 
 
-export class AirspaceAlertMessage extends OneTimeMessage {
+/**
+ * AIRSPACE ALERT stays while the alert still warns of the area (the warned areas map its key to this message) and the
+ * aircraft is not laterally inside it. Reading the message does not remove it (#412). The check of the alert refreshes
+ * the warned areas every 10 seconds; the live position makes the message go at once when the aircraft enters. Once its
+ * condition has failed, the message has left the MSG page for good and stays invalid, so the next check that finds the
+ * area to warn of again posts a new one, even if the aircraft was back outside before that check.
+ */
+export class AirspaceAlertMessage implements Message {
 
+    public seen: boolean = false;
+    private ended: boolean = false;
 
-    constructor(message: string[], private readonly airspace: LodBoundary, private readonly sensors: Sensors) {
-        super(message);
+    constructor(public readonly message: string[], private readonly airspace: LodBoundary, private readonly key: string, private readonly sensors: Sensors, private readonly navState: NavPageState) {
     }
 
     public isConditionValid(): boolean {
         //TODO need to check that we are still closing in
-        return super.isConditionValid() && !BoundaryUtils.isInside(this.airspace, this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon);
+        this.ended = this.ended || this.navState.airspaceWarned.get(this.key) !== this || BoundaryUtils.isInside(this.airspace, this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon);
+        return !this.ended;
     }
 }
 
-export class InsideAirspaceMessage extends OneTimeMessage {
+/**
+ * INSIDE SPC USE AIRSPACE stays while the aircraft is inside the area (the entered areas map its key to this message) and
+ * laterally inside this boundary. Reading the message does not remove it (#412). Like AIRSPACE ALERT, it stays invalid
+ * once its condition has failed, so the next check that finds the aircraft inside again posts a new one.
+ */
+export class InsideAirspaceMessage implements Message {
 
+    public seen: boolean = false;
+    private ended: boolean = false;
 
-    constructor(message: string[], private readonly airspace: LodBoundary, private readonly sensors: Sensors) {
-        super(message);
+    constructor(public readonly message: string[], private readonly airspace: LodBoundary, private readonly key: string, private readonly sensors: Sensors, private readonly navState: NavPageState) {
     }
 
     public isConditionValid(): boolean {
-        return super.isConditionValid() && BoundaryUtils.isInside(this.airspace, this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon);
+        this.ended = this.ended || this.navState.airspaceEntered.get(this.key) !== this || !BoundaryUtils.isInside(this.airspace, this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon);
+        return !this.ended;
     }
 }

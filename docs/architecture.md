@@ -638,6 +638,15 @@ comment gives the sources for the 1 Hz rate.
   search session's per-id bookkeeping stays, `areas()` hands out the copy with the shortest name (ties by the lowest id),
   and the warned and entered areas are remembered by key (`airspaceAreaKey`), so a change of the shown copy posts no
   second message.
+- AIRSPACE ALERT and INSIDE SPC USE AIRSPACE stay on the MSG page while their condition holds, and reading them does
+  not remove them (#412). The warned and the entered areas live on `NavPageState` (`airspaceWarned`,
+  `airspaceEntered`), each key mapped to the message posted for it, and are reset at power-on, so a condition that
+  still holds posts its message again after a power cycle. Each check drops the keys of areas that left the search.
+  Entering an area ends its alert, so leaving it within 2 NM alerts again. With the alert disabled on SET 8 or
+  inhibited in ARM/APR both maps are cleared and the open messages go. Each message also tests the live position
+  laterally on every message tick, so it goes at once when the aircraft enters (alert) or leaves (inside), before the
+  next check. A message whose condition has failed stays invalid, so a check that finds the condition true again posts
+  a new message (which flashes MSG), even when the aircraft was back across the edge before that check.
 - `BoundaryUtils` (`isInside`, `intersects`, `getIntersections`, `distanceToBoundaryNm`) works on a polyline per
   boundary, built once on first use and cached per `LodBoundary`, over every shape of LOD 0. Lines stay single segments;
   arcs and circles are cut into chords at most `ARC_CHORD_TOLERANCE_NM` off the curve (#209). The point-in-polygon and
@@ -809,8 +818,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 ## Core 9. Messages, status line and annunciators
 
 - `data/MessageHandler.ts`: `Message {seen, message: string[], isConditionValid()}`.
-    - `OneTimeMessage` stays valid until it is seen. `AirspaceAlertMessage` and `InsideAirspaceMessage` add geometric
-      conditions.
+    - `OneTimeMessage` stays valid until it is seen. `AirspaceAlertMessage` and `InsideAirspaceMessage` do not
+      extend it: they are valid while their area is among the warned or entered areas of `NavPageState` and the live
+      position is outside or inside the boundary (#412).
     - `MessageHandler` (a 1 Hz tickable) keeps `activeMessages`. Each tick it drops invalid messages, adds
       `persistentMessages` whose condition becomes true, and resets their `seen` flag when the condition goes false.
       `KLN90BCore` calls `clear()` at every power-off (also a loss of electricity): the active messages go and the

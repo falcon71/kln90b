@@ -51,9 +51,7 @@ export class AirspaceAlert implements CalcTickable {
     private isSearching: boolean = false;
 
     private readonly nearAirspaces = new AirspaceAreas(); //All areas, that are near the plane, one per group of copies (#410)
-    private readonly warnedAirspaces = new Set<string>(); //The keys of all areas, the user have been warned of
-    private readonly enteredAirspaces = new Set<string>(); //The keys of all areas we are currently inside
-
+    //The areas the user is warned of and the areas we are inside, each with its message, live on navState, reset at power-on (#412)
 
     private tickTimer: number = 0;
 
@@ -77,6 +75,11 @@ export class AirspaceAlert implements CalcTickable {
 
         //3-41 Inhibited during approach
         const isApproachmode = this.navState.navmode === NavMode.ARM_LEG || this.navState.navmode === NavMode.ARM_OBS || this.navState.navmode === NavMode.APR_LEG;
+        if (!this.enabled.get() || isApproachmode) {
+            //#412: the open messages go with their areas, and the first check after the alert is back posts them anew
+            this.navState.airspaceWarned.clear();
+            this.navState.airspaceEntered.clear();
+        }
         //we run this one only every 10 seconds, because it is very expensive
         if (this.tickTimer < ALERT_TICK_TIME || !this.sensors.in.gps.isValid() || !this.enabled.get() || this.isSearching || !this.airspaceSession || isApproachmode) {
             return;
@@ -108,19 +111,44 @@ export class AirspaceAlert implements CalcTickable {
         const posIn10Min = this.sensors.in.gps.coords.offset(this.sensors.in.gps.trackTrue, UnitType.NMILE.convertTo(this.sensors.in.gps.groundspeed / 6, UnitType.GA_RADIAN), new GeoPoint(0, 0));
         const indicatedAlt = this.sensors.in.airdata.getIndicatedAlt();
 
-        for (const airspace of this.nearAirspaces.areas()) {
+        const areas = this.nearAirspaces.areas();
+        const warned = this.navState.airspaceWarned;
+        const entered = this.navState.airspaceEntered;
+
+        //#412: an area that left the search entirely is neither warned of nor entered any more; its key would keep its
+        //message valid for good
+        const keys = new Set<string>();
+        for (const airspace of areas) {
+            keys.add(this.nearAirspaces.keyOf(airspace));
+        }
+        for (const key of warned.keys()) {
+            if (!keys.has(key)) {
+                warned.delete(key);
+            }
+        }
+        for (const key of entered.keys()) {
+            if (!keys.has(key)) {
+                entered.delete(key);
+            }
+        }
+
+        for (const airspace of areas) {
             const key = this.nearAirspaces.keyOf(airspace);
             const isVerticallyInside = this.isVerticallyInsideAirspace(airspace.facility, indicatedAlt);
             const isInside = isVerticallyInside && BoundaryUtils.isInside(airspace, this.sensors.in.gps.coords.lat, this.sensors.in.gps.coords.lon);
             //console.log("checking airspace inside", airspace, isVerticallyInside, isInside);
             if (isInside) {
-                if (!this.enteredAirspaces.has(key)) {
-                    this.enteredAirspaces.add(key);
-                    this.messageHandler.addMessage(new InsideAirspaceMessage(["INSIDE SPC USE AIRSPACE", ...this.formatAirspaceAlertMessage(airspace.facility)], airspace, this.sensors));
+                //#412: entering ends the alert of the area (AVsoftech trainer, 2026-10-22), so leaving it within 2 NM alerts again
+                warned.delete(key);
+                //#412: a message that the live position has dropped since it was posted is posted anew
+                if (!entered.get(key)?.isConditionValid()) {
+                    const message = new InsideAirspaceMessage(["INSIDE SPC USE AIRSPACE", ...this.formatAirspaceAlertMessage(airspace.facility)], airspace, key, this.sensors, this.navState);
+                    entered.set(key, message);
+                    this.messageHandler.addMessage(message);
                 }
 
             } else {
-                this.enteredAirspaces.delete(key);
+                entered.delete(key);
 
 
                 //3-40, B-1: the alert comes when the track of the next 10 minutes meets the area, or when the area is within 2 NM
@@ -131,12 +159,14 @@ export class AirspaceAlert implements CalcTickable {
                 //console.log("checking airspace warning", airspace, isVerticallyInside, warn);
 
                 if (warn) {
-                    if (!this.warnedAirspaces.has(key)) {
-                        this.warnedAirspaces.add(key);
-                        this.messageHandler.addMessage(new AirspaceAlertMessage(["AIRSPACE ALERT:", ...this.formatAirspaceAlertMessage(airspace.facility)], airspace, this.sensors));
+                    //#412: a message that the live position has dropped since it was posted is posted anew
+                    if (!warned.get(key)?.isConditionValid()) {
+                        const message = new AirspaceAlertMessage(["AIRSPACE ALERT:", ...this.formatAirspaceAlertMessage(airspace.facility)], airspace, key, this.sensors, this.navState);
+                        warned.set(key, message);
+                        this.messageHandler.addMessage(message);
                     }
                 } else {
-                    this.warnedAirspaces.delete(key);
+                    warned.delete(key);
                 }
             }
         }

@@ -612,3 +612,258 @@ describe('copies of one area (#410)', () => {
         expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-4711 ALPHA      REST 1000ft to 18000ft']);
     });
 });
+
+// #412: the two airspace messages live as long as their condition holds; reading one does not remove it. The source is the
+// AVsoftech KLN 90B trainer, 2026-10-22 (third-party, unreliable, no manual page): it kept both messages on the MSG page
+// after they were read, replaced the alert with the INSIDE message on entering, and alerted again right after leaving.
+describe('airspace messages while their condition holds (characterization, #412)', () => {
+    // 10 NM ahead at 120 kt: 5 minutes to the boundary
+    const fiveMinutes = () => airspace('R-AHEAD', BoundaryType.Restricted, box(47 + 10 * NM_LAT, 47.4, 7.9, 8.1), LIMITS);
+    const around = () => airspace('R-AROUND', BoundaryType.Restricted, box(46.9, 47.1, 7.9, 8.1), LIMITS);
+
+    /** Opens the MSG page to read the messages, and leaves it again with a second press, as the pilot does */
+    async function readMessages(unit: HeadlessUnit) {
+        await unit.panel.msg();
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.msg();
+    }
+
+    it('keeps AIRSPACE ALERT after it was read while the area is still ahead (characterization, #412)', async () => {
+        const unit = await flying(0, [fiveMinutes()]);
+        await readMessages(unit);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-AHEAD           REST 1000ft to 18000ft']);
+    });
+
+    it('keeps INSIDE SPC USE AIRSPACE after it was read while inside (characterization, #412)', async () => {
+        const unit = await flying(0, [around()]);
+        await readMessages(unit);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-AROUND          REST 1000ft to 18000ft']);
+    });
+
+    // Entering ends the alert of the area, so leaving it within 2 NM alerts again. The aircraft starts inside, moves 1 NM
+    // north of the edge and is checked once
+    it('alerts again on leaving an area within 2 NM (characterization, #412)', async () => {
+        const unit = await flying(0, [around()]);
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-AROUND          REST 1000ft to 18000ft']); // Precondition
+
+        await moveAircraft(unit, {lat: 47.1 + NM_LAT, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-AROUND          REST 1000ft to 18000ft']);
+    });
+
+    // The same, after the alert was given before the aircraft entered: entering ends that alert, or the area would stay
+    // warned of and leaving it would give no new one
+    it('alerts again on leaving an area it was alerted to before entering (characterization, #412)', async () => {
+        const unit = await flying(0, [airspace('R-ENTER', BoundaryType.Restricted, box(47 + NM_LAT, 47.4, 7.9, 8.1), LIMITS)]);
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-ENTER           REST 1000ft to 18000ft']); // Precondition
+        await moveAircraft(unit, {lat: 47.2, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-ENTER           REST 1000ft to 18000ft']); // Precondition
+
+        await moveAircraft(unit, {lat: 47.4 + NM_LAT, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-ENTER           REST 1000ft to 18000ft']);
+    });
+
+    // The unit loses its messages at power-off; the condition still holds at power-on, so the alert comes again
+    it('shows AIRSPACE ALERT again after a power cycle while the area is still ahead (characterization, #412)', async () => {
+        const unit = await flying(0, [fiveMinutes()]);
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-AHEAD           REST 1000ft to 18000ft']); // Precondition
+
+        await unit.panel.powerCycle();
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-AHEAD           REST 1000ft to 18000ft']);
+    });
+
+    // SET 8 disables the alert; the open message goes with it
+    it('removes AIRSPACE ALERT when the alert is disabled on SET 8 (characterization, #412)', async () => {
+        const unit = await flying(0, [fiveMinutes()]);
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-AHEAD           REST 1000ft to 18000ft']); // Precondition
+
+        unit.props.userSettings.getSetting('airspaceAlertEnabled').set(false);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual([]);
+    });
+
+    // An area that left the search entirely is not warned of any more; its key must not keep the message valid
+    it('removes AIRSPACE ALERT when its area leaves the search (characterization, #412)', async () => {
+        const ahead = fiveMinutes();
+        const unit = await flying(0, [ahead]);
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-AHEAD           REST 1000ft to 18000ft']); // Precondition
+
+        unit.navdata.removeAirspace(ahead.id);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual([]);
+    });
+
+    // The inside twin: the aircraft is still where the area was, but the area is gone from the search
+    it('removes INSIDE SPC USE AIRSPACE when its area leaves the search (characterization, #412)', async () => {
+        const area = around();
+        const unit = await flying(0, [area]);
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-AROUND          REST 1000ft to 18000ft']); // Precondition
+
+        unit.navdata.removeAirspace(area.id);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual([]);
+    });
+
+    // The live position makes the alert go at once when the aircraft enters, before the next check (10 s) drops the key
+    it('removes AIRSPACE ALERT at once when the aircraft enters the area (characterization, #412)', async () => {
+        const unit = await flying(0, [fiveMinutes()]);
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-AHEAD           REST 1000ft to 18000ft']); // Precondition
+
+        await moveAircraft(unit, {lat: 47.2, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(sua(unit).filter(m => m.startsWith('AIRSPACE ALERT'))).toEqual([]);
+    });
+
+    /**
+     * Advances the clock a second at a time until a check of the alert has posted a message that starts with prefix, so
+     * that the next check is about 10 s away
+     */
+    async function untilPosted(unit: HeadlessUnit, prefix: string) {
+        for (let i = 0; !sua(unit).some(m => m.startsWith(prefix)); i++) {
+            if (i >= ALERT_PERIOD_MS / 1000) throw new Error(`untilPosted: no ${prefix} within one period of the alert`);
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+    }
+
+    // The aircraft enters an area 1 NM north of it, is out of it for a few seconds between two checks, and back in. The
+    // live position drops the message at once; the next check finds the aircraft inside again and posts a new message,
+    // which is unread although the first one was read, so MSG flashes
+    it('shows INSIDE SPC USE AIRSPACE again after a few seconds outside between two checks (characterization, #412)', async () => {
+        const unit = await flying(0, [airspace('R-ENTER', BoundaryType.Restricted, box(47 + NM_LAT, 47.4, 7.9, 8.1), LIMITS)]);
+        await moveAircraft(unit, {lat: 47.2, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
+        await untilPosted(unit, 'INSIDE');
+        await readMessages(unit);
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false); // Precondition: read
+
+        await moveAircraft(unit, {lat: 47.0, lon: 8.0}, {groundspeedKt: 120});
+        expect(sua(unit)).toEqual([]); // Precondition: outside, the message is gone and no check has run
+        await moveAircraft(unit, {lat: 47.2, lon: 8.0}, {groundspeedKt: 120});
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-ENTER           REST 1000ft to 18000ft']);
+        expect(unit.props.messageHandler.getMessages().filter(m => m.message[0] === 'INSIDE SPC USE AIRSPACE').map(m => m.seen)).toEqual([false]);
+        expect(unit.props.messageHandler.hasUnreadMessages()).toBe(true);
+    });
+
+    // The alert twin: the aircraft flies north 1 NM beside an area, nicks into it for a few seconds between two checks and
+    // flies on beside it. The next check finds the area within 2 NM again and posts a new alert
+    it('alerts again after a few seconds in the area between two checks, beside it within 2 NM (characterization, #412)', async () => {
+        const unit = await flying(0, [airspace('R-SKIRT', BoundaryType.Restricted, box(47 - 12 * NM_LAT, 47 + 12 * NM_LAT, 8 + 3 * NM_LON, 8 + 10 * NM_LON), LIMITS)]);
+        expect(sua(unit)).toEqual([]); // Precondition: 3 NM away, no alert
+        await moveAircraft(unit, {lat: 47.0, lon: 8 + 2 * NM_LON}, {groundspeedKt: 120, trackTrue: 0});
+        await untilPosted(unit, 'AIRSPACE ALERT');
+
+        await moveAircraft(unit, {lat: 47.0, lon: 8 + 3.5 * NM_LON}, {groundspeedKt: 120});
+        expect(sua(unit)).toEqual([]); // Precondition: inside, the alert is gone and no check has run
+        await moveAircraft(unit, {lat: 47.0, lon: 8 + 2 * NM_LON}, {groundspeedKt: 120, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-SKIRT           REST 1000ft to 18000ft']);
+    });
+
+    // The inside twin of the power cycle test
+    it('shows INSIDE SPC USE AIRSPACE again after a power cycle while inside (characterization, #412)', async () => {
+        const unit = await flying(0, [around()]);
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-AROUND          REST 1000ft to 18000ft']); // Precondition
+
+        await unit.panel.powerCycle();
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-AROUND          REST 1000ft to 18000ft']);
+    });
+
+    it('removes INSIDE SPC USE AIRSPACE when the alert is disabled on SET 8 (characterization, #412)', async () => {
+        const unit = await flying(0, [around()]);
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-AROUND          REST 1000ft to 18000ft']); // Precondition
+
+        unit.props.userSettings.getSetting('airspaceAlertEnabled').set(false);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual([]);
+    });
+
+    // The approach world of fixtures.ts arms the approach 29 NM north of KPRC. The unit flies south toward KPRC, 9 NM
+    // before an area it is alerted to in the enroute mode, then passes 1 NM past its south edge, where the approach arms
+    async function alertedBeforeArming() {
+        const w = approachWorld();
+        const p = w.north(31);
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.north(40),
+            airspaces: [airspace('R-APR', BoundaryType.Restricted, box(p.lat - 0.01, p.lat + 0.01, p.lon - 0.1, p.lon + 0.1), LIMITS)],
+            panelXml: panelXml(APR_ARM_SWITCH), altitudeFt: 1200,
+            storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
+        });
+        await settle(unit);
+        await moveAircraft(unit, w.north(40), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        return unit;
+    }
+
+    it('removes AIRSPACE ALERT when the approach is armed (characterization, #412)', async () => {
+        const unit = await alertedBeforeArming();
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_LEG); // Precondition
+        expect(sua(unit)).toEqual(['AIRSPACE ALERT: R-APR             REST 1000ft to 18000ft']); // Precondition
+
+        await unit.panel.loadProcedure('APT 8');
+        await moveAircraft(unit, approachWorld().north(29), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ARM_LEG);
+        expect(sua(unit)).toEqual([]);
+    });
+
+    // The inside twin: the aircraft is in an area around the point where the approach arms, 29 NM north of KPRC
+    it('removes INSIDE SPC USE AIRSPACE when the approach is armed (characterization, #412)', async () => {
+        const w = approachWorld();
+        const p = w.north(29);
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.north(40),
+            airspaces: [airspace('R-APR', BoundaryType.Restricted, box(p.lat - 0.05, p.lat + 0.05, p.lon - 0.1, p.lon + 0.1), LIMITS)],
+            panelXml: panelXml(APR_ARM_SWITCH), altitudeFt: 1200,
+            storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
+        });
+        await settle(unit);
+        await moveAircraft(unit, p, {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_LEG); // Precondition
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-APR             REST 1000ft to 18000ft']); // Precondition
+
+        await unit.panel.loadProcedure('APT 8');
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ARM_LEG);
+        expect(sua(unit)).toEqual([]);
+    });
+
+    // Leaving the band vertically ends the entered state while the aircraft stays laterally inside; coming back down
+    // posts a new message
+    it('removes INSIDE SPC USE AIRSPACE when the aircraft climbs out of the area (characterization, #412)', async () => {
+        const unit = await flying(0, [around()]);
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-AROUND          REST 1000ft to 18000ft']); // Precondition
+
+        unit.env.sim.set('PRESSURE ALTITUDE', 'feet', 25000);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+        expect(sua(unit)).toEqual([]);
+
+        unit.env.sim.set('PRESSURE ALTITUDE', 'feet', 1200);
+        await vi.advanceTimersByTimeAsync(ALERT_PERIOD_MS);
+
+        expect(sua(unit)).toEqual(['INSIDE SPC USE AIRSPACE R-AROUND          REST 1000ft to 18000ft']);
+    });
+});

@@ -20,6 +20,7 @@ import {ActiveWaypoint} from "./flightplan/ActiveWaypoint";
 import {TimeStamp} from "./Time";
 import {CenterWaypoint} from "../pages/right/Ctr1Page";
 import type {FplPage} from "../pages/left/FplPage";
+import type {Message} from "./MessageHandler";
 import {PowerEvent, PowerEventData} from "../PowerButton";
 import {Sensors} from "../Sensors";
 
@@ -114,6 +115,14 @@ export class NavPageState {
 
     //When operating outside the database coverage
     public userMagvar: Degrees = 0;
+
+    /**
+     * The areas (AirspaceAreas keys) AIRSPACE ALERT warns of and the areas the aircraft is inside of, each with the message
+     * posted for it. An airspace message is valid while its key maps to it, so the maps are the condition; both are reset
+     * at power-on (#412)
+     */
+    public readonly airspaceWarned = new Map<string, Message>();
+    public readonly airspaceEntered = new Map<string, Message>();
 
     constructor(bus: EventBus, userSettings: KLN90BUserSettings, sensors: Sensors, fpl0: Flightplan, lastactiveWaypoint: Facility | null) {
         this.activeWaypoint = new ActiveWaypoint(bus, userSettings, sensors, fpl0, lastactiveWaypoint);
@@ -298,6 +307,10 @@ export class VolatileMemory {
         this.navPage.isSelfTestApproved = false; //Every power-on runs the self-test again (#330)
         this.navPage.rollSteeringLatch = null; //A turn chosen before the power-off is not kept (#100)
         this.navPage.activeWaypoint.clearTurnStack(); //Nor a turn started before it, its plan or its own-turn flag (#375)
+        //#412: the power-off dropped the airspace messages, so the areas they stood for are forgotten too and the first check
+        //of the power-on posts them again when their condition still holds
+        this.navPage.airspaceWarned.clear();
+        this.navPage.airspaceEntered.clear();
 
         this.calPage.cal6TimeZ = null;
         this.calPage.cal6FromTimezone = null;

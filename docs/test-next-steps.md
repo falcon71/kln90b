@@ -130,8 +130,10 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   120°; a halved roll-in distance
   (`NavCalculator.ts:190`) survives the lower bound of the DME arc flight; the flag copy of `addArcInfoIfPrevIsSame`
   (`SidStar.ts:455`) has no arc whose fix carries other flags; the two halves of the SET 3 hard-surface filter
-  (`NearestList.ts:173` and `:205-213`) and the two polygon guards of the SUA alert (`AirspaceAlert.ts:109`,
-  `MessageHandler.ts:87`) cover each other.
+  (`NearestList.ts:173` and `:205-213`) cover each other. (The two polygon guards of the SUA alert no longer do since
+  #412: the live lateral test of `AirspaceAlertMessage` is held by "removes AIRSPACE ALERT at once when the aircraft
+  enters the area", that of `InsideAirspaceMessage` by "removes INSIDE SPC USE AIRSPACE once the aircraft has left the
+  area", both in `AirspaceAlert.test.ts`.)
 - **CTR tests with `centerWorld()`:** its legs are 300 NM, so each Center is met by a search from inside it. The #102
   test in `Ctr1Page.test.ts` computes twice in one unit on purpose, and the tests of the 30 waypoint limit there use
   one computation.
