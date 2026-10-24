@@ -5,6 +5,7 @@ import {Screen} from '../../../harness/render/screen';
 import {messages} from '../../../harness/readers';
 import {standardRoute} from '../../../harness/fixtures';
 import {savedFlightplan} from '../../../harness/storage';
+import {convertUnit} from '../../../harness/sim/units';
 
 describe('self-test page', () => {
     it('outputs a course of 315° and an RMI bearing of 130° during the self-test (955b535)', async () => {
@@ -426,5 +427,23 @@ describe('ADJ NAV IND CRS around the self-test', () => {
         expect(Math.round(unit.props.modeController.getDtkOrObsMagnetic()!)).toBe(50); // Precondition: the leg to ABC
 
         expect(await adjustMessagesFor(unit, 40)).toEqual([]);
+    });
+});
+
+describe('a power-off during the self-test (#400)', () => {
+    it('outputs no self-test values on the Turn-On page after a power-off during the self-test (#400)', async () => {
+        const unit = await bootToSelfTest({magvar: 0});
+        const from = unit.env.sim.writes.length;
+        await unit.panel.powerCycle();
+        await vi.advanceTimersByTimeAsync(5000); // the Turn-On page (17 s, WelcomePage TEST_TIME)
+
+        expect(Screen.read().row(0)).toBe(' GPS             ORS 20'); // Precondition: the Turn-On page is showing
+        expect(unit.props.memory.navPage.isSelfTestActive).toBe(false);
+        const after = unit.env.sim.writes.slice(from);
+        expect(after.filter(w => w.name === 'GPS APPROACH MODE' && w.value === 3)).toEqual([]);
+        // The DTK is written in radians (Sensors.setDesiredTrack), so it is converted before the comparison
+        expect(after.filter(w => w.name === 'GPS WP DESIRED TRACK'
+            && Math.abs(convertUnit(w.value as number, w.unit, 'degrees') - 315) < 0.1)).toEqual([]);
+        expect(unit.errors).toEqual([]);
     });
 });

@@ -305,6 +305,7 @@ export class VolatileMemory {
         this.navPage.aprActivationScale = 1;
         this.navPage.userMagvar = 0;
         this.navPage.isSelfTestApproved = false; //Every power-on runs the self-test again (#330)
+        this.navPage.isSelfTestActive = false; //A power-off during the self-test ends it (#400)
         this.navPage.rollSteeringLatch = null; //A turn chosen before the power-off is not kept (#100)
         this.navPage.activeWaypoint.clearTurnStack(); //Nor a turn started before it, its plan or its own-turn flag (#375)
         //#412: the power-off dropped the airspace messages, so the areas they stood for are forgotten too and the first check
