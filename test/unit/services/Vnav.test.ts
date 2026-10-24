@@ -158,6 +158,23 @@ describe('Vnav angle', () => {
         expect(vnav.state).toBe(VnavState.Inactive);
     });
 
+    // characterization: VNAV starts only on an angle that shows other than 0.0. Right after the reset at the end of a
+    // descent the aircraft is a few feet off SEL; the KLN 89 did nothing with its VS at 0 (trainer 2026-10-06).
+    // 30 NM = 182284 ft: 140 ft is 0.044 deg (shown 0.0), 170 ft is 0.053 deg (shown -0.1) (#73)
+    it('starts nothing on a computed angle that shows 0.0 (characterization, #73)', () => {
+        const {vnav} = dct({distToActive: 30, ind: 2040});
+        expect(vnav.getAngle()).toBeCloseTo(-0.044, 3);
+        vnav.armVnav();
+        expect(vnav.state).toBe(VnavState.Inactive);
+    });
+
+    it('starts on a computed angle that shows -0.1 (characterization, #73)', () => {
+        const {vnav} = dct({distToActive: 30, ind: 2070});
+        expect(vnav.getAngle()).toBeCloseTo(-0.053, 3);
+        vnav.armVnav();
+        expect(vnav.state).toBe(VnavState.Active);
+    });
+
     // A programmed angle is shown as entered
     it('keeps a programmed angle (5-8)', () => {
         const {vnav} = dct({distToActive: 64.8, ind: 7500, angle: -1.8});
@@ -249,18 +266,132 @@ describe('Vnav states', () => {
         expect(vnav.state).toBe(VnavState.Inactive);
     });
 
+    // KLN 89 trainer (2026-10-06, again 2026-10-24): when the path reaches the selected altitude the 89 goes inactive and
+    // resets its inputs: the from altitude becomes the selected one, the offset 0, the vertical speed 0, the waypoint
+    // the active one; the selected altitude stays. On the 90B the programmed angle goes, so ANGLE shows the computed
+    // angle again, and FR takes SEL (the mapping is a characterization) (#73)
+    it('resets the inputs when the descent path reaches SEL (KLN 89 trainer, #73)', () => {
+        const {vnav, nav} = dct({distToActive: 31, ind: 7500, offset: 2, angle: -1.8, fromAlt: 7500});
+        vnav.armVnav();
+        nav.distToActive = 2.1;
+        vnav.tick();
+        expect(vnav.state).toBe(VnavState.Active);
+        expect(nav.nav4VnavWpt).toBe(WPT_B); // Precondition: armVnav stored the waypoint
+
+        nav.distToActive = 1.9;
+        vnav.tick();
+
+        expect(vnav.state).toBe(VnavState.Inactive);
+        expect(nav.nav4VnavAngle).toBeNull();
+        expect(nav.nav4VnavDist).toBe(0);
+        expect(nav.nav4VnavWpt).toBeNull();
+        expect(nav.nav4FromAlt).toBe(1900);
+        expect(nav.nav4SelectedAltitude).toBe(1900);
+    });
+
+    // The climb twin: the inputs reset when the climb path reaches SEL (KLN 89 trainer, see above) (#73)
+    it('resets the inputs when the climb path reaches SEL (KLN 89 trainer, #73)', () => {
+        const {vnav, nav} = dct({distToActive: 20, ind: 3000, sel: 9000, angle: 2, offset: 2, fromAlt: 3000});
+        vnav.armVnav();
+        nav.distToActive = 2.1;
+        vnav.tick();
+        expect(vnav.state).toBe(VnavState.Active);
+
+        nav.distToActive = 1.9;
+        vnav.tick();
+
+        expect(vnav.state).toBe(VnavState.Inactive);
+        expect(nav.nav4VnavAngle).toBeNull();
+        expect(nav.nav4VnavDist).toBe(0);
+        expect(nav.nav4VnavWpt).toBeNull();
+        expect(nav.nav4FromAlt).toBe(9000);
+        expect(nav.nav4SelectedAltitude).toBe(9000);
+    });
+
     // 5-9, C-1: a VNAV waypoint the aircraft has passed (behind the active leg) is not valid any more; VNAV goes
-    // inactive and NAV 4 falls back to the active waypoint
-    it('drops a VNAV waypoint behind the active leg (5-9, C-1)', () => {
-        const {vnav, nav} = vnavFor({fplIdx: 2, active: WPT_C, distToActive: 20, ind: 7500, angle: -1.8});
+    // inactive and NAV 4 falls back to the active waypoint. KLN 89 trainer 2026-10-24: an active and an armed VNAV whose
+    // waypoint was sequenced reset the inputs as at the end of the path (#73)
+    it.each([
+        ['armed', VnavState.Armed],
+        ['active', VnavState.Active],
+    ])('drops a VNAV waypoint behind the active leg while %s and resets the inputs (5-9, C-1, KLN 89 trainer, #73)', (_name, state) => {
+        const {vnav, nav} = vnavFor({fplIdx: 2, active: WPT_C, distToActive: 20, ind: 7500, angle: -1.8, offset: 2, fromAlt: 3000});
         nav.nav4VnavWpt = WPT_B;
-        vnav.state = VnavState.Armed;
+        vnav.state = state;
         expect(vnav.isValidVnavWpt(WPT_B)).toBe(false);
         expect(vnav.isValidVnavWpt(WPT_C)).toBe(true);
+
         vnav.tick();
+
         expect(vnav.state).toBe(VnavState.Inactive);
         expect(nav.nav4VnavWpt).toBeNull();
         expect(vnav.getVnavWaypoint()).toBe(WPT_C);
+        expect(nav.nav4VnavAngle).toBeNull();
+        expect(nav.nav4VnavDist).toBe(0);
+        expect(nav.nav4FromAlt).toBe(1900);
+    });
+
+    // KLN 89 trainer 2026-10-24: VNAV to a waypoint after the active one stayed active, with its inputs, when the active
+    // waypoint was sequenced. Active leg to WPT_B, VNAV to WPT_C; then WPT_C becomes the active waypoint (#73)
+    it('keeps VNAV to a waypoint further ahead through a sequence (KLN 89 trainer, #73)', () => {
+        const options = {fplIdx: 1, active: WPT_B, distToActive: 40, ind: 7500, angle: -1.8, offset: 2};
+        const {vnav, nav} = vnavFor(options);
+        nav.nav4VnavWpt = WPT_C;
+        vnav.armVnav();
+        const before = vnav.state;
+        expect(before).not.toBe(VnavState.Inactive); // Precondition: programmed
+
+        options.fplIdx = 2;
+        options.active = WPT_C;
+        nav.distToActive = 30;
+        vnav.tick();
+
+        expect(vnav.state).not.toBe(VnavState.Inactive);
+        expect(nav.nav4VnavWpt).toBe(WPT_C);
+        expect(nav.nav4VnavAngle).toBe(-1.8);
+        expect(nav.nav4VnavDist).toBe(2);
+    });
+
+    // characterization: a Direct To elsewhere ends the programming like a sequence (the trainer showed only the
+    // sequence; one rule covers every way the VNAV waypoint becomes invalid) (#73)
+    it('resets the inputs when a Direct To elsewhere ends VNAV (characterization, #73)', () => {
+        const {vnav, nav} = vnavFor({fplIdx: -1, active: WPT_A, distToActive: 20, ind: 7500, angle: -1.8, offset: 2, fromAlt: 3000});
+        nav.nav4VnavWpt = WPT_B;
+        vnav.state = VnavState.Armed;
+
+        vnav.tick();
+
+        expect(vnav.state).toBe(VnavState.Inactive);
+        expect(nav.nav4VnavWpt).toBeNull();
+        expect(nav.nav4VnavAngle).toBeNull();
+        expect(nav.nav4VnavDist).toBe(0);
+        expect(nav.nav4FromAlt).toBe(1900);
+    });
+
+    // The reset runs whatever the state: a waypoint programmed on NAV 4 while VNAV is inactive, then passed (#73)
+    it('resets the inputs when a waypoint programmed while inactive is passed (#73)', () => {
+        const {vnav, nav} = vnavFor({fplIdx: 2, active: WPT_C, distToActive: 20, ind: 7500, offset: 2, fromAlt: 3000});
+        nav.nav4VnavWpt = WPT_B;
+        expect(vnav.state).toBe(VnavState.Inactive); // Precondition: never started
+
+        vnav.tick();
+
+        expect(nav.nav4VnavWpt).toBeNull();
+        expect(nav.nav4VnavDist).toBe(0);
+        expect(nav.nav4FromAlt).toBe(1900);
+    });
+
+    // While no VNAV waypoint is programmed the pilot may be typing SEL, the offset or FR: the reset never runs then (#73)
+    it('keeps the inputs while no VNAV waypoint is programmed (#73)', () => {
+        const {vnav, nav} = dct({distToActive: 64.8, ind: null, fromAlt: 7500, offset: 2});
+
+        vnav.tick();
+        vnav.tick();
+
+        expect(vnav.state).toBe(VnavState.Inactive);
+        expect(nav.nav4VnavDist).toBe(2);
+        expect(nav.nav4FromAlt).toBe(7500);
+        expect(nav.nav4SelectedAltitude).toBe(1900);
     });
 
     // C-1: a waypoint that is not in FPL 0 is not valid while FPL 0 is active

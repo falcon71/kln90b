@@ -615,7 +615,10 @@ comment gives the sources for the 1 Hz rate.
   output is raw; the aircraft smooth it.
 
 **`Vnav`** (`services/Vnav.ts`): NAV 4 advisory VNAV with the state machine `Inactive/Armed/Active`. It uses
-`navPage.nav4*` fields and has no sim output.
+`navPage.nav4*` fields and has no sim output. Bringing the cursor onto ANGLE starts it from Inactive (a cursor
+resting there does not), and only on an angle that shows other than 0.0; an angle entered on ANGLE re-arms it
+(`setAngle`, #418). When the path reaches SEL or a programmed VNAV waypoint stops being valid, it resets the NAV 4
+inputs as the KLN 89 does: angle, offset and waypoint cleared, FR set to SEL (#73).
 
 **`KLNMagvar`** (`data/navdata/KLNMagvar.ts`):
 

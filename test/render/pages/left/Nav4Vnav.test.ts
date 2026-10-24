@@ -89,6 +89,44 @@ describe('NAV 4 VNAV', () => {
         expect(unit.props.memory.navPage.nav4VnavAngle).toBe(-1.8);
     });
 
+    // Video 6 of #73: an entry on one NAV 4 must show on the NAV 4 of the other side. The AVsoftech KLN 90B trainer
+    // (third party, unreliable) syncs both pages at once (the maintainer, 2026-10-24). The cursor lands on the first
+    // SEL digit; one inner click makes 01900 into 11900 (#73)
+    it('shows a SEL entered on one side on the NAV 4 of the other side (#73)', async () => {
+        const unit = await bootAt(64.8);
+        await unit.panel.show('L', 'NAV 4');
+        await unit.panel.show('R', 'NAV 4');
+        await unit.panel.cursor('L');
+
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L')[3]).toBe('SEL:11900ft');
+        expect(Screen.read().rows('R')[3]).toBe('SEL:11900ft');
+    });
+
+    // Video 5 of #73: the pilot confirmed the VNAV waypoint again and VNAV went inactive. The maintainer's ruling
+    // (2026-10-24): only a different waypoint cancels VNAV; the AVsoftech trainer (unreliable) kept VNAV on ENT and on
+    // the same ident typed again. From the first ANGLE digit, three outer steps back reach the waypoint field (#73)
+    it('keeps VNAV when the same waypoint is entered again (#73)', async () => {
+        const unit = await bootAt(64.8);
+        await unit.panel.show('L', 'NAV 4');
+        await cursorToAngle(unit);
+        expect(Screen.read().rows('L')[0]).toBe('VNV 7500ft ');
+        await unit.panel.outer('L', -3);
+        expect(unit.panel.focused('L').text).toBe('KDDD ');
+
+        await unit.panel.enterIdent('L', 'KDDD');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.props.vnav.state).toBe(VnavState.Active);
+        expect(Screen.read().rows('L')[0]).toMatch(/^VNV [ 0-9]{4}ft/);
+        expect(Screen.read().rows('L')[4]).toMatch(/^KDDD/);
+    });
+
     // 5-8 (figure 5-27): with a programmed angle the top line shows VNV ARMED while the descent starts in more than
     // ten minutes: 62.8 - 29.33 = 33.47 NM before the start, 831 s at 145 kt
     it('shows VNV ARMED more than ten minutes before the descent (5-8)', async () => {
@@ -206,6 +244,44 @@ describe('NAV 4 VNAV under the ANGLE cursor (characterization)', () => {
     });
 });
 
+// 5-8: VNAV starts when the cursor is brought onto ANGLE, not while it rests there (the maintainer's ruling 2026-10-24,
+// after the final review of #73); the KLN 89 started VNAV when the cursor moved onto VS (trainer 2026-10-06)
+describe('NAV 4 VNAV and the arrival of the cursor on ANGLE (#73)', () => {
+    /** VNAV active at -1.8 with the cursor resting on ANGLE, then the end of the path: 1.9 NM west at 1950 ft */
+    async function endOfDescentUnderTheCursor(): Promise<HeadlessUnit> {
+        const unit = await bootAt(31, {angle: -1.8});
+        unit.props.vnav.armVnav();
+        await unit.panel.show('L', 'NAV 4');
+        await cursorToAngle(unit);
+        expect(Screen.read().rows('L')[0]).toBe('VNV 7400ft '); // Precondition: active
+        unit.env.sim.set('PRESSURE ALTITUDE', 'feet', 1950);
+        await moveAircraft(unit, west(1.9), {groundspeedKt: 145, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(3000);
+        return unit;
+    }
+
+    // The reset leaves the angle computed to the active waypoint with offset 00: -0.5 here, where the harness reads IND
+    // about 100 ft above SEL; a cursor resting on ANGLE does not start it
+    it('stays inactive at the end of the descent with the cursor resting on ANGLE (5-8, #73)', async () => {
+        const unit = await endOfDescentUnderTheCursor();
+
+        expect(unit.props.vnav.state).toBe(VnavState.Inactive);
+        expect(Screen.read().rows('L')[0]).toBe('VNV INACTV ');
+        expect(Screen.read().rows('L')[4]).toBe('KDDD :-00nm');
+    });
+
+    it('starts again when the cursor is moved off ANGLE and back onto it (5-8, #73)', async () => {
+        const unit = await endOfDescentUnderTheCursor();
+
+        await unit.panel.outer('L', -1);
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.outer('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.props.vnav.state).not.toBe(VnavState.Inactive);
+    });
+});
+
 // Checked in the KLN 89 trainer, 2026-10-14: VNAV to a waypoint after the active one is cancelled in OBS mode, the
 // active waypoint is shown as the VNAV waypoint, no message comes, and LEG does not bring the programming back; VNAV to
 // the active waypoint stays. MIDAA lies 50 NM west of KDDD on the leg, so it is the active waypoint 64.8 NM west
@@ -258,6 +334,24 @@ describe('VNAV and the switch to OBS (checked in the KLN 89 trainer, 2026-10-14,
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_LEG);
         expect(unit.props.vnav.state).toBe(VnavState.Inactive);
         expect((await unit.panel.show('L', 'NAV 4'))[4]).toMatch(/^MIDAA/);
+    });
+
+    // KLN 89 trainer 2026-10-24: stepping the VNAV waypoint to another one cancels VNAV at once. With VNAV to KDDD,
+    // MIDAA (the active waypoint) is entered on NAV 4 (#73)
+    it('cancels VNAV when a different waypoint is entered (KLN 89 trainer, #73)', async () => {
+        const unit = await armedTo('KDDD');
+        await unit.panel.show('L', 'NAV 4');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'KDDD');
+
+        await unit.panel.enterIdent('L', 'MIDAA');
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.props.memory.navPage.nav4VnavWpt!.icaoStruct.ident).toBe('MIDAA');
+        expect(unit.props.vnav.state).toBe(VnavState.Inactive);
     });
 
     it('keeps VNAV to the active waypoint through the switch to OBS', async () => {

@@ -1,4 +1,4 @@
-import {Facility, FSComponent, VNode} from '@microsoft/msfs-sdk';
+import {Facility, FSComponent, ICAO, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, PageSide, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
@@ -31,6 +31,9 @@ abstract class Nav4Page extends SixLineHalfPage {
     readonly children: UIElementChildren<Nav4PageTypes>;
 
     readonly name: string = "NAV 4";
+
+    /** The ANGLE cursor at the last display tick: VNAV starts when the cursor arrives there (5-8) */
+    private angleWasFocused: boolean = false;
 
 
     constructor(props: PageProps) {
@@ -77,9 +80,13 @@ abstract class Nav4Page extends SixLineHalfPage {
         this.requiresRedraw = true;
         super.tick(blink);
 
-        if (this.children.get("vnavAngle").isFocused()) {
+        //5-8: bringing the cursor onto ANGLE starts VNAV; a cursor resting there does not, so VNAV that ends under it
+        //stays inactive (#73, and an active path is kept, #194)
+        const angleFocused = this.children.get("vnavAngle").isFocused();
+        if (angleFocused && !this.angleWasFocused) {
             this.props.vnav.armVnav();
         }
+        this.angleWasFocused = angleFocused;
     }
 
     protected abstract getPageSide(): PageSide;
@@ -92,6 +99,7 @@ abstract class Nav4Page extends SixLineHalfPage {
         } else {
             this.children.get("ind").setValue(Math.round((this.props.sensors.in.airdata.getIndicatedAlt()!) / 100) * 100);
         }
+        this.children.get("sel").setValue(this.props.memory.navPage.nav4SelectedAltitude);
         this.children.get("vnavWpt").setValue(this.props.vnav.getVnavWaypoint());
         this.children.get("vnavDist").setValue(this.props.memory.navPage.nav4VnavDist);
         this.children.get("vnavAngle").setValue(this.props.vnav.getAngle());
@@ -132,8 +140,13 @@ abstract class Nav4Page extends SixLineHalfPage {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID VNV");
             return;
         }
+        //Only a different waypoint cancels VNAV; the same one entered again keeps it (#73)
+        const current = this.props.vnav.getVnavWaypoint();
+        const same = current !== null && ICAO.valueEquals(wpt.icaoStruct, current.icaoStruct);
         this.props.memory.navPage.nav4VnavWpt = wpt;
-        this.props.vnav.disarmVnav();
+        if (!same) {
+            this.props.vnav.disarmVnav();
+        }
     }
 
     private setVnavDist(dist: NauticalMiles): void {

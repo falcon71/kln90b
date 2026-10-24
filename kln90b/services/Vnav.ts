@@ -25,9 +25,14 @@ export class Vnav implements CalcTickable {
     public tick(): void {
         this.advisoryAltitude = null;
         this.timeToVnav = null;
-        if (this.navState.nav4VnavWpt === null || !this.isValidVnavWpt(this.navState.nav4VnavWpt)) {
-            this.navState.nav4VnavWpt = null;
+        if (this.navState.nav4VnavWpt === null) {
             this.state = VnavState.Inactive;
+            return;
+        }
+        if (!this.isValidVnavWpt(this.navState.nav4VnavWpt)) {
+            //KLN 89 trainer: a sequenced VNAV waypoint resets the inputs as the end of the path does (#73)
+            this.state = VnavState.Inactive;
+            this.resetInputs();
             return;
         }
 
@@ -46,6 +51,7 @@ export class Vnav implements CalcTickable {
                 || (this.navState.nav4VnavAngle! < 0 && this.advisoryAltitude <= this.navState.nav4SelectedAltitude)//descend
             ) {
                 this.state = VnavState.Inactive;
+                this.resetInputs();
                 return;
             }
         }
@@ -78,8 +84,9 @@ export class Vnav implements CalcTickable {
 
     public armVnav(): void {
         const angle = this.getAngle();
-        //5-8: the cursor over ANGLE starts VNAV; an active VNAV keeps its path while the cursor stays there (#194)
-        if (this.state === VnavState.Inactive && angle !== 0) {
+        //5-8: the cursor over ANGLE starts VNAV; an active VNAV keeps its path while the cursor stays there (#194).
+        //An angle that shows 0.0 starts nothing, as the 89 with its VS at 0 (#73)
+        if (this.state === VnavState.Inactive && Math.round(angle * 10) !== 0) {
             this.navState.nav4VnavAngle = angle;
             this.navState.nav4VnavWpt = this.getVnavWaypoint();
             this.state = VnavState.Armed;
@@ -138,6 +145,19 @@ export class Vnav implements CalcTickable {
         } else {
             return `${minutes.toString().padStart(2, " ")}:${format(seconds, "00")}`;
         }
+    }
+
+    /**
+     * KLN 89 trainer: at the end of the path the inputs reset: the from altitude becomes the selected one, the offset
+     * and the VS 0, the waypoint the active one; the selected altitude stays. Here the programmed angle goes, so ANGLE
+     * shows the computed angle again (#73)
+     * @private
+     */
+    private resetInputs(): void {
+        this.navState.nav4VnavAngle = null;
+        this.navState.nav4VnavDist = 0;
+        this.navState.nav4VnavWpt = null;
+        this.navState.nav4FromAlt = this.navState.nav4SelectedAltitude;
     }
 
     /**

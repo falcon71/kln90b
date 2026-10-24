@@ -560,3 +560,27 @@ trainer, in two rounds; the VM was not started, stopped or reset)
   evidence. It did show the active waypoint on the page type of the right side at power-on again (3-8). It keeps the
   page number; the KLN 89 resets it, and the simulation follows the KLN 89 (no counterpart check on the 90B).
 - No simulation bug came out of these checks, so nothing was filed.
+
+**2026-10-24** (agent checks for #73 and #418, VNAV; the KLN 89 trainer and the third-party AVsoftech KLN 90B trainer;
+the VM was not started, stopped or reset)
+- KLN 89, the vertical speed turned on ALT 2 while VNAV was active (high): a steeper VS gave a countdown that matched
+  the geometry (`Vnv in 02:41`), a VS shallower than required, so that the start lay behind, gave a new advisory
+  altitude at once (`Vnv Alt 03000'`), and going steeper again from there went back to a countdown. VNAV never went
+  Inactive and never kept the old path. The 89 recomputes only when a knob turns a value, as before.
+- KLN 89, the VNAV waypoint (high): on ALT 2 it is a selector over the active waypoint and the FPL 0 waypoints after
+  it, with no ident entry; ENT on the unchanged field changed nothing. The first step to another waypoint made VNAV
+  Inactive at once, and stepping back did not bring it back; the cursor onto VS then started it again.
+- KLN 89, the inputs after VNAV ends (high). An active VNAV and an armed one (countdown) whose waypoint was
+  sequenced, and an active one whose path reached the selected altitude with an offset of -3 NM, all showed at the
+  next recompute: Inactive, the indicated (from) altitude replaced by the selected one and editable again, the
+  selected altitude kept, the waypoint field on the active waypoint, offset +00, VS 0, the ground speed kept. This
+  confirms the end-of-path reset of 2026-10-06 and adds the sequence. With offset 0 the 89 may treat the passed
+  waypoint as the end of the path; the screen does not tell the two apart. VNAV to a waypoint after the active one
+  stayed active with all its inputs when the active waypoint was sequenced.
+- The AVsoftech KLN 90B trainer, which is unreliable: an angle turned while VNAV was active gave `VNV ARMED` at once;
+  ENT on the unchanged VNAV waypoint and the same ident typed again kept VNAV active (medium). Its VNAV is otherwise
+  broken (the altitude only climbs, an entered angle never leaves ARMED, a SEL or offset change starts VNAV, the
+  advisory runs below SEL and never ends), so it says nothing about the end of a descent. The maintainer saw on the
+  same trainer that entries on NAV 4 show on both NAV 4 pages at once.
+- Outcome: #418 filed and fixed (a new angle re-arms VNAV); #73 fixed (SEL shown on both NAV 4 pages, the same
+  waypoint keeps VNAV, the inputs reset when the path ends or a programmed VNAV waypoint becomes invalid).
