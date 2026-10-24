@@ -23,8 +23,8 @@ const FIVE = [
     freq(FacilityFrequencyType.CTAF, 118.35),
 ];
 
-/** The V1 ICAO string of KAAA, as the unit stores the last active waypoint (setting activeWaypoint) */
-const KAAA_V1 = 'A      KAAA ';
+/** The V2 ICAO string of KAAA, as the unit stores the last active waypoint (setting activeWaypoint) */
+const KAAA_ICAO = ICAO.valueToStringV2(ICAO.value('A', '', '', 'KAAA'));
 
 describe('APT 4 page (characterization)', () => {
     it('shows the frequencies of an airport', async () => {
@@ -228,7 +228,7 @@ describe('APT 4 page after power-on', () => {
         const kbbb = airport('KBBB', 47.3, 8.0);
         const unit = await bootUnit({
             facilities: [withFreqs(freq(FacilityFrequencyType.Unicom, 122.8)), kbbb],
-            storage: {activeWaypoint: KAAA_V1, ...savedFlightplan(0, [kbbb, withFreqs()])},
+            storage: {activeWaypoint: KAAA_ICAO, ...savedFlightplan(0, [kbbb, withFreqs()])},
         });
         await settle(unit);
 

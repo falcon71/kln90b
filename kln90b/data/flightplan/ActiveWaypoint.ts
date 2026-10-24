@@ -347,7 +347,8 @@ export class ActiveWaypoint {
         const active = this.getActiveWpt();
         if (active !== null) {
             this.lastactiveWaypoint = active;
-            this.setting.set(ICAO.valueToStringV1(active.icaoStruct));
+            //V2: V1 cannot hold an airport field of more than four characters (#415)
+            this.setting.set(ICAO.valueToStringV2(active.icaoStruct));
         }
     }
 

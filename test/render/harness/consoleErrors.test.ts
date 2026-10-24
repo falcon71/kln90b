@@ -37,7 +37,7 @@ describe('console.error collector (harness)', () => {
     it('counts a console.error raised during the boot', async () => {
         const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
         onTestFinished(() => spy.mockRestore());
-        const lost = ICAO.valueToStringV1(airport('KZZZ', 47.0, 8.0).icaoStruct);
+        const lost = ICAO.valueToStringV2(airport('KZZZ', 47.0, 8.0).icaoStruct);
 
         const unit = await bootUnit({storage: {activeWaypoint: lost}});
 

@@ -1,8 +1,8 @@
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, onTestFinished, vi} from 'vitest';
 import {FacilityType, ICAO} from '@microsoft/msfs-sdk';
 import {KLNFacilityRepository} from '../../kln90b/data/navdata/KLNFacilityRepository';
 import {bootUnit, HeadlessUnit, settle} from '../harness/boot';
-import {airport, ndb, vor} from '../harness/navdata/builders';
+import {airport, intersection, ndb, vor} from '../harness/navdata/builders';
 import {Screen} from '../harness/render/screen';
 import {fplIdents, messages, userWaypoints} from '../harness/readers';
 import {savedFlightplan, storedSetting} from '../harness/storage';
@@ -64,26 +64,81 @@ describe('user data conversion of every kind (#47)', () => {
     });
 });
 
-// Core 7: the last active waypoint is stored as an ICAO V1 string, whatever the format of the rest of the user data
-describe('the stored last active waypoint is an ICAO V1 string', () => {
-    it('reads activeWaypoint as V1 and opens its page at boot', async () => {
-        const unit = await bootUnit({facilities: [vor('ABC', 47.2, 8, {region: 'K1'})], storage: {activeWaypoint: 'VK1    ABC  '}});
+// Core 7: the last active waypoint is saved as an ICAO V2 string, and a V1 string of an older version still restores
+describe('the stored last active waypoint is an ICAO string', () => {
+    const abc = vor('ABC', 47.2, 8, {region: 'K1'});
 
+    it('restores a last active waypoint saved as ICAO V2 and opens its page at boot (#415)', async () => {
+        const unit = await bootUnit({facilities: [abc], storage: {activeWaypoint: ICAO.valueToStringV2(abc.icaoStruct)}});
+
+        expect(unit.props.memory.navPage.activeWaypoint.lastactiveWaypoint?.icaoStruct.ident).toBe('ABC');
         expect(Screen.read().rightName()).toBe('VOR  ');
         // The D marks a VOR with DME, which the builder's VOR is
         expect(Screen.read().rows('R')[0]).toBe(' ABC D     ');
         expect(unit.consoleErrors).toEqual([]);
     });
 
-    it('writes activeWaypoint as V1', async () => {
-        const kaaa = airport('KAAA', 47, 8);
-        const abc = vor('ABC', 47.2, 8, {region: 'K1'});
-        const unit = await bootUnit({facilities: [kaaa, abc], position: {lat: 47.1, lon: 8}, storage: savedFlightplan(0, [kaaa, abc])});
+    it('still restores a last active waypoint saved as ICAO V1 by an older version (#415)', async () => {
+        const unit = await bootUnit({facilities: [abc], storage: {activeWaypoint: 'VK1    ABC  '}});
+
+        expect(unit.props.memory.navPage.activeWaypoint.lastactiveWaypoint?.icaoStruct.ident).toBe('ABC');
+        expect(Screen.read().rightName()).toBe('VOR  ');
+        expect(Screen.read().rows('R')[0]).toBe(' ABC D     ');
+        expect(unit.consoleErrors).toEqual([]);
+    });
+
+    it('does not rewrite a stored V1 value at boot (#415)', async () => {
+        const unit = await bootUnit({facilities: [abc], storage: {activeWaypoint: 'VK1    ABC  '}});
         await settle(unit);
 
         expect(storedSetting(unit, 'activeWaypoint')).toBe('VK1    ABC  ');
     });
+
+    // The type letter Q is no facility type, so the string is well formed but names nothing the unit can load
+    it('boots without a last active waypoint when the stored value is malformed (#415)', async () => {
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        onTestFinished(() => spy.mockRestore());
+        const malformed = 'QK1        ABC     ';
+
+        const unit = await bootUnit({facilities: [abc], storage: {activeWaypoint: malformed}});
+
+        expect(unit.consoleErrors.map(args => args[0])).toEqual([`Last active waypoint not found: ${malformed}`]);
+        expect(unit.props.memory.navPage.activeWaypoint.lastactiveWaypoint).toBeNull();
+    });
+
+    it('saves the active waypoint as ICAO V2 (#415)', async () => {
+        const kaaa = airport('KAAA', 47, 8);
+        const unit = await bootUnit({facilities: [kaaa, abc], position: {lat: 47.1, lon: 8}, storage: savedFlightplan(0, [kaaa, abc])});
+        await settle(unit);
+
+        // Type V, region K1, eight blanks for the airport, the ident padded to eight
+        expect(storedSetting(unit, 'activeWaypoint')).toBe('VK1        ABC     ');
+    });
+
+    // The V1 string holds four characters of airport, so the save used to throw for a terminal waypoint of a longer ident
+    it('saves an active waypoint that the V1 format cannot hold (#415)', async () => {
+        const kaaa = airport('KAAA', 47, 8);
+        const terminal = longAirportIntersection();
+        const unit = await bootUnit({facilities: [kaaa, terminal], position: {lat: 47.1, lon: 8}, storage: savedFlightplan(0, [kaaa, terminal])});
+        await settle(unit);
+
+        expect(unit.errors).toEqual([]);
+        expect(storedSetting(unit, 'activeWaypoint')).toBe('WK1LONGAPT TERM    ');
+    });
+
+    it('restores an active waypoint that the V1 format cannot hold (#415)', async () => {
+        const terminal = longAirportIntersection();
+        const unit = await bootUnit({facilities: [terminal], storage: {activeWaypoint: 'WK1LONGAPT TERM    '}});
+
+        expect(unit.props.memory.navPage.activeWaypoint.lastactiveWaypoint?.icaoStruct).toEqual(terminal.icaoStruct);
+        expect(unit.consoleErrors).toEqual([]);
+    });
 });
+
+/** A terminal intersection of an airport with a seven character ident */
+function longAirportIntersection() {
+    return {...intersection('TERM', 47.2, 8, {region: 'K1'}), icaoStruct: ICAO.value('W', 'K1', 'LONGAPT', 'TERM')};
+}
 
 // Core 7: a failed restore replaces the plans by empty ones and posts USER DATA LOST. The maintainer ruled that the
 // corrupt data is then wiped once from the saved data, as the V1 conversion does (#144).

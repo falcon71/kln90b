@@ -308,7 +308,10 @@ export class KLN90BCore {
         let lastActiveWaypoint: Facility | null = null;
         if (lastActiveIcao !== "") {
             try {
-                lastActiveWaypoint = await facilityLoader.getFacility(ICAO.getFacilityTypeFromStringV1(lastActiveIcao), lastActiveIcao);
+                //Versions before #415 saved an ICAO V1 string (12 characters), later ones a V2 string (19 characters). A stored
+                //V1 value stays as it is until the active waypoint is saved the next time, which is always V2
+                const lastActiveValue = lastActiveIcao.length === ICAO.EMPTY_V1.length ? ICAO.stringV1ToValue(lastActiveIcao) : ICAO.stringV2ToValue(lastActiveIcao);
+                lastActiveWaypoint = await facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(lastActiveValue), lastActiveValue);
             } catch (e) {
                 console.error(`Last active waypoint not found: ${lastActiveIcao}`, e);
             }

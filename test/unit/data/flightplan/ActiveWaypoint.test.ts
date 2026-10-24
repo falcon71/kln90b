@@ -267,17 +267,17 @@ describe('ActiveWaypoint direct-to flows', () => {
         expect(aw.turnStack).toEqual([]);
     });
 
-    // characterization: the saved waypoint is the one the unit restores at the next power-up. The V1 ICAO literal is
-    // region K1, four blanks, the ident padded to five
+    // characterization: the saved waypoint is the one the unit restores at the next power-up. The ICAO V2 literal
+    // is region K1, eight blanks for the airport, the ident padded to eight
     it('characterization: a direct-to saves the active waypoint', () => {
         const position = pointFrom(A, 90, 10);
         const {aw, settings} = activeWaypointWith([A, B, C, D].map(user), position);
         aw.activateFpl0();
-        expect(settings.getSetting('activeWaypoint').get()).toBe('VK1    ABC  '); // Precondition: the leg before the direct-to is saved
+        expect(settings.getSetting('activeWaypoint').get()).toBe('VK1        ABC     '); // Precondition: the leg before the direct-to is saved
 
         aw.directTo(fromHere(position), C);
 
-        expect(settings.getSetting('activeWaypoint').get()).toBe('VK1    DEF  ');
+        expect(settings.getSetting('activeWaypoint').get()).toBe('VK1        DEF     ');
         expect(aw.lastactiveWaypoint!.icaoStruct.ident).toBe('DEF');
     });
 

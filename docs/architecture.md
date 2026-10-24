@@ -74,8 +74,10 @@ topic and rendered by `controls/ErrorPage` as a full-screen error page with a Gi
     - `UserWaypointPersistor.restoreWaypoints()`.
     - `UserFlightplanPersistor.restoreAllFlightplan()`, which returns 26 `Flightplan`s (index 0 to 25). On failure it
       creates empty plans and sets `restoreSuccessFull=false`, which later produces the `USER DATA LOST` message.
-    - The last active waypoint is loaded from the `activeWaypoint` setting. **That setting is stored as an ICAO V1
-      string**: `ICAO.valueToStringV1` / `getFacilityTypeFromStringV1`.
+    - The last active waypoint is loaded from the `activeWaypoint` setting. **That setting is saved as an ICAO V2
+      string** (`ICAO.valueToStringV2`; V1 cannot hold an airport of more than four characters, #415). The read accepts
+      both: a V1 string of an older version (12 characters) is parsed as V1, anything else as V2. A stored V1 value is
+      not rewritten at boot; it becomes V2 the next time the active waypoint is saved.
     - If `userDataFormat !== 2`, or when a restore failed, it re-persists everything in the V2 format and sets
       `userDataFormat=2` (see Core 7).
 7. Constructs `VolatileMemory`, `WTFlightplanSync`, `AirspaceAlert`, `Vnav`, `KLNMagvar`, `ModeController`, then
@@ -727,13 +729,13 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 `"<ATC MODEL>.profile_1"`. `KLN90BSettingSaveManager` concatenates four managers:
 
 - `KLN90BUserSettings`: the typed keys that `KLN90BUserSettingsTypes` declares. These include `welcome1..4`, `powercycles`, `totalTime`, `timezone`, baro,
-  `lastLatitude/Longitude`, `lastAlmanacDownload`, `lastEphemeris`, `activeWaypoint` (ICAO **V1** string), alert settings
-  (the ALT page's `altAlertEnabled` and `altAlertWarn` since #259, which a power cycle keeps), the TRI and OTH figures
-  (`triTas`, `triWindDirTrue`, `triWindSpeed`, `triFuelFlow`, `triReserve`, `tri5Fpl`, `othReserve`, since #192, which a
-  power cycle keeps), the last waypoint of each waypoint page (`aptPageWpt`, `vorPageWpt`, `ndbPageWpt`, `intPageWpt`,
-  `supPageWpt`) and the TRI waypoints (`tri1To`, `tri3From`, `tri3To`), likewise since #192 and saved as ICAO **V2**
-  strings (the V1 format is deprecated), `turnAnticipation`, the NAV 5 and Super NAV 5 layout, CAL page inputs,
-  `fastGpsAcquisition` and `userDataFormat`.
+  `lastLatitude/Longitude`, `lastAlmanacDownload`, `lastEphemeris`, `activeWaypoint` (ICAO **V2** string; V1 from older
+  versions is still read), alert settings (the ALT page's `altAlertEnabled` and `altAlertWarn` since #259, which a
+  power cycle keeps), the TRI and OTH figures (`triTas`, `triWindDirTrue`, `triWindSpeed`, `triFuelFlow`, `triReserve`,
+  `tri5Fpl`, `othReserve`, since #192, which a power cycle keeps), the last waypoint of each waypoint page
+  (`aptPageWpt`, `vorPageWpt`, `ndbPageWpt`, `intPageWpt`, `supPageWpt`) and the TRI waypoints (`tri1To`, `tri3From`,
+  `tri3To`), likewise since #192 and saved as ICAO **V2** strings (the V1 format is deprecated), `turnAnticipation`, the
+  NAV 5 and Super NAV 5 layout, CAL page inputs, `fastGpsAcquisition` and `userDataFormat`.
 - `KLN90BUserWaypointsSettings`: `wpt0..wpt249` (`MAX_USER_WAYPOINTS=250`).
 - `KLN90BUserFlightplansSettings`: `fpl0..fpl25` (`NUM_FLIGHTPLANS=25`, inclusive loop).
 - `KLN90BUserRemarkSettings`: `rmk0..rmk99` (`NUM_REMARKS=100`, the 100 airports of 3-47; `rmk10` and up since #92).

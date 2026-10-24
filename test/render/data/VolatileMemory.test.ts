@@ -492,8 +492,8 @@ function waypointWorld() {
 /** The setting value of a waypoint: its ICAO string (V2) */
 const savedIcao = (type: string, region: string, ident: string) => ICAO.valueToStringV2(ICAO.value(type, region, '', ident));
 const savedOf = (f: Facility) => ICAO.valueToStringV2(f.icaoStruct);
-/** The activeWaypoint setting, which ActiveWaypoint still saves as V1 (#415) */
-const activeIcao = (type: string, region: string, ident: string) => ICAO.valueToStringV1(ICAO.value(type, region, '', ident));
+/** The activeWaypoint setting: its ICAO string (V2, #415) */
+const activeIcao = (type: string, region: string, ident: string) => ICAO.valueToStringV2(ICAO.value(type, region, '', ident));
 
 type WaypointPageKey = 'aptPage' | 'vorPage' | 'ndbPage' | 'intPage' | 'supPage';
 
