@@ -584,3 +584,29 @@ the VM was not started, stopped or reset)
   same trainer that entries on NAV 4 show on both NAV 4 pages at once.
 - Outcome: #418 filed and fixed (a new angle re-arms VNAV); #73 fixed (SEL shown on both NAV 4 pages, the same
   waypoint keeps VNAV, the inputs reset when the path ends or a programmed VNAV waypoint becomes invalid).
+
+**2026-10-24** (AVsoftech KLN 90B trainer, which is unreliable, scratchpad messages, #237; the maintainer and an agent
+checking screenshots, timings about 0.1 s; the VM was not involved)
+- On Super NAV 5, GPS/APR posts `NO APPROACH`, invisible there, and the MSG light flashes indefinitely. MSG shows the
+  message on the MSG page and on the status line; the MSG page keeps listing it after the status line clears, and the
+  light goes off when the status line clears. Leaving Super NAV 5 for another page shows it on the status line for 5 s.
+  Reading it does not stop the flashing. The message stays after its cause is gone.
+- The 5 s run on a wall clock from the first time the status line shows the message, also while it is hidden again, and
+  the expiry takes effect only while the status line is visible: closed at 2.3 s and reopened at 3.5 s, it cleared at
+  5.1 s; reopened after 8.5 s, it cleared at once, still listed on the MSG page, light off.
+- A message posted while the MSG page is open shows on the status line but is not added to the open page; reopening
+  within the 5 s lists it.
+- On the MSG page the entry is a single line at column 0, in normal video; the status line shows it inverse. With only
+  read messages left after it clears, the light is steady.
+- A second, different message within the 5 s replaces the text but clears 5 s after the first one's first display, and in
+  the one usable sample only the first was listed (low). The same message twice gives one entry and no restart. The
+  maintainer ruled the case too rare to trust the trainer on, so the simulation gives the second message its own 5 s and
+  lists only it (pinned as a characterization test). The same message twice also replaces the entry and restarts its
+  5 s there, as the status line always did; the trainer's no-restart is not copied.
+- `D-> CRS 308` was listed as `D-> CRS`; in one sample the entry was listed below an older message. The simulation lists
+  the text as the status line shows it and keeps the newest first, as for every message (the builder's call).
+- The trainer has a DME arc (KFLD VORD 36) but answers CLR on it with `INVALID DEL` on FPL 0 and offers no MOVE ? on
+  Super NAV 5 either, so it never implemented the function and says nothing about #134.
+- The KLN 89 trainer does not list scratchpad messages on its message page; its scratchpad is always visible, so it
+  never needs to (the maintainer).
+- Outcome: #237 implemented for every status line message, as the 90B trainer shows it.

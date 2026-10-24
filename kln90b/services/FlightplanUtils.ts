@@ -127,6 +127,8 @@ export function moveArcEntry(bus: EventBus, fpl: Flightplan, idx: number, active
     }
     const newData = SidStar.recalculateArcEntryData(leg, sensors);
     if (newData === null) {
+        //6-18 and C-2 put NO INTRCEPT in the scratch pad. Super NAV 5 hides the status line, so the message also reaches the
+        //MSG page and flashes the MSG light until the status line has shown it (StatusLine.showMessage, #237)
         bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO INTRCEPT");
         return false;
     }

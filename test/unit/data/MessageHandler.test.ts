@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {Message, MessageHandler, OneTimeMessage} from '../../../kln90b/data/MessageHandler';
+import {Message, MessageHandler, OneTimeMessage, ScratchpadMessage} from '../../../kln90b/data/MessageHandler';
 
 /** A persistent message whose condition the test switches */
 class Condition implements Message {
@@ -213,5 +213,45 @@ describe('MessageHandler.clear and the seen flags (#351)', () => {
 
         expect(texts(handler)).toEqual(['HOLDS']);
         expect(handler.hasUnreadMessages()).toBe(true);
+    });
+});
+
+// #237: a status line message is also an entry of the MSG page. The status line posts, times and ends it
+describe('MessageHandler, scratchpad messages (#237)', () => {
+    // AVsoftech 90B trainer, 2026-10-24: reading the entry does not stop the MSG prompt from flashing
+    it('a scratchpad message never counts as read (#237)', () => {
+        const handler = new MessageHandler();
+        const message = new ScratchpadMessage('NO APPROACH');
+        handler.addMessage(message);
+
+        message.seen = true;
+
+        expect(message.seen).toBe(false);
+        expect(handler.hasUnreadMessages()).toBe(true);
+    });
+
+    it('removes a message at once with removeMessage (#237)', () => {
+        const handler = new MessageHandler();
+        const first = new ScratchpadMessage('NO APPROACH');
+        const second = new ScratchpadMessage('INVALID ENT');
+        handler.addMessage(first);
+        handler.addMessage(second);
+
+        handler.removeMessage(first);
+
+        expect(texts(handler)).toEqual(['INVALID ENT']);
+    });
+
+    it('drops an ended scratchpad message at the next tick (#237)', () => {
+        const handler = new MessageHandler();
+        const message = new ScratchpadMessage('NO APPROACH');
+        handler.addMessage(message);
+        handler.tick();
+        expect(handler.hasMessages()).toBe(true); // the precondition: it stays while it has not ended
+
+        message.ended = true;
+        handler.tick();
+
+        expect(handler.hasMessages()).toBe(false);
     });
 });

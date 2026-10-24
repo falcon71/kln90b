@@ -30,6 +30,35 @@ export class OneTimeMessage implements Message {
     }
 }
 
+/**
+ * A status line message (3-10) is also an entry on the MSG page (AVsoftech 90B trainer, 2026-10-24), so that a pilot who
+ * could not see it, on Super NAV 5, can still read it. The status line posts it, counts its 5 seconds and ends it. It never
+ * counts as read: reading it does not stop the MSG prompt from flashing, only the status line clearing it does (3-16).
+ */
+export class ScratchpadMessage implements Message {
+
+    public readonly message: string[];
+    /** The time the status line has shown it, null until its first visible display tick */
+    public elapsedMs: number | null = null;
+    public ended: boolean = false;
+
+    constructor(text: string) {
+        this.message = [text];
+    }
+
+    public get seen(): boolean {
+        return false;
+    }
+
+    public set seen(_value: boolean) {
+        //never read
+    }
+
+    public isConditionValid(): boolean {
+        return !this.ended;
+    }
+}
+
 export class MessageHandler implements CalcTickable {
 
     //A lot of messages depent on state. All those messages are kept here
@@ -51,6 +80,14 @@ export class MessageHandler implements CalcTickable {
 
     public addMessage(message: Message): void {
         this.activeMessages.push(message);
+    }
+
+    /**
+     * Removes a message at once. The 1 Hz tick would drop an ended one only at its next run, which would leave the MSG
+     * light on for up to a second after the status line cleared it
+     */
+    public removeMessage(message: Message): void {
+        this.activeMessages = this.activeMessages.filter(m => m !== message);
     }
 
     /**

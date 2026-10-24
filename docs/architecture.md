@@ -882,6 +882,11 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - **Status-line transient messages** are a separate channel. Publish `statusLineMessage` (`StatusLineMessageEvents`)
   with a `KLNErrorMessage` literal; it is a typed string union in `StatusLine.tsx` (`"NO APPROACH"`,
   `"USR DB FULL"`, ...). Add new strings to the union.
+    - Each one is also a `ScratchpadMessage` in the `MessageHandler`, so the MSG page lists it and the MSG light flashes
+      for it (AVsoftech 90B trainer, 2026-10-24, #237). It never counts as read. `StatusLine` counts its 5 seconds from
+      the first display tick in which the status line is visible, the clock runs on while Super NAV 5 hides it, and the
+      message ends and is removed (`removeMessage`) only while the status line is visible. A newer message replaces the
+      older one. `StatusLine.destroy` removes the entry.
 - The WPT alert light is steady (a video contradicts the manual's "flashing") and comes from `navPage.waypointAlert`.
   The annunciator test LVar and `GPS APPROACH MODE=3` are used during the self-test.
 
@@ -1356,7 +1361,8 @@ export class Set3Page extends SixLineHalfPage {
     - else `msg` plain while the message page is open.
 - Short error messages: publish `bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO SUCH WPT")`.
   The value is typed `KLNErrorMessage` (union: `INVALID ENT`, `DUP IDENT`, `NO APT WPTS`, `FPL FULL`, ...). It shows
-  inverted for `STATUS_MESSAGE_TIME = 5000` ms (manual 3-10). Non-standard texts are cast `as any` (e.g.
+  inverted for `STATUS_MESSAGE_TIME = 5000` ms (manual 3-10); the MSG page lists it too (see the status-line transient
+  messages in Core 9, #237). Non-standard texts are cast `as any` (e.g.
   `` `d› CRS ${obs}` `` in `DirectToPage`).
 - The status line also drives the annunciator `sensors.out.setMessageLight` (flashing or steady). It special-cases
   `"SET 0"` (blank mode and right name, 3-7).

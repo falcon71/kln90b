@@ -5,8 +5,12 @@ import {courseDeg} from '../../harness/flight/geo';
 import {blinkCycle} from '../../harness/render/blink';
 import {Screen} from '../../harness/render/screen';
 import {messages} from '../../harness/readers';
-import {NO_ALTIMETER, NO_OBS, panelXml} from '../../harness/panelXml';
+import {APR_ARM_SWITCH, NO_ALTIMETER, NO_OBS, panelXml} from '../../harness/panelXml';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
+import {showSuperNav5, SuperNav5} from '../../harness/render/superNav5';
+import {EVT_APPR_ARM} from '../../../kln90b/HEvents';
+import {StatusLineMessageEvents} from '../../../kln90b/controls/StatusLine';
+import {NullPage} from '../../../kln90b/pages/NullPage';
 
 /** The values L:KLN90B_MsgLight takes over 8 display ticks (250 ms each), two seconds */
 async function msgLightOverTwoSeconds(unit: HeadlessUnit): Promise<Set<number>> {
@@ -303,4 +307,192 @@ describe('status line after an ENT prompt (#320)', () => {
 
             expect(await overTwoSeconds(prompt)).toEqual(new Set(['msg III']));
         });
+});
+
+// The AVsoftech 90B trainer (third party, unreliable; the maintainer and agent checks, 2026-10-24, see
+// docs/kln89-trainer-record.md) lists every status line message on the MSG page and flashes the MSG light until the status
+// line has shown it for 5 s; Super NAV 5 hides the status line, so there the message waits. 3-10 gives the status line and 3-16
+// the MSG page.
+//
+// NO APPROACH is the trigger: the approach arm button without an approach (6-1, C-1). Timing: a press advances 250 ms and
+// the display ticks run every 250 ms, so the message is first shown by a display tick up to 250 ms after the press and ends
+// at the display tick 5 s after that, between 5.0 and 5.25 s after the press. Every "still shown" check below sits at 4.5 s
+// or earlier from the press, and every "gone" check at 5.75 s or later, 500 ms clear of that window.
+describe('scratchpad messages on the MSG page (AVsoftech 90B trainer, 2026-10-24, #237)', () => {
+    /** A unit with the approach arm switch, no flight plan and the boot messages read, so that nothing else holds the light */
+    async function armUnit(): Promise<HeadlessUnit> {
+        const unit = await bootUnit({panelXml: panelXml(APR_ARM_SWITCH)});
+        await settle(unit);
+        await unit.panel.readMessages();
+        expect(messages(unit)).toEqual([]); // the precondition: the list is empty
+        return unit;
+    }
+
+    const status = () => Screen.read().status().mode;
+    const msgPageRow0 = () => Screen.read().row(0).trim();
+    const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
+
+    it('flashes the MSG light while it shows and goes dark when it clears (#237)', async () => {
+        const unit = await armUnit();
+
+        await unit.panel.press(EVT_APPR_ARM); // 0.25 s after the press
+        expect(status()).toBe('NO APPROACH');
+        expect(await msgLightOverTwoSeconds(unit)).toEqual(new Set([0, 1])); // to 2.25 s
+        await wait(3750); // 6 s
+
+        expect(status()).not.toBe('NO APPROACH');
+        expect(messages(unit)).not.toContain('NO APPROACH');
+        expect(await msgLightOverTwoSeconds(unit)).toEqual(new Set([0]));
+    });
+
+    it('lists it on the MSG page and keeps it there after the status line clears (#237)', async () => {
+        const unit = await armUnit();
+        await unit.panel.press(EVT_APPR_ARM);
+
+        await unit.panel.msg(); // 0.5 s
+        expect(msgPageRow0()).toBe('NO APPROACH');
+        expect(status()).toBe('NO APPROACH');
+        await wait(5500); // 6 s
+
+        expect(msgPageRow0()).toBe('NO APPROACH');
+        expect(status()).not.toBe('NO APPROACH');
+    });
+
+    it('keeps the light flashing after the MSG page has shown it (#237)', async () => {
+        const unit = await armUnit();
+        await unit.panel.press(EVT_APPR_ARM);
+        await unit.panel.msg();
+        await unit.panel.msg(); // the page is closed, 0.75 s
+
+        // A read entry would hold the light steady, this one flashes it
+        expect(await msgLightOverTwoSeconds(unit)).toEqual(new Set([0, 1])); // to 2.75 s
+    });
+
+    it('keeps the light flashing on Super NAV 5 past 5 s (#237)', async () => {
+        const unit = await armUnit();
+        await showSuperNav5(unit);
+
+        await unit.panel.press(EVT_APPR_ARM);
+        await wait(10000);
+
+        expect(await msgLightOverTwoSeconds(unit)).toEqual(new Set([0, 1]));
+        expect(messages(unit)).toContain('NO APPROACH');
+        expect(SuperNav5.read().msg).toBe('msg');
+    });
+
+    // The 5 s run on while the status line is hidden again. A clock restarted at the second display (the MSG page closed at
+    // 2.25 s, reopened at 3.25 s) would still show the message at 6 s. That the clock starts at the first display and not at
+    // the post is the next test: this one opens the MSG page one tick after the press
+    it('keeps counting the 5 s while Super NAV 5 hides the status line again (#237)', async () => {
+        const unit = await armUnit();
+        await showSuperNav5(unit);
+        await unit.panel.press(EVT_APPR_ARM);
+
+        await unit.panel.msg(); // M = the start of this press, the first display tick within 250 ms of it; now M + 0.25 s
+        expect(status()).toBe('NO APPROACH');
+        await wait(1750);
+        await unit.panel.msg(); // closed, back on Super NAV 5: M + 2.25 s
+        await wait(750);
+        await unit.panel.msg(); // reopened: M + 3.25 s
+        expect(status()).toBe('NO APPROACH');
+        await wait(1250); // M + 4.5 s
+        expect(status()).toBe('NO APPROACH');
+        await wait(1500); // M + 6 s
+
+        expect(status()).not.toBe('NO APPROACH');
+        expect(msgPageRow0()).toBe('NO APPROACH');
+    });
+
+    // 3-10 and the trainer (2026-10-24): leaving Super NAV 5 shows the message on the status line for 5 s, however long it
+    // waited, so the clock starts at the first visible display and not at the post. M is the start of the MSG press; the
+    // first visible display tick is within 250 ms after it and the message ends 5 s after that, between M + 5.0 and
+    // M + 5.25 s: shown at M + 4.5 s, gone at M + 6 s (500 ms clear of the window)
+    it('shows it for 5 s from the first visible display, after it waited more than 5 s on Super NAV 5 (#237)', async () => {
+        const unit = await armUnit();
+        await showSuperNav5(unit);
+        await unit.panel.press(EVT_APPR_ARM);
+        await wait(8000); // the status line has been hidden for more than 5 s
+
+        await unit.panel.msg(); // M + 0.25 s
+        expect(status()).toBe('NO APPROACH');
+        await wait(4250); // M + 4.5 s
+        expect(status()).toBe('NO APPROACH');
+        await wait(1500); // M + 6 s
+
+        expect(status()).not.toBe('NO APPROACH');
+        expect(msgPageRow0()).toBe('NO APPROACH');
+    });
+
+    it('clears at once when the status line returns after more than 5 s, still listed (#237)', async () => {
+        const unit = await armUnit();
+        await showSuperNav5(unit);
+        await unit.panel.press(EVT_APPR_ARM);
+        await unit.panel.msg();
+        await wait(750);
+        await unit.panel.msg(); // closed, back on Super NAV 5
+        await wait(6000);
+        expect(await msgLightOverTwoSeconds(unit)).toEqual(new Set([0, 1])); // past 8 s, the entry waits
+
+        await unit.panel.msg();
+
+        expect(msgPageRow0()).toBe('NO APPROACH');
+        expect(status()).not.toBe('NO APPROACH');
+        expect(await msgLightOverTwoSeconds(unit)).toEqual(new Set([0]));
+    });
+
+    it('does not add a message posted while the MSG page is open to the open page (#237)', async () => {
+        const unit = await armUnit();
+        await unit.panel.msg(); // the empty MSG page
+
+        await unit.panel.press(EVT_APPR_ARM);
+
+        expect(status()).toBe('NO APPROACH');
+        expect(Screen.read().text().split('\n').slice(0, 6).map(r => r.trim())).toEqual(['', '', '', '', '', '']);
+        await unit.panel.msg(); // closed
+        await unit.panel.msg(); // reopened within the 5 s
+        expect(msgPageRow0()).toBe('NO APPROACH');
+    });
+
+    it('drops the scratchpad entry at a power cycle (#237)', async () => {
+        const unit = await armUnit();
+        await unit.panel.press(EVT_APPR_ARM);
+        expect(messages(unit)).toContain('NO APPROACH'); // the precondition
+
+        await unit.panel.powerCycle();
+        await unit.panel.approveSelfTest();
+
+        expect(messages(unit)).not.toContain('NO APPROACH');
+    });
+
+    // The screen change is the one a power-off makes: the page manager replaces the main page with the null page
+    it('drops the entry when its status line is destroyed (#237)', async () => {
+        const unit = await armUnit();
+        await unit.panel.press(EVT_APPR_ARM);
+        expect(messages(unit)).toContain('NO APPROACH'); // the precondition
+
+        unit.props.pageManager.setCurrentPage(NullPage, {});
+
+        expect(messages(unit)).not.toContain('NO APPROACH');
+    });
+
+    // The AVsoftech 90B trainer instead clears the second message 5 s after the first one's first display, and in its one
+    // usable sample listed only the first. That case is too rare to trust the trainer on (the maintainer, 2026-10-24), so
+    // the unit does the simpler thing: the newest message replaces the older, with its own 5 s, and only it is listed.
+    it('characterization: a second message replaces the first, with its own 5 s, and only it is listed (#237)', async () => {
+        const unit = await armUnit();
+        await unit.panel.press(EVT_APPR_ARM); // P, now P + 0.25 s
+        await wait(2750); // P + 3 s
+
+        unit.props.bus.getPublisher<StatusLineMessageEvents>().pub('statusLineMessage', 'INVALID ENT');
+        await wait(4000); // P + 7 s: the first one's clock would have ended it, the second one's has not
+
+        expect(status()).toBe('INVALID ENT');
+        expect(messages(unit)).toContain('INVALID ENT');
+        expect(messages(unit)).not.toContain('NO APPROACH');
+        await wait(1750); // P + 8.75 s: 5.75 s after the second, clear of its end at 5 to 5.25 s
+
+        expect(status()).not.toBe('INVALID ENT');
+        expect(status()).not.toBe('NO APPROACH');
+        expect(messages(unit)).not.toContain('INVALID ENT');
+    });
 });

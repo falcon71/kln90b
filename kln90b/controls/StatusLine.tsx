@@ -4,6 +4,7 @@ import {NO_CHILDREN, Page, PageProps, UiElement} from "../pages/Page";
 import {NavMode} from "../data/VolatileMemory";
 import {format} from "numerable";
 import {roundBearing} from "../data/Coordinates";
+import {ScratchpadMessage} from "../data/MessageHandler";
 
 
 export interface StatusLineProps extends PageProps {
@@ -63,8 +64,8 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
     private readonly msgEntRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     private readonly statusLineMessageRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
-    private statusLineMessage: KLNErrorMessage | null = null;
-    private statusLineMessageTimer: number = 0;
+    //The message on the status line. It is also an entry of the MessageHandler, so the MSG page lists it
+    private scratchpad: ScratchpadMessage | null = null;
     private sub: Subscription;
 
     constructor(props: StatusLineProps) {
@@ -99,13 +100,9 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
             this.containerRef.instance.classList.add("d-none");
         }
 
-        if (this.statusLineMessageTimer > 0) {
-            this.statusLineMessageTimer -= TICK_TIME_DISPLAY;
-        } else {
-            this.statusLineMessage = null;
-        }
+        this.tickScratchpad();
 
-        if (this.statusLineMessage === null) {
+        if (this.scratchpad === null) {
             this.statusLineMessageRef.instance.classList.add("d-none");
             this.statusRef.instance.classList.remove("d-none");
 
@@ -141,7 +138,7 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
                 this.msgEntRef.instance.textContent = "   ";
             }
         } else {
-            this.statusLineMessageRef.instance.textContent = this.statusLineMessage.padEnd(11, " ");
+            this.statusLineMessageRef.instance.textContent = this.scratchpad.message[0].padEnd(11, " ");
             this.statusLineMessageRef.instance.classList.remove("d-none");
             this.statusRef.instance.classList.add("d-none");
         }
@@ -211,6 +208,7 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
     destroy() {
         console.log("destroy StatusLine");
         this.sub.destroy();
+        this.endScratchpad(); //a screen change or a power-off leaves no entry behind
         super.destroy();
     }
 
@@ -219,9 +217,42 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
      * @param message
      */
     public showMessage(message: KLNErrorMessage): void {
-        this.statusLineMessage = message;
-        this.statusLineMessageTimer = STATUS_MESSAGE_TIME;
+        //A newer message replaces the older one and gets its own 5 seconds. The AVsoftech 90B trainer keeps the first
+        //one's clock instead (2026-10-24, one sample), too rare to trust it on, see the characterization test
+        this.endScratchpad();
+        this.scratchpad = new ScratchpadMessage(message);
+        this.props.messageHandler.addMessage(this.scratchpad);
+    }
 
+    /**
+     * 3-10: a message stays on the status line for about 5 seconds, counted from the first time the status line shows it
+     * (AVsoftech 90B trainer, 2026-10-24). The clock runs on while Super NAV 5 hides the status line again, but the
+     * message ends only while the status line is visible, so it waits there, and clears at once when the status line
+     * returns. A message posted on a visible page stays on screen as long as it always did.
+     */
+    private tickScratchpad(): void {
+        const scratchpad = this.scratchpad;
+        if (scratchpad === null) {
+            return;
+        }
+        if (scratchpad.elapsedMs === null) {
+            if (this.isVisible) {
+                scratchpad.elapsedMs = 0;
+            }
+        } else {
+            scratchpad.elapsedMs += TICK_TIME_DISPLAY;
+        }
+        if (this.isVisible && scratchpad.elapsedMs !== null && scratchpad.elapsedMs >= STATUS_MESSAGE_TIME) {
+            this.endScratchpad(); //before the light and the prompt below, so that both follow on this tick
+        }
+    }
+
+    private endScratchpad(): void {
+        if (this.scratchpad !== null) {
+            this.scratchpad.ended = true;
+            this.props.messageHandler.removeMessage(this.scratchpad);
+            this.scratchpad = null;
+        }
     }
 
     private getModeString(): string {
