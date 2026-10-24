@@ -87,6 +87,16 @@ export class Vnav implements CalcTickable {
         }
     }
 
+    /**
+     * 5-8 step 5: an angle entered on ANGLE starts VNAV again at that angle, also when the cursor had already started
+     * it at the displayed angle (#418)
+     */
+    public setAngle(angle: Degrees): void {
+        this.navState.nav4VnavAngle = angle;
+        this.state = VnavState.Inactive;
+        this.armVnav();
+    }
+
     public disarmVnav(): void {
         this.navState.nav4VnavAngle = null;
         this.state = VnavState.Inactive;

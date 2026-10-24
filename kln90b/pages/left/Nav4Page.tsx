@@ -142,7 +142,7 @@ abstract class Nav4Page extends SixLineHalfPage {
     }
 
     private setVnavAngle(angle: Degrees): void {
-        this.props.memory.navPage.nav4VnavAngle = angle;
+        this.props.vnav.setAngle(angle);
     }
 
 

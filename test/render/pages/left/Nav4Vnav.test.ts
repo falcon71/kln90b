@@ -74,6 +74,21 @@ describe('NAV 4 VNAV', () => {
         expect(Screen.read().rows('L')[0]).toBe('VNV 7500ft ');
     });
 
+    // 5-8 step 5 (figures 5-26, 5-27): the cursor on ANGLE starts VNAV at -0.8, the inner knob then enters -1.8, and the
+    // top line becomes VNV ARMED: the start lies 62.8 - 29.33 = 33.47 NM ahead, 831 s at 145 kt (#418)
+    it('restarts VNAV at an angle entered after the cursor started it (5-8, #418)', async () => {
+        const unit = await bootAt(64.8);
+        await unit.panel.show('L', 'NAV 4');
+        await cursorToAngle(unit);
+        expect(Screen.read().rows('L')[0]).toBe('VNV 7500ft ');
+
+        await unit.panel.inner('L', 1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L')[0]).toBe('VNV ARMED  ');
+        expect(unit.props.memory.navPage.nav4VnavAngle).toBe(-1.8);
+    });
+
     // 5-8 (figure 5-27): with a programmed angle the top line shows VNV ARMED while the descent starts in more than
     // ten minutes: 62.8 - 29.33 = 33.47 NM before the start, 831 s at 145 kt
     it('shows VNV ARMED more than ten minutes before the descent (5-8)', async () => {

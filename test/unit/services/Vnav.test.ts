@@ -298,6 +298,59 @@ describe('Vnav states', () => {
         expect(vnav.state).toBe(VnavState.Inactive);
         expect(nav.nav4VnavAngle).toBeNull();
     });
+
+    // 5-8 step 5 (figures 5-26, 5-27): VNAV started at the displayed angle, then -1.8 entered on ANGLE: armed again,
+    // with (62.8 - 29.3271) NM at 160 kt = 753.1 s to the descent (#418)
+    it('re-arms an active VNAV at a new angle (5-8, #418)', () => {
+        const {vnav, nav} = dct({distToActive: 64.8, ind: 7500, offset: 2});
+        vnav.armVnav();
+        expect(vnav.state).toBe(VnavState.Active);
+
+        vnav.setAngle(-1.8);
+
+        expect(vnav.state).toBe(VnavState.Armed);
+        expect(nav.nav4VnavAngle).toBe(-1.8);
+        expect(vnav.timeToVnav).toBeCloseTo(753.1, 0);
+        expect(vnav.advisoryAltitude).toBeNull();
+    });
+
+    // KLN 89 trainer 2026-10-24: a VS shallower than required, so that the start lies behind the aircraft, gives a new
+    // advisory altitude at once. 29 NM to the target at -1.0: 1900 + tan(1 deg) * 29 NM = 4975.7 ft (#418)
+    it('starts at once on a shallower angle whose start lies behind (KLN 89 trainer, #418)', () => {
+        const {vnav} = dct({distToActive: 31, ind: 7500, offset: 2});
+        vnav.armVnav();
+        expect(vnav.state).toBe(VnavState.Active);
+
+        vnav.setAngle(-1.0);
+
+        expect(vnav.state).toBe(VnavState.Active);
+        expect(vnav.advisoryAltitude).toBeCloseTo(4975.7, 0);
+    });
+
+    // An armed VNAV takes a new angle too: -2.5 at 64.8 NM needs 5600 / tan(2.5 deg) = 21.109 NM, so the start is
+    // (62.8 - 21.109) NM away, 938.0 s at 160 kt (#418)
+    it('re-arms an armed VNAV at a new angle (#418)', () => {
+        const {vnav, nav} = dct({distToActive: 64.8, ind: 7500, offset: 2, angle: -1.8});
+        vnav.armVnav();
+        expect(vnav.state).toBe(VnavState.Armed);
+
+        vnav.setAngle(-2.5);
+
+        expect(vnav.state).toBe(VnavState.Armed);
+        expect(nav.nav4VnavAngle).toBe(-2.5);
+        expect(vnav.timeToVnav).toBeCloseTo(938.0, 0);
+    });
+
+    // characterization: an angle of 0.0 entered while active leaves VNAV inactive (#418)
+    it('leaves VNAV inactive on an angle of 0.0 (characterization, #418)', () => {
+        const {vnav} = dct({distToActive: 64.8, ind: 7500, offset: 2});
+        vnav.armVnav();
+        expect(vnav.state).toBe(VnavState.Active);
+
+        vnav.setAngle(0);
+
+        expect(vnav.state).toBe(VnavState.Inactive);
+    });
 });
 
 describe('Vnav.formatDuration', () => {
