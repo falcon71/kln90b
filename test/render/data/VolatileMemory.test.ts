@@ -827,6 +827,30 @@ describe('the waypoint pages over a power cycle and a sim restart (#192)', () =>
     });
 });
 
+// A power-on shows the first waypoint of the scan list on a page whose saved waypoint does not resolve. Only the SUP page
+// catches a lookup of that waypoint that rejects; on the APT, VOR, NDB and INT pages the rejection ends the power-on
+// before the memory is ready, and the unit stays on the Turn-On page (WelcomePage waits for it). The lookup of the
+// default intersection ZZXIN, the only one and so the first of the INT scan list, is made to reject here, as a database
+// facility the ident search returns but that does not load would
+describe('a first waypoint of a scan list that does not load (#416)', () => {
+    it.fails('leaves the Turn-On page when the first waypoint of the INT scan list does not load (#416)', async () => {
+        const getFacility = MemoryFacilityClient.prototype.getFacility;
+        const spy = vi.spyOn(MemoryFacilityClient.prototype, 'getFacility');
+        onTestFinished(() => spy.mockRestore());
+        spy.mockImplementation(function (this: MemoryFacilityClient, type, icao) {
+            const ident = typeof icao === 'string' ? ICAO.getIdentFromStringV1(icao) : icao.ident;
+            return ident === 'ZZXIN' ? Promise.reject(new Error('no facility ZZXIN')) : getFacility.call(this, type, icao);
+        });
+        const unit = await bootUnit(); // Engine running: the Turn-On page goes as soon as the memory is ready
+
+        await vi.advanceTimersByTimeAsync(20_000); // Past the 17 s of a Turn-On page that waits
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.props.memory.isReady).toBe(true);
+        expect(Screen.read().status().left).toBe('NAV 2');
+    });
+});
+
 // The trainers kept the TRI 1 waypoint (AVsoftech) and the trip waypoints of CAL 1 (KLN 89) over a power cycle
 // (2026-10-24, docs/kln89-trainer-record.md); they are user settings (#192), which survive a sim restart too
 describe('the TRI waypoints over a sim restart (#192)', () => {
