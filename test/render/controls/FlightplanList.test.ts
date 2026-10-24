@@ -575,4 +575,32 @@ describe('FlightplanList, MOVE ? on a DME arc entry (6-17, #134)', () => {
         expect(seen).toEqual(['INVALID DEL']);
         expect(showsMove()).toBe(false);
     });
+
+    // The arc is the active leg here: ARCEN is the active waypoint and the entry is its "from" waypoint. ActiveWaypoint
+    // keeps "from" as a copy, so the move leaves the old entry in it (#420, below). This control asserts the setup the
+    // pin relies on, and what the move does update
+    it('moves the entry of the active arc and keeps ARCEN as the active waypoint (#420 control)', async () => {
+        const {unit} = await moveQuestion();
+        const active = unit.props.memory.navPage.activeWaypoint;
+        expect(active.getActiveFplIdx()).toBe(1); // Precondition: ARCEN, the arc is the active leg
+        expect(active.getFromWpt()!.icaoStruct.ident).toBe('D225J'); // Precondition: the entry is the from waypoint
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(fplIdents(unit)[0]).toBe('D205J');
+        expect(active.getActiveFplIdx()).toBe(1);
+        expect(active.getActiveWpt()!.icaoStruct.ident).toBe('ARCEN');
+    });
+
+    // #420: the from waypoint of the active arc leg (NAV 1/NAV 3 from ident, the NAV 5 map line, the previous-waypoint GPS
+    // SimVars) stays the old entry after MOVE ? until the next sequence
+    it.fails('makes the moved entry the from waypoint of the active arc leg (#420)', async () => {
+        const {unit} = await moveQuestion();
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(unit.props.memory.navPage.activeWaypoint.getFromWpt()!.icaoStruct.ident).toBe('D205J');
+    });
 });
