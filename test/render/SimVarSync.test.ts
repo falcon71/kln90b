@@ -6,6 +6,7 @@ import {panelXml} from '../harness/panelXml';
 import {activeIdent} from '../harness/readers';
 import {bootOnStandardRoute} from '../harness/worldBoot';
 import {courseDeg} from '../harness/flight/geo';
+import {PowerEvent} from '../../kln90b/PowerSupply';
 
 const BLANK_ROW = ' '.repeat(23);
 
@@ -71,6 +72,15 @@ describe('ElectricitySimVar and L:KLN90B_ElectricitySimVarIndex (public contract
 
         unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
         await vi.advanceTimersByTimeAsync(3000);
+        expect(Screen.read().row(0)).toBe(BLANK_ROW);
+    });
+
+    // The first reading applies at once: a unit that loads without aircraft power must not show the Turn-On page while
+    // the ride-through of a loss that never happened runs out (#332)
+    it('applies the first reading at once: a unit booted without aircraft power stays dark (#332)', async () => {
+        await bootUnit({panelXml: CIRCUIT_XML});
+        await vi.advanceTimersByTimeAsync(200);
+
         expect(Screen.read().row(0)).toBe(BLANK_ROW);
     });
 
@@ -195,9 +205,9 @@ describe('aircraft power interruptions (maintenance manual)', () => {
         expect(Screen.read().row(0)).toBe(' GPS             ORS 20');
     });
 
-    // SimVarSync passes every change of the circuit to PowerSupply at once, so a loss of half a second power-cycles the
-    // unit: it restarts with the Turn-On page and the self-test
-    it.fails('rides through a 0.5 s loss of the aircraft power (maintenance manual, PDF 53) (#332)', async () => {
+    // PowerSupply carries a loss shorter than its ride-through (RIDE_THROUGH_TIME) on the battery module: the unit goes on
+    // running, with no Turn-On page and no self-test (#332)
+    it('rides through a 0.5 s loss of the aircraft power (maintenance manual, PDF 53) (#332)', async () => {
         const unit = await onCircuit();
         const cycles = unit.props.userSettings.getSetting('powercycles').value;
 
@@ -208,6 +218,121 @@ describe('aircraft power interruptions (maintenance manual)', () => {
 
         expect(Screen.read().status().left).toBe('NAV 2');
         expect(unit.props.userSettings.getSetting('powercycles').value).toBe(cycles);
+    });
+
+    // The boundary of the switch-over (PDF 79: about 1.5 s): 1.4 s is carried, 1.6 s is not
+    it('rides through a loss of 1.4 s (maintenance manual, PDF 79) (#332)', async () => {
+        const unit = await onCircuit();
+        const cycles = unit.props.userSettings.getSetting('powercycles').value;
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(1400);
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().status().left).toBe('NAV 2');
+        expect(unit.props.userSettings.getSetting('powercycles').value).toBe(cycles);
+    });
+
+    it('turns the unit off after a loss of 1.6 s (maintenance manual, PDF 79) (#332)', async () => {
+        const unit = await onCircuit();
+        const cycles = unit.props.userSettings.getSetting('powercycles').value;
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(1600);
+        expect(Screen.read().text()).toBe(Array.from({length: 7}, () => BLANK_ROW).join('\n'));
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(Screen.read().row(0)).toBe(' GPS             ORS 20');
+        expect(unit.props.userSettings.getSetting('powercycles').value).toBe(cycles + 1);
+    });
+
+    // No battery charge model: every short loss is carried on its own
+    it('rides through repeated short losses (#332)', async () => {
+        const unit = await onCircuit();
+        const cycles = unit.props.userSettings.getSetting('powercycles').value;
+
+        for (let i = 0; i < 3; i++) {
+            unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+            await vi.advanceTimersByTimeAsync(1000);
+            unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+            await vi.advanceTimersByTimeAsync(100);
+        }
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Screen.read().status().left).toBe('NAV 2');
+        expect(unit.props.userSettings.getSetting('powercycles').value).toBe(cycles);
+    });
+
+    // The loss the knob cut short is a loss for good: the knob coming on again must not power the unit from a supply that is
+    // gone, even before the next poll (SimVarSync reports the circuit every 100 ms) has said so
+    it('does not power the unit when the knob is turned on again during the loss that was ridden through (#332)', async () => {
+        const unit = await onCircuit();
+        const cycles = unit.props.userSettings.getSetting('powercycles').value;
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(500);
+        unit.send('KLN90B_Power_Off');
+        unit.send('KLN90B_Power_On');
+        await vi.advanceTimersByTimeAsync(50);
+
+        expect(unit.props.userSettings.getSetting('powercycles').value).toBe(cycles);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(Screen.read().text()).toBe(Array.from({length: 7}, () => BLANK_ROW).join('\n'));
+    });
+
+    // With the knob off nothing runs on the battery module, so a loss has nothing to carry and applies at once
+    it('applies a loss at once while the knob is off, so the knob does not power the unit afterwards (#332)', async () => {
+        const unit = await onCircuit();
+        const cycles = unit.props.userSettings.getSetting('powercycles').value;
+        await unit.panel.powerOff();
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(500);
+        await unit.panel.powerOn();
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(unit.props.userSettings.getSetting('powercycles').value).toBe(cycles);
+    });
+
+    // The off time of the power event counts from the moment the unit actually turned off, the end of the ride-through,
+    // not from the loss (the GPS advances its clock by it). The poll of the circuit is 100 ms, so the power-on event
+    // comes up to 100 ms after the circuit is restored
+    it('counts the off time from the end of the ride-through (#332)', async () => {
+        const unit = await onCircuit();
+        const events: {isPowered: boolean, timeSincePowerChange: number, at: number}[] = [];
+        unit.props.bus.getSubscriber<PowerEvent>().on('powerEvent').handle(e => events.push({...e, at: Date.now()}));
+        events.length = 0; // The bus replays the last power event on subscribing
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(events.map(e => e.isPowered)).toEqual([false]); // Precondition: the ride-through has ended
+        const turnedOffAt = events[0].at;
+
+        await vi.advanceTimersByTimeAsync(turnedOffAt + 10_000 - Date.now());
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(500);
+
+        const on = events.filter(e => e.isPowered);
+        expect(on.length).toBe(1);
+        expect(on[0].timeSincePowerChange).toBeGreaterThanOrEqual(10_000);
+        expect(on[0].timeSincePowerChange).toBeLessThanOrEqual(10_100);
+    });
+
+    // The knob acts at once: the battery module only bridges the aircraft power, the pilot's switch is still the switch
+    it('turns the unit off at once when the knob is turned off during a ride-through (#332)', async () => {
+        const unit = await onCircuit();
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(500);
+        await unit.panel.powerOff();
+        await vi.advanceTimersByTimeAsync(100);
+        expect(Screen.read().text()).toBe(Array.from({length: 7}, () => BLANK_ROW).join('\n'));
+
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(Screen.read().text()).toBe(Array.from({length: 7}, () => BLANK_ROW).join('\n'));
     });
 });
 
@@ -363,13 +488,13 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
     // unit ignores the power H events (#138), so the circuit is its only power path
     const onCircuit = () => bootOnStandardRoute({panelXml: CIRCUIT_XML, simVars: [{name: 'CIRCUIT ON:1', unit: 'bool', value: 1}]});
 
-    it('the sibling: a loss of the aircraft power claims the GPS of an enabled unit at once', async () => {
+    it('the sibling: a loss of the aircraft power claims the GPS of an enabled unit when the ride-through ends', async () => {
         const unit = await onCircuit();
         const sim = unit.env.sim;
         sim.set('GPS OVERRIDDEN', 'bool', false); // As another device would
 
         sim.set('CIRCUIT ON:1', 'bool', false);
-        await vi.advanceTimersByTimeAsync(300);
+        await vi.advanceTimersByTimeAsync(2000);
 
         expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
     });
@@ -389,6 +514,41 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
         expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
     });
 
+    // A loss shorter than the ride-through is no power change, so there is nothing to claim either (#332)
+    it('stays released through a short power loss while disabled (#350, #332)', async () => {
+        const unit = await onCircuit();
+        const sim = unit.env.sim;
+        sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+
+        const cycles = unit.props.userSettings.getSetting('powercycles').value;
+
+        sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(1000);
+        sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0);
+        expect(unit.props.userSettings.getSetting('powercycles').value).toBe(cycles); // Carried: no power cycle
+    });
+
+    // The sibling of the assertion above: a disabled unit does count the cycle of a loss beyond the ride-through, so that
+    // the unchanged count above is meaningful
+    it('counts a power cycle for a long power loss while disabled (#332)', async () => {
+        const unit = await onCircuit();
+        const sim = unit.env.sim;
+        sim.set('L:KLN90B_Disabled', 'bool', true);
+        await vi.advanceTimersByTimeAsync(300);
+        const cycles = unit.props.userSettings.getSetting('powercycles').value;
+
+        sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(2000);
+        sim.set('CIRCUIT ON:1', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.userSettings.getSetting('powercycles').value).toBe(cycles + 1);
+    });
+
     it('claims the GPS on the resume after the aircraft power went off and came back while disabled (#350)', async () => {
         const unit = await onCircuit();
         const sim = unit.env.sim;
@@ -406,8 +566,8 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
     });
 
     // The maintainer's ruling: the gates read Hardware.isDisabled, never the LVar (see the read count of #138 below). The
-    // gate of the power change (SensorsOut.reset) runs on each of the two circuit changes: two seconds of polls, ten per
-    // second, and no read of its own
+    // gate of the power change (SensorsOut.reset) runs on each of the two power changes (the loss counts when the
+    // ride-through of 1.5 s ends): three seconds of polls, ten per second, and no read of its own
     it('reads L:KLN90B_Disabled only in the poll, also when the aircraft power changes (#350)', async () => {
         const unit = await onCircuit();
         const sim = unit.env.sim;
@@ -417,11 +577,11 @@ describe('GPS OVERRIDDEN while the unit is disabled (public contract)', () => {
         onTestFinished(() => read.mockRestore()); // A second spyOn on the method would return this one with its calls
 
         sim.set('CIRCUIT ON:1', 'bool', false);
-        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(2000);
         sim.set('CIRCUIT ON:1', 'bool', true);
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(read.mock.calls.filter(c => c[0] === 'L:KLN90B_Disabled').length).toBe(20);
+        expect(read.mock.calls.filter(c => c[0] === 'L:KLN90B_Disabled').length).toBe(30);
         expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(0); // Precondition: the power change did not claim the GPS
     });
 });

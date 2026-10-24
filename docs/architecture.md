@@ -99,6 +99,12 @@ arrives.
 - State is `powerSwitchOn` (the knob, mirrored to `L:KLN90B_Power`) AND `electricityAvailable`. `SimVarSync` sets
   `electricityAvailable` every 100 ms from `Input.ElectricitySimVar`; if that option is empty, power is always
   available.
+- **Ride-through** (#332): a loss of `electricityAvailable` while the unit is powered is carried by the unit's battery
+  module for `RIDE_THROUGH_TIME` (1.5 s, maintenance manual PDF 53, 54, 79, 107). Nothing changes meanwhile: no page, no
+  `powerEvent`, no `powercycles` increment, and the power coming back ends it. When it runs out the loss applies as an
+  ordinary power-off, so the `powerEvent` and its off time follow the actual power change, not the loss. The first
+  reading, a loss while the knob is off and the knob itself act at once; turning the knob off during a ride-through
+  ends it. `GPS OVERRIDDEN` stays claimed through it, because the running unit's `NavCalculator` claims it at 1 Hz.
 - On a power-on edge, `PowerSupply` increments the `powercycles` setting, calls
   `pageManager.setCurrentPage(WelcomePage, props)` and publishes **`powerEvent {isPowered, timeSincePowerChange}`**.
 - On a power-off edge, it shows the `NullPage` and publishes the same event.

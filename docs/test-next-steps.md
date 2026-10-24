@@ -78,8 +78,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   `FlightplanEdit.test.ts`.
 - **A boot that leaves an `ElectricitySimVar` unit dark from the start.** The `simVars` boot option sets SimVars before
   `init` (section 4), but the circuit tests of `SimVarSync.test.ts` and `PowerSupply.test.ts` still boot powered, lose
-  power at the first `SimVarSync` tick and wait 3 s for the unit to go dark, beyond the ride-through a fix of #332 may
-  add.
+  power at the first `SimVarSync` tick and wait 3 s for the unit to go dark, beyond the 1.5 s ride-through of #332.
 - **Sampling an LVar.** Tests sample an LVar over display ticks with a hand-written loop (`SimVarSync.test.ts`,
   `StatusLine.test.ts`, `SelfTestLeftPage.test.ts`). A sampling helper would remove the pitfall; the counting half is
   `sim.writeCount(name)` (section 3).
@@ -256,7 +255,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
     - `TickController.setupLoops` starts new intervals without clearing the old ones. Only the dedup upstream
       (`PowerSupply` publishes a power event on a change only, `SimVarSync` dedups its enable and disable) keeps a second
       power-on event from doubling every loop, the symptom of #24. That early return of `PowerSupply.refreshPowerState`
-      (`PowerSupply.ts:122`) is not run by any test.
+      (`PowerSupply.ts:184-186`) is not run by any test.
     - H events sent before `KLN90BCore.init()` are dropped (`7b4465d`), an early power-on included: `KLN90B_Power_On`
       before `init()` leaves a cold-and-dark unit off. The `hEvent` topic is also dropped until
       `hEventPublisher.startPublish()`. Whether an aircraft's early power-on should be kept is open.
@@ -292,8 +291,8 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 ## Across the suite
 
 - **Flip the pins when the bugs are fixed:** remove `.fails` from the tests that `grep -rn "it.fails" test/` lists, each
-  of which names its issue. A fix that touches other tests: a fix of #332 with a ride-through above about 1.5 s needs
-  the 3 s waits of the circuit tests raised.
+  of which names its issue. A change that touches other tests: raising the ride-through of #332 (1.5 s) much further
+  needs the 3 s waits of the circuit tests raised.
 - **Open questions for the KLN 89 trainer** (the maintainer starts the VM): duplicate idents on a waypoint
   page (2026-10-08, T20, not done), and the empty top row of FPL 0 with the first waypoint active (above). #162 and
   #163 are no open questions: the trainer shows neither ARM nor ACTV, so the maintainer's rulings settle them and the
