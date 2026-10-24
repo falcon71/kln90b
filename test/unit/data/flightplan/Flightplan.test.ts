@@ -173,6 +173,21 @@ describe('Flightplan copies', () => {
         expect(identsOf(target.getLegs())).toEqual(['KBBB', 'ABC', 'KAAA']);
     });
 
+    // #378 (design §6): the EFB route import loads FPL 0 with its SID, STAR and approach, which load drops
+    it('loadLegs keeps procedure legs and publishes once', () => {
+        const {fpl, events} = planWithEvents(0, [user(D)]);
+        const legs = [user(A), proc(B, KLNLegType.SID), user(C), proc(D, KLNLegType.STAR), proc(A, KLNLegType.APP), user(C)];
+
+        fpl.loadLegs(legs);
+        legs.pop(); // The plan holds its own array
+
+        expect(identsOf(fpl.getLegs())).toEqual(['KAAA', 'ABC', 'KBBB', 'DEF', 'KAAA', 'KBBB']);
+        expect(fpl.getLegs().map(l => l.type)).toEqual([
+            KLNLegType.USER, KLNLegType.SID, KLNLegType.USER, KLNLegType.STAR, KLNLegType.APP, KLNLegType.USER,
+        ]);
+        expect(events).toEqual([fpl]);
+    });
+
     it('delete empties the plan (4-5)', () => {
         const {fpl} = planWithEvents(4, [user(A), user(B)]);
 

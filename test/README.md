@@ -277,6 +277,11 @@ resolves, like a sim with no EFB.
   (its ICAO is the fix), `{lat, lon}`, which the unit imports as a temporary user waypoint (region `XY`),
   `{pbd: {reference, bearing, distance, name}}` (a point-bearing-distance leg), `{fix, via}` (the exit fix of the
   airway `via`; add the airway with `unit.navdata.addAirway`) or `{ppos: true}` (a present-position leg).
+- The procedure fields of `efbRoute` name the procedures as the EFB does, and each is left empty when omitted: `sid` and
+  `arrival` (the procedure names), `departureTransition` and `arrivalTransition`, `departureRunway` and
+  `destinationRunway` (a runway as `'27'` or `'09R'`), and `approach` (`{type, runway, suffix}`, with an `ApproachType`
+  and the runway `''` for a circling approach) with `approachTransition` (its IAF). `departure` and `destination` stay
+  the airports.
 
 ## Procedures
 

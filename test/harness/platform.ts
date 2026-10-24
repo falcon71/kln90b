@@ -1,10 +1,13 @@
 import {
+    ApproachUtils,
     EventBus,
     Facility,
     FlightPlanRoute,
     FlightPlanRouteManager,
     FlightPlanRouteUtils,
     ReadonlyFlightPlanRoute,
+    RunwayIdentifier,
+    RunwayUtils,
     SubEvent,
     Subject,
 } from '@microsoft/msfs-sdk';
@@ -61,6 +64,28 @@ export interface EfbRouteSpec {
     departure?: Facility;
     destination?: Facility;
     enroute?: EfbEnrouteSpec[];
+    /** The name of the SID (the route's `departure`; here `departure` is the airport) */
+    sid?: string;
+    departureTransition?: string;
+    /** The runway of the SID: '27', '09R' */
+    departureRunway?: string;
+    /** The name of the STAR */
+    arrival?: string;
+    arrivalTransition?: string;
+    /** The runway of the STAR: '27', '09R' */
+    destinationRunway?: string;
+    /**
+     * The approach as the EFB names it: an ApproachType global, the runway ('27', '27L', '' for circling) and the
+     * suffix
+     */
+    approach?: { type: ApproachType; runway: string; suffix?: string };
+    /** The IAF of the approach */
+    approachTransition?: string;
+}
+
+/** A runway as the EFB names it: '09R' is the number '09' and the designator 'R' */
+function runwayIdentifier(runway: string): RunwayIdentifier {
+    return {...RunwayUtils.emptyIdentifier(), number: runway.slice(0, 2), designator: runway.slice(2)};
 }
 
 /** A route as the EFB syncs it, built on the SDK's empty route so that every field the unit may read exists */
@@ -68,6 +93,21 @@ export function efbRoute(spec: EfbRouteSpec): FlightPlanRoute {
     const route = FlightPlanRouteUtils.emptyRoute();
     if (spec.departure !== undefined) route.departureAirport = spec.departure.icaoStruct;
     if (spec.destination !== undefined) route.destinationAirport = spec.destination.icaoStruct;
+    route.departure = spec.sid ?? '';
+    route.departureTransition = spec.departureTransition ?? '';
+    if (spec.departureRunway !== undefined) route.departureRunway = runwayIdentifier(spec.departureRunway);
+    route.arrival = spec.arrival ?? '';
+    route.arrivalTransition = spec.arrivalTransition ?? '';
+    if (spec.destinationRunway !== undefined) route.destinationRunway = runwayIdentifier(spec.destinationRunway);
+    if (spec.approach !== undefined) {
+        route.approach = {
+            ...ApproachUtils.emptyIdentifier(),
+            type: ApproachUtils.typeToName(spec.approach.type),
+            runway: runwayIdentifier(spec.approach.runway),
+            suffix: spec.approach.suffix ?? '',
+        };
+    }
+    route.approachTransition = spec.approachTransition ?? '';
     for (const point of spec.enroute ?? []) {
         const leg = FlightPlanRouteUtils.emptyEnrouteLeg();
         if ('icaoStruct' in point) {

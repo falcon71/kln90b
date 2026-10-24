@@ -386,9 +386,15 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
       and point-bearing-distance legs become temporary user waypoints in region `XY`, except a lat/lon leg whose
       `fixIcao` names, by region and ident, a user or temporary waypoint the unit holds: the saver sends those as lat/lon
       legs of type U, and they come back as themselves with the stored position, #187. An airway leg (`via`) is
-      expanded into the airway's fixes between the fix before it and its exit. The temporary waypoints this import
-      created for legs the fit cut are removed again, and an import overtaken by a newer route has no effect. While
-      `Hardware.isDisabled` is set the request goes unanswered (#353) and the synced route is dropped (#188).
+      expanded into the airway's fixes between the fix before it and its exit (after a SID, from its last fix). The
+      SID, STAR and approach (#378) are found by name with the SDK's `AirportUtils` and converted with `SidStar`, as
+      APT 7/8 load them; one that APT 7/8 would not have let the pilot load as the route names it (not in their list, or
+      a runway, transition or IAF the flow would ask for and the route does not give) is skipped with its legs
+      reported. `fitEfbRoute` takes each procedure whole or not at all, and `Flightplan.loadLegs` loads FPL 0 with them.
+      The temporary waypoints this import created for legs the fit cut, and the DME arc entries of procedures it cut or
+      skipped, are removed again. An import overtaken by a newer route neither loads FPL 0 nor reports anything;
+      temporary waypoints it already created stay until the power-on cleanup (5-22). While `Hardware.isDisabled` is
+      set the request goes unanswered (#353) and the synced route is dropped (#188).
 - The ticks that write the L:KLN90B_* outputs stop with the power, so `SensorsOut.setPoweredOff()` writes their zero
   state once on a power-off: `L:KLN90B_RollCommand` 0, `L:KLN90B_HSI_TF_FLAGS` 0 (flagged) and the MSG, WPT and annunciator
   test lights false, `L:KLN90B_IntegrityWarn` 0, `L:KLN90B_GPS_WP_BEARING` 0 and `L:KLN90B_XTK` 0, whatever `writeGPSSimVars` says. It also discharges the D-bar filter, so `GPS WP CROSS TRK` starts from 0 after the next power-on. A unit that is only disabled for hot swapping keeps its values, but a power-off while disabled zeroes them too.

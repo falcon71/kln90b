@@ -10,10 +10,12 @@ import {Hardware} from "../Hardware";
 import {EfbRouteResolver} from "./EfbRouteResolver";
 import {fitEfbRoute} from "./EfbRouteFit";
 import {TemporaryWaypointDeleter} from "./TemporaryWaypointDeleter";
+import {SidStar} from "../data/navdata/SidStar";
 
 /**
  * Imports routes from the EFB into the KLN. The route is resolved first (EfbRouteResolver), then fitted into the
- * limits of FPL 0 in one step (fitEfbRoute, #195)
+ * limits of FPL 0 in one step (fitEfbRoute, #195). FPL 0 gets the SID, STAR and approach of the route where APT 7/8
+ * would have let the pilot load them (#378)
  */
 export class KlnEfbLoader extends Flightplanloader {
 
@@ -22,10 +24,10 @@ export class KlnEfbLoader extends Flightplanloader {
     /** Counts the imports, so that one overtaken by a newer route can tell */
     private loadOpId = 0;
 
-    constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler, private readonly flightPlanRouteManager: FlightPlanRouteManager, private readonly flightplans: Flightplan[], private readonly pageManager: PageManager, private readonly facilityRepository: KLNFacilityRepository, private readonly hardware: Hardware) {
+    constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler, private readonly flightPlanRouteManager: FlightPlanRouteManager, private readonly flightplans: Flightplan[], private readonly pageManager: PageManager, private readonly facilityRepository: KLNFacilityRepository, private readonly hardware: Hardware, sidstar: SidStar) {
         super(bus, facilityLoader, messageHandler);
         this.fpl0 = flightplans[0];
-        this.resolver = new EfbRouteResolver(bus, facilityLoader, facilityRepository);
+        this.resolver = new EfbRouteResolver(bus, facilityLoader, facilityRepository, sidstar);
         this.flightPlanRouteManager.syncedAvionicsRoute.sub(this.loadRoute.bind(this));
     }
 
@@ -53,11 +55,8 @@ export class KlnEfbLoader extends Flightplanloader {
         }
 
         const fit = fitEfbRoute(resolved);
-        const fpl = new Flightplan(0, fit.legs, this.bus);
-        console.log("Route loaded", fpl);
-        this.fpl0.load(fpl);
-
-        //TODO would be nice, if we could add SID and STAR here
+        console.log("Route loaded", fit.legs);
+        this.fpl0.loadLegs(fit.legs); //#378: with the procedures
 
         this.removeUnusedWaypoints(resolved.createdWaypoints);
         this.addDeletedMessages(fit.deleted.map(ident => new OneTimeMessage([`WAYPOINT ${ident} DELETED`])));
@@ -72,10 +71,10 @@ export class KlnEfbLoader extends Flightplanloader {
     }
 
     /**
-     * Design §6: removes the waypoints this import created that no flight plan uses, the temporary waypoints of legs the
-     * fit cut, so that OTH 3 does not list them. Nothing else in the repository is touched: a waypoint that was there
-     * before, or that the pilot creates while the route resolves, stays (the power-on cleanup, 5-22, takes the unused
-     * temporary ones)
+     * Design §6: removes the waypoints this import created that no flight plan uses, the temporary waypoints of legs
+     * the fit cut and the DME arc entries of procedures it cut or skipped, so that OTH 3 does not list them. Nothing
+     * else in the repository is touched: a waypoint that was there before, or that the pilot creates while the route
+     * resolves, stays (the power-on cleanup, 5-22, takes the unused temporary ones)
      */
     private removeUnusedWaypoints(created: Facility[]): void {
         for (const fac of created) {

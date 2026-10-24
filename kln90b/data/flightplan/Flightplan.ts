@@ -183,6 +183,16 @@ export class Flightplan {
         this.publisher.pub("flightplanChanged", this);
     }
 
+    /**
+     * #378: replaces all legs, procedures included, and publishes once. Unlike `load`, which copies a numbered plan and
+     * drops its procedures (6-23), this is for the EFB route import, which loads FPL 0 with the SID, STAR and approach
+     * the unit can take. The caller ensures the limits (fitEfbRoute)
+     */
+    public loadLegs(legs: KLNFlightplanLeg[]): void {
+        this.legs = [...legs];
+        this.publisher.pub("flightplanChanged", this);
+    }
+
     public loadInverted(fpl: Flightplan) {
         this.legs = [...fpl.legs];
         this.legs.reverse();

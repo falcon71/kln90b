@@ -387,7 +387,7 @@ export class KLN90BCore {
 
         this.platform.getRouteManager().then(manager => {
             this.efbSaver = new KlnEfbSaver(this.planeSettings!, manager, flightplans[0], this.hardware);
-            this.efbLoader = new KlnEfbLoader(this.bus, facilityLoader, this.messageHandler, manager, flightplans, this.pageManager, facilityRepository, this.hardware);
+            this.efbLoader = new KlnEfbLoader(this.bus, facilityLoader, this.messageHandler, manager, flightplans, this.pageManager, facilityRepository, this.hardware, sidstar);
         });
 
         Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), msa.init(this.planeSettings.basePath)]).then(() => {

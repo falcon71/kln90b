@@ -1,7 +1,10 @@
-import {Facility, FacilityType, FlightPlanRoute, FlightPlanRouteUtils, ICAO, UserFacilityType, VorFacility} from '@microsoft/msfs-sdk';
+import {
+    ApproachProcedure, Facility, FacilityType, FixTypeFlags, FlightPlanLeg, FlightPlanRoute, FlightPlanRouteUtils, ICAO,
+    LegTurnDirection, Procedure, UserFacilityType, VorFacility,
+} from '@microsoft/msfs-sdk';
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
-import {efbRoute} from '../../harness/platform';
+import {efbRoute, EfbRouteSpec} from '../../harness/platform';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {Screen} from '../../harness/render/screen';
 import {savedFlightplan, savedUserWaypoints} from '../../harness/storage';
@@ -10,6 +13,9 @@ import {fplIdents, messages, userWaypoints} from '../../harness/readers';
 import {KLNFacilityRepository} from '../../../kln90b/data/navdata/KLNFacilityRepository';
 import {showSuperNav5} from '../../harness/render/superNav5';
 import {MessagePage} from '../../../kln90b/controls/MessagePage';
+import {approach, Leg, sid, star, withProcedures} from '../../harness/navdata/procedures';
+import {pointFrom} from '../../harness/flight/geo';
+import {KLNLegType} from '../../../kln90b/data/flightplan/Flightplan';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
 const kbbb = airport('KBBB', 47.4, 8.0);
@@ -1063,5 +1069,436 @@ describe('EFB route import over open pages (#395)', () => {
         await sync(unit);
         expect(unit.overlay()).toBeNull();
         expect(Screen.read().status().left).toBe('FPL 0');
+    });
+});
+
+// #378 (design §4, §5): the SID, STAR and approach of the route load into FPL 0 where APT 7 and APT 8 would have let
+// the pilot load them as the route names them, whole or not at all. KAAA has the SID DEP1 (D1 D2), KBBB the STAR ARR1
+// (transitions T1 and T2, then A1 A2) and the approach RNAV 27 (IAF1 or IAF2, FAF, MAP, the missed approach hold at
+// MAHP)
+describe('EFB route import of procedures (#378)', () => {
+    const d1 = intersection('D1', 47.05, 8.05);
+    const d2 = intersection('D2', 47.1, 8.1);
+    const e1 = intersection('E1', 47.15, 8.15);
+    const t1 = intersection('T1', 47.2, 8.25);
+    const t2 = intersection('T2', 47.2, 8.35);
+    const a1 = intersection('A1', 47.25, 8.2);
+    const a2 = intersection('A2', 47.3, 8.15);
+    const iaf1 = intersection('IAF1', 47.35, 8.25);
+    const iaf2 = intersection('IAF2', 47.35, 7.75);
+    const faf = intersection('FAF', 47.4, 8.15);
+    const map = intersection('MAP', 47.4, 8.05);
+    const mahp = intersection('MAHP', 47.4, 7.9);
+    const r09 = intersection('R09', 47.0, 8.1);
+    const r27 = intersection('R27', 47.0, 7.9);
+    const dx1 = intersection('DX1', 47.1, 8.2);
+    const dx2 = intersection('DX2', 47.1, 7.95);
+    const fixes = [d1, d2, e1, t1, t2, a1, a2, iaf1, iaf2, faf, map, mahp, r09, r27, dx1, dx2];
+
+    // Fresh procedures for every airport: a leg is never shared between procedures
+    const dep1 = (runways?: { runway: string; legs: FlightPlanLeg[] }[]) => sid('DEP1', {runways, common: [Leg.DF(d1), Leg.TF(d2)]});
+    const arr1 = (transitions = ['T1', 'T2']) => star('ARR1', {
+        transitions: transitions.map(name => ({name, legs: [Leg.IF(name === 'T1' ? t1 : t2)]})),
+        common: [Leg.TF(a1), Leg.TF(a2)],
+    });
+    const rnav27 = (type: ApproachType = ApproachType.APPROACH_TYPE_RNAV) => approach({
+        type, runway: '27',
+        transitions: [
+            {name: 'IAF1', legs: [Leg.IF(iaf1, FixTypeFlags.IAF)]},
+            {name: 'IAF2', legs: [Leg.IF(iaf2, FixTypeFlags.IAF)]},
+        ],
+        final: [Leg.TF(faf, FixTypeFlags.FAF), Leg.TF(map, FixTypeFlags.MAP)],
+        missed: [Leg.HM(mahp, 270)],
+    });
+    const departureWith = (departures: Procedure[]) => withProcedures(airport('KAAA', 47.0, 8.0), {departures});
+    const destinationWith = (arrivals: Procedure[], approaches: ApproachProcedure[]) =>
+        withProcedures(airport('KBBB', 47.4, 8.0), {arrivals, approaches});
+
+    const RNAV_27 = {type: ApproachType.APPROACH_TYPE_RNAV, runway: '27'};
+    const ILS_27 = {type: ApproachType.APPROACH_TYPE_ILS, runway: '27'};
+    const {USER, SID, STAR, APP} = {USER: KLNLegType.USER, SID: KLNLegType.SID, STAR: KLNLegType.STAR, APP: KLNLegType.APP};
+
+    async function boot(airports: Facility[], extra: Facility[] = []): Promise<HeadlessUnit> {
+        const unit = await bootUnit({facilities: [...airports, ...fixes, ...extra], efb: true, position: {lat: 47.0, lon: 8.0}});
+        await settle(unit);
+        return unit;
+    }
+
+    /** Syncs the route and returns the DELETED messages it adds */
+    async function sync(unit: HeadlessUnit, spec: EfbRouteSpec): Promise<string[]> {
+        const before = messages(unit).length;
+        unit.efb!.sync(efbRoute(spec));
+        await vi.advanceTimersByTimeAsync(2000);
+        return messages(unit).slice(before).filter(m => m.includes('DELETED'));
+    }
+
+    const types = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.type);
+
+    it('loads the SID, the STAR and the approach in route order (#378)', async () => {
+        const kaaa = departureWith([dep1()]);
+        const kbbb = destinationWith([arr1()], [rnav27()]);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {
+            departure: kaaa, sid: 'DEP1', enroute: [e1], arrival: 'ARR1', arrivalTransition: 'T1',
+            approach: RNAV_27, approachTransition: 'IAF1', destination: kbbb,
+        });
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'D1', 'D2', 'E1', 'T1', 'A1', 'A2', 'IAF1', 'FAF', 'MAP', 'MAHP', 'KBBB']);
+        expect(types(unit)).toEqual([USER, SID, SID, USER, STAR, STAR, STAR, APP, APP, APP, APP, USER]);
+        expect(deleted).toEqual([]);
+    });
+
+    // Design §4 "Duplicates": the fix stays twice, and the APT 7 message about redundant waypoints is not shown
+    it('keeps a fix the route repeats after the SID and shows no REDUNDANT message (#378)', async () => {
+        const kaaa = departureWith([dep1()]);
+        const unit = await boot([kaaa, kbbb]);
+        const before = messages(unit).length;
+
+        await sync(unit, {departure: kaaa, sid: 'DEP1', enroute: [d2, e1], destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'D1', 'D2', 'D2', 'E1', 'KBBB']);
+        expect(types(unit)).toEqual([USER, SID, SID, USER, USER, USER]);
+        expect(messages(unit).slice(before).filter(m => m.includes('REDUNDANT'))).toEqual([]);
+    });
+
+    // Design §4 "Invalid procedure": APT 7 would ask for the transition of a STAR with two; the route names none. The
+    // STAR is skipped, its legs without the transition are reported, and the approach after it still loads
+    it('skips a STAR whose needed transition the route does not name, reports its waypoints and still loads the approach (#378)', async () => {
+        const kbbb = destinationWith([arr1()], [rnav27()]);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {
+            departure: kaaa, enroute: [e1], arrival: 'ARR1', approach: RNAV_27, approachTransition: 'IAF2', destination: kbbb,
+        });
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'IAF2', 'FAF', 'MAP', 'MAHP', 'KBBB']);
+        expect(types(unit)).toEqual([USER, USER, APP, APP, APP, APP, USER]);
+        expect(deleted).toEqual(['WAYPOINT A1 DELETED', 'WAYPOINT A2 DELETED']);
+    });
+
+    it('loads a STAR with the transition the route names (#378)', async () => {
+        const kbbb = destinationWith([arr1()], []);
+        const unit = await boot([kaaa, kbbb]);
+
+        await sync(unit, {departure: kaaa, enroute: [e1], arrival: 'ARR1', arrivalTransition: 'T2', destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'T2', 'A1', 'A2', 'KBBB']);
+    });
+
+    // APT 7 selects the only transition itself (Apt7Page.selectProcedure), so the import does too
+    it('takes the only transition of a procedure the route does not name (#378)', async () => {
+        const kbbb = destinationWith([arr1(['T1'])], []);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {departure: kaaa, enroute: [e1], arrival: 'ARR1', destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'T1', 'A1', 'A2', 'KBBB']);
+        expect(types(unit)).toEqual([USER, USER, STAR, STAR, STAR, USER]);
+        expect(deleted).toEqual([]);
+    });
+
+    // APT 7 does not list a STAR with an RF leg (SidStar.isProcedureRecognized). The conversion drops the RF leg, so
+    // the STAR would load in part; it is skipped, with its other legs reported
+    it('skips a STAR with an RF leg (#378)', async () => {
+        const kbbb = destinationWith([star('ARR1', {transitions: [{name: 'T1', legs: [Leg.IF(t1)]}], common: [Leg.TF(a1), Leg.RF(a2)]})], []);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {departure: kaaa, enroute: [e1], arrival: 'ARR1', arrivalTransition: 'T1', destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'KBBB']);
+        expect(deleted).toEqual(['WAYPOINT T1 DELETED', 'WAYPOINT A1 DELETED']);
+    });
+
+    // APT 8 does not list an ILS approach (SidStar.isApproachRecognized); its legs with the IAF are reported
+    it('skips an ILS approach and reports its waypoints (#378)', async () => {
+        const kbbb = destinationWith([], [rnav27(ApproachType.APPROACH_TYPE_ILS)]);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {departure: kaaa, enroute: [e1], approach: ILS_27, approachTransition: 'IAF1', destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'KBBB']);
+        expect(deleted).toEqual(['WAYPOINT IAF1 DELETED', 'WAYPOINT FAF DELETED', 'WAYPOINT MAP DELETED', 'WAYPOINT MAHP DELETED']);
+    });
+
+    // APT 8 would ask for the IAF of an approach with two (6-8); an approach starts at an IAF, never at the IF
+    it('skips an approach without the IAF it needs (#378)', async () => {
+        const kbbb = destinationWith([], [rnav27()]);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {departure: kaaa, enroute: [e1], approach: RNAV_27, destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'KBBB']);
+        expect(deleted).toEqual(['WAYPOINT FAF DELETED', 'WAYPOINT MAP DELETED', 'WAYPOINT MAHP DELETED']);
+    });
+
+    // APT 7 asks for the runway of a SID with two runway transitions
+    it('loads the SID of the named runway (#378)', async () => {
+        const kaaa = departureWith([dep1([{runway: '09', legs: [Leg.DF(r09)]}, {runway: '27', legs: [Leg.DF(r27)]}])]);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {departure: kaaa, sid: 'DEP1', departureRunway: '27', enroute: [e1], destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'R27', 'D1', 'D2', 'E1', 'KBBB']);
+        expect(types(unit)).toEqual([USER, SID, SID, SID, USER, USER]);
+        expect(deleted).toEqual([]);
+    });
+
+    it('skips a SID of two runways when the route names none, and reports its waypoints (#378)', async () => {
+        const kaaa = departureWith([dep1([{runway: '09', legs: [Leg.DF(r09)]}, {runway: '27', legs: [Leg.DF(r27)]}])]);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {departure: kaaa, sid: 'DEP1', enroute: [e1], destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'KBBB']);
+        expect(deleted).toEqual(['WAYPOINT D1 DELETED', 'WAYPOINT D2 DELETED']);
+    });
+
+    // DEP2: D1 D2, then the en-route transition DX1 or DX2. APT 7 asks for the transition of a SID with two (6-21). The
+    // route also names an arrival transition and the other runway, so that the SID cannot take the STAR's choices
+    const dep2 = () => sid('DEP2', {
+        common: [Leg.DF(d1), Leg.TF(d2)],
+        transitions: [{name: 'DX1', legs: [Leg.TF(dx1)]}, {name: 'DX2', legs: [Leg.TF(dx2)]}],
+    });
+
+    it('loads the SID with the en-route transition the route names (#378)', async () => {
+        const kaaa = departureWith([dep2()]);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {
+            departure: kaaa, sid: 'DEP2', departureTransition: 'DX2', departureRunway: '09',
+            enroute: [e1], arrivalTransition: 'DX1', destinationRunway: '27', destination: kbbb,
+        });
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'D1', 'D2', 'DX2', 'E1', 'KBBB']);
+        expect(types(unit)).toEqual([USER, SID, SID, SID, USER, USER]);
+        expect(deleted).toEqual([]);
+    });
+
+    it('skips a SID of two en-route transitions when the route names none, reports its waypoints and loads on (#378)', async () => {
+        const kaaa = departureWith([dep2()]);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {
+            departure: kaaa, sid: 'DEP2', departureRunway: '09', enroute: [e1], arrivalTransition: 'DX1', destinationRunway: '27', destination: kbbb,
+        });
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'KBBB']);
+        expect(types(unit)).toEqual([USER, USER, USER]);
+        expect(deleted).toEqual(['WAYPOINT D1 DELETED', 'WAYPOINT D2 DELETED']);
+    });
+
+    // ARR2: the transition T1, A1 A2, then runway 09 (R09) or 27 (R27). APT 7 asks for the runway of a STAR with two
+    // (6-22). The route's departure runway is the other one
+    const arr2 = () => star('ARR2', {
+        transitions: [{name: 'T1', legs: [Leg.IF(t1)]}],
+        common: [Leg.TF(a1), Leg.TF(a2)],
+        runways: [{runway: '09', legs: [Leg.TF(r09)]}, {runway: '27', legs: [Leg.TF(r27)]}],
+    });
+
+    it('loads the STAR of the named destination runway (#378)', async () => {
+        const kbbb = destinationWith([arr2()], []);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {departure: kaaa, departureRunway: '09', enroute: [e1], arrival: 'ARR2', destinationRunway: '27', destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'T1', 'A1', 'A2', 'R27', 'KBBB']);
+        expect(types(unit)).toEqual([USER, USER, STAR, STAR, STAR, STAR, USER]);
+        expect(deleted).toEqual([]);
+    });
+
+    it('skips a STAR of two runways when the route names none, and reports its waypoints (#378)', async () => {
+        const kbbb = destinationWith([arr2()], []);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {departure: kaaa, departureRunway: '09', enroute: [e1], arrival: 'ARR2', destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'KBBB']);
+        expect(types(unit)).toEqual([USER, USER, USER]);
+        expect(deleted).toEqual(['WAYPOINT T1 DELETED', 'WAYPOINT A1 DELETED', 'WAYPOINT A2 DELETED']);
+    });
+
+    // Public contract (the EFB route sync): the procedures go back to the EFB as they came (KlnEfbSaver reads the
+    // procedure information the conversion stores in each leg), here a VOR approach and a SID of a runway and a
+    // transition
+    it('answers the EFB with the SID and the VOR approach it imported (#378)', async () => {
+        const kaaa = departureWith([sid('DEP3', {
+            runways: [{runway: '09', legs: [Leg.DF(r09)]}, {runway: '27', legs: [Leg.DF(r27)]}],
+            common: [Leg.TF(d1), Leg.TF(d2)],
+            transitions: [{name: 'DX1', legs: [Leg.TF(dx1)]}, {name: 'DX2', legs: [Leg.TF(dx2)]}],
+        })]);
+        const kbbb = destinationWith([], [rnav27(ApproachType.APPROACH_TYPE_VOR)]);
+        const unit = await boot([kaaa, kbbb]);
+        await sync(unit, {
+            departure: kaaa, sid: 'DEP3', departureRunway: '09', departureTransition: 'DX2', enroute: [e1],
+            approach: {type: ApproachType.APPROACH_TYPE_VOR, runway: '27'}, approachTransition: 'IAF2', destination: kbbb,
+        });
+        // Precondition: both loaded
+        expect(fplIdents(unit)).toEqual(['KAAA', 'R09', 'D1', 'D2', 'DX2', 'E1', 'IAF2', 'FAF', 'MAP', 'MAHP', 'KBBB']);
+
+        const before = unit.efb!.replies.length;
+        unit.efb!.request();
+        const reply = unit.efb!.replies[before].route;
+
+        expect([reply.departure, reply.departureTransition, reply.departureRunway.number, reply.departureRunway.designator])
+            .toEqual(['DEP3', 'DX2', '09', '']);
+        expect([reply.approach.type, reply.approach.runway.number, reply.approach.runway.designator, reply.approach.suffix, reply.approachTransition])
+            .toEqual(['VOR', '27', '', '', 'IAF2']);
+        expect(reply.enroute.map(leg => leg.fixIcao.ident)).toEqual(['E1']);
+    });
+
+    // Design §4: for a procedure the database does not have, nothing is known and nothing is reported
+    it('skips a procedure the airport does not have without a message (#378)', async () => {
+        const kbbb = destinationWith([arr1()], []);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {departure: kaaa, enroute: [e1], arrival: 'NOPE', destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'KBBB']);
+        expect(deleted).toEqual([]);
+    });
+
+    // A SID belongs to the departure airport; without one there is no SID to find
+    it('skips a SID when the route has no departure airport (#378)', async () => {
+        const kaaa = departureWith([dep1()]);
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {sid: 'DEP1', enroute: [e1], destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['E1', 'KBBB']);
+        expect(deleted).toEqual([]);
+    });
+
+    // Design §5: the entry of an airway is the last fix of a valid SID
+    it('expands an airway from the last fix of the SID (#378)', async () => {
+        const x1 = intersection('X1', 47.15, 8.1);
+        const exit = intersection('EXIT', 47.2, 8.1);
+        const kaaa = departureWith([dep1()]);
+        const unit = await boot([kaaa, kbbb], [x1, exit]);
+        unit.navdata.addAirway('Q1', [d2, x1, exit]);
+
+        await sync(unit, {departure: kaaa, sid: 'DEP1', enroute: [{fix: exit, via: 'Q1'}], destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'D1', 'D2', 'X1', 'EXIT', 'KBBB']);
+    });
+
+    // Design §4 "Fit": the departure, 26 en-route fixes and the destination leave 17 of the 45 legs of FPL 0 (#221)
+    describe('a STAR at the limit of FPL 0', () => {
+        const enroute = Array.from({length: 26}, (_, i) => intersection(`W${String(i + 1).padStart(2, '0')}`, 46.0 + i * 0.01, 8.5));
+        const starFixes = Array.from({length: 18}, (_, i) => intersection(`S${String(i + 1).padStart(2, '0')}`, 47.2 + i * 0.01, 8.6));
+        const longStar = (length: number) => star('ARR1', {common: starFixes.slice(0, length).map(f => Leg.TF(f))});
+
+        it('takes a STAR that fills FPL 0 to 45 legs (#221)', async () => {
+            const kbbb = destinationWith([longStar(17)], []);
+            const unit = await boot([kaaa, kbbb], [...enroute, ...starFixes]);
+
+            const deleted = await sync(unit, {departure: kaaa, enroute, arrival: 'ARR1', destination: kbbb});
+
+            expect(fplIdents(unit)).toEqual([
+                'KAAA', ...enroute.map(f => f.icaoStruct.ident), ...starFixes.slice(0, 17).map(f => f.icaoStruct.ident), 'KBBB',
+            ]);
+            expect(deleted).toEqual([]);
+        });
+
+        it('drops a STAR that does not fit and the approach after it, keeping the destination (#378)', async () => {
+            const kbbb = destinationWith([longStar(18)], [rnav27()]);
+            const unit = await boot([kaaa, kbbb], [...enroute, ...starFixes]);
+
+            const deleted = await sync(unit, {
+                departure: kaaa, enroute, arrival: 'ARR1', approach: RNAV_27, approachTransition: 'IAF1', destination: kbbb,
+            });
+
+            expect(fplIdents(unit)).toEqual(['KAAA', ...enroute.map(f => f.icaoStruct.ident), 'KBBB']);
+            expect(types(unit).filter(t => t !== USER)).toEqual([]);
+            // The first ten of the 18 STAR and 4 approach waypoints, in route order (Appendix B)
+            expect(deleted).toEqual([...starFixes.slice(0, 10).map(f => `WAYPOINT ${f.icaoStruct.ident} DELETED`), 'OTHER WAYPOINTS DELETED']);
+        });
+    });
+
+    // Design §6: SidStar adds the entry of a DME arc to the user waypoints while it converts the approach (6-16). The
+    // import removes the entry of an approach it does not load, and keeps the one FPL 0 uses
+    describe('the DME arc entry of an approach', () => {
+        const abc = vor('ABC', 47.7, 8.3);
+        const at = (bearing: number, nm: number) => pointFrom({lat: abc.lat, lon: abc.lon}, bearing, nm);
+        const arcbg = intersection('ARCBG', at(270, 10).lat, at(270, 10).lon);
+        const arcen = intersection('ARCEN', at(180, 10).lat, at(180, 10).lon);
+        const fafaa = intersection('FAFAA', 47.5, 8.2);
+        const mapaa = intersection('MAPAA', 47.4, 8.1);
+        const arcApproach = (type: ApproachType) => approach({
+            type, runway: '27',
+            transitions: [{
+                name: 'ARCBG', legs: [
+                    Leg.IF(arcbg, FixTypeFlags.IAF),
+                    Leg.AF(arcen, abc, {radiusNm: 10, fromRadial: 270, toRadial: 180, turn: LegTurnDirection.Left}),
+                    Leg.TF(fafaa, FixTypeFlags.FAF),
+                ],
+            }],
+            final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
+        });
+        const arcFixes = [abc, arcbg, arcen, fafaa, mapaa];
+        const ENTRY = /^D\d{3}J$/; // 6-6: D, the magnetic radial and the letter of 10 NM
+        const xyWaypoints = (unit: HeadlessUnit) => userWaypoints(unit).map(f => [f.icaoStruct.ident, f.icaoStruct.region]);
+
+        it('removes the DME arc entry of a skipped approach', async () => {
+            const kbbb = destinationWith([], [arcApproach(ApproachType.APPROACH_TYPE_ILS)]);
+            const unit = await boot([kaaa, kbbb], arcFixes);
+
+            const deleted = await sync(unit, {departure: kaaa, enroute: [e1], approach: ILS_27, destination: kbbb});
+
+            expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'KBBB']);
+            // Precondition: the conversion made an entry, which is reported in place of ARCBG
+            expect(deleted.slice(1)).toEqual(['WAYPOINT ARCEN DELETED', 'WAYPOINT FAFAA DELETED', 'WAYPOINT MAPAA DELETED']);
+            expect(deleted[0]).toMatch(/^WAYPOINT D\d{3}J DELETED$/);
+            expect(xyWaypoints(unit)).toEqual([]);
+        });
+
+        it('keeps the DME arc entry of a loaded approach', async () => {
+            const kbbb = destinationWith([], [arcApproach(ApproachType.APPROACH_TYPE_RNAV)]);
+            const unit = await boot([kaaa, kbbb], arcFixes);
+
+            await sync(unit, {departure: kaaa, enroute: [e1], approach: RNAV_27, destination: kbbb});
+
+            const idents = fplIdents(unit);
+            expect(idents[2]).toMatch(ENTRY);
+            expect(idents).toEqual(['KAAA', 'E1', idents[2], 'ARCEN', 'FAFAA', 'MAPAA', 'KBBB']);
+            expect(xyWaypoints(unit)).toEqual([[idents[2], 'XY']]);
+        });
+
+        // Design §6: a waypoint that was in the repository before the import is never removed. The second import
+        // converts the same arc again, to the same entry, and does not load it
+        it('keeps a DME arc entry that was in the user waypoints before the import', async () => {
+            const kbbb = destinationWith([], [arcApproach(ApproachType.APPROACH_TYPE_RNAV), arcApproach(ApproachType.APPROACH_TYPE_ILS)]);
+            const unit = await boot([kaaa, kbbb], arcFixes);
+            await sync(unit, {departure: kaaa, enroute: [e1], approach: RNAV_27, destination: kbbb});
+            const entry = fplIdents(unit)[2];
+            expect(entry).toMatch(ENTRY); // Precondition: the first import loaded the entry
+
+            const deleted = await sync(unit, {departure: kaaa, enroute: [e1], approach: ILS_27, destination: kbbb});
+
+            expect(deleted[0]).toBe(`WAYPOINT ${entry} DELETED`); // Precondition: the same entry, converted again
+            expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'KBBB']);
+            expect(xyWaypoints(unit)).toEqual([[entry, 'XY']]);
+        });
+    });
+
+    // Design §2: a fresh sim session counts as an hour off (PowerSupply), so a route synced while the unit is off
+    // loses its procedures at the first power-on (6-5)
+    it('loses the procedures at the first power-on of a fresh session (§2 ruling, 6-5)', async () => {
+        const kaaa = departureWith([dep1()]);
+        const kbbb = destinationWith([arr1()], [rnav27()]);
+        const unit = await bootUnit({engineRunning: false, efb: true, facilities: [kaaa, kbbb, ...fixes], position: {lat: 47.0, lon: 8.0}});
+        unit.efb!.sync(efbRoute({
+            departure: kaaa, sid: 'DEP1', enroute: [e1], arrival: 'ARR1', arrivalTransition: 'T1',
+            approach: RNAV_27, approachTransition: 'IAF1', destination: kbbb,
+        }));
+        await vi.advanceTimersByTimeAsync(2000);
+        // Precondition: loaded with the procedures while off
+        expect(types(unit)).toEqual([USER, SID, SID, USER, STAR, STAR, STAR, APP, APP, APP, APP, USER]);
+
+        await unit.panel.powerOn();
+        await settle(unit);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'KBBB']);
+        expect(types(unit)).toEqual([USER, USER, USER]);
     });
 });
