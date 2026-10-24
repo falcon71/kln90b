@@ -17,7 +17,7 @@ import {PageProps} from '../../../kln90b/pages/Page';
 interface World {
     activeLeg: { fixType?: KLNFixType, askObs?: boolean } | null;
     navmode: NavMode;
-    distToActive: number;
+    distToActive: number | null;
     userMagvar: number;
     magvarValid: boolean;
     dbCurrent: boolean;
@@ -174,7 +174,7 @@ describe('ARM GPS APPROACH', () => {
 
 describe('IF REQUIRED SELECT OBS', () => {
     // B-2: 4 NM before a waypoint usable for a procedure turn or a holding pattern, in LEG mode (all spec tests)
-    const before = (dist: number, askObs: boolean, obsMode = false) => {
+    const before = (dist: number | null, askObs: boolean, obsMode = false) => {
         const w = quietWorld();
         w.activeLeg = {askObs};
         w.distToActive = dist;
@@ -196,6 +196,12 @@ describe('IF REQUIRED SELECT OBS', () => {
 
     it('does not show in OBS mode (B-2)', () => {
         expect(before(2, true, true)).toEqual([]);
+    });
+
+    // B-2, 6-10: the reminder comes 4 NM before the fix. Without a position (NAV flag) NavCalculator.setFlag sets the
+    // distance to null, and null <= 4 is true in JavaScript, so the reminder is posted at any distance
+    it.fails('does not show without a distance to the fix (B-2) (#417)', () => {
+        expect(before(null, true)).toEqual([]);
     });
 });
 

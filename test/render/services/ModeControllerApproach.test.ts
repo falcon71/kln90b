@@ -195,6 +195,30 @@ describe('GPS APR switch while armed', () => {
         expect(nav(unit).navmode).toBe(NavMode.ENR_LEG);
         expect(messageLines(unit)).toContainEqual(['ARM GPS APPROACH']);
     });
+
+    // B-1 gives the reminder by the distance to the FAF (3 NM), which a unit without a position does not know. With the
+    // GPS lost (NAV flag) the distance is null, and the comparison null <= 3 is true in JavaScript, so the reminder is posted
+    // 15 NM from the FAF. The unit sequences onto FAFAA at 7.9 NM north (the test above) and flies back to 20 NM north,
+    // where the reminder has gone, before the GPS loses its solution
+    it.fails('does not show ARM GPS APPROACH without a position, 15 NM before the FAF (B-1) (#417)', async () => {
+        const {w, unit} = await approachLoaded(20);
+        await unit.panel.press('KLN90B_ApprArm_Push');
+        await vi.advanceTimersByTimeAsync(2000);
+        await moveAircraft(unit, w.north(7.9), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(2000);
+        await moveAircraft(unit, w.north(20), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(activeIdent(unit)).toBe('FAFAA'); // Precondition: the FAF is active
+        expect(nav(unit).navmode).toBe(NavMode.ENR_LEG); // Precondition: disarmed
+        expect(messageLines(unit)).not.toContainEqual(['ARM GPS APPROACH']); // Precondition: 15 NM out, no reminder
+
+        unit.props.sensors.in.gps.reset();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.sensors.in.gps.isValid()).toBe(false); // Precondition: no position
+        expect(nav(unit).distToActive).toBeNull(); // Precondition: NavCalculator flagged the distance
+        expect(messageLines(unit)).not.toContainEqual(['ARM GPS APPROACH']);
+    });
 });
 
 describe('approach active and the CDI scale ramp to 0.3 NM (6-3, 6-11)', () => {
