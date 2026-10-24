@@ -17,7 +17,7 @@ import {NavPageState} from "../data/VolatileMemory";
 import {MainPage} from "../pages/MainPage";
 import {Apt8Page} from "../pages/right/Apt8Page";
 import {Apt7Page} from "../pages/right/Apt7Page";
-import {deleteFrontLegs, insertLegIntoFpl, roomSteps} from "../services/FlightplanUtils";
+import {deleteFrontLegs, insertLegIntoFpl, moveArcEntry, roomSteps} from "../services/FlightplanUtils";
 import {FplInsertMakeRoomPage} from "../pages/left/FplInsertMakeRoomPage";
 
 export const enum FplWptEnterMode {
@@ -343,6 +343,18 @@ class EditableFlightplan {
     }
 
     /**
+     * 6-17: ENT on MOVE ? moves the entry of the DME arc to the intercept of the present track. The rebuilt list shows the
+     * new entry name, and the cursor stays on the row.
+     */
+    public moveArcEntry(idx: number) {
+        const leg = this.legs[idx];
+        moveArcEntry(this.props.bus, this.flightplan, leg.origIdx, this.props.memory.navPage.activeWaypoint, this.props.sensors);
+        this.syncLegsFromFlightplan();
+        this.legs[idx].focusMe = true;
+        this.buildList();
+    }
+
+    /**
      * @return false when the insert was refused with FPL FULL, true otherwise (#240)
      */
     public insertLeg(idx: number, wpt: Facility | null, leg: KLNFlightplanLeg | null): boolean {
@@ -567,6 +579,7 @@ class EditableFlightplan {
                 onCreate: this.createLeg.bind(this),
                 onInsertDone: this.insertLeg.bind(this),
                 onDelete: this.deleteLeg.bind(this),
+                onMoveArc: this.moveArcEntry.bind(this),
                 onBeforeDelete: () => null,
                 askRoom: this.askRoom.bind(this),
                 cursorController: this.cursorController,

@@ -1,7 +1,11 @@
 import {NauticalMiles} from "../data/Units";
-import {Facility, GeoPoint, ICAO, UnitType} from "@microsoft/msfs-sdk";
+import {EventBus, Facility, GeoPoint, ICAO, UnitType} from "@microsoft/msfs-sdk";
 import {NavPageState} from "../data/VolatileMemory";
 import {Flightplan, KLNFlightplanLeg, KLNLegType, legsFit} from "../data/flightplan/Flightplan";
+import {ActiveWaypoint} from "../data/flightplan/ActiveWaypoint";
+import {SidStar} from "../data/navdata/SidStar";
+import {Sensors} from "../Sensors";
+import {StatusLineMessageEvents} from "../controls/StatusLine";
 
 export function calcDistToDestination(navState: NavPageState, futureLegs: KLNFlightplanLeg[]): NauticalMiles | null {
     const fplIdx = navState.activeWaypoint.getActiveFplIdx();
@@ -107,4 +111,30 @@ export function insertLegIntoFpl(fpl: Flightplan, navstate: NavPageState, idx: n
     const count = steps.reduce((sum, size) => sum + size, 0);
     deleteFrontLegs(fpl, count);
     fpl.insertLeg(Math.max(0, idx - count), leg); //#148: the index follows the deleted legs; in front of the first is 0
+}
+
+/**
+ * 6-17: MOVE ? moves the entry waypoint of a DME arc to the intercept of the present track with the arc. Super NAV 5 and
+ * the FPL 0 page ask it the same way. 6-18: a track that does not meet the arc gives NO INTRCEPT and changes nothing.
+ * @param idx the index of the leg in `fpl`; the leg has `arcData`
+ * @return true when the entry was moved
+ */
+export function moveArcEntry(bus: EventBus, fpl: Flightplan, idx: number, activeWpt: ActiveWaypoint, sensors: Sensors): boolean {
+    const leg = fpl.getLegs()[idx];
+    //FPL 0 can be replaced while MOVE ? is pending (an EFB route load), and the leg at idx is read live here
+    if (leg === undefined || leg.arcData === undefined) {
+        return false;
+    }
+    const newData = SidStar.recalculateArcEntryData(leg, sensors);
+    if (newData === null) {
+        bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO INTRCEPT");
+        return false;
+    }
+    //A bit ugly modifying this directly...
+    leg.arcData = newData;
+    leg.wpt = newData.entryFacility;
+    if (idx === activeWpt.getActiveFplIdx()) {
+        activeWpt.recalculatePath();
+    }
+    return true;
 }

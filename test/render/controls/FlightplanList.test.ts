@@ -1,13 +1,15 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {Facility} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
+import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {Screen} from '../../harness/render/screen';
 import {fplIdents} from '../../harness/readers';
 import {savedFlightplan} from '../../harness/storage';
 import {intersection} from '../../harness/navdata/builders';
-import {pointFrom} from '../../harness/flight/geo';
-import {approachWorld} from '../../harness/fixtures';
+import {courseDeg, distanceNm, pointFrom} from '../../harness/flight/geo';
+import {approachWorld, arcWorld} from '../../harness/fixtures';
+import {blinkCycle} from '../../harness/render/blink';
+import {collectStatusMessages} from '../../harness/statusLine';
 
 // FlightplanList (kln90b/controls/FlightplanList.tsx) is the list of the FPL 0 to FPL 25 pages: a six-row List whose
 // bottom row keeps the last waypoint, a first line with USE? INVRT?, LOAD FPL 0? or DELETE FPL?, and a blank position
@@ -456,4 +458,121 @@ describe('FlightplanList, the DEL question', () => {
             expect(left().some(r => r.includes('DEL'))).toBe(false);
             expect(fplIdents(unit, 4)).toEqual(['FX1AA', 'FX2AA', 'FX3AA', 'FX4AA']);
         });
+});
+
+describe('FlightplanList, MOVE ? on a DME arc entry (6-17, #134)', () => {
+    /**
+     * The aircraft 15 NM out on the 200 radial of ABC, flying `track`, FPL 0 with the arc loaded (D225J is the entry), the
+     * cursor on the entry and CLR pressed. As in SuperNav5DirectToSelector.test.ts, a track of 10 meets the circle inside
+     * the arc and a track of 330 misses it.
+     */
+    async function moveQuestion(track = 10) {
+        const w = arcWorld();
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.at(225, 10), storage: savedFlightplan(0, [w.kprc]),
+            panelXml: panelXml(APR_ARM_SWITCH),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        expect(fplIdents(unit)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']); // Precondition
+        await moveAircraft(unit, w.at(200, 15), {groundspeedKt: 0});
+        await moveAircraft(unit, pointFrom(w.at(200, 15), track, 0.05), {groundspeedKt: 120});
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'D225Jà');
+        await unit.panel.clr();
+        return {unit, w};
+    }
+    const showsMove = () => left().some(r => r.includes('MOVE'));
+
+    // 6-17: on the FPL 0 page, CLR on the first waypoint of the arc asks MOVE ?, like DEL it takes the whole row, with the
+    // question mark in the last cell, and it flashes
+    it('asks MOVE ? over the whole row on CLR on the arc entry (6-17, #134)', async () => {
+        const {unit} = await moveQuestion();
+
+        const at = unit.panel.focused('L');
+        expect(at.text).toBe('MOVE      ?');
+        expect(at.col).toBe(0);
+        const masks = await blinkCycle(() => Screen.read().maskRows('L')[at.row].slice(0, 11));
+        expect(masks.slice().sort()).toEqual(['FFFFFFFFFFF', 'IIIIIIIIIII', 'IIIIIIIIIII', 'IIIIIIIIIII']);
+        expect(fplIdents(unit)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+    });
+
+    // 6-17, 4-5: a second CLR withdraws the question, as it does for DEL
+    it('withdraws MOVE ? on a second CLR (6-17, 4-5, #134)', async () => {
+        const {unit} = await moveQuestion();
+
+        await unit.panel.clr();
+
+        expect(unit.panel.focused('L').text).toBe('D225Jà');
+        expect(showsMove()).toBe(false);
+        expect(fplIdents(unit)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+    });
+
+    // As for DEL, the outer knob withdraws the question and moves the cursor on (#317)
+    it('withdraws MOVE ? when the outer knob turns (#317, #134)', async () => {
+        const {unit} = await moveQuestion();
+
+        await unit.panel.outer('L', 1);
+
+        expect(showsMove()).toBe(false);
+        expect(unit.panel.focused('L').text).toBe('ARCEN ');
+        expect(fplIdents(unit)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+    });
+
+    // As for DEL, the inner knob withdraws the question; an approach waypoint refuses the addition it would open
+    it('withdraws MOVE ? and refuses the add when the inner knob turns (#134)', async () => {
+        const {unit} = await moveQuestion();
+        const seen = collectStatusMessages(unit);
+
+        await unit.panel.inner('L', 1);
+
+        expect(seen).toEqual(['INVALID ADD']);
+        expect(showsMove()).toBe(false);
+        await unit.panel.ent(); // no question is open any more: ENT must not move the entry
+        expect(fplIdents(unit)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+    });
+
+    // 6-17: ENT moves the entry to the intercept of the present track with the arc. The numbers are those of the Super NAV 5
+    // test: the track from the aircraft meets the circle on the 205.05 radial, 10 NM from ABC
+    it('moves the entry to the intercept of the present track on ENT (6-17, #134)', async () => {
+        const {unit, w} = await moveQuestion();
+
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(fplIdents(unit)).toEqual(['D205J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+        const [entry] = unit.props.memory.fplPage.flightplans[0].getLegs();
+        expect(courseDeg(w.abc, entry.wpt)).toBeCloseTo(205.05, 1);
+        expect(distanceNm(w.abc, entry.wpt)).toBeCloseTo(10, 2);
+        expect(entry.arcData!.entryFacility).toBe(entry.wpt); // the arc's geometry moved with its entry
+        expect(unit.panel.focused('L').text).toBe('D205Jà');
+        expect(showsMove()).toBe(false);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // 6-18: a track that does not meet the arc gives NO INTRCEPT and changes nothing
+    it('shows NO INTRCEPT when the present track misses the arc (6-18, #134)', async () => {
+        const {unit} = await moveQuestion(330);
+        const seen = collectStatusMessages(unit);
+
+        await unit.panel.ent();
+
+        expect(seen).toEqual(['NO INTRCEPT']);
+        expect(fplIdents(unit)).toEqual(['D225J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']);
+        expect(showsMove()).toBe(false);
+    });
+
+    // 4-5: only the first waypoint of the arc offers MOVE ?; CLR on any other approach waypoint still answers INVALID DEL
+    it('keeps INVALID DEL on CLR on an approach waypoint that starts no arc (4-5, #134)', async () => {
+        const {unit} = await moveQuestion();
+        await unit.panel.clr(); // withdraw the question
+        await unit.panel.cursorTo('L', 'FAFAAá');
+        const seen = collectStatusMessages(unit);
+
+        await unit.panel.clr();
+
+        expect(seen).toEqual(['INVALID DEL']);
+        expect(showsMove()).toBe(false);
+    });
 });

@@ -5,7 +5,7 @@ import {Flightplan, KLNFlightplanLeg} from "../../data/flightplan/Flightplan";
 import {ActiveWaypoint} from "../../data/flightplan/ActiveWaypoint";
 import {SidStar} from "../../data/navdata/SidStar";
 import {Sensors} from "../../Sensors";
-import {StatusLineMessageEvents} from "../StatusLine";
+import {moveArcEntry} from "../../services/FlightplanUtils";
 
 export class SuperNav5DirectToSelector implements UiElement {
 
@@ -101,18 +101,7 @@ export class SuperNav5DirectToSelector implements UiElement {
             return false;
         }
 
-        const leg = this.legs[this.idx];
-        const newData = SidStar.recalculateArcEntryData(leg, this.sensors);
-        if (newData === null) {
-            this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO INTRCEPT"); //How does this work? On the Super NAV 5 page, there is no statusline??
-        } else {
-            //A bit ugly modifying this directly...
-            leg.arcData = newData;
-            leg.wpt = newData.entryFacility;
-            if(this.idx === this.activeWpt.getActiveFplIdx()){
-                this.activeWpt.recalculatePath();
-            }
-        }
+        moveArcEntry(this.bus, this.flightplan, this.idx, this.activeWpt, this.sensors);
         this.isMovingArc = false;
 
         return true;

@@ -639,7 +639,9 @@ inputs as the KLN 89 does: angle, offset and waypoint cleared, FR set to SEL (#7
 - The sim sets no MAHP flag, so the MAHP is derived: the hold (HA, HF or HM) that ends the missed approach gets the
   flag on the conversion's copy of the leg (#220). A missed approach that ends otherwise has none.
 - The arc entry point is created as a temporary user waypoint in `XY` and recalculated from the current position (
-  `recalculateArcEntryData`).
+  `recalculateArcEntryData`). MOVE ? on the entry (6-17, Super NAV 5 and FPL 0) goes through `moveArcEntry`
+  (`services/FlightplanUtils.ts`), which stores the new entry with `Flightplan.setArcEntry` so that the `kln90b`
+  flight planner follows (#134, #419).
 - `isProcedureRecognized` filters out RNAV procedures as the real unit does.
 - Approach names are formatted as `R/V/N + rwy + suffix + -IDENT`.
 - Fix suffix glyphs are Latin-1 chars that map to custom font glyphs: IAF `à`, FAF `á`, MAP `ã`, MAHP `â`.

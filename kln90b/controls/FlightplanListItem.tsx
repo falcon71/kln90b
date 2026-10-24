@@ -22,6 +22,7 @@ export interface FlightplanListItemProps extends PageProps {
     wpt: Facility | null,
     onCreate: (idx: number, mode: FplWptEnterMode, keyboardKey?: string) => void,
     onDelete: (idx: number) => void,
+    onMoveArc: (idx: number) => void, //6-17: MOVE ? on the entry of a DME arc
     onInsertDone: (idx: number, value: Facility | null, leg: KLNFlightplanLeg | null) => boolean, //false: refused with FPL FULL (#240)
     onBeforeDelete: (idx: number) => KLNErrorMessage | null,
     //#380: true when the addition that is about to open asks first to make room; `retry` repeats it on the rebuilt row
@@ -38,6 +39,7 @@ export class FlightplanListItem implements Field, ListItem {
     readonly children: UIElementChildren<FlightplanListItemTypes>;
     public isEntered = false;
     public isDeleting = false;
+    public isMoving = false; //6-17: the MOVE ? question on the entry of a DME arc
     public isFocused = false;
     public readonly isReadonly = false;
     public wpt: Facility | null;
@@ -45,6 +47,7 @@ export class FlightplanListItem implements Field, ListItem {
     protected readonly ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     protected readonly readonlyRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     protected readonly delRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
+    protected readonly moveRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
     private waypointEditor: WaypointEditor;
     private insertRefused = false; //#240 the insert of the last confirmation was refused with FPL FULL
     private refEntry = false; //#291 the reference waypoint of the REF page, from its confirmation until the entry is left
@@ -103,12 +106,16 @@ export class FlightplanListItem implements Field, ListItem {
             <span ref={this.delRef} class="d-none inverted">
                 DEL {IcaoFixedLength.getIdentFromFacility(this.wpt)} ?
             </span>
+            <span ref={this.moveRef} class="d-none inverted">
+                MOVE      ?
+            </span>
         </span>);
     }
 
     public setFocused(focused: boolean) {
         this.isEntered = false;
         this.isDeleting = false;
+        this.isMoving = false;
         this.isFocused = focused;
 
         if (!focused && this.waypointEditor.isEntered) {
@@ -121,20 +128,21 @@ export class FlightplanListItem implements Field, ListItem {
     }
 
     outerLeft(): boolean {
-        if (this.isDeleting) {
-            return false; //The knob withdraws the DEL question (#317)
+        if (this.isDeleting || this.isMoving) {
+            return false; //The knob withdraws the DEL or MOVE ? question (#317)
         }
         return this.waypointEditor.outerLeft();
     }
 
     outerRight(): boolean {
-        if (this.isDeleting) {
-            return false; //The knob withdraws the DEL question (#317)
+        if (this.isDeleting || this.isMoving) {
+            return false; //The knob withdraws the DEL or MOVE ? question (#317)
         }
         return this.waypointEditor.outerRight();
     }
 
     innerLeft(): boolean {
+        this.isMoving = false; //the inner knob withdraws the MOVE ? question; the approach waypoint then refuses the add
         if (this.type === KLNLegType.APP) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID ADD");
             return true;
@@ -155,6 +163,7 @@ export class FlightplanListItem implements Field, ListItem {
     }
 
     innerRight(): boolean {
+        this.isMoving = false;
         if (this.type === KLNLegType.APP) {
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID ADD");
             return true;
@@ -175,7 +184,7 @@ export class FlightplanListItem implements Field, ListItem {
     }
 
     isEnterAccepted(): boolean {
-        return this.isDeleting || this.waypointEditor.isEnterAccepted();
+        return this.isDeleting || this.isMoving || this.waypointEditor.isEnterAccepted();
     }
 
     isClearAccepted(): boolean {
@@ -187,6 +196,11 @@ export class FlightplanListItem implements Field, ListItem {
         if (this.isDeleting) {
             this.props.onDelete(this.props.wptIdx);
             this.isDeleting = false;
+            this.isEntered = false;
+            return EnterResult.Handled_Keep_Focus;
+        } else if (this.isMoving) {
+            this.props.onMoveArc(this.props.wptIdx); //6-17
+            this.isMoving = false;
             this.isEntered = false;
             return EnterResult.Handled_Keep_Focus;
         } else {
@@ -254,6 +268,17 @@ export class FlightplanListItem implements Field, ListItem {
             this.ref.instance.classList.remove("d-none");
             this.delRef.instance.classList.add("d-none");
         }
+        if (this.isMoving) {
+            this.ref.instance.classList.add("d-none");
+            this.moveRef.instance.classList.remove("d-none");
+            if (blink) {
+                this.moveRef.instance.classList.add("inverted-blink");
+            } else {
+                this.moveRef.instance.classList.remove("inverted-blink");
+            }
+        } else {
+            this.moveRef.instance.classList.add("d-none");
+        }
         //children is not set, so we have to do this manually
         this.waypointEditor.tick(blink);
         this.waypointEditor.children.walk(c => c.tick(blink));
@@ -303,6 +328,12 @@ export class FlightplanListItem implements Field, ListItem {
             return handled;
         }
         if (this.type === KLNLegType.APP) {
+            //6-17: on the first waypoint of a DME arc in FPL 0, CLR asks MOVE ? and a second CLR withdraws it (4-5)
+            if (this.props.fplIdx === 0 && this.props.leg?.arcData !== undefined) {
+                this.isMoving = !this.isMoving;
+                this.isEntered = this.isMoving;
+                return true;
+            }
             this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "INVALID DEL");
             return true;
         }
