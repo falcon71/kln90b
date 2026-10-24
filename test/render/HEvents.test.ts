@@ -386,7 +386,7 @@ describe('right scan knob (3-13, 3-21)', () => {
 
 describe('Power_Toggle H event (public contract)', () => {
     // The source is the doc comment of HEvents.ts and the wiki page External Hardware: Power_Toggle switches the unit off
-    // when it is on and on when it is off (Power_On and Power_Off set it, PowerButton.test.ts, BrightnessManager.test.ts)
+    // when it is on and on when it is off (Power_On and Power_Off set it, PowerSupply.test.ts, BrightnessManager.test.ts)
     it('switches the unit off, and a second press switches it on again', async () => {
         const unit = await bootUnit();
         // The brightness ramp of the boot has run out, and the save of the setting is deferred

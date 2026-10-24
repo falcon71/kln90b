@@ -1,7 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {EventBus} from '@microsoft/msfs-sdk';
 import {CalcTickable, DisplayTickable, TickController} from '../../kln90b/TickController';
-import {PowerEvent} from '../../kln90b/PowerButton';
+import {PowerEvent} from '../../kln90b/PowerSupply';
 import {ErrorEvent} from '../../kln90b/controls/ErrorPage';
 
 /** What the tickables of one controller recorded */

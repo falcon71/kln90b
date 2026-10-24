@@ -195,7 +195,7 @@ describe('aircraft power interruptions (maintenance manual)', () => {
         expect(Screen.read().row(0)).toBe(' GPS             ORS 20');
     });
 
-    // SimVarSync passes every change of the circuit to PowerButton at once, so a loss of half a second power-cycles the
+    // SimVarSync passes every change of the circuit to PowerSupply at once, so a loss of half a second power-cycles the
     // unit: it restarts with the Turn-On page and the self-test
     it.fails('rides through a 0.5 s loss of the aircraft power (maintenance manual, PDF 53) (#332)', async () => {
         const unit = await onCircuit();

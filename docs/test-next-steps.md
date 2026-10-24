@@ -77,7 +77,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
   worlds of `SuperNav5Page.test.ts`, the obsMode boot of `power.test.ts` and the garbage `wpt0` of
   `FlightplanEdit.test.ts`.
 - **A boot that leaves an `ElectricitySimVar` unit dark from the start.** The `simVars` boot option sets SimVars before
-  `init` (section 4), but the circuit tests of `SimVarSync.test.ts` and `PowerButton.test.ts` still boot powered, lose
+  `init` (section 4), but the circuit tests of `SimVarSync.test.ts` and `PowerSupply.test.ts` still boot powered, lose
   power at the first `SimVarSync` tick and wait 3 s for the unit to go dark, beyond the ride-through a fix of #332 may
   add.
 - **Sampling an LVar.** Tests sample an LVar over display ticks with a hand-written loop (`SimVarSync.test.ts`,
@@ -254,9 +254,9 @@ several tests need it (section 5); a gap that serves one test is listed here ins
 
 - **Code notes** (latent or possibly intended, so questions rather than bugs; the code is unchanged):
     - `TickController.setupLoops` starts new intervals without clearing the old ones. Only the dedup upstream
-      (`PowerButton` publishes a power event on a change only, `SimVarSync` dedups its enable and disable) keeps a second
-      power-on event from doubling every loop, the symptom of #24. That early return of `PowerButton.refreshPowerState`
-      (`PowerButton.ts:118`) is not run by any test.
+      (`PowerSupply` publishes a power event on a change only, `SimVarSync` dedups its enable and disable) keeps a second
+      power-on event from doubling every loop, the symptom of #24. That early return of `PowerSupply.refreshPowerState`
+      (`PowerSupply.ts:122`) is not run by any test.
     - H events sent before `KLN90BCore.init()` are dropped (`7b4465d`), an early power-on included: `KLN90B_Power_On`
       before `init()` leaves a cold-and-dark unit off. The `hEvent` topic is also dropped until
       `hEventPublisher.startPublish()`. Whether an aircraft's early power-on should be kept is open.
@@ -279,7 +279,7 @@ several tests need it (section 5); a gap that serves one test is listed here ins
       baro change takes effect before ENT; the distance indicator's 0 KTS and 0 MIN of Installation Manual 2-69; a time
       entry in a time zone other than UTC.
     - Power cycle: `Timers` saves the total time every 60 s and not at power-off, so STA 4 loses up to 59 s when the sim
-      closes; `PowerButton` counts the first cold power-on as an hour off (intended);
+      closes; `PowerSupply` counts the first cold power-on as an hour off (intended);
       `SimVarSync` ignores the LEG/OBS switch while disabled (read again at the resume); the Direct To and the active
       waypoint survive a power cycle unchanged, while 3-8 only says the last waypoint's page shows; the
       `memory.<x>Page.ident` writes of `PageManager.startMainPage` are equivalent, because `WaypointPage` uses the ident

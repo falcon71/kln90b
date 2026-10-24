@@ -138,7 +138,7 @@ describe('procedures over a power cycle (6-5, 6-23)', () => {
     }, 20_000);
 
     // 6-5: "more than 5 minutes", so exactly 5 minutes keeps the procedures. The time off reaches the memory as
-    // timeSincePowerChange of the power event (PowerButton); the whole-second cycles above cannot hit the millisecond
+    // timeSincePowerChange of the power event (PowerSupply); the whole-second cycles above cannot hit the millisecond
     it('keeps the approach at exactly 5 minutes off and deletes it a millisecond later (6-5) (#94)', async () => {
         const unit = await approachLoaded();
         const before = procedureLegs(unit);

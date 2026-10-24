@@ -1,5 +1,5 @@
 import {EventBus, NodeReference} from "@microsoft/msfs-sdk";
-import {PowerEvent, PowerEventData} from "./PowerButton";
+import {PowerEvent, PowerEventData} from "./PowerSupply";
 import {ErrorEvent} from "./controls/ErrorPage";
 
 export const TICK_TIME_DISPLAY = 250;

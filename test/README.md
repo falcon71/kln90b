@@ -728,7 +728,7 @@ recording (an `it.fails` until #100 was fixed), so a broken flight cannot be mis
   flight-plan strings) have no manual page behind them. They need neither a manual citation nor the word
   `characterization`; they cite their source in a comment instead: `CLAUDE.md` "Public contract with aircraft", the doc
   comments in `HEvents.ts` and `LVars.ts`, or the formats in `docs/architecture.md` (Core 7). The tests of
-  `PowerButton.test.ts` and `BrightnessManager.test.ts` are the examples.
+  `PowerSupply.test.ts` and `BrightnessManager.test.ts` are the examples.
 - **Cite the manual page behind an expectation** in a comment (`// 4-8: ...`), the same as in the code. A test is a
   statement of the real unit's behavior, and the page is the evidence.
 - **Which evidence decides.** The KLN 90B Pilot's Guide and its figures win. Where the guide is silent, a check on the

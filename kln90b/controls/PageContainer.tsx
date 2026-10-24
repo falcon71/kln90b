@@ -12,7 +12,7 @@ import {DisplayTickable, TickController} from "../TickController";
 import {Page, PageProps} from "../pages/Page";
 import {CHAR_HEIGHT, CHAR_WIDTH, MARGIN_X, MARGIN_Y, ZOOM_FACTOR} from "../data/Constants";
 import {KeyboardEvent, KeyboardEventData} from "./StatusLine";
-import {PowerEvent} from "../PowerButton";
+import {PowerEvent} from "../PowerSupply";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 import {ErrorPage} from "./ErrorPage";
 import {PanelXmlErrorPage} from "./PanelXmlErrorPage";

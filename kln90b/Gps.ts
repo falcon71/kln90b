@@ -15,7 +15,7 @@ import {TimeStamp} from "./data/Time";
 import {KLN90BUserSettings} from "./settings/KLN90BUserSettings";
 import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {MessageHandler, OneTimeMessage} from "./data/MessageHandler";
-import {PowerEvent, PowerEventData} from "./PowerButton";
+import {PowerEvent, PowerEventData} from "./PowerSupply";
 import {TICK_TIME_CALC} from "./TickController";
 import {GPS_ERA_DURATION, GpsSearch, HOT_ACQUISITION, HOT_ACQUISITION_RANGE, IDLE_ACQUISITION, SearchMode, WARM_ACQUISITION_RANGE} from "./GpsSearch";
 
@@ -165,7 +165,7 @@ export class GPS {
             'none',
             gpsOptions,
         );
-        //Before the power event subscription, so that powerChanged always finds the search. PowerButton publishes no power
+        //Before the power event subscription, so that powerChanged always finds the search. PowerSupply publishes no power
         //event before Sensors exists, so powerChanged never runs before the end of this constructor
         //The model needs the REAL timings the computer was built with: after a switch from FAST it stays off until the next session
         this.search = new GpsSearch(this.gpsSatComputer, () => fastGPS || this.userSettings.getSetting("fastGpsAcquisition").get());
@@ -371,7 +371,7 @@ export class GPS {
     private powerChanged(evt: PowerEventData) {
         if (evt.isPowered) {
             //Ticks are not running, when we are powered off. The battery clock counts the off time itself:
-            //PowerButton's timeSincePowerChange is shaped for the CRT warm-up and is about 0 on a forced start (#328).
+            //PowerSupply's timeSincePowerChange is shaped for the CRT warm-up and is about 0 on a forced start (#328).
             //It counts sim time: the clock follows the sim's world time, as the satellites do, and a sim pause has no
             //real-world counterpart
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + (SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) - this.lastPowerOffTime) * 1000);

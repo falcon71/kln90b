@@ -21,7 +21,7 @@ import {TimeStamp} from "./Time";
 import {CenterWaypoint} from "../pages/right/Ctr1Page";
 import type {FplPage} from "../pages/left/FplPage";
 import type {Message} from "./MessageHandler";
-import {PowerEvent, PowerEventData} from "../PowerButton";
+import {PowerEvent, PowerEventData} from "../PowerSupply";
 import {Sensors} from "../Sensors";
 
 export interface WaypointPageState<T extends Facility> {

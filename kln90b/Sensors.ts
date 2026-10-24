@@ -14,7 +14,7 @@ import {
 } from "@microsoft/msfs-sdk";
 import {pressureAlt2IndicatedAlt} from "./data/Conversions";
 import {Celsius, Degrees, Feet, Inhg, Knots, NauticalMiles, Seconds} from "./data/Units";
-import {PowerEvent, PowerEventData} from "./PowerButton";
+import {PowerEvent, PowerEventData} from "./PowerSupply";
 import {KLN90BUserSettings} from "./settings/KLN90BUserSettings";
 import {CalcTickable} from "./TickController";
 import {AudioGenerator} from "./services/AudioGenerator";

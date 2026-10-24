@@ -19,7 +19,11 @@ export interface PowerEvent {
     powerEvent: PowerEventData;
 }
 
-export class PowerButton {
+/**
+ * Models the unit's power path: the BRT/PUSH ON knob (ON/OFF and the brightness events it carries), the aircraft power
+ * and the battery module (maintenance manual PDF 53, 54).
+ */
+export class PowerSupply {
 
 
     private powerSwitchOn: boolean = false; //State of the knob

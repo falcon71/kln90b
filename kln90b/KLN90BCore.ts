@@ -30,7 +30,7 @@ import {
 } from '@microsoft/msfs-sdk';
 
 import {KLN90BPlatform} from "./KLN90BPlatform";
-import {PowerButton, PowerEvent} from "./PowerButton";
+import {PowerSupply, PowerEvent} from "./PowerSupply";
 import {KLN90BSettingSaveManager} from "./settings/KLN90BUserSettingsSaverManager";
 import {PageProps} from "./pages/Page";
 import {PageManager} from "./pages/PageManager";
@@ -120,7 +120,7 @@ export class KLN90BCore {
     public readonly bus = new EventBus();
     private keyboardEventSub: Subscription;
 
-    private powerButton: PowerButton | undefined;
+    private powerSupply: PowerSupply | undefined;
     private readonly hEventPublisher: HEventPublisher;
     private readonly settingSaveManager: KLN90BSettingSaveManager;
 
@@ -258,7 +258,7 @@ export class KLN90BCore {
         }
 
         const brightnessManager = new BrightnessManager(this.bus, this.planeSettings);
-        this.powerButton = new PowerButton({
+        this.powerSupply = new PowerSupply({
             bus: this.bus,
             userSettings: this.userSettings,
             planeSettings: this.planeSettings,
@@ -278,7 +278,7 @@ export class KLN90BCore {
         console.log("KLN 90B ready to show welcome page");
 
         if (forceReadyToUse) {
-            this.powerButton.forceReadyToUse();
+            this.powerSupply.forceReadyToUse();
         }
 
         let restoreSuccessFull = true;
@@ -370,7 +370,7 @@ export class KLN90BCore {
                 new SignalOutputFillterTick(sensors),
             ]);
 
-        this.simvarSync = new SimVarSync(this.powerButton, this.planeSettings, this.tickManager, modeController, this.pageManager, brightnessManager, this.wtFlightplanSync, this.hardware);
+        this.simvarSync = new SimVarSync(this.powerSupply, this.planeSettings, this.tickManager, modeController, this.pageManager, brightnessManager, this.wtFlightplanSync, this.hardware);
 
         const msa = new MSA();
 

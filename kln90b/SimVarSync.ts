@@ -1,5 +1,5 @@
 import {SimVarValueType} from "@microsoft/msfs-sdk";
-import {PowerButton} from "./PowerButton";
+import {PowerSupply} from "./PowerSupply";
 import {ELECTRICITY_INDEX, KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {
     LVAR_BRIGHTNESS,
@@ -24,7 +24,7 @@ const SYNC_TICK = 100;
  */
 export class SimVarSync {
 
-    constructor(private readonly powerButton: PowerButton, private readonly settings: KLN90PlaneSettings, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager, private readonly brightnessManager: BrightnessManager, private readonly wtFlightplanSync: WTFlightplanSync, private readonly hardware: Hardware) {
+    constructor(private readonly powerSupply: PowerSupply, private readonly settings: KLN90PlaneSettings, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager, private readonly brightnessManager: BrightnessManager, private readonly wtFlightplanSync: WTFlightplanSync, private readonly hardware: Hardware) {
         window.setInterval(this.tick.bind(this), SYNC_TICK);
     }
 
@@ -35,7 +35,7 @@ export class SimVarSync {
                 this.settings.input.electricitySimVar = this.settings.input.electricitySimVar.replace(ELECTRICITY_INDEX, `:${index}`);
             }
 
-            this.powerButton.setElectricityAvailable(!!SimVar.GetSimVarValue(this.settings.input.electricitySimVar, SimVarValueType.Bool));
+            this.powerSupply.setElectricityAvailable(!!SimVar.GetSimVarValue(this.settings.input.electricitySimVar, SimVarValueType.Bool));
         }
 
         //The only read of L:KLN90B_Disabled: everything else reads hardware.isDisabled (#138)

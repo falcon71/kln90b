@@ -609,7 +609,7 @@ describe('messages at power-on (B-3, B-4)', () => {
 
     // B-4: the clock of a unit that was running all along needs no correction of more than 10 minutes. A flight started
     // with the engine running stands for a unit that is already on, and its clock is right: the GPS measures the off
-    // time itself and no longer depends on the hour PowerButton assumes (#328)
+    // time itself and no longer depends on the hour PowerSupply assumes (#328)
     it('posts no message on an engine-running start at the stored position (B-3, B-4, #328)', async () => {
         const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
         await settle(unit);
@@ -876,7 +876,7 @@ describe('the system clock without a fix (3-53)', () => {
     });
 
     // 3-53: the internal battery clock runs while the unit is off. A cold-and-dark unit that stays unpowered for half an
-    // hour is right when it is switched on (#328: the GPS measures the off time itself, PowerButton's assumed hour is
+    // hour is right when it is switched on (#328: the GPS measures the off time itself, PowerSupply's assumed hour is
     // for the CRT warm-up)
     it('keeps the time over 30 minutes unpowered before the first power-on (3-53, #328)', async () => {
         const unit = await bootUnit({engineRunning: false, storage: {lastLatitude: 47, lastLongitude: 8}});

@@ -62,11 +62,11 @@ topic and rendered by `controls/ErrorPage` as a full-screen error page with a Gi
    unit skips the welcome and self-test pages.
 3. `pageManager.Init(bus, userSettings)` creates the `PageContainer` and shows the `NullPage`. If the parser recorded
    invalid panel.xml values, they are published now as `panelXmlErrors`, because the page that shows them did not
-   exist before. It then constructs `BrightnessManager` and `PowerButton`.
+   exist before. It then constructs `BrightnessManager` and `PowerSupply`.
    From here on, the WelcomePage can be shown while everything else initialises.
 4. Constructs `AudioGenerator`, then `Sensors` (which builds `GPS` and the `KLNGPSSatComputer`), then calls
    `hEventPublisher.startPublish()`.
-   If `forceReadyToUse` is set, it calls `powerButton.forceReadyToUse()`.
+   If `forceReadyToUse` is set, it calls `powerSupply.forceReadyToUse()`.
 5. Navdata: it asks the platform for the facility repository (`KLNFacilityRepository.getRepository(bus)`, a singleton)
    and the facility client (in the sim `new FacilityLoader(FacilityRepository.getRepository(bus))`), builds
    `KLNFacilityLoader(client, klnRepo)` from them, then `Scanlists`.
@@ -91,15 +91,15 @@ topic and rendered by `controls/ErrorPage` as a full-screen error page with a Gi
 and contains:
 `ref, bus, userSettings, planeSettings, sensors, pageManager, messageHandler, hardware, memory (VolatileMemory), facilityLoader,
 facilityRepository, nearestLists, nearestUtils, remarksManager, scanLists, msa, vnav, modeController, database, magvar, sidstar`.
-`PowerButton` and `WelcomePage` start with a reduced `WelcomePageProps` and swap in the full props when `propsReady`
+`PowerSupply` and `WelcomePage` start with a reduced `WelcomePageProps` and swap in the full props when `propsReady`
 arrives.
 
-**Power** (`PowerButton.ts`):
+**Power** (`PowerSupply.ts`):
 
 - State is `powerSwitchOn` (the knob, mirrored to `L:KLN90B_Power`) AND `electricityAvailable`. `SimVarSync` sets
   `electricityAvailable` every 100 ms from `Input.ElectricitySimVar`; if that option is empty, power is always
   available.
-- On a power-on edge, `PowerButton` increments the `powercycles` setting, calls
+- On a power-on edge, `PowerSupply` increments the `powercycles` setting, calls
   `pageManager.setCurrentPage(WelcomePage, props)` and publishes **`powerEvent {isPowered, timeSincePowerChange}`**.
 - On a power-off edge, it shows the `NullPage` and publishes the same event.
 - `lastPowerChangeTime` starts one hour in the past, so the unit is assumed to have been off for one hour.
@@ -146,7 +146,7 @@ disabled nothing claims it, since `SensorsOut.reset()` skips its claim on a powe
   disabled unit follows only the electricity SimVar. Otherwise it handles the SCAN pull state (`Hardware.isScanPulled`,
   mirrored to `L:KLN90B_RightScan`).
   While SCAN is pulled, it remaps right-inner turns to the internal `EVT_R_SCAN_LEFT/RIGHT`.
-- It then calls `hEventPublisher.dispatchHEvent([evt])`, which puts the event on the bus `hEvent` topic. `PowerButton`
+- It then calls `hEventPublisher.dispatchHEvent([evt])`, which puts the event on the bus `hEvent` topic. `PowerSupply`
   listens there for power and brightness events.
 - It also calls `pageManager.onInteractionEvent(evt)`, which handles everything else in pages and controls.
   `EVT_MSG/DCT/ALT/APPR_ARM` are handled in `pages/MainPage.tsx`.
@@ -296,7 +296,7 @@ main computer; RAIM failures are still not modeled.
   since #175). The AIRAC-expired message is the persistent `DatabaseOutOfDateMessage` alone (Core 9).
 - Internal clock `timeZulu` (`data/Time.ts TimeStamp`):
     - At construction it is set from `E:ABSOLUTE TIME` plus a random ±2.5 s. No hour is subtracted, and the hour
-      `PowerButton` assumes for the CRT warm-up is not used.
+      `PowerSupply` assumes for the CRT warm-up is not used.
     - While the unit is off it runs on in sim time: at power-on the `E:ABSOLUTE TIME` elapsed since construction or the
       last power-off is added (#328). A sim pause has no real-world counterpart, so wall-clock time would put the clock
       off by the length of the pause.
@@ -873,7 +873,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   failures, 3-satellite plus altitude solutions, CTA/TMA in the SUA filter (TODO), and the third line of the SUA
   messages (the APT 4 reference for Class B/C and the controlling agency, #210: the sim's data has neither).
 - **Event bus topics** are typed by interfaces declared next to their owner. There is no central file:
-    - `PowerEvent.powerEvent` (`PowerButton.ts`)
+    - `PowerEvent.powerEvent` (`PowerSupply.ts`)
     - `PropsReadyEvent.propsReady` (`KLN90BCore.ts`)
     - `FlightplanEvents.flightplanChanged` (`Flightplan.ts`)
     - `ActiveWaypointChangedEvents.activeWaypointChanged` (`ActiveWaypoint.ts`)
@@ -917,7 +917,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - `PageManager.setCurrentPage(Type, props)` → `PageContainer.setCurrentPage`. This destroys the old Page, runs
   `FSComponent.buildComponent`, then `rerenderCurrentPage()` sets `innerHTML=""` and renders again.
 - Startup sequence. Each step is a full Page:
-    1. `PowerButton.ts` → `WelcomePage`, or `NullPage` when powered off.
+    1. `PowerSupply.ts` → `WelcomePage`, or `NullPage` when powered off.
     2. `WelcomePage.tick` waits about 15 s and for the `propsReady` bus event. It then goes to
        `FiveSegmentPage{SelfTestLeftPage, SelfTestRightPage}`, or to `FourSegmentPage{TakehomePage}` when
        `planeSettings.takeHomeMode` is set.

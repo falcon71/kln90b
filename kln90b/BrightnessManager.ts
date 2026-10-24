@@ -1,5 +1,5 @@
 import {EventBus, MathUtils, SimVarValueType, Wait} from "@microsoft/msfs-sdk";
-import {PowerEvent, PowerEventData} from "./PowerButton";
+import {PowerEvent, PowerEventData} from "./PowerSupply";
 import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {LVAR_BRIGHTNESS} from "./LVars";
 

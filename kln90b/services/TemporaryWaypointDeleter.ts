@@ -1,6 +1,6 @@
 import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
 import {EventBus, FacilityType, ICAO, IcaoValue, UserFacility} from "@microsoft/msfs-sdk";
-import {PowerEvent} from "../PowerButton";
+import {PowerEvent} from "../PowerSupply";
 import {Flightplan} from "../data/flightplan/Flightplan";
 import {TEMPORARY_WAYPOINT} from "../data/navdata/IcaoBuilder";
 
