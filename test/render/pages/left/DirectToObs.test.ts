@@ -159,7 +159,7 @@ describe('Direct To in OBS mode (5-37)', () => {
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(500);
 
-        expect(Screen.read().status().mode).toBe('d› CRS 024'); // 034.2 true less the variation of 10 E
+        expect(Screen.read().status().mode).toBe('d› CRS 024°'); // 034.2 true less the variation of 10 E
     });
 
     // 5-37 (5.9.6): a driven indicator (ObsTarget 1, VOR 1) is slewed to the direct course, with no message
@@ -211,7 +211,7 @@ describe('Direct To in OBS mode, the CRS message at north (characterization)', (
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(500);
 
-        expect(Screen.read().status().mode).toBe('d› CRS 000');
+        expect(Screen.read().status().mode).toBe('d› CRS 000°');
     });
 });
 
