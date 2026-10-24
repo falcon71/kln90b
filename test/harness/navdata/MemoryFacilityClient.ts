@@ -1,6 +1,6 @@
 import {
-    AirportFacility, BoundaryFacility, Facility, FacilitySearchType, FacilityType, GeoKdTree, GeoPoint, ICAO, IcaoValue,
-    LegType, NearestSearchResults, UnitType, VorFacility,
+    AirportFacility, AirwayData, BoundaryFacility, Facility, FacilitySearchType, FacilityType, GeoKdTree, GeoPoint, ICAO, IcaoValue,
+    IntersectionFacility, LegType, NearestSearchResults, UnitType, VorFacility,
 } from '@microsoft/msfs-sdk';
 import {distanceToBoxNm} from './airspaces';
 
@@ -148,6 +148,7 @@ export class MemoryFacilityClient {
     private readonly byUid = new Map<string, Facility>();
     private readonly trees = new Map<FacilityType, GeoKdTree<Facility>>();
     private readonly airspaces: BoundaryFacility[] = [];
+    private readonly airways = new Map<string, Facility[]>();
     private nextSessionId = 1;
 
     constructor(facilities: Facility[] = [], airspaces: BoundaryFacility[] = []) {
@@ -169,6 +170,15 @@ export class MemoryFacilityClient {
     /** Adds an airspace (see airspaces.ts). Boundary sessions serve it, also those started before. */
     public addAirspace(airspace: BoundaryFacility): void {
         this.airspaces.push(airspace);
+    }
+
+    /**
+     * Adds an airway: its fixes in order. getAirway serves it for any fix on it. The fixes are not added as facilities;
+     * add them with add() as well when they are to be found otherwise. A VOR keeps its type V ICAO, as the sim gives a
+     * VOR on an airway.
+     */
+    public addAirway(name: string, fixes: Facility[]): void {
+        this.airways.set(name, fixes);
     }
 
     /** Removes the airspace with this id. A boundary session that had it in its last result reports the id as removed in its next search. */
@@ -226,6 +236,16 @@ export class MemoryFacilityClient {
         const value = typeof icao === 'string' ? (icao.length === 19 ? ICAO.stringV2ToValue(icao) : ICAO.stringV1ToValue(icao)) : icao;
         const fac = this.byUid.get(ICAO.getUid(value));
         return fac ? Promise.resolve(fac) : Promise.reject(new Error(`MemoryFacilityClient: no facility ${ICAO.tryValueToStringV2(value)}`));
+    }
+
+    /** Like the sim: the airway of that name through the fix, else a rejection. The type is ignored. */
+    public getAirway(name: string, _type: number, icao: IcaoValue): Promise<AirwayData> {
+        const fixes = this.airways.get(name);
+        const uid = ICAO.getUid(icao);
+        if (fixes === undefined || !fixes.some(f => ICAO.getUid(f.icaoStruct) === uid)) {
+            return Promise.reject(new Error(`MemoryFacilityClient: no airway ${name} through ${ICAO.tryValueToStringV2(icao)}`));
+        }
+        return Promise.resolve({name, type: 0, waypoints: fixes as IntersectionFacility[]});
     }
 
     public searchByIdentWithIcaoStructs(filter: FacilitySearchType, ident: string, maxItems = 40): Promise<IcaoValue[]> {

@@ -11,8 +11,9 @@ import {identsOf} from '../../harness/readers';
 
 // Appendix B (B-4: WAYPOINT ______ DELETED; B-3: OTHER WAYPOINTS DELETED when that message would be effective for more
 // than ten waypoints). The flight plans of the unit are cut at 30 legs (4-1), and the legs that no longer exist in
-// the database are dropped. The three loaders (V1, V2 and the EFB loader) share loadIcaos; the V2 loader is the one the
-// unit uses to restore (UserFlightplanLoaderV2.test.ts covers its format).
+// the database are dropped. The stored-plan loaders (V1, V2) share loadIcaos, and the EFB import shares its message
+// limit (addDeletedMessages, #195); the V2 loader is the one the unit uses to restore (UserFlightplanLoaderV2.test.ts
+// covers its format).
 const bus = new EventBus();
 const repo = KLNFacilityRepository.getRepository(bus);
 const KNOWN = Array.from({length: 40}, (_, i) => vor(`K${String(i).padStart(2, '0')}`, 47 + i / 100, 8, {region: 'K1'}));

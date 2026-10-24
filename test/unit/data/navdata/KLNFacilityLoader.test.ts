@@ -298,3 +298,40 @@ describe('KLNFacilityLoader nearest search sessions', () => {
         });
     });
 });
+
+describe('KLNFacilityLoader airways', () => {
+    const fixA = intersection('FIXAA', 47.0, 8.0);
+    const fixB = intersection('FIXBB', 47.5, 8.5);
+    const fixC = intersection('FIXCC', 48.0, 9.0);
+
+    /** A loader over a sim client that knows the airway Y100 with the fixes A, B and C in this order */
+    function airwayLoader(): KLNFacilityLoader {
+        const client = new MemoryFacilityClient([fixA, fixB, fixC]);
+        client.addAirway('Y100', [fixA, fixB, fixC]);
+        return new KLNFacilityLoader(client as unknown as ActualFacilityClient, KLNFacilityRepository.getRepository(new EventBus()));
+    }
+
+    it("getAirway asks the sim's facility loader", async () => {
+        const airway = await airwayLoader().getAirway('Y100', 0, fixB.icaoStruct);
+
+        expect(airway.name).toBe('Y100');
+        expect(airway.waypoints.map(w => w.icaoStruct.ident)).toEqual(['FIXAA', 'FIXBB', 'FIXCC']);
+    });
+
+    it('getAirway converts a V1 ICAO string like getFacility does', async () => {
+        const airway = await airwayLoader().getAirway('Y100', 0, ICAO.valueToStringV1(fixC.icaoStruct));
+
+        expect(airway.waypoints.map(w => w.icaoStruct.ident)).toEqual(['FIXAA', 'FIXBB', 'FIXCC']);
+    });
+
+    it('getAirway rejects when the sim has no such airway through the fix', async () => {
+        await expect(airwayLoader().getAirway('Y200', 0, fixB.icaoStruct)).rejects.toThrow();
+    });
+
+    it('tryGetAirway resolves the airway, or null when the sim rejects', async () => {
+        const loader = airwayLoader();
+
+        expect((await loader.tryGetAirway('Y100', 0, fixA.icaoStruct))?.waypoints.map(w => w.icaoStruct.ident)).toEqual(['FIXAA', 'FIXBB', 'FIXCC']);
+        await expect(loader.tryGetAirway('Y200', 0, fixA.icaoStruct)).resolves.toBeNull();
+    });
+});

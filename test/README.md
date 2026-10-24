@@ -274,7 +274,9 @@ resolves, like a sim with no EFB.
   identity. The unit loads it into FPL 0 and shows FPL 0 on the left.
 - `request()` asks the unit for its route and returns the request id. The answer lands in `replies`.
 - `efbRoute({departure, destination, enroute})` builds a route on the SDK's empty route. An enroute entry is a facility
-  (its ICAO is the fix) or `{lat, lon}`, which the unit imports as a temporary user waypoint (region `XY`).
+  (its ICAO is the fix), `{lat, lon}`, which the unit imports as a temporary user waypoint (region `XY`),
+  `{pbd: {reference, bearing, distance, name}}` (a point-bearing-distance leg), `{fix, via}` (the exit fix of the
+  airway `via`; add the airway with `unit.navdata.addAirway`) or `{ppos: true}` (a present-position leg).
 
 ## Procedures
 

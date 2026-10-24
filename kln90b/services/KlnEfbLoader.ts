@@ -1,35 +1,31 @@
-import {
-    DeepReadonly,
-    EventBus,
-    Facility,
-    FacilityClient,
-    FlightPlanRouteEnrouteLeg,
-    FlightPlanRouteManager,
-    ICAO,
-    IcaoValue,
-    ReadonlyFlightPlanRoute,
-    UserFacility,
-    UserFacilityType,
-} from "@microsoft/msfs-sdk";
+import {EventBus, Facility, FacilityClient, FlightPlanRouteManager, ReadonlyFlightPlanRoute} from "@microsoft/msfs-sdk";
 import {Flightplan} from "../data/flightplan/Flightplan";
-import {MessageHandler} from "../data/MessageHandler";
+import {MessageHandler, OneTimeMessage} from "../data/MessageHandler";
 import {Flightplanloader} from "./Flightplanloader";
 import {MainPage} from "../pages/MainPage";
 import {Fpl0Page} from "../pages/left/FplPage";
 import {PageManager} from "../pages/PageManager";
-import {getUniqueIdent} from "../data/navdata/UniqueIdentGenerator";
-import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "../data/navdata/IcaoBuilder";
-import {StatusLineMessageEvents} from "../controls/StatusLine";
 import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
 import {Hardware} from "../Hardware";
+import {EfbRouteResolver} from "./EfbRouteResolver";
+import {fitEfbRoute} from "./EfbRouteFit";
+import {TemporaryWaypointDeleter} from "./TemporaryWaypointDeleter";
 
 /**
- * Imports routes from the EFB into the KLN
+ * Imports routes from the EFB into the KLN. The route is resolved first (EfbRouteResolver), then fitted into the
+ * limits of FPL 0 in one step (fitEfbRoute, #195)
  */
 export class KlnEfbLoader extends Flightplanloader {
 
-    constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler, private readonly flightPlanRouteManager: FlightPlanRouteManager, private readonly fpl0: Flightplan, private readonly pageManager: PageManager, private readonly facilityRepository: KLNFacilityRepository, private readonly hardware: Hardware) {
+    private readonly resolver: EfbRouteResolver;
+    private readonly fpl0: Flightplan;
+    /** Counts the imports, so that one overtaken by a newer route can tell */
+    private loadOpId = 0;
+
+    constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler, private readonly flightPlanRouteManager: FlightPlanRouteManager, private readonly flightplans: Flightplan[], private readonly pageManager: PageManager, private readonly facilityRepository: KLNFacilityRepository, private readonly hardware: Hardware) {
         super(bus, facilityLoader, messageHandler);
+        this.fpl0 = flightplans[0];
+        this.resolver = new EfbRouteResolver(bus, facilityLoader, facilityRepository);
         this.flightPlanRouteManager.syncedAvionicsRoute.sub(this.loadRoute.bind(this));
     }
 
@@ -40,111 +36,53 @@ export class KlnEfbLoader extends Flightplanloader {
             return;
         }
 
+        const opId = ++this.loadOpId;
         console.log("Loading route", route);
 
-        const fpl = await this.doLoad(route);
+        if (route === null) {
+            this.fpl0.load(new Flightplan(0, [], this.bus));
+            this.showFpl0();
+            return;
+        }
 
+        const resolved = await this.resolver.resolve(route);
+        if (opId !== this.loadOpId) {
+            //Design §6: the newest route wins. This one neither loads FPL 0 nor reports anything
+            console.log("Route overtaken by a newer one", route);
+            return;
+        }
+
+        const fit = fitEfbRoute(resolved);
+        const fpl = new Flightplan(0, fit.legs, this.bus);
         console.log("Route loaded", fpl);
-
         this.fpl0.load(fpl);
 
         //TODO would be nice, if we could add SID and STAR here
 
+        this.removeUnusedWaypoints(resolved.createdWaypoints);
+        this.addDeletedMessages(fit.deleted.map(ident => new OneTimeMessage([`WAYPOINT ${ident} DELETED`])));
+        this.showFpl0();
+    }
+
+    private showFpl0(): void {
         const currentPage = this.pageManager.getCurrentPage();
         if (currentPage instanceof MainPage) { //We might still be on the self-test page
             currentPage.replaceLeftBasePage(new Fpl0Page(currentPage.props));
         }
     }
 
-
-    private async doLoad(route: ReadonlyFlightPlanRoute | null): Promise<Flightplan> {
-        if (route === null) {
-            return new Flightplan(0, [], this.bus);
-        }
-
-        const icaos: IcaoValue[] = [];
-
-        if (!ICAO.isValueEmpty(route.departureAirport)) {
-            icaos.push(route.departureAirport);
-        }
-
-        for (const enroute of route.enroute) {
-            const converted = await this.loadLeg(enroute);
-            if (converted) {
-                icaos.push(converted);
-            }
-        }
-
-        if (!ICAO.isValueEmpty(route.destinationAirport)) {
-            icaos.push(route.destinationAirport);
-        }
-
-
-        return this.loadIcaos(icaos);
-    }
-
-    private async loadLeg(enroute: DeepReadonly<FlightPlanRouteEnrouteLeg>): Promise<IcaoValue | null> {
-        if (enroute.hasLatLon) {
-            const held = this.findHeldWaypoint(enroute.fixIcao);
-            if (held !== undefined) {
-                return held.icaoStruct;
-            }
-
-            let ident = "CUST";
-            if (!ICAO.isValueEmpty(enroute.fixIcao)) {
-                ident = enroute.fixIcao.ident;
-            }
-
-            //Will be added as a temporary user waypoint
-            const newIdent = await getUniqueIdent(ident, this.facilityLoader);
-
-            if (newIdent === null) {
-                return this.notFoundIcao(ident); //This waypoint will not be found and cause a WAYPOINT DELETED message
-            }
-
-            const facility: UserFacility = {
-                icao: buildIcao('U', TEMPORARY_WAYPOINT, newIdent),
-                icaoStruct: buildIcaoStruct('U', TEMPORARY_WAYPOINT, newIdent),
-                name: "",
-                lat: enroute.lat,
-                lon: enroute.lon,
-                region: TEMPORARY_WAYPOINT,
-                city: "",
-                isTemporary: false, //irrelevant, because this flag is not persisted
-                userFacilityType: UserFacilityType.LAT_LONG,
-            };
-            console.log("Adding temporary user waypoint", facility);
-
-            try {
-                this.facilityRepository.add(facility);
-                return facility.icaoStruct;
-            } catch (e) {
-                this.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "USR DB FULL");
-                console.error(e);
-                return this.notFoundIcao(ident); //This waypoint will not be found and cause a WAYPOINT DELETED message
-            }
-
-
-        } else if (!ICAO.isValueEmpty(enroute.fixIcao)) {
-            return enroute.fixIcao;
-        }
-        return null;
-    }
-
     /**
-     * #187, the maintainer's ruling: KlnEfbSaver sends a user (region XX) or temporary (region XY) waypoint as a lat/lon
-     * leg whose fixIcao names it, always with the type U. When the EFB syncs that leg back and the unit still holds the
-     * waypoint, the leg is that waypoint, matched by region and ident whatever its type, with the position the unit
-     * holds. The repository holds only user and temporary waypoints, so a database fix never matches
+     * Design §6: removes the waypoints this import created that no flight plan uses, the temporary waypoints of legs the
+     * fit cut, so that OTH 3 does not list them. Nothing else in the repository is touched: a waypoint that was there
+     * before, or that the pilot creates while the route resolves, stays (the power-on cleanup, 5-22, takes the unused
+     * temporary ones)
      */
-    private findHeldWaypoint(fixIcao: DeepReadonly<IcaoValue>): Facility | undefined {
-        let held: Facility | undefined = undefined;
-        this.facilityRepository.forEach(fac => {
-            if (fac.icaoStruct.region === fixIcao.region && fac.icaoStruct.ident === fixIcao.ident) {
-                held = fac;
+    private removeUnusedWaypoints(created: Facility[]): void {
+        for (const fac of created) {
+            if (TemporaryWaypointDeleter.findUsageInFlightplans(fac.icaoStruct, this.flightplans) === null) {
+                console.log("Removing the temporary waypoint of a cut leg", fac);
+                this.facilityRepository.remove(fac);
             }
-        });
-        return held;
+        }
     }
-
 }

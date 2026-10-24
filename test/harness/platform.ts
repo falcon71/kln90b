@@ -41,11 +41,26 @@ export class FakeRouteManager {
     }
 }
 
+/**
+ * An enroute leg of an EFB route (the SDK's FlightPlanRouteEnrouteLeg):
+ * - a database facility: its ICAO is the fix, flown direct;
+ * - a lat/lon point, which the unit imports as a temporary waypoint;
+ * - `pbd`: a point at a true bearing and a distance in NM from a reference facility (hasPointBearingDistance), with the
+ *   name the EFB gives it (empty when left out);
+ * - `fix` with `via`: the exit fix of the airway named `via`;
+ * - `ppos`: a leg to the present position (isPpos).
+ */
+export type EfbEnrouteSpec =
+    | Facility
+    | { lat: number; lon: number }
+    | { pbd: { reference: Facility; bearing: number; distance: number; name?: string } }
+    | { fix: Facility; via: string }
+    | { ppos: true };
+
 export interface EfbRouteSpec {
     departure?: Facility;
     destination?: Facility;
-    /** A database facility (its ICAO is the fix) or a lat/lon point, which the unit imports as a temporary waypoint */
-    enroute?: (Facility | { lat: number; lon: number })[];
+    enroute?: EfbEnrouteSpec[];
 }
 
 /** A route as the EFB syncs it, built on the SDK's empty route so that every field the unit may read exists */
@@ -57,6 +72,17 @@ export function efbRoute(spec: EfbRouteSpec): FlightPlanRoute {
         const leg = FlightPlanRouteUtils.emptyEnrouteLeg();
         if ('icaoStruct' in point) {
             leg.fixIcao = point.icaoStruct;
+        } else if ('pbd' in point) {
+            leg.hasPointBearingDistance = true;
+            leg.referenceIcao = point.pbd.reference.icaoStruct;
+            leg.bearing = point.pbd.bearing;
+            leg.distance = point.pbd.distance;
+            leg.name = point.pbd.name ?? '';
+        } else if ('via' in point) {
+            leg.fixIcao = point.fix.icaoStruct;
+            leg.via = point.via;
+        } else if ('ppos' in point) {
+            leg.isPpos = true;
         } else {
             leg.hasLatLon = true;
             leg.lat = point.lat;

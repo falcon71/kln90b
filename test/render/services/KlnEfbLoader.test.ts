@@ -1,4 +1,4 @@
-import {Facility, FacilityType, FlightPlanRoute, FlightPlanRouteUtils, ICAO, UserFacilityType} from '@microsoft/msfs-sdk';
+import {Facility, FacilityType, FlightPlanRoute, FlightPlanRouteUtils, ICAO, UserFacilityType, VorFacility} from '@microsoft/msfs-sdk';
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {efbRoute} from '../../harness/platform';
@@ -154,9 +154,9 @@ describe('EFB route import (KlnEfbLoader)', () => {
         expect(messages(unit)).toContain('WAYPOINT CUST DELETED');
     });
 
-    // The loader keeps the first 30 waypoints of a longer route, so the destination of a route of 31 is the one reported
-    // deleted
-    it('keeps the first 30 waypoints of a route of 31 and reports the destination deleted (characterization)', async () => {
+    // #195 (design §4): the destination keeps its place in the 30 en-route waypoints (4-1), so a route of 31 loses its
+    // last en-route fix instead of its destination
+    it('keeps the destination of a route of 31 and reports the last en-route fix deleted (#195)', async () => {
         const fixes = Array.from({length: 29}, (_, i) => intersection(`W${String(i + 1).padStart(2, '0')}`, 47.0 + i * 0.01, 8.5));
         const unit = await bootUnit({facilities: [kaaa, kbbb, ...fixes], efb: true});
         await settle(unit);
@@ -164,8 +164,377 @@ describe('EFB route import (KlnEfbLoader)', () => {
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: fixes}));
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(fplIdents(unit)).toEqual(['KAAA', ...fixes.map(f => f.icaoStruct.ident)]);
+        expect(fplIdents(unit)).toEqual(['KAAA', ...fixes.slice(0, 28).map(f => f.icaoStruct.ident), 'KBBB']);
+        expect(messages(unit)).toContain('WAYPOINT W29 DELETED');
+        expect(messages(unit)).not.toContain('WAYPOINT KBBB DELETED');
+    });
+
+    // Appendix B: more than ten deleted waypoints give the first ten and OTHER WAYPOINTS DELETED, as loadIcaos does
+    it('shows 10 deleted waypoints and OTHER WAYPOINTS DELETED for a longer cut', async () => {
+        const fixes = Array.from({length: 45}, (_, i) => intersection(`W${String(i + 1).padStart(2, '0')}`, 47.0 + i * 0.01, 8.5));
+        const unit = await bootUnit({facilities: [kaaa, kbbb, ...fixes], efb: true});
+        await settle(unit);
+        const before = messages(unit).length;
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: fixes}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(messages(unit).slice(before).filter(m => m.includes('DELETED'))).toEqual([
+            'WAYPOINT W29 DELETED', 'WAYPOINT W30 DELETED', 'WAYPOINT W31 DELETED', 'WAYPOINT W32 DELETED',
+            'WAYPOINT W33 DELETED', 'WAYPOINT W34 DELETED', 'WAYPOINT W35 DELETED', 'WAYPOINT W36 DELETED',
+            'WAYPOINT W37 DELETED', 'WAYPOINT W38 DELETED', 'OTHER WAYPOINTS DELETED',
+        ]);
+        expect(fplIdents(unit)[29]).toBe('KBBB');
+    });
+
+    // #195 (design §6): the temporary waypoint of a lat/lon leg that the limit cuts is created, then removed again, so
+    // that OTH 3 does not list a waypoint no plan uses
+    it('removes the temporary waypoint of a cut lat/lon leg (#195)', async () => {
+        const fixes = Array.from({length: 28}, (_, i) => intersection(`W${String(i + 1).padStart(2, '0')}`, 47.0 + i * 0.01, 8.5));
+        const unit = await bootUnit({facilities: [kaaa, kbbb, ...fixes], efb: true});
+        await settle(unit);
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [...fixes, {lat: 47.5, lon: 8.6}]}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', ...fixes.map(f => f.icaoStruct.ident), 'KBBB']);
+        expect(userWaypoints(unit)).toEqual([]);
+        expect(messages(unit)).toContain('WAYPOINT CUST DELETED');
+    });
+
+    // #195 (design §6): only the waypoints this import added are removed. CUST, made by the first import, is in no
+    // plan after the second, but stays until the power-on cleanup (5-22, TemporaryWaypointDeleter)
+    it('keeps a temporary waypoint that existed before the import', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
+        await settle(unit);
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [{lat: 47.1, lon: 8.1}]}));
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(fplIdents(unit)).toEqual(['KAAA', 'CUST', 'KBBB']); // Precondition
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
+        expect(userWaypoints(unit).map(f => [f.icaoStruct.ident, f.icaoStruct.region])).toEqual([['CUST', 'XY']]);
+    });
+
+    // Design §6: the import removes only the waypoints it created itself. FARM, a saved user waypoint (region XX) in
+    // no plan, stays when the import removes the temporary waypoint of its cut lat/lon leg
+    it('keeps a saved user waypoint in no plan through an import that cuts a lat/lon leg', async () => {
+        const fixes = Array.from({length: 28}, (_, i) => intersection(`W${String(i + 1).padStart(2, '0')}`, 47.0 + i * 0.01, 8.5));
+        const unit = await bootUnit({
+            facilities: [kaaa, kbbb, ...fixes], efb: true,
+            storage: savedUserWaypoints([{kind: 'sup', ident: 'FARM', lat: 47.2, lon: 8.1}]),
+        });
+        await settle(unit);
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [...fixes, {lat: 47.5, lon: 8.6}]}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(messages(unit)).toContain('WAYPOINT CUST DELETED'); // Precondition: the lat/lon leg was cut
+        expect(userWaypoints(unit).map(f => [f.icaoStruct.ident, f.icaoStruct.region])).toEqual([['FARM', 'XX']]);
+    });
+
+    // Design §5: the departure and the destination are reported like any fix that cannot be found, and the rest loads
+    it('reports a departure airport that is not in the database and loads the rest (#195)', async () => {
+        const a = intersection('A', 47.2, 8.1);
+        const unit = await bootUnit({facilities: [kbbb, a], efb: true});
+        await settle(unit);
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [a]}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['A', 'KBBB']);
+        expect(messages(unit)).toContain('WAYPOINT KAAA DELETED');
+    });
+
+    it('reports a destination airport that is not in the database and loads the rest (#195)', async () => {
+        const a = intersection('A', 47.2, 8.1);
+        const unit = await bootUnit({facilities: [kaaa, a], efb: true});
+        await settle(unit);
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [a]}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'A']);
         expect(messages(unit)).toContain('WAYPOINT KBBB DELETED');
+    });
+
+    // Design §2: a PPOS leg is ignored, as before; the rest of the route loads and nothing is reported
+    it('skips a PPOS leg (design §2)', async () => {
+        const a = intersection('A', 47.2, 8.1);
+        const unit = await bootUnit({facilities: [kaaa, kbbb, a], efb: true});
+        await settle(unit);
+        const before = messages(unit).length;
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [{ppos: true}, a]}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'A', 'KBBB']);
+        expect(messages(unit).slice(before).filter(m => m.includes('DELETED'))).toEqual([]);
+    });
+
+    // Design §6: the newest route wins. The first route is still resolving when the second arrives, so it neither
+    // loads FPL 0 nor reports its unknown fix
+    it('loads only the newest of two routes synced at once', async () => {
+        const zzz = intersection('ZZZ', 47.2, 8.1); // not in the database
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
+        await settle(unit);
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [zzz]}));
+        unit.efb!.sync(efbRoute({departure: kbbb, destination: kaaa}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KBBB', 'KAAA']);
+        expect(messages(unit)).not.toContain('WAYPOINT ZZZ DELETED');
+    });
+
+    // Design §6: the EFB clears the route (null) while the route before it is still resolving. FPL 0 ends empty and
+    // the overtaken route reports nothing
+    it('empties FPL 0 when null follows a route (design §6)', async () => {
+        const zzz = intersection('ZZZ', 47.2, 8.1); // not in the database
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
+        await settle(unit);
+        const before = messages(unit).length;
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [zzz]}));
+        unit.efb!.sync(null);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual([]);
+        expect(messages(unit).slice(before).filter(m => m.includes('DELETED'))).toEqual([]);
+    });
+});
+
+// #195.1 (design §5): a point-bearing-distance leg (EDDF DKB180/15 WLD EDDM in #195) becomes a temporary waypoint
+// like a named lat/lon leg
+describe('EFB route import of point-bearing-distance legs (#195)', () => {
+    const dkb = vor('DKB', 49.0, 10.0);
+    const wld = intersection('WLD', 48.5, 10.5);
+
+    async function syncPbd(facilities: Facility[], name: string): Promise<HeadlessUnit> {
+        const unit = await bootUnit({facilities: [kaaa, kbbb, wld, ...facilities], efb: true});
+        await settle(unit);
+        unit.efb!.sync(efbRoute({
+            departure: kaaa, destination: kbbb,
+            enroute: [{pbd: {reference: dkb, bearing: 180, distance: 15, name}}, wld],
+        }));
+        await vi.advanceTimersByTimeAsync(2000);
+        return unit;
+    }
+
+    // 15 NM due south of 49.0 N is 0.25° of latitude
+    it('loads a point-bearing-distance leg as a temporary waypoint at the bearing and distance (#195)', async () => {
+        const unit = await syncPbd([dkb], 'DKB180');
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'DKB1', 'WLD', 'KBBB']);
+        const wpt = unit.props.memory.fplPage.flightplans[0].getLegs()[1].wpt;
+        expect(wpt.icaoStruct.region).toBe('XY');
+        expect(wpt.icaoStruct.type).toBe('U');
+        expect(wpt.lat).toBeCloseTo(48.75, 3);
+        expect(wpt.lon).toBeCloseTo(10.0, 3);
+        expect(userWaypoints(unit).map(f => f.icaoStruct.ident)).toEqual(['DKB1']);
+    });
+
+    // A bearing that is not symmetric: 15 NM due east of 49.0 N 10.0 E along the great circle (spherical, the SDK's
+    // GeoPoint.offset) is 48.9994 N 10.3808 E
+    it('places a point-bearing-distance waypoint east of its reference for a bearing of 090° (#195)', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb, wld, dkb], efb: true});
+        await settle(unit);
+
+        unit.efb!.sync(efbRoute({
+            departure: kaaa, destination: kbbb,
+            enroute: [{pbd: {reference: dkb, bearing: 90, distance: 15, name: 'DKB090'}}, wld],
+        }));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'DKB0', 'WLD', 'KBBB']);
+        const wpt = unit.props.memory.fplPage.flightplans[0].getLegs()[1].wpt;
+        expect(wpt.lat).toBeCloseTo(48.9994, 3);
+        expect(wpt.lon).toBeCloseTo(10.3808, 3);
+    });
+
+    // The reference ident is DKB, which the VOR has, so the first free letter makes it DKBA
+    it('names an unnamed point-bearing-distance waypoint after its reference (#195)', async () => {
+        const unit = await syncPbd([dkb], '');
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'DKBA', 'WLD', 'KBBB']);
+    });
+
+    it('drops a point-bearing-distance leg whose reference is not in the database (#195)', async () => {
+        const unit = await syncPbd([], 'DKB180');
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'WLD', 'KBBB']);
+        expect(messages(unit)).toContain('WAYPOINT DKB1 DELETED');
+        expect(userWaypoints(unit)).toEqual([]);
+    });
+
+    // The MSG page does not truncate: WAYPOINT, the ident and DELETED fit the 23 columns for up to 6 characters, so the
+    // message names the four characters the waypoint would have had
+    it('reports a long point-bearing-distance name by its first four characters (#195)', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb, wld], efb: true});
+        await settle(unit);
+        const before = messages(unit).length;
+
+        unit.efb!.sync(efbRoute({
+            departure: kaaa, destination: kbbb,
+            enroute: [{pbd: {reference: dkb, bearing: 180, distance: 15, name: 'DKB180/15'}}, wld],
+        }));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(messages(unit).slice(before).filter(m => m.includes('DELETED'))).toEqual(['WAYPOINT DKB1 DELETED']);
+    });
+
+    // The same when no letter is free for the waypoint: 27 legs take FARM and FARMA to FARMZ, the 28th is reported
+    it('reports a long lat/lon name by its first four characters when no letter is free (#195)', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
+        await settle(unit);
+        const before = messages(unit).length;
+        const points = Array.from({length: 28}, (_, i) => ({name: 'FARMSTEAD', lat: 47.0 + i * 0.01, lon: 8.3}));
+
+        unit.efb!.sync(namedLatLonRoute(points));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(messages(unit).slice(before).filter(m => m.includes('DELETED'))).toEqual(['WAYPOINT FARM DELETED']);
+    });
+});
+
+// #195.2 (design §5): an airway is expanded into its fixes (KMIA … KPASA Q118 BONNT … KORD in #195). Only the
+// airway's exit and the fixes on either side are in the database; F1, F2 and F3 come from the airway alone
+describe('EFB route import of airways (#195)', () => {
+    const kmia = airport('KMIA', 25.8, -80.3);
+    const kord = airport('KORD', 41.98, -87.9);
+    const kpasa = intersection('KPASA', 26.5, -80.5);
+    const f1 = intersection('F1', 27.0, -80.6);
+    const f2 = intersection('F2', 27.5, -80.7);
+    const hevan = intersection('HEVAN', 28.0, -80.8);
+    const f3 = intersection('F3', 28.5, -80.9);
+    const bonnt = intersection('BONNT', 30.0, -82.0);
+
+    async function boot(facilities: Facility[] = []): Promise<HeadlessUnit> {
+        const unit = await bootUnit({facilities: [kmia, kord, kpasa, hevan, bonnt, ...facilities], efb: true});
+        await settle(unit);
+        return unit;
+    }
+
+    async function syncQ118(unit: HeadlessUnit): Promise<void> {
+        unit.efb!.sync(efbRoute({departure: kmia, destination: kord, enroute: [kpasa, {fix: hevan, via: 'Q118'}, bonnt]}));
+        await vi.advanceTimersByTimeAsync(2000);
+    }
+
+    it('expands an airway into its fixes (#195)', async () => {
+        const unit = await boot();
+        unit.navdata.addAirway('Q118', [kpasa, f1, f2, hevan, f3]);
+
+        await syncQ118(unit);
+
+        expect(fplIdents(unit)).toEqual(['KMIA', 'KPASA', 'F1', 'F2', 'HEVAN', 'BONNT', 'KORD']);
+    });
+
+    it('expands an airway flown against its listed order (#195)', async () => {
+        const unit = await boot();
+        unit.navdata.addAirway('Q118', [f3, hevan, f2, f1, kpasa]);
+
+        await syncQ118(unit);
+
+        expect(fplIdents(unit)).toEqual(['KMIA', 'KPASA', 'F1', 'F2', 'HEVAN', 'BONNT', 'KORD']);
+    });
+
+    // The sim gives a VOR on an airway as an intersection record with the VOR's ICAO; the leg is the VOR of the
+    // database (with its frequency), as the SDK's Garmin route loader does
+    it('loads a VOR on an airway as the VOR (#195)', async () => {
+        const vvv = vor('VVV', 27.5, -80.7, {frequencyMHz: 113.9});
+        const vvvOnAirway = {...intersection('VVV', 27.5, -80.7), icaoStruct: vvv.icaoStruct} as Facility;
+        const unit = await boot([vvv]);
+        unit.navdata.addAirway('Q118', [kpasa, f1, vvvOnAirway, hevan, f3]);
+
+        await syncQ118(unit);
+
+        expect(fplIdents(unit)).toEqual(['KMIA', 'KPASA', 'F1', 'VVV', 'HEVAN', 'BONNT', 'KORD']);
+        const wpt = unit.props.memory.fplPage.flightplans[0].getLegs()[3].wpt;
+        expect(wpt.icaoStruct.type).toBe('V');
+        expect((wpt as VorFacility).freqMHz).toBe(113.9);
+    });
+
+    // A VOR on the airway that the database does not have is reported like any fix that cannot be found; the airway's
+    // other fixes load
+    it('reports a VOR on an airway that is not in the database (#195)', async () => {
+        const vvvOnAirway = {...intersection('VVV', 27.5, -80.7), icaoStruct: vor('VVV', 27.5, -80.7).icaoStruct} as Facility;
+        const unit = await boot();
+        unit.navdata.addAirway('Q118', [kpasa, f1, vvvOnAirway, hevan, f3]);
+
+        await syncQ118(unit);
+
+        expect(fplIdents(unit)).toEqual(['KMIA', 'KPASA', 'F1', 'HEVAN', 'BONNT', 'KORD']);
+        expect(messages(unit)).toContain('WAYPOINT VVV DELETED');
+    });
+
+    // Design §5: an airway the database does not have is flown direct to its exit, which loads, so nothing is reported
+    it('flies direct to the exit fix of an airway that is not in the database (#195)', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb, hevan], efb: true});
+        await settle(unit);
+        const before = messages(unit).length;
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [{fix: hevan, via: 'Q999'}]}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'HEVAN', 'KBBB']);
+        expect(messages(unit).slice(before).filter(m => m.includes('DELETED'))).toEqual([]);
+    });
+
+    // Without a departure airport the airway leg is the first leg: nothing comes before it, so it goes direct to its
+    // exit
+    it('flies direct to the exit fix of an airway that is the first leg of a route without departure (#195)', async () => {
+        const unit = await bootUnit({facilities: [kbbb, hevan], efb: true});
+        await settle(unit);
+        unit.navdata.addAirway('Q118', [kpasa, f1, f2, hevan, f3]);
+        const before = messages(unit).length;
+
+        unit.efb!.sync(efbRoute({destination: kbbb, enroute: [{fix: hevan, via: 'Q118'}]}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['HEVAN', 'KBBB']);
+        expect(messages(unit).slice(before).filter(m => m.includes('DELETED'))).toEqual([]);
+    });
+
+    // The fix before the airway is the airport, which is not on it: the leg goes direct to its exit, and as the exit is
+    // loaded nothing is reported
+    it('flies direct to the exit fix when the airway has no entry (#195)', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb, kpasa, hevan], efb: true});
+        await settle(unit);
+        unit.navdata.addAirway('Q118', [kpasa, f1, f2, hevan, f3]);
+        const before = messages(unit).length;
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [{fix: hevan, via: 'Q118'}]}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'HEVAN', 'KBBB']);
+        expect(messages(unit).slice(before).filter(m => m.includes('DELETED'))).toEqual([]);
+    });
+
+    it('flies direct when the exit is the entry (#195)', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb, kpasa], efb: true});
+        await settle(unit);
+        unit.navdata.addAirway('Q118', [kpasa, f1, f2, hevan, f3]);
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [kpasa, {fix: kpasa, via: 'Q118'}]}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KPASA', 'KPASA', 'KBBB']);
+    });
+
+    // Expanded fixes are en-route fixes: they count toward the 30 (4-1) and are cut like any other
+    it('cuts an expanded airway at the limit and keeps the destination (#195)', async () => {
+        const fixes = Array.from({length: 40}, (_, i) => intersection(`X${String(i).padStart(2, '0')}`, 47.0 + i * 0.01, 8.5));
+        const unit = await bootUnit({facilities: [kaaa, kbbb, fixes[0], fixes[39]], efb: true});
+        await settle(unit);
+        unit.navdata.addAirway('J40', fixes);
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [fixes[0], {fix: fixes[39], via: 'J40'}]}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', ...fixes.slice(0, 28).map(f => f.icaoStruct.ident), 'KBBB']);
+        expect(messages(unit)).toContain('WAYPOINT X28 DELETED');
     });
 });
 

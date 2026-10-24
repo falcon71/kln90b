@@ -71,6 +71,28 @@ describe('MemoryFacilityClient', () => {
         expect(found.lat).toBe(46);
     });
 
+    describe('airways', () => {
+        const fixA = intersection('FIXAA', 47.0, 8.0);
+        const fixB = intersection('FIXBB', 47.5, 8.5);
+        const fixC = intersection('FIXCC', 48.0, 9.0);
+        const airwayClient = new MemoryFacilityClient();
+        airwayClient.addAirway('Y100', [fixA, abc, fixC]);
+
+        it('getAirway returns the airway holding the fix', async () => {
+            const airway = await airwayClient.getAirway('Y100', 0, fixC.icaoStruct);
+            expect(airway.name).toBe('Y100');
+            expect(airway.type).toBe(0);
+            expect(airway.waypoints.map(w => w.icaoStruct.ident)).toEqual(['FIXAA', 'ABC', 'FIXCC']);
+            // the sim gives a VOR on an airway with its own type V ICAO
+            expect(airway.waypoints[1].icaoStruct.type).toBe('V');
+        });
+
+        it('getAirway rejects for a fix not on the airway', async () => {
+            await expect(airwayClient.getAirway('Y100', 0, fixB.icaoStruct)).rejects.toThrow(/no airway/);
+            await expect(airwayClient.getAirway('Y999', 0, fixA.icaoStruct)).rejects.toThrow(/no airway/);
+        });
+    });
+
     it('serves KLNFacilityLoader', async () => {
         const loader = new KLNFacilityLoader(client as unknown as ActualFacilityClient, KLNFacilityRepository.getRepository(new EventBus()));
         await expect(loader.getFacility(FacilityType.VOR, abc.icaoStruct)).resolves.toBe(abc);

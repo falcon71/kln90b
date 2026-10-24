@@ -380,9 +380,14 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
       `L:KLN90B_WriteGpsSimvars` switches it on at runtime. While `Hardware.isDisabled` is set nothing is written,
       whatever asks for the sync, and `SimVarSync.setDisabled` syncs once on the resume (#398).
     - `KlnEfbSaver` answers EFB `avionicsRouteRequested` (only with `writeGPSSimVars` set); `KlnEfbLoader` loads
-      `syncedAvionicsRoute` into FPL 0 (lat/lon legs become temporary user waypoints in region `XY`, except a leg whose
+      `syncedAvionicsRoute` into FPL 0 in two steps (#195): `EfbRouteResolver` does every lookup and turns the route
+      into ordered segments, then the pure `fitEfbRoute` applies the limits (`MAX_LEGS`, `MAX_FPL0_LEGS`, the
+      destination's place reserved) and returns the legs and the idents to report as `WAYPOINT xxx DELETED`. Lat/lon
+      and point-bearing-distance legs become temporary user waypoints in region `XY`, except a lat/lon leg whose
       `fixIcao` names, by region and ident, a user or temporary waypoint the unit holds: the saver sends those as lat/lon
-      legs of type U, and they come back as themselves with the stored position, #187). While
+      legs of type U, and they come back as themselves with the stored position, #187. An airway leg (`via`) is
+      expanded into the airway's fixes between the fix before it and its exit. The temporary waypoints this import
+      created for legs the fit cut are removed again, and an import overtaken by a newer route has no effect. While
       `Hardware.isDisabled` is set the request goes unanswered (#353) and the synced route is dropped (#188).
 - The ticks that write the L:KLN90B_* outputs stop with the power, so `SensorsOut.setPoweredOff()` writes their zero
   state once on a power-off: `L:KLN90B_RollCommand` 0, `L:KLN90B_HSI_TF_FLAGS` 0 (flagged) and the MSG, WPT and annunciator
@@ -767,8 +772,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   waypoints, so a restore writes nothing back; the first change after it rewrites all slots from the repository.
 - Restore errors cause empty plans and the `USER DATA LOST` message. The same block then writes the empty state over
   the stored data, so the corrupt data is lost once and the message shows once, as after a failed V1 conversion.
-- `Flightplanloader.loadIcaos` (base class) truncates to 30 legs and emits `WAYPOINT xxx DELETED` messages (at most 10,
-  then `OTHER WAYPOINTS DELETED`).
+- `Flightplanloader.loadIcaos` (base class, used by the stored-plan loaders) truncates to 30 legs and emits
+  `WAYPOINT xxx DELETED` messages through `addDeletedMessages` (at most 10, then `OTHER WAYPOINTS DELETED`), which the
+  EFB import shares.
 - Persist triggers: waypoints persist on any `KLNfacilityrepo_sync` Add/Remove/Update (all 250 slots are rewritten);
   flight plans persist on `flightplanChanged`.
 - Remarks (`settings/RemarksManager.ts`): stored as `ident(blank-padded to 4 chars) + 3×11 chars`, keyed by airport ident; publishes

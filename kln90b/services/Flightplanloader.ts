@@ -1,7 +1,6 @@
 import {Flightplan, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
 import {Message, MessageHandler, OneTimeMessage} from "../data/MessageHandler";
 import {EventBus, FacilityClient, ICAO, IcaoValue} from "@microsoft/msfs-sdk";
-import {buildIcaoStructIdentOnly} from "../data/navdata/IcaoBuilder";
 
 export abstract class Flightplanloader {
     protected constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler) {
@@ -15,7 +14,7 @@ export abstract class Flightplanloader {
      * @protected
      */
     protected async loadIcaos(icaos: IcaoValue[], fplIdx: number = 0): Promise<Flightplan> {
-        let messages: Message[] = [];
+        const messages: Message[] = [];
 
         for (let i = 30; i < icaos.length; i++) { //I'm terribly sorry, but the KLN90B flightplans can only have a maximum of 30 legs
             messages.push(new OneTimeMessage([`WAYPOINT ${icaos[i].ident} DELETED`]));
@@ -25,11 +24,7 @@ export abstract class Flightplanloader {
         const legs = await Promise.all(promises);
 
         messages.push(...(legs.filter(l => l instanceof OneTimeMessage) as OneTimeMessage[]));
-        if (messages.length > 10) {
-            messages = messages.slice(0, 10);
-            messages.push(new OneTimeMessage(["OTHER WAYPOINTS DELETED"]));
-        }
-        messages.forEach(this.messageHandler.addMessage.bind(this.messageHandler));
+        this.addDeletedMessages(messages);
 
         const fpl = new Flightplan(fplIdx, legs.filter(l => !(l instanceof OneTimeMessage)) as KLNFlightplanLeg[], this.bus);
         console.log("loaded flightplan", fpl);
@@ -37,12 +32,17 @@ export abstract class Flightplanloader {
     }
 
     /**
-     * This waypoint will not be found and cause a WAYPOINT DELETED message
-     * @param ident
+     * Posts the WAYPOINT DELETED messages of a load. B-3: when more than ten waypoints are deleted, the first ten are
+     * shown and then OTHER WAYPOINTS DELETED
+     * @param messages
      * @protected
      */
-    protected notFoundIcao(ident: string): IcaoValue {
-        return buildIcaoStructIdentOnly(ident);
+    protected addDeletedMessages(messages: Message[]): void {
+        if (messages.length > 10) {
+            messages = messages.slice(0, 10);
+            messages.push(new OneTimeMessage(["OTHER WAYPOINTS DELETED"]));
+        }
+        messages.forEach(this.messageHandler.addMessage.bind(this.messageHandler));
     }
 
     private async convertToKLNLeg(icao: IcaoValue): Promise<KLNFlightplanLeg | OneTimeMessage> {

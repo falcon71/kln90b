@@ -186,7 +186,7 @@ export class KLNNearestVorSearchSession extends KLNCoherentNearestSearchSession<
  * The part of the SDK FacilityLoader that KLNFacilityLoader uses. The sim passes the real FacilityLoader; tests pass
  * an in-memory source.
  */
-export type ActualFacilityClient = Pick<FacilityLoader, 'getFacility' | 'searchByIdentWithIcaoStructs' | 'startNearestSearchSessionWithIcaoStructs' | 'awaitInitialization'>;
+export type ActualFacilityClient = Pick<FacilityLoader, 'getFacility' | 'getAirway' | 'searchByIdentWithIcaoStructs' | 'startNearestSearchSessionWithIcaoStructs' | 'awaitInitialization'>;
 
 /**
  * We use our own FacilityLoader, because the one from the SDK only supports USR as user waypoints.
@@ -362,7 +362,13 @@ export class KLNFacilityLoader implements FacilityClient {
     public getAirway(airwayName: string, airwayType: number, icao: string): Promise<AirwayData>;
 
     public getAirway(airwayName: string, airwayType: number, icao: IcaoValue | string): Promise<AirwayData> {
-        throw new Error("getAirway is not implemented");
+        if (typeof icao === 'string') {
+            icao = ICAO.stringV1ToValue(icao);
+        }
+
+        // Airways exist only in the sim database; the repository holds user waypoints. The sim rejects when it has no
+        // such airway or the fix is not on it.
+        return this.actualFacilityLoader.getAirway(airwayName, airwayType, icao);
     }
 
     public getMetar(airport: AirportFacility): Promise<Metar | undefined>;
@@ -393,8 +399,10 @@ export class KLNFacilityLoader implements FacilityClient {
         throw new Error("startNearestSearchSession is not implemented");
     }
 
+    /** @inheritDoc */
     public tryGetAirway(airwayName: string, airwayType: number, icao: IcaoValue): Promise<AirwayData | null> {
-        throw new Error("tryGetAirway is not implemented");
+        // The FacilityClient interface answers null where the sim rejects, as in _tryGetFacility.
+        return this.actualFacilityLoader.getAirway(airwayName, airwayType, icao).catch(() => null);
     }
 
     /**
