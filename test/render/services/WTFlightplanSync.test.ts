@@ -4,18 +4,20 @@ import {
     FlightPlan,
     FlightPlanner,
     FlightPlannerOptions,
+    GeoPoint,
     LegTurnDirection,
 } from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
-import {standardRoute} from '../../harness/fixtures';
+import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
+import {arcWorld, standardRoute} from '../../harness/fixtures';
 import {insertLeg} from '../../harness/flightplan';
-import {pointBefore, pointFrom} from '../../harness/flight/geo';
+import {angleDiff, courseDeg, EARTH_RADIUS_NM, pointBefore, pointFrom} from '../../harness/flight/geo';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
 import {APR_ARM_SWITCH, NO_GPS_SIMVARS, panelXml} from '../../harness/panelXml';
 import {activeIdent, fplIdents} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
+import {showSuperNav5, SuperNav5} from '../../harness/render/superNav5';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {KLNLegType} from '../../../kln90b/data/flightplan/Flightplan';
 import {insertLegIntoFpl} from '../../../kln90b/services/FlightplanUtils';
@@ -654,5 +656,86 @@ describe('the "kln90b" flight planner after a procedure leaves FPL 0', () => {
         await vi.advanceTimersByTimeAsync(300);
 
         expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(['ENRBB', 'ENRAA', 'KPRC']);
+    });
+});
+
+// 6-17: MOVE ? moves the entry of a DME arc. The move rewrites the entry in FPL 0 in place, and the planner has to follow
+// it like any other change of FPL 0 (the public contract, #419). Super NAV 5 and the FPL 0 page ask the same helper.
+describe('the "kln90b" flight planner after the entry of a DME arc is moved (6-17, #419)', () => {
+    /**
+     * The arc world of SuperNav5DirectToSelector.test.ts with an en-route fix ENRWP west of the arc in front of the
+     * approach. The approach is loaded 25 NM out on the 270 radial of ABC, ahead of the arc, so that the entry D270J is the
+     * active leg and the planner sends the legs up to it. The aircraft then flies track 100: it meets the
+     * arc 15 NM ahead, and MOVE ? moves the entry to D253J.
+     */
+    async function arcUnit() {
+        const w = arcWorld();
+        const enrwp = intersection('ENRWP', w.at(270, 30).lat, w.at(270, 30).lon);
+        const unit = await bootUnit({
+            facilities: [...w.facilities, enrwp], position: w.at(270, 25), storage: savedFlightplan(0, [enrwp, w.kprc]),
+            panelXml: panelXml(APR_ARM_SWITCH), magvar: 0,
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        await moveAircraft(unit, pointFrom(w.at(270, 25), 100, 0.05), {groundspeedKt: 120});
+        const plan = plannerOf(unit).getFlightPlan(0);
+        expect(fplIdents(unit)).toEqual(['ENRWP', 'D270J', 'ARCEN', 'FAFAA', 'MAPAA', 'KPRC']); // Precondition
+        expect(unit.props.memory.navPage.activeWaypoint.getActiveFplIdx()).toBe(1); // Precondition: the entry is active
+        expect(identsOf(plan)).toEqual(['ENRWP', 'D270J']); // Precondition: the planner has the old entry
+        return {unit, plan};
+    }
+
+    /** The planner's entry is the entry of FPL 0, by ident and by coordinates */
+    function expectMoved(unit: HeadlessUnit, plan: FlightPlan) {
+        const entry = unit.props.memory.fplPage.flightplans[0].getLegs()[1];
+        expect(fplIdents(unit)[1]).toBe('D253J');
+        expect(identsOf(plan)).toEqual(['ENRWP', 'D253J']);
+        const sent = [...plan.legs()][1];
+        expect([sent.leg.lat, sent.leg.lon]).toEqual([entry.wpt.lat, entry.wpt.lon]);
+        expect(plan.activeLateralLeg).toBe(1);
+        expect(unit.errors).toEqual([]);
+        expectGuidanceOnMovedEntry(unit);
+    }
+
+    /**
+     * Guidance follows the move: the entry is the active waypoint, so the active path must be the great circle from the
+     * previous waypoint to the NEW entry. Course and distance are computed from the coordinates, not by the code under test
+     */
+    function expectGuidanceOnMovedEntry(unit: HeadlessUnit) {
+        const legs = unit.props.memory.fplPage.flightplans[0].getLegs();
+        const entry = legs[1].wpt;
+        const prev = legs[0].wpt;
+        const path = unit.props.memory.navPage.activeWaypoint.getFromLeg()!.path;
+
+        expect(path.distance(new GeoPoint(entry.lat, entry.lon)) * EARTH_RADIUS_NM).toBeCloseTo(0, 2); // The new entry lies on the path
+        expect(Math.abs(angleDiff(path.bearingAt(new GeoPoint(prev.lat, prev.lon)), courseDeg(prev, entry)))).toBeLessThan(0.1);
+    }
+
+    it('follows an entry moved on Super NAV 5 (#419)', async () => {
+        const {unit, plan} = await arcUnit();
+        await showSuperNav5(unit, {waitMs: 0});
+        await unit.panel.scan();
+        await vi.advanceTimersByTimeAsync(250);
+        expect(SuperNav5.read().directTo).toBe('D270Jà'); // The window opens on the active leg, which is the entry
+
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(250);
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expectMoved(unit, plan);
+    });
+
+    it('follows an entry moved on FPL 0 (#419)', async () => {
+        const {unit, plan} = await arcUnit();
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'D270Jà');
+
+        await unit.panel.clr();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expectMoved(unit, plan);
     });
 });

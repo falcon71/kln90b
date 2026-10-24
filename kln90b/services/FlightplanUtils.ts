@@ -130,9 +130,7 @@ export function moveArcEntry(bus: EventBus, fpl: Flightplan, idx: number, active
         bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO INTRCEPT");
         return false;
     }
-    //A bit ugly modifying this directly...
-    leg.arcData = newData;
-    leg.wpt = newData.entryFacility;
+    fpl.setArcEntry(idx, newData);
     if (idx === activeWpt.getActiveFplIdx()) {
         activeWpt.recalculatePath();
     }

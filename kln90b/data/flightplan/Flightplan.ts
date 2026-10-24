@@ -117,6 +117,20 @@ export class Flightplan {
         this.publishingEnabled = true;
     }
 
+    /**
+     * 6-17: replaces the entry of the DME arc at `idx`, when MOVE ? has moved it. The leg changes in place, so the active
+     * waypoint, which holds the leg object, sees the new entry. Publishes like insertLeg, so that the flight planner mirror
+     * follows (#419); inside a batch it does not
+     */
+    public setArcEntry(idx: number, arcData: ArcData): void {
+        const leg = this.legs[idx];
+        leg.arcData = arcData;
+        leg.wpt = arcData.entryFacility;
+        if (this.publishingEnabled) {
+            this.publisher.pub("flightplanChanged", this);
+        }
+    }
+
     public deleteLeg(idx: number) {
         this.legs.splice(idx, 1);
         if (this.publishingEnabled) {
