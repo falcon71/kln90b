@@ -1,6 +1,6 @@
 # MOVE ? on FPL 0 (#134) and scratchpad messages on the MSG page (#237): design
 
-Date: 2026-10-24. Issues: #134, #237. Branch: `fix-134-237-arc-move-scratchpad`. Two small changes: this short design
+Date: 2026-10-24. Issues: #134, #237, #419. Branch: `fix-134-237-arc-move-scratchpad`. Small changes: this short design
 records what was settled in chat. Each issue gets its own `fixes #NN` commit with its tests.
 
 ## Intent
@@ -103,6 +103,15 @@ open bugs (#104, #121) that two copies would let drift apart.
   changed in place and adds what is missing.
 - Known arc bugs stay out of scope: #104 (right-hand arc entry misnamed after a recalculation), #121 (closest-leg logic
   on an arc).
+
+### #419: the planner follows a moved arc entry
+
+Found while planning #134 and added to this session by the maintainer (2026-10-24). The move writes the new `arcData`
+and `wpt` into the FPL 0 leg in place and publishes nothing, so `WTFlightplanSync` keeps the old entry in the
+`"kln90b"` planner (the public contract). Fix: a `Flightplan` method that replaces an arc leg's entry and publishes
+`flightplanChanged` like `insertLeg` and `deleteLeg` (inside a batch it does not). The #134 helper uses it, so the fix
+covers Super NAV 5 and FPL 0. Its own `fixes #419` commit, after #134's. The persistor stores only en-route legs, so the
+extra publish writes nothing new.
 
 ## Tests
 
