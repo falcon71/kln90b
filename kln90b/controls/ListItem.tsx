@@ -2,7 +2,7 @@ import {EventBus, FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {EnterResult, Field} from "../pages/CursorController";
 import {NO_CHILDREN, UiElement} from '../pages/Page';
 import {TickController} from "../TickController";
-import {KLNErrorMessage, StatusLineMessageEvents} from "./StatusLine";
+import {StatusLineMessage, StatusLineMessageEvents} from "./StatusLine";
 
 export interface ListItemProps<T> {
     bus: EventBus,
@@ -12,7 +12,7 @@ export interface ListItemProps<T> {
     onEnter?: (value: T) => void,
     onDelete?: (value: T) => void,
 
-    onBeforeDelete?: (value: T) => KLNErrorMessage | null,
+    onBeforeDelete?: (value: T) => StatusLineMessage | null,
 }
 
 export interface ListItem extends UiElement {

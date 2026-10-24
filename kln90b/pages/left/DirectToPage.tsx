@@ -121,7 +121,7 @@ export class DirectToPage extends SixLineHalfPage {
                     this.props.modeController.setObsOnUnit(obsMag);
 
                     if (this.props.planeSettings.output.obsTarget === 0) {
-                        this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", `d› CRS ${format(roundBearing(obsMag), "000")}` as any);
+                        this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", `d› CRS ${format(roundBearing(obsMag), "000")}°`);
                     }
                 }
 

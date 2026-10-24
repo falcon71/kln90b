@@ -11,8 +11,9 @@ export interface StatusLineProps extends PageProps {
     screen: Page;
 }
 
-export type KLNErrorMessage =
+export type StatusLineMessage =
     "ACTIVE WPT" |
+    `d› CRS ${string}°` |
     "DUP IDENT" |
     "ENT LAT/LON" |
     "FPL FULL" |
@@ -39,7 +40,7 @@ export type KLNErrorMessage =
 const STATUS_MESSAGE_TIME = 5000;
 
 export interface StatusLineMessageEvents {
-    statusLineMessage: KLNErrorMessage;
+    statusLineMessage: StatusLineMessage;
 }
 
 export interface KeyboardEventData {
@@ -216,7 +217,7 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
      * 3-10
      * @param message
      */
-    public showMessage(message: KLNErrorMessage): void {
+    public showMessage(message: StatusLineMessage): void {
         //A newer message replaces the older one and gets its own 5 seconds. The AVsoftech 90B trainer keeps the first
         //one's clock instead (2026-10-24, one sample), too rare to trust it on, see the characterization test
         this.endScratchpad();

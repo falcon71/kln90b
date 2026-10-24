@@ -4,7 +4,7 @@ import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {List} from "../../controls/List";
 import {KLNFacilityRepository} from "../../data/navdata/KLNFacilityRepository";
-import {KLNErrorMessage} from "../../controls/StatusLine";
+import {StatusLineMessage} from "../../controls/StatusLine";
 import {WaypointDeleteListItem} from "../../controls/WaypointDeleteListItem";
 import {IcaoFixedLength} from "../../data/navdata/IcaoFixedLength";
 import {TemporaryWaypointDeleter} from "../../services/TemporaryWaypointDeleter";
@@ -135,7 +135,7 @@ export class Oth3Page extends SixLineHalfPage {
         this.props.facilityRepository.remove(facility);
     }
 
-    private beforeDeleteFacility(facility: Facility): KLNErrorMessage | null {
+    private beforeDeleteFacility(facility: Facility): StatusLineMessage | null {
         const activeWpt = this.props.memory.navPage.activeWaypoint.getActiveWpt();
         if (activeWpt !== null && ICAO.valueEquals(activeWpt.icaoStruct, facility.icaoStruct)) {
             return "ACTIVE WPT";

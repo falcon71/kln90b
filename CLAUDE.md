@@ -137,7 +137,7 @@ change what they mean; add new ones instead:
     - Fixed-width output uses `format()` from `numerable` plus `padStart`/`padEnd`.
     - A null display value renders as dashes.
 - Angles are stored **true** unless the name says `Mag`. Convert with `props.magvar`.
-- Transient errors go to the status line: publish `statusLineMessage` with a `KLNErrorMessage` from the union in
+- Transient errors go to the status line: publish `statusLineMessage` with a `StatusLineMessage` from the union in
   `controls/StatusLine.tsx`. MSG-page entries use `messageHandler.addMessage(new OneTimeMessage([...]))`, or a
   condition-driven message in `data/PersistentMessages.ts`.
 - Exceptions in ticks or input are caught and shown on the on-screen `ErrorPage`. Async ticks are not caught.

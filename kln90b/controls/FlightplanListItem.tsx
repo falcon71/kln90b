@@ -2,7 +2,7 @@ import {Facility, FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {CursorController, EnterResult, Field} from "../pages/CursorController";
 import {PageProps, UIElementChildren} from '../pages/Page';
 import {TickController} from "../TickController";
-import {KLNErrorMessage, StatusLineMessageEvents} from "./StatusLine";
+import {StatusLineMessage, StatusLineMessageEvents} from "./StatusLine";
 import {WaypointEditor} from "./editors/WaypointEditor";
 import {ListItem} from "./ListItem";
 import {FlightplanArrow} from "./displays/FlightplanArrow";
@@ -24,7 +24,7 @@ export interface FlightplanListItemProps extends PageProps {
     onDelete: (idx: number) => void,
     onMoveArc: (idx: number) => void, //6-17: MOVE ? on the entry of a DME arc
     onInsertDone: (idx: number, value: Facility | null, leg: KLNFlightplanLeg | null) => boolean, //false: refused with FPL FULL (#240)
-    onBeforeDelete: (idx: number) => KLNErrorMessage | null,
+    onBeforeDelete: (idx: number) => StatusLineMessage | null,
     //#380: true when the addition that is about to open asks first to make room; `retry` repeats it on the rebuilt row
     askRoom: (idx: number, retry: () => void) => boolean,
     parent: SixLineHalfPage,

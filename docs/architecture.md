@@ -880,7 +880,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - The MSG page (`controls/MessagePage.tsx`) shows newest first. `controls/StatusLine.tsx` shows the `MSG` indicator and
   drives `L:KLN90B_MsgLight` in the display tick: flashing while unread, steady while read, off when empty.
 - **Status-line transient messages** are a separate channel. Publish `statusLineMessage` (`StatusLineMessageEvents`)
-  with a `KLNErrorMessage` literal; it is a typed string union in `StatusLine.tsx` (`"NO APPROACH"`,
+  with a `StatusLineMessage` literal; it is a typed string union in `StatusLine.tsx` (`"NO APPROACH"`,
   `"USR DB FULL"`, ...). Add new strings to the union.
     - Each one is also a `ScratchpadMessage` in the `MessageHandler`, so the MSG page lists it and the MSG light flashes
       for it (AVsoftech 90B trainer, 2026-10-24, #237). It never counts as read. `StatusLine` counts its 5 seconds from
@@ -1360,7 +1360,7 @@ export class Set3Page extends SixLineHalfPage {
     - else `msg` inverted (flashing while unread messages exist);
     - else `msg` plain while the message page is open.
 - Short error messages: publish `bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "NO SUCH WPT")`.
-  The value is typed `KLNErrorMessage` (union: `INVALID ENT`, `DUP IDENT`, `NO APT WPTS`, `FPL FULL`, ...). It shows
+  The value is typed `StatusLineMessage` (union: `INVALID ENT`, `DUP IDENT`, `NO APT WPTS`, `FPL FULL`, ...). It shows
   inverted for `STATUS_MESSAGE_TIME = 5000` ms (manual 3-10); the MSG page lists it too (see the status-line transient
   messages in Core 9, #237). Non-standard texts are cast `as any` (e.g.
   `` `d› CRS ${obs}` `` in `DirectToPage`).
