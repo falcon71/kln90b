@@ -28,9 +28,9 @@ export class Tri0Page extends SixLineHalfPage {
         super(props);
 
         this.children = new UIElementChildren<Tri0PageTypes>({
-            tas: new SpeedFieldset(this.props.memory.triPage.tas, this.setSpeed.bind(this)),
-            windDir: new BearingFieldset(this.props.memory.triPage.windDirTrue, this.setWindDir.bind(this)),
-            windSpeed: new SpeedFieldset(this.props.memory.triPage.windSpeed, this.setWindSpeed.bind(this)),
+            tas: new SpeedFieldset(this.props.userSettings.getSetting('triTas').get(), this.setSpeed.bind(this)),
+            windDir: new BearingFieldset(this.props.userSettings.getSetting('triWindDirTrue').get(), this.setWindDir.bind(this)),
+            windSpeed: new SpeedFieldset(this.props.userSettings.getSetting('triWindSpeed').get(), this.setWindSpeed.bind(this)),
         });
 
         this.cursorController = new CursorController(this.children);
@@ -48,14 +48,14 @@ export class Tri0Page extends SixLineHalfPage {
     }
 
     private setSpeed(speed: Knots) {
-        this.props.memory.triPage.tas = speed;
+        this.props.userSettings.getSetting('triTas').set(speed);
     }
 
     private setWindDir(dir: Degrees) {
-        this.props.memory.triPage.windDirTrue = dir;
+        this.props.userSettings.getSetting('triWindDirTrue').set(dir);
     }
 
     private setWindSpeed(speed: Knots) {
-        this.props.memory.triPage.windSpeed = speed;
+        this.props.userSettings.getSetting('triWindSpeed').set(speed);
     }
 }

@@ -2,6 +2,8 @@ import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {fuelComputer, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
+import {storedSetting} from '../../../harness/storage';
+import {setTriFigures} from '../../../harness/triSettings';
 
 const FUEL_PANEL_XML = panelXml(fuelComputer());
 
@@ -18,7 +20,7 @@ async function single(o: { fobLb: number; reserve: number; groundspeedKt?: numbe
     if (o.groundspeedKt !== undefined) {
         await moveAircraft(unit, {lat: 47.01, lon: 8.0}, {groundspeedKt: o.groundspeedKt, trackTrue: 0});
     }
-    unit.props.memory.othPage.reserve = o.reserve;
+    setTriFigures(unit, {othReserve: o.reserve}); // a user setting (#192), read when the page is built
     await unit.panel.selectPage('L', 'OTH 6');
     await vi.advanceTimersByTimeAsync(1500);
     return unit;
@@ -114,5 +116,22 @@ describe('OTH 6 page, endurance, range and efficiency (5-41)', () => {
         await single({fobLb: 294, reserve: 0});
 
         expect(Screen.read().rows('L')[2]).toBe(' ENDUR 4:54');
+    });
+});
+
+// Persisted user data: the reserve entered on OTH 6 is the user setting othReserve, which OTH 5 shares (#192)
+describe('OTH 6 reserve as a user setting (#192)', () => {
+    it('saves the OTH 6 reserve in the user settings (#192)', async () => {
+        const unit = await bootUnit({panelXml: FUEL_PANEL_XML});
+        await unit.panel.selectPage('L', 'OTH 6');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 3);     // the tens digit
+        await unit.panel.inner('L', 4);
+        await unit.panel.outer('L', 1);     // the units digit
+        await unit.panel.inner('L', 5);
+        expect(Screen.read().rows('L')[5]).toBe(' RES: 00045');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'othReserve')).toBe(45);
     });
 });

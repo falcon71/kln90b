@@ -49,19 +49,19 @@ export class Tri5Page extends SixLineHalfPage {
 
 
         this.children = new UIElementChildren<Tri5PageTypes>({
-            fpl: new SelectField([" 0", " 1", " 2", " 3", " 4", " 5", " 6", " 7", " 8", " 9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25"], this.props.memory.triPage.tri5Fpl, this.setFpl.bind(this)),
+            fpl: new SelectField([" 0", " 1", " 2", " 3", " 4", " 5", " 6", " 7", " 8", " 9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25"], this.props.userSettings.getSetting('tri5Fpl').get(), this.setFpl.bind(this)),
             distance: new RoundedDistanceDisplay(Alignment.right, this.dist),
             from: new TextDisplay(this.from),
             to: new TextDisplay(this.to),
             gs: new SpeedFieldset(this.gs ?? 0, this.setGS.bind(this)),
             ete: new DurationDisplay(this.ete, true),
-            ff: new TripFuelFieldset(this.props.memory.triPage.ff, this.setFF.bind(this)),
-            res: new TripFuelFieldset(this.props.memory.triPage.reserve, this.setReserve.bind(this)),
+            ff: new TripFuelFieldset(this.props.userSettings.getSetting('triFuelFlow').get(), this.setFF.bind(this)),
+            res: new TripFuelFieldset(this.props.userSettings.getSetting('triReserve').get(), this.setReserve.bind(this)),
             fReq: new TripFuelDisplay(null),
         });
 
         this.cursorController = new CursorController(this.children);
-        this.setFpl(this.props.memory.triPage.tri5Fpl);
+        this.setFpl(this.props.userSettings.getSetting('tri5Fpl').get());
     }
 
     public render(): VNode {
@@ -76,7 +76,7 @@ export class Tri5Page extends SixLineHalfPage {
     }
 
     private setFpl(fpl: number) {
-        this.props.memory.triPage.tri5Fpl = fpl;
+        this.props.userSettings.getSetting('tri5Fpl').set(fpl);
 
         const fplLegs = this.props.memory.fplPage.flightplans[fpl].getLegs();
         if (fplLegs.length < 2) {
@@ -101,7 +101,7 @@ export class Tri5Page extends SixLineHalfPage {
                     continue; //#388: a leg from a waypoint to itself has no course and takes no time
                 }
                 this.dist += legDist;
-                const legGs = calculateGroundspeedAlongCourse(this.props.memory.triPage.tas, from.bearingTo(fplLegs[i].wpt), this.props.memory.triPage.windSpeed, this.props.memory.triPage.windDirTrue);
+                const legGs = calculateGroundspeedAlongCourse(this.props.userSettings.getSetting('triTas').get(), from.bearingTo(fplLegs[i].wpt), this.props.userSettings.getSetting('triWindSpeed').get(), this.props.userSettings.getSetting('triWindDirTrue').get());
                 //a leg the wind leaves no solution for leaves the plan without a ground speed (#167)
                 if (legGs === null) {
                     noSolution = true;
@@ -131,19 +131,19 @@ export class Tri5Page extends SixLineHalfPage {
         if (this.ete === null) {
             this.children.get("fReq").fuel = null;
         } else {
-            this.children.get("fReq").fuel = (this.ete / 3600) * this.props.memory.triPage.ff + this.props.memory.triPage.reserve;
+            this.children.get("fReq").fuel = (this.ete / 3600) * this.props.userSettings.getSetting('triFuelFlow').get() + this.props.userSettings.getSetting('triReserve').get();
         }
 
     }
 
     private setFF(ff: number) {
-        this.props.memory.triPage.ff = ff;
+        this.props.userSettings.getSetting('triFuelFlow').set(ff);
 
         this.calcFuelRequired();
     }
 
     private setReserve(reserve: number) {
-        this.props.memory.triPage.reserve = reserve;
+        this.props.userSettings.getSetting('triReserve').set(reserve);
 
         this.calcFuelRequired();
     }

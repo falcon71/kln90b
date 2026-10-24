@@ -4,7 +4,8 @@ import {standardRoute} from '../../../harness/fixtures';
 import {distanceNm} from '../../../harness/flight/geo';
 import {fuelComputer, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
-import {savedFlightplan} from '../../../harness/storage';
+import {savedFlightplan, storedSetting} from '../../../harness/storage';
+import {setTriFigures} from '../../../harness/triSettings';
 
 const FUEL_PANEL_XML = panelXml(fuelComputer());
 
@@ -47,7 +48,7 @@ async function twinOnRoute(reserve = 0, fpl0?: 'KAAA-KBBB'): Promise<HeadlessUni
     unit.env.sim.set('ENG FUEL FLOW PPH:2', 'pounds per hour', 84);
     await settle(unit);
     await moveAircraft(unit, ON_LEG, {groundspeedKt: 120, trackTrue: 50});
-    unit.props.memory.othPage.reserve = reserve;
+    setTriFigures(unit, {othReserve: reserve}); // a user setting (#192), read when the page is built
     await unit.panel.selectPage('L', 'OTH 5');
     await vi.advanceTimersByTimeAsync(1500);
     return unit;
@@ -139,5 +140,30 @@ describe('OTH 5 page, fuel on board and reserve entry (5-40)', () => {
 
         await unit.panel.selectPage('L', 'OTH 6');
         expect(Screen.read().rows('L')[5]).toBe(' RES: 00045');
+    });
+});
+
+// Persisted user data (CLAUDE.md "Public contract with aircraft"): the reserve of OTH 5 and OTH 6 is the user setting
+// othReserve (#192). No trainer has OTH: it follows the TRI reserve, which the trainers kept (2026-10-24)
+describe('OTH 5 reserve as a user setting (#192)', () => {
+    it('saves the OTH 5 reserve in the user settings (#192)', async () => {
+        const unit = await bootUnit({panelXml: FUEL_PANEL_XML});
+        await unit.panel.selectPage('L', 'OTH 5');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 3);     // the tens digit
+        await unit.panel.inner('L', 4);
+        await unit.panel.outer('L', 1);     // the units digit
+        await unit.panel.inner('L', 5);
+        expect(Screen.read().rows('L')[4]).toBe('RES:  00045');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'othReserve')).toBe(45);
+    });
+
+    it('shows the stored reserve on OTH 5 at a new boot (#192)', async () => {
+        const unit = await bootUnit({panelXml: FUEL_PANEL_XML, storage: {othReserve: 45}});
+        await unit.panel.selectPage('L', 'OTH 5');
+
+        expect(Screen.read().rows('L')[4]).toBe('RES:  00045');
     });
 });

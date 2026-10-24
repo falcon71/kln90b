@@ -728,8 +728,12 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 
 - `KLN90BUserSettings`: the typed keys that `KLN90BUserSettingsTypes` declares. These include `welcome1..4`, `powercycles`, `totalTime`, `timezone`, baro,
   `lastLatitude/Longitude`, `lastAlmanacDownload`, `lastEphemeris`, `activeWaypoint` (ICAO **V1** string), alert settings
-  (the ALT page's `altAlertEnabled` and `altAlertWarn` since #259, which a power cycle keeps),
-  `turnAnticipation`, the NAV 5 and Super NAV 5 layout, CAL page inputs, `fastGpsAcquisition` and `userDataFormat`.
+  (the ALT page's `altAlertEnabled` and `altAlertWarn` since #259, which a power cycle keeps), the TRI and OTH figures
+  (`triTas`, `triWindDirTrue`, `triWindSpeed`, `triFuelFlow`, `triReserve`, `tri5Fpl`, `othReserve`, since #192, which a
+  power cycle keeps), the last waypoint of each waypoint page (`aptPageWpt`, `vorPageWpt`, `ndbPageWpt`, `intPageWpt`,
+  `supPageWpt`) and the TRI waypoints (`tri1To`, `tri3From`, `tri3To`), likewise since #192 and saved as ICAO **V2**
+  strings (the V1 format is deprecated), `turnAnticipation`, the NAV 5 and Super NAV 5 layout, CAL page inputs,
+  `fastGpsAcquisition` and `userDataFormat`.
 - `KLN90BUserWaypointsSettings`: `wpt0..wpt249` (`MAX_USER_WAYPOINTS=250`).
 - `KLN90BUserFlightplansSettings`: `fpl0..fpl25` (`NUM_FLIGHTPLANS=25`, inclusive loop).
 - `KLN90BUserRemarkSettings`: `rmk0..rmk99` (`NUM_REMARKS=100`, the 100 airports of 3-47; `rmk10` and up since #92).
@@ -765,10 +769,26 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - **`VolatileMemory`** (`data/VolatileMemory.ts`) is not persisted. It holds RAM state for each page group:
   `aptPage/vorPage/ndbPage/intPage/supPage` (`WaypointPageState`), `dtPage`, `fplPage {flightplans}`, *
   *`navPage: NavPageState`** (the hub for nav results, mode, `activeWaypoint`, `isSelfTestActive`, NAV 4 VNAV inputs,
-  `userMagvar`), `triPage`, `calPage`, `ctrPage` and `othPage`.
+  `userMagvar`), `triPage` (the TRI waypoints), `calPage` and `ctrPage`.
+    - **The rule (#192): `VolatileMemory` keeps only what the unit forgets at a power-on.** What the unit keeps over a
+      power cycle is a user setting, which also survives a sim restart. State that must survive a page change but not a
+      power cycle lives here, and a field added here has to be reset in `reset()`. A guard test
+      (`test/render/data/VolatileMemory.test.ts`) writes a sentinel into every field of every page state, runs a
+      power-on and expects each field back at its initial value, so a new field that is neither reset nor a setting fails
+      it. That is why every field of a page state needs an initializer, which the class comment explains. The evidence
+      for what the unit keeps is the trainer record of 2026-10-24 ([kln89-trainer-record.md](kln89-trainer-record.md)).
     - `reset()` runs on every power-on. It resets these fields, **removes procedures from FPL 0 when the unit was off
-      for more than 5 minutes** (6-5; `timeSincePowerChange` of the power event), and re-initialises the first scan-list
-      entry per type, setting `isReady` when done; WelcomePage waits on `isReady`.
+      for more than 5 minutes** (6-5; `timeSincePowerChange` of the power event), and restores each waypoint page's saved
+      waypoint (the first scan-list entry when none is saved or it no longer resolves) and the TRI waypoints, setting
+      `isReady` when done; WelcomePage waits on `isReady`. A waypoint shown at a nearest rank is saved, and restored, as
+      the plain waypoint (the KLN 89 trainer did the same). It builds every scan list either way: a restored page needs
+      the index for the scan past the last nearest rank (3-24) and for the fast scan.
+    - **The 5-minute exception:** the pilot-entered magnetic variation (`navPage.userMagvar`) is kept over a power-off of
+      up to 5 minutes and cleared after more (`RESET_TIME`, 6-5; the KLN 89 Pilot's Guide says so on 4-46 and 4-47, the
+      90B guide is silent). A sim restart counts as long, because memory does not survive it and the first power-on
+      reads as an hour off. It is the only page state that stays in memory over a power cycle (the plans and the active
+      waypoint are persisted on their own path). The NAV 4 selected altitude, the OBS course and the Super NAV 5 range
+      are reset at every power-on, and the derived navigation values start empty until the first calculation tick.
     - `ctrPage` keeps the left FPL page instance of the CTR computation (`lastFplPage`). CTR 1 and CTR 2 call
       `syncCtrState` (`pages/right/CtrState.ts`) in their display ticks and return to the start state when another
       instance is on the left (5-26).
@@ -998,7 +1018,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - `subPageIndices` remembers the last sub-page per group.
 - `createPage(type)` = `new type(this.props)`. **Pages are recreated on every knob step.** Instance state is lost, so
   durable state lives in `props.memory` (`VolatileMemory`: `aptPage`, `vorPage`, `ndbPage`, `intPage`, `supPage`,
-  `navPage`, `fplPage`, `dtPage`, `triPage`, ...) or in `userSettings` (the ALT page's ALERT and WARN, #259).
+  `navPage`, `fplPage`, `dtPage`, `triPage`, ...) or in `userSettings` (the ALT page's ALERT and WARN, #259; what a
+  power cycle keeps, such as the TRI and OTH figures, #192).
 - The tree position is found with `instanceof` (`getPageIndices`). Every slot must therefore be a *distinct class*. That
   is why `Fpl0Page...Fpl25Page` are trivial subclasses of `FplPage({page:n})`, and why NAV 4 is split into
   `Nav4LeftPage`/`Nav4RightPage` (they differ in `getPageSide()`). Nav1/2/3/5 are the same classes in both trees.
@@ -1422,8 +1443,9 @@ export class Set3Page extends SixLineHalfPage {
    `RIGHT_PAGE_TREE`. It must be a unique class, so subclass if the same page sits in two slots.
 3. If its presence depends on plane settings, add or fix the hard-coded `splice` indices in the `PageTreeController`
    constructor.
-4. Keep any state that must survive re-selection in `VolatileMemory` (`kln90b/data/VolatileMemory.ts`) or in
-   `userSettings`, because the instance is recreated on every knob step.
+4. Keep any state that must survive re-selection in `VolatileMemory` (`kln90b/data/VolatileMemory.ts`), because the
+   instance is recreated on every knob step, and reset it in `reset()`. State that the unit keeps over a power cycle is a
+   user setting (`userSettings`) instead (#192).
 5. Temporary or modal pages are not put in the tree. They are pushed with
    `mainPage.pushLeftPage/pushRightPage(page, parent)` from an event or another page. Full-screen pages extend
    `SixLinePage` or `SevenLinePage` and are triggered through `pushOverlayPage`, or a dummy tree page plus

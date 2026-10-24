@@ -5,16 +5,18 @@ import {
     FacilityClient,
     FacilityType,
     GeoCircle,
+    IcaoValue,
     IntersectionFacility,
     NdbFacility,
     RunwayFacility,
     UserFacility,
     VorFacility,
 } from "@microsoft/msfs-sdk";
-import {Scanlists} from "./navdata/Scanlist";
-import {NearestWpt} from "./navdata/NearestList";
+import {Scanlist, Scanlists} from "./navdata/Scanlist";
+import {NearestWpt, unpackFacility} from "./navdata/NearestList";
+import {SavedWaypoint} from "./SavedWaypoint";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
-import {Degrees, Feet, Knots, NauticalMiles, Seconds} from "./Units";
+import {Degrees, Feet, NauticalMiles, Seconds} from "./Units";
 import {Flightplan, KLNFlightplanLeg} from "./flightplan/Flightplan";
 import {ActiveWaypoint} from "./flightplan/ActiveWaypoint";
 import {TimeStamp} from "./Time";
@@ -24,14 +26,43 @@ import type {Message} from "./MessageHandler";
 import {PowerEvent, PowerEventData} from "../PowerSupply";
 import {Sensors} from "../Sensors";
 
-export interface WaypointPageState<T extends Facility> {
-    facility: T | NearestWpt<T> | null,
-    ident: string,
+/**
+ * The state of a waypoint page type (APT, VOR, NDB, INT, SUP). The waypoint it shows is kept over a power cycle (KLN 89
+ * trainer 2026-10-24) and so is a user setting (#192): every write of `facility` saves it, and a power-on resolves it
+ * again. A waypoint shown at a nearest rank is saved as the plain waypoint, and only when it changes
+ */
+export class WaypointPageState<T extends Facility> {
+    private _facility: T | NearestWpt<T> | null = null;
     /**
      * #202: the last waypoint the ident entry matched, while the typed ident matches none. A scan starts from it (3-21,
      * KLN 89 trainer 2026-10-07)
      */
-    lastMatch: T | null,
+    public lastMatch: T | null = null;
+
+    constructor(public ident: string, private readonly saved: SavedWaypoint<T>) {
+    }
+
+    get facility(): T | NearestWpt<T> | null {
+        return this._facility;
+    }
+
+    set facility(value: T | NearestWpt<T> | null) {
+        this._facility = value;
+        this.saved.save(unpackFacility(value));
+    }
+
+    /**
+     * Shows the saved waypoint again, as the plain waypoint (KLN 89 trainer 2026-10-24); null if it does not resolve, and
+     * the state is left as it was
+     */
+    public async restore(loader: FacilityClient): Promise<T | null> {
+        const facility = await this.saved.restore(loader);
+        if (facility !== null) {
+            this.facility = facility;
+            this.ident = facility.icaoStruct.ident;
+        }
+        return facility;
+    }
 }
 
 export interface FplPageState {
@@ -130,16 +161,64 @@ export class NavPageState {
 
 }
 
-export interface TriPageState {
-    tas: Knots;
-    windDirTrue: Degrees;
-    windSpeed: Knots;
-    ff: number;
-    reserve: number;
-    tri1To: Facility | null;
-    tri3From: Facility | null;
-    tri3To: Facility | null;
-    tri5Fpl: number,
+/**
+ * The TRI waypoints. They and the TRI numbers (TAS, wind, fuel flow, reserve, plan number) are user settings since #192:
+ * the trip waypoints were kept over a power cycle by the AVsoftech TRI 1 and the KLN 89 CAL 1, the fuel flow and reserve
+ * by both trainers, and the TAS, wind and plan number only by the AVsoftech trainer, which is unreliable (2026-10-24,
+ * docs/kln89-trainer-record.md); only user settings survive a sim restart. Every write saves the waypoint, and a power-on
+ * resolves it again
+ */
+export class TriPageState {
+    private _tri1To: Facility | null = null;
+    private _tri3From: Facility | null = null;
+    private _tri3To: Facility | null = null;
+
+    constructor(private readonly savedTri1To: SavedWaypoint<Facility>,
+                private readonly savedTri3From: SavedWaypoint<Facility>,
+                private readonly savedTri3To: SavedWaypoint<Facility>) {
+    }
+
+    get tri1To(): Facility | null {
+        return this._tri1To;
+    }
+
+    set tri1To(value: Facility | null) {
+        this._tri1To = value;
+        this.savedTri1To.save(value);
+    }
+
+    get tri3From(): Facility | null {
+        return this._tri3From;
+    }
+
+    set tri3From(value: Facility | null) {
+        this._tri3From = value;
+        this.savedTri3From.save(value);
+    }
+
+    get tri3To(): Facility | null {
+        return this._tri3To;
+    }
+
+    set tri3To(value: Facility | null) {
+        this._tri3To = value;
+        this.savedTri3To.save(value);
+    }
+
+    /**
+     * Resolves the saved waypoints again; one that does not resolve becomes null. The settings are not written here: they
+     * hold the resolved waypoints, and SavedWaypoint.restore cleared one that does not resolve
+     */
+    public async restore(loader: FacilityClient): Promise<void> {
+        const [tri1To, tri3From, tri3To] = await Promise.all([
+            this.savedTri1To.restore(loader),
+            this.savedTri3From.restore(loader),
+            this.savedTri3To.restore(loader),
+        ]);
+        this._tri1To = tri1To;
+        this._tri3From = tri3From;
+        this._tri3To = tri3To;
+    }
 }
 
 export interface CalPageState {
@@ -176,39 +255,22 @@ export interface CtrPageState {
 }
 
 
-export interface OthPageState {
-    reserve: number;
-}
-
 const RESET_TIME = 5 * 60 * 1000; //6-5 Reset occurs after 5 minutes
 
+/**
+ * The state the unit forgets at a power-on (#192); what it keeps is a user setting. The state of every page is one object
+ * of the fields `<name>Page` below (NavPageState, WaypointPageState, TriPageState and the interfaces above).
+ * **Every field of a page state needs an initializer** (`= null`, `= 0`, ...), also one that is null at first: the guard
+ * test in VolatileMemory.test.ts finds the fields as the own keys of the object, and a field without an initializer is
+ * none of them, so a missing reset would go unnoticed.
+ */
 export class VolatileMemory {
 
-    public readonly aptPage: WaypointPageState<AirportFacility> = {
-        facility: null,
-        ident: "0   ",
-        lastMatch: null,
-    };
-    public readonly vorPage: WaypointPageState<VorFacility> = {
-        facility: null,
-        ident: "0  ",
-        lastMatch: null,
-    };
-    public readonly ndbPage: WaypointPageState<NdbFacility> = {
-        facility: null,
-        ident: "0  ",
-        lastMatch: null,
-    };
-    public readonly intPage: WaypointPageState<IntersectionFacility | RunwayFacility> = {
-        facility: null,
-        ident: "0    ",
-        lastMatch: null,
-    };
-    public readonly supPage: WaypointPageState<UserFacility> = {
-        facility: null,
-        ident: "0    ",
-        lastMatch: null,
-    };
+    public readonly aptPage: WaypointPageState<AirportFacility>;
+    public readonly vorPage: WaypointPageState<VorFacility>;
+    public readonly ndbPage: WaypointPageState<NdbFacility>;
+    public readonly intPage: WaypointPageState<IntersectionFacility | RunwayFacility>;
+    public readonly supPage: WaypointPageState<UserFacility>;
 
     public readonly dtPage: DtPageState = {
         flightTimer: 0,
@@ -219,17 +281,7 @@ export class VolatileMemory {
 
     public readonly navPage: NavPageState;
 
-    public readonly triPage: TriPageState = {
-        tas: 150,
-        windDirTrue: 0,
-        windSpeed: 0,
-        ff: 0,
-        reserve: 0,
-        tri1To: null,
-        tri3From: null,
-        tri3To: null,
-        tri5Fpl: 0,
-    };
+    public readonly triPage: TriPageState;
 
     public readonly calPage: CalPageState = {
         cal6TimeZ: null,
@@ -250,14 +302,19 @@ export class VolatileMemory {
         computedLegs: null,
     };
 
-
-    public readonly othPage: OthPageState = {
-        reserve: 0,
-    };
-
     public isReady = false;
 
     public constructor(bus: EventBus, userSettings: KLN90BUserSettings, private facilityLoader: FacilityClient, sensors: Sensors, private scanlists: Scanlists, flightplans: Flightplan[], lastactiveWaypoint: Facility | null) {
+        this.aptPage = new WaypointPageState("0   ", new SavedWaypoint(userSettings.getSetting("aptPageWpt"), [FacilityType.Airport]));
+        this.vorPage = new WaypointPageState("0  ", new SavedWaypoint(userSettings.getSetting("vorPageWpt"), [FacilityType.VOR]));
+        this.ndbPage = new WaypointPageState("0  ", new SavedWaypoint(userSettings.getSetting("ndbPageWpt"), [FacilityType.NDB]));
+        this.intPage = new WaypointPageState("0    ", new SavedWaypoint(userSettings.getSetting("intPageWpt"), [FacilityType.Intersection, FacilityType.RWY]));
+        this.supPage = new WaypointPageState("0    ", new SavedWaypoint(userSettings.getSetting("supPageWpt"), [FacilityType.USR]));
+        this.triPage = new TriPageState(
+            new SavedWaypoint(userSettings.getSetting("tri1To")),
+            new SavedWaypoint(userSettings.getSetting("tri3From")),
+            new SavedWaypoint(userSettings.getSetting("tri3To")),
+        );
         this.navPage = new NavPageState(bus, userSettings, sensors, flightplans[0], lastactiveWaypoint);
         this.fplPage = {
             flightplans,
@@ -286,14 +343,6 @@ export class VolatileMemory {
         this.dtPage.departureTime = null;
         this.dtPage.flightTimer = 0;
 
-        this.triPage.tas = 150;
-        this.triPage.windSpeed = 0;
-        this.triPage.windDirTrue = 0;
-        this.triPage.tri1To = null;
-        this.triPage.tri3From = null;
-        this.triPage.tri3To = null;
-        this.triPage.tri5Fpl = 0;
-
         this.navPage.nav4VnavWpt = null;
         this.navPage.nav4VnavAngle = null;
         this.navPage.nav4FromAlt = 0;
@@ -303,7 +352,29 @@ export class VolatileMemory {
         this.navPage.approachDisarmedLeg = null; //The legs of a short power-off stay in FPL 0, the disarm does not (#139)
         this.navPage.aprActivationDist = 2;
         this.navPage.aprActivationScale = 1;
-        this.navPage.userMagvar = 0;
+        //The entered variation outside the database coverage is kept over a short power-off. The KLN 89 Pilot's Guide says
+        //so (4-46, 4-47); the 90B guide is silent (5-44)
+        if (evt.timeSincePowerChange > RESET_TIME) {
+            this.navPage.userMagvar = 0;
+        }
+        //#192: what a power-on forgets (spec 2026-10-24-power-cycle-design.md, 4.4). The KLN 89 trainer forgot the selected
+        //altitude (2026-10-24). The OBS course is not offered again: the unit powers up in LEG (3-3). The Super NAV 5 range is
+        //a cache of the automatic range (SuperNav5Page), not pilot state
+        this.navPage.nav4SelectedAltitude = 0;
+        this.navPage.obsMag = 0;
+        this.navPage.superNav5ActualRange = 40;
+        //The derived values are recomputed by the first calculation tick
+        this.navPage.xtkToActive = null;
+        this.navPage.distToActive = null;
+        this.navPage.eteToActive = null;
+        this.navPage.distToDest = null;
+        this.navPage.eteToDest = null;
+        this.navPage.bearingToActive = null;
+        this.navPage.bearingForAP = null;
+        this.navPage.desiredTrack = null;
+        this.navPage.steeringPath = null;
+        this.navPage.toFrom = null;
+        this.navPage.waypointAlert = false;
         this.navPage.isSelfTestApproved = false; //Every power-on runs the self-test again (#330)
         this.navPage.isSelfTestActive = false; //A power-off during the self-test ends it (#400)
         this.navPage.rollSteeringLatch = null; //A turn chosen before the power-off is not kept (#100)
@@ -327,21 +398,42 @@ export class VolatileMemory {
         this.ctrPage.waypoints = [];
         this.ctrPage.computedLegs = null;
 
-        this.othPage.reserve = 0;
-
+        //#192: each waypoint page shows its saved waypoint again (KLN 89 trainer 2026-10-24), else the first of its scan
+        //list; the TRI waypoints come back or become null
         Promise.all([
-            this.setFirstApt(),
-            this.setFirstVor(),
-            this.setFirstNdb(),
-            this.setFirstIntersection(),
-            this.setFirstSupplementary(),
+            this.restoreOr(this.aptPage, this.scanlists.aptScanlist, icao => this.setFirstApt(icao)),
+            this.restoreOr(this.vorPage, this.scanlists.vorScanlist, icao => this.setFirstVor(icao)),
+            this.restoreOr(this.ndbPage, this.scanlists.ndbScanlist, icao => this.setFirstNdb(icao)),
+            this.restoreOr(this.intPage, this.scanlists.intScanlist, icao => this.setFirstIntersection(icao)),
+            this.restoreOr(this.supPage, this.scanlists.supScanlist, icao => this.setFirstSupplementary(icao)),
+            this.afterPowerEvent().then(() => this.triPage.restore(this.facilityLoader)),
         ]).then(_ => {
             this.isReady = true;
         });
     }
 
-    private async setFirstSupplementary() {
-        const icao = await this.scanlists.supScanlist.init();
+    /**
+     * The scan list is built at every power-on, also when the page restores its saved waypoint: the scan past the last
+     * nearest rank (3-24) and the fast scan need its index
+     */
+    private async restoreOr<T extends Facility>(page: WaypointPageState<T>, scanlist: Scanlist, setFirst: (first: IcaoValue | null) => Promise<void>): Promise<void> {
+        await this.afterPowerEvent();
+        const [restored, first] = await Promise.all([page.restore(this.facilityLoader), scanlist.init()]);
+        if (restored === null) {
+            await setFirst(first);
+        }
+    }
+
+    /**
+     * Resolves once the other handlers of the power event have run. TemporaryWaypointDeleter deletes the unused
+     * temporary waypoints in the same event (5-22), and the repository lookup of a restore runs at once, so without the
+     * wait a saved temporary waypoint would be restored while it is being deleted
+     */
+    private afterPowerEvent(): Promise<void> {
+        return Promise.resolve();
+    }
+
+    private async setFirstSupplementary(icao: IcaoValue | null) {
         if (icao === null) {
             this.supPage.ident = "0   ";
             this.supPage.facility = null;
@@ -358,8 +450,7 @@ export class VolatileMemory {
         }
     }
 
-    private async setFirstIntersection() {
-        const icao = await this.scanlists.intScanlist.init();
+    private async setFirstIntersection(icao: IcaoValue | null) {
         if (icao === null) {
             this.intPage.ident = "0   ";
             this.intPage.facility = null;
@@ -369,8 +460,7 @@ export class VolatileMemory {
         }
     }
 
-    private async setFirstNdb() {
-        const icao = await this.scanlists.ndbScanlist.init();
+    private async setFirstNdb(icao: IcaoValue | null) {
         if (icao === null) {
             this.ndbPage.ident = "0   ";
             this.ndbPage.facility = null;
@@ -380,8 +470,7 @@ export class VolatileMemory {
         }
     }
 
-    private async setFirstVor() {
-        const icao = await this.scanlists.vorScanlist.init();
+    private async setFirstVor(icao: IcaoValue | null) {
         if (icao === null) {
             this.vorPage.ident = "0  ";
             this.vorPage.facility = null;
@@ -391,8 +480,7 @@ export class VolatileMemory {
         }
     }
 
-    private async setFirstApt() {
-        const icao = await this.scanlists.aptScanlist.init();
+    private async setFirstApt(icao: IcaoValue | null) {
         if (icao === null) {
             this.aptPage.ident = "0   ";
             this.aptPage.facility = null;

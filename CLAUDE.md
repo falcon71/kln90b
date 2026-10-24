@@ -106,8 +106,11 @@ change what they mean; add new ones instead:
       (MSG, Super NAV 1/5, SET 0).
     - `PageTreeController.ts` defines `LEFT_PAGE_TREE`/`RIGHT_PAGE_TREE`. The outer knob selects the page group and the
       inner knob the page.
-    - **Pages are recreated on every knob step**, so state that must survive goes in `props.memory` (`VolatileMemory`)
-      or in user settings.
+    - **Pages are recreated on every knob step**, so state that must survive a page change goes in `props.memory`
+      (`VolatileMemory`). State the unit keeps over a power cycle is a user setting instead. State kept only over a short
+      interruption stays in memory behind the 5-minute check (`RESET_TIME`, 6-5), as the pilot-entered magnetic variation
+      does; a sim restart counts as a long interruption and loses it. Everything else in `VolatileMemory` is reset at a
+      power-on, which a guard test holds.
     - A tree slot is identified by `instanceof`, so every slot needs a distinct class (hence `Fpl0Page`…`Fpl25Page`).
 - **Rendering:** DOM text in `<pre>` using the custom font `kln90b.ttf`, on a **23×7 character grid** (each half page
   is 11×6, and row 7 is the status line). Each character cell is 9×13 px scaled ×4, which gives the 860×388 screen.

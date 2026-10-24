@@ -114,6 +114,23 @@ export type KLN90BUserSettingsTypes = {
 
     fastGpsAcquisition: boolean,
 
+    triTas: Knots,
+    triWindDirTrue: Degrees,
+    triWindSpeed: Knots,
+    triFuelFlow: number,
+    triReserve: number,
+    tri5Fpl: number,
+    othReserve: number,
+
+    aptPageWpt: string,
+    vorPageWpt: string,
+    ndbPageWpt: string,
+    intPageWpt: string,
+    supPageWpt: string,
+    tri1To: string,
+    tri3From: string,
+    tri3To: string,
+
     userDataFormat: number,
 }
 
@@ -323,6 +340,81 @@ export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSett
             {
                 name: "cal5SpeedMph",
                 defaultValue: 0,
+            },
+            {
+                //TRI 0 TAS in kt, kept over a power cycle (AVsoftech trainer 2026-10-24, unreliable; the KLN 89 CAL 7 TAS came back 0, docs/kln89-trainer-record.md, #192)
+                name: "triTas",
+                defaultValue: 150,
+            },
+            {
+                //TRI 0 wind direction, true, kept over a power cycle (AVsoftech trainer 2026-10-24, unreliable, docs/kln89-trainer-record.md, #192)
+                name: "triWindDirTrue",
+                defaultValue: 0,
+            },
+            {
+                //TRI 0 wind speed in kt, kept over a power cycle (AVsoftech trainer 2026-10-24, unreliable, docs/kln89-trainer-record.md, #192)
+                name: "triWindSpeed",
+                defaultValue: 0,
+            },
+            {
+                //TRI 1/3/5 fuel flow, kept over a power cycle (both trainers 2026-10-24, docs/kln89-trainer-record.md, #192)
+                name: "triFuelFlow",
+                defaultValue: 0,
+            },
+            {
+                //TRI 1/3/5 fuel reserve, kept over a power cycle (both trainers 2026-10-24, docs/kln89-trainer-record.md, #192)
+                name: "triReserve",
+                defaultValue: 0,
+            },
+            {
+                //TRI 5/6 flight plan number, kept over a power cycle (AVsoftech trainer 2026-10-24, unreliable, docs/kln89-trainer-record.md, #192)
+                name: "tri5Fpl",
+                defaultValue: 0,
+            },
+            {
+                //OTH 5/6 reserve, kept like the TRI reserve (no trainer has OTH; #192)
+                name: "othReserve",
+                defaultValue: 0,
+            },
+            {
+                //The APT page waypoint, an ICAO string (V2), kept over a power cycle (KLN 89 trainer 2026-10-24, #192)
+                name: "aptPageWpt",
+                defaultValue: "",
+            },
+            {
+                //The VOR page waypoint, an ICAO string (V2), kept over a power cycle (KLN 89 trainer 2026-10-24, #192)
+                name: "vorPageWpt",
+                defaultValue: "",
+            },
+            {
+                //The NDB page waypoint, an ICAO string (V2), kept over a power cycle (KLN 89 trainer 2026-10-24, #192)
+                name: "ndbPageWpt",
+                defaultValue: "",
+            },
+            {
+                //The INT page waypoint, an ICAO string (V2), kept over a power cycle (KLN 89 trainer 2026-10-24, #192)
+                name: "intPageWpt",
+                defaultValue: "",
+            },
+            {
+                //The SUP page waypoint, an ICAO string (V2), kept over a power cycle (KLN 89 trainer 2026-10-24, #192)
+                name: "supPageWpt",
+                defaultValue: "",
+            },
+            {
+                //The TRI 1 and TRI 2 TO waypoint, an ICAO string (V2), kept over a power cycle (AVsoftech TRI 1 and KLN 89 CAL 1 trip waypoints, 2026-10-24, docs/kln89-trainer-record.md, #192)
+                name: "tri1To",
+                defaultValue: "",
+            },
+            {
+                //The TRI 3 and TRI 4 FROM waypoint, an ICAO string (V2), kept over a power cycle (KLN 89 CAL 1 trip waypoints; the AVsoftech TRI 3 came back inconsistent, 2026-10-24, docs/kln89-trainer-record.md, #192)
+                name: "tri3From",
+                defaultValue: "",
+            },
+            {
+                //The TRI 3 and TRI 4 TO waypoint, an ICAO string (V2), kept over a power cycle (KLN 89 CAL 1 trip waypoints; the AVsoftech TRI 3 came back inconsistent, 2026-10-24, docs/kln89-trainer-record.md, #192)
+                name: "tri3To",
+                defaultValue: "",
             },
             {
                 name: "userDataFormat",

@@ -63,8 +63,8 @@ export class Tri3Page extends SixLineHalfPage {
             bearing: new BearingDisplay(this.bearingTrue),
             gs: new SpeedFieldset(this.gs ?? 0, this.setGS.bind(this)),
             ete: new DurationDisplay(this.ete, true),
-            ff: new TripFuelFieldset(this.props.memory.triPage.ff, this.setFF.bind(this)),
-            res: new TripFuelFieldset(this.props.memory.triPage.reserve, this.setReserve.bind(this)),
+            ff: new TripFuelFieldset(this.props.userSettings.getSetting('triFuelFlow').get(), this.setFF.bind(this)),
+            res: new TripFuelFieldset(this.props.userSettings.getSetting('triReserve').get(), this.setReserve.bind(this)),
             fReq: new TripFuelDisplay(null),
         });
 
@@ -107,7 +107,7 @@ export class Tri3Page extends SixLineHalfPage {
             this.magvar = this.props.magvar.getMagvarForCoordinates(from);
 
             this.dist = UnitType.GA_RADIAN.convertTo(from.distance(this.props.memory.triPage.tri3To), UnitType.NMILE);
-            this.gs = calculateGroundspeedAlongCourse(this.props.memory.triPage.tas, this.bearingTrue, this.props.memory.triPage.windSpeed, this.props.memory.triPage.windDirTrue);
+            this.gs = calculateGroundspeedAlongCourse(this.props.userSettings.getSetting('triTas').get(), this.bearingTrue, this.props.userSettings.getSetting('triWindSpeed').get(), this.props.userSettings.getSetting('triWindDirTrue').get());
             this.ete = this.gs === null ? null : this.dist / this.gs * HOURS_TO_SECONDS;
         }
 
@@ -124,19 +124,19 @@ export class Tri3Page extends SixLineHalfPage {
         if (this.ete === null) {
             this.children.get("fReq").fuel = null;
         } else {
-            this.children.get("fReq").fuel = (this.ete / 3600) * this.props.memory.triPage.ff + this.props.memory.triPage.reserve;
+            this.children.get("fReq").fuel = (this.ete / 3600) * this.props.userSettings.getSetting('triFuelFlow').get() + this.props.userSettings.getSetting('triReserve').get();
         }
 
     }
 
     private setFF(ff: number) {
-        this.props.memory.triPage.ff = ff;
+        this.props.userSettings.getSetting('triFuelFlow').set(ff);
 
         this.calcFuelRequired();
     }
 
     private setReserve(reserve: number) {
-        this.props.memory.triPage.reserve = reserve;
+        this.props.userSettings.getSetting('triReserve').set(reserve);
 
         this.calcFuelRequired();
     }

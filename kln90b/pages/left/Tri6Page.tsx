@@ -33,7 +33,7 @@ export class Tri6Page extends SixLineHalfPage {
 
         this.children = new UIElementChildren<Tri6PageTypes>({
 
-            fpl: new SelectField([" 0", " 1", " 2", " 3", " 4", " 5", " 6", " 7", " 8", " 9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25"], this.props.memory.triPage.tri5Fpl, this.setFpl.bind(this)),
+            fpl: new SelectField([" 0", " 1", " 2", " 3", " 4", " 5", " 6", " 7", " 8", " 9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25"], this.props.userSettings.getSetting('tri5Fpl').get(), this.setFpl.bind(this)),
             line0: new TextDisplay(""),
             line1: new TextDisplay(""),
             line2: new TextDisplay(""),
@@ -42,7 +42,7 @@ export class Tri6Page extends SixLineHalfPage {
         });
 
         this.cursorController = new CursorController(this.children);
-        this.setFpl(this.props.memory.triPage.tri5Fpl);
+        this.setFpl(this.props.userSettings.getSetting('tri5Fpl').get());
     }
 
 
@@ -71,7 +71,7 @@ export class Tri6Page extends SixLineHalfPage {
     }
 
     private setFpl(fpl: number) {
-        this.props.memory.triPage.tri5Fpl = fpl;
+        this.props.userSettings.getSetting('tri5Fpl').set(fpl);
         this.lines = [];
         this.requiresRedraw = true;
         const fplLegs = this.props.memory.fplPage.flightplans[fpl].getLegs();
@@ -84,7 +84,7 @@ export class Tri6Page extends SixLineHalfPage {
             const esa = this.props.msa.getMSAForRoute(route);
             const lines = ["ESA " + (esa?.toString().padStart(5, " ") ?? "-----") + "ft"];
             airspacesAlongRoute(route, this.props.nearestUtils).then(airspaces => {
-                if (this.props.memory.triPage.tri5Fpl !== fpl) {
+                if (this.props.userSettings.getSetting('tri5Fpl').get() !== fpl) {
                     return; //The user scrolled faster than we could load the airspaces
                 }
                 for (const airspace of airspaces) {

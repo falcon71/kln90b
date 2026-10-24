@@ -3,6 +3,8 @@ import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {distanceNm, pointFrom} from '../../../harness/flight/geo';
 import {airport} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
+import {storedSetting} from '../../../harness/storage';
+import {setTriFigures, TriFigures} from '../../../harness/triSettings';
 
 // The aircraft is at KAAA; KBBB lies one degree of latitude due south: true course 180, 60.107 NM on the sphere of
 // geo.ts. At the default TAS of 150 kt in no wind that is 0.40072 h, 24.04 min.
@@ -17,13 +19,14 @@ async function bootTri1(o: {
     if (!o.coldGps) {
         await settle(unit);
     }
-    // Fuel flow and reserve are volatile memory, read when the page is built
-    Object.assign(unit.props.memory.triPage, {ff: o.ff ?? 0, reserve: o.reserve ?? 0});
+    // The figures are user settings (#192), read when the page is built
+    const figures: TriFigures = {ff: o.ff ?? 0, reserve: o.reserve ?? 0};
     for (const key of ['tas', 'windDirTrue', 'windSpeed'] as const) {
         if (o[key] !== undefined) {
-            unit.props.memory.triPage[key] = o[key]!;
+            figures[key] = o[key];
         }
     }
+    setTriFigures(unit, figures);
     await unit.panel.selectPage('L', 'TRI 1');
     return unit;
 }
@@ -226,5 +229,32 @@ describe('TRI 1 ground speed along the course (characterization, #167)', () => {
         expect(unit.errors).toEqual([]);
         const rows = Screen.read().rows('L');
         expect([rows[2], rows[5]]).toEqual(['100kt  0:36', 'F REQ   6.0']);
+    });
+});
+
+// Persisted user data (CLAUDE.md "Public contract with aircraft"): the fuel flow and reserve are the user settings
+// triFuelFlow and triReserve, kept over a power cycle by the trainers (2026-10-24) and so over a sim restart (#192)
+describe('TRI 1 fuel flow and reserve as user settings (#192)', () => {
+    it('saves the TRI 1 fuel flow and reserve in the user settings (#192)', async () => {
+        const unit = await bootTri1();
+        await unit.panel.cursor('L');
+        await cursorToCell(unit, 3, 7);
+        await setDigit(unit, 1);
+        await cursorToCell(unit, 3, 8);
+        await setDigit(unit, 2);
+        await cursorToCell(unit, 4, 7);
+        await setDigit(unit, 3);
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FF: 00012.0', 'RES:00030.0']);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'triFuelFlow')).toBe(12);
+        expect(storedSetting(unit, 'triReserve')).toBe(30);
+    });
+
+    it('shows the stored fuel flow and reserve on TRI 1 at a new boot (#192)', async () => {
+        const unit = await bootUnit({storage: {triFuelFlow: 12, triReserve: 30}});
+        await unit.panel.selectPage('L', 'TRI 1');
+
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FF: 00012.0', 'RES:00030.0']);
     });
 });

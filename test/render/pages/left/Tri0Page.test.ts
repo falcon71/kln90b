@@ -1,7 +1,8 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {airport} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
+import {storedSetting} from '../../../harness/storage';
 
 /** The focused field after each of `clicks` outer-knob steps, starting with the field the cursor comes on at */
 async function cursorStops(unit: HeadlessUnit, clicks: number): Promise<string[]> {
@@ -73,5 +74,34 @@ describe('TRI 0 page (5-2)', () => {
         Object.assign(unit.props.memory.triPage, {tri3From: kaaa, tri3To: kbbb});
         await unit.panel.selectPage('L', 'TRI 3');
         expect(Screen.read().rows('L')[2].slice(0, 5)).toBe('175kt');
+    });
+});
+
+// Persisted user data (CLAUDE.md "Public contract with aircraft"): the TAS and the wind are the user settings triTas,
+// triWindDirTrue and triWindSpeed, kept over a power cycle by the AVsoftech trainer (2026-10-24, unreliable; the KLN 89 CAL 7 TAS came back 0) and so over a sim restart (#192)
+describe('TRI 0 TAS and wind as user settings (#192)', () => {
+    it('saves the TRI 0 TAS and wind in the user settings (#192)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'TRI 0');
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 2); // TAS tens 5 -> 7
+        await unit.panel.outer('L', 2);
+        await unit.panel.inner('L', 2); // wind direction 00 -> 20
+        await unit.panel.outer('L', 3);
+        await unit.panel.inner('L', 3); // wind speed tens 0 -> 3
+        expect(Screen.read().rows('L').slice(3)).toEqual(['TAS:  170kt', 'WIND: 020°¥', '      030kt']);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'triTas')).toBe(170);
+        expect(storedSetting(unit, 'triWindDirTrue')).toBe(20);
+        expect(storedSetting(unit, 'triWindSpeed')).toBe(30);
+    });
+
+    it('shows the stored TAS and wind on TRI 0 at a new boot (#192)', async () => {
+        const unit = await bootUnit({storage: {triTas: 170, triWindDirTrue: 20, triWindSpeed: 30}});
+        await unit.panel.selectPage('L', 'TRI 0');
+
+        expect(Screen.read().rows('L').slice(3)).toEqual(['TAS:  170kt', 'WIND: 020°¥', '      030kt']);
     });
 });

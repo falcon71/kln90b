@@ -515,3 +515,48 @@ flying, SET 4 turn anticipation on unless noted; raw data and the reports in
   FULL); ENT deleted only KAPA and left the SID without its airport; the insert row opened one waypoint later, and the
   new waypoint became an en-route waypoint between two SID waypoints. Taken for a fault of that trainer; #148's rule
   stays (maintainer), recorded on #148. A repeat on the resulting plan deleted the SID header instead (#386).
+
+**2026-10-24** (agent checks for #192, what a power cycle keeps; the KLN 89 trainer and the third-party AVsoftech KLN 90B
+trainer, in two rounds; the VM was not started, stopped or reset)
+- How the power was cycled. The KLN 89 trainer has no power switch: its only power cycle is closing the program and
+  starting it again (10 to 20 s off, and once about 27 min). Every start runs the whole start-up. Whatever it keeps
+  may come from its own data files (its take-home persistence) and not from the unit, so a "kept" is weaker evidence
+  than a "reset", which the trainer must have done on purpose. Cycles of 20 s, 15 s and 27 min gave the same
+  result: it does not model the time off. The AVsoftech trainer (unreliable, contradicts the Pilot's Guide in several
+  places below) has a GPS PUSH ON button with a "turn off?" dialog; cycles of 15 s and 6 min 50 s gave the same result.
+  Its simulation ran during both.
+- KLN 89, reset at every power cycle (high): the VNAV selected altitude (ALT 2, entered twice, back to 0), the VNAV
+  waypoint (back to the active waypoint), the VNAV offset (0), the departure and flight time on NAV 3 (high only with a
+  caveat: the take-home ground speed came back 0 as well, so no new departure could start), the CAL 3 alarm time
+  (cleared), the CAL 3 elapsed timer (restarted from power-on; the 89 guide says it counts since power-on), the mode
+  (Leg; after OBS course 088 the OBS key offered the current DTK) and the manually entered magnetic variation (back to
+  auto after 20 s). The last one is against the 89 guide (4-47: lost only after more than 5 minutes), so the trainer most
+  likely does not model the time off. Medium: the page within the CAL group (back on CAL 1) and the CAL 7 TAS, which came
+  back 0, possibly derived from the CAL 6 TAS, which was 0.
+- KLN 89, kept: the CAL 1 trip waypoints (From and To), the CAL 1 and CAL 2 ground speed, the fuel flow, the reserve (once
+  004 became 003, probably an entry slip; medium), the CAL 7 heading, the manually entered indicated altitude and the
+  VNAV ground speed (all possibly its file).
+- AVsoftech, kept (medium): the NAV 4 selected altitude, offset and angle, TRI 0 TAS and wind, the fuel flow, the
+  reserve, the TRI 1 waypoint, the TRI 5 plan number, the departure time (its timer did not restart; low) and the OBS
+  mode (low; the switch is latched in the trainer, it contradicts 3-3, and no OBS warning page appeared). It reset the
+  CTR computation (agrees with 5-22 and 5-26) and showed the page of the active waypoint on the right (agrees with 3-8).
+  Its TRI 3 waypoints came back inconsistent (the old first ident with the distance of the new one), a trainer defect.
+  The KLN 90B magnetic variation line is outside its coverage logic (5-44), so it could not be checked there.
+- Both trainers kept the fuel flow, the reserve and the trip waypoints. They disagree on the VNAV selected altitude,
+  offset and the departure time; the AVsoftech trainer is the unreliable one. The simulation resets the selected
+  altitude as the KLN 89 trainer did, twice with the same result; the AVsoftech trainer kept it.
+- Round 2, the waypoint pages and the nearest rank. KLN 89: the last viewed waypoint of the APT, VOR, NDB and INT pages
+  and the USR page came back, however it had been reached (scan, ident entry, creation, nearest rank). A page parked on a
+  nearest rank (APT KCLI at rank 2, VOR GRB at rank 3) came back as the same waypoint, shown plain, without the nearest
+  marker, and also when the ranking had changed before the power-off (KAUW entered at rank 2, rank 1 at the power-off,
+  back as plain KAUW; high). The page number within the group was reset to 1 (APT 3 came back as APT 1). A deleted user
+  waypoint left the USR page on the first or the preceding user waypoint (the deleted one was entry 0, so which is not
+  known), also after a power-on (medium). While flying, a nearest page
+  stayed on its airport and only the rank number changed (3-23, 3-24), so the unit does not follow the ranking; the mode
+  with the cursor parked on the rank could not be reached in this trainer. A position re-initialization on SET 1 dropped
+  the nearest mode and left the airport as a plain airport. The AVsoftech trainer brought the waypoint pages back on
+  fixed idents at every start (an airport, an NDB, an intersection, a supplementary waypoint), neither the last viewed
+  nor the last typed, and showed a nearest page as that fixed airport with its rank flag, 789 NM away. Trainer defect, no
+  evidence. It did show the active waypoint on the page type of the right side at power-on again (3-8). It keeps the
+  page number; the KLN 89 resets it, and the simulation follows the KLN 89 (no counterpart check on the 90B).
+- No simulation bug came out of these checks, so nothing was filed.

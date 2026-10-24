@@ -1,17 +1,18 @@
 import {describe, expect, it} from 'vitest';
 import {bootUnit, HeadlessUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
+import {setTriFigures} from '../../../harness/triSettings';
 
 // BearingFieldset: a direction of 000 to 359 in two cells, the first two digits as one cell (00 to 35) and the last
-// digit. Its host here is the wind direction of TRI 0 (row 4, after the three TAS digits; navPage memory
-// triPage.windDirTrue). CAL 3 uses it for the heading (Cal3Page.test.ts). The keyboard cannot type the first cell (its
+// digit. Its host here is the wind direction of TRI 0 (row 4, after the three TAS digits; the user setting
+// triWindDirTrue). CAL 3 uses it for the heading (Cal3Page.test.ts). The keyboard cannot type the first cell (its
 // entries are two characters long): #109 left such cells to the knobs by decision, so no test here holds either
 // behavior.
 
 /** TRI 0 with the wind direction stored as `dir` and the left cursor on its first two digits */
 async function onWindDir(dir: number): Promise<HeadlessUnit> {
     const unit = await bootUnit();
-    unit.props.memory.triPage.windDirTrue = dir; // read when TRI 0 is built
+    setTriFigures(unit, {windDirTrue: dir}); // a user setting (#192), read when TRI 0 is built
     await unit.panel.selectPage('L', 'TRI 0');
     await unit.panel.cursor('L');
     await unit.panel.outer('L', 3);
@@ -30,7 +31,7 @@ describe('bearing fieldset', () => {
         await unit.panel.inner('L', -3);
 
         expect(windRow()).toBe('WIND: 180°¥');
-        expect(unit.props.memory.triPage.windDirTrue).toBe(180);
+        expect(unit.props.userSettings.getSetting('triWindDirTrue').get()).toBe(180);
     });
 
     // 5-2 step 6: the last digit completes the direction and keeps the first two: 180 to 184
@@ -41,7 +42,7 @@ describe('bearing fieldset', () => {
         await unit.panel.inner('L', 4);
 
         expect(windRow()).toBe('WIND: 184°¥');
-        expect(unit.props.memory.triPage.windDirTrue).toBe(184);
+        expect(unit.props.userSettings.getSetting('triWindDirTrue').get()).toBe(184);
     });
 
     // 5-2: the first two digits keep the last one: 184 to 214
@@ -50,7 +51,7 @@ describe('bearing fieldset', () => {
         await unit.panel.inner('L', 3);
 
         expect(windRow()).toBe('WIND: 214°¥');
-        expect(unit.props.memory.triPage.windDirTrue).toBe(214);
+        expect(unit.props.userSettings.getSetting('triWindDirTrue').get()).toBe(214);
     });
 });
 
@@ -65,9 +66,9 @@ describe('bearing fieldset wrap', () => {
         await unit.panel.inner('L', 1);
 
         expect(windRow()).toBe('WIND: 009°¥');
-        expect(unit.props.memory.triPage.windDirTrue).toBe(9);
+        expect(unit.props.userSettings.getSetting('triWindDirTrue').get()).toBe(9);
         await unit.panel.inner('L', -1);
         expect(windRow()).toBe('WIND: 359°¥');
-        expect(unit.props.memory.triPage.windDirTrue).toBe(359);
+        expect(unit.props.userSettings.getSetting('triWindDirTrue').get()).toBe(359);
     });
 });

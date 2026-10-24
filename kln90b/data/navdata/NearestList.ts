@@ -232,3 +232,21 @@ export class NdbNearestList extends NearestList<FacilitySearchType.Ndb, NdbFacil
     protected initFilters(session: NearestSearchSessionTypeMap<NearestIcaoSearchSessionDataType.Struct>[FacilitySearchType.Ndb]): void {
     }
 }
+
+/**
+ * If facility is a NearestFacility, then this return the internal facility
+ * @protected
+ */
+export function unpackFacility<T extends Facility>(facility: T | NearestWpt<T>): T;
+export function unpackFacility<T extends Facility>(facility: T | NearestWpt<T> | null): T | null;
+export function unpackFacility<T extends Facility>(facility: T | NearestWpt<T> | null): T | null {
+    if (isNearestWpt(facility)) {
+        return facility.facility;
+    } else {
+        return facility;
+    }
+}
+
+export function isNearestWpt<T extends Facility>(wpt: NearestWpt<T> | T | null): wpt is NearestWpt<T> {
+    return wpt !== null && "facility" in wpt;
+}

@@ -866,8 +866,9 @@ recording (an `it.fails` until #100 was fixed), so a broken flight cannot be mis
   `NAV 5` is a hazard too: Super NAV 5 hides the status line the helper reads (section 4).
 - **`selectPage` runs the pages it passes.** Each page on the way is built and runs its side effects: on the way from
   CAL 1 to CAL 3 the unit shows CAL 2, which overwrites the CAL 3 TAS (#33), so a CAL 3 test enters its TAS with the
-  knobs after arriving; the TRI pages read their fields from `unit.props.memory.triPage` when they are built, so a test
-  seeds the memory first and selects the page after.
+  knobs after arriving; the TRI and OTH pages read their figures from the user settings (#192) when they are built, so a
+  test seeds them first (`setTriFigures` in `harness/triSettings.ts`, or `storage` in the boot) and selects the page
+  after.
 - **`selectPage` throws once a row overflows**, because it reads the screen after every click, and `Screen.read()`
   throws on a character past column 11 (below). A test of an overflow (a distance that rounded up to its cutoff, #226)
   selects its page first, then moves the aircraft into the overflow, and a setup sibling that must see the overflowing

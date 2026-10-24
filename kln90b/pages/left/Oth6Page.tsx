@@ -37,7 +37,7 @@ export class Oth6Page extends SixLineHalfPage {
             range: new DistanceDisplay(4, null),
             fuelUnit: new TextDisplay(this.props.planeSettings.input.fuelComputer.unit.padEnd(3, " ")),
             efficiency: new TextDisplay("-.-"),
-            res: new OthFuelFieldset(this.props.memory.othPage.reserve, this.setReserve.bind(this)),
+            res: new OthFuelFieldset(this.props.userSettings.getSetting('othReserve').get(), this.setReserve.bind(this)),
         });
 
         this.cursorController = new CursorController(this.children);
@@ -67,7 +67,7 @@ export class Oth6Page extends SixLineHalfPage {
         let range = null;
         let efficiencyString = "---";
         if (ff > 0) {
-            endurance = (fob - this.props.memory.othPage.reserve) / ff * HOURS_TO_SECONDS;
+            endurance = (fob - this.props.userSettings.getSetting('othReserve').get()) / ff * HOURS_TO_SECONDS;
             if (endurance < 0) {
                 endurance = null;
             } else {
@@ -88,6 +88,6 @@ export class Oth6Page extends SixLineHalfPage {
     }
 
     private setReserve(reserve: number) {
-        this.props.memory.othPage.reserve = reserve;
+        this.props.userSettings.getSetting('othReserve').set(reserve);
     }
 }

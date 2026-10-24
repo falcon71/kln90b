@@ -152,7 +152,7 @@ unit's battery: the text is drafted for the maintainer, who edits the wiki.
 | `fplPage.flightplans`, `navPage.activeWaypoint` | persisted on their own path | unchanged | not `VolatileMemory` state in the sense of #192 |
 
 Setting keys are new, added with defaults equal to today's defaults. Names follow the existing style (`cal3Tas`,
-`altAlertWarn`). An ICAO string is written the way `activeWaypoint` is (`ICAO.valueToStringV1`).
+`altAlertWarn`). An ICAO string is written as V2 (`ICAO.valueToStringV2`); V1 is deprecated (maintainer, 2026-10-24; the V1 `activeWaypoint` is #415).
 
 **Numbers** are read and written through `props.userSettings` by the pages (TRI 0-6, OTH 5, OTH 6); the fields leave
 `TriPageState` and `OthPageState`.

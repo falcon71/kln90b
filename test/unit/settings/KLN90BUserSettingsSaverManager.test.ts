@@ -64,6 +64,21 @@ const DEFAULTS: Record<string, unknown> = {
     cal5TempF: 32,
     cal5SpeedKt: 0,
     cal5SpeedMph: 0,
+    triTas: 150, // #192
+    triWindDirTrue: 0, // #192
+    triWindSpeed: 0, // #192
+    triFuelFlow: 0, // #192
+    triReserve: 0, // #192
+    tri5Fpl: 0, // #192
+    othReserve: 0, // #192
+    aptPageWpt: '', // #192
+    vorPageWpt: '', // #192
+    ndbPageWpt: '', // #192
+    intPageWpt: '', // #192
+    supPageWpt: '', // #192
+    tri1To: '', // #192
+    tri3From: '', // #192
+    tri3To: '', // #192
     userDataFormat: 0,
 };
 

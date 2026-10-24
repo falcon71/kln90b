@@ -49,7 +49,7 @@ export class Oth5Page extends SixLineHalfPage {
             fob: new FuelOnBoardSelect(this.props.planeSettings, this.props.sensors),
             reqd: new OthFuelDisplay(null),
             lFob: new OthFuelDisplay(null),
-            res: new OthFuelFieldset(this.props.memory.othPage.reserve, this.setReserve.bind(this)),
+            res: new OthFuelFieldset(this.props.userSettings.getSetting('othReserve').get(), this.setReserve.bind(this)),
             extra: new OthFuelDisplay(null),
         });
 
@@ -90,7 +90,7 @@ export class Oth5Page extends SixLineHalfPage {
         if (this.props.memory.navPage.eteToDest !== null) {
             reqd = ff * this.props.memory.navPage.eteToDest / 3600;
             lfob = fob - reqd;
-            extra = lfob - this.props.memory.othPage.reserve;
+            extra = lfob - this.props.userSettings.getSetting('othReserve').get();
         }
 
         this.children.get("reqd").fuel = reqd;
@@ -99,7 +99,7 @@ export class Oth5Page extends SixLineHalfPage {
     }
 
     private setReserve(reserve: number) {
-        this.props.memory.othPage.reserve = reserve;
+        this.props.userSettings.getSetting('othReserve').set(reserve);
     }
 
 }

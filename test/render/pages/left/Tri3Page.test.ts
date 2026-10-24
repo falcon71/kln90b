@@ -4,6 +4,8 @@ import {bootUnit, BootOptions, HeadlessUnit, settle} from '../../../harness/boot
 import {distanceNm, pointFrom} from '../../../harness/flight/geo';
 import {airport} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
+import {storedSetting} from '../../../harness/storage';
+import {setTriFigures} from '../../../harness/triSettings';
 
 // KAAA to KBBB is one degree of latitude due south: true course 180, 60.107 NM on the sphere of geo.ts, 24.04 min at
 // the default TAS of 150 kt in no wind.
@@ -45,7 +47,7 @@ describe('TRI 3 page (characterization)', () => {
     it('shows the trip between two waypoints with fuel flow and reserve (characterization)', async () => {
         const unit = await bootUnit({facilities: [kaaa(), kbbb()]});
         await settle(unit);
-        Object.assign(unit.props.memory.triPage, {ff: 30, reserve: 25}); // volatile memory, read when the page is built
+        setTriFigures(unit, {ff: 30, reserve: 25}); // user settings (#192), read when the page is built
         await unit.panel.selectPage('L', 'TRI 3');
         await enterRoute(unit, 'KAAA', 'KBBB');
         expect(unit.errors).toEqual([]);
@@ -145,7 +147,7 @@ describe('TRI 3, F REQ at a ground speed of 0 (characterization, #257)', () => {
     async function atGs0(ff: number): Promise<HeadlessUnit> {
         const unit = await bootUnit({facilities: [kaaa(), kbbb()]});
         await settle(unit);
-        Object.assign(unit.props.memory.triPage, {ff, reserve: 5}); // volatile memory, read when the page is built
+        setTriFigures(unit, {ff, reserve: 5}); // user settings (#192), read when the page is built
         await unit.panel.selectPage('L', 'TRI 3');
         await enterRoute(unit, 'KAAA', 'KBBB');
         await unit.panel.cursor('L');
@@ -168,5 +170,24 @@ describe('TRI 3, F REQ at a ground speed of 0 (characterization, #257)', () => {
         const unit = await atGs0(0);
         const rows = Screen.read().rows('L');
         expect([rows[2], rows[3], rows[5]]).toEqual(['000kt --:--', 'FF: 00000.0', 'F REQ ---.-']);
+    });
+});
+
+// Persisted user data (CLAUDE.md "Public contract with aircraft"): the fuel flow and reserve entered on TRI 3 are the user
+// settings triFuelFlow and triReserve (#192), so that they survive a power cycle and a sim restart
+describe('TRI 3 fuel flow and reserve as user settings (#192)', () => {
+    it('saves the TRI 3 fuel flow and reserve in the user settings (#192)', async () => {
+        const unit = await bootTri3([kaaa(), kbbb()]);
+        await enterRoute(unit, 'KAAA', 'KBBB');
+        await unit.panel.cursor('L');
+        await cursorToCell(unit, 3, 7);
+        await unit.panel.inner('L', 4); // FF tens 0 -> 4
+        await cursorToCell(unit, 4, 8);
+        await unit.panel.inner('L', 7); // RES units 0 -> 7
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FF: 00040.0', 'RES:00007.0']);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'triFuelFlow')).toBe(40);
+        expect(storedSetting(unit, 'triReserve')).toBe(7);
     });
 });

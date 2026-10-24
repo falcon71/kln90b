@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {bootUnit} from '../../../harness/boot';
 import {airport} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
+import {setTriFigures} from '../../../harness/triSettings';
 
 // KAAA to KBBB is due south (true 180, magnetic variation 0), 60 NM.
 function world() {
@@ -11,8 +12,9 @@ function world() {
 async function tri3(tas: number, windDirTrue: number, windSpeed: number): Promise<string[]> {
     const {kaaa, kbbb} = world();
     const unit = await bootUnit({facilities: [kaaa, kbbb]});
-    // TRI 0 values and the TRI 3 waypoints are volatile memory; the page computes on construction
-    Object.assign(unit.props.memory.triPage, {tas, windDirTrue, windSpeed, tri3From: kaaa, tri3To: kbbb});
+    // The TRI 0 values are user settings (#192) and the TRI 3 waypoints volatile memory; the page computes on construction
+    setTriFigures(unit, {tas, windDirTrue, windSpeed});
+    Object.assign(unit.props.memory.triPage, {tri3From: kaaa, tri3To: kbbb});
     await unit.panel.selectPage('L', 'TRI 3');
     expect(unit.errors).toEqual([]);
     return Screen.read().rows("L");

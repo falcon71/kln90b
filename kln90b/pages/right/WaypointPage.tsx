@@ -3,7 +3,8 @@ import {PageProps} from "../Page";
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {MAX_SCROLL_SPEED, Scanlist} from "../../data/navdata/Scanlist";
-import {AirportNearestList, NdbNearestList, NearestWpt, VorNearestList} from "../../data/navdata/NearestList";
+import {AirportNearestList, isNearestWpt, NdbNearestList, NearestWpt, unpackFacility, VorNearestList} from "../../data/navdata/NearestList";
+export {isNearestWpt, unpackFacility} from "../../data/navdata/NearestList";
 import {NearestSelector} from "../../controls/selects/NearestSelector";
 import {buildIcaoStructIdentOnly, TEMPORARY_WAYPOINT, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
@@ -288,25 +289,6 @@ export function isActiveWaypointPageProps<T extends Facility>(props: PageProps):
 export function isUserWaypoint(fac: Facility): boolean {
     return fac.icaoStruct.region === USER_WAYPOINT || fac.icaoStruct.region === TEMPORARY_WAYPOINT;
 }
-
-/**
- * If facility is a NearestFacility, then this return the internal facility
- * @protected
- */
-export function unpackFacility<T extends Facility>(facility: T | NearestWpt<T>): T;
-export function unpackFacility<T extends Facility>(facility: T | NearestWpt<T> | null): T | null;
-export function unpackFacility<T extends Facility>(facility: T | NearestWpt<T> | null): T | null {
-    if (isNearestWpt(facility)) {
-        return facility.facility;
-    } else {
-        return facility;
-    }
-}
-
-export function isNearestWpt<T extends Facility>(wpt: NearestWpt<T> | T | null): wpt is NearestWpt<T> {
-    return wpt !== null && "facility" in wpt;
-}
-
 
 export function isWapointPage(page: any): page is WaypointPage<Facility> {
     return "facility" in page;

@@ -1,10 +1,11 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {Facility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {distanceNm, pointFrom} from '../../../harness/flight/geo';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
-import {savedFlightplan} from '../../../harness/storage';
+import {savedFlightplan, storedSetting} from '../../../harness/storage';
+import {setTriFigures, TriFigures} from '../../../harness/triSettings';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
 
 // Two legs of half a degree of latitude each along the meridian 8 E, due north: 30.054 NM each, 60.107 NM in all,
@@ -19,11 +20,13 @@ async function bootTri5(
     if (!o.coldGps) {
         await settle(unit);
     }
+    const figures: TriFigures = {};
     for (const key of ['tas', 'windDirTrue', 'windSpeed', 'ff'] as const) {
         if (o[key] !== undefined) {
-            unit.props.memory.triPage[key] = o[key]!; // volatile memory, read when the page is built
+            figures[key] = o[key]; // a user setting (#192), read when the page is built
         }
     }
+    setTriFigures(unit, figures);
     await unit.panel.selectPage('L', 'TRI 5');
     return unit;
 }
@@ -31,7 +34,7 @@ async function bootTri5(
 describe('TRI 5 page (characterization)', () => {
     it('shows the analysis of FPL 0 with fuel flow and reserve (characterization)', async () => {
         const unit = await bootOnStandardRoute();
-        Object.assign(unit.props.memory.triPage, {ff: 30, reserve: 25}); // volatile memory, read when the page is built
+        setTriFigures(unit, {ff: 30, reserve: 25}); // user settings (#192), read when the page is built
         await unit.panel.selectPage('L', 'TRI 5');
         expect(unit.errors).toEqual([]);
         // Row 2 is 91.23 NM at 150 kt (no wind), 36.49 min: 0:36 (the GS row is characterization, #254)
@@ -160,7 +163,7 @@ describe('TRI 5 ground speed with a wind that differs per leg', () => {
         const {kaaa, kbbb, kccc} = windRoute();
         const unit = await bootUnit({facilities: [kaaa, kbbb, kccc], storage: savedFlightplan(0, [kaaa, kbbb, kccc])});
         await settle(unit);
-        Object.assign(unit.props.memory.triPage, {tas: 150, windDirTrue: 0, windSpeed: 50});
+        setTriFigures(unit, {tas: 150, windDirTrue: 0, windSpeed: 50});
         await unit.panel.selectPage('L', 'TRI 5');
         return unit;
     }
@@ -256,5 +259,54 @@ describe('TRI 5 ground speed along the course (characterization, #167)', () => {
         const kaaa = airport('KAAA', 47.0, 8.0);
         await bootTri5([kaaa], savedFlightplan(0, [kaaa]));
         expect(Screen.read().rows('L')[2]).toBe('000kt --:--');
+    });
+});
+
+// Persisted user data (CLAUDE.md "Public contract with aircraft"): the plan number of TRI 5 and TRI 6 is the user setting
+// tri5Fpl, kept over a power cycle by the AVsoftech trainer (2026-10-24, unreliable) and so over a sim restart (#192)
+describe('TRI 5 plan number as a user setting (#192)', () => {
+    it('saves the TRI 5 plan number in the user settings (#192)', async () => {
+        const unit = await bootUnit();
+        await unit.panel.selectPage('L', 'TRI 5');
+        await unit.panel.cursor('L');
+        await unit.panel.inner('L', 3);
+        expect(Screen.read().rows('L')[0].slice(0, 4)).toBe('FP 3');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'tri5Fpl')).toBe(3);
+    });
+
+    // FPL 3 is KCCC to KDDD, half a degree north: 30.054 NM. FPL 0 is empty, so the page shows FPL 3 only when it reads the
+    // stored number (the heading alone would also come from a plan 0 analysis under a plan 3 select field)
+    it('shows the stored plan number on TRI 5 at a new boot and analyzes that plan (#192)', async () => {
+        const kccc = airport('KCCC', 47.0, 8.0);
+        const kddd = airport('KDDD', 47.5, 8.0);
+        const unit = await bootTri5([kccc, kddd], {tri5Fpl: 3, ...savedFlightplan(3, [kccc, kddd])});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const rows = Screen.read().rows('L');
+        expect([rows[0], rows[1], rows[2].slice(0, 5)]).toEqual(['FP 3   30nm', 'KCCC -KDDD ', '150kt']);
+        expect(storedSetting(unit, 'tri5Fpl')).toBe(3); // showing the page does not overwrite it
+    });
+});
+
+// Persisted user data: the fuel flow and reserve entered on TRI 5 are the user settings triFuelFlow and triReserve (#192)
+describe('TRI 5 fuel flow and reserve as user settings (#192)', () => {
+    it('saves the TRI 5 fuel flow and reserve in the user settings (#192)', async () => {
+        const unit = await bootTri5([], {});
+        await unit.panel.cursor('L');
+        for (let i = 0; i < 20 && !(unit.panel.focused('L').row === 3 && unit.panel.focused('L').col === 7); i++) {
+            await unit.panel.outer('L', 1);
+        }
+        await unit.panel.inner('L', 4); // FF tens 0 -> 4
+        for (let i = 0; i < 20 && !(unit.panel.focused('L').row === 4 && unit.panel.focused('L').col === 8); i++) {
+            await unit.panel.outer('L', 1);
+        }
+        await unit.panel.inner('L', 7); // RES units 0 -> 7
+        expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FF: 00040.0', 'RES:00007.0']);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'triFuelFlow')).toBe(40);
+        expect(storedSetting(unit, 'triReserve')).toBe(7);
     });
 });
