@@ -81,6 +81,46 @@ describe('the mode after a power cycle (3-3)', () => {
     });
 });
 
+// The 90B guide is silent about a Direct To at the power-on (3-3 only says ENR-LEG, 3-8 the page of the last active
+// waypoint). The KLN 89 trainer dropped it at every relaunch and came back on an FPL 0 leg (checked in the KLN 89 trainer,
+// 2026-10-25). The trainer does not model the time off, so the pin powers off for longer than the 5 minutes of 6-5
+describe('the Direct To over a power cycle (#422)', () => {
+    const kaaa = airport('KAAA', 47.0, 8.0);
+    const kbbb = airport('KBBB', 47.4, 8.0);
+    const kccc = airport('KCCC', 47.2, 8.3);
+
+    /** On the leg KAAA-KBBB of FPL 0, then D-> KCCC, which no flight plan holds */
+    async function directToOutsideFpl0() {
+        const unit = await bootUnit({
+            facilities: [kaaa, kbbb, kccc], position: {lat: 47.1, lon: 8.0}, storage: savedFlightplan(0, [kaaa, kbbb]),
+        });
+        await settle(unit);
+        await unit.panel.directTo('KCCC');
+        return unit;
+    }
+
+    it('the Direct To to KCCC is active before the power-off and FPL 0 is kept over the power cycle (precondition of the #422 pin)', async () => {
+        const unit = await directToOutsideFpl0();
+        const aw = unit.props.memory.navPage.activeWaypoint;
+        expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('KCCC');
+        expect(aw.isDctNavigation()).toBe(true);
+
+        await cycle(unit, 600);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
+    });
+
+    it.fails('drops the Direct To at the power-on and comes back on the leg to KBBB (KLN 89 trainer 2026-10-25, #422)', async () => {
+        const unit = await directToOutsideFpl0();
+        const aw = unit.props.memory.navPage.activeWaypoint;
+
+        await cycle(unit, 600);
+
+        expect(aw.isDctNavigation()).toBe(false);
+        expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
+    });
+});
+
 /** Boots `nm` NM north of KPRC and loads the approach of approachWorld() */
 async function approachLoadedAt(nm: number) {
     const w = approachWorld();
