@@ -9,6 +9,7 @@ import {pointFrom} from '../../../harness/flight/geo';
 import {activeIdent} from '../../../harness/readers';
 import {NO_OBS, panelXml} from '../../../harness/panelXml';
 import {variationNear} from '../../../harness/fixtures';
+import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
 // An invented world: KDDD, with KAAA 200 NM west of it on the great circle that leaves KDDD on 270 true, so every point
 // west(nm) lies on the leg KAAA to KDDD (no cross track). FPL 0 is KAAA, KDDD; KDDD is active.
@@ -191,6 +192,35 @@ describe('NAV 1 page in OBS mode (#371)', () => {
         expect(unit.errors).toEqual([]);
         expect(rawLeftRow(5)).toMatch(/^BRG {4}/);
         expect(rawLeftRow(5)).not.toContain('NaN');
+    });
+});
+
+describe('NAV 1 page with the aircraft on the active waypoint', () => {
+    /** On the leg 64.8 NM west of KDDD in LEG mode, then exactly at KDDD on track 090, the last waypoint of FPL 0 */
+    async function onKddd(): Promise<HeadlessUnit> {
+        const unit = await onLeg(64.8, 145);
+        await moveAircraft(unit, {lat: KDDD.lat, lon: KDDD.lon}, {groundspeedKt: 145, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(1000);
+        return unit;
+    }
+
+    // The sibling of the #426 pin below, which holds its preconditions: KDDD stays active in LEG mode, the page shows
+    // NAV 1 without an error, and row 5 is the BRG field
+    it('characterization: KDDD stays active and NAV 1 shows its BRG field with the aircraft on KDDD', async () => {
+        const unit = await onKddd();
+
+        expect(activeIdent(unit)).toBe('KDDD');
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_LEG);
+        expect(unit.errors).toEqual([]);
+        expect(rawLeftRow(5)).toMatch(/^BRG {4}/);
+    });
+
+    // 3-31: BRG is the bearing to the active waypoint, three digits, or dashes where there is none (figure 3-101). On the
+    // waypoint the bearing to it is undefined (NaN), and the cells stay blank instead (#426)
+    it.fails('shows three digits or dashes for BRG with the aircraft exactly on the active waypoint (3-31, #426)', async () => {
+        await onKddd();
+
+        expect(rawLeftRow(5)).toMatch(/^BRG {4}(\d{3}|---)°$/);
     });
 });
 
