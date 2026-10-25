@@ -206,6 +206,37 @@ describe('DIS on a DME arc (6-18)', () => {
     });
 });
 
+// #433: with the aircraft exactly on ABC, the VOR of the active arc, every point of the arc is equally close, and the DTK
+// on the arc throws. The arc world of fixtures.ts, the aircraft parked on ABC (0 kt), so that the arc is not sequenced
+describe('the aircraft exactly on the VOR of the active DME arc', () => {
+    async function parkedOnArcVor(): Promise<HeadlessUnit> {
+        const w = arcWorld();
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.at(225, 10), panelXml: panelXml(APR_ARM_SWITCH),
+            storage: savedFlightplan(0, [w.kprc]),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        await moveAircraft(unit, {lat: w.abc.lat, lon: w.abc.lon}, {groundspeedKt: 0, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(1000);
+        return unit;
+    }
+
+    // The sibling of the #433 pin below, which holds its preconditions: the arc to ARCEN is still the active leg
+    it('keeps the arc to ARCEN active with the aircraft parked on ABC (the setup of #433)', async () => {
+        const unit = await parkedOnArcVor();
+
+        expect(activeIdent(unit)).toBe('ARCEN');
+        expect(activeWaypoint(unit).getFromLeg()!.path.isGreatCircle()).toBe(false);
+    });
+
+    it.fails('raises no error with the aircraft exactly on the VOR of the active DME arc (#433)', async () => {
+        const unit = await parkedOnArcVor();
+
+        expect(unit.errors).toEqual([]);
+    });
+});
+
 // 4-9: with turn anticipation disabled (SET 6) the waypoint alert starts about 36 s before the waypoint. At 120 kt that
 // is 1.2 NM: off at 1.3 NM (39 s), on at 1.1 NM (33 s).
 describe('waypoint alert without turn anticipation (4-9)', () => {
