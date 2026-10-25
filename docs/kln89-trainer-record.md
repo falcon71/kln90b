@@ -610,3 +610,26 @@ checking screenshots, timings about 0.1 s; the VM was not involved)
 - The KLN 89 trainer does not list scratchpad messages on its message page; its scratchpad is always visible, so it
   never needs to (the maintainer).
 - Outcome: #237 implemented for every status line message, as the 90B trainer shows it.
+
+**2026-10-25** (agent checks for #193, the active Direct To target over a power cycle and when it leaves FPL 0; the KLN 89
+trainer, power cycled by relaunching it as on 2026-10-24, 11 relaunches; the VM was not started, stopped or reset)
+- Set-up: FPL 0 held user waypoints only, with the active leg to the last en route waypoint; the aircraft stood still
+  near KCLI and SET 1 was not changed.
+- A Direct To never survived a relaunch (6 of 6). The target made no difference: an airport outside FPL 0, a user
+  waypoint in no plan, an approach waypoint of FPL 0, or an en route waypoint of FPL 0 nearer than the leg's waypoint.
+  Every time the unit came back in Leg on the same FPL 0 leg, never with no active waypoint and never on a leg to the old
+  target. Which rule picks that leg (the closest one, the last en route one, a stored one) is not known (low): every
+  relaunch was at the same position.
+- The first page after start-up followed the old target all the same: APT 5 of an airport target, APT 5 of the approach's
+  airport for an approach waypoint, NAV 1 otherwise. So the trainer remembers the last active waypoint but does not
+  restore the Direct To to it.
+- In flight, with a Direct To to an approach waypoint: deleting the approach (only the usual delete prompt, no message)
+  or replacing it with another approach (the replace prompt, no message) kept the Direct To as one to a waypoint outside
+  the plan; the FPL 0 distances went to dashes, and the new approach's waypoints did not become active. Loading the same
+  approach again put the active arrow back on that waypoint (medium, seen once).
+- Whether a relaunch drops a loaded approach could not be judged: it dropped it 4 times and kept it twice, once under the
+  name of an earlier approach over the waypoints of another (a trainer defect). This follows the trainer's file writing,
+  not a rule; the 89 rule of procedures deleted after more than 5 minutes off cannot be tested, as the trainer does not
+  model the time off. En route deletions always persisted.
+- Outcome: #422 (the simulation keeps a Direct To over a power cycle within one sim session; a sim restart already
+  comes back on the closest FPL 0 leg). With the Direct To dropped at the power-on, question 2 of #193 has no case left.
