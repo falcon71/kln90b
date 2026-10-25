@@ -383,7 +383,8 @@ export class KLN90BCore {
 
         const msa = new MSA();
 
-        this.temporaryWaypointDeleter = new TemporaryWaypointDeleter(facilityRepository, this.bus, flightplans);
+        //After VolatileMemory, whose power-on reset removes the procedures and drops the Direct To before the purge runs (#94, #422)
+        this.temporaryWaypointDeleter = new TemporaryWaypointDeleter(facilityRepository, this.bus, flightplans, memory.navPage.activeWaypoint);
 
         if (!restoreSuccessFull) {
             this.messageHandler.addMessage(new OneTimeMessage(["USER DATA LOST"]));

@@ -4,7 +4,7 @@ import {bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {efbRoute} from '../../harness/platform';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
-import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
+import {APR_ARM_SWITCH, NO_GPS_SIMVARS, panelXml} from '../../harness/panelXml';
 import {savedFlightplan, savedUserWaypoints} from '../../harness/storage';
 import {activeIdent, fplIdents, userWaypoints} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
@@ -94,9 +94,8 @@ describe('TemporaryWaypointDeleter', () => {
         expect(userWaypointNames(unit)).toEqual(['FARM XX']);
     });
 
-    // The purge looks at the flight plans only. A temporary waypoint that is the direct-to target of the active
-    // waypoint, but that no plan holds any more (the EFB replaced FPL 0), is deleted at the power cycle all the same
-    it('deletes a temporary waypoint that is the active direct-to target once no plan holds it (characterization)', async () => {
+    /** D-> CUST, a temporary waypoint of an EFB route, then a re-sync without it: CUST stays the target, no plan holds it */
+    async function directToCustNoPlanHolds() {
         const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true});
         await settle(unit);
         unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb, enroute: [{lat: 47.1, lon: 8.1}]}));
@@ -112,18 +111,40 @@ describe('TemporaryWaypointDeleter', () => {
         expect(activeIdent(unit)).toBe('CUST'); // Precondition: CUST is still the direct-to target
         expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
         expect(userWaypointNames(unit)).toEqual(['CUST XY']);
+        return unit;
+    }
+
+    // A short power-off keeps the Direct To (#422), so the purge spares the active waypoint, at the power-off and at the
+    // power-on, as OTH 3 refuses to delete it (ACTIVE WPT, C-1)
+    it('keeps a temporary waypoint that is the active Direct To target over a power cycle of 5 minutes or less, also when no plan holds it (C-1, #193)', async () => {
+        const unit = await directToCustNoPlanHolds();
 
         await unit.panel.powerCycle();
         await unit.panel.approveSelfTest();
         await vi.advanceTimersByTimeAsync(2000);
 
+        expect(userWaypointNames(unit)).toEqual(['CUST XY']);
+        expect(activeIdent(unit)).toBe('CUST');
+    });
+
+    // A long power-off drops the Direct To in VolatileMemory.reset, which runs before the purge (#422), so the former
+    // target is purged at that power-on
+    it('deletes the former Direct To target at the power-on after more than 5 minutes off, once the Direct To is dropped (5-22, 5-26, #422, #193)', async () => {
+        const unit = await directToCustNoPlanHolds();
+
+        await unit.panel.powerCycle({offSeconds: 600});
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(2000);
+
         expect(userWaypointNames(unit)).toEqual([]);
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(false);
     });
 
     // The sim can be left with the unit on, which is no power-off, so the unit also purges at power-on: a temporary
     // waypoint saved by the last session that no saved flight plan holds is gone after the boot. TMPB, held by FPL 3, is
-    // the control
-    it('deletes a saved temporary waypoint that no saved flight plan holds at the boot (characterization)', async () => {
+    // the control. The power-on run is how the deletion "when turned off" of 5-22 and 5-26 takes effect: a cut of the
+    // power runs no logic (#193)
+    it('deletes a saved temporary waypoint that no saved flight plan holds at the boot (#193)', async () => {
         const unit = await bootUnit({
             facilities: [kaaa],
             storage: {
@@ -138,11 +159,11 @@ describe('TemporaryWaypointDeleter', () => {
         expect(userWaypointNames(unit)).toEqual(['TMPB XY']);
     });
 
-    // The entry waypoint of a DME arc (SidStar) is a temporary waypoint in the repository while the approach is in FPL 0.
-    // A power cycle of more than 5 minutes removes the procedures from FPL 0 (6-5, VolatileMemory.reset) before the purge
-    // runs, so the entry is gone after it. The arc: right, 10 NM around ABC from the 180 to the 270 radial; the unit starts on the
-    // 190 radial, so the entry is D190J
-    it('deletes the entry waypoint of a DME arc at a power cycle of more than 5 minutes that removes the approach (characterization)', async () => {
+    /**
+     * An RNAV approach to KPRC with a DME arc: right, 10 NM around ABC from the 180 to the 270 radial. A unit on the 190
+     * radial gets the entry waypoint D190J
+     */
+    function arcWorld() {
         const abc = vor('ABC', 47.3, 8.3);
         const at = (radial: number, nm: number) => pointFrom(abc, radial, nm);
         const arcbg = intersection('ARCBG', at(180, 10).lat, at(180, 10).lon);
@@ -160,8 +181,16 @@ describe('TemporaryWaypointDeleter', () => {
                 final: [Leg.TF(mapaa, FixTypeFlags.MAP)],
             })],
         });
+        return {at, kprc, facilities: [kprc, abc, arcbg, arcen, mapaa]};
+    }
+
+    // The entry waypoint of a DME arc (SidStar) is a temporary waypoint in the repository while the approach is in FPL 0.
+    // A power cycle of more than 5 minutes removes the procedures from FPL 0 (6-5, VolatileMemory.reset) before the purge
+    // runs, so the entry is gone after it (#193)
+    it('deletes the entry waypoint of a DME arc at a power cycle of more than 5 minutes that removes the approach (#193)', async () => {
+        const w = arcWorld();
         const unit = await bootUnit({
-            facilities: [kprc, abc, arcbg, arcen, mapaa], position: at(190, 10), storage: savedFlightplan(0, [kprc]),
+            facilities: w.facilities, position: w.at(190, 10), storage: savedFlightplan(0, [w.kprc]),
             panelXml: panelXml(APR_ARM_SWITCH),
         });
         await settle(unit);
@@ -172,6 +201,32 @@ describe('TemporaryWaypointDeleter', () => {
         await unit.panel.approveSelfTest();
 
         expect(fplIdents(unit)).toEqual(['KPRC']);
+        expect(userWaypointNames(unit)).toEqual([]);
+    });
+
+    // The plan leg to D190J is active (no Direct To). The power-on removes its approach, so the leg is gone: the purge
+    // must not take the entry waypoint of that removed leg for the active waypoint. With the GPS SimVars the flight planner
+    // mirror resolves the removed leg before the purge runs; without them only the purge's own lookup does
+    it.each([
+        {simVars: 'with', options: APR_ARM_SWITCH},
+        {simVars: 'without', options: {...APR_ARM_SWITCH, ...NO_GPS_SIMVARS}},
+    ])('does not spare the entry waypoint of a DME arc on a plan leg that the power-on removed with its approach, $simVars the GPS SimVars (5-22, #193)', async ({options}) => {
+        const w = arcWorld();
+        const enr = intersection('ENRAA', w.at(190, 30).lat, w.at(190, 30).lon);
+        const unit = await bootUnit({
+            facilities: [...w.facilities, enr], position: w.at(190, 20), storage: savedFlightplan(0, [enr, w.kprc]),
+            panelXml: panelXml(options),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        expect(userWaypointNames(unit)).toEqual(['D190J XY']); // Precondition: the entry waypoint exists
+        expect(activeIdent(unit)).toBe('D190J'); // and the leg to it is active
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(false);
+
+        await unit.panel.powerCycle({offSeconds: 6 * 60});
+        await unit.panel.approveSelfTest();
+
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'KPRC']);
         expect(userWaypointNames(unit)).toEqual([]);
     });
 });

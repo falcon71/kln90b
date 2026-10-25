@@ -709,7 +709,9 @@ inputs as the KLN 89 does: angle, offset and waypoint cleared, FR set to SEL (#7
     - User waypoints use region **`XX`** (`USER_WAYPOINT`).
     - **Temporary** waypoints (EFB lat/lon legs, arc entry points) use region **`XY`** (`TEMPORARY_WAYPOINT`).
       `TemporaryWaypointDeleter` deletes unused `XY` waypoints on every power event (5-22); the `isTemporary` flag is
-      not persisted.
+      not persisted. It spares the active waypoint (C-1, #193) and runs after `VolatileMemory.reset` at the power-on,
+      which removes the procedures and drops the Direct To after a long power-off first (it is built later in
+      `KLN90BCore.init`).
     - `buildIcao*` string variants are `@deprecated`; use `buildIcaoStruct*` (`IcaoValue`).
       `UniqueIdentGenerator.getUniqueIdent` appends letters or digits to avoid duplicates.
 - `Scanlists` / `FacilityLoaderScanlist` (`data/navdata/Scanlist.ts`, 3-21) implement alphabetical scanning with
