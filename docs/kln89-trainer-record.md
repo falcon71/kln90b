@@ -673,3 +673,20 @@ course was set, and a rhumb line; the VM was not started, stopped or reset)
 - This corrects the reading of the 2026-10-14 block: the bearing shown in OBS mode there was the course at the waypoint,
   so its 3 to 4° above LEG mode are the meridian convergence plus the variation difference between waypoint and
   aircraft, and the variation at that waypoint was about 7.1° W, not 8.7°.
+
+**2026-10-25** (a second agent check of the OBS model, for #425: is the OBS course held true or magnetic; the KLN 89
+trainer at GS 0, waypoints a user waypoint at 7.60° W, an NDB at 3.87° W and a VOR with a published 1° E; every
+reading compared with spherical predictions of both hypotheses; the VM was not started, stopped or reset)
+- ACTIVATE in OBS mode to a waypoint with another variation kept the true course: 8 of 8 at three positions, both
+  directions for both pairs (8.6° and 3.7° apart), with SET 2 on automatic and once on a manual value. The deviation was
+  measured from the great circle through the new waypoint with the unchanged true course at it, and the course shown
+  changed by the variation difference (for example 273 to 282, Fly R 3.9 against 3.93 predicted; keeping the magnetic
+  course would have given Fly L 5.8). Neither a recentered needle nor a kept magnetic number (#425).
+- Changing the SET 2 variation with a course held (automatic, 0° E, 10° E, automatic) changed the course shown from 282
+  to 274, 264 and back to 282, while the deviation stayed at Fly L 27.2. The course shown changed as soon as the field
+  changed, before ENT (#425).
+- With the VOR active, a manual 10° E on SET 2 changed nothing: in OBS mode the VOR's published variation took
+  precedence over the manual value; for the user waypoint the manual value was used.
+- One click of the knob on the OBS course sets the course shown (rounded) plus or minus one as a whole magnetic degree,
+  so a held fraction is lost: 281.6 (shown 282) went to 283.0 on a click up and back to 282.0 on a click down, 273.4
+  (shown 273) to 272.0 on a click down (#425).
