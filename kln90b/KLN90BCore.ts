@@ -24,6 +24,7 @@ import {
     FSComponent,
     HEventPublisher,
     ICAO,
+    IcaoValue,
     NodeReference,
     SimVarValueType,
     Subscription,
@@ -307,13 +308,18 @@ export class KLN90BCore {
         const lastActiveIcao: string | null = this.userSettings.getSetting("activeWaypoint").get();
         let lastActiveWaypoint: Facility | null = null;
         if (lastActiveIcao !== "") {
+            let lastActiveValue: IcaoValue | null = null;
             try {
                 //Versions before #415 saved an ICAO V1 string (12 characters), later ones a V2 string (19 characters). A stored
                 //V1 value stays as it is until the active waypoint is saved the next time, which is always V2
-                const lastActiveValue = lastActiveIcao.length === ICAO.EMPTY_V1.length ? ICAO.stringV1ToValue(lastActiveIcao) : ICAO.stringV2ToValue(lastActiveIcao);
+                lastActiveValue = lastActiveIcao.length === ICAO.EMPTY_V1.length ? ICAO.stringV1ToValue(lastActiveIcao) : ICAO.stringV2ToValue(lastActiveIcao);
                 lastActiveWaypoint = await facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(lastActiveValue), lastActiveValue);
             } catch (e) {
                 console.error(`Last active waypoint not found: ${lastActiveIcao}`, e);
+                //B-4, #421: a waypoint that is no longer in the database is reported, which the active one is as well
+                if (lastActiveValue !== null) {
+                    this.messageHandler.addMessage(new OneTimeMessage([`WAYPOINT ${lastActiveValue.ident} DELETED`]));
+                }
             }
         }
 

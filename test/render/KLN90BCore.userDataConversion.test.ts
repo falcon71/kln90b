@@ -106,6 +106,32 @@ describe('the stored last active waypoint is an ICAO string', () => {
         expect(unit.props.memory.navPage.activeWaypoint.lastactiveWaypoint).toBeNull();
     });
 
+    // B-4: a waypoint that is no longer in the database is reported as WAYPOINT ___ DELETED. That includes the active one
+    it('reports a last active waypoint that is no longer in the database as WAYPOINT xxx DELETED (#421)', async () => {
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        onTestFinished(() => spy.mockRestore());
+
+        const unit = await bootUnit({facilities: [], storage: {activeWaypoint: ICAO.valueToStringV2(abc.icaoStruct)}});
+
+        expect(messages(unit).filter(m => m.includes('DELETED'))).toEqual(['WAYPOINT ABC DELETED']);
+        expect(unit.props.memory.navPage.activeWaypoint.lastactiveWaypoint).toBeNull();
+    });
+
+    it('reports a last active waypoint saved as ICAO V1 that is no longer in the database (#421)', async () => {
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        onTestFinished(() => spy.mockRestore());
+
+        const unit = await bootUnit({facilities: [], storage: {activeWaypoint: 'VK1    ABC  '}});
+
+        expect(messages(unit).filter(m => m.includes('DELETED'))).toEqual(['WAYPOINT ABC DELETED']);
+    });
+
+    it('posts no message when the last active waypoint is restored (#421)', async () => {
+        const unit = await bootUnit({facilities: [abc], storage: {activeWaypoint: ICAO.valueToStringV2(abc.icaoStruct)}});
+
+        expect(messages(unit).filter(m => m.includes('DELETED'))).toEqual([]);
+    });
+
     it('saves the active waypoint as ICAO V2 (#415)', async () => {
         const kaaa = airport('KAAA', 47, 8);
         const unit = await bootUnit({facilities: [kaaa, abc], position: {lat: 47.1, lon: 8}, storage: savedFlightplan(0, [kaaa, abc])});
