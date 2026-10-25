@@ -41,7 +41,9 @@ npx vitest run --project flight   # one stage
 
 Tests live in `test/` and run with Vitest in three stages: unit (Node), render (happy-dom, reads the 23×7 screen) and
 flight (boots the whole unit headless and flies it on simulated time). See **[test/README.md](test/README.md)**; the
-records about the suite (coverage, next steps, KLN 89 trainer checks) are in `docs/`. There is no linter. `tsc` and the
+records about the suite (coverage, next steps, KLN 89 trainer checks) are in `docs/`. With the sim running, the
+`sim-debugger` skill (`.claude/skills/sim-debugger/`) reads SimVars, the unit's screen and the sim's navdata through the
+Coherent GT debugger; ask the developer before using it, since they have to start the sim. There is no linter. `tsc` and the
 build are separate checks; the GitHub Actions workflow `.github/workflows/ci.yml` runs both and `npm test` on every push
 and pull request. Behavior changes should come with a test at the cheapest stage that can observe them.
 

@@ -1,3 +1,5 @@
+// The sim-debugger skill (.claude/skills/sim-debugger) also runs this file in the sim's Coherent GT page to read the real
+// screen, so it must stay plain DOM code: no imports, no Node APIs, nothing newer than ES2017.
 export type CellAttr = '.' | 'I' | 'B' | 'F';
 
 export interface Cell {

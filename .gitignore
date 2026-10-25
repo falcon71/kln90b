@@ -5,3 +5,4 @@ coverage
 node_modules
 types
 test/flight/__output__/
+.claude/settings.local.json
