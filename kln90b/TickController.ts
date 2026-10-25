@@ -56,6 +56,16 @@ export class TickController {
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.handlePowerChange.bind(this));
     }
 
+    /**
+     * Appends calculations to the lists the running loops iterate; they run from the next tick, after the ones already
+     * in the lists. The display loop is built early so that the Turn-On page's self-test runs during the boot, while the
+     * services the calculations need are still being built (#416).
+     */
+    public addCalculations(calcTickables: CalcTickable[], signalTickables: CalcTickable[]): void {
+        this.calcTickables.push(...calcTickables);
+        this.signalTickables.push(...signalTickables);
+    }
+
     public static checkRef(...refs: NodeReference<any>[]): boolean {
         return refs.every(ref => ref.getOrDefault() !== null);
     }

@@ -17,6 +17,7 @@ import {Database} from "../data/navdata/Database";
 import {KLNMagvar} from "../data/navdata/KLNMagvar";
 import {SidStar} from "../data/navdata/SidStar";
 import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
+import {PendingCalls} from "../services/PendingCalls";
 
 export enum PageSide {
     LeftPage,
@@ -48,6 +49,7 @@ export interface PageProps extends ComponentProps {
     database: Database;
     magvar: KLNMagvar,
     sidstar: SidStar,
+    pendingCalls: PendingCalls,
 }
 
 /**

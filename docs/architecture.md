@@ -64,11 +64,13 @@ topic and rendered by `controls/ErrorPage` as a full-screen error page with a Gi
    invalid panel.xml values, they are published now as `panelXmlErrors`, because the page that shows them did not
    exist before. It then constructs `BrightnessManager` and `PowerSupply`.
    From here on, the WelcomePage can be shown while everything else initialises.
-4. Constructs `AudioGenerator`, then `Sensors` (which builds `GPS` and the `KLNGPSSatComputer`), then calls
+4. Constructs `AudioGenerator`, then `Sensors` (which builds `GPS` and the `KLNGPSSatComputer`), then the
+   `TickController` with the display loop only (the Turn-On page ticks during the boot, #416), then calls
    `hEventPublisher.startPublish()`.
    If `forceReadyToUse` is set, it calls `powerSupply.forceReadyToUse()`.
 5. Navdata: it asks the platform for the facility repository (`KLNFacilityRepository.getRepository(bus)`, a singleton)
-   and the facility client (in the sim `new FacilityLoader(FacilityRepository.getRepository(bus))`), builds
+   and the facility client (in the sim `new FacilityLoader(FacilityRepository.getRepository(bus))`, wrapped by
+   `trackFacilityClient` so that the calls it has pending are listed in `PendingCalls`), builds
    `KLNFacilityLoader(client, klnRepo)` from them, then `Scanlists`.
 6. Persistence:
     - `UserWaypointPersistor.restoreWaypoints()`.
@@ -80,19 +82,20 @@ topic and rendered by `controls/ErrorPage` as a full-screen error page with a Gi
       not rewritten at boot; it becomes V2 the next time the active waypoint is saved.
     - If `userDataFormat !== 2`, or when a restore failed, it re-persists everything in the V2 format and sets
       `userDataFormat=2` (see Core 7).
-7. Constructs `VolatileMemory`, `WTFlightplanSync`, `AirspaceAlert`, `Vnav`, `KLNMagvar`, `ModeController`, then
-   `TickController` (Core 2), then `SimVarSync`,
+7. Constructs `VolatileMemory`, `WTFlightplanSync`, `AirspaceAlert`, `Vnav`, `KLNMagvar`, `ModeController`, then adds
+   the calculations to the `TickController` (Core 2, `addCalculations`), then `SimVarSync`,
    `MSA`, `TemporaryWaypointDeleter` and `SidStar`. The platform's route manager (in the sim
    `FlightPlanRouteManager.getManager()`) then creates `KlnEfbSaver` and `KlnEfbLoader` (EFB route sync).
-8. `Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), msa.init(basePath)])` then builds the *
-   *`PageProps`**,
+8. `Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), msa.init(basePath)])` (the MSA file
+   is tracked in `PendingCalls`) then builds the **`PageProps`**,
    sets `messageHandler.persistentMessages = buildPersistentMessages(props)` and publishes **`propsReady`** with the
-   props.
+   props. A call in this chain that never answers means `propsReady` never comes; the self-test below reports it.
 
 **`PageProps` is the central context object** (interface in `pages/Page.tsx`). It is passed to every page and control
 and contains:
 `ref, bus, userSettings, planeSettings, sensors, pageManager, messageHandler, hardware, memory (VolatileMemory), facilityLoader,
-facilityRepository, nearestLists, nearestUtils, remarksManager, scanLists, msa, vnav, modeController, database, magvar, sidstar`.
+facilityRepository, nearestLists, nearestUtils, remarksManager, scanLists, msa, vnav, modeController, database, magvar, sidstar,
+pendingCalls`.
 `PowerSupply` and `WelcomePage` start with a reduced `WelcomePageProps` and swap in the full props when `propsReady`
 arrives.
 
@@ -122,8 +125,10 @@ arrives.
       the start model (`search.start`, Core 3); at power-off it ends it.
     - `VolatileMemory.reset()`, which runs on power-on only (see Core 7).
     - `TemporaryWaypointDeleter`.
-- Welcome and self-test flow (lives in pages, summarised here for wiring): `WelcomePage.tick` waits `TEST_TIME=17000`
-  ms, a free cursor and `memory.isReady`. It then goes to:
+- Welcome and self-test flow (lives in pages, summarised here for wiring): the display loop runs from the start of the
+  boot (Core 2), so `WelcomePage.tick` runs while `asyncInit` is still under way. Each tick it first runs the self-test
+  check (#416, below). It then waits `TEST_TIME=17000` ms, a free cursor and `memory.isReady` (or a failure), and goes
+  to:
     - `FiveSegmentPage(SelfTestLeftPage, SelfTestRightPage)` normally. `SelfTestLeftPage` sets
       `navPage.isSelfTestActive = true` and `SelfTestRightPage` clears it at the approval, where it also sets
       `navPage.isSelfTestApproved`.
@@ -131,6 +136,30 @@ arrives.
     - `pageManager.startMainPage(props)` directly if `forceReadyToUse` is set. This also calls
       `gpsSatComputer.acquireAndUseSatellites()` and sets `navPage.isSelfTestApproved` (a skipped self-test counts as
       approved).
+- **The self-test check** (#416) lets the Turn-On page fail instead of waiting silently on a facility call the sim never
+  answers. It runs once per power-on and ends at the first failure, which is one of these:
+    - `VolatileMemory.selfTestFailure`: a scan list whose index cannot be built (Core 7). It is read once the props are
+      there.
+    - A call that `PendingCalls` (`services/PendingCalls.ts`) has listed for longer than `HANG_TIME_MS` (60 s),
+      found by `findHung`. `trackFacilityClient` wraps the facility client and lists each call it makes from the moment
+      it is made until it settles, with the one-time initialization first; `KLN90BCore` lists the `msa.json` load the
+      same way. The wrapper only observes, and a tracked promise settles exactly as the original does. The
+      initialization is named first, whenever it started, because every later call depends on it. Otherwise the oldest
+      call started since the page was shown counts, so a call an earlier power-on left pending does not fail this one.
+      Before the props are there the boot itself waits on every call, so then every pending call counts. The check
+      stops looking at the calls once `memory.isReady`.
+- **A failed self-test** publishes its error on the `error` topic, so the error page names the call that hung. The
+  check ignores the cursor rule, so the error page shows even while the pilot edits a welcome line.
+    - With the props there, the page leaves as it does after a passed test, but `leaveFailed` first hands the failure to
+      `memory.selfTestFailure` and adds the `DATA BASE CHECKSUM ERR` message (B-2), which the pilot reads on the MSG page
+      after APPROVE?. `SelfTestLeftPage` then flashes `TEST FAIL` (3-4) in place of `ANNUN ON`. The test is not counted
+      as approved, so the pilot approves it with APPROVE? as after a passed test.
+    - With the engine running (`forceReadyToUse`) the page also goes to the Self Test page, not the main page, and the
+      GPS acquires at once as it does after a skipped test; the pilot approves the test there.
+    - When the hang is in `asyncInit`, the props are never published and nothing leaves the Turn-On page: the error page
+      covers it and the unit stays there.
+    - There is no retry apart from the next power cycle: it numbers a new power-on (`VolatileMemory.reset`), clears
+      `selfTestFailure` and starts the checks again.
 - `navPage.isSelfTestApproved` is false from every power-on (`VolatileMemory.reset`) until then. Unlike
   `isSelfTestActive` it also covers the Turn-On page; ADJ NAV IND CRS is not evaluated before it (#330).
 - While `isSelfTestActive` is set:
@@ -164,7 +193,9 @@ disabled nothing claims it, since `SensorsOut.reset()` skips its claim on a powe
 ## Core 2. Tick loops (`kln90b/TickController.ts`)
 
 `TickController(bus, displayTickables, calcTickables, signalTickables)` runs three `window.setInterval` loops. **They
-only run while the unit is powered AND enabled.**
+only run while the unit is powered AND enabled.** `KLN90BCore` builds it with the display loop alone, before the unit is
+powered, and appends the calculation and signal tickables with `addCalculations` once their services exist, so the
+Turn-On page ticks during the boot (#416).
 
 | constant                                 | rate                                                                         | tickables                                                                                                                                                                                                        |
 |------------------------------------------|------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -717,6 +748,11 @@ inputs as the KLN 89 does: angle, offset and waypoint cleared, FR set to SEL (#7
 - `Scanlists` / `FacilityLoaderScanlist` (`data/navdata/Scanlist.ts`, 3-21) implement alphabetical scanning with
   outer-knob scrolling. Instead of holding all ICAOs, they keep a moving window cache filled by `searchByIdent`, plus an
   index of the first ident per letter. Async jobs are cancelled by a job id. `sync(icao)` re-centres the window.
+  The index is built aside and replaces the list's index only while its build is the newest one (`buildGeneration`,
+  #416): an `init` or a waypoint change started later wins, and the build it overtook leaves the list alone. A superseded
+  `init` waits for the build that won and answers the first waypoint from it. An `init` whose own build fails (and is not
+  overtaken) leaves the list empty and rejects, which fails the start-up self-test (Core 1); a failed rebuild after a
+  waypoint change is only logged.
 - `Nearestlists` (`data/navdata/NearestList.ts`): APT/VOR/NDB lists with a 9-item maximum and a 200 NM radius (#207);
   the VOR list holds every VOR class (#204). The search runs every 10 s and bearing and distance update every 1 Hz. The
   airport filter comes from the `nearestAptSurface` and `nearestAptMinRunwayLength` settings, with `updateFilters()`
@@ -804,6 +840,21 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       `isReady` when done; WelcomePage waits on `isReady`. A waypoint shown at a nearest rank is saved, and restored, as
       the plain waypoint (the KLN 89 trainer did the same). It builds every scan list either way: a restored page needs
       the index for the scan past the last nearest rank (3-24) and for the fast scan.
+    - **Power-on numbering and late answers** (#416): each `reset()` takes the next power-on number. What `restoreOr`
+      does after an asynchronous answer returns (a waypoint lookup, `failSelfTest`, the page write) and the `isReady`
+      itself check that their power-on is still the current one before they write. The answer of an earlier power-on,
+      such as a request the sim resolves much later, therefore writes nothing: no page state, no setting cleared by
+      `SavedWaypoint.restore`, no failure, no `isReady`. A scan list build is not checked against the power-on but
+      against its own build generation (`Scanlist.init`): a later `init` or waypoint change wins, and the build that was
+      overtaken leaves the index alone and answers from the winner.
+    - **A first waypoint that does not load** (#416): when the scan list names a first waypoint and the lookup rejects,
+      the page starts empty (the ident of a page without a waypoint) for this power-on, and the next one tries again. It
+      does not fail the self-test.
+    - **`selfTestFailure`** (#416): a scan list whose build fails stays empty for this power-on and records its error as
+      the first failure of the power-on in `selfTestFailure` (an unexpected rejection of the whole restore does the
+      same). A page whose saved waypoint restored keeps it when its scan list build fails (`restoreOr` returns early
+      once `restored !== null`); the page without one starts empty. `reset()` clears it at every power-on. `WelcomePage` reads it for the failed path
+      (Core 1) and publishes it to the error page with the prefix `Start-up self-test failed: `.
     - **The 5-minute exception:** the pilot-entered magnetic variation (`navPage.userMagvar`) is kept over a power-off of
       up to 5 minutes and cleared after more (`RESET_TIME`, 6-5; the KLN 89 Pilot's Guide says so on 4-46 and 4-47, the
       90B guide is silent). A sim restart counts as long, because memory does not survive it and the first power-on
@@ -986,7 +1037,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - `PageProps` (`pages/Page.tsx`) is the single "services bag" passed to every page and many controls. It holds bus,
   userSettings, planeSettings, sensors, pageManager, messageHandler, hardware, memory (`VolatileMemory`),
   facilityLoader, facilityRepository, nearestLists, nearestUtils, scanLists, remarksManager, msa, vnav, modeController,
-  database, magvar and sidstar. It is assembled in `KLN90BCore.asyncInit` and published as `propsReady`.
+  database, magvar, sidstar and pendingCalls. It is assembled in `KLN90BCore.asyncInit` and published as `propsReady`.
 
 ## UI 1. Page model
 

@@ -81,6 +81,12 @@ export class FacilityLoaderScanlist implements Scanlist {
     private listManangerJob: Promise<void> | null = null;
     private lastManangerJobId = 0;
 
+    //#416: the newest build of the index. A build that is no longer the newest (the build of an earlier power-on that
+    //answers late, or one a waypoint change overtook) does not change the list (spec 4.3)
+    private buildGeneration = 0;
+    //#416: the newest build of the index, which a superseded init waits for
+    private latestBuild: Promise<void> = Promise.resolve();
+
     //The last icao the pilot viewed. This should be the center of the moving cache window
     private lastIcao: IcaoValue = ICAO.emptyValue();
 
@@ -97,12 +103,52 @@ export class FacilityLoaderScanlist implements Scanlist {
         bus.getSubscriber<any>().on(KLNFacilityRepository.SYNC_TOPIC).handle(this.waypointsChanged.bind(this));
     }
 
+    /**
+     * Builds the index and starts filling the cache. A later init or waypoint change wins over a build that is still
+     * running; this one then leaves the list alone and answers from the build that won. A build that rejects leaves the
+     * list empty and rejects (#416, spec 4.1a and 4.3)
+     */
     public async init(): Promise<IcaoValue | null> {
-        await this.rebuildIndex();
+        const generation = ++this.buildGeneration;
+        const build = this.rebuildIndex(generation);
+        this.latestBuild = build;
+        try {
+            await build;
+        } catch (e) {
+            if (generation === this.buildGeneration) {
+                this.index = [];
+                ++this.lastManangerJobId; //A fill still running from before stops at its next search
+                this.listManangerJob = null;
+                this.invalidateCache();
+                throw e;
+            }
+            //Superseded: the build that won decides, also when this one failed
+        }
+        if (generation !== this.buildGeneration) {
+            return this.startOfLatestBuild();
+        }
         if (this.index.length > 0) {
             this.lastIcao = this.index[0];
         }
         this.listManangerJob = this.startListManager();
+        return this.start();
+    }
+
+    /**
+     * #416: the first waypoint once the newest build has ended, for an init a later build superseded. A build that is
+     * superseded in turn is followed to the next one. When the build that won fails, the answer comes from the index the
+     * list then holds (empty after a failed init)
+     */
+    private async startOfLatestBuild(): Promise<IcaoValue | null> {
+        let build: Promise<void>;
+        do {
+            build = this.latestBuild;
+            try {
+                await build;
+            } catch {
+                //Handled by the init or the waypoint change that started it
+            }
+        } while (build !== this.latestBuild);
         return this.start();
     }
 
@@ -395,7 +441,10 @@ export class FacilityLoaderScanlist implements Scanlist {
     }
 
     private waypointsChanged(): void {
-        this.rebuildIndex();
+        //#416: a build of its own, which wins over a build still running. Nothing awaits it, so a rejection is only logged
+        const build = this.rebuildIndex(++this.buildGeneration);
+        this.latestBuild = build;
+        build.catch(e => console.warn(`The ${this.facilitySearchType} scan list could not be rebuilt`, e));
         this.invalidateCache();
         this.listManangerJob = this.startListManager();
     }
@@ -432,28 +481,34 @@ export class FacilityLoaderScanlist implements Scanlist {
         return aIcao.ident.localeCompare(bIcao.ident);
     }
 
-    private async rebuildIndex(): Promise<IcaoValue[]> {
-        this.index = [];
+    /**
+     * Builds the index. It is built aside and becomes the list's index only while its build is the newest one (#416)
+     * @param generation The build's number from buildGeneration
+     */
+    private async rebuildIndex(generation: number): Promise<void> {
+        const index: IcaoValue[] = [];
         for (let i = 0; i < CHARSET.length; i++) {
             const res = await this.facilityLoader.searchByIdentWithIcaoStructs(this.facilitySearchType, CHARSET[i], 1);
             if (res.length > 0) {
                 //#105: with duplicate idents the search may return any of them. The index holds the first in list order
                 const sameIdent = await this.searchExactIdent(res[0].ident);
-                this.index.push(sameIdent.length > 0 ? sameIdent[0] : res[0]);
+                index.push(sameIdent.length > 0 ? sameIdent[0] : res[0]);
             }
         }
 
         //Now we just need to find the very last navaid
-        if (this.index.length > 0) {
-            const lastResult = this.index[this.index.length - 1];
+        if (index.length > 0) {
+            const lastResult = index[index.length - 1];
             const lastEntry = await this.findLastInListOrder(lastResult.ident.substring(0, 1));
             if (lastEntry !== null && !ICAO.valueEquals(lastEntry, lastResult)) {
-                this.index.push(lastEntry);
+                index.push(lastEntry);
             }
         }
 
-        this.log("index", this.index);
-        return this.index;
+        this.log("index", index);
+        if (generation === this.buildGeneration) {
+            this.index = index;
+        }
     }
 
     /**

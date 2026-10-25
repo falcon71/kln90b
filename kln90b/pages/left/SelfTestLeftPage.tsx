@@ -4,11 +4,13 @@ import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {DeviationBar} from "../../controls/displays/DeviationBar";
 import {BearingDisplay} from "../../controls/displays/BearingDisplay";
+import {Blink} from "../../controls/Blink";
 
 
 type SelfTestLeftPageTypes = {
     scale: DeviationBar,
     obsIn: BearingDisplay,
+    testFail: Blink,
 }
 
 export class SelfTestLeftPage extends SixLineHalfPage {
@@ -17,7 +19,12 @@ export class SelfTestLeftPage extends SixLineHalfPage {
     readonly children = new UIElementChildren<SelfTestLeftPageTypes>({
         scale: new DeviationBar(-0.5, false, 1),
         obsIn: new BearingDisplay(this.props.sensors.in.obsMag),
+        //3-4: a failed self-test flashes TEST FAIL in place of ANNUN ON (#416). The page container ticks it
+        testFail: new Blink("TEST FAIL", false),
     });
+
+    /** #416: whether the self-test of this power-on has failed; it does not change while the page is shown */
+    private readonly isTestFailed: boolean;
 
     readonly name: string = "     ";
 
@@ -25,6 +32,7 @@ export class SelfTestLeftPage extends SixLineHalfPage {
         super(props);
 
         this.props.memory.navPage.isSelfTestActive = true;
+        this.isTestFailed = this.props.memory.selfTestFailure !== null;
     }
 
 
@@ -35,7 +43,7 @@ export class SelfTestLeftPage extends SixLineHalfPage {
             OBS IN {this.children.get("obsIn").render()}<br/>
             &nbsp&nbsp&nbspOUT 315°<br/>
             RMI    130°<br/>
-            ANNUN    ON
+            {this.isTestFailed ? <span>{this.children.get("testFail").render()}&nbsp&nbsp</span> : "ANNUN    ON"}
         </pre>);
     }
 

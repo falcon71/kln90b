@@ -357,28 +357,8 @@ export interface FailedBoot {
     errorPage(): string | null;
 }
 
-/**
- * Boots a unit whose start-up is expected to fail (#50): waits for the first error event instead of propsReady.
- * platform overrides methods of FakePlatform, for example a facility client whose nearest session rejects.
- *
- * The boot stays marked incomplete, so the teardown tolerates singletons that were never created.
- * @throws Error if the unit came up (propsReady fired), or if no error came within 30 s
- */
-export async function bootUnitExpectingError(opts: BootOptions = {}): Promise<FailedBoot> {
-    const {core, env, errors, consoleErrors, rejections} = prepareBoot(opts);
-    let propsReady = false;
-    core.bus.getSubscriber<PropsReadyEvent>().on('propsReady').handle(() => propsReady = true);
-
-    void core.init(new DOMParser().parseFromString(opts.panelXml ?? MINIMAL_PANEL_XML, 'text/xml'));
-    for (let i = 0; i < 120 && errors.length === 0 && !propsReady; i++) {
-        await vi.advanceTimersByTimeAsync(250);
-    }
-    if (propsReady) {
-        throw new Error('bootUnitExpectingError: propsReady fired');
-    }
-    if (errors.length === 0) {
-        throw new Error('bootUnitExpectingError: no error event within 30 s');
-    }
+/** The handle of a unit that has not come up: bootUnitExpectingError and startUnit return it */
+function failedBoot({core, env, errors, consoleErrors, rejections}: PreparedBoot): FailedBoot {
     return {
         core, env, errors, consoleErrors, rejections,
         takeRejections: () => rejections.splice(0, rejections.length),
@@ -388,6 +368,50 @@ export async function bootUnitExpectingError(opts: BootOptions = {}): Promise<Fa
             return page.querySelector('.errormessage')?.textContent ?? '';
         },
     };
+}
+
+/**
+ * Boots a unit whose start-up is expected to fail (#50): waits for the first error event instead of propsReady.
+ * platform overrides methods of FakePlatform, for example a facility client whose nearest session rejects.
+ *
+ * It waits up to 70 s: a call of the boot that never answers is reported by the self-test of the Turn-On page once it
+ * has been pending for 60 s (HANG_TIME_MS in kln90b/services/PendingCalls.ts, #416), and the rest is the margin.
+ *
+ * The boot stays marked incomplete, so the teardown tolerates singletons that were never created.
+ * @throws Error if the unit came up (propsReady fired), or if no error came within 70 s
+ */
+export async function bootUnitExpectingError(opts: BootOptions = {}): Promise<FailedBoot> {
+    const prepared = prepareBoot(opts);
+    const {core, errors} = prepared;
+    let propsReady = false;
+    core.bus.getSubscriber<PropsReadyEvent>().on('propsReady').handle(() => propsReady = true);
+
+    void core.init(new DOMParser().parseFromString(opts.panelXml ?? MINIMAL_PANEL_XML, 'text/xml'));
+    for (let i = 0; i < 280 && errors.length === 0 && !propsReady; i++) {
+        await vi.advanceTimersByTimeAsync(250);
+    }
+    if (propsReady) {
+        throw new Error('bootUnitExpectingError: propsReady fired');
+    }
+    if (errors.length === 0) {
+        throw new Error('bootUnitExpectingError: no error event within 70 s');
+    }
+    return failedBoot(prepared);
+}
+
+/**
+ * Starts the unit and advances the clock by waitMs, waiting for nothing: no propsReady and no error event. For a test of
+ * what the unit does while its boot is still under way, or never ends (#416). The boot stays marked incomplete, as in
+ * bootUnitExpectingError, so the teardown tolerates singletons that were never created. The returned unit is the same
+ * shape; a test that advances the clock further takes the rejections it provokes.
+ */
+export async function startUnit(opts: BootOptions = {}, waitMs = 1000): Promise<FailedBoot> {
+    const prepared = prepareBoot(opts);
+    const {core} = prepared;
+
+    void core.init(new DOMParser().parseFromString(opts.panelXml ?? MINIMAL_PANEL_XML, 'text/xml'));
+    await vi.advanceTimersByTimeAsync(waitMs);
+    return failedBoot(prepared);
 }
 
 /**

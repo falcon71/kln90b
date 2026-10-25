@@ -5,7 +5,7 @@ import {
     FacilityClient,
     FacilityType,
     GeoCircle,
-    IcaoValue,
+    ICAO,
     IntersectionFacility,
     NdbFacility,
     RunwayFacility,
@@ -54,10 +54,13 @@ export class WaypointPageState<T extends Facility> {
     /**
      * Shows the saved waypoint again, as the plain waypoint (KLN 89 trainer 2026-10-24); null if it does not resolve, and
      * the state is left as it was
+     * @param loader The facility client
+     * @param isCurrent Whether the power-on that restores is still the current one; an earlier one writes nothing (#416,
+     * spec 4.3)
      */
-    public async restore(loader: FacilityClient): Promise<T | null> {
-        const facility = await this.saved.restore(loader);
-        if (facility !== null) {
+    public async restore(loader: FacilityClient, isCurrent: () => boolean = () => true): Promise<T | null> {
+        const facility = await this.saved.restore(loader, isCurrent);
+        if (facility !== null && isCurrent()) {
             this.facility = facility;
             this.ident = facility.icaoStruct.ident;
         }
@@ -214,13 +217,19 @@ export class TriPageState {
     /**
      * Resolves the saved waypoints again; one that does not resolve becomes null. The settings are not written here: they
      * hold the resolved waypoints, and SavedWaypoint.restore cleared one that does not resolve
+     * @param loader The facility client
+     * @param isCurrent Whether the power-on that restores is still the current one; an earlier one writes neither the
+     * waypoints nor the settings (#416, spec 4.3)
      */
-    public async restore(loader: FacilityClient): Promise<void> {
+    public async restore(loader: FacilityClient, isCurrent: () => boolean = () => true): Promise<void> {
         const [tri1To, tri3From, tri3To] = await Promise.all([
-            this.savedTri1To.restore(loader),
-            this.savedTri3From.restore(loader),
-            this.savedTri3To.restore(loader),
+            this.savedTri1To.restore(loader, isCurrent),
+            this.savedTri3From.restore(loader, isCurrent),
+            this.savedTri3To.restore(loader, isCurrent),
         ]);
+        if (!isCurrent()) {
+            return;
+        }
         this._tri1To = tri1To;
         this._tri3From = tri3From;
         this._tri3To = tri3To;
@@ -310,6 +319,15 @@ export class VolatileMemory {
 
     public isReady = false;
 
+    /**
+     * #416: the first failure of the current power-on that the reset does not recover from (a scan list that cannot be
+     * built, spec 4.1a); null at every power-on
+     */
+    public selfTestFailure: Error | null = null;
+
+    /** #416: the number of the current power-on. A step of the reset of an earlier one changes nothing (spec 4.3) */
+    private powerOnCount = 0;
+
     public constructor(bus: EventBus, userSettings: KLN90BUserSettings, private facilityLoader: FacilityClient, sensors: Sensors, private scanlists: Scanlists, flightplans: Flightplan[], lastactiveWaypoint: Facility | null) {
         this.aptPage = new WaypointPageState("0   ", new SavedWaypoint(userSettings.getSetting("aptPageWpt"), [FacilityType.Airport]));
         this.vorPage = new WaypointPageState("0  ", new SavedWaypoint(userSettings.getSetting("vorPageWpt"), [FacilityType.VOR]));
@@ -334,7 +352,11 @@ export class VolatileMemory {
             return;
         }
 
+        //#416: the reset of an earlier power-on may still be waiting for an answer; what it gets changes nothing (spec 4.3)
+        const powerOn = ++this.powerOnCount;
+        const isCurrent = () => powerOn === this.powerOnCount;
         this.isReady = false;
+        this.selfTestFailure = null;
         this.navPage.startPageWaypoint = this.navPage.activeWaypoint.lastactiveWaypoint; //#422: before a leg can be activated
         //#202: a power cycle forgets the last match of the ident entry
         this.aptPage.lastMatch = null;
@@ -412,26 +434,68 @@ export class VolatileMemory {
         //#192: each waypoint page shows its saved waypoint again (KLN 89 trainer 2026-10-24), else the first of its scan
         //list; the TRI waypoints come back or become null
         Promise.all([
-            this.restoreOr(this.aptPage, this.scanlists.aptScanlist, icao => this.setFirstApt(icao)),
-            this.restoreOr(this.vorPage, this.scanlists.vorScanlist, icao => this.setFirstVor(icao)),
-            this.restoreOr(this.ndbPage, this.scanlists.ndbScanlist, icao => this.setFirstNdb(icao)),
-            this.restoreOr(this.intPage, this.scanlists.intScanlist, icao => this.setFirstIntersection(icao)),
-            this.restoreOr(this.supPage, this.scanlists.supScanlist, icao => this.setFirstSupplementary(icao)),
-            this.afterPowerEvent().then(() => this.triPage.restore(this.facilityLoader)),
+            this.restoreOr(this.aptPage, this.scanlists.aptScanlist, FacilityType.Airport, "0   ", isCurrent),
+            this.restoreOr(this.vorPage, this.scanlists.vorScanlist, FacilityType.VOR, "0  ", isCurrent),
+            this.restoreOr(this.ndbPage, this.scanlists.ndbScanlist, FacilityType.NDB, "0   ", isCurrent),
+            this.restoreOr(this.intPage, this.scanlists.intScanlist, FacilityType.Intersection, "0   ", isCurrent),
+            this.restoreOr(this.supPage, this.scanlists.supScanlist, FacilityType.USR, "0   ", isCurrent),
+            this.afterPowerEvent().then(() => this.triPage.restore(this.facilityLoader, isCurrent)),
         ]).then(_ => {
-            this.isReady = true;
+            if (isCurrent()) {
+                this.isReady = true;
+            }
+        }).catch(reason => {
+            //#416: no rejection is expected here; one that comes fails the self-test instead of leaving the unit on the
+            //Turn-On page (spec 4.1a)
+            this.failSelfTest(reason, isCurrent);
         });
     }
 
     /**
      * The scan list is built at every power-on, also when the page restores its saved waypoint: the scan past the last
-     * nearest rank (3-24) and the fast scan need its index
+     * nearest rank (3-24) and the fast scan need its index. Without a restored waypoint the page shows the first of the
+     * scan list, and starts empty when there is none or it does not load
+     * @param page The page state
+     * @param scanlist The page's scan list
+     * @param type The facility type of the scan list's waypoints
+     * @param emptyIdent The ident of the page without a waypoint
+     * @param isCurrent Whether the power-on is still the current one; an earlier one writes nothing (#416, spec 4.3)
      */
-    private async restoreOr<T extends Facility>(page: WaypointPageState<T>, scanlist: Scanlist, setFirst: (first: IcaoValue | null) => Promise<void>): Promise<void> {
+    private async restoreOr<T extends Facility>(page: WaypointPageState<T>, scanlist: Scanlist, type: FacilityType, emptyIdent: string, isCurrent: () => boolean): Promise<void> {
         await this.afterPowerEvent();
-        const [restored, first] = await Promise.all([page.restore(this.facilityLoader), scanlist.init()]);
-        if (restored === null) {
-            await setFirst(first);
+        const [restored, first] = await Promise.all([
+            page.restore(this.facilityLoader, isCurrent),
+            scanlist.init().catch(reason => {
+                //#416: the list stays empty for this power-on, which fails its self-test (spec 4.1a)
+                this.failSelfTest(reason, isCurrent);
+                return null;
+            }),
+        ]);
+        if (restored !== null) {
+            return;
+        }
+        let facility: T | null = null;
+        if (first !== null) {
+            try {
+                facility = await this.facilityLoader.getFacility(type, first) as Facility as T;
+            } catch (e) {
+                //#416: the page starts empty for this power-on, and the next one tries again (spec 4.1). A user waypoint
+                //may also have been deleted by TemporaryWaypointDeleter while it was looked up
+                console.warn(`The first waypoint ${ICAO.tryValueToStringV2(first)} of the scan list does not load`, e);
+            }
+        }
+        if (isCurrent()) {
+            page.facility = facility;
+            page.ident = facility === null ? emptyIdent : facility.icaoStruct.ident;
+        }
+    }
+
+    /**
+     * #416: records the first failure of the current power-on as the failure of its self-test (spec 4.1a)
+     */
+    private failSelfTest(reason: unknown, isCurrent: () => boolean): void {
+        if (isCurrent() && this.selfTestFailure === null) {
+            this.selfTestFailure = reason instanceof Error ? reason : new Error(String(reason));
         }
     }
 
@@ -442,62 +506,5 @@ export class VolatileMemory {
      */
     private afterPowerEvent(): Promise<void> {
         return Promise.resolve();
-    }
-
-    private async setFirstSupplementary(icao: IcaoValue | null) {
-        if (icao === null) {
-            this.supPage.ident = "0   ";
-            this.supPage.facility = null;
-        } else {
-            try {
-                this.supPage.facility = await this.facilityLoader.getFacility(FacilityType.USR, icao);
-                this.supPage.ident = icao.ident;
-            } catch (e) {
-                console.warn(`Waypoint was deleted while accessing it: ${icao}`, e);
-                //There is an await above. Inbetween, TemporaryWaypointDeleter might run and delete this waypoint
-                this.supPage.ident = "0   ";
-                this.supPage.facility = null;
-            }
-        }
-    }
-
-    private async setFirstIntersection(icao: IcaoValue | null) {
-        if (icao === null) {
-            this.intPage.ident = "0   ";
-            this.intPage.facility = null;
-        } else {
-            this.intPage.facility = await this.facilityLoader.getFacility(FacilityType.Intersection, icao);
-            this.intPage.ident = icao.ident;
-        }
-    }
-
-    private async setFirstNdb(icao: IcaoValue | null) {
-        if (icao === null) {
-            this.ndbPage.ident = "0   ";
-            this.ndbPage.facility = null;
-        } else {
-            this.ndbPage.facility = await this.facilityLoader.getFacility(FacilityType.NDB, icao);
-            this.ndbPage.ident = icao.ident;
-        }
-    }
-
-    private async setFirstVor(icao: IcaoValue | null) {
-        if (icao === null) {
-            this.vorPage.ident = "0  ";
-            this.vorPage.facility = null;
-        } else {
-            this.vorPage.facility = await this.facilityLoader.getFacility(FacilityType.VOR, icao);
-            this.vorPage.ident = icao.ident;
-        }
-    }
-
-    private async setFirstApt(icao: IcaoValue | null) {
-        if (icao === null) {
-            this.aptPage.ident = "0   ";
-            this.aptPage.facility = null;
-        } else {
-            this.aptPage.facility = await this.facilityLoader.getFacility(FacilityType.Airport, icao);
-            this.aptPage.ident = icao.ident;
-        }
     }
 }

@@ -157,13 +157,19 @@ The sim globals are installed once per test file by the setup files `test/harnes
   first), and a throw in it does not stop the teardown. The teardown removes the listener.
 
 `bootUnitExpectingError({...bootOptions, platform})` is the boot for a start-up that is expected to fail (#50). It
-shares the guard and the teardown with `bootUnit`, but waits for the first `error` event instead of `propsReady`,
-throws `propsReady fired` if the unit came up, and returns `{core, env, errors, consoleErrors, rejections,
+shares the guard and the teardown with `bootUnit`, but waits for the first `error` event instead of `propsReady`, for
+up to 70 s of simulated time (long enough for the 60 s hang rule of the self-test, #416), throws `propsReady fired` if
+the unit came up, and returns `{core, env, errors, consoleErrors, rejections,
 takeRejections(), errorPage()}`. `errorPage()` is the message on the visible error page, or `null` while it is hidden.
 A failed unit keeps ticking and its nearest searches keep rejecting, so a test that advances the clock after the
 failure must call `takeRejections()`, or the strict collector fails the test. `platform` overrides methods of
 `FakePlatform`, for example `createFacilityClient`. The boot stays marked incomplete, so the teardown tolerates
 singletons that were never created.
+
+`startUnit({...bootOptions}, waitMs = 1000)` starts the unit and advances the clock by `waitMs`, waiting for nothing: no
+`propsReady` and no `error` event. It is for a test of what the unit does while its boot is still under way or never
+ends (#416), for example a lookup that never answers. It returns the same handle as `bootUnitExpectingError`, and the
+boot stays marked incomplete in the same way.
 
 ## Navdata
 

@@ -20,6 +20,16 @@ describe('Blink (spec)', () => {
         m.tick(false);
         expect(m.mask()).toBe('IIIIIIIIIIII');
     });
+
+    // 3-4: TEST FAIL of a failed self-test flashes in normal video (SelfTestLeftPage, #416)
+    it('flashes its text in normal video when it is not inverted (3-4)', () => {
+        const m = mount(new Blink('TEST FAIL', false));
+
+        const cycle = mountedCycle(m, () => ({text: m.text(), mask: m.mask()}));
+
+        expect(cycle.slice(0, 3)).toEqual(Array(3).fill({text: 'TEST FAIL', mask: '.........'}));
+        expect(cycle[3]).toEqual({text: 'TEST FAIL', mask: 'BBBBBBBBB'});
+    });
 });
 
 // The guide does not say whether a flashing inverse field shows its text in normal video or nothing in the blink phase.

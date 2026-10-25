@@ -1,6 +1,11 @@
 import {readFileSync} from 'node:fs';
-import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, MINIMAL_PANEL_XML} from '../harness/boot';
+import {ICAO, IcaoValue} from '@microsoft/msfs-sdk';
+import {describe, expect, it, onTestFinished, vi} from 'vitest';
+import {bootUnit, MINIMAL_PANEL_XML, startUnit} from '../harness/boot';
+import {defaultNavdata} from '../harness/fixtures';
+import {MemoryFacilityClient} from '../harness/navdata/MemoryFacilityClient';
+import {PropsReadyEvent} from '../../kln90b/KLN90BCore';
+import {WelcomePage} from '../../kln90b/pages/WelcomePage';
 import {NavCalculator} from '../../kln90b/data/navdata/NavCalculator';
 import {AirspaceAlert} from '../../kln90b/data/navdata/AirspaceAlert';
 import {HtAboveAirportAlert} from '../../kln90b/services/HtAboveAirportAlert';
@@ -17,7 +22,7 @@ const SAMPLE_PANEL_XML = readFileSync('cfg/panel.xml', 'utf8');
  */
 const PAGE_PROPS = ['ref', 'bus', 'userSettings', 'planeSettings', 'sensors', 'pageManager', 'messageHandler',
     'hardware', 'memory', 'facilityLoader', 'facilityRepository', 'nearestLists', 'nearestUtils', 'remarksManager',
-    'scanLists', 'msa', 'vnav', 'modeController', 'database', 'magvar', 'sidstar'];
+    'scanLists', 'msa', 'vnav', 'modeController', 'database', 'magvar', 'sidstar', 'pendingCalls'];
 
 // Public contract: cfg/panel.xml is the documented sample that aircraft developers copy (CLAUDE.md, "Public contract
 // with aircraft"; the wiki page panel.xml customization), and docs/architecture.md (Core 1) lists what KLN90BCore.init
@@ -92,5 +97,38 @@ describe('the order of the calculation tickables (spec, docs/architecture.md Cor
         ]);
         expect(tickController.signalTickables.map(name)).toEqual(['SignalOutputFillterTick']);
         expect(tickController.displayTickables).toEqual([p.pageManager]);
+    });
+});
+
+// #416: a lookup of the boot that never answers must not leave the Turn-On page frozen. The page's self-test reports it,
+// so the page must tick while the boot is still waiting (docs/architecture.md, Core 2).
+describe('the Turn-On page during a boot that waits (#416)', () => {
+    it('ticks the Turn-On page while the boot waits on its first lookup (#416)', async () => {
+        const waypoint = defaultNavdata()[1]; // The VOR ZZV
+        const original = MemoryFacilityClient.prototype.getFacility;
+        const getFacility = vi.spyOn(MemoryFacilityClient.prototype, 'getFacility');
+        onTestFinished(() => getFacility.mockRestore());
+        getFacility.mockImplementation(function (this: MemoryFacilityClient, type: any, icao: IcaoValue, ...rest: any[]) {
+            if (icao.ident === waypoint.icaoStruct.ident) {
+                return new Promise(() => undefined); // The sim's database that never answers
+            }
+            return (original as any).call(this, type, icao, ...rest);
+        } as any);
+        const welcomeTick = vi.spyOn(WelcomePage.prototype, 'tick');
+        onTestFinished(() => welcomeTick.mockRestore());
+
+        const unit = await startUnit({
+            engineRunning: true,
+            storage: {activeWaypoint: ICAO.valueToStringV2(waypoint.icaoStruct)},
+        });
+        let propsReady = false;
+        unit.core.bus.getSubscriber<PropsReadyEvent>().on('propsReady').handle(() => propsReady = true);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(welcomeTick.mock.calls.length).toBeGreaterThanOrEqual(1);
+        // A unit that is force-ready leaves the Turn-On page as soon as its props are ready: it is still on it
+        expect(unit.core.pageManager.getCurrentPage()).toBeInstanceOf(WelcomePage);
+        expect(propsReady).toBe(false);
+        expect(unit.errors).toEqual([]);
     });
 });

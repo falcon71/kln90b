@@ -95,6 +95,7 @@ import {KlnEfbSaver} from "./services/KlnEfbSaver";
 import {KlnEfbLoader} from "./services/KlnEfbLoader";
 import {WTFlightplanSync} from "./services/WTFlightplanSync";
 import {BrightnessManager} from "./BrightnessManager";
+import {PendingCalls, trackFacilityClient} from "./services/PendingCalls";
 import KEY_ENTER = KeyCode.KEY_ENTER;
 import KEY_PAGE_UP = KeyCode.KEY_PAGE_UP;
 import KEY_PAGE_DOWN = KeyCode.KEY_PAGE_DOWN;
@@ -142,6 +143,8 @@ export class KLN90BCore {
     private wtFlightplanSync: WTFlightplanSync | undefined;
     private efbSaver: KlnEfbSaver | undefined;
     private efbLoader: KlnEfbLoader | undefined;
+    /** The facility calls and the data file the boot waits on, so that the Turn-On page can name the one that hangs (#416) */
+    private readonly pendingCalls = new PendingCalls();
 
 
     /**
@@ -265,6 +268,7 @@ export class KLN90BCore {
             planeSettings: this.planeSettings,
             pageManager: this.pageManager,
             forceReadyToUse: forceReadyToUse,
+            pendingCalls: this.pendingCalls,
         }, brightnessManager);
 
 
@@ -274,6 +278,10 @@ export class KLN90BCore {
 
         this.audioGenerator = new AudioGenerator(this.bus, this.planeSettings, this.userSettings);
         const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, this.audioGenerator, this.messageHandler, this.hardware);
+
+        //The display ticks run from the start of the boot, so that the Turn-On page shows and checks the boot while it is
+        //still under way (#416). The calculations are added once their services exist
+        this.tickManager = new TickController(this.bus, [this.pageManager], [], []);
 
         this.hEventPublisher.startPublish();
         console.log("KLN 90B ready to show welcome page");
@@ -287,7 +295,7 @@ export class KLN90BCore {
         const facilityRepository = this.platform.getFacilityRepository(this.bus);
 
         const facilityLoader = new KLNFacilityLoader(
-            this.platform.createFacilityClient(this.bus),
+            trackFacilityClient(this.platform.createFacilityClient(this.bus), this.pendingCalls),
             facilityRepository,
         );
 
@@ -359,7 +367,7 @@ export class KLN90BCore {
         const modeController = new ModeController(this.bus, memory.navPage, flightplans[0], this.planeSettings, sensors, magvar);
 
 
-        this.tickManager = new TickController(this.bus, [this.pageManager],
+        this.tickManager.addCalculations(
             [
                 sensors,
                 magvar,
@@ -397,7 +405,7 @@ export class KLN90BCore {
             this.efbLoader = new KlnEfbLoader(this.bus, facilityLoader, this.messageHandler, manager, flightplans, this.pageManager, facilityRepository, this.hardware, sidstar);
         });
 
-        Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), msa.init(this.planeSettings.basePath)]).then(() => {
+        Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), this.pendingCalls.track("msa.json", msa.init(this.planeSettings.basePath))]).then(() => {
             const props: PageProps = {
                 ref: this.mainScreen,
                 bus: this.bus,
@@ -420,6 +428,7 @@ export class KLN90BCore {
                 database: new Database(sensors),
                 magvar: magvar,
                 sidstar: sidstar,
+                pendingCalls: this.pendingCalls,
             };
 
             this.messageHandler.persistentMessages = buildPersistentMessages(props);

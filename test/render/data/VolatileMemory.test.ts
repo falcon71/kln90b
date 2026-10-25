@@ -1,6 +1,6 @@
 import {describe, expect, it, onTestFinished, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS, settle} from '../../harness/boot';
-import {approachWorld, standardRoute} from '../../harness/fixtures';
+import {approachWorld, defaultNavdata, standardRoute} from '../../harness/fixtures';
 import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {savedFlightplan, savedUserWaypoints, storedSetting} from '../../harness/storage';
 import {efbRoute} from '../../harness/platform';
@@ -9,7 +9,7 @@ import {activeIdent, fplIdents} from '../../harness/readers';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {Screen} from '../../harness/render/screen';
 import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
-import {AirportFacility, EventBus, Facility, FlightPlanner, FlightPlannerOptions, ICAO, UserFacility} from '@microsoft/msfs-sdk';
+import {AirportFacility, EventBus, Facility, FacilitySearchType, FlightPlanner, FlightPlannerOptions, ICAO, IcaoValue, IntersectionFacility, UserFacility} from '@microsoft/msfs-sdk';
 import {isNearestWpt, unpackFacility} from '../../../kln90b/data/navdata/NearestList';
 import {Leg, runwayFix, star, withProcedures} from '../../harness/navdata/procedures';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
@@ -998,27 +998,344 @@ describe('the waypoint pages over a power cycle and a sim restart (#192)', () =>
     });
 });
 
-// A power-on shows the first waypoint of the scan list on a page whose saved waypoint does not resolve. Only the SUP page
-// catches a lookup of that waypoint that rejects; on the APT, VOR, NDB and INT pages the rejection ends the power-on
-// before the memory is ready, and the unit stays on the Turn-On page (WelcomePage waits for it). The lookup of the
-// default intersection ZZXIN, the only one and so the first of the INT scan list, is made to reject here, as a database
-// facility the ident search returns but that does not load would
+/**
+ * Makes the lookup of the facility with this ident reject, as a database facility the ident search returns but that does
+ * not load would. The spy is restored when the test ends
+ */
+function failLookupOf(failing: string): void {
+    const getFacility = MemoryFacilityClient.prototype.getFacility;
+    const spy = vi.spyOn(MemoryFacilityClient.prototype, 'getFacility');
+    onTestFinished(() => spy.mockRestore());
+    spy.mockImplementation(function (this: MemoryFacilityClient, type, icao) {
+        const ident = typeof icao === 'string' ? ICAO.getIdentFromStringV1(icao) : icao.ident;
+        return ident === failing ? Promise.reject(new Error(`no facility ${failing}`)) : getFacility.call(this, type, icao);
+    });
+}
+
+/** A promise the test settles by hand */
+function deferred<T>(): { promise: Promise<T>, resolve: (value: T | Promise<T>) => void, reject: (reason: unknown) => void } {
+    let resolve!: (value: T | Promise<T>) => void;
+    let reject!: (reason: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return {promise, resolve, reject};
+}
+
+// A power-on shows the first waypoint of the scan list on a page whose saved waypoint does not resolve. A lookup of that
+// waypoint that rejects leaves the page empty for this power-on, as nothing restored (spec 4.1 of
+// docs/superpowers/specs/2026-10-25-startup-self-test-design.md); the unit is fully usable and leaves the Turn-On page.
+// The lookups of the default facilities (fixtures.ts), each the only one of its type and so the first of its scan list,
+// are made to reject here
 describe('a first waypoint of a scan list that does not load (#416)', () => {
-    it.fails('leaves the Turn-On page when the first waypoint of the INT scan list does not load (#416)', async () => {
-        const getFacility = MemoryFacilityClient.prototype.getFacility;
-        const spy = vi.spyOn(MemoryFacilityClient.prototype, 'getFacility');
-        onTestFinished(() => spy.mockRestore());
-        spy.mockImplementation(function (this: MemoryFacilityClient, type, icao) {
-            const ident = typeof icao === 'string' ? ICAO.getIdentFromStringV1(icao) : icao.ident;
-            return ident === 'ZZXIN' ? Promise.reject(new Error('no facility ZZXIN')) : getFacility.call(this, type, icao);
-        });
+    it('leaves the Turn-On page when the first waypoint of the INT scan list does not load (#416)', async () => {
+        failLookupOf('ZZXIN');
         const unit = await bootUnit(); // Engine running: the Turn-On page goes as soon as the memory is ready
 
         await vi.advanceTimersByTimeAsync(20_000); // Past the 17 s of a Turn-On page that waits
 
         expect(unit.takeRejections()).toEqual([]);
         expect(unit.props.memory.isReady).toBe(true);
+        expect(unit.props.memory.selfTestFailure).toBeNull();
+        expect(unit.props.memory.intPage.facility).toBeNull();
+        expect(unit.props.memory.intPage.ident).toBe('0   ');
         expect(Screen.read().status().left).toBe('NAV 2');
+    });
+
+    // The empty idents are the ones a page without a first waypoint has always started with
+    it.each([
+        {name: 'APT', memory: 'aptPage' as const, first: 'ZZXA', empty: '0   '},
+        {name: 'VOR', memory: 'vorPage' as const, first: 'ZZV', empty: '0  '},
+        {name: 'NDB', memory: 'ndbPage' as const, first: 'ZZN', empty: '0   '},
+    ])('leaves the Turn-On page when the first waypoint of the $name scan list does not load (#416)', async (c) => {
+        failLookupOf(c.first);
+        const unit = await bootUnit();
+
+        await vi.advanceTimersByTimeAsync(20_000);
+
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.props.memory.isReady).toBe(true);
+        expect(unit.props.memory.selfTestFailure).toBeNull();
+        expect(unit.props.memory[c.memory].facility).toBeNull();
+        expect(unit.props.memory[c.memory].ident).toBe(c.empty);
+        expect(Screen.read().status().left).toBe('NAV 2');
+    });
+});
+
+// A scan list that cannot be built would leave the list empty or incomplete for the rest of the power-on, which the pilot
+// cannot see. It fails the self-test of the power-on at once; the rest of the reset goes on (spec 4.1a)
+describe('a scan list that cannot be built (#416)', () => {
+    function failIntersectionSearch(): Error {
+        const failure = new Error('the intersection search failed');
+        const search = MemoryFacilityClient.prototype.searchByIdentWithIcaoStructs;
+        const spy = vi.spyOn(MemoryFacilityClient.prototype, 'searchByIdentWithIcaoStructs');
+        onTestFinished(() => spy.mockRestore());
+        spy.mockImplementation(function (this: MemoryFacilityClient, filter, ident, maxItems) {
+            return filter === FacilitySearchType.Intersection ? Promise.reject(failure) : search.call(this, filter, ident, maxItems);
+        });
+        return failure;
+    }
+
+    it('fails the self-test of the power-on when a scan list cannot be built (#416)', async () => {
+        const failure = failIntersectionSearch();
+        const unit = await bootUnit();
+        await settle(unit);
+
+        expect(unit.props.memory.selfTestFailure).toBe(failure);
+        expect(unit.props.memory.isReady).toBe(true);
+        expect(unit.takeRejections()).toEqual([]);
+        expect(unit.props.scanLists.intScanlist.isEmpty()).toBe(true);
+    });
+
+    // No other step of the reset rejects today. One that does fails the self-test too, and is not left unhandled; the
+    // memory does not become ready in that power-on (spec 4.1a)
+    it('fails the self-test of the power-on when another step of the reset rejects (#416)', async () => {
+        const failure = new Error('the TRI restore failed');
+        const spy = vi.spyOn(TriPageState.prototype, 'restore').mockRejectedValueOnce(failure);
+        onTestFinished(() => spy.mockRestore());
+        const unit = await bootUnit();
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(spy).toHaveBeenCalledTimes(1); // Precondition: the boot's power-on restored once, and that rejected
+        expect(unit.props.memory.selfTestFailure).toBe(failure);
+        expect(unit.props.memory.isReady).toBe(false);
+        expect(unit.takeRejections()).toEqual([]);
+    });
+
+    // The failure belongs to its power-on: a power cycle is the retry, and a power-on that works passes (spec 4.3)
+    it('passes the self-test of the next power-on after a scan list could not be built (#416)', async () => {
+        let failing = true;
+        const search = MemoryFacilityClient.prototype.searchByIdentWithIcaoStructs;
+        const spy = vi.spyOn(MemoryFacilityClient.prototype, 'searchByIdentWithIcaoStructs');
+        onTestFinished(() => spy.mockRestore());
+        spy.mockImplementation(function (this: MemoryFacilityClient, filter, ident, maxItems) {
+            return failing && filter === FacilitySearchType.Intersection
+                ? Promise.reject(new Error('the intersection search failed'))
+                : search.call(this, filter, ident, maxItems);
+        });
+        const unit = await bootUnit();
+        await settle(unit);
+        expect(unit.props.memory.selfTestFailure).not.toBeNull(); // Precondition: the boot's power-on failed
+
+        failing = false;
+        await unit.panel.powerCycle();
+        await settle(unit);
+
+        expect(unit.props.memory.selfTestFailure).toBeNull();
+        expect(unit.props.memory.isReady).toBe(true);
+        expect(heldIdent(unit, 'intPage')).toBe('ZZXIN');
+    });
+
+    // The first failure of a power-on is kept, and a reason that is not an Error is wrapped in one. The VOR scan list is
+    // built before the INT one (the order of the reset), so its search rejects first
+    it('keeps the first failure of the power-on and wraps a reason that is not an Error (#416)', async () => {
+        const search = MemoryFacilityClient.prototype.searchByIdentWithIcaoStructs;
+        const spy = vi.spyOn(MemoryFacilityClient.prototype, 'searchByIdentWithIcaoStructs');
+        onTestFinished(() => spy.mockRestore());
+        spy.mockImplementation(function (this: MemoryFacilityClient, filter, ident, maxItems) {
+            if (filter === FacilitySearchType.Vor) {
+                return Promise.reject('the VOR search failed');
+            }
+            if (filter === FacilitySearchType.Intersection) {
+                return Promise.reject(new Error('the intersection search failed'));
+            }
+            return search.call(this, filter, ident, maxItems);
+        });
+        const unit = await bootUnit();
+        await settle(unit);
+
+        const failure = unit.props.memory.selfTestFailure;
+        expect(failure).toBeInstanceOf(Error);
+        expect(failure?.message).toBe('the VOR search failed');
+    });
+
+    it('keeps a page\'s restored waypoint when its scan list cannot be built (#416)', async () => {
+        failIntersectionSearch();
+        const zzxin = defaultNavdata().find(f => f.icaoStruct.ident === 'ZZXIN')!;
+        const unit = await bootUnit({storage: {intPageWpt: savedOf(zzxin)}});
+        await settle(unit);
+
+        expect(heldIdent(unit, 'intPage')).toBe('ZZXIN');
+    });
+});
+
+// A power cycle is the retry of a failed self-test, and the call that hung in the earlier power-on may answer late. That
+// answer changes nothing: the reset numbers its power-ons, and an earlier one writes no page state, no user setting and
+// does not set isReady (spec 4.3)
+describe('a late answer of an earlier power-on (#416)', () => {
+    // When the new power-on asks for the same ICAO, the SDK resolves the old hung request with null, which
+    // KLNFacilityLoader.getFacility turns into a rejection. TRI 1 is not saved again by a page, so a cleared setting would
+    // lose its waypoint for good. KAAA sorts before the default airport ZZXA, so that the TRI restore is the only lookup of
+    // ZZXA, and the deferred is its
+    it('writes no page state and no setting from a late answer of an earlier power-on (#416)', async () => {
+        const zzxa = defaultNavdata().find(f => f.icaoStruct.ident === 'ZZXA')!;
+        const held = deferred<Facility>();
+        let lookups = 0;
+        const getFacility = MemoryFacilityClient.prototype.getFacility;
+        const spy = vi.spyOn(MemoryFacilityClient.prototype, 'getFacility');
+        onTestFinished(() => spy.mockRestore());
+        spy.mockImplementation(function (this: MemoryFacilityClient, type, icao) {
+            const ident = typeof icao === 'string' ? ICAO.getIdentFromStringV1(icao) : icao.ident;
+            if (ident === 'ZZXA' && lookups++ === 0) {
+                return held.promise;
+            }
+            return getFacility.call(this, type, icao);
+        });
+        const unit = await bootUnit({facilities: [airport('KAAA', 47.0, 8.0)], storage: {tri1To: savedOf(zzxa)}});
+        expect(lookups).toBe(1); // Precondition: the restore of the boot's power-on waits
+
+        await unit.panel.powerCycle();
+        await settle(unit);
+        expect(lookups).toBe(2); // Precondition: the new power-on looked it up again
+        held.reject(new Error('timed out'));
+        await settle(unit);
+
+        expect(storedSetting(unit, 'tri1To')).toBe(savedOf(zzxa));
+        expect(unit.props.memory.triPage.tri1To?.icaoStruct.ident).toBe('ZZXA');
+        expect(unit.props.memory.isReady).toBe(true);
+    });
+
+    /**
+     * Holds back the index searches of the INT scan list for the character Z (where the default intersection ZZXIN is)
+     * of the first power-ons, one per power-on; the later ones answer at once. Returns the held-back searches
+     */
+    function holdIntersectionSearches(count: number): { resolve: (value: IcaoValue[] | Promise<IcaoValue[]>) => void, answer: Promise<IcaoValue[]> }[] {
+        const held: { resolve: (value: IcaoValue[] | Promise<IcaoValue[]>) => void, answer: Promise<IcaoValue[]> }[] = [];
+        const search = MemoryFacilityClient.prototype.searchByIdentWithIcaoStructs;
+        const spy = vi.spyOn(MemoryFacilityClient.prototype, 'searchByIdentWithIcaoStructs');
+        onTestFinished(() => spy.mockRestore());
+        spy.mockImplementation(function (this: MemoryFacilityClient, filter, ident, maxItems) {
+            const answer = search.call(this, filter, ident, maxItems);
+            if (filter === FacilitySearchType.Intersection && ident === 'Z' && maxItems === 1 && held.length < count) {
+                const d = deferred<IcaoValue[]>();
+                held.push({resolve: d.resolve, answer});
+                return d.promise;
+            }
+            return answer;
+        });
+        return held;
+    }
+
+    it('sets isReady only for the current power-on (#416)', async () => {
+        const held = holdIntersectionSearches(1);
+        const unit = await bootUnit();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(held).toHaveLength(1); // Precondition: the boot's power-on waits for its INT scan list
+        expect(unit.props.memory.isReady).toBe(false);
+
+        await unit.panel.powerCycle();
+        await settle(unit);
+        expect(unit.props.memory.isReady).toBe(true);
+
+        held[0].resolve([]);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.scanLists.intScanlist.isEmpty()).toBe(false);
+        expect(unit.props.memory.isReady).toBe(true);
+    });
+
+    // The page the pilot chose after the power-on stays, when the earlier power-on gets the first waypoint of its scan
+    // list late. INTAA sorts before ZZXIN, so it is the first
+    it('writes no waypoint page from a late answer of an earlier power-on (#416)', async () => {
+        const held = holdIntersectionSearches(1);
+        const unit = await bootUnit({facilities: [intersection('INTAA', 47.2, 8.4)]});
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(held).toHaveLength(1); // Precondition: the boot's power-on waits for its INT scan list
+        await unit.panel.powerCycle();
+        await settle(unit);
+        expect(heldIdent(unit, 'intPage')).toBe('INTAA'); // Precondition: the current power-on showed the first
+        const zzxin = defaultNavdata().find(f => f.icaoStruct.ident === 'ZZXIN') as IntersectionFacility;
+        unit.props.memory.intPage.facility = zzxin; // The pilot's choice
+        unit.props.memory.intPage.ident = 'ZZXIN';
+
+        held[0].resolve(held[0].answer);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(heldIdent(unit, 'intPage')).toBe('ZZXIN');
+        expect(unit.props.memory.intPage.ident).toBe('ZZXIN');
+        expect(storedSetting(unit, 'intPageWpt')).toBe(savedOf(zzxin));
+    });
+
+    // The same for a page's saved waypoint: the earlier power-on's restore of it answers after the pilot chose another
+    it('writes no waypoint page from a late restore of an earlier power-on (#416)', async () => {
+        const zzxin = defaultNavdata().find(f => f.icaoStruct.ident === 'ZZXIN') as IntersectionFacility;
+        const intaa = intersection('INTAA', 47.2, 8.4);
+        const held = deferred<Facility>();
+        let lookups = 0;
+        const getFacility = MemoryFacilityClient.prototype.getFacility;
+        const spy = vi.spyOn(MemoryFacilityClient.prototype, 'getFacility');
+        onTestFinished(() => spy.mockRestore());
+        spy.mockImplementation(function (this: MemoryFacilityClient, type, icao) {
+            const ident = typeof icao === 'string' ? ICAO.getIdentFromStringV1(icao) : icao.ident;
+            if (ident === 'ZZXIN' && lookups++ === 0) {
+                return held.promise;
+            }
+            return getFacility.call(this, type, icao);
+        });
+        const unit = await bootUnit({facilities: [intaa], storage: {intPageWpt: savedOf(zzxin)}});
+        expect(lookups).toBe(1); // Precondition: the restore of the boot's power-on waits
+        await unit.panel.powerCycle();
+        await settle(unit);
+        expect(heldIdent(unit, 'intPage')).toBe('ZZXIN'); // Precondition: the current power-on restored it
+        unit.props.memory.intPage.facility = intaa; // The pilot's choice
+        unit.props.memory.intPage.ident = 'INTAA';
+
+        held.resolve(zzxin);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(heldIdent(unit, 'intPage')).toBe('INTAA');
+        expect(unit.props.memory.intPage.ident).toBe('INTAA');
+        expect(storedSetting(unit, 'intPageWpt')).toBe(savedOf(intaa));
+    });
+
+    // The retry of spec 4.3 for a waypoint page: the earlier power-on's lookup of the saved waypoint rejects late (the SDK
+    // resolves the hung request with null once the current power-on asks again). The page's setting is not cleared, or
+    // the waypoint would be lost at the next sim restart
+    it('keeps a waypoint page\'s setting when the restore of an earlier power-on fails late (#416)', async () => {
+        const zzxin = defaultNavdata().find(f => f.icaoStruct.ident === 'ZZXIN') as IntersectionFacility;
+        const held = deferred<Facility>();
+        let lookups = 0;
+        const getFacility = MemoryFacilityClient.prototype.getFacility;
+        const spy = vi.spyOn(MemoryFacilityClient.prototype, 'getFacility');
+        onTestFinished(() => spy.mockRestore());
+        spy.mockImplementation(function (this: MemoryFacilityClient, type, icao) {
+            const ident = typeof icao === 'string' ? ICAO.getIdentFromStringV1(icao) : icao.ident;
+            if (ident === 'ZZXIN' && lookups++ === 0) {
+                return held.promise;
+            }
+            return getFacility.call(this, type, icao);
+        });
+        const unit = await bootUnit({storage: {intPageWpt: savedOf(zzxin)}});
+        expect(lookups).toBe(1); // Precondition: the restore of the boot's power-on waits
+        await unit.panel.powerCycle();
+        await settle(unit);
+        expect(heldIdent(unit, 'intPage')).toBe('ZZXIN'); // Precondition: the current power-on restored it
+
+        held.reject(new Error('timed out'));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(storedSetting(unit, 'intPageWpt')).toBe(savedOf(zzxin));
+        expect(heldIdent(unit, 'intPage')).toBe('ZZXIN');
+    });
+
+    // An earlier power-on that finishes while the current one still waits does not make the memory ready
+    it('does not set isReady when an earlier power-on finishes during the current one (#416)', async () => {
+        const held = holdIntersectionSearches(2);
+        const unit = await bootUnit();
+        await unit.panel.powerCycle();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(held).toHaveLength(2); // Precondition: both power-ons wait for their INT scan list
+        expect(unit.props.memory.isReady).toBe(false);
+
+        held[0].resolve(held[0].answer);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(unit.props.memory.isReady).toBe(false);
+
+        held[1].resolve(held[1].answer);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(unit.props.memory.isReady).toBe(true);
+        expect(heldIdent(unit, 'intPage')).toBe('ZZXIN');
     });
 });
 

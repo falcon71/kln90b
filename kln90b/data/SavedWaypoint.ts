@@ -30,8 +30,12 @@ export class SavedWaypoint<T extends Facility> {
      * Resolves the saved waypoint. A waypoint that does not resolve (a deleted user waypoint, a temporary waypoint the
      * power-off deleted, another database, a corrupted value, a waypoint of another type) gives null, and the setting is
      * cleared. Never rejects
+     * @param loader The facility client
+     * @param isCurrent Whether the power-on that restores is still the current one. Only then is the setting cleared: the
+     * lookup of an earlier power-on that answers late (a hung request the SDK resolves with null once the same waypoint
+     * is asked for again) must not clear a waypoint the current power-on restored (#416, spec 4.3)
      */
-    public async restore(loader: FacilityClient): Promise<T | null> {
+    public async restore(loader: FacilityClient, isCurrent: () => boolean = () => true): Promise<T | null> {
         const icao = this.setting.get();
         if (icao === "") {
             return null;
@@ -46,7 +50,9 @@ export class SavedWaypoint<T extends Facility> {
         } catch (e) {
             //Expected after a database change or a deleted user waypoint, so a warning and not an error
             console.warn(`The saved waypoint ${icao} does not resolve`, e);
-            this.save(null);
+            if (isCurrent()) {
+                this.save(null);
+            }
             return null;
         }
     }

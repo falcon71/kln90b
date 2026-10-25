@@ -191,6 +191,27 @@ describe('TickController loops (spec, docs/architecture.md Core 2)', () => {
     });
 });
 
+// KLN90BCore builds the controller early, for the display ticks of the Turn-On page during the boot, and appends the
+// calculations when the services exist (#416)
+describe('TickController.addCalculations (#416)', () => {
+    it('runs calculations added after construction, in order, from the next tick (#416)', () => {
+        const bus = new EventBus();
+        const log: string[] = [];
+        const tickController = new TickController(bus, [], [], []);
+        bus.getPublisher<PowerEvent>().pub('powerEvent', {isPowered: true, timeSincePowerChange: 0});
+
+        tickController.tickCalc();
+        tickController.tickSignals();
+        expect(log).toEqual([]);
+
+        tickController.addCalculations([calcTickable('a', log), calcTickable('b', log)], [calcTickable('s', log)]);
+        tickController.tickCalc();
+        expect(log).toEqual(['a', 'b']);
+        tickController.tickSignals();
+        expect(log).toEqual(['a', 'b', 's']);
+    });
+});
+
 // docs/architecture.md, Core 2: each tickable is wrapped in try/catch, which logs the error and publishes it on the
 // error topic (the error page shows it). The wrapping is per tickable, so the others of the same tick still run.
 describe('TickController exceptions (spec, docs/architecture.md Core 2)', () => {

@@ -233,6 +233,217 @@ describe('FacilityLoaderScanlist background jobs', () => {
     });
 });
 
+// The scan list is built at every power-on. A build that fails leaves nothing of the list behind, and a build of an
+// earlier power-on that answers late does not replace the list of the current one (#416, spec 4.1a and 4.3 of
+// docs/superpowers/specs/2026-10-25-startup-self-test-design.md)
+describe('FacilityLoaderScanlist builds that fail or overlap (#416)', () => {
+    it('a rejected init leaves the list empty and rethrows', async () => {
+        const client = airports();
+        const list = await airportScanlist(client);
+        expect(list.isEmpty()).toBe(false); // Precondition: the list of an earlier build
+        client.searchByIdentWithIcaoStructs = () => Promise.reject(new Error('the search failed'));
+
+        await expect(list.init()).rejects.toThrow('the search failed');
+
+        expect(list.isEmpty()).toBe(true);
+        expect(list.start()).toBeNull();
+        expect(await list.getNext(ICAO.value('A', '', '', 'KAAA'), 1)).toBeNull();
+    });
+
+    // A fill of the cache that still runs from before the failed init would fill the list again
+    it('a rejected init stops a fill of the cache that is still running', async () => {
+        const client = new GatedClient([airport('KAAA', 47, 8), airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8)]);
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, client as unknown as FacilityClient, new EventBus());
+        await list.init();
+        await managerJob(list);
+        client.gateClosed = true;
+        list.sync(ICAO.value('A', '', '', 'KAAD')); // Not cached: the fill throws the cache away and searches again
+        expect(client.waiting).toHaveLength(1); // Precondition: the fill waits for its first search
+        const gated = client.searchByIdentWithIcaoStructs.bind(client);
+        let failNext = true;
+        client.searchByIdentWithIcaoStructs = (filter, ident, maxItems) => {
+            if (failNext) {
+                failNext = false;
+                return Promise.reject(new Error('the search failed'));
+            }
+            return gated(filter, ident, maxItems);
+        };
+
+        await expect(list.init()).rejects.toThrow('the search failed');
+        client.gateClosed = false;
+        while (client.waiting.length > 0) {
+            await client.release();
+        }
+
+        expect(list.isEmpty()).toBe(true);
+    });
+
+    it('a later init wins over an earlier build that finishes last', async () => {
+        const client = new GatedClient([airport('KAAA', 47, 8), airport('KAAB', 47.1, 8)]);
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, client as unknown as FacilityClient, new EventBus());
+        client.gateClosed = true;
+        const first = list.init();
+        expect(client.waiting).toHaveLength(1); // Precondition: the first build waits for its first search
+        client.gateClosed = false;
+        await list.init();
+        expect(list.start()?.ident).toBe('KAAA'); // Precondition: the second build is done
+
+        // The first build's search answers with other waypoints, as after a database change
+        const waiting = client.waiting.shift()!;
+        client.searchByIdentWithIcaoStructs = async () => [ICAO.value('A', '', '', '0XYZ')];
+        waiting();
+        await first;
+
+        expect(list.start()?.ident).toBe('KAAA');
+        // The index jump reads the whole index: nothing of the first build is in it
+        expect(await list.getNext(ICAO.value('A', '', '', 'KAAA'), -MAX_SCROLL_SPEED)).toBeNull();
+    });
+
+    // A repository sync can come during the power-on (the temporary waypoints are deleted in the same power event). The
+    // init it overtakes answers from the sync's build, which holds the waypoints as they are now, and not from the index
+    // of an earlier build (KAAB) or with none. The init's own build ends first here, while the sync's still waits
+    it('an init whose build is superseded by a waypoint sync answers from the sync\'s build', async () => {
+        const client = new GatedClient([airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8)]);
+        const bus = new EventBus();
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, client as unknown as FacilityClient, bus);
+        await list.init();
+        await managerJob(list);
+        expect(list.start()?.ident).toBe('KAAB'); // Precondition: the index of an earlier build
+
+        client.gateClosed = true;
+        let answered = false;
+        const answer = list.init().then(icao => {
+            answered = true;
+            return icao;
+        });
+        expect(client.waiting).toHaveLength(1); // Precondition: the init's build waits for its first search
+        client.add(airport('KAAA', 47, 8));
+        bus.getPublisher<any>().pub(KLNFacilityRepository.SYNC_TOPIC, {}, false, false);
+        client.gateClosed = false;
+        await client.release(); // The init's search answers, and its build runs to its end
+        for (let i = 0; i < 1000; i++) {
+            await Promise.resolve();
+        }
+        expect(answered).toBe(false); // It waits for the sync's build
+
+        while (client.waiting.length > 0) {
+            await client.release();
+        }
+
+        expect((await answer)?.ident).toBe('KAAA');
+    });
+
+    // The sync that overtook the init is overtaken in turn by a second sync while the init waits: the second one decides.
+    // 0AAA sorts first and exists only for the second sync's searches
+    it('an init superseded twice answers from the last build', async () => {
+        const client = new GatedClient([airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8)]);
+        const bus = new EventBus();
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, client as unknown as FacilityClient, bus);
+        await list.init();
+        await managerJob(list);
+        const sync = () => bus.getPublisher<any>().pub(KLNFacilityRepository.SYNC_TOPIC, {}, false, false);
+
+        client.gateClosed = true;
+        const answer = list.init();
+        client.add(airport('KAAA', 47, 8));
+        sync();
+        client.gateClosed = false;
+        const searchesOfZ = () => client.searched.filter(ident => ident === 'Z').length;
+        const before = searchesOfZ();
+        await client.release(); // The init's build runs to its end; the first sync's build still waits
+        for (let i = 0; i < 1000; i++) {
+            await Promise.resolve();
+        }
+        expect(searchesOfZ()).toBe(before + 1); // Precondition: the init's build got to its last character
+        client.gateClosed = true;
+        client.add(airport('0AAA', 47.3, 8));
+        sync();
+        client.gateClosed = false;
+        while (client.waiting.length > 0) {
+            await client.release();
+        }
+
+        expect((await answer)?.ident).toBe('0AAA');
+    });
+
+    // An overtaken init does not fail with its own build: the newest build decides (here it succeeds). Otherwise a stale
+    // build of an earlier power-on could fail the self-test of a power-on whose own build worked
+    // The overtaken build fails while the newest one still waits, so the overtaken init has to wait for it
+    it('an overtaken init whose own build fails answers from the newest build', async () => {
+        const client = new GatedClient([airport('KAAA', 47, 8)]);
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, client as unknown as FacilityClient, new EventBus());
+        client.gateClosed = true;
+        let answered = false;
+        const first = list.init().then(icao => ({icao}), (e: unknown) => ({rejected: e})).finally(() => answered = true);
+        const second = list.init();
+        expect(client.waiting).toHaveLength(2); // Precondition: both builds wait for their first search
+        // The next search, the first build's second one, rejects; the ones after it are gated again
+        let failNext = true;
+        const gated = client.searchByIdentWithIcaoStructs.bind(client);
+        client.searchByIdentWithIcaoStructs = (filter, ident, maxItems) => {
+            if (failNext) {
+                failNext = false;
+                return Promise.reject(new Error('the search failed'));
+            }
+            return gated(filter, ident, maxItems);
+        };
+
+        await client.release(); // The first build's search answers; its next one rejects
+        expect(failNext).toBe(false); // Precondition: the first build has failed
+        expect(answered).toBe(false); // It waits for the newest build
+
+        client.gateClosed = false;
+        await client.release(); // The newest build runs to its end
+        expect((await second)?.ident).toBe('KAAA');
+        expect(await first).toEqual({icao: expect.objectContaining({ident: 'KAAA'})});
+    });
+
+    // When the newest build fails as well, the overtaken init answers from what the list then holds: nothing, as the
+    // failed init emptied it. Only the newest init rejects
+    it('an overtaken init whose newest build fails answers with nothing', async () => {
+        const client = new GatedClient([airport('KAAA', 47, 8)]);
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, client as unknown as FacilityClient, new EventBus());
+        client.gateClosed = true;
+        const first = list.init().then(icao => ({icao}), (e: unknown) => ({rejected: e}));
+        const second = list.init().then(icao => ({icao}), (e: unknown) => ({rejected: e}));
+        expect(client.waiting).toHaveLength(2); // Precondition: both builds wait for their first search
+        const failure = new Error('the search failed');
+        client.searchByIdentWithIcaoStructs = () => Promise.reject(failure);
+
+        await client.release(); // The first build's search answers; its next one rejects
+        await client.release(); // The same for the newest build
+
+        expect(await second).toEqual({rejected: failure});
+        expect(await first).toEqual({icao: null});
+        expect(list.isEmpty()).toBe(true);
+    });
+
+    // Nothing awaits the build of a waypoint change, so its rejection is logged and not left unhandled. Only the index
+    // searches (one result each) reject, so that the fill of the cache the change starts as well runs
+    it('logs a build after a waypoint change that rejects', async () => {
+        const client = airports();
+        const bus = new EventBus();
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, client as unknown as FacilityClient, bus);
+        await list.init();
+        await managerJob(list);
+        const failure = new Error('the search failed');
+        const search = client.searchByIdentWithIcaoStructs.bind(client);
+        client.searchByIdentWithIcaoStructs = (filter, ident, maxItems) => maxItems === 1 ? Promise.reject(failure) : search(filter, ident, maxItems);
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        try {
+            bus.getPublisher<any>().pub(KLNFacilityRepository.SYNC_TOPIC, {}, false, false);
+            await managerJob(list);
+            for (let i = 0; i < 20; i++) {
+                await Promise.resolve();
+            }
+
+            expect(warn.mock.calls.map(call => call[1])).toEqual([failure]);
+        } finally {
+            warn.mockRestore();
+        }
+    });
+});
+
 // The user (SUP) scan list is built at every boot, and most boots have no user waypoints, so a failure here stopped
 // the whole unit in its self-test. The null contract is the one of the Scanlist interface: no waypoint, no start.
 describe('FacilityLoaderScanlist with no user waypoints (characterization, #42 07873c0, e1e75d0)', () => {
