@@ -16,6 +16,7 @@ import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {KLNFixType} from "../../data/flightplan/Flightplan";
 import {FROM} from "../../data/VolatileMemory";
 import {FlightPlanWaypint, isFlightPlanWaypint} from "../../controls/FlightplanList";
+import {courseAtWaypoint} from "../../data/navdata/ObsGeometry";
 
 
 type DirectToPageTypes = {
@@ -115,7 +116,9 @@ export class DirectToPage extends SixLineHalfPage {
                     //5-37: ACTIVATE keeps the course and lays it through the new waypoint, so the bar is not recentered (#154)
                     this.props.modeController.setObs(this.props.memory.navPage.obsMag, true);
                 } else {
-                    const obsTrue = this.props.sensors.in.gps.coords.bearingTo(waypoint);
+                    //5-37: the course set is the direct path's course at the waypoint, where the deviation is measured, not the
+                    //bearing at the aircraft, which differs on a long direct path (#370)
+                    const obsTrue = courseAtWaypoint(this.props.sensors.in.gps.coords, waypoint);
                     const magvar = this.props.modeController.getMagvarForObs(waypoint);
                     const obsMag = this.props.magvar.trueToMag(obsTrue, magvar);
                     this.props.modeController.setObsOnUnit(obsMag);

@@ -8,7 +8,7 @@ import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {intersection, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
-import {courseDeg, crossTrackNm, pointBefore, pointFrom} from '../../../harness/flight/geo';
+import {courseDeg, crossTrackNm, finalCourseDeg, pointBefore, pointFrom} from '../../../harness/flight/geo';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
 const {kaaa, abc, kbbb} = standardRoute();
@@ -87,12 +87,13 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
 describe('Direct To in OBS mode (5-37)', () => {
     const offLeg = pointFrom(pointBefore(kaaa, abc, 10), 141, 3); // 3 NM right of KAAA - ABC
     // ABC with a published variation of 10 E (the sim stores east as negative), so that the magnetic course the unit shows
-    // is the true course minus 10: the direct course from offLeg is 034.2 true, so 024.2 magnetic. At a variation of 0 a
+    // is the true course minus 10: the direct course at ABC from offLeg is 034.3 true, so 024.3 magnetic. At a variation of 0 a
     // unit that mixes up true and magnetic, or the sign of the variation, would pass
     const abcE = vor('ABC', abc.lat, abc.lon, {magneticVariation: -10});
 
     // 5-37 (5.9.6): the direct-to selects the OBS that leads from the present position to the waypoint when the unit
-    // is not the displayed source (ObsSource 0: the unit cannot read the indicator)
+    // is not the displayed source (ObsSource 0: the unit cannot read the indicator). The course is the one of the direct
+    // path at ABC (#370), which differs from the initial course by 0.1 degrees over this short path
     it('sets the OBS to the course from the present position and centers the deviation', async () => {
         const unit = await planInObs(offLeg, {panelXml: panelXml(NO_OBS), abc: abcE});
         const nav = unit.props.memory.navPage;
@@ -103,21 +104,23 @@ describe('Direct To in OBS mode (5-37)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(courseDeg(offLeg, abc)).toBeCloseTo(34.2, 1);
-        expect(Math.abs(nav.obsMag - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.2 magnetic
+        expect(Math.abs(nav.obsMag - (finalCourseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.3 magnetic: the course at ABC, 0.1 above the initial one
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
     });
 
     /**
      * FPL 0 KAAA - EEE, EEE 150 NM east of KAAA. The aircraft is 100 NM before EEE and 5 NM north of the leg. In OBS mode
-     * (ObsSource 0, so that the course is the unit's own), D-> EEE and ENT, then 1 s.
+     * (ObsSource 0, so that the course is the unit's own), D-> EEE and ENT, then 1 s. With `obs` the unit instead reads a
+     * non-driven indicator that is on that course.
      */
-    async function longDirectToEee() {
+    async function longDirectToEee(o: { obs?: number } = {}) {
         const eeePos = pointFrom(kaaa, 90, 150);
         const eee = intersection('EEE', eeePos.lat, eeePos.lon);
         const onLeg = pointBefore(kaaa, eee, 100);
         const position = pointFrom(onLeg, courseDeg(onLeg, eee) - 90, 5);
-        const unit = await bootUnit({facilities: [kaaa, eee], position, panelXml: panelXml(NO_OBS), storage: savedFlightplan(0, [kaaa, eee])});
+        const unit = await bootUnit({facilities: [kaaa, eee], position, panelXml: o.obs === undefined ? panelXml(NO_OBS) : undefined, storage: savedFlightplan(0, [kaaa, eee])});
         await settle(unit);
+        if (o.obs !== undefined) unit.env.sim.set('Nav OBS:1', 'degrees', o.obs);
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
         const nav = unit.props.memory.navPage;
@@ -127,7 +130,7 @@ describe('Direct To in OBS mode (5-37)', () => {
         await unit.panel.dct();
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
-        return {unit, nav};
+        return {unit, nav, position, eee};
     }
 
     // 5-37 (5.9.6): the setup of the test below. The direct-to makes EEE active as a direct-to and keeps ENR-OBS
@@ -139,15 +142,29 @@ describe('Direct To in OBS mode (5-37)', () => {
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
     });
 
-    // 5-37 (5.9.6): the direct-to selects the OBS that leads from the present position to the waypoint and centers the
-    // deviation. #370: on a long direct course the unit sets the course at the aircraft but measures the deviation from
-    // the course through the waypoint; the direct path crosses the meridians, so its course at EEE (095.54 true here) is
-    // not the one at the aircraft (093.76 true, the obsMag shown is about 093.75), and the deviation reads about -3.11 NM
-    // instead of 0. The issue quotes 091.09 and 092.87 for its own variation; the -3.11 NM is the same
-    it.fails('centers the deviation after a long Direct To in OBS mode (5-37, #370)', async () => {
+    // 5-37 (the Direct To selects the course from the present position to the waypoint and centers the deviation);
+    // checked in the KLN 89 trainer, 2026-10-25 (the course set is the direct path's course at the waypoint). #370: the
+    // direct path crosses the meridians, so its course at EEE (095.54 true here) is not the one at the aircraft (093.76
+    // true). The course is laid through EEE, so a course taken at the aircraft left the deviation at about -3.11 NM
+    // instead of 0
+    it('centers the deviation after a long Direct To in OBS mode (5-37, #370)', async () => {
         const {nav} = await longDirectToEee();
 
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.1);
+    });
+
+    // 5-37; checked in the KLN 89 trainer, 2026-10-25 (the course set is the direct path's course at the waypoint)
+    it('sets the course of the direct path at EEE (5-37, #370)', async () => {
+        const {nav, position, eee} = await longDirectToEee();
+
+        expect(Math.abs(nav.obsMag - finalCourseDeg(position, eee))).toBeLessThan(0.05); // 095.54, variation 0; the initial bearing would be 093.76
+    });
+
+    // 5-37 (5.9.6) and C-1: the CRS message tells the course set, which is the direct path's course at the waypoint
+    it('shows CRS with the course at the waypoint after a long direct to (5-37, C-1, #370)', async () => {
+        await longDirectToEee({obs: 50});
+
+        expect(Screen.read().status().mode).toBe('d› CRS 096°'); // 095.54 rounded; the initial bearing would give 094
     });
 
     // 5-37 (5.9.6) and C-1: on a non-driven indicator that shows the unit, the status line tells the course to set
@@ -159,7 +176,7 @@ describe('Direct To in OBS mode (5-37)', () => {
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(500);
 
-        expect(Screen.read().status().mode).toBe('d› CRS 024°'); // 034.2 true less the variation of 10 E
+        expect(Screen.read().status().mode).toBe('d› CRS 024°'); // 034.3 true less the variation of 10 E
     });
 
     // 5-37 (5.9.6): a driven indicator (ObsTarget 1, VOR 1) is slewed to the direct course, with no message
@@ -188,7 +205,7 @@ describe('Direct To in OBS mode (5-37)', () => {
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(Math.abs(nav.obsMag - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.2 magnetic
+        expect(Math.abs(nav.obsMag - (finalCourseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.3 magnetic: the course at ABC, 0.1 above the initial one
         expect(Math.abs(unit.env.sim.get('Nav OBS:1', 'degrees') - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.5);
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
     });
@@ -199,10 +216,10 @@ describe('Direct To in OBS mode (5-37)', () => {
 describe('Direct To in OBS mode, the CRS message at north (characterization)', () => {
     const offLeg = pointFrom(pointBefore(kaaa, abc, 10), 141, 3); // 3 NM right of KAAA - ABC
 
-    // #263: the direct course is 034.2 true; with a variation of 34.5 east at ABC it is 359.7 magnetic, which the CRS
+    // #263: the direct course is 034.3 true; with a variation of 34.6 east at ABC it is 359.7 magnetic, which the CRS
     // message shows as 000
     it('characterization: shows a direct course of 359.7 in the CRS message as 000 (#263)', async () => {
-        const variation = courseDeg(offLeg, abc) + 0.3; // the direct course minus this is 359.7
+        const variation = finalCourseDeg(offLeg, abc) + 0.3; // the direct course at ABC minus this is 359.7
         const abcNorth = vor('ABC', abc.lat, abc.lon, {magneticVariation: -variation});
         const unit = await planInObs(offLeg, {obs: 50, abc: abcNorth});
         await unit.panel.selectPage('R', 'CTR 1');
