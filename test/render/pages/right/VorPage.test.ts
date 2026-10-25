@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {VorClass, VorType} from '@microsoft/msfs-sdk';
+import {ICAO, VorClass, VorType} from '@microsoft/msfs-sdk';
 import {bootUnit, NEAREST_SEARCH_WAIT_MS} from '../../../harness/boot';
 import {vor} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
@@ -167,6 +167,25 @@ describe('VOR page contents (3-49)', () => {
         await unit.panel.selectPage('R', 'VOR  ');
 
         expect(Screen.read().status().mode).toBe('NO VOR WPTS');
+    });
+
+    // C-2 is about a list without any VOR. The power-on fills the scan list's cache around its first VOR; a page that
+    // restored its saved VOR (#192) beyond that window refills the cache when it is first shown, and the list is not
+    // empty meanwhile. More VORs come before YKM than the cache holds after its first one (Scanlist.ts TARGET_CACHE_SIZE)
+    it('does not show NO VOR WPTS the first time it shows a restored VOR outside the cached part of the list (#428)', async () => {
+        const before = Array.from({length: 700}, (_, i) => vor(`A${String(i).padStart(3, '0')}`, 47, 8));
+        const unit = await bootUnit({
+            facilities: [...before, vor('YKM', 46.57, -120.45, {name: 'YAKIMA'})],
+            position: {lat: 47, lon: 8},
+            storage: {vorPageWpt: ICAO.valueToStringV2(ICAO.value('V', 'K1', '', 'YKM'))},
+        });
+        expect(unit.props.memory.vorPage.ident).toBe('YKM'); // Precondition: the page restored its saved VOR
+
+        await unit.panel.selectPage('R', 'VOR  ');
+
+        expect(identAndName()).toEqual([' YKM D     ', 'YAKIMA     ']);
+        expect(Screen.read().status().mode).toBe('enr-leg msg'); // The mode, where the scratchpad message would stand
+        expect(unit.errors).toEqual([]);
     });
 });
 

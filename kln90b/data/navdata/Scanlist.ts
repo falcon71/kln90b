@@ -35,6 +35,9 @@ export class Scanlists {
 }
 
 export interface Scanlist {
+    /**
+     * Whether the list has no waypoint at all (C-2)
+     */
     isEmpty(): boolean;
 
     /**
@@ -80,6 +83,8 @@ export class FacilityLoaderScanlist implements Scanlist {
 
     private listManangerJob: Promise<void> | null = null;
     private lastManangerJobId = 0;
+    //#428: the last fill that ran to its end. A fill is running while this is not the last one started
+    private finishedManagerJobId = 0;
 
     //#416: the newest build of the index. A build that is no longer the newest (the build of an earlier power-on that
     //answers late, or one a waypoint change overtook) does not change the list (spec 4.3)
@@ -192,6 +197,9 @@ export class FacilityLoaderScanlist implements Scanlist {
         if (this.listManangerJob !== null) {
             await this.listManangerJob;
         }
+        if (this.icaoListCache.length === 0) {
+            return null;
+        }
 
         let listIndex = this.indexOfIcaoInCache(icao);
         if (listIndex === -1) {
@@ -238,8 +246,15 @@ export class FacilityLoaderScanlist implements Scanlist {
         return -1;
     }
 
+    /**
+     * #428: answered from the index, which holds the first waypoint of the list once it is built. The cache is emptied
+     * whenever a sync jumps outside it or a waypoint changes, and stays empty until its refill ends. After a waypoint
+     * change the index is rebuilt, which takes longer than the refill: a refill that found nothing (the last user
+     * waypoint was deleted) tells first, and also when that rebuild fails
+     */
     public isEmpty(): boolean {
-        return this.icaoListCache.length === 0;
+        const fillRunning = this.finishedManagerJobId !== this.lastManangerJobId;
+        return this.index.length === 0 || (this.icaoListCache.length === 0 && !fillRunning);
     }
 
     public sync(icao: IcaoValue): void {
@@ -377,6 +392,7 @@ export class FacilityLoaderScanlist implements Scanlist {
         }
         this.log(`${this.facilitySearchType}: "Listmanager done ${this.cacheValidFromIdent}-${this.cacheValidBelowIdent}`, this.icaoListCache);
         this.listManangerJob = null;
+        this.finishedManagerJobId = jobId;
     }
 
     private invalidateCache() {

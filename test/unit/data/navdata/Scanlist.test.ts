@@ -1069,6 +1069,109 @@ describe('FacilityLoaderScanlist idents after ZZZZ (#201)', () => {
     });
 });
 
+// C-2: a page posts NO APT WPTS, NO VOR WPTS and so on only for a list without any waypoint. The cache is thrown away
+// when a page syncs to a waypoint outside it (the restored waypoint of a page, #192) and at every waypoint change; the
+// list is not empty while it refills (#428)
+describe('FacilityLoaderScanlist while its cache refills (#428)', () => {
+    it('is not empty right after a sync to a waypoint outside its cache, and scans from there', async () => {
+        const list = await airportScanlist(airports());
+        setCacheWindow(list, 'KAAA', 'KAAB', [ICAO.value('A', '', '', 'KAAA')]); // A window that holds only KAAA
+        const kaac = ICAO.value('A', '', '', 'KAAC');
+
+        list.sync(kaac);
+
+        expect(list.isEmpty()).toBe(false);
+        expect((await list.getNext(kaac, -1))?.ident).toBe('KAAB');
+    });
+
+    // Two syncs outside the cache in a row (a page left and shown again before the refill ends): the first fill is
+    // cancelled at its next search, while the second one still runs
+    it('is not empty when a cancelled fill stops while the newer one still runs', async () => {
+        const client = new GatedClient([airport('KAAA', 47, 8), airport('KAAB', 47.1, 8), airport('KAAC', 47.2, 8)]);
+        const list = new FacilityLoaderScanlist(FacilitySearchType.Airport, client as unknown as FacilityClient, new EventBus());
+        await list.init();
+        await managerJob(list);
+        setCacheWindow(list, 'KAAA', 'KAAB', [ICAO.value('A', '', '', 'KAAA')]); // A window that holds only KAAA
+        client.gateClosed = true;
+        list.sync(ICAO.value('A', '', '', 'KAAC'));
+        list.sync(ICAO.value('A', '', '', 'KAAB'));
+        expect(client.waiting).toHaveLength(2); // Precondition: both fills wait for their first search
+
+        await client.release(); // The first fill gets its answer and stops
+
+        expect(list.isEmpty()).toBe(false);
+        client.gateClosed = false;
+        while (client.waiting.length > 0) {
+            await client.release();
+        }
+        await managerJob(list);
+        expect(list.isEmpty()).toBe(false);
+    });
+
+    it('is not empty right after a waypoint change', async () => {
+        const bus = new EventBus();
+        const list = await scanlist(FacilitySearchType.Airport, [airport('KAAA', 47, 8), airport('KAAB', 47.1, 8)], bus);
+
+        bus.getPublisher<any>().pub(KLNFacilityRepository.SYNC_TOPIC, undefined); // what the repository publishes on a change
+
+        expect(list.isEmpty()).toBe(false);
+        await managerJob(list);
+    });
+
+    /** The SUP list with the one user waypoint USRA, built; the loader is returned to change its searches */
+    async function oneUserWaypoint() {
+        clearStatic(KLNFacilityRepository, 'INSTANCE', false);
+        const bus = new EventBus();
+        const repo = KLNFacilityRepository.getRepository(bus);
+        const usra = {
+            icao: '', icaoStruct: ICAO.value('U', 'XX', '', 'USRA'), name: '', lat: 47, lon: 8, region: 'XX', city: '',
+            isTemporary: false, userFacilityType: UserFacilityType.LAT_LONG,
+        } as unknown as Facility;
+        repo.add(usra);
+        const loader = new KLNFacilityLoader(new MemoryFacilityClient([]) as unknown as ActualFacilityClient, repo);
+        const list = new FacilityLoaderScanlist(FacilitySearchType.User, loader, bus);
+        await list.init();
+        await managerJob(list);
+        return {repo, usra, loader, list};
+    }
+
+    // The refill after the last user waypoint is deleted finds nothing, while the index of the list before the change is
+    // still being rebuilt: a scan in either direction then finds nothing either
+    it('finds nothing to scan to when the refill after a change finds no waypoint', async () => {
+        const {repo, usra, list} = await oneUserWaypoint();
+
+        repo.remove(usra);
+        expect(list.isEmpty()).toBe(false); // Precondition: the index of the list before the change, the refill running
+
+        expect(await list.getNext(usra.icaoStruct, -1)).toBeNull();
+        expect(await list.getNext(usra.icaoStruct, 1)).toBeNull();
+    });
+
+    // C-2: NO SUP WPTS once the last user waypoint is deleted. The refill tells before the rebuild of the index ends,
+    // and also when that rebuild fails. Only the index searches (one result each) wait or reject, so the refill runs
+    it.each([
+        ['still running', () => new Promise<IcaoValue[]>(() => undefined)],
+        ['failed', () => Promise.reject(new Error('the search failed'))],
+    ])('is empty once the refill after deleting the last user waypoint found nothing, with the rebuild of the index %s', async (_, indexSearch) => {
+        const {repo, usra, loader, list} = await oneUserWaypoint();
+        const search = loader.searchByIdentWithIcaoStructs.bind(loader);
+        loader.searchByIdentWithIcaoStructs = (filter, ident, maxItems) => maxItems === 1 ? indexSearch() : search(filter, ident, maxItems);
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        try {
+            repo.remove(usra);
+            await managerJob(list);
+            for (let i = 0; i < 20; i++) {
+                await Promise.resolve(); // The failed rebuild is logged
+            }
+
+            expect(list.isEmpty()).toBe(true);
+            expect(list.start()?.ident).toBe('USRA'); // Precondition: the index is still the one from before the change
+        } finally {
+            warn.mockRestore();
+        }
+    });
+});
+
 // 3-21 (SUP is one of the scanned types): a user waypoint made after the start is in the SUP scan list
 describe('FacilityLoaderScanlist of the user waypoints', () => {
     const user = (ident: string, lat: number) => ({
