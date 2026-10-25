@@ -41,6 +41,27 @@ describe('VOR page with duplicate idents (d3228dd)', () => {
     });
 });
 
+describe('VOR page scan after a waypoint that does not load', () => {
+    // 3-21: the scan knob steps through the list. One waypoint that does not load (a user waypoint deleted while the scan
+    // ran, a facility call that fails) must not stop the scan on the page for good
+    it.fails('scans on after a scan step whose waypoint did not load (#429)', async () => {
+        const unit = await bootUnit({facilities: [vor('ABC', 47.1, 8.1), vor('ABD', 47.2, 8.2), vor('ABE', 47.3, 8.3)], position: {lat: 47, lon: 8}});
+        await unit.panel.selectPage('R', 'VOR  ');
+        expect(identAndName()[0]).toBe(' ABC D     '); // Precondition: the page starts on the first VOR
+        await unit.panel.scan();
+        const failure = new Error('the facility does not load');
+        vi.spyOn(unit.props.facilityLoader, 'getFacility').mockRejectedValueOnce(failure);
+        await unit.panel.inner('R', 1);
+        expect(identAndName()[0]).toBe(' ABC D     '); // Precondition: the step whose waypoint did not load
+        expect(unit.takeRejections()).toEqual([failure]);
+
+        await vi.advanceTimersByTimeAsync(400); // Another scan step within 350 ms would speed the scan up (WaypointPage SPEEDSTEP)
+        await unit.panel.inner('R', 1);
+
+        expect(identAndName()[0]).toBe(' ABD D     ');
+    });
+});
+
 /** The VOR page of a world whose first VOR (in ident order) is the first one given, cursor off */
 async function vorPageOf(...facilities: ReturnType<typeof vor>[]) {
     const unit = await bootUnit({facilities, position: {lat: 47, lon: 8}});
