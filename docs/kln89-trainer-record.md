@@ -641,3 +641,35 @@ trainer, power cycled by relaunching it as on 2026-10-24, 11 relaunches; the VM 
 - The maintainer took this as the 5-minute rule of the procedures (6-5): a power-off of more than 5 minutes drops the
   Direct To, a shorter one keeps it.
 - Outcome: #422.
+
+**2026-10-25** (an agent check of the OBS model for #370, #371 and #151; the KLN 89 trainer, SET 1 take-home with
+position jumps at GS 0; SET 2 set by hand to a variation of 0° for the geometry checks, so that courses and bearings
+read true, and back on automatic for the variation checks; every reading compared with independently computed
+spherical predictions of four models: the great circle through the waypoint with the course at the waypoint, the
+deviation measured from the bearing at the aircraft, a line laid once through the aircraft's position at the moment the
+course was set, and a rhumb line; the VM was not started, stopped or reset)
+- In LEG mode the leg is a great circle, the NAV 1 bearing is the great-circle initial bearing at the aircraft, and the
+  DTK is the leg's course at the aircraft's abeam point (a 176 NM east-west leg: 1.1 NM off at the rhumb-line midpoint,
+  1.09 predicted).
+- The OBS course line is the great circle through the active waypoint whose course at the waypoint is the OBS course.
+  It depends only on the waypoint, the course and the present position: jumps along and off the line read 0.00, L 0.54
+  and R 15.0 NM where that model predicts 0.00, 0.54 and 15.00 and the others miss by 0.5 to 1.2 NM, and turning the
+  course away and back changed nothing. Past the waypoint (40 NM, FROM) it is the same line.
+- A Direct To in OBS mode 130 NM from the waypoint sets the course of the direct path at the waypoint, fraction kept:
+  91.04 bracketed against 91.042 predicted (the initial bearing 88.96 and the rhumb course 90.00 are excluded). The NAV 1
+  bearing in OBS mode is the same quantity, measured at the waypoint (091 where LEG mode shows 089) (#370).
+- LEG to OBS keeps the deviation at offsets of 0 to 8 NM on either side: the course is the leg's course at the
+  waypoint (#151). In 4 of 12 presses the unit seemed to keep an earlier course of a whole degree that shows the same
+  as the new one; the same setup did not repeat it (low, probably a trainer defect). OBS to LEG on the TO
+  side makes the OBS line the leg; on the FROM side the unit went back to the FPL 0 leg.
+- With the variation on automatic, OBS mode uses the variation at the active waypoint: 7.60° W for a user waypoint,
+  the same to 0.01° from aircraft longitudes 4.7° apart; 3.87° W with an NDB 4° farther west active from the same
+  position; the LEG-mode variation read at each waypoint's position agrees within its whole-degree resolution. A VOR
+  uses its published variation (1° E, where the model gives 4 to 6° W). The course stays stored true: switching SET 2
+  back to automatic changed the course shown from 091 to 099 (medium) (#371).
+- In OBS mode the OBS course, the NAV 1 bearing and the NAV 1 track use the waypoint's variation; the track is the true
+  track at the aircraft plus that variation (TK 266 against 270 in LEG at the same place). The waypoint pages, the
+  active waypoint's included, do not change (#371).
+- This corrects the reading of the 2026-10-14 block: the bearing shown in OBS mode there was the course at the waypoint,
+  so its 3 to 4° above LEG mode are the meridian convergence plus the variation difference between waypoint and
+  aircraft, and the variation at that waypoint was about 7.1° W, not 8.7°.
