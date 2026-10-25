@@ -26,7 +26,8 @@ power-on, which is also the only run that follows leaving the sim with the unit 
   treats every relaunch as a long power-off.
 - AVsoftech KLN 90B trainer, 2026-10-25, checked by the maintainer: turning the unit off and on quickly kept the Direct
   To; closing the program and starting it again dropped it and activated FPL 0. The maintainer ruled that this follows
-  the 5-minute rule (6-5) and is adopted, although that trainer is otherwise unreliable.
+  the 5-minute rule (6-5) and is adopted, although that trainer is otherwise unreliable. In the same check, with fewer
+  than two waypoints in the flight plan, the unit came up flagged after a restart of the program.
 - The 90B guide is silent about the Direct To at power-on; it says the unit powers up in ENR-LEG (3-3) and shows the page
   of the waypoint that was active before the power-off (3-8).
 - The #192 rule (2026-10-24 power-cycle design): state kept only over a short interruption stays in `VolatileMemory`
