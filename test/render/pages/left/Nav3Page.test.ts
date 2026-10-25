@@ -233,12 +233,12 @@ describe('NAV 3 page on an FPL 0 leg', () => {
         await vi.advanceTimersByTimeAsync(2000);
         await unit.panel.cursor('L');
         expect(unit.panel.focused('L').text).toMatch(/^\d{3}°$/); // The cursor is on the OBS course of NAV 3
-        const start = unit.props.memory.navPage.obsMag;
+        const start = unit.props.modeController.getObsMag();
 
         await unit.panel.inner('L', 3);
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(unit.props.memory.navPage.obsMag).toBeCloseTo(start + 3, 3);
+        expect(unit.props.modeController.getObsMag()).toBeCloseTo(start + 3, 3);
         expect(Math.abs(unit.env.sim.get('Nav OBS:1', 'degrees') - (start + 3))).toBeLessThan(0.5);
     });
 

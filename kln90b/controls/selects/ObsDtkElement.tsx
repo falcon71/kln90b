@@ -6,7 +6,6 @@ import {roundBearing} from "../../data/Coordinates";
 import {TickController} from "../../TickController";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {Sensors} from "../../Sensors";
-import {NavPageState} from "../../data/VolatileMemory";
 import {ModeController} from "../../services/ModeController";
 
 /**
@@ -30,7 +29,6 @@ export class ObsDtkElement implements Field {
      */
     constructor(private readonly planeSettings: KLN90PlaneSettings,
                 private readonly sensors: Sensors,
-                private readonly navState: NavPageState,
                 private readonly modeController: ModeController,
                 private readonly withoutDegreeWhenEditable: boolean = false) {
     }
@@ -44,12 +42,12 @@ export class ObsDtkElement implements Field {
     }
 
     public innerLeft(): boolean {
-        this.modeController.setObsOnUnit(NavMath.normalizeHeading(this.navState.obsMag - 1));
+        this.modeController.stepObs(-1);
         return true;
     }
 
     public innerRight(): boolean {
-        this.modeController.setObsOnUnit(NavMath.normalizeHeading(this.navState.obsMag + 1));
+        this.modeController.stepObs(1);
         return true;
     }
 

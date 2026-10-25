@@ -63,7 +63,7 @@ describe('ModeController OBS course of 000', () => {
         const nav = unit.props.memory.navPage;
 
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
-        expect(nav.obsMag).toBe(77);
+        expect(unit.props.modeController.getObsMag()).toBe(77);
         expect(nav.activeWaypoint.isDctNavigation()).toBe(true);
         expect(crossTrackNm(position, abc, 77)).toBeCloseTo(4.38, 1);
         expect(Math.abs(nav.xtkToActive! - crossTrackNm(position, abc, 77))).toBeLessThan(0.05);

@@ -153,7 +153,7 @@ describe('OBS mode on a flight plan with the same waypoint twice (3415417, #67)'
 
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
         expect(activeIdent(unit)).toBe('KAAA');
-        expect(Number.isFinite(nav.obsMag)).toBe(true);
+        expect(Number.isFinite(unit.props.modeController.getObsMag())).toBe(true);
         // The aircraft stands on the OBS course, which is the bearing to the waypoint, so only rounding remains
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.01);
         // Under the break the OBS course on the left half is blank (OBS:°)
@@ -167,7 +167,7 @@ describe('OBS mode on a flight plan with the same waypoint twice (3415417, #67)'
         const {unit, position} = await enterObsOnDuplicatedPlan();
 
         expect(Math.abs(unit.props.memory.navPage.xtkToActive!)).toBeLessThan(0.05);
-        expect(Math.abs(unit.props.memory.navPage.obsMag - courseDeg(position, kaaa))).toBeLessThan(0.5);
+        expect(Math.abs(unit.props.modeController.getObsMag() - courseDeg(position, kaaa))).toBeLessThan(0.5);
         expect(Screen.read().rows('L')[3]).toBe('OBS:090°   ');
     });
 });

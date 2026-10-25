@@ -140,7 +140,7 @@ export class NavPageState {
      * great-circle leg and rewrites it in place (the roll steering design, section 4B (amended 2026-10-19))
      */
     public rollSteeringLatch: { turn: 'left' | 'right', path: GeoCircle } | null = null;
-    public obsMag: Degrees = 0; //Magnetic!!
+    public obsTrue: Degrees = 0; //The OBS course, true; the magnetic course is ModeController.getObsMag() (#425)
     public toFrom: ToFrom | null = null;
     public xtkScale: number = 5;
     public approachDisarmedLeg: KLNFlightplanLeg | null = null; //6-1: the first APP leg of FPL 0 when the pilot disarmed the approach (#139)
@@ -399,7 +399,7 @@ export class VolatileMemory {
         //altitude (2026-10-24). The OBS course is not offered again: the unit powers up in LEG (3-3). The Super NAV 5 range is
         //a cache of the automatic range (SuperNav5Page), not pilot state
         this.navPage.nav4SelectedAltitude = 0;
-        this.navPage.obsMag = 0;
+        this.navPage.obsTrue = 0;
         this.navPage.superNav5ActualRange = 40;
         //The derived values are recomputed by the first calculation tick
         this.navPage.xtkToActive = null;

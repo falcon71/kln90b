@@ -23,7 +23,7 @@ export class SuperNav5Field2Selector extends SelectField {
     private constructor(valueSet: string[], private readonly setting: UserSetting<SuperNav5Field2>, private readonly state: NavPageState, private readonly sensors: Sensors, planeSettings: KLN90PlaneSettings, private readonly modeController: ModeController, changedCallback: (value: number) => void) {
         super(valueSet, setting.get(), changedCallback);
         this.children = new UIElementChildren<SuperNav5Field2SelectorTypes>({
-            obsdtk: new ObsDtkElement(planeSettings, sensors, state, modeController, true),
+            obsdtk: new ObsDtkElement(planeSettings, sensors, modeController, true),
         });
     }
 

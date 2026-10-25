@@ -4,7 +4,8 @@ import {airport, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {NO_OBS, panelXml} from '../../../harness/panelXml';
 import {activeIdent, messages} from '../../../harness/readers';
-import {finalCourseDeg} from '../../../harness/flight/geo';
+import {angleDiff, finalCourseDeg} from '../../../harness/flight/geo';
+import {Screen} from '../../../harness/render/screen';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
 const MAGVAR_INVALID = 'MAGNETIC VAR INVALID ALL DATA REFERENCED TO TRUE NORTH';
@@ -134,7 +135,7 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
         await unit.panel.obsMode();
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(unit.props.memory.navPage.obsMag).toBeCloseTo(0, 1);
+        expect(unit.props.modeController.getObsMag()).toBeCloseTo(0, 1);
     });
 
     // 5-44: in OBS mode with the active waypoint outside the area the unit references to true north; this holds for an
@@ -152,6 +153,69 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(activeIdent(unit)).toBe('VFA');
-        expect(unit.props.memory.navPage.obsMag).toBeCloseTo(0, 1);
+        expect(unit.props.modeController.getObsMag()).toBeCloseTo(0, 1);
+    });
+
+    // 5-44: with the variation invalid the pilot may enter one on SET 2, and the unit uses it. Checked in the KLN 89
+    // trainer, 2026-10-25 (the second OBS block): a changed SET 2 variation keeps the true course and the line, and the
+    // course shown changes by the variation. The course is 000 true through KFAR; 9°E entered makes it 351, and the
+    // aircraft, on the line 90 NM before KFAR, stays on it (a line turned by 9° about KFAR would put it about 14 NM off)
+    it('keeps the OBS line and shows the course with a variation entered on SET 2 (5-44, checked in the KLN 89 trainer, 2026-10-25, #425)', async () => {
+        const unit = await toKfar();
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(2000);
+        const nav = unit.props.memory.navPage;
+        expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05); // Preconditions: on the line, 000 shown
+        expect(unit.props.modeController.getObsMag()).toBeCloseTo(0, 6);
+
+        await unit.panel.selectPage('L', 'SET 2');
+        await unit.panel.cursor('L'); // the time zone
+        await unit.panel.outer('L', 1); // line 6, the variation
+        await unit.panel.inner('L', 1); // the tens: the first click gives its first choice
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 10); // the first click gives 0, so the tenth is 9
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 1); // E
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(nav.userMagvar).toBe(9); // Precondition: 9°E entered
+
+        expect(Math.abs(angleDiff(unit.props.modeController.getObsMag(), 351))).toBeLessThan(1e-6);
+        expect(Screen.read().status().mode).toMatch(/^enr:351/);
+        expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
+    });
+});
+
+// The variation in use for the OBS course can change without a pilot's action: here the aircraft leaves the coverage
+// area, so the course is referenced to true north instead of the active VOR's published 10 E (5-44, #190). The unit
+// holds the true course, so the number changes (by analogy with the SET 2 change the KLN 89 trainer showed, 2026-10-25,
+// #425), and an indicator the unit drives is slewed to the new number (5-35) and not read back over it (#261)
+describe('a driven OBS indicator when the aircraft leaves the coverage area (characterization)', () => {
+    // FPL 0 KAAA - VNE, due north; VNE at N 73.8 with a published 10 E. The aircraft is on the leg at N 73.5, ObsSource 1
+    // and ObsTarget 1 (the default reads the indicator, the target drives it), and the fake moves the indicator on
+    // K:VOR1_SET as the sim does. OBS 000 true is 350 magnetic at VNE; past N 74 it is 000
+    it('characterization: holds 000 true and slews the indicator from 350 to 000 when the aircraft leaves the area (#261, #425)', async () => {
+        const kaaa = airport('KAAA', 73.0, 8.0);
+        const vne = vor('VNE', 73.8, 8.0, {magneticVariation: -10});
+        const unit = await bootUnit({
+            facilities: [kaaa, vne], position: {lat: 73.5, lon: 8.0}, magvar: 10,
+            panelXml: panelXml({'Output.ObsTarget': 1}), storage: savedFlightplan(0, [kaaa, vne]),
+        });
+        await settle(unit);
+        unit.env.sim.applyObsKeyEvents = true;
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(2000);
+        const mc = unit.props.modeController;
+        expect(activeIdent(unit)).toBe('VNE'); // Preconditions: 000 true, 350 on the indicator
+        expect(Math.abs(angleDiff(mc.getObsTrue(), 0))).toBeLessThan(1e-6);
+        expect(Math.abs(angleDiff(unit.env.sim.get('Nav OBS:1', 'degrees'), 350))).toBeLessThan(0.5);
+
+        await moveAircraft(unit, {lat: 74.5, lon: 8.0}, {groundspeedKt: 120, trackTrue: 0});
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(messages(unit)).toContain(MAGVAR_INVALID); // Precondition: outside the area
+
+        expect(Math.abs(angleDiff(mc.getObsTrue(), 0))).toBeLessThan(1e-6);
+        expect(Math.abs(angleDiff(unit.env.sim.get('Nav OBS:1', 'degrees'), 0))).toBeLessThan(0.5);
+        expect(Math.abs(unit.props.memory.navPage.xtkToActive!)).toBeLessThan(0.05); // A course of 350 through VNE would be 7 NM off here
     });
 });

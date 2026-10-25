@@ -54,26 +54,26 @@ describe('LEG to OBS (5-36)', () => {
 
             await unit.panel.obsMode();
             await vi.advanceTimersByTimeAsync(2000);
-            return {nav, trueCourse: finalCourseDeg(kaaa, end)};
+            return {unit, nav, trueCourse: finalCourseDeg(kaaa, end)};
         }
 
         // 5-35 item 6: an active VOR counts with its published variation, here 10 E (the sim stores east as negative)
         it('with the published variation of the active VOR (10 E)', async () => {
             const end = vor('ABC', abc.lat, abc.lon, {magneticVariation: -10});
-            const {nav, trueCourse} = await twoNmRight(end, undefined);
+            const {unit, nav, trueCourse} = await twoNmRight(end, undefined);
 
             expect(nav.navmode).toBe(NavMode.ENR_OBS);
-            expect(Math.abs(nav.obsMag - (trueCourse - 10))).toBeLessThan(0.2);
+            expect(Math.abs(unit.props.modeController.getObsMag() - (trueCourse - 10))).toBeLessThan(0.2);
             expect(nav.xtkToActive!).toBeCloseTo(2, 1);
         });
 
         // 5-35 item 6: the published variation holds where the variation model gives another one at the VOR (3 E)
         it('keeps the published variation of an active VOR where the model gives another (5-35)', async () => {
             const end = vor('ABC', abc.lat, abc.lon, {magneticVariation: -10});
-            const {nav, trueCourse} = await twoNmRight(end, 3);
+            const {unit, nav, trueCourse} = await twoNmRight(end, 3);
 
             expect(nav.navmode).toBe(NavMode.ENR_OBS);
-            expect(Math.abs(nav.obsMag - (trueCourse - 10))).toBeLessThan(0.2);
+            expect(Math.abs(unit.props.modeController.getObsMag() - (trueCourse - 10))).toBeLessThan(0.2);
             expect(nav.xtkToActive!).toBeCloseTo(2, 1);
         });
 
@@ -82,10 +82,10 @@ describe('LEG to OBS (5-36)', () => {
         // an airport; it follows by analogy with those two waypoints that are not VORs. Here 10 E within 1 NM of KBBB
         // and 0 at the aircraft, 2 NM before it
         it('with the variation at the active airport, not at the aircraft (10 E at KBBB)', async () => {
-            const {nav, trueCourse} = await twoNmRight(kbbb, variationNear(kbbb, 10));
+            const {unit, nav, trueCourse} = await twoNmRight(kbbb, variationNear(kbbb, 10));
 
             expect(nav.navmode).toBe(NavMode.ENR_OBS);
-            expect(Math.abs(nav.obsMag - (trueCourse - 10))).toBeLessThan(0.2);
+            expect(Math.abs(unit.props.modeController.getObsMag() - (trueCourse - 10))).toBeLessThan(0.2);
             expect(nav.xtkToActive!).toBeCloseTo(2, 1);
         });
     });
@@ -172,7 +172,7 @@ describe('LEG to OBS (5-36)', () => {
         const nav = unit.props.memory.navPage;
         expect(nav.navmode).toBe(NavMode.ARM_OBS);
         expect(activeIdent(unit)).toBe('ARCEN');
-        expect(Math.abs(nav.obsMag - 90)).toBeLessThan(0.5);
+        expect(Math.abs(unit.props.modeController.getObsMag() - 90)).toBeLessThan(0.5);
         expect(Math.abs(nav.xtkToActive!)).toBeCloseTo(0.168, 1);
     });
 
@@ -508,7 +508,7 @@ describe('OBS course and the published variation of a VOR (5-35)', () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         const nav = unit.props.memory.navPage;
-        expect(nav.obsMag).toBe(90);
+        expect(unit.props.modeController.getObsMag()).toBe(90);
         expect(nav.xtkToActive!).toBeCloseTo(5.0, 2);
     });
 });
@@ -551,7 +551,7 @@ describe('the external GPS CRS switch (5-33)', () => {
         unit.env.sim.set('GPS OBS ACTIVE', 'bool', true);
         await vi.advanceTimersByTimeAsync(2000);
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
-        expect(nav.obsMag).toBe(70);
+        expect(unit.props.modeController.getObsMag()).toBe(70);
 
         unit.env.sim.set('GPS OBS ACTIVE', 'bool', false);
         await vi.advanceTimersByTimeAsync(2000);
@@ -559,5 +559,33 @@ describe('the external GPS CRS switch (5-33)', () => {
         expect(nav.navmode).toBe(NavMode.ENR_LEG);
         expect(activeIdent(unit)).toBe('ABC');
         expect(Math.abs(nav.desiredTrack! - 70)).toBeLessThan(0.2); // 5-36 rule 2
+    });
+});
+
+// The switch can select OBS without an active waypoint (setExternalObsMode). The unit then has no course to choose and,
+// with ObsSource 0, no indicator to read, so OBS shows the course LEG left behind: 000, because a switch to LEG clears it
+describe('the external GPS CRS switch without an active waypoint (characterization)', () => {
+    it('characterization: shows 000 after LEG and OBS again, not the course set before (#425)', async () => {
+        const unit = await bootUnit({panelXml: panelXml({...LEG_OBS_SWITCH, ...NO_OBS})});
+        await settle(unit);
+        const nav = unit.props.memory.navPage;
+        const mc = unit.props.modeController;
+        unit.env.sim.set('GPS OBS ACTIVE', 'bool', true);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(nav.activeWaypoint.getActiveWpt()).toBeNull(); // Preconditions: OBS without an active waypoint, course 070
+        expect(nav.navmode).toBe(NavMode.ENR_OBS);
+        mc.setObsOnUnit(70);
+        await vi.advanceTimersByTimeAsync(6000); // NO ACTV WPT (C-1) holds the status line for 5 s
+        expect(Screen.read().status().mode).toMatch(/^enr:070/);
+
+        unit.env.sim.set('GPS OBS ACTIVE', 'bool', false);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(nav.navmode).toBe(NavMode.ENR_LEG);
+        unit.env.sim.set('GPS OBS ACTIVE', 'bool', true);
+        await vi.advanceTimersByTimeAsync(6000); // NO ACTV WPT again
+        expect(nav.navmode).toBe(NavMode.ENR_OBS);
+
+        expect(mc.getObsMag()).toBe(0);
+        expect(Screen.read().status().mode).toMatch(/^enr:000/);
     });
 });

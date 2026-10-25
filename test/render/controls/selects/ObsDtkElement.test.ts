@@ -9,9 +9,9 @@ import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
 // ObsDtkElement: the DTK of NAV 3 (and of the sixth line of Super NAV 5), which becomes the OBS course in OBS mode and
 // can then be entered with the inner knob, one degree per click, when no external indicator supplies the course.
-// Host: NAV 3 on the left, row 1 (DTK or OBS, value in columns 7 to 10). The committed value is the navPage memory
-// obsMag. Nav3Page.test.ts holds the OBS: colon and the course entry of 5-35; SuperNav5Page.test.ts holds the Super
-// NAV 5 course entry and its test of #238.
+// Host: NAV 3 on the left, row 1 (DTK or OBS, value in columns 7 to 10). The committed value is the OBS course of
+// ModeController (held true, shown as getObsMag()). Nav3Page.test.ts holds the OBS: colon and the course entry of
+// 5-35; SuperNav5Page.test.ts holds the Super NAV 5 course entry and its test of #238.
 
 // The leg world: FPL 0 is KAAA, KDDD, KEEE, and the aircraft is on the leg 30 NM west of KDDD, track 090, DTK 089 there
 const OBS_SOURCE_OFF = panelXml(NO_OBS);
@@ -86,6 +86,22 @@ describe('OBS/DTK element', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(Screen.read().rows('L')[1].slice(7, 11)).toBe('359°');
+    });
+
+    // By analogy with MOD 2 (Mod2Page.test.ts, the KLN 89 trainer, 2026-10-25): one click on NAV 3 sets the course shown
+    // plus one as a whole degree, so 089.6, shown as 090, goes to 091 and the fraction is lost (#425)
+    it('characterization: steps an OBS course of 089.6, shown as 090, up to exactly 091 (#425)', async () => {
+        const unit = await nav3(OBS_SOURCE_OFF);
+        await unit.panel.obsMode();
+        await unit.panel.selectPage('L', 'NAV 3');
+        unit.props.modeController.setObsOnUnit(89.6);
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.cursor('L');
+        expect(unit.panel.focused('L')).toEqual({row: 1, col: 7, text: '090°'}); // Precondition
+
+        await unit.panel.inner('L', 1);
+
+        expect(Math.abs(unit.props.modeController.getObsMag() - 91)).toBeLessThan(1e-6);
     });
 
     // 4-9: with an external indicator whose selected course differs from the DTK by more than 10 degrees, the DTK on

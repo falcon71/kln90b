@@ -17,8 +17,17 @@ import {Degrees} from "../data/Units";
 import {StatusLineMessageEvents} from "../controls/StatusLine";
 import {CalcTickable, TICK_TIME_CALC} from "../TickController";
 import {KLNMagvar} from "../data/navdata/KLNMagvar";
+import {roundBearing} from "../data/Coordinates";
 
 const VEC3_CACHE = new Float64Array(3);
+
+/**
+ * Two magnetic OBS courses closer than this are the same course, for the read-back of the indicator in tick. The first
+ * protection against laying an unchanged course again is the unforced guard in setObsTrue, which compares the true
+ * course. This epsilon only keeps a round-trip of the indicator's magnetic course (converted to true and back, which is
+ * not always the same number to the last bit) from counting as a turn of the indicator (#122, #425)
+ */
+const OBS_SAME_COURSE_EPSILON = 1e-6;
 
 /**
  * 5-36
@@ -87,7 +96,7 @@ export class ModeController implements CalcTickable {
         this.navState.navmode = this.navState.navmode === NavMode.ARM_OBS ? NavMode.ARM_LEG : NavMode.ENR_LEG;
 
         const active = this.navState.activeWaypoint.getActiveWpt();
-        this.navState.obsMag = 0;
+        this.navState.obsTrue = 0;
         if (active !== null) {
             if (this.navState.toFrom === FROM && this.navState.activeWaypoint.getActiveFplIdx() !== -1) {
                 //5-36: on the FROM side the unit re-orients on FPL 0 and the leg found by position becomes active as a plan leg (#155)
@@ -165,23 +174,24 @@ export class ModeController implements CalcTickable {
     }
 
     /**
-     * Sets the OBS course and lays it through the active waypoint. An unchanged course is skipped unless force is set:
-     * the indicator is read every second (tick), and laying the same course again would make a new direct-to each time.
-     * Entering OBS and ACTIVATE force it, because the course must be laid even when its number did not change (5-36,
-     * 5-37; #122, #154)
+     * Sets the OBS course, true, and lays it through the active waypoint. The unit holds the course true (checked in the
+     * KLN 89 trainer, 2026-10-25, #425): a change of the variation in use changes the magnetic course shown, not the
+     * line. An unchanged course is skipped unless force is set: laying the same course again would make a new direct-to
+     * each time. Entering OBS, a Direct To and ACTIVATE force it, because the course must be laid even when it did not
+     * change (5-36, 5-37; #122, #154)
      */
-    public setObs(obsMag: Degrees, force: boolean = false): void {
-        if (!force && obsMag === this.navState.obsMag) {
+    public setObsTrue(obsTrue: Degrees, force: boolean = false): void {
+        if (!force && obsTrue === this.navState.obsTrue) {
             return;
         }
 
-        this.navState.obsMag = obsMag;
+        this.navState.obsTrue = obsTrue;
         const active = this.navState.activeWaypoint.getActiveWpt();
         if (active === null) {
             return;
         }
         const toPoint = new GeoPoint(active.lat, active.lon);
-        const bearing = this.getObsTrue() - 180;
+        const bearing = obsTrue - 180;
 
         toPoint.offset(bearing, UnitType.NMILE.convertTo(1000, UnitType.GA_RADIAN));
         const from = UserFacilityUtils.createFromLatLon(ICAO.value("U", "XX", "", ""), toPoint.lat, toPoint.lon, true);
@@ -195,13 +205,37 @@ export class ModeController implements CalcTickable {
     }
 
     /**
-     * A course set on the unit: MOD 2, NAV 3, Super NAV 5, a Direct To in OBS, and the course the unit chooses on entering
-     * OBS with a driven indicator. 5-35, 5-37: a driven indicator is slewed to it, so the output is written at once;
-     * otherwise the indicator's old course is read back at the next tick and replaces it (#261)
+     * Sets the OBS course from a magnetic one (the indicator, the knob), converted with the OBS variation in use now (#425)
+     */
+    public setObs(obsMag: Degrees, force: boolean = false): void {
+        this.setObsTrue(this.magvar.magToTrue(obsMag, this.getMagvarForObs(this.navState.activeWaypoint.getActiveWpt())), force);
+    }
+
+    /**
+     * A true course set on the unit: a Direct To or ACTIVATE in OBS, and the course the unit chooses on entering OBS with
+     * a driven indicator. 5-35, 5-37: a driven indicator is slewed to it, so the output is written at once: the aircraft
+     * gets the course without waiting for the next tick, and a turn of the indicator since the last output is overwritten
+     * instead of being read back over the course at the next tick (#261)
+     */
+    public setObsTrueOnUnit(obsTrue: Degrees, force: boolean = false): void {
+        this.setObsTrue(obsTrue, force);
+        this.sensors.out.setObs(this.getObsMag());
+    }
+
+    /**
+     * A magnetic course set on the unit: MOD 2, NAV 3, Super NAV 5. The output is written at once, as in setObsTrueOnUnit
      */
     public setObsOnUnit(obsMag: Degrees, force: boolean = false): void {
         this.setObs(obsMag, force);
-        this.sensors.out.setObs(this.navState.obsMag);
+        this.sensors.out.setObs(this.getObsMag());
+    }
+
+    /**
+     * One click of the knob on the OBS course (MOD 2, NAV 3, Super NAV 5, 5-35): the course shown plus or minus one as a
+     * whole magnetic degree, so a held fraction is lost (checked in the KLN 89 trainer, 2026-10-25, #425)
+     */
+    public stepObs(clicks: 1 | -1): void {
+        this.setObsOnUnit(NavMath.normalizeHeading(roundBearing(this.getObsMag()) + clicks));
     }
 
     public isObsModeActive(): boolean {
@@ -210,7 +244,7 @@ export class ModeController implements CalcTickable {
 
     public getDtkOrObsMagnetic(): number | null {
         if (this.isObsModeActive()) {
-            return this.navState.obsMag;
+            return this.getObsMag();
         }
         return this.magvar.trueToMag(this.navState.desiredTrack);
     }
@@ -226,10 +260,19 @@ export class ModeController implements CalcTickable {
         return this.navState.desiredTrack;
     }
 
-    public getObsTrue(): number {
-        const toWpt = this.navState.activeWaypoint.getActiveWpt();
-        const magvar = this.getMagvarForObs(toWpt);
-        return this.magvar.magToTrue(this.navState.obsMag, magvar);
+    /**
+     * The OBS course, true, as the unit holds it (#425)
+     */
+    public getObsTrue(): Degrees {
+        return this.navState.obsTrue;
+    }
+
+    /**
+     * The OBS course, magnetic, as the unit shows it and sends it to the indicator: the true course with the OBS
+     * variation in use now (getMagvarForObs), in [0, 360) (#425)
+     */
+    public getObsMag(): Degrees {
+        return this.magvar.trueToMag(this.navState.obsTrue, this.getMagvarForObs(this.navState.activeWaypoint.getActiveWpt()));
     }
 
     /**
@@ -295,8 +338,7 @@ export class ModeController implements CalcTickable {
             const pathCourse = fromPath !== undefined && fromPath.isValid() ? fromPath.bearingAt(fromPath.closest(active, VEC3_CACHE)) : NaN;
             const obsTrue = isNaN(pathCourse) ? (this.navState.desiredTrack ?? this.navState.bearingToActive!) : pathCourse;
 
-            const magvar = this.getMagvarForObs(active);
-            this.setObsOnUnit(this.magvar.trueToMag(obsTrue, magvar), true);
+            this.setObsTrueOnUnit(obsTrue, true);
         }
     }
 
@@ -308,10 +350,7 @@ export class ModeController implements CalcTickable {
                 break;
             case NavMode.ENR_OBS:
                 this.checkSwitchEnrToArmMode(apt);
-                const obsIn = this.sensors.in.obsMag;
-                if (obsIn !== null) {
-                    this.setObs(obsIn);
-                }
+                this.readObsIndicator();
                 break;
             case NavMode.ARM_LEG:
                 if (apt === null) {
@@ -328,10 +367,7 @@ export class ModeController implements CalcTickable {
                     this.navState.xtkScale = 5;
                 } else {
                     this.adjustXtkScaleArm(apt);
-                    const obsIn = this.sensors.in.obsMag;
-                    if (obsIn !== null) {
-                        this.setObs(obsIn);
-                    }
+                    this.readObsIndicator();
                 }
                 break;
             case NavMode.APR_LEG:
@@ -351,6 +387,31 @@ export class ModeController implements CalcTickable {
                 }
                 break;
         }
+    }
+
+    /**
+     * Takes the course of the indicator the unit reads (Input.ObsSource) when the pilot turned it (5-35). It is a turn
+     * only when it differs from the unit's magnetic course and, with an indicator the unit drives (Output.ObsTarget), also
+     * from the course last sent to it: when the variation in use changes without a course set on the unit (a SET 2
+     * entry, the edge of the coverage area), a driven indicator still shows the old number until the output at the end of
+     * this tick slews it, and reading it back would turn the true course (#261, #425). Each calculation tick reads the
+     * indicator (Sensors) before this, and NavCalculator.setOutput writes the course after it. Courses set on the unit
+     * (setObsTrueOnUnit, setObsOnUnit) write the output at once
+     */
+    private readObsIndicator(): void {
+        const obsIn = this.sensors.in.obsMag;
+        if (obsIn === null || ModeController.isSameCourse(obsIn, this.getObsMag())) {
+            return;
+        }
+        const sent = this.sensors.out.obsOut;
+        if (this.planeSettings.output.obsTarget !== 0 && sent !== null && ModeController.isSameCourse(obsIn, sent)) {
+            return;
+        }
+        this.setObs(obsIn);
+    }
+
+    private static isSameCourse(a: Degrees, b: Degrees): boolean {
+        return Math.abs(NavMath.diffAngle(a, b)) <= OBS_SAME_COURSE_EPSILON;
     }
 
     private checkSwitchEnrToArmMode(apt: AirportFacility | null): void {

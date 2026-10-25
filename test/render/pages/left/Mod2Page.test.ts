@@ -1,6 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
-import {approachWorld} from '../../../harness/fixtures';
+import {approachWorld, standardRoute} from '../../../harness/fixtures';
+import {bootOnStandardRoute} from '../../../harness/worldBoot';
+import {angleDiff, finalCourseDeg, pointBefore} from '../../../harness/flight/geo';
 import {airport, vor} from '../../../harness/navdata/builders';
 import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
@@ -132,7 +134,7 @@ describe('MOD 2 page (spec)', () => {
         await unit.panel.inner('L', 1);
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(unit.props.memory.navPage.obsMag).toBe(70);
+        expect(unit.props.modeController.getObsMag()).toBe(70);
         expect(Screen.read().rows('L')[3]).toBe('OBS 070°   ');
         expect(['CDI:±0.30NM', 'CDI:±1.00NM']).toContain(Screen.read().rows('L')[5]); // Another of the choices of 5-38
     });
@@ -187,7 +189,7 @@ describe('MOD 2 OBS course with a driven indicator', () => {
         await unit.panel.inner('L', 3);
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(Math.round(unit.props.memory.navPage.obsMag)).toBe(93);
+        expect(Math.round(unit.props.modeController.getObsMag())).toBe(93);
         expect(Math.round(unit.env.sim.get('Nav OBS:1', 'degrees'))).toBe(93);
     });
 
@@ -204,7 +206,7 @@ describe('MOD 2 OBS course with a driven indicator', () => {
         await vi.advanceTimersByTimeAsync(2000);
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
 
-        expect(Math.round(unit.props.memory.navPage.obsMag)).toBe(90);
+        expect(Math.round(unit.props.modeController.getObsMag())).toBe(90);
         expect(Math.round(unit.env.sim.get('Nav OBS:1', 'degrees'))).toBe(90);
     });
 });
@@ -223,7 +225,7 @@ describe('MOD 2 OBS course knob (spec)', () => {
 
         await unit.panel.inner('L', -5);
         expect(Screen.read().rows('L')[3]).toBe('OBS:088°   ');
-        expect(unit.props.memory.navPage.obsMag).toBeCloseTo(88, 3);
+        expect(unit.props.modeController.getObsMag()).toBeCloseTo(88, 3);
     });
 
     // 5-35: the KLN 89 trainer shows north as 000, never 360, and the course wraps between 000 and 359. A leg due north
@@ -232,7 +234,7 @@ describe('MOD 2 OBS course knob (spec)', () => {
         const unit = await onMeridianLeg(OBS_SOURCE_OFF);
         await unit.panel.obsMode();
         await unit.panel.cursor('L');
-        expect(unit.props.memory.navPage.obsMag).toBe(0); // Precondition: exactly north
+        expect(unit.props.modeController.getObsMag()).toBe(0); // Precondition: exactly north
         expect(Screen.read().rows('L')[3]).toBe('OBS:000°   ');
 
         await unit.panel.inner('L', -1);
@@ -243,36 +245,91 @@ describe('MOD 2 OBS course knob (spec)', () => {
     });
 });
 
-// 5-35 and the KLN 89 trainer (2026-10-07): the OBS course shows 000, never 360. On the near-equator leg the course the
-// unit takes is its course at ABC, about 089.83 (finalCourseDeg of the leg), so ninety clicks to the left leave just
-// under 360 (359.83), which the row shows as 000 (the 90B pads with zeros). The 89 trainer also showed a bearing going from 359
-// to 0 and never 360 (2026-10-08, T34)
-describe('MOD 2 OBS course just below north', () => {
-    /** The near-equator leg with the course entered on the unit, and the course turned 90 degrees left (22.5 s of clicks) */
-    async function turned90Left() {
-        const unit = await onNearEquatorLeg(OBS_SOURCE_OFF);
+// Checked in the KLN 89 trainer, 2026-10-25 (the second OBS block): one click of the knob sets the course shown plus or
+// minus one as a whole magnetic degree, so a held fraction is lost. The standard leg KAAA - ABC, ABC at a variation of
+// 0, gives an OBS course with a fraction: the leg's course at ABC, 051.03 (finalCourseDeg)
+describe('MOD 2 OBS course knob from a course with a fraction (checked in the KLN 89 trainer, 2026-10-25, #425)', () => {
+    const {kaaa, abc} = standardRoute();
+
+    /** OBS mode on the standard leg 5 NM before ABC, the course entered on the unit, the cursor on the course */
+    async function onCourse5103() {
+        const unit = await bootOnStandardRoute({position: pointBefore(kaaa, abc, 5), panelXml: OBS_SOURCE_OFF});
         await unit.panel.obsMode();
-        const course = unit.props.memory.navPage.obsMag;
-        expect(course).toBeGreaterThan(89.5); // Precondition: just below 090, so ninety clicks left end just below 360
-        expect(course).toBeLessThan(90);
         await unit.panel.cursor('L');
-        await unit.panel.inner('L', -90);
+        const course = unit.props.modeController.getObsMag();
+        expect(finalCourseDeg(kaaa, abc)).toBeCloseTo(51.03, 2); // Preconditions: the course has a fraction
+        expect(Math.abs(course - finalCourseDeg(kaaa, abc))).toBeLessThan(1e-6);
+        expect(Screen.read().rows('L')[3]).toBe('OBS:051°   ');
         return unit;
     }
 
-    it('turns the course 90 degrees left from a leg just north of east (5-35)', async () => {
-        const unit = await turned90Left();
+    it('steps 051.03 up to exactly 052 (checked in the KLN 89 trainer, 2026-10-25, #425)', async () => {
+        const unit = await onCourse5103();
 
-        const obs = unit.props.memory.navPage.obsMag;
-        expect(obs).toBeGreaterThanOrEqual(359.5);
-        expect(obs).toBeLessThan(360);
-    }, 30_000); // turned90Left clicks the knob 90 times, 22.5 s of simulated time with every tick running
+        await unit.panel.inner('L', 1);
+
+        expect(Math.abs(unit.props.modeController.getObsMag() - 52)).toBeLessThan(1e-6);
+    });
+
+    it('steps 051.03 down to exactly 050 (checked in the KLN 89 trainer, 2026-10-25, #425)', async () => {
+        const unit = await onCourse5103();
+
+        await unit.panel.inner('L', -1);
+
+        expect(Math.abs(unit.props.modeController.getObsMag() - 50)).toBeLessThan(1e-6);
+    });
+
+    // The course 359.6 shows as 000 (checked in the KLN 89 trainer, 2026-10-07), so one click up gives 001
+    it('steps 359.6, shown as 000, up to exactly 001 (checked in the KLN 89 trainer, 2026-10-07 and 2026-10-25, #425)', async () => {
+        const unit = await onCourse5103();
+        unit.props.modeController.setObsOnUnit(359.6);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L')[3]).toBe('OBS:000°   ');
+
+        await unit.panel.inner('L', 1);
+
+        expect(Math.abs(unit.props.modeController.getObsMag() - 1)).toBeLessThan(1e-6);
+    });
+});
+
+// 5-35 and the KLN 89 trainer (2026-10-07): the OBS course shows 000, never 360. On the near-equator leg the course the
+// unit takes is its course at ABC, about 089.83 (finalCourseDeg of the leg). A click of the knob lands on a whole degree
+// (checked in the KLN 89 trainer, 2026-10-25, #425), so ninety clicks to the left end on exactly 000, and the knob no
+// longer reaches a course just under 360. Such a course (359.83, the leg's course less 90) is set on the unit instead,
+// as a Direct To or a change of the variation can leave one; the row shows it as 000 (the 90B pads with zeros). The 89
+// trainer also showed a bearing going from 359 to 0 and never 360 (2026-10-08, T34)
+describe('MOD 2 OBS course just below north', () => {
+    /** The near-equator leg with the course entered on the unit, OBS mode */
+    async function onNearEquatorObs() {
+        const unit = await onNearEquatorLeg(OBS_SOURCE_OFF);
+        await unit.panel.obsMode();
+        const course = unit.props.modeController.getObsMag();
+        expect(course).toBeGreaterThan(89.5); // Precondition: just below 090
+        expect(course).toBeLessThan(90);
+        return unit;
+    }
+
+    // Before #425 the course kept its fraction over the clicks and ended at 359.83
+    it('turns the course 90 degrees left from a leg just north of east to exactly 000 (5-35, checked in the KLN 89 trainer, 2026-10-25, #425)', async () => {
+        const unit = await onNearEquatorObs();
+        await unit.panel.cursor('L');
+
+        await unit.panel.inner('L', -90);
+
+        expect(Math.abs(angleDiff(unit.props.modeController.getObsMag(), 0))).toBeLessThan(1e-6);
+        expect(Screen.read().rows('L')[3]).toBe('OBS:000°   ');
+    }, 30_000); // 90 clicks of the knob, 22.5 s of simulated time with every tick running
 
     it('shows a course just below north as 000° (5-35, checked in the KLN 89 trainer, 2026-10-07, #263)', async () => {
-        const unit = await turned90Left();
+        const unit = await onNearEquatorObs();
+        const mc = unit.props.modeController;
+        mc.setObsOnUnit(mc.getObsMag() - 90);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(mc.getObsMag()).toBeGreaterThanOrEqual(359.5); // Precondition: 359.83, just below north
+        expect(mc.getObsMag()).toBeLessThan(360);
 
         expect(Screen.read().rows('L')[3]).toBe('OBS:000°   ');
-    }, 30_000); // the same 90 clicks
+    });
 });
 
 describe('MOD 2 CDI scale field with an approach armed 40 NM from the airport (#160)', () => {

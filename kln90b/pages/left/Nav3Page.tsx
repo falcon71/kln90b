@@ -49,7 +49,7 @@ export class Nav3Page extends SixLineHalfPage {
             activeArrow: new ActiveArrow(to?.icaoStruct ?? null, navState),
             to: new TextDisplay(IcaoFixedLength.getIdentFromFacility(to)),
             dtkLabel: new TextDisplay(this.getDtkLabel()),
-            dtk: new ObsDtkElement(this.props.planeSettings, this.props.sensors, navState, this.props.modeController),
+            dtk: new ObsDtkElement(this.props.planeSettings, this.props.sensors, this.props.modeController),
             track: new BearingDisplay(),
             flyDir: new TextDisplay(this.formatXTKDirection(navState.xtkToActive)),
             flyDist: new DistanceDisplay(4, navState.xtkToActive !== null ? Math.abs(navState.xtkToActive) : null, false, true), //#393: 0 is a value

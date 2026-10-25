@@ -626,9 +626,19 @@ sim.
   `navPage.aprActivationDist`.
 - `armApproachPressed()` is triggered from MainPage on `EVT_APPR_ARM`.
 - **OBS mode is implemented as a direct-to from a synthetic user facility (`ICAO.value("U","XX",...)`) 1000 NM away on
-  the reciprocal of the OBS** (`setObs`). `setObs` skips an unchanged course unless `force` is set (entering OBS and
-  ACTIVATE force it). A course set on the unit (MOD 2, NAV 3, a Direct To in OBS) goes through `setObsOnUnit`, which
-  also writes it to a driven indicator at once; otherwise the 1 Hz read-back of the indicator would replace it.
+  the reciprocal of the OBS** (`setObsTrue`). The course is held true in `navPage.obsTrue` (#425); `setObs` takes a
+  magnetic course (the indicator, the knob) and converts it with the OBS variation in use at that moment. Both skip an
+  unchanged course unless `force` is set (entering OBS, a Direct To and ACTIVATE force it). A course set on the unit
+  goes through `setObsTrueOnUnit` (a Direct To or ACTIVATE in OBS, the course chosen on entering OBS) or `setObsOnUnit`
+  (MOD 2, NAV 3, Super NAV 5), which also write the magnetic course to the outputs at once: the aircraft gets it without
+  waiting for the next tick, and a driven indicator turned since the last output is overwritten instead of being read
+  back over the course at the next tick. A knob click (`stepObs`) sets the course shown ± 1 as a whole magnetic
+  degree. The unforced guard in `setObsTrue` (the true course unchanged) is the first protection against laying an
+  unchanged course again. The indicator is read in `tick`: its course is taken only when it differs from `getObsMag()`
+  and, with a driven indicator, from the course last sent (`sensors.out.obsOut`), because a driven indicator still
+  shows the old number for one tick after the variation in use changed without a course set on the unit (a SET 2
+  entry, the edge of the coverage area). Both comparisons allow `OBS_SAME_COURSE_EPSILON` (1e-6°), so that the
+  round-trip of a magnetic course to true and back does not count as a turn of the indicator (#122, #261, #425).
 - Status-line feedback: `NO APPROACH`, `NO ACTV WPT`.
 
 **`RollSteeringController`** (1 Hz, after `NavCalculator`) applies one control law, `rollSteeringCommand` in
@@ -680,8 +690,12 @@ inputs as the KLN 89 does: angle, offset and waypoint cleared, FR set to SEL (#7
   (`NavCalculator.setOutput`, `SensorsOut.setDesiredTrack`). Only the OBS course sent to the indicator
   (`K:VOR1_SET`/`K:VOR2_SET` and `GPS OBS VALUE`, `SensorsOut.setObs`) is the magnetic course the unit shows, with the
   OBS variation.
-- Convention: DTK and bearings are stored **true**; `obsMag` and `getDtkOrObsMagnetic()` are magnetic, and the names say
-  which.
+- Convention: DTK, bearings and the OBS course (`navPage.obsTrue`) are stored **true**. The magnetic OBS course is
+  derived, never stored: `ModeController.getObsMag()` converts the true course with the OBS variation in use now
+  (`getMagvarForObs`), so an ACTIVATE to a waypoint with another variation or a changed variation keeps the line and
+  changes the number shown (checked in the KLN 89 trainer, 2026-10-25, #425). Every display of the OBS course, the
+  `CRS` message and the output to the indicator use it, and `getDtkOrObsMagnetic()` returns it in OBS mode. A knob
+  click steps the course shown. The names say which values are magnetic.
 
 **SID/STAR/approaches** (`data/navdata/SidStar.ts`):
 

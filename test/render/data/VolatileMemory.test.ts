@@ -384,7 +384,7 @@ describe('VolatileMemory over a power cycle', () => {
         m.navPage.nav4FromAlt = 5000;
         m.navPage.nav4VnavDist = 3;
         m.navPage.nav4VnavAngle = -3;
-        m.navPage.obsMag = 123;
+        m.navPage.obsTrue = 123;
         m.navPage.superNav5ActualRange = 100;
         m.calPage.cal6FromTimezone = 4;
         m.calPage.cal6ToTimezone = 5;
@@ -406,7 +406,7 @@ describe('VolatileMemory over a power cycle', () => {
         expect(m.navPage.nav4VnavAngle).toBeNull();
         expect(m.navPage.nav4FromAlt).toBe(0);
         expect(m.navPage.nav4VnavDist).toBe(0);
-        expect(m.navPage.obsMag).toBe(0);
+        expect(m.navPage.obsTrue).toBe(0);
         expect(m.navPage.superNav5ActualRange).toBe(40);
         expect(m.calPage).toMatchObject({cal6FromTimezone: null, cal6ToTimezone: null, cal7Wpt: null, cal7Date: null, cal7Timezone: null});
         expect(m.ctrPage).toEqual({state: CtrState.NO_FPL, lastFpl: null, lastFplPage: null, waypoints: [], computedLegs: null});

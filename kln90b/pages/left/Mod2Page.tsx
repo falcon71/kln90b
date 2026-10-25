@@ -1,10 +1,9 @@
-import {FSComponent, NavMath, NodeReference, VNode} from '@microsoft/msfs-sdk';
+import {FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {NO_CHILDREN, PageProps, UIElementChildren} from "../Page";
 import {CursorController, EnterResult, Field} from "../CursorController";
 import {CdiScaleField} from "../../controls/selects/CdiScaleField";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {NavPageState} from "../../data/VolatileMemory";
 import {format} from "numerable";
 import {roundBearing} from "../../data/Coordinates";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
@@ -36,7 +35,7 @@ export class Mod2Page extends SixLineHalfPage {
             title1: new TextDisplay(""),
             title2: new TextDisplay(""),
             obsLabel: new TextDisplay(""),
-            obs: new ModObsElement(this.props.planeSettings, this.props.sensors, this.props.memory.navPage, this.props.modeController),
+            obs: new ModObsElement(this.props.planeSettings, this.props.sensors, this.props.modeController),
             cdiScale: new CdiScaleField(this.props.memory.navPage),
         });
 
@@ -110,7 +109,6 @@ class ModObsElement implements Field {
 
     constructor(private readonly planeSettings: KLN90PlaneSettings,
                 private readonly sensors: Sensors,
-                private readonly navState: NavPageState,
                 private readonly modeController: ModeController) {
     }
 
@@ -123,12 +121,12 @@ class ModObsElement implements Field {
     }
 
     public innerLeft(): boolean {
-        this.modeController.setObsOnUnit(NavMath.normalizeHeading(this.navState.obsMag - 1));
+        this.modeController.stepObs(-1);
         return true;
     }
 
     public innerRight(): boolean {
-        this.modeController.setObsOnUnit(NavMath.normalizeHeading(this.navState.obsMag + 1));
+        this.modeController.stepObs(1);
         return false;
     }
 
@@ -181,7 +179,7 @@ class ModObsElement implements Field {
     }
 
     private getDisplayValue(): string {
-        return this.modeController.isObsModeActive() ? `${format(roundBearing(this.navState.obsMag), "000")}°` : "---°";
+        return this.modeController.isObsModeActive() ? `${format(roundBearing(this.modeController.getObsMag()), "000")}°` : "---°";
     }
 
     private canObsBeEntered(): boolean {

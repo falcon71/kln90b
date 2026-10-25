@@ -25,14 +25,18 @@ async function planInObs(position: { lat: number; lon: number }, o: { obs?: numb
     return unit;
 }
 
-/** DCT from FPL 0 with the cursor on KBBB; ACTIVATE with a second DCT press when asked */
-async function directToKbbbFromFpl0(unit: HeadlessUnit, activate: boolean) {
+/**
+ * DCT from FPL 0 with the cursor on KBBB; ACTIVATE with a second DCT press when asked. `beforeEnt` runs right before
+ * the ENT, with no calculation tick between the two
+ */
+async function directToKbbbFromFpl0(unit: HeadlessUnit, activate: boolean, beforeEnt?: () => void) {
     await unit.panel.selectPage('L', 'FPL 0');
     await unit.panel.cursor('L');
     await unit.panel.outer('L', 2); // KBBB
     await unit.panel.dct();
     if (activate) await unit.panel.dct();
     expect(Screen.read().rows('L')[0]).toBe(activate ? 'ACTIVATE:  ' : 'DIRECT TO: ');
+    beforeEnt?.();
     await unit.panel.ent();
     await vi.advanceTimersByTimeAsync(2000);
 }
@@ -44,13 +48,13 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
         const position = pointBefore(kaaa, abc, 5);
         const unit = await planInObs(position, {panelXml: panelXml(NO_OBS)});
         const nav = unit.props.memory.navPage;
-        const obsBefore = nav.obsMag; // The DTK of the leg to ABC, about 051
+        const obsBefore = unit.props.modeController.getObsMag(); // The DTK of the leg to ABC, about 051
         expect(Math.abs(obsBefore - courseDeg(position, kbbb))).toBeGreaterThan(5); // So a direct course to KBBB cannot match
 
         await directToKbbbFromFpl0(unit, true);
 
         expect(activeIdent(unit)).toBe('KBBB');
-        expect(nav.obsMag).toBe(obsBefore);
+        expect(unit.props.modeController.getObsMag()).toBe(obsBefore);
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
     });
 
@@ -72,7 +76,7 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
 
         expect(activeIdent(unit)).toBe('KBBB');
         expect(nav.navmode).toBe(NavMode.ENR_OBS);
-        expect(nav.obsMag).toBe(50);
+        expect(unit.props.modeController.getObsMag()).toBe(50);
     });
 
     // 5-37 (5.9.7) step 3: the D-bar is not recentered, the deviation is from the 050 course through KBBB; checked in the
@@ -81,6 +85,93 @@ describe('ACTIVATE in OBS mode (5-37)', () => {
         const {nav, expected} = await activateKbbbOnCourse50();
 
         expect(Math.abs(nav.xtkToActive! - expected)).toBeLessThan(0.05);
+    });
+});
+
+// ABC with a published variation of 10 E (the sim stores east as negative); KBBB at the world's variation of 0. An OBS
+// course of 050 magnetic at ABC is 060 true, so a unit that keeps the true course shows 060 at KBBB, and one that keeps
+// the magnetic number lays 050 true through KBBB
+const abc10E = vor('ABC', abc.lat, abc.lon, {magneticVariation: -10});
+
+describe('ACTIVATE in OBS mode keeps the true course (checked in the KLN 89 trainer, 2026-10-25, #425)', () => {
+    // Checked in the KLN 89 trainer, 2026-10-25 (the second OBS block): ACTIVATE to a waypoint with another variation
+    // keeps the true course, lays it through the new waypoint, and the course shown changes by the variation difference.
+    // ObsSource 0, so that the course is the unit's own
+    it('keeps the true course through KBBB and shows it with the variation of KBBB (checked in the KLN 89 trainer, 2026-10-25, #425)', async () => {
+        const position = pointBefore(kaaa, abc, 5);
+        const unit = await planInObs(position, {panelXml: panelXml(NO_OBS), abc: abc10E});
+        const mc = unit.props.modeController;
+        mc.setObsOnUnit(50); // 060 true at ABC
+        await vi.advanceTimersByTimeAsync(1000);
+        const expected = crossTrackNm(position, kbbb, 60);
+        expect(Math.abs(expected - crossTrackNm(position, kbbb, 50))).toBeGreaterThan(1); // A kept magnetic 050 cannot match
+
+        await directToKbbbFromFpl0(unit, true);
+
+        expect(activeIdent(unit)).toBe('KBBB');
+        expect(Math.abs(mc.getObsTrue() - 60)).toBeLessThan(1e-6);
+        expect(Math.abs(unit.props.memory.navPage.xtkToActive! - expected)).toBeLessThan(0.05);
+        expect(Math.abs(mc.getObsMag() - 60)).toBeLessThan(1e-6); // KBBB at 0°
+    });
+});
+
+// The indicator rules are the 90B's: 5-37 has ACTIVATE keep the selected course, which with an indicator the unit reads
+// is the indicator's; 5-35 has the unit slew an indicator it drives (#261); an indicator that did not move must not
+// re-lay the course every second (#122)
+describe('OBS mode with an indicator the unit reads (5-35, 5-37, #122, #261)', () => {
+    const position = pointBefore(kaaa, abc, 5);
+
+    // 5-37 (5.9.7): ACTIVATE keeps the selected course, here the one on the non-driven indicator (ObsSource 1,
+    // ObsTarget 0): it still shows 050, so the unit takes 050 at KBBB. This passes before #425 too: the indicator wins
+    // either way
+    it('takes the course of a read, non-driven indicator after ACTIVATE (5-37, #425)', async () => {
+        const unit = await planInObs(position, {obs: 50, abc: abc10E});
+        const mc = unit.props.modeController;
+        expect(Math.abs(mc.getObsTrue() - 60)).toBeLessThan(1e-6); // Precondition: 050 at ABC is 060 true
+
+        await directToKbbbFromFpl0(unit, true);
+
+        expect(activeIdent(unit)).toBe('KBBB');
+        expect(Math.abs(mc.getObsMag() - 50)).toBeLessThan(1e-6);
+        expect(Math.abs(unit.props.memory.navPage.xtkToActive! - crossTrackNm(position, kbbb, 50))).toBeLessThan(0.05);
+    });
+
+    // 5-35, 5-37: with an indicator the unit reads and drives (ObsSource 1, ObsTarget 1) ACTIVATE keeps the true course,
+    // and the indicator is slewed to the new magnetic course at once. The indicator is turned to 045 right before the
+    // ENT, with no calculation tick between: the unit's course is written over it at the ACTIVATE, and the 045 is not read
+    // back over the course at the next tick (#261)
+    it('keeps the true course and slews an indicator it reads and drives after ACTIVATE (5-35, 5-37, #261, #425)', async () => {
+        const unit = await planInObs(position, {obs: 50, panelXml: panelXml({'Output.ObsTarget': 1}), abc: abc10E});
+        unit.env.sim.applyObsKeyEvents = true;
+        const mc = unit.props.modeController;
+        mc.setObsOnUnit(50);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Math.abs(mc.getObsTrue() - 60)).toBeLessThan(1e-6); // Preconditions: 050 at ABC, 060 true
+        expect(unit.env.sim.get('Nav OBS:1', 'degrees')).toBeCloseTo(50, 6);
+
+        await directToKbbbFromFpl0(unit, true, () => unit.env.sim.set('Nav OBS:1', 'degrees', 45));
+
+        expect(Math.abs(mc.getObsTrue() - 60)).toBeLessThan(1e-6);
+        expect(Math.abs(unit.env.sim.get('Nav OBS:1', 'degrees') - 60)).toBeLessThan(0.5);
+        expect(Math.abs(unit.props.memory.navPage.xtkToActive! - crossTrackNm(position, kbbb, 60))).toBeLessThan(0.05);
+    });
+
+    // #122: the indicator is read every second, and a course that did not change must not be laid again. ABC has a
+    // published variation of 14.04 E, for which 050 converted to true and back is not exactly 050 (5.7e-14 off), so a
+    // comparison that is not exact enough would re-lay the course every second. This passes before #425 too: the
+    // course was held magnetic and compared exactly
+    it('does not lay the course again while a read indicator does not move (#122)', async () => {
+        const abcOdd = vor('ABC', abc.lat, abc.lon, {magneticVariation: -14.04});
+        const unit = await planInObs(position, {obs: 50, abc: abcOdd});
+        const aw = unit.props.memory.navPage.activeWaypoint;
+        const toIndex = vi.spyOn(aw, 'directToFlightplanIndex');
+        const to = vi.spyOn(aw, 'directTo');
+
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(toIndex).not.toHaveBeenCalled();
+        expect(to).not.toHaveBeenCalled();
+        expect(Math.abs(unit.props.modeController.getObsMag() - 50)).toBeLessThan(1e-6);
     });
 });
 
@@ -104,7 +195,7 @@ describe('Direct To in OBS mode (5-37)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(courseDeg(offLeg, abc)).toBeCloseTo(34.2, 1);
-        expect(Math.abs(nav.obsMag - (finalCourseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.3 magnetic: the course at ABC, 0.1 above the initial one
+        expect(Math.abs(unit.props.modeController.getObsMag() - (finalCourseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.3 magnetic: the course at ABC, 0.1 above the initial one
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
     });
 
@@ -155,9 +246,9 @@ describe('Direct To in OBS mode (5-37)', () => {
 
     // 5-37; checked in the KLN 89 trainer, 2026-10-25 (the course set is the direct path's course at the waypoint)
     it('sets the course of the direct path at EEE (5-37, #370)', async () => {
-        const {nav, position, eee} = await longDirectToEee();
+        const {unit, position, eee} = await longDirectToEee();
 
-        expect(Math.abs(nav.obsMag - finalCourseDeg(position, eee))).toBeLessThan(0.05); // 095.54, variation 0; the initial bearing would be 093.76
+        expect(Math.abs(unit.props.modeController.getObsMag() - finalCourseDeg(position, eee))).toBeLessThan(0.05); // 095.54, variation 0; the initial bearing would be 093.76
     });
 
     // 5-37 (5.9.6) and C-1: the CRS message tells the course set, which is the direct path's course at the waypoint
@@ -205,7 +296,7 @@ describe('Direct To in OBS mode (5-37)', () => {
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(Math.abs(nav.obsMag - (finalCourseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.3 magnetic: the course at ABC, 0.1 above the initial one
+        expect(Math.abs(unit.props.modeController.getObsMag() - (finalCourseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.3 magnetic: the course at ABC, 0.1 above the initial one
         expect(Math.abs(unit.env.sim.get('Nav OBS:1', 'degrees') - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.5);
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
     });
