@@ -12,6 +12,7 @@ import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {bankeAngleForStandardTurn, distanceToAchieveBankAngleChange} from "../../services/KLNNavmath";
 import {FromLeg, TurnBisector, TurnPlan, TurnStackEntry} from "../flightplan/ActiveWaypoint";
 import {courseAtWaypoint} from "./ObsGeometry";
+import {bearingBetween} from "./Bearing";
 import {alongTrackDistance, bisectorSide, inboundLegLength, segmentDistance, turnLead} from "./SequencingGeometry";
 
 
@@ -124,7 +125,9 @@ export class NavCalculator implements CalcTickable {
         const futureLegs = nav.activeWaypoint.getFutureLegs();
         nav.distToDest = calcDistToDestination(nav, futureLegs);
 
-        nav.bearingToActive = this.sensors.in.gps.coords.bearingTo(toLeg.wpt);
+        //#426: with the aircraft on the waypoint there is no bearing to it. It is null, as any missing value, so the
+        //displays show dashes (3-31) and the outputs write their null value. The course at the waypoint is null there too
+        nav.bearingToActive = bearingBetween(this.sensors.in.gps.coords, toLeg.wpt);
         nav.bearingAtActive = courseAtWaypoint(this.sensors.in.gps.coords, toLeg.wpt);
 
         let dtk: Degrees;
@@ -220,7 +223,8 @@ export class NavCalculator implements CalcTickable {
         }
 
 
-        nav.toFrom = Math.abs(NavMath.diffAngle(nav.bearingToActive, dtk)) <= 90;
+        //#426: on the waypoint the aircraft is on the line between TO and FROM, which the comparison counts as TO
+        nav.toFrom = nav.bearingToActive === null ? TO : Math.abs(NavMath.diffAngle(nav.bearingToActive, dtk)) <= 90;
 
         //waypoint sequencing
         if (this.modeController.isObsModeActive()) {

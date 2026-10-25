@@ -331,12 +331,13 @@ export class ModeController implements CalcTickable {
         } else if (active !== null) {
             //5-36: the course of the current path at the active waypoint, so that the course laid through it is the leg
             //itself and the deviation is kept on any leg length (#151). A degenerate path (TO and FROM the same
-            //waypoint, #67) falls back to the DTK or the bearing. The waypoint is taken to its closest point on the
-            //path first: the end fix of a DME arc is a database fix and need not lie on the arc circle, and bearingAt
-            //throws for a point off the circle (as in NavCalculator)
+            //waypoint, #67) falls back to the DTK or the bearing, and with the aircraft on the waypoint, where there is no
+            //bearing, to the course held (#426). The waypoint is taken to its closest point on the path first: the end fix
+            //of a DME arc is a database fix and need not lie on the arc circle, and bearingAt throws for a point off the
+            //circle (as in NavCalculator)
             const fromPath = this.navState.activeWaypoint.getFromLeg()?.path;
             const pathCourse = fromPath !== undefined && fromPath.isValid() ? fromPath.bearingAt(fromPath.closest(active, VEC3_CACHE)) : NaN;
-            const obsTrue = isNaN(pathCourse) ? (this.navState.desiredTrack ?? this.navState.bearingToActive!) : pathCourse;
+            const obsTrue = isNaN(pathCourse) ? (this.navState.desiredTrack ?? this.navState.bearingToActive ?? this.navState.obsTrue) : pathCourse;
 
             this.setObsTrueOnUnit(obsTrue, true);
         }

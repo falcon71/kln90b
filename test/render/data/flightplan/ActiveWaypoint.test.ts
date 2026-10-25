@@ -170,6 +170,27 @@ describe('OBS mode on a flight plan with the same waypoint twice (3415417, #67)'
         expect(Math.abs(unit.props.modeController.getObsMag() - courseDeg(position, kaaa))).toBeLessThan(0.5);
         expect(Screen.read().rows('L')[3]).toBe('OBS:090°   ');
     });
+
+    // #426: with the aircraft exactly on the waypoint there is no bearing to it either, so OBS keeps the course the unit
+    // holds; before, the course became NaN, which a knob click could not recover. The course held is set in memory, as
+    // from an earlier OBS session: setting it on the unit in LEG mode would lay it as a direct-to
+    it('keeps the course it holds with the aircraft exactly on the waypoint (#426)', async () => {
+        const unit = await bootUnit({
+            facilities: [kaaa], position: {lat: kaaa.lat, lon: kaaa.lon}, panelXml: OBS_SOURCE_OFF,
+            storage: savedFlightplan(0, [kaaa, kaaa]),
+        });
+        await settle(unit);
+        const nav = unit.props.memory.navPage;
+        nav.obsTrue = 123;
+
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(nav.navmode).toBe(NavMode.ENR_OBS);
+        expect(activeIdent(unit)).toBe('KAAA');
+        expect(unit.props.modeController.getObsTrue()).toBe(123);
+        expect(unit.errors).toEqual([]);
+    });
 });
 
 describe('sequencing after a direct-to to a waypoint of FPL 0 (748151c, #70)', () => {

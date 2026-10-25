@@ -9,7 +9,7 @@ import {pointFrom} from '../../../harness/flight/geo';
 import {activeIdent} from '../../../harness/readers';
 import {NO_OBS, panelXml} from '../../../harness/panelXml';
 import {variationNear} from '../../../harness/fixtures';
-import {NavMode} from '../../../../kln90b/data/VolatileMemory';
+import {NavMode, TO} from '../../../../kln90b/data/VolatileMemory';
 
 // An invented world: KDDD, with KAAA 200 NM west of it on the great circle that leaves KDDD on 270 true, so every point
 // west(nm) lies on the leg KAAA to KDDD (no cross track). FPL 0 is KAAA, KDDD; KDDD is active.
@@ -180,18 +180,18 @@ describe('NAV 1 page in OBS mode (#371)', () => {
         expect(Screen.read().rows('L')[5]).toBe('BRG    ---°');
     });
 
-    // Robustness (characterization): with the aircraft on the waypoint the course at the waypoint is undefined (NaN, like
-    // the bearing to it, whose cells stay blank as before this change); the page raises no error and prints no NaN
-    it('characterization: raises no error and prints no NaN with the aircraft on the waypoint', async () => {
+    // 3-31: BRG shows dashes where there is no bearing (figure 3-101). With the aircraft on the waypoint there is no
+    // course at the waypoint, as there is no bearing to it, in OBS mode too (#426)
+    it('shows dashes for BRG with the aircraft exactly on the active waypoint in OBS mode (3-31, #426)', async () => {
         const unit = await onLeg(64.8, 145, variationNear(KDDD, 10), panelXml(NO_OBS));
         await unit.panel.obsMode();
         await unit.panel.selectPage('L', 'NAV 1');
         await moveAircraft(unit, {lat: KDDD.lat, lon: KDDD.lon}, {groundspeedKt: 145, trackTrue: 90});
         await vi.advanceTimersByTimeAsync(1000);
 
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
         expect(unit.errors).toEqual([]);
-        expect(rawLeftRow(5)).toMatch(/^BRG {4}/);
-        expect(rawLeftRow(5)).not.toContain('NaN');
+        expect(rawLeftRow(5)).toBe('BRG    ---°');
     });
 });
 
@@ -204,8 +204,8 @@ describe('NAV 1 page with the aircraft on the active waypoint', () => {
         return unit;
     }
 
-    // The sibling of the #426 pin below, which holds its preconditions: KDDD stays active in LEG mode, the page shows
-    // NAV 1 without an error, and row 5 is the BRG field
+    // The sibling of the #426 tests below, which holds their preconditions: KDDD stays active in LEG mode, the page
+    // shows NAV 1 without an error, and row 5 is the BRG field
     it('characterization: KDDD stays active and NAV 1 shows its BRG field with the aircraft on KDDD', async () => {
         const unit = await onKddd();
 
@@ -215,12 +215,33 @@ describe('NAV 1 page with the aircraft on the active waypoint', () => {
         expect(rawLeftRow(5)).toMatch(/^BRG {4}/);
     });
 
-    // 3-31: BRG is the bearing to the active waypoint, three digits, or dashes where there is none (figure 3-101). On the
-    // waypoint the bearing to it is undefined (NaN), and the cells stay blank instead (#426)
-    it.fails('shows three digits or dashes for BRG with the aircraft exactly on the active waypoint (3-31, #426)', async () => {
+    // 3-31: BRG is the bearing to the active waypoint, or dashes where there is none (figure 3-101). On the waypoint
+    // there is no bearing to it (#426)
+    it('shows dashes for BRG with the aircraft exactly on the active waypoint (3-31, #426)', async () => {
         await onKddd();
 
-        expect(rawLeftRow(5)).toMatch(/^BRG {4}(\d{3}|---)°$/);
+        expect(rawLeftRow(5)).toBe('BRG    ---°');
+    });
+
+    // #426: without a bearing the bearing outputs write their null value, as with the GPS lost (Sensors.setWpBearing),
+    // not NaN. The default panel.xml writes the GPS SimVars
+    it('writes the null value to the bearing outputs with the aircraft exactly on the active waypoint (#426)', async () => {
+        const unit = await onKddd();
+
+        expect(unit.env.sim.get('L:KLN90B_GPS_WP_BEARING', 'degrees')).toBe(0);
+        expect(unit.env.sim.get('GPS WP BEARING', 'degrees')).toBe(0);
+        expect(unit.env.sim.get('GPS WP TRUE BEARING', 'degrees')).toBe(0);
+    });
+
+    // #426: on the waypoint the aircraft is on the line between TO and FROM, which the TO/FROM comparison counts as TO;
+    // the waypoint is reached, not passed, so the alert of the last waypoint is still on (#372)
+    it('is TO with the alert on with the aircraft exactly on the active waypoint (#426)', async () => {
+        const unit = await onKddd();
+        const nav = unit.props.memory.navPage;
+
+        expect(nav.toFrom).toBe(TO);
+        expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(1);
+        expect(nav.waypointAlert).toBe(true);
     });
 });
 

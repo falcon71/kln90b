@@ -13,7 +13,7 @@ describe('courseAtWaypoint (5-37, #370)', () => {
 
     it('is the final course of the great circle from the position, not the initial bearing', () => {
         expect(courseAtWaypoint(position, eee)).toBeCloseTo(finalCourseDeg(position, eee), 6); // 095.54
-        expect(Math.abs(courseAtWaypoint(position, eee) - courseDeg(position, eee))).toBeGreaterThan(1.5); // 093.76
+        expect(Math.abs(courseAtWaypoint(position, eee)! - courseDeg(position, eee))).toBeGreaterThan(1.5); // 093.76
     });
 
     it('is just below 360 for a course just west of north, which needs no wrap', () => {
@@ -41,5 +41,12 @@ describe('courseAtWaypoint (5-37, #370)', () => {
         expect(course).toBeGreaterThanOrEqual(0);
         expect(course).toBeLessThan(2);
         expect(course).toBeCloseTo(finalCourseDeg(south, waypoint), 6);
+    });
+
+    // #426: with the position on the waypoint there is no great circle to it, so there is no course
+    it('is null with the position on the waypoint (#426)', () => {
+        const waypoint = {lat: 47.0, lon: 9.0};
+
+        expect(courseAtWaypoint(waypoint, waypoint)).toBeNull();
     });
 });

@@ -120,8 +120,9 @@ export class DirectToPage extends SixLineHalfPage {
                     this.props.modeController.setObsTrueOnUnit(this.props.modeController.getObsTrue(), true);
                 } else {
                     //5-37: the course set is the direct path's course at the waypoint, where the deviation is measured, not the
-                    //bearing at the aircraft, which differs on a long direct path (#370)
-                    this.props.modeController.setObsTrueOnUnit(courseAtWaypoint(this.props.sensors.in.gps.coords, waypoint), true);
+                    //bearing at the aircraft, which differs on a long direct path (#370). With the aircraft on the waypoint
+                    //there is no such course, and the course held is kept (#426)
+                    this.props.modeController.setObsTrueOnUnit(courseAtWaypoint(this.props.sensors.in.gps.coords, waypoint) ?? this.props.modeController.getObsTrue(), true);
 
                     if (this.props.planeSettings.output.obsTarget === 0) {
                         this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", `d› CRS ${format(roundBearing(this.props.modeController.getObsMag()), "000")}°`);

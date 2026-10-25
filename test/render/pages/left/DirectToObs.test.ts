@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {Facility} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
+import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {standardRoute} from '../../../harness/fixtures';
 import {NO_OBS, panelXml} from '../../../harness/panelXml';
 import {activeIdent, fplIdents} from '../../../harness/readers';
@@ -301,6 +301,25 @@ describe('Direct To in OBS mode (5-37)', () => {
         expect(Math.abs(unit.props.modeController.getObsMag() - (finalCourseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.3 magnetic: the course at ABC, 0.1 above the initial one
         expect(Math.abs(unit.env.sim.get('Nav OBS:1', 'degrees') - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.5);
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
+    });
+
+    // #426: with the aircraft parked exactly on ABC there is no direct path to it and no course along one, so the Direct
+    // To keeps the OBS course; before, the course became NaN, which a knob click could not recover
+    it('keeps the OBS course with the aircraft exactly on the waypoint (#426)', async () => {
+        const unit = await planInObs(offLeg, {panelXml: panelXml(NO_OBS), abc: abcE});
+        unit.props.modeController.setObsOnUnit(50);
+        await moveAircraft(unit, {lat: abc.lat, lon: abc.lon}, {groundspeedKt: 0, trackTrue: 0});
+        expect(activeIdent(unit)).toBe('ABC'); // Precondition: OBS mode does not sequence
+        await unit.panel.selectPage('R', 'CTR 1');
+
+        await unit.panel.dct();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(true);
+        expect(unit.props.modeController.getObsMag()).toBeCloseTo(50, 6);
+        expect(Screen.read().status().mode).toBe('d› CRS 050°');
+        expect(unit.errors).toEqual([]);
     });
 });
 
