@@ -621,14 +621,10 @@ export class Canvas implements UiElement {
     public getDrawingContextWithCenterRange(center: GeoPointInterface, range: NauticalMiles): CoordinateCanvasDrawContext {
         const ctx = this.getDrawingContext();
 
-        const offsetArr = new Float64Array(2);
-        offsetArr[0] = 0;
-        offsetArr[1] = 0;
-
         //3-35 Range is aircraft to top of the screen
         this.projection!.set({
             target: center,
-            targetProjectedOffset: offsetArr,
+            targetProjectedOffset: this.wholePixelOffset(ctx, 0, 0),
             range: UnitType.NMILE.convertTo(range, UnitType.GA_RADIAN) * 2,
             rotation: 0,
         });
@@ -649,13 +645,9 @@ export class Canvas implements UiElement {
         const ctx = this.getDrawingContext();
         //3-35 Range is aircraft to top of the screen
 
-        const offsetArr = new Float64Array(2);
-        offsetArr[0] = 0;
-        offsetArr[1] = ctx.height * (1 - offset);
-
         this.projection!.set({
             target: center,
-            targetProjectedOffset: offsetArr,
+            targetProjectedOffset: this.wholePixelOffset(ctx, 0, ctx.height * (1 - offset)),
             range: UnitType.NMILE.convertTo(range, UnitType.GA_RADIAN) / offset,
             rotation: -rotation * Avionics.Utils.DEG2RAD,
         });
@@ -710,6 +702,23 @@ export class Canvas implements UiElement {
     }
 
     tick(blink: boolean): void {
+    }
+
+    /**
+     * The offset of the target from the center of the map, rounded onto a whole pixel. The target could land on a half
+     * pixel (the middle of an odd width, or three quarters down the 78 pixels of NAV 5), where the aircraft of a parked,
+     * shaking airplane projects a hair to either side and is rounded one pixel back and forth (#431). Rounding the half
+     * pixel up centers the aircraft symbol of NAV 5: its 5 pixels sit one pixel left of the point.
+     * @param ctx
+     * @param offsetX
+     * @param offsetY
+     * @private
+     */
+    private wholePixelOffset(ctx: CanvasDrawContext, offsetX: number, offsetY: number): Float64Array {
+        const offset = new Float64Array(2);
+        offset[0] = Math.round(ctx.width / 2 + offsetX) - ctx.width / 2;
+        offset[1] = Math.round(ctx.height / 2 + offsetY) - ctx.height / 2;
+        return offset;
     }
 
     private getDrawingContext(): CanvasDrawContext {

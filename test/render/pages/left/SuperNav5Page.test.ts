@@ -352,6 +352,44 @@ describe('Super NAV 5 page', () => {
         expect(Math.abs(squares[1][2] - 13.65)).toBeLessThanOrEqual(1);
     });
 
+    // #431: the aircraft of a shaking parked airplane moves by a centimeter, far less than a map pixel at any range.
+    // North up the map centered on a half pixel (y = 45.5 of 91), where such a move rounded the symbol one pixel up or
+    // down. The aircraft now sits on its point rounded to a whole pixel. Three quarters down (y = 68.25) was never a half
+    // pixel, so the other orientations held before the fix as well; they guard the rounding there. Track up needs 2 kt
+    // (3-35), so there the aircraft taxis north at 3 kt (1.39e-5 degrees a second) while it shakes.
+    for (const [orientation, name, symbol, pixel] of [
+        [0, 'north up', '$', [74, 46]],
+        [1, 'desired track up', '$', [74, 68]],
+        [2, 'actual track up', '#', [74, 68]],
+        [3, 'heading up', '#', [74, 68]],
+    ] as const) {
+        it(`keeps the aircraft on one pixel while the aircraft shakes, ${name} (#431)`, async () => {
+            const w = world();
+            const ahead = pointFrom(w.kaaa, 60, 8);
+            const wpt = intersection('AHEAD', ahead.lat, ahead.lon);
+            const map = recordMap();
+            const unit = await bootUnit({
+                facilities: [w.kaaa, wpt], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
+                storage: {...savedFlightplan(0, [w.kaaa, wpt]), superNav5MapRange: 1000, superNav5MapOrientation: orientation},
+                panelXml: orientation === 3 ? HEADING_INPUT_XML : undefined,
+            });
+            unit.env.sim.set('PLANE HEADING DEGREES GYRO', 'degrees', 123);
+            await settle(unit);
+            await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+            await showSuperNav5(unit);
+
+            const taxi = orientation === 2 ? 1.39e-5 : 0;
+            const seen: number[][] = [];
+            for (const [i, [dLat, dLon]] of [[1, 1], [-1, -1], [1, -1], [-1, 1], [0, 0]].entries()) {
+                await moveAircraft(unit, {lat: w.kaaa.lat + (i + 1) * taxi + dLat * 1e-7, lon: w.kaaa.lon + dLon * 1e-7},
+                    {groundspeedKt: taxi === 0 ? 0 : 3});
+                const [, x, y] = map.pixels.find(p => p[0] === symbol)!;
+                seen.push([x, y]);
+            }
+            expect(seen).toEqual([pixel, pixel, pixel, pixel, pixel]);
+        });
+    }
+
     // 3-37: the route labels ABC, a VOR of FPL 0, once with the VORs off, and once with VOR: H, which selects ABC
     it('labels a VOR of FPL 0 once, with the VORs off and with VOR: H (3-37)', async () => {
         const off = await superNav5OnRoute();

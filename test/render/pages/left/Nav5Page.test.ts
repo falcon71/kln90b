@@ -357,6 +357,43 @@ describe('NAV 5 page map', () => {
         expect(Math.abs(at('2')[2] - 11.7)).toBeLessThanOrEqual(1);
     });
 
+    // #431: the aircraft of a shaking parked airplane moves by a centimeter, far less than a map pixel at any range. The
+    // map centered on a half pixel (x = 49.5, and y = 58.5 except north up), where such a move rounded the symbol one
+    // pixel to either side. The aircraft now sits on that point rounded to a whole pixel. Track up needs 2 kt (3-35), so
+    // there the aircraft taxis north at 3 kt (1.39e-5 degrees a second) while it shakes.
+    for (const [orientation, name, symbol, pixel] of [
+        [0, 'north up', '$', [50, 39]],
+        [1, 'desired track up', '$', [50, 59]],
+        [2, 'actual track up', '#', [50, 59]],
+        [3, 'heading up', '#', [50, 59]],
+    ] as const) {
+        it(`keeps the aircraft on one pixel while the aircraft shakes, ${name} (#431)`, async () => {
+            const w = standardRoute();
+            const ahead = pointFrom(w.kaaa, 60, 8);
+            const wpt = intersection('AHEAD', ahead.lat, ahead.lon);
+            const map = recordMap();
+            const unit = await bootUnit({
+                facilities: [w.kaaa, wpt], position: {lat: w.kaaa.lat, lon: w.kaaa.lon},
+                storage: {...savedFlightplan(0, [w.kaaa, wpt]), nav5MapRange: 1000, nav5MapOrientation: orientation},
+                panelXml: orientation === 3 ? HEADING_INPUT_XML : undefined,
+            });
+            unit.env.sim.set('PLANE HEADING DEGREES GYRO', 'degrees', 123);
+            await settle(unit);
+            await unit.panel.selectPage('L', 'NAV 5');
+            await vi.advanceTimersByTimeAsync(1000);
+
+            const taxi = orientation === 2 ? 1.39e-5 : 0;
+            const seen: number[][] = [];
+            for (const [i, [dLat, dLon]] of [[1, 1], [-1, -1], [1, -1], [-1, 1], [0, 0]].entries()) {
+                await moveAircraft(unit, {lat: w.kaaa.lat + (i + 1) * taxi + dLat * 1e-7, lon: w.kaaa.lon + dLon * 1e-7},
+                    {groundspeedKt: taxi === 0 ? 0 : 3});
+                const [, x, y] = map.pixels.find(p => p[0] === symbol)!;
+                seen.push([x, y]);
+            }
+            expect(seen).toEqual([pixel, pixel, pixel, pixel, pixel]);
+        });
+    }
+
     // 3-35: actual track up and heading up draw the aircraft symbol instead of the diamond ("#" in the map font)
     it('draws the aircraft symbol track up (3-35)', async () => {
         const {unit, map} = await nav5OnRoute({storage: {nav5MapOrientation: 2}});
