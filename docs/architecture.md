@@ -808,6 +808,11 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       reads as an hour off. It is the only page state that stays in memory over a power cycle (the plans and the active
       waypoint are persisted on their own path). The NAV 4 selected altitude, the OBS course and the Super NAV 5 range
       are reset at every power-on, and the derived navigation values start empty until the first calculation tick.
+    - **The Direct To** follows the same rule: after more than 5 minutes off, `reset()` drops it with the procedures
+      (`ActiveWaypoint.dropDirectTo`, #422) and leaves no active leg, and the first calculation tick with a valid GPS
+      position activates the closest FPL 0 leg (`NavCalculator`), as after a sim restart. A shorter power-off keeps it.
+      `reset()` first copies the last active waypoint to `navPage.startPageWaypoint`, the page shown first (3-8), because
+      a leg activated before that page is chosen overwrites `lastactiveWaypoint`.
     - `ctrPage` keeps the left FPL page instance of the CTR computation (`lastFplPage`). CTR 1 and CTR 2 call
       `syncCtrState` (`pages/right/CtrState.ts`) in their display ticks and return to the start state when another
       instance is on the left (5-26).
@@ -973,8 +978,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
        `planeSettings.takeHomeMode` is set.
     3. `SelfTestRightPage.approve()` → `FourSegmentPage{VFROnlyPage | ObsWarningPage | AiracPage}`.
     4. → `pageManager.startMainPage(props)`, which builds `MainPage{lPage: Nav2Page, rPage: SupPage}`. If there is a
-       last active waypoint, `rPage` is that waypoint's page instead (Apt4/Vor/Ndb/Int/Sup), and its
-       `props.memory.*Page` is pre-seeded.
+       waypoint that was active at the power-off (`navPage.startPageWaypoint`, copied by `VolatileMemory.reset`), `rPage`
+       is that waypoint's page instead (Apt4/Vor/Ndb/Int/Sup), and its `props.memory.*Page` is pre-seeded.
     5. With `forceReadyToUse` (engine running at load), `WelcomePage` goes straight to `startMainPage`.
 - `PageProps` (`pages/Page.tsx`) is the single "services bag" passed to every page and many controls. It holds bus,
   userSettings, planeSettings, sensors, pageManager, messageHandler, hardware, memory (`VolatileMemory`),

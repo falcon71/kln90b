@@ -103,6 +103,11 @@ export class NavPageState {
      */
     public isSelfTestApproved: boolean = false;
     public activeWaypoint: ActiveWaypoint;
+    /**
+     * 3-8: the waypoint whose page is shown first after the power-on, the one active at the power-off. Copied at the
+     * power-on, because a leg activated before the first page is chosen overwrites the last active waypoint (#422)
+     */
+    public startPageWaypoint: Facility | null = null;
     public navmode: NavMode = NavMode.ENR_LEG;
 
     public xtkToActive: NauticalMiles | null = null;
@@ -157,6 +162,7 @@ export class NavPageState {
 
     constructor(bus: EventBus, userSettings: KLN90BUserSettings, sensors: Sensors, fpl0: Flightplan, lastactiveWaypoint: Facility | null) {
         this.activeWaypoint = new ActiveWaypoint(bus, userSettings, sensors, fpl0, lastactiveWaypoint);
+        this.startPageWaypoint = lastactiveWaypoint;
     }
 
 }
@@ -329,6 +335,7 @@ export class VolatileMemory {
         }
 
         this.isReady = false;
+        this.navPage.startPageWaypoint = this.navPage.activeWaypoint.lastactiveWaypoint; //#422: before a leg can be activated
         //#202: a power cycle forgets the last match of the ident entry
         this.aptPage.lastMatch = null;
         this.vorPage.lastMatch = null;
@@ -338,6 +345,10 @@ export class VolatileMemory {
 
         if (evt.timeSincePowerChange > RESET_TIME) {
             this.fplPage.flightplans[0].removeProcedures();
+            //#422: a Direct To is dropped as well (the KLN 89 trainer always, the AVsoftech KLN 90B trainer after a restart of
+            //the program but not after a quick off and on, 2026-10-25). NavCalculator activates the closest FPL 0 leg, as
+            //after a sim restart
+            this.navPage.activeWaypoint.dropDirectTo();
         }
 
         this.dtPage.departureTime = null;

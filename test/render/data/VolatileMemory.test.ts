@@ -5,11 +5,11 @@ import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {savedFlightplan, savedUserWaypoints, storedSetting} from '../../harness/storage';
 import {efbRoute} from '../../harness/platform';
 import {setTriFigures} from '../../harness/triSettings';
-import {fplIdents} from '../../harness/readers';
+import {activeIdent, fplIdents} from '../../harness/readers';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {Screen} from '../../harness/render/screen';
 import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
-import {AirportFacility, EventBus, Facility, ICAO, UserFacility} from '@microsoft/msfs-sdk';
+import {AirportFacility, EventBus, Facility, FlightPlanner, FlightPlannerOptions, ICAO, UserFacility} from '@microsoft/msfs-sdk';
 import {isNearestWpt, unpackFacility} from '../../../kln90b/data/navdata/NearestList';
 import {Leg, runwayFix, star, withProcedures} from '../../harness/navdata/procedures';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
@@ -83,7 +83,8 @@ describe('the mode after a power cycle (3-3)', () => {
 
 // The 90B guide is silent about a Direct To at the power-on (3-3 only says ENR-LEG, 3-8 the page of the last active
 // waypoint). The KLN 89 trainer dropped it at every relaunch and came back on an FPL 0 leg (checked in the KLN 89 trainer,
-// 2026-10-25). The trainer does not model the time off, so the pin powers off for longer than the 5 minutes of 6-5
+// 2026-10-25); it does not model the time off. In the AVsoftech KLN 90B trainer a quick off and on kept the Direct To and a
+// restart of the program dropped it (the maintainer, 2026-10-25), which the maintainer took as the 5 minutes of 6-5
 describe('the Direct To over a power cycle (#422)', () => {
     const kaaa = airport('KAAA', 47.0, 8.0);
     const kbbb = airport('KBBB', 47.4, 8.0);
@@ -99,7 +100,7 @@ describe('the Direct To over a power cycle (#422)', () => {
         return unit;
     }
 
-    it('the Direct To to KCCC is active before the power-off and FPL 0 is kept over the power cycle (precondition of the #422 pin)', async () => {
+    it('the Direct To to KCCC is active before the power-off and FPL 0 is kept over the power cycle (the precondition, #422)', async () => {
         const unit = await directToOutsideFpl0();
         const aw = unit.props.memory.navPage.activeWaypoint;
         expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('KCCC');
@@ -110,7 +111,7 @@ describe('the Direct To over a power cycle (#422)', () => {
         expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
     });
 
-    it.fails('drops the Direct To at the power-on and comes back on the leg to KBBB (KLN 89 trainer 2026-10-25, #422)', async () => {
+    it('drops the Direct To after a power-off of more than 5 minutes and comes back on the leg to KBBB (KLN 89 trainer 2026-10-25, #422)', async () => {
         const unit = await directToOutsideFpl0();
         const aw = unit.props.memory.navPage.activeWaypoint;
 
@@ -118,6 +119,97 @@ describe('the Direct To over a power cycle (#422)', () => {
 
         expect(aw.isDctNavigation()).toBe(false);
         expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('KBBB');
+    });
+
+    it('keeps the Direct To over a power-off of 5 minutes or less (6-5, AVsoftech KLN 90B trainer 2026-10-25, #422)', async () => {
+        const unit = await directToOutsideFpl0();
+        const aw = unit.props.memory.navPage.activeWaypoint;
+
+        await cycle(unit, 60);
+
+        expect(aw.isDctNavigation()).toBe(true);
+        expect(aw.getActiveWpt()?.icaoStruct.ident).toBe('KCCC');
+    });
+
+    // The calculation tick on the data base page activates the leg to KBBB, which writes the last active waypoint, before
+    // ACKNOWLEDGE? chooses the first page
+    it('opens on the page of the dropped Direct To target although the leg to KBBB is already active (3-8, KLN 89 trainer 2026-10-25, #422)', async () => {
+        const unit = await directToOutsideFpl0();
+        const until = async (text: string) => {
+            for (let i = 0; i < 30 && !Screen.read().text().includes(text); i++) {
+                await vi.advanceTimersByTimeAsync(1000);
+            }
+            expect(Screen.read().text()).toContain(text);
+        };
+
+        await unit.panel.powerCycle({offSeconds: 600});
+        await until('APPROVE?');
+        await unit.panel.cursorTo('R', 'APPROVE?');
+        await unit.panel.ent();
+        await until('ACKNOWLEDGE?');
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(activeIdent(unit)).toBe('KBBB'); // Precondition: the new leg is active before the first page is chosen
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        const screen = Screen.read();
+        expect(screen.status().right).toBe('APT 4');
+        expect(screen.rows('R')[0].slice(1).split(' ')[0]).toBe('KCCC');
+    });
+
+    it('drops a Direct To to an approach waypoint with the approach after a power-off of more than 5 minutes (6-5, #422)', async () => {
+        const unit = await approachLoadedAt(40);
+        const aw = unit.props.memory.navPage.activeWaypoint;
+        await unit.panel.directTo('FAFAA');
+        expect(aw.isDctNavigation()).toBe(true); // Precondition
+        expect(activeIdent(unit)).toBe('FAFAA');
+
+        await cycle(unit, 600);
+
+        expect(unit.errors).toEqual([]);
+        expect(fplIdents(unit)).toEqual(['ENRAA', 'KPRC']);
+        expect(aw.isDctNavigation()).toBe(false);
+        expect(activeIdent(unit)).toBe('KPRC');
+    });
+
+    it('comes up flagged when FPL 0 has fewer than two waypoints after a power-off of more than 5 minutes (AVsoftech KLN 90B trainer 2026-10-25, #422)', async () => {
+        const unit = await bootUnit({facilities: [kccc], position: {lat: 47.1, lon: 8.0}});
+        await settle(unit);
+        const aw = unit.props.memory.navPage.activeWaypoint;
+        await unit.panel.directTo('KCCC');
+        expect(aw.isDctNavigation()).toBe(true); // Precondition
+
+        await cycle(unit, 600);
+
+        expect(aw.getActiveWpt()).toBeNull();
+        expect(aw.isDctNavigation()).toBe(false);
+    });
+
+    // Removing the procedures publishes the change, and the flight planner mirror then activates a new leg inside the
+    // reset, so the start page must be copied before the procedures go
+    it('opens on the page of the approach waypoint that was active although the power-on removed the approach (3-8, 6-5, #422)', async () => {
+        const unit = await approachLoadedAt(40);
+        expect(activeIdent(unit)).toBe('IAFAA'); // Precondition: the plan leg to the IAF is active
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(false);
+
+        await cycle(unit, 600);
+
+        const screen = Screen.read();
+        expect(screen.status().right).toBe('INT');
+        expect(screen.rows('R')[0].slice(1).split(' ')[0]).toBe('IAFAA');
+    });
+
+    // The SDK flight planner "kln90b" is part of the contract with aircraft: it leaves its Direct To plan at the power-on,
+    // not only once the GPS has a fix and a leg is activated
+    it('mirrors the dropped Direct To in the SDK flight planner at the power-on (#422)', async () => {
+        const unit = await directToOutsideFpl0();
+        // The SDK keeps one planner per id and ignores the options of a later call, so this is the unit's own planner
+        const planner = FlightPlanner.getPlanner('kln90b', unit.core.bus, {} as FlightPlannerOptions);
+        expect(planner.activePlanIndex).toBe(1); // Precondition: the planner flies its Direct To plan
+
+        await unit.panel.powerCycle({offSeconds: 600});
+
+        expect(planner.activePlanIndex).toBe(0);
     });
 });
 

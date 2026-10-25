@@ -156,6 +156,16 @@ export class ActiveWaypoint {
     }
 
     /**
+     * #422: a power-on after more than 5 minutes off (6-5) drops a Direct To and leaves no active leg; the first calculation
+     * tick then activates the closest FPL 0 leg, as after a sim restart. The last active waypoint is not touched
+     */
+    public dropDirectTo() {
+        if (this.isDirectTo) {
+            this.flag();
+        }
+    }
+
+    /**
      * If FPL 0 is valid, then this activates the closest leg
      */
     public activateFpl0(): KLNFlightplanLeg | null {

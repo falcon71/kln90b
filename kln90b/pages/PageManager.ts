@@ -60,7 +60,7 @@ export class PageManager implements DisplayTickable {
     }
 
     public startMainPage(props: PageProps) {
-        const lastActiveWaypoint = props.memory.navPage.activeWaypoint.lastactiveWaypoint;
+        const lastActiveWaypoint = props.memory.navPage.startPageWaypoint;
         if (lastActiveWaypoint === null) {
             this.setCurrentPage(MainPage, {
                 ...props,

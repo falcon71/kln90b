@@ -633,3 +633,11 @@ trainer, power cycled by relaunching it as on 2026-10-24, 11 relaunches; the VM 
   model the time off. En route deletions always persisted.
 - Outcome: #422 (the simulation keeps a Direct To over a power cycle within one sim session; a sim restart already
   comes back on the closest FPL 0 leg). With the Direct To dropped at the power-on, question 2 of #193 has no case left.
+
+**2026-10-25** (the maintainer's checks in the third-party AVsoftech KLN 90B trainer, which is unreliable, for #422)
+- Turning the unit off and on again quickly kept the Direct To. Closing the program and starting it again dropped it and
+  activated FPL 0. With fewer than two waypoints in the flight plan, the unit came up flagged after a restart of the
+  program.
+- The maintainer took this as the 5-minute rule of the procedures (6-5): a power-off of more than 5 minutes drops the
+  Direct To, a shorter one keeps it.
+- Outcome: #422.
