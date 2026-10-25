@@ -49,8 +49,8 @@ export class FakeSim {
     public readonly gameVars = new Map<string, string | number>();
     /**
      * Off by default: key events only go to keyEvents. On, K:VOR1_SET and K:VOR2_SET set Nav OBS:1 and Nav OBS:2 to
-     * their value in degrees, as the sim does, for a test of an indicator the unit drives (ObsTarget). reset() turns it
-     * off again.
+     * their value as a whole degree, as the sim does (rounded half up, #427), for a test of an indicator the unit drives
+     * (ObsTarget). reset() turns it off again.
      */
     public applyObsKeyEvents = false;
     /**
@@ -141,7 +141,11 @@ export class FakeSim {
             this.keyEvents.push({time, name: reg.key, value: Number(v)});
             const obs = OBS_KEY_EVENTS[reg.key];
             if (this.applyObsKeyEvents && obs !== undefined) {
-                this.set(obs, 'degrees', Number(v));
+                //The sim stores the course as a whole degree, rounded half up: 11.11 and 11.49 read back as 11, 11.5 and
+                //11.7 as 12. A rounded value outside 0..359 reads back as 0, it does not wrap: 359.9, 370 and -10 all
+                //read back 0 (the maintainer's sim checks, 2026-10-25, #427)
+                const rounded = Math.round(Number(v));
+                this.set(obs, 'degrees', rounded >= 0 && rounded < 360 ? rounded : 0);
             }
             return;
         }

@@ -637,8 +637,12 @@ sim.
   unchanged course again. The indicator is read in `tick`: its course is taken only when it differs from `getObsMag()`
   and, with a driven indicator, from the course last sent (`sensors.out.obsOut`), because a driven indicator still
   shows the old number for one tick after the variation in use changed without a course set on the unit (a SET 2
-  entry, the edge of the coverage area). Both comparisons allow `OBS_SAME_COURSE_EPSILON` (1e-6°), so that the
-  round-trip of a magnetic course to true and back does not count as a turn of the indicator (#122, #261, #425).
+  entry, the edge of the coverage area). A driven indicator also holds whole degrees only (the sim keeps the course
+  sent, rounded half up), so its read-back of the course last sent as a whole degree
+  (`normalizeHeading(Math.round(obsOut))`, with 360 and 000 the same course) is the unit's own course as well, not a
+  turn (#427). Both comparisons allow
+  `OBS_SAME_COURSE_EPSILON` (1e-6°), so that the round-trip of a magnetic course to true and back does not count as a
+  turn of the indicator (#122, #261, #425).
 - Status-line feedback: `NO APPROACH`, `NO ACTV WPT`.
 
 **`RollSteeringController`** (1 Hz, after `NavCalculator`) applies one control law, `rollSteeringCommand` in

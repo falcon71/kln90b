@@ -96,8 +96,9 @@ The sim globals are installed once per test file by the setup files `test/harnes
     - **Key events have no effect.** `sim.keyEvents` records a `K:` event, but nothing acts on it: `K:GPS_OBS_ON` does
       not set `GPS OBS ACTIVE`, and `K:VOR1_SET` does not move `Nav OBS:1`. A test asserts the event, or sets the
       SimVar the sim would set itself. The one exception is opt-in: `sim.applyObsKeyEvents = true` makes `K:VOR1_SET`
-      and `K:VOR2_SET` set `Nav OBS:1` and `Nav OBS:2` to their value in degrees, as the sim does, for a test of an
-      indicator the unit drives (`ObsTarget`). `reset()` turns it off, so it lasts one test.
+      and `K:VOR2_SET` set `Nav OBS:1` and `Nav OBS:2` to their value as a whole degree, rounded half up, with a value
+      outside 0 to 359 after rounding read back as 0, as the sim does (#427), for a test of an indicator the unit drives
+      (`ObsTarget`). `reset()` turns it off, so it lasts one test.
     - `E:ABSOLUTE TIME` and `E:SIMULATION TIME` follow the fake clock, so real and sim time run together.
       `sim.absoluteTimeOffsetMs` moves `E:ABSOLUTE TIME` against it: a negative offset while the clock advances is a sim
       pause, a positive one a jump of the sim time (the #328 clock tests). `reset()` sets it back to 0.

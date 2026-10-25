@@ -34,6 +34,19 @@ describe('FakeSim, the course key events (applyObsKeyEvents)', () => {
         expect(sim.keyEvents.map(k => [k.name, k.value])).toEqual([['K:VOR1_SET', 93], ['K:VOR2_SET', 271]]);
     });
 
+    // The maintainer's sim checks, 2026-10-25 (#427): whole degrees rounded half up; outside 0..359 after rounding, 0
+    it('keeps a whole degree rounded half up, and reads a value outside 0..359 back as 0, as the sim does (#427)', () => {
+        sim.reset();
+        sim.applyObsKeyEvents = true;
+        const read = (sent: number) => {
+            SimVar.SetSimVarValue('K:VOR1_SET', SimVarValueType.Number, sent);
+            return sim.get('Nav OBS:1', 'degrees');
+        };
+
+        expect([11.11, 11.49, 11.5, 11.7].map(read)).toEqual([11, 11, 12, 12]);
+        expect([359.4, 359.9, 360, 370, -10].map(read)).toEqual([359, 0, 0, 0, 0]);
+    });
+
     it('only records another key event when on: K:GPS_OBS_ON sets nothing', () => {
         sim.reset();
         sim.applyObsKeyEvents = true;

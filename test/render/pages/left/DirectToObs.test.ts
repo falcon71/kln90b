@@ -175,6 +175,33 @@ describe('OBS mode with an indicator the unit reads (5-35, 5-37, #122, #261)', (
     });
 });
 
+/**
+ * FPL 0 KAAA - EEE, EEE 150 NM east of KAAA. The aircraft is 100 NM before EEE and 5 NM north of the leg. In OBS mode
+ * (ObsSource 0, so that the course is the unit's own), D-> EEE and ENT, then 1 s. With `obs` the unit instead reads a
+ * non-driven indicator that is on that course. With `driven` it reads and drives the indicator (ObsSource 1, ObsTarget 1) and
+ * the sim keeps the whole degree it is sent (#427).
+ */
+async function longDirectToEee(o: { obs?: number, driven?: boolean } = {}) {
+    const eeePos = pointFrom(kaaa, 90, 150);
+    const eee = intersection('EEE', eeePos.lat, eeePos.lon);
+    const onLeg = pointBefore(kaaa, eee, 100);
+    const position = pointFrom(onLeg, courseDeg(onLeg, eee) - 90, 5);
+    const unit = await bootUnit({facilities: [kaaa, eee], position, panelXml: o.driven ? panelXml({'Input.ObsSource': 1, 'Output.ObsTarget': 1}) : o.obs === undefined ? panelXml(NO_OBS) : undefined, storage: savedFlightplan(0, [kaaa, eee])});
+    await settle(unit);
+    if (o.driven) unit.env.sim.applyObsKeyEvents = true;
+    if (o.obs !== undefined) unit.env.sim.set('Nav OBS:1', 'degrees', o.obs);
+    await unit.panel.obsMode();
+    await vi.advanceTimersByTimeAsync(2000);
+    const nav = unit.props.memory.navPage;
+    expect(nav.navmode).toBe(NavMode.ENR_OBS);
+
+    await unit.panel.selectPage('R', 'CTR 1'); // So DCT pre-fills the active waypoint (3-27 rule 4)
+    await unit.panel.dct();
+    await unit.panel.ent();
+    await vi.advanceTimersByTimeAsync(1000);
+    return {unit, nav, position, eee};
+}
+
 describe('Direct To in OBS mode (5-37)', () => {
     const offLeg = pointFrom(pointBefore(kaaa, abc, 10), 141, 3); // 3 NM right of KAAA - ABC
     // ABC with a published variation of 10 E (the sim stores east as negative), so that the magnetic course the unit shows
@@ -198,31 +225,6 @@ describe('Direct To in OBS mode (5-37)', () => {
         expect(Math.abs(unit.props.modeController.getObsMag() - (finalCourseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.3 magnetic: the course at ABC, 0.1 above the initial one
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
     });
-
-    /**
-     * FPL 0 KAAA - EEE, EEE 150 NM east of KAAA. The aircraft is 100 NM before EEE and 5 NM north of the leg. In OBS mode
-     * (ObsSource 0, so that the course is the unit's own), D-> EEE and ENT, then 1 s. With `obs` the unit instead reads a
-     * non-driven indicator that is on that course.
-     */
-    async function longDirectToEee(o: { obs?: number } = {}) {
-        const eeePos = pointFrom(kaaa, 90, 150);
-        const eee = intersection('EEE', eeePos.lat, eeePos.lon);
-        const onLeg = pointBefore(kaaa, eee, 100);
-        const position = pointFrom(onLeg, courseDeg(onLeg, eee) - 90, 5);
-        const unit = await bootUnit({facilities: [kaaa, eee], position, panelXml: o.obs === undefined ? panelXml(NO_OBS) : undefined, storage: savedFlightplan(0, [kaaa, eee])});
-        await settle(unit);
-        if (o.obs !== undefined) unit.env.sim.set('Nav OBS:1', 'degrees', o.obs);
-        await unit.panel.obsMode();
-        await vi.advanceTimersByTimeAsync(2000);
-        const nav = unit.props.memory.navPage;
-        expect(nav.navmode).toBe(NavMode.ENR_OBS);
-
-        await unit.panel.selectPage('R', 'CTR 1'); // So DCT pre-fills the active waypoint (3-27 rule 4)
-        await unit.panel.dct();
-        await unit.panel.ent();
-        await vi.advanceTimersByTimeAsync(1000);
-        return {unit, nav, position, eee};
-    }
 
     // 5-37 (5.9.6): the setup of the test below. The direct-to makes EEE active as a direct-to and keeps ENR-OBS
     it('makes EEE active as a direct-to and keeps ENR-OBS on a long direct course (the setup of #370)', async () => {
@@ -299,6 +301,71 @@ describe('Direct To in OBS mode (5-37)', () => {
         expect(Math.abs(unit.props.modeController.getObsMag() - (finalCourseDeg(offLeg, abc) - 10))).toBeLessThan(0.05); // 024.3 magnetic: the course at ABC, 0.1 above the initial one
         expect(Math.abs(unit.env.sim.get('Nav OBS:1', 'degrees') - (courseDeg(offLeg, abc) - 10))).toBeLessThan(0.5);
         expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
+    });
+});
+
+// The 90B's own rule, not a trainer check: the sim keeps the course it is sent as a whole degree, rounded half up (the
+// maintainer's sim check, 2026-10-25, #427). With an indicator the unit reads and drives, the unit holds the fraction
+// itself, so the whole degree that comes back is its own course, not a turn of the indicator by the pilot. A read-only
+// indicator is not driven, so what it shows is always the pilot's
+describe('the whole-degree echo of an OBS indicator (the 90B, #427)', () => {
+    // The long Direct To of #370: the course at EEE is 095.54, which the sim keeps as 96. Read back as a turn, the course
+    // snapped to 96 and the deviation was about 0.8 NM
+    it('keeps a course with a fraction and the deviation centered while the indicator shows the whole degree (#427)', async () => {
+        const {unit, nav, position, eee} = await longDirectToEee({driven: true});
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Math.abs(unit.props.modeController.getObsMag() - finalCourseDeg(position, eee))).toBeLessThan(1e-6); // 095.54, variation 0
+        expect(unit.env.sim.get('Nav OBS:1', 'degrees')).toBe(96);
+        expect(Math.abs(nav.xtkToActive!)).toBeLessThan(0.05);
+    });
+
+    // A value that is not the echo of the course sent is a turn by the pilot, and it is taken. This passes before the fix
+    // too: 097 differs from the course and from the whole degree of the course sent
+    it('still takes a turn of the indicator to another course (#427)', async () => {
+        const {unit} = await longDirectToEee({driven: true});
+        await vi.advanceTimersByTimeAsync(2000);
+
+        unit.env.sim.set('Nav OBS:1', 'degrees', 97);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Math.abs(unit.props.modeController.getObsMag() - 97)).toBeLessThan(1e-6);
+    });
+
+    // The sim rounds half up: a course of exactly 100.5 comes back as 101, which is not a turn
+    it('does not take the echo of a course at the half degree as a turn (#427)', async () => {
+        const {unit} = await longDirectToEee({driven: true});
+
+        unit.props.modeController.setObsOnUnit(100.5);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.env.sim.get('Nav OBS:1', 'degrees')).toBe(101);
+        expect(Math.abs(unit.props.modeController.getObsMag() - 100.5)).toBeLessThan(1e-6);
+    });
+
+    // The echo rule is for a driven indicator only. A read-only one (ObsSource 1, ObsTarget 0) shows what the pilot dialed,
+    // so a pilot who turns it to 101 while the unit holds 100.5 has turned the course. This passes before the fix too: it
+    // pins that the rule does not leak onto the read-only path
+    it('takes a turn of a read-only indicator to the whole degree of the course the unit holds (#427)', async () => {
+        const {unit} = await longDirectToEee({obs: 50});
+        const mc = unit.props.modeController;
+
+        mc.setObsOnUnit(100.5);
+        unit.env.sim.set('Nav OBS:1', 'degrees', 101); // No calculation tick between: the pilot turned it right after
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(Math.abs(mc.getObsMag() - 101)).toBeLessThan(1e-6);
+    });
+
+    // The sim reads 359.7 back as 000, the same direction as the unit's course, one degree rounded away across north
+    it('does not take the echo of a course at north as a turn (#427)', async () => {
+        const {unit} = await longDirectToEee({driven: true});
+
+        unit.props.modeController.setObsOnUnit(359.7);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.env.sim.get('Nav OBS:1', 'degrees')).toBe(0);
+        expect(Math.abs(unit.props.modeController.getObsMag() - 359.7)).toBeLessThan(1e-6);
     });
 });
 

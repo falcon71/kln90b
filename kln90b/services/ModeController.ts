@@ -394,9 +394,11 @@ export class ModeController implements CalcTickable {
      * only when it differs from the unit's magnetic course and, with an indicator the unit drives (Output.ObsTarget), also
      * from the course last sent to it: when the variation in use changes without a course set on the unit (a SET 2
      * entry, the edge of the coverage area), a driven indicator still shows the old number until the output at the end of
-     * this tick slews it, and reading it back would turn the true course (#261, #425). Each calculation tick reads the
-     * indicator (Sensors) before this, and NavCalculator.setOutput writes the course after it. Courses set on the unit
-     * (setObsTrueOnUnit, setObsOnUnit) write the output at once
+     * this tick slews it, and reading it back would turn the true course (#261, #425). The indicator also holds whole
+     * degrees only, rounded half up, so what it shows of the course last sent is that course as a whole degree, and
+     * that echo is the unit's own course as well (#427). Each calculation tick reads the indicator (Sensors) before
+     * this, and NavCalculator.setOutput writes the course after it. Courses set on the unit (setObsTrueOnUnit,
+     * setObsOnUnit) write the output at once
      */
     private readObsIndicator(): void {
         const obsIn = this.sensors.in.obsMag;
@@ -404,8 +406,14 @@ export class ModeController implements CalcTickable {
             return;
         }
         const sent = this.sensors.out.obsOut;
-        if (this.planeSettings.output.obsTarget !== 0 && sent !== null && ModeController.isSameCourse(obsIn, sent)) {
-            return;
+        //The sim keeps the course as a whole degree, rounded half up, and a course that rounds to 360 reads back as
+        //000: the maintainer's sim checks, 2026-10-25 (#427). The unit only sends courses of 0 up to 360, and diffAngle
+        //takes 360 and 000 as the same course
+        if (this.planeSettings.output.obsTarget !== 0 && sent !== null) {
+            const echo = NavMath.normalizeHeading(Math.round(sent));
+            if (ModeController.isSameCourse(obsIn, sent) || ModeController.isSameCourse(obsIn, echo)) {
+                return;
+            }
         }
         this.setObs(obsIn);
     }

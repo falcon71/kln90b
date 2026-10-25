@@ -125,3 +125,19 @@ ACTIVATE, the edge of the area, a SET 2 entry, a change of the active waypoint) 
 - Where the shared final-course function lives, and whether the display bearing is stored in `NavPageState` next to
   `bearingToActive` (then reset with it) or computed by the helper from the 1 Hz state.
 - The helper and field names, and how the indicator comparison avoids round-trip noise.
+
+## Amendment 2026-10-25 (#427)
+
+A driven indicator holds whole degrees: the maintainer's sim check of 2026-10-25 found that `K:VOR1_SET` stores the
+course as a whole degree, rounded half up (11.11 and 11.49 read back as 11, 11.5 and 11.7 as 12), and that a value
+outside 0 to 359 after rounding reads back as 0 (359.9, 370 and -10 all read 0). The unit holds the fraction itself (a
+Direct To course of 095.54), so the indicator's echo of the course last sent is not a turn of the indicator by the
+pilot, and reading it back would snap the course to the whole degree and leave a deviation (about 0.8 NM on the long
+geometry of #370).
+
+- With a driven indicator (`Output.ObsTarget` not 0), a read-back equal to `normalizeHeading(Math.round(obsOut))` is
+  the unit's own course and is skipped, as the exact `obsOut` match is. The comparison goes through `diffAngle`, so
+  360 and 000 are the same course. Any other value is a pilot's turn and is taken as before.
+- A read-only indicator is unchanged.
+- The unit only sends courses of 0 up to 360, so the sim's reading of a value outside that range is not needed by the
+  rule. `FakeSim.applyObsKeyEvents` stores the value as the sim does.
