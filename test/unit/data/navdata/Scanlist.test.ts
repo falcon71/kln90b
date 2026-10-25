@@ -786,6 +786,43 @@ describe('FacilityLoaderScanlist across the edge of its cache window (#40 8abd5f
     });
 });
 
+// In the sim an airport found by the scan list's search carries no region, while the same airport loaded as a facility
+// does (KTTS: region "" from SEARCH_BY_IDENT_WITH_STRUCT, "K7" in its icaoStruct, checked in the sim 2026-10-25). The
+// SDK takes both as the same airport. A page that shows the nearest airport (3-23) syncs the list to the loaded one.
+describe('FacilityLoaderScanlist synced to an airport loaded with its region (#430)', () => {
+    // 3000 airports KAAAA to KELJA, in this order
+    const world = () => idents('K', 3000);
+    const facilities = (list: string[]) => list.map((ident, i) => airport(ident, 47 + i * 0.0001, 8));
+
+    // The page shows KCNKA, then the nearest airport KCHQA, 150 airports earlier and inside the cache window. More than
+    // half the window follows it, so the first sync prunes the end of the cache. Taking the cached KCHQA (no region) as
+    // before the loaded one (K7) kept one airport too many, and the second sync read past the end of the cache: the
+    // sim's "undefined is not an object (evaluating 'this.icaoListCache[end].ident')" after MSG, ENT and ENT again.
+    // The scan then goes past the edge of the window to the last airport, which a cache that took the end of its window
+    // for the end of the list would not reach
+    it('syncs twice to the nearest airport inside its cache window and scans from it to the last airport', async () => {
+        const all = world();
+        const list = await scanlist(FacilitySearchType.Airport, facilities(all));
+        list.sync(ICAO.value('A', '', '', all[1700]));
+        await managerJob(list);
+        const nearest = ICAO.value('A', 'K7', '', all[1550]);
+
+        list.sync(nearest);
+        await managerJob(list);
+        list.sync(nearest);
+        await managerJob(list);
+
+        const shown: string[] = [];
+        let current: IcaoValue | null = nearest;
+        while (current !== null && shown.length < 2000) {
+            shown.push(current.ident);
+            current = await step(list, current, 1);
+        }
+
+        expect(shown).toEqual(all.slice(1550));
+    });
+});
+
 // 3-21: scanning slowly shows the waypoints one at a time in alphabetical order. Here more idents start with AB than
 // one search of the scan list asks for, so the search for the prefix AB may have been cut (whether the sim honors
 // maxItems is not known; the test database honors it and keeps the first idents). The list is the 3-21 order; the cut

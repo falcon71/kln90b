@@ -491,6 +491,11 @@ export class FacilityLoaderScanlist implements Scanlist {
 
     private listSortFunction(aIcao: IcaoValue, bIcao: IcaoValue): number {
         if (aIcao.ident === bIcao.ident) {
+            //#430: the order agrees with the uid the cache is searched by. The sim's search gives an airport no region, the
+            //loaded facility gives it one; both are the same airport
+            if (ICAO.valueEquals(aIcao, bIcao)) {
+                return 0;
+            }
             return ICAO.valueToStringV2(aIcao).localeCompare(ICAO.valueToStringV2(bIcao));
         }
 
