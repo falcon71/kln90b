@@ -119,6 +119,11 @@ export class NavPageState {
     public distToDest: NauticalMiles | null = null;
     public eteToDest: Seconds | null = null;
     public bearingToActive: Degrees | null = null; //true, based on appendix A of the manual
+    /**
+     * The course at the active waypoint of the great circle from the aircraft, true (5-37, #371): the bearing the NAV 1
+     * family of displays shows in OBS mode, in the frame of the waypoint. Null whenever bearingToActive is
+     */
+    public bearingAtActive: Degrees | null = null;
     public bearingForAP: Degrees | null = null; //true. Will be set to desiredTrack in DME arcs to improve autopilot tracking
     public desiredTrack: Degrees | null = null;  //true
     /**
@@ -403,6 +408,7 @@ export class VolatileMemory {
         this.navPage.distToDest = null;
         this.navPage.eteToDest = null;
         this.navPage.bearingToActive = null;
+        this.navPage.bearingAtActive = null;
         this.navPage.bearingForAP = null;
         this.navPage.desiredTrack = null;
         this.navPage.steeringPath = null;

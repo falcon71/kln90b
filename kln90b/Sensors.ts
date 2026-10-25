@@ -333,20 +333,28 @@ export class SensorsOut {
         SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, UnitType.NMILE.convertTo(this.xtkFilter.getCurrentValue(), UnitType.METER));
     }
 
-    public setDesiredTrack(dtkMag: number | null, actualTrack: number | null, magvar: number) {
+    /**
+     * GPS WP DESIRED TRACK is the DTK or the OBS course, magnetic with the variation at the aircraft, and
+     * GPS WP TRACK ANGLE ERROR that course less the track, computed in true. In OBS mode the unit shows the OBS course
+     * with the variation of the active waypoint (#371), but these outputs keep the frame of the aircraft
+     * @param dtkTrue the DTK or the OBS course, true
+     * @param actualTrack the track, true
+     * @param magvar the variation at the aircraft
+     */
+    public setDesiredTrack(dtkTrue: number | null, actualTrack: number | null, magvar: number) {
         if (!this.options.output.writeGPSSimVars) {
             return;
         }
-        if (dtkMag === null) {
+        if (dtkTrue === null) {
             SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
             SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, 0);
         } else {
             if (actualTrack === null) {
                 SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
             } else {
-                SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, UnitType.DEGREE.convertTo(NavMath.diffAngle(MagVar.trueToMagnetic(actualTrack, magvar), dtkMag), UnitType.RADIAN));
+                SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, UnitType.DEGREE.convertTo(NavMath.diffAngle(actualTrack, dtkTrue), UnitType.RADIAN));
             }
-            SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(dtkMag, UnitType.RADIAN));
+            SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(dtkTrue, magvar), UnitType.RADIAN));
 
         }
     }

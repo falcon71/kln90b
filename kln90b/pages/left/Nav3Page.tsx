@@ -90,7 +90,7 @@ export class Nav3Page extends SixLineHalfPage {
         this.children.get("activeArrow").icao = to?.icaoStruct ?? null;
         this.children.get("to").text = IcaoFixedLength.getIdentFromFacility(to);
 
-        this.children.get("track").bearing = gps.isValid() ? this.props.magvar.trueToMag(gps.getTrackTrueRespectingGroundspeed()) : null;
+        this.children.get("track").bearing = gps.isValid() ? this.props.modeController.getTrackMag() : null;
         this.children.get("flyDir").text = this.formatXTKDirection(navState.xtkToActive);
         this.children.get("flyDist").distance = navState.xtkToActive !== null ? Math.abs(navState.xtkToActive) : null; //#393: 0 is a value
 

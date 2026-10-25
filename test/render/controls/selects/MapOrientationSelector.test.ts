@@ -3,6 +3,10 @@ import {HeadlessUnit, moveAircraft} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {storedSetting} from '../../../harness/storage';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
+import {bootUnit, settle} from '../../../harness/boot';
+import {legWorld, variationNear} from '../../../harness/fixtures';
+import {NO_OBS, panelXml} from '../../../harness/panelXml';
+import {savedFlightplan} from '../../../harness/storage';
 
 // MapOrientationSelector: the NAV 5 orientation, a select whose text is the choice with the up arrow while the
 // cursor is on it and the orientation's value otherwise. Host: NAV 5 on the left (row 5, columns 0 to 3), saved as
@@ -82,5 +86,39 @@ describe('map orientation selector (characterization)', () => {
 
         expect(unit.panel.focused('L').text).toBe('TK^ ');
         expect(storedSetting(unit, 'nav5MapOrientation')).toBe(2);
+    });
+});
+
+describe('map orientation selector in OBS mode (characterization, #371)', () => {
+    // By analogy with the NAV 1 track of the KLN 89 trainer (2026-10-25): the track-up value is magnetic with the
+    // variation of the active waypoint in OBS mode. The world of the NAV 1 test: 64.8 NM west of KDDD on the leg to it,
+    // track 090 true, the variation 10 E within 1 NM of KDDD and 0 elsewhere: 090 in LEG mode, 080 in OBS mode
+    async function trackUp(obs: boolean): Promise<HeadlessUnit> {
+        const {kaaa, kddd, west} = legWorld();
+        const unit = await bootUnit({
+            facilities: [kaaa, kddd], position: west(64.8), magvar: variationNear(kddd, 10), panelXml: panelXml(NO_OBS),
+            storage: {...savedFlightplan(0, [kaaa, kddd]), nav5MapOrientation: 2},
+        });
+        await settle(unit);
+        if (obs) {
+            await unit.panel.obsMode();
+        }
+        await unit.panel.selectPage('L', 'NAV 5');
+        await moveAircraft(unit, west(64.8), {groundspeedKt: 145, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(1000);
+        return unit;
+    }
+
+    // The sibling of the OBS test below: the same world in LEG mode, where the aircraft's variation applies
+    it('characterization: shows the track at the variation of the aircraft in LEG mode, 090 for 090 true', async () => {
+        await trackUp(false);
+
+        expect(Screen.read().rows('L')[5].slice(0, 4)).toBe('090°');
+    });
+
+    it('characterization: shows the track at the variation of the waypoint, 080 for 090 true', async () => {
+        await trackUp(true);
+
+        expect(Screen.read().rows('L')[5].slice(0, 4)).toBe('080°');
     });
 });

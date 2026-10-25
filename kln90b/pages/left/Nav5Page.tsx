@@ -39,7 +39,7 @@ export class Nav5Page extends SixLineHalfPage {
 
         this.children = new UIElementChildren<Nav5PageTypes>({
             canvas: new Canvas(),
-            orientation: MapOrientationSelector.build(this.props.planeSettings, this.orientationSetting, this.props.sensors, this.props.modeController, this.props.magvar),
+            orientation: MapOrientationSelector.build(this.props.planeSettings, this.orientationSetting, this.props.sensors, this.props.modeController),
             range: new SelectField(RANGES, RANGES.indexOf(this.rangeSetting.get().toString().padStart(4, " ")), this.saveRange.bind(this)),
         });
 

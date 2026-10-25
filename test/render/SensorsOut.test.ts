@@ -1,11 +1,12 @@
 import {describe, expect, it, vi} from 'vitest';
 import {BootOptions, bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle, untilCalcTick} from '../harness/boot';
 import {Screen} from '../harness/render/screen';
-import {standardRoute} from '../harness/fixtures';
+import {legWorld, standardRoute, variationNear} from '../harness/fixtures';
 import {savedFlightplan} from '../harness/storage';
-import {HEADING_INPUT, NO_GPS_SIMVARS, panelXml} from '../harness/panelXml';
+import {HEADING_INPUT, NO_GPS_SIMVARS, NO_OBS, panelXml} from '../harness/panelXml';
 import {activeIdent} from '../harness/readers';
 import {bootOnStandardRoute} from '../harness/worldBoot';
+import {NavMode} from '../../kln90b/data/VolatileMemory';
 import {courseDeg, finalCourseDeg, pointBefore, pointFrom} from '../harness/flight/geo';
 
 // Public contract: the LVar is documented in LVars.ts (ARINC label 275, bit 22: true when no GPS signal is acquired) and
@@ -164,6 +165,77 @@ describe('LVar outputs with Output.WriteGPSSimVars off (public contract) (#124)'
         // The GPS SimVar of the same quantity stays with the other GPS
         expect(unit.env.sim.lastWrite('GPS WP BEARING')).toBeUndefined();
         expect(unit.env.sim.lastWrite('GPS WP TRUE BEARING')).toBeUndefined();
+    });
+});
+
+// The output keeps the frame of the aircraft (#371): the NAV 1 displays show the bearing at the active waypoint in OBS
+// mode, but the RMI bearing stays the initial bearing at the aircraft with the aircraft's variation. The world of
+// Nav1Page.test.ts: 64.8 NM west of KDDD on the leg to it, the variation 10 E within 1 NM of KDDD and 0 at the aircraft.
+describe('L:KLN90B_GPS_WP_BEARING in OBS mode keeps the frame of the aircraft (#371)', () => {
+    it('is the initial bearing with the variation of the aircraft, not the one at the waypoint', async () => {
+        const {kaaa, kddd, west} = legWorld();
+        const unit = await bootUnit({
+            facilities: [kaaa, kddd], position: west(64.8), magvar: variationNear(kddd, 10), panelXml: panelXml(NO_OBS),
+            storage: savedFlightplan(0, [kaaa, kddd]),
+        });
+        await settle(unit);
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
+        const expected = courseDeg(west(64.8), kddd); // 088.8 true, the variation at the aircraft is 0
+        expect(Math.abs(expected - 88.8)).toBeLessThan(0.1); // The literal follows from the geometry
+        const written = unit.env.sim.lastWrite('L:KLN90B_GPS_WP_BEARING')!;
+        expect(written.unit).toBe('radians');
+        expect(Math.abs((written.value as number) * 180 / Math.PI - expected)).toBeLessThan(0.1);
+    });
+});
+
+// Public contract (CLAUDE.md, "Public contract with aircraft", the GPS SimVars): GPS WP DESIRED TRACK is the DTK or the
+// OBS course in the frame of the aircraft, magnetic with the variation at the aircraft, and GPS WP TRACK ANGLE ERROR is
+// that course less the track, both in radians. The OBS course shown and sent to the indicator uses the variation of the
+// waypoint (#371), but these two keep the aircraft's frame, as before #371 for a waypoint that is not a VOR. The world of
+// the describe above: the leg KAAA to KDDD, the aircraft 64.8 NM west of KDDD at 145 kt on track 090 true, the variation
+// 10 E within 1 NM of KDDD and 0 at the aircraft.
+describe('GPS WP DESIRED TRACK and GPS WP TRACK ANGLE ERROR keep the frame of the aircraft (public contract) (#371)', () => {
+    async function onLegToKddd(): Promise<HeadlessUnit> {
+        const {kaaa, kddd, west} = legWorld();
+        const unit = await bootUnit({
+            facilities: [kaaa, kddd], position: west(69.8), magvar: variationNear(kddd, 10), panelXml: panelXml(NO_OBS),
+            storage: savedFlightplan(0, [kaaa, kddd]),
+        });
+        await settle(unit);
+        await moveAircraft(unit, west(64.8), {groundspeedKt: 145, trackTrue: 90});
+        return unit;
+    }
+
+    /** The last value written to the SimVar, which must be in radians, in degrees */
+    function degrees(unit: HeadlessUnit, name: string): number {
+        const written = unit.env.sim.lastWrite(name)!;
+        expect(written.unit).toBe('radians');
+        return (written.value as number) * 180 / Math.PI;
+    }
+
+    it('LEG mode: the DTK at the aircraft, 088.8, and the angle error 088.8 less the track 090', async () => {
+        const unit = await onLegToKddd();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_LEG); // Precondition
+        // The DTK at the aircraft is the course of the great circle there: 088.8 true (geo.ts), 0 variation
+        expect(Math.abs(degrees(unit, 'GPS WP DESIRED TRACK') - 88.8)).toBeLessThan(0.1);
+        expect(Math.abs(degrees(unit, 'GPS WP TRACK ANGLE ERROR') - (88.8 - 90))).toBeLessThan(0.1);
+    });
+
+    it('OBS mode: the OBS course 090 true with the variation at the aircraft, and no angle error on track 090', async () => {
+        const unit = await onLegToKddd();
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS); // Precondition
+        // Precondition: the unit chose the leg's course at KDDD, 090 true, shown as 080 with the variation of KDDD
+        expect(Math.abs(unit.props.modeController.getDtkOrObsMagnetic()! - 80)).toBeLessThan(0.1);
+        expect(Math.abs(degrees(unit, 'GPS WP DESIRED TRACK') - 90)).toBeLessThan(0.1);
+        expect(Math.abs(degrees(unit, 'GPS WP TRACK ANGLE ERROR'))).toBeLessThan(0.1);
     });
 });
 

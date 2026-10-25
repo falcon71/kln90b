@@ -1,5 +1,5 @@
 import {BoundaryType, Facility, FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
-import {pointFrom} from './flight/geo';
+import {distanceNm, LatLon, pointFrom} from './flight/geo';
 import {airspace} from './navdata/airspaces';
 import {airport, intersection, ndb, vor} from './navdata/builders';
 import {approach, Leg, sid, star, withProcedures} from './navdata/procedures';
@@ -165,6 +165,14 @@ export function legWorld() {
         keee: airport('KEEE', at(90, 30).lat, at(90, 30).lon),
         west: (nm: number) => at(270, nm),
     };
+}
+
+/**
+ * A variation model for BootOptions.magvar: `degrees` east (negative: west) within 1 NM of `place`, 0 everywhere else.
+ * It makes the variation at a waypoint differ from the one at the aircraft, which a uniform model cannot.
+ */
+export function variationNear(place: LatLon, degrees: number): (lat: number, lon: number) => number {
+    return (lat, lon) => distanceNm({lat, lon}, place) < 1 ? degrees : 0;
 }
 
 /**

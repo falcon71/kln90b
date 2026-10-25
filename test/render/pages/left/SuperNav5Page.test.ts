@@ -6,15 +6,17 @@ import {approach, Leg, withProcedures} from '../../../harness/navdata/procedures
 import {canvasToAscii, downsampled} from '../../../harness/render/canvas';
 import {APR_ARM_SWITCH, HEADING_INPUT, NO_OBS, panelXml} from '../../../harness/panelXml';
 import {activeIdent} from '../../../harness/readers';
-import {showSuperNav5, SuperNav5, superNav5OnArc} from '../../../harness/render/superNav5';
+import {showSuperNav5, SuperNav5, superNav5OnArc, superNav5OnLeg} from '../../../harness/render/superNav5';
 import {recordMap} from '../../../harness/render/mapRecorder';
 import {Screen} from '../../../harness/render/screen';
 import {savedFlightplan, storedSetting} from '../../../harness/storage';
-import {arcWorld, standardRoute} from '../../../harness/fixtures';
+import {arcWorld, legWorld, standardRoute, variationNear} from '../../../harness/fixtures';
 import {courseDeg, pointFrom} from '../../../harness/flight/geo';
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {SuperNav5Page} from '../../../../kln90b/pages/left/SuperNav5Page';
+import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 import {KLNFixType} from '../../../../kln90b/data/flightplan/Flightplan';
+import {SuperNav5Field2, SuperNav5Field3} from '../../../../kln90b/settings/KLN90BUserSettings';
 
 const HEADING_INPUT_XML = panelXml(HEADING_INPUT);
 
@@ -832,5 +834,62 @@ describe('Super NAV 5 OBS course', () => {
 
         expect(unit.overlay()).toBeInstanceOf(SuperNav5Page);
         expect(obsCourse()).toBe('052');
+    });
+});
+
+describe('Super NAV 5 in OBS mode (characterization, #371)', () => {
+    // Super NAV 5 is the 90B's own page, which the KLN 89 trainer does not have; by analogy with the NAV 1 bearing and
+    // track it showed in OBS mode (the trainer, 2026-10-25), the fields use the variation of the active waypoint. The
+    // world of the NAV 1 test: 64.8 NM west of KDDD on the leg to it, track 090 true, the variation 10 E within 1 NM of
+    // KDDD and 0 elsewhere, the unit chooses the OBS course (090 true at KDDD, 080 magnetic). In LEG mode the bearing
+    // is 088.8 true, 089 at the aircraft's variation of 0.
+    async function inObs(field2: SuperNav5Field2, field3: SuperNav5Field3, obs = true) {
+        return superNav5OnLeg({
+            westNm: 64.8, groundspeedKt: 145, magvar: variationNear(legWorld().kddd, 10), panelXml: panelXml(NO_OBS), obs,
+            storage: {superNav5Field2: field2, superNav5Field3: field3},
+        });
+    }
+
+    // The sibling of the OBS test below: the same world in LEG mode, where the aircraft's variation applies
+    it('characterization: shows the bearing and the track at the variation of the aircraft in LEG mode', async () => {
+        await inObs(SuperNav5Field2.BRG, SuperNav5Field3.TK, false);
+
+        expect(SuperNav5.read().left.slice(5)).toEqual(['Ô089°', 'Ö090°']);
+    });
+
+    it('characterization: shows the bearing in field 2 and the track in field 3 at the variation of the waypoint', async () => {
+        const unit = await inObs(SuperNav5Field2.BRG, SuperNav5Field3.TK);
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
+        expect(SuperNav5.read().left.slice(5)).toEqual(['Ô080°', 'Ö080°']);
+    });
+
+    it('characterization: shows the radial in field 2 as the reciprocal of the bearing at the waypoint', async () => {
+        await inObs(SuperNav5Field2.RAD, SuperNav5Field3.TK);
+
+        expect(SuperNav5.read().left[5]).toBe('Õ260°');
+    });
+
+    it('characterization: shows the radial in field 3 as the reciprocal of the bearing at the waypoint', async () => {
+        await inObs(SuperNav5Field2.BRG, SuperNav5Field3.RAD);
+
+        expect(SuperNav5.read().left[6]).toBe('Õ260°');
+    });
+
+    it('characterization: shows the bearing in field 3 at the variation of the waypoint', async () => {
+        await inObs(SuperNav5Field2.RAD, SuperNav5Field3.BRG);
+
+        expect(SuperNav5.read().left[6]).toBe('Ô080°');
+    });
+
+    // The menu of the right cursor shows the value of the TK-up orientation before its symbol (figure 3-119)
+    it('characterization: shows the track at the variation of the waypoint as the TK-up value of the menu', async () => {
+        const unit = await superNav5OnLeg({
+            westNm: 64.8, groundspeedKt: 145, magvar: variationNear(legWorld().kddd, 10), panelXml: panelXml(NO_OBS), obs: true,
+            storage: {superNav5MapOrientation: 2},
+        });
+        await unit.panel.cursor('R');
+
+        expect(SuperNav5.read().right![3]).toBe(' 080°Ö^');
     });
 });

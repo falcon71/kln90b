@@ -89,7 +89,7 @@ export class Nav1Page extends SixLineHalfPage {
         this.children.get("dist").distance = navState.distToActive;
         this.children.get("speed").speed = this.props.sensors.in.gps.isValid() ? this.props.sensors.in.gps.groundspeed : null;
         this.children.get("ete").time = navState.eteToActive;
-        this.children.get("brg").bearing = this.props.magvar.trueToMag(navState.bearingToActive);
+        this.children.get("brg").bearing = this.props.modeController.getBearingToActiveMag();
 
     }
 

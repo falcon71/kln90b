@@ -7,6 +7,7 @@ import {pointFrom} from '../../../harness/flight/geo';
 import {NO_OBS, panelXml} from '../../../harness/panelXml';
 import {activeIdent} from '../../../harness/readers';
 import {hold} from '../../../harness/navState';
+import {variationNear} from '../../../harness/fixtures';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 import {Nav3Page} from '../../../../kln90b/pages/left/Nav3Page';
 
@@ -54,7 +55,7 @@ const OBS_SOURCE_OFF = panelXml(NO_OBS);
  * the course (south of it, the leg is eastbound; a negative value is left of the course) at 120 kt with the track of
  * the leg
  */
-async function nav3OnLeg(rightNm: number, xml = OBS_SOURCE_OFF, magvar = 0): Promise<HeadlessUnit> {
+async function nav3OnLeg(rightNm: number, xml = OBS_SOURCE_OFF, magvar: number | ((lat: number, lon: number) => number) = 0): Promise<HeadlessUnit> {
     const unit = await bootUnit({
         facilities: [KAAA, KDDD, KEEE], position: west(30), panelXml: xml, magvar,
         storage: savedFlightplan(0, [KAAA, KDDD, KEEE]),
@@ -79,6 +80,23 @@ describe('NAV 3 page (characterization)', () => {
             'MSA 15900ft',
             'ESA 15900ft',
         ]);
+    });
+});
+
+describe('NAV 3 page in OBS mode (characterization, #371)', () => {
+    // The NAV 3 track is the 90B's own page; by analogy with the NAV 1 bearing of the KLN 89 trainer (2026-10-25) the
+    // track is magnetic with the variation of the active waypoint in OBS mode. The variation is 10 E within 1 NM of
+    // KDDD and 0 elsewhere, the track 090 true: 090 in LEG mode (the aircraft's variation, 0), 080 in OBS mode
+    it('characterization: shows the track with the variation of the waypoint in OBS mode, 080 for 090 true', async () => {
+        const unit = await nav3OnLeg(0, OBS_SOURCE_OFF, variationNear(KDDD, 10));
+        expect(Screen.read().rows('L')[2]).toBe('TK     090°'); // Precondition: LEG mode
+
+        await unit.panel.obsMode(); // The OBS key shows MOD 2 on the left
+        await unit.panel.selectPage('L', 'NAV 3');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
+        expect(Screen.read().rows('L')[2]).toBe('TK     080°');
     });
 });
 

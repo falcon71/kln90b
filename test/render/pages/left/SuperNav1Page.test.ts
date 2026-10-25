@@ -3,10 +3,12 @@ import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boo
 import {airport} from '../../../harness/navdata/builders';
 import {activeIdent} from '../../../harness/readers';
 import {Screen} from '../../../harness/render/screen';
-import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
+import {variationNear} from '../../../harness/fixtures';
+import {APR_ARM_SWITCH, NO_OBS, panelXml} from '../../../harness/panelXml';
 import {savedFlightplan} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
 import {approachWorld} from '../../../harness/fixtures';
+import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 import {SuperNav1Page} from '../../../../kln90b/pages/left/SuperNav1Page';
 
 // The world of Nav1Page.test.ts: KDDD, with KAAA 200 NM west of it on the great circle that leaves KDDD on 270 true
@@ -39,9 +41,9 @@ async function onApproach(): Promise<HeadlessUnit> {
 }
 
 /** On the leg KAAA to KDDD, `nm` west of KDDD at `groundspeedKt`, Super NAV 1 shown */
-async function onLeg(nm: number, groundspeedKt: number, magvar = 0): Promise<HeadlessUnit> {
+async function onLeg(nm: number, groundspeedKt: number, magvar: number | ((lat: number, lon: number) => number) = 0, xml?: string): Promise<HeadlessUnit> {
     const unit = await bootUnit({
-        facilities: [KAAA, KDDD], position: west(nm + 5), magvar, storage: savedFlightplan(0, [KAAA, KDDD]),
+        facilities: [KAAA, KDDD], position: west(nm + 5), magvar, panelXml: xml, storage: savedFlightplan(0, [KAAA, KDDD]),
     });
     await settle(unit);
     await superNav1(unit);
@@ -128,6 +130,22 @@ describe('Super NAV 1 page', () => {
         await directToKddd();
 
         expect(Screen.read().row(0).trimEnd()).toMatch(/d›KDDD$/);
+    });
+});
+
+describe('Super NAV 1 page in OBS mode (characterization, #371)', () => {
+    // Super NAV 1 holds the data of NAV 1 (3-32), whose bearing the KLN 89 trainer showed at the waypoint with the
+    // variation of the waypoint in OBS mode (2026-10-25); the Super NAV 1 follows by analogy. The variation is 10 E
+    // within 1 NM of KDDD and 0 elsewhere: BRG 089 in LEG mode (088.8 true), 080 in OBS mode (090.0 true at KDDD)
+    it('characterization: shows the bearing at the waypoint with the variation of the waypoint, 080', async () => {
+        const unit = await onLeg(64.8, 145, variationNear(KDDD, 10), panelXml(NO_OBS));
+        expect(untrimmedRows()[3]).toBe('GS    145kt   BRG  089°'); // Precondition: LEG mode
+
+        await unit.panel.obsMode(); // The OBS key shows MOD 2 on the left
+        await superNav1(unit);
+
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_OBS);
+        expect(untrimmedRows()[3]).toBe('GS    145kt   BRG  080°');
     });
 });
 

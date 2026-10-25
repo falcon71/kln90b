@@ -10,7 +10,6 @@ import {UIElementChildren} from "../../pages/Page";
 import {ObsDtkElement} from "./ObsDtkElement";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {ModeController} from "../../services/ModeController";
-import {KLNMagvar} from "../../data/navdata/KLNMagvar";
 
 type SuperNav5Field2SelectorTypes = {
     obsdtk: ObsDtkElement,
@@ -21,15 +20,15 @@ export class SuperNav5Field2Selector extends SelectField {
     public children: UIElementChildren<SuperNav5Field2SelectorTypes>;
 
 
-    private constructor(valueSet: string[], private readonly setting: UserSetting<SuperNav5Field2>, private readonly state: NavPageState, private readonly sensors: Sensors, planeSettings: KLN90PlaneSettings, private readonly modeController: ModeController, private readonly magvar: KLNMagvar, changedCallback: (value: number) => void) {
+    private constructor(valueSet: string[], private readonly setting: UserSetting<SuperNav5Field2>, private readonly state: NavPageState, private readonly sensors: Sensors, planeSettings: KLN90PlaneSettings, private readonly modeController: ModeController, changedCallback: (value: number) => void) {
         super(valueSet, setting.get(), changedCallback);
         this.children = new UIElementChildren<SuperNav5Field2SelectorTypes>({
             obsdtk: new ObsDtkElement(planeSettings, sensors, state, modeController, true),
         });
     }
 
-    public static build(setting: UserSetting<SuperNav5Field2>, state: NavPageState, sensors: Sensors, planeSettings: KLN90PlaneSettings, modeController: ModeController, magvar: KLNMagvar): SuperNav5Field2Selector {
-        return new SuperNav5Field2Selector(["DTK   ", "BRG   ", "RAD   "], setting, state, sensors, planeSettings, modeController, magvar, (field) => this.saveSetting(setting, field));
+    public static build(setting: UserSetting<SuperNav5Field2>, state: NavPageState, sensors: Sensors, planeSettings: KLN90PlaneSettings, modeController: ModeController): SuperNav5Field2Selector {
+        return new SuperNav5Field2Selector(["DTK   ", "BRG   ", "RAD   "], setting, state, sensors, planeSettings, modeController, (field) => this.saveSetting(setting, field));
     }
 
     private static saveSetting(setting: UserSetting<SuperNav5Field2>, field: SuperNav5Field2): void {
@@ -75,10 +74,10 @@ export class SuperNav5Field2Selector extends SelectField {
                     }
                     break;
                 case SuperNav5Field2.BRG:
-                    this.ref.instance.textContent = "Ô" + this.formatDegrees(this.magvar.trueToMag(this.state.bearingToActive));
+                    this.ref.instance.textContent = "Ô" + this.formatDegrees(this.modeController.getBearingToActiveMag());
                     break;
                 case SuperNav5Field2.RAD:
-                    this.ref.instance.textContent = "Õ" + this.formatDegrees(this.toRadial(this.magvar.trueToMag(this.state.bearingToActive)));
+                    this.ref.instance.textContent = "Õ" + this.formatDegrees(this.toRadial(this.modeController.getBearingToActiveMag()));
                     break;
             }
         }

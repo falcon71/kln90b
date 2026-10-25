@@ -7,6 +7,8 @@ import {Nav1Page} from '../../../../kln90b/pages/left/Nav1Page';
 import {savedFlightplan} from '../../../harness/storage';
 import {pointFrom} from '../../../harness/flight/geo';
 import {activeIdent} from '../../../harness/readers';
+import {NO_OBS, panelXml} from '../../../harness/panelXml';
+import {variationNear} from '../../../harness/fixtures';
 
 // An invented world: KDDD, with KAAA 200 NM west of it on the great circle that leaves KDDD on 270 true, so every point
 // west(nm) lies on the leg KAAA to KDDD (no cross track). FPL 0 is KAAA, KDDD; KDDD is active.
@@ -20,9 +22,9 @@ const west = (nm: number) => pointFrom(KDDD, 270, nm);
  * `groundspeedKt` with the track of the leg. The page is selected first, because selectPage reads the screen, and a
  * screen that overflows its half page (the DIS test of #226) cannot be read.
  */
-async function onLeg(nm: number, groundspeedKt: number, magvar = 0): Promise<HeadlessUnit> {
+async function onLeg(nm: number, groundspeedKt: number, magvar: number | ((lat: number, lon: number) => number) = 0, xml?: string): Promise<HeadlessUnit> {
     const unit = await bootUnit({
-        facilities: [KAAA, KDDD], position: west(nm + 5), magvar,
+        facilities: [KAAA, KDDD], position: west(nm + 5), magvar, panelXml: xml,
         storage: savedFlightplan(0, [KAAA, KDDD]),
     });
     await settle(unit);
@@ -140,6 +142,55 @@ describe('NAV 1 page', () => {
         await onLeg(99.97, 145);
 
         expect(['DIS   100nm', 'DIS  99.9nm']).toContain(Screen.read().rows('L')[2]);
+    });
+});
+
+describe('NAV 1 page in OBS mode (#371)', () => {
+    // 5-37; checked in the KLN 89 trainer, 2026-10-25 (OBS model block): in OBS mode the NAV 1 bearing is the bearing at
+    // the active waypoint, with the variation of the waypoint. The variation is 10 E within 1 NM of KDDD and 0
+    // elsewhere, the aircraft 64.8 NM west of KDDD on the 270 great circle: the bearing to KDDD is 088.8 true at the
+    // aircraft and 090.0 at KDDD. The unit chooses the OBS course (ObsSource 0): 090 true at KDDD, 080 magnetic. The
+    // bearing shows 080: the initial bearing with the variation of the waypoint would give 079, the bearing at the
+    // waypoint with the variation of the aircraft 090.
+    it('shows the bearing at the waypoint with the variation of the waypoint (checked in the KLN 89 trainer, 2026-10-25)', async () => {
+        const unit = await onLeg(64.8, 145, variationNear(KDDD, 10), panelXml(NO_OBS));
+        expect(Screen.read().rows('L')[5]).toBe('BRG    089°'); // Precondition: LEG mode, the initial bearing 088.8 less 0
+
+        await unit.panel.obsMode(); // The OBS key shows MOD 2 on the left
+        await unit.panel.selectPage('L', 'NAV 1');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L')[5]).toBe('BRG    080°');
+    });
+
+    // 3-31, figure 3-101: without a usable GPS NAV 1 shows dashes for BRG, in OBS mode too: the bearing at the waypoint
+    // must not stay on the screen as a stale value
+    it('shows dashes for BRG when the GPS is lost in OBS mode (3-31, figure 3-101)', async () => {
+        const unit = await onLeg(64.8, 145, variationNear(KDDD, 10), panelXml(NO_OBS));
+        await unit.panel.obsMode();
+        await unit.panel.selectPage('L', 'NAV 1');
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(Screen.read().rows('L')[5]).toBe('BRG    080°'); // Precondition: OBS mode, the bearing at KDDD
+
+        unit.props.sensors.in.gps.reset();
+        await vi.advanceTimersByTimeAsync(1500);
+
+        expect(unit.props.sensors.in.gps.isValid()).toBe(false); // the fast acquisition takes 10 s
+        expect(Screen.read().rows('L')[5]).toBe('BRG    ---°');
+    });
+
+    // Robustness (characterization): with the aircraft on the waypoint the course at the waypoint is undefined (NaN, like
+    // the bearing to it, whose cells stay blank as before this change); the page raises no error and prints no NaN
+    it('characterization: raises no error and prints no NaN with the aircraft on the waypoint', async () => {
+        const unit = await onLeg(64.8, 145, variationNear(KDDD, 10), panelXml(NO_OBS));
+        await unit.panel.obsMode();
+        await unit.panel.selectPage('L', 'NAV 1');
+        await moveAircraft(unit, {lat: KDDD.lat, lon: KDDD.lon}, {groundspeedKt: 145, trackTrue: 90});
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
+        expect(rawLeftRow(5)).toMatch(/^BRG {4}/);
+        expect(rawLeftRow(5)).not.toContain('NaN');
     });
 });
 

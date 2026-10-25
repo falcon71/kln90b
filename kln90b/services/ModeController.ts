@@ -3,15 +3,12 @@ import {
     AirportFacility,
     EventBus,
     Facility,
-    FacilityType,
-    FacilityUtils,
     GeoPoint,
     ICAO,
     LatLonInterface,
     NavMath,
     UnitType,
     UserFacilityUtils,
-    VorFacility,
 } from "@microsoft/msfs-sdk";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {Sensors} from "../Sensors";
@@ -235,14 +232,42 @@ export class ModeController implements CalcTickable {
         return this.magvar.magToTrue(this.navState.obsMag, magvar);
     }
 
-    public getMagvarForObs(wpt: Facility | null) {
-        if (!this.magvar.isMagvarValid()) {
-            return this.magvar.getCurrentMagvar(); //5-44: true north (or the variation entered on SET 2), also for a VOR (#190)
+    /**
+     * The variation of the OBS course at the active waypoint, east positive. The OBS course is laid through the waypoint
+     * and measured there (5-37), so with a valid variation (5-44) the waypoint's own applies: a VOR's published one, any
+     * other waypoint the model at its position (KLNMagvar.getReferenceMagvar; the KLN 89 trainer showed it at the waypoint,
+     * 2026-10-25, #371). Without a valid variation it is true north or the SET 2 value, also for a VOR (#190)
+     */
+    public getMagvarForObs(wpt: Facility | null): number {
+        if (wpt === null || !this.magvar.isMagvarValid()) {
+            return this.magvar.getCurrentMagvar();
         }
-        if (wpt !== null && FacilityUtils.isFacilityType(wpt, FacilityType.VOR)) {
-            return -(wpt as VorFacility).magneticVariation; //Seems to be opposite to the magvar service
+        return KLNMagvar.getReferenceMagvar(wpt);
+    }
+
+    /**
+     * The bearing to the active waypoint as NAV 1 and its relatives show it, magnetic. In OBS mode it is the bearing at the
+     * waypoint with the variation of the waypoint, the frame of the OBS course (the KLN 89 trainer, 2026-10-25, #371);
+     * in LEG mode the bearing at the aircraft with the variation there. Null without a bearing
+     */
+    public getBearingToActiveMag(): Degrees | null {
+        if (this.isObsModeActive()) {
+            return this.magvar.trueToMag(this.navState.bearingAtActive, this.getMagvarForObs(this.navState.activeWaypoint.getActiveWpt()));
         }
-        return this.magvar.getCurrentMagvar();
+        return this.magvar.trueToMag(this.navState.bearingToActive);
+    }
+
+    /**
+     * The actual track as NAV 3 and its relatives show it, magnetic, null below the ground speed for a track (3-32). In
+     * OBS mode with the variation of the active waypoint (the KLN 89 trainer, 2026-10-25, #371), in LEG mode with the
+     * variation at the aircraft
+     */
+    public getTrackMag(): Degrees | null {
+        const track = this.sensors.in.gps.getTrackTrueRespectingGroundspeed();
+        if (this.isObsModeActive()) {
+            return this.magvar.trueToMag(track, this.getMagvarForObs(this.navState.activeWaypoint.getActiveWpt()));
+        }
+        return this.magvar.trueToMag(track);
     }
 
     private forceSwitchToEnrObsMode() {

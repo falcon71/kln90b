@@ -61,7 +61,7 @@ export class SuperNav5Right implements UiElement {
             case Nav5Orientation.DTK_UP:
                 return this.props.modeController.getDtkOrObsMagnetic();
             case Nav5Orientation.TK_UP:
-                return this.props.magvar.trueToMag(this.props.sensors.in.gps.getTrackTrueRespectingGroundspeed());
+                return this.props.modeController.getTrackMag();
             case Nav5Orientation.HDG_UP:
                 return this.props.sensors.in.headingGyro;
         }

@@ -9,17 +9,18 @@ import {SuperNav5Field3} from "../../settings/KLN90BUserSettings";
 import {KLNMagvar} from "../../data/navdata/KLNMagvar";
 import {SidStar} from "../../data/navdata/SidStar";
 import {Flightplan} from "../../data/flightplan/Flightplan";
+import {ModeController} from "../../services/ModeController";
 
 
 export class SuperNav5Field3Selector extends SelectField {
 
 
-    private constructor(valueSet: string[], private setting: UserSetting<SuperNav5Field3>, private state: NavPageState, private sensors: Sensors, private readonly magvar: KLNMagvar, private readonly fpl0: Flightplan, changedCallback: (value: number) => void) {
+    private constructor(valueSet: string[], private setting: UserSetting<SuperNav5Field3>, private state: NavPageState, private sensors: Sensors, private readonly magvar: KLNMagvar, private readonly fpl0: Flightplan, private readonly modeController: ModeController, changedCallback: (value: number) => void) {
         super(valueSet, setting.get(), changedCallback);
     }
 
-    public static build(setting: UserSetting<SuperNav5Field3>, state: NavPageState, sensors: Sensors, magvar: KLNMagvar, fpl0: Flightplan): SuperNav5Field3Selector {
-        return new SuperNav5Field3Selector([" TK   ", "BRG   ", "RAD   "], setting, state, sensors, magvar, fpl0, (field) => this.saveSetting(setting, field));
+    public static build(setting: UserSetting<SuperNav5Field3>, state: NavPageState, sensors: Sensors, magvar: KLNMagvar, fpl0: Flightplan, modeController: ModeController): SuperNav5Field3Selector {
+        return new SuperNav5Field3Selector([" TK   ", "BRG   ", "RAD   "], setting, state, sensors, magvar, fpl0, modeController, (field) => this.saveSetting(setting, field));
     }
 
     private static saveSetting(setting: UserSetting<SuperNav5Field3>, field: SuperNav5Field3): void {
@@ -55,13 +56,13 @@ export class SuperNav5Field3Selector extends SelectField {
 
             switch (field) {
                 case SuperNav5Field3.TK:
-                    this.ref.instance.textContent = "Ö" + this.formatDegrees(this.magvar.trueToMag(this.sensors.in.gps.getTrackTrueRespectingGroundspeed()));
+                    this.ref.instance.textContent = "Ö" + this.formatDegrees(this.modeController.getTrackMag());
                     break;
                 case SuperNav5Field3.BRG:
-                    this.ref.instance.textContent = "Ô" + this.formatDegrees(this.magvar.trueToMag(this.state.bearingToActive));
+                    this.ref.instance.textContent = "Ô" + this.formatDegrees(this.modeController.getBearingToActiveMag());
                     break;
                 case SuperNav5Field3.RAD:
-                    this.ref.instance.textContent = "Õ" + this.formatDegrees(this.toRadial(this.magvar.trueToMag(this.state.bearingToActive)));
+                    this.ref.instance.textContent = "Õ" + this.formatDegrees(this.toRadial(this.modeController.getBearingToActiveMag()));
                     break;
                 case SuperNav5Field3.ARC:
                     this.ref.instance.textContent = "Ø" + this.formatDegrees(arc);

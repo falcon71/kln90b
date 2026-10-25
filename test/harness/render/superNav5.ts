@@ -91,18 +91,24 @@ export async function showSuperNav5(unit: HeadlessUnit, o: { waitMs?: number } =
 /**
  * Boots in the leg world on the leg to KDDD, `westNm` west of it and `rightNm` right of the course (south), moving at
  * `groundspeedKt` on track 090, and shows Super NAV 5 (NAV 5 on both sides; the right side first, its shorter way
- * passes NAV 5)
+ * passes NAV 5). `magvar` is a variation (east) or a model for BootOptions.magvar; `panelXml` is for BootOptions.panelXml;
+ * `obs` enters OBS mode at the start position, before the move.
  */
 export async function superNav5OnLeg(o: {
-    westNm: number, rightNm?: number, groundspeedKt?: number, storage?: Record<string, unknown>, magvar?: number,
+    westNm: number, rightNm?: number, groundspeedKt?: number, storage?: Record<string, unknown>,
+    magvar?: number | ((lat: number, lon: number) => number), panelXml?: string, obs?: boolean,
 }): Promise<HeadlessUnit> {
     const {kaaa, kddd, keee, west} = legWorld();
     const start = west(o.westNm);
     const unit = await bootUnit({
-        facilities: [kaaa, kddd, keee], position: start, magvar: o.magvar,
+        facilities: [kaaa, kddd, keee], position: start, magvar: o.magvar, panelXml: o.panelXml,
         storage: {...savedFlightplan(0, [kaaa, kddd, keee]), ...o.storage},
     });
     await settle(unit);
+    if (o.obs) {
+        await unit.panel.obsMode();
+        await vi.advanceTimersByTimeAsync(1000);
+    }
     const right = o.rightNm ?? 0;
     const at = pointFrom(start, right >= 0 ? 180 : 0, Math.abs(right));
     await moveAircraft(unit, at, {groundspeedKt: o.groundspeedKt ?? 120, trackTrue: 90});

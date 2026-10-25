@@ -629,8 +629,6 @@ sim.
   the reciprocal of the OBS** (`setObs`). `setObs` skips an unchanged course unless `force` is set (entering OBS and
   ACTIVATE force it). A course set on the unit (MOD 2, NAV 3, a Direct To in OBS) goes through `setObsOnUnit`, which
   also writes it to a driven indicator at once; otherwise the 1 Hz read-back of the indicator would replace it.
-- For OBS on VORs, the magnetic variation is taken from the VOR's `magneticVariation`, negated ("Seems to be opposite to
-  the magvar service").
 - Status-line feedback: `NO APPROACH`, `NO ACTV WPT`.
 
 **`RollSteeringController`** (1 Hz, after `NavCalculator`) applies one control law, `rollSteeringCommand` in
@@ -669,6 +667,19 @@ inputs as the KLN 89 does: angle, offset and waypoint cleared, FR set to SEL (#7
   `navPage.userMagvar`, which resets to 0 when re-entering coverage. In OBS mode the active waypoint must lie inside
   the band too (5-44, #190): otherwise the variation counts as invalid, and `getMagvarForObs` references the OBS course
   to true north (or the variation entered on SET 2), also for an active VOR.
+- In OBS mode with a valid variation the OBS course is measured at the active waypoint and uses the variation there
+  (5-35, 5-37, #371): `getMagvarForObs` returns `KLNMagvar.getReferenceMagvar` of the waypoint, a VOR's published
+  variation or the model at the position of any other waypoint. The NAV 1 family of displays (NAV 1, Super NAV 1,
+  NAV 3, the Super NAV 5 BRG, RAD and TK fields and the track-up value of the map) takes the bearing and the track
+  from `ModeController.getBearingToActiveMag` and `getTrackMag`: in OBS mode the bearing at the waypoint
+  (`navPage.bearingAtActive`, from `courseAtWaypoint`) and the track, both with the variation of the waypoint; in LEG
+  mode the bearing at the aircraft and the track with the variation at the aircraft. The outputs to the aircraft keep
+  the frame of the aircraft in both modes: `L:KLN90B_GPS_WP_BEARING`, `GPS WP BEARING`, `GPS GROUND MAGNETIC TRACK` and
+  `GPS MAGVAR` use the variation at the aircraft, `GPS WP DESIRED TRACK` is the DTK or the true OBS course
+  (`getDtkOrObsTrue`) with the variation at the aircraft, and `GPS WP TRACK ANGLE ERROR` is computed in true
+  (`NavCalculator.setOutput`, `SensorsOut.setDesiredTrack`). Only the OBS course sent to the indicator
+  (`K:VOR1_SET`/`K:VOR2_SET` and `GPS OBS VALUE`, `SensorsOut.setObs`) is the magnetic course the unit shows, with the
+  OBS variation.
 - Convention: DTK and bearings are stored **true**; `obsMag` and `getDtkOrObsMagnetic()` are magnetic, and the names say
   which.
 

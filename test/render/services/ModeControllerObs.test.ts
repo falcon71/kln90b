@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {Facility, FixTypeFlags, FlightPlanLeg, LegTurnDirection} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
-import {standardRoute} from '../../harness/fixtures';
+import {standardRoute, variationNear} from '../../harness/fixtures';
 import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {savedFlightplan} from '../../harness/storage';
@@ -45,7 +45,7 @@ describe('LEG to OBS (5-36)', () => {
     // the unit chooses is the leg's course at the active waypoint (its final course) less the variation (#151).
     describe('keeps a deviation of 2 NM and sets the magnetic OBS course', () => {
         /** ObsSource 0, 5 NM before the end of the leg KAAA - `end`, 2 NM right of it */
-        async function twoNmRight(end: Facility, magvar: number | undefined) {
+        async function twoNmRight(end: Facility, magvar: number | ((lat: number, lon: number) => number) | undefined) {
             const position = pointFrom(pointBefore(kaaa, end, 5), finalCourseDeg(kaaa, end) + 90, 2);
             const unit = await bootUnit({facilities: [kaaa, end], position, panelXml: OBS_SOURCE_OFF, magvar, storage: savedFlightplan(0, [kaaa, end])});
             await settle(unit);
@@ -67,9 +67,22 @@ describe('LEG to OBS (5-36)', () => {
             expect(nav.xtkToActive!).toBeCloseTo(2, 1);
         });
 
-        // 5-35: for a waypoint that is not a VOR the unit uses the variation at the aircraft, here 10 E
-        it('with the variation at the aircraft for an active airport (10 E)', async () => {
-            const {nav, trueCourse} = await twoNmRight(kbbb, 10);
+        // 5-35 item 6: the published variation holds where the variation model gives another one at the VOR (3 E)
+        it('keeps the published variation of an active VOR where the model gives another (5-35)', async () => {
+            const end = vor('ABC', abc.lat, abc.lon, {magneticVariation: -10});
+            const {nav, trueCourse} = await twoNmRight(end, 3);
+
+            expect(nav.navmode).toBe(NavMode.ENR_OBS);
+            expect(Math.abs(nav.obsMag - (trueCourse - 10))).toBeLessThan(0.2);
+            expect(nav.xtkToActive!).toBeCloseTo(2, 1);
+        });
+
+        // 5-35; checked in the KLN 89 trainer, 2026-10-25 (the OBS variation at the waypoint) for a user waypoint and an
+        // NDB: the unit used the variation at the waypoint, not the one at the aircraft. The trainer check did not cover
+        // an airport; it follows by analogy with those two waypoints that are not VORs. Here 10 E within 1 NM of KBBB
+        // and 0 at the aircraft, 2 NM before it
+        it('with the variation at the active airport, not at the aircraft (10 E at KBBB)', async () => {
+            const {nav, trueCourse} = await twoNmRight(kbbb, variationNear(kbbb, 10));
 
             expect(nav.navmode).toBe(NavMode.ENR_OBS);
             expect(Math.abs(nav.obsMag - (trueCourse - 10))).toBeLessThan(0.2);
