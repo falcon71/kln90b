@@ -58,16 +58,16 @@ class ScanHandler {
             throw new Error("I'm already scanning, you are calling me too fast!");
         }
         this.isSearchRunning = true;
-        const nextIcao = await this.scanList.getNext(lastIcao, scrollSpeed);
+        try {
+            const nextIcao = await this.scanList.getNext(lastIcao, scrollSpeed);
 
-        if (nextIcao === null) {
-            this.isSearchRunning = false;
-            return null
+            if (nextIcao === null) {
+                return null
+            }
+            return await this.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(nextIcao), nextIcao) as any;
+        } finally {
+            this.isSearchRunning = false; //#429: also after a step whose waypoint does not load, or the scan stops for good
         }
-        const nextFacility = await this.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(nextIcao), nextIcao) as any;
-
-        this.isSearchRunning = false;
-        return nextFacility;
     }
 }
 

@@ -44,7 +44,7 @@ describe('VOR page with duplicate idents (d3228dd)', () => {
 describe('VOR page scan after a waypoint that does not load', () => {
     // 3-21: the scan knob steps through the list. One waypoint that does not load (a user waypoint deleted while the scan
     // ran, a facility call that fails) must not stop the scan on the page for good
-    it.fails('scans on after a scan step whose waypoint did not load (#429)', async () => {
+    it('scans on after a scan step whose waypoint did not load (#429)', async () => {
         const unit = await bootUnit({facilities: [vor('ABC', 47.1, 8.1), vor('ABD', 47.2, 8.2), vor('ABE', 47.3, 8.3)], position: {lat: 47, lon: 8}});
         await unit.panel.selectPage('R', 'VOR  ');
         expect(identAndName()[0]).toBe(' ABC D     '); // Precondition: the page starts on the first VOR
