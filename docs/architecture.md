@@ -214,7 +214,8 @@ Turn-On page ticks during the boot (#416).
 - Each tickable is wrapped in try/catch, which logs the error and publishes `error`. **Async ticks** (`NearestList.tick`
   is `async`) are not awaited, but `tickCalc` attaches the same handler to the returned promise (#95), so their
   rejections reach the error page too. `NearestList` clears `isCalculating` in a `finally`, so a failed search does not
-  stop the later ones.
+  stop the later ones, and it does not search before its session exists (`init()` has resolved, #424): the first search
+  runs at the first tick after it.
 - Expensive work throttles itself inside the 1 Hz tick: `NearestList` and `AirspaceAlert` search every 10 s (
   `NEAREST_TICK_TIME`, `ALERT_TICK_TIME`); `GPS` and `Timers` save every 60 s.
 - Separate intervals: `SimVarSync` runs every 100 ms and always runs, even when powered off. `BrightnessManager` uses

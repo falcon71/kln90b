@@ -74,7 +74,8 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
         this.tickTimer += TICK_TIME_CALC;
         if (this.isCalculating) {
             return;
-        } else if (this.tickTimer < NEAREST_TICK_TIME) {
+        } else if (this.tickTimer < NEAREST_TICK_TIME || this.session === undefined) {
+            //#424: the session exists only once init() has resolved; the first search runs at the first tick after it
             this.updateBearingDistance();
             return;
         }

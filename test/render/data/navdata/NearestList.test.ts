@@ -524,7 +524,7 @@ describe('the nearest NDB list after a rejected search (#95)', () => {
 // NearestList.init() resolves. A session start that takes longer than 10 s (the sim's facility database is slow) must
 // not make the first search throw: AirspaceAlert.tick guards the same case.
 describe('the nearest lists before their search sessions have started (#424)', () => {
-    it.fails('publishes no error while the nearest search sessions have not started (#424)', async () => {
+    it('publishes no error while the nearest search sessions have not started (#424)', async () => {
         muteConsoleError();
         const startSession = MemoryFacilityClient.prototype.startNearestSearchSessionWithIcaoStructs;
         const spy = vi.spyOn(MemoryFacilityClient.prototype, 'startNearestSearchSessionWithIcaoStructs').mockImplementation(
@@ -538,5 +538,23 @@ describe('the nearest lists before their search sessions have started (#424)', (
         const unit = await startUnit({}, 11_000);
 
         expect(unit.errors.filter(e => e instanceof TypeError)).toEqual([]);
+    });
+
+    // A session that starts after the 10 s is used by the searches from then on, without an error before it
+    it('searches once the session has started late (#424)', async () => {
+        const startSession = MemoryFacilityClient.prototype.startNearestSearchSessionWithIcaoStructs;
+        const spy = vi.spyOn(MemoryFacilityClient.prototype, 'startNearestSearchSessionWithIcaoStructs').mockImplementation(
+            function (this: MemoryFacilityClient, type: FacilitySearchType) {
+                const session = startSession.call(this, type);
+                return type === FacilitySearchType.Ndb ? new Promise<any>(resolve => setTimeout(() => resolve(session), 15_000)) : session;
+            });
+        onTestFinished(() => spy.mockRestore());
+        const unit = await bootUnit({facilities: [ndb('NAA', 47.05, 8.0)], position: POSITION});
+        expect(unit.props.nearestLists.ndbNearestList.getNearestList()).toEqual([]); // Precondition: no search yet
+
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+
+        expect(unit.props.nearestLists.ndbNearestList.getNearestList().map(w => w.facility.icaoStruct.ident)).toEqual(['NAA']);
+        expect(unit.errors).toEqual([]);
     });
 });

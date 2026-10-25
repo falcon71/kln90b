@@ -1,6 +1,6 @@
 import {describe, expect, it, onTestFinished, vi} from 'vitest';
 import {Facility, FacilityType, ICAO, IcaoValue} from '@microsoft/msfs-sdk';
-import {bootUnit, bootUnitExpectingError, startUnit} from '../harness/boot';
+import {bootUnit, bootUnitExpectingError} from '../harness/boot';
 import {muteConsoleError} from '../harness/console';
 import {KLN90BCore} from '../../kln90b/KLN90BCore';
 import {EVT_ENT, EVT_POWER_OFF, EVT_POWER_ON} from '../../kln90b/HEvents';
@@ -78,17 +78,6 @@ function onLookupOfZzv(answer: (real: () => Promise<Facility>) => Promise<Facili
 
 const TURN_ON_TOP_ROW = ' GPS             ORS 20';
 
-/**
- * The errors without those of the nearest lists' calculation ticks. A nearest list whose search session never started
- * throws at each of its searches (NearestList.tick, every 10 s, with no session yet), and the tick controller publishes
- * that too; it is not part of the self-test. The self-test's error comes after the one at 60 s, so the error page shows
- * it at 61 s. Only because of #424: remove this filter, and the startUnit in place of bootUnitExpectingError in the
- * tests that use it, once #424 is fixed
- */
-function withoutNearestTickErrors(errors: Error[]): Error[] {
-    return errors.filter(e => !e.message.includes("reading 'searchNearest'"));
-}
-
 // A call of the boot (asyncInit) that never answers leaves the unit without its services: it stays on the Turn-On page,
 // and the self-test of the page names the call on the error page once it has been pending for 60 s. The engine runs, so
 // the unit is on during the boot. Spec 4.2 and 4.4 of docs/superpowers/specs/2026-10-25-startup-self-test-design.md
@@ -109,9 +98,9 @@ describe('a hang during the boot (#416)', () => {
         const spy = vi.spyOn(MemoryFacilityClient.prototype, 'startNearestSearchSessionWithIcaoStructs').mockImplementation(() => never());
         onTestFinished(() => spy.mockRestore());
 
-        const failed = await startUnit({}, 61_000); // Not bootUnitExpectingError because of #424 (withoutNearestTickErrors)
+        const failed = await bootUnitExpectingError();
 
-        expect(withoutNearestTickErrors(failed.errors)).toHaveLength(1);
+        expect(failed.errors).toHaveLength(1);
         expect(failed.errorPage()).toContain('startNearestSearchSessionWithIcaoStructs(');
         expect(Screen.read().row(0)).toBe(TURN_ON_TOP_ROW);
     });
@@ -154,11 +143,10 @@ describe('a hang during the boot (#416)', () => {
         const session = vi.spyOn(MemoryFacilityClient.prototype, 'startNearestSearchSessionWithIcaoStructs').mockImplementation(() => never());
         onTestFinished(() => session.mockRestore());
 
-        const failed = await startUnit({}, 61_000); // Not bootUnitExpectingError because of #424 (withoutNearestTickErrors)
+        const failed = await bootUnitExpectingError();
 
-        const published = withoutNearestTickErrors(failed.errors);
-        expect(published).toHaveLength(1);
-        expect(published[0].message).toBe("Start-up self-test failed: the sim's facility initialization has not completed for 60 s");
+        expect(failed.errors).toHaveLength(1);
+        expect(failed.errors[0].message).toBe("Start-up self-test failed: the sim's facility initialization has not completed for 60 s");
         expect(failed.errorPage()).toContain("the sim's facility initialization has not completed for");
         expect(Screen.read().row(0)).toBe(TURN_ON_TOP_ROW);
     });
