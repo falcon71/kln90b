@@ -355,6 +355,17 @@ describe('VOR classes in the nearest VOR list', () => {
         expect(Screen.read().rows('L').slice(2, 4)).toEqual(['HIG  180°fr', '     18.0nm']);
     });
 
+    // 3-32: NAV 2 shows the radial of the VOR at the aircraft, or dashes where there is none. With the aircraft exactly
+    // on HIG there is no radial (#432)
+    it('shows dashes for the NAV 2 radial with the aircraft exactly on the VOR (3-32, #432)', async () => {
+        const unit = await bootUnit({facilities: [vor('HIG', POSITION.lat, POSITION.lon)], position: POSITION});
+        await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
+        await unit.panel.selectPage('L', 'NAV 2');
+
+        expect(Screen.read().rows('L').slice(2, 4)).toEqual(['HIG  ---°fr', '      0.0nm']);
+        expect(unit.errors).toEqual([]);
+    });
+
     // Characterization: the guide is silent on a database VOR of undefined class on NAV 2. It follows from "NAV 2 shows a
     // low or high altitude VOR" (3-8, 3-32) only by inference, and the class mask of the NAV 2 search holds it
     it('shows HIG on NAV 2 although a database VOR of undefined class is nearer (characterization; 3-8, 3-32)', async () => {

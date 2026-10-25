@@ -1,4 +1,4 @@
-import {FSComponent, GeoPoint, UnitType, VNode, VorFacility} from '@microsoft/msfs-sdk';
+import {FSComponent, UnitType, VNode, VorFacility} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
@@ -10,6 +10,7 @@ import {LongitudeDisplay} from "../../controls/displays/LongitudeDisplay";
 import {SidStar} from "../../data/navdata/SidStar";
 import {TICK_TIME_DISPLAY} from "../../TickController";
 import {ErrorEvent} from "../../controls/ErrorPage";
+import {bearingBetween} from "../../data/navdata/Bearing";
 
 //#204: the 90B guide does not say how often NAV 2 picks its VOR again. The KLN 89 trainer switched to a new nearer VOR
 //within about 10 s while the page stayed shown (2026-10-16); maintainer ruling, #204: when the page opens, then every 10 s
@@ -88,7 +89,7 @@ export class Nav2Page extends SixLineHalfPage {
                 this.children.get("vorDist").distance = null;
             } else {
                 this.children.get("vor").text = vor.icaoStruct.ident.padEnd(3, " ");
-                const radialTrue = new GeoPoint(vor.lat, vor.lon).bearingTo(this.props.sensors.in.gps.coords); //#339: the radial is measured at the VOR
+                const radialTrue = bearingBetween(vor, this.props.sensors.in.gps.coords); //#339: the radial is measured at the VOR; #432: none on the VOR
                 this.children.get("vorBearing").bearing = this.props.magvar.trueToMag(radialTrue, -vor.magneticVariation);
                 this.children.get("vorDist").distance = UnitType.GA_RADIAN.convertTo(this.props.sensors.in.gps.coords.distance(vor), UnitType.NMILE);
             }

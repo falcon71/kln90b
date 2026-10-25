@@ -258,3 +258,17 @@ describe('TRI 1 fuel flow and reserve as user settings (#192)', () => {
         expect(Screen.read().rows('L').slice(3, 5)).toEqual(['FF: 00012.0', 'RES:00030.0']);
     });
 });
+
+describe('TRI 1 page with the aircraft on the waypoint', () => {
+    // 5-3: the bearing to the waypoint, or dashes where there is none. The aircraft is exactly on KAAA, so there is no
+    // bearing to it, and without a course no ground speed along it either (#432)
+    it('shows dashes for the bearing and the ground speed with the aircraft exactly on the waypoint (5-3, #432)', async () => {
+        const unit = await bootTri1();
+
+        await enterTo(unit, 'KAAA');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['P.POS-KAAA ', '   0nm ---°', '---kt --:--']);
+        expect(unit.errors).toEqual([]);
+    });
+});

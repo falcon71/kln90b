@@ -520,6 +520,17 @@ describe('APT 1 page in the nearest list', () => {
         expect(Screen.read().rows('R')[0]).toBe(' KAAA  nr 1');
         expect(Screen.read().rows('R')[5].trim()).toMatch(/^04\.1nm$/);
     });
+
+    // 3-22: the bearing to the airport, or dashes where there is none. With the aircraft exactly on KAAA there is no
+    // bearing to it; the whole nearest list shares the bearing, so the other waypoint pages follow (#432)
+    it('shows dashes for the bearing with the aircraft exactly on the airport (3-22, #432)', async () => {
+        const unit = await bootNearest(POS.lat);
+
+        const rows = Screen.read().rows('R');
+        expect(rows[0]).toBe(' KAAA  nr 1');
+        expect(rows[4]).toBe('L    ---°to');
+        expect(unit.errors).toEqual([]);
+    });
 });
 
 describe('APT 1 page with the cursor on the nearest rank', () => {

@@ -1,4 +1,4 @@
-import {FSComponent, GeoPoint, UserSetting} from "@microsoft/msfs-sdk";
+import {FSComponent, UserSetting} from "@microsoft/msfs-sdk";
 import {SelectField} from "./SelectField";
 import {NavPageState} from "../../data/VolatileMemory";
 import {TickController} from "../../TickController";
@@ -10,6 +10,7 @@ import {KLNMagvar} from "../../data/navdata/KLNMagvar";
 import {SidStar} from "../../data/navdata/SidStar";
 import {Flightplan} from "../../data/flightplan/Flightplan";
 import {ModeController} from "../../services/ModeController";
+import {bearingBetween} from "../../data/navdata/Bearing";
 
 
 export class SuperNav5Field3Selector extends SelectField {
@@ -45,12 +46,12 @@ export class SuperNav5Field3Selector extends SelectField {
             let field: SuperNav5Field3 = this.value;
 
             const vor = SidStar.getVorIfWithin30NMOfArc(this.state, this.fpl0);
-            let arc: number = 0;
+            let arc: number | null = 0;
 
             if (vor !== null) {
                 //6-18 Overriden to DTK, when an arc is active
                 field = SuperNav5Field3.ARC;
-                const radialTrue = new GeoPoint(vor.lat, vor.lon).bearingTo(this.sensors.in.gps.coords); //#339: the radial is measured at the VOR
+                const radialTrue = bearingBetween(vor, this.sensors.in.gps.coords); //#339: the radial is measured at the VOR; #432: none on the VOR
                 arc = this.magvar.trueToMag(radialTrue, -vor.magneticVariation);
             }
 

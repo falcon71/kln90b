@@ -192,9 +192,10 @@ describe('VOR page contents (3-49)', () => {
 
     // C-2 is about a list without any VOR. The power-on fills the scan list's cache around its first VOR; a page that
     // restored its saved VOR (#192) beyond that window refills the cache when it is first shown, and the list is not
-    // empty meanwhile. More VORs come before YKM than the cache holds after its first one (Scanlist.ts TARGET_CACHE_SIZE)
+    // empty meanwhile. More VORs come before YKM than the cache holds after its first one (Scanlist.ts TARGET_CACHE_SIZE).
+    // The idents have three characters, as a VOR's has: NAV 2 on the left shows the nearest of them with room for three
     it('does not show NO VOR WPTS the first time it shows a restored VOR outside the cached part of the list (#428)', async () => {
-        const before = Array.from({length: 700}, (_, i) => vor(`A${String(i).padStart(3, '0')}`, 47, 8));
+        const before = Array.from({length: 700}, (_, i) => vor(`A${i.toString(36).toUpperCase().padStart(2, '0')}`, 47, 8));
         const unit = await bootUnit({
             facilities: [...before, vor('YKM', 46.57, -120.45, {name: 'YAKIMA'})],
             position: {lat: 47, lon: 8},
@@ -249,6 +250,17 @@ describe('VOR page nearest view (3-22, 3-49)', () => {
         const rows = Screen.read().rows('R');
         expect(rows[0]).toBe(' ABC D nr 1');
         expect(parseFloat(rows[5].trim())).toBe(7.3);
+    });
+
+    // 3-49: the bearing to the VOR, or dashes where there is none. With the aircraft exactly on ABC there is no bearing to
+    // it. The VOR page stands for the NDB, INT and USR pages, which share its nearest view (#432)
+    it('shows dashes for the bearing with the aircraft exactly on the VOR (3-49, #432)', async () => {
+        const unit = await nearestAbc(0, 47, 8);
+
+        const rows = Screen.read().rows('R');
+        expect(rows[0]).toBe(' ABC D nr 1');
+        expect(rows[4]).toBe('     ---°to');
+        expect(unit.errors).toEqual([]);
     });
 
     // 3-22: the NR number flashes

@@ -1,6 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
 import {superNav5OnArc, superNav5OnLeg, SuperNav5} from '../../../harness/render/superNav5';
 import {storedSetting} from '../../../harness/storage';
+import {moveAircraft} from '../../../harness/boot';
+import {arcWorld} from '../../../harness/fixtures';
 import {SuperNav5Field3} from '../../../../kln90b/settings/KLN90BUserSettings';
 
 // SuperNav5Field3Selector: the bottom line of the Super NAV 5 left column (left[6]): the actual track, the bearing to
@@ -69,5 +71,18 @@ describe('Super NAV 5 field 3', () => {
     it('characterization: shows the arc radial measured at the VOR (#339)', async () => {
         await superNav5OnArc({radial: 225.55, storage: {superNav5Field3: SuperNav5Field3.TK}});
         expect(field3()).toBe('Ø226°');
+    });
+
+    // 6-18: the arc radial of the VOR, or dashes where there is none. With the aircraft exactly on ABC, the arc's VOR,
+    // there is no radial (#432). The DTK on the arc raises an error there, which is #433 and pinned in
+    // NavCalculator.test.ts, so unit.errors is not asserted here
+    it('shows dashes for the arc radial with the aircraft exactly on the arc\'s VOR (6-18, #432)', async () => {
+        const unit = await superNav5OnArc({storage: {superNav5Field3: SuperNav5Field3.TK}});
+        const {abc} = arcWorld();
+
+        await moveAircraft(unit, {lat: abc.lat, lon: abc.lon}, {groundspeedKt: 0, trackTrue: 0}); // Parked, so the arc is not sequenced
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(field3()).toBe('Ø---°');
     });
 });

@@ -21,6 +21,7 @@ import {
 import {Sensors} from "../../Sensors";
 import {KLN90BUserSettings, SURFACE_HRD, SURFACE_HRD_SFT} from "../../settings/KLN90BUserSettings";
 import {CalcTickable, TICK_TIME_CALC} from "../../TickController";
+import {bearingBetween} from "./Bearing";
 
 const NEAREST_TICK_TIME = 10000;
 const MAX_ITEMS = 9;
@@ -48,7 +49,7 @@ export class Nearestlists {
 
 export interface NearestWpt<T extends Facility> {
     facility: T,
-    bearingToTrue: number,
+    bearingToTrue: number | null, //null with the aircraft on the waypoint (#432)
     distance: number,
     index: number,
 }
@@ -135,7 +136,7 @@ abstract class NearestList<SearchType extends NearestSearchType, FacType extends
         for (const wpt of this.nearestList) {
             const wptCoords = new GeoPoint(wpt.facility.lat, wpt.facility.lon);
             wpt.distance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(wptCoords), UnitType.NMILE);
-            wpt.bearingToTrue = this.sensors.in.gps.coords.bearingTo(wptCoords);
+            wpt.bearingToTrue = bearingBetween(this.sensors.in.gps.coords, wptCoords);
         }
         this.nearestList.sort(this.sortByDistanceFunction.bind(this));
 

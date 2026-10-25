@@ -12,6 +12,7 @@ import {DurationDisplay} from "../../controls/displays/DurationDisplay";
 import {TripFuelDisplay} from "../../controls/displays/FuelDisplay";
 import {calculateGroundspeedAlongCourse} from "../../data/Wind";
 import {HOURS_TO_SECONDS} from "../../data/navdata/NavCalculator";
+import {bearingBetween} from "../../data/navdata/Bearing";
 
 
 type Tri3PageTypes = {
@@ -103,11 +104,12 @@ export class Tri3Page extends SixLineHalfPage {
         } else {
             const from = new GeoPoint(this.props.memory.triPage.tri3From.lat, this.props.memory.triPage.tri3From.lon);
 
-            this.bearingTrue = from.bearingTo(this.props.memory.triPage.tri3To);
+            //#432: from a waypoint to itself there is no course, and without one no ground speed along it
+            this.bearingTrue = bearingBetween(from, this.props.memory.triPage.tri3To);
             this.magvar = this.props.magvar.getMagvarForCoordinates(from);
 
             this.dist = UnitType.GA_RADIAN.convertTo(from.distance(this.props.memory.triPage.tri3To), UnitType.NMILE);
-            this.gs = calculateGroundspeedAlongCourse(this.props.userSettings.getSetting('triTas').get(), this.bearingTrue, this.props.userSettings.getSetting('triWindSpeed').get(), this.props.userSettings.getSetting('triWindDirTrue').get());
+            this.gs = this.bearingTrue === null ? null : calculateGroundspeedAlongCourse(this.props.userSettings.getSetting('triTas').get(), this.bearingTrue, this.props.userSettings.getSetting('triWindSpeed').get(), this.props.userSettings.getSetting('triWindDirTrue').get());
             this.ete = this.gs === null ? null : this.dist / this.gs * HOURS_TO_SECONDS;
         }
 

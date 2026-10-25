@@ -191,3 +191,17 @@ describe('TRI 3 fuel flow and reserve as user settings (#192)', () => {
         expect(storedSetting(unit, 'triReserve')).toBe(7);
     });
 });
+
+describe('TRI 3 page from a waypoint to itself', () => {
+    // 5-5: the course from the first waypoint to the second, or dashes where there is none. From KAAA to KAAA there is
+    // no course, and without one no ground speed along it either (#432)
+    it('shows dashes for the course and the ground speed from a waypoint to itself (5-5, #432)', async () => {
+        const unit = await bootTri3([kaaa()], {position: {lat: 46.0, lon: 8.0}});
+
+        await enterRoute(unit, 'KAAA', 'KAAA');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L').slice(0, 3)).toEqual(['KAAA -KAAA ', '   0nm ---°', '---kt --:--']);
+        expect(unit.errors).toEqual([]);
+    });
+});
