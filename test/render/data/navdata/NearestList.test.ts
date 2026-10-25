@@ -1,6 +1,7 @@
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, onTestFinished, vi} from 'vitest';
 import {Facility, FacilitySearchType, FacilityType, RunwaySurfaceType, VorClass, VorType} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS} from '../../../harness/boot';
+import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS, startUnit} from '../../../harness/boot';
+import {muteConsoleError} from '../../../harness/console';
 import {MemoryFacilityClient} from '../../../harness/navdata/MemoryFacilityClient';
 import {airport, ndb, vor} from '../../../harness/navdata/builders';
 import {recordMap} from '../../../harness/render/mapRecorder';
@@ -516,5 +517,26 @@ describe('the nearest NDB list after a rejected search (#95)', () => {
         await vi.advanceTimersByTimeAsync(2 * NEAREST_SEARCH_WAIT_MS);
 
         expect(unit.props.nearestLists.ndbNearestList.getNearestList().map(w => w.facility.icaoStruct.ident)).toEqual(['NAA']);
+    });
+});
+
+// The lists search every 10 s of calculation ticks (NearestList.tick), but their sessions exist only once
+// NearestList.init() resolves. A session start that takes longer than 10 s (the sim's facility database is slow) must
+// not make the first search throw: AirspaceAlert.tick guards the same case.
+describe('the nearest lists before their search sessions have started (#424)', () => {
+    it.fails('publishes no error while the nearest search sessions have not started (#424)', async () => {
+        muteConsoleError();
+        const startSession = MemoryFacilityClient.prototype.startNearestSearchSessionWithIcaoStructs;
+        const spy = vi.spyOn(MemoryFacilityClient.prototype, 'startNearestSearchSessionWithIcaoStructs').mockImplementation(
+            function (this: MemoryFacilityClient, type: FacilitySearchType) {
+                const hung = type === FacilitySearchType.Airport || type === FacilitySearchType.Vor || type === FacilitySearchType.Ndb;
+                return hung ? new Promise<any>(() => undefined) : startSession.call(this, type);
+            });
+        onTestFinished(() => spy.mockRestore());
+
+        // The boot waits for the sessions, so it never reaches propsReady; the calculation ticks run all the same
+        const unit = await startUnit({}, 11_000);
+
+        expect(unit.errors.filter(e => e instanceof TypeError)).toEqual([]);
     });
 });
