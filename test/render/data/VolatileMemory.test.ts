@@ -226,6 +226,45 @@ async function approachLoadedAt(nm: number) {
     return unit;
 }
 
+// A plan leg on the approach is active when the unit is turned off, and the aircraft flies on while it is off. The
+// power-on of more than 5 minutes removes the approach, and the unit must then take the leg closest to where the aircraft
+// is now, as it does for a dropped Direct To (#422) and after a sim restart
+describe('the active leg after a power-on that removed its approach (#423)', () => {
+    /** FPL 0 ENRZZ (150 NM north), ENRAA (60 NM north), the approach, KPRC; the leg to IAFAA active 16 NM north. Then off
+     * for 600 s while the aircraft moves to 110 NM north, on the leg ENRZZ - ENRAA, and on again */
+    async function movedWhileOff() {
+        const w = approachWorld();
+        const enrzz = intersection('ENRZZ', w.north(150).lat, w.north(150).lon);
+        const unit = await bootUnit({
+            facilities: [...w.facilities, enrzz], position: w.north(16),
+            panelXml: panelXml(APR_ARM_SWITCH),
+            storage: {...savedFlightplan(0, [enrzz, w.enraa, w.kprc]), turnAnticipation: false},
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        const before = activeIdent(unit);
+        await unit.panel.powerOff();
+        unit.env.sim.set('PLANE LATITUDE', 'degrees', w.north(110).lat);
+        await vi.advanceTimersByTimeAsync(600_000);
+        await unit.panel.powerOn();
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(2000);
+        return {unit, before};
+    }
+
+    it('the leg to IAFAA is active before the power-off, and the power-on removes the approach (the precondition, #423)', async () => {
+        const {unit, before} = await movedWhileOff();
+        expect(before).toBe('IAFAA');
+        expect(fplIdents(unit)).toEqual(['ENRZZ', 'ENRAA', 'KPRC']);
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true);
+    });
+
+    it.fails('comes back on the leg closest to the position after the power-on, ENRZZ - ENRAA (#423)', async () => {
+        const {unit} = await movedWhileOff();
+        expect(activeIdent(unit)).toBe('ENRAA');
+    });
+});
+
 describe('procedures over a power cycle (6-5, 6-23)', () => {
     const approachLoaded = () => approachLoadedAt(40);
 
