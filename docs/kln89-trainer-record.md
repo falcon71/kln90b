@@ -714,3 +714,42 @@ coordinates; the VM was not started, stopped or reset)
 - A point on the whole-degree corner N44°00' W86°00' read 4100 ft, the value north of the parallel (2900 south of it).
 - CAL 1 with the same waypoint as From and To shows the ESA dashed.
 - Outcome: the maintainer keeps the one-sided reading as it is (#392, not planned).
+
+**2026-10-26** (the maintainer's check and an agent check for #401 and #434, the course message `ADJ NAV IND CRS TO`;
+the AVsoftech KLN 90B trainer reads its HSI course and is third-party and unreliable, the KLN 89 trainer has no course
+input; times from screenshots every 0.5-0.7 s, because the MSG prompt blinks at about 1 Hz; the VM was not started,
+stopped or reset)
+- AVsoftech, Leg mode, readable HSI: a Direct To with the course left off the new DTK posted the message 12.2-12.9 s
+  after ENT (the maintainer, then 5 agent runs). With the course already on the new DTK, or set within about 6 s, no
+  message (medium, one clean run each). A swing of about 5 s off and back posted nothing; about 12 s off posted it.
+- AVsoftech: at a flight-plan leg change with the course left on the old leg, the message came with the leg switch,
+  within 0.7 s, not 12 s later (medium, one clean run).
+- AVsoftech: setting the course onto the DTK removed an unread message within about a second. A message read with the
+  course still off came back as new about 12 s after the MSG page was left (not adopted: 3-16 keeps a read condition
+  message with a steady prompt).
+- AVsoftech: the unit's window looked narrower than 5° (low; the pointer can be read only to a few degrees).
+- AVsoftech: a Direct To to KFLD, a waypoint of FPL 0, posted nothing three times and the aircraft did not turn; cause
+  unknown, a trainer oddity.
+- KLN 89, Direct To in Leg mode: `GPS Course is nnn°` within a second for course changes of 23° and 87°, none for 0°.
+  Once read it did not return, and a newer one replaced an unread older one.
+- Outcome: #434 (12 s for a readable course).
+
+**2026-10-26** (a second agent check for #434 and #436: is the course message at a leg change tied to the waypoint
+alert or to the course; the same two trainers; the VM was not started, stopped or reset)
+- AVsoftech, readable HSI left on the old course through a leg change (5 runs, turns of 26-160°): the message came in
+  the frame of the leg switch and stayed unread for 2-4 minutes, long after the arrow had gone steady. It went only
+  when the course was set onto the new DTK, or when it was read.
+- AVsoftech, the course set onto the new DTK before the switch (medium, one clean run): no message at the switch, and a
+  pending message of the old leg went at the switch. With the course 3-10° off the new DTK the switch posted it.
+- AVsoftech, the course set 15-40 s after the switch: the message went within about 1.5 s of the course coming within
+  the window (2 runs).
+- AVsoftech: no setting makes the HSI course unreadable; the NAV/GPS switch on NAV still feeds it to the unit.
+- AVsoftech: its arrow is unlike the real unit. It flashes from about 2.1 NM before the waypoint and goes steady at the
+  leg switch, which comes earlier the larger the turn (0.3 NM at 26°, about 4 NM at 150-160°, where the arrow never
+  flashes). So it cannot show whether a message ends with the arrow.
+- KLN 89, flight-plan leg change of 34° with turn anticipation: the arrow flashed from 18 s before the turn until 7 s
+  after the sequencing. `M` came with the DTK switch (`GPS Course is 242°`) and was still on, unread, 2 minutes after
+  the arrow went steady. A turn of 117° out of a Direct To leg posted nothing and the arrow did not flash before it
+  (medium, 2 runs over two checks; unexplained).
+- Outcome: #434 (a leg change posts at once with a readable course; no forced window). The trainers do not settle the
+  case without a course input, which the two real-unit videos of #436 decide.
