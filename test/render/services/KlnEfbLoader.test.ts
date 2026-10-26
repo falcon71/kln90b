@@ -1254,6 +1254,60 @@ describe('EFB route import of procedures (#378)', () => {
         expect(deleted).toEqual(['WAYPOINT D1 DELETED', 'WAYPOINT D2 DELETED']);
     });
 
+    // #409 6-22, figure 6-35: APT 7 asks no runway when every runway gives the same legs, and loads the first one
+    const runwaysOf = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs()
+        .filter(l => l.type === SID).map(l => [l.procedure!.runwayNumber, l.procedure!.runwayDesignator]);
+    const dep1Parallels = () => departureWith([dep1([{runway: '09L', legs: [Leg.DF(r09)]}, {runway: '09R', legs: [Leg.DF(r09)]}])]);
+
+    it('loads a SID whose runways give the same legs when the route names no runway, with the first one (#409)', async () => {
+        const kaaa = dep1Parallels();
+        const unit = await boot([kaaa, kbbb]);
+
+        const deleted = await sync(unit, {departure: kaaa, sid: 'DEP1', enroute: [e1], destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'R09', 'D1', 'D2', 'E1', 'KBBB']);
+        expect(runwaysOf(unit)).toEqual(Array(3).fill([9, RunwayDesignator.RUNWAY_DESIGNATOR_LEFT]));
+        expect(deleted).toEqual([]);
+    });
+
+    it('keeps the runway the route names for a SID whose runways give the same legs (#409)', async () => {
+        const kaaa = dep1Parallels();
+        const unit = await boot([kaaa, kbbb]);
+
+        await sync(unit, {departure: kaaa, sid: 'DEP1', departureRunway: '09R', enroute: [e1], destination: kbbb});
+
+        expect(runwaysOf(unit)).toEqual(Array(3).fill([9, RunwayDesignator.RUNWAY_DESIGNATOR_RIGHT]));
+    });
+
+    // APT 7 does not list a runway that leaves no leg to fly; a route that names one keeps the SID from loading, even when
+    // the other runways would merge, rather than loading another runway's legs
+    it('skips a SID whose named runway the unit cannot fly, also when its other runways merge (#409, #378)', async () => {
+        const kaaa = departureWith([sid('DEP9', {
+            runways: [{runway: '09L', legs: [Leg.DF(r09)]}, {runway: '09R', legs: [Leg.DF(r09)]}, {runway: '27', legs: [Leg.CA(270), Leg.VM(270)]}],
+        })]);
+        const unit = await boot([kaaa, kbbb]);
+
+        await sync(unit, {departure: kaaa, sid: 'DEP9', departureRunway: '27', enroute: [e1], destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'E1', 'KBBB']);
+        expect(types(unit)).toEqual([USER, USER, USER]);
+    });
+
+    // As APT 7, the import compares the runways with the only en-route transition, which it takes without asking: here
+    // both runways give DX1, DX2
+    it('loads a SID whose only transition makes its runways alike when the route names no runway (#409)', async () => {
+        const kaaa = departureWith([sid('DEP5', {
+            runways: [{runway: '09', legs: [Leg.CA(90), Leg.DF(dx1)]}, {runway: '27', legs: [Leg.CA(270), Leg.VM(270)]}],
+            transitions: [{name: 'DX1', legs: [Leg.IF(dx1), Leg.TF(dx2)]}],
+        })]);
+        const unit = await boot([kaaa, kbbb]);
+
+        await sync(unit, {departure: kaaa, sid: 'DEP5', departureTransition: 'DX1', enroute: [e1], destination: kbbb});
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'DX1', 'DX2', 'E1', 'KBBB']);
+        expect(runwaysOf(unit)).toEqual(Array(2).fill([9, RunwayDesignator.RUNWAY_DESIGNATOR_NONE]));
+    });
+
     // DEP2: D1 D2, then the en-route transition DX1 or DX2. APT 7 asks for the transition of a SID with two (6-21). The
     // route also names an arrival transition and the other runway, so that the SID cannot take the STAR's choices
     const dep2 = () => sid('DEP2', {

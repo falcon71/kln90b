@@ -53,6 +53,14 @@ export interface ArcData {
     circle: GeoCircle,
 }
 
+/** #409 6-22, figure 6-35: an entry of the APT 7 runway list */
+export interface RunwayChoice {
+    /** "RW14B" for parallels with the same legs, "RW14L" or "RW13" for a runway on its own */
+    readonly name: string;
+    /** The runway transitions of the entry in the navdata's order; the first one is loaded */
+    readonly members: readonly RunwayTransition[];
+}
+
 export class SidStar {
 
 
@@ -664,6 +672,23 @@ export class SidStar {
      */
 
     public async getKLNProcedureLegList(facility: AirportFacility, proc: Procedure, type: KLNLegType, rwy: RunwayTransition | null, trans: EnrouteTransition | null): Promise<KLNFlightplanLeg[]> {
+        const legs = this.procedureLegs(proc, type, rwy, trans);
+        const {legs: cleaned, askObsLegs, iafArcLegs} = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
+        const procedureName = `${proc.name}-${type === KLNLegType.SID ? "SID" : "Æ"}`;
+        return await this.convertToKLN(facility, {
+            displayName: procedureName,
+            procedureName: proc.name,
+            transition: trans?.name,
+            runwayNumber: rwy?.runwayNumber,
+            runwayDesignator: rwy?.runwayDesignation as RunwayDesignator ?? null,
+        }, type, cleaned, askObsLegs, iafArcLegs);
+
+    }
+
+    /**
+     * The legs of a SID or STAR in the order they are flown: a SID from the runway, a STAR to it
+     */
+    private procedureLegs(proc: Procedure, type: KLNLegType, rwy: RunwayTransition | null, trans: EnrouteTransition | null): FlightPlanLeg[] {
         const legs: FlightPlanLeg[] = [];
 
         //#376: the legs belong to the facility the SDK caches, so the conversion works on copies
@@ -689,17 +714,70 @@ export class SidStar {
                 legs.push(...rwy.legs.map(leg => ({...leg})));
             }
         }
+        return legs;
+    }
 
-        const {legs: cleaned, askObsLegs, iafArcLegs} = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
-        const procedureName = `${proc.name}-${type === KLNLegType.SID ? "SID" : "Æ"}`;
-        return await this.convertToKLN(facility, {
-            displayName: procedureName,
-            procedureName: proc.name,
-            transition: trans?.name,
-            runwayNumber: rwy?.runwayNumber,
-            runwayDesignator: rwy?.runwayDesignation as RunwayDesignator ?? null,
-        }, type, cleaned, askObsLegs, iafArcLegs);
+    /**
+     * #409 6-22, figure 6-35: the entries of the APT 7 runway list. The unit offers only the runways it can tell apart:
+     * the runway transitions of one runway number whose kept legs are the same are one entry, named RWnnB for parallels.
+     * The AVsoftech KLN 90B trainer asks no runway for CHINS2 at KBFI, whose runways differ only in legs the unit drops
+     * (2026-10-26): when every runway gives the same legs, the result is one entry holding all of them, and APT 7 skips
+     * the runway step. Runways of different numbers stay apart otherwise, so the pilot finds the runway they use.
+     * Only the runway transitions the unit can fly count (isProcedureRecognized), as on the list
+     * @param proc
+     * @param type
+     * @param trans the en-route transition chosen, null before it is chosen (a SID asks for the runway first)
+     * @return the entries in the order of their first runway in the navdata; the first runway of an entry is the one loaded
+     */
+    public getRunwayChoices(proc: Procedure, type: KLNLegType, trans: EnrouteTransition | null): RunwayChoice[] {
+        const keyed = proc.runwayTransitions
+            .filter(rwy => SidStar.isProcedureRecognized(proc, rwy, trans))
+            .map(rwy => ({rwy: rwy, key: this.keptLegsKey(this.procedureLegs(proc, type, rwy, trans))}));
+        if (keyed.length === 0) {
+            return [];
+        }
+        if (keyed.every(k => k.key === keyed[0].key)) {
+            const members = keyed.map(k => k.rwy);
+            return [{name: SidStar.runwayChoiceName(members), members: members}];
+        }
 
+        const groups: { key: string, members: RunwayTransition[] }[] = [];
+        for (const k of keyed) {
+            const key = `${k.rwy.runwayNumber}|${k.key}`;
+            const group = groups.find(g => g.key === key);
+            if (group === undefined) {
+                groups.push({key: key, members: [k.rwy]});
+            } else {
+                group.members.push(k.rwy);
+            }
+        }
+        return groups.map(g => ({name: SidStar.runwayChoiceName(g.members), members: g.members}));
+    }
+
+    /**
+     * #409 figure 6-35: B for parallels, otherwise the runway's own name. The members of an entry with more than one
+     * number are never listed, so the first number names it
+     */
+    private static runwayChoiceName(members: RunwayTransition[]): string {
+        const first = members[0];
+        const parallels = members.some(rwy => rwy.runwayDesignation !== first.runwayDesignation);
+        return RunwayUtils.getRunwayNameString(first.runwayNumber,
+            parallels ? RunwayDesignator.RUNWAY_DESIGNATOR_B : first.runwayDesignation as RunwayDesignator, true, "RW");
+    }
+
+    /**
+     * #409: what the unit makes of the legs, as convertToKLN reads them: the fixes it keeps, the arcs, the OBS reminders,
+     * the fly-overs and the fix marks. Altitudes, headings and the type of a straight leg do not count
+     */
+    private keptLegsKey(legs: FlightPlanLeg[]): string {
+        const {legs: kept, askObsLegs, iafArcLegs} = this.filterOutDuplicates(legs.filter(leg => SidStar.isLegSupported(leg)));
+        return kept.map(leg => {
+            const askObs = this.shouldAskObs(leg.type) || askObsLegs.has(leg);
+            const arc = leg.type === LegType.AF
+                ? [ICAO.getUid(leg.originIcaoStruct), leg.rho, leg.course, leg.theta, leg.turnDirection, iafArcLegs.has(leg)].join(",")
+                : "";
+            return [ICAO.getUid(leg.fixIcaoStruct), arc, askObs, leg.flyOver || askObs, this.getKLNFixType(leg)].join(";");
+        }).join("/");
     }
 
     /**

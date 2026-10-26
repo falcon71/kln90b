@@ -1,9 +1,9 @@
 import {describe, expect, it} from 'vitest';
 import {
     AirportFacility, ApproachProcedure, Facility, FixTypeFlags, FlightPlan, FlightPlanLeg, GeoCircle, GeoPoint, ICAO, LegTurnDirection,
-    LegType, Procedure, RnavTypeFlags,
+    LegType, Procedure, RnavTypeFlags, RunwayTransition, RunwayUtils,
 } from '@microsoft/msfs-sdk';
-import {SidStar} from '../../../../kln90b/data/navdata/SidStar';
+import {RunwayChoice, SidStar} from '../../../../kln90b/data/navdata/SidStar';
 import {KLNFixType, KLNFlightplanLeg, KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {Sensors} from '../../../../kln90b/Sensors';
 import {airport, intersection, vor} from '../../../harness/navdata/builders';
@@ -143,6 +143,175 @@ describe('SidStar.isProcedureRecognized needs a recognized leg (characterization
         const [rwy04, rwy31] = p.runwayTransitions;
         expect(SidStar.isProcedureRecognized(p, rwy04)).toBe(false);
         expect(SidStar.isProcedureRecognized(p, rwy31)).toBe(true);
+    });
+});
+
+// #409 6-22, figure 6-35: the APT 7 runway list offers only the runways the unit can tell apart. PORTE9 at KSFO lists one
+// entry per pair of parallels; the AVsoftech KLN 90B trainer asks no runway for CHINS2 at KBFI, whose runways differ only
+// in legs the unit drops (2026-10-26)
+describe('SidStar.getRunwayChoices (#409, 6-22 figure 6-35)', () => {
+    const a = intersection('RWYAA', 47.1, 8.1);
+    const b = intersection('RWYAB', 47.2, 8.2);
+    const c = intersection('RWYAC', 47.3, 8.3);
+    const abc = vor('ABC', 47.3, 8.5);
+    const sidStar = new SidStar(new MemoryFacilityClient([]) as any, {add() {}} as any,
+                                {in: {gps: {coords: new GeoPoint(47, 8)}}} as any);
+    const rw = (r: RunwayTransition) => RunwayUtils.getRunwayNameString(r.runwayNumber, r.runwayDesignation, true, 'RW');
+    const names = (c: RunwayChoice[]) => c.map(e => [e.name, e.members.map(rw)]);
+    const ofSid = (p: Procedure) => sidStar.getRunwayChoices(p, KLNLegType.SID, null);
+    const ofStar = (p: Procedure) => sidStar.getRunwayChoices(p, KLNLegType.STAR, null);
+    const arc = (radiusNm: number) => Leg.AF(b, abc, {radiusNm, fromRadial: 90, toRadial: 180, turn: LegTurnDirection.Right});
+
+    it('merges parallels with the same legs into RWnnB (6-22, figure 6-35)', () => {
+        const p = sid('DEP1', {
+            runways: [
+                {runway: '01L', legs: [Leg.CA(10), Leg.DF(a)]}, {runway: '01R', legs: [Leg.CA(10), Leg.DF(a)]},
+                {runway: '19L', legs: [Leg.CA(190), Leg.DF(b)]}, {runway: '19R', legs: [Leg.CA(190), Leg.DF(b)]},
+            ],
+            common: [Leg.TF(c)],
+        });
+        expect(names(ofSid(p))).toEqual([['RW01B', ['RW01L', 'RW01R']], ['RW19B', ['RW19L', 'RW19R']]]);
+    });
+
+    it('merges three parallels into one RWnnB', () => {
+        const p = sid('DEP1', {
+            runways: [
+                {runway: '17L', legs: [Leg.DF(a)]}, {runway: '17C', legs: [Leg.DF(a)]}, {runway: '17R', legs: [Leg.DF(a)]},
+                {runway: '35', legs: [Leg.DF(b)]},
+            ],
+        });
+        expect(names(ofSid(p))).toEqual([['RW17B', ['RW17L', 'RW17C', 'RW17R']], ['RW35', ['RW35']]]);
+    });
+
+    it('keeps parallels with different legs apart', () => {
+        const p = sid('DEP1', {
+            runways: [
+                {runway: '08L', legs: [Leg.DF(c)]}, {runway: '08R', legs: [Leg.DF(c)]},
+                {runway: '26L', legs: [Leg.DF(a)]}, {runway: '26R', legs: [Leg.DF(b)]},
+            ],
+        });
+        expect(names(ofSid(p))).toEqual([['RW08B', ['RW08L', 'RW08R']], ['RW26L', ['RW26L']], ['RW26R', ['RW26R']]]);
+    });
+
+    // The shape of CANUC7 at CYVR (AIRAC 2607): 08B and 13 alike, 26L and 26R different
+    it('keeps the same legs under different numbers apart while another runway differs', () => {
+        const p = sid('DEP1', {
+            runways: [
+                {runway: '08L', legs: [Leg.DF(a)]}, {runway: '08R', legs: [Leg.DF(a)]}, {runway: '13', legs: [Leg.DF(a)]},
+                {runway: '26L', legs: [Leg.DF(b)]}, {runway: '26R', legs: [Leg.DF(c)]},
+            ],
+        });
+        expect(names(ofSid(p))).toEqual([
+            ['RW08B', ['RW08L', 'RW08R']], ['RW13', ['RW13']], ['RW26L', ['RW26L']], ['RW26R', ['RW26R']],
+        ]);
+    });
+
+    // The shape of CHINS5 at KBFI in the sim's navdata (AIRAC 2610): the runways differ only in altitudes and the heading
+    // of the vectors at the end
+    it('gives one entry holding every runway when all give the same legs', () => {
+        const p = star('ARR1', {
+            common: [Leg.IF(a), Leg.TF(b)],
+            runways: [
+                {runway: '14L', legs: [Leg.IF(b), {...Leg.TF(c), altitude1: 4572, altDesc: 3}, Leg.VM(343)]},
+                {runway: '14R', legs: [Leg.IF(b), {...Leg.TF(c), altitude1: 4572, altDesc: 3}, Leg.VM(343)]},
+                {runway: '32L', legs: [Leg.IF(b), Leg.TF(c), Leg.VM(250)]},
+                {runway: '32R', legs: [Leg.IF(b), Leg.TF(c), Leg.VM(250)]},
+            ],
+        });
+        const choices = ofStar(p);
+        expect(choices).toHaveLength(1);
+        expect(choices[0].members.map(rw)).toEqual(['RW14L', 'RW14R', 'RW32L', 'RW32R']);
+    });
+
+    it('does not tell a CF from a TF to the same fix', () => {
+        const p = sid('DEP1', {
+            runways: [{runway: '14L', legs: [Leg.TF(a)]}, {runway: '14R', legs: [Leg.CF(a, 140)]}, {runway: '32', legs: [Leg.TF(b)]}],
+        });
+        expect(names(ofSid(p))).toEqual([['RW14B', ['RW14L', 'RW14R']], ['RW32', ['RW32']]]);
+    });
+
+    it('tells apart a hold at the end', () => {
+        const p = sid('DEP1', {runways: [{runway: '14L', legs: [Leg.DF(a)]}, {runway: '14R', legs: [Leg.DF(a), Leg.HM(a, 140)]}]});
+        expect(names(ofSid(p))).toEqual([['RW14L', ['RW14L']], ['RW14R', ['RW14R']]]);
+    });
+
+    it('tells apart a fly-over', () => {
+        const p = sid('DEP1', {runways: [{runway: '14L', legs: [Leg.TF(a)]}, {runway: '14R', legs: [Leg.TF(a, 0, true)]}]});
+        expect(names(ofSid(p))).toEqual([['RW14L', ['RW14L']], ['RW14R', ['RW14R']]]);
+    });
+
+    it('tells apart an arc of another radius', () => {
+        const p = sid('DEP1', {runways: [{runway: '14L', legs: [Leg.TF(a), arc(10)]}, {runway: '14R', legs: [Leg.TF(a), arc(12)]}]});
+        expect(names(ofSid(p))).toEqual([['RW14L', ['RW14L']], ['RW14R', ['RW14R']]]);
+    });
+
+    it.each([
+        ['another start radial', {fromRadial: 100}],
+        ['another end radial', {toRadial: 170}],
+        ['the other turn direction', {turn: LegTurnDirection.Left}],
+    ])('tells apart an arc with %s', (_name, change) => {
+        const other = Leg.AF(b, abc, {radiusNm: 10, fromRadial: 90, toRadial: 180, turn: LegTurnDirection.Right, ...change});
+        const p = sid('DEP1', {runways: [{runway: '14L', legs: [Leg.TF(a), arc(10)]}, {runway: '14R', legs: [Leg.TF(a), other]}]});
+        expect(names(ofSid(p))).toEqual([['RW14L', ['RW14L']], ['RW14R', ['RW14R']]]);
+    });
+
+    it('tells apart an arc around another navaid', () => {
+        const abd = vor('ABD', 47.3, 8.0);
+        const other = Leg.AF(b, abd, {radiusNm: 10, fromRadial: 90, toRadial: 180, turn: LegTurnDirection.Right});
+        const p = sid('DEP1', {runways: [{runway: '14L', legs: [Leg.TF(a), arc(10)]}, {runway: '14R', legs: [Leg.TF(a), other]}]});
+        expect(names(ofSid(p))).toEqual([['RW14L', ['RW14L']], ['RW14R', ['RW14R']]]);
+    });
+
+    // The preview shows the mark of an IAF beside its fix (6-10)
+    it('tells apart an IAF mark', () => {
+        const p = sid('DEP1', {runways: [{runway: '14L', legs: [Leg.TF(a)]}, {runway: '14R', legs: [Leg.TF(a, FixTypeFlags.IAF)]}]});
+        expect(names(ofSid(p))).toEqual([['RW14L', ['RW14L']], ['RW14R', ['RW14R']]]);
+    });
+
+    // #382: an IAF on an arc that goes on around the same navaid and radius is dropped, and the kept arc's entry carries it
+    it('tells apart an IAF that an arc carries', () => {
+        const arcIn = (flags: number) => [
+            Leg.TF(a),
+            Leg.AF(c, abc, {radiusNm: 10, fromRadial: 90, toRadial: 135, turn: LegTurnDirection.Right, flags}),
+            Leg.AF(b, abc, {radiusNm: 10, fromRadial: 135, toRadial: 180, turn: LegTurnDirection.Right}),
+        ];
+        const p = sid('DEP1', {runways: [{runway: '14L', legs: arcIn(0)}, {runway: '14R', legs: arcIn(FixTypeFlags.IAF)}]});
+        expect(names(ofSid(p))).toEqual([['RW14L', ['RW14L']], ['RW14R', ['RW14R']]]);
+    });
+
+    it('does not tell apart the same arc', () => {
+        const p = sid('DEP1', {runways: [{runway: '14L', legs: [Leg.TF(a), arc(10)]}, {runway: '14R', legs: [Leg.TF(a), arc(10)]}]});
+        expect(ofSid(p)).toHaveLength(1);
+    });
+
+    // The runway part of 14L starts at the fix the common route ends at; the load drops the second one
+    it('takes the duplicate at the join into account', () => {
+        const p = star('ARR1', {
+            common: [Leg.IF(c), Leg.TF(a)],
+            runways: [{runway: '14L', legs: [Leg.TF(a), Leg.TF(b)]}, {runway: '14R', legs: [Leg.TF(b)]}],
+        });
+        expect(ofStar(p)).toHaveLength(1);
+    });
+
+    it('lists only the runways the unit can fly', () => {
+        const p = sid('DEP1', {
+            runways: [
+                {runway: '04', legs: [Leg.CA(40), Leg.VM(40)]}, {runway: '31', legs: [Leg.CA(310), Leg.TF(a)]},
+                {runway: '13', legs: [Leg.TF(b)]},
+            ],
+        });
+        expect(names(ofSid(p))).toEqual([['RW31', ['RW31']], ['RW13', ['RW13']]]);
+    });
+
+    it('names two transitions of one runway without designator RWnn', () => {
+        const p = sid('DEP1', {
+            runways: [{runway: '27', legs: [Leg.DF(a)]}, {runway: '27', legs: [Leg.DF(a)]}, {runway: '09', legs: [Leg.DF(b)]}],
+        });
+        expect(names(ofSid(p))).toEqual([['RW27', ['RW27', 'RW27']], ['RW09', ['RW09']]]);
+    });
+
+    it('gives no entry without runway transitions', () => {
+        expect(ofSid(sid('DEP1', {common: [Leg.TF(a)]}))).toEqual([]);
     });
 });
 

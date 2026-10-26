@@ -143,9 +143,10 @@ export class EfbRouteResolver {
      * #378: the SID or STAR the route names, as APT 7 would load it (Apt7Page.selectProcedure, selectRunway,
      * selectTransition). APT 7 selects a runway or a transition itself where there are none or one; where it would show
      * a list, the route's choice is taken if the list would show it (Apt7RunwayPage, Apt7TransitionPage show only those
-     * that leave a leg the unit can fly). A SID asks for the runway first, a STAR for the transition first, and each
-     * list depends on the choice before it. Null when the airport has no procedure of that name (nothing is known,
-     * nothing is reported)
+     * that leave a leg the unit can fly). APT 7 asks no runway where every runway gives the same legs (#409), so the
+     * route needs to name one only where the runway list would show. A SID asks for the runway first, a STAR for the
+     * transition first, and each list depends on the choice before it. Null when the airport has no procedure of that
+     * name (nothing is known, nothing is reported)
      */
     private async resolveDepartureArrival(airport: Facility, type: KLNLegType.SID | KLNLegType.STAR, name: string, transitionName: string, runway: DeepReadonly<RunwayIdentifier>, created: Facility[]): Promise<EfbSegment | null> {
         if (!FacilityUtils.isFacilityType(airport, FacilityType.Airport)) {
@@ -158,15 +159,23 @@ export class EfbRouteResolver {
         }
         const proc = procedures[found.procedureIndex];
 
-        const chooseRunway = (trans: EnrouteTransition | null) => EfbRouteResolver.choose(proc.runwayTransitions, found.runwayTransitionIndex,
-            r => SidStar.isProcedureRecognized(proc, r, trans));
+        const chooseRunway = (trans: EnrouteTransition | null): Choice<RunwayTransition> => {
+            if (found.runwayTransitionIndex >= 0) {
+                //The named runway keeps its own designator; one the list would not show is no choice
+                return EfbRouteResolver.choose(proc.runwayTransitions, found.runwayTransitionIndex, r => SidStar.isProcedureRecognized(proc, r, trans));
+            }
+            //#409 6-22, figure 6-35: APT 7 asks no runway where every runway gives the same legs, and loads the first one
+            const choices = this.sidstar.getRunwayChoices(proc, type, trans);
+            return choices.length <= 1 ? {choice: choices[0]?.members[0] ?? null, made: true} : {choice: null, made: false};
+        };
         const chooseTransition = (rwy: RunwayTransition | null) => EfbRouteResolver.choose(proc.enRouteTransitions, found.enrouteTransitionIndex,
             t => SidStar.isProcedureRecognized(proc, rwy, t));
 
         let rwy: Choice<RunwayTransition>;
         let trans: Choice<EnrouteTransition>;
         if (type === KLNLegType.SID) {
-            rwy = chooseRunway(null);
+            //#409: as on APT 7, the runways are compared with the only transition, which is taken without asking
+            rwy = chooseRunway(proc.enRouteTransitions.length === 1 ? proc.enRouteTransitions[0] : null);
             trans = chooseTransition(rwy.choice);
         } else {
             trans = chooseTransition(null);

@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {FixTypeFlags, LegTurnDirection} from '@microsoft/msfs-sdk';
+import {AirportFacility, Facility, FixTypeFlags, LegTurnDirection, Procedure} from '@microsoft/msfs-sdk';
 import {BootOptions, bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {APR_ARM_SWITCH, panelXml} from '../../../harness/panelXml';
 import {Screen} from '../../../harness/render/screen';
@@ -820,7 +820,7 @@ describe('APT 7 selecting a SID (6-22)', () => {
         await unit.panel.ent(); // TRNAA
 
         // The CA leg of the runway transition is dropped (test/render/harness/procedures.test.ts)
-        expect(rows('R')).toEqual(['DEP1-SID', ' 1 SIDAA', ' 2 SIDAB', ' 3 TRNAA', '', 'LOAD IN FPL']);
+        expect(rows('R')).toEqual(['DEP1-SID', ' 1 SIDAC', ' 2 SIDAB', ' 3 TRNAA', '', 'LOAD IN FPL']);
         expect(unit.panel.focused('R')).toEqual({row: 5, col: 12, text: 'LOAD IN FPL'});
     });
 
@@ -979,7 +979,7 @@ describe('APT 7 selecting a STAR (6-23)', () => {
         expect(rows('R')[1]).toBe('PRESS ENT');
 
         await unit.panel.clr();
-        expect(rows('R')).toEqual(['DEP1-SID', ' 1 SIDAA', ' 2 SIDAB', ' 3 TRNAA', '', 'LOAD IN FPL']);
+        expect(rows('R')).toEqual(['DEP1-SID', ' 1 SIDAC', ' 2 SIDAB', ' 3 TRNAA', '', 'LOAD IN FPL']);
         await unit.panel.clr();
         expect(rows('R')).toEqual(['DEP1-SID', 'TRANSITION', ' 1 TRNAA', ' 2 TRNAB', '', '']);
         await unit.panel.clr();
@@ -1003,7 +1003,7 @@ describe('APT 7 selecting a STAR (6-23)', () => {
 
         await unit.panel.ent(); // TRNAA again
 
-        expect(rows('R')).toEqual(['DEP1-SID', ' 1 SIDAA', ' 2 SIDAB', ' 3 TRNAA', '', 'LOAD IN FPL']);
+        expect(rows('R')).toEqual(['DEP1-SID', ' 1 SIDAC', ' 2 SIDAB', ' 3 TRNAA', '', 'LOAD IN FPL']);
     });
 
     // 6-5: the same for a STAR, where the step back from the waypoints is the runway list and the transition is the one
@@ -1266,7 +1266,7 @@ describe('APT 7 loading a second SID (characterization)', () => {
         await vi.advanceTimersByTimeAsync(1000);
 
         expect(fpl0Legs(unit)).toEqual([
-            ['KPRC', KLNLegType.USER], ['SIDAA', KLNLegType.SID], ['SIDAB', KLNLegType.SID], ['TRNAB', KLNLegType.SID],
+            ['KPRC', KLNLegType.USER], ['SIDAC', KLNLegType.SID], ['SIDAB', KLNLegType.SID], ['TRNAB', KLNLegType.SID],
         ]);
     });
 });
@@ -1383,5 +1383,175 @@ describe('APT 7 selection step on the right of the room question of an FPL 0 ins
         expect(mainPage.getLeftPage()).not.toBeInstanceOf(MakeRoomPage);
         expect(rows('R')).toEqual(right);
         expect(fplIdents(unit)).toEqual(FILLERS);
+    });
+});
+
+// #409 6-22, figure 6-35: the runway list offers only the runways the unit can tell apart. PORTE9 at KSFO lists one entry
+// per pair of parallels; the AVsoftech KLN 90B trainer asks no runway for CHINS2 at KBFI, whose runways differ only in
+// legs the unit drops (2026-10-26). A merged entry, and a skipped runway step, load the first runway of the entry
+describe('APT 7 runways the unit cannot tell apart (#409)', () => {
+    /** KPRC of sidStarWorld() with only the procedures `build` makes from its fixes, on APT 7 */
+    async function bootWith(build: (fix: (ident: string) => Facility) => { departures?: Procedure[]; arrivals?: Procedure[] }): Promise<HeadlessUnit> {
+        const w = sidStarWorld({sids: [], stars: false});
+        const fix = (ident: string) => w.facilities.find(f => f.icaoStruct.ident === ident)!;
+        const kprc = w.facilities[0] as AirportFacility;
+        const facilities = [withProcedures(kprc, {approaches: [...kprc.approaches], ...build(fix)}), ...w.facilities.slice(1)];
+        const unit = await bootUnit({facilities, position: w.position});
+        await settle(unit);
+        await unit.panel.selectPage('R', 'APT 7');
+        return unit;
+    }
+
+    /** The runway of every leg of FPL 0 of the type, as [number, designator] */
+    const runwaysOf = (unit: HeadlessUnit, type: KLNLegType) => unit.props.memory.fplPage.flightplans[0].getLegs()
+        .filter(leg => leg.type === type).map(leg => [leg.procedure!.runwayNumber, leg.procedure!.runwayDesignator]);
+
+    /** LOAD IN FPL and the question that adds KPRC */
+    async function loadAndAdd(unit: HeadlessUnit): Promise<void> {
+        await unit.panel.ent(); // LOAD IN FPL
+        await unit.panel.ent(); // add KPRC
+        await vi.advanceTimersByTimeAsync(1000);
+    }
+
+    /** The shape of CHINS5 at KBFI in the sim's navdata (AIRAC 2610): the runways differ only in the vectors at the end */
+    const arr3 = (fix: (ident: string) => Facility) => ({
+        arrivals: [star('ARR3', {
+            common: [Leg.IF(fix('TRNAA')), Leg.TF(fix('SIDAB'))],
+            runways: [
+                {runway: '14L', legs: [Leg.TF(fix('SIDAA')), Leg.VM(140)]}, {runway: '14R', legs: [Leg.TF(fix('SIDAA')), Leg.VM(140)]},
+                {runway: '32L', legs: [Leg.TF(fix('SIDAA')), Leg.VM(320)]}, {runway: '32R', legs: [Leg.TF(fix('SIDAA')), Leg.VM(320)]},
+            ],
+        })],
+    });
+
+    /** Two pairs of parallels, as PORTE9 in figure 6-35 */
+    const dep3 = (fix: (ident: string) => Facility) => ({
+        departures: [sid('DEP3', {
+            runways: [
+                {runway: '01L', legs: [Leg.CA(10), Leg.DF(fix('SIDAA'))]}, {runway: '01R', legs: [Leg.CA(10), Leg.DF(fix('SIDAA'))]},
+                {runway: '19L', legs: [Leg.CA(190), Leg.DF(fix('SIDAC'))]}, {runway: '19R', legs: [Leg.CA(190), Leg.DF(fix('SIDAC'))]},
+            ],
+            common: [Leg.TF(fix('SIDAB'))],
+            transitions: [{name: 'TRNAA', legs: [Leg.TF(fix('TRNAA'))]}, {name: 'TRNAB', legs: [Leg.TF(fix('TRNAB'))]}],
+        })],
+    });
+
+    /** Every runway the same; the transitions given */
+    const dep4 = (transitions: string[]) => (fix: (ident: string) => Facility) => ({
+        departures: [sid('DEP4', {
+            runways: [{runway: '09', legs: [Leg.CA(90), Leg.DF(fix('SIDAA'))]}, {runway: '27', legs: [Leg.CA(270), Leg.DF(fix('SIDAA'))]}],
+            common: [Leg.TF(fix('SIDAB'))],
+            transitions: transitions.map(name => ({name, legs: [Leg.TF(fix(name))]})),
+        })],
+    });
+
+    it('asks for no runway for a STAR whose runways all give the same waypoints (AVsoftech KLN 90B trainer, 2026-10-26)', async () => {
+        const unit = await bootWith(arr3);
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR3
+
+        expect(rows('R')).toEqual(['ARR3-Æ', ' 1 TRNAA', ' 2 SIDAB', ' 3 SIDAA', '', 'LOAD IN FPL']);
+    });
+
+    it('loads the first runway of a STAR whose runway step was skipped', async () => {
+        const unit = await bootWith(arr3);
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR3: the waypoints
+        await loadAndAdd(unit);
+
+        expect(runwaysOf(unit, KLNLegType.STAR)).toEqual(Array(3).fill([14, RunwayDesignator.RUNWAY_DESIGNATOR_LEFT]));
+    });
+
+    it('lists parallels with the same waypoints once as RWnnB (6-22, figure 6-35)', async () => {
+        const unit = await bootWith(dep3);
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP3
+
+        expect(rows('R')).toEqual(['DEP3-SID', 'RUNWAY', ' 1 RW01B', ' 2 RW19B', '', '']);
+    });
+
+    it('loads the first runway of a merged entry', async () => {
+        const unit = await bootWith(dep3);
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP3: the runways
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // RW19B: the transitions
+        await unit.panel.ent(); // TRNAA: the waypoints
+        await loadAndAdd(unit);
+
+        expect(runwaysOf(unit, KLNLegType.SID)).toEqual(Array(3).fill([19, RunwayDesignator.RUNWAY_DESIGNATOR_LEFT]));
+    });
+
+    it('puts the cursor back on the merged entry after CLR (#273)', async () => {
+        const unit = await bootWith(dep3);
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP3: the runways
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // RW19B: the transitions
+
+        await unit.panel.clr();
+
+        expect(rows('R').slice(0, 2)).toEqual(['DEP3-SID', 'RUNWAY']);
+        expect(unit.panel.focused('R').text).toBe(' 2 RW19B');
+    });
+
+    it('goes from the SID straight to the transitions and back to the SID list when its runways merge (6-5)', async () => {
+        const unit = await bootWith(dep4(['TRNAA', 'TRNAB']));
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP4
+        expect(rows('R')).toEqual(['DEP4-SID', 'TRANSITION', ' 1 TRNAA', ' 2 TRNAB', '', '']);
+
+        await unit.panel.clr();
+
+        expect(rows('R').slice(0, 3)).toEqual([' KPRC', 'SELECT SID', ' 1 DEP4']);
+    });
+
+    it('goes from the SID straight to the waypoints and back to the SID list with merged runways and one transition (6-5)', async () => {
+        const unit = await bootWith(dep4(['TRNAA']));
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP4
+        expect(rows('R')).toEqual(['DEP4-SID', ' 1 SIDAA', ' 2 SIDAB', ' 3 TRNAA', '', 'LOAD IN FPL']);
+
+        await unit.panel.clr();
+
+        expect(rows('R').slice(0, 3)).toEqual([' KPRC', 'SELECT SID', ' 1 DEP4']);
+    });
+
+    // APT 7 takes the only en-route transition of a SID itself, so it is the chosen one when the runways are compared:
+    // here the transition starts at the fix of runway 09, which the load drops as a duplicate, so both runways give
+    // TRNAA, TRNAB. Forward and after CLR the same rule applies
+    it('asks no runway for a SID whose only transition makes its runways alike, also after CLR (6-5)', async () => {
+        const unit = await bootWith(fix => ({
+            departures: [sid('DEP5', {
+                runways: [{runway: '09', legs: [Leg.CA(90), Leg.DF(fix('TRNAA'))]}, {runway: '27', legs: [Leg.CA(270), Leg.VM(270)]}],
+                transitions: [{name: 'TRNAA', legs: [Leg.IF(fix('TRNAA')), Leg.TF(fix('TRNAB'))]}],
+            })],
+        }));
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // DEP5
+        expect(rows('R')).toEqual(['DEP5-SID', ' 1 TRNAA', ' 2 TRNAB', '', '', 'LOAD IN FPL']);
+
+        await unit.panel.clr();
+
+        expect(rows('R').slice(0, 3)).toEqual([' KPRC', 'SELECT SID', ' 1 DEP5']);
+    });
+
+    it('goes back from the waypoints to the transitions for a STAR whose runways merge (6-5)', async () => {
+        const unit = await bootWith(fix => ({
+            arrivals: [star('ARR4', {
+                transitions: [{name: 'TRNAA', legs: [Leg.IF(fix('TRNAA'))]}, {name: 'TRNAB', legs: [Leg.IF(fix('TRNAB'))]}],
+                common: [Leg.TF(fix('SIDAB'))],
+                runways: [{runway: '14L', legs: [Leg.TF(fix('SIDAA'))]}, {runway: '14R', legs: [Leg.TF(fix('SIDAA'))]}, {runway: '32', legs: [Leg.TF(fix('SIDAA'))]}],
+            })],
+        }));
+        await unit.panel.cursor('R');
+        await unit.panel.ent(); // ARR4: the transitions
+        await unit.panel.outer('R', 1);
+        await unit.panel.ent(); // TRNAB
+        expect(rows('R')).toEqual(['ARR4-Æ', ' 1 TRNAB', ' 2 SIDAB', ' 3 SIDAA', '', 'LOAD IN FPL']);
+
+        await unit.panel.clr();
+
+        expect(rows('R')).toEqual(['ARR4-Æ', 'TRANSITION', ' 1 TRNAA', ' 2 TRNAB', '', '']);
     });
 });

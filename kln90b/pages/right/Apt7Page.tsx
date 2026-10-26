@@ -9,7 +9,6 @@ import {
     NodeReference,
     Procedure,
     RunwayTransition,
-    RunwayUtils,
     VNode,
 } from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
@@ -32,7 +31,7 @@ import {KLNFlightplanLeg, KLNLegType} from "../../data/flightplan/Flightplan";
 import {OneTimeMessage} from "../../data/MessageHandler";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {NearestSelector} from "../../controls/selects/NearestSelector";
-import {SidStar} from "../../data/navdata/SidStar";
+import {RunwayChoice, SidStar} from "../../data/navdata/SidStar";
 import {deleteFrontLegs, roomSteps} from "../../services/FlightplanUtils";
 import {ProcedureMakeRoomPage} from "../left/ProcedureMakeRoomPage";
 
@@ -186,7 +185,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
                     step--;
                 }
             } else {
-                if (proc.runwayTransitions.length <= 1) {
+                if (this.runwayChoices(proc, trans).length <= 1) { //#409
                     step--;
                 }
             }
@@ -194,7 +193,7 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
 
         if (step === 1) {
             if (type === KLNLegType.SID) {
-                if (proc.runwayTransitions.length <= 1) {
+                if (this.runwayChoices(proc, trans).length <= 1) { //#409
                     step--;
                 }
             } else {
@@ -322,13 +321,16 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
         console.log("selectProcedure", proc);
 
         if (this.getProcedureType() === KLNLegType.SID) {
-            if (proc.runwayTransitions.length <= 1) {
-                this.selectRunway(proc, proc.runwayTransitions.length === 1 ? proc.runwayTransitions[0] : null, null)
+            //#409: the only transition is taken without asking, so the runways are compared with it, as on the way back
+            const onlyTrans = proc.enRouteTransitions.length === 1 ? proc.enRouteTransitions[0] : null;
+            const choices = this.runwayChoices(proc, onlyTrans);
+            if (choices.length <= 1) {
+                this.selectRunway(proc, choices[0]?.members[0] ?? null, null)
             } else {
                 this.currentApt7Page = new Apt7RunwayPage({
                     ...this.props,
                     proc: proc,
-                    trans: null,
+                    trans: onlyTrans,
                     selectRunway: this.selectRunway.bind(this),
                     type: this.getProcedureType(),
                 });
@@ -394,8 +396,9 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
                 type: this.getProcedureType(),
             });
         } else {
-            if (proc.runwayTransitions.length <= 1) {
-                return this.selectRunway(proc, proc.runwayTransitions.length === 1 ? proc.runwayTransitions[0] : null, trans)
+            const choices = this.runwayChoices(proc, trans);
+            if (choices.length <= 1) {
+                return this.selectRunway(proc, choices[0]?.members[0] ?? null, trans)
             } else {
                 this.currentApt7Page = new Apt7RunwayPage({
                     ...this.props,
@@ -407,6 +410,14 @@ export class Apt7Page extends WaypointPage<AirportFacility> {
             }
         }
         this.requiresRedraw = true;
+    }
+
+    /**
+     * #409 6-22, figure 6-35: the entries of the runway list. With one entry or none, APT 7 asks no runway and loads the
+     * first runway of the entry
+     */
+    private runwayChoices(proc: Procedure, trans: EnrouteTransition | null): RunwayChoice[] {
+        return this.props.sidstar.getRunwayChoices(proc, this.getProcedureType(), trans);
     }
 
     private loadIfFplContainsApt(proc: Procedure, rwy: RunwayTransition | null, trans: EnrouteTransition | null, legs: KLNFlightplanLeg[]): void {
@@ -745,7 +756,7 @@ class Apt7RunwayPage extends Apt7SelectorPage {
     public readonly trans: EnrouteTransition | null;
     protected readonly procedureType: KLNLegType;
     private readonly selectRunway: (proc: Procedure, rwy: RunwayTransition, trans: (EnrouteTransition | null)) => void;
-    private selectedItem: SimpleListItem<RunwayTransition> | null = null;
+    private selectedItem: SimpleListItem<RunwayChoice> | null = null;
 
     constructor(props: Apt7RunwayPageProps) {
         super(props);
@@ -776,15 +787,18 @@ class Apt7RunwayPage extends Apt7SelectorPage {
         </pre>);
     }
 
+    /**
+     * #409 6-22, figure 6-35: one entry per runway the unit can tell apart; an entry loads its first runway
+     */
     private buildList(selected: RunwayTransition | null): UIElementChildren<any> {
-        const recognized = this.proc.runwayTransitions.filter(runwayTransition => SidStar.isProcedureRecognized(this.proc, runwayTransition, this.trans));
-        const rwys = recognized.map((rwy, idx) => new SimpleListItem<RunwayTransition>({
+        const choices = this.props.sidstar.getRunwayChoices(this.proc, this.procedureType, this.trans);
+        const rwys = choices.map((choice, idx) => new SimpleListItem<RunwayChoice>({
             bus: this.props.bus,
-            value: rwy,
-            fulltext: (idx + 1).toString().padStart(2, " ") + " " + RunwayUtils.getRunwayNameString(rwy.runwayNumber, rwy.runwayDesignation, true, "RW").padEnd(5, " "),
-            onEnter: (rwy) => this.selectRunway(this.proc, rwy, this.trans),
+            value: choice,
+            fulltext: (idx + 1).toString().padStart(2, " ") + " " + choice.name.padEnd(5, " "),
+            onEnter: (choice) => this.selectRunway(this.proc, choice.members[0], this.trans),
         }));
-        this.selectedItem = selected === null ? null : rwys[recognized.indexOf(selected)] ?? null;
+        this.selectedItem = selected === null ? null : rwys[choices.findIndex(choice => choice.members.includes(selected))] ?? null;
 
         return UIElementChildren.forList(rwys);
     }

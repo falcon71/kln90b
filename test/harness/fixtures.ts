@@ -75,16 +75,18 @@ export function approachWorld() {
  * add KPRC on LOAD IN FPL. KPRC and ENRAA are the first two facilities. Fresh objects on every call.
  * - a SID has the runway transitions 09 and 27L, the common leg to SIDAB and the enroute transitions TRNAA and TRNAB;
  * - ARR1 has no transition and no runway transition; ARR2 has the transitions TRNAA and TRNAB and the runways 09 and 27L.
+ * - 09 flies to SIDAA and 27L to SIDAC, so the unit tells the two runways apart and asks for one (#409).
  */
 export function sidStarWorld(o: { sids: string[], stars: boolean, rf?: boolean }) {
     const w = approachWorld();
     const east = (nm: number) => pointFrom(w.mapaa, 90, nm);
     const sidaa = intersection('SIDAA', east(8).lat, east(8).lon);
     const sidab = intersection('SIDAB', east(20).lat, east(20).lon);
+    const sidac = intersection('SIDAC', east(12).lat, east(12).lon);
     const trnaa = intersection('TRNAA', east(30).lat, east(30).lon);
     const trnab = intersection('TRNAB', east(35).lat, east(35).lon);
     const departures = o.sids.map(name => sid(name, {
-        runways: [{runway: '09', legs: [Leg.CA(90), Leg.DF(sidaa)]}, {runway: '27L', legs: [Leg.CA(270), Leg.DF(sidaa)]}],
+        runways: [{runway: '09', legs: [Leg.CA(90), Leg.DF(sidaa)]}, {runway: '27L', legs: [Leg.CA(270), Leg.DF(sidac)]}],
         common: [Leg.TF(sidab)],
         transitions: [{name: 'TRNAA', legs: [Leg.TF(trnaa)]}, {name: 'TRNAB', legs: [Leg.TF(trnab)]}],
     }));
@@ -93,7 +95,7 @@ export function sidStarWorld(o: { sids: string[], stars: boolean, rf?: boolean }
         star('ARR2', {
             transitions: [{name: 'TRNAA', legs: [Leg.IF(trnaa)]}, {name: 'TRNAB', legs: [Leg.IF(trnab)]}],
             common: [Leg.TF(sidab)],
-            runways: [{runway: '09', legs: [Leg.TF(sidaa)]}, {runway: '27L', legs: [Leg.TF(sidaa)]}],
+            runways: [{runway: '09', legs: [Leg.TF(sidaa)]}, {runway: '27L', legs: [Leg.TF(sidac)]}],
         }),
     ] : [];
     if (o.rf) {
@@ -102,7 +104,7 @@ export function sidStarWorld(o: { sids: string[], stars: boolean, rf?: boolean }
         arrivals.unshift(star('ARRRF', {common: [Leg.IF(trnaa), Leg.RF(sidab)]}));
     }
     const kprc = withProcedures(w.kprc, {approaches: [...w.kprc.approaches], departures, arrivals});
-    return {facilities: [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.sdfaa, w.mapaa, sidaa, sidab, trnaa, trnab], position: w.north(40)};
+    return {facilities: [kprc, w.enraa, w.iafaa, w.ifaaa, w.fafaa, w.sdfaa, w.mapaa, sidaa, sidab, sidac, trnaa, trnab], position: w.north(40)};
 }
 
 /**

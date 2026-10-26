@@ -301,6 +301,24 @@ describe('KlnEfbSaver route contents', () => {
         expect(route.departureRunway.designator).toBe('L');
     });
 
+    // #409 6-22, figure 6-35: APT 7 asks no runway for parallels with the same legs and loads the first one, which the
+    // EFB gets (the maintainer's ruling, 2026-10-26: it may be the wrong parallel, but there is no better choice)
+    it('sends the first runway of a merged entry: 03L and 03R with the same legs go out as 03 and L (#409)', async () => {
+        const depaa = intersection('DEPAA', 47.0, 8.2);
+        const kprc = withProcedures(airport('KPRC', 47.0, 8.0), {
+            departures: [sid('DEP1', {runways: [{runway: '03L', legs: [Leg.CA(30), Leg.DF(depaa)]}, {runway: '03R', legs: [Leg.CA(30), Leg.DF(depaa)]}]})],
+        });
+        const unit = await bootUnit({facilities: [kprc, depaa], efb: true, storage: savedFlightplan(0, [kprc])});
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 7');
+        expect(fplIdents(unit)).toEqual(['KPRC', 'DEPAA']); // Precondition
+
+        const route = requestRoute(unit);
+
+        expect(route.departureRunway.number).toBe('03');
+        expect(route.departureRunway.designator).toBe('L');
+    });
+
     // A lettered runway (the north runway, number 37 in the database) goes out as its letters, as the SDK's number
     // string gives it (#186)
     it('sends the north runway of a SID as N (#186)', async () => {
