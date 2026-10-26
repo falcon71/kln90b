@@ -23,6 +23,18 @@ const GREAT_CIRCLE_CACHE = new GeoCircle(new Float64Array(3), 0);
 const FROM_GEOPOINT_CACHE = new GeoPoint(0, 0);
 const ARC_FROM_CACHE = new GeoPoint(0, 0);
 const ARC_TO_CACHE = new GeoPoint(0, 0);
+const CLOSEST_CACHE = new Float64Array(3);
+
+/**
+ * #433: the DTK of a path at the point closest to pos, or null with pos on the center of a DME arc (or its antipode),
+ * where every point of the circle is equally close. The SDK then returns NaN or, rounded, a point off the circle.
+ * @param path a great circle or the circle of a DME arc
+ * @param pos
+ */
+export function dtkAtClosest(path: GeoCircle, pos: LatLonInterface): Degrees | null {
+    const closest = path.closest(pos, CLOSEST_CACHE);
+    return path.includes(closest) ? path.bearingAt(closest) : null;
+}
 
 export interface TurnLead {
     /** How far before the waypoint the turn starts, measured along the inbound leg */

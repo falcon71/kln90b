@@ -3,6 +3,7 @@ import {GeoCircle, UnitType} from '@microsoft/msfs-sdk';
 import {
     alongTrackDistance,
     bisectorSide,
+    dtkAtClosest,
     inboundLegLength,
     LEAD_CAP_TIME,
     segmentDistance,
@@ -152,5 +153,19 @@ describe('inboundLegLength (#404)', () => {
         it('counts an end off the arc at its radial: the start 1 NM outside it', () => {
             expect(inboundLegLength(pointFrom(center, 90, 11), arc, pointFrom(center, 0, 10))).toBeCloseTo(15.71, 2);
         });
+    });
+});
+
+// #433: on the center of a circle every point of it is equally close, so there is no DTK abeam
+describe('dtkAtClosest (#433)', () => {
+    const circle = () => GeoCircle.createFromPoint(W, UnitType.NMILE.convertTo(10, UnitType.GA_RADIAN));
+
+    it('is the course of the circle abeam the position', () => {
+        // 5 NM south of the center the closest point is 10 NM south, where the counterclockwise circle runs due east
+        expect(dtkAtClosest(circle(), pointFrom(W, 180, 5))!).toBeCloseTo(90, 1);
+    });
+
+    it('is null on the center', () => {
+        expect(dtkAtClosest(circle(), W)).toBeNull();
     });
 });

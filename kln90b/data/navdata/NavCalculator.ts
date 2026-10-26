@@ -13,7 +13,7 @@ import {bankeAngleForStandardTurn, distanceToAchieveBankAngleChange} from "../..
 import {FromLeg, TurnBisector, TurnPlan, TurnStackEntry} from "../flightplan/ActiveWaypoint";
 import {courseAtWaypoint} from "./ObsGeometry";
 import {bearingBetween} from "./Bearing";
-import {alongTrackDistance, bisectorSide, inboundLegLength, segmentDistance, turnLead} from "./SequencingGeometry";
+import {alongTrackDistance, bisectorSide, dtkAtClosest, inboundLegLength, segmentDistance, turnLead} from "./SequencingGeometry";
 
 
 //4-8
@@ -210,7 +210,8 @@ export class NavCalculator implements CalcTickable {
             //XTK will be switched to the next XTK right at the start of the turn, even if the active waypoint has not been switched yet
             const pathForDtk = nav.activeWaypoint.turnStack.length > 0 ? nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1].pathForDtk : legPath;
 
-            dtk = pathForDtk.bearingAt(pathForDtk.closest(this.sensors.in.gps.coords, VEC3_CACHE));
+            //#433: on the VOR of the DME arc the DTK at the end of the arc
+            dtk = dtkAtClosest(pathForDtk, this.sensors.in.gps.coords) ?? pathForDtk.bearingAt(pathForDtk.closest(toLeg.wpt, VEC3_CACHE));
             nav.desiredTrack = dtk;
 
             if (legPath.isGreatCircle()) {
@@ -485,7 +486,10 @@ export class NavCalculator implements CalcTickable {
         if (track === null || along < 0) {
             return false;
         }
-        const legDtk = legPath.bearingAt(legPath.closest(this.sensors.in.gps.coords, VEC3_CACHE));
+        const legDtk = dtkAtClosest(legPath, this.sensors.in.gps.coords);
+        if (legDtk === null) {
+            return false;
+        }
         const closure = this.sensors.in.gps.groundspeed * Math.cos(UnitType.DEGREE.convertTo(NavMath.diffAngle(legDtk, track), UnitType.RADIAN)) / HOURS_TO_SECONDS;
         return closure > 0 && along / closure <= time;
     }

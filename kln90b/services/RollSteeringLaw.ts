@@ -5,6 +5,7 @@
 import {FlightPathUtils, GeoCircle, LatLonInterface, MathUtils, NavMath, UnitType} from "@microsoft/msfs-sdk";
 import {Degrees, Knots, Seconds} from "../data/Units";
 import {HOURS_TO_SECONDS, MAX_BANK_ANGLE} from "../data/navdata/NavCalculator";
+import {dtkAtClosest} from "../data/navdata/SequencingGeometry";
 
 /**
  * The turn direction kept while the track is far off the course to steer, so that a turn once commanded does not
@@ -36,8 +37,6 @@ export const BANK_GAIN = 1.25;
  */
 export const TURN_LATCH_ANGLE: Degrees = 150;
 
-const VEC3_CACHE = new Float64Array(3);
-
 /**
  * The roll steering law of the roll steering design, section 4B: one continuous law from the path to the bank. It is
  * a pure function, so the latch comes in and goes out with the command. The ground speed must be positive (the
@@ -54,7 +53,9 @@ export function rollSteeringCommand(path: GeoCircle, position: LatLonInterface, 
                                     trackTrue: Degrees, latch: TurnLatch, turnCircle = false): RollSteeringCommand {
     // XTK positive right of the path, and the DTK of the path abeam the aircraft, so that a curved path has its local DTK
     const xtk = UnitType.GA_RADIAN.convertTo(path.distance(position), UnitType.NMILE);
-    const dtk = path.bearingAt(path.closest(position, VEC3_CACHE));
+    // #433: on the center of a DME arc no point of the path is abeam: the track then counts as the DTK, and the intercept
+    // turns toward the arc
+    const dtk = dtkAtClosest(path, position) ?? trackTrue;
 
     // LNavComputer.ts: the course to steer is the DTK less an intercept toward the path. The intercept aims at the point
     // LOOK_AHEAD_TIME ahead on the path, at most MAX_INTERCEPT_ANGLE (the trainer, see the constants)

@@ -159,6 +159,19 @@ describe('rollSteeringCommand on a curved path (the roll steering design, sectio
     });
 });
 
+// #433: on the center of a DME arc no point of the circle is abeam. The track counts as the DTK, and the intercept,
+// capped at 45 for an XTK of the whole radius, turns toward the circle: the center is left of a counterclockwise circle,
+// so the course to steer is 45 right of the track
+describe('rollSteeringCommand on the center of a curved path (#433)', () => {
+    it('steers 45 right of the track on the center of a left circle of 10 NM', () => {
+        const circle = GeoCircle.createFromPoint(new GeoPoint(0, 0), 10 / EARTH_RADIUS_NM);
+
+        const c = rollSteeringCommand(circle, new GeoPoint(0, 0), 120, 90, null);
+
+        expect(c.courseToSteer).toBeCloseTo(135, 2);
+    });
+});
+
 // The roll steering design, section 4B (amended 2026-10-19): on the circle of an anticipated turn (turnCircle) the command
 // never banks against the turn; that side is held at 0. Inside the circle near its start the law alone steers out to it
 describe('rollSteeringCommand on the circle of an anticipated turn (the roll steering design, section 4B, amended)', () => {

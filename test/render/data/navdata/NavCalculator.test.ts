@@ -230,8 +230,25 @@ describe('the aircraft exactly on the VOR of the active DME arc', () => {
         expect(activeWaypoint(unit).getFromLeg()!.path.isGreatCircle()).toBe(false);
     });
 
-    it.fails('raises no error with the aircraft exactly on the VOR of the active DME arc (#433)', async () => {
+    // The DTK is then the course at the end of the arc: ARCEN on the 180 radial of the arc turning left, due east
+    it('raises no error with the aircraft exactly on the VOR of the active DME arc, and the DTK is the course at ARCEN (#433)', async () => {
         const unit = await parkedOnArcVor();
+
+        expect(unit.errors).toEqual([]);
+        expect(nav(unit).desiredTrack!).toBeCloseTo(90, 0);
+    });
+
+    // Moving, the sequencing checks also take the DTK abeam the aircraft
+    it('raises no error with the aircraft moving over the VOR of the active DME arc (#433)', async () => {
+        const w = arcWorld();
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.at(225, 10), panelXml: panelXml(APR_ARM_SWITCH),
+            storage: savedFlightplan(0, [w.kprc]),
+        });
+        await settle(unit);
+        await unit.panel.loadProcedure('APT 8');
+        await moveAircraft(unit, {lat: w.abc.lat, lon: w.abc.lon}, {groundspeedKt: 120, trackTrue: 45});
+        await vi.advanceTimersByTimeAsync(1000);
 
         expect(unit.errors).toEqual([]);
     });
