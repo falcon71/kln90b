@@ -46,7 +46,9 @@ the unit drops (altitudes, vector legs). So the pilot is asked to choose between
   of the FPL 0 legs, so the EFB sync (`KlnEfbSaver`) reports that runway. It may be the wrong parallel or even the
   opposite end of the runway the pilot uses; the maintainer accepts this, as there is no better choice (2026-10-26).
 - **A route that comes in from the EFB** keeps its runway: `EfbRouteResolver` picks the runway transition the route
-  names, so it is reported back unchanged.
+  names, so it is reported back unchanged. The import follows APT 7 (#378): where APT 7 would ask no runway, a route
+  that names none loads the first runway transition instead of being skipped as incomplete (the planner's call, added
+  while writing the plan).
 - **CLR back to the runway list** (#273) puts the cursor on the entry that holds the runway chosen before.
 
 ## 4. Approaches
