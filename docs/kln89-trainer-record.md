@@ -690,3 +690,11 @@ reading compared with spherical predictions of both hypotheses; the VM was not s
 - One click of the knob on the OBS course sets the course shown (rounded) plus or minus one as a whole magnetic degree,
   so a held fraction is lost: 281.6 (shown 282) went to 283.0 on a click up and back to 282.0 on a click down, 273.4
   (shown 273) to 272.0 on a click down (#425).
+
+**2026-10-26** (the maintainer's checks in both trainers for #409, the runway list of a SID or STAR; the AVsoftech KLN
+90B trainer is third-party and unreliable)
+- AVsoftech KLN 90B trainer: the STAR CHINS2 at KBFI asks for no runway. Its runway transitions differ only in vector
+  legs, which the unit drops, so the waypoint list is the same for every runway. Adopted by the maintainer, together with
+  figure 6-35 (PORTE9 at KSFO lists `RW01B`, `RW10B`, `RW19B`, `RW28B`).
+- KLN 89 trainer: KMKE is the only airport of the demo database with a STAR, and the database has no SID.
+- Outcome: #409.

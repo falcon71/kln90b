@@ -86,4 +86,4 @@ the unit drops (altitudes, vector legs). So the pilot is asked to choose between
   CLR from the transition page of a SID whose runway step was skipped goes back to the procedure list; CLR back to the
   runway list puts the cursor on the merged entry.
 - Render (`test/render/services/KlnEfbSaver.test.ts`): a merged entry reports its first member's runway.
-- The dated record: the CHINS2 check goes into `docs/kln89-trainer-record.md` as a 2026-10-26 block.
+- The dated record: the CHINS2 check is in `docs/kln89-trainer-record.md`, the 2026-10-26 block.
