@@ -698,3 +698,19 @@ reading compared with spherical predictions of both hypotheses; the VM was not s
   figure 6-35 (PORTE9 at KSFO lists `RW01B`, `RW10B`, `RW19B`, `RW28B`).
 - KLN 89 trainer: KMKE is the only airport of the demo database with a STAR, and the database has no SID.
 - Outcome: #409.
+
+**2026-10-26** (an agent check for #392, the ESA of a leg that lies exactly on a whole-degree meridian; the KLN 89
+trainer, MSA read on ALT 1 at SET 1 positions and ESA on CAL 1 between two user waypoints moved by editing their
+coordinates; the VM was not started, stopped or reset)
+- The trainer's MSA is not a grid of 1° cells, unlike the Grid MORA of 3-33: at N44°30' inside the one cell
+  44-45° N / 86-87° W, ALT 1 read 4100 ft at W86°05', 2600 ft at W86°20' and 3200 ft at W86°55'. The 4100/2600
+  boundary at that latitude lies between W86°06.99' and W86°07.00', and farther north the 4100 area reaches west of it,
+  so it is neither on a whole degree nor a meridian. The question of #392 cannot be asked of this trainer.
+- The two whole-degree meridians tried, 88° W (N44°40' to N45°20') and 87° W (N44°20' to N44°40'), had equal values on
+  both sides, 3400 and 3200 ft; a leg exactly on 87° W read 3200.
+- What the trainer does show, weakly relevant to the 90B: a leg's ESA reads like the highest point value along the
+  leg. A leg ending exactly on a boundary took one side's value, and a 4 NM leg 0.1' beside a boundary read only its
+  own side: no margin and no rule that adds the neighbor across a line.
+- A point on the whole-degree corner N44°00' W86°00' read 4100 ft, the value north of the parallel (2900 south of it).
+- CAL 1 with the same waypoint as From and To shows the ESA dashed.
+- Outcome: the maintainer keeps the one-sided reading as it is (#392, not planned).
