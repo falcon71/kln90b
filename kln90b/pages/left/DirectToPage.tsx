@@ -112,7 +112,22 @@ export class DirectToPage extends SixLineHalfPage {
 
             this.props.modeController.deactivateApproach();
             if (this.props.modeController.isObsModeActive()) {
-                if (this.activateMode) {
+                const obsIndicator = this.props.sensors.in.obsMag;
+                if (obsIndicator !== null && this.props.modeController.isObsReadFromIndicator()) {
+                    //5-37, the maintainer's ruling of 2026-10-26: the course on an indicator the unit reads and cannot drive is
+                    //the input, and the unit only reads it, so neither the Direct To nor ACTIVATE sets it (#435). The course is
+                    //still laid, as read, through the new waypoint: the leg from the aircraft that the Direct To set up is not
+                    //the course line, and the next tick would not lay it again with the same variation. No output is written,
+                    //so there is nothing to slew (#261)
+                    this.props.modeController.setObs(obsIndicator, true);
+                    if (!this.activateMode) {
+                        //The course to set is the direct path's course at the waypoint (#370), or the course held with the
+                        //aircraft on the waypoint (#426), in the variation of the new waypoint: the number the pilot would see
+                        //once it is set. It is not set here, so it is converted only
+                        const obsTrue = courseAtWaypoint(this.props.sensors.in.gps.coords, waypoint) ?? this.props.modeController.getObsTrue();
+                        this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", `d› CRS ${format(roundBearing(this.props.modeController.trueToObsMag(obsTrue)), "000")}°`);
+                    }
+                } else if (this.activateMode) {
                     //5-37: ACTIVATE keeps the course and lays it through the new waypoint, so the bar is not recentered (#154).
                     //The course kept is the true one, so the number shown changes with the variation of the new waypoint
                     //(checked in the KLN 89 trainer, 2026-10-25, #425); the output is written at once, so that a driven

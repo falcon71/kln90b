@@ -633,8 +633,12 @@ sim.
   goes through `setObsTrueOnUnit` (a Direct To or ACTIVATE in OBS, the course chosen on entering OBS) or `setObsOnUnit`
   (MOD 2, NAV 3, Super NAV 5), which also write the magnetic course to the outputs at once: the aircraft gets it without
   waiting for the next tick, and a driven indicator turned since the last output is overwritten instead of being read
-  back over the course at the next tick. A knob click (`stepObs`) sets the course shown ± 1 as a whole magnetic
-  degree. The unforced guard in `setObsTrue` (the true course unchanged) is the first protection against laying an
+  back over the course at the next tick. With a readable indicator the unit cannot drive
+  (`ModeController.isObsReadFromIndicator`), the indicator's course is the input (5-37): a Direct To or ACTIVATE in OBS
+  lays the indicator's course through the new waypoint with `setObs(…, true)` and writes no output, and the Direct To
+  shows the direct course, converted with `trueToObsMag`, only in the `d› CRS` status-line message (#435). A knob
+  click (`stepObs`) sets the course shown ± 1 as a whole magnetic degree. The unforced guard in `setObsTrue` (the true
+  course unchanged) is the first protection against laying an
   unchanged course again. The indicator is read in `tick`: its course is taken only when it differs from `getObsMag()`
   and, with a driven indicator, from the course last sent (`sensors.out.obsOut`), because a driven indicator still
   shows the old number for one tick after the variation in use changed without a course set on the unit (a SET 2

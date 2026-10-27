@@ -10,6 +10,7 @@ import {savedFlightplan} from '../../../harness/storage';
 import {Screen} from '../../../harness/render/screen';
 import {courseDeg, crossTrackNm, finalCourseDeg, pointBefore, pointFrom} from '../../../harness/flight/geo';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
+import {EVT_ENT} from '../../../../kln90b/HEvents';
 
 const {kaaa, abc, kbbb} = standardRoute();
 
@@ -27,9 +28,10 @@ async function planInObs(position: { lat: number; lon: number }, o: { obs?: numb
 
 /**
  * DCT from FPL 0 with the cursor on KBBB; ACTIVATE with a second DCT press when asked. `beforeEnt` runs right before
- * the ENT, with no calculation tick between the two
+ * the ENT, with no calculation tick between the two. `afterMs` is the time run after the ENT; with 0 the ENT is sent
+ * without any time passing, so the state right at the Direct To can be read before the next calculation tick
  */
-async function directToKbbbFromFpl0(unit: HeadlessUnit, activate: boolean, beforeEnt?: () => void) {
+async function directToKbbbFromFpl0(unit: HeadlessUnit, activate: boolean, beforeEnt?: () => void, afterMs = 2000) {
     await unit.panel.selectPage('L', 'FPL 0');
     await unit.panel.cursor('L');
     await unit.panel.outer('L', 2); // KBBB
@@ -37,8 +39,12 @@ async function directToKbbbFromFpl0(unit: HeadlessUnit, activate: boolean, befor
     if (activate) await unit.panel.dct();
     expect(Screen.read().rows('L')[0]).toBe(activate ? 'ACTIVATE:  ' : 'DIRECT TO: ');
     beforeEnt?.();
+    if (afterMs === 0) {
+        unit.send(EVT_ENT);
+        return;
+    }
     await unit.panel.ent();
-    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(afterMs);
 }
 
 describe('ACTIVATE in OBS mode (5-37)', () => {
@@ -134,6 +140,23 @@ describe('OBS mode with an indicator the unit reads (5-35, 5-37, #122, #261)', (
         expect(activeIdent(unit)).toBe('KBBB');
         expect(Math.abs(mc.getObsMag() - 50)).toBeLessThan(1e-6);
         expect(Math.abs(unit.props.memory.navPage.xtkToActive! - crossTrackNm(position, kbbb, 50))).toBeLessThan(0.05);
+    });
+
+    // 5-37 and the maintainer's ruling of 2026-10-26: ACTIVATE with a readable, undriven indicator leaves the course
+    // the indicator's. Before #435 it set the held true course through KBBB (060 magnetic at KBBB's variation of 0) until
+    // the next tick read 050 back
+    it('keeps the indicator course at the ACTIVATE itself, before the next tick (5-37, #435)', async () => {
+        const unit = await planInObs(position, {obs: 50, abc: abc10E});
+        const mc = unit.props.modeController;
+
+        await directToKbbbFromFpl0(unit, true, undefined, 0);
+
+        expect(activeIdent(unit)).toBe('KBBB');
+        expect(Math.abs(mc.getObsMag() - 50)).toBeLessThan(1e-6);
+
+        // 5-37: ACTIVATE leaves the course alone, so there is no course to tell the pilot to set
+        await vi.advanceTimersByTimeAsync(500);
+        expect(Screen.read().status().mode).not.toMatch(/CRS/);
     });
 
     // 5-35, 5-37: with an indicator the unit reads and drives (ObsSource 1, ObsTarget 1) ACTIVATE keeps the true course,
@@ -270,6 +293,59 @@ describe('Direct To in OBS mode (5-37)', () => {
         await vi.advanceTimersByTimeAsync(500);
 
         expect(Screen.read().status().mode).toBe('d› CRS 024°'); // 034.3 true less the variation of 10 E
+    });
+
+    // 5-37 and the maintainer's ruling of 2026-10-26: the course on an indicator the unit reads and cannot drive is the
+    // input. The Direct To computes the direct course (024.3) only for the CRS message; before #435 it set it, and for up
+    // to a second the pages and the OBS output showed it until the next tick read the indicator back. The ENT is sent
+    // without time passing, so no calculation tick has read the indicator back yet
+    it('keeps the indicator course at the Direct To itself, before the next tick (5-37, #435)', async () => {
+        const unit = await planInObs(offLeg, {obs: 50, abc: abcE});
+        const mc = unit.props.modeController;
+        await unit.panel.selectPage('R', 'CTR 1');
+
+        await unit.panel.dct();
+        unit.send(EVT_ENT);
+
+        expect(activeIdent(unit)).toBe('ABC');
+        expect(Math.abs(mc.getObsMag() - 50)).toBeLessThan(1e-6);
+        expect(unit.props.sensors.out.obsOut).toBe(50); // With ObsTarget 0 nothing is sent to the indicator; the output holds the course in use, not the direct course
+        await vi.advanceTimersByTimeAsync(500);
+        expect(Screen.read().status().mode).toBe('d› CRS 024°');
+    });
+
+    // #435: the course is the indicator's, laid through the new waypoint. The straight leg from the aircraft that the
+    // Direct To sets up has no deviation; the 050 line through ABC passes about 2 NM off the aircraft. The variation at
+    // ABC is the same as before (0), so the next tick does not lay the line again: skipping the call altogether would
+    // leave the bar centered
+    it('lays the indicator course through the new waypoint at a Direct To with the same variation (#435)', async () => {
+        const unit = await planInObs(offLeg, {obs: 50});
+        await unit.panel.selectPage('R', 'CTR 1');
+        const expected = crossTrackNm(offLeg, abc, 50);
+        expect(Math.abs(expected)).toBeGreaterThan(1); // Precondition: far from the straight leg's 0
+
+        await unit.panel.dct();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Math.abs(unit.props.memory.navPage.xtkToActive! - expected)).toBeLessThan(0.05);
+    });
+
+    // #426 with a readable, undriven indicator: with the aircraft exactly on ABC there is no direct path to it, so the
+    // course to tell is the one held, which is the indicator's 050, shown with the variation of the new active waypoint
+    it('shows CRS with the indicator course with the aircraft exactly on the waypoint (5-37, #426, #435)', async () => {
+        const unit = await planInObs(offLeg, {obs: 50, abc: abcE});
+        await moveAircraft(unit, {lat: abc.lat, lon: abc.lon}, {groundspeedKt: 0, trackTrue: 0});
+        await unit.panel.selectPage('R', 'CTR 1');
+
+        await unit.panel.dct();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(true);
+        expect(Math.abs(unit.props.modeController.getObsMag() - 50)).toBeLessThan(1e-6);
+        expect(Screen.read().status().mode).toBe('d› CRS 050°');
+        expect(unit.errors).toEqual([]);
     });
 
     // 5-37 (5.9.6): a driven indicator (ObsTarget 1, VOR 1) is slewed to the direct course, with no message

@@ -272,7 +272,24 @@ export class ModeController implements CalcTickable {
      * variation in use now (getMagvarForObs), in [0, 360) (#425)
      */
     public getObsMag(): Degrees {
-        return this.magvar.trueToMag(this.navState.obsTrue, this.getMagvarForObs(this.navState.activeWaypoint.getActiveWpt()));
+        return this.trueToObsMag(this.navState.obsTrue);
+    }
+
+    /**
+     * A true course as the unit would show it: magnetic, with the OBS variation of the active waypoint (getMagvarForObs),
+     * in [0, 360) (#425, #435)
+     */
+    public trueToObsMag(obsTrue: Degrees): Degrees {
+        return this.magvar.trueToMag(obsTrue, this.getMagvarForObs(this.navState.activeWaypoint.getActiveWpt()));
+    }
+
+    /**
+     * Whether the OBS course is the indicator's: the unit reads an indicator it cannot drive (Input.ObsSource, with
+     * Output.ObsTarget 0), and the indicator is readable now. 5-37 and the maintainer's ruling of 2026-10-26: the indicator's
+     * course is the input and the unit only reads it (#435)
+     */
+    public isObsReadFromIndicator(): boolean {
+        return this.planeSettings.output.obsTarget === 0 && this.sensors.in.obsMag !== null;
     }
 
     /**
@@ -326,8 +343,9 @@ export class ModeController implements CalcTickable {
             this.navState.navmode = this.navState.navmode === NavMode.ARM_LEG ? NavMode.ARM_OBS : NavMode.ENR_OBS;
         }
 
-        if (this.sensors.in.obsMag !== null && this.planeSettings.output.obsTarget === 0) {
-            this.setObs(this.sensors.in.obsMag, true);
+        const obsIndicator = this.sensors.in.obsMag;
+        if (obsIndicator !== null && this.isObsReadFromIndicator()) {
+            this.setObs(obsIndicator, true);
         } else if (active !== null) {
             //5-36: the course of the current path at the active waypoint, so that the course laid through it is the leg
             //itself and the deviation is kept on any leg length (#151). A degenerate path (TO and FROM the same
