@@ -94,8 +94,9 @@ boot as `buildPersistentMessages` does today.
   - Both turns (about t=2245 and t=2574): the MSG light comes on when the WPT light goes from flashing to steady at the
     start of the turn, and goes out, unread, when the WPT light goes off at the end of the turn.
   - About 43:52: a Direct To posts no message and gives no waypoint alert.
-  - 4-8 says there is no message when the unit slews the pointer, and the light did come on, so the unit there did not
-    drive the pointer; the Direct To without a message also fits a course it cannot read. An agent analysis found the
+  - About 02:57: the self-test page shows `OBS IN` dashed, so the unit in this aircraft cannot read the course at all;
+    it is the unreadable case (the maintainer, 2026-10-27). That agrees with what 4-8 implies: there is no message when
+    the unit slews the pointer, and the light did come on, so the unit did not drive it either. An agent analysis found the
     pointer moved smoothly by 74° within about 3 s at 37:13 (servo-like, moderate confidence), most likely driven by
     the aircraft's own navigation computer; the MSG lamp kept flashing until about 37:50, after the pointer had moved.
 - Air Chathams CV580 video, at 30:38, the maintainer, 2026-10-26: the CDI is on NAV 1, so the unit cannot see the
@@ -107,8 +108,9 @@ boot as `buildPersistentMessages` does today.
 - Not followed: the KLN 89 trainer (no course input) posts its own message, `GPS Course is nnn°`, also at a Direct To.
   It is a different unit with a different message.
 
-**Confidence**: high for the start and the end at a turn and for no message at a Direct To (two real-unit videos, the
-Pilot's Guide). Low for the message without a turn staying until read.
+**Confidence**: high for the start and the end at a turn and for no message at a Direct To (two real-unit videos, both
+proven unreadable installations: the Tu-154's self-test page and the CV580's CDI on NAV 1; the Pilot's Guide). Low for
+the message without a turn staying until read.
 
 ## Case 2: readable, not driven
 
