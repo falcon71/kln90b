@@ -237,7 +237,8 @@ unit's own -1 m.
 
 `standardRoute()` (`test/harness/fixtures.ts`) returns the world many tests use: KAAA, the VOR ABC and KBBB, fresh objects
 on every call. `insertLeg(unit, idx, fac)` (`test/harness/flightplan.ts`) puts a `USER` leg into FPL 0 at `idx`, the way the
-FPL page does after a waypoint confirmation, which is far faster than typing it with the knobs.
+FPL page does after a waypoint confirmation, which is far faster than typing it with the knobs. `deleteLeg(unit, idx)`
+(same file) deletes the leg at `idx` from FPL 0, as the FPL page does once the pilot confirms the delete.
 
 `approachWorld()` (same file) returns an RNAV approach to KPRC from the north with fresh objects on every call: the IAF
 IAFAA, the intermediate fix IFAAA, the FAF FAFAA 5 NM north of the MAP, a step-down fix SDFAA between the FAF and the MAP, the MAP MAPAA at the

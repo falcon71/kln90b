@@ -113,6 +113,12 @@ export class ActiveWaypoint {
     private isDirectTo: boolean = false;
 
     private fplIdx: number = -1; //The index of the active waypoint (to) in the flightplan
+    /**
+     * #408: the leg after the active waypoint that the turn state was made for, compared by instance in
+     * assertToMatchesFplIdx (onFollowingLegChanged). A reference only, which every setActiveIdx sets again, and not reset
+     * at a power-on: VolatileMemory.reset clears the turn state, so a difference found after it changes nothing
+     */
+    private followingLeg: KLNFlightplanLeg | null = null;
 
     public turnStack: TurnStackEntry[] = []; //This is a stack, because for each turn, we keep two entries: One before the start of the turn (to account for the bank angle change) and the turn itself up to the end of the turn
     /**
@@ -263,6 +269,8 @@ export class ActiveWaypoint {
     }
 
     private setActiveIdx(activeIdx: number) {
+        //#408: on every call, also when the index stays: the turn state below is the one of this following leg
+        this.followingLeg = activeIdx >= 0 ? this.fpl0.getLegs()[activeIdx + 1] ?? null : null;
         if (this.fplIdx !== activeIdx) {
             this.fplIdx = activeIdx;
             this.clearTurnState();
@@ -278,7 +286,8 @@ export class ActiveWaypoint {
     }
 
     /**
-     * Gets the leg after the active waypoint
+     * Gets the leg after the active waypoint. It does not run assertToMatchesFplIdx, which notices an edit of this leg
+     * (#408): NavCalculator.tick reads getActiveLeg first in every calculation
      */
     public getFollowingLeg(): KLNFlightplanLeg | null {
         const legs = this.fpl0.getLegs();
@@ -420,16 +429,62 @@ export class ActiveWaypoint {
 
         const legs = this.fpl0.getLegs();
         if (this.fplIdx < legs.length && this.to === legs[this.fplIdx]) { //Yes, we really need to check the instance here. For example the user may remove the enroute waypoint with the same icao as the IAF
+            this.assertFollowingLegUnchanged(legs);
             return;
         }
         if (this.isDirectTo) {
             //The target moved when a leg was inserted or deleted in front of it, and becomes a random DTO when it is deleted from the plan
             this.fplIdx = legs.indexOf(this.to);
+            this.assertFollowingLegUnchanged(legs);
             return;
         }
 
         //The user must have modified the flightplan if to does not match the index anymore
         this.activateFpl0();
+    }
+
+    /**
+     * #408: the leg after the active waypoint is compared by instance, as the active leg is: an insert after the active
+     * waypoint, a delete of the next waypoint and a procedure load that replaces the next leg all change it, an edit
+     * further down the plan does not (the design, docs/superpowers/specs/2026-10-27-sequencing-406-407-408-design.md,
+     * section 3). A Direct To to a waypoint of FPL 0 is checked the same way, after its target index has followed the
+     * edit (the design's call, not flown in the trainer)
+     * @param legs the legs of FPL 0
+     */
+    private assertFollowingLegUnchanged(legs: KLNFlightplanLeg[]): void {
+        const followingLeg = this.fplIdx >= 0 ? legs[this.fplIdx + 1] ?? null : null;
+        if (followingLeg !== this.followingLeg) {
+            this.followingLeg = followingLeg;
+            this.onFollowingLegChanged();
+        }
+    }
+
+    /**
+     * #408: the leg after the active waypoint changed while the active leg stayed: the turn is computed again for the new
+     * geometry, by the maintainer's rule (c) of 2026-10-27 (the design, section 2.3). Checked in the KLN 89 trainer,
+     * 2026-10-27 (docs/kln89-trainer-record.md):
+     * - the waypoint's own turn that has started is dropped, and the DTK goes back to the active leg (runs a2, a5). While
+     *   ownTurnStarted the stack holds only that turn, because startOwnTurn replaced it. NavCalculator starts the new turn
+     *   at its own lead, at once when the aircraft is already inside it, and sequences at its bisector (a2, a6, a11).
+     *   When the active waypoint is now the last one there is no turn, and it gets the alert of a waypoint without one
+     *   (a9);
+     * - a plan to turn at the lead is decided again by the normal rule, at the decision point of the new turn or at once
+     *   past it, so the old lead does nothing and the alert pauses when the new turn point is more than 20 s away (a3,
+     *   a4);
+     * - a plan to turn at the abeam line is kept (a8, a16): there was no turn at the new lead with the aircraft inside it
+     *   and only 1.0 to 1.7 NM off. An abeam turn that had started is dropped with the rest of the own turn and starts
+     *   again onto the new next leg, the plan being kept and the aircraft past the abeam line;
+     * - what is left on the stack of the previous waypoint's turn, such as the run-out of its abeam turn (#406), is not
+     *   the active waypoint's and stays (the design's call, not flown in the trainer)
+     */
+    private onFollowingLegChanged(): void {
+        if (this.ownTurnStarted) {
+            this.turnStack = [];
+            this.ownTurnStarted = false;
+        }
+        if (this.turnPlan === TurnPlan.AT_LEAD) {
+            this.turnPlan = null;
+        }
     }
 
     /**

@@ -499,6 +499,15 @@ Flightplan really is dead simple".
   the active index changes, by `clearTurnStack()` and by `VolatileMemory.reset`. The turn stack itself survives the
   sequencing, because the turn onto the next leg is still being flown; an abeam turn on it becomes its run-out then
   (`TurnStackEntry.runOut`, #406, below).
+- A change of the following leg also resets part of that state (#408). `ActiveWaypoint` remembers the instance of the
+  leg after the active waypoint (`followingLeg`, set again by every `setActiveIdx`), and `assertToMatchesFplIdx()`
+  compares it by instance once the active leg has matched, also for a Direct To to an FPL 0 waypoint. When it differs
+  (an insert after the active waypoint, a delete of the next waypoint, a procedure load that replaces the next leg),
+  `onFollowingLegChanged()` drops the waypoint's own started turn (`ownTurnStarted` and the stack, which holds only that
+  turn then) and clears an `AT_LEAD` plan, so that `NavCalculator` decides and starts the turn again for the new
+  geometry. An `AT_ABEAM` plan and a leftover of the previous waypoint's turn, such as its run-out, stay. An edit further
+  down the plan keeps the instance and changes nothing. This is the maintainer's rule (c), checked in the KLN 89
+  trainer, 2026-10-27 (docs/superpowers/specs/2026-10-27-sequencing-406-407-408-design.md, section 2.3).
 - API: `directTo`, `directToFlightplanIndex`, `cancelDirectTo`, `activateFpl0()` (chooses the *closest* leg to the
   plane, as checked against the KLN 89 trainer), `sequenceToNextWaypoint`, `getFutureLegs`/`getDestination` (stop at the
   MAP, 6-20), `getFollowingLeg`, `recalculatePath`.
