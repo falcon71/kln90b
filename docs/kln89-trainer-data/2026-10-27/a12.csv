@@ -1,0 +1,287 @@
+t_s,wall_clock,line1,line2,line3,line4
+0.02,20:15:02.963,16.2nm|INIT POS:       ,8U    |   N 44d24.52'  ,## Leg|   W 89d06.65'  ,*CRSR*|120kt ###d Ok?  
+0.50,20:15:03.428,16.2nm|INIT POS:       ,8U    |   N 44d24.52'  ,   Leg|   W 89d06.65'  ,*CRSR*|120kt    d Ok?  
+0.75,20:15:03.677,16.2nm|INIT POS:       ,8U    |   N 44d24.52'  ,## Leg|   W 89d06.65'  ,*CRSR*|120kt ###d Ok?  
+1.50,20:15:04.428,16.2nm|INIT POS:       ,8U    |   N 44d24.52'  ,   Leg|   W 89d06.65'  ,*CRSR*|120kt    d Ok?  
+1.75,20:15:04.678,16.1nm|INIT POS:       ,8U    |   N 44d24.52'  ,## Leg|   W 89d06.65'  ,*CRSR*|120kt  64d Ok?  
+2.76,20:15:05.693,16.1nm|INIT POS:       ,8U    |   N 44d24.52'  ,   Leg|   W 89d06.65'  ,*CRSR*|120kt  64d      
+3.00,20:15:05.929,16.1nm|INIT POS:       ,8U    |   N 44d24.52'  ,## Leg|   W 89d06.65'  ,*CRSR*|120kt  64d Ok?  
+3.75,20:15:06.678,16.1nm|INIT POS:       ,8U    |   N 44d24.52'  ,   Leg|   W 89d06.65'  ,*CRSR*|120kt  64d      
+4.01,20:15:06.941,16.1nm|INIT POS:       ,8U    |   N 44d24.52'  ,## Leg|   W 89d06.65'  ,SET 1 |120kt  64d      
+4.25,20:15:07.180,16.1nm|INIT POS:       ,8U    |   N 44d24.52'  ,## Leg|   W 89d06.65'  ,SET 1 |120kt  66d      
+4.75,20:15:07.679,16.1nm|INIT POS:       ,8U    |   N 44d24.52'  ,   Leg|   W 89d06.65'  ,SET 1 |120kt  66d      
+5.25,20:15:08.180,16.1nm|INIT POS:       ,8U    |   N 44d24.52'  ,## Leg|   W 89d06.65'  ,SET 1 |120kt  66d      
+5.50,20:15:08.429, 3.0nm|INIT POS:       ,8U    |   N 44d24.54'  ,## Leg|   W 89d06.60'  ,SET 1 |120kt  64d      
+6.00,20:15:08.933, 3.0nm|INIT POS:       ,8U    |   N 44d24.54'  ,   Leg|   W 89d06.60'  ,SET 1 |120kt  64d      
+6.25,20:15:09.178, 3.0nm|INIT POS:       ,8U    |   N 44d24.54'  ,## Leg|   W 89d06.60'  ,SET 1 |120kt  64d      
+7.00,20:15:09.932, 3.0nm|INIT POS:       ,8U    |   N 44d24.54'  ,   Leg|   W 89d06.60'  ,SET 1 |120kt  64d      
+7.50,20:15:10.430, 3.0nm|INIT POS:       ,8U    |   N 44d24.54'  ,## Leg|   W 89d06.60'  ,SET 1 |120kt  64d      
+8.25,20:15:11.177, 3.0nm|INIT POS:       ,8U    |   N 44d24.54'  ,   Leg|   W 89d06.60'  ,SET 1 |120kt  64d      
+8.50,20:15:11.429, 2.9nm|INIT POS:       ,8U    |   N 44d24.57'  ,## Leg|   W 89d06.53'  ,SET 1 |120kt  64d      
+9.26,20:15:12.191, 2.9nm|INIT POS:       ,8U    |   N 44d24.57'  ,   Leg|   W 89d06.53'  ,SET 1 |120kt  64d      
+9.75,20:15:12.681, 2.9nm|INIT POS:       ,8U    |   N 44d24.59'  ,## Leg|   W 89d06.49'  ,SET 1 |120kt  64d      
+10.50,20:15:13.429, 2.9nm|INIT POS:       ,8U    |   N 44d24.59'  ,   Leg|   W 89d06.49'  ,SET 1 |120kt  64d      
+10.76,20:15:13.690, 2.8nm|INIT POS:       ,8U    |   N 44d24.61'  ,## Leg|   W 89d06.45'  ,SET 1 |120kt  64d      
+11.50,20:15:14.428, 2.8nm|INIT POS:       ,8U    |   N 44d24.61'  ,   Leg|   W 89d06.45'  ,SET 1 |120kt  64d      
+11.75,20:15:14.678, 2.8nm|INIT POS:       ,8U    |   N 44d24.62'  ,## Leg|   W 89d06.41'  ,SET 1 |120kt  64d      
+12.75,20:15:15.678, 2.8nm|INIT POS:       ,8U    |   N 44d24.62'  ,   Leg|   W 89d06.41'  ,SET 1 |120kt  64d      
+13.00,20:15:15.929, 2.8nm|INIT POS:       ,8U    |   N 44d24.62'  ,## Leg|   W 89d06.41'  ,SET 1 |120kt  64d      
+13.76,20:15:16.690, 2.8nm|INIT POS:       ,8U    |   N 44d24.62'  ,   Leg|   W 89d06.41'  ,SET 1 |120kt  64d      
+14.00,20:15:16.929, 2.7nm|INIT POS:       ,8U    |   N 44d24.66'  ,## Leg|   W 89d06.33'  ,SET 1 |120kt  65d      
+15.00,20:15:17.928, 2.7nm|INIT POS:       ,8U    |   N 44d24.66'  ,   Leg|   W 89d06.33'  ,SET 1 |120kt  65d      
+15.25,20:15:18.179, 2.7nm|INIT POS:       ,8U    |   N 44d24.66'  ,## Leg|   W 89d06.33'  ,SET 1 |120kt  65d      
+16.00,20:15:18.929, 2.7nm|INIT POS:       ,8U    |   N 44d24.66'  ,   Leg|   W 89d06.33'  ,SET 1 |120kt  65d      
+16.25,20:15:19.179, 2.7nm|INIT POS:       ,8U    |   N 44d24.69'  ,## Leg|   W 89d06.25'  ,SET 1 |120kt  65d      
+17.25,20:15:20.181, 2.6nm|INIT POS:       ,8U    |   N 44d24.71'  ,   Leg|   W 89d06.21'  ,SET 1 |120kt  65d      
+17.50,20:15:20.430, 2.6nm|INIT POS:       ,8U    |   N 44d24.71'  ,## Leg|   W 89d06.21'  ,SET 1 |120kt  65d      
+18.25,20:15:21.180, 2.6nm|INIT POS:       ,8U    |   N 44d24.71'  ,   Leg|   W 89d06.21'  ,SET 1 |120kt  65d      
+18.50,20:15:21.429, 2.6nm|INIT POS:       ,8U    |   N 44d24.71'  ,## Leg|   W 89d06.21'  ,SET 1 |120kt  65d      
+19.25,20:15:22.180,8_?? Co?rse is 65d     ,                       ,                       ,                       
+22.25,20:15:25.179, 2.5nm|INIT POS:       ,8U    |   N 44d24.77'  ,   Leg|   W 89d06.05'  ,SET 1 |120kt  65d      
+23.00,20:15:25.929, 2.5nm|INIT POS:       ,8U    |   N 44d24.79'  ,   Leg|   W 89d06.01'  ,SET 1 |120kt  65d      
+24.50,20:15:27.429, 2.4nm|INIT POS:       ,8U    |   N 44d24.81'  ,   Leg|   W 89d05.96'  ,SET 1 |120kt  65d      
+25.50,20:15:28.429, 2.4nm|INIT POS:       ,8U    |   N 44d24.82'  ,   Leg|   W 89d05.92'  ,SET 1 |120kt  65d      
+26.00,20:15:28.929, 2.4nm|INIT POS:       ,8U    |   N 44d24.82'  ,   Leg|   ? 89d05.92'  ,SET 1 |120kt  65d      
+26.25,20:15:29.180, 2.4nm|INIT POS:       ,8U    |   N 44d24.84'  ,   Leg|   W 89d05.88'  ,SET 1 |120kt  65d      
+26.50,20:15:29.429, 2.4nm|INIT POS:       ,8U    |   N 44d24.84'  ,   Leg|   W 8?d05.88'  ,SET 1 |120kt  65d      
+26.75,20:15:29.678, 2.4nm|INIT POS:       ,8U    |   N 44d24.84'  ,   Leg|   W 89d05.88'  ,SET 1 |120kt  65d      
+27.00,20:15:29.929, 2.4nm|INIT POS:       ,8U    |   N 44d24.84'  ,   Leg|   W 89d0?.88'  ,SET 1 |120kt  65?      
+27.25,20:15:30.179, 2.3nm|INIT POS:       ,8U    |   N 44d24.86'  ,   Leg|   W 89d05.84'  ,SET 1 |120kt  65d      
+28.50,20:15:31.431, 2.3nm|INIT POS:       ,8U    |   N 44d24.87'  ,   Leg|   W 89d05.80'  ,SET 1 |120kt  65d      
+28.75,20:15:31.679, 2.3nm|>Wpt  Fr>8P     ,8U    | 188d To>8Q     ,   Leg|   4nm ESA 2600',CAL 1 | 996kt ETE 0:00 
+29.75,20:15:32.681, 2.3nm|[ 4:8V      >Dis,8U    |^ 5:8U         2,   Leg|  6:8T        30,FPL 0 |  8:8R        94
+30.50,20:15:33.432, 2.3nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:01
+30.75,20:15:33.679, 2.2nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:01
+34.25,20:15:37.177, 2.1nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:01
+37.50,20:15:40.430, 2.0nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:01
+39.75,20:15:42.679, 2.0nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :59
+40.75,20:15:43.679, 1.9nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :58
+42.00,20:15:44.929, 1.9nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :57
+43.00,20:15:45.930, 1.9nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :56
+44.01,20:15:46.941, 1.8nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :55
+45.25,20:15:48.179, 1.8nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :54
+46.25,20:15:49.179, 1.8nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :53
+47.50,20:15:50.429, 1.7nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :52
+48.75,20:15:51.680, 1.7nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :51
+49.50,20:15:52.429, 1.7nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :50
+50.75,20:15:53.678, 1.6nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :49
+52.00,20:15:54.929, 1.6nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :48
+53.00,20:15:55.929, 1.6nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :47
+54.00,20:15:56.931, 1.5nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :46
+55.25,20:15:58.179, 1.5nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :45
+56.50,20:15:59.429, 1.5nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :44
+57.25,20:16:00.180, 1.4nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :43
+58.50,20:16:01.429, 1.4nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :42
+59.75,20:16:02.679, 1.4nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :41
+60.75,20:16:03.679, 1.3nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :40
+62.00,20:16:04.928, 1.3nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :39
+63.00,20:16:05.930, 1.3nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :38
+64.25,20:16:07.178, 1.2nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :37
+65.25,20:16:08.180, 1.2nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :36
+66.50,20:16:09.429, 1.2nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :35
+67.00,20:16:09.937, 1.2nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :35
+67.26,20:16:10.194, 1.1nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :34
+67.50,20:16:10.436, 1.1nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :34
+68.25,20:16:11.179, 1.1nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :34
+68.50,20:16:11.429, 1.1nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :33
+69.26,20:16:12.192, 1.1nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :33
+69.50,20:16:12.429, 1.1nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :33
+70.00,20:16:12.931, 1.1nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :32
+70.50,20:16:13.429, 1.1nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :32
+70.75,20:16:13.678, 1.1nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :32
+71.00,20:16:13.931, 1.0nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :31
+71.50,20:16:14.428, 1.0nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :31
+71.75,20:16:14.679, 1.0nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :30
+72.50,20:16:15.429, 1.0nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :30
+72.75,20:16:15.681, 1.0nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :29
+73.00,20:16:15.930, 1.0nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :29
+73.75,20:16:16.679, 1.0nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :29
+74.00,20:16:16.929, 1.0nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :29
+74.75,20:16:17.678, 1.0nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :29
+75.25,20:16:18.180, 1.0nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :29
+75.50,20:16:18.429, 0.9nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :27
+76.00,20:16:18.928, 0.9nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :27
+76.26,20:16:19.191, 0.9nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :26
+77.00,20:16:19.927, 0.9nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :26
+77.25,20:16:20.179, 0.9nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :26
+78.26,20:16:21.191, 0.9nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :26
+78.50,20:16:21.428, 0.8nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :24
+79.26,20:16:22.191, 0.8nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :24
+79.75,20:16:22.679, 0.8nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :23
+80.50,20:16:23.430, 0.8nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :23
+80.75,20:16:23.679, 0.8nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :23
+81.50,20:16:24.433, 0.8nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :23
+81.75,20:16:24.680, 0.8nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :23
+82.01,20:16:24.941, 0.7nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :21
+82.75,20:16:25.679, 0.7nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :21
+83.00,20:16:25.930, 0.7nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :20
+84.00,20:16:26.929, 0.7nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :20
+84.25,20:16:27.179, 0.7nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :20
+85.00,20:16:27.929, 0.7nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :20
+85.25,20:16:28.178, 0.6nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :18
+86.00,20:16:28.929, 0.6nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :18
+86.25,20:16:29.179, 0.6nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :18
+87.25,20:16:30.181, 0.6nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :18
+87.50,20:16:30.430, 0.5nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :16
+88.25,20:16:31.182, 0.5nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :16
+88.50,20:16:31.429, 0.5nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :16
+89.50,20:16:32.432, 0.5nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :16
+89.75,20:16:32.681, 0.5nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :14
+90.50,20:16:33.432, 0.5nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :14
+90.75,20:16:33.678, 0.4nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :13
+91.50,20:16:34.432, 0.4nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :13
+91.75,20:16:34.680, 0.4nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :13
+92.00,20:16:34.929, 0.4nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :12
+92.75,20:16:35.679, 0.4nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :12
+93.00,20:16:35.929, 0.4nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :11
+93.75,20:16:36.678, 0.4nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :11
+94.00,20:16:36.931, 0.4nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :11
+95.00,20:16:37.929, 0.4nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :11
+95.25,20:16:38.180, 0.3nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :10
+96.00,20:16:38.929, 0.3nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 66dTo      :10
+96.25,20:16:39.181, 0.3nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :08
+97.00,20:16:39.928, 0.3nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :08
+97.25,20:16:40.178, 0.3nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :08
+98.25,20:16:41.179, 0.3nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :08
+98.50,20:16:41.429, 0.3nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :08
+98.75,20:16:41.681, 0.2nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :07
+99.25,20:16:42.178, 0.2nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :07
+99.50,20:16:42.428, 0.2nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :07
+99.75,20:16:42.679, 0.2nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :05
+100.51,20:16:43.441, 0.2nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :05
+100.75,20:16:43.679, 0.2nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :05
+101.50,20:16:44.432, 0.2nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :05
+101.75,20:16:44.682, 0.2nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 67dTo      :05
+102.00,20:16:44.929, 0.1nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 68dTo      :04
+102.75,20:16:45.680, 0.1nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 68dTo      :04
+103.00,20:16:45.928, 0.1nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 68dTo      :04
+103.25,20:16:46.179, 0.1nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 70dTo      :02
+103.75,20:16:46.679, 0.1nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 70dTo      :02
+104.00,20:16:46.929, 0.1nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 70dTo      :02
+104.25,20:16:47.179, 0.0nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 75dTo      :01
+105.00,20:16:47.928, 0.0nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 75dTo      :01
+105.25,20:16:48.188, 0.0nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 74dTo      :01
+106.00,20:16:48.929, 0.0nm| 8V       8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 74dTo      :01
+106.25,20:16:49.178, 0.0nm| 8V     @ 8U    , 119kt|> Fly R  0.01nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 74dTo      :01
+106.50,20:16:49.429,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.01nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+107.00,20:16:49.929,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.03nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+107.25,20:16:50.183,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.03nm ,   Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+107.50,20:16:50.430,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.06nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+107.75,20:16:50.680,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.07nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+108.00,20:16:50.928,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.08nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+108.25,20:16:51.180,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.09nm ,   Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+108.50,20:16:51.430,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.09nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+108.75,20:16:51.679,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.07nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+109.25,20:16:52.184,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.08nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+109.50,20:16:52.428,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.08nm ,   Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+109.75,20:16:52.678,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.13nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+110.25,20:16:53.179,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.14nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+110.50,20:16:53.429,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.12nm ,   Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+110.75,20:16:53.679,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.12nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+111.00,20:16:53.931,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.13nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+111.25,20:16:54.182,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.14nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+111.75,20:16:54.680,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.15nm ,   Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+112.00,20:16:54.928,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.16nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+112.50,20:16:55.430,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.17nm ,## Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+112.75,20:16:55.683,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.18nm ,   Leg|DTK 305d TK  65d,NAV 1 |>305dTo     0:14
+113.00,20:16:55.928,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.18nm ,## Leg|DTK 305d TK  65d,NAV 1 |>304dTo     0:14
+113.25,20:16:56.181,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.19nm ,## Leg|DTK 305d TK  65d,NAV 1 |>304dTo     0:14
+113.75,20:16:56.678,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.20nm ,   Leg|DTK 305d TK  65d,NAV 1 |>304dTo     0:14
+114.00,20:16:56.929,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.21nm ,   Leg|DTK 305d TK  64d,NAV 1 |>304dTo     0:14
+114.25,20:16:57.180,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.21nm ,## Leg|DTK 305d TK  64d,NAV 1 |>304dTo     0:14
+114.50,20:16:57.429,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.22nm ,## Leg|DTK 305d TK  64d,NAV 1 |>304dTo     0:14
+115.00,20:16:57.929,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.23nm ,   Leg|DTK 305d TK  64d,NAV 1 |>304dTo     0:14
+115.25,20:16:58.178,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.24nm ,## Leg|DTK 305d TK  64d,NAV 1 |>304dTo     0:14
+115.50,20:16:58.428,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.25nm ,## Leg|DTK 305d TK  64d,NAV 1 |>304dTo     0:14
+116.00,20:16:58.928,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.26nm ,   Leg|DTK 305d TK  64d,NAV 1 |>304dTo     0:14
+116.25,20:16:59.179,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.27nm ,## Leg|DTK 305d TK  63d,NAV 1 |>304dTo     0:14
+116.50,20:16:59.429,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.28nm ,## Leg|DTK 305d TK  63d,NAV 1 |>304dTo     0:14
+117.00,20:16:59.931,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.29nm ,## Leg|DTK 305d TK  63d,NAV 1 |>304dTo     0:14
+117.25,20:17:00.177,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.29nm ,   Leg|DTK 305d TK  63d,NAV 1 |>304dTo     0:14
+117.50,20:17:00.429,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.29nm ,## Leg|DTK 305d TK  63d,NAV 1 |>304dTo     0:14
+117.75,20:17:00.679,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.31nm ,## Leg|DTK 305d TK  62d,NAV 1 |>304dTo     0:14
+118.25,20:17:01.179,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.33nm ,   Leg|DTK 305d TK  62d,NAV 1 |>304dTo     0:14
+118.51,20:17:01.440,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.33nm ,## Leg|DTK 305d TK  51d,NAV 1 |>304dTo     0:14
+118.75,20:17:01.679,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.34nm ,## Leg|DTK 305d TK  51d,NAV 1 |>304dTo     0:14
+119.25,20:17:02.184,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.35nm ,## Leg|DTK 305d TK  51d,NAV 1 |>304dTo     0:14
+119.50,20:17:02.428,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.36nm ,   Leg|DTK 305d TK  51d,NAV 1 |>304dTo     0:14
+119.75,20:17:02.679,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.37nm ,## Leg|DTK 305d TK  47d,NAV 1 |>304dTo     0:14
+120.01,20:17:02.941,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.38nm ,## Leg|DTK 305d TK  47d,NAV 1 |>304dTo     0:14
+120.50,20:17:03.429,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.39nm ,   Leg|DTK 305d TK  47d,NAV 1 |>304dTo     0:14
+120.75,20:17:03.677,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.39nm ,## Leg|DTK 305d TK  47d,NAV 1 |>304dTo     0:14
+121.00,20:17:03.929,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.40nm ,## Leg|DTK 305d TK  44d,NAV 1 |>304dTo     0:14
+121.26,20:17:04.191,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.41nm ,## Leg|DTK 305d TK  44d,NAV 1 |>304dTo     0:14
+121.50,20:17:04.428,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.41nm ,   Leg|DTK 305d TK  44d,NAV 1 |>304dTo     0:14
+121.75,20:17:04.680,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.42nm ,   Leg|DTK 305d TK  44d,NAV 1 |>304dTo     0:14
+122.00,20:17:04.930,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.43nm ,## Leg|DTK 305d TK  40d,NAV 1 |>304dTo     0:14
+122.25,20:17:05.178,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.44nm ,## Leg|DTK 305d TK  40d,NAV 1 |>304dTo     0:14
+122.50,20:17:05.430,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.45nm ,## Leg|DTK 305d TK  40d,NAV 1 |>304dTo     0:14
+122.75,20:17:05.681,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.46nm ,   Leg|DTK 305d TK  40d,NAV 1 |>304dTo     0:14
+123.00,20:17:05.928,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.47nm ,## Leg|DTK 305d TK  36d,NAV 1 |>304dTo     0:14
+123.50,20:17:06.429,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.48nm ,## Leg|DTK 305d TK  36d,NAV 1 |>304dTo     0:14
+123.75,20:17:06.681,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.49nm ,   Leg|DTK 305d TK  36d,NAV 1 |>304dTo     0:14
+124.00,20:17:06.930,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.50nm ,   Leg|DTK 305d TK  31d,NAV 1 |>304dTo     0:14
+124.25,20:17:07.178,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.51nm ,## Leg|DTK 305d TK  31d,NAV 1 |>304dTo     0:14
+124.75,20:17:07.678,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.52nm ,## Leg|DTK 305d TK  31d,NAV 1 |>304dTo     0:14
+125.00,20:17:07.930,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.52nm ,   Leg|DTK 305d TK  31d,NAV 1 |>304dTo     0:14
+125.25,20:17:08.180,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.54nm ,## Leg|DTK 305d TK  27d,NAV 1 |>304dTo     0:14
+126.00,20:17:08.930,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.55nm ,## Leg|DTK 305d TK  27d,NAV 1 |>304dTo     0:14
+126.25,20:17:09.179,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.57nm ,   Leg|DTK 305d TK  23d,NAV 1 |>304dTo     0:14
+126.50,20:17:09.428,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.57nm ,## Leg|DTK 305d TK  23d,NAV 1 |>304dTo     0:14
+126.75,20:17:09.679,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.58nm ,## Leg|DTK 305d TK  23d,NAV 1 |>304dTo     0:14
+127.25,20:17:10.182,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.59nm ,## Leg|DTK 305d TK  23d,NAV 1 |>304dTo     0:14
+127.50,20:17:10.430,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.60nm ,   Leg|DTK 305d TK  19d,NAV 1 |>304dTo     0:14
+127.75,20:17:10.678,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.60nm ,## Leg|DTK 305d TK  19d,NAV 1 |>304dTo     0:14
+128.00,20:17:10.929,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.61nm ,## Leg|DTK 305d TK  19d,NAV 1 |>304dTo     0:14
+128.25,20:17:11.179,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.62nm ,## Leg|DTK 305d TK  19d,NAV 1 |>304dTo     0:14
+128.51,20:17:11.441,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.63nm ,   Leg|DTK 305d TK  15d,NAV 1 |>304dTo     0:14
+128.75,20:17:11.679,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.64nm ,## Leg|DTK 305d TK  15d,NAV 1 |>304dTo     0:14
+129.00,20:17:11.929,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.65nm ,## Leg|DTK 305d TK  15d,NAV 1 |>304dTo     0:14
+129.50,20:17:12.432,28.3nm| 8U     @ 8T    , 119kt|> Fly L  0.66nm ,## Leg|DTK 305d TK  15d,NAV 1 |>304dTo     0:14
+129.75,20:17:12.679,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.66nm ,   Leg|DTK 305d TK  10d,NAV 1 |>304dTo     0:14
+130.00,20:17:12.928,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.67nm ,## Leg|DTK 305d TK  10d,NAV 1 |>304dTo     0:14
+130.50,20:17:13.428,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.68nm ,## Leg|DTK 305d TK  10d,NAV 1 |>304dTo     0:14
+130.75,20:17:13.681,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.69nm ,   Leg|DTK 305d TK  10d,NAV 1 |>304dTo     0:14
+131.01,20:17:13.941,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.69nm ,## Leg|DTK 305d TK   6d,NAV 1 |>303dTo     0:14
+131.25,20:17:14.178,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.70nm ,## Leg|DTK 305d TK   6d,NAV 1 |>303dTo     0:14
+131.50,20:17:14.429,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.71nm ,## Leg|DTK 305d TK   6d,NAV 1 |>303dTo     0:14
+131.75,20:17:14.681,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.71nm ,   Leg|DTK 305d TK   6d,NAV 1 |>303dTo     0:14
+132.00,20:17:14.930,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.73nm ,## Leg|DTK 305d TK   2d,NAV 1 |>303dTo     0:14
+132.75,20:17:15.678,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.74nm ,## Leg|DTK 305d TK   2d,NAV 1 |>303dTo     0:14
+133.00,20:17:15.931,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.75nm ,   Leg|DTK 305d TK 358d,NAV 1 |>303dTo     0:14
+133.25,20:17:16.178,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.76nm ,## Leg|DTK 305d TK 358d,NAV 1 |>303dTo     0:14
+133.75,20:17:16.687,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.77nm ,## Leg|DTK 305d TK 358d,NAV 1 |>303dTo     0:14
+134.01,20:17:16.943,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.77nm ,   Leg|DTK 305d TK 358d,NAV 1 |>303dTo     0:14
+134.25,20:17:17.181,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.78nm ,## Leg|DTK 305d TK 353d,NAV 1 |>303dTo     0:14
+134.50,20:17:17.430,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.79nm ,## Leg|DTK 305d TK 353d,NAV 1 |>303dTo     0:14
+135.25,20:17:18.181,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.80nm ,   Leg|DTK 305d TK 350d,NAV 1 |>303dTo     0:14
+135.50,20:17:18.430,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.81nm ,## Leg|DTK 305d TK 350d,NAV 1 |>303dTo     0:14
+136.00,20:17:18.931,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.82nm ,## Leg|DTK 305d TK 350d,NAV 1 |>303dTo     0:14
+136.25,20:17:19.179,28.2nm| 8U     @ 8T    , 119kt|> Fly L  0.82nm ,   Leg|DTK 305d TK 350d,NAV 1 |>303dTo     0:14
+136.50,20:17:19.430,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.82nm ,## Leg|DTK 305d TK 346d,NAV 1 |>303dTo     0:14
+136.75,20:17:19.678,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.83nm ,## Leg|DTK 305d TK 346d,NAV 1 |>303dTo     0:14
+137.25,20:17:20.179,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.84nm ,   Leg|DTK 305d TK 346d,NAV 1 |>303dTo     0:14
+137.51,20:17:20.444,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.84nm ,## Leg|DTK 305d TK 342d,NAV 1 |>303dTo     0:14
+137.75,20:17:20.681,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.85nm ,## Leg|DTK 305d TK 342d,NAV 1 |>303dTo     0:14
+138.00,20:17:20.929,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.86nm ,## Leg|DTK 305d TK 342d,NAV 1 |>303dTo     0:14
+138.50,20:17:21.432,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.86nm ,   Leg|DTK 305d TK 338d,NAV 1 |>303dTo     0:14
+138.75,20:17:21.684,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.87nm ,## Leg|DTK 305d TK 338d,NAV 1 |>303dTo     0:14
+139.25,20:17:22.181,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.88nm ,## Leg|DTK 305d TK 338d,NAV 1 |>303dTo     0:14
+139.50,20:17:22.431,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.88nm ,   Leg|DTK 305d TK 338d,NAV 1 |>303dTo     0:14
+139.75,20:17:22.687,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.88nm ,## Leg|DTK 305d TK 335d,NAV 1 |>303dTo     0:14
+140.01,20:17:22.941,28.1nm| 8U     @ 8T    , 119kt|> Fly L  0.89nm ,## Leg|DTK 305d TK 335d,NAV 1 |>303dTo     0:14
+140.75,20:17:23.680,28.0nm| 8U     @ 8T    , 119kt|> Fly L  0.90nm ,   Leg|DTK 305d TK 332d,NAV 1 |>303dTo     0:14
+141.00,20:17:23.930,28.0nm| 8U     @ 8T    , 119kt|> Fly L  0.90nm ,## Leg|DTK 305d TK 332d,NAV 1 |>303dTo     0:14
+141.25,20:17:24.179,28.0nm| 8U     @ 8T    , 119kt|> Fly L  0.91nm ,## Leg|DTK 305d TK 332d,NAV 1 |>303dTo     0:14
+141.75,20:17:24.680,28.0nm| 8U     @ 8T    , 119kt|> Fly L  0.91nm ,   Leg|DTK 305d TK 332d,NAV 1 |>303dTo     0:14
+142.01,20:17:24.942,28.0nm| 8U     @ 8T    , 119kt|> Fly L  0.91nm ,## Leg|DTK 305d TK 328d,NAV 1 |>303dTo     0:14
+142.25,20:17:25.179,28.0nm| 8U     @ 8T    , 119kt|> Fly L  0.92nm ,## Leg|DTK 305d TK 328d,NAV 1 |>303dTo     0:14
+142.75,20:17:25.679,28.0nm| 8U     @ 8T    , 119kt|> Fly L  0.93nm ,## Leg|DTK 305d TK 328d,NAV 1 |>303dTo     0:14
+143.01,20:17:25.944,28.0nm| 8U     @ 8T    , 119kt|> Fly L  0.93nm ,   Leg|DTK 305d TK 325d,NAV 1 |>303dTo     0:14
+143.25,20:17:26.181,28.0nm| 8U     @ 8T    , 119kt|> Fly L  0.93nm ,## Leg|DTK 305d TK 325d,NAV 1 |>303dTo     0:14
+143.76,20:17:26.693,28.0nm| 8U     @ 8T    , 119kt|> Fly L  0.94nm ,## Leg|DTK 305d TK 325d,NAV 1 |>303dTo     0:14
+144.00,20:17:26.930,28.0nm| 8U     @ 8T    , 119kt|> Fly L  0.94nm ,   Leg|DTK 305d TK 325d,NAV 1 |>303dTo     0:14
+144.25,20:17:27.179,27.9nm| 8U     @ 8T    , 119kt|> Fly L  0.94nm ,## Leg|DTK 305d TK 323d,NAV 1 |>303dTo     0:14
+144.75,20:17:27.680,27.9nm| 8U     @ 8T    , 119kt|> Fly L  0.95nm ,## Leg|DTK 305d TK 323d,NAV 1 |>303dTo     0:14
+145.25,20:17:28.180,27.9nm| 8U     @ 8T    , 119kt|> Fly L  0.95nm ,   Leg|DTK 305d TK 320d,NAV 1 |>303dTo     0:14
+145.50,20:17:28.431,27.9nm| 8U     @ 8T    , 119kt|> Fly L  0.95nm ,## Leg|DTK 305d TK 320d,NAV 1 |>303dTo     0:14

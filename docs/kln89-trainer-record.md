@@ -753,3 +753,32 @@ alert or to the course; the same two trainers; the VM was not started, stopped o
   (medium, 2 runs over two checks; unexplained).
 - Outcome: #434 (a leg change posts at once with a readable course; no forced window). The trainers do not settle the
   case without a course input, which the two real-unit videos of #436 decide.
+
+**2026-10-27** (two agent checks for #406, #407 and #408, waypoint alert, edits next to the active waypoint and
+same-second updates; the KLN 89 trainer, SET 1 take-home flying at 119 kt, SET 4 turn anticipation on; raw data and the
+reports in [kln89-trainer-data/2026-10-27](kln89-trainer-data/2026-10-27/README.md); the VM display was unchanged)
+- The alert ends where the turn in use ends: L past the waypoint on the next leg for a turn circle (L being the lead of
+  that arc), and the abeam line of the waypoint on the new leg for the zero-size abeam turn. It is not a track angle,
+  a cross track or a time: with the aircraft held at 10 kt it stayed on for about 3 min and ended only once the exit
+  point was passed. Every on-course pass and every lead turn ended within about 0.2 NM of L (high); the one exception
+  is a16, a late normal-arc turn on the abeam plan, which ended at 1.32 NM for L 1.98 (#439).
+- An edit of the next leg while the turn plan is active: the turn is computed again from the new next leg, the old lead
+  does nothing, and a turn already started is dropped (DTK goes back to the inbound leg within the first display
+  frame). When the new turn point is more than about 20 s away, the alert pauses at the edit and starts again about 20 s
+  before it; when the aircraft is already inside the new lead, the turn starts at once (a2 to a6, a9, a11; high for the
+  new lead, medium-high for the pause). A delete that leaves the active waypoint as the last one cancels the turn and
+  gives the alert of an end-of-plan waypoint (a9; medium, one run).
+- An edit on the abeam plan keeps the abeam plan: no turn at the edit although the aircraft was already inside the new
+  lead, the turn came at or just before the abeam line (a8, a16; medium-high, two runs). Whether the plan is decided
+  again at the edit with a tighter gate could not be separated from keeping it.
+- An edit further down the plan changes nothing: DTK, the sequencing point and the alert end stay as they were (a7; one
+  clean run).
+- No lag: at every sequencing and turn start the new ident, distance, bearing, ETE, DTK and the message prompt appear in
+  the same display update; the XTK line changes in that frame or up to 0.5 s earlier, never later. Also with turn
+  anticipation off (a12; high).
+- Findings filed: #438, the lead-plan gate looks lower than 2.8 NM at 119 kt in flight (decisions at a cross track of
+  about 2.0 NM gave the abeam plan, a14 and a15), and #439, the abeam plan sometimes flies the normal turn circle late
+  instead of the zero-size turn at the abeam line (a14 to a16).
+- Left behind in the trainer: it is still running and flying GS 120 on 8T to 8S, NAV 1 shown, a message pending. SET 4
+  turn anticipation is off again and FPL 0 holds 8Z 8Y 8X 8V 8U 8T 8S 8R. No user waypoint and no numbered flight plan
+  was changed. The AVsoftech trainer was not used.
