@@ -22,7 +22,7 @@ describe('first flight', () => {
         let alertOnAt: number | null = null;
         let lastSequence = flight.t;
         flight.monitor('waypoint alert before the turn', f => {
-            if (alertOnAt === null && f.sim.get('L:KLN90B_WptLight', 'bool')) alertOnAt = f.t;
+            if (alertOnAt === null && f.nav.waypointAlert) alertOnAt = f.t; // the light flashes, one sample a second can fall on its dark phase (#437)
             return true;
         });
         flight.monitor('on course outside turns', f => {
@@ -43,7 +43,8 @@ describe('first flight', () => {
         expect(distAtTurnStart).toBeGreaterThan(0.2);
         expect(distAtTurnStart).toBeLessThan(0.45);
         // 4-8: the alert starts about 20 s before the turn (WPT_ALERT_WITH_TURN_ANTI) and stays on through it.
-        // The monitor samples once per second.
+        // The monitor samples once per second, so it detects the alert by the flag: the light flashes before the turn (#437)
+        // and is steady from its start, which the check below reads.
         expect(flight.sim.get('L:KLN90B_WptLight', 'bool')).toBe(1);
         expect(alertOnAt).not.toBeNull();
         const alertLead = flight.t - alertOnAt!;

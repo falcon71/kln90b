@@ -18,10 +18,10 @@ const atKbbbSequencing: AtSequencing[] = [];
  * second judges what was recorded at KBBB, so a broken flight cannot be taken for the bug.
  */
 describe('waypoint alert through an anticipated turn', () => {
-    // 4-8: the alert goes steady when the turn begins; 4-9: turn anticipation ends once the transition to the next leg is
-    // made. The light stays on until the end of the turn, past the sequencing at the midpoint of the turn (the video the
-    // code cites at the waypointAlert assignment in NavCalculator.ts). The WPT light is steady, the maintainer's ruling
-    // (SensorsOut.test.ts).
+    // 4-8: the light goes steady when the turn begins; 4-9: turn anticipation ends once the transition to the next leg is
+    // made. The light stays on until the end of the turn, past the sequencing at the midpoint of the turn (the Tu-154 video,
+    // https://youtu.be/S1lt2W95bLA, t=2245). Before the turn it flashes (#437, SensorsOut.test.ts), and a sample once a
+    // second can fall on its dark phase, so the monitor judges the light only while the turn is flown.
     it('stays on past the sequencing at ABC until the turn ends, then goes off on the next leg (4-8, 4-9)', async () => {
         const {kaaa, abc, kbbb} = standardRoute();
         const c = pointFrom(kbbb, 60, 20);
@@ -37,15 +37,11 @@ describe('waypoint alert through an anticipated turn', () => {
         await flight.flyUntilActive('ABC', {timeout: 30});
         const light = () => flight.sim.get('L:KLN90B_WptLight', 'bool');
 
-        // Once on, the light never goes off again until the turn has ended
-        let alertOn = false;
-        flight.monitor('WPT light steady from the alert to the end of the turn at ABC', f => {
-            if (f.nav.activeIdent === 'KCCC' || (f.nav.activeIdent === 'KBBB' && !alertOn)) return true;
-            const on = light() === 1;
-            if (on) alertOn = true;
-            const turnDone = f.nav.activeIdent === 'KBBB' && turnStackLength(flight.unit) === 0;
-            if (turnDone) alertOn = false;
-            return !alertOn || on || `light off at ${f.t.toFixed(0)} s, ${f.nav.activeIdent} active, turn stack ${turnStackLength(flight.unit)}`;
+        // From the start of the turn the light never goes off until the turn has ended
+        flight.monitor('WPT light steady through the turn at ABC', f => {
+            if (f.nav.activeIdent === 'KCCC') return true;
+            return turnStackLength(flight.unit) === 0 || light() === 1
+                || `light off at ${f.t.toFixed(0)} s, ${f.nav.activeIdent} active, turn stack ${turnStackLength(flight.unit)}`;
         });
 
         await flight.flyUntilActive('KBBB', {timeout: 150});

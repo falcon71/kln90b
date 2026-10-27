@@ -28,7 +28,7 @@ describe('a Direct To a waypoint of FPL 0 with a following leg (#146)', () => {
 
         let alertOnAt: number | null = null;
         flight.monitor('waypoint alert before the turn', f => {
-            if (alertOnAt === null && f.sim.get('L:KLN90B_WptLight', 'bool')) alertOnAt = f.t;
+            if (alertOnAt === null && f.nav.waypointAlert) alertOnAt = f.t; // the light flashes, one sample a second can fall on its dark phase (#437)
             return true;
         });
 

@@ -11,6 +11,7 @@ import {NavMode} from "../data/VolatileMemory";
 import {format} from "numerable";
 import {roundBearing} from "../data/Coordinates";
 import {SidStar} from "../data/navdata/SidStar";
+import {isWaypointAlertSteady} from "../data/navdata/WaypointAlert";
 
 type SuperNav5LeftTypes = {
     range: SuperNav5RangeSelector,
@@ -64,7 +65,8 @@ export class SuperNav5Left implements UiElement {
     public tick(blink: boolean): void {
         this.children.get("distance").distance = this.props.memory.navPage.distToActive;
 
-        if (this.props.memory.navPage.waypointAlert && blink) { //4-8
+        const nav = this.props.memory.navPage;
+        if (nav.waypointAlert && !isWaypointAlertSteady(nav) && blink) { //4-8: steady from the start of the turn, #437
             this.children.get("ident").text = "     "; //bit of a hack
         } else {
             this.children.get("ident").text = this.getIdent();

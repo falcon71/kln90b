@@ -9,6 +9,7 @@ import {activeIdent, fplIdents, messageLines, turnStackLength} from '../../../ha
 import {bootOnStandardRoute} from '../../../harness/worldBoot';
 import {angleBetween, courseDeg, crossTrackNm, distanceNm, finalCourseDeg, pointBefore, pointFrom} from '../../../harness/flight/geo';
 import {Screen} from '../../../harness/render/screen';
+import {blinkCycle} from '../../../harness/render/blink';
 import {approachWorld, arcWorld, standardRoute} from '../../../harness/fixtures';
 import {KLNFixType} from '../../../../kln90b/data/flightplan/Flightplan';
 
@@ -254,6 +255,13 @@ describe('the aircraft exactly on the VOR of the active DME arc', () => {
     });
 });
 
+/**
+ * The WPT light on four display ticks, one blink cycle. Before a turn it flashes (4-8, #437), so a single read can fall on
+ * its dark phase; where no turn is flown the alert shows as {0, 1}, an off light as {0}.
+ */
+const wptLightCycle = async (unit: HeadlessUnit): Promise<Set<number>> =>
+    new Set(await blinkCycle(() => unit.env.sim.get('L:KLN90B_WptLight', 'bool')));
+
 // 4-9: with turn anticipation disabled (SET 6) the waypoint alert starts about 36 s before the waypoint. At 120 kt that
 // is 1.2 NM: off at 1.3 NM (39 s), on at 1.1 NM (33 s).
 describe('waypoint alert without turn anticipation (4-9)', () => {
@@ -267,7 +275,7 @@ describe('waypoint alert without turn anticipation (4-9)', () => {
 
         await moveAircraft(unit, pointBefore(kaaa, abc, 1.1), {groundspeedKt: 120, trackTrue: leg});
         expect(nav(unit).waypointAlert).toBe(true);
-        expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(1);
+        expect(await wptLightCycle(unit)).toEqual(new Set([0, 1])); // no turn is anticipated, so it flashes (3-29, #437)
     });
 });
 
@@ -299,8 +307,9 @@ describe('waypoint alert on a Direct To outside the flight plan (checked in the 
 
         await at(0.4);
         expect(nav(unit).waypointAlert).toBe(true);
-        // The WPT annunciator follows the alert (3-59); the 89 has no external output and showed only the arrow
-        expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(1);
+        // The WPT annunciator follows the alert (3-59), flashing as no turn is flown (#437); the 89 has no external output and
+        // showed only the arrow
+        expect(await wptLightCycle(unit)).toEqual(new Set([0, 1]));
     });
 
     it('ends once the waypoint is passed (checked in the KLN 89 trainer, 2026-10-14, #372)', async () => {
@@ -370,8 +379,9 @@ describe('waypoint alert in OBS mode (checked in the KLN 89 trainer, 2026-10-14)
         expect(nav(unit).waypointAlert).toBe(false);
         await at(0.4);
         expect(nav(unit).waypointAlert).toBe(true);
-        // The WPT annunciator follows the alert (3-59); the 89 has no external output and showed only the arrow
-        expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(1);
+        // The WPT annunciator follows the alert (3-59), flashing as no turn is flown (#437); the 89 has no external output and
+        // showed only the arrow
+        expect(await wptLightCycle(unit)).toEqual(new Set([0, 1]));
 
         await moveAircraft(unit, pointFrom(abc, leg, 0.2), {groundspeedKt: 120, trackTrue: leg});
         expect(activeIdent(unit)).toBe('ABC'); // 5-35: no sequencing in OBS mode
@@ -635,7 +645,7 @@ describe('GPS invalid (3-31)', () => {
     it('turns the WPT light off when the GPS is lost during the alert', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
         await moveAircraft(unit, pointBefore(kaaa, abc, 0.84), {groundspeedKt: 120, trackTrue: finalCourseDeg(kaaa, abc)});
-        expect(unit.env.sim.get('L:KLN90B_WptLight', 'bool')).toBe(1); // Precondition: the alert is on (see above)
+        expect(nav(unit).waypointAlert).toBe(true); // Precondition: the alert is on (the light flashes, see above)
 
         unit.props.sensors.in.gps.reset(); // before the next calculation tick, which would sequence the held position
         await vi.advanceTimersByTimeAsync(1500);

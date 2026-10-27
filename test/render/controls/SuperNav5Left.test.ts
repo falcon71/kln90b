@@ -1,8 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
 import {approachWorld, standardRoute} from '../../harness/fixtures';
-import {courseDeg, finalCourseDeg} from '../../harness/flight/geo';
-import {messages} from '../../harness/readers';
+import {courseDeg, finalCourseDeg, pointBefore} from '../../harness/flight/geo';
+import {messages, turnStackLength} from '../../harness/readers';
 import {TICK_TIME_DISPLAY} from '../../../kln90b/TickController';
 import {OneTimeMessage} from '../../../kln90b/data/MessageHandler';
 import {blinkCycle} from '../../harness/render/blink';
@@ -250,5 +250,40 @@ describe('Super NAV 5 message prompt (3-16, 3-36)', () => {
 
         const [first, second] = await mapPromptCycles();
         expect(new Set([...first, ...second])).toEqual(new Set(['msg III']));
+    });
+});
+
+// 4-8: at a waypoint with an anticipated turn the alert flashes the active waypoint, and the ident of Super NAV 5 stops
+// flashing and goes steady when the turn starts (#437)
+describe('Super NAV 5 active ident at a turn (4-8, #437)', () => {
+    /** The aircraft 0.8 NM before ABC (inside the alert, before the turn) or 0.25 NM before it (in the turn) */
+    async function nearAbc(nm: number): Promise<HeadlessUnit> {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({magvar: 0});
+        await moveAircraft(unit, pointBefore(kaaa, abc, nm), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
+        await showSuperNav5(unit);
+        return unit;
+    }
+
+    it('flashes the active ident before the turn (4-8, #437)', async () => {
+        const unit = await nearAbc(0.8);
+        expect(unit.props.memory.navPage.waypointAlert).toBe(true); // Preconditions: the alert, no turn yet
+        expect(turnStackLength(unit)).toBe(0);
+
+        // The ident cell is blank on the one display tick in four that is the blink tick, on the same tick of both cycles
+        const first = await blinkCycle(() => SuperNav5.read().left[1]);
+        const second = await blinkCycle(() => SuperNav5.read().left[1]);
+        expect(first.filter(r => r.trim() === 'ABC')).toHaveLength(3);
+        expect(first.filter(r => r.trim() === '')).toHaveLength(1);
+        expect(second.map(r => r.trim())).toEqual(first.map(r => r.trim()));
+    });
+
+    it('shows the active ident steady during the turn (4-8, #437)', async () => {
+        const unit = await nearAbc(0.25);
+        expect(unit.props.memory.navPage.waypointAlert).toBe(true); // Preconditions: the alert and a turn on the stack
+        expect(turnStackLength(unit)).toBeGreaterThan(0);
+
+        const reads = [...await blinkCycle(() => SuperNav5.read().left[1]), ...await blinkCycle(() => SuperNav5.read().left[1])];
+        expect(reads.map(r => r.trim())).toEqual(Array(8).fill('ABC'));
     });
 });

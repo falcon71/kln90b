@@ -5,6 +5,7 @@ import {NavMode} from "../data/VolatileMemory";
 import {format} from "numerable";
 import {roundBearing} from "../data/Coordinates";
 import {ScratchpadMessage} from "../data/MessageHandler";
+import {isWptLightOn} from "../data/navdata/WaypointAlert";
 
 
 export interface StatusLineProps extends PageProps {
@@ -204,6 +205,10 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
         } else {
             this.props.sensors.out.setMessageLight(false);
         }
+
+        //The external WPT light flashes during the alert before a turn and is steady from the start of the turn (3-29, 4-8,
+        //Tu-154 video https://youtu.be/S1lt2W95bLA?t=2245, #437). Like the MSG light it is written here, where blink is known
+        this.props.sensors.out.setWptAlertLight(isWptLightOn(this.props.memory.navPage, blink));
     }
 
     destroy() {

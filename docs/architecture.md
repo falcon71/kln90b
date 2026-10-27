@@ -403,8 +403,9 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
   *reads* `GPS OBS ACTIVE` and calls `modeController.setExternalObsMode`.
 - **Not gated** by `writeGPSSimVars`:
     - All KLN LVars, `K:VOR{1,2}_SET` (when `obsTarget` is set and the GPS drives NAV1).
-    - Annunciators: `setMessageLight` (called from `controls/StatusLine.tsx` in the display tick, flashing while there
-      are unread messages) and `setWptAlertLight` / `setAnnunTest` (from NavCalculator).
+    - Annunciators: `setMessageLight` and `setWptAlertLight` (called from `controls/StatusLine.tsx` in the display
+      tick: the MSG light flashes while there are unread messages, the WPT light as `isWptLightOn` decides) and
+      `setAnnunTest` (from NavCalculator).
 - Other outputs:
     - `WTFlightplanSync` mirrors FPL 0 into an SDK `FlightPlanner` with id `"kln90b"` (`initSyncRole:'primary'`): plan 0
       is DF legs and plan 1 is a direct-to plan "like the Garmins". Data stops after the MAP or an arc ("Install manual:
@@ -987,8 +988,12 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       the first display tick in which the status line is visible, the clock runs on while Super NAV 5 hides it, and the
       message ends and is removed (`removeMessage`) only while the status line is visible. A newer message replaces the
       older one. `StatusLine.destroy` removes the entry.
-- The WPT alert light is steady (a video contradicts the manual's "flashing") and comes from `navPage.waypointAlert`.
-  The annunciator test LVar and `GPS APPROACH MODE=3` are used during the self-test.
+- The WPT alert light is on while `navPage.waypointAlert` is. It flashes with the display blink during the alert before
+  an anticipated turn and before a waypoint without a turn, and is steady from the start of the turn (the turn stack
+  holds a turn) and during the self-test (3-29, 4-8, the Tu-154 video, #437). `isWptLightOn` and `isWaypointAlertSteady`
+  in `data/navdata/WaypointAlert.ts` decide it; `StatusLine.tick` writes it on the display tick, where `blink` is known,
+  and Super NAV 5 flashes the active ident by the same rule. The annunciator test LVar and `GPS APPROACH MODE=3` are
+  used during the self-test.
 
 ## Core 10. Conventions and gotchas
 
@@ -1464,8 +1469,9 @@ export class Set3Page extends SixLineHalfPage {
   inverted for `STATUS_MESSAGE_TIME = 5000` ms (manual 3-10); the MSG page lists it too (see the status-line transient
   messages in Core 9, #237). Non-standard texts are cast `as any` (e.g.
   `` `d› CRS ${obs}` `` in `DirectToPage`).
-- The status line also drives the annunciator `sensors.out.setMessageLight` (flashing or steady). It special-cases
-  `"SET 0"` (blank mode and right name, 3-7).
+- The status line also drives the annunciators `sensors.out.setMessageLight` (flashing or steady) and
+  `sensors.out.setWptAlertLight` (`isWptLightOn`, #437), both on the display tick. It special-cases `"SET 0"` (blank
+  mode and right name, 3-7).
 
 ### MessagePage (`controls/MessagePage.tsx`)
 

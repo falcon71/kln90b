@@ -4,10 +4,11 @@ import {Screen} from '../harness/render/screen';
 import {legWorld, standardRoute, variationNear} from '../harness/fixtures';
 import {savedFlightplan} from '../harness/storage';
 import {HEADING_INPUT, NO_GPS_SIMVARS, NO_OBS, panelXml} from '../harness/panelXml';
-import {activeIdent} from '../harness/readers';
+import {activeIdent, turnStackLength} from '../harness/readers';
 import {bootOnStandardRoute} from '../harness/worldBoot';
 import {NavMode} from '../../kln90b/data/VolatileMemory';
 import {courseDeg, finalCourseDeg, pointBefore, pointFrom} from '../harness/flight/geo';
+import {blinkCycle} from '../harness/render/blink';
 
 // Public contract: the LVar is documented in LVars.ts (ARINC label 275, bit 22: true when no GPS signal is acquired) and
 // listed in CLAUDE.md, "Public contract with aircraft". An unset LVar reads 0, so "written as 0" is asserted with
@@ -262,35 +263,88 @@ describe('L:KLN90B_HSI_TF_FLAGS (public contract)', () => {
     });
 });
 
-// Public contract: LVars.ts, the External Annunciators wiki page: the WPT light is 1 during the alert. The Pilot's Guide
-// (3-29, 4-8) describes a flashing annunciator, but the maintainer ruled that a steady light is correct (the code cites a
-// video of the real unit, NavCalculator.ts), so this test asserts the ruling, not the manual. firstFlight.test.ts reads the
-// light once at the start of the turn, not at every sample of the alert.
+// Public contract: LVars.ts, the External Annunciators wiki page: the WPT light is on during the waypoint alert. The
+// Pilot's Guide (3-29, 4-8) and the Tu-154 video (https://youtu.be/S1lt2W95bLA, t=2245) show it flashing before an
+// anticipated turn and steady from the start of the turn (#437). The light is written on the display tick, like the MSG
+// light. firstFlight.test.ts reads it once at the start of the turn.
 describe('L:KLN90B_WptLight during the waypoint alert (public contract)', () => {
-    it('is 1 at every sample while the alert is on', async () => {
+    /**
+     * The aircraft flies toward ABC at 120 kt in steps of 0.00833 NM, 250 ms, one per display tick; a held position would
+     * sequence ABC within a few seconds. `sample` runs after each tick.
+     */
+    async function approachAbc(sample: (unit: HeadlessUnit) => void, steps: number, startNm = 0.8): Promise<HeadlessUnit> {
         const {kaaa, abc} = standardRoute();
         const unit = await bootOnStandardRoute({magvar: 0});
-        // The turn starts about 0.3 NM before ABC (firstFlight.test.ts) and the alert 20 s earlier, about 0.7 NM at 120 kt,
-        // so the unit is inside the alert from 0.8 NM on. A held position would sequence ABC within a few seconds, so the
-        // aircraft advances 0.00833 NM, 250 ms at 120 kt, per display tick and the light is sampled at every one, so that a
-        // light that flashes with the display blink shows a 0 in some sample
         const sim = unit.env.sim;
-        const samples: number[] = [];
-        const alerts: boolean[] = [];
-        await moveAircraft(unit, pointBefore(kaaa, abc, 0.8), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
-        for (let i = 0; i < 24; i++) {
+        await moveAircraft(unit, pointBefore(kaaa, abc, startNm), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
+        for (let i = 0; i < steps; i++) {
             if (i > 0) {
-                const p = pointBefore(kaaa, abc, 0.8 - i * 120 / 3600 / 4);
+                const p = pointBefore(kaaa, abc, startNm - i * 120 / 3600 / 4);
                 sim.set('PLANE LATITUDE', 'degrees', p.lat);
                 sim.set('PLANE LONGITUDE', 'degrees', p.lon);
                 await vi.advanceTimersByTimeAsync(250);
             }
-            alerts.push(unit.props.memory.navPage.waypointAlert);
-            samples.push(sim.get('L:KLN90B_WptLight', 'bool'));
+            sample(unit);
         }
+        return unit;
+    }
+
+    // The turn starts about 0.3 NM before ABC (firstFlight.test.ts) and the alert 20 s earlier, about 0.7 NM at 120 kt, so
+    // the unit is inside the alert from 0.8 NM on and 24 samples, 0.2 NM, end before the turn
+    it('flashes before the turn (4-8, #437)', async () => {
+        const samples: number[] = [];
+        const alerts: boolean[] = [];
+        const turnStacks: number[] = [];
+        await approachAbc(unit => {
+            alerts.push(unit.props.memory.navPage.waypointAlert);
+            turnStacks.push(turnStackLength(unit));
+            samples.push(unit.env.sim.get('L:KLN90B_WptLight', 'bool'));
+        }, 24);
 
         expect(alerts).toEqual(Array(24).fill(true));
-        expect(samples).toEqual(Array(24).fill(1));
+        expect(turnStacks).toEqual(Array(24).fill(0));
+        expect(new Set(samples)).toEqual(new Set([0, 1]));
+    });
+
+    it('is steady during the turn (4-8, #437)', async () => {
+        const samples: number[] = [];
+        let turning = false;
+        const unit = await approachAbc(() => undefined, 1);
+        // Advance until the turn stack has a turn, then sample 8 display ticks, two blink cycles
+        const {kaaa, abc} = standardRoute();
+        for (let i = 1; i < 200 && !turning; i++) {
+            const p = pointBefore(kaaa, abc, 0.8 - i * 120 / 3600 / 4);
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', p.lat);
+            unit.env.sim.set('PLANE LONGITUDE', 'degrees', p.lon);
+            await vi.advanceTimersByTimeAsync(250);
+            turning = turnStackLength(unit) > 0;
+        }
+        expect(turning).toBe(true);
+        for (let i = 0; i < 8; i++) {
+            await vi.advanceTimersByTimeAsync(250);
+            samples.push(unit.env.sim.get('L:KLN90B_WptLight', 'bool'));
+        }
+
+        expect(samples).toEqual(Array(8).fill(1));
+    });
+
+    // 3-29: without turn anticipation the alert starts 36 s before the waypoint (NavCalculator), 1.2 NM at 120 kt, and no
+    // turn starts, so nothing makes the light steady: it flashes until the waypoint is sequenced (#437). The light is read
+    // on every display tick of a blink cycle, since one read lands on the same phase every time
+    it('flashes before a waypoint without an anticipated turn (3-29, #437)', async () => {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootOnStandardRoute({magvar: 0, storage: {turnAnticipation: false}});
+        await moveAircraft(unit, pointBefore(kaaa, abc, 1.0), {groundspeedKt: 120, trackTrue: courseDeg(kaaa, abc)});
+
+        const cycle = await blinkCycle(() => ({
+            alert: unit.props.memory.navPage.waypointAlert,
+            turnStack: turnStackLength(unit),
+            light: unit.env.sim.get('L:KLN90B_WptLight', 'bool'),
+        }));
+
+        expect(cycle.map(c => c.alert)).toEqual([true, true, true, true]); // Precondition: inside the alert
+        expect(cycle.map(c => c.turnStack)).toEqual([0, 0, 0, 0]); // Precondition: no turn
+        expect(new Set(cycle.map(c => c.light))).toEqual(new Set([0, 1]));
     });
 
     it('is 0 before the alert', async () => {
@@ -339,6 +393,19 @@ describe('outputs at power-off (public contract)', () => {
 
         expect(unit.env.sim.get('L:KLN90B_Power', 'bool')).toBe(0);
         expect(Screen.read().text()).toBe(BLANK_SCREEN);
+    });
+
+    // Installation Manual 2-69: the annunciator lights are lit during the self-test, not flashing (#437). The alert is on
+    // during the self-test (NavCalculator), so only the steady branch keeps the light from flashing; one read lands on the
+    // same phase every time, so the light is read on every display tick of a blink cycle
+    it('the WPT light is steady, not flashing, on the self-test page (2-69, #437)', async () => {
+        const unit = await onSelfTestPage();
+        expect(unit.props.memory.navPage.waypointAlert).toBe(true); // Precondition: the alert is on
+
+        const cycle = await blinkCycle(() => unit.env.sim.get('L:KLN90B_WptLight', 'bool'));
+
+        expect(cycle).toHaveLength(4);
+        expect(new Set(cycle)).toEqual(new Set([1]));
     });
 
     it('sibling B: MSG, WPT and the annunciator test are 1 on the self-test page, and the switch-off blanks the unit', async () => {

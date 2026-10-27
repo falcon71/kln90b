@@ -21,7 +21,10 @@ export const LVAR_XTK = "L:KLN90B_XTK";
 
 //External annunciators, see https://github.com/falcon71/kln90b/wiki/External-Annunciators for details
 export const LVAR_MSG_LIGHT = "L:KLN90B_MsgLight"; //Boolean. true whenever the MSG light flashes
-export const LVAR_WPT_LIGHT = "L:KLN90B_WptLight"; //Boolean. true if the waypoint alert is active
+// Boolean. true while the waypoint alert is on. It flashes before a turn and before a waypoint without a turn and is
+// steady during the turn and on the self-test, as the real light does (3-29, 4-8, #437). Like L:KLN90B_MsgLight, the
+// aircraft adds no flash of its own
+export const LVAR_WPT_LIGHT = "L:KLN90B_WptLight";
 export const LVAR_ANNUN_TEST = "L:KLN90B_AnnunTest"; //Boolean. true if the self-test is shown and all external annunciator lights should light up
 
 // Number, 0 to 99. The altitude alert volume of SET 9 (3-57). The unit cannot set the loudness of kln_short_beep and
