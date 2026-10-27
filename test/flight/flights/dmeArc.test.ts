@@ -7,7 +7,8 @@ import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {APR_ARM_SWITCH, HEADING_INPUT, panelXml} from '../../harness/panelXml';
 import {savedFlightplan} from '../../harness/storage';
-import {fplIdents} from '../../harness/readers';
+import {fplIdents, turnStackLength} from '../../harness/readers';
+import {moveArcEntry} from '../../../kln90b/services/FlightplanUtils';
 import {angleBetween, angleDiff, courseDeg, crossTrackNm, distanceNm, EARTH_RADIUS_NM, pointFrom} from '../../harness/flight/geo';
 
 const RNAV = ApproachType.APPROACH_TYPE_RNAV;
@@ -219,6 +220,69 @@ describe('roll steering near the VOR of a DME arc (#100)', () => {
         // leads away from the VOR, within 90 degrees of the radial
         expect(roll).toBeGreaterThan(0);
         expect(angleBetween(cts, radial)).toBeLessThan(90);
+    });
+});
+
+// #441: MOVE ? on the arc entry that follows the active waypoint changes the leg in place, so the unit does not notice
+// that the leg after the active waypoint is another one, and the turn started onto the old entry goes on. It must be
+// dropped and calculated again, as an insert or a delete of the next leg does (#408)
+describe('MOVE ? on the arc entry after the active waypoint (#441)', () => {
+    /**
+     * FPL 0 is KAAA WPTAA KPRC, and the approach is loaded with the aircraft on the leg to WPTAA, 10 NM before it. The
+     * unit enters the arc at the point of the arc closest to the aircraft then (6-16), the radial 184 here, which is
+     * about 58 degrees right of the leg as seen from WPTAA. The entry follows the active waypoint WPTAA. The autopilot
+     * flies the leg until the turn at WPTAA has started, and 1 s more. There the track is the leg's: its line meets the
+     * arc where the leg's line does, so a moved entry needs hardly a turn at all (MOVE ? takes the entry on the track,
+     * 6-17)
+     */
+    async function inTurnToArcEntry() {
+        const {world, abc, kprc} = arcWorld(LegTurnDirection.Right);
+        const wpt1 = pointFrom(pointFrom(abc, 270, 3), 180, 12);
+        const kaaa = pointFrom(wpt1, 170, 25);
+        const start = pointFrom(wpt1, 170, 10);
+        const kaaaFac = airport('KAAA', kaaa.lat, kaaa.lon);
+        const wptFac = intersection('WPTAA', wpt1.lat, wpt1.lon);
+        world.add(kaaaFac, wptFac);
+        const flight = await Flight.start({
+            world,
+            storage: savedFlightplan(0, [kaaaFac, wptFac, kprc]),
+            panelXml: panelXml({...APR_ARM_SWITCH, ...HEADING_INPUT}),
+            aircraft: {lat: start.lat, lon: start.lon, altitudeFt: 3000, groundspeedKt: 120, trackTrue: 350},
+        });
+        await flight.fly(2);
+        await flight.panel.loadProcedure('APT 8', {ident: 'KPRC'});
+        await flight.flyUntil(() => flight.unit.props.memory.navPage.activeWaypoint.ownTurnStarted, {timeout: 400, description: 'the turn at WPTAA'});
+        await flight.fly(1);
+        // MOVE ? on the entry: the entry is recalculated on the aircraft's track, as FlightplanUtils.moveArcEntry does
+        const move = () => moveArcEntry(flight.unit.props.bus, flight.unit.props.memory.fplPage.flightplans[0], 2,
+            flight.unit.props.memory.navPage.activeWaypoint, flight.unit.props.sensors);
+        return {flight, abc, aw: flight.unit.props.memory.navPage.activeWaypoint, move};
+    }
+
+    // The sibling that holds the preconditions: the move itself works, and the turn at WPT1 is the one onto the old entry
+    it('moves the entry while the turn at the waypoint before it has started (control of the pin)', async () => {
+        const {flight, aw, move} = await inTurnToArcEntry();
+        expect(fplIdents(flight.unit).slice(0, 3)).toEqual(['KAAA', 'WPTAA', 'D184J']);
+        expect(flight.nav.activeIdent).toBe('WPTAA');
+        expect(aw.ownTurnStarted).toBe(true);
+        expect(turnStackLength(flight.unit)).toBeGreaterThan(0);
+        // The old turn is onto the entry about 58 degrees right of the leg, with a lead of about 0.48 NM: the aircraft is 1 s
+        // into it, still more than 0.3 NM before WPTAA, which a turn of the moved entry's few degrees has not reached
+        expect(distanceNm(flight.aircraft, flight.world.pos('WPTAA'))).toBeGreaterThan(0.3);
+
+        expect(move()).toBe(true);
+        expect(fplIdents(flight.unit)[2]).not.toBe('D184J');
+    });
+
+    it.fails('drops the turn started onto the old entry when the entry is moved (#441)', async () => {
+        const {flight, aw, move} = await inTurnToArcEntry();
+        const oldEntries = [...aw.turnStack];
+        expect(move()).toBe(true);
+        await flight.fly(1);
+        expect(flight.nav.activeIdent).toBe('WPTAA');
+        // The moved entry is on the leg's own line, so the new turn is small and its start is still ahead
+        expect(aw.ownTurnStarted).toBe(false);
+        oldEntries.forEach(entry => expect(aw.turnStack).not.toContain(entry));
     });
 });
 
