@@ -932,6 +932,196 @@ describe('ADJ NAV IND CRS TO nnn, a readable indicator', () => {
     });
 });
 
+describe('ADJ NAV IND CRS TO nnn, an unreadable indicator', () => {
+    // In LEG mode, without an indicator course the unit reads (sensors.in.obsMag null) or sets (Output.ObsTarget 0), the
+    // message comes at a leg change of more than 5 degrees (4-8, B-1), which at an anticipated turn is the moment the WPT
+    // light goes from flashing to steady, and goes when that turn ends, when the light goes off (the Tu-154 video,
+    // https://youtu.be/S1lt2W95bLA, about t=2245 and t=2574; the Air Chathams CV580 video at 30:38), or once read (the
+    // maintainer, 2026-10-27). #436
+    const MSG_080 = 'ADJ NAV IND CRS TO 080°';
+
+    /** An unreadable world on a DTK of 46°, after the first tick */
+    const unreadable = () => {
+        const w = quietWorld();
+        w.dtkMag = 46;
+        w.obsIn = null;
+        const h = harness(w);
+        h.tick();
+        return {w, h};
+    };
+
+    /** The leg change to a DTK of 80°, 34 degrees on, `turn` saying whether it starts a turn; the messages of its tick */
+    const legChange = (h: ReturnType<typeof harness>, w: World, turn: boolean, dtkMag = 80, delta = 34): string[] => {
+        w.dtkMag = dtkMag;
+        w.legChangeDtkDelta = delta;
+        w.turnStackLength = turn ? 1 : 0;
+        const messages = tickSeconds(h, w, 1);
+        w.legChangeDtkDelta = null; // Only the first DTK of the leg change is marked
+        return messages;
+    };
+
+    it('shows at a leg change of more than 5 degrees (4-8)', () => {
+        const {w, h} = unreadable();
+        expect(everySecond(h, w, 5).flat()).toEqual([]); // Precondition
+
+        expect(legChange(h, w, true)).toEqual([MSG_080]);
+    });
+
+    it('does not show at a leg change of 5 degrees (4-8)', () => {
+        const {w, h} = unreadable();
+        const ticks = [legChange(h, w, true, 51, 5)];
+        ticks.push(...everySecond(h, w, 30));
+
+        expect(ticks.flat()).toEqual([]);
+    });
+
+    it('stays through the turn and goes when the turn ends (4-8, the Tu-154 and CV580 videos)', () => {
+        const {w, h} = unreadable();
+        expect(legChange(h, w, true)).toEqual([MSG_080]);
+        expect(everySecond(h, w, 40)).toEqual(Array(40).fill([MSG_080]));
+        w.turnStackLength = 0; // The end of the turn
+
+        expect(tickSeconds(h, w, 1)).toEqual([]);
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
+    });
+
+    it('goes once read, also during the turn (the maintainer, 2026-10-27)', () => {
+        const {w, h} = unreadable();
+        expect(legChange(h, w, true)).toEqual([MSG_080]);
+        expect(tickSeconds(h, w, 3)).toEqual([MSG_080]);
+        h.handler.getMessages()[0].seen = true; // What the MSG page does
+
+        expect(tickSeconds(h, w, 1)).toEqual([]); // turnStackLength is still 1
+    });
+
+    it('does not come back after it was read', () => {
+        const {w, h} = unreadable();
+        expect(legChange(h, w, true)).toEqual([MSG_080]);
+        h.handler.getMessages()[0].seen = true;
+        const ticks = everySecond(h, w, 20); // through the rest of the turn
+        w.turnStackLength = 0;
+        ticks.push(...everySecond(h, w, 30));
+
+        expect(ticks.flat()).toEqual([]);
+    });
+
+    // The Tu-154 video, about 43:52: a Direct To posts no message. The 30 s window of #177 posted at any DTK change
+    it('does not show at a DTK change that is no leg change, a Direct To (the Tu-154 video, 43:52)', () => {
+        const {w, h} = unreadable();
+        w.dtkMag = 100; // legChangeDtkDelta stays null
+
+        expect(everySecond(h, w, 40).flat()).toEqual([]);
+    });
+
+    // Without a turn nothing marks an end: the message stays until it is read (low confidence, the maintainer's ruling
+    // of 2026-10-27)
+    it('characterization: stays without a turn until read (low confidence, the maintainer, 2026-10-27)', () => {
+        const {w, h} = unreadable();
+        expect(legChange(h, w, false)).toEqual([MSG_080]);
+        expect(everySecond(h, w, 300)).toEqual(Array(300).fill([MSG_080]));
+        h.handler.getMessages()[0].seen = true;
+
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
+    });
+
+    // The number follows the DTK, and the second leg change decides whether a turn ends the message
+    it('takes the new DTK and the new turn at a second leg change while listed', () => {
+        const {w, h} = unreadable();
+        expect(legChange(h, w, false)).toEqual([MSG_080]);
+        expect(tickSeconds(h, w, 10)).toEqual([MSG_080]);
+        expect(legChange(h, w, true, 140, 60)).toEqual(['ADJ NAV IND CRS TO 140°']);
+        expect(tickSeconds(h, w, 10)).toEqual(['ADJ NAV IND CRS TO 140°']);
+        w.turnStackLength = 0; // The end of the second leg change's turn
+
+        expect(tickSeconds(h, w, 1)).toEqual([]);
+    });
+
+    // The other direction: the turn of an earlier message does not tie a later one posted without a turn
+    it('keeps a message posted without a turn after an earlier one that ended with its turn', () => {
+        const {w, h} = unreadable();
+        expect(legChange(h, w, true)).toEqual([MSG_080]);
+        w.turnStackLength = 0; // The end of the turn
+        expect(tickSeconds(h, w, 1)).toEqual([]); // Precondition: gone with the turn
+        expect(everySecond(h, w, 20).flat()).toEqual([]);
+
+        expect(legChange(h, w, false, 140, 60)).toEqual(['ADJ NAV IND CRS TO 140°']);
+        expect(everySecond(h, w, 60)).toEqual(Array(60).fill(['ADJ NAV IND CRS TO 140°']));
+    });
+
+    // Each leg change is a new message (#436): a read removes the message before, not the next one, even when the read
+    // falls in the second before the leg change
+    it('posts a new leg change unread, also in the second the message before was read (#436)', () => {
+        const {w, h} = unreadable();
+        expect(legChange(h, w, false)).toEqual([MSG_080]);
+        h.handler.getMessages()[0].seen = true; // What the MSG page does, just before the next calculation
+
+        expect(legChange(h, w, false, 140, 60)).toEqual(['ADJ NAV IND CRS TO 140°']);
+        expect(h.handler.hasUnreadMessages()).toBe(true);
+        expect(everySecond(h, w, 30)).toEqual(Array(30).fill(['ADJ NAV IND CRS TO 140°']));
+        expect(h.handler.hasUnreadMessages()).toBe(true);
+    });
+
+    // The case is that of the current tick (the CDI switched back to GPS): the readable rules, so the message goes with
+    // the course on the DTK, and with the course off it comes back only after more than 12 s. Unreadable again, the
+    // message that the readable course removed is not posted again without a new leg change
+    it('goes when the course can be read again, and the readable rules apply', () => {
+        const {w, h} = unreadable();
+        expect(legChange(h, w, false)).toEqual([MSG_080]);
+        w.obsIn = 80;
+        expect(tickSeconds(h, w, 1)).toEqual([]);
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
+        w.obsIn = null;
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
+
+        expect(legChange(h, w, true, 120, 40)).toEqual(['ADJ NAV IND CRS TO 120°']);
+        w.obsIn = 60; // More than 5 degrees off
+        expect(everySecond(h, w, 13).flat()).toEqual([]); // read back at s, then s + 1 to s + 12
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 120°']);
+    });
+
+    it('drops a readable message when the course can no longer be read and posts nothing without a leg change', () => {
+        const {w, h} = unreadable();
+        w.obsIn = 52;
+        tickSeconds(h, w, 13); // read back at s, then s + 1 to s + 12
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 046°']); // Precondition: the readable message
+        w.obsIn = null;
+
+        expect(tickSeconds(h, w, 1)).toEqual([]);
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
+        // Readable again within a minute, off the DTK: the count starts at the return, not at the old count (#434)
+        w.obsIn = 52;
+        expect(everySecond(h, w, 13).flat()).toEqual([]); // read back at s, then s + 1 to s + 12
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 046°']);
+    });
+
+    it('does not show in OBS mode (5-37)', () => {
+        const {w, h} = unreadable();
+        w.obsMode = true;
+        const ticks = [legChange(h, w, true, 100, 54)];
+        ticks.push(...everySecond(h, w, 30));
+
+        expect(ticks.flat()).toEqual([]);
+    });
+
+    // A message posted without a turn, which only a read or the next leg change would end otherwise. LEG to OBS and back
+    // is no leg change, nor is the return of a DTK or of Output.ObsTarget 0 (L:KLN90B_ObsTarget, SimVarSync)
+    it.each([
+        ['OBS mode (5-37)', (w: World, on: boolean) => w.obsMode = on],
+        ['Output.ObsTarget 1 (4-8, B-1)', (w: World, on: boolean) => w.obsTarget = on ? 1 : 0],
+        ['no DTK', (w: World, on: boolean) => w.dtkMag = on ? null : 80],
+    ])('goes with %s and does not come back with Leg mode', (_name, interrupt) => {
+        const {w, h} = unreadable();
+        expect(legChange(h, w, false)).toEqual([MSG_080]);
+        expect(tickSeconds(h, w, 5)).toEqual([MSG_080]); // Precondition
+        interrupt(w, true);
+        expect(tickSeconds(h, w, 1)).toEqual([]);
+        expect(everySecond(h, w, 5).flat()).toEqual([]);
+        interrupt(w, false);
+
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
+    });
+});
+
 describe('ADJ NAV IND CRS TO nnn before the self-test is approved', () => {
     // Figure 3-4: the self-test page with the indicator on 242° against the fixed course of 315° and no message prompt.
     // The maintainer's ruling (#330) widens this to the whole time before the approval, the Turn-On page included. The
@@ -991,5 +1181,48 @@ describe('ADJ NAV IND CRS TO nnn before the self-test is approved', () => {
 
         expect(everySecond(h, w, 13).flat()).toEqual([]); // The count starts at the approval
         expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 046°']);
+    });
+
+    // #330 without a readable course (#436): the course at the approval, the self-test course of 315° giving way to the
+    // DTK, is no leg change
+    it('shows nothing at the approval without a readable course (#330, #436)', () => {
+        const w = quietWorld();
+        w.dtkMag = 315;
+        w.selfTestApproved = false;
+        const h = harness(w);
+        h.tick();
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
+        w.selfTestApproved = true;
+        w.dtkMag = 46;
+
+        expect(everySecond(h, w, 40).flat()).toEqual([]);
+    });
+
+    it('shows nothing at the first course of a start that skips the self-test, without a readable course (#330, #436)', () => {
+        const w = quietWorld();
+        const h = harness(w);
+        h.tick();
+        w.dtkMag = 46;
+
+        expect(everySecond(h, w, 40).flat()).toEqual([]);
+    });
+
+    // #330, #176: the power-off drops the message (MessageHandler.clear), and the posting does not outlive it: no turn
+    // ends a message posted without one, so only the power-on can
+    it('is gone after the next approval, after a power cycle with a message posted by a leg change (#330, #436)', () => {
+        const w = quietWorld();
+        w.dtkMag = 46;
+        const h = harness(w);
+        h.tick();
+        w.dtkMag = 80;
+        w.legChangeDtkDelta = 34; // A sequencing without a turn
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 080°']); // Precondition: listed
+        w.legChangeDtkDelta = null;
+        h.handler.clear(); // The power-off
+        w.selfTestApproved = false; // The next power-on
+        expect(everySecond(h, w, 5).flat()).toEqual([]);
+        w.selfTestApproved = true;
+
+        expect(everySecond(h, w, 40).flat()).toEqual([]);
     });
 });

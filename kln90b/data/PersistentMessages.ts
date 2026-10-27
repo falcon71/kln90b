@@ -47,14 +47,25 @@ export function buildPersistentMessages(props: PageProps): Message[] {
 
 /**
  * ADJ NAV IND CRS TO nnn°: set the indicator's course to the DTK. Only in Leg mode with a DTK, and never for an indicator
- * the unit drives (4-8, B-1), whose message is AdjustCourseMessage. The number follows the live DTK.
+ * the unit drives (4-8, B-1), whose message is AdjustCourseMessage. The number follows the live DTK. It goes once it is
+ * read (the maintainer's ruling, 2026-10-27, unlike the messages that stay listed when read, 3-16). The case is that of
+ * the current calculation, since the CDI can be switched to and away from GPS at any time.
  *
  * With an indicator course the unit reads (sensors.in.obsMag), the message shows while that course is more than 5
  * degrees off the DTK (B-1): at once at a leg change (4-8, B-1; NavPageState.legChangeDtkDelta), otherwise once the
  * course has been off for more than 12 s of GPS time (KA 90 Installation Manual pp. 3-43, 3-45). It goes on the next
- * calculation once the course is within 5 degrees, and once it is read (the maintainer's ruling, 2026-10-27, unlike the
- * messages that stay listed when read, 3-16); while the course stays off it comes back, unread, more than 12 s after the
- * read. The AVsoftech trainer showed each of these (docs/kln89-trainer-record.md, 2026-10-26). #434
+ * calculation once the course is within 5 degrees; while the course stays off it comes back, unread, more than 12 s after
+ * the read. The AVsoftech trainer showed each of these (docs/kln89-trainer-record.md, 2026-10-26). #434
+ *
+ * Without one, the unit cannot tell where the indicator points, so the message comes at a leg change of more than 5
+ * degrees (4-8, B-1): at an anticipated or abeam turn the moment the WPT light goes from flashing to steady. If the leg
+ * change started a turn, the message goes when the turn ends and the WPT light goes off, read or not. Both videos show
+ * this, and both are proven unreadable installations: the Tu-154 (https://youtu.be/S1lt2W95bLA, about t=2245 and
+ * t=2574), whose self-test page at about 02:57 shows OBS IN dashed (the maintainer, 2026-10-27), and the Air Chathams
+ * CV580 at 30:38, its CDI on NAV 1. A Direct To, an activation, the first DTK and a switch between LEG and OBS are no
+ * leg change and post nothing (the Tu-154 video at about 43:52; the maintainer's ruling, 2026-10-27). Without a turn
+ * nothing marks an end, so the message stays until it is read or the next leg change (the maintainer's ruling,
+ * 2026-10-27, low confidence). This replaces the 30 s window of #177. #436
  */
 class AdjustCourseToMessage implements Message {
 
@@ -62,12 +73,10 @@ class AdjustCourseToMessage implements Message {
     public seen: boolean = false;
     /** The readable course more than 5 degrees off the DTK */
     private readonly offTimer = new SustainedCondition(COURSE_MESSAGE_DELAY);
-
-    //The unreadable case: the 30 s window after a DTK change of more than 5 degrees (#177)
-    private forceShow = false;
-    private lastCourse: number | null = null;
-    private validUntil: number = 0;
-    private atStartUp = true; //Until the first evaluation after the self-test is approved (#330)
+    /** The unreadable case: posted by a leg change and not yet removed */
+    private posted = false;
+    /** The unreadable case: the leg change that posted the message started a turn, whose end removes it */
+    private endsWithTurn = false;
 
 
     constructor(private readonly sensors: Sensors, private readonly modeController: ModeController, private readonly navState: NavPageState,
@@ -78,56 +87,51 @@ class AdjustCourseToMessage implements Message {
     public isConditionValid(): boolean {
         if (this.planeSettings.output.obsTarget !== 0) {
             //4-8, B-1: no TO message when the unit slews the indicator itself. The plain message is the one for a driven
-            //indicator that does not follow (#401). The next evaluation starts as a new one, so a course from before is
-            //no DTK change
-            this.atStartUp = true;
-            this.offTimer.reset();
+            //indicator that does not follow (#401)
+            this.reset();
             return false;
         }
 
         if (!this.navState.isSelfTestApproved) {
             //#330: not evaluated before the self-test is approved, neither on the Turn-On page nor on the self-test page,
-            //whose fixed course is part of the check and not a course to set (figure 3-4). The count starts at the approval
-            this.atStartUp = true;
-            this.offTimer.reset();
+            //whose fixed course is part of the check and not a course to set (figure 3-4). The count starts at the
+            //approval, and a message posted before the power-off is not posted again
+            this.reset();
             return false;
         }
 
-        //This message has two conditions. They must both be here, otherwise this message could be shown twice
         const dtk = this.modeController.getDtkOrObsMagnetic();
-        if (this.atStartUp) {
-            //#330: the course at the approval is where the unit starts, not a DTK change, so it opens no 30 s window,
-            //and a window from before the power-off is over
-            this.atStartUp = false;
-            this.forceShow = false;
-            this.lastCourse = dtk;
-        }
         if (dtk === null || this.modeController.isObsModeActive()) {
-            this.offTimer.reset();
+            this.reset();
             return false;
         }
 
         this.message = [`ADJ NAV IND CRS TO ${format(roundBearing(dtk), "000")}°`];
 
-        if (this.lastCourse === null || Math.abs(NavMath.diffAngle(this.lastCourse, dtk)) > 5) {
-            //First part: Whenever turn changes to more than 5 degress
-            this.forceShow = true;
-            this.validUntil = Date.now() + 30 * 1000;
-            //The time is about 30 seconds: https://youtu.be/S1lt2W95bLA?t=2244 https://youtu.be/S1lt2W95bLA?t=2574
-        }
-        this.lastCourse = dtk;
-
-        if (this.seen) {
-            this.forceShow = false;
-        }
-
         const obsMag = this.sensors.in.obsMag;
         if (obsMag === null) {
             //The unreadable case
             this.offTimer.reset();
-            return this.forceShow && Date.now() < this.validUntil;
+            const delta = this.navState.legChangeDtkDelta;
+            if (delta !== null && delta > 5) {
+                //4-8, B-1: at the leg change, at a turn the WPT light going steady. A later leg change gives the
+                //message the new DTK and decides anew whether a turn ends it. Each leg change is a new message, so it
+                //is unread, also in the second the one before was read (#436). Both calls of the tick see the same mark
+                this.seen = false;
+                this.posted = true;
+                this.endsWithTurn = this.navState.activeWaypoint.turnStack.length > 0;
+            } else if (this.seen) {
+                //Removed once read, for good until the next leg change (the maintainer, 2026-10-27)
+                this.posted = false;
+            } else if (this.posted && this.endsWithTurn && this.navState.activeWaypoint.turnStack.length === 0) {
+                //The end of the turn, the WPT light going off (the Tu-154 and CV580 videos)
+                this.posted = false;
+            }
+            return this.posted;
         }
 
+        //The readable case
+        this.posted = false;
         //The GPS replaces its time object on some ticks, so it is read through the GPS each time. MessageHandler.tick
         //asks twice per tick, and the time is the same for both
         const now = this.sensors.in.gps.timeZulu.getTimestamp();
@@ -145,6 +149,12 @@ class AdjustCourseToMessage implements Message {
             return false;
         }
         return this.offTimer.update(off, now);
+    }
+
+    /** Neither case carries over a time the message is not evaluated */
+    private reset(): void {
+        this.offTimer.reset();
+        this.posted = false;
     }
 }
 

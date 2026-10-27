@@ -984,8 +984,9 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   in exactly the calculation whose DTK is the first of the next leg (an anticipated or abeam turn starting, or a
   sequencing without a turn), through `legChangePending` set the calculation before. `legChangeFrom` keeps the FROM
   leg of that moment, which `ActiveWaypoint` replaces at a Direct To, an activation or an FPL 0 edit of the active leg,
-  so such a change in between drops the mark. Without a readable course the message still opens its 30 s window at a
-  DTK change of more than 5° (#177).
+  so such a change in between drops the mark. Without a readable course the TO message comes at a leg change of more
+  than 5° and nothing else, goes once read, and, if the leg change started a turn, goes when the turn stack is empty
+  again; without a turn it stays until read or the next leg change (#436, replacing the 30 s window of #177).
 - The MSG page (`controls/MessagePage.tsx`) shows newest first. `controls/StatusLine.tsx` shows the `MSG` indicator and
   drives `L:KLN90B_MsgLight` in the display tick: flashing while unread, steady while read, off when empty.
 - **Status-line transient messages** are a separate channel. Publish `statusLineMessage` (`StatusLineMessageEvents`)
