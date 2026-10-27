@@ -56,6 +56,34 @@ describe('the sequencing of an anticipated turn at its bisector (#375)', () => {
         expect(before, `bearing ${bearing.toFixed(1)}`).toBeGreaterThan(1);
     });
 
+    // #407: the new waypoint's distance, TO/FROM and GPS SimVars show in the calculation of the sequencing at the
+    // bisector, not one later (checked in the KLN 89 trainer, 2026-10-27, docs/kln89-trainer-record.md: the new ident,
+    // distance, bearing, ETE, DTK and TO/FROM appear in the same display update at every sequencing). The tolerance is a
+    // display tick of flight at 239 kt (0.017 NM) plus the rounding of the aircraft's position
+    it('shows the new waypoint\'s values in the calculation of the sequencing (KLN 89 trainer, 2026-10-27; #407)', async () => {
+        const kbbb = pointFrom(abcPosition(), 279, 20);
+        const {flight} = await bootBeforeTurn({nextCourse: 279, groundspeedKt: 239, startNmBefore: 12});
+        await flight.flyUntil(() => flight.nav.activeIdent !== 'ABC', {timeout: 300, description: 'ABC sequenced'});
+        expect(flight.nav.activeIdent).toBe('KBBB');
+
+        const dist = distanceNm(flight.aircraft, kbbb);
+        expect(Math.abs(flight.nav.distNm! - dist)).toBeLessThan(0.07);
+        expect(flight.nav.toFrom).toBe('TO');
+        expect(flight.sim.get('GPS WP NEXT ID', 'string')).toBe('KBBB');
+        expect(Math.abs(flight.sim.get('GPS WP DISTANCE', 'nautical miles') - dist)).toBeLessThan(0.07);
+        // The bearing and the ETE to KBBB, KBBB the destination too: 0.07 NM of position is 0.2° of bearing at about 23 NM
+        // and 1.05 s of ETE at 239 kt. The world has magvar 0, so the magnetic SimVar is the true bearing
+        const navPage = flight.unit.props.memory.navPage;
+        const bearing = courseDeg(flight.aircraft, kbbb);
+        const ete = dist / 239 * 3600;
+        expect(angleBetween(navPage.bearingToActive, bearing)).toBeLessThan(0.5);
+        expect(angleBetween(flight.sim.get('GPS WP BEARING', 'radians') * 180 / Math.PI, bearing)).toBeLessThan(0.5);
+        expect(Math.abs(navPage.eteToActive! - ete)).toBeLessThan(1.5);
+        expect(Math.abs(flight.sim.get('GPS WP ETE', 'seconds') - ete)).toBeLessThan(1.5);
+        expect(Math.abs(navPage.distToDest! - dist)).toBeLessThan(0.07);
+        expect(Math.abs(navPage.eteToDest! - ete)).toBeLessThan(1.5);
+    });
+
     it('sequences at once when the aircraft is already past the bisector as its turn starts', async () => {
         // Parallel 0.5 NM inside the inbound leg and held wings level: at the turn start (4.3 NM before ABC) the bearing
         // from ABC is 270 + atan(0.5 / 4.3), about 276.6, beyond the bisector ray at 274.5
@@ -69,7 +97,9 @@ describe('the sequencing of an anticipated turn at its bisector (#375)', () => {
         }
         expect(dtkSwitch, 'the DTK switched to the next leg').not.toBeNull();
         expect(sequenced, 'ABC sequenced').not.toBeNull();
-        expect(Math.abs(sequenced! - dtkSwitch!), `DTK at ${dtkSwitch} s, sequenced at ${sequenced} s`).toBeLessThanOrEqual(2);
+        // In the same calculation: the turn starts and ABC is sequenced at once, and the DTK of the next leg shows with both
+        // (#407, checked in the KLN 89 trainer, 2026-10-27: no lag at any turn start or sequencing)
+        expect(sequenced, `DTK at ${dtkSwitch} s, sequenced at ${sequenced} s`).toBe(dtkSwitch);
         // Sequenced at the turn start, 4.3 NM before ABC (less the seconds flown since), not near ABC
         expect(alongBeforeNm(w, flight.aircraft)).toBeGreaterThan(3);
     });
@@ -99,7 +129,11 @@ describe('the sequencing of an anticipated turn at its bisector (#375)', () => {
         expect(angleBetween(ac.trackTrue, 240)).toBeLessThan(90);
         expect(Math.abs(crossTrackNm(ac, w, 90))).toBeLessThan(1);
 
-        // Each second for 30 s from the turn start. The DTK follows the turn start one calculation later
+        // #407: the DTK is the next leg's in the calculation of the turn start (checked in the KLN 89 trainer,
+        // 2026-10-27: no lag at any turn start)
+        expect(angleBetween(flight.nav.dtkTrue, 240), 'DTK on the next leg at the turn start').toBeLessThan(1);
+
+        // Each second for 30 s from the turn start
         const samples: { ident: string | null; stack: number; dtk: number | null; side: number }[] = [];
         for (let s = 0; s < 30; s++) {
             await flight.fly(1);
@@ -113,13 +147,13 @@ describe('the sequencing of an anticipated turn at its bisector (#375)', () => {
         // The turn ended in the calculation that sequenced ABC and is not started again for ABC before the sequencing:
         // KBBB has no turn of ABC's on the stack
         expect(samples.slice(kbbbFrom).every(s => s.stack === 0), all).toBe(true);
-        // While ABC is active the turn is on the stack, and the DTK is the next leg's in every second but one. ABC is
-        // sequenced at the bisector (KLN 89 trainer, 2026-10-20, docs/kln89-trainer-record.md), and here the turn ends
-        // in the calculation that sequences ABC (the aircraft is past the bisector and already past the end
-        // point), and that calculation takes the DTK before the sequencing, from the inbound leg: the one-calculation lag
-        // of the DTK behind the sequencing, which predates #375
+        // While ABC is active the turn is on the stack, and the DTK is the next leg's in every second. ABC is sequenced at
+        // the bisector (KLN 89 trainer, 2026-10-20, docs/kln89-trainer-record.md), and here the turn ends in the
+        // calculation that sequences ABC (the aircraft is past the bisector and already past the end point). That
+        // calculation shows the DTK of the new active leg, which is the turn's next leg: the one-calculation lag behind
+        // the sequencing, in which it showed the inbound leg, is gone (#407, checked in the KLN 89 trainer, 2026-10-27)
         expect(samples.slice(0, kbbbFrom).every(s => s.stack > 0), all).toBe(true);
-        expect(samples.filter(s => angleBetween(s.dtk, 240) >= 1), all).toEqual([samples[kbbbFrom]]);
+        expect(samples.filter(s => angleBetween(s.dtk, 240) >= 1), all).toEqual([]);
     });
 });
 
@@ -227,9 +261,9 @@ describe('a turn left over from the previous waypoint at the turn point (2026-10
             const along = alongBeforeDef();
             expect(along, 'along-track distance before DEF at its turn start').toBeLessThanOrEqual(turnPoint + groundspeedKt / 3600 + POSITION_TOLERANCE_NM);
             expect(along, 'along-track distance before DEF at its turn start').toBeGreaterThanOrEqual(turnPoint - POSITION_TOLERANCE_NM);
-            await flight.fly(1);
-            expect(flight.nav.activeIdent).toBe('DEF');
-            expect(angleBetween(flight.nav.dtkTrue, next), 'DTK on the next leg one second after the turn start').toBeLessThan(1);
+            // #407: the DTK is the next leg's in the calculation of the turn start (checked in the KLN 89 trainer,
+            // 2026-10-27: no lag at any turn start)
+            expect(angleBetween(flight.nav.dtkTrue, next), 'DTK on the next leg at the turn start').toBeLessThan(1);
 
             await flight.flyUntil(() => flight.nav.activeIdent !== 'DEF', {timeout: 120, description: 'DEF sequenced'});
             expect(flight.nav.activeIdent).toBe('KBBB');
@@ -263,8 +297,8 @@ describe('a turn left over from the previous waypoint at the turn point (2026-10
         await flight.flyUntil(() => flight.nav.activeIdent !== 'DEF', {timeout: 30, description: 'DEF sequenced'});
         expect(flight.nav.activeIdent).toBe('KBBB');
         expect(alongBeforeDef(), 'sequenced before DEF').toBeGreaterThan(0.3);
-        // By DEF's own turn, which is on the stack: the DTK is DEF's next leg's from the calculation after
-        await flight.fly(1);
+        // By DEF's own turn, which is on the stack: the DTK is DEF's next leg's in the calculation of the sequencing (#407,
+        // checked in the KLN 89 trainer, 2026-10-27: no lag at any sequencing)
         expect(angleBetween(flight.nav.dtkTrue, next)).toBeLessThan(1);
         expect(turnStackLength(flight.unit)).toBeGreaterThan(0);
         // And nothing of ABC's turn is left under it

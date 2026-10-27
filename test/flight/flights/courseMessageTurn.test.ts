@@ -75,10 +75,12 @@ describe('ADJ NAV IND CRS TO without a readable course (#436)', () => {
         const turnEnd = samples.length - 1; // the first sample after the turn
         expect(turnStart).toBeGreaterThan(30); // Precondition: half a minute on the first leg before the turn
 
-        // Before the turn, and in the calculation that starts it, whose DTK is still that of the first leg: nothing
-        expect(samples.slice(0, turnStart + 1).flatMap(s => s.messages)).toEqual([]);
-        // From the first DTK of the second leg to the last calculation of the turn, past the sequencing at its midpoint
-        const duringTurn = samples.slice(turnStart + 1, turnEnd);
+        // Before the turn: nothing
+        expect(samples.slice(0, turnStart).flatMap(s => s.messages)).toEqual([]);
+        // From the calculation that starts the turn, which shows the DTK of the second leg (#407, checked in the KLN 89
+        // trainer, 2026-10-27: the message prompt comes in the same display update as the turn start), to the last
+        // calculation of the turn, past the sequencing at its midpoint
+        const duringTurn = samples.slice(turnStart, turnEnd);
         expect(duringTurn.every(s => s.turnStackLength > 0)).toBe(true); // Precondition: one turn, no break
         expect(duringTurn.length).toBeGreaterThan(5);
         expect(duringTurn.map(s => s.messages)).toEqual(Array(duringTurn.length).fill([MSG_LEG2]));
@@ -96,8 +98,10 @@ describe('ADJ NAV IND CRS TO without a readable course (#436)', () => {
         const samples = await sampleUntil(flight, s => s.active === 'KBBB', 300);
         const sequencing = samples.length - 1;
         expect(sequencing).toBeGreaterThan(30); // Precondition: half a minute on the first leg before ABC
-        // Before ABC, and in the calculation that sequences it, whose DTK is still that of the first leg: nothing
-        expect(samples.flatMap(s => s.messages)).toEqual([]);
+        // Before ABC: nothing. From the calculation that sequences it, which shows the DTK of the second leg (#407,
+        // checked in the KLN 89 trainer, 2026-10-27, run a12: no lag with turn anticipation off either), the message
+        expect(samples.slice(0, sequencing).flatMap(s => s.messages)).toEqual([]);
+        expect(samples[sequencing].messages).toEqual([MSG_LEG2]);
 
         const after = await sampleFor(flight, 60);
         expect([...samples, ...after].every(s => s.turnStackLength === 0)).toBe(true); // Precondition: no turn

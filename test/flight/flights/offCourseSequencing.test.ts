@@ -134,16 +134,15 @@ describe('the turn start off course on the leg (#157)', () => {
         expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
         expect(turnStackLength(flight.unit)).toBe(0);
 
-        // The turn starts (it goes onto the turn stack) at the along-track distance TP, 1.5 NM off the leg. The DTK
-        // follows one calculation later: it is calculated before the turn start in the tick
+        // The turn starts (it goes onto the turn stack) at the along-track distance TP, 1.5 NM off the leg. The DTK is
+        // the next leg's in the same calculation (#407, checked in the KLN 89 trainer, 2026-10-27: no lag at any turn
+        // start)
         await flight.flyUntil(() => turnStackLength(flight.unit) > 0 || flight.nav.activeIdent !== 'WWW', {timeout: 120, description: 'the turn start at WWW'});
         expect(flight.nav.activeIdent).toBe('WWW');
         const startAlong = alongBefore(flight.aircraft);
         expect(startAlong).toBeGreaterThanOrEqual(TP);
         expect(startAlong).toBeLessThanOrEqual(TP + TICK_NM + 0.05);
         expect(Math.abs(xtkRight(flight.aircraft))).toBeGreaterThan(1.0);
-        await flight.fly(1);
-        expect(flight.nav.activeIdent).toBe('WWW');
         expect(angleBetween(flight.nav.dtkTrue, NEXT)).toBeLessThan(1);
 
         // WWW is sequenced past the bisector. The plan belongs to WWW: KBBB, 20 NM away, starts undecided, and once the
@@ -191,9 +190,10 @@ describe('the turn start off course on the leg (#157)', () => {
         expect(Math.abs(xtkRight(flight.aircraft)), 'well below the gate at the alert').toBeLessThan(1.0);
 
         // The turn starts at the abeam line, within one calculation of it. It is measured where the turn goes onto the
-        // stack: the DTK follows one calculation later, because it is calculated before the turn start in the tick
+        // stack, and the DTK stays on the inbound leg up to the calculation before
         await flight.flyUntil(() => {
-            dtkSwitchedEarly ||= !dtkOnInbound();
+            // The calculation that starts the turn shows the next leg's DTK already (#407), so it is not early
+            dtkSwitchedEarly ||= turnStackLength(flight.unit) === 0 && !dtkOnInbound();
             return turnStackLength(flight.unit) > 0 || flight.nav.activeIdent !== 'WWW';
         }, {timeout: 60, description: 'the turn start at WWW'});
         expect(flight.nav.activeIdent).toBe('WWW');
@@ -206,11 +206,12 @@ describe('the turn start off course on the leg (#157)', () => {
         expect(navPage.steeringPath).toBe(aw.turnStack[0].pathForDtk);
 
         // The abeam turn has no size: XTK is the distance to WWW, FLY L for the left turn, and the DTK is the next leg's,
-        // up to the sequencing at the outside bisector ray 095 (the trainer's run C sequenced at 096 to 101). Sampled once
-        // a second from one second after the turn start
+        // from the calculation of the turn start (#407, checked in the KLN 89 trainer, 2026-10-27: no lag at any turn
+        // start) up to the sequencing at the outside bisector ray 095 (the trainer's run C sequenced at 096 to 101).
+        // Sampled once a second from the turn start
         const samples: string[] = [];
         for (let s = 0; s < 60 && flight.nav.activeIdent === 'WWW'; s++) {
-            await flight.fly(1);
+            if (s > 0) await flight.fly(1);
             if (flight.nav.activeIdent !== 'WWW') break;
             const nav = flight.nav;
             const dist = distanceNm(flight.aircraft, W_POS);
@@ -291,7 +292,9 @@ describe('the turn start off course on the leg (#157)', () => {
         const {flight} = await boot([at(12, -3.5), at(-20, -3.5)]);
         let dtkSwitchedEarly = false;
         await flight.flyUntil(() => {
-            dtkSwitchedEarly ||= angleBetween(flight.nav.dtkTrue, INBOUND) >= 1;
+            // While WWW is active: the calculation that sequences it shows the DTK of the leg to KBBB already (#407,
+            // checked in the KLN 89 trainer, 2026-10-27: no lag at any sequencing)
+            dtkSwitchedEarly ||= flight.nav.activeIdent === 'WWW' && angleBetween(flight.nav.dtkTrue, INBOUND) >= 1;
             return flight.nav.activeIdent !== 'WWW';
         }, {timeout: 300, description: 'WWW sequenced'});
         expect(flight.nav.activeIdent).toBe('KBBB');
@@ -446,7 +449,8 @@ describe('the sequencing off the leg (#157)', () => {
         let dtkSwitched = false;
         let secondsWithinTurnPoint = 0;
         const watch = () => {
-            dtkSwitched ||= flight.nav.activeIdent === 'WWW' && angleBetween(flight.nav.dtkTrue, INBOUND) >= 1;
+            // Before the abeam turn: the calculation that starts it shows the next leg's DTK already (#407)
+            dtkSwitched ||= flight.nav.activeIdent === 'WWW' && turnStackLength(flight.unit) === 0 && angleBetween(flight.nav.dtkTrue, INBOUND) >= 1;
             if (distanceNm(flight.aircraft, W_POS) < tp) secondsWithinTurnPoint += 0.25;
         };
 

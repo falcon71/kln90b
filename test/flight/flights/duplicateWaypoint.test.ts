@@ -44,7 +44,11 @@ describe('consecutive identical waypoints sequence without an error (#19)', () =
         await flight.flyUntil(() => activeIdx() === 3, {timeout: 150, description: 'sequenced through both ABC legs to KBBB'});
         await flight.fly(2);
 
-        expect(withoutRepeats(indices)).toEqual([1, 2, 3]);
+        // #407: the leg of no length between the copies is passed in the calculation that sequences the first one, so
+        // the second copy (index 2) is never the active waypoint of a calculation. Before, it was for one calculation,
+        // the lag of the values behind the sequencing; the same calculation is the design's call (2026-10-27, Review
+        // Focus 1), not flown in the trainer
+        expect(withoutRepeats(indices)).toEqual([1, 3]);
         expect(flight.nav.activeIdent).toBe('KBBB');
         expect(angleBetween(flight.nav.dtkTrue, courseDeg(abc, kbbb))).toBeLessThan(1);
     });
@@ -67,7 +71,9 @@ describe('consecutive identical waypoints sequence without an error (#19)', () =
         await flight.flyUntilActive('KBBB', {timeout: 150});
         await flight.fly(2);
 
-        expect(idents.filter((v, i) => i === 0 || v !== idents[i - 1])).toEqual(['ABC', 'ABD', 'KBBB']);
+        // #407: ABD, the leg of no length, is passed in the calculation that sequences ABC (the design's call, 2026-10-27;
+        // see the previous test)
+        expect(idents.filter((v, i) => i === 0 || v !== idents[i - 1])).toEqual(['ABC', 'KBBB']);
         expect(angleBetween(flight.nav.dtkTrue, courseDeg(abc, kbbb))).toBeLessThan(1);
     });
 });
@@ -88,7 +94,8 @@ describe('no turn anticipation into a duplicated waypoint (#27)', () => {
             return true;
         });
 
-        await flight.flyUntil(() => activeIdx() === 2, {timeout: 150, description: 'first ABC passed'});
+        // Past the first ABC the unit goes on past the second at once, to KBBB (#407)
+        await flight.flyUntil(() => activeIdx() > 1, {timeout: 150, description: 'first ABC passed'});
 
         // 3 NM at 120 kt take 90 s, one sample each
         expect(samples.length).toBeGreaterThanOrEqual(80);

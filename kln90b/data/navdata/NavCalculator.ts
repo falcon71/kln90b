@@ -66,12 +66,31 @@ export const WPT_ALERT_OFF_LEG: Seconds = 36;
 
 
 /**
+ * The active leg as NavCalculator resolves it in a calculation
+ */
+interface ActiveLeg {
+    /** The active waypoint */
+    toLeg: KLNFlightplanLeg;
+    /** The start of the active leg, for a Direct To where it was activated */
+    fromLeg: FromLeg;
+    /** The path of the active leg: the path of fromLeg, or past a leg without length the leg before it (#120) */
+    legPath: GeoCircle;
+}
+
+/**
  * This class updates all navigation variables
  */
 export class NavCalculator implements CalcTickable {
     private readonly turnAnticipation: UserSetting<boolean>;
 
     private lastTurnStackDistance: NauticalMiles | null = null;
+
+    /**
+     * Set when the active flight plan moves on to the next leg by itself in this calculation: an anticipated or abeam turn
+     * starts (4-8), or a waypoint is sequenced without a turn (4-9). tick() clears it first and turns it into
+     * NavPageState.legChangeDtkDelta last, so it holds nothing from one calculation to the next (#434, #407)
+     */
+    private legChange = false;
 
 
     constructor(private readonly sensors: Sensors, private readonly memory: VolatileMemory, private readonly magvar: KLNMagvar, userSettings: KLN90BUserSettings, private readonly modeController: ModeController, private readonly planeSettings: KLN90PlaneSettings) {
@@ -81,12 +100,9 @@ export class NavCalculator implements CalcTickable {
 
     tick(): void {
         const nav = this.memory.navPage;
-        //#434: a leg change of the previous calculation shows its new DTK in this one (legChangePending), unless the active
-        //leg was changed in between by something that is no leg change (legChangeFrom)
-        const legChange = nav.legChangePending;
-        const legChangeFrom = nav.legChangeFrom;
-        nav.legChangePending = false;
-        nav.legChangeFrom = null;
+        //#434: a leg change is measured against the DTK the previous calculation showed
+        const previousDtk = nav.desiredTrack;
+        this.legChange = false;
         nav.legChangeDtkDelta = null;
         if (nav.isSelfTestActive) {
             nav.xtkToActive = -2.5;
@@ -111,137 +127,23 @@ export class NavCalculator implements CalcTickable {
             return;
         }
 
-        let toLeg = nav.activeWaypoint.getActiveLeg();
-
-        if (toLeg === null) {
-            toLeg = nav.activeWaypoint.activateFpl0();
-        }
-
-
-        if (toLeg === null) {
-            this.setFlag();
+        const leg = this.updateActiveLeg(false);
+        if (leg === null) {
             this.setOutput();
             return;
         }
-
-        const fromLeg = nav.activeWaypoint.getFromLeg()!;
-
-        //6-18 Always direct distance, even for arcs
-        nav.distToActive = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(toLeg.wpt), UnitType.NMILE);
-
-        const futureLegs = nav.activeWaypoint.getFutureLegs();
-        nav.distToDest = calcDistToDestination(nav, futureLegs);
-
-        //#426: with the aircraft on the waypoint there is no bearing to it. It is null, as any missing value, so the
-        //displays show dashes (3-31) and the outputs write their null value. The course at the waypoint is null there too
-        nav.bearingToActive = bearingBetween(this.sensors.in.gps.coords, toLeg.wpt);
-        nav.bearingAtActive = courseAtWaypoint(this.sensors.in.gps.coords, toLeg.wpt);
-
-        let dtk: Degrees;
-
-        //ETE
-        if (this.sensors.in.gps.groundspeed > 2) {
-            nav.eteToActive = nav.distToActive / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
-            nav.eteToDest = nav.distToDest !== null ? nav.distToDest / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS : null; //#393: 0 is a value
-        } else {
-            nav.eteToActive = null;
-            nav.eteToDest = null;
-            nav.waypointAlert = false;
-        }
-
-        let legPath = fromLeg.path;
-        if (!this.modeController.isObsModeActive() && isNaN(fromLeg.path.center[0])) { //Happens when FROM and TO are the same waypoint
-            const idx = nav.activeWaypoint.getActiveFplIdx();
-            nav.activeWaypoint.sequenceToNextWaypoint();
-            if (nav.activeWaypoint.getActiveFplIdx() !== idx) {
-                console.warn("invalid path, sequencing to the next waypoint", fromLeg);
-                if (legChange && legChangeFrom === fromLeg) {
-                    //#434: the leg change onto a duplicated waypoint (4-9) goes on past the leg of no length; its DTK is
-                    //the one of the leg after it, in the next calculation
-                    this.markLegChange();
-                }
-                return;
-            }
-            //#120: the last leg has no length. The unit keeps navigating on the course of the leg before it (checked in
-            //the KLN 89 trainer, 2026-10-14); without a leg before, only distance, bearing and ETE remain
-            const incoming = this.getIncomingPath(idx);
-            if (incoming === null) {
-                nav.xtkToActive = null;
-                nav.steeringPath = null;
-                nav.desiredTrack = null;
-                nav.toFrom = null;
-                nav.bearingForAP = nav.bearingToActive;
-                nav.waypointAlert = false;
-                this.setOutput();
-                return;
-            }
-            legPath = incoming;
-        }
+        const {toLeg, fromLeg, legPath} = leg;
 
         //The distance flown in one calculation tick
         const tickDistance = this.sensors.in.gps.groundspeed / HOURS_TO_SECONDS / 1000 * TICK_TIME_CALC;
 
-        //Special handling for turns
-        if (nav.activeWaypoint.turnStack.length > 0) {
-            const turnStackEntry = nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1];
-            const distFromCurrent = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(turnStackEntry.switchPoint), UnitType.NMILE);
-            //The abeam turn has no end of its own: it ends with its waypoint (ActiveWaypoint.setActiveIdx)
-            if (turnStackEntry.abeamTurnSign === null && (turnStackEntry.turnBisector !== undefined ? this.isPastEndOfTurn(turnStackEntry, turnStackEntry.turnBisector, tickDistance, legPath)
-                : distFromCurrent <= tickDistance || distFromCurrent > this.lastTurnStackDistance!)) {
-                console.debug("Reached end of turn", distFromCurrent, this.lastTurnStackDistance, nav.activeWaypoint.turnStack);
-                //We have reached the end of the turn, XTK will now use the normal leg again
-                nav.activeWaypoint.turnStack.pop();
-                const nextEntry = nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1];
-                if (nextEntry) {
-                    this.lastTurnStackDistance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(nextEntry.switchPoint), UnitType.NMILE);
-                } else {
-                    this.lastTurnStackDistance = null;
-                }
-            } else {
-                this.lastTurnStackDistance = distFromCurrent;
-            }
-        }
+        this.popEndedTurn(legPath, tickDistance);
+        this.updateCourse(leg);
 
-        //XTK
-        if (nav.activeWaypoint.turnStack.length > 0) {
-            //4-8 XTK will be based on a smooth turn
-            const turnStackEntry = nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1];
-            nav.xtkToActive = turnStackEntry.abeamTurnSign !== null ? turnStackEntry.abeamTurnSign * nav.distToActive
-                : UnitType.GA_RADIAN.convertTo(turnStackEntry.path.distance(this.sensors.in.gps.coords), UnitType.NMILE);
-        } else {
-            nav.xtkToActive = UnitType.GA_RADIAN.convertTo(legPath.distance(this.sensors.in.gps.coords), UnitType.NMILE);
-        }
-
-
-        //DTK
-        if (this.modeController.isObsModeActive()) {
-            nav.desiredTrack = null;
-            nav.bearingForAP = nav.bearingToActive;
-            dtk = this.modeController.getObsTrue();
-        } else {
-            //XTK will be switched to the next XTK right at the start of the turn, even if the active waypoint has not been switched yet
-            const pathForDtk = nav.activeWaypoint.turnStack.length > 0 ? nav.activeWaypoint.turnStack[nav.activeWaypoint.turnStack.length - 1].pathForDtk : legPath;
-
-            //#433: on the VOR of the DME arc the DTK at the end of the arc
-            dtk = dtkAtClosest(pathForDtk, this.sensors.in.gps.coords) ?? pathForDtk.bearingAt(pathForDtk.closest(toLeg.wpt, VEC3_CACHE));
-            if (legChange && legChangeFrom === fromLeg && nav.desiredTrack !== null) {
-                //#434: the first DTK of a leg change, on which the course messages post at once (4-8, B-1)
-                nav.legChangeDtkDelta = Math.abs(NavMath.diffAngle(nav.desiredTrack, dtk));
-            }
-            nav.desiredTrack = dtk;
-
-            if (legPath.isGreatCircle()) {
-                nav.bearingForAP = nav.bearingToActive;
-            } else {
-                //The autopilot does not play well with DME arcs, when DTK and bearing to does not match.
-                nav.bearingForAP = dtk;
-            }
-
-        }
-
-
-        //#426: on the waypoint the aircraft is on the line between TO and FROM, which the comparison counts as TO
-        nav.toFrom = nav.bearingToActive === null ? TO : Math.abs(NavMath.diffAngle(nav.bearingToActive, dtk)) <= 90;
+        //#407: what the decisions below may change, which then shows in this calculation
+        const activeWaypoint = nav.activeWaypoint;
+        const fromLegBefore = activeWaypoint.getFromLeg();
+        const turnBefore = activeWaypoint.turnStack[activeWaypoint.turnStack.length - 1];
 
         //waypoint sequencing
         if (this.modeController.isObsModeActive()) {
@@ -250,7 +152,7 @@ export class NavCalculator implements CalcTickable {
             nav.waypointAlert = this.sensors.in.gps.groundspeed > 2 && this.isAlertWithoutTurn();
         } else if (this.sensors.in.gps.groundspeed > 2) {
             TO_GEOPOINT_CACHE.set(toLeg.wpt);
-            const followingLeg = nav.activeWaypoint.getFollowingLeg();
+            const followingLeg = activeWaypoint.getFollowingLeg();
 
             if (this.turnAnticipation.get()
                 && followingLeg !== null
@@ -282,7 +184,6 @@ export class NavCalculator implements CalcTickable {
                 //The turn starts at an along-track distance, measured along the inbound leg: on course it is the straight
                 //distance, off course it is not (checked in the KLN 89 trainer, 2026-10-20)
                 const along = alongTrackDistance(legPath, toLeg.wpt, this.sensors.in.gps.coords);
-                const activeWaypoint = nav.activeWaypoint;
                 //#157: the cross track to the active leg's own path, not to a turn circle, decides every calculation
                 //whether the aircraft is on the leg or off it (checked in the KLN 89 trainer, 2026-10-20: not latched)
                 const legXtk = UnitType.GA_RADIAN.convertTo(legPath.distance(this.sensors.in.gps.coords), UnitType.NMILE);
@@ -323,7 +224,7 @@ export class NavCalculator implements CalcTickable {
                             activeWaypoint.startOwnTurn(
                                 new TurnStackEntry(turnCircle, endOfTurn, nextPath, {wpt: new GeoPoint(toLeg.wpt.lat, toLeg.wpt.lon), inboundDtk: fromDtk, nextDtk: nextDtk}),
                                 new TurnStackEntry(fromPath, startOfTurn, nextPath));
-                            this.markLegChange(); //4-8: the DTK switches to the next leg with the turn (#434)
+                            this.legChange = true; //4-8: the DTK switches to the next leg with the turn (#434)
                             console.log("turn: moving to next wpt", toLeg.wpt, activeWaypoint.getActiveWpt(), along, turnPoint);
                         } else if (activeWaypoint.turnPlan === TurnPlan.AT_ABEAM && nav.toFrom === FROM) {
                             //The abeam turn reproduces the real unit: on the abeam plan the turn starts at the abeam line as a
@@ -334,7 +235,7 @@ export class NavCalculator implements CalcTickable {
                             //back toward the waypoint until the bisector. Roll steering steers on the next leg at once, because
                             //the aircraft is farther from a circle of no size than its radius (steeringPath)
                             activeWaypoint.startOwnTurn(TurnStackEntry.abeamTurn(toLeg.wpt, nextPath, turnDirection));
-                            this.markLegChange(); //The DTK is the next leg's from the abeam line (#434)
+                            this.legChange = true; //The DTK is the next leg's from the abeam line (#434)
                             console.log("abeam turn: moving to next wpt", toLeg.wpt, activeWaypoint.getActiveWpt());
                         }
                     }
@@ -361,34 +262,207 @@ export class NavCalculator implements CalcTickable {
                 nav.waypointAlert = this.isAlertWithoutTurn();
                 if (toLeg.fixType !== KLNFixType.MAP && nav.toFrom === FROM) {
                     this.sequenceToNextWaypoint();
-                    console.log("moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt());
+                    console.log("moving to next wpt", toLeg.wpt, activeWaypoint.getActiveWpt());
                 }
             }
         } else {
             nav.waypointAlert = false;
         }
 
+        //#407: a turn start or a sequencing shows its new leg in the calculation that made it: ident, distance, bearing,
+        //ETE, DTK, XTK and TO/FROM, on the pages and in every output alike (checked in the KLN 89 trainer, 2026-10-27,
+        //docs/kln89-trainer-record.md: no lag at any turn start or sequencing, also with turn anticipation off, run a12).
+        //The decisions above read the values of the leg as it was, so the values are computed again after them, and only
+        //when they changed the active leg or the turn in use. The end-of-turn pop is not run again
+        let shown = leg;
+        if (activeWaypoint.getFromLeg() !== fromLegBefore || activeWaypoint.turnStack[activeWaypoint.turnStack.length - 1] !== turnBefore) {
+            const after = this.updateActiveLeg(true);
+            if (after === null) {
+                this.setLegChangeDtkDelta(previousDtk);
+                this.setOutput();
+                return;
+            }
+            this.updateCourse(after);
+            shown = after;
+        }
+
         //#373, #100: the path roll steering follows, taken after the sequencing of this tick (which may have changed the
         //leg), so that a turn pushed in this tick is steered in this tick
-        nav.steeringPath = this.steeringPath(this.activeLegPath() ?? legPath);
+        nav.steeringPath = this.steeringPath(shown.legPath);
 
+        this.setLegChangeDtkDelta(previousDtk);
         this.setOutput();
     }
 
     /**
-     * The path of the active leg as tick() takes it at its start: the path of the from leg, or past a leg without length
-     * the leg before it (#120). Null without a leg, or without a leg before one without length
+     * Resolves the active leg and writes its distance, bearing and ETE values (6-18: always the direct distance, even for
+     * arcs). Without an active leg it activates FPL 0, and without one there either it flags the values. A leg of no
+     * length (FROM and TO the same waypoint) is sequenced past at once, onto the leg after it. The last one keeps the
+     * course of the leg before it (#120), and without a leg before only distance, bearing and ETE remain
+     * @param afterDecisions true for the pass after the turn and sequencing decisions of the calculation (#407)
+     * @returns the active leg, or null when the values were flagged or no leg before one of no length gives a course
      */
-    private activeLegPath(): GeoCircle | null {
-        const activeWaypoint = this.memory.navPage.activeWaypoint;
-        const fromLeg = activeWaypoint.getFromLeg();
-        if (fromLeg === null) {
+    private updateActiveLeg(afterDecisions: boolean): ActiveLeg | null {
+        const nav = this.memory.navPage;
+        const activeWaypoint = nav.activeWaypoint;
+        let toLeg = activeWaypoint.getActiveLeg();
+
+        if (toLeg === null) {
+            toLeg = activeWaypoint.activateFpl0();
+        }
+
+        if (toLeg === null) {
+            this.setFlag();
             return null;
         }
-        if (!this.modeController.isObsModeActive() && isNaN(fromLeg.path.center[0])) {
-            return this.getIncomingPath(activeWaypoint.getActiveFplIdx());
+
+        let fromLeg = activeWaypoint.getFromLeg()!;
+        let legPath: GeoCircle | null = fromLeg.path;
+        while (!this.modeController.isObsModeActive() && isNaN(fromLeg.path.center[0])) { //Happens when FROM and TO are the same waypoint
+            const idx = activeWaypoint.getActiveFplIdx();
+            activeWaypoint.sequenceToNextWaypoint();
+            if (activeWaypoint.getActiveFplIdx() === idx) {
+                //#120: the last leg has no length. The unit keeps navigating on the course of the leg before it (checked
+                //in the KLN 89 trainer, 2026-10-14); without a leg before, only distance, bearing and ETE remain
+                legPath = this.getIncomingPath(idx);
+                break;
+            }
+            console.warn("invalid path, sequencing to the next waypoint", fromLeg);
+            if (afterDecisions) {
+                //#434, #407: the leg change of this calculation onto a duplicated waypoint (4-9) goes on past the leg of
+                //no length, and its DTK is the one of the leg after it. In the first pass the active leg was changed
+                //between two calculations, by a Direct To, an activation, an FPL 0 edit or a switch to LEG, which is no
+                //leg change (the design's call, not flown in the trainer). A defensive duplicate of the mark that
+                //sequenceToNextWaypoint sets: a skip here always follows a sequencing without an own turn (an own turn
+                //is never started toward a copy of the waypoint), which has set the flag already; the line stays
+                //so that the leg change is marked here too should that ever change
+                this.legChange = true;
+            }
+            toLeg = activeWaypoint.getActiveLeg()!;
+            fromLeg = activeWaypoint.getFromLeg()!;
+            legPath = fromLeg.path;
         }
-        return fromLeg.path;
+
+        //6-18 Always direct distance, even for arcs
+        nav.distToActive = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(toLeg.wpt), UnitType.NMILE);
+
+        const futureLegs = activeWaypoint.getFutureLegs();
+        nav.distToDest = calcDistToDestination(nav, futureLegs);
+
+        //#426: with the aircraft on the waypoint there is no bearing to it. It is null, as any missing value, so the
+        //displays show dashes (3-31) and the outputs write their null value. The course at the waypoint is null there too
+        nav.bearingToActive = bearingBetween(this.sensors.in.gps.coords, toLeg.wpt);
+        nav.bearingAtActive = courseAtWaypoint(this.sensors.in.gps.coords, toLeg.wpt);
+
+        //ETE
+        if (this.sensors.in.gps.groundspeed > 2) {
+            nav.eteToActive = nav.distToActive / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS;
+            nav.eteToDest = nav.distToDest !== null ? nav.distToDest / this.sensors.in.gps.groundspeed * HOURS_TO_SECONDS : null; //#393: 0 is a value
+        } else {
+            nav.eteToActive = null;
+            nav.eteToDest = null;
+            nav.waypointAlert = false;
+        }
+
+        if (legPath === null) {
+            nav.xtkToActive = null;
+            nav.steeringPath = null;
+            nav.desiredTrack = null;
+            nav.toFrom = null;
+            nav.bearingForAP = nav.bearingToActive;
+            nav.waypointAlert = false;
+            return null;
+        }
+
+        return {toLeg, fromLeg, legPath};
+    }
+
+    /**
+     * Pops the entry on top of the turn stack once the aircraft is past its end, so that XTK and DTK follow the next
+     * entry or the leg again. Run once per calculation, before the course values, and not in the pass after the decisions
+     * (#407). The abeam turn has no end of its own: it ends with its waypoint (ActiveWaypoint.setActiveIdx)
+     * @param legPath the path of the active leg
+     * @param tickDistance the distance flown in one calculation tick
+     */
+    private popEndedTurn(legPath: GeoCircle, tickDistance: NauticalMiles): void {
+        const activeWaypoint = this.memory.navPage.activeWaypoint;
+        if (activeWaypoint.turnStack.length === 0) {
+            return;
+        }
+        const turnStackEntry = activeWaypoint.turnStack[activeWaypoint.turnStack.length - 1];
+        const distFromCurrent = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(turnStackEntry.switchPoint), UnitType.NMILE);
+        if (turnStackEntry.abeamTurnSign === null && (turnStackEntry.turnBisector !== undefined ? this.isPastEndOfTurn(turnStackEntry, turnStackEntry.turnBisector, tickDistance, legPath)
+            : distFromCurrent <= tickDistance || distFromCurrent > this.lastTurnStackDistance!)) {
+            console.debug("Reached end of turn", distFromCurrent, this.lastTurnStackDistance, activeWaypoint.turnStack);
+            //We have reached the end of the turn, XTK will now use the normal leg again
+            activeWaypoint.turnStack.pop();
+            const nextEntry = activeWaypoint.turnStack[activeWaypoint.turnStack.length - 1];
+            if (nextEntry) {
+                this.lastTurnStackDistance = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(nextEntry.switchPoint), UnitType.NMILE);
+            } else {
+                this.lastTurnStackDistance = null;
+            }
+        } else {
+            this.lastTurnStackDistance = distFromCurrent;
+        }
+    }
+
+    /**
+     * Writes XTK, DTK, the bearing for the autopilot and TO/FROM of the active leg, or of the turn on top of the turn
+     * stack (4-8)
+     * @param leg the active leg as updateActiveLeg resolved it
+     */
+    private updateCourse(leg: ActiveLeg): void {
+        const nav = this.memory.navPage;
+        const turnStack = nav.activeWaypoint.turnStack;
+        const legPath = leg.legPath;
+
+        //XTK
+        if (turnStack.length > 0) {
+            //4-8 XTK will be based on a smooth turn
+            const turnStackEntry = turnStack[turnStack.length - 1];
+            nav.xtkToActive = turnStackEntry.abeamTurnSign !== null ? turnStackEntry.abeamTurnSign * nav.distToActive!
+                : UnitType.GA_RADIAN.convertTo(turnStackEntry.path.distance(this.sensors.in.gps.coords), UnitType.NMILE);
+        } else {
+            nav.xtkToActive = UnitType.GA_RADIAN.convertTo(legPath.distance(this.sensors.in.gps.coords), UnitType.NMILE);
+        }
+
+        //DTK
+        let dtk: Degrees;
+        if (this.modeController.isObsModeActive()) {
+            nav.desiredTrack = null;
+            nav.bearingForAP = nav.bearingToActive;
+            dtk = this.modeController.getObsTrue();
+        } else {
+            //XTK will be switched to the next XTK right at the start of the turn, even if the active waypoint has not been switched yet
+            const pathForDtk = turnStack.length > 0 ? turnStack[turnStack.length - 1].pathForDtk : legPath;
+
+            //#433: on the VOR of the DME arc the DTK at the end of the arc
+            dtk = dtkAtClosest(pathForDtk, this.sensors.in.gps.coords) ?? pathForDtk.bearingAt(pathForDtk.closest(leg.toLeg.wpt, VEC3_CACHE));
+            nav.desiredTrack = dtk;
+
+            if (legPath.isGreatCircle()) {
+                nav.bearingForAP = nav.bearingToActive;
+            } else {
+                //The autopilot does not play well with DME arcs, when DTK and bearing to does not match.
+                nav.bearingForAP = dtk;
+            }
+        }
+
+        //#426: on the waypoint the aircraft is on the line between TO and FROM, which the comparison counts as TO
+        nav.toFrom = nav.bearingToActive === null ? TO : Math.abs(NavMath.diffAngle(nav.bearingToActive, dtk)) <= 90;
+    }
+
+    /**
+     * #434: marks a leg change of this calculation (legChange) with how far the DTK moved against the one the previous
+     * calculation showed. The course messages post at once at a leg change (4-8, B-1). A Direct To, an activation or an
+     * FPL 0 edit between two calculations sets no legChange, so it marks nothing
+     * @param previousDtk the DTK of the previous calculation
+     */
+    private setLegChangeDtkDelta(previousDtk: Degrees | null): void {
+        const nav = this.memory.navPage;
+        nav.legChangeDtkDelta = this.legChange && previousDtk !== null && nav.desiredTrack !== null
+            ? Math.abs(NavMath.diffAngle(previousDtk, nav.desiredTrack)) : null;
     }
 
     /**
@@ -490,30 +564,19 @@ export class NavCalculator implements CalcTickable {
     }
 
     /**
-     * Sequences the active waypoint, and marks the sequencing as a leg change (legChangePending, #434) when no turn of the
-     * waypoint's own was started: the sequencing without a turn (4-9), also the one off the leg. After an own turn the DTK
-     * switched at the turn start, which was the leg change (4-8), so the sequencing at the bisector is none; when the turn
-     * started in this same calculation, its mark is moved onto the new active leg
+     * Sequences the active waypoint, and marks the sequencing as a leg change of this calculation (legChange, #434) when
+     * no turn of the waypoint's own was started: the sequencing without a turn (4-9), also the one off the leg. After an
+     * own turn the DTK switched at the turn start, which was the leg change (4-8), so the sequencing at the bisector is
+     * none; when the turn started in this same calculation, that start has marked it already
      */
     private sequenceToNextWaypoint(): void {
-        const nav = this.memory.navPage;
-        const activeWaypoint = nav.activeWaypoint;
+        const activeWaypoint = this.memory.navPage.activeWaypoint;
         const withoutTurn = !activeWaypoint.ownTurnStarted;
         const idx = activeWaypoint.getActiveFplIdx();
         activeWaypoint.sequenceToNextWaypoint();
-        if ((withoutTurn || nav.legChangePending) && activeWaypoint.getActiveFplIdx() !== idx) {
-            this.markLegChange();
+        if (withoutTurn && activeWaypoint.getActiveFplIdx() !== idx) {
+            this.legChange = true;
         }
-    }
-
-    /**
-     * Marks a leg change for the next calculation, which shows its DTK (legChangeDtkDelta), on the active leg as it is now
-     * (#434)
-     */
-    private markLegChange(): void {
-        const nav = this.memory.navPage;
-        nav.legChangePending = true;
-        nav.legChangeFrom = nav.activeWaypoint.getFromLeg();
     }
 
     /**

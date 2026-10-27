@@ -28,9 +28,10 @@ const POSITION_TOLERANCE_NM = 0.02;
 
 /**
  * Flies until the unit starts the turn at `ident` (it puts the turn on the turn stack) or `ident` is no longer active,
- * and returns the straight distance from the aircraft to `wpt` then. The DTK is calculated before the sequencing in the
- * calculation tick, so it shows the next leg from the following calculation on: the function checks that one second
- * later the DTK is `nextCourse`, with `ident` still active.
+ * and returns the straight distance from the aircraft to `wpt` then. The DTK shows the next leg in the calculation that
+ * starts the turn, on NAV 1 and in the GPS SimVar alike (#407, checked in the KLN 89 trainer, 2026-10-27,
+ * docs/kln89-trainer-record.md: no lag at any turn start): the function checks that the DTK is `nextCourse` then, with
+ * `ident` still active. The worlds of these flights have magvar 0, so the magnetic SimVar is the true course.
  */
 async function flyToTurnStart(flight: Flight, ident: string, wpt: { lat: number; lon: number }, nextCourse: number, timeout: number): Promise<number> {
     expect(turnStackLength(flight.unit), 'no turn on the stack before the turn at ' + ident).toBe(0);
@@ -38,9 +39,9 @@ async function flyToTurnStart(flight: Flight, ident: string, wpt: { lat: number;
         {timeout, description: `start of the turn at ${ident}`});
     const dist = distanceNm(flight.aircraft, wpt);
     expect(flight.nav.activeIdent, 'active at the turn start').toBe(ident);
-    await flight.fly(1);
-    expect(flight.nav.activeIdent, 'active one second after the turn start').toBe(ident);
-    expect(angleBetween(flight.nav.dtkTrue, nextCourse), 'DTK on the next leg one second after the turn start').toBeLessThan(1);
+    expect(angleBetween(flight.nav.dtkTrue, nextCourse), 'DTK on the next leg at the turn start').toBeLessThan(1);
+    expect(angleBetween(flight.sim.get('GPS WP DESIRED TRACK', 'radians') * 180 / Math.PI, nextCourse),
+        'GPS WP DESIRED TRACK on the next leg at the turn start').toBeLessThan(1);
     return dist;
 }
 
@@ -155,11 +156,11 @@ describe('the turn anticipation distance (#404)', () => {
         expect(inbound).toBeLessThan(0.197);
         expect(inbound).toBeGreaterThan(0.1);
 
-        // The first calculation of the Direct To starts the turn instead of skipping ABC; the DTK follows with the next
+        // The first calculation of the Direct To starts the turn instead of skipping ABC, and shows the DTK of the next
+        // leg in the same calculation (#407, checked in the KLN 89 trainer, 2026-10-27: no lag at any turn start)
         await flight.fly(1);
         expect(flight.nav.activeIdent).toBe('ABC');
         expect(turnStackLength(flight.unit)).toBeGreaterThan(0);
-        await flight.fly(1);
         expect(angleBetween(flight.nav.dtkTrue, courseDeg(abc, kbbb))).toBeLessThan(1);
     });
 });
@@ -196,23 +197,25 @@ describe('the end of an anticipated turn (#404)', () => {
 
             await flight.flyUntil(() => flight.nav.activeIdent !== 'ABC' || turnStackLength(flight.unit) > 0, {timeout: 300, description: 'start of the turn at ABC'});
             expect(flight.nav.activeIdent).toBe('ABC');
-            // Each second from the turn start until the turn has left the stack. The DTK follows the turn start one
-            // calculation later (it is calculated before the sequencing), so the first sample is one second in
-            const samples: { ident: string | null; dtk: number | null; stack: number; remaining: number }[] = [];
-            do {
+            // Each second from the turn start until the turn has left the stack. The DTK shows the next leg in the
+            // calculation of the turn start (#407, checked in the KLN 89 trainer, 2026-10-27: no lag), so the first sample
+            // is the turn start itself
+            const sample = () => ({ident: flight.nav.activeIdent, dtk: flight.nav.dtkTrue, stack: turnStackLength(flight.unit), remaining: remainingToEnd()});
+            const samples: { ident: string | null; dtk: number | null; stack: number; remaining: number }[] = [sample()];
+            while (samples[samples.length - 1].stack > 0) {
                 await flight.fly(1);
-                samples.push({ident: flight.nav.activeIdent, dtk: flight.nav.dtkTrue, stack: turnStackLength(flight.unit), remaining: remainingToEnd()});
+                samples.push(sample());
                 expect(samples.length, 'the turn ends').toBeLessThan(300);
-            } while (samples[samples.length - 1].stack > 0);
+            }
             const all = JSON.stringify(samples.map(s => `${s.ident}:${s.stack}:${s.dtk?.toFixed(0)}:${s.remaining.toFixed(2)}`));
 
             // ABC is sequenced while the turn is flown, and KBBB stays active. It is sequenced where the aircraft passes
             // the bisector of the turn (#375, checked in the KLN 89 trainer, 2026-10-20, docs/kln89-trainer-record.md). At
             // 180° the bisector runs along both legs: the aircraft is on it at the turn start and past it as soon as it
-            // turns, so ABC is sequenced in the first second of the turn
+            // turns, so ABC is sequenced in the first second of the turn (the sample after the turn start)
             const kbbbFrom = samples.findIndex(s => s.ident === 'KBBB');
             if (turnDeg === 180) {
-                expect(kbbbFrom, all).toBe(0);
+                expect(kbbbFrom, all).toBe(1);
             } else {
                 expect(kbbbFrom, all).toBeGreaterThan(0);
             }

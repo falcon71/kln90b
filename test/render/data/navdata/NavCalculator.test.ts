@@ -441,6 +441,7 @@ describe('sequencing without turn anticipation (4-9)', () => {
 interface TickRecord {
     delta: number | null;
     dtk: number | null;
+    xtk: number | null;
     active: string | undefined;
     turnStack: number;
     plan: TurnPlan | null;
@@ -455,7 +456,7 @@ async function flyPoints(unit: HeadlessUnit, points: { lat: number, lon: number 
         unit.env.sim.set('PLANE LONGITUDE', 'degrees', p.lon);
         await vi.advanceTimersByTimeAsync(1000);
         records.push({
-            delta: nav(unit).legChangeDtkDelta, dtk: nav(unit).desiredTrack, active: activeIdent(unit),
+            delta: nav(unit).legChangeDtkDelta, dtk: nav(unit).desiredTrack, xtk: nav(unit).xtkToActive, active: activeIdent(unit),
             turnStack: turnStackLength(unit), plan: activeWaypoint(unit).turnPlan,
         });
     }
@@ -502,8 +503,9 @@ async function flyThroughAbc(unit: HeadlessUnit, kaaa: Facility, abc: Facility, 
 
 // #434, #436: the course messages tell a leg change (the DTK moving on to the next leg by itself, the design's
 // definition) from any other DTK change. NavCalculator marks the first tick with the new DTK: the start of an anticipated
-// turn (4-8) or the sequencing without one (4-9). The DTK of a leg change shows the tick after the turn is pushed or the
-// waypoint sequenced, because the DTK of a tick is taken before both
+// turn (4-8) or the sequencing without one (4-9). #407: the DTK of a leg change shows in the calculation of the turn start
+// or the sequencing itself, with the new ident, distance and TO/FROM (checked in the KLN 89 trainer, 2026-10-27,
+// docs/kln89-trainer-record.md: no lag at any turn start or sequencing)
 describe('the leg-change marker (4-8, #434, #436)', () => {
     it('marks the tick the DTK takes the next leg at an anticipated turn, once (4-8)', async () => {
         const {unit, kaaa, abc, kbbb} = await onStandardRoute();
@@ -515,6 +517,8 @@ describe('the leg-change marker (4-8, #434, #436)', () => {
         expect(marked[0].delta!).toBeCloseTo(angleBetween(finalCourseDeg(kaaa, abc), courseDeg(abc, kbbb)), 1); // 35.1
         expect(angleBetween(marked[0].dtk, courseDeg(abc, kbbb))).toBeLessThan(0.5);
         expect(marked[0].turnStack).toBeGreaterThan(0); // Precondition: in the turn
+        // #407: in the calculation that starts the turn, not one later
+        expect(records.indexOf(marked[0])).toBe(records.findIndex(r => r.turnStack > 0));
     });
 
     it('marks the sequencing without turn anticipation (4-9)', async () => {
@@ -527,6 +531,34 @@ describe('the leg-change marker (4-8, #434, #436)', () => {
         expect(angleBetween(marked[0].dtk, courseDeg(abc, kbbb))).toBeLessThan(0.5);
         expect(marked[0].active).toBe('KBBB');
         expect(records.every(r => r.turnStack === 0)).toBe(true); // Precondition: no turn was flown
+        // #407: in the calculation that sequences ABC, not one later
+        expect(records.indexOf(marked[0])).toBe(records.findIndex(r => r.active === 'KBBB'));
+    });
+
+    // #407: the XTK of the calculation that sequences ABC is the new leg's (checked in the KLN 89 trainer, 2026-10-27,
+    // run a12, turn anticipation off). Flown 0.3 NM right of the route on both legs, so that the cross tracks to the old
+    // and the new leg differ at the sequencing point
+    it('shows the XTK of the new leg in the calculation of the sequencing without turn anticipation (4-9, #407)', async () => {
+        const {unit, kaaa, abc, kbbb} = await onStandardRoute({turnAnticipation: false});
+        const leg1 = finalCourseDeg(kaaa, abc);
+        const leg2 = courseDeg(abc, kbbb);
+        const points = [];
+        for (let i = 30; i > 0; i--) {
+            points.push(pointFrom(pointBefore(kaaa, abc, i * STEP_NM), leg1 + 90, 0.3));
+        }
+        for (let i = 0; i <= 30; i++) {
+            points.push(pointFrom(pointFrom(abc, leg2, i * STEP_NM), leg2 + 90, 0.3));
+        }
+        const records = await flyPoints(unit, points);
+
+        const sequenced = records.findIndex(r => r.active === 'KBBB');
+        expect(sequenced).toBeGreaterThan(0); // Precondition: sequenced inside the flight
+        const point = points[sequenced];
+        const newXtk = crossTrackNm(point, abc, leg2);
+        const oldXtk = crossTrackNm(point, kaaa, courseDeg(kaaa, abc));
+        // Precondition: the two legs give cross tracks far enough apart to tell them
+        expect(Math.abs(Math.abs(newXtk) - Math.abs(oldXtk))).toBeGreaterThan(0.05);
+        expect(Math.abs(Math.abs(records[sequenced].xtk!) - Math.abs(newXtk))).toBeLessThan(0.005);
     });
 
     // A Direct To is no leg change (the design's definition): every value written while it is entered and flown is null
@@ -575,9 +607,10 @@ describe('the leg-change marker (4-8, #434, #436)', () => {
     });
 
     // The design's definition: a sequencing without a turn is a leg change, also onto a duplicated waypoint (4-9). The
-    // leg between the copies has no length, so the unit sequences on past it in the next calculation, before any DTK,
-    // and the DTK of the leg change is the one of the leg after it. Turn anticipation flies over a duplicated waypoint
-    // (the KLN 89 trainer), so both settings sequence without a turn
+    // leg between the copies has no length, so the unit sequences on past it in the same calculation (#407), and the DTK
+    // of the leg change is the one of the leg after it. Turn anticipation flies over a duplicated waypoint (the KLN 89
+    // trainer), so both settings sequence without a turn. No output takes a value of the leg of no length, which has no
+    // path: none is NaN
     it.each([true, false])('marks the leg change past a duplicated waypoint once, turn anticipation %s (4-9)', async (turnAnticipation) => {
         const {kaaa, abc, kbbb} = standardRoute();
         const unit = await bootUnit({
@@ -585,6 +618,7 @@ describe('the leg-change marker (4-8, #434, #436)', () => {
         });
         await settle(unit);
         expect(activeIdent(unit)).toBe('ABC'); // Precondition
+        const writesBefore = unit.env.sim.writes.length;
 
         const records = await flyThroughAbc(unit, kaaa, abc, kbbb);
 
@@ -593,6 +627,33 @@ describe('the leg-change marker (4-8, #434, #436)', () => {
         expect(marked[0].delta!).toBeCloseTo(angleBetween(finalCourseDeg(kaaa, abc), courseDeg(abc, kbbb)), 1); // 35.1
         expect(marked[0].active).toBe('KBBB');
         expect(angleBetween(marked[0].dtk, courseDeg(abc, kbbb))).toBeLessThan(0.5);
+        // #407: in the calculation that sequences ABC, which goes on past the copy at once
+        const sequenced = records.findIndex(r => r.active === 'KBBB');
+        expect(records[sequenced - 1].active).toBe('ABC'); // Precondition: sequenced inside the flight
+        expect(records.indexOf(marked[0])).toBe(sequenced);
+        expect(records.filter(r => Number.isNaN(r.dtk) || Number.isNaN(r.xtk))).toEqual([]);
+        const written = unit.env.sim.writes.slice(writesBefore);
+        expect(written.length).toBeGreaterThan(0); // Precondition: the outputs were written
+        expect(written.filter(w => typeof w.value === 'number' && Number.isNaN(w.value))).toEqual([]);
+    });
+
+    // #407: the first pass of a calculation goes on past a leg of no length only when the active leg was changed between
+    // two calculations, which is no leg change, so it marks nothing (the design's call, not flown in the trainer). A
+    // Direct To from ABC to ABC stands in for such a change: its leg has no length
+    it('does not mark the pass past a leg of no length that a Direct To made', async () => {
+        const {unit, kaaa, abc, kbbb} = await onStandardRoute({turnAnticipation: false});
+        const leg1 = finalCourseDeg(kaaa, abc);
+        const start = pointBefore(kaaa, abc, 2);
+        await moveAircraft(unit, start, {groundspeedKt: 120, trackTrue: leg1});
+        expect(angleBetween(nav(unit).desiredTrack, leg1)).toBeLessThan(0.5); // Precondition
+
+        activeWaypoint(unit).directTo(abc, abc);
+        const records = await flyPoints(unit, [pointFrom(start, leg1, STEP_NM)]);
+
+        // Preconditions: past the leg of no length at once, onto a DTK 35 degrees away
+        expect(records[0].active).toBe('KBBB');
+        expect(angleBetween(records[0].dtk, courseDeg(abc, kbbb))).toBeLessThan(1);
+        expect(records[0].delta).toBeNull();
     });
 
     // The abeam plan (checked in the KLN 89 trainer, 2026-10-20): 3.5 NM right of the leg at the decision the turn starts
@@ -625,9 +686,11 @@ describe('the leg-change marker (4-8, #434, #436)', () => {
         expect(sequenced).toBeGreaterThan(0);
         const marked = records.filter(r => r.delta !== null);
         expect(marked).toHaveLength(1);
-        expect(records[sequenced + 1].delta).not.toBeNull(); // the DTK of the next leg comes one tick after the sequencing
-        expect(records[sequenced + 1].delta!).toBeCloseTo(angleBetween(records[sequenced].dtk, records[sequenced + 1].dtk!), 6);
-        expect(records[sequenced + 1].delta!).toBeGreaterThan(30);
+        // #407: the DTK of the next leg comes in the calculation of the sequencing (checked in the KLN 89 trainer,
+        // 2026-10-27: no lag at any sequencing)
+        expect(records[sequenced].delta).not.toBeNull();
+        expect(records[sequenced].delta!).toBeCloseTo(angleBetween(records[sequenced - 1].dtk, records[sequenced].dtk!), 6);
+        expect(records[sequenced].delta!).toBeGreaterThan(30);
     });
 
     // Past the last waypoint the unit is FROM it and tries to sequence on every calculation, but there is nothing to
@@ -656,14 +719,16 @@ describe('the leg-change marker (4-8, #434, #436)', () => {
         expect(records[turnAt - 1].active).toBe('ABC');
         expect(records[turnAt].active).toBe('KBBB');
         expect(records.filter(r => r.delta !== null)).toHaveLength(1);
-        expect(records[turnAt + 1].delta!).toBeCloseTo(angleBetween(records[turnAt].dtk, records[turnAt + 1].dtk!), 6);
-        expect(records[turnAt + 1].delta!).toBeGreaterThan(30);
+        // #407: in that calculation, with the DTK of the new active leg (checked in the KLN 89 trainer, 2026-10-27: no lag)
+        expect(records[turnAt].delta!).toBeCloseTo(angleBetween(records[turnAt - 1].dtk, records[turnAt].dtk!), 6);
+        expect(records[turnAt].delta!).toBeGreaterThan(30);
     });
 
     // An FPL 0 edit that changes the active leg is no leg change either: moving the entry of an active DME arc
     // (FlightplanUtils.moveArcEntry, 6-18) recalculates the active path, stood in for here by its call in the second after
-    // a sequencing without a turn
-    it('does not mark a sequencing whose leg is recalculated in the same second', async () => {
+    // a sequencing without a turn. The sequencing itself is marked in its own calculation (#407, checked in the KLN 89
+    // trainer, 2026-10-27: no lag), before the recalculation; the recalculation marks nothing after it
+    it('does not mark the recalculation of a leg in the second after its sequencing', async () => {
         const {unit, kaaa, abc, kbbb} = await onStandardRoute({turnAnticipation: false});
         const records: TickRecord[] = [];
         let recalculated = false;
@@ -676,11 +741,13 @@ describe('the leg-change marker (4-8, #434, #436)', () => {
         }
 
         expect(recalculated).toBe(true); // Precondition: sequenced
-        expect(records.map(r => r.delta).filter(d => d !== null)).toEqual([]);
+        const sequenced = records.findIndex(r => r.active === 'KBBB');
+        expect(records.map((r, i) => r.delta === null ? null : i).filter(i => i !== null)).toEqual([sequenced]);
     });
 
-    // The design's definition: a Direct To is no leg change. Entered in the second between the turn start and the
-    // calculation that would show the DTK of the turn, it replaces that leg change, and nothing is marked
+    // The design's definition: a Direct To is no leg change. The turn start is marked in its own calculation (#407,
+    // checked in the KLN 89 trainer, 2026-10-27: no lag); a Direct To entered in the second after it marks nothing,
+    // although it moves the DTK by more than 60 degrees
     it('does not mark a Direct To entered right after the turn start', async () => {
         const {kaaa, abc, kbbb} = standardRoute();
         const kccc = airport('KCCC', 46.8, 9.6); // south-east of ABC, in no plan
@@ -691,16 +758,16 @@ describe('the leg-change marker (4-8, #434, #436)', () => {
         for (const p of points) {
             records.push(...await flyPoints(unit, [p]));
             if (!directed && turnStackLength(unit) > 0) {
-                expect(records[records.length - 1].delta).toBeNull(); // Precondition: the turn was pushed in this tick
                 activeWaypoint(unit).directTo(abc, kccc);
                 directed = true;
             }
         }
 
-        expect(directed).toBe(true); // Preconditions: the Direct To took the DTK more than 5 degrees away
+        expect(directed).toBe(true); // Preconditions: the Direct To took the DTK more than 60 degrees away from the turn's
         expect(activeIdent(unit)).toBe('KCCC');
-        expect(angleBetween(nav(unit).desiredTrack, finalCourseDeg(kaaa, abc))).toBeGreaterThan(60);
-        expect(records.map(r => r.delta).filter(d => d !== null)).toEqual([]);
+        const turnAt = records.findIndex(r => r.turnStack > 0);
+        expect(angleBetween(records[turnAt + 1].dtk, records[turnAt].dtk!)).toBeGreaterThan(60);
+        expect(records.map((r, i) => r.delta === null ? null : i).filter(i => i !== null)).toEqual([turnAt]);
     });
 });
 

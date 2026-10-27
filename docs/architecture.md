@@ -510,12 +510,20 @@ Flightplan really is dead simple".
 **`NavCalculator`** (`data/navdata/NavCalculator.ts`, 1 Hz) does all navigation math and then calls `setOutput()` to the
 sim.
 
+- The tick runs in this order: the self-test and GPS checks; the active leg with its distance, bearing and ETE
+  (`updateActiveLeg`); the end-of-turn pop (`popEndedTurn`, which holds the end-of-turn tests); XTK, DTK
+  and TO/FROM (`updateCourse`); the turn and sequencing decisions, which read those values; then, when the decisions
+  changed the FROM leg or the top of the turn stack, `updateActiveLeg` and `updateCourse` once more without the pop.
+  So a turn start or a sequencing shows its new leg (ident, distance, bearing, ETE, DTK, XTK, TO/FROM) on the pages
+  and in every output in its own calculation, as the KLN 89 trainer does (2026-10-27, no lag, #407). The steering path
+  and `setOutput` come last.
 - It handles self-test and GPS-invalid by flagging all values to null. If there is no active leg it calls
   `activateFpl0()`. A flag does not change `navPage.xtkScale` (#159), and a power-up sets 5 NM again in
   `VolatileMemory.reset`.
 - DIS is always the direct distance, even for arcs (6-18).
 - A leg without length (FROM and TO are the same waypoint, so its path has no center) is sequenced at once when a next
-  leg exists. The last one navigates on the course of the leg before it (#120, as the KLN 89 trainer does): XTK, DTK
+  leg exists, and the calculation goes on with the leg after it; a leg change onto it is marked once, with that leg's
+  DTK. The last one navigates on the course of the leg before it (#120, as the KLN 89 trainer does): XTK, DTK
   and TO/FROM come from that leg's path, and all outputs are written. With no leg before it, XTK, DTK and TO/FROM are
   null and the distance, bearing and ETE remain.
 - XTK uses the top of the turn stack during turns (4-8) and the leg circle otherwise.
@@ -985,12 +993,14 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   approved (#330). With a readable course the TO message shows at once at a leg change and otherwise after more than
   12 s of GPS time off the DTK, goes once read or once the course is within 5°, and comes back more than 12 s after the
   read if the course is still off (#434). `NavCalculator` marks the leg change: `navPage.legChangeDtkDelta` is non-null
-  in exactly the calculation whose DTK is the first of the next leg (an anticipated or abeam turn starting, or a
-  sequencing without a turn), through `legChangePending` set the calculation before. `legChangeFrom` keeps the FROM
-  leg of that moment, which `ActiveWaypoint` replaces at a Direct To, an activation or an FPL 0 edit of the active leg,
-  so such a change in between drops the mark. Without a readable course the TO message comes at a leg change of more
-  than 5° and nothing else, goes once read, and, if the leg change started a turn, goes when the turn stack is empty
-  again; without a turn it stays until read or the next leg change (#436, replacing the 30 s window of #177).
+  in exactly the calculation in which the plan moved on to the next leg by itself (an anticipated or abeam turn
+  starting, or a sequencing without a turn), which already shows the new leg's DTK (#407), and holds how far the DTK
+  moved against the previous calculation. A per-calculation flag (`NavCalculator.legChange`) carries the leg change to
+  the end of the tick; a Direct To, an activation or an FPL 0 edit between two calculations sets none, so it marks
+  nothing. `messageHandler` is ticked after `NavCalculator`, so the message posts in that same calculation. Without a
+  readable course the TO message comes at a leg change of more than 5° and nothing else, goes once read, and, if the
+  leg change started a turn, goes when the turn stack is empty again; without a turn it stays until read or the next
+  leg change (#436, replacing the 30 s window of #177).
 - The MSG page (`controls/MessagePage.tsx`) shows newest first. `controls/StatusLine.tsx` shows the `MSG` indicator and
   drives `L:KLN90B_MsgLight` in the display tick: flashing while unread, steady while read, off when empty.
 - **Status-line transient messages** are a separate channel. Publish `statusLineMessage` (`StatusLineMessageEvents`)
