@@ -88,35 +88,98 @@ export class KLN90BPlaneSettingsParser {
         const instrumentsTag = this.getKLNInstrumentsTag(xmlConfig);
         const headingSimVar = this.getHeadingSimVar(instrumentsTag, "Input.HeadingInput");
 
+        //The panel.xml keys stand for how the unit is wired and strapped at the P901 connector, which the real unit reads at
+        //power-up. "Real unit:" comments name the interface: P901 pins and RS-232 items from the Installation manual
+        //(006-10521-0005 Rev 5, appendix A for RS-232), ARINC 429 labels in GAMA format (Installation manual 1-1)
         const options: KLN90PlaneSettings = {
+            //Real unit: P901 pin 2 TAKE HOME. Grounded = take-home mode, which acts as if the GPS had a fix at the last or
+            //the entered position; always open in an aircraft (Installation manual 1-6, 2-4)
             takeHomeMode: this.getBoolean(instrumentsTag, "TakeHomeMode", false),
+            //Real unit: fictional, where the gauge's files are in the sim package
             basePath: this.getString(instrumentsTag, "BasePath", 'html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B'),
+            //Real unit: P901 pin 30 APPROACH ARM SELECT strapped to pin 16 APPROACH ACTIVE, sampled at power-up. Interconnect
+            //drawing, figure 2-17 sheet 8 (Installation manual 2-57), "VFR ONLY"
             vfrOnly: this.getBoolean(instrumentsTag, "VFROnly", false),
             input: {
+                //Real unit: an altitude source, any of
+                //- Gray code from an encoding altimeter: P901 pins 41-50 = D4, A1, A2, A4, B1, B2, B4, C1, C2, C4 (no D1/D2
+                //  inputs), pressure altitude in 100 ft steps (Installation manual 1-6, 2-7, figure 2-17 sheet 3 on 2-47)
+                //- ARINC 429 air data receiver, P901 pins 8/9, label 203 (see Input.Airdata.IsInterfaced)
+                //- RS-232 IN, P901 pin 36, fuel/air data format C or D, bytes 64-69 pressure altitude (see
+                //  Input.Airdata.IsInterfaced)
+                //The key only switches the gray code: Airdata.tick reads the altitude itself when an air data computer is
+                //interfaced
                 altimeterInterfaced: this.getBoolean(instrumentsTag, "Input.AltimeterInterfaced", true),
+                //Real unit: where the selected course comes from, read by SensorsIn.tick
+                //- 1, 2: the OBS resolver of a CDI/HSI, P901 pin 26 sine in, pin 37 cosine in, excited by the 450 Hz of
+                //  pin 31 OBS RESOLVER OUT, read only while pin 1 GPS DISPLAYED is open (Installation manual 1-6, 1-7,
+                //  2-4, 2-6)
+                //- 1, 2: or ARINC 429 EFIS receiver, P901 pins 4/5, label 100 selected course, from an EFIS or a KA 90
+                //  that reads the indicator's resolver or XYZ course (Installation manual 1-2, 2-4; KA 90 manual 1-1)
+                //- 0: none of these, pin 1 grounded. The course is set on MOD 2 only
                 obsSource: this.getChoice(instrumentsTag, "Input.ObsSource", OBS_DEVICES, 1),
+                //Real unit: a heading source (Installation manual 2-69), any of
+                //- ARINC 429 EFIS receiver, P901 pins 4/5, label 314 true heading or label 320 magnetic heading (Installation
+                //  manual 1-2), from an EFIS 40/50 or a KA 90 that converts 3-wire heading
+                //- RS-232 IN, P901 pin 36, fuel/air data format C or D, bytes 100-102 magnetic heading (Installation
+                //  manual A-13), e.g. from a Shadin converter
                 headingInput: headingSimVar !== null,
+                //Real unit: fictional, the SimVar that stands for the heading source above
                 headingSimVar: headingSimVar ?? DEFAULT_HEADING_SIMVAR,
+                //Real unit: P901 pin 40 A/C POWER, 11 to 33 VDC, with pin 27 A/C GROUND (Installation manual 1-5, 2-6, 2-7)
                 electricitySimVar: this.getString(instrumentsTag, "Input.ElectricitySimVar", "").trim(), //A pretty-printed element ends in whitespace, which would hide the index
                 airdata: {
+                    //Real unit: an air data computer on either
+                    //- ARINC 429 air data receiver, P901 pins 8/9, labels 203 pressure altitude, 204 baro-corrected altitude,
+                    //  205 Mach, 210 TAS, 211 TAT, 213 SAT (Installation manual 1-2, 2-4). false = pins 8/9 wired to the
+                    //  429 transmitter pins 23/24, otherwise AIR DATA FAIL is shown
+                    //- RS-232 IN, P901 pin 36, fuel/air data format C or D (Installation manual A-11 to A-13). The 429 value
+                    //  wins when both send an item
                     isInterfaced: this.getBoolean(instrumentsTag, "Input.Airdata.IsInterfaced", false),
+                    //Real unit: only RS-232 IN, P901 pin 36, format D, bytes 108-112 barometric setting (Installation manual
+                    //A-13). The 429 air data receiver takes no baro setting label; it gets label 204 baro-corrected
+                    //altitude instead (Installation manual 1-2, 2-68). Without either, the pilot enters the baro
                     baroSource: this.getChoice(instrumentsTag, "Input.Airdata.BaroSource", BARO_SOURCES, 0),
                 },
                 fuelComputer: {
+                    //Real unit: RS-232 IN, P901 pin 36, fuel/air data format A, B, C or D, sent every 1.6 s (Installation
+                    //manual 2-7, A-10 to A-13). false = pin 36 looped to pin 13 RS-232 OUT, otherwise NO RS-232 DATA is
+                    //shown. There is no fuel input on ARINC 429
                     isInterfaced: this.getBoolean(instrumentsTag, "Input.FuelComputer.IsInterfaced", false),
+                    //Real unit: RS-232 fuel/air data byte 2, units of measure: G, I, L, K or B (Installation manual A-10)
                     unit: this.getChoice(instrumentsTag, "Input.FuelComputer.Unit", FUEL_UNITS, FuelUnit.GAL),
+                    //Real unit: fictional. The fuel computer sends volume or mass; the type only converts the sim's pounds
                     type: this.getChoice(instrumentsTag, "Input.FuelComputer.Type", FUEL_TYPES, FuelType.AVGAS),
+                    //Real unit: false = format D with asterisks in bytes 3-9 total fuel remaining, so the pilot enters
+                    //the fuel on board (Installation manual A-13)
                     fobTransmitted: this.getBoolean(instrumentsTag, "Input.FuelComputer.FOBTransmitted", true),
+                    //Real unit: false = format A, which has no fuel used. Formats B, C and D carry it in bytes 31-51
+                    //(Installation manual A-10, A-11)
                     fuelUsedTransmitted: this.getBoolean(instrumentsTag, "Input.FuelComputer.FuelUsedTransmitted", true),
                 },
                 externalSwitches: {
+                    //Real unit: P901 pin 33 LEG/OBS CONTROL, sampled at power-up. true = the latching GPS CRS switch,
+                    //which holds pin 33 grounded in OBS and open in LEG, and the MOD page selection is disabled. false =
+                    //pin 33 strapped to pin 21 +TO (Installation manual 2-6, figure 2-17 sheet 8 on 2-57)
                     legObsSwitchInstalled: this.getBoolean(instrumentsTag, "Input.ExternalSwitches.LegObsSwitchInstalled", false),
+                    //Real unit: P901 pin 30 APPROACH ARM SELECT, sampled at power-up. true = the GPS APR switch, each momentary
+                    //ground arms or disarms the approach (H:KLN90B_ApprArm_Push). false without VFROnly = pin 30 strapped
+                    //to pin 17 APPROACH ARM, "IFR ENROUTE ONLY" (Installation manual 2-6, figure 2-17 sheet 8 on 2-57)
                     appArmSwitchInstalled: this.getBoolean(instrumentsTag, "Input.ExternalSwitches.AppArmSwitchInstalled", false),
                 },
             },
             output: {
+                //Real unit: a remotely driven course pointer, fed by ARINC 429 transmitter P901 pins 23/24, label 100
+                //selected course: an EFIS directly, or a mechanical HSI through a KA 90 -0201/-0202, which can also drive
+                //the pointer from label 114 desired track (Installation manual 1-3, 2-67; KA 90 manual 1-2). The KLN has
+                //no analog course output of its own
                 obsTarget: this.getChoice(instrumentsTag, "Output.ObsTarget", OBS_DEVICES, 0),
+                //Real unit: P901 pin 38 ALT ALERT, sampled at power-up. Open or driving a Sonalert/lamp = output, and the
+                //pilot can use the altitude alert. Grounded = input, and the alert functions are disabled (Installation
+                //manual 1-6, 2-7)
                 altitudeAlertEnabled: this.getBoolean(instrumentsTag, "Output.AltitudeAlertEnabled", false),
+                //Real unit: fictional. It switches the sim's GPS SimVars and the Working Title flight plan, which stand for
+                //the unit's analog nav outputs, its ARINC 429 transmitter and its RS-232 OUT together (see SensorsOut)
                 writeGPSSimVars: this.getBoolean(instrumentsTag, "Output.WriteGPSSimVars", true),
             },
             debugMode: false,
@@ -134,6 +197,9 @@ export class KLN90BPlaneSettingsParser {
             console.warn("Invalid panel.xml values", this.problems);
         }
 
+        //Real unit: fictional. The runtime overrides start from the panel.xml values; SimVarSync reads them back. A real
+        //installation's wiring can only change through a relay, as the NAV/GPS switching does (figure 2-17 sheets 4 to 6,
+        //Installation manual 2-49 to 2-53)
         SimVar.SetSimVarValue(LVAR_OBS_SOURCE, SimVarValueType.Number, options.input.obsSource);
         SimVar.SetSimVarValue(LVAR_OBS_TARGET, SimVarValueType.Number, options.output.obsTarget);
         SimVar.SetSimVarValue(LVAR_HEADING_INPUT, SimVarValueType.Bool, options.input.headingInput);

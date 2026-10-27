@@ -10,7 +10,7 @@ import {NavMode} from '../../kln90b/data/VolatileMemory';
 import {courseDeg, finalCourseDeg, pointBefore, pointFrom} from '../harness/flight/geo';
 import {blinkCycle} from '../harness/render/blink';
 
-// Public contract: the LVar is documented in LVars.ts (ARINC label 275, bit 22: true when no GPS signal is acquired) and
+// Public contract: the LVar is documented in LVars.ts (ARINC label 261, bit 24: true when no GPS signal is acquired) and
 // listed in CLAUDE.md, "Public contract with aircraft". An unset LVar reads 0, so "written as 0" is asserted with
 // lastWrite().
 describe('L:KLN90B_IntegrityWarn (public contract) (#87)', () => {

@@ -43,6 +43,8 @@ export class WTFlightplanSync {
             bus,
         );
 
+        //Real unit: fictional as a container. The SDK planner "kln90b" stands for the flight plan the unit sends on RS-232
+        //and ARINC 429 (setPlanLegs); its plan indexes, segments, leg types and path calculator have no counterpart
         this.flightplanner = FlightPlanner.getPlanner(FLIGHTPLANNER_ID, bus, {calculator: calculator});
         this.flightplanner.createFlightPlan(0);
         this.flightplanner.setActivePlanIndex(0);
@@ -97,6 +99,12 @@ export class WTFlightplanSync {
     private writeDtoPlan() {
         //DTO is done on flightplan 1 like the Garmins
         //Since the KLN always keeps the entire flightplan, we do all DTOs here, not just random DTOs
+        //Real unit: plan 1 is fictional. A direct-to is sent as
+        //- ARINC 429 transmitter, label 275 bit 13 = 1 direct to (GAMA 11 page 19), with the from and to records of
+        //  label 075 (setPlanLegs). In GAMA's example protocol a direct-to sends the header labels 074 and 075 again
+        //  (GAMA 11 page 3-3)
+        //- RS-232 OUT, item t GPS discretes, character d = D (Installation manual A-6)
+        //The from position of a direct-to is not a flight plan waypoint, so neither output carries it as one
         if (this.activeWaypoint.isDctNavigation()) {
             const dtoPlan = this.flightplanner.createFlightPlan(DTO_PLAN_INDEX);
             const batchID = dtoPlan.openBatch("KLN_sync");
@@ -147,6 +155,22 @@ export class WTFlightplanSync {
 
         for (const klnLeg of klnPlan.getLegs()) {
             //The real KLN only transmits waypoint number, active waypoint, identifier, lat, lon and magvar
+            //Real unit: one waypoint of the active flight plan (FPL 0), either
+            //- RS-232 OUT, item w flight plan data, item designator w01 to w99 and at most 32 waypoints, the whole plan
+            //  every 2 s: byte 1 sequence (bits 0-4 waypoint number, bit 5 active, bit 6 last), bytes 2-6 the identifier
+            //  in ASCII, bytes 7-9 latitude and 10-13 longitude as packed degrees, minutes and hundredths of minutes,
+            //  bytes 14-15 the waypoint's magnetic variation in 1/16 deg, two's complement, East positive (Installation
+            //  manual A-8, A-9)
+            //- ARINC 429 transmitter, one record per waypoint, after the header labels 074 (bits
+            //  9-15 the number of records) and 075 (from/to record numbers). A record is label 303 (bits 9-12 the number
+            //  of words, 13-15 the waypoint type, 17-23 the record number in flight plan order), labels 304/305 the
+            //  identifier in 7-bit characters, labels 306/307 latitude and longitude (BNR bits 9-28, 180/1048576 deg
+            //  LSB, bit 29 = 1 South or West), label 300 for a navaid (bits 17-24 its declination in whole degrees), and
+            //  label 113 last, the checksum of the record (GAMA 11 pages 9 to 11, 21 to 23, 3-3 to 3-5). GAMA's example
+            //  protocol also sends one record every 0.1 s and no waypoints before the from waypoint (GAMA 11 pages 3-3,
+            //  3-4), but other systems may do it differently and Honeywell does not say what the KLN 90B does. The
+            //  RS-232 output sends the whole plan instead (Installation manual A-8)
+            //The leg type DF is fictional; neither output carries a leg type
             const leg = FlightPlan.createLeg({
                 type: LegType.DF,
                 fixIcaoStruct: klnLeg.wpt.icaoStruct,
@@ -156,6 +180,9 @@ export class WTFlightplanSync {
             });
             wtPlan.addLeg(0, leg);
             if (klnLeg.fixType === KLNFixType.MAP && currentIdx >= activeIdx) {
+                //Real unit: the active waypoint, either RS-232 OUT item w, bit 5 of the sequence byte (Installation
+                //manual A-8), or ARINC 429 label 075, the TO record number in BCD in bits 13-16 (tens) and 21-24 (units)
+                //and the FROM in bits 17-20 and 25-28 (GAMA 11 page 10)
                 wtPlan.setLateralLeg(idxForWt);
                 wtPlan.setDirectToData(this.activeWaypoint.isDctNavigation() ? idxForWt : -1);
                 return; //Install manual: We do not return data after a fence

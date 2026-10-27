@@ -71,6 +71,8 @@ export class PowerSupply {
 
         this.powerCyclesSettings = this.props.userSettings.getSetting("powercycles");
 
+        //Real unit: fictional as a signal. L:KLN90B_Power is the position of the front-panel power knob, which has no
+        //connector pin. The supply itself is P901 pin 40 (Input.ElectricitySimVar, SimVarSync)
         SimVar.SetSimVarValue(LVAR_POWER, SimVarValueType.Bool, this.powerSwitchOn);
 
         this.props.bus.getSubscriber<PropsReadyEvent>().on("propsReady").handle(this.handlePropsReady.bind(this));
@@ -175,6 +177,7 @@ export class PowerSupply {
             this.electricityAvailable = false;
         }
 
+        //Real unit: fictional, the power knob's position (see the constructor)
         SimVar.SetSimVarValue(LVAR_POWER, SimVarValueType.Bool, powerSwitchOn);
         this.refreshPowerState();
     }

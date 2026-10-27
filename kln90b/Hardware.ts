@@ -23,6 +23,8 @@ export class Hardware {
     public isDisabled: boolean = false;
 
     constructor() {
+        //Real unit: fictional as a signal. L:KLN90B_RightScan is the position of the front-panel right inner knob (pulled
+        //out = scan), which has no connector pin
         SimVar.SetSimVarValue(LVAR_RIGHT_SCAN, SimVarValueType.Bool, this.isScanPulled);
     }
 

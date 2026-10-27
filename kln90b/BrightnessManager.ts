@@ -22,6 +22,8 @@ export class BrightnessManager {
         this.container = document.getElementById('InstrumentsContainer')!;
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.powerChanged.bind(this));
 
+        //Real unit: fictional as a signal. L:KLN90B_Brightness is the position of the front-panel brightness knob, which
+        //has no connector pin. P901 pins 28, 29 and 32 dim only the panel lighting (Installation manual 2-6)
         this.brightnessSetting = SimVar.GetSimVarValue(LVAR_BRIGHTNESS, SimVarValueType.Number);
         if(this.brightnessSetting === 0){
             this.setBrightness(1); //Initialize with 1
@@ -62,6 +64,7 @@ export class BrightnessManager {
 
     private updateLvar(): void{
         this.simVarWritten = false;
+        //Real unit: fictional, the brightness knob's position (see the constructor)
         SimVar.SetSimVarValue(LVAR_BRIGHTNESS, SimVarValueType.Number, this.brightnessSetting).then(() => this.simVarWritten = true);
     }
 

@@ -639,6 +639,10 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
                 }
                 return true;
             case EVT_APPR_ARM:
+                //Real unit: P901 pin 30 APPROACH ARM SELECT, a momentary ground from the GPS APR switch arms or disarms
+                //the approach. A real unit has it only with that switch installed
+                //(Input.ExternalSwitches.AppArmSwitchInstalled); otherwise the pin is strapped at power-up (Installation
+                //manual 2-6, figure 2-17 sheet 8 on 2-57)
                 this.props.modeController.armApproachPressed();
                 return true;
         }

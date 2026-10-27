@@ -12,7 +12,7 @@ export const LVAR_HSI_TF_FLAGS = "L:KLN90B_HSI_TF_FLAGS"; //Enum. To from to ani
 
 export const LVAR_ROLL_COMMAND = "L:KLN90B_RollCommand"; //Roll steering command for the autopilot. Please see https://github.com/falcon71/kln90b/wiki/Autopilot for details
 
-export const LVAR_INTEGRITY_WARNING = "L:KLN90B_IntegrityWarn"; //Based on ARINC label 275 bit 22. True if GPS signal is not available
+export const LVAR_INTEGRITY_WARNING = "L:KLN90B_IntegrityWarn"; //Based on ARINC label 261 bit 24. True if GPS signal is not available
 
 // Number, nautical miles, positive = fly left. The cross track of ARINC label 116, for EFIS displays. Being digital, it
 // changes once per second and is not smoothed like the analog deviation bar, which GPS WP CROSS TRK follows. 0 without an

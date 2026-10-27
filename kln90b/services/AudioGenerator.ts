@@ -23,6 +23,9 @@ export class AudioGenerator {
     constructor(private bus: EventBus, private settings: KLN90PlaneSettings, userSettings: KLN90BUserSettings) {
         this.soundController = new SoundServerController(bus);
         this.soundServer = new SoundServer(bus);
+        //Real unit: fictional as a signal. The SET 9 volume (3-57) sets the level of the tone on P901 pin 39 ALT ALERT
+        //AUDIO, at most 3.5 V rms into 500 ohm (Installation manual 1-8). The sim gauge cannot set the loudness, so the
+        //aircraft reads the setting from L:KLN90B_AlertVolume
         userSettings.getSetting("altAlertVolume").sub(volume => SimVar.SetSimVarValue(LVAR_ALERT_VOLUME, SimVarValueType.Number, volume), true);
     }
 
@@ -62,6 +65,11 @@ export class AudioGenerator {
     private doBeep() {
         const beep = this.beeps.shift();
         if (beep) {
+            //Real unit: two outputs that are active together (Installation manual 1-8, 2-7, 2-69)
+            //- P901 pin 39 ALT ALERT AUDIO, a 1 kHz tone to an audio panel input
+            //- P901 pin 38 ALT ALERT, pulled low to sound a Sonalert or light a lamp, unless pin 38 is strapped to ground
+            //  (Output.AltitudeAlertEnabled false)
+            //The sim plays the aircraft's kln_short_beep and kln_long_beep for both
             this.soundController.playSound(beep);
         }
     }
