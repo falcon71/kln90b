@@ -497,7 +497,8 @@ Flightplan really is dead simple".
   `isDirectTo` and `turnStack: TurnStackEntry[]`. `ownTurnStarted` (the active waypoint's own turn was pushed) and
   `turnPlan` (`TurnPlan.AT_LEAD`/`AT_ABEAM`, the decided turn start) belong to the active waypoint: they are cleared when
   the active index changes, by `clearTurnStack()` and by `VolatileMemory.reset`. The turn stack itself survives the
-  sequencing, because the turn onto the next leg is still being flown.
+  sequencing, because the turn onto the next leg is still being flown; an abeam turn on it becomes its run-out then
+  (`TurnStackEntry.runOut`, #406, below).
 - API: `directTo`, `directToFlightplanIndex`, `cancelDirectTo`, `activateFpl0()` (chooses the *closest* leg to the
   plane, as checked against the KLN 89 trainer), `sequenceToNextWaypoint`, `getFutureLegs`/`getDestination` (stop at the
   MAP, 6-20), `getFollowingLeg`, `recalculatePath`.
@@ -562,10 +563,20 @@ sim.
     - On `AT_LEAD` the turn starts at the turn point along the track, whatever the cross track is by then.
     - On `AT_ABEAM` it starts at the abeam line (TO turns FROM) as the abeam turn, a turn of no size: one
       `TurnStackEntry` with `abeamTurnSign` set, whose XTK is that sign times the distance to the waypoint (FLY L for a
-      left turn) and whose DTK is the next leg's. No end-of-turn test pops it; `ActiveWaypoint.setActiveIdx` drops it
-      when the active waypoint changes. Roll steering steers on the next leg at once (the aircraft is farther from a
-      circle of no size than its radius). This is the real unit's dogleg: it only happens when a waypoint is passed up
-      to 4 NM off course, and a default autopilot coupled then steers back toward the waypoint until the bisector.
+      left turn) and whose DTK is the next leg's. No end-of-turn test pops it. Roll steering steers on the next leg at
+      once (the aircraft is farther from a circle of no size than its radius). This is the real unit's dogleg: it only
+      happens when a waypoint is passed up to 4 NM off course, and a default autopilot coupled then steers back toward
+      the waypoint until the bisector.
+    - When its waypoint is sequenced, `ActiveWaypoint.setActiveIdx` replaces the abeam turn by its run-out
+      (`TurnStackEntry.runOut`, `isRunOut`, #406): an entry whose path and DTK path are the new leg and whose switch
+      point is the old waypoint. So XTK and DTK are the new leg's, and the entry on the stack keeps the waypoint alert
+      on. It ends (`NavCalculator.isPastEndOfRunOut`) once the aircraft is past the abeam line of the old waypoint on
+      the new leg, within the tick ahead: the far end of a turn of no size, as the turn circle ends at its far end
+      (checked in the KLN 89 trainer, 2026-10-27: no track angle, cross track or time ends it). It also ends more than
+      `OFF_LEG_XTK` from the active leg (the design's call). It stands for the leg that was active when it was made, so
+      any later change of the active index drops it: the next waypoint's own turn replaces it like any leftover turn, a
+      sequencing of the next waypoint without a turn of its own drops it (`setActiveIdx`), and a Direct To clears it
+      with the stack. Leftover turn circles are kept as before. Roll steering does not treat it as a turn circle.
     - A capped turn is flown on the tighter circle that is tangent to both legs at the lead (radius lead / tan(θ/2)). The
       aircraft cannot fly that circle at 25° of bank, so it lags it. An uncapped turn uses the circle of radius r.
     - At the start of the turn plan's turn it pushes two `TurnStackEntry`s: the pre-turn straight segment (the roll-in)
@@ -609,7 +620,9 @@ sim.
   2026-10-20); off the leg `WPT_ALERT_OFF_LEG` (36 s) before the abeam line at the closure rate on the outside of the
   turn and none on the inside, where the inside bisector sequences first (#157, checked in the KLN 89 trainer,
   2026-10-20). These two hold only before the abeam line, so they end past the MAP, where nothing is sequenced and no
-  turn is started. All stay on while a turn is on the stack. Before a waypoint without a turn 15 s with turn anticipation
+  turn is started. All stay on while a turn is on the stack, so the alert ends at the end of the turn in use: past the
+  turn circle's end point, or after an abeam turn at the end of its run-out, past the old waypoint's abeam line on the
+  new leg (#406). Before a waypoint without a turn 15 s with turn anticipation
   on (`WPT_ALERT_NO_TURN_WITH_TURN_ANTI`, #372, measured in the KLN 89 trainer) or 36 s with it off
   (`WPT_ALERT_WITHOUT_TURN_ANTI`). The alert of a waypoint without a turn ends once the waypoint is behind (FROM),
   unless a turn is still being flown.
@@ -673,8 +686,9 @@ comment gives the sources for the 1 Hz rate.
   error (the framework's `LNavRollSteerComputer`), at most `MAX_BANK_ANGLE` (25).
 - On a curved path (turn circle, DME arc) the bank the circle needs at the ground speed is added, in full on the path
   and fading out within one turn radius at 25 degrees of bank.
-- On the circle of an anticipated turn (`turnStack[0].path`, not a DME arc) the command never banks against the turn;
-  that side is held at 0, so an aircraft inside the turn near its start gets no wrong-way bank (#100).
+- On the circle of an anticipated turn (`turnStack[0].path`, not a DME arc, nor the run-out of an abeam turn, whose
+  path is the new leg, #406) the command never banks against the turn; that side is held at 0, so an aircraft inside
+  the turn near its start gets no wrong-way bank (#100).
 - Beyond 150 degrees of track error the turn direction is latched: the shorter way when the error first exceeds 150
   (`navPage.rollSteeringLatch`, with a copy of the path it was chosen on), so a turn does not reverse while the error
   passes 180 and XTK changes sign. It is cleared on another path, without a

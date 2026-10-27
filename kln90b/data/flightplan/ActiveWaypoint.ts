@@ -43,9 +43,14 @@ export class TurnStackEntry {
                  * Non-null marks the abeam turn, a turn of no size at the waypoint (the design,
                  * docs/superpowers/specs/2026-10-20-waypoint-sequencing-design.md, section 3.3): XTK is abeamTurnSign times
                  * the distance to the waypoint, -1 for a right turn and +1 for a left turn. No end-of-turn test pops it;
-                 * ActiveWaypoint drops it when the active waypoint changes
+                 * when the waypoint is sequenced, ActiveWaypoint replaces it by its run-out (runOut, #406)
                  */
-                public readonly abeamTurnSign: number | null = null) {
+                public readonly abeamTurnSign: number | null = null,
+                /**
+                 * #406: marks the run-out of an abeam turn, which keeps the waypoint alert on after the sequencing until
+                 * the aircraft is past the abeam line of the old waypoint (switchPoint) on the new leg (runOut)
+                 */
+                public readonly isRunOut: boolean = false) {
     }
 
     /**
@@ -58,6 +63,18 @@ export class TurnStackEntry {
     public static abeamTurn(wpt: LatLonInterface, nextPath: GeoCircle, turnDirection: "left" | "right"): TurnStackEntry {
         const point = new GeoPoint(wpt.lat, wpt.lon);
         return new TurnStackEntry(GeoCircle.createFromPoint(point, 0), point, nextPath, undefined, turnDirection === "left" ? 1 : -1);
+    }
+
+    /**
+     * #406: what is left of an abeam turn once its waypoint is sequenced. The alert of the abeam turn lasts until the
+     * aircraft is past the abeam line of the waypoint on the new leg, the far end of a turn of no size, and not until the
+     * sequencing (checked in the KLN 89 trainer, 2026-10-27: the 2026-10-20 runs R2 and R6 re-read, 53 s and 41 s after
+     * the sequencing, and run a8). Until then XTK and DTK are those of the new leg (R6), so its path and its DTK path are
+     * both the new leg; NavCalculator.isPastEndOfRunOut ends it. Any entry on the stack keeps the alert on (#156)
+     * @param abeam the abeam turn: its switchPoint is the waypoint, its pathForDtk the next leg
+     */
+    public static runOut(abeam: TurnStackEntry): TurnStackEntry {
+        return new TurnStackEntry(abeam.pathForDtk, abeam.switchPoint, abeam.pathForDtk, undefined, null, true);
     }
 }
 
@@ -249,8 +266,14 @@ export class ActiveWaypoint {
         if (this.fplIdx !== activeIdx) {
             this.fplIdx = activeIdx;
             this.clearTurnState();
-            //The abeam turn ends with its waypoint, unlike a turn circle, which is still flown onto the next leg
-            this.turnStack = this.turnStack.filter(entry => entry.abeamTurnSign === null);
+            //A turn circle is still flown onto the next leg. #406: the abeam turn becomes its run-out on the next leg,
+            //which keeps the alert on until the abeam line of its waypoint on that leg (TurnStackEntry.runOut). A run-out
+            //stands for the leg that was active when it was made, so it goes at the next change of the active index, also
+            //at a sequencing without a turn of its own, where it would show the old leg's DTK and XTK (the design's
+            //call, not flown in the trainer). A Direct To, an activation and a power-on clear the stack anyway
+            //(clearTurnStack)
+            this.turnStack = this.turnStack.filter(entry => !entry.isRunOut)
+                .map(entry => entry.abeamTurnSign === null ? entry : TurnStackEntry.runOut(entry));
         }
     }
 

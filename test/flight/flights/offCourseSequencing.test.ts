@@ -3,7 +3,7 @@ import {Flight} from '../../harness/flight/Flight';
 import {World} from '../../harness/flight/World';
 import {airport, vor} from '../../harness/navdata/builders';
 import {savedFlightplan} from '../../harness/storage';
-import {angleBetween, courseDeg, crossTrackNm, distanceNm, LatLon, pointFrom} from '../../harness/flight/geo';
+import {angleBetween, courseDeg, crossTrackNm, distanceNm, EARTH_RADIUS_NM, LatLon, pointFrom} from '../../harness/flight/geo';
 import {turnStackLength} from '../../harness/readers';
 import {ManualPilot, Pilot, scriptedPath} from '../../harness/flight/pilots';
 import {TurnPlan} from '../../../kln90b/data/flightplan/ActiveWaypoint';
@@ -71,27 +71,53 @@ const pastBisector = (pos: LatLon) => crossTrackNm(pos, W_POS, 275) > 0;
  */
 function trackPilot(turnAtAlongNm: number, first: number, second: number): Pilot {
     return {
+        commandedBank: ({aircraft}) => bankToward(aircraft.trackTrue, alongBefore(aircraft) > turnAtAlongNm ? first : second),
+    };
+}
+
+/** The bank of trackPilot toward the true course `target`: 3° per degree of track error, at most 25° */
+function bankToward(trackTrue: number, target: number): number {
+    const diff = ((target - trackTrue + 540) % 360) - 180;
+    return Math.max(-25, Math.min(25, 3 * diff));
+}
+
+/**
+ * The 3.5 NM pass of the abeam plan, then onto the next leg: flies INBOUND - 45 until 2.8 NM before WWW (with `converge`,
+ * the default; INBOUND throughout without), then INBOUND, and from the abeam line of WWW on `next` (NEXT by default),
+ * banking as trackPilot does. The switch to `next` is kept, because flying a next leg that turns back takes the aircraft
+ * back across that abeam line
+ */
+function onToNextPilot(next = NEXT, converge = true): Pilot {
+    let onNext = false;
+    return {
         commandedBank: ({aircraft}) => {
-            const target = alongBefore(aircraft) > turnAtAlongNm ? first : second;
-            const diff = ((target - aircraft.trackTrue + 540) % 360) - 180;
-            return Math.max(-25, Math.min(25, 3 * diff));
+            const along = alongBefore(aircraft);
+            onNext ||= along <= 0;
+            return bankToward(aircraft.trackTrue, onNext ? next : converge && along > 2.8 ? INBOUND - 45 : INBOUND);
         },
     };
 }
 
 /**
- * KAAA - WWW - KBBB - KCCC: the 30 NM inbound leg arrives at WWW on 065, the leg to KBBB leaves on `next` (305 by
- * default, a 120° left turn), and KBBB has a turn of its own onto KCCC, so that its turn anticipation reads the turn plan
- * too. The aircraft starts at `path[0]` at 239 kt toward `path[1]`. `pilot` flies it, a scripted path through the rest of
- * `path` if not given
+ * The along-track distance past WWW on the next leg (NEXT), measured in the plane: 0 on the abeam line of WWW on that
+ * leg, positive past it
  */
-async function boot(path: LatLon[], pilot?: Pilot, next = NEXT) {
+const alongPastOnNext = (pos: LatLon) => distanceNm(W_POS, pos) * Math.cos((courseDeg(W_POS, pos) - NEXT) * DEG);
+
+/**
+ * KAAA - WWW - KBBB - KCCC: the 30 NM inbound leg arrives at WWW on 065, the leg to KBBB leaves on `next` (305 by
+ * default, a 120° left turn) and is `kbbbNm` long (20 NM by default), and KBBB has a turn of its own onto KCCC,
+ * `kbbbTurn` (40° right by default, negative to the left), so that its turn anticipation reads the turn plan too. The
+ * aircraft starts at `path[0]` at 239 kt toward `path[1]`. `pilot` flies it, a scripted path through the rest of `path`
+ * if not given
+ */
+async function boot(path: LatLon[], pilot?: Pilot, next = NEXT, kbbbNm = 20, kbbbTurn = 40) {
     const w = vor('WWW', W_POS.lat, W_POS.lon);
     const a0 = pointFrom(W_POS, INBOUND + 180, 30);
     const a = airport('KAAA', a0.lat, a0.lon);
-    const b0 = pointFrom(W_POS, next, 20);
+    const b0 = pointFrom(W_POS, next, kbbbNm);
     const b = airport('KBBB', b0.lat, b0.lon);
-    const c0 = pointFrom(b0, next + 40, 20);
+    const c0 = pointFrom(b0, next + kbbbTurn, 20);
     const c = airport('KCCC', c0.lat, c0.lon);
     const world = new World({magvar: 0}).add(a, w, b, c);
     const flight = await Flight.start({
@@ -224,9 +250,173 @@ describe('the turn start off course on the leg (#157)', () => {
         await flight.flyUntil(() => flight.nav.activeIdent !== 'WWW', {timeout: 5, description: 'WWW sequenced'});
         expect(flight.nav.activeIdent).toBe('KBBB');
         expect(angleBetween(courseDeg(W_POS, flight.aircraft), 95)).toBeLessThan(3);
-        // The abeam turn is dropped with WWW: KBBB has nothing on the stack and no alert
+        // #406: the abeam turn becomes the run-out of WWW on the leg to KBBB, which keeps the alert on until the aircraft
+        // is past the abeam line of WWW on that leg (checked in the KLN 89 trainer, 2026-10-27, docs/kln89-trainer-record.md;
+        // this test expected the alert to go off at the sequencing before). This pilot flies on along 065, away from that
+        // line, so the run-out ends only once the aircraft is more than 4.0 NM from the leg to KBBB (the design's call,
+        // not flown in the trainer)
+        expect(turnStackLength(flight.unit)).toBe(1);
+        expect(flight.nav.waypointAlert).toBe(true);
+        await flight.flyUntil(() => !flight.nav.waypointAlert, {timeout: 120, description: 'the run-out of WWW ended'});
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        const offNext = Math.abs(crossTrackNm(flight.aircraft, W_POS, NEXT));
+        expect(offNext).toBeGreaterThan(4.0 - POSITION_TOLERANCE_NM);
+        // Within the calculation after the aircraft went beyond 4.0 NM: on 065 it moves away from the leg on 305 by
+        // sin 120° of a tick per calculation
+        expect(offNext).toBeLessThan(4.0 + TICK_NM * Math.sin(120 * DEG) + POSITION_TOLERANCE_NM);
         expect(turnStackLength(flight.unit)).toBe(0);
+    });
+
+    // #406: after an abeam turn the alert ends where the turn in use ends, the abeam line of the waypoint on the new leg:
+    // not at the sequencing, nor at a track angle, a cross track or a time (checked in the KLN 89 trainer, 2026-10-27,
+    // docs/kln89-trainer-record.md and kln89-trainer-data/2026-10-27/report.md: the 2026-10-20 runs R2 and R6 re-read,
+    // 53 s and 41 s after the sequencing, and run a8). Until then line 2 shows the XTK of the new leg (R6)
+    it('keeps the alert after an abeam turn until the aircraft is past the waypoint\'s abeam line on the next leg (KLN 89 trainer, 2026-10-27, R2, R6, a8; #406)', async () => {
+        const {flight, aw} = await boot([at(9.75, 8.5), at(4.25, 3.0)], onToNextPilot());
+        let planAtWww: TurnPlan | null = null;
+        await flight.flyUntil(() => {
+            if (flight.nav.activeIdent === 'WWW') planAtWww = aw.turnPlan;
+            return flight.nav.activeIdent === 'KBBB';
+        }, {timeout: 300, description: 'WWW sequenced'});
+        expect(planAtWww, 'precondition: the abeam plan at WWW').toBe(TurnPlan.AT_ABEAM);
+        // Precondition: the run-out is on the stack in the calculation that creates it. No geometry ends it there: at the
+        // outside bisector the aircraft is as far from the new leg as from the inbound one (at most 4 NM) and projects
+        // before the old waypoint's abeam line on the new leg
+        expect(turnStackLength(flight.unit)).toBe(1);
+        expect(aw.turnStack[0].isRunOut).toBe(true);
+
+        // Sampled once a second from the sequencing until the alert is off. The run-out ends with the abeam line within
+        // the tick ahead, as a turn circle ends (the trainer's R2, R6 and a10 ended 0.02 to 0.17 NM before the line): the
+        // alert is on while the line is more than a tick ahead, and off in the calculation after that, within one tick
+        // before the line or on it
+        const samples: string[] = [];
+        for (let s = 0; ; s++) {
+            const nav = flight.nav;
+            const pos = flight.aircraft;
+            const along = alongPastOnNext(pos);
+            samples.push(`${along.toFixed(3)}:${nav.xtkNm?.toFixed(3)}:${nav.dtkTrue?.toFixed(0)}:${nav.waypointAlert}`);
+            if (!nav.waypointAlert) break;
+            expect(s, samples.join(' ')).toBeLessThan(120);
+            expect(nav.activeIdent).toBe('KBBB');
+            expect(along, samples.join(' ')).toBeLessThan(-TICK_NM + POSITION_TOLERANCE_NM);
+            // Signed: the XTK of the leg to KBBB, positive right of it (FLY L), where the aircraft comes from (the outside
+            // of the left turn at WWW)
+            expect(crossTrackNm(pos, W_POS, NEXT), samples.join(' ')).toBeGreaterThan(0);
+            expect(Math.abs(nav.xtkNm! - crossTrackNm(pos, W_POS, NEXT)), samples.join(' ')).toBeLessThan(0.02);
+            expect(angleBetween(nav.dtkTrue, NEXT), samples.join(' ')).toBeLessThan(1);
+            await flight.fly(1);
+        }
+        const alongAtEnd = alongPastOnNext(flight.aircraft);
+        expect(alongAtEnd, samples.join(' ')).toBeGreaterThanOrEqual(-TICK_NM - POSITION_TOLERANCE_NM);
+        expect(alongAtEnd, samples.join(' ')).toBeLessThan(POSITION_TOLERANCE_NM);
+        expect(samples.length - 1, 'seconds of alert after the sequencing (R6: 41 s, R2: 53 s)').toBeGreaterThanOrEqual(5);
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(turnStackLength(flight.unit)).toBe(0);
+    });
+
+    // The design, Review Focus 2: the leg after WWW is short, so that KBBB's own turn starts while the run-out of WWW is
+    // still on the stack. The run-out ends at WWW's abeam line on the leg to KBBB, which lies kbbbNm before KBBB along
+    // that leg, within the tick ahead; KBBB's turn starts at its lead plus the roll-in before KBBB, within the tick
+    // ahead, and the lead is capped at half the leg. The calculation that starts the turn finds the aircraft at most a
+    // tick inside the turn point, so the run-out is still on the stack there, and is replaced, only when the turn point
+    // lies more than a tick before WWW's abeam line: kbbbNm / 2 + 0.332 > kbbbNm + 0.066, a leg under 0.53 NM. 0.4 NM,
+    // whose turn point lies 0.53 NM before KBBB, 0.13 NM before that line. The turn at KBBB goes 40° left, away from the
+    // side the aircraft comes from (about 2 NM right of the leg there): on the inside of a right turn the aircraft is past
+    // KBBB's bisector at the turn start, and KBBB would be sequenced in the same calculation
+    it('replaces the run-out by the next waypoint\'s own turn, with no gap in the alert (the design\'s call)', async () => {
+        const kbbbNm = 0.4;
+        const tpKbbb = kbbbNm / 2 + rollInNm(GS);
+        expect(kbbbNm / 2).toBeLessThan(leadNm(GS, 40)); // Precondition: the lead is capped at half the leg
+        const {flight, aw} = await boot([at(9.75, 8.5), at(4.25, 3.0)], onToNextPilot(), NEXT, kbbbNm, -40);
+        await flight.flyUntil(() => flight.nav.activeIdent !== 'WWW', {timeout: 300, description: 'WWW sequenced'});
+        expect(flight.nav.activeIdent).toBe('KBBB');
+
+        let runOutBefore = false;
+        const samples: string[] = [];
+        for (let s = 0; !aw.ownTurnStarted; s++) {
+            samples.push(`${alongPastOnNext(flight.aircraft).toFixed(3)}:${turnStackLength(flight.unit)}:${flight.nav.waypointAlert}`);
+            expect(s, samples.join(' ')).toBeLessThan(60);
+            expect(flight.nav.activeIdent, samples.join(' ')).toBe('KBBB');
+            expect(flight.nav.waypointAlert, samples.join(' ')).toBe(true);
+            runOutBefore = turnStackLength(flight.unit) === 1 && aw.turnStack[0].isRunOut;
+            await flight.fly(1);
+        }
+        expect(runOutBefore, 'precondition: the run-out on the stack in the calculation before KBBB\'s turn starts').toBe(true);
+        // Precondition: the turn started at KBBB's turn point, more than a tick before WWW's abeam line on the leg, where
+        // the run-out does not end by itself
+        const along = alongPastOnNext(flight.aircraft);
+        expect(along, samples.join(' ')).toBeGreaterThanOrEqual(-(tpKbbb + TICK_NM - kbbbNm) - POSITION_TOLERANCE_NM);
+        expect(along, samples.join(' ')).toBeLessThan(-(tpKbbb - kbbbNm) + POSITION_TOLERANCE_NM);
+        expect(along, samples.join(' ')).toBeLessThan(-TICK_NM - POSITION_TOLERANCE_NM);
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(flight.nav.waypointAlert).toBe(true);
+        expect(turnStackLength(flight.unit)).toBeGreaterThan(0);
+        expect(aw.turnStack.every(e => !e.isRunOut), 'nothing of the run-out under the new turn').toBe(true);
+    });
+
+    // A run-out stands for the leg that was active when it was made, so the next change of the active waypoint drops it
+    // (the design's call, not flown in the trainer). Here the next waypoint is sequenced on its own abeam plan, without
+    // a turn of its own: a 30° left turn at WWW onto 035, passed parallel 3.5 NM right of the inbound leg, so that WWW
+    // takes the abeam plan; KBBB 0.5 NM on, with a 90° right turn onto 125. From WWW's
+    // abeam line the aircraft flies 035 about 3 NM right of the leg to KBBB, the inside of KBBB's turn: KBBB takes the
+    // abeam plan too, and the aircraft is past KBBB's inside bisector at once, while WWW's abeam line on the leg to KBBB
+    // is still ahead. Kept, the run-out of WWW showed the DTK and XTK of the leg to KBBB with KCCC active
+    it('drops the run-out when the next waypoint is sequenced without a turn of its own (the design\'s call)', async () => {
+        const next = 35;
+        const {flight, aw} = await boot([at(10, 3.5), at(-20, 3.5)], onToNextPilot(next, false), next, 0.5, 90);
+        await flight.flyUntil(() => flight.nav.activeIdent !== 'WWW', {timeout: 300, description: 'WWW sequenced'});
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(aw.turnStack.map(e => e.isRunOut), 'precondition: the run-out of WWW').toEqual([true]);
+        let runOutBefore = false;
+        let ownTurnBefore = true;
+        let xtkToKbbbBefore = NaN;
+        await flight.flyUntil(() => {
+            if (flight.nav.activeIdent !== 'KBBB') return true;
+            runOutBefore = turnStackLength(flight.unit) === 1 && aw.turnStack[0].isRunOut;
+            ownTurnBefore = aw.ownTurnStarted;
+            xtkToKbbbBefore = crossTrackNm(flight.aircraft, W_POS, next);
+            return false;
+        }, {timeout: 120, description: 'KBBB sequenced'});
+        expect(flight.nav.activeIdent).toBe('KCCC');
+        expect(runOutBefore, 'precondition: the run-out on the stack up to the sequencing of KBBB').toBe(true);
+        expect(ownTurnBefore, 'precondition: KBBB has no turn of its own').toBe(false);
+        // Precondition: on the leg to KBBB, but beyond the gate of the turn plan, so KBBB is decided on the abeam plan in
+        // its first calculation, and sequenced there past its inside bisector
+        expect(xtkToKbbbBefore).toBeGreaterThan(2.8 + 0.1);
+        expect(xtkToKbbbBefore).toBeLessThan(4.0 - 0.1);
+        // Precondition: WWW's abeam line on the leg to KBBB is more than a tick ahead, so the run-out did not end by itself
+        const pos = flight.aircraft;
+        expect(distanceNm(W_POS, pos) * Math.cos((courseDeg(W_POS, pos) - next) * DEG)).toBeLessThan(-TICK_NM - POSITION_TOLERANCE_NM);
+
+        // In the calculation that sequences KBBB: the DTK and the signed XTK of the leg to KCCC, nothing on the stack, and
+        // roll steering on that leg (the old leg lies about 3 NM away)
+        const kbbb = pointFrom(W_POS, next, 0.5);
+        const legCourse = courseDeg(kbbb, pointFrom(kbbb, next + 90, 20));
+        const navPage = flight.unit.props.memory.navPage;
+        expect(turnStackLength(flight.unit)).toBe(0);
+        expect(angleBetween(flight.nav.dtkTrue, legCourse)).toBeLessThan(1);
+        expect(Math.abs(flight.nav.xtkNm! - crossTrackNm(pos, kbbb, legCourse))).toBeLessThan(0.02);
+        expect(Math.abs(navPage.steeringPath!.distance(pos) * EARTH_RADIUS_NM - crossTrackNm(pos, kbbb, legCourse))).toBeLessThan(0.02);
+        // No alert for KCCC, the last waypoint, 20 NM away, from the next calculation on. The calculation of the
+        // sequencing still shows the alert KBBB's own branch decided before it sequenced KBBB, as at every sequencing
         await flight.fly(1);
+        expect(flight.nav.activeIdent).toBe('KCCC');
+        expect(turnStackLength(flight.unit)).toBe(0);
+        expect(flight.nav.waypointAlert).toBe(false);
+    });
+
+    // The design, Review Focus 3: a Direct To clears the run-out with the rest of the turn stack, and the alert follows
+    // the Direct To's own rule: KCCC, the last waypoint, is more than 20 NM away
+    it('clears the run-out at a Direct To', async () => {
+        const {flight, aw} = await boot([at(9.75, 8.5), at(4.25, 3.0)], trackPilot(2.8, INBOUND - 45, INBOUND));
+        await flight.flyUntil(() => flight.nav.activeIdent !== 'WWW', {timeout: 300, description: 'WWW sequenced'});
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(turnStackLength(flight.unit), 'precondition: the run-out on the stack').toBe(1);
+        expect(aw.turnStack[0].isRunOut).toBe(true);
+
+        await flight.panel.directTo('KCCC');
+        expect(turnStackLength(flight.unit)).toBe(0);
+        expect(flight.nav.activeIdent).toBe('KCCC');
         expect(flight.nav.waypointAlert).toBe(false);
     });
 

@@ -380,7 +380,9 @@ export class NavCalculator implements CalcTickable {
     /**
      * Pops the entry on top of the turn stack once the aircraft is past its end, so that XTK and DTK follow the next
      * entry or the leg again. Run once per calculation, before the course values, and not in the pass after the decisions
-     * (#407). The abeam turn has no end of its own: it ends with its waypoint (ActiveWaypoint.setActiveIdx)
+     * (#407), so an entry pushed by the decisions cannot end in the calculation that pushed it. The abeam turn has no end
+     * of its own: at the sequencing of its waypoint it becomes its run-out (ActiveWaypoint.setActiveIdx, #406), which
+     * ends by isPastEndOfRunOut
      * @param legPath the path of the active leg
      * @param tickDistance the distance flown in one calculation tick
      */
@@ -391,7 +393,8 @@ export class NavCalculator implements CalcTickable {
         }
         const turnStackEntry = activeWaypoint.turnStack[activeWaypoint.turnStack.length - 1];
         const distFromCurrent = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(turnStackEntry.switchPoint), UnitType.NMILE);
-        if (turnStackEntry.abeamTurnSign === null && (turnStackEntry.turnBisector !== undefined ? this.isPastEndOfTurn(turnStackEntry, turnStackEntry.turnBisector, tickDistance, legPath)
+        if (turnStackEntry.isRunOut ? this.isPastEndOfRunOut(turnStackEntry, tickDistance, legPath)
+            : turnStackEntry.abeamTurnSign === null && (turnStackEntry.turnBisector !== undefined ? this.isPastEndOfTurn(turnStackEntry, turnStackEntry.turnBisector, tickDistance, legPath)
             : distFromCurrent <= tickDistance || distFromCurrent > this.lastTurnStackDistance!)) {
             console.debug("Reached end of turn", distFromCurrent, this.lastTurnStackDistance, activeWaypoint.turnStack);
             //We have reached the end of the turn, XTK will now use the normal leg again
@@ -471,7 +474,8 @@ export class NavCalculator implements CalcTickable {
      * circle (turnStack[0]), so that the bank is established when the circle begins. More than one radius from the circle
      * the turn is no path to follow: beyond its center the closest point lies on the far side, where the circle runs
      * backward, and farther outside the circle steering back to it is a detour. The aircraft then steers on the next leg
-     * (pathForDtk) until the turn ends
+     * (pathForDtk) until the turn ends. The run-out of an abeam turn (#406) has the new leg as its path, so it is steered
+     * on as the leg, and RollSteeringController does not treat it as a turn circle
      */
     private steeringPath(legPath: GeoCircle): GeoCircle {
         const turnStack = this.memory.navPage.activeWaypoint.turnStack;
@@ -608,7 +612,8 @@ export class NavCalculator implements CalcTickable {
      * the aircraft turned away before the turn point) it ends once the waypoint is behind, as before the plan. On the
      * abeam plan it starts WPT_ALERT_ABEAM_TURN before the abeam line, at the closure
      * rate along the leg, and not while the aircraft does not close on the line (checked in the KLN 89 trainer,
-     * 2026-10-20). It stays on while a turn is flown, also a turn of the previous waypoint (#156)
+     * 2026-10-20). It stays on while a turn is flown, also a turn of the previous waypoint (#156) or the run-out of its
+     * abeam turn (#406)
      * @param legPath the path of the active leg
      * @param along the along-track distance to the active waypoint
      */
@@ -655,6 +660,23 @@ export class NavCalculator implements CalcTickable {
         const nextDtk = entry.pathForDtk.bearingAt(entry.pathForDtk.closest(pos, VEC3_CACHE));
         return Math.abs(NavMath.diffAngle(track, nextDtk)) < 90
             && alongTrackDistance(entry.pathForDtk, entry.switchPoint, pos) <= tickDistance;
+    }
+
+    /**
+     * #406: the run-out of an abeam turn ends once the aircraft is past the abeam line of the old waypoint on the new leg
+     * (within the tick ahead, as the end of a turn circle), the far end of the turn of no size (checked in the KLN 89
+     * trainer, 2026-10-27: R2, R6 and a10 ended 0.02 to 0.17 NM before that line). A track angle, a cross track or a time
+     * does not end it: an aircraft that does not progress along the new leg keeps the alert on (run a1). It also ends
+     * when the aircraft is more than OFF_LEG_XTK from the active leg, as a turn circle does (the design's call, not flown
+     * in the trainer)
+     * @param entry the run-out (TurnStackEntry.runOut)
+     * @param tickDistance the distance flown in one calculation tick
+     * @param activeLegPath the path of the active leg
+     */
+    private isPastEndOfRunOut(entry: TurnStackEntry, tickDistance: NauticalMiles, activeLegPath: GeoCircle): boolean {
+        const pos = this.sensors.in.gps.coords;
+        return alongTrackDistance(entry.pathForDtk, entry.switchPoint, pos) <= tickDistance
+            || Math.abs(UnitType.GA_RADIAN.convertTo(activeLegPath.distance(pos), UnitType.NMILE)) > OFF_LEG_XTK;
     }
 
     /**

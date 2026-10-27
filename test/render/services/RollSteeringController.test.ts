@@ -452,4 +452,22 @@ describe('the next-leg fallback of an anticipated turn (the roll steering design
 
         expect(roll(unit)).toBeCloseTo(-25, 6);
     });
+
+    // #406: after an abeam turn its run-out stays on the stack until the aircraft is past the waypoint's abeam line on
+    // the new leg. Its path is the new leg, a great circle, and it is no turn circle either, although it lies at the
+    // bottom of the stack. The same setup as the previous test, with the run-out of a left abeam turn at ABC instead
+    it('banks right toward the leg during the run-out of an abeam turn, which is no turn circle', async () => {
+        const {unit, mid, dtk} = await onRoute(HEADING_INPUT_XML);
+        await moveAircraft(unit, pointFrom(mid, dtk - 90, 2), {groundspeedKt: 120, trackTrue: dtk});
+        const nav = unit.props.memory.navPage;
+        expect(roll(unit)).toBeCloseTo(-25, 6); // Precondition: the leg itself gives the right cap
+        const leg = nav.steeringPath!;
+        const runOut = TurnStackEntry.runOut(TurnStackEntry.abeamTurn(standardRoute().abc, leg, 'left'));
+        expect(runOut.path).toBe(leg); // Precondition: the run-out's path is the path steered on
+        nav.activeWaypoint.turnStack.push(runOut);
+
+        new RollSteeringController(unit.props.sensors, unit.props.memory, unit.props.planeSettings).tick();
+
+        expect(roll(unit)).toBeCloseTo(-25, 6);
+    });
 });

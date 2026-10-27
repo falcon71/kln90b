@@ -70,9 +70,9 @@ export class RollSteeringController implements CalcTickable {
         //every leg, so the latch keeps a copy and compares the geometry
         const latch = nav.rollSteeringLatch;
         //The circle of an anticipated turn is the bottom entry of the turn stack (NavCalculator.steeringPath); a DME arc is a
-        //leg path and never lies there
+        //leg path and never lies there. #406: the run-out of an abeam turn lies there too, but its path is the new leg
         const turnStack = nav.activeWaypoint.turnStack;
-        const turnCircle = turnStack.length > 0 && turnStack[0].path === path;
+        const turnCircle = turnStack.length > 0 && !turnStack[0].isRunOut && turnStack[0].path === path;
         const command = rollSteeringCommand(path, gps.coords, gps.groundspeed, gps.getTrackTrueRespectingGroundspeed()!,
             latch !== null && isSamePath(latch.path, path) ? latch.turn : null, turnCircle);
         nav.rollSteeringLatch = command.latch === null ? null : {turn: command.latch, path: new GeoCircle(path.center, path.radius)};
