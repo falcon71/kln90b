@@ -44,7 +44,9 @@ boot as `buildPersistentMessages` does today.
   the moment the light goes off (#437, 4-8).
 - **Off**: more than 5° between the indicator's course and the DTK for the TO message (B-1, KA 90 manual); more than
   0.5° between the indicator and the unit's own course for the plain message (B-1).
-- **More than 12 s**: the condition has held without a break for more than 12 s, measured with `Date.now()`.
+- **More than 12 s**: the condition has held without a break for more than 12 s of GPS time
+  (`sensors.in.gps.timeZulu`), which stands still while the sim is paused; `Date.now()` runs on and is not used (the
+  maintainer, 2026-10-27).
 - **Read**: the message has been on a MSG page the pilot viewed (`MessagePage.markSeen`, 3-16).
 
 ## Rules common to all cases
@@ -198,14 +200,17 @@ or the abeam plan):
 
 | | Before the turn (from about 20 s before it, timing unchanged) | The turn | After |
 |---|---|---|---|
-| External WPT light | flashing | steady | off |
-| Active arrow (NAV, D/T, waypoint, ACT, FPL 0 pages) | steady | flashing | steady |
+| External WPT light (`L:KLN90B_WptLight`) | flashing | steady | off |
 | Super NAV 5 active ident | flashing | steady | steady |
+| Active arrow (NAV, D/T, waypoint, ACT, FPL 0 pages) | flashing | flashing | steady |
 
-- The light and the arrow: the Tu-154 video, the maintainer, 2026-10-27, and 4-8 for the light. The guide's 4-8 has the
-  arrow flashing from 20 s before the turn; the maintainer takes the video over that wording.
+- The light: the Tu-154 video, the maintainer, 2026-10-27, and 4-8.
 - The Super NAV 5 ident: 4-8 names it together with the light as the one that stops flashing and goes steady at the
   start of the turn; the video does not show it. *Guide-based.*
+- The arrow: unchanged. It flashes from about 20 s before the turn (4-8, the KLN 89 trainer, the video) until the end
+  of the turn (the video).
+- The light flashes through `L:KLN90B_WptLight` itself (the maintainer, 2026-10-27: aircraft wire it only to the light).
+  The comment in `LVars.ts` changes to say so; the maintainer updates the wiki page External Annunciators.
 - At a waypoint without an anticipated turn (a Direct To outside FPL 0, the last waypoint, turn anticipation off, a
   fly-over or duplicated waypoint, OBS mode): the light flashes, instead of today's steady, together with the arrow and
   the Super NAV 5 ident, for the alert time of #372 (about 15 s with turn anticipation on, 36 s off) until the
@@ -250,20 +255,9 @@ Considered for the message rules:
 For #435, putting the guard inside `setObsTrueOnUnit` instead of the Direct To page: it would hide the rule in a setter,
 and the `d› CRS` text reads the number back from the course it just set. Dropped.
 
-## Open question for the maintainer
-
-**The WPT light LVar.** `L:KLN90B_WptLight` is part of the public contract, documented as "true if the waypoint alert
-is active" (`LVars.ts`, the wiki page External Annunciators). Making the light flash changes what it carries.
-
-- Toggle `L:KLN90B_WptLight` with the blink, as `L:KLN90B_MsgLight` already does (*recommended*): every aircraft that
-  wires it to a lamp shows the real behavior without a change, and the MSG light has set the pattern. Aircraft that use
-  it as a logic signal ("alert on") would see it toggle; the wiki page and the comment in `LVars.ts` change.
-- Keep `L:KLN90B_WptLight` steady as it is and add a new LVar for the lamp: nothing changes for existing aircraft, which
-  then also do not get the flashing until their authors switch.
-
 ## Goals
 
-1. **#437**: the WPT light, the arrow and the Super NAV 5 ident show the two phases of the alert at a turn.
+1. **#437**: the WPT light and the Super NAV 5 ident show the two phases of the alert at a turn.
 2. **#401**: the plain message only after more than 12 s off by more than 0.5°.
 3. **#434**: the readable case as in case 2.
 4. **#436**: the unreadable case as in case 1.
@@ -275,7 +269,8 @@ is active" (`LVars.ts`, the wiki page External Annunciators). Making the light f
   cases, and the self-test gate (#330): unchanged.
 - The alert's timing and end (#372, #406): unchanged; the message and the indicators follow it.
 - The 89's `GPS Course is` message and the AVsoftech trainer's narrower window: not emulated.
-- No H event or panel.xml key is added or changes meaning; the WPT light LVar is the open question above.
+- No H event, LVar or panel.xml key is added. `L:KLN90B_WptLight` flashes where the real light flashes; aircraft wire
+  it only to the light (the maintainer, 2026-10-27).
 
 ## Left to the builder
 
@@ -286,7 +281,10 @@ is active" (`LVars.ts`, the wiki page External Annunciators). Making the light f
   one.
 - How the alert's two phases reach the displays and the light (a second flag next to `waypointAlert`, or a phase
   value).
-- One small time-based helper for "held for more than 12 s", shared by both message classes. `MessageHandler.tick`
+- One small helper for "held for more than 12 s" of GPS time, shared by both message classes. GPS time can jump (a time
+  entered on SET 2 before the first fix, the correction when the fix comes, a change of the sim time); a jump must
+  neither post a message at once nor hold one back for long, for example by restarting the count on a backward jump or
+  one of more than a few seconds. `MessageHandler.tick`
   evaluates `isConditionValid` twice per tick while a message is listed, so no state may depend on the number of calls.
   Removing a read message and bringing it back unread needs the message to reset its own `seen` once it is posted
   again.
@@ -302,4 +300,4 @@ is active" (`LVars.ts`, the wiki page External Annunciators). Making the light f
 
 One per issue, each with its tests and comments citing the pages above, in this order: `fixes #437`, `fixes #401`,
 `fixes #434`, `fixes #436`, `fixes #435`. #436 builds on #437's turn phase. The trainer record of 2026-10-26 is
-already committed (`references #434`). If the LVar changes, the wiki page External Annunciators needs the same change.
+already committed (`references #434`). The maintainer updates the wiki page External Annunciators for #437.
