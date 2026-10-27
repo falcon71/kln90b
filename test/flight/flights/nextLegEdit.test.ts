@@ -346,6 +346,49 @@ describe('an edit of the leg after the active waypoint (#408)', () => {
     });
 });
 
+// #440: an edit in front of the active waypoint moves the active leg to another index, and the unit goes on with the
+// same leg and the turn state that belongs to it. Today assertToMatchesFplIdx finds the instance at another index and
+// reactivates FPL 0, which clears the turn stack
+describe('an edit in front of the active waypoint (#440)', () => {
+    /**
+     * Flies KAAA ABC KBBB KCCC until ABC is sequenced in its turn: KBBB is active and the turn of ABC is still on the
+     * stack. Returns the entries of the stack and the DTK then
+     */
+    async function flyToSequencedInTurn() {
+        const booted = await boot();
+        const {flight, aw} = booted;
+        await flight.flyUntil(() => flight.nav.activeIdent === 'KBBB', {timeout: 600, description: 'ABC sequenced'});
+        await flight.fly(1);
+        expect(flight.nav.activeIdent, 'precondition: KBBB is active').toBe('KBBB');
+        expect(aw.getActiveFplIdx(), 'precondition: KBBB is leg 2').toBe(2);
+        expect(turnStackLength(flight.unit), 'precondition: the turn of ABC is on the stack').toBeGreaterThan(0);
+        return {...booted, entries: [...aw.turnStack], dtk: flight.nav.dtkTrue};
+    }
+
+    // The sibling that holds the preconditions: an edit behind the active waypoint changes nothing of the turn
+    it('keeps the turn of the waypoint just sequenced when a leg behind the active one is deleted (control of the pin)', async () => {
+        const {flight, aw, entries} = await flyToSequencedInTurn();
+        deleteLeg(flight.unit, 3);
+        await flight.fly(1);
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(turnStackLength(flight.unit)).toBeGreaterThanOrEqual(entries.length);
+        entries.forEach((entry, i) => expect(aw.turnStack[i]).toBe(entry));
+    });
+
+    it.fails('keeps the turn in progress when the first waypoint of the plan is deleted (#440)', async () => {
+        const {flight, aw, entries, dtk} = await flyToSequencedInTurn();
+        deleteLeg(flight.unit, 0);
+        await flight.fly(1);
+        // The active leg is the same instance, now at index 1
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(turnStackLength(flight.unit)).toBeGreaterThanOrEqual(entries.length);
+        entries.forEach((entry, i) => expect(aw.turnStack[i]).toBe(entry));
+        // The DTK goes on with the turn (a few degrees in a second), it does not jump to the leg
+        expect(angleBetween(flight.nav.dtkTrue, dtk!)).toBeLessThan(10);
+    });
+});
+
 /** Where the abeam pass turns from its converging course onto the inbound course, before ABC */
 const ABEAM_TURN_AT = 0.8;
 
