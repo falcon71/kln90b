@@ -974,10 +974,18 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - Messages are added with `messageHandler.addMessage(new OneTimeMessage(["LINE1","LINE2"]))`; each line holds at
       most about 22 to 23 characters.
 - `buildPersistentMessages(props)` creates: `AltitudeFailMessage`, `ArmGPSApproachMessage`, `DatabaseOutOfDateMessage`,
-  `IfRequiredSelectObsMessage`, `MagvarMessage`, `Obs200NMMessage`, `PressAltToSetBaroMessage`, `VnavAlertMessage`, plus
-  `AdjustCourseToWithObsReadingMessage` (`ADJ NAV IND CRS TO xxx°`) when `obsTarget===0`, otherwise
-  `AdjustCourseMessage`. The former is not evaluated before the self-test is approved, and it takes the course at its
-  first evaluation after the approval as the start, not as a DTK change that opens its 30 s window (#330).
+  `IfRequiredSelectObsMessage`, `MagvarMessage`, `Obs200NMMessage`, `PressAltToSetBaroMessage`, `VnavAlertMessage`, and
+  both course messages, which decide on every call which indicator case applies, because `Output.ObsTarget` can change
+  at run time (#401): `AdjustCourseToMessage` (`ADJ NAV IND CRS TO xxx°`) while `obsTarget===0`, and
+  `AdjustCourseMessage` (`ADJ NAV IND CRS`) for a driven indicator. Neither is evaluated before the self-test is
+  approved (#330). With a readable course the TO message shows at once at a leg change and otherwise after more than
+  12 s of GPS time off the DTK, goes once read or once the course is within 5°, and comes back more than 12 s after the
+  read if the course is still off (#434). `NavCalculator` marks the leg change: `navPage.legChangeDtkDelta` is non-null
+  in exactly the calculation whose DTK is the first of the next leg (an anticipated or abeam turn starting, or a
+  sequencing without a turn), through `legChangePending` set the calculation before. `legChangeFrom` keeps the FROM
+  leg of that moment, which `ActiveWaypoint` replaces at a Direct To, an activation or an FPL 0 edit of the active leg,
+  so such a change in between drops the mark. Without a readable course the message still opens its 30 s window at a
+  DTK change of more than 5° (#177).
 - The MSG page (`controls/MessagePage.tsx`) shows newest first. `controls/StatusLine.tsx` shows the `MSG` indicator and
   drives `L:KLN90B_MsgLight` in the display tick: flashing while unread, steady while read, off when empty.
 - **Status-line transient messages** are a separate channel. Publish `statusLineMessage` (`StatusLineMessageEvents`)

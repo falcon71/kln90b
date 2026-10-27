@@ -12,6 +12,7 @@ import {Screen} from '../../../harness/render/screen';
 import {blinkCycle} from '../../../harness/render/blink';
 import {approachWorld, arcWorld, standardRoute} from '../../../harness/fixtures';
 import {KLNFixType} from '../../../../kln90b/data/flightplan/Flightplan';
+import {TurnPlan} from '../../../../kln90b/data/flightplan/ActiveWaypoint';
 
 const fpl0 = (unit: HeadlessUnit) => unit.props.memory.fplPage.flightplans[0].getLegs();
 const activeWaypoint = (unit: HeadlessUnit) => unit.props.memory.navPage.activeWaypoint;
@@ -433,6 +434,273 @@ describe('sequencing without turn anticipation (4-9)', () => {
         await moveAircraft(unit, pointFrom(abc, leg1, 0.1), {groundspeedKt: 120, trackTrue: leg1});
         expect(activeIdent(unit)).toBe('KBBB');
         expect(angleBetween(nav(unit).desiredTrack, courseDeg(abc, kbbb))).toBeLessThan(0.5);
+    });
+});
+
+/** What one calculation tick left behind */
+interface TickRecord {
+    delta: number | null;
+    dtk: number | null;
+    active: string | undefined;
+    turnStack: number;
+    plan: TurnPlan | null;
+}
+
+/** Flies through the points at 120 kt, one calculation tick per point, and records each tick */
+async function flyPoints(unit: HeadlessUnit, points: { lat: number, lon: number }[]): Promise<TickRecord[]> {
+    unit.env.sim.set('GROUND VELOCITY', 'knots', 120);
+    const records: TickRecord[] = [];
+    for (const p of points) {
+        unit.env.sim.set('PLANE LATITUDE', 'degrees', p.lat);
+        unit.env.sim.set('PLANE LONGITUDE', 'degrees', p.lon);
+        await vi.advanceTimersByTimeAsync(1000);
+        records.push({
+            delta: nav(unit).legChangeDtkDelta, dtk: nav(unit).desiredTrack, active: activeIdent(unit),
+            turnStack: turnStackLength(unit), plan: activeWaypoint(unit).turnPlan,
+        });
+    }
+    return records;
+}
+
+/** 1/30 NM: the distance flown in one calculation tick at 120 kt */
+const STEP_NM = 120 / 3600;
+
+/**
+ * The points 1/30 NM apart from `fromNm` before ABC to `toNm` past ABC along the first leg of the standard route (and on
+ * along its final course past ABC), `rightNm` to the right of it (the outside of the left turn at ABC; negative to the
+ * left, the inside)
+ */
+function alongFirstLeg(kaaa: Facility, abc: Facility, fromNm: number, toNm: number, rightNm = 0): { lat: number, lon: number }[] {
+    const leg1 = finalCourseDeg(kaaa, abc);
+    const points = [];
+    for (let d = fromNm; d >= -toNm - 1e-9; d -= STEP_NM) {
+        const onLeg = d >= 0 ? pointBefore(kaaa, abc, d) : pointFrom(abc, leg1, -d);
+        points.push(rightNm === 0 ? onLeg : pointFrom(onLeg, rightNm > 0 ? leg1 + 90 : leg1 - 90, Math.abs(rightNm)));
+    }
+    return points;
+}
+
+/**
+ * Flies the standard route at 120 kt from 1 NM before ABC along the first leg to ABC and on along the second leg for 1 NM,
+ * one calculation tick per 1/30 NM, and records each tick. The straight path cuts no corner, so the bisector of the turn
+ * is crossed at ABC
+ */
+function throughAbc(kaaa: Facility, abc: Facility, kbbb: Facility): { lat: number, lon: number }[] {
+    const points = [];
+    for (let i = 30; i > 0; i--) {
+        points.push(pointBefore(kaaa, abc, i * STEP_NM));
+    }
+    for (let i = 0; i <= 30; i++) {
+        points.push(pointFrom(abc, courseDeg(abc, kbbb), i * STEP_NM));
+    }
+    return points;
+}
+
+async function flyThroughAbc(unit: HeadlessUnit, kaaa: Facility, abc: Facility, kbbb: Facility): Promise<TickRecord[]> {
+    return flyPoints(unit, throughAbc(kaaa, abc, kbbb));
+}
+
+// #434, #436: the course messages tell a leg change (the DTK moving on to the next leg by itself, the design's
+// definition) from any other DTK change. NavCalculator marks the first tick with the new DTK: the start of an anticipated
+// turn (4-8) or the sequencing without one (4-9). The DTK of a leg change shows the tick after the turn is pushed or the
+// waypoint sequenced, because the DTK of a tick is taken before both
+describe('the leg-change marker (4-8, #434, #436)', () => {
+    it('marks the tick the DTK takes the next leg at an anticipated turn, once (4-8)', async () => {
+        const {unit, kaaa, abc, kbbb} = await onStandardRoute();
+        const records = await flyThroughAbc(unit, kaaa, abc, kbbb);
+
+        const marked = records.filter(r => r.delta !== null);
+        expect(marked).toHaveLength(1);
+        // The turn at ABC: the final course of the first leg (051.0) to the initial course of the second (015.9)
+        expect(marked[0].delta!).toBeCloseTo(angleBetween(finalCourseDeg(kaaa, abc), courseDeg(abc, kbbb)), 1); // 35.1
+        expect(angleBetween(marked[0].dtk, courseDeg(abc, kbbb))).toBeLessThan(0.5);
+        expect(marked[0].turnStack).toBeGreaterThan(0); // Precondition: in the turn
+    });
+
+    it('marks the sequencing without turn anticipation (4-9)', async () => {
+        const {unit, kaaa, abc, kbbb} = await onStandardRoute({turnAnticipation: false});
+        const records = await flyThroughAbc(unit, kaaa, abc, kbbb);
+
+        const marked = records.filter(r => r.delta !== null);
+        expect(marked).toHaveLength(1);
+        expect(marked[0].delta!).toBeCloseTo(angleBetween(finalCourseDeg(kaaa, abc), courseDeg(abc, kbbb)), 1); // 35.1
+        expect(angleBetween(marked[0].dtk, courseDeg(abc, kbbb))).toBeLessThan(0.5);
+        expect(marked[0].active).toBe('KBBB');
+        expect(records.every(r => r.turnStack === 0)).toBe(true); // Precondition: no turn was flown
+    });
+
+    // A Direct To is no leg change (the design's definition): every value written while it is entered and flown is null
+    it('does not mark a Direct To', async () => {
+        const {unit, kaaa, abc, kbbb} = await onStandardRoute();
+        const leg1 = finalCourseDeg(kaaa, abc);
+        await moveAircraft(unit, pointBefore(kaaa, abc, 10), {groundspeedKt: 120, trackTrue: leg1});
+        const navState = nav(unit);
+        const written: (number | null)[] = [];
+        let stored = navState.legChangeDtkDelta;
+        Object.defineProperty(navState, 'legChangeDtkDelta', {
+            get: () => stored,
+            set: (v: number | null) => {
+                stored = v;
+                written.push(v);
+            },
+            configurable: true,
+        });
+
+        await unit.panel.directTo('KBBB');
+        const toKbbb = courseDeg(pointBefore(kaaa, abc, 10), kbbb);
+        for (let i = 1; i <= 5; i++) {
+            const p = pointFrom(pointBefore(kaaa, abc, 10), toKbbb, i * 120 / 3600);
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', p.lat);
+            unit.env.sim.set('PLANE LONGITUDE', 'degrees', p.lon);
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+
+        expect(activeIdent(unit)).toBe('KBBB'); // Preconditions: the Direct To changed the DTK by more than 5 degrees
+        expect(angleBetween(navState.desiredTrack, leg1)).toBeGreaterThan(5);
+        expect(written.length).toBeGreaterThanOrEqual(5); // written on every calculation tick
+        expect(written.filter(v => v !== null)).toEqual([]);
+    });
+
+    it('does not mark the bisector sequencing after the turn', async () => {
+        const {unit, kaaa, abc, kbbb} = await onStandardRoute();
+        const records = await flyThroughAbc(unit, kaaa, abc, kbbb);
+
+        const sequenced = records.findIndex(r => r.active === 'KBBB');
+        expect(sequenced).toBeGreaterThan(0); // Precondition: sequenced at the bisector, inside the flight
+        const markedAt = records.findIndex(r => r.delta !== null);
+        expect(markedAt).toBeLessThan(sequenced); // the turn start, before the sequencing
+        expect(records[markedAt].active).toBe('ABC');
+        expect(records[sequenced].delta).toBeNull();
+        expect(records[sequenced + 1].delta).toBeNull();
+    });
+
+    // The design's definition: a sequencing without a turn is a leg change, also onto a duplicated waypoint (4-9). The
+    // leg between the copies has no length, so the unit sequences on past it in the next calculation, before any DTK,
+    // and the DTK of the leg change is the one of the leg after it. Turn anticipation flies over a duplicated waypoint
+    // (the KLN 89 trainer), so both settings sequence without a turn
+    it.each([true, false])('marks the leg change past a duplicated waypoint once, turn anticipation %s (4-9)', async (turnAnticipation) => {
+        const {kaaa, abc, kbbb} = standardRoute();
+        const unit = await bootUnit({
+            facilities: [kaaa, abc, kbbb], position: kaaa, storage: {turnAnticipation, ...savedFlightplan(0, [kaaa, abc, abc, kbbb])},
+        });
+        await settle(unit);
+        expect(activeIdent(unit)).toBe('ABC'); // Precondition
+
+        const records = await flyThroughAbc(unit, kaaa, abc, kbbb);
+
+        const marked = records.filter(r => r.delta !== null);
+        expect(marked).toHaveLength(1);
+        expect(marked[0].delta!).toBeCloseTo(angleBetween(finalCourseDeg(kaaa, abc), courseDeg(abc, kbbb)), 1); // 35.1
+        expect(marked[0].active).toBe('KBBB');
+        expect(angleBetween(marked[0].dtk, courseDeg(abc, kbbb))).toBeLessThan(0.5);
+    });
+
+    // The abeam plan (checked in the KLN 89 trainer, 2026-10-20): 3.5 NM right of the leg at the decision the turn starts
+    // at the abeam line, and the DTK is the next leg's from there. That start is the leg change; the sequencing at the
+    // bisector after it is not
+    it('marks the start of the abeam turn, once', async () => {
+        const {unit, kaaa, abc} = await onStandardRoute();
+        const records = await flyPoints(unit, alongFirstLeg(kaaa, abc, 3, 3, 3.5));
+
+        expect(records.some(r => r.plan === TurnPlan.AT_ABEAM)).toBe(true); // Preconditions: the abeam plan, sequenced
+        expect(records[records.length - 1].active).toBe('KBBB');
+        const markedAt = records.findIndex(r => r.delta !== null);
+        expect(records.filter(r => r.delta !== null)).toHaveLength(1);
+        expect(records[markedAt].active).toBe('ABC');
+        expect(records[markedAt].turnStack).toBe(1); // the abeam turn
+        // The DTK moved onto the next leg in that tick, by the size of the move
+        expect(angleBetween(records[markedAt - 1].dtk, finalCourseDeg(kaaa, abc))).toBeLessThan(1);
+        expect(records[markedAt].delta!).toBeCloseTo(angleBetween(records[markedAt - 1].dtk, records[markedAt].dtk!), 6);
+        expect(records[markedAt].delta!).toBeGreaterThan(30);
+    });
+
+    // #157: more than 4.0 NM off the leg the unit sequences once the next leg's segment is as close as the active one
+    // (checked in the KLN 89 trainer, 2026-10-20). That sequencing has no turn, so it is a leg change
+    it('marks the sequencing off the leg, once (#157)', async () => {
+        const {unit, kaaa, abc} = await onStandardRoute();
+        const records = await flyPoints(unit, alongFirstLeg(kaaa, abc, 3, 3, 5));
+
+        expect(records.every(r => r.turnStack === 0)).toBe(true); // Preconditions: no turn, sequenced
+        const sequenced = records.findIndex(r => r.active === 'KBBB');
+        expect(sequenced).toBeGreaterThan(0);
+        const marked = records.filter(r => r.delta !== null);
+        expect(marked).toHaveLength(1);
+        expect(records[sequenced + 1].delta).not.toBeNull(); // the DTK of the next leg comes one tick after the sequencing
+        expect(records[sequenced + 1].delta!).toBeCloseTo(angleBetween(records[sequenced].dtk, records[sequenced + 1].dtk!), 6);
+        expect(records[sequenced + 1].delta!).toBeGreaterThan(30);
+    });
+
+    // Past the last waypoint the unit is FROM it and tries to sequence on every calculation, but there is nothing to
+    // sequence to: no leg change
+    it('does not mark flying on past the last waypoint', async () => {
+        const {kaaa, abc} = standardRoute();
+        const unit = await bootUnit({facilities: [kaaa, abc], position: kaaa, storage: savedFlightplan(0, [kaaa, abc])});
+        await settle(unit);
+        const records = await flyPoints(unit, alongFirstLeg(kaaa, abc, 0.5, 1));
+
+        expect(records.every(r => r.active === 'ABC')).toBe(true); // Preconditions: ABC stays active, the unit is FROM it
+        expect(nav(unit).toFrom).toBe(false);
+        expect(records.map(r => r.delta).filter(d => d !== null)).toEqual([]);
+    });
+
+    // 2 NM inside the turn the bisector of the turn at ABC lies 0.6 NM before the abeam line, behind the turn point (0.3
+    // NM), so the turn starts with the aircraft already past it and ABC is sequenced in the same calculation. The leg
+    // change is still marked once, on the new active leg
+    it('marks a turn start and a sequencing in the same calculation once', async () => {
+        const {unit, kaaa, abc} = await onStandardRoute();
+        const records = await flyPoints(unit, alongFirstLeg(kaaa, abc, 2, 1, -2));
+
+        const turnAt = records.findIndex(r => r.turnStack > 0);
+        expect(turnAt).toBeGreaterThan(0); // Preconditions: the turn plan, the turn started and ABC sequenced at once
+        expect(records[turnAt - 1].plan).toBe(TurnPlan.AT_LEAD);
+        expect(records[turnAt - 1].active).toBe('ABC');
+        expect(records[turnAt].active).toBe('KBBB');
+        expect(records.filter(r => r.delta !== null)).toHaveLength(1);
+        expect(records[turnAt + 1].delta!).toBeCloseTo(angleBetween(records[turnAt].dtk, records[turnAt + 1].dtk!), 6);
+        expect(records[turnAt + 1].delta!).toBeGreaterThan(30);
+    });
+
+    // An FPL 0 edit that changes the active leg is no leg change either: moving the entry of an active DME arc
+    // (FlightplanUtils.moveArcEntry, 6-18) recalculates the active path, stood in for here by its call in the second after
+    // a sequencing without a turn
+    it('does not mark a sequencing whose leg is recalculated in the same second', async () => {
+        const {unit, kaaa, abc, kbbb} = await onStandardRoute({turnAnticipation: false});
+        const records: TickRecord[] = [];
+        let recalculated = false;
+        for (const p of throughAbc(kaaa, abc, kbbb)) {
+            records.push(...await flyPoints(unit, [p]));
+            if (!recalculated && activeIdent(unit) === 'KBBB') {
+                activeWaypoint(unit).recalculatePath();
+                recalculated = true;
+            }
+        }
+
+        expect(recalculated).toBe(true); // Precondition: sequenced
+        expect(records.map(r => r.delta).filter(d => d !== null)).toEqual([]);
+    });
+
+    // The design's definition: a Direct To is no leg change. Entered in the second between the turn start and the
+    // calculation that would show the DTK of the turn, it replaces that leg change, and nothing is marked
+    it('does not mark a Direct To entered right after the turn start', async () => {
+        const {kaaa, abc, kbbb} = standardRoute();
+        const kccc = airport('KCCC', 46.8, 9.6); // south-east of ABC, in no plan
+        const unit = await bootOnStandardRoute({facilities: [kccc]});
+        const points = throughAbc(kaaa, abc, kbbb);
+        const records: TickRecord[] = [];
+        let directed = false;
+        for (const p of points) {
+            records.push(...await flyPoints(unit, [p]));
+            if (!directed && turnStackLength(unit) > 0) {
+                expect(records[records.length - 1].delta).toBeNull(); // Precondition: the turn was pushed in this tick
+                activeWaypoint(unit).directTo(abc, kccc);
+                directed = true;
+            }
+        }
+
+        expect(directed).toBe(true); // Preconditions: the Direct To took the DTK more than 5 degrees away
+        expect(activeIdent(unit)).toBe('KCCC');
+        expect(angleBetween(nav(unit).desiredTrack, finalCourseDeg(kaaa, abc))).toBeGreaterThan(60);
+        expect(records.map(r => r.delta).filter(d => d !== null)).toEqual([]);
     });
 });
 

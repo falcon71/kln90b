@@ -18,7 +18,7 @@ import {SavedWaypoint} from "./SavedWaypoint";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 import {Degrees, Feet, NauticalMiles, Seconds} from "./Units";
 import {Flightplan, KLNFlightplanLeg} from "./flightplan/Flightplan";
-import {ActiveWaypoint} from "./flightplan/ActiveWaypoint";
+import {ActiveWaypoint, FromLeg} from "./flightplan/ActiveWaypoint";
 import {TimeStamp} from "./Time";
 import {CenterWaypoint} from "../pages/right/Ctr1Page";
 import type {FplPage} from "../pages/left/FplPage";
@@ -150,6 +150,25 @@ export class NavPageState {
     public aprActivationScale: number = 1;
 
     public waypointAlert = false;
+    /**
+     * Set by NavCalculator when the active flight plan moves on to the next leg by itself: an anticipated or abeam turn
+     * starts (4-8), or a waypoint is sequenced without a turn (4-9). The DTK of a calculation is taken before the turn or
+     * the sequencing, so the new DTK shows in the next calculation, which consumes the flag (#434)
+     */
+    public legChangePending: boolean = false;
+    /**
+     * The FROM leg of the active leg when legChangePending was set. ActiveWaypoint replaces the object whenever the
+     * active leg changes: a Direct To, an activation of a flight plan or an approach, an FPL 0 edit that moves the active
+     * leg, a sequencing. A different object at the next calculation means the leg change was overtaken by such a change,
+     * which is no leg change, and the mark is dropped (#434)
+     */
+    public legChangeFrom: FromLeg | null = null;
+    /**
+     * Non-null in exactly the calculation whose DTK is the first of a leg change: how far the DTK moved, in degrees. The
+     * course messages post at once at a leg change (4-8, B-1) and count 12 s at any other DTK change (#434). A Direct To,
+     * activating a flight plan or an approach, editing FPL 0 and switching between LEG and OBS are no leg change
+     */
+    public legChangeDtkDelta: Degrees | null = null;
 
     public nav4SelectedAltitude: Feet = 0;
     public nav4FromAlt: Feet = 0;
@@ -415,6 +434,9 @@ export class VolatileMemory {
         this.navPage.steeringPath = null;
         this.navPage.toFrom = null;
         this.navPage.waypointAlert = false;
+        this.navPage.legChangePending = false; //A leg change before the power-off is not one of this power-on (#434)
+        this.navPage.legChangeFrom = null;
+        this.navPage.legChangeDtkDelta = null;
         this.navPage.isSelfTestApproved = false; //Every power-on runs the self-test again (#330)
         this.navPage.isSelfTestActive = false; //A power-off during the self-test ends it (#400)
         this.navPage.rollSteeringLatch = null; //A turn chosen before the power-off is not kept (#100)

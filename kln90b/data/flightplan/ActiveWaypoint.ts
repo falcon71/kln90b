@@ -314,7 +314,12 @@ export class ActiveWaypoint {
      * be recalculated
      */
     public recalculatePath() {
-        this.from!.path = CACHED_CIRCLE.setAsGreatCircle(this.from!.wpt, this.to!.wpt);
+        //A new object, as for every other change of the active leg: NavCalculator tells a leg change from such a change by
+        //the identity of the FROM leg (NavPageState.legChangeFrom, #434)
+        this.from = {
+            wpt: this.from!.wpt,
+            path: CACHED_CIRCLE.setAsGreatCircle(this.from!.wpt, this.to!.wpt),
+        };
     }
 
     /**

@@ -198,18 +198,19 @@ describe('Super NAV 5 message prompt (3-16, 3-36)', () => {
         expect(new Set([...first, ...second])).toEqual(new Set(['    ...']));
     });
 
-    // A pilot reaches this state: the ADJ NAV IND CRS message is read and Super NAV 5 shows, then a new message is
-    // posted whose condition lapses before it is read (the shape of InsideAirspaceMessage). When the lapse falls between
-    // a flashing tick and the next display tick, the element that flashed is the one that must turn steady; whether it
-    // does so depends on the timing, so the test calls the message handler's tick itself, right after the flashing tick
-    // (the maintainer's ruling, #326)
+    // A pilot reaches this state: the ADJ NAV IND CRS message of a driven indicator that does not follow is read and
+    // Super NAV 5 shows, then a new message is posted whose condition lapses before it is read (the shape of
+    // InsideAirspaceMessage). When the lapse falls between a flashing tick and the next display tick, the element that
+    // flashed is the one that must turn steady; whether it does so depends on the timing, so the test calls the message
+    // handler's tick itself, right after the flashing tick (the maintainer's ruling, #326). The fake sim does not slew
+    // the indicator (applyObsKeyEvents)
     it('keeps msg steady when the unread message lapses after a flashing tick (3-16, 3-36, #326)', async () => {
         const {kaaa, abc} = standardRoute();
-        const unit = await bootOnStandardRoute({magvar: 4});
+        const unit = await bootOnStandardRoute({magvar: 4, panelXml: panelXml({'Output.ObsTarget': 1})});
         unit.env.sim.set('Nav OBS:1', 'degrees', courseDeg(kaaa, abc) - 4 + 30);
-        await vi.advanceTimersByTimeAsync(15000); // Past the 10 s in which the message shows whatever the course is
+        await vi.advanceTimersByTimeAsync(15000); // Past the 12 s the indicator must be off
         await unit.panel.readMessages();
-        expect(messages(unit)).toEqual(['ADJ NAV IND CRS TO 046°']); // Preconditions
+        expect(messages(unit)).toEqual(['ADJ NAV IND CRS']); // Preconditions
         expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
         await showSuperNav5(unit);
         const lapsing = new class extends OneTimeMessage {
@@ -227,7 +228,7 @@ describe('Super NAV 5 message prompt (3-16, 3-36)', () => {
 
         lapsing.valid = false;
         unit.props.messageHandler.tick();
-        expect(messages(unit)).toEqual(['ADJ NAV IND CRS TO 046°']); // Precondition: only the read message is left
+        expect(messages(unit)).toEqual(['ADJ NAV IND CRS']); // Precondition: only the read message is left
         await vi.advanceTimersByTimeAsync(TICK_TIME_DISPLAY);
 
         expect(mapPrompt()).toBe('msg III');
@@ -236,15 +237,15 @@ describe('Super NAV 5 message prompt (3-16, 3-36)', () => {
     });
 
     // 3-16: a message whose condition needs action keeps the prompt on, not flashing, once it is read; 3-36 puts the same
-    // prompt on the map. The condition is a wrong external course, as in the status line test (StatusLine.test.ts). The
-    // steady inverse once read is the maintainer's ruling (#326)
+    // prompt on the map. The condition is a driven indicator that does not follow, as in the status line test
+    // (StatusLine.test.ts). The steady inverse once read is the maintainer's ruling (#326)
     it('keeps msg steady in inverse video once read while the condition stays (3-16, 3-36, #326)', async () => {
         const {kaaa, abc} = standardRoute();
-        const unit = await bootOnStandardRoute({magvar: 4});
+        const unit = await bootOnStandardRoute({magvar: 4, panelXml: panelXml({'Output.ObsTarget': 1})});
         unit.env.sim.set('Nav OBS:1', 'degrees', courseDeg(kaaa, abc) - 4 + 30);
-        await vi.advanceTimersByTimeAsync(15000); // Past the 10 s in which the message shows whatever the course is
+        await vi.advanceTimersByTimeAsync(15000); // Past the 12 s the indicator must be off
         await unit.panel.readMessages();
-        expect(messages(unit)).toEqual(['ADJ NAV IND CRS TO 046°']); // Preconditions
+        expect(messages(unit)).toEqual(['ADJ NAV IND CRS']); // Preconditions
         expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
         await showSuperNav5(unit);
 

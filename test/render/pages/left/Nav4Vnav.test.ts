@@ -316,8 +316,8 @@ describe('VNAV and the switch to OBS (checked in the KLN 89 trainer, 2026-10-14,
         const rows = await unit.panel.show('L', 'NAV 4');
         expect(rows[0]).toBe('VNV INACTV ');
         expect(rows[4]).toMatch(/^MIDAA/);
-        // The course advisory of LEG mode (ADJ NAV IND CRS TO, PersistentMessages) leaves the list with the switch, so
-        // the lists differ by that removal; the cancel itself adds none
+        // The course advisory of LEG mode (ADJ NAV IND CRS TO, PersistentMessages) leaves the list with the switch where it
+        // is listed, so the lists may differ by that removal; the cancel itself adds none
         const added = messages(unit).filter(m => !before.includes(m));
         expect(added).toEqual([]);
     });

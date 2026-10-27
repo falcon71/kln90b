@@ -1,4 +1,4 @@
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {describe, expect, it} from 'vitest';
 import {buildPersistentMessages} from '../../../kln90b/data/PersistentMessages';
 import {MessageHandler} from '../../../kln90b/data/MessageHandler';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
@@ -35,6 +35,10 @@ interface World {
     selfTestApproved: boolean;
     /** The GPS time in ms, which the course messages count their seconds in (#401) */
     gpsTime: number;
+    /** NavPageState.legChangeDtkDelta: non-null in the calculation whose DTK is the first of a leg change (#434) */
+    legChangeDtkDelta: number | null;
+    /** The length of ActiveWaypoint.turnStack: a turn is being flown while it is not 0 */
+    turnStackLength: number;
 }
 
 /** A page object that passes the instanceof checks of PersistentMessages without being rendered */
@@ -61,6 +65,8 @@ function quietWorld(): World {
         baroSource: 0,
         selfTestApproved: true,
         gpsTime: Date.UTC(2026, 5, 1, 12),
+        legChangeDtkDelta: null,
+        turnStackLength: 0,
     };
 }
 
@@ -69,6 +75,12 @@ function harness(w: World) {
         activeWaypoint: {
             getActiveLeg: () => w.activeLeg,
             getActiveFafLeg: () => w.activeLeg?.fixType === KLNFixType.FAF ? w.activeLeg : null,
+            get turnStack() {
+                return {length: w.turnStackLength};
+            },
+        },
+        get legChangeDtkDelta() {
+            return w.legChangeDtkDelta;
         },
         get navmode() {
             return w.navmode;
@@ -153,10 +165,6 @@ function tickSeconds(h: ReturnType<typeof harness>, w: World, seconds: number): 
     }
     return messages;
 }
-
-afterEach(() => {
-    vi.useRealTimers();
-});
 
 describe('the quiet world', () => {
     // The precondition of every test below: the stub state raises no message, so a message in a test is that test's own
@@ -704,236 +712,284 @@ describe('ADJ NAV IND CRS, a driven indicator', () => {
     });
 });
 
+/**
+ * The messages of every second for the next `seconds`, the GPS time advancing by a second before each calculation tick,
+ * one array per tick
+ */
+function everySecond(h: ReturnType<typeof harness>, w: World, seconds: number): string[][] {
+    const ticks: string[][] = [];
+    for (let i = 0; i < seconds; i++) {
+        ticks.push(tickSeconds(h, w, 1));
+    }
+    return ticks;
+}
+
 describe('ADJ NAV IND CRS TO nnn, a readable indicator', () => {
-    // In LEG mode, with an HSI course the unit can read, the message shows while the course differs from the DTK
-    // by more than 5 degrees (B-1, on the spec tests below). The unit also shows it for a while after every DTK change
-    // of more than 5 degrees, whatever the indicator shows (the force window, below)
-    const readable = () => {
-        vi.useFakeTimers({toFake: ['Date']});
-        vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
+    // In LEG mode, with an indicator course the unit reads but does not set (Output.ObsTarget 0), the message shows while
+    // the course differs from the DTK by more than 5 degrees (B-1): at once at a leg change (4-8, B-1), otherwise once
+    // the course has been off for more than 12 s of GPS time (KA 90 Installation Manual pp. 3-43, 3-45; the AVsoftech
+    // checks of 2026-10-26, docs/kln89-trainer-record.md; #434). The first tick is at the start time, so the n-th
+    // second after it is the n-th tick of tickSeconds
+    const readable = (obsIn: number) => {
         const w = quietWorld();
         w.dtkMag = 46;
-        w.obsIn = 46;
+        w.obsIn = obsIn;
         const h = harness(w);
-        h.tick(); // The first DTK is the start-up course and opens no force window (#330); 31 s keep a window closed anyway
-        vi.advanceTimersByTime(31_000);
+        h.tick();
         return {w, h};
     };
 
-    it('shows at 6 degrees off the DTK, with the DTK in three digits (B-1)', () => {
-        const {w, h} = readable();
-        expect(h.tick()).toEqual([]); // The precondition: the force window has closed
-        w.obsIn = 52;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 046°']);
+    it('shows after more than 12 s at 6 degrees off the DTK (B-1, KA 90 manual 3-43, 3-45)', () => {
+        const {w, h} = readable(52);
+        expect(tickSeconds(h, w, 12)).toEqual([]);
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 046°']);
     });
 
-    it('shows at 6 degrees off the DTK on the other side (B-1)', () => {
-        const {w, h} = readable();
-        expect(h.tick()).toEqual([]); // The precondition: the force window has closed
-        w.obsIn = 40;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 046°']);
+    it('shows after more than 12 s at 6 degrees off on the other side (B-1)', () => {
+        const {w, h} = readable(40);
+        expect(tickSeconds(h, w, 12)).toEqual([]);
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 046°']);
+    });
+
+    it('does not show at 5 degrees off the DTK (B-1)', () => {
+        const {w, h} = readable(41);
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
+    });
+
+    // The AVsoftech trainer, 2026-10-26: a 5 s swing of the course gave nothing. "Held without a break": the course back
+    // on the DTK breaks the count, so 5 s and then 10 s off are never more than 12 s
+    it('does not show when the indicator comes back within 12 s', () => {
+        const {w, h} = readable(46);
+        w.obsIn = 52;
+        const ticks = everySecond(h, w, 5);
+        w.obsIn = 46;
+        ticks.push(...everySecond(h, w, 1));
+        w.obsIn = 52;
+        ticks.push(...everySecond(h, w, 10));
+
+        expect(ticks.flat()).toEqual([]);
+    });
+
+    // The AVsoftech trainer, 2026-10-26: the message went within about 1.5 s of the course being set
+    it('goes on the next tick once the indicator is within 5 degrees', () => {
+        const {w, h} = readable(52);
+        expect(tickSeconds(h, w, 13)).toEqual(['ADJ NAV IND CRS TO 046°']); // Precondition
+        w.obsIn = 46;
+
+        expect(tickSeconds(h, w, 1)).toEqual([]);
+    });
+
+    // 4-8 with B-1: at the start of the turn the message comes for a course change of more than 5 degrees. The AVsoftech
+    // trainer, 2026-10-26: posted in the frame of the switch with the course left off. It stays while the course is off
+    it('shows at once at a leg change with the indicator more than 5 degrees off the new DTK (4-8, B-1)', () => {
+        const {w, h} = readable(46);
+        expect(tickSeconds(h, w, 1)).toEqual([]); // Precondition: on the DTK
+        w.dtkMag = 80;
+        w.legChangeDtkDelta = 34;
+
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 080°']);
+        w.legChangeDtkDelta = null; // Only the first DTK of the leg change is marked
+        expect(everySecond(h, w, 30)).toEqual(Array(30).fill(['ADJ NAV IND CRS TO 080°']));
+    });
+
+    it('does not show at a leg change with the indicator on the new DTK', () => {
+        const {w, h} = readable(46);
+        w.dtkMag = 80;
+        w.obsIn = 80;
+        w.legChangeDtkDelta = 34;
+        const ticks = everySecond(h, w, 1);
+        w.legChangeDtkDelta = null;
+        ticks.push(...everySecond(h, w, 30));
+
+        expect(ticks.flat()).toEqual([]);
+    });
+
+    // The 30 s window of #177 went (#434): a DTK change that is no leg change, with the indicator already on the new
+    // course, gives nothing
+    it('shows nothing after a DTK change with the indicator on the new course', () => {
+        const {w, h} = readable(46);
+        w.dtkMag = 100;
+        w.obsIn = 100;
+
+        expect(everySecond(h, w, 40).flat()).toEqual([]);
+    });
+
+    // The maintainer's ruling, 2026-10-27: the TO message is removed once read, and with a readable course comes back,
+    // unread, after more than 12 s if the course is still off (the AVsoftech trainer, 2026-10-26, five runs). The count
+    // starts at the read, the first tick after it. MessageHandler sets seen back to false while the message is invalid
+    it('goes once read and comes back after more than 12 s if still off (the maintainer, 2026-10-27)', () => {
+        const {w, h} = readable(52);
+        expect(tickSeconds(h, w, 13)).toEqual(['ADJ NAV IND CRS TO 046°']); // Precondition
+        h.handler.getMessages()[0].seen = true; // What the MSG page does
+
+        expect(everySecond(h, w, 13).flat()).toEqual([]); // the read at t, then t + 1 to t + 12
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 046°']); // t + 13
+        expect(h.handler.hasUnreadMessages()).toBe(true);
+    });
+
+    // 4-8 with B-1: a leg change with the course off posts at once. It is a new message, so a read in the same second
+    // removes the message before but neither holds the new one back for 12 s nor leaves it read (#434)
+    it('posts a leg change at once and unread, also in the second the message before was read (4-8, B-1, #434)', () => {
+        const {w, h} = readable(52);
+        expect(tickSeconds(h, w, 13)).toEqual(['ADJ NAV IND CRS TO 046°']); // Precondition
+        h.handler.getMessages()[0].seen = true; // What the MSG page does, just before the next calculation
+        w.dtkMag = 80;
+        w.legChangeDtkDelta = 34;
+
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 080°']);
+        expect(h.handler.hasUnreadMessages()).toBe(true);
+        w.legChangeDtkDelta = null; // Only the first DTK of the leg change is marked
+        expect(everySecond(h, w, 30)).toEqual(Array(30).fill(['ADJ NAV IND CRS TO 080°']));
+        expect(h.handler.hasUnreadMessages()).toBe(true);
+    });
+
+    // The design's call (#434): no source covers a DTK change during the count, so the 12 s run from the moment the
+    // course went off
+    it('is not restarted by a DTK change while the indicator stays off', () => {
+        const {w, h} = readable(30);
+        expect(tickSeconds(h, w, 8)).toEqual([]);
+        w.dtkMag = 60; // No leg change: legChangeDtkDelta stays null
+
+        expect(tickSeconds(h, w, 4)).toEqual([]);
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 060°']);
     });
 
     // #361: a DTK of 359.7 magnetic is named 000 in the message, the north rule of #263
     it('names a DTK of 359.7 as 000° (characterization, #361)', () => {
-        vi.useFakeTimers({toFake: ['Date']});
-        vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
         const w = quietWorld();
         w.dtkMag = 359.7;
         w.obsIn = 10; // more than 5 degrees off
         const h = harness(w);
+        h.tick();
 
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 000°']);
-    });
-
-    it('does not show at 5 degrees off the DTK (B-1)', () => {
-        const {w, h} = readable();
-        w.obsIn = 41;
-        expect(h.tick()).toEqual([]);
+        expect(tickSeconds(h, w, 13)).toEqual(['ADJ NAV IND CRS TO 000°']);
     });
 
     it('does not show in OBS mode (B-1)', () => {
-        const {w, h} = readable();
-        w.obsIn = 100;
+        const {w, h} = readable(100);
         w.obsMode = true;
-        expect(h.tick()).toEqual([]);
+        w.legChangeDtkDelta = 54;
+        const ticks = everySecond(h, w, 1);
+        w.legChangeDtkDelta = null;
+        ticks.push(...everySecond(h, w, 30));
+
+        expect(ticks.flat()).toEqual([]);
     });
 
-    // The code comment (PersistentMessages.ts, forceShow) cites two YouTube timestamps for about 30 s; the maintainer
-    // re-checked the video: https://youtu.be/S1lt2W95bLA?t=2244 and https://youtu.be/S1lt2W95bLA?t=2574
-    it('keeps ADJ NAV IND CRS TO for 30 s after a DTK change of more than 5 degrees, even on course (#177)', () => {
-        const {w, h} = readable();
-        w.dtkMag = 100;
-        w.obsIn = 100;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']);
-        vi.advanceTimersByTime(25_000);
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']);
-        vi.advanceTimersByTime(6_000);
-        expect(h.tick()).toEqual([]);
+    // The design (#434): OBS to LEG is a DTK change that is no leg change, so the 12 s count from the switch, also with
+    // the indicator off since before it
+    it('counts 12 s from the switch from OBS to LEG (#434)', () => {
+        const {w, h} = readable(52);
+        w.obsMode = true;
+        expect(everySecond(h, w, 20).flat()).toEqual([]);
+        w.obsMode = false;
+
+        expect(everySecond(h, w, 13).flat()).toEqual([]); // the switch at s, then s + 1 to s + 12
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 046°']);
     });
 
-    // The video gives "about 30 s", not the exact edge: the code shows the message up to, and not at, 30.000 s
-    it('closes the window at 30 s, not before (characterization)', () => {
-        const {w, h} = readable();
-        w.dtkMag = 100;
-        w.obsIn = 100;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']);
-        vi.advanceTimersByTime(29_999);
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']);
-        vi.advanceTimersByTime(1);
-        expect(h.tick()).toEqual([]);
+    // 4-8, B-1: no TO message when the unit slews the indicator itself. Output.ObsTarget can change while the unit runs
+    // (L:KLN90B_ObsTarget, SimVarSync); here the indicator follows the course sent, so the plain message stays away too
+    it.each([1, 2])('goes when Output.ObsTarget changes to %i', (obsTarget) => {
+        const {w, h} = readable(52);
+        expect(tickSeconds(h, w, 13)).toEqual(['ADJ NAV IND CRS TO 046°']); // Precondition
+        w.obsTarget = obsTarget;
+        w.obsOut = 52;
+
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
     });
 
-    it('starts a new 30 s window at a second DTK change of more than 5 degrees (characterization)', () => {
-        const {w, h} = readable();
-        w.dtkMag = 100;
-        w.obsIn = 100;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']);
-        vi.advanceTimersByTime(20_000);
-        w.dtkMag = 160;
-        w.obsIn = 160;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 160°']);
-        vi.advanceTimersByTime(29_000); // 49 s after the first change, 29 s after the second
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 160°']);
-        vi.advanceTimersByTime(1_000);
-        expect(h.tick()).toEqual([]);
-    });
-
-    it('ends the window once the message is read (characterization)', () => {
-        const {w, h} = readable();
-        w.dtkMag = 100;
-        w.obsIn = 100;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']);
-        h.handler.getMessages().forEach(m => m.seen = true); // What the MSG page does
-        vi.advanceTimersByTime(1_000);
-        expect(h.tick()).toEqual([]);
-    });
-
-    it('does not open the window for a DTK change of 5 degrees (characterization)', () => {
-        const {w, h} = readable();
-        w.dtkMag = 51;
-        w.obsIn = 51;
-        expect(h.tick()).toEqual([]);
-    });
-
-    it('opens the window for a DTK change of 6 degrees (characterization)', () => {
-        const {w, h} = readable();
-        w.dtkMag = 52;
+    // "Held without a break": a course that is not read back (the CDI switched away from GPS) is a break, as for the
+    // driven indicator, so the count starts again when it returns
+    it('starts the count again after the course was not read back (#434)', () => {
+        const {w, h} = readable(52);
+        expect(tickSeconds(h, w, 6)).toEqual([]);
+        w.obsIn = null;
+        expect(everySecond(h, w, 20).flat()).toEqual([]);
         w.obsIn = 52;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 052°']);
+
+        expect(everySecond(h, w, 13).flat()).toEqual([]); // read back again at s, then s + 1 to s + 12
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 046°']);
     });
 
-    it('opens the window for a DTK change of 6 degrees to the left (characterization)', () => {
-        const {w, h} = readable();
-        w.dtkMag = 40;
-        w.obsIn = 40;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 040°']);
-    });
+    // A driven indicator in between (Output.ObsTarget 1, L:KLN90B_ObsTarget) is a break of the count, as a course not
+    // read back is: the count starts again at the return to 0
+    it('starts the count again after Output.ObsTarget was 1 for a while (#434)', () => {
+        const {w, h} = readable(52);
+        expect(tickSeconds(h, w, 13)).toEqual(['ADJ NAV IND CRS TO 046°']); // Precondition
+        w.obsTarget = 1;
+        expect(everySecond(h, w, 5).flat()).toEqual([]);
+        w.obsTarget = 0;
 
-    // Since #330 the course at the first evaluation after the approval is the start-up course and opens no window, so
-    // the first DTK here comes after a start-up without one, as at a Direct To after a start-up without a flight plan
-    it('opens the window at the first DTK, even on course (characterization)', () => {
-        vi.useFakeTimers({toFake: ['Date']});
-        vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
-        const w = quietWorld();
-        const h = harness(w);
-        expect(h.tick()).toEqual([]); // The start-up, without a DTK
-        w.dtkMag = 3;
-        w.obsIn = 3;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 003°']);
+        expect(everySecond(h, w, 13).flat()).toEqual([]); // the return at s, then s + 1 to s + 12
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 046°']);
     });
 
     it('does not show without a course read back from the indicator (characterization)', () => {
-        const {w, h} = readable();
+        const {w, h} = readable(46);
         w.obsIn = null;
-        expect(h.tick()).toEqual([]);
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
     });
 });
 
 describe('ADJ NAV IND CRS TO nnn before the self-test is approved', () => {
-    const atNoon = () => {
-        vi.useFakeTimers({toFake: ['Date']});
-        vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
-    };
-
     // Figure 3-4: the self-test page with the indicator on 242° against the fixed course of 315° and no message prompt.
     // The maintainer's ruling (#330) widens this to the whole time before the approval, the Turn-On page included. The
-    // same world after the approval shows the message, so the approval is what lets it through
+    // same world after the approval shows the message, more than 12 s later, so the approval is what lets it through
     it('is not evaluated before the approval, with the indicator off the course (figure 3-4) (#330)', () => {
-        atNoon();
         const w = quietWorld();
         w.dtkMag = 315;
         w.obsIn = 242;
         w.selfTestApproved = false;
         const h = harness(w);
-        expect(h.tick()).toEqual([]);
-        expect(h.tick()).toEqual([]);
+        h.tick();
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
 
         w.selfTestApproved = true;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 315°']);
+        expect(everySecond(h, w, 13).flat()).toEqual([]); // The count starts at the approval
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 315°']);
     });
 
-    // #330: the start-up is no DTK change. The DTK of 046° at the approval opens no 30 s window (#177) for a pilot whose
-    // indicator is already on it
-    it('takes the course at the approval as no DTK change, so it opens no 30 s window (#330)', () => {
-        atNoon();
+    // #330: the course at the approval is where the unit starts, no leg change
+    it('shows nothing at the approval with the indicator on the DTK (#330)', () => {
         const w = quietWorld();
         w.selfTestApproved = false;
         const h = harness(w);
-        expect(h.tick()).toEqual([]);
+        h.tick();
         w.selfTestApproved = true;
         w.dtkMag = 46;
         w.obsIn = 46;
 
-        expect(h.tick()).toEqual([]);
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
     });
 
     // #330: the engine-running start skips the self-test and counts as approved; its first course is the start-up
     // course as well
-    it('takes the first course of a start that skips the self-test as no DTK change (#330)', () => {
-        atNoon();
-        const w = quietWorld();
-        w.dtkMag = 46;
-        w.obsIn = 46;
-
-        expect(harness(w).tick()).toEqual([]);
-    });
-
-    // #330: every power-on starts anew. The last course of the previous power-on (046°) is not compared with the DTK at
-    // the next approval (100°), so that DTK opens no window either
-    it('takes the course at the approval after a power cycle as no DTK change (#330)', () => {
-        atNoon();
-        const w = quietWorld();
-        w.dtkMag = 46;
-        w.obsIn = 46;
-        const h = harness(w);
-        expect(h.tick()).toEqual([]); // Precondition: the start-up course opens no window
-        w.selfTestApproved = false; // The next power-on
-        expect(h.tick()).toEqual([]);
-        w.dtkMag = 100;
-        w.obsIn = 100;
-        w.selfTestApproved = true;
-
-        expect(h.tick()).toEqual([]);
-    });
-
-    // #330: a window opened by a DTK change before a power-off does not show after the approval of the next power-on,
-    // although its 30 s have not run out
-    it('ends a window from before the power-off at the approval (#330)', () => {
-        atNoon();
+    it('shows nothing at the first course of a start that skips the self-test, with the indicator on it (#330)', () => {
         const w = quietWorld();
         w.dtkMag = 46;
         w.obsIn = 46;
         const h = harness(w);
         h.tick();
-        w.dtkMag = 100;
-        w.obsIn = 100;
-        expect(h.tick()).toEqual(['ADJ NAV IND CRS TO 100°']); // Precondition: the DTK change opened the window
+
+        expect(everySecond(h, w, 30).flat()).toEqual([]);
+    });
+
+    // #330, #176: the power-off drops the message (MessageHandler.clear). The next power-on is not evaluated before its
+    // approval, and the count starts at the approval, not at the course from before the power-off
+    it('is gone after the next approval and not back before 13 s, after a power cycle with the message listed (#330)', () => {
+        const w = quietWorld();
+        w.dtkMag = 46;
+        w.obsIn = 52;
+        const h = harness(w);
+        h.tick();
+        expect(tickSeconds(h, w, 13)).toEqual(['ADJ NAV IND CRS TO 046°']); // Precondition: listed
+        h.handler.clear(); // The power-off
         w.selfTestApproved = false; // The next power-on
-        expect(h.tick()).toEqual([]);
-        vi.advanceTimersByTime(5_000);
+        expect(everySecond(h, w, 5).flat()).toEqual([]);
         w.selfTestApproved = true;
 
-        expect(h.tick()).toEqual([]);
+        expect(everySecond(h, w, 13).flat()).toEqual([]); // The count starts at the approval
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS TO 046°']);
     });
 });

@@ -45,28 +45,29 @@ describe('L:KLN90B_MsgLight (spec)', () => {
     });
 
     // 3-16: the MSG prompt stays steady while a condition that needs action persists, and 3-59 has the remote annunciator
-    // follow the prompt. The condition is a wrong external course: ADJ NAV IND CRS TO nnn stays while Nav OBS:1 differs from
-    // the DTK by more than 5 degrees (PersistentMessages.ts, active with the default Output.ObsTarget 0 and Input.ObsSource 1).
+    // follow the prompt. The condition is a driven indicator that does not follow: ADJ NAV IND CRS stays while Nav OBS:1
+    // differs from the course the unit sends by more than 0.5 degrees, after 12 s (B-1, PersistentMessages.ts, with
+    // Output.ObsTarget 1 and the default Input.ObsSource 1). The fake sim does not slew the indicator (applyObsKeyEvents).
+    // The TO message is removed once read (the maintainer, 2026-10-27, #434), so it cannot serve here
     it('is steady while a persistent message stays, and dark once its condition ends (3-16, 3-59)', async () => {
         const {kaaa, abc} = standardRoute();
         const magvar = 4;
-        const unit = await bootOnStandardRoute({magvar});
-        // On KAAA the DTK is the course of the first leg, and the unit shows it magnetic
+        const unit = await bootOnStandardRoute({magvar, panelXml: panelXml({'Output.ObsTarget': 1})});
+        // On KAAA the DTK is the course of the first leg, and the unit sends it magnetic
         const dtk = courseDeg(kaaa, abc) - magvar;
-        expect(Math.round(dtk)).toBe(46); // The literal of the message below follows from this, not from the unit
 
         unit.env.sim.set('Nav OBS:1', 'degrees', dtk + 30);
-        await vi.advanceTimersByTimeAsync(15000); // Past the 10 s in which the message shows whatever the course is
+        await vi.advanceTimersByTimeAsync(15000); // Past the 12 s the indicator must be off
 
         // Read every message: the MSG page marks them seen, and readMessages throws unless the page closed
         // A precondition: the setup raised the message, so the light below is held by it and not by something else
-        expect(await unit.panel.readMessages()).toContain('ADJ NAV IND CRS TO 046°');
+        expect(await unit.panel.readMessages()).toContain('ADJ NAV IND CRS');
 
         // Read, and the message stays: steady at every display tick, not flashing
         expect(await msgLightOverTwoSeconds(unit)).toEqual(new Set([1]));
 
-        // The course is set onto the DTK: the condition ends, the message goes and the light with it
-        unit.env.sim.set('Nav OBS:1', 'degrees', dtk);
+        // The indicator follows the course sent: the condition ends, the message goes and the light with it
+        unit.env.sim.set('Nav OBS:1', 'degrees', unit.props.sensors.out.obsOut!);
         await vi.advanceTimersByTimeAsync(3000);
 
         expect(await msgLightOverTwoSeconds(unit)).toEqual(new Set([0]));
@@ -169,16 +170,16 @@ describe('status line, the center segment (spec)', () => {
     });
 
     // 3-16: a message whose condition needs action keeps the prompt on, not flashing, once it is read. The condition is
-    // a wrong external course, as in the MSG light test above
+    // a driven indicator that does not follow, as in the MSG light test above
     it('keeps msg steady in inverse video once read while the condition stays (3-16)', async () => {
         const {kaaa, abc} = standardRoute();
-        const unit = await bootOnStandardRoute({magvar: 4});
+        const unit = await bootOnStandardRoute({magvar: 4, panelXml: panelXml({'Output.ObsTarget': 1})});
         unit.env.sim.set('Nav OBS:1', 'degrees', courseDeg(kaaa, abc) - 4 + 30);
-        await vi.advanceTimersByTimeAsync(15000); // Past the 10 s in which the message shows whatever the course is
+        await vi.advanceTimersByTimeAsync(15000); // Past the 12 s the indicator must be off
         // readMessages throws unless the page closed; the persistent message is not removed by the reading
         await unit.panel.readMessages();
         // The preconditions: every message was read, and the persistent one stays
-        expect(messages(unit)).toEqual(['ADJ NAV IND CRS TO 046°']);
+        expect(messages(unit)).toEqual(['ADJ NAV IND CRS']);
         expect(unit.props.messageHandler.hasUnreadMessages()).toBe(false);
 
         expect(await overTwoSeconds(prompt)).toEqual(new Set(['msg III']));

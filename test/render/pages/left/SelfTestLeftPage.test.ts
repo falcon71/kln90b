@@ -381,16 +381,17 @@ describe('ADJ NAV IND CRS around the self-test', () => {
         expect(unit.env.sim.keyEvents.some(k => k.name === 'K:VOR1_SET' && k.value === 315)).toBe(true); // The course was slewed
     });
 
-    // B-1: with a readable indicator the message shows while the course differs from the DTK by more than 5°
-    it('shows ADJ NAV IND CRS TO 050° right after the approval with the indicator off the DTK (B-1)', async () => {
+    // B-1: with a readable indicator the message shows while the course differs from the DTK by more than 5°, once it
+    // has differed for more than 12 s (KA 90 Installation Manual pp. 3-43, 3-45; #434)
+    it('shows ADJ NAV IND CRS TO 050° after the approval with the indicator off the DTK (B-1)', async () => {
         const unit = await approvedOnStandardRoute(242);
 
         expect(await adjustMessagesFor(unit, 40)).toEqual(['ADJ NAV IND CRS TO 050°']);
         expect(messages(unit)).toContain('ADJ NAV IND CRS TO 050°'); // Still there after 40 s: the course differs
     });
 
-    // #330: the start-up is no DTK change, so the DTK at the approval opens no 30 s window (#177) for a pilot whose
-    // indicator is already on it
+    // #330: the start-up is no leg change, so the DTK at the approval posts nothing for a pilot whose indicator is
+    // already on it
     it('shows no ADJ NAV IND CRS right after the approval with the indicator on the DTK (#330)', async () => {
         const unit = await approvedOnStandardRoute(50);
 
@@ -401,6 +402,7 @@ describe('ADJ NAV IND CRS around the self-test', () => {
     // and does not come back on the Turn-On page or the self-test page of the next power-on, only after its approval
     it('is not listed again before the approval of the next power-on (#330)', async () => {
         const unit = await approvedOnStandardRoute(242);
+        await vi.advanceTimersByTimeAsync(13000); // 15 s after the approval: past the 12 s the indicator must be off
         expect(messages(unit)).toContain('ADJ NAV IND CRS TO 050°'); // Precondition: listed after the first approval
 
         await unit.panel.powerCycle();
@@ -408,7 +410,7 @@ describe('ADJ NAV IND CRS around the self-test', () => {
         expect(approveShows()).toBe(true); // Precondition: not yet approved
 
         await unit.panel.approveSelfTest();
-        await vi.advanceTimersByTimeAsync(2000);
+        await vi.advanceTimersByTimeAsync(15000);
         expect(messages(unit)).toContain('ADJ NAV IND CRS TO 050°');
     });
 
@@ -417,10 +419,10 @@ describe('ADJ NAV IND CRS around the self-test', () => {
     it('shows ADJ NAV IND CRS TO 050° on an engine-running start, which skips the self-test (#330)', async () => {
         const unit = await bootUnit(onStandardRoute(242));
 
-        expect(await adjustMessagesFor(unit, 10)).toEqual(['ADJ NAV IND CRS TO 050°']);
+        expect(await adjustMessagesFor(unit, 20)).toEqual(['ADJ NAV IND CRS TO 050°']);
     });
 
-    // #330: on the engine-running start too, the first DTK is the start-up course and opens no 30 s window (#177)
+    // #330: on the engine-running start too, the first DTK is the start-up course, no leg change
     it('shows no ADJ NAV IND CRS on an engine-running start with the indicator on the DTK (#330)', async () => {
         const unit = await bootUnit(onStandardRoute(50));
         await vi.advanceTimersByTimeAsync(2000);

@@ -39,18 +39,32 @@ export function buildPersistentMessages(props: PageProps): Message[] {
         new VnavAlertMessage(props.vnav, props.pageManager),
         //Both course messages are always built: Output.ObsTarget can change while the unit runs (L:KLN90B_ObsTarget,
         //SimVarSync), so each decides on every call which indicator case applies (#401)
-        new AdjustCourseToWithObsReadingMessage(props.sensors, props.modeController, props.memory.navPage, props.planeSettings),
+        new AdjustCourseToMessage(props.sensors, props.modeController, props.memory.navPage, props.planeSettings),
         new AdjustCourseMessage(props.sensors, props.memory.navPage, props.planeSettings),
     ];
 }
 
 
-class AdjustCourseToWithObsReadingMessage implements Message {
+/**
+ * ADJ NAV IND CRS TO nnn°: set the indicator's course to the DTK. Only in Leg mode with a DTK, and never for an indicator
+ * the unit drives (4-8, B-1), whose message is AdjustCourseMessage. The number follows the live DTK.
+ *
+ * With an indicator course the unit reads (sensors.in.obsMag), the message shows while that course is more than 5
+ * degrees off the DTK (B-1): at once at a leg change (4-8, B-1; NavPageState.legChangeDtkDelta), otherwise once the
+ * course has been off for more than 12 s of GPS time (KA 90 Installation Manual pp. 3-43, 3-45). It goes on the next
+ * calculation once the course is within 5 degrees, and once it is read (the maintainer's ruling, 2026-10-27, unlike the
+ * messages that stay listed when read, 3-16); while the course stays off it comes back, unread, more than 12 s after the
+ * read. The AVsoftech trainer showed each of these (docs/kln89-trainer-record.md, 2026-10-26). #434
+ */
+class AdjustCourseToMessage implements Message {
 
     public message: string[] = ["ADJ NAV IND CRS"];
     public seen: boolean = false;
-    private forceShow = false;
+    /** The readable course more than 5 degrees off the DTK */
+    private readonly offTimer = new SustainedCondition(COURSE_MESSAGE_DELAY);
 
+    //The unreadable case: the 30 s window after a DTK change of more than 5 degrees (#177)
+    private forceShow = false;
     private lastCourse: number | null = null;
     private validUntil: number = 0;
     private atStartUp = true; //Until the first evaluation after the self-test is approved (#330)
@@ -67,13 +81,15 @@ class AdjustCourseToWithObsReadingMessage implements Message {
             //indicator that does not follow (#401). The next evaluation starts as a new one, so a course from before is
             //no DTK change
             this.atStartUp = true;
+            this.offTimer.reset();
             return false;
         }
 
         if (!this.navState.isSelfTestApproved) {
             //#330: not evaluated before the self-test is approved, neither on the Turn-On page nor on the self-test page,
-            //whose fixed course is part of the check and not a course to set (figure 3-4)
+            //whose fixed course is part of the check and not a course to set (figure 3-4). The count starts at the approval
             this.atStartUp = true;
+            this.offTimer.reset();
             return false;
         }
 
@@ -87,6 +103,7 @@ class AdjustCourseToWithObsReadingMessage implements Message {
             this.lastCourse = dtk;
         }
         if (dtk === null || this.modeController.isObsModeActive()) {
+            this.offTimer.reset();
             return false;
         }
 
@@ -104,16 +121,30 @@ class AdjustCourseToWithObsReadingMessage implements Message {
             this.forceShow = false;
         }
 
-        if (this.forceShow && Date.now() < this.validUntil) {
-            return true;
+        const obsMag = this.sensors.in.obsMag;
+        if (obsMag === null) {
+            //The unreadable case
+            this.offTimer.reset();
+            return this.forceShow && Date.now() < this.validUntil;
         }
 
-        if (this.sensors.in.obsMag === null) {
+        //The GPS replaces its time object on some ticks, so it is read through the GPS each time. MessageHandler.tick
+        //asks twice per tick, and the time is the same for both
+        const now = this.sensors.in.gps.timeZulu.getTimestamp();
+        const off = Math.abs(NavMath.diffAngle(dtk, obsMag)) > 5;
+        if (this.navState.legChangeDtkDelta !== null && off) {
+            //4-8 with B-1: a leg change posts at once. It is a new message, so it is unread, also in the second the one
+            //before was read, and the read does not hold it back for 12 s. Both calls of the tick see the same mark
+            this.seen = false;
+            this.offTimer.satisfy(now);
+        }
+        if (this.seen) {
+            //Removed once read, and counted again from the read (the maintainer, 2026-10-27). MessageHandler sets seen
+            //back to false while the message is invalid, so it comes back unread
+            this.offTimer.restart(now);
             return false;
         }
-
-        //Second part, if we can read in, then check for a difference
-        return Math.abs(NavMath.diffAngle(dtk, this.sensors.in.obsMag)) > 5;
+        return this.offTimer.update(off, now);
     }
 }
 
