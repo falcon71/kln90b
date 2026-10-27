@@ -1,9 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle} from '../../harness/boot';
-import {approachWorld} from '../../harness/fixtures';
+import {approachWorld, standardRoute} from '../../harness/fixtures';
+import {angleDiff, courseDeg, finalCourseDeg, pointBefore, pointFrom} from '../../harness/flight/geo';
 import {savedFlightplan} from '../../harness/storage';
 import {AIRDATA, APR_ARM_SWITCH, NO_ALTIMETER, panelXml, VFR_ONLY} from '../../harness/panelXml';
-import {messages} from '../../harness/readers';
+import {activeIdent, messages} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 
@@ -257,5 +258,49 @@ describe('DATA BASE OUT OF DATE, one copy (#175)', () => {
 
         expect(unit.props.sensors.in.gps.timeZulu.getHours()).toBe(0); // Precondition: the entries were taken
         expect(dbCopies(unit)).toBe(0);
+    });
+});
+
+// #401: the unit sends the new course of a leg to a driven indicator, the sim slews it with K:VOR1_SET and the unit reads
+// it back one calculation tick later. The message is for an indicator that does not follow (B-1), and for a slew of a
+// moment it must stay quiet. The fake sim applies K:VOR1_SET at once, so the read-back is the slew of the sim
+describe('ADJ NAV IND CRS, a driven indicator slewed through a sequencing (#401)', () => {
+    it('posts no ADJ NAV IND CRS while the unit slews a driven indicator through a sequencing (#401)', async () => {
+        const {kaaa, abc, kbbb} = standardRoute();
+        const unit = await bootUnit({
+            facilities: [kaaa, abc, kbbb], position: pointBefore(kaaa, abc, 4),
+            panelXml: panelXml({'Output.ObsTarget': 1}), storage: savedFlightplan(0, [kaaa, abc, kbbb]),
+        });
+        unit.env.sim.set('Nav OBS:1', 'degrees', 50);
+        unit.env.sim.applyObsKeyEvents = true;
+        await settle(unit);
+        expect(activeIdent(unit)).toBe('ABC'); // Preconditions: on the first leg, a driven indicator
+        expect(unit.props.planeSettings.output.obsTarget).toBe(1);
+
+        // 240 kt, sampled every display tick: 4 NM to ABC and on, along ABC to KBBB, for about two minutes
+        unit.env.sim.set('GROUND VELOCITY', 'knots', 240);
+        const nmPerStep = 240 * 0.25 / 3600;
+        const legBefore = finalCourseDeg(kaaa, abc);
+        const legAfter = courseDeg(abc, kbbb);
+        const sampled: string[] = [];
+        const indicator = new Set<number>();
+        let sequenced = false;
+        for (let step = 1; step <= 480; step++) {
+            const nm = step * nmPerStep;
+            const to = nm <= 4 ? pointBefore(kaaa, abc, 4 - nm) : pointFrom(abc, legAfter, nm - 4);
+            unit.env.sim.set('PLANE LATITUDE', 'degrees', to.lat);
+            unit.env.sim.set('PLANE LONGITUDE', 'degrees', to.lon);
+            await vi.advanceTimersByTimeAsync(250);
+            sampled.push(...messages(unit));
+            indicator.add(Math.round(unit.env.sim.get('Nav OBS:1', 'degrees')));
+            sequenced = sequenced || activeIdent(unit) === 'KBBB';
+        }
+
+        expect(sequenced).toBe(true); // Precondition: the flight went through the sequencing at ABC
+        // The unit slewed the indicator to the new course of the leg after ABC (the magnetic variation is 0)
+        const slewedTo = (course: number) => [...indicator].some(v => Math.abs(angleDiff(v, course)) <= 1);
+        expect(slewedTo(legBefore)).toBe(true);
+        expect(slewedTo(legAfter)).toBe(true);
+        expect(sampled.filter(m => m.includes('ADJ NAV IND CRS'))).toEqual([]);
     });
 });

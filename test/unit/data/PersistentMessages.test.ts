@@ -33,6 +33,8 @@ interface World {
     airdataInterfaced: boolean;
     baroSource: number;
     selfTestApproved: boolean;
+    /** The GPS time in ms, which the course messages count their seconds in (#401) */
+    gpsTime: number;
 }
 
 /** A page object that passes the instanceof checks of PersistentMessages without being rendered */
@@ -58,6 +60,7 @@ function quietWorld(): World {
         airdataInterfaced: false,
         baroSource: 0,
         selfTestApproved: true,
+        gpsTime: Date.UTC(2026, 5, 1, 12),
     };
 }
 
@@ -87,7 +90,12 @@ function harness(w: World) {
         planeSettings: {
             vfrOnly: false,
             input: {altimeterInterfaced: true, airdata: {isInterfaced: w.airdataInterfaced, baroSource: w.baroSource}},
-            output: {obsTarget: w.obsTarget},
+            output: {
+                // A getter, because the run-time Output.ObsTarget can change between two ticks (SimVarSync, #401)
+                get obsTarget() {
+                    return w.obsTarget;
+                },
+            },
         },
         memory: {navPage},
         database: {isAiracCurrent: () => w.dbCurrent},
@@ -107,6 +115,12 @@ function harness(w: World) {
                 get obsMag() {
                     return w.obsIn;
                 },
+                // Read through sensors.in.gps each time, as the unit does: Gps replaces its timeZulu object
+                gps: {
+                    get timeZulu() {
+                        return {getTimestamp: () => w.gpsTime};
+                    },
+                },
             },
             out: {
                 get obsOut() {
@@ -125,6 +139,19 @@ function harness(w: World) {
             return handler.getMessages().map(m => m.message.join(' '));
         },
     };
+}
+
+/**
+ * Runs `seconds` calculation ticks, the GPS time advancing by a second before each, and returns the messages after the
+ * last
+ */
+function tickSeconds(h: ReturnType<typeof harness>, w: World, seconds: number): string[] {
+    let messages: string[] = [];
+    for (let i = 0; i < seconds; i++) {
+        w.gpsTime += 1000;
+        messages = h.tick();
+    }
+    return messages;
 }
 
 afterEach(() => {
@@ -489,37 +516,191 @@ describe('DATA BASE OUT OF DATE', () => {
 });
 
 describe('ADJ NAV IND CRS, a driven indicator', () => {
-    // With an indicator the unit slews (Output.ObsTarget other than 0), the message shows when the indicator's
-    // course differs from the unit's selected course by more than 0.5 degrees (B-1, on the spec tests below)
-    const driven = (out: number | null, inp: number | null, obsTarget = 1) => {
+    // With an indicator the unit slews (Output.ObsTarget other than 0), the message shows when the indicator's course
+    // has differed from the unit's selected course by more than 0.5 degrees for more than 12 s (B-1, on the spec tests
+    // below; the 12 s are those of the KA 90 Installation Manual pp. 3-43 and 3-45, carried over by analogy for a driven
+    // indicator, the maintainer, 2026-10-26; #401). The first tick is at the start time, so `seconds` is the time held
+    const driven = (out: number | null, inp: number | null, obsTarget = 1, seconds = 13) => {
         const w = quietWorld();
         w.obsTarget = obsTarget;
         w.obsOut = out;
         w.obsIn = inp;
-        return harness(w).tick();
+        const h = harness(w);
+        h.tick();
+        return tickSeconds(h, w, seconds);
     };
 
-    it('shows at 0.6 degrees off, to either side (B-1)', () => {
+    /** A driven world with the indicator 0.6 degrees off, after the first tick */
+    const drivenOff = () => {
+        const w = quietWorld();
+        w.obsTarget = 1;
+        w.obsOut = 100;
+        w.obsIn = 100.6;
+        const h = harness(w);
+        h.tick();
+        return {w, h};
+    };
+
+    it('shows after more than 12 s at 0.6 degrees off, to either side (B-1, #401)', () => {
+        expect(driven(100, 100.6, 1, 12)).toEqual([]);
         expect(driven(100, 100.6)).toEqual(['ADJ NAV IND CRS']);
+        expect(driven(100, 99.4, 1, 12)).toEqual([]);
         expect(driven(100, 99.4)).toEqual(['ADJ NAV IND CRS']);
     });
 
     it('does the same for the second indicator target (characterization)', () => {
+        expect(driven(100, 100.6, 2, 12)).toEqual([]);
         expect(driven(100, 100.6, 2)).toEqual(['ADJ NAV IND CRS']);
-        expect(driven(100, 100.4, 2)).toEqual([]);
+        expect(driven(100, 100.4, 2, 30)).toEqual([]);
     });
 
     it('does not show at 0.4 degrees off (B-1)', () => {
-        expect(driven(100, 99.6)).toEqual([]);
+        expect(driven(100, 99.6, 1, 30)).toEqual([]);
     });
 
     it('compares across north (B-1)', () => {
-        expect(driven(359.8, 0.1)).toEqual([]);
+        expect(driven(359.8, 0.1, 1, 30)).toEqual([]);
         expect(driven(359.8, 0.5)).toEqual(['ADJ NAV IND CRS']);
     });
 
     it('does not show without a course read back (characterization)', () => {
-        expect(driven(100, null)).toEqual([]);
+        expect(driven(100, null, 1, 30)).toEqual([]);
+    });
+
+    it('does not show for an indicator that follows within 12 s (#401)', () => {
+        const {w, h} = drivenOff();
+        expect(tickSeconds(h, w, 5)).toEqual([]);
+        w.obsIn = 100;
+
+        const after: string[][] = [];
+        for (let i = 0; i < 30; i++) {
+            after.push(tickSeconds(h, w, 1));
+        }
+        expect(after.filter(m => m.length > 0)).toEqual([]);
+    });
+
+    it('starts the count again after the indicator was within 0.5 degrees (#401)', () => {
+        const {w, h} = drivenOff();
+        expect(tickSeconds(h, w, 10)).toEqual([]);
+        w.obsIn = 100;
+        expect(tickSeconds(h, w, 1)).toEqual([]);
+        w.obsIn = 100.6;
+
+        expect(tickSeconds(h, w, 13)).toEqual([]);
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS']);
+    });
+
+    // "Held without a break": a course that is not read back is a break, so the count starts again when it returns
+    it('starts the count again after the course was not read back (#401)', () => {
+        const {w, h} = drivenOff();
+        expect(tickSeconds(h, w, 6)).toEqual([]);
+        w.obsIn = null;
+        expect(tickSeconds(h, w, 20)).toEqual([]);
+        w.obsIn = 100.6;
+
+        expect(tickSeconds(h, w, 1)).toEqual([]); // The count starts here
+        expect(tickSeconds(h, w, 12)).toEqual([]);
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS']);
+    });
+
+    // The same for the case that changes while the unit runs: Output.ObsTarget 1, 0 and 1 again (SimVarSync)
+    it('starts the count again after Output.ObsTarget went to 0 and back to 1 (#401)', () => {
+        const {w, h} = drivenOff();
+        expect(tickSeconds(h, w, 6)).toEqual([]);
+        w.obsTarget = 0;
+        expect(tickSeconds(h, w, 20)).toEqual([]);
+        w.obsTarget = 1;
+
+        expect(tickSeconds(h, w, 1)).toEqual([]); // The count starts here
+        expect(tickSeconds(h, w, 12)).toEqual([]);
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS']);
+    });
+
+    it('does not count while the GPS time stands still (the sim paused) (#401)', () => {
+        const {h} = drivenOff();
+        for (let i = 0; i < 60; i++) {
+            expect(h.tick()).toEqual([]);
+        }
+    });
+
+    // 3-16: a message stays listed with a steady prompt for as long as its condition holds
+    it('stays listed once read while the indicator is off (3-16)', () => {
+        const {w, h} = drivenOff();
+        expect(tickSeconds(h, w, 13)).toEqual(['ADJ NAV IND CRS']);
+        expect(h.handler.hasUnreadMessages()).toBe(true);
+        h.handler.getMessages()[0].seen = true;
+
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS']);
+        expect(h.handler.hasUnreadMessages()).toBe(false);
+    });
+
+    it('goes as soon as the indicator is within 0.5 degrees (B-1)', () => {
+        const {w, h} = drivenOff();
+        expect(tickSeconds(h, w, 13)).toEqual(['ADJ NAV IND CRS']);
+        w.obsIn = 100.4;
+
+        expect(tickSeconds(h, w, 1)).toEqual([]);
+    });
+
+    it('goes when the course is no longer read back (characterization)', () => {
+        const {w, h} = drivenOff();
+        expect(tickSeconds(h, w, 13)).toEqual(['ADJ NAV IND CRS']);
+        w.obsIn = null;
+
+        expect(tickSeconds(h, w, 1)).toEqual([]);
+    });
+
+    it('is evaluated from the tick Output.ObsTarget changes to 1 (#401)', () => {
+        const w = quietWorld();
+        w.obsOut = 100;
+        w.obsIn = 100.6;
+        const h = harness(w);
+        h.tick();
+        expect(tickSeconds(h, w, 20)).toEqual([]); // Precondition: an undriven indicator posts no plain message
+        w.obsTarget = 1;
+
+        expect(tickSeconds(h, w, 13)).toEqual([]);
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS']);
+    });
+
+    it('is no longer evaluated from the tick Output.ObsTarget changes to 0 (#401)', () => {
+        const {w, h} = drivenOff();
+        expect(tickSeconds(h, w, 13)).toEqual(['ADJ NAV IND CRS']);
+        w.obsTarget = 0;
+
+        expect(tickSeconds(h, w, 1)).toEqual([]);
+        expect(tickSeconds(h, w, 30)).toEqual([]);
+    });
+
+    // 4-8, B-1: no turn-anticipation message when the unit slews the indicator itself, whatever the indicator shows
+    it('never shows the TO message (4-8, B-1)', () => {
+        const w = quietWorld();
+        w.obsTarget = 1;
+        w.dtkMag = 46;
+        w.obsOut = 46;
+        w.obsIn = 46;
+        const h = harness(w);
+        h.tick();
+        w.dtkMag = 100; // A leg change of more than 5 degrees
+        w.obsOut = 100;
+        w.obsIn = 100;
+        expect(tickSeconds(h, w, 1)).toEqual([]);
+        w.obsIn = 60; // 40 degrees off the DTK: the plain message is the one for it, and only after 12 s
+
+        expect(tickSeconds(h, w, 13)).toEqual([]);
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS']);
+    });
+
+    // #330, as for the readable indicator: the self-test page sends its fixed course to a driven indicator, which reads
+    // it back one tick later
+    it('is not evaluated before the self-test is approved (#330)', () => {
+        const {w, h} = drivenOff();
+        w.selfTestApproved = false;
+        expect(tickSeconds(h, w, 30)).toEqual([]);
+
+        w.selfTestApproved = true;
+        expect(tickSeconds(h, w, 13)).toEqual([]); // The count starts at the approval
+        expect(tickSeconds(h, w, 1)).toEqual(['ADJ NAV IND CRS']);
     });
 });
 

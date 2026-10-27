@@ -14,13 +14,21 @@ import {Message} from "./MessageHandler";
 import {Vnav, VnavState} from "../services/Vnav";
 import {Nav4LeftPage, Nav4RightPage} from "../pages/left/Nav4Page";
 import {isBaroTransmitted, KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
+import {SustainedCondition} from "./SustainedCondition";
+
+/**
+ * How long the course must be off before a course message that waits shows: the KA 90 Installation Manual pp. 3-43 and
+ * 3-45 give 12 s for a readable indicator, and the same time is carried over by analogy for a driven indicator (the
+ * maintainer, 2026-10-26, #401). Counted in GPS time, which stands still while the sim is paused
+ */
+export const COURSE_MESSAGE_DELAY = 12_000;
 
 /*
 We have pretty all messages except for failures and RAIM problems
  */
 
 export function buildPersistentMessages(props: PageProps): Message[] {
-    const messages: Message[] = [
+    return [
         new AltitudeFailMessage(props.planeSettings),
         new ArmGPSApproachMessage(props.memory.navPage),
         new DatabaseOutOfDateMessage(props.database),
@@ -29,15 +37,11 @@ export function buildPersistentMessages(props: PageProps): Message[] {
         new Obs200NMMessage(props.memory.navPage, props.modeController),
         new PressAltToSetBaroMessage(props.memory.navPage, props.pageManager, props.planeSettings),
         new VnavAlertMessage(props.vnav, props.pageManager),
+        //Both course messages are always built: Output.ObsTarget can change while the unit runs (L:KLN90B_ObsTarget,
+        //SimVarSync), so each decides on every call which indicator case applies (#401)
+        new AdjustCourseToWithObsReadingMessage(props.sensors, props.modeController, props.memory.navPage, props.planeSettings),
+        new AdjustCourseMessage(props.sensors, props.memory.navPage, props.planeSettings),
     ];
-
-    if (props.planeSettings.output.obsTarget === 0) {
-        messages.push(new AdjustCourseToWithObsReadingMessage(props.sensors, props.modeController, props.memory.navPage));
-    } else {
-        messages.push(new AdjustCourseMessage(props.sensors, props.memory.navPage));
-    }
-
-    return messages;
 }
 
 
@@ -52,11 +56,20 @@ class AdjustCourseToWithObsReadingMessage implements Message {
     private atStartUp = true; //Until the first evaluation after the self-test is approved (#330)
 
 
-    constructor(private readonly sensors: Sensors, private readonly modeController: ModeController, private readonly navState: NavPageState) {
+    constructor(private readonly sensors: Sensors, private readonly modeController: ModeController, private readonly navState: NavPageState,
+                private readonly planeSettings: KLN90PlaneSettings) {
     }
 
 
     public isConditionValid(): boolean {
+        if (this.planeSettings.output.obsTarget !== 0) {
+            //4-8, B-1: no TO message when the unit slews the indicator itself. The plain message is the one for a driven
+            //indicator that does not follow (#401). The next evaluation starts as a new one, so a course from before is
+            //no DTK change
+            this.atStartUp = true;
+            return false;
+        }
+
         if (!this.navState.isSelfTestApproved) {
             //#330: not evaluated before the self-test is approved, neither on the Turn-On page nor on the self-test page,
             //whose fixed course is part of the check and not a course to set (figure 3-4)
@@ -104,27 +117,46 @@ class AdjustCourseToWithObsReadingMessage implements Message {
     }
 }
 
+/**
+ * B-1: the indicator the unit drives (Output.ObsTarget other than 0) does not follow the course the unit sent. The unit
+ * reads the course back one calculation tick after it sends it, and the sim slews the indicator in the time between, so
+ * the message waits until the indicator has been more than 0.5 degrees off for more than 12 s of GPS time. The KA 90
+ * Installation Manual (pp. 3-43, 3-45) gives the 12 s for a readable indicator, and they are carried over by analogy
+ * for a driven one (the maintainer, 2026-10-26, #401).
+ */
 class AdjustCourseMessage implements Message {
 
     public readonly message: string[] = ["ADJ NAV IND CRS"];
     public seen: boolean = false;
+    private readonly off = new SustainedCondition(COURSE_MESSAGE_DELAY);
 
 
-    constructor(private readonly sensors: Sensors, private readonly navState: NavPageState) {
+    constructor(private readonly sensors: Sensors, private readonly navState: NavPageState, private readonly planeSettings: KLN90PlaneSettings) {
     }
 
     public isConditionValid(): boolean {
         if (!this.navState.isSelfTestApproved) {
             //#330: not evaluated before the self-test is approved, as for the readable indicator. The self-test page
             //sends its fixed course (figure 3-4) to a driven indicator, which reads it back one tick later
+            this.off.reset();
+            return false;
+        }
+
+        if (this.planeSettings.output.obsTarget === 0) {
+            //An indicator the unit does not drive is the readable case, which has its own message
+            this.off.reset();
             return false;
         }
 
         if (this.sensors.out.obsOut === null || this.sensors.in.obsMag === null) {
+            this.off.reset();
             return false;
         }
 
-        return Math.abs(NavMath.diffAngle(this.sensors.out.obsOut, this.sensors.in.obsMag)) > 0.5;
+        //The GPS replaces its time object on some ticks, so it is read through the GPS each time. MessageHandler.tick
+        //asks twice per tick, and the time is the same for both
+        const now = this.sensors.in.gps.timeZulu.getTimestamp();
+        return this.off.update(Math.abs(NavMath.diffAngle(this.sensors.out.obsOut, this.sensors.in.obsMag)) > 0.5, now);
     }
 }
 
