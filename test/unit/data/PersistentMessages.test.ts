@@ -177,7 +177,7 @@ describe('the quiet world', () => {
 
 describe('ARM GPS APPROACH', () => {
     // With the approach disarmed (ENR), the unit reminds the pilot 3 NM before the FAF (B-1, on the spec tests below)
-    const atFaf = (navmode: NavMode, dist: number, fixType = KLNFixType.FAF) => {
+    const atFaf = (navmode: NavMode, dist: number | null, fixType = KLNFixType.FAF) => {
         const w = quietWorld();
         w.activeLeg = {fixType};
         w.navmode = navmode;
@@ -200,6 +200,11 @@ describe('ARM GPS APPROACH', () => {
 
     it('does not show before a fix that is not the FAF (B-1)', () => {
         expect(atFaf(NavMode.ENR_LEG, 2, KLNFixType.IAF)).toEqual([]);
+    });
+
+    // Without a position (NAV flag) NavCalculator.setFlag sets the distance to null, which is not inside the 3 NM (#417)
+    it('does not show without a distance to the FAF (B-1)', () => {
+        expect(atFaf(NavMode.ENR_LEG, null)).toEqual([]);
     });
 
     it('shows in ENR-OBS too (characterization)', () => {
@@ -234,8 +239,8 @@ describe('IF REQUIRED SELECT OBS', () => {
     });
 
     // B-2, 6-10: the reminder comes 4 NM before the fix. Without a position (NAV flag) NavCalculator.setFlag sets the
-    // distance to null, and null <= 4 is true in JavaScript, so the reminder is posted at any distance
-    it.fails('does not show without a distance to the fix (B-2) (#417)', () => {
+    // distance to null, which is not inside the 4 NM (#417)
+    it('does not show without a distance to the fix (B-2)', () => {
         expect(before(null, true)).toEqual([]);
     });
 });

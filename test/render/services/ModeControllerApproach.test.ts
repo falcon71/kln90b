@@ -197,10 +197,10 @@ describe('GPS APR switch while armed', () => {
     });
 
     // B-1 gives the reminder by the distance to the FAF (3 NM), which a unit without a position does not know. With the
-    // GPS lost (NAV flag) the distance is null, and the comparison null <= 3 is true in JavaScript, so the reminder is posted
-    // 15 NM from the FAF. The unit sequences onto FAFAA at 7.9 NM north (the test above) and flies back to 20 NM north,
-    // where the reminder has gone, before the GPS loses its solution
-    it.fails('does not show ARM GPS APPROACH without a position, 15 NM before the FAF (B-1) (#417)', async () => {
+    // GPS lost (NAV flag) the distance is null, which must not count as inside the 3 NM (#417). The unit sequences onto
+    // FAFAA at 7.9 NM north (the test above) and flies back to 20 NM north, where the reminder has gone, before the GPS
+    // loses its solution
+    it('does not show ARM GPS APPROACH without a position, 15 NM before the FAF (B-1)', async () => {
         const {w, unit} = await approachLoaded(20);
         await unit.panel.press('KLN90B_ApprArm_Push');
         await vi.advanceTimersByTimeAsync(2000);

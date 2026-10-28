@@ -230,7 +230,8 @@ class ArmGPSApproachMessage implements Message {
             return false;
         }
 
-        return this.navstate.distToActive! <= 3;
+        //Without a position (NAV flag) the distance is null, and null <= 3 would be true in JavaScript (#417)
+        return this.navstate.distToActive !== null && this.navstate.distToActive <= 3;
     }
 }
 
@@ -291,7 +292,8 @@ class IfRequiredSelectObsMessage implements Message {
             return false;
         }
 
-        return this.navstate.distToActive! <= 4;
+        //B-2, 6-10: 4 NM before the fix, which a unit without a position does not know (#417)
+        return this.navstate.distToActive !== null && this.navstate.distToActive <= 4;
     }
 }
 
