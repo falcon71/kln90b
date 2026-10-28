@@ -41,7 +41,10 @@ place, and `ActiveWaypoint` keeps copies or instance checks that do not see an i
   was observed for a changed next leg, not for a moved active waypoint, but it covers what changes here (the turn onto
   the arc and the lead), and one rule for all edits around the active waypoint is easier to reason about. The
   alternative, also dropping an abeam plan because the inbound leg itself changed, was not chosen. A Direct To to the
-  entry is handled the same way.
+  entry is handled the same way. One departure from #441, decided by the maintainer after the final review
+  (2026-10-28): a turn left over from the previous waypoint (its turn onto the active leg, or the run-out of its abeam
+  turn, #406) is dropped as well. It was made onto the old active leg, so keeping it would steer DTK and XTK along that
+  leg until it ends and then jump to the new one. #441 keeps such a leftover, because there the active leg is unchanged.
 - A move of any other arc entry changes nothing in `ActiveWaypoint`, as today.
 - MOVE ? stays offered behind the aircraft. Refusing it has no evidence (#420's alternative).
 

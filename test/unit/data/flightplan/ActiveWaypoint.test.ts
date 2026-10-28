@@ -469,3 +469,88 @@ describe('ActiveWaypoint.onArcEntryMoved (6-17)', () => {
         expect(aw.getFromLeg()).toBe(from);
     });
 });
+
+// #442: a move of the entry that is the active waypoint calculates the path again, and the turn by the rule of #441
+describe('ActiveWaypoint.onArcEntryMoved on the active entry (6-17, #442)', () => {
+    const anyTurn = () => {
+        const circle = GeoCircle.createGreatCircle(A, B);
+        return new TurnStackEntry(circle, new GeoPoint(B.lat, B.lon), circle);
+    };
+
+    /** KAAA 40 NM out on the 270 radial, then the arc entry, which is active with the aircraft 20 NM out */
+    function entryActive() {
+        const kaaa = onRadial(270, 40);
+        const {legs} = arcRoute([airport('KAAA', kaaa.lat, kaaa.lon)]);
+        const position = onRadial(270, 20);
+        const {aw, fpl} = activeWaypointWith(legs, position);
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(1); // Precondition: the arc entry PPP is active
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('PPP');
+        return {aw, fpl, legs, position};
+    }
+
+    it('drops the own started turn and a lead plan when the active entry moves, and calculates the path again (#442)', () => {
+        const {aw, fpl, legs} = entryActive();
+        aw.startOwnTurn(anyTurn());
+        aw.turnPlan = TurnPlan.AT_LEAD;
+        const oldEntry = legs[1].wpt;
+
+        fpl.setArcEntry(1, movedArcData(legs[1].arcData!, 280));
+        aw.onArcEntryMoved(1);
+
+        expect(aw.ownTurnStarted).toBe(false);
+        expect(aw.turnStack).toEqual([]);
+        expect(aw.turnPlan).toBeNull();
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('KAAA');
+        // GeoCircle.distance is signed, so both sides are measured as absolute values: the moved entry on the path, the
+        // old one, about 1.7 NM away, off it
+        expect(Math.abs(aw.getFromLeg()!.path.distance(legs[1].wpt))).toBeLessThan(NM(0.01));
+        expect(Math.abs(aw.getFromLeg()!.path.distance(oldEntry))).toBeGreaterThan(NM(1));
+    });
+
+    it('keeps an abeam plan when the active entry moves (#442)', () => {
+        const {aw, fpl, legs} = entryActive();
+        aw.turnPlan = TurnPlan.AT_ABEAM;
+
+        fpl.setArcEntry(1, movedArcData(legs[1].arcData!, 280));
+        aw.onArcEntryMoved(1);
+
+        expect(aw.turnPlan).toBe(TurnPlan.AT_ABEAM);
+    });
+
+    // Unlike an edit of the next leg (#408, #441), the move changes the active leg itself, and a turn left over from the
+    // previous waypoint, such as the run-out of its abeam turn, was made onto the old one: it goes too (the maintainer,
+    // 2026-10-28)
+    it('drops a turn left over from the previous waypoint when the active entry moves (#442)', () => {
+        const {aw, fpl, legs} = entryActive();
+        aw.turnStack.push(anyTurn());
+        expect(aw.ownTurnStarted).toBe(false); // Precondition: the turn on the stack is not PPP's own
+
+        fpl.setArcEntry(1, movedArcData(legs[1].arcData!, 280));
+        aw.onArcEntryMoved(1);
+
+        expect(aw.turnStack).toEqual([]);
+    });
+
+    it('applies the same rule to a Direct To to the entry (#442)', () => {
+        const {aw, fpl, legs, position} = entryActive();
+        const origin = fromHere(position);
+        aw.directToFlightplanIndex(origin, 1);
+        aw.startOwnTurn(anyTurn());
+        aw.turnPlan = TurnPlan.AT_LEAD;
+        const oldEntry = legs[1].wpt;
+
+        fpl.setArcEntry(1, movedArcData(legs[1].arcData!, 280));
+        aw.onArcEntryMoved(1);
+
+        expect(aw.ownTurnStarted).toBe(false);
+        expect(aw.turnStack).toEqual([]);
+        expect(aw.turnPlan).toBeNull();
+        expect(aw.isDctNavigation()).toBe(true);
+        expect(aw.getFromWpt()).toBe(origin);
+        // GeoCircle.distance is signed, so both sides are measured as absolute values: the moved entry on the path, the
+        // old one, about 1.7 NM away, off it
+        expect(Math.abs(aw.getFromLeg()!.path.distance(legs[1].wpt))).toBeLessThan(NM(0.01));
+        expect(Math.abs(aw.getFromLeg()!.path.distance(oldEntry))).toBeGreaterThan(NM(1));
+    });
+});

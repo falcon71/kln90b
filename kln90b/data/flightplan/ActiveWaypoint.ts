@@ -357,7 +357,10 @@ export class ActiveWaypoint {
      * 6-17: MOVE ? has moved the entry of the DME arc at `idx` in FPL 0 (FlightplanUtils.moveArcEntry). The leg changed
      * in place (Flightplan.setArcEntry), so neither instance check of assertToMatchesFplIdx sees it, and what depends on
      * the entry is updated here (the design, docs/superpowers/specs/2026-10-28-arc-entry-move-design.md):
-     * - the active waypoint: its path is calculated again;
+     * - the active waypoint (#442): its path is calculated again, and its turn by the same rule as below. That rule was
+     *   checked in the KLN 89 trainer for an edit of the next leg; applying it to a moved active waypoint is the design's
+     *   call, as the trainer offers no MOVE ? at all. Unlike there, a turn left over from the previous waypoint, such as
+     *   the run-out of its abeam turn, goes too, because it was made onto the old active leg (the maintainer, 2026-10-28);
      * - the leg after the active waypoint (#441): the turn is computed again by the rule of an edit of the next leg
      *   (onFollowingLegChanged, #408).
      * A move of any other entry changes nothing here
@@ -370,6 +373,8 @@ export class ActiveWaypoint {
         }
         if (idx === activeIdx) {
             this.recalculatePath();
+            this.onFollowingLegChanged();
+            this.turnStack = [];
         } else if (idx === activeIdx + 1) {
             this.onFollowingLegChanged();
         }

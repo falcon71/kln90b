@@ -226,38 +226,43 @@ describe('roll steering near the VOR of a DME arc (#100)', () => {
 // #441: MOVE ? on the arc entry that follows the active waypoint changes the leg in place, so moveArcEntry tells the
 // active waypoint (ActiveWaypoint.onArcEntryMoved). The turn started onto the old entry is dropped and calculated again,
 // as an insert or a delete of the next leg does (#408)
+/**
+ * FPL 0 is KAAA WPTAA KPRC, and the approach is loaded with the aircraft on the leg to WPTAA, 10 NM before it. The unit
+ * enters the arc at the point of the arc closest to the aircraft then (6-16), the radial 184 here, which is about 58
+ * degrees right of the leg as seen from WPTAA, so FPL 0 holds the entry D184J at index 2. The autopilot flies until the
+ * own turn of the waypoint `turnAt` has started, and `seconds` more. `move` is MOVE ? on the entry: the entry is
+ * recalculated on the aircraft's track, as FlightplanUtils.moveArcEntry does (6-17)
+ */
+async function inTurnBeforeArc(turnAt: 'WPTAA' | 'D184J', seconds: number) {
+    const {world, abc, kprc} = arcWorld(LegTurnDirection.Right);
+    const wpt1 = pointFrom(pointFrom(abc, 270, 3), 180, 12);
+    const kaaa = pointFrom(wpt1, 170, 25);
+    const start = pointFrom(wpt1, 170, 10);
+    const kaaaFac = airport('KAAA', kaaa.lat, kaaa.lon);
+    const wptFac = intersection('WPTAA', wpt1.lat, wpt1.lon);
+    world.add(kaaaFac, wptFac);
+    const flight = await Flight.start({
+        world,
+        storage: savedFlightplan(0, [kaaaFac, wptFac, kprc]),
+        panelXml: panelXml({...APR_ARM_SWITCH, ...HEADING_INPUT}),
+        aircraft: {lat: start.lat, lon: start.lon, altitudeFt: 3000, groundspeedKt: 120, trackTrue: 350},
+    });
+    await flight.fly(2);
+    await flight.panel.loadProcedure('APT 8', {ident: 'KPRC'});
+    await flight.flyUntil(() => flight.nav.activeIdent === turnAt && flight.unit.props.memory.navPage.activeWaypoint.ownTurnStarted,
+        {timeout: 400, description: `the turn at ${turnAt}`});
+    await flight.fly(seconds);
+    const move = () => moveArcEntry(flight.unit.props.bus, flight.unit.props.memory.fplPage.flightplans[0], 2,
+        flight.unit.props.memory.navPage.activeWaypoint, flight.unit.props.sensors);
+    return {flight, abc, aw: flight.unit.props.memory.navPage.activeWaypoint, move};
+}
+
 describe('MOVE ? on the arc entry after the active waypoint (#441)', () => {
     /**
-     * FPL 0 is KAAA WPTAA KPRC, and the approach is loaded with the aircraft on the leg to WPTAA, 10 NM before it. The
-     * unit enters the arc at the point of the arc closest to the aircraft then (6-16), the radial 184 here, which is
-     * about 58 degrees right of the leg as seen from WPTAA. The entry follows the active waypoint WPTAA. The autopilot
-     * flies the leg until the turn at WPTAA has started, and 1 s more. There the track is the leg's: its line meets the
-     * arc where the leg's line does, so a moved entry needs hardly a turn at all (MOVE ? takes the entry on the track,
-     * 6-17)
+     * The turn at WPTAA has started, and 1 s more. There the track is the leg's: its line meets the arc where the leg's
+     * line does, so a moved entry needs hardly a turn at all
      */
-    async function inTurnToArcEntry() {
-        const {world, abc, kprc} = arcWorld(LegTurnDirection.Right);
-        const wpt1 = pointFrom(pointFrom(abc, 270, 3), 180, 12);
-        const kaaa = pointFrom(wpt1, 170, 25);
-        const start = pointFrom(wpt1, 170, 10);
-        const kaaaFac = airport('KAAA', kaaa.lat, kaaa.lon);
-        const wptFac = intersection('WPTAA', wpt1.lat, wpt1.lon);
-        world.add(kaaaFac, wptFac);
-        const flight = await Flight.start({
-            world,
-            storage: savedFlightplan(0, [kaaaFac, wptFac, kprc]),
-            panelXml: panelXml({...APR_ARM_SWITCH, ...HEADING_INPUT}),
-            aircraft: {lat: start.lat, lon: start.lon, altitudeFt: 3000, groundspeedKt: 120, trackTrue: 350},
-        });
-        await flight.fly(2);
-        await flight.panel.loadProcedure('APT 8', {ident: 'KPRC'});
-        await flight.flyUntil(() => flight.unit.props.memory.navPage.activeWaypoint.ownTurnStarted, {timeout: 400, description: 'the turn at WPTAA'});
-        await flight.fly(1);
-        // MOVE ? on the entry: the entry is recalculated on the aircraft's track, as FlightplanUtils.moveArcEntry does
-        const move = () => moveArcEntry(flight.unit.props.bus, flight.unit.props.memory.fplPage.flightplans[0], 2,
-            flight.unit.props.memory.navPage.activeWaypoint, flight.unit.props.sensors);
-        return {flight, abc, aw: flight.unit.props.memory.navPage.activeWaypoint, move};
-    }
+    const inTurnToArcEntry = () => inTurnBeforeArc('WPTAA', 1);
 
     // The sibling that holds the preconditions: the move itself works, and the turn at WPT1 is the one onto the old entry
     it('moves the entry while the turn at the waypoint before it has started (control of the pin)', async () => {
@@ -283,6 +288,44 @@ describe('MOVE ? on the arc entry after the active waypoint (#441)', () => {
         // The moved entry is on the leg's own line, so the new turn is small and its start is still ahead
         expect(aw.ownTurnStarted).toBe(false);
         oldEntries.forEach(entry => expect(aw.turnStack).not.toContain(entry));
+    });
+});
+
+// #442: MOVE ? on the arc entry that is the active waypoint calculates its path again, and drops the turn started onto
+// the old entry by the rule of an edit of the next leg (#408). The design's call; the KLN 89 trainer offers no MOVE ?
+describe('MOVE ? on the arc entry that is the active waypoint (#442)', () => {
+    /**
+     * WPTAA is sequenced and the entry D184J is active; the autopilot flies until the turn onto the arc has started, and
+     * 6 s more, so the track has turned away from the leg and meets the arc elsewhere
+     */
+    const inTurnOntoArc = () => inTurnBeforeArc('D184J', 6);
+
+    // The sibling that holds the preconditions: the move itself works, the entry moves far enough to tell the turns apart
+    it('moves the active entry while its turn onto the arc has started (control of the #442 test)', async () => {
+        const {flight, aw, move} = await inTurnOntoArc();
+        expect(flight.nav.activeIdent).toBe('D184J');
+        expect(aw.ownTurnStarted).toBe(true);
+        expect(turnStackLength(flight.unit)).toBeGreaterThan(0);
+        const oldEntry = {...flight.unit.props.memory.fplPage.flightplans[0].getLegs()[2].wpt};
+
+        expect(move()).toBe(true);
+        expect(distanceNm(oldEntry, flight.unit.props.memory.fplPage.flightplans[0].getLegs()[2].wpt)).toBeGreaterThan(0.2);
+    });
+
+    it('drops the turn started onto the old entry when the active entry is moved (#442)', async () => {
+        const {flight, aw, move} = await inTurnOntoArc();
+        const oldEntries = [...aw.turnStack];
+        expect(move()).toBe(true);
+        const moved = flight.unit.props.memory.fplPage.flightplans[0].getLegs()[2].wpt;
+        await flight.fly(1);
+        expect(flight.nav.activeIdent).toBe(moved.icaoStruct.ident);
+        oldEntries.forEach(entry => expect(aw.turnStack).not.toContain(entry));
+        // The aircraft is inside the new lead, so the new turn starts at once (as in the KLN 89 trainer, 2026-10-27, run a2,
+        // for an edit of the next leg), at the moved entry. The turn circle carries the bisector; the roll-in above it does not
+        expect(aw.ownTurnStarted).toBe(true);
+        const circle = aw.turnStack.find(entry => entry.turnBisector !== undefined);
+        expect(circle).toBeDefined();
+        expect(distanceNm(circle!.turnBisector!.wpt, moved)).toBeLessThan(0.01);
     });
 });
 
