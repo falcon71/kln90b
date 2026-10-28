@@ -512,8 +512,9 @@ Flightplan really is dead simple".
   `moveArcEntry` calls `onArcEntryMoved(idx)` instead, which decides by the moved index: the active waypoint gets its
   path calculated again (`recalculatePath`) and then the #408 handling as well, and a turn left over from the previous
   waypoint is dropped too, because it was made onto the old active leg (#442, the design's and the maintainer's call;
-  the KLN 89 trainer offers no MOVE ?). The leg after it gets the #408 handling (`onFollowingLegChanged`, #441). A move
-  of any other entry changes nothing in `ActiveWaypoint`
+  the KLN 89 trainer offers no MOVE ?). The leg after it gets the #408 handling (`onFollowingLegChanged`, #441). `from` is a
+  copy made at the activation, so a move of the entry of the active arc makes it again from the plan (#420); a Direct
+  To keeps its own origin. A move of any other entry changes nothing in `ActiveWaypoint`
   (docs/superpowers/specs/2026-10-28-arc-entry-move-design.md).
 - API: `directTo`, `directToFlightplanIndex`, `cancelDirectTo`, `activateFpl0()` (chooses the *closest* leg to the
   plane, as checked against the KLN 89 trainer), `sequenceToNextWaypoint`, `getFutureLegs`/`getDestination` (stop at the

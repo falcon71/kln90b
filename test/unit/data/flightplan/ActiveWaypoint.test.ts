@@ -554,3 +554,90 @@ describe('ActiveWaypoint.onArcEntryMoved on the active entry (6-17, #442)', () =
         expect(Math.abs(aw.getFromLeg()!.path.distance(oldEntry))).toBeGreaterThan(NM(1));
     });
 });
+
+// #420: the from waypoint is a copy made at the activation, so a move of the entry of the active arc renews it
+describe('ActiveWaypoint.onArcEntryMoved on the entry of the active arc (6-17, #420)', () => {
+    const anyTurn = () => {
+        const circle = GeoCircle.createGreatCircle(A, B);
+        return new TurnStackEntry(circle, new GeoPoint(B.lat, B.lon), circle);
+    };
+
+    /** KAAA 40 NM out on the 270 radial, then the arc, which is active with the aircraft on it at the 330 radial */
+    function arcActive() {
+        const kaaa = onRadial(270, 40);
+        const {legs} = arcRoute([airport('KAAA', kaaa.lat, kaaa.lon)]);
+        const position = onRadial(330, 10);
+        const {aw, fpl} = activeWaypointWith(legs, position);
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(2); // Precondition: the arc PPP to QQQ is the active leg
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('QQQ');
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('PPP');
+        return {aw, fpl, legs, position};
+    }
+
+    it('makes the moved entry the from waypoint of the active arc, with the arc as its path (#420)', () => {
+        const {aw, fpl, legs} = arcActive();
+        const turn = anyTurn();
+        aw.startOwnTurn(turn);
+        aw.turnPlan = TurnPlan.AT_LEAD;
+
+        fpl.setArcEntry(1, movedArcData(legs[1].arcData!, 300));
+        aw.onArcEntryMoved(1);
+
+        expect(aw.getFromWpt()).toBe(legs[1].wpt);
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('D300J');
+        expect(aw.getFromLeg()!.path).toBe(legs[1].arcData!.circle);
+        // Only the from waypoint changes: the turn state of the active waypoint QQQ stays
+        expect(aw.ownTurnStarted).toBe(true);
+        expect(aw.turnStack).toHaveLength(1);
+        expect(aw.turnStack[0]).toBe(turn);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
+    });
+
+    // The turn onto the arc, left over from the entry's sequencing, is the previous waypoint's and on the arc's circle,
+    // which the move keeps: it stays
+    it('keeps the turn onto the arc left over from the entry when the entry of the active arc moves (#420)', () => {
+        const {aw, fpl, legs} = arcActive();
+        const leftover = anyTurn();
+        aw.turnStack.push(leftover);
+        expect(aw.ownTurnStarted).toBe(false); // Precondition: the turn on the stack is not QQQ's own
+
+        fpl.setArcEntry(1, movedArcData(legs[1].arcData!, 300));
+        aw.onArcEntryMoved(1);
+
+        expect(aw.turnStack).toHaveLength(1);
+        expect(aw.turnStack[0]).toBe(leftover);
+        expect(aw.turnPlan).toBeNull();
+    });
+
+    // After the arc and its end QQQ are flown, MOVE ? is still offered on its entry (6-17); the entry is two legs before the
+    // active waypoint RRR, whose from waypoint is QQQ
+    it('changes nothing when an entry two legs before the active waypoint moves (#420)', () => {
+        const kaaa = onRadial(270, 40);
+        const {legs} = arcRoute([airport('KAAA', kaaa.lat, kaaa.lon)]);
+        const {aw, fpl} = activeWaypointWith(legs, pointFrom(onRadial(0, 10), 90, 15));
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(3); // Precondition: RRR, from QQQ
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('QQQ');
+        const from = aw.getFromLeg();
+
+        fpl.setArcEntry(1, movedArcData(legs[1].arcData!, 300));
+        aw.onArcEntryMoved(1);
+
+        expect(aw.getFromLeg()).toBe(from);
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('QQQ');
+    });
+
+    it('keeps the Direct To origin as from when the entry before the Direct To waypoint moves (#420)', () => {
+        const {aw, fpl, legs, position} = arcActive();
+        const origin = fromHere(position);
+        aw.directToFlightplanIndex(origin, 2);
+        const from = aw.getFromLeg();
+
+        fpl.setArcEntry(1, movedArcData(legs[1].arcData!, 300));
+        aw.onArcEntryMoved(1);
+
+        expect(aw.getFromWpt()).toBe(origin);
+        expect(aw.getFromLeg()).toBe(from);
+    });
+});

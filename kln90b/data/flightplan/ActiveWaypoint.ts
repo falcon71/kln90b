@@ -362,7 +362,10 @@ export class ActiveWaypoint {
      *   call, as the trainer offers no MOVE ? at all. Unlike there, a turn left over from the previous waypoint, such as
      *   the run-out of its abeam turn, goes too, because it was made onto the old active leg (the maintainer, 2026-10-28);
      * - the leg after the active waypoint (#441): the turn is computed again by the rule of an edit of the next leg
-     *   (onFollowingLegChanged, #408).
+     *   (onFollowingLegChanged, #408);
+     * - the leg before the active waypoint, the entry of the active arc (#420): the from waypoint, a copy made at the
+     *   activation, is made again, so the pages, the map and the previous-waypoint outputs show the moved entry. The arc
+     *   keeps its circle, so the path does not change. A Direct To flies from its own origin and keeps it.
      * A move of any other entry changes nothing here
      * @param idx the index of the moved leg in FPL 0
      */
@@ -371,7 +374,12 @@ export class ActiveWaypoint {
         if (activeIdx === -1) {
             return;
         }
-        if (idx === activeIdx) {
+        if (idx === activeIdx - 1) {
+            if (!this.isDirectTo) {
+                const legs = this.fpl0.getLegs();
+                this.from = this.fromLegOf(legs[idx], legs[activeIdx]);
+            }
+        } else if (idx === activeIdx) {
             this.recalculatePath();
             this.onFollowingLegChanged();
             this.turnStack = [];
@@ -396,24 +404,28 @@ export class ActiveWaypoint {
 
     private setFplData(idx: number): KLNFlightplanLeg {
         const legs = this.fpl0.getLegs();
-        const from = legs[idx - 1];
-        const to = legs[idx];
-        if (from.arcData === undefined) {
-            CACHED_CIRCLE.setAsGreatCircle(from.wpt, to.wpt);
-            this.from = {
-                wpt: from.wpt,
-                path: CACHED_CIRCLE,
-            };
-        } else {
-            this.from = {
-                wpt: from.wpt,
-                path: from.arcData.circle,
-            }
-        }
+        this.from = this.fromLegOf(legs[idx - 1], legs[idx]);
         this.to = legs[idx];
         this.isDirectTo = false;
         this.saveLastActiveWaypoint();
         return this.to;
+    }
+
+    /**
+     * The from leg of the plan leg `from` to `to`: an arc is flown on its circle, any other leg on the great circle
+     */
+    private fromLegOf(from: KLNFlightplanLeg, to: KLNFlightplanLeg): FromLeg {
+        if (from.arcData === undefined) {
+            return {
+                wpt: from.wpt,
+                path: CACHED_CIRCLE.setAsGreatCircle(from.wpt, to.wpt),
+            };
+        } else {
+            return {
+                wpt: from.wpt,
+                path: from.arcData.circle,
+            };
+        }
     }
 
     private saveLastActiveWaypoint() {
