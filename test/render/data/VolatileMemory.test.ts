@@ -185,8 +185,8 @@ describe('the Direct To over a power cycle (#422)', () => {
         expect(aw.isDctNavigation()).toBe(false);
     });
 
-    // Removing the procedures publishes the change, and the flight planner mirror then activates a new leg inside the
-    // reset, so the start page must be copied before the procedures go
+    // Dropping the active approach leg (#423) and removing the procedures both change the active leg inside the reset,
+    // so the start page must be copied before the procedures go
     it('opens on the page of the approach waypoint that was active although the power-on removed the approach (3-8, 6-5, #422)', async () => {
         const unit = await approachLoadedAt(40);
         expect(activeIdent(unit)).toBe('IAFAA'); // Precondition: the plan leg to the IAF is active
@@ -259,7 +259,7 @@ describe('the active leg after a power-on that removed its approach (#423)', () 
         expect(unit.props.sensors.in.gps.isValid()).toBe(true);
     });
 
-    it.fails('comes back on the leg closest to the position after the power-on, ENRZZ - ENRAA (#423)', async () => {
+    it('comes back on the leg closest to the position after the power-on, ENRZZ - ENRAA (#423)', async () => {
         const {unit} = await movedWhileOff();
         expect(activeIdent(unit)).toBe('ENRAA');
     });

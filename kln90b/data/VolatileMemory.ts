@@ -380,6 +380,8 @@ export class VolatileMemory {
         this.supPage.lastMatch = null;
 
         if (evt.timeSincePowerChange > RESET_TIME) {
+            //#423: before the removal, which would activate a new leg from the position stored at the power-off
+            this.navPage.activeWaypoint.dropProcedureLeg();
             this.fplPage.flightplans[0].removeProcedures();
             //#422: a Direct To is dropped as well (the KLN 89 trainer always, the AVsoftech KLN 90B trainer after a restart of
             //the program but not after a quick off and on, 2026-10-25). NavCalculator activates the closest FPL 0 leg, as

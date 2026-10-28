@@ -189,6 +189,19 @@ export class ActiveWaypoint {
     }
 
     /**
+     * #423: a power-on after more than 5 minutes off removes the procedures of FPL 0 (6-5). An active plan leg of a
+     * procedure goes with them, and the unit would at once activate the leg closest to the position stored at the
+     * power-off, before the GPS has a fix. Called before the removal, this leaves no active leg instead, and the first
+     * calculation tick with a valid GPS activates the closest FPL 0 leg, as for a dropped Direct To (#422). A Direct To is
+     * left to dropDirectTo. The last active waypoint is not touched
+     */
+    public dropProcedureLeg() {
+        if (!this.isDirectTo && this.to !== null && this.to.type !== KLNLegType.USER) {
+            this.flag();
+        }
+    }
+
+    /**
      * If FPL 0 is valid, then this activates the closest leg
      */
     public activateFpl0(): KLNFlightplanLeg | null {
