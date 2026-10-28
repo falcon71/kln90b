@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {EventBus, Facility, GeoCircle, GeoPoint, UnitType} from '@microsoft/msfs-sdk';
-import {ActiveWaypoint, TurnStackEntry} from '../../../../kln90b/data/flightplan/ActiveWaypoint';
+import {ActiveWaypoint, TurnPlan, TurnStackEntry} from '../../../../kln90b/data/flightplan/ActiveWaypoint';
 import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {ArcData} from '../../../../kln90b/data/navdata/SidStar';
 import {KLN90BUserSettings} from '../../../../kln90b/settings/KLN90BUserSettings';
@@ -102,28 +102,48 @@ describe('ActiveWaypoint.activateFpl0 with two waypoints always activates (#34)'
     });
 });
 
+const ARC_STATION = vor('STN', 47.0, 8.0);
+
+/**
+ * The legs `before`, then the arc P to Q that runs 10 NM around the VOR STN from the west radial to the north radial, and
+ * R 30 NM east of Q. The arc data is the arc leg P's, so the arc entry is at index `before.length`
+ */
+function arcRoute(before: Facility[] = []) {
+    const station = ARC_STATION;
+    const p = pointFrom(station, 270, 10);
+    const q = pointFrom(station, 0, 10);
+    const r = pointFrom(q, 90, 30);
+    const P = vor('PPP', p.lat, p.lon);
+    const Q = vor('QQQ', q.lat, q.lon);
+    const R = vor('RRR', r.lat, r.lon);
+    // Only circle is read by findClosestLegIdx; the other fields are filled in as far as they are known
+    const arcData = {
+        beginRadial: 270, beginPoint: p, entryFacility: P, endRadial: 0, endFacility: Q, endPoint: q,
+        vor: station,
+        // A right arc (270 to 000 clockwise): SidStar reverses the circle of every arc that is not a left arc
+        circle: GeoCircle.createFromPoint(station, NM(10)).reverse(),
+    } as unknown as ArcData;
+    return {station, legs: [...before.map(user), {...user(P), arcData}, user(Q), user(R)] as KLNFlightplanLeg[]};
+}
+
+/**
+ * The arc data of `arc` with its entry moved to `radial` at 10 NM, keeping the same circle object, as
+ * SidStar.recalculateArcEntryData does for MOVE ? (6-17)
+ */
+function movedArcData(arc: ArcData, radial: number): ArcData {
+    const point = pointFrom(ARC_STATION, radial, 10);
+    return {...arc, beginRadial: radial, beginPoint: point, entryFacility: intersection(`D${radial}J`, point.lat, point.lon)} as unknown as ArcData;
+}
+
+/** A point `nm` out on `radial` of the arc's VOR */
+const onRadial = (radial: number, nm: number) => pointFrom(ARC_STATION, radial, nm);
+
 describe('ActiveWaypoint.activateFpl0 on a DME arc', () => {
     // #41 continued (closed): the expected leg is the leg the aircraft is on, the rule of the #41 describe above.
     // On a DME arc the closest point lies on the small circle, and it is between FROM and TO when its angle along the
     // arc, in the circle's own direction, is no larger than TO's (#121).
-    // The arc P to Q runs 10 NM around a VOR from the west radial to the north radial; R is 30 NM east of Q.
-    function arcPlan() {
-        const station = vor('STN', 47.0, 8.0);
-        const p = pointFrom(station, 270, 10);
-        const q = pointFrom(station, 0, 10);
-        const r = pointFrom(q, 90, 30);
-        const P = vor('PPP', p.lat, p.lon);
-        const Q = vor('QQQ', q.lat, q.lon);
-        const R = vor('RRR', r.lat, r.lon);
-        // Only circle is read by findClosestLegIdx; the other fields are filled in as far as they are known
-        const arcData = {
-            beginRadial: 270, beginPoint: p, entryFacility: P, endRadial: 0, endFacility: Q, endPoint: q,
-            vor: station,
-            // A right arc (270 to 000 clockwise): SidStar reverses the circle of every arc that is not a left arc
-            circle: GeoCircle.createFromPoint(station, NM(10)).reverse(),
-        } as unknown as ArcData;
-        return {station, legs: [{...user(P), arcData}, user(Q), user(R)] as KLNFlightplanLeg[]};
-    }
+    // The arc P to Q runs 10 NM around a VOR from the west radial to the north radial; R is 30 NM east of Q
+    const arcPlan = () => arcRoute();
 
     it('activates the arc leg P to Q for an aircraft at the start of the arc, so the setup holds (#121)', () => {
         // The next test stands on this: the plan and the hand-built arc work when the aircraft is at P
@@ -354,5 +374,98 @@ describe('ActiveWaypoint.getActiveFafLeg', () => {
         const aw = activeAtB([user(A), app(B, KLNFixType.MAP)]);
 
         expect(aw.getActiveFafLeg()).toBeNull();
+    });
+});
+
+// 6-17: MOVE ? moves a DME arc entry in place (Flightplan.setArcEntry), so FlightplanUtils.moveArcEntry tells the active
+// waypoint which leg moved (the design, docs/superpowers/specs/2026-10-28-arc-entry-move-design.md)
+describe('ActiveWaypoint.onArcEntryMoved (6-17)', () => {
+    /** A turn entry of no particular geometry: the tests only follow the objects */
+    const anyTurn = () => {
+        const circle = GeoCircle.createGreatCircle(A, B);
+        return new TurnStackEntry(circle, new GeoPoint(B.lat, B.lon), circle);
+    };
+
+    /** KAAA 40 NM and ABC 20 NM out on the 270 radial, then the arc entry: ABC is active, the entry is the next leg */
+    function entryAfterActive() {
+        const kaaa = onRadial(270, 40);
+        const abc = onRadial(270, 20);
+        const {legs} = arcRoute([airport('KAAA', kaaa.lat, kaaa.lon), vor('ABC', abc.lat, abc.lon)]);
+        const position = onRadial(270, 30);
+        const {aw, fpl} = activeWaypointWith(legs, position);
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(1); // Precondition: ABC, the arc entry is the next leg
+        return {aw, fpl, legs, position};
+    }
+
+    // #441: the same handling as an edit of the next leg (#408, rule (c)): the own started turn goes, a lead plan is
+    // decided again
+    it('drops the own started turn and a lead plan when the entry after the active waypoint moves (#441)', () => {
+        const {aw, fpl, legs} = entryAfterActive();
+        aw.startOwnTurn(anyTurn());
+        aw.turnPlan = TurnPlan.AT_LEAD;
+
+        fpl.setArcEntry(2, movedArcData(legs[2].arcData!, 280));
+        aw.onArcEntryMoved(2);
+
+        expect(aw.ownTurnStarted).toBe(false);
+        expect(aw.turnStack).toEqual([]);
+        expect(aw.turnPlan).toBeNull();
+    });
+
+    it('keeps an abeam plan and a leftover of the previous turn when the entry after the active waypoint moves (#441)', () => {
+        const {aw, fpl, legs} = entryAfterActive();
+        const leftover = anyTurn();
+        aw.turnStack.push(leftover);
+        aw.turnPlan = TurnPlan.AT_ABEAM;
+
+        fpl.setArcEntry(2, movedArcData(legs[2].arcData!, 280));
+        aw.onArcEntryMoved(2);
+
+        expect(aw.turnPlan).toBe(TurnPlan.AT_ABEAM);
+        expect(aw.turnStack).toHaveLength(1);
+        expect(aw.turnStack[0]).toBe(leftover);
+    });
+
+    it('changes nothing when an entry two legs after the active waypoint moves', () => {
+        const kaaa = onRadial(270, 40);
+        const abc = onRadial(270, 25);
+        const def = onRadial(270, 15);
+        const {legs} = arcRoute([airport('KAAA', kaaa.lat, kaaa.lon), vor('ABC', abc.lat, abc.lon), vor('DEF', def.lat, def.lon)]);
+        const {aw, fpl} = activeWaypointWith(legs, onRadial(270, 32));
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(1); // Precondition: ABC, the arc entry two legs after it
+        const turn = anyTurn();
+        aw.startOwnTurn(turn);
+        aw.turnPlan = TurnPlan.AT_LEAD;
+        const from = aw.getFromLeg();
+
+        fpl.setArcEntry(3, movedArcData(legs[3].arcData!, 280));
+        aw.onArcEntryMoved(3);
+
+        expect(aw.ownTurnStarted).toBe(true);
+        expect(aw.turnStack).toHaveLength(1);
+        expect(aw.turnStack[0]).toBe(turn);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
+        expect(aw.getFromLeg()).toBe(from);
+    });
+
+    it('changes nothing during a Direct To outside FPL 0', () => {
+        const {aw, fpl, legs, position} = entryAfterActive();
+        aw.directTo(fromHere(position), vor('OFF', 46.5, 8.5));
+        expect(aw.getActiveFplIdx()).toBe(-1); // Precondition: a Direct To outside FPL 0
+        const turn = anyTurn();
+        aw.startOwnTurn(turn);
+        aw.turnPlan = TurnPlan.AT_LEAD;
+        const from = aw.getFromLeg();
+
+        fpl.setArcEntry(2, movedArcData(legs[2].arcData!, 280));
+        aw.onArcEntryMoved(2);
+
+        expect(aw.ownTurnStarted).toBe(true);
+        expect(aw.turnStack).toHaveLength(1);
+        expect(aw.turnStack[0]).toBe(turn);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
+        expect(aw.getFromLeg()).toBe(from);
     });
 });

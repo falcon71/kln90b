@@ -354,6 +354,28 @@ export class ActiveWaypoint {
     }
 
     /**
+     * 6-17: MOVE ? has moved the entry of the DME arc at `idx` in FPL 0 (FlightplanUtils.moveArcEntry). The leg changed
+     * in place (Flightplan.setArcEntry), so neither instance check of assertToMatchesFplIdx sees it, and what depends on
+     * the entry is updated here (the design, docs/superpowers/specs/2026-10-28-arc-entry-move-design.md):
+     * - the active waypoint: its path is calculated again;
+     * - the leg after the active waypoint (#441): the turn is computed again by the rule of an edit of the next leg
+     *   (onFollowingLegChanged, #408).
+     * A move of any other entry changes nothing here
+     * @param idx the index of the moved leg in FPL 0
+     */
+    public onArcEntryMoved(idx: number): void {
+        const activeIdx = this.getActiveFplIdx();
+        if (activeIdx === -1) {
+            return;
+        }
+        if (idx === activeIdx) {
+            this.recalculatePath();
+        } else if (idx === activeIdx + 1) {
+            this.onFollowingLegChanged();
+        }
+    }
+
+    /**
      * Deativates (flags) navigation
      * @private
      */

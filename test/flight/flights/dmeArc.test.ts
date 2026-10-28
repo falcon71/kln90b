@@ -223,9 +223,9 @@ describe('roll steering near the VOR of a DME arc (#100)', () => {
     });
 });
 
-// #441: MOVE ? on the arc entry that follows the active waypoint changes the leg in place, so the unit does not notice
-// that the leg after the active waypoint is another one, and the turn started onto the old entry goes on. It must be
-// dropped and calculated again, as an insert or a delete of the next leg does (#408)
+// #441: MOVE ? on the arc entry that follows the active waypoint changes the leg in place, so moveArcEntry tells the
+// active waypoint (ActiveWaypoint.onArcEntryMoved). The turn started onto the old entry is dropped and calculated again,
+// as an insert or a delete of the next leg does (#408)
 describe('MOVE ? on the arc entry after the active waypoint (#441)', () => {
     /**
      * FPL 0 is KAAA WPTAA KPRC, and the approach is loaded with the aircraft on the leg to WPTAA, 10 NM before it. The
@@ -274,7 +274,7 @@ describe('MOVE ? on the arc entry after the active waypoint (#441)', () => {
         expect(fplIdents(flight.unit)[2]).not.toBe('D184J');
     });
 
-    it.fails('drops the turn started onto the old entry when the entry is moved (#441)', async () => {
+    it('drops the turn started onto the old entry when the entry is moved (#441)', async () => {
         const {flight, aw, move} = await inTurnToArcEntry();
         const oldEntries = [...aw.turnStack];
         expect(move()).toBe(true);

@@ -508,9 +508,14 @@ Flightplan really is dead simple".
   geometry. An `AT_ABEAM` plan and a leftover of the previous waypoint's turn, such as its run-out, stay. An edit further
   down the plan keeps the instance and changes nothing. This is the maintainer's rule (c), checked in the KLN 89
   trainer, 2026-10-27 (docs/superpowers/specs/2026-10-27-sequencing-406-407-408-design.md, section 2.3).
+- MOVE ? on a DME arc entry (6-17) changes the leg in place (`Flightplan.setArcEntry`), so no instance check sees it.
+  `moveArcEntry` calls `onArcEntryMoved(idx)` instead, which decides by the moved index: the active waypoint gets its
+  path calculated again (`recalculatePath`), and the leg after it gets the #408 handling (`onFollowingLegChanged`,
+  #441). A move of any other entry changes nothing in `ActiveWaypoint`
+  (docs/superpowers/specs/2026-10-28-arc-entry-move-design.md).
 - API: `directTo`, `directToFlightplanIndex`, `cancelDirectTo`, `activateFpl0()` (chooses the *closest* leg to the
   plane, as checked against the KLN 89 trainer), `sequenceToNextWaypoint`, `getFutureLegs`/`getDestination` (stop at the
-  MAP, 6-20), `getFollowingLeg`, `recalculatePath`.
+  MAP, 6-20), `getFollowingLeg`, `recalculatePath`, `onArcEntryMoved`.
 - Emits **`activeWaypointChanged`** and persists the active waypoint ICAO to the `activeWaypoint` setting.
 - `assertToMatchesFplIdx()` runs on every getter and compares by **instance** (not ICAO). If the user edited the plan,
   it re-activates or turns into a random direct-to.
@@ -749,7 +754,7 @@ inputs as the KLN 89 does: angle, offset and waypoint cleared, FR set to SEL (#7
 - The arc entry point is created as a temporary user waypoint in `XY` and recalculated from the current position (
   `recalculateArcEntryData`). MOVE ? on the entry (6-17, Super NAV 5 and FPL 0) goes through `moveArcEntry`
   (`services/FlightplanUtils.ts`), which stores the new entry with `Flightplan.setArcEntry` so that the `kln90b`
-  flight planner follows (#134, #419).
+  flight planner follows (#134, #419), and then tells `ActiveWaypoint.onArcEntryMoved` which leg moved.
 - `isProcedureRecognized` filters out RNAV procedures as the real unit does.
 - Approach names are formatted as `R/V/N + rwy + suffix + -IDENT`.
 - Fix suffix glyphs are Latin-1 chars that map to custom font glyphs: IAF `à`, FAF `á`, MAP `ã`, MAHP `â`.

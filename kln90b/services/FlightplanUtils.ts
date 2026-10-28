@@ -133,8 +133,6 @@ export function moveArcEntry(bus: EventBus, fpl: Flightplan, idx: number, active
         return false;
     }
     fpl.setArcEntry(idx, newData);
-    if (idx === activeWpt.getActiveFplIdx()) {
-        activeWpt.recalculatePath();
-    }
+    activeWpt.onArcEntryMoved(idx);
     return true;
 }
