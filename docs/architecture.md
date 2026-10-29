@@ -557,6 +557,13 @@ sim.
       is capped at 60 s of ground speed (`LEAD_CAP_TIME`) and at half the inbound leg. The inbound leg
       (`inboundLegLength`) is the distance between the waypoints, along the arc for a DME arc, and from where a Direct To
       was activated.
+    - A turn of more than `MAX_ANTICIPATED_TURN_ANGLE` (175°, the course leaving the waypoint minus the course arriving
+      at it, compared with a margin of 0.001° for the rounding of the courses) is not anticipated (#444, checked in the
+      KLN 89 trainer, 2026-10-29: lead turns up to 175.00°, fly-overs from 175.26° on, also 0.72 NM inside a 176.1° turn).
+      It gets no turn plan, and on the leg it is flown over as a waypoint without a turn (`tickWithoutTurn`): no turn at
+      the lead or the abeam line, no sequencing at the inside bisector, the DTK on the inbound leg, the sequencing at
+      FROM, and the 36 s alert of 4-9 although turn anticipation is on. Off the leg the off-leg rule below stays (the
+      design's call; the trainer flew these turns only within 1 NM of the leg).
     - The turn point is the lead plus the roll-in (`distanceToAchieveBankAngleChange`, the bank at 5 deg/s), measured
       along the track: the along-track distance to the waypoint (`alongTrackDistance`), which on course is the straight
       distance. The trainer adds no roll-in, so this is a deliberate departure: a 1 Hz calculation, autopilot lag, and
@@ -620,11 +627,9 @@ sim.
       Past the midpoint means on the next leg's side of the bisector, with the GPS track within 90° of the next leg.
     - It also ends when the aircraft is more than `OFF_LEG_XTK` (4.0 NM) from the active leg: the inbound leg until the
       waypoint is sequenced, the next leg afterwards.
-    - The midpoint condition keeps a turn near 180° from ending where it starts, where the start lies barely before the
-      end point along the next leg. At 180° the start is the end point and the bisector runs along both legs: in the
-      first calculations of the circle the aircraft is at the end point and not on the inbound side of the bisector, and
-      only the track, still opposite the next leg, keeps the turn. After that the aircraft moves away from the end point
-      along the next leg until the turn is nearly complete.
+    - The midpoint condition keeps a turn near 175°, the largest one anticipated (#444), from ending where it starts,
+      where the start lies barely before the end point along the next leg. After that the aircraft moves away from the
+      end point along the next leg until the turn is nearly complete.
     - The end-point condition keeps a lagging aircraft from ending the turn as it moves away from the end point at first.
     - Measuring the 4.0 NM to the active leg keeps a fast aircraft, which starts the turn lead · sin θ from the next leg,
       from ending it at once.
@@ -640,13 +645,11 @@ sim.
       of the turn; for a big turn it lies well before the waypoint. It is a state, not a crossing, so an aircraft already
       past the line sequences at once. On the inside of a turn that can be before the turn point and before the abeam
       line, with no turn started and no alert (checked in the KLN 89 trainer, 2026-10-29, I3'a, I3'b and I3'c); on course
-      and on the outside the turn starts before the bisector is reached. Above 175° the unit does not anticipate the turn and does
-      not sequence at the inside bisector (checked in the KLN 89 trainer, 2026-10-29: lead turns at 173.5° and 175.0°,
-      fly-over from 175.3°; #444): there the test waits for the waypoint's own turn. It
-      does not read the waypoint alert, so a turn still on the stack from the previous waypoint cannot sequence the next
-      one. Since a turn ends only past the bisector, a turn's normal end comes in or after the calculation that
-      sequences its waypoint.
-- Without turn anticipation, it sequences on FROM.
+      and on the outside the turn starts before the bisector is reached. Turns above 175° never reach this test, since
+      they are flown over (#444). It does not read the waypoint alert, so a turn still on the stack from the previous
+      waypoint cannot sequence the next one. Since a turn ends only past the bisector, a turn's normal end comes in or
+      after the calculation that sequences its waypoint.
+- Without turn anticipation, and with it for a turn of more than 175° (#444), it sequences on FROM.
 - **The MAP is never auto-sequenced.**
 - Waypoint alert thresholds: on the turn plan `WPT_ALERT_WITH_TURN_ANTI` (20 s) before the turn point at the
   along-track closure rate, or once inside the turn point, and not with the plan (#438, checked in the KLN 89 trainer,
@@ -660,8 +663,9 @@ sim.
   turn circle's end point, or after an abeam turn at the end of its run-out, past the old waypoint's abeam line on the
   new leg (#406). Before a waypoint without a turn 15 s with turn anticipation
   on (`WPT_ALERT_NO_TURN_WITH_TURN_ANTI`, #372, measured in the KLN 89 trainer) or 36 s with it off
-  (`WPT_ALERT_WITHOUT_TURN_ANTI`). The alert of a waypoint without a turn ends once the waypoint is behind (FROM),
-  unless a turn is still being flown.
+  (`WPT_ALERT_WITHOUT_TURN_ANTI`). A turn of more than 175° flown over takes the 36 s with turn anticipation on too
+  (#444, checked in the KLN 89 trainer, 2026-10-29: 36 to 39 s before the waypoint). The alert of a waypoint without a
+  turn ends once the waypoint is behind (FROM), unless a turn is still being flown.
 - At the end of the tick, after the sequencing, it publishes `navPage.steeringPath`, the path roll steering follows: the
   leg path without a turn (also the OBS leg, an arc's circle and, past a final leg without length, the leg before it),
   the turn circle (`turnStack[0]`) from the start of the lead-in, or the next leg (`pathForDtk`) once the aircraft was

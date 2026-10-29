@@ -178,13 +178,14 @@ function leadNm(groundspeedKt: number, turnDeg: number): number {
 
 // #404: a capped turn is tighter than the aircraft can fly at 25° of bank, so the aircraft lags its circle and moves away
 // from the circle's end point at first. The turn ends only once the aircraft is past the bisector of the turn, flying
-// along the next leg, and past the end point along the next leg, so near 180° (where the start of the turn lies barely
-// before its end point along the next leg, at 180° on it) it does not end where it starts, and it is not started over
-// and over again either. At a high ground speed the aircraft starts the turn far from the next leg (lead · sin θ, more
+// along the next leg, and past the end point along the next leg, so near 175°, the largest turn the unit anticipates
+// (#444; where the start of the turn lies barely before its end point along the next leg), it does not end where it
+// starts, and it is not started over and over again either. At a high ground speed the aircraft starts the turn far from the next leg (lead · sin θ, more
 // than 4.0 NM for 120° at 300 kt): the off-the-leg end is measured to the active leg, so that does not end the turn
 describe('the end of an anticipated turn (#404)', () => {
-    for (const {turnDeg, groundspeedKt} of [{turnDeg: 171, groundspeedKt: 239}, {turnDeg: 179, groundspeedKt: 239},
-        {turnDeg: 180, groundspeedKt: 239}, {turnDeg: 120, groundspeedKt: 300}]) {
+    // 175° is the largest turn the trainer anticipated (checked in the KLN 89 trainer, 2026-10-29, t2_1750; #444)
+    for (const {turnDeg, groundspeedKt} of [{turnDeg: 171, groundspeedKt: 239}, {turnDeg: 175, groundspeedKt: 239},
+        {turnDeg: 120, groundspeedKt: 300}]) {
         it(`keeps the DTK on the next leg from the start of a ${turnDeg}° turn at ${groundspeedKt} kt until the aircraft is past its end point (#404)`, async () => {
             const {flight, w, next} = await bootBeforeCappedTurn(turnDeg, groundspeedKt);
             const lead = leadNm(groundspeedKt, turnDeg);
@@ -210,15 +211,9 @@ describe('the end of an anticipated turn (#404)', () => {
             const all = JSON.stringify(samples.map(s => `${s.ident}:${s.stack}:${s.dtk?.toFixed(0)}:${s.remaining.toFixed(2)}`));
 
             // ABC is sequenced while the turn is flown, and KBBB stays active. It is sequenced where the aircraft passes
-            // the bisector of the turn (#375, checked in the KLN 89 trainer, 2026-10-20, docs/kln89-trainer-record.md). At
-            // 180° the bisector runs along both legs: the aircraft is on it at the turn start and past it as soon as it
-            // turns, so ABC is sequenced in the first second of the turn (the sample after the turn start)
+            // the bisector of the turn (#375, checked in the KLN 89 trainer, 2026-10-20, docs/kln89-trainer-record.md)
             const kbbbFrom = samples.findIndex(s => s.ident === 'KBBB');
-            if (turnDeg === 180) {
-                expect(kbbbFrom, all).toBe(1);
-            } else {
-                expect(kbbbFrom, all).toBeGreaterThan(0);
-            }
+            expect(kbbbFrom, all).toBeGreaterThan(0);
             expect(samples.slice(kbbbFrom).every(s => s.ident === 'KBBB'), all).toBe(true);
             // The DTK is the next leg's in every second, before and after the sequencing: no flip back to the inbound leg
             expect(samples.filter(s => angleBetween(s.dtk, next) >= 1), all).toEqual([]);
@@ -229,8 +224,7 @@ describe('the end of an anticipated turn (#404)', () => {
             expect(end.remaining, all).toBeGreaterThanOrEqual(-POSITION_TOLERANCE_NM);
             expect(samples.slice(0, -1).every(s => s.stack > 0), all).toBe(true);
             // And the turn has been flown by then: the circle meets the next leg at the end point on the next leg's course,
-            // and the aircraft, lagging a capped circle, reaches it still turning. At 180° the end point is also where the
-            // turn starts (lead · (1 + cos θ) is 0 along the next leg), which the aircraft passes on the inbound course
+            // and the aircraft, lagging a capped circle, reaches it still turning
             expect(angleBetween(flight.aircraft.trackTrue, next), all).toBeLessThan(45);
         });
     }
@@ -273,5 +267,35 @@ describe('the end of an anticipated turn (#404)', () => {
         // end of the turn one calculation later, so the first second beyond is left out)
         expect(beyond.slice(1).filter(s => angleBetween(s.dtk, 90) >= 1), all).toEqual([]);
         expect(beyond.length, all).toBeGreaterThan(20);
+    });
+});
+
+// #444: above 175° the unit does not anticipate a turn (checked in the KLN 89 trainer, 2026-10-29,
+// docs/kln89-trainer-data/2026-10-29/near-reversal/README.md); more cases in offCourseSequencing.test.ts
+describe('near-reversal turns are flown over (#444)', () => {
+    it('flies over a 180° turn (KLN 89 trainer, 2026-10-29, p3a_180)', async () => {
+        // The trainer flew a 180° turn on course at 119 kt with no turn at the lead, the DTK on the inbound course and the
+        // alert from 1.2 NM, and sequenced the waypoint on reaching it (0.0 NM), then reversed in a teardrop. Here at
+        // 239 kt, where an anticipated turn would start at the capped lead, 4.0 NM plus the roll-in before ABC (#404)
+        const {flight, w, next} = await bootBeforeCappedTurn(180);
+        const samples: { stack: number; dtk: number | null }[] = [];
+        await flight.flyUntil(() => {
+            if (flight.nav.activeIdent !== 'ABC') {
+                return true;
+            }
+            samples.push({stack: turnStackLength(flight.unit), dtk: flight.nav.dtkTrue});
+            return false;
+        }, {timeout: 300, description: 'ABC sequenced'});
+        const all = JSON.stringify(samples);
+        expect(samples.filter(s => s.stack > 0), 'no turn before ABC: ' + all).toEqual([]);
+        expect(samples.filter(s => angleBetween(s.dtk, 90) >= 0.5), 'the DTK on the inbound course: ' + all).toEqual([]);
+        // Sequenced in the calculation that finds ABC abeam (FROM): within the tick of flight past it, and the display
+        // tick of rounding
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        const gps = flight.unit.props.sensors.in.gps.coords;
+        expect(angleBetween(courseDeg(w, gps), 90), 'past ABC').toBeLessThan(1);
+        expect(distanceNm(w, gps), 'within one tick of ABC').toBeLessThanOrEqual(tickNm(239) + POSITION_TOLERANCE_NM);
+        expect(turnStackLength(flight.unit)).toBe(0);
+        expect(angleBetween(flight.nav.dtkTrue, next)).toBeLessThan(0.5);
     });
 });

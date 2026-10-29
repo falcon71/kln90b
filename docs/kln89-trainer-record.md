@@ -839,3 +839,23 @@ SET 4 on, restarted by the maintainer before the check; raw data and report in
   (medium-high). Filed as #443 for the turn plan.
 - A SET 1 jump that lands past the bisector activates the next leg at once, on either plan (the closest leg).
 - Left behind in the trainer: as before; no edits were made.
+
+**2026-10-29** (two agent checks, near-reversal turns and the anticipation cutoff, #443 and #444; the KLN 89 trainer at
+119 kt, SET 4 on, single SET 1 jumps onto the inbound leg and take-home flying; raw data and reports in
+[kln89-trainer-data/2026-10-29/near-reversal](kln89-trainer-data/2026-10-29/near-reversal/README.md))
+- Turn angle here means the course leaving the waypoint minus the course arriving at it. Up to 175.00° the turn is
+  anticipated as usual: lead turns at 171.2° (capped at half a 2.5 NM leg), 173.48° and 175.00° (the DTK switch at the
+  60 s lead, the alert about 24.5 s before it). At 171° on the inside the waypoint is sequenced at the bisector crossing
+  with no turn and no alert, as at 150° (#443), also after the short leg before the capped turn point.
+- Above it there is no anticipation at all: at 175.26°, 175.52°, 176.1° and 180° no turn at the lead, no sequencing at
+  the inside bisector (176.1° flown up to 0.72 NM inside, far past the line), the DTK on the inbound course, and the
+  waypoint sequenced on reaching it (distance 0.0); the take-home then flew a teardrop. On course and with offsets alike
+  (high). Filed as #444.
+- The cutoff lies between 175.00° and 175.26°, which fits a round 175° compared with "above"; the trainer's whole-degree
+  DTKs (304 -> 119 on both sides) cannot tell a finer comparison (medium for the exact form).
+- The fly-over's alert started 36 to 39 s before the waypoint (1.2 NM) although turn anticipation was on: the alert
+  without turn anticipation, not the 15 s of a waypoint without a turn. It ended about 1 s after the sequencing, and the
+  new leg had no alert of its own (four passes).
+- Left behind in the trainer: SET 4 off, GS 120, flying 8S to 8R; FPL 0 8Z 8Y 8X 8V 8U 8T 8S 8R, checked row by row. The
+  temporary user waypoints 8N of each check were deleted again; no existing user waypoint or numbered flight plan was
+  changed.

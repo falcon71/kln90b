@@ -11,3 +11,6 @@ scripts and screen frames were not kept.
 
 [inside/](inside/report.md) holds a second check of the same day: is a waypoint sequenced at the bisector on the inside
 of a turn, far before the turn point, within 4.0 NM of the leg (#443).
+
+[near-reversal/](near-reversal/README.md) holds two more checks of the same evening: near-reversal turns, which the unit
+flies over above 175° without anticipating them (#444), and the inside bisector at about 171° (#443).

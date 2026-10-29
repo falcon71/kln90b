@@ -97,14 +97,21 @@ export const WPT_ALERT_ABEAM_TURN: Seconds = 15;
 export const WPT_ALERT_OFF_LEG: Seconds = 36;
 
 /**
- * The largest turn angle (the course leaving the waypoint minus the course arriving at it) at which the unit anticipates
- * the turn, so the largest one at which an aircraft is sequenced at the inside bisector before the waypoint's own turn
- * (#443). Checked in the KLN 89 trainer, 2026-10-29: lead turns were flown at 173.5° and 175.0°, and turns of 175.3°,
- * 175.5°, 176.1° and 180° were flown over the waypoint, with no sequencing at the inside bisector even 0.72 NM inside. The
- * turns above it have no anticipation in the unit (#444). Until #444 is fixed the emulation still flies a lead turn
- * there, but never sequences them at the bisector before that turn
+ * #444: the largest turn angle (the course leaving the waypoint minus the course arriving at it) at which the unit
+ * anticipates the turn (4-8). A larger turn is flown over the waypoint as without turn anticipation (4-9). Checked in the
+ * KLN 89 trainer, 2026-10-29: lead turns were flown at 171.2°, 173.48° and 175.00°, and turns of 175.26°, 175.52°, 176.1°
+ * and 180° were flown over the waypoint, with no sequencing at the inside bisector (#443) even 0.72 NM inside. The bracket
+ * of 175.00° to 175.26° fits a round 175° compared with "above"; the trainer's whole-degree DTKs cannot tell a finer
+ * comparison
  */
 const MAX_ANTICIPATED_TURN_ANGLE: Degrees = 175;
+
+/**
+ * #444: the margin of the comparison with MAX_ANTICIPATED_TURN_ANGLE, so that the rounding in the courses does not make a
+ * turn of exactly 175° a fly-over: the courses of a turn built at 175° come out up to about 0.000001° above it. The design's
+ * call, far below what the trainer can resolve (its waypoints are entered to 0.01', 0.04° of course at 12 NM)
+ */
+const TURN_ANGLE_MARGIN: Degrees = 0.001;
 
 
 /**
@@ -198,7 +205,7 @@ export class NavCalculator implements CalcTickable {
         if (this.modeController.isObsModeActive()) {
             //5-35: no sequencing in OBS mode; the alert as for a waypoint without a turn (#147, checked in the KLN 89
             //trainer, 2026-10-14)
-            nav.waypointAlert = this.sensors.in.gps.groundspeed > 2 && this.isAlertWithoutTurn();
+            nav.waypointAlert = this.sensors.in.gps.groundspeed > 2 && this.isAlertWithoutTurn(this.alertTimeWithoutTurn());
         } else if (this.sensors.in.gps.groundspeed > 2) {
             TO_GEOPOINT_CACHE.set(toLeg.wpt);
             const followingLeg = activeWaypoint.getFollowingLeg();
@@ -237,10 +244,22 @@ export class NavCalculator implements CalcTickable {
                 //whether the aircraft is on the leg or off it (checked in the KLN 89 trainer, 2026-10-20: not latched).
                 //#438: it also updates the turn plan, on the leg and off it
                 const legXtk = UnitType.GA_RADIAN.convertTo(legPath.distance(this.sensors.in.gps.coords), UnitType.NMILE);
-                this.updateTurnPlan(Math.abs(legXtk));
+                //#444: a turn of more than MAX_ANTICIPATED_TURN_ANGLE is not anticipated (checked in the KLN 89 trainer,
+                //2026-10-29). On the leg it is flown over as without turn anticipation (4-9): no turn plan, no turn at the
+                //lead or the abeam line, no sequencing at the inside bisector, the DTK on the inbound leg up to the
+                //waypoint, which is sequenced at its abeam line (FROM), and the alert of WPT_ALERT_WITHOUT_TURN_ANTI
+                //before it, although turn anticipation is on: the trainer's alert started 36 to 39 s before the
+                //waypoint and ended with the sequencing. Off the leg the off-leg rule stays (the design's call: the
+                //trainer flew near-reversal turns only within 1 NM of the leg)
+                const anticipated = turnAngle <= MAX_ANTICIPATED_TURN_ANGLE + TURN_ANGLE_MARGIN;
+                if (anticipated) {
+                    this.updateTurnPlan(Math.abs(legXtk));
+                }
 
                 if (Math.abs(legXtk) > OFF_LEG_XTK) {
                     this.tickOffLeg(fromLeg, toLeg, followingLeg, legPath, legXtk, along, turnDirection);
+                } else if (!anticipated) {
+                    this.tickWithoutTurn(toLeg, WPT_ALERT_WITHOUT_TURN_ANTI);
                 } else {
                     //On the leg (the design, docs/superpowers/specs/2026-10-20-waypoint-sequencing-design.md, section 3.3)
                     //We have reached the start of the turn but not the waypoint yet. XTK will now follow a curved path and DTK will indicate the next path
@@ -302,10 +321,7 @@ export class NavCalculator implements CalcTickable {
                     //changes there. The test is a state, not a crossing, so an aircraft already past the line sequences
                     //at once. It does not read the waypoint alert: a turn still on the stack from the previous waypoint
                     //keeps the alert on, and the abeam test that read it sequenced a waypoint 13 NM away
-                    //Above MAX_ANTICIPATED_TURN_ANGLE the unit does not anticipate the turn and does not sequence at the
-                    //inside bisector (checked in the KLN 89 trainer, 2026-10-29): the test waits for the waypoint's own turn
                     if (toLeg.fixType !== KLNFixType.MAP //don't move missed approach waypoint!
-                        && (activeWaypoint.ownTurnStarted || turnAngle <= MAX_ANTICIPATED_TURN_ANGLE)
                         && bisectorSide(toLeg.wpt, fromDtk, nextDtk, this.sensors.in.gps.coords) >= 0) {
                         this.sequenceToNextWaypoint();
                         console.log("moving to next wpt", toLeg.wpt, activeWaypoint.getActiveWpt());
@@ -313,11 +329,7 @@ export class NavCalculator implements CalcTickable {
                 }
 
             } else {
-                nav.waypointAlert = this.isAlertWithoutTurn();
-                if (toLeg.fixType !== KLNFixType.MAP && nav.toFrom === FROM) {
-                    this.sequenceToNextWaypoint();
-                    console.log("moving to next wpt", toLeg.wpt, activeWaypoint.getActiveWpt());
-                }
+                this.tickWithoutTurn(toLeg, this.alertTimeWithoutTurn());
             }
         } else {
             nav.waypointAlert = false;
@@ -544,13 +556,37 @@ export class NavCalculator implements CalcTickable {
     }
 
     /**
-     * The waypoint alert for a waypoint without a turn to anticipate: no following leg, a fly-over, a waypoint followed by
-     * a copy of itself, or turn anticipation off. It ends once the waypoint is passed (#372). The turn onto the last leg
-     * is still being flown after the sequencing, so the alert stays on until it ends (#156)
+     * A waypoint without a turn to anticipate, on the leg: the waypoint alert of isAlertWithoutTurn, and the sequencing
+     * once the aircraft is past the waypoint's abeam line (FROM, 4-9). Not at the MAP
+     * @param toLeg the active waypoint
+     * @param alertTime how long before the waypoint the alert starts
      */
-    private isAlertWithoutTurn(): boolean {
+    private tickWithoutTurn(toLeg: KLNFlightplanLeg, alertTime: Seconds): void {
         const nav = this.memory.navPage;
-        const alertTime = this.turnAnticipation.get() ? WPT_ALERT_NO_TURN_WITH_TURN_ANTI : WPT_ALERT_WITHOUT_TURN_ANTI;
+        nav.waypointAlert = this.isAlertWithoutTurn(alertTime);
+        if (toLeg.fixType !== KLNFixType.MAP && nav.toFrom === FROM) {
+            this.sequenceToNextWaypoint();
+            console.log("moving to next wpt", toLeg.wpt, nav.activeWaypoint.getActiveWpt());
+        }
+    }
+
+    /**
+     * The alert time of a waypoint without a turn: no following leg, a fly-over, a waypoint followed by a copy of itself,
+     * or turn anticipation off. 15 s with turn anticipation on (#372), 36 s with it off (4-9). Not for a turn of more than
+     * MAX_ANTICIPATED_TURN_ANGLE, whose alert takes the 36 s whatever the setting (#444)
+     */
+    private alertTimeWithoutTurn(): Seconds {
+        return this.turnAnticipation.get() ? WPT_ALERT_NO_TURN_WITH_TURN_ANTI : WPT_ALERT_WITHOUT_TURN_ANTI;
+    }
+
+    /**
+     * The waypoint alert for a waypoint without a turn to anticipate, from alertTime before it at the ground speed. It
+     * ends once the waypoint is passed (#372). The turn onto the last leg is still being flown after the sequencing, so the
+     * alert stays on until it ends (#156)
+     * @param alertTime how long before the waypoint the alert starts
+     */
+    private isAlertWithoutTurn(alertTime: Seconds): boolean {
+        const nav = this.memory.navPage;
         return (nav.toFrom === TO && nav.eteToActive! <= alertTime) || nav.activeWaypoint.turnStack.length > 0;
     }
 

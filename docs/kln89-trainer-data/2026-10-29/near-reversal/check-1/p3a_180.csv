@@ -1,0 +1,1588 @@
+t_s,wall_clock,line1,line2,line3,line4
+0.02,18:39:14.276,15.9nm|  6:8T      >Dis,8R    |  7:8U          ,## Leg|[ 8:81          ,*CRSR*|^ 9:8R        16
+0.26,18:39:14.503,15.9nm|  6:8T      >Dis,8R    |  7:8U          ,   Leg|[ 8:            ,*CRSR*|^ 9:8R        16
+0.51,18:39:14.756,15.9nm|  6:8T      >Dis,8R    |  7:8U          ,## Leg|[ 8:81          ,*CRSR*|^ 9:8R        16
+1.51,18:39:15.752,15.9nm|  6:8T      >Dis,8R    |  7:8U          ,   Leg|[ 8:            ,*CRSR*|^ 9:8R        16
+1.76,18:39:16.002,15.9nm|  6:8T      >Dis,8R    |  7:8U          ,## Leg|[ 8:8S          ,FPL 0 |^ 9:8R        16
+2.50,18:39:16.743,15.9nm|  6:8T      >Dis,8R    |  7:8U          ,   Leg|[ 8:8S          ,FPL 0 |^ 9:8R        16
+2.75,18:39:16.995,15.8nm|  6:8T      >Dis,8R    |  7:8U          ,## Leg|[ 8:8S          ,FPL 0 |^ 9:8R        16
+3.76,18:39:18.011,15.8nm|  6:8T      >Dis,8R    |  7:8U          ,   Leg|[ 8:8S          ,FPL 0 |^ 9:8R        16
+4.00,18:39:18.256,15.8nm|  6:8T      >Dis,8R    |  7:8U          ,## Leg|[ 8:8S          ,FPL 0 |^ 9:8R        16
+4.25,18:39:18.508,15.8nm| 8S     @ 8R    , 119kt|> Fly L  0.12nm ,## Leg|DTK 284d TK 281d,NAV 1 |>283dTo     0:07
+4.76,18:39:19.013,15.8nm| 8S     @ 8R    , 119kt|> Fly L  0.12nm ,   Leg|DTK 284d TK 281d,NAV 1 |>283dTo     0:07
+5.00,18:39:19.256,15.8nm| 8S     @ 8R    , 119kt|> Fly L  0.12nm ,## Leg|DTK 284d TK 281d,NAV 1 |>283dTo     0:07
+5.75,18:39:20.010,15.8nm| 8S     @ 8R    , 119kt|> Fly L  0.12nm ,   Leg|DTK 284d TK 281d,NAV 1 |>283dTo     0:07
+6.00,18:39:20.257,15.7nm| 8S     @ 8R    , 119kt|> Fly L  0.12nm ,## Leg|DTK 284d TK 281d,NAV 1 |>283dTo     0:07
+6.51,18:39:20.758,15.7nm|  6:8T      >Dis,8R    |  7:8U          ,## Leg|[ 8:8S          ,FPL 0 |^ 9:8R        16
+7.01,18:39:21.253,15.7nm|>Wpt  Fr>8P     ,8R    | 188d To>8Q     ,   Leg|   4nm ESA 2600',CAL 1 | 996kt ETE 0:00 
+7.26,18:39:21.511,15.7nm|>Wpt  Fr>8P     ,8R    | 188d To>8Q     ,## Leg|   4nm ESA 2600',CAL 1 | 996kt ETE 0:00 
+7.75,18:39:22.005,15.7nm|INIT POS:       ,8R    |   N 44d41.72'  ,## Leg|   W 88d58.20'  ,SET 1 |120kt 282d      
+8.01,18:39:22.256,15.7nm|INIT POS:       ,8R    |   N 44d41.73'  ,   Leg|   W 88d58.25'  ,SET 1 |120kt 282d      
+8.26,18:39:22.507,15.7nm|INIT POS:       ,8R    |   N 44d41.73'  ,## Leg|   W 88d58.25'  ,SET 1 |120kt 282d      
+9.25,18:39:23.507,15.6nm|INIT POS:       ,8R    |   N 44d41.73'  ,   Leg|   W 88d58.29'  ,SET 1 |120kt 282d      
+9.50,18:39:23.751,15.6nm|INIT POS:       ,8R    |   N 44d41.73'  ,## Leg|   W 88d58.29'  ,SET 1 |120kt 282d      
+10.25,18:39:24.505,15.6nm|INIT POS:       ,8R    |   N 44d41.74'  ,   Leg|   W 88d58.34'  ,*CRSR*|120kt 282d      
+10.51,18:39:24.765,15.6nm|INIT POS:       ,8R    |   N 44d41.74'  ,## Leg|   W 88d58.34'  ,*CRSR*|120kt 282d      
+11.26,18:39:25.510,15.6nm|INIT POS:       ,8R    |   N 44d41.74'  ,   Leg|   W 88d58.39'  ,*CRSR*|120kt 281d      
+11.50,18:39:25.748,15.6nm|INIT POS:       ,8R    |   N 44d41.74'  ,## Leg|   W 88d58.39'  ,*CRSR*|120kt 281d      
+12.26,18:39:26.512,15.5nm|INIT POS:       ,8R    |   N 44d41.74'  ,## Leg|   W 88d58.43'  ,*CRSR*|120kt 281d      
+12.50,18:39:26.747,15.5nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.43'  ,*CRSR*|120kt 281d      
+12.75,18:39:26.994,15.5nm|INIT POS:       ,8R    |   N 44d41.74'  ,## Leg|   W 88d58.43'  ,*CRSR*|120kt 281d      
+13.51,18:39:27.756,15.5nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.48'  ,*CRSR*|120kt 281d      
+13.75,18:39:28.000,15.5nm|INIT POS:       ,8R    |   N 44d41.75'  ,## Leg|   W 88d58.48'  ,*CRSR*|120kt 281d      
+14.50,18:39:28.752,15.5nm|INIT POS:       ,8R    |   # __d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+14.76,18:39:29.007,15.5nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+15.00,18:39:29.245,15.5nm|INIT POS:       ,8R    |   # __d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+15.75,18:39:29.998,15.4nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+16.00,18:39:30.260,15.4nm|INIT POS:       ,8R    |   # __d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+16.50,18:39:30.757,15.4nm|INIT POS:       ,8R    |   N?#_d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+16.75,18:39:31.008,15.4nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+17.00,18:39:31.246,15.4nm|INIT POS:       ,8R    |   N?#_d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+18.01,18:39:32.257,15.4nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+18.25,18:39:32.494,15.4nm|INIT POS:       ,8R    |   N?#_d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+19.01,18:39:33.257,15.3nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+19.25,18:39:33.506,15.3nm|INIT POS:       ,8R    |   N?#_d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+20.25,18:39:34.501,15.3nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+20.51,18:39:34.761,15.3nm|INIT POS:       ,8R    |   N?#_d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+21.25,18:39:35.497,15.3nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+21.50,18:39:35.745,15.3nm|INIT POS:       ,8R    |   N ?#d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+22.00,18:39:36.247,15.2nm|INIT POS:       ,8R    |   N ?#d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+22.25,18:39:36.505,15.2nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+22.51,18:39:36.756,15.2nm|INIT POS:       ,8R    |   N ?#d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+23.50,18:39:37.745,15.2nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+23.75,18:39:38.006,15.2nm|INIT POS:       ,8R    |   N ?#d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+24.51,18:39:38.756,15.2nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+24.76,18:39:39.005,15.2nm|INIT POS:       ,8R    |   N ?#d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+25.26,18:39:39.505,15.1nm|INIT POS:       ,8R    |   N ?#d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+25.75,18:39:39.997,15.1nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+26.00,18:39:40.244,15.1nm|INIT POS:       ,8R    |   N ?#d__.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+26.50,18:39:40.748,15.1nm|INIT POS:       ,8R    |   N 44?#_.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+26.75,18:39:40.996,15.1nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+27.00,18:39:41.246,15.1nm|INIT POS:       ,8R    |   N 44?#_.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+27.76,18:39:42.006,15.1nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+28.01,18:39:42.260,15.1nm|INIT POS:       ,8R    |   N 44?#_.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+28.75,18:39:42.996,15.0nm|INIT POS:       ,8R    |   N 44?#_.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+29.00,18:39:43.254,15.0nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+29.26,18:39:43.508,15.0nm|INIT POS:       ,8R    |   N 44?#_.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+30.00,18:39:44.245,15.0nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+30.25,18:39:44.507,15.0nm|INIT POS:       ,8R    |   N 44?#_.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+30.75,18:39:44.996,15.0nm|INIT POS:       ,8R    |   N 44d?#.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+31.26,18:39:45.510,15.0nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+31.51,18:39:45.756,15.0nm|INIT POS:       ,8R    |   N 44d?#.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+31.76,18:39:46.016,14.9nm|INIT POS:       ,8R    |   N 44d?#.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+32.26,18:39:46.517,14.9nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+32.50,18:39:46.755,14.9nm|INIT POS:       ,8R    |   N 44d?#.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+33.26,18:39:47.509,14.9nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+33.51,18:39:47.756,14.9nm|INIT POS:       ,8R    |   N 44d?#.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+34.51,18:39:48.754,14.9nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+34.76,18:39:49.009,14.9nm|INIT POS:       ,8R    |   N 44d?#.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+35.25,18:39:49.506,14.8nm|INIT POS:       ,8R    |   N 44d?#.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+35.51,18:39:49.757,14.8nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+35.75,18:39:49.994,14.8nm|INIT POS:       ,8R    |   N 44d?#.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+36.75,18:39:51.006,14.8nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+37.00,18:39:51.258,14.8nm|INIT POS:       ,8R    |   N 44d?#.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+37.76,18:39:52.011,14.8nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+38.00,18:39:52.247,14.8nm|INIT POS:       ,8R    |   N 44d?#.__'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+38.26,18:39:52.506,14.7nm|INIT POS:       ,8R    |   N 44d37_#_'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+39.01,18:39:53.254,14.7nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+39.26,18:39:53.506,14.7nm|INIT POS:       ,8R    |   N 44d37_#_'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+40.00,18:39:54.249,14.7nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+40.25,18:39:54.504,14.7nm|INIT POS:       ,8R    |   N 44d37.?#'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+41.00,18:39:55.246,14.7nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+41.25,18:39:55.505,14.7nm|INIT POS:       ,8R    |   N 44d37.?#'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+41.51,18:39:55.764,14.6nm|INIT POS:       ,8R    |   N 44d37.?#'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+42.26,18:39:56.511,14.6nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+42.50,18:39:56.758,14.6nm|INIT POS:       ,8R    |   N 44d37.?#'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+43.25,18:39:57.496,14.6nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+43.50,18:39:57.747,14.6nm|INIT POS:       ,8R    |   N 44d37.?#'  ,## Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+44.51,18:39:58.761,14.6nm|INIT POS:       ,8R    |                ,   Leg|   W 88d58.53'  ,*CRSR*|120kt 281d      
+44.75,18:39:59.002,14.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 88d59.83'  ,*CRSR*|120kt 281d Ok?  
+45.50,18:39:59.748,14.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+45.75,18:40:00.003,14.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 88d59.83'  ,*CRSR*|120kt 281d Ok?  
+46.51,18:40:00.761,14.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+46.75,18:40:00.996,14.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 88d59.83'  ,*CRSR*|120kt 281d Ok?  
+47.25,18:40:01.496,14.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   #___d__.__'  ,*CRSR*|120kt 281d Ok?  
+47.75,18:40:01.998,14.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+48.01,18:40:02.259,14.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   #___d__.__'  ,*CRSR*|120kt 281d Ok?  
+48.75,18:40:03.006,14.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+49.01,18:40:03.259,14.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   #___d__.__'  ,*CRSR*|120kt 281d Ok?  
+49.25,18:40:03.494,14.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 281d Ok?  
+50.00,18:40:04.256,14.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+50.26,18:40:04.509,14.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 281d Ok?  
+51.00,18:40:05.244,14.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+51.25,18:40:05.497,14.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 281d Ok?  
+52.26,18:40:06.508,14.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+52.50,18:40:06.749,14.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 281d Ok?  
+53.25,18:40:07.495,14.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+53.51,18:40:07.757,14.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 281d Ok?  
+54.26,18:40:08.508,14.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+54.50,18:40:08.759,14.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 281d Ok?  
+55.51,18:40:09.763,14.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+55.76,18:40:10.009,14.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 281d Ok?  
+56.50,18:40:10.744,14.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+56.75,18:40:10.995,14.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 281d Ok?  
+57.26,18:40:11.509,14.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 281d Ok?  
+57.50,18:40:11.756,14.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 281d Ok?  
+57.76,18:40:12.008,14.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+58.00,18:40:12.245,14.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 281d Ok?  
+58.76,18:40:13.013,14.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+59.00,18:40:13.245,14.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 281d Ok?  
+59.76,18:40:14.012,14.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+60.00,18:40:14.252,14.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 281d Ok?  
+60.76,18:40:15.009,14.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 281d Ok?  
+61.00,18:40:15.246,14.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+61.25,18:40:15.496,14.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 281d Ok?  
+62.00,18:40:16.255,14.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+62.26,18:40:16.511,14.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 281d Ok?  
+63.25,18:40:17.497,14.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+63.51,18:40:17.755,14.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 281d Ok?  
+64.00,18:40:18.243,13.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 281d Ok?  
+64.25,18:40:18.501,13.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+64.51,18:40:18.760,13.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 281d Ok?  
+65.25,18:40:19.506,13.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+65.50,18:40:19.745,13.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 281d Ok?  
+66.25,18:40:20.509,13.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt 281d Ok?  
+66.50,18:40:20.746,13.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+66.75,18:40:21.006,13.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt 281d Ok?  
+67.51,18:40:21.760,13.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+67.75,18:40:21.997,13.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt 281d Ok?  
+68.76,18:40:23.010,13.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+69.00,18:40:23.243,13.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt 281d Ok?  
+69.75,18:40:24.009,13.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+70.00,18:40:24.255,13.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 281d Ok?  
+70.51,18:40:24.758,13.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 281d Ok?  
+70.75,18:40:24.998,13.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+71.00,18:40:25.247,13.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 281d Ok?  
+72.01,18:40:26.261,13.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+72.26,18:40:26.510,13.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 281d Ok?  
+73.00,18:40:27.256,13.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+73.25,18:40:27.510,13.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 281d Ok?  
+73.76,18:40:28.008,13.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 281d Ok?  
+74.26,18:40:28.510,13.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+74.50,18:40:28.745,13.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 281d Ok?  
+75.27,18:40:29.512,13.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+75.50,18:40:29.746,13.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 281d Ok?  
+76.25,18:40:30.508,13.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+76.50,18:40:30.758,13.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 281d Ok?  
+77.00,18:40:31.257,13.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 281d Ok?  
+77.50,18:40:31.750,13.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+77.76,18:40:32.013,13.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 281d Ok?  
+78.50,18:40:32.750,13.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+78.76,18:40:33.013,13.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29_#_'  ,*CRSR*|120kt 281d Ok?  
+79.75,18:40:34.006,13.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+80.00,18:40:34.247,13.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29_#_'  ,*CRSR*|120kt 281d Ok?  
+80.75,18:40:35.005,13.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+81.01,18:40:35.264,13.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29_#_'  ,*CRSR*|120kt 281d Ok?  
+81.76,18:40:36.009,13.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+82.26,18:40:36.507,13.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29_#_'  ,*CRSR*|120kt 281d Ok?  
+83.00,18:40:37.243,13.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+83.25,18:40:37.500,13.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29_#_'  ,*CRSR*|120kt 281d Ok?  
+83.52,18:40:37.761,13.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29_#_'  ,*CRSR*|120kt 281d Ok?  
+84.25,18:40:38.496,13.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+84.50,18:40:38.747,13.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29_#_'  ,*CRSR*|120kt 281d Ok?  
+85.25,18:40:39.508,13.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+85.50,18:40:39.748,13.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29.?#'  ,*CRSR*|120kt 281d Ok?  
+86.51,18:40:40.764,13.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+86.75,18:40:40.993,13.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29.?#'  ,*CRSR*|120kt 281d Ok?  
+87.00,18:40:41.253,13.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29.?#'  ,*CRSR*|120kt 281d Ok?  
+87.51,18:40:41.758,13.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+87.76,18:40:42.005,13.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29.?#'  ,*CRSR*|120kt 281d Ok?  
+88.51,18:40:42.758,13.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+89.00,18:40:43.247,13.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29.?#'  ,*CRSR*|120kt 281d Ok?  
+89.75,18:40:44.007,13.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+90.00,18:40:44.250,13.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29.?#'  ,*CRSR*|120kt 281d Ok?  
+90.75,18:40:44.995,13.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+91.00,18:40:45.254,13.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29.?#'  ,*CRSR*|120kt 281d Ok?  
+92.00,18:40:46.258,13.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+92.25,18:40:46.494,13.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29.?#'  ,*CRSR*|120kt 281d Ok?  
+93.00,18:40:47.255,13.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+93.26,18:40:47.510,13.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29.?#'  ,*CRSR*|120kt 281d Ok?  
+94.00,18:40:48.255,13.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+94.26,18:40:48.507,13.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29.?#'  ,*CRSR*|120kt 281d Ok?  
+95.25,18:40:49.507,13.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|                ,*CRSR*|120kt 281d Ok?  
+95.50,18:40:49.746,13.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W089d29.?#'  ,*CRSR*|120kt 281d Ok?  
+96.00,18:40:50.255,13.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt 281d Ok?  
+96.26,18:40:50.513,13.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|   kt 281d Ok?  
+96.50,18:40:50.745,12.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt 281d Ok?  
+97.50,18:40:51.756,12.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|   kt 281d Ok?  
+97.76,18:40:52.009,12.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt 281d Ok?  
+98.26,18:40:52.510,12.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt 28?d Ok?  
+98.50,18:40:52.754,12.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+98.76,18:40:53.008,12.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt 28?d Ok?  
+99.50,18:40:53.746,12.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+100.00,18:40:54.247,12.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt 28?d Ok?  
+100.51,18:40:54.765,12.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+100.75,18:40:55.006,12.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+101.01,18:40:55.263,12.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+101.76,18:40:56.011,12.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+102.00,18:40:56.243,12.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+103.00,18:40:57.243,12.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+103.25,18:40:57.498,12.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+104.00,18:40:58.258,12.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+104.25,18:40:58.496,12.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+105.00,18:40:59.248,12.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+105.25,18:40:59.508,12.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+106.00,18:41:00.260,12.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+106.25,18:41:00.508,12.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+106.50,18:41:00.748,12.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+107.25,18:41:01.506,12.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+107.50,18:41:01.757,12.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+108.51,18:41:02.763,12.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+108.75,18:41:03.003,12.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+109.25,18:41:03.497,12.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+109.50,18:41:03.747,12.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+109.75,18:41:03.999,12.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+110.51,18:41:04.755,12.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+110.76,18:41:05.005,12.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+111.75,18:41:05.995,12.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+112.00,18:41:06.248,12.5nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+112.50,18:41:06.745,12.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+112.75,18:41:06.996,12.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+113.00,18:41:07.244,12.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+114.01,18:41:08.253,12.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+114.26,18:41:08.507,12.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+115.00,18:41:09.244,12.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+115.25,18:41:09.495,12.4nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+115.75,18:41:09.995,12.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+116.00,18:41:10.244,12.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+116.25,18:41:10.494,12.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+117.25,18:41:11.494,12.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+117.50,18:41:11.746,12.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+118.25,18:41:12.493,12.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+118.50,18:41:12.746,12.3nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+119.00,18:41:13.244,12.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+119.50,18:41:13.747,12.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+119.75,18:41:13.994,12.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+120.51,18:41:14.755,12.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+120.76,18:41:15.004,12.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+121.76,18:41:16.005,12.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+122.01,18:41:16.254,12.2nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+122.26,18:41:16.507,12.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+122.76,18:41:17.009,12.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+123.00,18:41:17.246,12.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+123.75,18:41:17.994,12.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+124.25,18:41:18.495,12.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+125.00,18:41:19.244,12.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+125.25,18:41:19.494,12.1nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+125.50,18:41:19.745,12.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+126.00,18:41:20.244,12.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+126.25,18:41:20.494,12.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+127.26,18:41:21.503,12.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+127.51,18:41:21.753,12.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+128.25,18:41:22.493,12.0nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+128.50,18:41:22.743,11.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+129.25,18:41:23.494,11.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+129.75,18:41:23.994,11.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+130.51,18:41:24.756,11.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+130.75,18:41:24.996,11.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+131.51,18:41:25.756,11.9nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+131.76,18:41:26.005,11.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+132.76,18:41:27.005,11.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+133.01,18:41:27.255,11.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+133.76,18:41:28.007,11.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+134.01,18:41:28.254,11.8nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+135.00,18:41:29.246,11.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+135.25,18:41:29.494,11.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+136.00,18:41:30.245,11.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt    d Ok?  
+136.25,18:41:30.494,11.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt ###d Ok?  
+136.75,18:41:30.995,11.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt 304d Ok?  
+137.00,18:41:31.245,11.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt 304d      
+137.50,18:41:31.743,11.7nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt 304d Ok?  
+138.25,18:41:32.494,11.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt 304d      
+138.50,18:41:32.745,11.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt 304d Ok?  
+139.26,18:41:33.503,11.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,*CRSR*|120kt 304d      
+139.51,18:41:33.759,11.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,*CRSR*|120kt 304d Ok?  
+139.75,18:41:33.994,11.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,## Leg|   W 89d29.69'  ,SET 1 |120kt 304d      
+140.51,18:41:34.753,11.6nm|INIT POS:       ,8R    |   N 44d37.01'  ,   Leg|   W 89d29.69'  ,SET 1 |120kt 304d      
+140.76,18:41:35.010, 6.0nm|INIT POS:       ,8T    |   N 44d37.02'  ,## Leg|   W 89d29.74'  ,SET 1 |120kt 304d      
+141.50,18:41:35.749, 6.0nm|INIT POS:       ,8T    |   N 44d37.03'  ,   Leg|   W 89d29.73'  ,SET 1 |120kt 304d      
+141.75,18:41:35.993, 6.0nm|INIT POS:       ,8T    |   N 44d37.03'  ,## Leg|   W 89d29.73'  ,SET 1 |120kt 304d      
+142.50,18:41:36.744, 6.0nm|INIT POS:       ,8T    |   N 44d37.04'  ,   Leg|   W 89d29.76'  ,SET 1 |120kt 304d      
+143.00,18:41:37.246, 6.0nm|INIT POS:       ,8T    |   N 44d37.04'  ,## Leg|   W 89d29.76'  ,SET 1 |120kt 304d      
+143.25,18:41:37.495, 6.0nm|>Wpt  Fr>8P     ,8T    | 188d To>8Q     ,## Leg|   4nm ESA 2600',CAL 1 | 996kt ETE 0:00 
+143.75,18:41:37.994, 5.9nm|>Wpt  Fr>8P     ,8T    | 188d To>8Q     ,   Leg|   4nm ESA 2600',CAL 1 | 996kt ETE 0:00 
+144.00,18:41:38.244, 5.9nm|>Wpt  Fr>8P     ,8T    | 188d To>8Q     ,## Leg|   4nm ESA 2600',CAL 1 | 996kt ETE 0:00 
+144.25,18:41:38.494, 5.9nm|[ 5:8U      >Dis,8T    |^ 6:8T         6,## Leg|  7:8U        34,FPL 0 |  9:8R        79
+144.75,18:41:38.993, 5.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+145.26,18:41:39.507, 5.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+146.01,18:41:40.254, 5.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+146.26,18:41:40.506, 5.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+146.76,18:41:41.004, 5.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+147.01,18:41:41.256, 5.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+147.26,18:41:41.521, 5.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+148.25,18:41:42.494, 5.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+148.50,18:41:42.744, 5.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+149.26,18:41:43.504, 5.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+149.51,18:41:43.755, 5.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+150.25,18:41:44.494, 5.7nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+150.76,18:41:45.005, 5.7nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+151.25,18:41:45.494, 5.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+151.50,18:41:45.743, 5.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+151.75,18:41:45.993, 5.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+152.50,18:41:46.747, 5.7nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+152.75,18:41:46.994, 5.7nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+153.51,18:41:47.758, 5.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+153.75,18:41:47.993, 5.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+154.00,18:41:48.243, 5.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+154.75,18:41:48.994, 5.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+155.00,18:41:49.248, 5.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+155.76,18:41:50.004, 5.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+156.01,18:41:50.255, 5.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+156.51,18:41:50.756, 5.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+157.00,18:41:51.246, 5.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+157.25,18:41:51.495, 5.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+158.00,18:41:52.243, 5.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+158.26,18:41:52.504, 5.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+159.25,18:41:53.494, 5.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+159.50,18:41:53.745, 5.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+159.75,18:41:53.993, 5.4nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+160.26,18:41:54.505, 5.4nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+160.51,18:41:54.759, 5.4nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+161.25,18:41:55.497, 5.4nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+161.75,18:41:55.996, 5.4nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+162.50,18:41:56.745, 5.4nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+162.75,18:41:56.995, 5.4nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+163.00,18:41:57.244, 5.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+163.50,18:41:57.747, 5.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+163.76,18:41:58.003, 5.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+164.75,18:41:58.994, 5.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+165.00,18:41:59.246, 5.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+165.75,18:41:59.993, 5.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+166.00,18:42:00.243, 5.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+166.50,18:42:00.747, 5.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+166.75,18:42:00.993, 5.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+167.26,18:42:01.506, 5.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+168.00,18:42:02.243, 5.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+168.25,18:42:02.500, 5.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+169.00,18:42:03.245, 5.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+169.25,18:42:03.495, 5.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+169.75,18:42:03.995, 5.1nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+170.25,18:42:04.493, 5.1nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+170.50,18:42:04.745, 5.1nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+171.25,18:42:05.495, 5.1nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+171.50,18:42:05.746, 5.1nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+172.26,18:42:06.506, 5.1nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+172.51,18:42:06.759, 5.1nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+173.00,18:42:07.244, 5.0nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+173.50,18:42:07.745, 5.0nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+173.75,18:42:07.995, 5.0nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+174.50,18:42:08.746, 5.0nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+174.75,18:42:08.995, 5.0nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+175.75,18:42:09.994, 5.0nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+176.00,18:42:10.244, 5.0nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+176.25,18:42:10.495, 4.9nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+176.76,18:42:11.004, 4.9nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+177.01,18:42:11.258, 4.9nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+177.25,18:42:11.496, 4.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+177.75,18:42:11.995, 4.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+178.00,18:42:12.245, 4.9nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+178.25,18:42:12.495, 4.9nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+179.00,18:42:13.245, 4.9nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+179.26,18:42:13.505, 4.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+180.00,18:42:14.245, 4.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+180.25,18:42:14.495, 4.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+181.25,18:42:15.496, 4.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+181.50,18:42:15.746, 4.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+182.26,18:42:16.507, 4.8nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+182.50,18:42:16.745, 4.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+183.25,18:42:17.495, 4.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+183.75,18:42:17.997, 4.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+184.50,18:42:18.745, 4.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+184.75,18:42:18.994, 4.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+185.50,18:42:19.744, 4.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+185.75,18:42:19.996, 4.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+186.00,18:42:20.244, 4.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+186.75,18:42:20.997, 4.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+187.00,18:42:21.245, 4.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+187.76,18:42:22.005, 4.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+188.01,18:42:22.256, 4.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+189.00,18:42:23.244, 4.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+189.26,18:42:23.503, 4.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+190.01,18:42:24.255, 4.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+190.25,18:42:24.496, 4.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+191.00,18:42:25.244, 4.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+191.26,18:42:25.504, 4.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+192.25,18:42:26.495, 4.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+192.50,18:42:26.749, 4.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+193.25,18:42:27.495, 4.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+193.50,18:42:27.743, 4.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+194.50,18:42:28.746, 4.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+194.75,18:42:28.997, 4.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+195.50,18:42:29.746, 4.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+195.75,18:42:29.996, 4.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+196.50,18:42:30.744, 4.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+197.00,18:42:31.245, 4.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+197.75,18:42:31.995, 4.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+198.00,18:42:32.246, 4.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+198.76,18:42:33.005, 4.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+199.01,18:42:33.254, 4.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+200.00,18:42:34.245, 4.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+200.25,18:42:34.494, 4.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+201.00,18:42:35.243, 4.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+201.25,18:42:35.494, 4.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+202.00,18:42:36.244, 4.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+202.50,18:42:36.745, 4.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+203.25,18:42:37.494, 4.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+203.51,18:42:37.754, 4.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+204.25,18:42:38.493, 4.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+204.76,18:42:39.006, 4.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+205.50,18:42:39.744, 4.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+205.75,18:42:39.996, 4.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+206.50,18:42:40.746, 4.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+207.00,18:42:41.245, 4.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:02
+207.50,18:42:41.744, 4.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+207.75,18:42:41.994, 4.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+208.00,18:42:42.247, 4.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+208.75,18:42:42.996, 4.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+209.00,18:42:43.244, 4.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+209.76,18:42:44.005, 3.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+210.01,18:42:44.254, 3.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+210.26,18:42:44.505, 3.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+211.00,18:42:45.246, 3.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+211.25,18:42:45.496, 3.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+211.50,18:42:45.745, 3.9nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+211.75,18:42:45.994, 3.8nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+212.25,18:42:46.495, 3.8nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+212.50,18:42:46.745, 3.8nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+213.25,18:42:47.499, 3.8nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+213.50,18:42:47.744, 3.8nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+214.25,18:42:48.494, 3.8nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+214.75,18:42:48.996, 3.8nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+215.25,18:42:49.495, 3.7nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+215.51,18:42:49.756, 3.7nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+215.76,18:42:50.004, 3.7nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+216.50,18:42:50.745, 3.7nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+216.75,18:42:50.995, 3.7nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+217.75,18:42:51.995, 3.7nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+218.00,18:42:52.244, 3.7nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+218.25,18:42:52.495, 3.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+218.75,18:42:52.994, 3.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+219.00,18:42:53.245, 3.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+219.76,18:42:54.008, 3.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+220.25,18:42:54.493, 3.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+221.00,18:42:55.244, 3.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+221.25,18:42:55.495, 3.6nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+221.50,18:42:55.745, 3.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+222.00,18:42:56.243, 3.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+222.25,18:42:56.494, 3.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+223.26,18:42:57.506, 3.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+223.51,18:42:57.756, 3.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+224.26,18:42:58.504, 3.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+224.51,18:42:58.758, 3.5nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+225.00,18:42:59.244, 3.4nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+225.26,18:42:59.503, 3.4nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+225.75,18:42:59.995, 3.4nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+226.50,18:43:00.743, 3.4nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+226.75,18:43:01.000, 3.4nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+227.00,18:43:01.245, 3.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+227.50,18:43:01.744, 3.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+227.75,18:43:01.994, 3.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+228.75,18:43:02.996, 3.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+229.00,18:43:03.244, 3.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+229.75,18:43:03.993, 3.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+230.00,18:43:04.243, 3.3nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+230.25,18:43:04.493, 3.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+230.76,18:43:05.003, 3.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+231.26,18:43:05.505, 3.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+232.01,18:43:06.255, 3.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+232.26,18:43:06.505, 3.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+233.00,18:43:07.244, 3.2nm| 8U     @ 8T    , 119kt|> Fly R  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+233.26,18:43:07.504, 3.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+233.51,18:43:07.755, 3.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+234.26,18:43:08.503, 3.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+234.51,18:43:08.759, 3.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+235.26,18:43:09.504, 3.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+235.51,18:43:09.755, 3.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+236.26,18:43:10.504, 3.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+236.75,18:43:10.995, 3.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+237.50,18:43:11.746, 3.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+237.75,18:43:11.994, 3.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+238.51,18:43:12.755, 3.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+238.76,18:43:13.004, 3.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+239.76,18:43:14.008, 2.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+240.00,18:43:14.247, 2.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+240.75,18:43:14.994, 2.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+241.00,18:43:15.244, 2.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+241.75,18:43:15.993, 2.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+242.25,18:43:16.494, 2.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+243.00,18:43:17.245, 2.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+243.25,18:43:17.498, 2.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+244.00,18:43:18.245, 2.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+244.25,18:43:18.494, 2.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+245.25,18:43:19.495, 2.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+245.50,18:43:19.744, 2.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+246.25,18:43:20.495, 2.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+246.50,18:43:20.745, 2.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+247.25,18:43:21.494, 2.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+247.76,18:43:22.007, 2.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+248.50,18:43:22.744, 2.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+248.75,18:43:22.994, 2.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+249.51,18:43:23.756, 2.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+249.75,18:43:23.993, 2.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+250.76,18:43:25.006, 2.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+251.00,18:43:25.243, 2.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+251.75,18:43:25.995, 2.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+252.00,18:43:26.243, 2.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+252.75,18:43:26.994, 2.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+253.26,18:43:27.505, 2.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+254.01,18:43:28.255, 2.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+254.26,18:43:28.504, 2.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+255.01,18:43:29.254, 2.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+255.26,18:43:29.505, 2.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+256.26,18:43:30.502, 2.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+256.51,18:43:30.756, 2.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+257.26,18:43:31.503, 2.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+257.51,18:43:31.756, 2.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+258.26,18:43:32.504, 2.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+258.75,18:43:32.995, 2.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+259.51,18:43:33.755, 2.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+259.76,18:43:34.004, 2.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+260.51,18:43:34.757, 2.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+260.75,18:43:34.995, 2.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+261.75,18:43:35.993, 2.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+262.00,18:43:36.244, 2.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+262.75,18:43:36.996, 2.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+263.00,18:43:37.243, 2.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+263.76,18:43:38.004, 2.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+264.26,18:43:38.504, 2.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+265.01,18:43:39.256, 2.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+265.26,18:43:39.503, 2.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+265.75,18:43:39.995, 2.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+266.00,18:43:40.244, 2.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+266.25,18:43:40.494, 2.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+267.25,18:43:41.494, 2.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+267.50,18:43:41.744, 2.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+268.25,18:43:42.492, 2.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+268.50,18:43:42.745, 2.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+269.50,18:43:43.743, 2.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+269.75,18:43:43.996, 2.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+270.00,18:43:44.246, 2.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+270.50,18:43:44.745, 2.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+270.75,18:43:44.994, 2.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+271.50,18:43:45.744, 2.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+272.00,18:43:46.245, 2.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo     0:01
+272.25,18:43:46.493, 2.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :59
+272.75,18:43:46.996, 2.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :59
+273.00,18:43:47.245, 2.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :59
+273.25,18:43:47.493, 1.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :58
+273.75,18:43:47.993, 1.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :58
+274.01,18:43:48.255, 1.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :58
+274.51,18:43:48.757, 1.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :57
+275.00,18:43:49.244, 1.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :57
+275.26,18:43:49.505, 1.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :57
+275.51,18:43:49.754, 1.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :55
+276.01,18:43:50.253, 1.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :55
+276.26,18:43:50.505, 1.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :55
+276.76,18:43:51.006, 1.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :54
+277.01,18:43:51.254, 1.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :54
+277.50,18:43:51.745, 1.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :54
+277.75,18:43:51.994, 1.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :53
+278.25,18:43:52.494, 1.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :53
+278.50,18:43:52.744, 1.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :53
+278.75,18:43:52.995, 1.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :52
+279.26,18:43:53.504, 1.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :52
+279.51,18:43:53.754, 1.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :52
+280.51,18:43:54.756, 1.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :52
+280.75,18:43:54.994, 1.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :51
+281.51,18:43:55.757, 1.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :51
+281.75,18:43:55.994, 1.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :51
+282.00,18:43:56.244, 1.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :50
+282.50,18:43:56.744, 1.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :50
+283.00,18:43:57.245, 1.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :48
+283.75,18:43:57.994, 1.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :48
+284.00,18:43:58.244, 1.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :48
+284.75,18:43:58.995, 1.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :48
+285.00,18:43:59.243, 1.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :47
+286.00,18:44:00.244, 1.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :47
+286.25,18:44:00.493, 1.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :46
+287.00,18:44:01.246, 1.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :46
+287.26,18:44:01.504, 1.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :44
+288.00,18:44:02.246, 1.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :44
+288.25,18:44:02.495, 1.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :43
+288.50,18:44:02.744, 1.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :43
+289.25,18:44:03.495, 1.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :42
+289.50,18:44:03.746, 1.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :42
+290.25,18:44:04.493, 1.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :42
+290.50,18:44:04.746, 1.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :42
+291.51,18:44:05.757, 1.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :41
+291.75,18:44:05.993, 1.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :41
+292.50,18:44:06.745, 1.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :40
+292.75,18:44:06.995, 1.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :40
+293.50,18:44:07.744, 1.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :39
+293.75,18:44:07.996, 1.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :39
+294.00,18:44:08.246, 1.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :39
+294.75,18:44:08.995, 1.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :38
+295.00,18:44:09.246, 1.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :38
+295.51,18:44:09.755, 1.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :37
+295.76,18:44:10.003, 1.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :37
+296.25,18:44:10.493, 1.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :37
+296.76,18:44:11.007, 1.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :36
+297.00,18:44:11.243, 1.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :36
+297.25,18:44:11.495, 1.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :36
+297.75,18:44:11.993, 1.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :35
+298.00,18:44:12.245, 1.2nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :35
+298.25,18:44:12.494, 1.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :35
+298.76,18:44:13.004, 1.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :34
+299.26,18:44:13.506, 1.1nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :34
+299.51,18:44:13.760, 1.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :34
+300.00,18:44:14.245, 1.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :33
+300.25,18:44:14.495, 1.1nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :33
+300.50,18:44:14.743, 1.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :33
+301.00,18:44:15.246, 1.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :32
+301.25,18:44:15.497, 1.1nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :32
+301.75,18:44:15.994, 1.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :32
+302.00,18:44:16.244, 1.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :31
+302.51,18:44:16.755, 1.0nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :31
+302.76,18:44:17.004, 1.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :31
+303.26,18:44:17.504, 1.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :30
+303.51,18:44:17.755, 1.0nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :30
+303.76,18:44:18.004, 1.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :30
+304.50,18:44:18.746, 0.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :28
+304.75,18:44:18.994, 0.9nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :28
+305.00,18:44:19.245, 0.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :28
+305.50,18:44:19.744, 0.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :27
+305.76,18:44:20.004, 0.9nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :27
+306.01,18:44:20.254, 0.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :27
+306.75,18:44:20.995, 0.9nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :27
+307.25,18:44:21.494, 0.9nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :27
+307.75,18:44:21.995, 0.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :25
+308.00,18:44:22.244, 0.8nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :25
+308.25,18:44:22.495, 0.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :25
+308.75,18:44:22.994, 0.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :24
+309.00,18:44:23.246, 0.8nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :24
+309.25,18:44:23.495, 0.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :24
+309.75,18:44:24.000, 0.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :23
+310.25,18:44:24.494, 0.8nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :23
+310.50,18:44:24.746, 0.8nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :23
+311.00,18:44:25.245, 0.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :22
+311.25,18:44:25.493, 0.7nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :22
+311.50,18:44:25.743, 0.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :22
+312.50,18:44:26.746, 0.7nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :22
+312.76,18:44:27.007, 0.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :22
+313.01,18:44:27.254, 0.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :20
+313.51,18:44:27.755, 0.7nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :20
+313.76,18:44:28.007, 0.7nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :20
+314.51,18:44:28.756, 0.7nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :20
+315.00,18:44:29.244, 0.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :18
+315.75,18:44:29.995, 0.6nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :18
+316.00,18:44:30.244, 0.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :18
+316.25,18:44:30.494, 0.6nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :17
+316.75,18:44:30.998, 0.6nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :17
+317.25,18:44:31.493, 0.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :16
+318.00,18:44:32.246, 0.5nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :16
+318.25,18:44:32.494, 0.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :16
+319.00,18:44:33.245, 0.5nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :16
+319.25,18:44:33.493, 0.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :15
+320.25,18:44:34.495, 0.5nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :15
+320.50,18:44:34.745, 0.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :14
+321.25,18:44:35.494, 0.5nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :14
+321.50,18:44:35.745, 0.5nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :14
+321.75,18:44:35.994, 0.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :12
+322.25,18:44:36.494, 0.4nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :12
+322.76,18:44:37.003, 0.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :11
+323.51,18:44:37.755, 0.4nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :11
+323.76,18:44:38.006, 0.4nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :11
+324.51,18:44:38.755, 0.4nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :11
+324.76,18:44:39.006, 0.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :10
+325.75,18:44:39.994, 0.3nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :10
+326.00,18:44:40.243, 0.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :09
+326.76,18:44:41.005, 0.3nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :09
+327.01,18:44:41.255, 0.3nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :09
+327.26,18:44:41.504, 0.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :07
+327.76,18:44:42.005, 0.2nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :07
+328.26,18:44:42.506, 0.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :07
+329.01,18:44:43.254, 0.2nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>304dTo      :07
+329.26,18:44:43.506, 0.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>303dTo      :06
+330.01,18:44:44.253, 0.2nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>303dTo      :06
+330.26,18:44:44.506, 0.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>303dTo      :06
+330.51,18:44:44.754, 0.2nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>303dTo      :05
+331.25,18:44:45.493, 0.2nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>303dTo      :05
+331.50,18:44:45.743, 0.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>303dTo      :04
+332.25,18:44:46.495, 0.1nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>303dTo      :04
+332.50,18:44:46.744, 0.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>303dTo      :03
+333.25,18:44:47.494, 0.1nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>302dTo      :02
+333.75,18:44:47.994, 0.1nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>302dTo      :02
+334.51,18:44:48.754, 0.1nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>302dTo      :02
+334.76,18:44:49.004, 0.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>301dTo      :01
+335.51,18:44:49.756, 0.0nm| 8U       8T    , 119kt|> Fly L  0.00nm ,   Leg|DTK 304d TK 304d,NAV 1 |>293dTo      :00
+335.76,18:44:50.003, 0.0nm| 8U     @ 8T    , 119kt|> Fly L  0.00nm ,## Leg|DTK 304d TK 304d,NAV 1 |>293dTo      :00
+336.51,18:44:50.756,28.0nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,## Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+336.75,18:44:50.994,28.0nm| 8T       8U    , 119kt|> Fly R  0.00nm ,   Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+337.00,18:44:51.244,28.0nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,## Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+337.75,18:44:51.994,28.0nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,   Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+338.00,18:44:52.243,28.0nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,## Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+338.75,18:44:52.996,28.1nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,## Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+339.00,18:44:53.244,28.1nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,   Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+339.25,18:44:53.493,28.1nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,## Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+340.00,18:44:54.245,28.1nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,   Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+340.25,18:44:54.494,28.1nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,## Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+341.25,18:44:55.498,28.1nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,   Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+341.50,18:44:55.746,28.1nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,## Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+342.25,18:44:56.494,28.2nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,   Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+342.51,18:44:56.755,28.2nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,## Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+343.25,18:44:57.496,28.2nm| 8T     @ 8U    , 119kt|> Fly R  0.00nm ,   Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+343.50,18:44:57.743,28.2nm| 8T     @ 8U    , 119kt|> Fly L  0.00nm ,## Leg|DTK 124d TK 304d,NAV 1 |>124dTo     0:14
+343.75,18:44:57.995,28.2nm| 8T     @ 8U    , 119kt|> Fly L  0.00nm ,## Leg|DTK 124d TK 303d,NAV 1 |>124dTo     0:14
+344.50,18:44:58.746,28.2nm| 8T     @ 8U    , 119kt|> Fly L  0.00nm ,   Leg|DTK 124d TK 303d,NAV 1 |>124dTo     0:14
+344.75,18:44:58.994,28.2nm| 8T     @ 8U    , 119kt|> Fly L  0.00nm ,## Leg|DTK 124d TK 303d,NAV 1 |>124dTo     0:14
+345.51,18:44:59.754,28.3nm| 8T     @ 8U    , 119kt|> Fly L  0.01nm ,   Leg|DTK 124d TK 302d,NAV 1 |>124dTo     0:14
+345.76,18:45:00.009,28.3nm| 8T     @ 8U    , 119kt|> Fly L  0.01nm ,## Leg|DTK 124d TK 302d,NAV 1 |>124dTo     0:14
+346.76,18:45:01.006,28.3nm| 8T     @ 8U    , 119kt|> Fly L  0.01nm ,   Leg|DTK 124d TK 302d,NAV 1 |>124dTo     0:14
+347.01,18:45:01.254,28.3nm| 8T     @ 8U    , 119kt|> Fly L  0.01nm ,## Leg|DTK 124d TK 302d,NAV 1 |>124dTo     0:14
+347.75,18:45:01.994,28.3nm| 8T     @ 8U    , 119kt|> Fly L  0.02nm ,   Leg|DTK 124d TK 301d,NAV 1 |>124dTo     0:14
+348.00,18:45:02.245,28.3nm| 8T     @ 8U    , 119kt|> Fly L  0.02nm ,## Leg|DTK 124d TK 301d,NAV 1 |>124dTo     0:14
+348.75,18:45:02.994,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.02nm ,## Leg|DTK 124d TK 289d,NAV 1 |>124dTo     0:14
+349.00,18:45:03.249,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.03nm ,   Leg|DTK 124d TK 289d,NAV 1 |>124dTo     0:14
+349.25,18:45:03.493,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.03nm ,## Leg|DTK 124d TK 289d,NAV 1 |>124dTo     0:14
+349.75,18:45:03.995,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.03nm ,## Leg|DTK 124d TK 286d,NAV 1 |>124dTo     0:14
+350.00,18:45:04.244,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.03nm ,   Leg|DTK 124d TK 286d,NAV 1 |>124dTo     0:14
+350.25,18:45:04.494,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.04nm ,## Leg|DTK 124d TK 286d,NAV 1 |>124dTo     0:14
+350.75,18:45:04.994,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.04nm ,## Leg|DTK 124d TK 282d,NAV 1 |>124dTo     0:14
+351.00,18:45:05.243,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.04nm ,   Leg|DTK 124d TK 282d,NAV 1 |>124dTo     0:14
+351.25,18:45:05.495,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.05nm ,## Leg|DTK 124d TK 282d,NAV 1 |>124dTo     0:14
+351.75,18:45:05.995,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.06nm ,## Leg|DTK 124d TK 278d,NAV 1 |>124dTo     0:14
+352.26,18:45:06.505,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.06nm ,   Leg|DTK 124d TK 278d,NAV 1 |>124dTo     0:14
+352.51,18:45:06.756,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.07nm ,## Leg|DTK 124d TK 278d,NAV 1 |>124dTo     0:14
+352.75,18:45:06.996,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.07nm ,## Leg|DTK 124d TK 274d,NAV 1 |>124dTo     0:14
+353.26,18:45:07.506,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.07nm ,   Leg|DTK 124d TK 274d,NAV 1 |>124dTo     0:14
+353.51,18:45:07.755,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.08nm ,## Leg|DTK 124d TK 274d,NAV 1 |>124dTo     0:14
+354.01,18:45:08.256,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.08nm ,## Leg|DTK 124d TK 269d,NAV 1 |>124dTo     0:14
+354.25,18:45:08.494,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.09nm ,## Leg|DTK 124d TK 269d,NAV 1 |>124dTo     0:14
+354.51,18:45:08.754,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.09nm ,   Leg|DTK 124d TK 269d,NAV 1 |>124dTo     0:14
+354.76,18:45:09.006,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.10nm ,## Leg|DTK 124d TK 269d,NAV 1 |>124dTo     0:14
+355.00,18:45:09.244,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.10nm ,## Leg|DTK 124d TK 265d,NAV 1 |>124dTo     0:14
+355.25,18:45:09.494,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.11nm ,## Leg|DTK 124d TK 265d,NAV 1 |>124dTo     0:14
+355.50,18:45:09.743,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.11nm ,   Leg|DTK 124d TK 265d,NAV 1 |>124dTo     0:14
+355.75,18:45:09.996,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.12nm ,## Leg|DTK 124d TK 265d,NAV 1 |>124dTo     0:14
+356.00,18:45:10.244,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.12nm ,## Leg|DTK 124d TK 261d,NAV 1 |>124dTo     0:14
+356.25,18:45:10.495,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.13nm ,## Leg|DTK 124d TK 261d,NAV 1 |>124dTo     0:14
+356.75,18:45:10.996,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.13nm ,   Leg|DTK 124d TK 261d,NAV 1 |>124dTo     0:14
+357.00,18:45:11.246,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.14nm ,## Leg|DTK 124d TK 261d,NAV 1 |>124dTo     0:14
+357.25,18:45:11.494,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.15nm ,## Leg|DTK 124d TK 257d,NAV 1 |>124dTo     0:14
+357.75,18:45:11.996,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.16nm ,   Leg|DTK 124d TK 257d,NAV 1 |>124dTo     0:14
+358.00,18:45:12.245,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.16nm ,## Leg|DTK 124d TK 257d,NAV 1 |>124dTo     0:14
+358.26,18:45:12.506,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.17nm ,## Leg|DTK 124d TK 253d,NAV 1 |>124dTo     0:14
+358.50,18:45:12.745,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.18nm ,## Leg|DTK 124d TK 253d,NAV 1 |>124dTo     0:14
+358.75,18:45:12.995,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.18nm ,   Leg|DTK 124d TK 253d,NAV 1 |>124dTo     0:14
+359.00,18:45:13.246,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.19nm ,## Leg|DTK 124d TK 253d,NAV 1 |>124dTo     0:14
+359.50,18:45:13.744,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.20nm ,## Leg|DTK 124d TK 248d,NAV 1 |>124dTo     0:14
+360.00,18:45:14.249,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.21nm ,   Leg|DTK 124d TK 248d,NAV 1 |>124dTo     0:14
+360.25,18:45:14.494,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.22nm ,## Leg|DTK 124d TK 248d,NAV 1 |>124dTo     0:14
+360.75,18:45:14.993,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.23nm ,## Leg|DTK 124d TK 244d,NAV 1 |>124dTo     0:14
+361.01,18:45:15.254,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.24nm ,   Leg|DTK 124d TK 244d,NAV 1 |>124dTo     0:14
+361.26,18:45:15.505,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.24nm ,## Leg|DTK 124d TK 244d,NAV 1 |>124dTo     0:14
+361.76,18:45:16.003,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.26nm ,## Leg|DTK 124d TK 240d,NAV 1 |>124dTo     0:14
+362.01,18:45:16.256,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.27nm ,   Leg|DTK 124d TK 240d,NAV 1 |>124dTo     0:14
+362.26,18:45:16.504,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.28nm ,   Leg|DTK 124d TK 240d,NAV 1 |>124dTo     0:14
+362.51,18:45:16.754,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.28nm ,## Leg|DTK 124d TK 240d,NAV 1 |>124dTo     0:14
+362.76,18:45:17.012,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.28nm ,## Leg|DTK 124d TK 236d,NAV 1 |>124dTo     0:14
+363.02,18:45:17.290,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.30nm ,## Leg|DTK 124d TK 236d,NAV 1 |>124dTo     0:14
+363.26,18:45:17.510,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.30nm ,   Leg|DTK 124d TK 236d,NAV 1 |>124dTo     0:14
+363.50,18:45:17.753,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.30nm ,## Leg|DTK 124d TK 236d,NAV 1 |>124dTo     0:14
+364.00,18:45:18.243,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.32nm ,## Leg|DTK 124d TK 232d,NAV 1 |>124dTo     0:14
+364.25,18:45:18.493,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.33nm ,   Leg|DTK 124d TK 232d,NAV 1 |>124dTo     0:14
+364.50,18:45:18.744,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.34nm ,## Leg|DTK 124d TK 232d,NAV 1 |>124dTo     0:14
+365.00,18:45:19.251,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.35nm ,## Leg|DTK 124d TK 228d,NAV 1 |>124dTo     0:14
+365.26,18:45:19.507,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.36nm ,## Leg|DTK 124d TK 228d,NAV 1 |>124dTo     0:14
+365.51,18:45:19.755,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.37nm ,   Leg|DTK 124d TK 228d,NAV 1 |>124dTo     0:14
+365.76,18:45:20.005,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.37nm ,## Leg|DTK 124d TK 228d,NAV 1 |>124dTo     0:14
+366.01,18:45:20.256,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.38nm ,## Leg|DTK 124d TK 223d,NAV 1 |>124dTo     0:14
+366.50,18:45:20.747,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.39nm ,   Leg|DTK 124d TK 223d,NAV 1 |>124dTo     0:14
+366.75,18:45:20.996,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.40nm ,## Leg|DTK 124d TK 223d,NAV 1 |>124dTo     0:14
+367.00,18:45:21.248,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.41nm ,## Leg|DTK 124d TK 219d,NAV 1 |>124dTo     0:14
+367.25,18:45:21.496,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.42nm ,## Leg|DTK 124d TK 219d,NAV 1 |>124dTo     0:14
+367.51,18:45:21.755,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.43nm ,   Leg|DTK 124d TK 219d,NAV 1 |>124dTo     0:14
+367.76,18:45:22.008,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.44nm ,   Leg|DTK 124d TK 219d,NAV 1 |>124dTo     0:14
+368.00,18:45:22.246,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.44nm ,## Leg|DTK 124d TK 219d,NAV 1 |>124dTo     0:14
+368.25,18:45:22.495,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.45nm ,## Leg|DTK 124d TK 215d,NAV 1 |>124dTo     0:14
+368.50,18:45:22.747,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.46nm ,## Leg|DTK 124d TK 215d,NAV 1 |>124dTo     0:14
+368.75,18:45:22.994,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.47nm ,   Leg|DTK 124d TK 215d,NAV 1 |>124dTo     0:14
+369.00,18:45:23.245,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.47nm ,## Leg|DTK 124d TK 215d,NAV 1 |>124dTo     0:14
+369.25,18:45:23.494,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.48nm ,## Leg|DTK 124d TK 211d,NAV 1 |>123dTo     0:14
+369.51,18:45:23.755,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.49nm ,## Leg|DTK 124d TK 211d,NAV 1 |>123dTo     0:14
+369.76,18:45:24.006,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.50nm ,   Leg|DTK 124d TK 211d,NAV 1 |>123dTo     0:14
+370.00,18:45:24.244,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.50nm ,## Leg|DTK 124d TK 211d,NAV 1 |>123dTo     0:14
+370.26,18:45:24.508,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.51nm ,## Leg|DTK 124d TK 206d,NAV 1 |>123dTo     0:14
+370.75,18:45:24.998,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.52nm ,## Leg|DTK 124d TK 206d,NAV 1 |>123dTo     0:14
+371.00,18:45:25.258,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.54nm ,   Leg|DTK 124d TK 206d,NAV 1 |>123dTo     0:14
+371.25,18:45:25.501,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.54nm ,## Leg|DTK 124d TK 202d,NAV 1 |>123dTo     0:14
+371.51,18:45:25.772,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.55nm ,## Leg|DTK 124d TK 202d,NAV 1 |>123dTo     0:14
+372.00,18:45:26.257,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.56nm ,   Leg|DTK 124d TK 202d,NAV 1 |>123dTo     0:14
+372.25,18:45:26.502,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.57nm ,## Leg|DTK 124d TK 202d,NAV 1 |>123dTo     0:14
+372.51,18:45:26.766,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.58nm ,## Leg|DTK 124d TK 198d,NAV 1 |>123dTo     0:14
+373.01,18:45:27.262,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.59nm ,   Leg|DTK 124d TK 198d,NAV 1 |>123dTo     0:14
+373.25,18:45:27.506,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.60nm ,   Leg|DTK 124d TK 198d,NAV 1 |>123dTo     0:14
+373.50,18:45:27.750,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.61nm ,## Leg|DTK 124d TK 194d,NAV 1 |>123dTo     0:14
+374.00,18:45:28.254,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.62nm ,## Leg|DTK 124d TK 194d,NAV 1 |>123dTo     0:14
+374.26,18:45:28.505,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.63nm ,   Leg|DTK 124d TK 194d,NAV 1 |>123dTo     0:14
+374.51,18:45:28.758,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.63nm ,## Leg|DTK 124d TK 194d,NAV 1 |>123dTo     0:14
+374.75,18:45:28.996,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.64nm ,## Leg|DTK 124d TK 189d,NAV 1 |>123dTo     0:14
+375.00,18:45:29.248,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.65nm ,## Leg|DTK 124d TK 189d,NAV 1 |>123dTo     0:14
+375.51,18:45:29.759,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.66nm ,   Leg|DTK 124d TK 189d,NAV 1 |>123dTo     0:14
+375.75,18:45:29.995,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.67nm ,## Leg|DTK 124d TK 185d,NAV 1 |>123dTo     0:14
+376.00,18:45:30.244,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.68nm ,## Leg|DTK 124d TK 185d,NAV 1 |>123dTo     0:14
+376.50,18:45:30.748,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.69nm ,   Leg|DTK 124d TK 185d,NAV 1 |>123dTo     0:14
+376.75,18:45:31.003,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.70nm ,## Leg|DTK 124d TK 181d,NAV 1 |>123dTo     0:14
+377.51,18:45:31.758,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.71nm ,   Leg|DTK 124d TK 181d,NAV 1 |>123dTo     0:14
+377.75,18:45:31.996,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.72nm ,## Leg|DTK 124d TK 181d,NAV 1 |>123dTo     0:14
+378.00,18:45:32.247,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.72nm ,## Leg|DTK 124d TK 177d,NAV 1 |>123dTo     0:14
+378.25,18:45:32.496,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.73nm ,## Leg|DTK 124d TK 177d,NAV 1 |>123dTo     0:14
+378.76,18:45:33.007,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.74nm ,   Leg|DTK 124d TK 177d,NAV 1 |>123dTo     0:14
+379.00,18:45:33.247,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.75nm ,## Leg|DTK 124d TK 173d,NAV 1 |>123dTo     0:14
+379.25,18:45:33.497,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.76nm ,## Leg|DTK 124d TK 173d,NAV 1 |>123dTo     0:14
+379.75,18:45:34.001,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.77nm ,   Leg|DTK 124d TK 173d,NAV 1 |>123dTo     0:14
+380.01,18:45:34.256,28.7nm| 8T     @ 8U    , 119kt|> Fly L  0.77nm ,## Leg|DTK 124d TK 173d,NAV 1 |>123dTo     0:14
+380.25,18:45:34.496,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.78nm ,## Leg|DTK 124d TK 169d,NAV 1 |>123dTo     0:14
+380.50,18:45:34.748,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.79nm ,## Leg|DTK 124d TK 169d,NAV 1 |>123dTo     0:14
+381.00,18:45:35.244,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.79nm ,   Leg|DTK 124d TK 169d,NAV 1 |>123dTo     0:14
+381.25,18:45:35.495,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.80nm ,## Leg|DTK 124d TK 165d,NAV 1 |>123dTo     0:14
+381.50,18:45:35.744,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.81nm ,## Leg|DTK 124d TK 165d,NAV 1 |>123dTo     0:14
+382.00,18:45:36.244,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.81nm ,   Leg|DTK 124d TK 165d,NAV 1 |>123dTo     0:14
+382.25,18:45:36.497,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.82nm ,## Leg|DTK 124d TK 165d,NAV 1 |>123dTo     0:14
+382.50,18:45:36.745,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.83nm ,## Leg|DTK 124d TK 161d,NAV 1 |>123dTo     0:14
+383.00,18:45:37.243,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.84nm ,   Leg|DTK 124d TK 161d,NAV 1 |>123dTo     0:14
+383.25,18:45:37.494,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.84nm ,## Leg|DTK 124d TK 161d,NAV 1 |>123dTo     0:14
+383.75,18:45:37.995,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.85nm ,## Leg|DTK 124d TK 157d,NAV 1 |>123dTo     0:14
+384.25,18:45:38.495,28.6nm| 8T     @ 8U    , 119kt|> Fly L  0.86nm ,   Leg|DTK 124d TK 157d,NAV 1 |>123dTo     0:14
+384.50,18:45:38.744,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.86nm ,## Leg|DTK 124d TK 154d,NAV 1 |>123dTo     0:14
+384.75,18:45:38.993,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.87nm ,## Leg|DTK 124d TK 154d,NAV 1 |>123dTo     0:14
+385.26,18:45:39.507,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.87nm ,   Leg|DTK 124d TK 154d,NAV 1 |>123dTo     0:14
+385.50,18:45:39.744,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.87nm ,## Leg|DTK 124d TK 154d,NAV 1 |>123dTo     0:14
+385.75,18:45:39.998,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.88nm ,## Leg|DTK 124d TK 151d,NAV 1 |>123dTo     0:14
+386.25,18:45:40.495,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.89nm ,## Leg|DTK 124d TK 151d,NAV 1 |>123dTo     0:14
+386.50,18:45:40.744,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.89nm ,   Leg|DTK 124d TK 151d,NAV 1 |>123dTo     0:14
+386.75,18:45:40.998,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.89nm ,## Leg|DTK 124d TK 148d,NAV 1 |>123dTo     0:14
+387.00,18:45:41.245,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.90nm ,## Leg|DTK 124d TK 148d,NAV 1 |>123dTo     0:14
+387.50,18:45:41.744,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.90nm ,   Leg|DTK 124d TK 148d,NAV 1 |>123dTo     0:14
+387.75,18:45:41.994,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.90nm ,## Leg|DTK 124d TK 148d,NAV 1 |>123dTo     0:14
+388.26,18:45:42.504,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.91nm ,## Leg|DTK 124d TK 145d,NAV 1 |>123dTo     0:14
+388.51,18:45:42.755,28.5nm| 8T     @ 8U    , 119kt|> Fly L  0.92nm ,   Leg|DTK 124d TK 145d,NAV 1 |>123dTo     0:14
+388.76,18:45:43.007,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.92nm ,## Leg|DTK 124d TK 142d,NAV 1 |>123dTo     0:14
+389.75,18:45:43.993,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.93nm ,   Leg|DTK 124d TK 142d,NAV 1 |>123dTo     0:14
+390.00,18:45:44.244,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.93nm ,## Leg|DTK 124d TK 139d,NAV 1 |>123dTo     0:14
+390.75,18:45:44.995,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.94nm ,   Leg|DTK 124d TK 139d,NAV 1 |>123dTo     0:14
+391.00,18:45:45.246,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.94nm ,## Leg|DTK 124d TK 137d,NAV 1 |>122dTo     0:14
+392.00,18:45:46.244,28.4nm| 8T     @ 8U    , 119kt|> Fly L  0.94nm ,   Leg|DTK 124d TK 137d,NAV 1 |>122dTo     0:14
+392.26,18:45:46.503,28.3nm| 8T     @ 8U    , 119kt|> Fly L  0.95nm ,## Leg|DTK 124d TK 134d,NAV 1 |>122dTo     0:14
+393.01,18:45:47.255,28.3nm| 8T     @ 8U    , 119kt|> Fly L  0.95nm ,   Leg|DTK 124d TK 134d,NAV 1 |>122dTo     0:14
+393.25,18:45:47.494,28.3nm| 8T     @ 8U    , 119kt|> Fly L  0.95nm ,## Leg|DTK 124d TK 132d,NAV 1 |>122dTo     0:14
+394.26,18:45:48.506,28.3nm| 8T     @ 8U    , 119kt|> Fly L  0.95nm ,   Leg|DTK 124d TK 130d,NAV 1 |>122dTo     0:14
+394.51,18:45:48.753,28.3nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,## Leg|DTK 124d TK 130d,NAV 1 |>122dTo     0:14
+395.26,18:45:49.506,28.2nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,   Leg|DTK 124d TK 128d,NAV 1 |>122dTo     0:14
+395.51,18:45:49.755,28.2nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,## Leg|DTK 124d TK 128d,NAV 1 |>122dTo     0:14
+396.26,18:45:50.506,28.2nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,   Leg|DTK 124d TK 128d,NAV 1 |>122dTo     0:14
+396.51,18:45:50.756,28.2nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,## Leg|DTK 124d TK 126d,NAV 1 |>122dTo     0:14
+397.50,18:45:51.750,28.2nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,   Leg|DTK 124d TK 124d,NAV 1 |>122dTo     0:14
+397.75,18:45:51.997,28.2nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,## Leg|DTK 124d TK 124d,NAV 1 |>122dTo     0:14
+398.50,18:45:52.744,28.1nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,   Leg|DTK 124d TK 123d,NAV 1 |>122dTo     0:14
+398.75,18:45:52.995,28.1nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,## Leg|DTK 124d TK 123d,NAV 1 |>122dTo     0:14
+399.75,18:45:53.994,28.1nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,   Leg|DTK 124d TK 121d,NAV 1 |>122dTo     0:14
+400.00,18:45:54.246,28.1nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,## Leg|DTK 124d TK 121d,NAV 1 |>122dTo     0:14
+400.75,18:45:54.997,28.1nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,   Leg|DTK 124d TK 120d,NAV 1 |>122dTo     0:14
+401.00,18:45:55.245,28.1nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,## Leg|DTK 124d TK 120d,NAV 1 |>122dTo     0:14
+401.75,18:45:55.994,28.1nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,   Leg|DTK 124d TK 120d,NAV 1 |>122dTo     0:14
+402.00,18:45:56.244,28.0nm| 8T     @ 8U    , 119kt|> Fly L  0.96nm ,## Leg|DTK 124d TK 118d,NAV 1 |>122dTo     0:14
+402.26,18:45:56.506,28.0nm| 8T     @ 8U    , 119kt|> Fly L  0.95nm ,## Leg|DTK 124d TK 118d,NAV 1 |>122dTo     0:14
+403.00,18:45:57.249,28.0nm| 8T     @ 8U    , 119kt|> Fly L  0.95nm ,   Leg|DTK 124d TK 117d,NAV 1 |>122dTo     0:14
+403.25,18:45:57.494,28.0nm| 8T     @ 8U    , 119kt|> Fly L  0.95nm ,## Leg|DTK 124d TK 117d,NAV 1 |>122dTo     0:14
+404.00,18:45:58.246,28.0nm| 8T     @ 8U    , 119kt|> Fly L  0.95nm ,   Leg|DTK 124d TK 116d,NAV 1 |>122dTo     0:14
+404.25,18:45:58.492,28.0nm| 8T     @ 8U    , 119kt|> Fly L  0.95nm ,## Leg|DTK 124d TK 116d,NAV 1 |>122dTo     0:14
+405.00,18:45:59.246,27.9nm| 8T     @ 8U    , 119kt|> Fly L  0.94nm ,## Leg|DTK 124d TK 115d,NAV 1 |>122dTo     0:14
+405.25,18:45:59.497,27.9nm| 8T     @ 8U    , 119kt|> Fly L  0.94nm ,   Leg|DTK 124d TK 115d,NAV 1 |>122dTo     0:14
+405.50,18:45:59.749,27.9nm| 8T     @ 8U    , 119kt|> Fly L  0.94nm ,## Leg|DTK 124d TK 115d,NAV 1 |>122dTo     0:14
+406.25,18:46:00.493,27.9nm| 8T     @ 8U    , 119kt|> Fly L  0.94nm ,   Leg|DTK 124d TK 114d,NAV 1 |>122dTo     0:14
+406.51,18:46:00.754,27.9nm| 8T     @ 8U    , 119kt|> Fly L  0.94nm ,## Leg|DTK 124d TK 114d,NAV 1 |>122dTo     0:14
+406.76,18:46:01.004,27.9nm| 8T     @ 8U    , 119kt|> Fly L  0.93nm ,## Leg|DTK 124d TK 114d,NAV 1 |>122dTo     0:14
+407.26,18:46:01.505,27.9nm| 8T     @ 8U    , 119kt|> Fly L  0.93nm ,   Leg|DTK 124d TK 113d,NAV 1 |>122dTo     0:14
+407.51,18:46:01.757,27.9nm| 8T     @ 8U    , 119kt|> Fly L  0.93nm ,## Leg|DTK 124d TK 113d,NAV 1 |>122dTo     0:14
+408.25,18:46:02.502,27.8nm| 8T     @ 8U    , 119kt|> Fly L  0.93nm ,## Leg|DTK 124d TK 112d,NAV 1 |>122dTo     0:13
+408.51,18:46:02.760,27.8nm| 8T     @ 8U    , 119kt|> Fly L  0.92nm ,   Leg|DTK 124d TK 112d,NAV 1 |>122dTo     0:13
+408.75,18:46:02.995,27.8nm| 8T     @ 8U    , 119kt|> Fly L  0.92nm ,## Leg|DTK 124d TK 112d,NAV 1 |>122dTo     0:13
+409.25,18:46:03.494,27.8nm| 8T     @ 8U    , 119kt|> Fly L  0.92nm ,## Leg|DTK 124d TK 111d,NAV 1 |>122dTo     0:13
+409.50,18:46:03.747,27.8nm| 8T     @ 8U    , 119kt|> Fly L  0.92nm ,   Leg|DTK 124d TK 111d,NAV 1 |>122dTo     0:13
+409.75,18:46:03.996,27.8nm| 8T     @ 8U    , 119kt|> Fly L  0.92nm ,## Leg|DTK 124d TK 111d,NAV 1 |>122dTo     0:13
+410.00,18:46:04.248,27.8nm| 8T     @ 8U    , 119kt|> Fly L  0.91nm ,## Leg|DTK 124d TK 111d,NAV 1 |>122dTo     0:13
+410.25,18:46:04.500,27.8nm| 8T     @ 8U    , 119kt|> Fly L  0.91nm ,## Leg|DTK 124d TK 110d,NAV 1 |>122dTo     0:13
+410.51,18:46:04.769,27.8nm| 8T     @ 8U    , 119kt|> Fly L  0.91nm ,   Leg|DTK 124d TK 110d,NAV 1 |>122dTo     0:13
+411.00,18:46:05.253,27.8nm| 8T     @ 8U    , 119kt|> Fly L  0.91nm ,## Leg|DTK 124d TK 110d,NAV 1 |>122dTo     0:13
+411.26,18:46:05.506,27.7nm| 8T     @ 8U    , 119kt|> Fly L  0.90nm ,## Leg|DTK 124d TK 110d,NAV 1 |>122dTo     0:13
+411.75,18:46:05.994,27.7nm| 8T     @ 8U    , 119kt|> Fly L  0.90nm ,   Leg|DTK 124d TK 110d,NAV 1 |>122dTo     0:13
+412.00,18:46:06.244,27.7nm| 8T     @ 8U    , 119kt|> Fly L  0.90nm ,## Leg|DTK 124d TK 110d,NAV 1 |>122dTo     0:13
+412.50,18:46:06.745,27.7nm| 8T     @ 8U    , 119kt|> Fly L  0.89nm ,## Leg|DTK 124d TK 109d,NAV 1 |>123dTo     0:13
+412.75,18:46:06.994,27.7nm| 8T     @ 8U    , 119kt|> Fly L  0.89nm ,   Leg|DTK 124d TK 109d,NAV 1 |>123dTo     0:13
+413.00,18:46:07.244,27.7nm| 8T     @ 8U    , 119kt|> Fly L  0.89nm ,## Leg|DTK 124d TK 109d,NAV 1 |>123dTo     0:13
+413.50,18:46:07.745,27.7nm| 8T     @ 8U    , 119kt|> Fly L  0.89nm ,## Leg|DTK 124d TK 108d,NAV 1 |>123dTo     0:13
+413.75,18:46:07.994,27.7nm| 8T     @ 8U    , 119kt|> Fly L  0.88nm ,## Leg|DTK 124d TK 108d,NAV 1 |>123dTo     0:13
+414.00,18:46:08.244,27.7nm| 8T     @ 8U    , 119kt|> Fly L  0.88nm ,   Leg|DTK 124d TK 108d,NAV 1 |>123dTo     0:13
+414.26,18:46:08.505,27.7nm| 8T     @ 8U    , 119kt|> Fly L  0.88nm ,## Leg|DTK 124d TK 108d,NAV 1 |>123dTo     0:13
+414.76,18:46:09.004,27.6nm| 8T     @ 8U    , 119kt|> Fly L  0.87nm ,## Leg|DTK 124d TK 108d,NAV 1 |>123dTo     0:13
+415.01,18:46:09.256,27.6nm| 8T     @ 8U    , 119kt|> Fly L  0.87nm ,   Leg|DTK 124d TK 108d,NAV 1 |>123dTo     0:13
+415.26,18:46:09.503,27.6nm| 8T     @ 8U    , 119kt|> Fly L  0.87nm ,## Leg|DTK 124d TK 108d,NAV 1 |>123dTo     0:13
+415.76,18:46:10.006,27.6nm| 8T     @ 8U    , 119kt|> Fly L  0.86nm ,## Leg|DTK 124d TK 108d,NAV 1 |>123dTo     0:13
+416.01,18:46:10.255,27.6nm| 8T     @ 8U    , 119kt|> Fly L  0.86nm ,   Leg|DTK 124d TK 108d,NAV 1 |>123dTo     0:13
+416.51,18:46:10.756,27.6nm| 8T     @ 8U    , 119kt|> Fly L  0.86nm ,## Leg|DTK 124d TK 108d,NAV 1 |>123dTo     0:13
+416.75,18:46:10.996,27.6nm| 8T     @ 8U    , 119kt|> Fly L  0.86nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+417.00,18:46:11.245,27.6nm| 8T     @ 8U    , 119kt|> Fly L  0.85nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+417.25,18:46:11.494,27.6nm| 8T     @ 8U    , 119kt|> Fly L  0.85nm ,   Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+417.50,18:46:11.745,27.6nm| 8T     @ 8U    , 119kt|> Fly L  0.85nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+417.75,18:46:11.993,27.5nm| 8T     @ 8U    , 119kt|> Fly L  0.85nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+418.25,18:46:12.493,27.5nm| 8T     @ 8U    , 119kt|> Fly L  0.84nm ,   Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+418.50,18:46:12.743,27.5nm| 8T     @ 8U    , 119kt|> Fly L  0.84nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+418.75,18:46:12.994,27.5nm| 8T     @ 8U    , 119kt|> Fly L  0.84nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+419.25,18:46:13.494,27.5nm| 8T     @ 8U    , 119kt|> Fly L  0.83nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+419.50,18:46:13.746,27.5nm| 8T     @ 8U    , 119kt|> Fly L  0.83nm ,   Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+419.75,18:46:14.006,27.5nm| 8T     @ 8U    , 119kt|> Fly L  0.83nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+420.51,18:46:14.755,27.5nm| 8T     @ 8U    , 119kt|> Fly L  0.82nm ,   Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+420.76,18:46:15.016,27.5nm| 8T     @ 8U    , 119kt|> Fly L  0.82nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+421.26,18:46:15.512,27.4nm| 8T     @ 8U    , 119kt|> Fly L  0.82nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+421.50,18:46:15.755,27.4nm| 8T     @ 8U    , 119kt|> Fly L  0.81nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+421.76,18:46:16.010,27.4nm| 8T     @ 8U    , 119kt|> Fly L  0.81nm ,   Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+422.00,18:46:16.258,27.4nm| 8T     @ 8U    , 119kt|> Fly L  0.81nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+422.50,18:46:16.754,27.4nm| 8T     @ 8U    , 119kt|> Fly L  0.80nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+422.76,18:46:17.019,27.4nm| 8T     @ 8U    , 119kt|> Fly L  0.80nm ,   Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+423.01,18:46:17.257,27.4nm| 8T     @ 8U    , 119kt|> Fly L  0.80nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+423.51,18:46:17.754,27.4nm| 8T     @ 8U    , 119kt|> Fly L  0.79nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+423.76,18:46:18.005,27.4nm| 8T     @ 8U    , 119kt|> Fly L  0.79nm ,   Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+424.01,18:46:18.254,27.4nm| 8T     @ 8U    , 119kt|> Fly L  0.79nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+424.26,18:46:18.506,27.4nm| 8T     @ 8U    , 119kt|> Fly L  0.78nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+424.50,18:46:18.745,27.3nm| 8T     @ 8U    , 119kt|> Fly L  0.78nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+425.00,18:46:19.248,27.3nm| 8T     @ 8U    , 119kt|> Fly L  0.78nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+425.25,18:46:19.494,27.3nm| 8T     @ 8U    , 119kt|> Fly L  0.77nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+426.00,18:46:20.244,27.3nm| 8T     @ 8U    , 119kt|> Fly L  0.77nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+426.25,18:46:20.498,27.3nm| 8T     @ 8U    , 119kt|> Fly L  0.76nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+427.25,18:46:21.497,27.3nm| 8T     @ 8U    , 119kt|> Fly L  0.76nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+427.50,18:46:21.747,27.3nm| 8T     @ 8U    , 119kt|> Fly L  0.75nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+428.26,18:46:22.507,27.3nm| 8T     @ 8U    , 119kt|> Fly L  0.75nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+428.50,18:46:22.745,27.3nm| 8T     @ 8U    , 119kt|> Fly L  0.75nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+428.75,18:46:22.995,27.2nm| 8T     @ 8U    , 119kt|> Fly L  0.74nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+429.26,18:46:23.504,27.2nm| 8T     @ 8U    , 119kt|> Fly L  0.73nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+429.51,18:46:23.756,27.2nm| 8T     @ 8U    , 119kt|> Fly L  0.73nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+429.75,18:46:23.995,27.2nm| 8T     @ 8U    , 119kt|> Fly L  0.73nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+430.50,18:46:24.746,27.2nm| 8T     @ 8U    , 119kt|> Fly L  0.72nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+430.75,18:46:24.996,27.2nm| 8T     @ 8U    , 119kt|> Fly L  0.72nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+431.25,18:46:25.493,27.2nm| 8T     @ 8U    , 119kt|> Fly L  0.71nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+431.50,18:46:25.746,27.2nm| 8T     @ 8U    , 119kt|> Fly L  0.71nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+431.76,18:46:26.011,27.2nm| 8T     @ 8U    , 119kt|> Fly L  0.71nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+432.00,18:46:26.246,27.1nm| 8T     @ 8U    , 119kt|> Fly L  0.70nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+432.75,18:46:26.993,27.1nm| 8T     @ 8U    , 119kt|> Fly L  0.70nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+433.01,18:46:27.255,27.1nm| 8T     @ 8U    , 119kt|> Fly L  0.70nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+433.26,18:46:27.506,27.1nm| 8T     @ 8U    , 119kt|> Fly L  0.69nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+433.76,18:46:28.005,27.1nm| 8T     @ 8U    , 119kt|> Fly L  0.69nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+434.01,18:46:28.256,27.1nm| 8T     @ 8U    , 119kt|> Fly L  0.68nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+435.01,18:46:29.253,27.1nm| 8T     @ 8U    , 119kt|> Fly L  0.68nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+435.26,18:46:29.507,27.1nm| 8T     @ 8U    , 119kt|> Fly L  0.68nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+435.50,18:46:29.747,27.0nm| 8T     @ 8U    , 119kt|> Fly L  0.67nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+436.00,18:46:30.247,27.0nm| 8T     @ 8U    , 119kt|> Fly L  0.67nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+436.26,18:46:30.504,27.0nm| 8T     @ 8U    , 119kt|> Fly L  0.66nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+437.25,18:46:31.497,27.0nm| 8T     @ 8U    , 119kt|> Fly L  0.65nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+437.50,18:46:31.747,27.0nm| 8T     @ 8U    , 119kt|> Fly L  0.65nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+437.75,18:46:31.993,27.0nm| 8T     @ 8U    , 119kt|> Fly L  0.64nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+438.25,18:46:32.496,26.9nm| 8T     @ 8U    , 119kt|> Fly L  0.64nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+438.50,18:46:32.745,26.9nm| 8T     @ 8U    , 119kt|> Fly L  0.64nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+439.00,18:46:33.243,26.9nm| 8T     @ 8U    , 119kt|> Fly L  0.63nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+439.25,18:46:33.495,26.9nm| 8T     @ 8U    , 119kt|> Fly L  0.63nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+439.50,18:46:33.745,26.9nm| 8T     @ 8U    , 119kt|> Fly L  0.63nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+440.00,18:46:34.247,26.9nm| 8T     @ 8U    , 119kt|> Fly L  0.62nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+440.50,18:46:34.747,26.9nm| 8T     @ 8U    , 119kt|> Fly L  0.62nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+440.75,18:46:34.995,26.9nm| 8T     @ 8U    , 119kt|> Fly L  0.62nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+441.00,18:46:35.247,26.9nm| 8T     @ 8U    , 119kt|> Fly L  0.61nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+441.25,18:46:35.497,26.8nm| 8T     @ 8U    , 119kt|> Fly L  0.61nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+441.50,18:46:35.744,26.8nm| 8T     @ 8U    , 119kt|> Fly L  0.61nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+441.75,18:46:35.995,26.8nm| 8T     @ 8U    , 119kt|> Fly L  0.60nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+442.75,18:46:36.995,26.8nm| 8T     @ 8U    , 119kt|> Fly L  0.59nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+443.00,18:46:37.244,26.8nm| 8T     @ 8U    , 119kt|> Fly L  0.59nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+443.75,18:46:37.993,26.8nm| 8T     @ 8U    , 119kt|> Fly L  0.58nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+444.00,18:46:38.243,26.8nm| 8T     @ 8U    , 119kt|> Fly L  0.58nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+444.76,18:46:39.005,26.7nm| 8T     @ 8U    , 119kt|> Fly L  0.57nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+445.01,18:46:39.255,26.7nm| 8T     @ 8U    , 119kt|> Fly L  0.57nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+445.76,18:46:40.003,26.7nm| 8T     @ 8U    , 119kt|> Fly L  0.56nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+446.01,18:46:40.253,26.7nm| 8T     @ 8U    , 119kt|> Fly L  0.56nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+446.26,18:46:40.511,26.7nm| 8T     @ 8U    , 119kt|> Fly L  0.56nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+446.75,18:46:40.995,26.7nm| 8T     @ 8U    , 119kt|> Fly L  0.55nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+447.00,18:46:41.243,26.7nm| 8T     @ 8U    , 119kt|> Fly L  0.55nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+447.26,18:46:41.503,26.7nm| 8T     @ 8U    , 119kt|> Fly L  0.55nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+448.01,18:46:42.255,26.7nm| 8T     @ 8U    , 119kt|> Fly L  0.54nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+448.26,18:46:42.505,26.7nm| 8T     @ 8U    , 119kt|> Fly L  0.54nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+448.51,18:46:42.755,26.7nm| 8T     @ 8U    , 119kt|> Fly L  0.54nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+449.01,18:46:43.258,26.6nm| 8T     @ 8U    , 119kt|> Fly L  0.53nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+449.25,18:46:43.492,26.6nm| 8T     @ 8U    , 119kt|> Fly L  0.53nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+449.50,18:46:43.745,26.6nm| 8T     @ 8U    , 119kt|> Fly L  0.53nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+449.75,18:46:43.994,26.6nm| 8T     @ 8U    , 119kt|> Fly L  0.52nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+450.25,18:46:44.495,26.6nm| 8T     @ 8U    , 119kt|> Fly L  0.52nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+450.51,18:46:44.753,26.6nm| 8T     @ 8U    , 119kt|> Fly L  0.52nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+451.01,18:46:45.257,26.6nm| 8T     @ 8U    , 119kt|> Fly L  0.51nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+451.50,18:46:45.746,26.6nm| 8T     @ 8U    , 119kt|> Fly L  0.51nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+451.75,18:46:45.994,26.6nm| 8T     @ 8U    , 119kt|> Fly L  0.50nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+452.25,18:46:46.494,26.5nm| 8T     @ 8U    , 119kt|> Fly L  0.50nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+452.51,18:46:46.757,26.5nm| 8T     @ 8U    , 119kt|> Fly L  0.50nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+452.75,18:46:46.994,26.5nm| 8T     @ 8U    , 119kt|> Fly L  0.50nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+453.00,18:46:47.244,26.5nm| 8T     @ 8U    , 119kt|> Fly L  0.49nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+453.75,18:46:47.994,26.5nm| 8T     @ 8U    , 119kt|> Fly L  0.49nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+454.00,18:46:48.243,26.5nm| 8T     @ 8U    , 119kt|> Fly L  0.49nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+454.26,18:46:48.503,26.5nm| 8T     @ 8U    , 119kt|> Fly L  0.48nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+454.75,18:46:48.994,26.5nm| 8T     @ 8U    , 119kt|> Fly L  0.48nm ,   Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+455.00,18:46:49.244,26.5nm| 8T     @ 8U    , 119kt|> Fly L  0.48nm ,## Leg|DTK 124d TK 105d,NAV 1 |>123dTo     0:13
+455.50,18:46:49.743,26.4nm| 8T     @ 8U    , 119kt|> Fly L  0.47nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+456.00,18:46:50.244,26.4nm| 8T     @ 8U    , 119kt|> Fly L  0.47nm ,   Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+456.26,18:46:50.504,26.4nm| 8T     @ 8U    , 119kt|> Fly L  0.46nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+457.01,18:46:51.257,26.4nm| 8T     @ 8U    , 119kt|> Fly L  0.46nm ,   Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+457.25,18:46:51.496,26.4nm| 8T     @ 8U    , 119kt|> Fly L  0.46nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+457.50,18:46:51.744,26.4nm| 8T     @ 8U    , 119kt|> Fly L  0.45nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+458.00,18:46:52.242,26.4nm| 8T     @ 8U    , 119kt|> Fly L  0.45nm ,   Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+458.25,18:46:52.495,26.4nm| 8T     @ 8U    , 119kt|> Fly L  0.45nm ,## Leg|DTK 124d TK 106d,NAV 1 |>123dTo     0:13
+458.75,18:46:52.994,26.3nm| 8T     @ 8U    , 119kt|> Fly L  0.44nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+459.25,18:46:53.493,26.3nm| 8T     @ 8U    , 119kt|> Fly L  0.44nm ,   Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+459.50,18:46:53.745,26.3nm| 8T     @ 8U    , 119kt|> Fly L  0.44nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+459.76,18:46:54.004,26.3nm| 8T     @ 8U    , 119kt|> Fly L  0.43nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+460.26,18:46:54.504,26.3nm| 8T     @ 8U    , 119kt|> Fly L  0.43nm ,   Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+460.51,18:46:54.754,26.3nm| 8T     @ 8U    , 119kt|> Fly L  0.43nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+461.01,18:46:55.255,26.3nm| 8T     @ 8U    , 119kt|> Fly L  0.42nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+461.51,18:46:55.755,26.3nm| 8T     @ 8U    , 119kt|> Fly L  0.42nm ,   Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+461.76,18:46:56.005,26.2nm| 8T     @ 8U    , 119kt|> Fly L  0.42nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+462.51,18:46:56.755,26.2nm| 8T     @ 8U    , 119kt|> Fly L  0.41nm ,   Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+462.76,18:46:57.006,26.2nm| 8T     @ 8U    , 119kt|> Fly L  0.41nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+463.50,18:46:57.744,26.2nm| 8T     @ 8U    , 119kt|> Fly L  0.40nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+463.75,18:46:57.994,26.2nm| 8T     @ 8U    , 119kt|> Fly L  0.40nm ,   Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+464.01,18:46:58.254,26.2nm| 8T     @ 8U    , 119kt|> Fly L  0.40nm ,## Leg|DTK 124d TK 107d,NAV 1 |>123dTo     0:13
+464.26,18:46:58.506,26.2nm| 8T     @ 8U    , 119kt|> Fly L  0.40nm ,## Leg|DTK 124d TK 107d,NAV 1 |>124dTo     0:13
+464.76,18:46:59.004,26.2nm| 8T     @ 8U    , 119kt|> Fly L  0.39nm ,   Leg|DTK 124d TK 107d,NAV 1 |>124dTo     0:13
+465.01,18:46:59.255,26.2nm| 8T     @ 8U    , 119kt|> Fly L  0.39nm ,## Leg|DTK 124d TK 107d,NAV 1 |>124dTo     0:13
+465.26,18:46:59.505,26.1nm| 8T     @ 8U    , 119kt|> Fly L  0.39nm ,## Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+465.76,18:47:00.005,26.1nm| 8T     @ 8U    , 119kt|> Fly L  0.39nm ,   Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+466.01,18:47:00.255,26.1nm| 8T     @ 8U    , 119kt|> Fly L  0.38nm ,## Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+467.01,18:47:01.255,26.1nm| 8T     @ 8U    , 119kt|> Fly L  0.38nm ,   Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+467.26,18:47:01.503,26.1nm| 8T     @ 8U    , 119kt|> Fly L  0.38nm ,## Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+467.51,18:47:01.755,26.1nm| 8T     @ 8U    , 119kt|> Fly L  0.37nm ,## Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+468.01,18:47:02.254,26.1nm| 8T     @ 8U    , 119kt|> Fly L  0.37nm ,   Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+468.26,18:47:02.503,26.0nm| 8T     @ 8U    , 119kt|> Fly L  0.37nm ,## Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+468.75,18:47:02.994,26.0nm| 8T     @ 8U    , 119kt|> Fly L  0.36nm ,## Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+469.25,18:47:03.494,26.0nm| 8T     @ 8U    , 119kt|> Fly L  0.36nm ,   Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+469.50,18:47:03.746,26.0nm| 8T     @ 8U    , 119kt|> Fly L  0.36nm ,## Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+470.00,18:47:04.244,26.0nm| 8T     @ 8U    , 119kt|> Fly L  0.35nm ,## Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+470.26,18:47:04.505,26.0nm| 8T     @ 8U    , 119kt|> Fly L  0.35nm ,   Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+470.51,18:47:04.760,26.0nm| 8T     @ 8U    , 119kt|> Fly L  0.35nm ,## Leg|DTK 124d TK 108d,NAV 1 |>124dTo     0:13
+471.25,18:47:05.494,25.9nm| 8T     @ 8U    , 119kt|> Fly L  0.34nm ,   Leg|DTK 124d TK 109d,NAV 1 |>124dTo     0:13
+471.50,18:47:05.745,25.9nm| 8T     @ 8U    , 119kt|> Fly L  0.34nm ,## Leg|DTK 124d TK 109d,NAV 1 |>124dTo     0:13
+472.51,18:47:06.759,25.9nm| 8T     @ 8U    , 119kt|> Fly L  0.34nm ,   Leg|DTK 124d TK 109d,NAV 1 |>124dTo     0:13
+472.75,18:47:06.995,25.9nm| 8T     @ 8U    , 119kt|> Fly L  0.34nm ,## Leg|DTK 124d TK 109d,NAV 1 |>124dTo     0:13
+473.00,18:47:07.248,25.9nm| 8T     @ 8U    , 119kt|> Fly L  0.33nm ,## Leg|DTK 124d TK 109d,NAV 1 |>124dTo     0:13
+473.50,18:47:07.748,25.9nm| 8T     @ 8U    , 119kt|> Fly L  0.33nm ,   Leg|DTK 124d TK 109d,NAV 1 |>124dTo     0:13
+473.75,18:47:07.996,25.9nm| 8T     @ 8U    , 119kt|> Fly L  0.33nm ,## Leg|DTK 124d TK 109d,NAV 1 |>124dTo     0:13
+474.51,18:47:08.756,25.9nm| 8T     @ 8U    , 119kt|> Fly L  0.32nm ,## Leg|DTK 124d TK 109d,NAV 1 |>124dTo     0:13
+474.75,18:47:08.994,25.9nm| 8T     @ 8U    , 119kt|> Fly L  0.32nm ,   Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:13
+475.00,18:47:09.244,25.9nm| 8T     @ 8U    , 119kt|> Fly L  0.32nm ,## Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:13
+475.75,18:47:09.996,25.8nm| 8T     @ 8U    , 119kt|> Fly L  0.31nm ,   Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:12
+476.00,18:47:10.245,25.8nm| 8T     @ 8U    , 119kt|> Fly L  0.31nm ,## Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:12
+476.75,18:47:10.998,25.8nm| 8T     @ 8U    , 119kt|> Fly L  0.31nm ,   Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:12
+477.00,18:47:11.242,25.8nm| 8T     @ 8U    , 119kt|> Fly L  0.30nm ,## Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:12
+478.01,18:47:12.254,25.8nm| 8T     @ 8U    , 119kt|> Fly L  0.30nm ,   Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:12
+478.26,18:47:12.505,25.8nm| 8T     @ 8U    , 119kt|> Fly L  0.30nm ,## Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:12
+478.76,18:47:13.008,25.8nm| 8T     @ 8U    , 119kt|> Fly L  0.29nm ,## Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:12
+479.01,18:47:13.256,25.7nm| 8T     @ 8U    , 119kt|> Fly L  0.29nm ,   Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:12
+479.25,18:47:13.497,25.7nm| 8T     @ 8U    , 119kt|> Fly L  0.29nm ,## Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:12
+480.25,18:47:14.496,25.7nm| 8T     @ 8U    , 119kt|> Fly L  0.29nm ,   Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:12
+480.50,18:47:14.746,25.7nm| 8T     @ 8U    , 119kt|> Fly L  0.28nm ,## Leg|DTK 124d TK 110d,NAV 1 |>124dTo     0:12
+481.01,18:47:15.264,25.7nm| 8T     @ 8U    , 119kt|> Fly L  0.28nm ,## Leg|DTK 124d TK 111d,NAV 1 |>124dTo     0:12
+481.25,18:47:15.506,25.7nm| 8T     @ 8U    , 119kt|> Fly L  0.28nm ,   Leg|DTK 124d TK 111d,NAV 1 |>124dTo     0:12
+481.50,18:47:15.756,25.7nm| 8T     @ 8U    , 119kt|> Fly L  0.28nm ,## Leg|DTK 124d TK 111d,NAV 1 |>124dTo     0:12
+482.25,18:47:16.504,25.6nm| 8T     @ 8U    , 119kt|> Fly L  0.27nm ,   Leg|DTK 124d TK 111d,NAV 1 |>124dTo     0:12
+482.51,18:47:16.766,25.6nm| 8T     @ 8U    , 119kt|> Fly L  0.27nm ,## Leg|DTK 124d TK 111d,NAV 1 |>124dTo     0:12
+483.50,18:47:17.750,25.6nm| 8T     @ 8U    , 119kt|> Fly L  0.27nm ,   Leg|DTK 124d TK 111d,NAV 1 |>124dTo     0:12
+483.76,18:47:18.009,25.6nm| 8T     @ 8U    , 119kt|> Fly L  0.26nm ,## Leg|DTK 124d TK 111d,NAV 1 |>124dTo     0:12
+484.26,18:47:18.519,25.6nm| 8T     @ 8U    , 119kt|> Fly L  0.26nm ,## Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+484.51,18:47:18.768,25.6nm| 8T     @ 8U    , 119kt|> Fly L  0.26nm ,   Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+484.76,18:47:19.015,25.6nm| 8T     @ 8U    , 119kt|> Fly L  0.26nm ,## Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+485.25,18:47:19.498,25.5nm| 8T     @ 8U    , 119kt|> Fly L  0.26nm ,## Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+485.50,18:47:19.753,25.5nm| 8T     @ 8U    , 119kt|> Fly L  0.25nm ,## Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+485.76,18:47:20.013,25.5nm| 8T     @ 8U    , 119kt|> Fly L  0.25nm ,   Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+486.00,18:47:20.252,25.5nm| 8T     @ 8U    , 119kt|> Fly L  0.25nm ,## Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+486.76,18:47:21.014,25.5nm| 8T     @ 8U    , 119kt|> Fly L  0.25nm ,   Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+487.01,18:47:21.263,25.5nm| 8T     @ 8U    , 119kt|> Fly L  0.25nm ,## Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+487.50,18:47:21.754,25.5nm| 8T     @ 8U    , 119kt|> Fly L  0.24nm ,## Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+487.76,18:47:22.014,25.5nm| 8T     @ 8U    , 119kt|> Fly L  0.24nm ,   Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+488.00,18:47:22.250,25.5nm| 8T     @ 8U    , 119kt|> Fly L  0.24nm ,## Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+488.75,18:47:23.002,25.4nm| 8T     @ 8U    , 119kt|> Fly L  0.24nm ,## Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+489.01,18:47:23.260,25.4nm| 8T     @ 8U    , 119kt|> Fly L  0.24nm ,   Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+489.26,18:47:23.508,25.4nm| 8T     @ 8U    , 119kt|> Fly L  0.23nm ,## Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+490.01,18:47:24.259,25.4nm| 8T     @ 8U    , 119kt|> Fly L  0.23nm ,   Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+490.25,18:47:24.505,25.4nm| 8T     @ 8U    , 119kt|> Fly L  0.23nm ,## Leg|DTK 124d TK 112d,NAV 1 |>124dTo     0:12
+490.76,18:47:25.004,25.4nm| 8T     @ 8U    , 119kt|> Fly L  0.23nm ,## Leg|DTK 124d TK 113d,NAV 1 |>124dTo     0:12
+491.01,18:47:25.256,25.4nm| 8T     @ 8U    , 119kt|> Fly L  0.22nm ,## Leg|DTK 124d TK 113d,NAV 1 |>124dTo     0:12
+491.26,18:47:25.507,25.4nm| 8T     @ 8U    , 119kt|> Fly L  0.22nm ,   Leg|DTK 124d TK 113d,NAV 1 |>124dTo     0:12
+491.50,18:47:25.746,25.4nm| 8T     @ 8U    , 119kt|> Fly L  0.22nm ,## Leg|DTK 124d TK 113d,NAV 1 |>124dTo     0:12
+491.75,18:47:25.997,25.3nm| 8T     @ 8U    , 119kt|> Fly L  0.22nm ,## Leg|DTK 124d TK 113d,NAV 1 |>124dTo     0:12
+492.26,18:47:26.511,25.3nm| 8T     @ 8U    , 119kt|> Fly L  0.22nm ,   Leg|DTK 124d TK 113d,NAV 1 |>124dTo     0:12
+492.50,18:47:26.745,25.3nm| 8T     @ 8U    , 119kt|> Fly L  0.22nm ,## Leg|DTK 124d TK 113d,NAV 1 |>124dTo     0:12
+493.26,18:47:27.506,25.3nm| 8T     @ 8U    , 119kt|> Fly L  0.21nm ,   Leg|DTK 124d TK 113d,NAV 1 |>124dTo     0:12
+493.50,18:47:27.748,25.3nm| 8T     @ 8U    , 119kt|> Fly L  0.21nm ,## Leg|DTK 124d TK 113d,NAV 1 |>124dTo     0:12
+494.00,18:47:28.250,25.3nm| 8T     @ 8U    , 119kt|> Fly L  0.21nm ,## Leg|DTK 124d TK 114d,NAV 1 |>124dTo     0:12
+494.26,18:47:28.513,25.3nm|[ 6:8T      >Dis,8U    |^ 7:8U        25,## Leg|  8:8S        45,FPL 0 |  9:8R        71
+494.50,18:47:28.752,25.3nm|[ 6:8T      >Dis,8U    |^ 7:8U        25,   Leg|  8:8S        45,FPL 0 |  9:8R        71
+494.76,18:47:29.008,25.3nm|>Wpt  Fr>8P     ,8U    | 188d To>8Q     ,## Leg|   4nm ESA 2600',CAL 1 | 996kt ETE 0:00 
+495.00,18:47:29.258,25.2nm|>Wpt  Fr>8P     ,8U    | 188d To>8Q     ,## Leg|   4nm ESA 2600',CAL 1 | 996kt ETE 0:00 
+495.50,18:47:29.750,25.2nm|INIT POS:       ,8U    |   N 44d38.44'  ,   Leg|   W 89d33.77'  ,SET 1 |120kt 116d      
+495.76,18:47:30.013,25.2nm|INIT POS:       ,8U    |   N 44d38.44'  ,## Leg|   W 89d33.77'  ,SET 1 |120kt 116d      
+496.00,18:47:30.248,25.2nm|INIT POS:       ,8U    |   N 44d38.43'  ,## Leg|   W 89d33.73'  ,SET 1 |120kt 116d      
+496.75,18:47:31.005,25.2nm|INIT POS:       ,8U    |   N 44d38.43'  ,   Leg|   W 89d33.73'  ,SET 1 |120kt 116d      
+497.01,18:47:31.263,25.2nm|INIT POS:       ,8U    |   N 44d38.43'  ,## Leg|   W 89d33.73'  ,SET 1 |120kt 116d      
+497.25,18:47:31.502,25.2nm|INIT POS:       ,8U    |   N 44d38.42'  ,## Leg|   W 89d33.68'  ,SET 1 |120kt 116d      
+497.75,18:47:31.994,25.2nm|INIT POS:       ,8U    |   N 44d38.42'  ,   Leg|   W 89d33.68'  ,*CRSR*|120kt 116d      
+498.00,18:47:32.244,25.2nm|INIT POS:       ,8U    |   N 44d38.42'  ,## Leg|   W 89d33.68'  ,*CRSR*|120kt 116d      
+498.26,18:47:32.504,25.1nm|INIT POS:       ,8U    |   N 44d38.41'  ,## Leg|   W 89d33.64'  ,*CRSR*|120kt 116d      
+498.75,18:47:32.995,25.1nm|INIT POS:       ,8U    |   N 44d38.41'  ,   Leg|   W 89d33.64'  ,*CRSR*|120kt 116d      
+499.00,18:47:33.244,25.1nm|INIT POS:       ,8U    |   N 44d38.41'  ,## Leg|   W 89d33.64'  ,*CRSR*|120kt 116d      
+499.25,18:47:33.495,25.1nm|INIT POS:       ,8U    |   N 44d38.39'  ,## Leg|   W 89d33.60'  ,*CRSR*|120kt 116d      
+500.00,18:47:34.245,25.1nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.60'  ,*CRSR*|120kt 116d      
+500.25,18:47:34.496,25.1nm|INIT POS:       ,8U    |   N 44d38.38'  ,## Leg|   W 89d33.55'  ,*CRSR*|120kt 117d      
+501.00,18:47:35.245,25.1nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.55'  ,*CRSR*|120kt 117d      
+501.25,18:47:35.495,25.0nm|INIT POS:       ,8U    |   N 44d38.37'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+502.25,18:47:36.496,25.0nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+502.50,18:47:36.746,25.0nm|INIT POS:       ,8U    |   # __d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+503.25,18:47:37.493,25.0nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+503.50,18:47:37.744,25.0nm|INIT POS:       ,8U    |   # __d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+504.25,18:47:38.494,25.0nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+504.50,18:47:38.746,25.0nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+504.75,18:47:38.997,24.9nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+505.50,18:47:39.746,24.9nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+505.76,18:47:40.006,24.9nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+506.51,18:47:40.757,24.9nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+506.75,18:47:40.999,24.9nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+507.75,18:47:41.995,24.9nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+508.00,18:47:42.246,24.8nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+508.75,18:47:42.995,24.8nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+509.00,18:47:43.246,24.8nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+509.25,18:47:43.495,24.8nm|INIT POS:       ,8U    |   N ?#d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+509.75,18:47:43.995,24.8nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+510.00,18:47:44.244,24.8nm|INIT POS:       ,8U    |   N ?#d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+511.00,18:47:45.247,24.8nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+511.25,18:47:45.499,24.7nm|INIT POS:       ,8U    |   N ?#d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+512.00,18:47:46.247,24.7nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+512.25,18:47:46.496,24.7nm|INIT POS:       ,8U    |   N ?#d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+513.25,18:47:47.497,24.7nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+513.50,18:47:47.745,24.7nm|INIT POS:       ,8U    |   N ?#d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+514.00,18:47:48.247,24.6nm|INIT POS:       ,8U    |   N ?#d__.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+514.25,18:47:48.496,24.6nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+514.50,18:47:48.745,24.6nm|INIT POS:       ,8U    |   N 44?#_.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+515.25,18:47:49.495,24.6nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+515.50,18:47:49.748,24.6nm|INIT POS:       ,8U    |   N 44?#_.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+516.50,18:47:50.745,24.6nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+516.76,18:47:51.006,24.6nm|INIT POS:       ,8U    |   N 44?#_.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+517.00,18:47:51.247,24.6nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+517.25,18:47:51.494,24.5nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+517.50,18:47:51.749,24.5nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+517.77,18:47:52.011,24.5nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+518.75,18:47:52.995,24.5nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+519.00,18:47:53.244,24.5nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+519.75,18:47:53.993,24.5nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+520.00,18:47:54.246,24.5nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+520.75,18:47:54.994,24.4nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+521.00,18:47:55.244,24.4nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+522.00,18:47:56.244,24.4nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+522.25,18:47:56.496,24.4nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+523.00,18:47:57.244,24.4nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+523.25,18:47:57.493,24.4nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+523.50,18:47:57.743,24.4nm|INIT POS:       ,8U    |   N 44d16_#_'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+524.00,18:47:58.248,24.3nm|INIT POS:       ,8U    |   N 44d16_#_'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+524.25,18:47:58.495,24.3nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+524.50,18:47:58.743,24.3nm|INIT POS:       ,8U    |   N 44d16_#_'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+525.25,18:47:59.495,24.3nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+525.50,18:47:59.747,24.3nm|INIT POS:       ,8U    |   N 44d16_#_'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+526.25,18:48:00.497,24.3nm|INIT POS:       ,8U    |   N 44d16.?#'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+526.50,18:48:00.750,24.3nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+526.76,18:48:01.026,24.3nm|INIT POS:       ,8U    |   N 44d16.?#'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+527.00,18:48:01.249,24.2nm|INIT POS:       ,8U    |   N 44d16.?#'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+527.51,18:48:01.769,24.2nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+527.76,18:48:02.011,24.2nm|INIT POS:       ,8U    |   N 44d16.?#'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+528.51,18:48:02.760,24.2nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+528.75,18:48:03.006,24.2nm|INIT POS:       ,8U    |   N 44d16.?#'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+529.75,18:48:04.003,24.2nm|INIT POS:       ,8U    |                ,   Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+530.01,18:48:04.268,24.2nm|INIT POS:       ,8U    |   N 44d16.?#'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+530.26,18:48:04.523,24.1nm|INIT POS:       ,8U    |   N 44d16.?#'  ,## Leg|   W 89d33.51'  ,*CRSR*|120kt 117d      
+530.75,18:48:05.004,24.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+531.01,18:48:05.258,24.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d32.36'  ,*CRSR*|120kt 120d Ok?  
+532.00,18:48:06.257,24.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+532.25,18:48:06.507,24.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d32.36'  ,*CRSR*|120kt 120d Ok?  
+533.00,18:48:07.253,24.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+533.26,18:48:07.517,24.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d32.36'  ,*CRSR*|120kt 120d Ok?  
+533.51,18:48:07.764,24.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   #___d__.__'  ,*CRSR*|120kt 120d Ok?  
+534.25,18:48:08.501,24.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+534.51,18:48:08.772,24.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   #___d__.__'  ,*CRSR*|120kt 120d Ok?  
+535.26,18:48:09.520,24.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+535.51,18:48:09.765,24.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 120d Ok?  
+536.51,18:48:10.767,24.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+536.76,18:48:11.015,23.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 120d Ok?  
+537.51,18:48:11.756,23.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+537.75,18:48:12.011,23.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 120d Ok?  
+538.75,18:48:13.005,23.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+539.00,18:48:13.258,23.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 120d Ok?  
+539.76,18:48:14.017,23.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+540.01,18:48:14.265,23.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 120d Ok?  
+540.75,18:48:15.011,23.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+541.26,18:48:15.511,23.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 120d Ok?  
+542.00,18:48:16.245,23.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+542.25,18:48:16.504,23.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 120d Ok?  
+543.01,18:48:17.257,23.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+543.26,18:48:17.508,23.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt 120d Ok?  
+543.75,18:48:18.005,23.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 120d Ok?  
+544.26,18:48:18.516,23.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+544.51,18:48:18.764,23.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 120d Ok?  
+545.26,18:48:19.515,23.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+545.51,18:48:19.768,23.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 120d Ok?  
+546.26,18:48:20.523,23.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+546.76,18:48:21.009,23.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 120d Ok?  
+547.50,18:48:21.757,23.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+547.75,18:48:21.996,23.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 120d Ok?  
+548.50,18:48:22.746,23.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+548.75,18:48:23.006,23.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 120d Ok?  
+549.50,18:48:23.755,23.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 120d Ok?  
+549.76,18:48:24.014,23.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+550.00,18:48:24.256,23.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 120d Ok?  
+550.75,18:48:25.005,23.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+551.01,18:48:25.267,23.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 120d Ok?  
+551.76,18:48:26.018,23.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+552.01,18:48:26.268,23.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt 120d Ok?  
+552.51,18:48:26.767,23.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt 120d Ok?  
+552.76,18:48:27.018,23.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt 120d Ok?  
+553.01,18:48:27.267,23.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+553.26,18:48:27.519,23.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt 120d Ok?  
+554.01,18:48:28.254,23.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+554.26,18:48:28.511,23.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt 120d Ok?  
+555.26,18:48:29.509,23.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+555.50,18:48:29.757,23.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt 120d Ok?  
+556.01,18:48:30.267,23.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 120d Ok?  
+556.26,18:48:30.512,23.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+556.50,18:48:30.756,23.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 120d Ok?  
+557.26,18:48:31.516,23.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+557.51,18:48:31.766,23.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 120d Ok?  
+558.50,18:48:32.750,23.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+558.75,18:48:33.006,23.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 120d Ok?  
+559.00,18:48:33.259,23.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 120d Ok?  
+559.51,18:48:33.764,23.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+559.75,18:48:33.995,23.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 120d Ok?  
+560.75,18:48:35.002,23.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+561.01,18:48:35.274,23.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 120d Ok?  
+561.76,18:48:36.018,23.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+562.01,18:48:36.269,23.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 120d Ok?  
+562.26,18:48:36.513,23.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt 120d Ok?  
+563.00,18:48:37.262,23.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+563.25,18:48:37.505,23.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27_#_'  ,*CRSR*|120kt 120d Ok?  
+564.00,18:48:38.258,23.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+564.25,18:48:38.506,23.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27_#_'  ,*CRSR*|120kt 120d Ok?  
+565.01,18:48:39.267,23.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+565.26,18:48:39.515,23.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27_#_'  ,*CRSR*|120kt 120d Ok?  
+565.75,18:48:40.008,23.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27_#_'  ,*CRSR*|120kt 120d Ok?  
+566.26,18:48:40.519,23.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+566.51,18:48:40.762,23.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27_#_'  ,*CRSR*|120kt 120d Ok?  
+566.76,18:48:41.008,23.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27.?#'  ,*CRSR*|120kt 120d Ok?  
+567.26,18:48:41.515,23.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+567.50,18:48:41.756,23.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27.?#'  ,*CRSR*|120kt 120d Ok?  
+568.50,18:48:42.757,23.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+568.75,18:48:43.010,23.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27.?#'  ,*CRSR*|120kt 120d Ok?  
+569.00,18:48:43.251,22.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27.?#'  ,*CRSR*|120kt 120d Ok?  
+569.50,18:48:43.754,22.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+569.76,18:48:44.017,22.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27.?#'  ,*CRSR*|120kt 120d Ok?  
+570.50,18:48:44.755,22.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+570.76,18:48:45.017,22.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27.?#'  ,*CRSR*|120kt 120d Ok?  
+571.75,18:48:46.007,22.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+572.00,18:48:46.248,22.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27.?#'  ,*CRSR*|120kt 120d Ok?  
+572.75,18:48:47.002,22.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+573.01,18:48:47.270,22.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27.?#'  ,*CRSR*|120kt 120d Ok?  
+574.01,18:48:48.268,22.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+574.26,18:48:48.517,22.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27.?#'  ,*CRSR*|120kt 120d Ok?  
+575.00,18:48:49.258,22.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+575.25,18:48:49.506,22.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27.?#'  ,*CRSR*|120kt 120d Ok?  
+576.01,18:48:50.261,22.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|                ,*CRSR*|120kt 120d Ok?  
+576.50,18:48:50.755,22.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W089d27.?#'  ,*CRSR*|120kt 120d Ok?  
+577.26,18:48:51.518,22.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|   kt 120d Ok?  
+577.51,18:48:51.768,22.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt 120d Ok?  
+578.26,18:48:52.516,22.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|   kt 120d Ok?  
+578.51,18:48:52.772,22.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|   kt 120d Ok?  
+578.75,18:48:53.004,22.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt 120d Ok?  
+579.51,18:48:53.766,22.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|   kt 120d Ok?  
+579.76,18:48:54.010,22.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt 120d Ok?  
+580.51,18:48:54.767,22.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+581.01,18:48:55.269,22.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt 120d Ok?  
+581.75,18:48:56.004,22.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+582.01,18:48:56.269,22.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+582.75,18:48:57.010,22.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+583.25,18:48:57.507,22.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+584.01,18:48:58.266,22.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+584.26,18:48:58.521,22.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+585.00,18:48:59.257,22.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+585.26,18:48:59.516,22.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+586.26,18:49:00.519,22.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+586.51,18:49:00.767,22.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+587.26,18:49:01.518,22.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+587.51,18:49:01.759,22.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+588.26,18:49:02.515,22.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+588.75,18:49:03.006,22.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+589.51,18:49:03.767,22.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+589.76,18:49:04.007,22.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+590.51,18:49:04.767,22.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+590.76,18:49:05.014,22.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+591.50,18:49:05.758,22.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+591.75,18:49:06.005,22.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+592.01,18:49:06.269,22.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+592.76,18:49:07.019,22.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+593.01,18:49:07.267,22.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+594.00,18:49:08.257,22.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+594.25,18:49:08.499,22.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+594.50,18:49:08.758,22.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+595.01,18:49:09.265,22.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+595.26,18:49:09.519,22.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+596.01,18:49:10.267,22.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+596.50,18:49:10.757,22.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+597.26,18:49:11.517,22.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+597.51,18:49:11.771,22.1nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+598.00,18:49:12.252,22.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+598.26,18:49:12.517,22.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+598.75,18:49:13.001,22.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+599.50,18:49:13.756,22.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+599.75,18:49:14.003,22.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+600.50,18:49:14.755,22.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+600.76,18:49:15.009,22.0nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+601.00,18:49:15.252,21.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+601.75,18:49:16.003,21.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+602.01,18:49:16.264,21.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+602.76,18:49:17.011,21.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+603.00,18:49:17.260,21.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+603.76,18:49:18.012,21.9nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+604.25,18:49:18.505,21.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+605.00,18:49:19.255,21.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+605.26,18:49:19.518,21.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+606.00,18:49:20.248,21.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+606.26,18:49:20.516,21.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+607.25,18:49:21.510,21.8nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+607.50,18:49:21.759,21.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+608.26,18:49:22.518,21.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+608.51,18:49:22.757,21.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+609.50,18:49:23.758,21.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+609.75,18:49:23.994,21.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+610.50,18:49:24.750,21.7nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+610.76,18:49:25.014,21.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+611.51,18:49:25.769,21.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+612.00,18:49:26.256,21.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+612.75,18:49:27.003,21.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+613.01,18:49:27.255,21.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+613.75,18:49:28.002,21.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+614.01,18:49:28.269,21.6nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+614.26,18:49:28.520,21.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+615.01,18:49:29.262,21.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+615.25,18:49:29.509,21.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+616.01,18:49:30.265,21.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+616.26,18:49:30.518,21.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+617.26,18:49:31.510,21.5nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+617.51,18:49:31.759,21.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+618.25,18:49:32.510,21.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+618.50,18:49:32.759,21.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+619.26,18:49:33.517,21.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+619.76,18:49:34.020,21.4nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+620.50,18:49:34.758,21.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+620.75,18:49:35.010,21.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+621.50,18:49:35.760,21.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+621.75,18:49:36.009,21.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+622.76,18:49:37.013,21.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt    d Ok?  
+623.01,18:49:37.269,21.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt ###d Ok?  
+623.25,18:49:37.502,21.3nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt  65d Ok?  
+623.76,18:49:38.017,21.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt  65d      
+624.01,18:49:38.272,21.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt  65d Ok?  
+624.76,18:49:39.018,21.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt  65d      
+625.26,18:49:39.511,21.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,*CRSR*|120kt  65d Ok?  
+626.00,18:49:40.246,21.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,   Leg|   W 89d27.29'  ,*CRSR*|120kt  65d      
+626.25,18:49:40.508,21.2nm|INIT POS:       ,8U    |   N 44d16.11'  ,## Leg|   W 89d27.29'  ,SET 1 |120kt  65d      
+627.25,18:49:41.511,20.0nm|INIT POS:       ,8U    |   N 44d16.10'  ,   Leg|   W 89d27.24'  ,SET 1 |120kt  65d      
+627.50,18:49:41.754,20.0nm|INIT POS:       ,8U    |   N 44d16.10'  ,## Leg|   W 89d27.24'  ,SET 1 |120kt  65d      
+628.00,18:49:42.257,20.0nm|INIT POS:       ,8U    |   N 44d16.13'  ,## Leg|   W 89d27.24'  ,SET 1 |120kt  65d      
+628.25,18:49:42.498,20.0nm|INIT POS:       ,8U    |   N 44d16.13'  ,   Leg|   W 89d27.24'  ,SET 1 |120kt  65d      
+628.51,18:49:42.766,20.0nm|INIT POS:       ,8U    |   N 44d16.13'  ,## Leg|   W 89d27.24'  ,SET 1 |120kt  65d      
+629.26,18:49:43.518,20.0nm|INIT POS:       ,8U    |   N 44d16.14'  ,   Leg|   W 89d27.23'  ,SET 1 |120kt  65d      
+629.51,18:49:43.763,20.0nm|INIT POS:       ,8U    |   N 44d16.14'  ,## Leg|   W 89d27.23'  ,SET 1 |120kt  65d      
+630.01,18:49:44.269,20.0nm|>Wpt  Fr>8P     ,8U    | 188d To>8Q     ,## Leg|   4nm ESA 2600',CAL 1 | 996kt ETE 0:00 
+630.51,18:49:44.774,20.0nm|>Wpt  Fr>8P     ,8U    | 188d To>8Q     ,   Leg|   4nm ESA 2600',CAL 1 | 996kt ETE 0:00 
+630.75,18:49:45.001,20.0nm|[ 4:8V      >Dis,8U    |^ 5:8U        20,## Leg|  6:8T        48,FPL 0 |  9:8R       122
+631.50,18:49:45.756,19.9nm| 8V     @ 8U    , 116kt|> Fly L  0.00nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+631.75,18:49:46.008,19.9nm| 8V     @ 8U    , 116kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+632.75,18:49:47.005,19.9nm| 8V     @ 8U    , 116kt|> Fly L  0.00nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+633.01,18:49:47.266,19.9nm| 8V     @ 8U    , 116kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+633.75,18:49:47.999,19.9nm| 8V     @ 8U    , 117kt|> Fly L  0.00nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+634.01,18:49:48.269,19.9nm| 8V     @ 8U    , 117kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+634.75,18:49:49.005,19.8nm| 8V     @ 8U    , 117kt|> Fly L  0.00nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+635.00,18:49:49.253,19.8nm| 8V     @ 8U    , 117kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+636.00,18:49:50.256,19.8nm| 8V     @ 8U    , 117kt|> Fly L  0.00nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+636.25,18:49:50.506,19.8nm| 8V     @ 8U    , 117kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+637.00,18:49:51.249,19.8nm| 8V     @ 8U    , 118kt|> Fly L  0.00nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+637.25,18:49:51.502,19.8nm| 8V     @ 8U    , 118kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+637.75,18:49:51.997,19.7nm| 8V     @ 8U    , 118kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+638.25,18:49:52.508,19.7nm| 8V     @ 8U    , 118kt|> Fly L  0.00nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+638.50,18:49:52.755,19.7nm| 8V     @ 8U    , 118kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:10
+639.01,18:49:53.266,19.7nm| 8V     @ 8U    , 118kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:09
+639.26,18:49:53.522,19.7nm| 8V     @ 8U    , 118kt|> Fly L  0.00nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:09
+639.50,18:49:53.755,19.7nm| 8V     @ 8U    , 118kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:09
+640.00,18:49:54.253,19.7nm| 8V     @ 8U    , 119kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:09
+640.26,18:49:54.515,19.7nm| 8V     @ 8U    , 119kt|> Fly L  0.00nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:09
+640.51,18:49:54.767,19.7nm| 8V     @ 8U    , 119kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:09
+641.01,18:49:55.273,19.6nm| 8V     @ 8U    , 119kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:09
+641.50,18:49:55.745,19.6nm| 8V     @ 8U    , 119kt|> Fly L  0.00nm ,   Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:09
+641.75,18:49:55.993,19.6nm| 8V     @ 8U    , 119kt|> Fly L  0.00nm ,## Leg|DTK  65d TK  65d,NAV 1 |> 65dTo     0:09
+642.25,18:49:56.508,19.6nm|[ 4:8V      >Dis,8U    |^ 5:8U        20,## Leg|  6:8T        48,FPL 0 |  9:8R       121
+642.50,18:49:56.759,19.6nm|[ 4:8V      >Dis,8U    |^ 5:8U        20,   Leg|  6:8T        48,FPL 0 |  9:8R       121
+643.00,18:49:57.245,19.6nm|>Wpt  Fr>8P     ,8U    | 188d To>8Q     ,## Leg|   4nm ESA 2600',CAL 1 | 996kt ETE 0:00 
+643.75,18:49:58.011,19.6nm|INIT POS:       ,8U    |   N 44d16.35'  ,   Leg|   W 89d26.70'  ,SET 1 |120kt  65d      
+644.01,18:49:58.255,19.6nm|INIT POS:       ,8U    |   N 44d16.35'  ,## Leg|   W 89d26.70'  ,SET 1 |120kt  65d      
+644.25,18:49:58.510,19.5nm|INIT POS:       ,8U    |   N 44d16.37'  ,## Leg|   W 89d26.66'  ,SET 1 |120kt  65d      
+644.75,18:49:58.993,19.5nm|INIT POS:       ,8U    |   N 44d16.37'  ,   Leg|   W 89d26.66'  ,SET 1 |120kt  65d      
+645.00,18:49:59.257,19.5nm|INIT POS:       ,8U    |   N 44d16.37'  ,## Leg|   W 89d26.66'  ,SET 1 |120kt  65d      
+645.25,18:49:59.507,19.5nm|INIT POS:       ,8U    |   N 44d16.38'  ,## Leg|   W 89d26.62'  ,SET 1 |120kt  65d      
+645.75,18:50:00.000,19.5nm|INIT POS:       ,8U    |   N 44d16.38'  ,   Leg|   W 89d26.62'  ,SET 1 |120kt  65d      
+646.01,18:50:00.258,19.5nm|INIT POS:       ,8U    |   N 44d16.38'  ,## Leg|   W 89d26.62'  ,*CRSR*|120kt  65d      
+646.25,18:50:00.508,19.5nm|INIT POS:       ,8U    |   N 44d16.40'  ,## Leg|   W 89d26.58'  ,*CRSR*|120kt  65d      
+647.00,18:50:01.244,19.5nm|INIT POS:       ,8U    |   N 44d16.40'  ,   Leg|   W 89d26.58'  ,*CRSR*|120kt  65d      
+647.25,18:50:01.511,19.5nm|INIT POS:       ,8U    |   N 44d16.40'  ,## Leg|   W 89d26.58'  ,*CRSR*|120kt  65d      
+647.50,18:50:01.759,19.4nm|INIT POS:       ,8U    |   N 44d16.42'  ,## Leg|   W 89d26.54'  ,*CRSR*|120kt  65d      
+648.00,18:50:02.258,19.4nm|INIT POS:       ,8U    |   N 44d16.42'  ,   Leg|   W 89d26.54'  ,*CRSR*|120kt  65d      
+648.25,18:50:02.496,19.4nm|INIT POS:       ,8U    |   N 44d16.42'  ,## Leg|   W 89d26.54'  ,*CRSR*|120kt  65d      
+648.76,18:50:03.019,19.4nm|INIT POS:       ,8U    |   N 44d16.43'  ,## Leg|   W 89d26.50'  ,*CRSR*|120kt  65d      
+649.26,18:50:03.506,19.4nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.50'  ,*CRSR*|120kt  65d      
+649.50,18:50:03.745,19.4nm|INIT POS:       ,8U    |   N 44d16.43'  ,## Leg|   W 89d26.50'  ,*CRSR*|120kt  65d      
+650.00,18:50:04.246,19.4nm|INIT POS:       ,8U    |   N 44d16.45'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+650.25,18:50:04.510,19.4nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+650.50,18:50:04.745,19.4nm|INIT POS:       ,8U    |   # __d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+651.00,18:50:05.245,19.3nm|INIT POS:       ,8U    |   # __d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+651.25,18:50:05.496,19.3nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+651.50,18:50:05.757,19.3nm|INIT POS:       ,8U    |   # __d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+652.26,18:50:06.519,19.3nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+652.51,18:50:06.770,19.3nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+652.76,18:50:07.005,19.3nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+653.50,18:50:07.755,19.3nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+653.76,18:50:08.019,19.3nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+654.01,18:50:08.269,19.2nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+654.76,18:50:09.020,19.2nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+655.01,18:50:09.271,19.2nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+655.75,18:50:09.995,19.2nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+656.00,18:50:10.256,19.2nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+657.00,18:50:11.255,19.1nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+657.26,18:50:11.521,19.1nm|INIT POS:       ,8U    |   N?#_d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+657.50,18:50:11.762,19.1nm|INIT POS:       ,8U    |   N ?#d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+658.00,18:50:12.260,19.1nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+658.25,18:50:12.499,19.1nm|INIT POS:       ,8U    |   N ?#d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+659.00,18:50:13.261,19.1nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+659.25,18:50:13.511,19.1nm|INIT POS:       ,8U    |   N ?#d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+660.25,18:50:14.508,19.0nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+660.50,18:50:14.753,19.0nm|INIT POS:       ,8U    |   N ?#d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+661.26,18:50:15.509,19.0nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+661.50,18:50:15.757,19.0nm|INIT POS:       ,8U    |   N ?#d__.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+662.50,18:50:16.752,19.0nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+662.76,18:50:17.016,19.0nm|INIT POS:       ,8U    |   N 44?#_.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+663.51,18:50:17.770,18.9nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+663.76,18:50:18.009,18.9nm|INIT POS:       ,8U    |   N 44?#_.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+664.50,18:50:18.759,18.9nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+664.75,18:50:19.010,18.9nm|INIT POS:       ,8U    |   N 44?#_.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+665.75,18:50:20.028,18.9nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+666.00,18:50:20.245,18.9nm|INIT POS:       ,8U    |   N 44?#_.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+666.76,18:50:21.008,18.8nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+667.00,18:50:21.246,18.8nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+668.00,18:50:22.246,18.8nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+668.25,18:50:22.494,18.8nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+669.00,18:50:23.245,18.8nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+669.25,18:50:23.497,18.8nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+670.00,18:50:24.244,18.7nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+670.25,18:50:24.494,18.7nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+671.25,18:50:25.494,18.7nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+671.50,18:50:25.746,18.7nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+672.25,18:50:26.496,18.7nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+672.50,18:50:26.745,18.7nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+673.25,18:50:27.494,18.6nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+673.50,18:50:27.746,18.6nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+673.75,18:50:27.996,18.6nm|INIT POS:       ,8U    |   N 44d?#.__'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+674.00,18:50:28.245,18.6nm|INIT POS:       ,8U    |   N 44d37_#_'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+674.51,18:50:28.756,18.6nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+674.76,18:50:29.005,18.6nm|INIT POS:       ,8U    |   N 44d37_#_'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+675.50,18:50:29.745,18.6nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+675.75,18:50:29.994,18.6nm|INIT POS:       ,8U    |   N 44d37_#_'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+676.25,18:50:30.495,18.5nm|INIT POS:       ,8U    |   N 44d37_#_'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+676.75,18:50:30.994,18.5nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+677.00,18:50:31.243,18.5nm|INIT POS:       ,8U    |   N 44d37.?#'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+677.75,18:50:31.997,18.5nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+678.00,18:50:32.246,18.5nm|INIT POS:       ,8U    |   N 44d37.?#'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+679.01,18:50:33.259,18.5nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+679.25,18:50:33.496,18.5nm|INIT POS:       ,8U    |   N 44d37.?#'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+679.51,18:50:33.757,18.4nm|INIT POS:       ,8U    |   N 44d37.?#'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+680.00,18:50:34.246,18.4nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+680.25,18:50:34.512,18.4nm|INIT POS:       ,8U    |   N 44d37.?#'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+681.26,18:50:35.507,18.4nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+681.50,18:50:35.744,18.4nm|INIT POS:       ,8U    |   N 44d37.?#'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+682.25,18:50:36.494,18.4nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+682.50,18:50:36.744,18.4nm|INIT POS:       ,8U    |   N 44d37.?#'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+682.75,18:50:36.995,18.3nm|INIT POS:       ,8U    |   N 44d37.?#'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+683.50,18:50:37.746,18.3nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+683.75,18:50:37.995,18.3nm|INIT POS:       ,8U    |   N 44d37.?#'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+684.50,18:50:38.744,18.3nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+684.75,18:50:38.994,18.3nm|INIT POS:       ,8U    |   N 44d37.?#'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+685.75,18:50:40.000,18.3nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+686.00,18:50:40.243,18.2nm|INIT POS:       ,8U    |   N 44d37.?#'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+686.75,18:50:40.995,18.2nm|INIT POS:       ,8U    |                ,   Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+687.00,18:50:41.245,18.2nm|INIT POS:       ,8U    |   N 44d37.?#'  ,## Leg|   W 89d26.46'  ,*CRSR*|120kt  65d      
+687.50,18:50:41.744,18.2nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W 89d25.05'  ,*CRSR*|120kt  65d Ok?  
+687.75,18:50:41.994,18.2nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+688.00,18:50:42.246,18.2nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W 89d25.05'  ,*CRSR*|120kt  65d Ok?  
+689.00,18:50:43.245,18.2nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+689.25,18:50:43.494,18.1nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W 89d25.05'  ,*CRSR*|120kt  65d Ok?  
+690.00,18:50:44.243,18.1nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+690.25,18:50:44.494,18.1nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   #___d__.__'  ,*CRSR*|120kt  65d Ok?  
+691.25,18:50:45.495,18.1nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+691.50,18:50:45.745,18.1nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   #___d__.__'  ,*CRSR*|120kt  65d Ok?  
+692.25,18:50:46.497,18.1nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+692.50,18:50:46.747,18.0nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt  65d Ok?  
+693.25,18:50:47.497,18.0nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+693.50,18:50:47.745,18.0nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt  65d Ok?  
+694.50,18:50:48.744,18.0nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+694.75,18:50:48.994,18.0nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt  65d Ok?  
+695.50,18:50:49.745,18.0nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+695.75,18:50:49.996,17.9nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt  65d Ok?  
+696.75,18:50:50.996,17.9nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+697.00,18:50:51.244,17.9nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt  65d Ok?  
+697.75,18:50:51.993,17.9nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+698.00,18:50:52.247,17.9nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt  65d Ok?  
+698.75,18:50:52.994,17.9nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+699.00,18:50:53.244,17.8nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   ?##_d__.__'  ,*CRSR*|120kt  65d Ok?  
+700.00,18:50:54.244,17.8nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+700.25,18:50:54.496,17.8nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt  65d Ok?  
+701.00,18:50:55.244,17.8nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+701.50,18:50:55.745,17.8nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt  65d Ok?  
+702.25,18:50:56.494,17.7nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+702.50,18:50:56.746,17.7nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt  65d Ok?  
+703.26,18:50:57.504,17.7nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+703.51,18:50:57.755,17.7nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt  65d Ok?  
+704.50,18:50:58.747,17.7nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+704.75,18:50:58.999,17.7nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt  65d Ok?  
+705.25,18:50:59.494,17.6nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt  65d Ok?  
+705.51,18:50:59.757,17.6nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+705.75,18:50:59.999,17.6nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt  65d Ok?  
+706.75,18:51:00.995,17.6nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+707.00,18:51:01.244,17.6nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt  65d Ok?  
+707.75,18:51:01.996,17.6nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+708.00,18:51:02.246,17.6nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt  65d Ok?  
+708.50,18:51:02.746,17.5nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W08#d__.__'  ,*CRSR*|120kt  65d Ok?  
+709.00,18:51:03.244,17.5nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+709.25,18:51:03.493,17.5nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt  65d Ok?  
+710.00,18:51:04.245,17.5nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+710.25,18:51:04.493,17.5nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt  65d Ok?  
+711.01,18:51:05.255,17.5nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+711.26,18:51:05.505,17.5nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt  65d Ok?  
+712.01,18:51:06.254,17.4nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089?#_.__'  ,*CRSR*|120kt  65d Ok?  
+712.26,18:51:06.505,17.4nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+712.51,18:51:06.755,17.4nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt  65d Ok?  
+713.26,18:51:07.505,17.4nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+713.51,18:51:07.755,17.4nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt  65d Ok?  
+714.50,18:51:08.744,17.4nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+714.75,18:51:08.997,17.4nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt  65d Ok?  
+715.25,18:51:09.494,17.3nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt  65d Ok?  
+715.50,18:51:09.745,17.3nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+715.75,18:51:09.996,17.3nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt  65d Ok?  
+716.75,18:51:10.994,17.3nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+717.00,18:51:11.245,17.3nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt  65d Ok?  
+717.75,18:51:11.996,17.3nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+718.00,18:51:12.244,17.3nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt  65d Ok?  
+718.51,18:51:12.755,17.2nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt  65d Ok?  
+718.75,18:51:12.996,17.2nm|INIT POS:       ,8U    |   N 44d37.19'  ,   Leg|                ,*CRSR*|120kt  65d Ok?  
+719.25,18:51:13.496,17.2nm|INIT POS:       ,8U    |   N 44d37.19'  ,## Leg|   W089d?#.__'  ,*CRSR*|120kt  65d Ok?  

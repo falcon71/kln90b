@@ -1,6 +1,6 @@
-# The turn-plan decision, the abeam plan's late turn, edits in front of the active waypoint and the inside bisector (#438, #439, #440, #443): design
+# The turn-plan decision, the abeam plan's late turn, edits in front of the active waypoint, the inside bisector and near-reversal turns (#438, #439, #440, #443, #444): design
 
-Date: 2026-10-29. Issues: #438, #439, #440, #443 (bugs). Branch: `turn-plan-438-439-440`.
+Date: 2026-10-29. Issues: #438, #439, #440, #443, #444 (bugs). Branch: `turn-plan-438-439-440`.
 
 A project: one commit with this design, the trainer data and the record, then one `fixes #NN` commit per issue, each with
 its tests and doc changes (CLAUDE.md).
@@ -170,6 +170,32 @@ waypoint and turns at the lead. The fix arms the test on the leg branch whatever
 and on the outside of a turn the turn starts before the bisector is reached, so nothing else changes; the existing
 on-course and outside tests hold that. The comment on the test cites the trainer check and drops the "not observed in
 the trainer" note of the 2026-10-20 design.
+
+### 3.5 Near-reversal turns (#444)
+
+Added by the maintainer on 2026-10-29, after the trainer checks for #443; its own `fixes #444` commit. Evidence: two
+agent checks of 2026-10-29 at 119 kt with turn anticipation on, in `docs/kln89-trainer-data/2026-10-29/near-reversal/`
+and the record's block on near-reversal turns.
+
+- **The rule.** The turn angle is the course leaving the waypoint minus the course arriving at it. Up to 175° the turn
+  is anticipated as before (4-8). Above 175° it is not anticipated at all: the waypoint is flown over as without turn
+  anticipation (4-9). There is no turn plan, no turn at the lead or the abeam line, and no sequencing at the inside
+  bisector (#443). The DTK stays on the inbound course, and the waypoint is sequenced at its abeam line (FROM). The
+  take-home then flew a teardrop onto the next leg.
+- **The cutoff.** Lead turns at 171.2°, 173.48° and 175.00°; fly-overs at 175.26°, 175.52°, 176.1° and 180°, at
+  176.1° also 0.72 NM inside, far past the bisector, and at 180° also 0.4 NM off the leg. The bracket of 0.26° fits a
+  round 175° compared with "above". The trainer's whole-degree DTKs cannot tell a finer comparison: the 175.00° and
+  175.26° passes both showed 304 -> 119. The emulation compares with a margin of 0.001°, so that a turn built at
+  exactly 175° does not flip on the rounding of its courses (the design's call).
+- **The alert.** The fly-over's alert started 36 to 39 s before the waypoint, 1.2 NM at 119 kt, although turn
+  anticipation was on: the alert without turn anticipation (4-9, `WPT_ALERT_WITHOUT_TURN_ANTI`), not the 15 s of a
+  waypoint without a turn (#372). It ended about 1 s after the sequencing, and the new leg had no alert of its own. The
+  emulation ends it in the calculation that sequences, as for every waypoint without a turn.
+- **Not settled, left as is.** Off the leg, more than 4.0 NM from it, near-reversal turns keep the off-leg rule
+  (`tickOffLeg`, #157): the trainer flew them only within 1 NM of the leg. With turn anticipation off nothing changes.
+- **Code.** In `NavCalculator.tick`, a turn above `MAX_ANTICIPATED_TURN_ANGLE` (175°) skips the turn plan, and on the
+  leg it takes the path of a waypoint without a turn with the 36 s alert. The #443 guard that kept those turns from the
+  bisector sequencing is gone, since they no longer reach it.
 
 ## 4. Approaches
 
