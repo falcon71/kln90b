@@ -578,12 +578,19 @@ sim.
       however far the turn point is, `AT_LEAD` with at most `turnPlanGate(gs)` of cross track, otherwise `AT_ABEAM`.
       The gate is `TURN_PLAN_MAX_XTK_TIME` (83 s) of the ground speed of the calculation, at most `TURN_PLAN_MAX_XTK`
       (4.9 NM) and at least `TURN_PLAN_MIN_XTK` (1.0 NM, the design's call). From then on `AT_LEAD` becomes `AT_ABEAM`
-      in the first calculation beyond the gate, and `AT_ABEAM` stays. A jump of the position, a GPS fix after a search
-      or an edit of the active waypoint shows up as a new cross track, so it needs no hook. Two calls are the design's:
-      an aircraft that drifts off the leg loses the turn plan beyond the gate (the trainer could not fly this), and a
-      jump that brings an aircraft on the abeam plan within the gate keeps the abeam plan. The plan is updated off the
-      leg too, so at 239 kt a turn plan holds between 4.0 and 4.9 NM and turns at the lead once back on the leg. It is
-      not updated while the waypoint's own turn is flown (`ownTurnStarted`).
+      in the first calculation beyond the gate. `AT_ABEAM` becomes `AT_LEAD` only at a check every
+      `TURN_PLAN_CHECK_PERIOD` (12 s) that finds the cross track below `TURN_PLAN_RECAPTURE_XTK` (1.0 NM; #439, checked
+      in the KLN 89 trainer, 2026-10-28 and 2026-10-29, section 3.2 of the design): the turn circle then starts at the
+      turn point, or at once when the aircraft is past it. The check runs free: `NavPageState.turnPlanCheckPhase`, the
+      seconds since the last one, advances in every calculation whatever the leg and the plan and starts again at a
+      power-on, because the trainer's delays spread over the whole period on passes started alike. The period is the
+      design's call within the trainer's 11 to 12 s. The floor of the gate keeps it above the 1.0 NM, so the two rules
+      cannot toggle the plan. A jump of the position, a GPS fix after a search or an edit of the active waypoint shows
+      up as a new cross track, so it needs no hook. Two calls are the design's: an aircraft that drifts off the leg
+      loses the turn plan beyond the gate (the trainer could not fly this), and a jump that brings an aircraft on the
+      abeam plan within the gate keeps the abeam plan until the 1.0 NM check. The plan is updated off the leg too, so at
+      239 kt a turn plan holds between 4.0 and 4.9 NM and turns at the lead once back on the leg. It is not updated
+      while the waypoint's own turn is flown (`ownTurnStarted`), so the turn of no size, once started, stays.
     - On `AT_LEAD` the turn starts at the turn point along the track, whatever the cross track is by then.
     - On `AT_ABEAM` it starts at the abeam line (TO turns FROM) as the abeam turn, a turn of no size: one
       `TurnStackEntry` with `abeamTurnSign` set, whose XTK is that sign times the distance to the waypoint (FLY L for a

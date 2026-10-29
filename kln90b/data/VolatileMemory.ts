@@ -158,6 +158,11 @@ export class NavPageState {
      * To, activating a flight plan or an approach, editing FPL 0 and switching between LEG and OBS are no leg change
      */
     public legChangeDtkDelta: Degrees | null = null;
+    /**
+     * #439: the seconds since the last check that turns the abeam plan into the turn plan (NavCalculator,
+     * TURN_PLAN_CHECK_PERIOD). It runs free, also over a new leg, and starts again at a power-on
+     */
+    public turnPlanCheckPhase: Seconds = 0;
 
     public nav4SelectedAltitude: Feet = 0;
     public nav4FromAlt: Feet = 0;
@@ -426,6 +431,7 @@ export class VolatileMemory {
         this.navPage.toFrom = null;
         this.navPage.waypointAlert = false;
         this.navPage.legChangeDtkDelta = null; //A leg change before the power-off is not one of this power-on (#434)
+        this.navPage.turnPlanCheckPhase = 0; //The check of the abeam plan runs from the power-on (#439)
         this.navPage.isSelfTestApproved = false; //Every power-on runs the self-test again (#330)
         this.navPage.isSelfTestActive = false; //A power-off during the self-test ends it (#400)
         this.navPage.rollSteeringLatch = null; //A turn chosen before the power-off is not kept (#100)

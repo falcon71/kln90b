@@ -67,6 +67,22 @@ export function turnPlanGate(groundspeed: Knots): NauticalMiles {
 }
 
 /**
+ * #439: below this cross track to the active leg the abeam plan becomes the turn plan, at the check of
+ * TURN_PLAN_CHECK_PERIOD. Checked in the KLN 89 trainer, 2026-10-28 and 2026-10-29: the normal turn followed the first
+ * reading of 0.99 NM in 20 starts at 60 and 119 kt and two at 239 kt, and never came without a reading below 1.0
+ */
+export const TURN_PLAN_RECAPTURE_XTK: NauticalMiles = 1.0;
+
+/**
+ * #439: the period of the check that turns the abeam plan into the turn plan. Checked in the KLN 89 trainer, 2026-10-28:
+ * a periodic check, not a filter, of about 11 trainer seconds (11 to 12 s of real time, the trainer running slow).
+ * Identical passes switched 4.0, 10.5 and 10.0 s after the first reading below 1.0 NM, and the delays seen ran from 2 to
+ * 12 s. 12 s within that is the design's call. The check runs free from the power-on, whatever the leg and the plan,
+ * because passes started alike gave different delays
+ */
+export const TURN_PLAN_CHECK_PERIOD: Seconds = 12;
+
+/**
  * On the abeam plan the waypoint alert starts this long before the abeam line, at the along-track closure rate, and not
  * with the plan (checked in the KLN 89 trainer, 2026-10-20: 14 to 16 s)
  */
@@ -116,6 +132,13 @@ export class NavCalculator implements CalcTickable {
 
     tick(): void {
         const nav = this.memory.navPage;
+        //#439: the check of the abeam plan runs free, in every calculation of the power-on whatever the state, so its
+        //phase does not restart at a new leg (TURN_PLAN_CHECK_PERIOD). Whether it also runs in the self-test, with the GPS
+        //invalid or in OBS mode, no trainer check shows; running on is the design's call
+        nav.turnPlanCheckPhase += TICK_TIME_CALC / 1000;
+        if (nav.turnPlanCheckPhase >= TURN_PLAN_CHECK_PERIOD) {
+            nav.turnPlanCheckPhase = 0;
+        }
         //#434: a leg change is measured against the DTK the previous calculation showed
         const previousDtk = nav.desiredTrack;
         this.legChange = false;
@@ -526,14 +549,19 @@ export class NavCalculator implements CalcTickable {
      * KLN 89 trainer, 2026-10-28 and 2026-10-29: decided at the first calculation of a leg, with no window before the turn
      * point (every window tried was refuted by a later pass).
      *
-     * From then on a turn plan becomes the abeam plan in the first calculation beyond the gate, and an abeam plan stays.
-     * The trainer decides again at a re-initialization: a jump of the position, a GPS fix after a search, an edit of the
-     * active waypoint. Each shows up here as a new cross track, and beyond the gate it gives the abeam plan in the same
-     * calculation, as the trainer did. Two calls are the design's, not the trainer's:
+     * From then on a turn plan becomes the abeam plan in the first calculation beyond the gate. An abeam plan becomes the
+     * turn plan only at a check of TURN_PLAN_CHECK_PERIOD that finds the cross track below TURN_PLAN_RECAPTURE_XTK (#439;
+     * checked in the KLN 89 trainer, 2026-10-28 and 2026-10-29; the design, section 3.2): the turn circle then starts at the
+     * turn point, or at once past it. The gate is never below that threshold, so the two cannot toggle the plan from one
+     * check to the next. The trainer decides again at a re-initialization: a jump of the position and an edit of the
+     * active waypoint (checked in the KLN 89 trainer, 2026-10-29). Each shows up here as a new cross track, and beyond
+     * the gate it gives the abeam plan in the same calculation, as the trainer did. A GPS fix after a search does the
+     * same by analogy (the design's call: the trainer does not lose its fix). Two more calls are the design's, not the
+     * trainer's:
      * - the drift case: an aircraft that leaves the leg in flight, with no re-initialization, loses the turn plan once it
      *   is beyond the gate. The trainer's take-home flying re-intercepts from any offset, so it could not show this;
-     * - a jump that brings an aircraft on the abeam plan within the gate keeps the abeam plan, where the trainer would
-     *   decide again and take the turn plan. No trainer pass shows this direction.
+     * - a jump that brings an aircraft on the abeam plan within the gate keeps the abeam plan until the check below
+     *   1.0 NM, where the trainer would decide again and take the turn plan. No trainer pass shows this direction.
      * The alternative to both is the plan latched until the next activation or re-initialization, which needs a hook for
      * each re-initialization. The gate takes the ground speed of the calculation, so slowing down alone can turn a turn
      * plan into the abeam plan (the design's call; the trainer flew every pass at a constant speed).
@@ -553,6 +581,11 @@ export class NavCalculator implements CalcTickable {
             activeWaypoint.turnPlan = legXtk <= turnPlanGate(this.sensors.in.gps.groundspeed) ? TurnPlan.AT_LEAD : TurnPlan.AT_ABEAM;
         } else if (activeWaypoint.turnPlan === TurnPlan.AT_LEAD && legXtk > turnPlanGate(this.sensors.in.gps.groundspeed)) {
             activeWaypoint.turnPlan = TurnPlan.AT_ABEAM;
+        } else if (activeWaypoint.turnPlan === TurnPlan.AT_ABEAM && this.memory.navPage.turnPlanCheckPhase === 0
+            && legXtk < TURN_PLAN_RECAPTURE_XTK) {
+            //#439: the turn plan from the check below 1.0 NM on, so the turn circle starts at the turn point, or at once
+            //when the aircraft is inside it already (the design, section 3.2)
+            activeWaypoint.turnPlan = TurnPlan.AT_LEAD;
         }
     }
 

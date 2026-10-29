@@ -91,8 +91,8 @@ export interface TurnBisector {
 /**
  * Where the anticipated turn of the active waypoint starts (the design,
  * docs/superpowers/specs/2026-10-20-waypoint-sequencing-design.md, section 3.3). NavCalculator decides it at the first
- * calculation of the leg and updates it by the cross track from then on (#438, the design,
- * docs/superpowers/specs/2026-10-29-turn-plan-decision-design.md, section 3.1)
+ * calculation of the leg and updates it by the cross track from then on (#438, #439, the design,
+ * docs/superpowers/specs/2026-10-29-turn-plan-decision-design.md, sections 3.1 and 3.2)
  */
 export enum TurnPlan {
     /** At the lead plus the roll-in before the waypoint */

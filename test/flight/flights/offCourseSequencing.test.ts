@@ -404,6 +404,282 @@ describe('the turn plan follows the cross track (#438)', () => {
     });
 });
 
+// #439: the passes below fly a 150° left turn (onto 275) at 119 kt, the turn of the started-lead-turn test above. The lead
+// is capped at 60 s of ground speed, 1.98 NM, and flown on the tighter circle tangent to both legs; the turn point lies
+// 2.10 NM before WWW and the gate is 2.744 NM
+const GS_439 = 119;
+const NEXT_439 = INBOUND - 150 + 360;
+const LEAD_439 = Math.min(leadNm(GS_439, 150), GS_439 * 60 / 3600);
+const TP_439 = LEAD_439 + rollInNm(GS_439);
+const TICK_439 = GS_439 / 3600;
+/** The along-track closure of one calculation on a track 20° to the leg */
+const CLOSURE_439 = TICK_439 * Math.cos(20 * DEG);
+/** The radius of the capped turn: the circle tangent to both legs LEAD_439 from WWW */
+const RADIUS_439 = LEAD_439 / Math.tan(75 * DEG);
+/** The center of that circle: RADIUS_439 left of the inbound leg, LEAD_439 before WWW */
+const CENTER_439 = pointFrom(at(LEAD_439, 0), INBOUND - 90, RADIUS_439);
+
+/**
+ * The converging pass of #439: from 4.3 NM right of the leg, beyond the gate of 2.744 NM, so the abeam plan from the first
+ * calculation (#438), on a straight track 20° toward the leg (045) that comes to 1.0 NM right `crossAlong` before WWW.
+ * The cross track falls by 0.011 NM and the along-track distance by 0.031 NM a calculation. `pilot` flies it, the straight
+ * track throughout if not given
+ */
+async function bootConvergingPass(crossAlong: number, pilot?: Pilot) {
+    const start = at(crossAlong + 3.3 / Math.tan(20 * DEG), 4.3);
+    const booted = await boot([start, pointFrom(start, INBOUND - 20, 30)], pilot ?? trackPilot(-100, INBOUND - 20, INBOUND - 20), NEXT_439, 20, 40, GS_439);
+    expect(gpsXtkRight(booted.flight), 'precondition: beyond the gate at the first calculation').toBeGreaterThan(turnPlanGate(GS_439) + 0.3);
+    expect(booted.aw.turnPlan).toBe(TurnPlan.AT_ABEAM);
+    return booted;
+}
+
+/** The state after one calculation, at the GPS position it used */
+interface CalcSample {
+    t: number;
+    along: number;
+    xtk: number;
+    plan: TurnPlan | null;
+    started: boolean;
+    alert: boolean;
+    ident: string | null;
+}
+
+/**
+ * Flies one calculation at a time and samples each, until `done` holds for a sample (which is the last one), at most `max`
+ * calculations
+ */
+async function sampleCalcs(flight: Flight, done: (s: CalcSample) => boolean, max: number): Promise<CalcSample[]> {
+    const aw = flight.unit.props.memory.navPage.activeWaypoint;
+    const samples: CalcSample[] = [];
+    for (; ;) {
+        await flight.fly(1);
+        const s: CalcSample = {
+            t: flight.t, along: gpsAlongBefore(flight), xtk: gpsXtkRight(flight), plan: aw.turnPlan,
+            started: aw.ownTurnStarted, alert: flight.nav.waypointAlert, ident: flight.nav.activeIdent,
+        };
+        samples.push(s);
+        if (done(s)) return samples;
+        expect(samples.length, describeSamples(samples)).toBeLessThan(max);
+    }
+}
+
+const describeSamples = (samples: CalcSample[]) =>
+    samples.map(s => `${s.along.toFixed(2)}:${s.xtk.toFixed(3)}:${s.plan}:${s.started ? 'T' : '-'}:${s.alert ? 'A' : '-'}`).join(' ');
+
+/**
+ * The first sample at or after `from` whose calculation runs the check of the abeam plan, every 12 s, with the check
+ * phase set to `phase` before the first sample: sample i is the calculation i + 1 after that, and the check runs where
+ * the seconds since the last check come to 12
+ */
+function nextCheck(phase: number, from: number): number {
+    let i = from;
+    while ((phase + i + 1) % 12 !== 0) i++;
+    return i;
+}
+
+/** The distance of the GPS position the last calculation used to the circle of the capped 150° turn at WWW */
+const distToTurnCircle = (flight: Flight) => Math.abs(distanceNm(flight.unit.props.sensors.in.gps.coords, CENTER_439) - RADIUS_439);
+
+// #439: on the abeam plan the unit flies the normal turn once the cross track to the inbound leg is below 1.0 NM, at a
+// check that runs every 11 to 12 s whatever the leg (checked in the KLN 89 trainer, 2026-10-28, P1 to P3, r1 to r5, a13
+// to a16, and 2026-10-29 at 239 kt; docs/kln89-trainer-record.md; the design,
+// docs/superpowers/specs/2026-10-29-turn-plan-decision-design.md, section 3.2). The plan then becomes the turn plan: past
+// the turn point the turn circle starts at once, before it at the turn point. Above 1.0 NM, and once the turn of no size
+// has started, the abeam plan stays. The period of 12 s is the design's call within the trainer's 11 to 12
+describe('the abeam plan switches to the normal turn (#439)', () => {
+    it('starts the normal turn within one check period once the cross track is below 1.0 NM, past the turn point', async () => {
+        // Below 1.0 NM 1.0 NM before WWW, 1.1 NM past the turn point: the switch comes at most 11 calculations later, at
+        // most 0.34 NM on, before the abeam line
+        const {flight, aw} = await bootConvergingPass(1.0);
+        const samples = await sampleCalcs(flight, s => s.started || s.ident !== 'WWW', 600);
+        const log = describeSamples(samples);
+        const below = samples.findIndex(s => Math.abs(s.xtk) < 1.0);
+        const start = samples.length - 1;
+        expect(below, log).toBeGreaterThanOrEqual(0);
+        // The abeam plan up to the first calculation below 1.0 NM
+        samples.slice(0, below).forEach(s => expect(s.plan, log).toBe(TurnPlan.AT_ABEAM));
+        expect(samples[start].ident, log).toBe('WWW');
+        expect(start - below, log).toBeLessThanOrEqual(11);
+        // The turn starts in the calculation of the switch, at once
+        expect(samples[start - 1].plan, log).toBe(TurnPlan.AT_ABEAM);
+        // Past the turn point and before the abeam line
+        expect(samples[start].along, log).toBeLessThan(TP_439 - 0.5);
+        expect(samples[start].along, log).toBeGreaterThan(0.3);
+        // The turn plan's turn: a circle, not the turn of no size, with the alert on and the DTK of the next leg
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
+        expect(turnStackLength(flight.unit)).toBeGreaterThan(0);
+        expect(aw.turnStack.every(e => e.abeamTurnSign === null)).toBe(true);
+        expect(flight.nav.waypointAlert).toBe(true);
+        expect(angleBetween(flight.nav.dtkTrue, NEXT_439)).toBeLessThan(1);
+
+        // From the calculation after the start, once the roll-in behind the aircraft is off the stack, XTK is the distance
+        // to the arc, not to WWW (line 2 the distance to the arc, checked in the KLN 89 trainer, 2026-10-28)
+        let apart = 0;
+        for (let s = 0; s < 10; s++) {
+            await flight.fly(1);
+            expect(flight.nav.activeIdent).toBe('WWW');
+            expect(flight.nav.waypointAlert).toBe(true);
+            const arc = distToTurnCircle(flight);
+            const toWww = distanceNm(flight.unit.props.sensors.in.gps.coords, W_POS);
+            expect(Math.abs(Math.abs(flight.nav.xtkNm!) - arc), `${flight.nav.xtkNm} arc ${arc} WWW ${toWww}`).toBeLessThan(0.02);
+            apart = Math.max(apart, Math.abs(arc - toWww));
+        }
+        expect(apart, 'precondition: the arc and WWW are told apart').toBeGreaterThan(0.2);
+    });
+
+    // The passes are identical up to the check phase set before their calculations, which places the switch before the
+    // point 20 s of closure before the turn point in one and after it in the other
+    it.each([
+        ['at 20 s of closure before the turn point, after the switch', 6, true],
+        ['at the switch, past the point 20 s of closure before the turn point', 11, false],
+    ])('starts the turn at the turn point when the switch comes before it, the alert %s', async (_, phase, switchFirst) => {
+        // Below 1.0 NM where the along-track distance to WWW is the lead plus 1.0 NM, 0.88 NM before the turn point: the
+        // switch comes at most 0.34 NM later, before the turn point
+        const {flight} = await bootConvergingPass(LEAD_439 + 1.0);
+        flight.unit.props.memory.navPage.turnPlanCheckPhase = phase;
+        const samples = await sampleCalcs(flight, s => s.started || s.ident !== 'WWW', 600);
+        const log = describeSamples(samples);
+        const below = samples.findIndex(s => Math.abs(s.xtk) < 1.0);
+        const switched = samples.findIndex(s => s.plan === TurnPlan.AT_LEAD);
+        const within20 = samples.findIndex(s => s.along - TP_439 <= 20 * CLOSURE_439);
+        const alert = samples.findIndex(s => s.alert);
+        const start = samples.length - 1;
+        expect(samples[start].ident, log).toBe('WWW');
+        expect(below, log).toBeGreaterThanOrEqual(0);
+        expect(switched, `below 1.0 NM at ${below}`).toBe(nextCheck(phase, below));
+        expect(samples[switched].along, 'precondition: the switch before the turn point').toBeGreaterThan(TP_439 + 2 * TICK_439);
+        if (switchFirst) {
+            expect(switched, 'precondition: the switch before the 20 s').toBeLessThan(within20);
+        } else {
+            expect(switched, 'precondition: the switch after the 20 s').toBeGreaterThan(within20);
+        }
+        // The alert starts in the later of the two calculations
+        expect(alert, log).toBe(Math.max(switched, within20));
+        // The turn starts at the turn point, within the calculation tick ahead (NavCalculator starts it a tick early
+        // rather than late), as a circle, with the alert on
+        expect(samples[start].along, log).toBeGreaterThanOrEqual(TP_439 + TICK_439 - CLOSURE_439 - GPS_TOLERANCE_NM);
+        expect(samples[start].along, log).toBeLessThanOrEqual(TP_439 + TICK_439 + GPS_TOLERANCE_NM);
+        const aw = flight.unit.props.memory.navPage.activeWaypoint;
+        expect(aw.turnStack.every(e => e.abeamTurnSign === null)).toBe(true);
+        expect(samples[start].alert).toBe(true);
+    });
+
+    it('flies the zero-size turn when the cross track stays at or above 1.0 NM', async () => {
+        // The converging pass, onto the inbound course once 1.25 NM right: parallel about 1.2 NM right of the leg, within
+        // the gate for several checks
+        let onParallel = false;
+        const pilot: Pilot = {
+            commandedBank: ({aircraft}) => {
+                onParallel ||= xtkRight(aircraft) <= 1.25;
+                return bankToward(aircraft.trackTrue, onParallel ? INBOUND : INBOUND - 20);
+            },
+        };
+        const {flight, aw} = await bootConvergingPass(2.0, pilot);
+        const samples = await sampleCalcs(flight, s => turnStackLength(flight.unit) > 0 || s.ident !== 'WWW', 900);
+        const log = describeSamples(samples);
+        samples.forEach(s => expect(s.plan, log).toBe(TurnPlan.AT_ABEAM));
+        const nearest = Math.min(...samples.map(s => s.xtk));
+        expect(nearest, 'precondition: at or above 1.0 NM, with a margin').toBeGreaterThan(1.1);
+        expect(nearest, 'precondition: close to 1.0 NM').toBeLessThan(1.3);
+        expect(samples.filter(s => s.xtk < turnPlanGate(GS_439)).length, 'precondition: several checks within the gate')
+            .toBeGreaterThan(5 * 12);
+        // The turn of no size at the abeam line, within one calculation of it
+        const last = samples[samples.length - 1];
+        expect(last.ident).toBe('WWW');
+        expect(last.along, log).toBeGreaterThanOrEqual(-TICK_439 - GPS_TOLERANCE_NM);
+        expect(last.along, log).toBeLessThanOrEqual(GPS_TOLERANCE_NM);
+        expect(aw.turnStack.map(e => e.abeamTurnSign)).toEqual([1]);
+    });
+
+    it('does not switch once the zero-size turn has started', async () => {
+        // The pass above, which turns 30° left onto 035 at the abeam line: the cross track to the inbound leg falls below
+        // 1.0 NM about 18 s after the turn of no size started, and stays below until WWW is sequenced on the outside
+        // bisector ray (080), about 54 s after it started, three checks later (the design, section 3.2; the trainer's T7
+        // repeat reached 0.99 NM 1.25 s before its abeam line and flew the turn of no size, checked in the KLN 89 trainer,
+        // 2026-10-29)
+        let phase = 0;
+        const pilot: Pilot = {
+            commandedBank: ({aircraft}) => {
+                if (phase === 0 && xtkRight(aircraft) <= 1.25) phase = 1;
+                if (phase === 1 && alongBefore(aircraft) <= 0) phase = 2;
+                return bankToward(aircraft.trackTrue, [INBOUND - 20, INBOUND, INBOUND - 30][phase]);
+            },
+        };
+        const {flight, aw} = await bootConvergingPass(2.0, pilot);
+        const before = await sampleCalcs(flight, s => turnStackLength(flight.unit) > 0 || s.ident !== 'WWW', 900);
+        expect(before[before.length - 1].ident).toBe('WWW');
+        expect(Math.min(...before.map(s => s.xtk)), 'precondition: above 1.0 NM up to the abeam line').toBeGreaterThan(1.1);
+        const abeamTurn = aw.turnStack[0];
+        expect(abeamTurn.abeamTurnSign).toBe(1);
+
+        // Every calculation up to the sequencing: the turn of no size and the abeam plan stay
+        const after = await sampleCalcs(flight, s => {
+            if (s.ident === 'WWW') {
+                const log = `${s.xtk.toFixed(3)}:${s.plan}`;
+                expect(s.plan, log).toBe(TurnPlan.AT_ABEAM);
+                expect(aw.turnStack, log).toEqual([abeamTurn]);
+                expect(Math.abs(flight.nav.xtkNm! - distanceNm(flight.unit.props.sensors.in.gps.coords, W_POS)), log).toBeLessThan(0.02);
+            }
+            return s.ident !== 'WWW';
+        }, 200);
+        expect(after[after.length - 1].ident).toBe('KBBB');
+        expect(after.filter(s => s.ident === 'WWW' && s.xtk < 1.0).length, 'precondition: below 1.0 NM for more than two check periods')
+            .toBeGreaterThan(24);
+    });
+
+    /** The sample of the first calculation below 1.0 NM in the passes below, the same in both */
+    const BELOW_439 = 292;
+    // Two passes alike up to the check phase, set before their calculations 6 s apart (one unit per test, so a pass each):
+    // the switch of each comes at the first check from the first calculation below 1.0 NM on, at most 11 calculations
+    // later, so the delays of the two differ by 6 s (the trainer: identical passes switched 4.0, 10.5 and 10.0 s after the
+    // first reading below 1.0)
+    it.each([
+        [0, 7],
+        [6, 1],
+    ])('checks every 12 s whatever the leg (the check phase set to %s, a switch %s s after the first calculation below 1.0 NM)', async (phase, delay) => {
+        const {flight} = await bootConvergingPass(LEAD_439 + 2.0);
+        const navPage = flight.unit.props.memory.navPage;
+        navPage.turnPlanCheckPhase = phase;
+        const samples = await sampleCalcs(flight, s => s.plan === TurnPlan.AT_LEAD || s.ident !== 'WWW', 900);
+        const log = describeSamples(samples);
+        const below = samples.findIndex(s => Math.abs(s.xtk) < 1.0);
+        const switched = samples.length - 1;
+        expect(samples[switched].ident, log).toBe('WWW');
+        expect(samples[switched].started, 'precondition: switched before the turn point').toBe(false);
+        expect(below, 'precondition: the passes alike').toBe(BELOW_439);
+        expect(switched, log).toBe(nextCheck(phase, below));
+        expect(switched - below).toBe(delay);
+
+        // The check runs on over the sequencing of WWW and the activation of KBBB: a step of one a calculation
+        const phases: number[] = [navPage.turnPlanCheckPhase];
+        await sampleCalcs(flight, s => {
+            phases.push(navPage.turnPlanCheckPhase);
+            return s.ident !== 'WWW';
+        }, 300);
+        await flight.fly(1);
+        phases.push(navPage.turnPlanCheckPhase);
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        phases.slice(1).forEach((p, i) => expect(p, phases.join(' ')).toBe((phases[i] + 1) % 12));
+    });
+
+    it('holds the gate at 1.0 NM at 20 kt, so the plan does not toggle', async () => {
+        // 20 kt, the ground speed of a taxi (the unit sees only the ground speed), 0.6 NM right of the leg: 83 s of the
+        // ground speed are 0.46 NM, below the cross track, but the gate is floored at 1.0 NM (#438, the design's call).
+        // Without the floor the plan would turn abeam beyond the gate and back to the turn plan at every check below
+        // 1.0 NM (the design, Review Focus 3)
+        expect(20 * 83 / 3600).toBeLessThan(0.6);
+        const {flight, aw} = await boot([at(5, 0.6), at(-20, 0.6)], new ManualPilot(), NEXT, 20, 40, 20);
+        const plans: (TurnPlan | null)[] = [];
+        for (let s = 0; s < 60; s++) {
+            await flight.fly(1);
+            plans.push(aw.turnPlan);
+        }
+        expect(flight.nav.activeIdent).toBe('WWW');
+        expect(Math.abs(gpsXtkRight(flight) - 0.6)).toBeLessThan(0.05);
+        expect(plans.every(p => p === TurnPlan.AT_LEAD), plans.join(' ')).toBe(true);
+    });
+});
+
 // The turn start off course within 4.0 NM of the leg (checked in the KLN 89 trainer, 2026-10-20,
 // docs/kln89-trainer-data/2026-10-20/report-turn-start.md): on the turn plan the unit starts the turn where the
 // along-track distance to the waypoint is the lead, on the abeam plan it waits for the abeam line and turns there on a
