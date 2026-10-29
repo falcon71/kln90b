@@ -782,3 +782,60 @@ reports in [kln89-trainer-data/2026-10-27](kln89-trainer-data/2026-10-27/README.
 - Left behind in the trainer: it is still running and flying GS 120 on 8T to 8S, NAV 1 shown, a message pending. SET 4
   turn anticipation is off again and FPL 0 holds 8Z 8Y 8X 8V 8U 8T 8S 8R. No user waypoint and no numbered flight plan
   was changed. The AVsoftech trainer was not used.
+
+**2026-10-28** (three agent checks with an agent analysis after each, for #438, #439 and #440: the turn-plan decision,
+the abeam plan's late normal turn, edits in front of the active waypoint; the KLN 89 trainer, SET 1 take-home flying at
+60, 119 and 239 kt, SET 4 turn anticipation on; raw data, reports and analyses in
+[kln89-trainer-data/2026-10-28](kln89-trainer-data/2026-10-28/README.md); the last check ran past midnight)
+- The cross track at the decision point of today's model (20 s before the turn point) does not decide the plan: lead
+  with 2.34 NM, abeam with 1.66 to 1.82 at 119 kt. Neither does a decision 1.5 NM or 2.1 NM before the turn point, nor
+  45 s of ground speed before it with a gate capped at 4.0 NM: each was refuted by a later pass (239 kt: lead with 4.2
+  and 4.5 NM 45 s before the turn point, Y1, Y2; lead at 8V with 3.5 and 3.2 NM 1.5 NM before it, where T7 of
+  2026-10-20 was abeam with 3.14).
+- The gate depends on the speed: lead with 1.30 NM and abeam with 1.48 NM at 60 kt (the 60-kt passes, all decided at
+  the landing), lead with 2.7 and abeam with 2.8 at 119 kt.
+- The abeam plan becomes the turn plan once the cross track to the inbound leg is below 1.0 NM: the normal turn circle
+  then starts at once past the turn point, or at the turn point before it, with the alert and line 2 the distance to
+  the arc (#439; 20 starts at 60 and 119 kt, high for the 1.0 NM). It is a periodic check, not a filter: three passes
+  with identical cross-track profiles started 4.0, 10.5 and 10.0 s after the first 0.99 reading; the delays seen run
+  from 2 to 12 wall s (medium for the period). Without a reading below 1.0 NM the zero-size abeam turn comes at the
+  abeam line as before.
+- Edits of a flown waypoint that leave the FROM and TO in place (#440): the active waypoint's plan and its started turn
+  are kept (3c, 3a''; the turn kept at 239 kt is one pass, medium); a normal turn circle of the waypoint just
+  sequenced is dropped, the alert stopping at once (two passes at 8S and two at 8U, high); the alert after a zero-size
+  abeam turn kept flashing, but ended later than without the edit (one pass, medium). Deleting the FROM picks the
+  closest leg again, before and during a turn; an insert between FROM and TO makes the new waypoint active; an insert
+  in front of the FROM changes nothing outside a turn. An insert into a full FPL 0 was not flown.
+- Left behind in the trainer: running, GS 120, on 8S to 8R, SET 4 off, FPL 0 8Z 8Y 8X 8V 8U 8T 8S 8R; the deleted
+  waypoints were inserted again with the same idents. No user waypoint was changed.
+
+**2026-10-29** (an agent check and the closing analysis of the 2026-10-28 series, #438 and #439; the KLN 89 trainer as
+the day before, 239 and 119 kt; raw data, report and analysis in
+[kln89-trainer-data/2026-10-29](kln89-trainer-data/2026-10-29/README.md))
+- The plan is decided at the first calculation of a leg: its activation, a SET 1 re-initialization (also onto the same
+  leg), and an edit of the active waypoint's coordinates (two passes: 8T moved 6 to 7 NM off after a sequencing on
+  course gave the abeam plan, although the cross track was below the gate 45 s and 2.1 NM before the turn point). Lead
+  when the cross track is at most the smaller of about 83 s of ground speed and about 4.9 NM: at 239 kt lead with 4.8
+  and abeam with 5.0 NM at a leg change (medium-high for the form; it fits 54 of the 55 decided passes of the series,
+  the miss being a jump out of a turn in progress). A cap of 5.0 NM with a strict comparison fits as well.
+- A T7 repeat (8V, 239 kt, 6.0 NM at the leg change, 4.8 NM 45 s before the turn point) was abeam again; a leg change
+  with 4.5 NM at 8U was lead, so a cross track above 4.0 NM at the activation does not latch the abeam plan.
+- The 1.0 NM switch from the abeam plan to the normal turn holds at 239 kt too (9.0 and 12.0 s after the first 0.99
+  reading).
+- Not settled: an aircraft that leaves the leg in flight, with no edit and no re-initialization, after the leg became
+  active on course (the take-home intercepts from any offset, so it cannot be flown): the plan may stay, or change once
+  the cross track passes the gate. Also the form of the gate between its two parts (a curved form fits too; a pass at
+  300 kt would separate them).
+- Left behind in the trainer: as on 2026-10-28; 8T was moved for the two drift passes and restored to its coordinates
+  each time, read back on its USR page.
+
+**2026-10-29** (a second agent check, sequencing on the inside of a turn within 4.0 NM; the KLN 89 trainer at 119 kt,
+SET 4 on, restarted by the maintainer before the check; raw data and report in
+[kln89-trainer-data/2026-10-29/inside](kln89-trainer-data/2026-10-29/inside/report.md))
+- An aircraft on the inside of a turn within 4.0 NM of the leg is sequenced when it crosses the bisector of the turn,
+  far before the waypoint, with no turn and no alert, the next leg active at once: on the abeam plan (3.2 to 3.3 NM
+  inside, 12.6 NM out) and on the turn plan (2.3 NM inside, 9 NM out, 7 NM before the turn point). Three passes at 8T
+  (150°), each crossing the line 4 to 9 s after the landing, the delay growing with the distance to the line
+  (medium-high). Filed as #443 for the turn plan.
+- A SET 1 jump that lands past the bisector activates the next leg at once, on either plan (the closest leg).
+- Left behind in the trainer: as before; no edits were made.

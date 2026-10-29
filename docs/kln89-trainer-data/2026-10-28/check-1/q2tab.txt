@@ -1,0 +1,130 @@
+T11 late normal: 8X -62 gs 239 r 1.78 L 1.07 rho 1.78 dec al 2.40
+   first    first     t  117.50 d  5.6 brg 347 dtk  35 tk  35 l2 -4.20 al  3.75 cr +4.16 arcD +4.74 tke   +0
+   decision  t  140.26 d  4.5 brg 336 dtk  35 tk 359 l2 -3.80 al  2.32 cr +3.86 arcD +3.99 tke  -36
+   al=L      t  184.00 d  1.8 brg 340 dtk  35 tk 341 l2 -1.50 al  1.03 cr +1.47 arcD +1.47 tke  -54
+   flashing 117.8-135.5, 193.0-211.8
+   fl-on     t  117.76 d  5.6 brg 347 dtk  35 tk  35 l2 -4.20 al  3.75 cr +4.16 arcD +4.74 tke   +0
+   fl-on     t  193.00 d  1.3 brg 338 dtk  35 tk 354 l2 -1.10 al  0.71 cr +1.09 arcD +1.11 tke  -41
+   pre-sw    t  206.01 d  0.7 brg 309 dtk  35 tk   9 l2 -0.62 al  0.05 cr +0.70 arcD +0.90 tke  -26
+   switch    t  206.26 d  0.6 brg 303 dtk 333 tk  10 l2 -0.87 al -0.02 cr +0.60 arcD +0.84 tke  -25
+   switch: to dtk 333, arcD(actual next) +0.84, |p| 0.60, brg-dtk -92, l2 after: -0.87 -0.87 -0.87 -0.87 -0.87 -0.87 -0.88 -0.88
+   seq t 212.00
+
+T13 late normal: 8U -120 gs 119 r 0.63 L 1.09 rho 0.63 dec al 1.75
+   first    first     t  206.75 d  3.6 brg  12 dtk  65 tk  64 l2 -2.90 al  2.17 cr +2.88 arcD +3.04 tke   -1
+   decision  t  221.25 d  3.3 brg   7 dtk  65 tk  26 l2 -2.80 al  1.75 cr +2.80 arcD +2.86 tke  -39
+   al=L      t  262.25 d  2.0 brg   7 dtk  65 tk   9 l2 -1.70 al  1.06 cr +1.70 arcD +1.70 tke  -56
+   flashing 295.8-329.8
+   fl-on     t  295.75 d  1.0 brg 356 dtk  65 tk  21 l2 -0.95 al  0.36 cr +0.93 arcD +1.10 tke  -44
+   pre-sw    t  303.50 d  0.8 brg 347 dtk  65 tk  30 l2 -1.10 al  0.17 cr +0.78 arcD +1.06 tke  -35
+   switch    t  303.75 d  0.8 brg 346 dtk 305 tk  31 l2 -1.10 al  0.15 cr +0.79 arcD +1.07 tke  -34
+   switch: to dtk 305, arcD(actual next) +1.07, |p| 0.80, brg-dtk -79, l2 after: -1.10 -1.10 -1.10 -1.10 -1.10 -1.10 -1.10 -1.10
+   seq t 330.25
+
+a13 late normal: 8T +150 gs 119 r 0.63 L 1.98 rho 0.53 dec al 2.64
+   first    first     t   21.76 d  5.2 brg 347 dtk 304 tk 330 l2 +3.50 al  3.80 cr -3.55 arcD +3.93 tke  +26
+   decision  t   97.25 d  3.1 brg 336 dtk 304 tk 357 l2 +1.70 al  2.63 cr -1.64 arcD +1.74 tke  +53
+   flashing 130.3-131.2
+   fl-on     t  130.26 d  2.2 brg 330 dtk  94 tk 348 l2 +0.94 al  1.98 cr -0.96 arcD +0.96 tke  +44
+   pre-sw    t  129.01 d  2.3 brg 331 dtk 304 tk 348 l2 +0.98 al  2.05 cr -1.04 arcD +1.05 tke  +44
+   switch    t  129.26 d  2.2 brg 330 dtk  94 tk 348 l2 +0.95 al  1.98 cr -0.96 arcD +0.96 tke  +44
+   switch: to dtk 94, arcD(actual next) +0.96, |p| 2.20, brg-dtk +26, l2 after: +0.95 +0.94 +0.94 +0.93 +0.92 +0.92 +0.94
+
+a15 late normal: 8T +150 gs 119 r 0.63 L 1.98 rho 0.53 dec al 2.64
+   first    first     t    9.75 d  6.1 brg 351 dtk 304 tk 303 l2 +4.40 al  4.16 cr -4.46 arcD +4.92 tke   -1
+   decision  t  112.00 d  3.3 brg 342 dtk 304 tk 357 l2 +2.00 al  2.60 cr -2.03 arcD +2.10 tke  +53
+   al=L      t  146.01 d  2.3 brg 338 dtk 304 tk 351 l2 +1.30 al  1.91 cr -1.29 arcD +1.29 tke  +47
+   flashing 167.2-216.2
+   fl-on     t  167.25 d  1.7 brg 335 dtk  94 tk 345 l2 +0.97 al  1.46 cr -0.88 arcD +0.97 tke  +41
+   pre-sw    t  166.75 d  1.7 brg 335 dtk 304 tk 345 l2 +0.97 al  1.46 cr -0.88 arcD +0.97 tke  +41
+   switch    t  167.00 d  1.7 brg 335 dtk  94 tk 345 l2 +0.97 al  1.46 cr -0.88 arcD +0.97 tke  +41
+   switch: to dtk 94, arcD(actual next) +0.97, |p| 1.70, brg-dtk +31, l2 after: +0.97 +0.97 +0.97 +0.97 +0.97 +0.97 +0.96 +0.95
+   seq t 216.75
+
+r1 late normal: 8T +150 gs 119 r 0.63 L 1.98 rho 0.53 dec al 2.64
+   first    first     t  138.76 d  6.1 brg 351 dtk 304 tk 295 l2 +4.40 al  4.16 cr -4.46 arcD +4.92 tke   -9
+   decision  t  235.25 d  3.7 brg 349 dtk 304 tk   2 l2 +2.60 al  2.62 cr -2.62 arcD +2.68 tke  +58
+   al=L      t  270.75 d  2.6 brg 346 dtk 304 tk 354 l2 +1.80 al  1.93 cr -1.74 arcD +1.74 tke  +50
+   flashing 317.3-356.0
+   fl-on     t  317.26 d  1.2 brg 345 dtk  94 tk 342 l2 +1.20 al  0.91 cr -0.79 arcD +1.17 tke  +38
+   pre-sw    t  316.51 d  1.2 brg 345 dtk 304 tk 342 l2 +0.79 al  0.91 cr -0.79 arcD +1.17 tke  +38
+   switch    t  317.01 d  1.2 brg 345 dtk  94 tk 342 l2 +1.20 al  0.91 cr -0.79 arcD +1.17 tke  +38
+   switch: to dtk 94, arcD(actual next) +1.17, |p| 1.20, brg-dtk +41, l2 after: +1.20 +1.20 +1.20 +1.20 +1.20 +1.20 +1.20 +1.20
+   seq t 357.01
+
+r2 late normal: 8T +150 gs 119 r 0.63 L 1.98 rho 0.53 dec al 2.64
+   first    first     t    0.02 d 20.6 brg 305 dtk 305 tk 304 l2 -0.00 al 20.60 cr -0.36 arcD +18.10 tke   +0
+   decision  t  191.76 d  3.2 brg 339 dtk 304 tk   1 l2 +1.80 al  2.62 cr -1.84 arcD +1.92 tke  +57
+   al=L      t  224.50 d  2.2 brg 332 dtk 304 tk 350 l2 +1.00 al  1.94 cr -1.03 arcD +1.03 tke  +46
+   flashing 232.0-279.5
+   fl-on     t  232.00 d  2.0 brg 331 dtk  94 tk 346 l2 +0.91 al  1.78 cr -0.91 arcD +0.92 tke  +42
+   pre-sw    t  231.25 d  2.0 brg 331 dtk 304 tk 347 l2 +0.90 al  1.78 cr -0.91 arcD +0.92 tke  +43
+   switch    t  231.75 d  2.0 brg 331 dtk  94 tk 346 l2 +0.91 al  1.78 cr -0.91 arcD +0.92 tke  +42
+   switch: to dtk 94, arcD(actual next) +0.92, |p| 2.00, brg-dtk +27, l2 after: +0.91 +0.91 +0.90 +0.89 +0.89 +0.88 +0.88 +0.87
+   seq t 280.25
+
+r4 late normal: 8U -120 gs 119 r 0.63 L 1.09 rho 0.63 dec al 1.75
+   first    first     t  141.50 d  4.4 brg  19 dtk  65 tk  63 l2 -3.20 al  3.06 cr +3.17 arcD +3.64 tke   -2
+   decision  t  209.25 d  2.4 brg  20 dtk  65 tk  11 l2 -1.70 al  1.70 cr +1.70 arcD +1.77 tke  -54
+   al=L      t  241.76 d  1.4 brg  22 dtk  65 tk  21 l2 -0.98 al  1.02 cr +0.95 arcD +0.96 tke  -44
+   flashing 251.5-290.3
+   fl-on     t  251.50 d  1.1 brg  20 dtk 305 tk  31 l2 -0.84 al  0.78 cr +0.78 arcD +0.81 tke  -34
+   pre-sw    t  250.76 d  1.2 brg  20 dtk  65 tk  26 l2 -0.81 al  0.85 cr +0.85 arcD +0.87 tke  -39
+   switch    t  251.50 d  1.1 brg  20 dtk 305 tk  31 l2 -0.84 al  0.78 cr +0.78 arcD +0.81 tke  -34
+   switch: to dtk 305, arcD(actual next) +0.81, |p| 1.10, brg-dtk -45, l2 after: -0.84 -0.83 -0.83 -0.82 -0.82 -0.81 -0.81 -0.81
+   seq t 290.51
+
+r5 late normal: 8T +150 gs 119 r 0.63 L 1.98 rho 0.53 dec al 2.64
+   first    first     t    0.02 d 26.9 brg 305 dtk 305 tk 292 l2 +0.07 al 26.90 cr -0.47 arcD +24.40 tke  -12
+   decision  t  193.26 d  3.1 brg 337 dtk 304 tk  -1 l2 +1.70 al  2.60 cr -1.69 arcD +1.77 tke  +56
+   al=L      t  223.51 d  2.2 brg 331 dtk 304 tk 350 l2 +0.99 al  1.96 cr -1.00 arcD +1.00 tke  +46
+   flashing 229.8-278.5
+   fl-on     t  229.75 d  2.1 brg 329 dtk  94 tk 341 l2 +0.88 al  1.90 cr -0.89 arcD +0.89 tke  +37
+   pre-sw    t  229.25 d  2.1 brg 329 dtk 304 tk 347 l2 +0.87 al  1.90 cr -0.89 arcD +0.89 tke  +43
+   switch    t  229.75 d  2.1 brg 329 dtk  94 tk 341 l2 +0.88 al  1.90 cr -0.89 arcD +0.89 tke  +37
+   switch: to dtk 94, arcD(actual next) +0.89, |p| 2.10, brg-dtk +25, l2 after: +0.88 +0.87 +0.86 +0.86 +0.86 +0.85 +0.84 +0.84
+   seq t 278.75
+
+q3c late normal: 8T +150 gs 119 r 0.63 L 1.98 rho 0.53 dec al 2.64
+   first    first     t  139.51 d  6.1 brg 351 dtk 304 tk 305 l2 +4.40 al  4.16 cr -4.46 arcD +4.92 tke   +1
+   decision  t  242.76 d  3.2 brg 339 dtk 304 tk 356 l2 +1.80 al  2.62 cr -1.84 arcD +1.92 tke  +52
+   al=L      t  276.01 d  2.2 brg 334 dtk 304 tk 349 l2 +1.10 al  1.91 cr -1.10 arcD +1.10 tke  +45
+   flashing 286.0-329.0
+   fl-on     t  286.01 d  2.0 brg 332 dtk  94 tk 346 l2 +0.94 al  1.77 cr -0.94 arcD +0.95 tke  +42
+   pre-sw    t  285.50 d  2.0 brg 332 dtk 304 tk 346 l2 +0.94 al  1.77 cr -0.94 arcD +0.95 tke  +42
+   switch    t  285.76 d  2.0 brg 332 dtk  94 tk 346 l2 +0.94 al  1.77 cr -0.94 arcD +0.95 tke  +42
+   switch: to dtk 94, arcD(actual next) +0.95, |p| 2.00, brg-dtk +28, l2 after: +0.94 +0.94 +0.93 +0.92 +0.92 +0.92 +0.91 +0.91
+
+q3c2 late normal after edit: 8T +150 gs 119 r 0.63 L 1.98 rho 0.53 dec al 2.64
+   first    first     t  254.25 d  2.7 brg 338 dtk 304 tk 340 l2 +1.50 al  2.24 cr -1.51 arcD +1.53 tke  +36
+   decision  t  254.25 d  2.7 brg 338 dtk 304 tk 340 l2 +1.50 al  2.24 cr -1.51 arcD +1.53 tke  +36
+   al=L      t  262.51 d  2.4 brg 341 dtk 304 tk 314 l2 +1.50 al  1.92 cr -1.44 arcD +1.45 tke  +10
+   flashing 308.0-330.0
+   fl-on     t  308.00 d  1.1 brg 355 dtk  94 tk 334 l2 +1.40 al  0.69 cr -0.85 arcD +1.36 tke  +30
+   pre-sw    t  307.00 d  1.1 brg 354 dtk 304 tk 335 l2 +0.85 al  0.71 cr -0.84 arcD +1.34 tke  +31
+   switch    t  307.25 d  1.1 brg 355 dtk  94 tk 334 l2 +1.40 al  0.69 cr -0.85 arcD +1.36 tke  +30
+   switch: to dtk 94, arcD(actual next) +1.36, |p| 1.10, brg-dtk +51, l2 after: +1.40 +1.40 +1.40 +1.40 +1.40 +1.40 +1.40 +1.40
+
+T7 zero: 8V +93 gs 239 r 1.78 L 1.88 rho 1.78 dec al 3.21
+   first    first     t  117.00 d  9.8 brg  10 dtk 332 tk 333 l2 +6.00 al  7.72 cr -6.03 arcD +7.98 tke   +1
+   decision  t  209.00 d  4.3 brg  15 dtk 332 tk  16 l2 +2.90 al  3.14 cr -2.93 arcD +3.10 tke  +44
+   al=L      t  236.75 d  2.6 brg  16 dtk 332 tk  12 l2 +1.80 al  1.87 cr -1.81 arcD +1.81 tke  +40
+   flashing 256.5-283.0
+   fl-on     t  256.50 d  1.5 brg  27 dtk 332 tk   3 l2 +1.20 al  0.86 cr -1.23 arcD +1.40 tke  +31
+   pre-sw    t  271.00 d  0.9 brg  60 dtk 332 tk 356 l2 +0.85 al  0.03 cr -0.90 arcD +1.47 tke  +24
+   switch    t  271.25 d  0.8 brg  64 dtk  65 tk 355 l2 +0.85 al -0.03 cr -0.80 arcD +1.43 tke  +23
+   switch: to dtk 65, arcD(actual next) +1.43, |p| 0.80, brg-dtk +92, l2 after: +0.85 +0.84 +0.84 +0.83 +0.83 +0.82 +0.82 +0.82
+   seq t 283.50
+
+C zero: 8U -120 gs 119 r 0.63 L 1.09 rho 0.63 dec al 1.75
+   first    first     t 2707.25 d  4.0 brg   4 dtk  65 tk  64 l2 -3.50 al  1.94 cr +3.50 arcD +3.58 tke   -1
+   decision  t 2714.01 d  3.9 brg   1 dtk  65 tk  53 l2 -3.50 al  1.71 cr +3.51 arcD +3.55 tke  -12
+   al=L      t 2752.25 d  2.7 brg 358 dtk  65 tk 359 l2 -2.50 al  1.05 cr +2.49 arcD +2.49 tke  -66
+   flashing 2713.5-2733.5, 2792.5-2842.0
+   fl-on     t 2713.51 d  3.9 brg   2 dtk  65 tk  56 l2 -3.50 al  1.77 cr +3.47 arcD +3.53 tke   -9
+   fl-on     t 2792.51 d  1.5 brg 347 dtk  65 tk  14 l2 -1.50 al  0.31 cr +1.47 arcD +1.61 tke  -51
+   pre-sw    t 2807.75 d  1.2 brg 336 dtk  65 tk  18 l2 -1.20 al  0.02 cr +1.20 arcD +1.49 tke  -47
+   switch    t 2808.01 d  1.2 brg 335 dtk 305 tk  18 l2 -1.20 al  0.00 cr +1.20 arcD +1.50 tke  -47
+   switch: to dtk 305, arcD(actual next) +1.50, |p| 1.20, brg-dtk -90, l2 after: -1.20 -1.10 -1.10 -1.10 -1.10 -1.10 -1.10 -1.10
+   seq t 2842.50
+
