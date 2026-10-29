@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {Facility} from '@microsoft/msfs-sdk';
 import {Flight} from '../../harness/flight/Flight';
 import {World} from '../../harness/flight/World';
-import {airport, vor} from '../../harness/navdata/builders';
+import {airport, intersection, vor} from '../../harness/navdata/builders';
 import {savedFlightplan} from '../../harness/storage';
 import {angleBetween, courseDeg, crossTrackNm, distanceNm, LatLon, pointFrom} from '../../harness/flight/geo';
 import {turnStackLength} from '../../harness/readers';
@@ -48,11 +48,12 @@ const gpsAlongBefore = (flight: Flight) => alongBefore(flight.unit.props.sensors
  * The world of bisectorSequencing.test.ts: KAAA 28 NM west of ABC, so the leg arrives at ABC on 090, and KBBB 15 NM from
  * ABC on `kbbbCourse` (000 by default, a 90° left turn), KCCC 15 NM from KBBB on 090, so that ABC to KCCC is about 045.
  * Two spare waypoints for the edits: SPR 15 NM from ABC on 120 (a 30° right turn instead, whose turn point is closer to
- * ABC) and SPB 15 NM from ABC on 210 (a 120° right turn instead, whose lead is longer). FPL 0 is KAAA ABC KBBB, with KCCC
- * at its end when `withKccc`. The aircraft starts at `start` (12 NM before ABC on the inbound course by default) on
- * `trackTrue`, flown by `pilot` (the coupled autopilot if not given)
+ * ABC) and SPB 15 NM from ABC on 210 (a 120° right turn instead, whose lead is longer), and the `extra` ones. FPL 0 is
+ * KAAA ABC KBBB, with KCCC at its end when `withKccc`, KFRT 20 NM west of KAAA in front when `withFront`, and `tail` more
+ * waypoints after KCCC, 10 NM apart on 090 (#440). The aircraft starts at `start` (12 NM before ABC on the inbound course
+ * by default) on `trackTrue`, flown by `pilot` (the coupled autopilot if not given)
  */
-async function boot(o: { withKccc?: boolean; kbbbCourse?: number; start?: LatLon; trackTrue?: number; pilot?: Pilot } = {}) {
+async function boot(o: { withKccc?: boolean; kbbbCourse?: number; start?: LatLon; trackTrue?: number; pilot?: Pilot; withFront?: boolean; tail?: number; extra?: Facility[] } = {}) {
     const abc = vor('ABC', ABC_POS.lat, ABC_POS.lon);
     const a0 = pointFrom(ABC_POS, 270, 28);
     const kaaa = airport('KAAA', a0.lat, a0.lon);
@@ -64,8 +65,17 @@ async function boot(o: { withKccc?: boolean; kbbbCourse?: number; start?: LatLon
     const spr = airport('SPR', r0.lat, r0.lon);
     const s0 = pointFrom(ABC_POS, 210, 15);
     const spb = airport('SPB', s0.lat, s0.lon);
-    const world = new World({magvar: 0}).add(kaaa, abc, kbbb, kccc, spr, spb);
-    const plan: Facility[] = o.withKccc === false ? [kaaa, abc, kbbb] : [kaaa, abc, kbbb, kccc];
+    const f0 = pointFrom(a0, 270, 20);
+    const kfrt = airport('KFRT', f0.lat, f0.lon);
+    const tail = Array.from({length: o.tail ?? 0}, (_, i) => {
+        const t0 = pointFrom(c0, 90, 10 * (i + 1));
+        return intersection(`TL${String(i + 1).padStart(2, '0')}`, t0.lat, t0.lon);
+    });
+    const world = new World({magvar: 0}).add(kfrt, kaaa, abc, kbbb, kccc, spr, spb, ...tail, ...(o.extra ?? []));
+    const plan: Facility[] = [
+        ...(o.withFront ? [kfrt] : []),
+        ...(o.withKccc === false ? [kaaa, abc, kbbb] : [kaaa, abc, kbbb, kccc, ...tail]),
+    ];
     const start = o.start ?? pointFrom(ABC_POS, 270, 12);
     const flight = await Flight.start({
         world, storage: savedFlightplan(0, plan), pilot: o.pilot,
@@ -356,27 +366,42 @@ describe('an edit of the leg after the active waypoint (#408)', () => {
     });
 });
 
-// #440: an edit in front of the active waypoint moves the active leg to another index, and the unit goes on with the
-// same leg and the turn state that belongs to it. Today assertToMatchesFplIdx finds the instance at another index and
-// reactivates FPL 0, which clears the turn stack
+// #440: an edit in front of the active waypoint moves the active leg to another index. When the FROM and the TO stay, the
+// unit follows the active leg with its plan and its own started turn, and drops a turn circle left over from the waypoint
+// just sequenced; the run-out of an abeam turn stays. Deleting the FROM activates the closest leg, and a waypoint inserted
+// between the FROM and the TO becomes the active one (checked in the KLN 89 trainer, 2026-10-28,
+// docs/kln89-trainer-record.md and docs/kln89-trainer-data/2026-10-28/, check-1 and check-2; the design,
+// docs/superpowers/specs/2026-10-29-turn-plan-decision-design.md, section 3.3)
 describe('an edit in front of the active waypoint (#440)', () => {
+    /** KBBB 15 NM north of ABC, as boot places it by default */
+    const KBBB_POS = pointFrom(ABC_POS, 0, 15);
+
     /**
-     * Flies KAAA ABC KBBB KCCC until ABC is sequenced in its turn: KBBB is active and the turn of ABC is still on the
-     * stack. Returns the entries of the stack and the DTK then
+     * Flies KAAA ABC KBBB KCCC until ABC is sequenced in its turn, and 1 s more: KBBB is active and the turn circle of ABC
+     * is still on the stack. `extra` goes to boot
      */
-    async function flyToSequencedInTurn() {
-        const booted = await boot();
+    async function flyToSequencedInTurn(extra: Facility[] = []) {
+        const booted = await boot({extra});
         const {flight, aw} = booted;
         await flight.flyUntil(() => flight.nav.activeIdent === 'KBBB', {timeout: 600, description: 'ABC sequenced'});
         await flight.fly(1);
         expect(flight.nav.activeIdent, 'precondition: KBBB is active').toBe('KBBB');
         expect(aw.getActiveFplIdx(), 'precondition: KBBB is leg 2').toBe(2);
         expect(turnStackLength(flight.unit), 'precondition: the turn of ABC is on the stack').toBeGreaterThan(0);
-        return {...booted, entries: [...aw.turnStack], dtk: flight.nav.dtkTrue};
+        expect(aw.turnStack.some(entry => entry.isRunOut), 'precondition: a turn circle, not a run-out').toBe(false);
+        return {...booted, entries: [...aw.turnStack]};
+    }
+
+    /** Flies until the roll-in of the turn at ABC has ended, then 2 s more: the circle lasts about 30 s (a7 above) */
+    async function flyOntoTurnCircle(flight: Flight): Promise<void> {
+        await flyIntoTurn(flight, 0);
+        await flight.flyUntil(() => turnStackLength(flight.unit) === 1, {timeout: 10, description: 'the roll-in ended'});
+        await flight.fly(2);
+        expect(flight.nav.activeIdent).toBe('ABC');
     }
 
     // The sibling that holds the preconditions: an edit behind the active waypoint changes nothing of the turn
-    it('keeps the turn of the waypoint just sequenced when a leg behind the active one is deleted (control of the pin)', async () => {
+    it('keeps the turn of the waypoint just sequenced when a leg behind the active one is deleted', async () => {
         const {flight, aw, entries} = await flyToSequencedInTurn();
         deleteLeg(flight.unit, 3);
         await flight.fly(1);
@@ -385,17 +410,215 @@ describe('an edit in front of the active waypoint (#440)', () => {
         entries.forEach((entry, i) => expect(aw.turnStack[i]).toBe(entry));
     });
 
-    it.fails('keeps the turn in progress when the first waypoint of the plan is deleted (#440)', async () => {
-        const {flight, aw, entries, dtk} = await flyToSequencedInTurn();
+    // 3b, 3b': a delete 2 to 7 s after the sequencing stopped the alert of the turn at once, and line 2 was the cross
+    // track to the leg, not the distance to the arc
+    it("follows the active leg and drops the turn of the waypoint just sequenced when the first waypoint is deleted (KLN 89 trainer, 2026-10-28, 3b, 3b'; #440)", async () => {
+        const {flight, aw} = await flyToSequencedInTurn();
+        expect(flight.nav.waypointAlert, 'precondition: the alert of the turn at ABC is on').toBe(true);
+        // Line 2 is the distance to the arc, which differs from the cross track to the leg (positive right of the course,
+        // as crossTrackNm). The DTK cannot tell them apart: in the turn it is the next leg's already
+        const legXtk = () => crossTrackNm(flight.unit.props.sensors.in.gps.coords, ABC_POS, 0);
+        expect(Math.abs(flight.nav.xtkNm! - legXtk()), 'precondition: line 2 is not the cross track to the leg').toBeGreaterThan(0.05);
+
         deleteLeg(flight.unit, 0);
         await flight.fly(1);
-        // The active leg is the same instance, now at index 1
+        // The active leg is the same instance, now at index 1, from ABC
         expect(flight.nav.activeIdent).toBe('KBBB');
         expect(aw.getActiveFplIdx()).toBe(1);
-        expect(turnStackLength(flight.unit)).toBeGreaterThanOrEqual(entries.length);
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(turnStackLength(flight.unit)).toBe(0);
+        expect(angleBetween(flight.nav.dtkTrue, courseDeg(ABC_POS, KBBB_POS))).toBeLessThan(1);
+        // Line 2 is the cross track to the leg, the aircraft still turning onto it
+        expect(Math.abs(flight.nav.xtkNm! - legXtk())).toBeLessThan(0.01);
+        // KBBB's own alert, 20 s before the turn point of its 90° turn onto KCCC (1.42 NM before KBBB), is far away
+        expect(distanceNm(flight.aircraft, KBBB_POS)).toBeGreaterThan(10);
+        expect(flight.nav.waypointAlert).toBe(false);
+    });
+
+    // 3c: the abeam plan was kept through a delete of a flown waypoint with 1.5 NM of cross track, where a plan decided
+    // again would have been the turn plan (the gate is 2.77 NM at 120 kt)
+    it('keeps the abeam plan through a delete in front (KLN 89 trainer, 2026-10-28, 3c)', async () => {
+        const {flight, aw} = await bootAbeamPass({withFront: true});
+        expect(aw.getActiveFplIdx(), 'precondition: ABC is leg 2, behind KFRT and KAAA').toBe(2);
+        await flight.flyUntil(() => alongBefore(flight.aircraft) <= ABEAM_TURN_AT - 0.02, {timeout: 600, description: '0.8 NM before ABC'});
+        const xtkNorth = -crossTrackNm(flight.aircraft, ABC_POS, 90);
+        expect(xtkNorth, 'within the gate of the turn plan, so that a new decision would give the turn plan').toBeLessThan(2.5);
+        expect(xtkNorth, 'above the 1.0 NM of the turn plan (#439), with a margin').toBeGreaterThan(1.2);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_ABEAM);
+        expect(turnStackLength(flight.unit)).toBe(0);
+
+        deleteLeg(flight.unit, 0);
+        await flight.fly(1);
+        expect(flight.nav.activeIdent).toBe('ABC');
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_ABEAM);
+
+        // No turn at the turn point of the 60° turn (0.49 NM before ABC): the zero-size turn comes at the abeam line
+        await flight.flyUntil(() => turnStackLength(flight.unit) > 0 || flight.nav.activeIdent !== 'ABC', {timeout: 120, description: 'the turn start at ABC'});
+        expect(flight.nav.activeIdent).toBe('ABC');
+        expect(aw.turnStack[0].abeamTurnSign).not.toBeNull();
+        const abeamAlong = alongBefore(flight.aircraft);
+        expect(abeamAlong).toBeGreaterThanOrEqual(-0.07);
+        expect(abeamAlong).toBeLessThanOrEqual(0.02);
+    });
+
+    // 3a'': a delete about 4 s into a turn of the turn plan, 2.4 NM off the inbound leg at 239 kt: the turn went on, with
+    // its alert and line 2 the distance to the arc (one pass, medium)
+    it("keeps the waypoint's own started turn through a delete in front (KLN 89 trainer, 2026-10-28, 3a'')", async () => {
+        const {flight, aw} = await boot({withFront: true});
+        expect(aw.getActiveFplIdx(), 'precondition: ABC is leg 2, behind KFRT and KAAA').toBe(2);
+        await flyOntoTurnCircle(flight);
+        expect(aw.ownTurnStarted).toBe(true);
+        const entries = [...aw.turnStack];
+        const plan = aw.turnPlan;
+
+        deleteLeg(flight.unit, 0);
+        await flight.fly(1);
+        expect(flight.nav.activeIdent).toBe('ABC');
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.ownTurnStarted).toBe(true);
+        expect(aw.turnPlan).toBe(plan);
+        expect(turnStackLength(flight.unit)).toBe(entries.length);
         entries.forEach((entry, i) => expect(aw.turnStack[i]).toBe(entry));
-        // The DTK goes on with the turn (a few degrees in a second), it does not jump to the leg
-        expect(angleBetween(flight.nav.dtkTrue, dtk!)).toBeLessThan(10);
+        expect(angleBetween(flight.nav.dtkTrue, 0)).toBeLessThan(1);
+        expect(flight.nav.waypointAlert).toBe(true);
+    });
+
+    // 3d: a delete 1.75 s after the sequencing of a zero-size abeam turn left its alert flashing (one pass, medium; it
+    // ended later than without the edit, which the pass cannot explain and which is not modeled)
+    it('keeps the run-out of a zero-size abeam turn through a delete in front (KLN 89 trainer, 2026-10-28, 3d)', async () => {
+        const {flight, aw} = await bootAbeamPass();
+        await flight.flyUntil(() => flight.nav.activeIdent !== 'ABC', {timeout: 600, description: 'ABC sequenced'});
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(aw.getActiveFplIdx(), 'precondition: KBBB is leg 2, from ABC').toBe(2);
+        expect(turnStackLength(flight.unit)).toBe(1);
+        const runOut = aw.turnStack[0];
+        expect(runOut.isRunOut).toBe(true);
+        await flight.fly(1);
+        expect(aw.turnStack[0], 'precondition: the run-out lasts').toBe(runOut);
+
+        deleteLeg(flight.unit, 0);
+        await flight.fly(1);
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(turnStackLength(flight.unit)).toBe(1);
+        expect(aw.turnStack[0]).toBe(runOut);
+        expect(flight.nav.waypointAlert).toBe(true);
+    });
+
+    // 3e: deleting the FROM activates the closest leg, before and during a turn, and the turn state goes. Here the FROM
+    // ABC goes in its leftover turn: the closest leg is KAAA to KBBB, about 13 NM away, against KBBB to KCCC at about 15
+    it('activates the closest leg when the FROM is deleted (KLN 89 trainer, 2026-10-28, 3e)', async () => {
+        const {flight, aw} = await flyToSequencedInTurn();
+
+        deleteLeg(flight.unit, 1);
+        await flight.fly(1);
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('KAAA');
+        expect(turnStackLength(flight.unit)).toBe(0);
+        expect(angleBetween(flight.nav.dtkTrue, courseDeg(pointFrom(ABC_POS, 270, 28), KBBB_POS))).toBeLessThan(1);
+    });
+
+    // 3f: a waypoint inserted between the FROM and the TO became the active waypoint, from the FROM, although it was 138 NM
+    // away. Here SPX, 20 NM from ABC on 120, goes in between ABC and KBBB during ABC's leftover turn, 1 s after the
+    // sequencing. The aircraft is then just north-west of ABC: the leg KAAA to ABC passes it closer than the leg ABC to SPX,
+    // whose nearest point is ABC, so the closest leg would make ABC active again. A waypoint on the inside of the turn at
+    // ABC would not tell the rules apart: the aircraft would be past its bisector and the unit would sequence it at once
+    // (#443), onto the leg the closest-leg rule picks
+    it('makes an inserted waypoint between FROM and TO active and keeps the FROM (KLN 89 trainer, 2026-10-28, 3f)', async () => {
+        const x0 = pointFrom(ABC_POS, 120, 20);
+        const spx = airport('SPX', x0.lat, x0.lon);
+        const {flight, aw} = await flyToSequencedInTurn([spx]);
+        expect(aw.turnPlan, "precondition: KBBB's plan is decided").not.toBeNull();
+        const pos = flight.unit.props.sensors.in.gps.coords;
+        expect(alongBefore(pos), 'precondition: before ABC on the leg KAAA to ABC').toBeGreaterThan(0.05);
+        const toKaaaAbc = Math.abs(crossTrackNm(pos, ABC_POS, 90));
+        expect(distanceNm(pos, ABC_POS) - toKaaaAbc, 'precondition: the leg KAAA to ABC is the closest leg').toBeGreaterThan(0.03);
+
+        insertLeg(flight.unit, 2, spx);
+        // Before the next calculation: the leg changed, so the plan is cleared as at any activation, and the turn left
+        // over from ABC was made onto the old leg and goes (the design's call; 3f was not flown in a turn)
+        expect(aw.getActiveFplIdx()).toBe(2);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('SPX');
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(aw.isDctNavigation()).toBe(false);
+        expect(aw.turnPlan).toBeNull();
+        expect(aw.ownTurnStarted).toBe(false);
+        expect(turnStackLength(flight.unit)).toBe(0);
+
+        // The next calculation decides the plan: the turn plan, a few hundredths off the leg ABC to SPX (#438)
+        await flight.fly(1);
+        expect(flight.nav.activeIdent).toBe('SPX');
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
+        expect(turnStackLength(flight.unit)).toBe(0);
+        expect(angleBetween(flight.nav.dtkTrue, 120)).toBeLessThan(1);
+        expect(flight.nav.waypointAlert).toBe(false);
+    });
+
+    // An insert into a full FPL 0 deletes waypoints from the front first (#148), and the active leg follows both edits by
+    // the same rule. Not flown in the trainer: by analogy with the deletes in front, the design's call
+    it("follows the active leg through an insert into a full FPL 0 during a turn (by analogy, the design's call)", async () => {
+        const {flight, aw, spr, spb} = await boot({withFront: true, tail: 25});
+        const fpl0 = flight.unit.props.memory.fplPage.flightplans[0];
+        expect(fpl0.getLegs().length, 'precondition: FPL 0 holds 30 waypoints').toBe(30);
+        expect(fpl0.fits(1, 0), 'precondition: FPL 0 is full').toBe(false);
+        expect(aw.getActiveFplIdx()).toBe(2);
+
+        // In ABC's own turn: KFRT, in front of the FROM KAAA, goes; the own turn stays
+        await flyOntoTurnCircle(flight);
+        const own = [...aw.turnStack];
+        insertLeg(flight.unit, 30, spr);
+        await flight.fly(1);
+        expect(fpl0.getLegs()[0].wpt.icaoStruct.ident).toBe('KAAA');
+        expect(fpl0.getLegs()[29].wpt.icaoStruct.ident).toBe('SPR');
+        expect(flight.nav.activeIdent).toBe('ABC');
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.ownTurnStarted).toBe(true);
+        expect(turnStackLength(flight.unit)).toBe(own.length);
+        own.forEach((entry, i) => expect(aw.turnStack[i]).toBe(entry));
+
+        // In ABC's leftover turn, KBBB active: KAAA, in front of the FROM ABC, goes, and the leftover turn with the edit
+        await flight.flyUntil(() => flight.nav.activeIdent === 'KBBB', {timeout: 120, description: 'ABC sequenced'});
+        await flight.fly(1);
+        expect(aw.getActiveFplIdx()).toBe(2);
+        expect(turnStackLength(flight.unit), 'precondition: the turn of ABC is on the stack').toBeGreaterThan(0);
+        expect(fpl0.fits(1, 0), 'precondition: FPL 0 is full again').toBe(false);
+        insertLeg(flight.unit, 30, spb);
+        await flight.fly(1);
+        expect(fpl0.getLegs()[0].wpt.icaoStruct.ident).toBe('ABC');
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(turnStackLength(flight.unit)).toBe(0);
+        expect(angleBetween(flight.nav.dtkTrue, courseDeg(ABC_POS, KBBB_POS))).toBeLessThan(1);
+        expect(flight.nav.waypointAlert).toBe(false);
+    });
+
+    // The design, Review Focus 5: a Direct To follows its target through an edit in front, as before #440, and keeps its
+    // own origin and its turn; the FPL 0 rule above does not apply to it
+    it('keeps the Direct To branch for a delete in front during a Direct To', async () => {
+        const {flight, aw} = await boot();
+        await flight.flyUntil(() => alongBefore(flight.aircraft) <= 3, {timeout: 600, description: '3 NM before ABC'});
+        await flight.panel.directTo('ABC');
+        expect(aw.isDctNavigation()).toBe(true); // Preconditions: a Direct To to the plan's ABC
+        expect(aw.getActiveFplIdx()).toBe(1);
+        const origin = aw.getFromWpt();
+        expect(origin!.icaoStruct.ident).not.toBe('KAAA');
+        await flyOntoTurnCircle(flight);
+        expect(aw.ownTurnStarted).toBe(true);
+        const entries = [...aw.turnStack];
+
+        // KAAA, the plan leg before ABC, goes: ABC is leg 0
+        deleteLeg(flight.unit, 0);
+        await flight.fly(1);
+        expect(flight.nav.activeIdent).toBe('ABC');
+        expect(aw.isDctNavigation()).toBe(true);
+        expect(aw.getActiveFplIdx()).toBe(0);
+        expect(aw.getFromWpt()).toBe(origin);
+        expect(aw.ownTurnStarted).toBe(true);
+        expect(turnStackLength(flight.unit)).toBe(entries.length);
+        entries.forEach((entry, i) => expect(aw.turnStack[i]).toBe(entry));
     });
 });
 
@@ -407,14 +630,14 @@ const ABEAM_TURN_AT = 0.8;
  * aircraft converges on 170, 80° to the leg, on the line that is 3.6 NM north of it 1.16 NM before ABC, from 12 NM north
  * of the leg, beyond the gate of the turn plan (2.77 NM at 120 kt), and turns onto the inbound course 090 at
  * ABEAM_TURN_AT, rolling out about 1.15 NM north of the leg: above the 1.0 NM below which the abeam plan becomes the turn
- * plan (#439). It returns once the abeam plan is decided, in the first calculation (#438)
+ * plan (#439). It returns once the abeam plan is decided, in the first calculation (#438). `withFront` is boot's
  */
-async function bootAbeamPass() {
+async function bootAbeamPass(o: { withFront?: boolean } = {}) {
     const course = 170;
     const startNorth = 12;
     const startAlong = alertPoint(60) + (startNorth - 3.6) * Math.tan(10 * DEG);
     const start = pointFrom(pointFrom(ABC_POS, 270, startAlong), 0, startNorth);
-    const booted = await boot({withKccc: false, kbbbCourse: 150, start, trackTrue: course, pilot: trackPilot(ABEAM_TURN_AT, course, 90)});
+    const booted = await boot({withKccc: false, kbbbCourse: 150, start, trackTrue: course, pilot: trackPilot(ABEAM_TURN_AT, course, 90), withFront: o.withFront});
     expect(booted.aw.turnPlan).toBe(TurnPlan.AT_ABEAM);
     return booted;
 }

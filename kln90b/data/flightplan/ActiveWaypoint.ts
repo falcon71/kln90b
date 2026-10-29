@@ -112,6 +112,12 @@ export class ActiveWaypoint {
 
     private from: FromLeg | null = null;
     private to: KLNFlightplanLeg | null = null;
+    /**
+     * #440: the leg of FPL 0 the from waypoint was made from (setFplData), compared by instance in assertToMatchesFplIdx
+     * to tell an edit in front of the from waypoint from one that removed it. Null when the from waypoint is not a plan
+     * leg: a Direct To flies from its own origin, and without an active leg there is none
+     */
+    private fromPlanLeg: KLNFlightplanLeg | null = null;
     private isDirectTo: boolean = false;
 
     private fplIdx: number = -1; //The index of the active waypoint (to) in the flightplan
@@ -148,6 +154,7 @@ export class ActiveWaypoint {
         const legs = this.fpl0.getLegs();
         this.to = legs[fplIdx]; //We need to keep the meta information like the suffix
         CACHED_CIRCLE.setAsGreatCircle(from, this.to.wpt);
+        this.fromPlanLeg = null;
 
         this.isDirectTo = true;
         this.setActiveIdx(fplIdx);
@@ -169,6 +176,7 @@ export class ActiveWaypoint {
         } else {
             this.to = {wpt: to, type: KLNLegType.USER};
         }
+        this.fromPlanLeg = null;
         this.isDirectTo = true;
         this.setActiveIdx(fplIdx);
         this.saveLastActiveWaypoint();
@@ -294,7 +302,7 @@ export class ActiveWaypoint {
             this.clearTurnState();
             //A turn circle is still flown onto the next leg. #406: the abeam turn becomes its run-out on the next leg,
             //which keeps the alert on until the abeam line of its waypoint on that leg (TurnStackEntry.runOut). A run-out
-            //stands for the leg that was active when it was made, so it goes at the next change of the active index, also
+            //stands for the leg that was active when it was made, so it goes at the next change of the active leg, also
             //at a sequencing without a turn of its own, where it would show the old leg's DTK and XTK (the design's
             //call, not flown in the trainer). A Direct To, an activation and a power-on clear the stack anyway
             //(clearTurnStack)
@@ -413,6 +421,7 @@ export class ActiveWaypoint {
     private flag(): null {
         this.setActiveIdx(-1);
         this.from = null;
+        this.fromPlanLeg = null;
         this.to = null;
         this.isDirectTo = false;
         this.saveLastActiveWaypoint();
@@ -422,7 +431,8 @@ export class ActiveWaypoint {
 
     private setFplData(idx: number): KLNFlightplanLeg {
         const legs = this.fpl0.getLegs();
-        this.from = this.fromLegOf(legs[idx - 1], legs[idx]);
+        this.fromPlanLeg = legs[idx - 1];
+        this.from = this.fromLegOf(this.fromPlanLeg, legs[idx]);
         this.to = legs[idx];
         this.isDirectTo = false;
         this.saveLastActiveWaypoint();
@@ -496,8 +506,72 @@ export class ActiveWaypoint {
             return;
         }
 
-        //The user must have modified the flightplan if to does not match the index anymore
+        //#440: an edit in front of the active waypoint (the design,
+        //docs/superpowers/specs/2026-10-29-turn-plan-decision-design.md, section 3.3). An insert into a full FPL 0 deletes
+        //waypoints from the front first (#148), and both edits go through the same rule, by analogy (the design's call, not
+        //flown in the trainer); roomSteps never deletes the from waypoint
+        const idx = legs.indexOf(this.to);
+        if (idx >= 1 && legs[idx - 1] === this.fromPlanLeg) {
+            //The from and the active waypoint are still neighbors: the edit was in front of them
+            this.followActiveLeg(legs, idx);
+            return;
+        }
+        if (idx >= 2 && legs[idx - 2] === this.fromPlanLeg) {
+            //One waypoint inserted between the from and the active waypoint
+            this.activateInsertedLeg(legs, idx - 1);
+            return;
+        }
+
+        //The from waypoint is gone: 3e, deleting the from waypoint activates the closest leg (checked in the KLN 89 trainer,
+        //2026-10-28, before and during a turn). The active waypoint gone, or more than one leg inserted between the from and
+        //the active waypoint in one edit, take the closest leg too (the design's call, section 3.3). Through the pages a
+        //waypoint is inserted one at a time and each insert is seen on its own, so only a batch edit (a procedure load, the
+        //EFB loader) reaches the second case: a cliff between one inserted leg, which becomes active, and two or more, where
+        //the closest leg is what the unit did before #440 and usually the leg to the first inserted fix anyway
         this.activateFpl0();
+    }
+
+    /**
+     * #440: the active leg moved to `idx` by an edit in front of the from waypoint, and the unit goes on with it (checked in
+     * the KLN 89 trainer, 2026-10-28, docs/kln89-trainer-record.md):
+     * - the plan is kept (3c: an abeam plan with 1.5 NM of cross track, where a new decision would have given the turn
+     *   plan), and so is the waypoint's own started turn (3a'', one pass, medium). While ownTurnStarted the stack holds
+     *   only that turn (startOwnTurn);
+     * - a turn left over from the waypoint just sequenced goes: its alert stopped at once, and line 2 was the cross track
+     *   to the leg (3b, 3b'), so the DTK and XTK follow the active leg again;
+     * - the run-out of an abeam turn (#406) stays, and its alert with it (3d, one pass, medium; there the alert ended
+     *   later than without the edit, which one pass cannot explain and which is not modeled).
+     * The index is set directly, as in the Direct To branch: setActiveIdx would clear the plan and turn the stack into
+     * run-outs. The #408 check of the leg after the active waypoint follows, as there
+     * @param legs the legs of FPL 0
+     * @param idx the new index of the active leg
+     */
+    private followActiveLeg(legs: KLNFlightplanLeg[], idx: number): void {
+        this.fplIdx = idx;
+        if (!this.ownTurnStarted) {
+            this.turnStack = this.turnStack.filter(entry => entry.isRunOut);
+        }
+        this.publisher.pub("activeWaypointChanged", this.fplIdx);
+        this.assertFollowingLegUnchanged(legs);
+    }
+
+    /**
+     * #440: a waypoint was inserted between the from waypoint and the active one. It becomes the active waypoint, from the
+     * same from waypoint, however far away it is (checked in the KLN 89 trainer, 2026-10-28, 3f: 138 NM away). The active
+     * leg changes, so the plan is cleared as at any activation. A turn left over from the previous waypoint was made onto
+     * the old leg and goes, the run-out of an abeam turn included (as for #442; the design's call, 3f was not flown in a
+     * turn). The old active index is normally the new one, so setActiveIdx alone would leave the turn state: clearTurnStack
+     * clears it
+     * @param legs the legs of FPL 0
+     * @param idx the index of the inserted leg
+     */
+    private activateInsertedLeg(legs: KLNFlightplanLeg[], idx: number): void {
+        this.setActiveIdx(idx);
+        this.clearTurnStack();
+        this.to = legs[idx];
+        this.from = this.fromLegOf(this.fromPlanLeg!, this.to);
+        this.saveLastActiveWaypoint();
+        this.publisher.pub("activeWaypointChanged", this.fplIdx);
     }
 
     /**
@@ -505,7 +579,8 @@ export class ActiveWaypoint {
      * waypoint, a delete of the next waypoint and a procedure load that replaces the next leg all change it, an edit
      * further down the plan does not (the design, docs/superpowers/specs/2026-10-27-sequencing-406-407-408-design.md,
      * section 3). A Direct To to a waypoint of FPL 0 is checked the same way, after its target index has followed the
-     * edit (the design's call, not flown in the trainer)
+     * edit (the design's call, not flown in the trainer), and so is an active leg that followed an edit in front of it
+     * (#440, followActiveLeg)
      * @param legs the legs of FPL 0
      */
     private assertFollowingLegUnchanged(legs: KLNFlightplanLeg[]): void {

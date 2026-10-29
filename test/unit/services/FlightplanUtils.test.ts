@@ -372,23 +372,27 @@ describe('mayAddWaypointBefore, the en-route legs (characterization)', () => {
 });
 
 // 4-10, 4-11: a Direct To to a waypoint of the plan resumes the plan behind it. Adding a waypoint in front of the
-// target shifts its index. A leg-mode plan and the direct-to both follow the shift.
-// Checked in the KLN 89 trainer: the direct-to follows its target to the new index.
+// target shifts its index, and the direct-to follows the shift. Checked in the KLN 89 trainer: the direct-to follows its
+// target to the new index. In leg mode a waypoint added between the from waypoint and the active one becomes the active
+// one instead (checked in the KLN 89 trainer, 2026-10-28, 3f; #440)
 describe('ActiveWaypoint after a leg is inserted in front of the active waypoint', () => {
-    // On the line A to B, 10 NM from A, so the leg-mode aircraft stays on the leg when this waypoint is added
+    // On the line A to B, 10 NM from A
     const f = pointFrom(A, 90, 10);
     const F = intersection('FFFFF', f.lat, f.lon);
 
-    it('follows the shifted index in leg mode', () => {
+    // #440: by the rule of 3f (its new waypoint lay 138 NM off to the side) also behind the aircraft, which is 7 NM before
+    // B and so past F; by position the leg F to B would be active
+    it('makes the waypoint inserted between the from waypoint and the active one active in leg mode (by the rule of the KLN 89 trainer\'s 3f; #440)', () => {
         const {fpl0, aw} = build([A, B, C, D].map(user), pointFrom(B, 270, 7));
         aw.activateFpl0();
         expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
 
         fpl0.insertLeg(1, user(F));
 
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
-        expect(aw.getActiveFplIdx()).toBe(2);
-        expect(identsOf(aw.getFutureLegs())).toEqual(['ABC', 'DEF', 'GHI']);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('FFFFF');
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('KAAA');
+        expect(identsOf(aw.getFutureLegs())).toEqual(['FFFFF', 'ABC', 'DEF', 'GHI']);
     });
 
     it('keeps a direct-to to a waypoint of the plan in the plan (#149)', () => {

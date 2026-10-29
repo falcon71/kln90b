@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {EventBus, Facility, GeoCircle, GeoPoint, UnitType} from '@microsoft/msfs-sdk';
-import {ActiveWaypoint, TurnPlan, TurnStackEntry} from '../../../../kln90b/data/flightplan/ActiveWaypoint';
+import {ActiveWaypoint, ActiveWaypointChangedEvents, TurnPlan, TurnStackEntry} from '../../../../kln90b/data/flightplan/ActiveWaypoint';
 import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType} from '../../../../kln90b/data/flightplan/Flightplan';
 import {ArcData} from '../../../../kln90b/data/navdata/SidStar';
 import {KLN90BUserSettings} from '../../../../kln90b/settings/KLN90BUserSettings';
@@ -21,13 +21,13 @@ function activeWaypointOver(legs: KLNFlightplanLeg[], position: { lat: number; l
     return activeWaypointWith(legs, position).aw;
 }
 
-/** The same, with the settings and FPL 0 the ActiveWaypoint works on, for tests that read or edit them */
+/** The same, with the settings, FPL 0 and the bus the ActiveWaypoint works on, for tests that read or edit them */
 function activeWaypointWith(legs: KLNFlightplanLeg[], position: { lat: number; lon: number }) {
     const bus = new EventBus();
     const settings = new KLN90BUserSettings(bus);
     const sensors = {in: {gps: {coords: new GeoPoint(position.lat, position.lon)}}} as unknown as Sensors;
     const fpl = new Flightplan(0, legs, bus);
-    return {aw: new ActiveWaypoint(bus, settings, sensors, fpl, null), settings, fpl};
+    return {aw: new ActiveWaypoint(bus, settings, sensors, fpl, null), settings, fpl, bus};
 }
 
 // An open box of invented waypoints: B is 40 NM east of A, C 40 NM north of B, D 40 NM west of C
@@ -299,23 +299,6 @@ describe('ActiveWaypoint direct-to flows', () => {
 
         expect(settings.getSetting('activeWaypoint').get()).toBe('VK1        DEF     ');
         expect(aw.lastactiveWaypoint!.icaoStruct.ident).toBe('DEF');
-    });
-
-    // characterization (#41 rule): after an edit the active leg is found again by position, not kept as the same leg.
-    // XXX goes into the active leg B-C, 30 NM past B on the line and beyond the aircraft (20 NM past B), so the aircraft is
-    // now on B-XXX: by position the leg is B-XXX (index 2); keeping the old leg would keep C at its shifted index 3
-    it('characterization: an edit inside the active leg re-activates the leg the aircraft is on', () => {
-        const position = pointFrom(B, 0, 20); // on the leg B-C
-        const {aw, fpl} = activeWaypointWith([A, B, C, D].map(user), position);
-        aw.activateFpl0();
-        expect(aw.getActiveFplIdx()).toBe(2); // Precondition: DEF is active
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('DEF');
-        const xPos = pointFrom(B, 0, 30);
-        fpl.insertLeg(2, user(vor('XXX', xPos.lat, xPos.lon)));
-
-        expect(aw.getActiveFplIdx()).toBe(2);
-        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('XXX');
-        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('ABC');
     });
 });
 
@@ -639,5 +622,214 @@ describe('ActiveWaypoint.onArcEntryMoved on the entry of the active arc (6-17, #
 
         expect(aw.getFromWpt()).toBe(origin);
         expect(aw.getFromLeg()).toBe(from);
+    });
+});
+
+// #440: an edit in front of the active waypoint moves the active leg to another index (the design,
+// docs/superpowers/specs/2026-10-29-turn-plan-decision-design.md, section 3.3; checked in the KLN 89 trainer, 2026-10-28)
+describe('ActiveWaypoint through an edit in front of the active waypoint (#440)', () => {
+    /** A turn entry of no particular geometry: the tests only follow the objects */
+    const anyTurn = () => {
+        const circle = GeoCircle.createGreatCircle(A, B);
+        return new TurnStackEntry(circle, new GeoPoint(B.lat, B.lon), circle);
+    };
+
+    /** The run-out of an abeam turn at ABC onto the leg to DEF (#406) */
+    const runOut = () => TurnStackEntry.runOut(TurnStackEntry.abeamTurn(B, GeoCircle.createGreatCircle(B, C), 'left'));
+
+    /**
+     * The open box A B C D with the aircraft 20 NM along the leg B - C: DEF is active from ABC. Records the indexes the
+     * activeWaypointChanged event publishes
+     */
+    function activeOnBC() {
+        const position = pointFrom(B, 0, 20);
+        const {aw, fpl, bus, settings} = activeWaypointWith([A, B, C, D].map(user), position);
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(2); // Precondition: DEF is active, from ABC
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('ABC');
+        const published: number[] = [];
+        bus.getSubscriber<ActiveWaypointChangedEvents>().on('activeWaypointChanged').handle(idx => published.push(idx));
+        published.length = 0; // a subscription may replay the last value
+        return {aw, fpl, settings, published, position};
+    }
+
+    // 3a'': the own started turn and the plan stay, and the FROM is the same object
+    it("keeps the own started turn, the plan and the FROM when a waypoint in front of the FROM is deleted (KLN 89 trainer, 3a'')", () => {
+        const {aw, fpl, published} = activeOnBC();
+        const rollIn = anyTurn();
+        const circle = anyTurn();
+        aw.startOwnTurn(rollIn, circle);
+        aw.turnPlan = TurnPlan.AT_LEAD;
+        const from = aw.getFromLeg();
+
+        fpl.deleteLeg(0);
+
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('DEF');
+        expect(aw.getFromLeg()).toBe(from);
+        expect(aw.isDctNavigation()).toBe(false);
+        expect(aw.ownTurnStarted).toBe(true);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
+        expect(aw.turnStack).toHaveLength(2);
+        expect(aw.turnStack[0]).toBe(rollIn);
+        expect(aw.turnStack[1]).toBe(circle);
+        expect(published).toEqual([1]);
+    });
+
+    // 3b, 3b': a turn circle left over from the waypoint just sequenced goes; 3c: the plan stays
+    it("drops a turn circle left over from the previous waypoint and keeps the plan (KLN 89 trainer, 3b, 3b', 3c)", () => {
+        const {aw, fpl} = activeOnBC();
+        aw.turnStack.push(anyTurn(), anyTurn());
+        aw.turnPlan = TurnPlan.AT_ABEAM;
+
+        fpl.deleteLeg(0);
+
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.turnStack).toEqual([]);
+        expect(aw.ownTurnStarted).toBe(false);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_ABEAM);
+    });
+
+    // 3d: the run-out of a zero-size abeam turn stays (one pass, medium)
+    it('keeps the run-out of an abeam turn of the previous waypoint (KLN 89 trainer, 3d)', () => {
+        const {aw, fpl} = activeOnBC();
+        const kept = runOut();
+        aw.turnStack.push(kept);
+
+        fpl.deleteLeg(0);
+
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.turnStack).toHaveLength(1);
+        expect(aw.turnStack[0]).toBe(kept);
+    });
+
+    // 3f: an insert in front of the FROM changed nothing of the active leg
+    it('follows the active leg when a waypoint is inserted in front of the FROM (KLN 89 trainer, 3f)', () => {
+        const {aw, fpl, published} = activeOnBC();
+        aw.turnPlan = TurnPlan.AT_LEAD;
+        const from = aw.getFromLeg();
+
+        fpl.insertLeg(1, user(vor('XXX', 46.5, 8.5)));
+
+        expect(aw.getActiveFplIdx()).toBe(3);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('DEF');
+        expect(aw.getFromLeg()).toBe(from);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
+        expect(published).toEqual([3]);
+    });
+
+    // #408: the leg after the active waypoint is checked once the index has followed, as for a Direct To. Here one batch
+    // deletes a waypoint in front and the waypoint after the active one: the own turn and a lead plan go
+    it('checks the leg after the active waypoint once the index has followed (#408)', () => {
+        const {aw, fpl} = activeOnBC();
+        aw.startOwnTurn(anyTurn());
+        aw.turnPlan = TurnPlan.AT_LEAD;
+
+        fpl.deleteLeg(0);
+        fpl.deleteLeg(2); // GHI, now after DEF at index 1
+
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.ownTurnStarted).toBe(false);
+        expect(aw.turnStack).toEqual([]);
+        expect(aw.turnPlan).toBeNull();
+    });
+
+    // 3f: the inserted waypoint became the active one from the FROM, although it was 138 NM away. XXX goes 100 NM east of
+    // B, between ABC and DEF: by position the closest leg is XXX - DEF (about 18 NM from the aircraft, against 20 NM for
+    // the legs through B and C), which would make DEF active from XXX. The old leg's index is the new leg's, so the turn
+    // state must be cleared although the index stays
+    it('makes a waypoint inserted between the FROM and the TO active, from the FROM, and clears the turn state (KLN 89 trainer, 3f)', () => {
+        const {aw, fpl, settings, published} = activeOnBC();
+        aw.turnStack.push(anyTurn());
+        aw.startOwnTurn(anyTurn());
+        aw.turnPlan = TurnPlan.AT_ABEAM;
+        const xPos = pointFrom(B, 90, 100);
+
+        fpl.insertLeg(2, user(vor('XXX', xPos.lat, xPos.lon)));
+
+        expect(aw.getActiveFplIdx()).toBe(2);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('XXX');
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(aw.isDctNavigation()).toBe(false);
+        // The path is the great circle ABC - XXX: a point 50 NM east of B lies on it
+        expect(Math.abs(aw.getFromLeg()!.path.distance(pointFrom(B, 90, 50)))).toBeLessThan(NM(0.01));
+        expect(aw.turnStack).toEqual([]);
+        expect(aw.ownTurnStarted).toBe(false);
+        expect(aw.turnPlan).toBeNull();
+        expect(aw.getFollowingLeg()!.wpt.icaoStruct.ident).toBe('DEF');
+        expect(settings.getSetting('activeWaypoint').get()).toBe('VK1        XXX     ');
+        expect(published).toEqual([2]);
+    });
+
+    // 3e: deleting the FROM activates the closest leg. Without ABC the legs are KAAA - DEF, about 14 NM from the
+    // aircraft, and DEF - GHI, 20 NM: DEF active from KAAA
+    it('activates the closest leg when the FROM is deleted (KLN 89 trainer, 3e)', () => {
+        const {aw, fpl} = activeOnBC();
+        aw.turnStack.push(runOut());
+        aw.turnPlan = TurnPlan.AT_ABEAM;
+
+        fpl.deleteLeg(1);
+
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('DEF');
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('KAAA');
+        expect(aw.turnStack).toEqual([]);
+        expect(aw.turnPlan).toBeNull();
+    });
+
+    // 3e with the FROM further down the plan: GHI is active from DEF at index 2, and DEF goes, so GHI comes to index 2.
+    // The leg two in front of it (ABC) is not the FROM's, so no insert is assumed between them: without DEF the legs are
+    // KAAA - ABC, 40 NM from the aircraft, and ABC - GHI, about 14 NM: GHI active from ABC
+    it('activates the closest leg when a FROM further down the plan is deleted (KLN 89 trainer, 3e)', () => {
+        const {aw, fpl} = activeWaypointWith([A, B, C, D].map(user), pointFrom(C, 270, 20));
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(3); // Precondition: GHI is active, from DEF
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('DEF');
+        aw.turnStack.push(anyTurn());
+        aw.turnPlan = TurnPlan.AT_LEAD;
+
+        fpl.deleteLeg(2);
+
+        expect(aw.getActiveFplIdx()).toBe(2);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('GHI');
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('ABC');
+        expect(aw.turnStack).toEqual([]);
+        expect(aw.turnPlan).toBeNull();
+    });
+
+    // Two waypoints inserted between the FROM and the TO in one batch are not the 3f case (one waypoint), and the closest
+    // leg is activated (the design, section 3.3). XXX and YYY go 10 and 30 NM north of B, on the active leg B - C: the
+    // aircraft, 20 NM north of B, is on XXX - YYY
+    it('activates the closest leg when two waypoints are inserted between the FROM and the TO in one batch', () => {
+        const {aw, fpl} = activeOnBC();
+        const xPos = pointFrom(B, 0, 10);
+        const yPos = pointFrom(B, 0, 30);
+
+        fpl.insertLeg(2, user(vor('XXX', xPos.lat, xPos.lon)));
+        fpl.insertLeg(3, user(vor('YYY', yPos.lat, yPos.lon)));
+
+        expect(aw.getActiveFplIdx()).toBe(3);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('YYY');
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('XXX');
+    });
+
+    // A Direct To follows its target and keeps its origin; the FPL 0 rule does not apply to it (the design, Review
+    // Focus 5)
+    it('keeps a Direct To to an FPL 0 waypoint when the plan leg before it is deleted', () => {
+        const {aw, fpl, position} = activeOnBC();
+        const origin = fromHere(position);
+        aw.directToFlightplanIndex(origin, 2);
+        const leftover = runOut();
+        aw.turnStack.push(anyTurn(), leftover);
+        aw.turnPlan = TurnPlan.AT_LEAD;
+
+        fpl.deleteLeg(0); // KAAA: ABC, the plan leg the FROM was made from before the Direct To, is now before DEF
+
+        expect(aw.getActiveFplIdx()).toBe(1);
+        expect(aw.isDctNavigation()).toBe(true);
+        expect(aw.getFromWpt()).toBe(origin);
+        expect(aw.turnStack).toHaveLength(2);
+        expect(aw.turnStack[1]).toBe(leftover);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
     });
 });

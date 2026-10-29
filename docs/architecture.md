@@ -494,9 +494,11 @@ Flightplan really is dead simple".
 **`ActiveWaypoint`** (`data/flightplan/ActiveWaypoint.ts`, owned by `VolatileMemory.navPage.activeWaypoint`):
 
 - It holds `from: {wpt, path: GeoCircle}`, `to: KLNFlightplanLeg`, `fplIdx` (-1 means a random direct-to or none),
-  `isDirectTo` and `turnStack: TurnStackEntry[]`. `ownTurnStarted` (the active waypoint's own turn was pushed) and
-  `turnPlan` (`TurnPlan.AT_LEAD`/`AT_ABEAM`, where the turn starts) belong to the active waypoint: they are cleared when
-  the active index changes, by `clearTurnStack()` and by `VolatileMemory.reset`. The turn stack itself survives the
+  `isDirectTo` and `turnStack: TurnStackEntry[]`, and `fromPlanLeg`, the FPL 0 leg the from waypoint was made from (null
+  for a Direct To, #440, below). `ownTurnStarted` (the active waypoint's own turn was pushed) and `turnPlan`
+  (`TurnPlan.AT_LEAD`/`AT_ABEAM`, where the turn starts) belong to the active waypoint: they are cleared when the active
+  leg changes (`setActiveIdx` with a new index), by `clearTurnStack()` and by `VolatileMemory.reset`; an edit in front of
+  the active leg moves its index and keeps them (#440, below). The turn stack itself survives the
   sequencing, because the turn onto the next leg is still being flown; an abeam turn on it becomes its run-out then
   (`TurnStackEntry.runOut`, #406, below).
 - A change of the following leg also resets part of that state (#408). `ActiveWaypoint` remembers the instance of the
@@ -520,8 +522,20 @@ Flightplan really is dead simple".
   plane, as checked against the KLN 89 trainer), `sequenceToNextWaypoint`, `getFutureLegs`/`getDestination` (stop at the
   MAP, 6-20), `getFollowingLeg`, `recalculatePath`, `onArcEntryMoved`.
 - Emits **`activeWaypointChanged`** and persists the active waypoint ICAO to the `activeWaypoint` setting.
-- `assertToMatchesFplIdx()` runs on every getter and compares by **instance** (not ICAO). If the user edited the plan,
-  it re-activates or turns into a random direct-to.
+- `assertToMatchesFplIdx()` runs on every getter and compares by **instance** (not ICAO). When the active leg is no
+  longer at `fplIdx`, the plan was edited:
+    - a Direct To follows its target to the new index, or becomes a random direct-to when the target was deleted;
+    - an edit in front of the from waypoint (`legs[idx - 1]` is still `fromPlanLeg`) follows the active leg
+      (`followActiveLeg`, #440): the index changes, and the from waypoint, the plan and the waypoint's own started turn
+      stay. A turn left over from the waypoint just sequenced is dropped, except the run-out of an abeam turn. Then the
+      #408 check of the following leg runs. Checked in the KLN 89 trainer, 2026-10-28 (3a'', 3b, 3b', 3c, 3d);
+    - one waypoint inserted between the from waypoint and the active one (`legs[idx - 2]` is `fromPlanLeg`) becomes the
+      active waypoint from the same from waypoint, however far away it is (`activateInsertedLeg`, 3f). The leg changed,
+      so the plan and the whole turn stack are cleared, run-out included;
+    - otherwise (the active waypoint or the from waypoint deleted, 3e) `activateFpl0()` picks the closest leg.
+  An insert into a full FPL 0 deletes waypoints from the front first (#148), and the active leg follows both edits by
+  the same rule (the design's call, not flown in the trainer). The design is
+  docs/superpowers/specs/2026-10-29-turn-plan-decision-design.md, section 3.3.
 - **Gotcha:** `CACHED_CIRCLE` is a module-level shared `GeoCircle` that is used as `from.path` for great-circle legs. It
   is mutated in place, so do not keep references expecting it to stay the same.
 
