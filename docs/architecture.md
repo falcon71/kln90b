@@ -495,7 +495,7 @@ Flightplan really is dead simple".
 
 - It holds `from: {wpt, path: GeoCircle}`, `to: KLNFlightplanLeg`, `fplIdx` (-1 means a random direct-to or none),
   `isDirectTo` and `turnStack: TurnStackEntry[]`. `ownTurnStarted` (the active waypoint's own turn was pushed) and
-  `turnPlan` (`TurnPlan.AT_LEAD`/`AT_ABEAM`, the decided turn start) belong to the active waypoint: they are cleared when
+  `turnPlan` (`TurnPlan.AT_LEAD`/`AT_ABEAM`, where the turn starts) belong to the active waypoint: they are cleared when
   the active index changes, by `clearTurnStack()` and by `VolatileMemory.reset`. The turn stack itself survives the
   sequencing, because the turn onto the next leg is still being flown; an abeam turn on it becomes its run-out then
   (`TurnStackEntry.runOut`, #406, below).
@@ -571,12 +571,19 @@ sim.
       leg's (`segmentDistance`, the measure of `findClosestLegIdx`; for a Direct To the active leg starts where it was
       activated): on the outside of the turn at the abeam line, on the inside at the inside bisector, however far from
       the waypoint. Not at the MAP.
-    - The turn plan (`ActiveWaypoint.turnPlan`, #157, checked in the KLN 89 trainer, 2026-10-20) is decided once, at the
-      first calculation within `TURN_DECISION_TIME` (20 s) of ground speed before the turn point along the track: with
-      at most `TURN_PLAN_MAX_XTK` (2.8 NM) of cross track to the leg `AT_LEAD`, otherwise `AT_ABEAM`. It is latched
-      until the active waypoint changes, and a leg that becomes active past the decision point is decided at once. The
-      gate and the moment of the decision are known with medium confidence. It is also decided off the leg, where it is
-      always `AT_ABEAM`, so an aircraft that comes back on the leg past the decision point turns at the abeam line.
+    - The turn plan (`ActiveWaypoint.turnPlan`, #157, #438, checked in the KLN 89 trainer, 2026-10-20 to 2026-10-29;
+      docs/superpowers/specs/2026-10-29-turn-plan-decision-design.md, section 3.1) follows the cross track to the
+      active leg (`NavCalculator.updateTurnPlan`). There is no decision point: an undecided plan (a new leg, after an
+      activation, a sequencing, a Direct To, or a #408 edit that clears it) is decided in the leg's first calculation,
+      however far the turn point is, `AT_LEAD` with at most `turnPlanGate(gs)` of cross track, otherwise `AT_ABEAM`.
+      The gate is `TURN_PLAN_MAX_XTK_TIME` (83 s) of the ground speed of the calculation, at most `TURN_PLAN_MAX_XTK`
+      (4.9 NM) and at least `TURN_PLAN_MIN_XTK` (1.0 NM, the design's call). From then on `AT_LEAD` becomes `AT_ABEAM`
+      in the first calculation beyond the gate, and `AT_ABEAM` stays. A jump of the position, a GPS fix after a search
+      or an edit of the active waypoint shows up as a new cross track, so it needs no hook. Two calls are the design's:
+      an aircraft that drifts off the leg loses the turn plan beyond the gate (the trainer could not fly this), and a
+      jump that brings an aircraft on the abeam plan within the gate keeps the abeam plan. The plan is updated off the
+      leg too, so at 239 kt a turn plan holds between 4.0 and 4.9 NM and turns at the lead once back on the leg. It is
+      not updated while the waypoint's own turn is flown (`ownTurnStarted`).
     - On `AT_LEAD` the turn starts at the turn point along the track, whatever the cross track is by then.
     - On `AT_ABEAM` it starts at the abeam line (TO turns FROM) as the abeam turn, a turn of no size: one
       `TurnStackEntry` with `abeamTurnSign` set, whose XTK is that sign times the distance to the waypoint (FLY L for a
@@ -630,11 +637,12 @@ sim.
       ends only past the bisector, a turn's normal end comes in or after the calculation that sequences its waypoint.
 - Without turn anticipation, it sequences on FROM.
 - **The MAP is never auto-sequenced.**
-- Waypoint alert thresholds: on the turn plan from the decision, 20 s before the turn point along the track
-  (`WPT_ALERT_WITH_TURN_ANTI`, which `TURN_DECISION_TIME` equals), while the aircraft is TO the waypoint (so it ends
-  past the MAP, where no turn is started); on the abeam plan `WPT_ALERT_ABEAM_TURN` (15 s)
-  before the abeam line at the along-track closure rate, none at the decision (checked in the KLN 89 trainer,
-  2026-10-20); off the leg `WPT_ALERT_OFF_LEG` (36 s) before the abeam line at the closure rate on the outside of the
+- Waypoint alert thresholds: on the turn plan `WPT_ALERT_WITH_TURN_ANTI` (20 s) before the turn point at the
+  along-track closure rate, or once inside the turn point, and not with the plan (#438, checked in the KLN 89 trainer,
+  2026-10-29), while the aircraft is TO the waypoint (so it ends past the MAP, where no turn is started). It is a
+  condition of each calculation, so a #408 edit that moves the turn point more than 20 s away pauses it. On the abeam
+  plan `WPT_ALERT_ABEAM_TURN` (15 s) before the abeam line at the along-track closure rate, none with the plan
+  (checked in the KLN 89 trainer, 2026-10-20); off the leg `WPT_ALERT_OFF_LEG` (36 s) before the abeam line at the closure rate on the outside of the
   turn and none on the inside, where the inside bisector sequences first (#157, checked in the KLN 89 trainer,
   2026-10-20). These two hold only before the abeam line, so they end past the MAP, where nothing is sequenced and no
   turn is started. All stay on while a turn is on the stack, so the alert ends at the end of the turn in use: past the

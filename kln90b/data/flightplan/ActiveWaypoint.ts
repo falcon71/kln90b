@@ -89,8 +89,10 @@ export interface TurnBisector {
 }
 
 /**
- * Where the anticipated turn of the active waypoint starts, decided once per waypoint (the design,
- * docs/superpowers/specs/2026-10-20-waypoint-sequencing-design.md, section 3.3)
+ * Where the anticipated turn of the active waypoint starts (the design,
+ * docs/superpowers/specs/2026-10-20-waypoint-sequencing-design.md, section 3.3). NavCalculator decides it at the first
+ * calculation of the leg and updates it by the cross track from then on (#438, the design,
+ * docs/superpowers/specs/2026-10-29-turn-plan-decision-design.md, section 3.1)
  */
 export enum TurnPlan {
     /** At the lead plus the roll-in before the waypoint */
@@ -126,7 +128,10 @@ export class ActiveWaypoint {
      * bisector, and the turn is not started again once it has ended while the waypoint is still active
      */
     public ownTurnStarted: boolean = false;
-    /** The decided turn plan of the active waypoint, null while undecided */
+    /**
+     * The turn plan of the active waypoint, null until NavCalculator decides it in the first calculation of the leg. It
+     * follows the cross track from then on (#438) and is not changed while the waypoint's own turn is flown
+     */
     public turnPlan: TurnPlan | null = null;
     private publisher: Publisher<ActiveWaypointChangedEvents>;
 
@@ -520,9 +525,8 @@ export class ActiveWaypoint {
      *   at its own lead, at once when the aircraft is already inside it, and sequences at its bisector (a2, a6, a11).
      *   When the active waypoint is now the last one there is no turn, and it gets the alert of a waypoint without one
      *   (a9);
-     * - a plan to turn at the lead is decided again by the normal rule, at the decision point of the new turn or at once
-     *   past it, so the old lead does nothing and the alert pauses when the new turn point is more than 20 s away (a3,
-     *   a4);
+     * - a plan to turn at the lead is decided again by the normal rule, in the next calculation (#438), so the old lead
+     *   does nothing, and the alert, timed to the new turn point, pauses when that is more than 20 s away (a3, a4);
      * - a plan to turn at the abeam line is kept (a8, a16): there was no turn at the new lead with the aircraft inside it
      *   and only 1.0 to 1.7 NM off. An abeam turn that had started is dropped with the rest of the own turn and starts
      *   again onto the new next leg, the plan being kept and the aircraft past the abeam line;
@@ -561,8 +565,9 @@ export class ActiveWaypoint {
     /**
      * #157: off the leg (more than 4.0 NM from it) the active waypoint has no anticipated turn, so a turn of its own that
      * has started is dropped (the design, docs/superpowers/specs/2026-10-20-waypoint-sequencing-design.md, section 3.2).
-     * While ownTurnStarted the stack holds only that turn, because startOwnTurn replaces the stack. The decided turnPlan
-     * is kept and applies again when the aircraft comes back on the leg
+     * While ownTurnStarted the stack holds only that turn, because startOwnTurn replaces the stack. The turnPlan is kept,
+     * and NavCalculator goes on updating it by the cross track off the leg too (#438): a turn plan applies again when the
+     * aircraft comes back on the leg, unless it went beyond the gate of the turn plan meanwhile
      */
     public dropOwnTurn(): void {
         //A circle on top of the stack was normally popped earlier in the same calculation by its 4.0 NM end

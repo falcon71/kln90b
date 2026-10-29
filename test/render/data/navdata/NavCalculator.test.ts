@@ -656,8 +656,8 @@ describe('the leg-change marker (4-8, #434, #436)', () => {
         expect(records[0].delta).toBeNull();
     });
 
-    // The abeam plan (checked in the KLN 89 trainer, 2026-10-20): 3.5 NM right of the leg at the decision the turn starts
-    // at the abeam line, and the DTK is the next leg's from there. That start is the leg change; the sequencing at the
+    // The abeam plan (checked in the KLN 89 trainer, 2026-10-20): 3.5 NM right of the leg, beyond the gate of 2.77 NM at
+    // 120 kt (#438), the turn starts at the abeam line, and the DTK is the next leg's from there. That start is the leg change; the sequencing at the
     // bisector after it is not
     it('marks the start of the abeam turn, once', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
@@ -904,8 +904,8 @@ describe('no sequencing past the MAP (6-7)', () => {
     // #157: the alerts timed to the abeam line, off the leg (36 s on the outside of the turn) and on the abeam plan (15 s),
     // hold only before the abeam line. Past it a waypoint off the leg on the outside is sequenced and the abeam plan has
     // its abeam turn on the stack, but at the MAP neither happens, so the alert ends there. West of the final is the
-    // outside of the left turn to MAHAA. Placed 3 NM west the aircraft is on the leg with the abeam plan (more than 2.8
-    // NM off at the decision), 5 NM west it is off the leg
+    // outside of the left turn to MAHAA. Placed 3 NM west the aircraft is on the leg with the abeam plan (beyond the gate
+    // of 2.77 NM at 120 kt, #438), 5 NM west it is off the leg
     for (const {westNm, alertBeforeNm, regime} of [
         {westNm: 5, alertBeforeNm: 1.0, regime: 'off the leg'}, // 30 s before the abeam line at 120 kt, within 36 s
         {westNm: 3, alertBeforeNm: 0.4, regime: 'on the abeam plan'}, // 12 s, within 15 s
@@ -1212,11 +1212,11 @@ describe('a NAV flag and a power-up keep the CDI scale (characterization, #159)'
 
 // 5-33 (item 3): in flight plan operation the next leg becomes active as the aircraft reaches a waypoint; 4-8: with turn
 // anticipation it sequences after the midpoint of the transition. Held positions along a line parallel to the leg, 1.5 NM
-// right of it. With turn anticipation the unit decides on the turn plan once the aircraft is past the decision point (20 s
-// before the turn point along the track), because 1.5 NM is within 2.8 NM of the leg, starts the turn at the turn point
-// along the track and sequences past the bisector of the turn, about 0.5 NM past abeam (checked in the KLN 89 trainer,
-// 2026-10-20, #157). Before that, the straight distance to ABC never came within the alert range of the turn
-// (about 1 NM at 120 kt), and the waypoint was never sequenced.
+// right of it. With turn anticipation the unit decides on the turn plan in its first calculation, because 1.5 NM is
+// within the gate of 2.77 NM at 120 kt (#438), starts the turn at the turn point along the track and sequences past the
+// bisector of the turn, about 0.5 NM past abeam (checked in the KLN 89 trainer, 2026-10-20, #157). Before that, the
+// straight distance to ABC never came within the alert range of the turn (about 1 NM at 120 kt), and the waypoint was
+// never sequenced.
 describe('passing a waypoint off course', () => {
     const abeamPositions = async (unit: HeadlessUnit, kaaa: Facility, abc: Facility) => {
         const leg1 = finalCourseDeg(kaaa, abc);

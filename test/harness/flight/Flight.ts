@@ -6,7 +6,7 @@ import {HEADING_INPUT, panelXml} from '../panelXml';
 import {Aircraft, AircraftInit, AircraftOptions} from './Aircraft';
 import {coupledAutopilot, Pilot} from './pilots';
 import {World} from './World';
-import {distanceNm} from './geo';
+import {distanceNm, LatLon} from './geo';
 import {FlightRecorder} from './Recorder';
 import {FrontPanel} from './FrontPanel';
 
@@ -218,6 +218,16 @@ export class Flight {
         // The jumped time is already covered by moveAlongTrack
         this.lastPhysicsMs = Date.now();
         await this.fly(1);
+    }
+
+    /**
+     * Moves the aircraft to `pos` at once, as a slew or a position set in the sim does: track, speed and altitude stay,
+     * no time passes and no tick runs, so the next tick reads the new position.
+     */
+    public teleport(pos: LatLon): void {
+        this.aircraft.lat = pos.lat;
+        this.aircraft.lon = pos.lon;
+        this.aircraft.writeTo(this.sim, this.world.magvar(pos.lat, pos.lon));
     }
 
     private installLoops(): void {

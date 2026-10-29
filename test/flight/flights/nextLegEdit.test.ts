@@ -24,8 +24,11 @@ const rollInNm = (gs: number) => bankDeg(gs) / 5 * gs / 3600;
 const leadNm = (gs: number, turnDeg: number) => gs ** 2 / (11.26 * Math.tan(bankDeg(gs) * DEG)) / 6076.12 * Math.tan(turnDeg / 2 * DEG);
 /** The turn point: the along-track distance before the waypoint at which the turn of the turn plan starts */
 const turnPoint = (turnDeg: number) => leadNm(GS, turnDeg) + rollInNm(GS);
-/** The decision point: 20 s of ground speed before the turn point, where the alert of the turn plan starts (4-8) */
-const decisionPoint = (turnDeg: number) => turnPoint(turnDeg) + GS * 20 / 3600;
+/**
+ * Where the alert of the turn plan starts on course: 20 s of along-track closure before the turn point, which on course
+ * is the ground speed (4-8, #438)
+ */
+const alertPoint = (turnDeg: number) => turnPoint(turnDeg) + GS * 20 / 3600;
 /** One calculation tick (1 s) of flight */
 const TICK_NM = GS / 3600;
 /** The along-track distance measured at the GPS position the last calculation used: the planar measure's tolerance */
@@ -106,30 +109,31 @@ describe('an edit of the leg after the active waypoint (#408)', () => {
         expect(TP_90).toBeCloseTo(0.757, 3);
         expect(TP_30).toBeCloseTo(0.292, 3);
         expect(turnPoint(120)).toBeCloseTo(1.222, 3);
-        expect(decisionPoint(30)).toBeCloseTo(0.959, 3);
+        expect(alertPoint(30)).toBeCloseTo(0.959, 3);
     });
 
     it('starts the turn at the new lead when the next leg is changed before the turn (KLN 89 trainer, 2026-10-27, a3, a4)', async () => {
         const {flight, aw, spr} = await boot();
         await flight.flyUntil(() => alongBefore(flight.aircraft) <= 1.3, {timeout: 600, description: '1.3 NM before ABC'});
-        // Preconditions: the alert of the 90° turn is on (its decision point is 1.42 NM before ABC), no turn has started
+        // Preconditions: the alert of the 90° turn is on (it starts 1.42 NM before ABC), no turn has started
         expect(flight.nav.waypointAlert).toBe(true);
         expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
         expect(turnStackLength(flight.unit)).toBe(0);
 
         insertLeg(flight.unit, 2, spr);
         await flight.fly(1);
-        // The new turn point is about 1.0 NM away, 30 s at 120 kt: more than the 20 s of the alert, which pauses (a3, a4)
+        // The new turn point is about 1.0 NM away, 30 s at 120 kt: more than the 20 s of the alert, which pauses (a3, a4).
+        // The plan is decided again at once, the turn plan on course; its alert is a condition of each calculation (#438)
         expect(flight.nav.activeIdent).toBe('ABC');
         expect(flight.nav.waypointAlert).toBe(false);
         expect(turnStackLength(flight.unit)).toBe(0);
 
-        // It comes back at the new decision point, within the calculation tick after it, measured at the GPS position
+        // It comes back 20 s before the new turn point, within the calculation tick after it, measured at the GPS position
         await flight.flyUntil(() => flight.nav.waypointAlert || turnStackLength(flight.unit) > 0, {timeout: 60, description: 'the alert at ABC again'});
         expect(turnStackLength(flight.unit)).toBe(0);
         const alertAlong = gpsAlongBefore(flight);
-        expect(alertAlong).toBeGreaterThanOrEqual(decisionPoint(30) - TICK_NM - GPS_TOLERANCE_NM);
-        expect(alertAlong).toBeLessThanOrEqual(decisionPoint(30) + GPS_TOLERANCE_NM);
+        expect(alertAlong).toBeGreaterThanOrEqual(alertPoint(30) - TICK_NM - GPS_TOLERANCE_NM);
+        expect(alertAlong).toBeLessThanOrEqual(alertPoint(30) + GPS_TOLERANCE_NM);
 
         // The old lead does nothing: the turn starts at the 30° turn point, not at the 90° one
         await expectTurnStartAt(flight, TP_30);
@@ -234,14 +238,14 @@ describe('an edit of the leg after the active waypoint (#408)', () => {
 
     // The ruling on the brief: the original next leg and the inserted one both turn right (KBBB on 150, a 60° turn, SPB
     // on 210, a 120° turn), and the aircraft passes ABC north of the inbound leg, outside both turns, as in a8 (132° right,
-    // then 150° right). It converges at 80° to the leg, 3.5 NM north of it at the decision point of the 60° turn (1.16 NM
-    // before ABC), above the 2.8 NM of the turn plan: the abeam plan. At 0.8 NM before ABC it turns onto the inbound course
-    // about 1.5 NM north of the leg, and SPB is inserted there: inside SPB's turn point (1.22 NM) and below the 2.8 NM, so
+    // then 150° right). It converges at 80° to the leg from 12 NM north of it, beyond the gate of the turn plan (2.77 NM
+    // at 120 kt): the abeam plan from the first calculation (#438). At 0.8 NM before ABC it turns onto the inbound course
+    // about 1.5 NM north of the leg, and SPB is inserted there: inside SPB's turn point (1.22 NM) and within the gate, so
     // that a plan decided again at the edit would turn at once (a8: 1.7 NM off, al 0.70)
     it('keeps the abeam plan when the next leg is changed (KLN 89 trainer, 2026-10-27, a8, a16)', async () => {
         const {flight, aw, spb, spr} = await bootAbeamPass();
 
-        await flight.flyUntil(() => alongBefore(flight.aircraft) <= ABEAM_TURN_AT - 0.02, {timeout: 120, description: '0.8 NM before ABC'});
+        await flight.flyUntil(() => alongBefore(flight.aircraft) <= ABEAM_TURN_AT - 0.02, {timeout: 600, description: '0.8 NM before ABC'});
         const xtkNorth = -crossTrackNm(flight.aircraft, ABC_POS, 90);
         expect(xtkNorth, 'north of the leg, below 1.7 NM at the edit').toBeLessThan(1.7);
         expect(xtkNorth).toBeGreaterThan(0.5);
@@ -288,7 +292,7 @@ describe('an edit of the leg after the active waypoint (#408)', () => {
     // the leg, on 090) reaches the bisector of the 60° turn, the ray 030 about 0.6 NM past the abeam line
     it("starts an abeam turn that had started again onto the new next leg (the design's call, not flown in the trainer)", async () => {
         const {flight, aw, spb} = await bootAbeamPass();
-        await flight.flyUntil(() => turnStackLength(flight.unit) > 0 || flight.nav.activeIdent !== 'ABC', {timeout: 300, description: 'the abeam turn at ABC'});
+        await flight.flyUntil(() => turnStackLength(flight.unit) > 0 || flight.nav.activeIdent !== 'ABC', {timeout: 600, description: 'the abeam turn at ABC'});
         expect(flight.nav.activeIdent).toBe('ABC');
         expect(Math.abs(alongBefore(flight.aircraft))).toBeLessThan(0.07); // Precondition: at the abeam line
         await flight.fly(2);
@@ -394,22 +398,17 @@ const ABEAM_TURN_AT = 0.8;
 
 /**
  * The abeam pass of the ruling on the brief: FPL 0 is KAAA ABC KBBB with KBBB on 150 from ABC (a 60° right turn). The
- * aircraft converges on 170, 80° to the leg, on the line that is 3.5 NM north of it at the decision point of that turn
- * (1.16 NM before ABC), 12 NM north of the leg at the start, and turns onto the inbound course 090 at ABEAM_TURN_AT. It
- * returns once the abeam plan is decided, with the cross track there checked
+ * aircraft converges on 170, 80° to the leg, on the line that is 3.5 NM north of it 1.16 NM before ABC, from 12 NM north
+ * of the leg, beyond the gate of the turn plan (2.77 NM at 120 kt), and turns onto the inbound course 090 at
+ * ABEAM_TURN_AT. It returns once the abeam plan is decided, in the first calculation (#438)
  */
 async function bootAbeamPass() {
     const course = 170;
-    const dp = decisionPoint(60);
     const startNorth = 12;
-    const startAlong = dp + (startNorth - 3.5) * Math.tan(10 * DEG);
+    const startAlong = alertPoint(60) + (startNorth - 3.5) * Math.tan(10 * DEG);
     const start = pointFrom(pointFrom(ABC_POS, 270, startAlong), 0, startNorth);
     const booted = await boot({withKccc: false, kbbbCourse: 150, start, trackTrue: course, pilot: trackPilot(ABEAM_TURN_AT, course, 90)});
-    const {flight, aw} = booted;
-    await flight.flyUntil(() => alongBefore(flight.aircraft) <= dp, {timeout: 600, description: 'the decision point of ABC'});
-    await flight.fly(1);
-    expect(Math.abs(crossTrackNm(flight.aircraft, ABC_POS, 90) + 3.5), 'about 3.5 NM north at the decision').toBeLessThan(0.15);
-    expect(aw.turnPlan).toBe(TurnPlan.AT_ABEAM);
+    expect(booted.aw.turnPlan).toBe(TurnPlan.AT_ABEAM);
     return booted;
 }
 

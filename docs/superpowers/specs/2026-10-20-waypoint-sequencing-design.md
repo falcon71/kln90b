@@ -79,6 +79,11 @@ flown. (The trainer evidence for this case is a single re-initialization, run A;
 
 ### 3.2 On the leg or off the leg
 
+Note (2026-10-29): the "off to on" decision below is superseded by
+[2026-10-29-turn-plan-decision-design.md](2026-10-29-turn-plan-decision-design.md), section 3.1 (#438): the plan is
+decided at the leg's first calculation and follows the cross track, so a lead plan holds off the leg up to the gate
+(4.9 NM at 239 kt).
+
 Every calculation tick the unit compares |XTK| to the **active leg** (the leg's own path, not a turn circle) against a
 fixed **4.0 NM**. Not latched: the regime can change from one tick to the next (in the trainer it changed 20 s before
 the abeam line). The threshold is the same at every speed, turn angle and mode; the trainer cannot show whether it
@@ -97,6 +102,9 @@ What a flip does to a turn already in progress (the maintainer's lead's calls; t
   back; it is cleared when the active waypoint changes.
 
 ### 3.3 On the leg: |XTK| ≤ 4.0 NM
+
+Note (2026-10-29): the decision of the plan below is superseded by
+[2026-10-29-turn-plan-decision-design.md](2026-10-29-turn-plan-decision-design.md), section 3.1 (#438).
 
 - **The decision.** The unit decides once where the turn will start, and keeps that decision until the active
   waypoint changes (latched: in T7, T11 and T13 the cross track fell to 0.7 to 0.9 NM later and the unit still waited
@@ -136,6 +144,9 @@ the inside it is the bisector, however far away (11 NM in the trainer). `ActiveW
 measures this distance, including DME arcs; reuse it rather than a second implementation.
 
 ### 3.5 The waypoint alert
+
+Note (2026-10-29): the turn plan's alert below is superseded by
+[2026-10-29-turn-plan-decision-design.md](2026-10-29-turn-plan-decision-design.md), section 3.1 (#438).
 
 - On the turn plan: from the decision point, about 20 s before the turn start, as today (4-8; the trainer's 21 to 24 s
   lies within its flash timing).

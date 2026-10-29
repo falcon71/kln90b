@@ -3,7 +3,7 @@ import {Sensors} from "../../Sensors";
 import {FROM, TO, VolatileMemory} from "../VolatileMemory";
 import {FlightPathUtils, GeoCircle, GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
-import {Degrees, NauticalMiles, Seconds} from "../Units";
+import {Degrees, Knots, NauticalMiles, Seconds} from "../Units";
 import {ModeController} from "../../services/ModeController";
 import {KLNFixType, KLNFlightplanLeg} from "../flightplan/Flightplan";
 import {KLNMagvar} from "./KLNMagvar";
@@ -37,22 +37,38 @@ export const MAX_BANK_ANGLE = 25;
 export const OFF_LEG_XTK: NauticalMiles = 4.0;
 
 /**
- * The unit decides where an anticipated turn starts (ActiveWaypoint.turnPlan) this long before the turn point, at the
- * ground speed: where the waypoint alert of a turn flown on course is due (4-8). Checked in the KLN 89 trainer, 2026-10-20:
- * the moment is known to a few seconds
+ * #438: the gate of the turn plan grows with the ground speed. Up to this long of it in cross track to the leg the turn
+ * starts at the lead (TurnPlan.AT_LEAD), beyond it at the abeam line (TurnPlan.AT_ABEAM). Checked in the KLN 89 trainer,
+ * 2026-10-28 and 2026-10-29: lead with 1.30 NM and abeam with 1.48 at 60 kt, lead with 2.7 and abeam with 2.8 at 119 kt,
+ * a bracket of 82 to 85 s
  */
-export const TURN_DECISION_TIME: Seconds = WPT_ALERT_WITH_TURN_ANTI;
+export const TURN_PLAN_MAX_XTK_TIME: Seconds = 83;
 
 /**
- * Up to this cross track to the leg at the decision the turn starts at the lead (TurnPlan.AT_LEAD), beyond it at the
- * abeam line (TurnPlan.AT_ABEAM). Checked in the KLN 89 trainer, 2026-10-20, with medium confidence: the gate lies
- * between 2.69 and 2.93 NM, the same at 119 and 239 kt
+ * #438: the cap of the turn plan's gate. Checked in the KLN 89 trainer, 2026-10-29: lead with 4.8 and abeam with 5.0 NM
+ * at 239 kt. A cap of 5.0 NM with a strict comparison fits as well
  */
-export const TURN_PLAN_MAX_XTK: NauticalMiles = 2.8;
+export const TURN_PLAN_MAX_XTK: NauticalMiles = 4.9;
+
+/**
+ * #438: the floor of the turn plan's gate. It keeps the gate above the 1.0 NM below which the abeam plan becomes the turn
+ * plan (the design, docs/superpowers/specs/2026-10-29-turn-plan-decision-design.md, section 3.2), so that below about
+ * 43 kt, on the ground included, the plan cannot flip at every check (the design's call)
+ */
+export const TURN_PLAN_MIN_XTK: NauticalMiles = 1.0;
+
+/**
+ * #438: the cross track to the active leg up to which the active waypoint takes the turn plan: TURN_PLAN_MAX_XTK_TIME of
+ * the ground speed, at least TURN_PLAN_MIN_XTK and at most TURN_PLAN_MAX_XTK
+ * @param groundspeed the ground speed of the calculation
+ */
+export function turnPlanGate(groundspeed: Knots): NauticalMiles {
+    return Math.min(Math.max(groundspeed * TURN_PLAN_MAX_XTK_TIME / HOURS_TO_SECONDS, TURN_PLAN_MIN_XTK), TURN_PLAN_MAX_XTK);
+}
 
 /**
  * On the abeam plan the waypoint alert starts this long before the abeam line, at the along-track closure rate, and not
- * at the decision (checked in the KLN 89 trainer, 2026-10-20: 14 to 16 s)
+ * with the plan (checked in the KLN 89 trainer, 2026-10-20: 14 to 16 s)
  */
 export const WPT_ALERT_ABEAM_TURN: Seconds = 15;
 
@@ -185,9 +201,10 @@ export class NavCalculator implements CalcTickable {
                 //distance, off course it is not (checked in the KLN 89 trainer, 2026-10-20)
                 const along = alongTrackDistance(legPath, toLeg.wpt, this.sensors.in.gps.coords);
                 //#157: the cross track to the active leg's own path, not to a turn circle, decides every calculation
-                //whether the aircraft is on the leg or off it (checked in the KLN 89 trainer, 2026-10-20: not latched)
+                //whether the aircraft is on the leg or off it (checked in the KLN 89 trainer, 2026-10-20: not latched).
+                //#438: it also updates the turn plan, on the leg and off it
                 const legXtk = UnitType.GA_RADIAN.convertTo(legPath.distance(this.sensors.in.gps.coords), UnitType.NMILE);
-                this.decideTurnPlan(Math.abs(legXtk), along, turnPoint);
+                this.updateTurnPlan(Math.abs(legXtk));
 
                 if (Math.abs(legXtk) > OFF_LEG_XTK) {
                     this.tickOffLeg(fromLeg, toLeg, followingLeg, legPath, legXtk, along, turnDirection);
@@ -199,7 +216,7 @@ export class NavCalculator implements CalcTickable {
                     //2026-10-20; this replaces the skip of #76)
                     //#375: the waypoint's own turn is started once. A turn that ended while the waypoint is still active is
                     //not started again, which flipped the DTK between the legs every tick. #157: a turn dropped off the leg
-                    //(tickOffLeg) is the exception: it starts again by the kept plan once the aircraft is back on the leg
+                    //(tickOffLeg) is the exception: it starts again by the plan once the aircraft is back on the leg
                     //(the design, section 3.2)
                     //The waypoint's own turn supersedes a turn left over from the previous waypoint once its turn point is
                     //reached by the plan: the leftover entries are dropped (ActiveWaypoint.startOwnTurn). Waiting for the
@@ -240,7 +257,7 @@ export class NavCalculator implements CalcTickable {
                         }
                     }
 
-                    nav.waypointAlert = this.isAlertWithTurn(legPath, along); //Arrow flashes until end of turn and the light remains on until end of turn: https://youtu.be/S1lt2W95bLA?si=C45kt8pik15Iodoy&t=2245
+                    nav.waypointAlert = this.isAlertWithTurn(legPath, along, turnPoint); //Arrow flashes until end of turn and the light remains on until end of turn: https://youtu.be/S1lt2W95bLA?si=C45kt8pik15Iodoy&t=2245
 
                     //#375: sequenced where the aircraft crosses the bisector of the turn, the line through the waypoint that
                     //halves the angle between the legs: on course the middle of the turn, for a big turn well before the
@@ -501,26 +518,42 @@ export class NavCalculator implements CalcTickable {
     }
 
     /**
-     * Decides once where the anticipated turn of the active waypoint starts, at the first calculation with the aircraft
-     * at most TURN_DECISION_TIME of ground speed before the turn point along the track: at the lead (TurnPlan.AT_LEAD)
-     * with at most TURN_PLAN_MAX_XTK of cross track to the leg then, otherwise at the abeam line (TurnPlan.AT_ABEAM). The
-     * decision is latched until the active waypoint changes (ActiveWaypoint.clearTurnState): in the KLN 89 trainer,
-     * 2026-10-20, the cross track fell to 0.7 to 0.9 NM after the decision and the unit still waited for the abeam line.
-     * The gate (2.8 NM, between 2.69 and 2.93 in the trainer) and the moment of the decision are known with medium
-     * confidence. A leg that becomes active past the decision point (a Direct To, a power-up) is decided at once.
-     * #157: the decision is also taken off the leg (more than OFF_LEG_XTK from it), which is then always AT_ABEAM, so that
-     * an aircraft that comes back on the leg past the decision point turns at the abeam line (the trainer's R2 and R6)
+     * #438: where the anticipated turn of the active waypoint starts follows the cross track to the active leg (the
+     * design, docs/superpowers/specs/2026-10-29-turn-plan-decision-design.md, section 3.1). An undecided plan is decided
+     * at once, however far the turn point is: at the lead (TurnPlan.AT_LEAD) with at most turnPlanGate of cross track,
+     * otherwise at the abeam line (TurnPlan.AT_ABEAM). The plan is undecided at the first calculation of a leg: after an
+     * activation, a sequencing, a Direct To, and an edit of the next leg that drops a turn plan (#408). Checked in the
+     * KLN 89 trainer, 2026-10-28 and 2026-10-29: decided at the first calculation of a leg, with no window before the turn
+     * point (every window tried was refuted by a later pass).
+     *
+     * From then on a turn plan becomes the abeam plan in the first calculation beyond the gate, and an abeam plan stays.
+     * The trainer decides again at a re-initialization: a jump of the position, a GPS fix after a search, an edit of the
+     * active waypoint. Each shows up here as a new cross track, and beyond the gate it gives the abeam plan in the same
+     * calculation, as the trainer did. Two calls are the design's, not the trainer's:
+     * - the drift case: an aircraft that leaves the leg in flight, with no re-initialization, loses the turn plan once it
+     *   is beyond the gate. The trainer's take-home flying re-intercepts from any offset, so it could not show this;
+     * - a jump that brings an aircraft on the abeam plan within the gate keeps the abeam plan, where the trainer would
+     *   decide again and take the turn plan. No trainer pass shows this direction.
+     * The alternative to both is the plan latched until the next activation or re-initialization, which needs a hook for
+     * each re-initialization. The gate takes the ground speed of the calculation, so slowing down alone can turn a turn
+     * plan into the abeam plan (the design's call; the trainer flew every pass at a constant speed).
+     *
+     * The plan is also updated off the leg (more than OFF_LEG_XTK from it), where tickOffLeg runs: at 239 kt a turn plan
+     * holds between 4.0 and 4.9 NM, and the turn starts at the lead once the aircraft is back on the leg (checked in the
+     * KLN 89 trainer, 2026-10-28 and 2026-10-29, Y2 and G48). Not once the waypoint's own turn has started: a started turn
+     * is not planned again, whatever the cross track, and only tickOffLeg drops it
      * @param legXtk the absolute cross track to the active leg
-     * @param along the along-track distance to the active waypoint
-     * @param turnPoint the along-track distance at which the turn of the turn plan starts
      */
-    private decideTurnPlan(legXtk: NauticalMiles, along: NauticalMiles, turnPoint: NauticalMiles): void {
+    private updateTurnPlan(legXtk: NauticalMiles): void {
         const activeWaypoint = this.memory.navPage.activeWaypoint;
-        if (activeWaypoint.turnPlan !== null
-            || along > turnPoint + this.sensors.in.gps.groundspeed * TURN_DECISION_TIME / HOURS_TO_SECONDS) {
+        if (activeWaypoint.ownTurnStarted) {
             return;
         }
-        activeWaypoint.turnPlan = legXtk <= TURN_PLAN_MAX_XTK ? TurnPlan.AT_LEAD : TurnPlan.AT_ABEAM;
+        if (activeWaypoint.turnPlan === null) {
+            activeWaypoint.turnPlan = legXtk <= turnPlanGate(this.sensors.in.gps.groundspeed) ? TurnPlan.AT_LEAD : TurnPlan.AT_ABEAM;
+        } else if (activeWaypoint.turnPlan === TurnPlan.AT_LEAD && legXtk > turnPlanGate(this.sensors.in.gps.groundspeed)) {
+            activeWaypoint.turnPlan = TurnPlan.AT_ABEAM;
+        }
     }
 
     /**
@@ -553,7 +586,7 @@ export class NavCalculator implements CalcTickable {
         //The outside of the turn is the side away from it: the right of the leg for a left turn
         const outside = turnDirection === "left" ? legXtk > 0 : legXtk < 0;
         this.memory.navPage.waypointAlert = activeWaypoint.turnStack.length > 0
-            || (outside && this.isWithinTimeOfAbeam(legPath, along, WPT_ALERT_OFF_LEG));
+            || (outside && this.isWithinTimeOfAlong(legPath, along, WPT_ALERT_OFF_LEG));
 
         if (toLeg.fixType === KLNFixType.MAP) { //don't move missed approach waypoint!
             return;
@@ -584,18 +617,19 @@ export class NavCalculator implements CalcTickable {
     }
 
     /**
-     * Whether the aircraft will cross the abeam line of the active waypoint within the time, at the closure rate along
-     * the leg: the ground speed times the cosine of the angle between the track and the leg. False while the aircraft
-     * does not close on the line, and once it is past the line: there the waypoint is sequenced off the leg on the
-     * outside, and the abeam turn is on the stack on the abeam plan, but at the MAP neither happens, and the alert would
-     * otherwise stay on through the whole missed approach (#157)
+     * Whether the aircraft will reach a point ahead on the active leg within the time, at the closure rate along the leg:
+     * the ground speed times the cosine of the angle between the track and the leg. False while the aircraft does not
+     * close on the point, and once it is past it. For the abeam line of the active waypoint (alongToPoint the
+     * along-track distance to the waypoint): past it the waypoint is sequenced off the leg on the outside, and the abeam
+     * turn is on the stack on the abeam plan, but at the MAP neither happens, and the alert would otherwise stay on
+     * through the whole missed approach (#157)
      * @param legPath the path of the active leg
-     * @param along the along-track distance to the active waypoint
+     * @param alongToPoint the along-track distance to the point, negative past it
      * @param time
      */
-    private isWithinTimeOfAbeam(legPath: GeoCircle, along: NauticalMiles, time: Seconds): boolean {
+    private isWithinTimeOfAlong(legPath: GeoCircle, alongToPoint: NauticalMiles, time: Seconds): boolean {
         const track = this.sensors.in.gps.getTrackTrueRespectingGroundspeed();
-        if (track === null || along < 0) {
+        if (track === null || alongToPoint < 0) {
             return false;
         }
         const legDtk = dtkAtClosest(legPath, this.sensors.in.gps.coords);
@@ -603,29 +637,34 @@ export class NavCalculator implements CalcTickable {
             return false;
         }
         const closure = this.sensors.in.gps.groundspeed * Math.cos(UnitType.DEGREE.convertTo(NavMath.diffAngle(legDtk, track), UnitType.RADIAN)) / HOURS_TO_SECONDS;
-        return closure > 0 && along / closure <= time;
+        return closure > 0 && alongToPoint / closure <= time;
     }
 
     /**
-     * The waypoint alert of a waypoint with a turn to anticipate (4-8). On the turn plan it starts at the decision, about
-     * 20 s before the turn starts, and holds while the aircraft is TO the waypoint: without a turn (at the MAP, or when
-     * the aircraft turned away before the turn point) it ends once the waypoint is behind, as before the plan. On the
-     * abeam plan it starts WPT_ALERT_ABEAM_TURN before the abeam line, at the closure
-     * rate along the leg, and not while the aircraft does not close on the line (checked in the KLN 89 trainer,
-     * 2026-10-20). It stays on while a turn is flown, also a turn of the previous waypoint (#156) or the run-out of its
-     * abeam turn (#406)
+     * The waypoint alert of a waypoint with a turn to anticipate (4-8). On the turn plan it starts
+     * WPT_ALERT_WITH_TURN_ANTI before the turn point at the closure rate along the leg, or once the aircraft is inside the
+     * turn point, and not with the plan, which is decided as soon as the leg is active (#438; checked in the KLN 89
+     * trainer, 2026-10-29: 20 to 23 s of along-track closure before the turn point on every pass of the turn plan). It is a
+     * condition of each calculation, so an edit of the next leg that moves the turn point more than 20 s away pauses it
+     * (#408, the trainer's a3 and a4, 2026-10-27). It holds while the aircraft is TO the waypoint: without a turn (at the
+     * MAP, or when the aircraft turned away before the turn point) it ends once the waypoint is behind. On the abeam plan
+     * it starts WPT_ALERT_ABEAM_TURN before the abeam line, at the closure rate along the leg, and not while the aircraft
+     * does not close on the line (checked in the KLN 89 trainer, 2026-10-20). It stays on while a turn is flown, also a
+     * turn of the previous waypoint (#156) or the run-out of its abeam turn (#406)
      * @param legPath the path of the active leg
      * @param along the along-track distance to the active waypoint
+     * @param turnPoint the along-track distance to the active waypoint at which the turn of the turn plan starts
      */
-    private isAlertWithTurn(legPath: GeoCircle, along: NauticalMiles): boolean {
+    private isAlertWithTurn(legPath: GeoCircle, along: NauticalMiles, turnPoint: NauticalMiles): boolean {
         const activeWaypoint = this.memory.navPage.activeWaypoint;
         if (activeWaypoint.turnStack.length > 0) {
             return true;
         }
         if (activeWaypoint.turnPlan === TurnPlan.AT_LEAD) {
-            return this.memory.navPage.toFrom === TO;
+            return this.memory.navPage.toFrom === TO
+                && (along <= turnPoint || this.isWithinTimeOfAlong(legPath, along - turnPoint, WPT_ALERT_WITH_TURN_ANTI));
         }
-        return activeWaypoint.turnPlan === TurnPlan.AT_ABEAM && this.isWithinTimeOfAbeam(legPath, along, WPT_ALERT_ABEAM_TURN);
+        return activeWaypoint.turnPlan === TurnPlan.AT_ABEAM && this.isWithinTimeOfAlong(legPath, along, WPT_ALERT_ABEAM_TURN);
     }
 
     /**

@@ -326,13 +326,12 @@ const CAPPED_150_RADIUS_NM = CAPPED_150_LEAD_NM / Math.tan(75 * Math.PI / 180);
  * tighter circle tangent to both legs at the lead, of radius 2.0 NM / tan(75°) = 0.54 NM (checked in the KLN 89 trainer,
  * 2026-10-20). The aircraft is put on a 005 track (the inbound 050 less 45°, closing from the right, the inside of the
  * turn) aimed at the point 2.0 NM right of the leg and 1.5 NM before ABC, 2.5 NM from it, and placed 0.6 NM before that
- * point: about 2.0 NM before ABC along the leg and 2.5 NM right of it. That is past the decision point of the turn
- * (20 s before its turn point, 2.8 NM before ABC) and inside its turn point, so the unit decides at once and, with at
- * most 2.8 NM of cross track, on the turn plan: the turn starts at once (checked in the KLN 89 trainer, 2026-10-20,
- * #157), with the aircraft about 2.5 NM inside the inbound leg, outside the turn circle on its far side by more than its
- * radius. Placed 2 NM before the aim point, as before #157, the aircraft would pass the decision point 3.3 NM right of
- * the leg and take the abeam plan; inside this turn it is past the bisector there, so ABC would be sequenced without a
- * turn. The stored BASELINE of S10 was flown from that old placement with the old controller; the placement moved
+ * point: about 2.0 NM before ABC along the leg and 2.5 NM right of it. That is inside its turn point, and the unit
+ * decides the plan in its first calculation: with 2.5 NM of cross track, within the gate of 2.77 NM at 120 kt (#438), the
+ * turn plan, so the turn starts at once (checked in the KLN 89 trainer, 2026-10-20, #157), with the aircraft about
+ * 2.5 NM inside the inbound leg, outside the turn circle on its far side by more than its radius. Placed 2 NM before the
+ * aim point, as before #157, the aircraft would be about 3.4 NM right of the leg, beyond the gate, and take the abeam
+ * plan; inside this turn it is past the bisector there, so ABC would be sequenced without a turn. The stored BASELINE of S10 was flown from that old placement with the old controller; the placement moved
  * because the old one no longer starts a turn, and the comparison keeps the baseline's numbers (the controller's ruling,
  * 2026-10-21). The start event is the DTK switch, the target the leg ABC - KBBB. `fallback` reports whether NavCalculator
  * steers on the next leg at the start event (the roll steering design, section 4A).

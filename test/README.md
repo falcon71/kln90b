@@ -621,6 +621,8 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
       later waypoints.
     - Monitors do not run across the skipped span.
     - It flies one normal second afterwards, so the unit sees the new position.
+- **`teleport(pos)`** moves the aircraft to a point at once, as a slew does: track, speed and altitude stay, and no time
+  passes, so the next tick reads the new position.
 - **`flight.nav`** is a typed view of the navigation state (`activeIdent`, `distNm`, `dtkTrue`, `xtkNm`, `toFrom`,
   `mode`, `waypointAlert`, `xtkScale`). `flight.sim` reads and writes SimVars, `flight.screen` reads the screen and
   `flight.t` is the simulated time in seconds.
