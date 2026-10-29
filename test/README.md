@@ -766,9 +766,10 @@ recording (an `it.fails` until #100 was fixed), so a broken flight cannot be mis
   triangle as a vector sum (`Wind.test.ts`), the USNO almanac with its URL (`Sun.test.ts`). The code's own source never
   is: `Conversions.ts` and `Wind.ts` follow avform, and an expectation computed from avform restates the code.
 - **Pin known bugs with `it.fails('... (#NN)')`.** The test states the correct behavior, fails today, and turns red when
-  someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. The suite may hold none at
-  a given time: the #440 pin (commit `7ca2612b`, in `test/flight/flights/nextLegEdit.test.ts`, with the sibling that
-  holds its preconditions) is an example from the history.
+  someone fixes the bug, which is the signal to remove `.fails`. Reference the GitHub issue. The #445 pin in
+  `test/unit/data/flightplan/ActiveWaypoint.test.ts`, with the sibling that holds its preconditions, is an example; the
+  #440 pin (commit `7ca2612b`, in `test/flight/flights/nextLegEdit.test.ts`) is one from the history, removed with its
+  fix.
 - **Prove a pin by fixing the bug, and keep heavy setup out of it.** An `it.fails` test passes on *any* failure, so a
   broken precondition inside it (a boot that threw, a wrong key sequence) is invisible: the pin stays green for the
   wrong reason. Prove a pin by fixing the bug temporarily and seeing the test turn red, then restore. Where it is cheap,

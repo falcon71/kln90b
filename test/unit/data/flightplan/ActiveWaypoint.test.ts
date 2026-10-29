@@ -833,3 +833,43 @@ describe('ActiveWaypoint through an edit in front of the active waypoint (#440)'
         expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
     });
 });
+
+// #445: a SID replaced by one of the same length, in one batch as Apt7Page.loadNow does it, leaves the active waypoint
+// at its index, so the early instance check of assertToMatchesFplIdx returns before the leg in front of it is looked at.
+// FPL 0 is KAAA SIDA1 SIDA2 ABC DEF; the aircraft is 10 NM along the leg SIDA2 - ABC, so ABC (index 3) is active from
+// SIDA2. The new SID is SIDB1 SIDB2. SIDB2 lies 15° off SIDA2 as seen from ABC, so that the leg SIDB2 - ABC is the
+// closest leg after the batch, and a fix that activates the closest leg turns the pin red
+describe('ActiveWaypoint when the active SID is replaced by one of the same length (#445)', () => {
+    const sid = (ident: string, p: { lat: number; lon: number }): KLNFlightplanLeg => ({wpt: intersection(ident, p.lat, p.lon), type: KLNLegType.SID});
+    const sidA2 = pointFrom(B, 315, 20);
+
+    function replaceSid() {
+        const legs = [user(A), sid('SIDA1', pointFrom(A, 0, 10)), sid('SIDA2', sidA2), user(B), user(C)];
+        const {aw, fpl} = activeWaypointWith(legs, pointFrom(B, 315, 10));
+        aw.activateFpl0();
+        const before = {idx: aw.getActiveFplIdx(), from: aw.getFromWpt()!.icaoStruct.ident};
+        fpl.startBatchInsert();
+        fpl.removeProcedure(KLNLegType.SID);
+        fpl.insertLeg(1, sid('SIDB1', pointFrom(A, 180, 10)));
+        fpl.insertLeg(2, sid('SIDB2', pointFrom(B, 300, 20)));
+        fpl.finishBatchInsert();
+        return {aw, fpl, before};
+    }
+
+    // The sibling that holds the preconditions of the pin: ABC was active from SIDA2, and after the batch it is still at
+    // index 3, with SIDB2 in front of it
+    it('leaves the active waypoint at its index with the new SID in front of it (control of the #445 pin)', () => {
+        const {aw, fpl, before} = replaceSid();
+        expect(before).toEqual({idx: 3, from: 'SIDA2'});
+        expect(identsOf(fpl.getLegs())).toEqual(['KAAA', 'SIDB1', 'SIDB2', 'ABC', 'DEF']);
+        expect(aw.getActiveFplIdx()).toBe(3);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
+    });
+
+    it.fails('makes the new SID\'s last fix the FROM when the active SID is replaced by one of the same length (#445)', () => {
+        const {aw} = replaceSid();
+        // As NavCalculator.updateActiveLeg reads it: the active leg first, which runs assertToMatchesFplIdx, then the FROM
+        expect(aw.getActiveLeg()!.wpt.icaoStruct.ident).toBe('ABC');
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('SIDB2');
+    });
+});
