@@ -1014,36 +1014,139 @@ describe('the turn start off course on the leg (#157)', () => {
         expect(Math.abs(flight.nav.xtkNm! + distanceNm(flight.aircraft, W_POS))).toBeLessThan(0.02);
     });
 
-    it('arms the bisector of the turn plan only once its turn has started (the design, section 3.3)', async () => {
-        // A 150° left turn (onto 275) at 239 kt, passed parallel 2.0 NM inside: the turn plan. The lead is capped at 60 s,
-        // 3.98 NM, so the turn point is 4.31 NM and the decision point 5.64 NM before WWW. The inside bisector ray (260)
-        // lies a · tan 15° from the leg, 1.51 NM at the decision point and 1.16 NM at the turn point, so the aircraft is
-        // past it from 7.5 NM before WWW on: WWW is sequenced where the turn starts, not at the decision
+    it('sequences on the turn plan at the inside bisector before the turn point, with no turn (by the rule of the KLN 89 trainer\'s I3\'b, 2026-10-29; #443)', async () => {
+        // A 150° left turn (onto 275) at 239 kt, passed parallel 2.0 NM inside, within the gate: the turn plan from the
+        // first calculation. The lead is capped at 60 s, 3.98 NM, so the turn point is 4.31 NM before WWW. The inside
+        // bisector ray (260) lies a · tan 15° from the leg, so the aircraft crosses it 2.0 / tan 15° = 7.46 NM before WWW,
+        // well before the turn point: WWW is sequenced there, with no turn and no alert, by the rule the trainer showed in
+        // I3'b (flown at 119 kt, 2.3 NM inside; the 119 kt test below mirrors it)
         const lead = GS * 60 / 3600;
         const tp = lead + rollInNm(GS);
         expect(lead).toBeLessThan(leadNm(GS, 150)); // Precondition: capped
         const {flight, aw} = await boot([at(12, -2.0), at(-20, -2.0)], trackPilot(-100, INBOUND, INBOUND), INBOUND - 150 + 360);
-        await flight.flyUntil(() => aw.turnPlan !== null || flight.nav.activeIdent !== 'WWW', {timeout: 300, description: 'the decision at WWW'});
-        expect(flight.nav.activeIdent).toBe('WWW');
         expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
+        const bisectorAlong = 2.0 / Math.tan(15 * DEG);
+        expect(bisectorAlong, 'precondition: the bisector lies before the turn point').toBeGreaterThan(tp + 2);
+        expect(gpsAlongBefore(flight), 'precondition: not yet past the bisector').toBeGreaterThan(bisectorAlong + 1);
 
-        await flight.flyUntil(() => flight.nav.activeIdent !== 'WWW', {timeout: 120, description: 'WWW sequenced'});
+        let dtkSwitchedEarly = false;
+        let alertBefore = false;
+        await flight.flyUntil(() => {
+            // While WWW is active, including the calculation that sequences it (#407: the DTK of the next leg shows in it)
+            alertBefore ||= flight.nav.activeIdent === 'WWW' && flight.nav.waypointAlert;
+            dtkSwitchedEarly ||= flight.nav.activeIdent === 'WWW' && angleBetween(flight.nav.dtkTrue, INBOUND) >= 1;
+            return flight.nav.activeIdent !== 'WWW';
+        }, {timeout: 300, description: 'WWW sequenced'});
         expect(flight.nav.activeIdent).toBe('KBBB');
+        // Within one tick of the crossing, at the GPS position the calculation used: the bisector of this position's
+        // cross track, which is 2.0 NM left of the leg to within the pilot's accuracy
+        const xtk = gpsXtkRight(flight);
+        expect(Math.abs(xtk + 2.0)).toBeLessThan(0.15);
+        const crossingAlong = -xtk / Math.tan(15 * DEG);
         const along = gpsAlongBefore(flight);
-        expect(along).toBeGreaterThanOrEqual(tp - GPS_TOLERANCE_NM);
-        expect(along).toBeLessThanOrEqual(tp + TICK_NM + GPS_TOLERANCE_NM);
-        // The turn was started: it is on the stack and flown onto the leg to KBBB
-        expect(turnStackLength(flight.unit)).toBeGreaterThan(0);
+        expect(along).toBeGreaterThanOrEqual(crossingAlong - TICK_NM - GPS_TOLERANCE_NM);
+        expect(along).toBeLessThanOrEqual(crossingAlong + GPS_TOLERANCE_NM);
+        expect(along, 'before the turn point').toBeGreaterThan(tp + 2);
+        expect(turnStackLength(flight.unit), 'no turn').toBe(0);
+        expect(alertBefore, 'no alert before the sequencing').toBe(false);
+        expect(dtkSwitchedEarly, 'no DTK switch before the sequencing').toBe(false);
+        // KBBB's turn point is 20 NM away: still no turn, no alert
+        await flight.fly(5);
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(turnStackLength(flight.unit)).toBe(0);
+        expect(flight.nav.waypointAlert).toBe(false);
     });
 
-    it('sequences on the abeam plan on the inside past the bisector, before the abeam line (the maintainer\'s lead\'s call)', async () => {
+    it('sequences at 119 kt where an aircraft diverging 60° across the inside bisector of the turn plan crosses it (KLN 89 trainer, 2026-10-29, I3\'b; #443)', async () => {
+        // Mirrors I3'b: the 150° left turn at 119 kt, 2.3 NM inside 9 NM before WWW, within the gate of 2.744 NM: the
+        // turn plan. The bisector lies 9 · tan 15° = 2.41 NM left of the leg there, so the aircraft starts just before it
+        // and, flying 60° left of the leg, crosses it about 8.95 NM before WWW, at 2.4 NM. The lead is capped at 60 s,
+        // 1.98 NM, so the turn point lies 2.1 NM before WWW: the crossing is far before it
+        const gs = 119;
+        const start = at(9.0, -2.3);
+        const {flight, aw} = await boot([start, pointFrom(start, INBOUND - 60, 30)], new ManualPilot(), INBOUND - 150 + 360, 20, 40, gs);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
+        const tan15 = Math.tan(15 * DEG);
+        expect(-gpsXtkRight(flight), 'precondition: before the bisector').toBeLessThan(gpsAlongBefore(flight) * tan15 - 0.03);
+
+        await flight.flyUntil(() => flight.nav.activeIdent !== 'WWW', {timeout: 60, description: 'WWW sequenced'});
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        // Within one tick of the crossing, at the GPS position the calculation used: on the bisector ray, 2.4 NM left
+        const xtk = -gpsXtkRight(flight);
+        const along = gpsAlongBefore(flight);
+        const tickNm = gs / 3600;
+        expect(xtk - along * tan15, 'past the bisector').toBeGreaterThanOrEqual(-GPS_TOLERANCE_NM);
+        expect(xtk - along * tan15, 'within one tick of it').toBeLessThanOrEqual(tickNm * Math.sin(60 * DEG) + tickNm * Math.cos(60 * DEG) * tan15 + GPS_TOLERANCE_NM);
+        expect(xtk).toBeLessThan(2.744); // Still the turn plan's range
+        expect(turnStackLength(flight.unit), 'no turn').toBe(0);
+        expect(flight.nav.waypointAlert).toBe(false);
+    });
+
+    it('sequences a 171° turn at the inside bisector crossing, well before the turn point, with no turn (KLN 89 trainer, 2026-10-29, p2_171; #443)', async () => {
+        // The trainer's 8S pass at 119 kt: a turn of 171° (left, onto 254) up to which the unit anticipates the turn, passed
+        // parallel 0.35 NM inside. The bisector lies 0.35 / tan 4.5° = 4.4 NM before WWW, the lead is capped at 60 s, so the
+        // turn point lies 2.1 NM before WWW: sequenced at the crossing, with no turn and no alert
+        const gs = 119;
+        const tp = gs * 60 / 3600 + rollInNm(gs);
+        const {flight, aw} = await boot([at(8, -0.35), at(-20, -0.35)], new ManualPilot(), INBOUND - 171 + 360, 20, 40, gs);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
+        let alertBefore = false;
+        await flight.flyUntil(() => {
+            alertBefore ||= flight.nav.activeIdent === 'WWW' && flight.nav.waypointAlert;
+            return flight.nav.activeIdent !== 'WWW';
+        }, {timeout: 120, description: 'WWW sequenced'});
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        const xtk = gpsXtkRight(flight);
+        expect(Math.abs(xtk + 0.35)).toBeLessThan(0.05);
+        const crossingAlong = -xtk / Math.tan(4.5 * DEG);
+        const tickNm = gs / 3600;
+        const along = gpsAlongBefore(flight);
+        expect(along).toBeGreaterThanOrEqual(crossingAlong - tickNm - GPS_TOLERANCE_NM);
+        expect(along).toBeLessThanOrEqual(crossingAlong + GPS_TOLERANCE_NM);
+        expect(along, 'well before the turn point').toBeGreaterThan(tp + 1.5);
+        expect(turnStackLength(flight.unit), 'no turn').toBe(0);
+        expect(alertBefore, 'no alert before the sequencing').toBe(false);
+    });
+
+    it('does not sequence a 176° turn at the inside bisector before its turn point (KLN 89 trainer, 2026-10-29, p1_176; #443, #444)', async () => {
+        // Above 175° the unit does not anticipate the turn and does not sequence at the inside bisector: the trainer flew
+        // 0.72 NM inside a 176.1° turn to the waypoint. The emulation still flies a lead turn there until #444. The same
+        // pass as above on a 176° turn (onto 249), 0.3 NM inside: the bisector lies 0.3 / tan 2° = 8.6 NM before WWW,
+        // the turn point 2.1 NM before it. Past the bisector, up to near the turn point, WWW stays active
+        const gs = 119;
+        const tp = gs * 60 / 3600 + rollInNm(gs);
+        const {flight} = await boot([at(9.5, -0.3), at(-20, -0.3)], new ManualPilot(), INBOUND - 176 + 360, 20, 40, gs);
+        await flight.flyUntil(() => alongBefore(flight.aircraft) <= tp + 0.5 || flight.nav.activeIdent !== 'WWW', {timeout: 300, description: 'near the turn point'});
+        expect(flight.nav.activeIdent).toBe('WWW');
+        expect(gpsAlongBefore(flight)).toBeLessThan(8.6 - 1);
+        expect(turnStackLength(flight.unit), 'no turn before the turn point').toBe(0);
+    });
+
+    it('sequences once in the first calculation after a jump past the inside bisector, within 4.0 NM (#443)', async () => {
+        // The 150° left turn at 239 kt, on course 10 NM before WWW with WWW active. A jump (a slew, a position set in the
+        // sim) to 3.5 NM inside, 6.0 NM before WWW: before the turn point (4.31 NM), past the bisector, which lies 1.6 NM
+        // left of the leg there. The test is a state, so the first calculation sequences WWW, with no turn, and the next
+        // leg is not sequenced after it: KBBB's own bisector is 20 NM away
+        const {flight} = await boot([at(10, 0), at(-20, 0)], new ManualPilot(), INBOUND - 150 + 360);
+        await flight.fly(2);
+        expect(flight.nav.activeIdent).toBe('WWW');
+        flight.teleport(at(6.0, -3.5));
+        await flight.fly(1);
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(turnStackLength(flight.unit)).toBe(0);
+        await flight.fly(10);
+        expect(flight.nav.activeIdent).toBe('KBBB');
+        expect(turnStackLength(flight.unit)).toBe(0);
+    });
+
+    it('sequences on the abeam plan on the inside at the bisector, before the abeam line (KLN 89 trainer, 2026-10-29, I3\'a, I3\'c; #443)', async () => {
         // On the inside, 3.5 NM left of the leg on the abeam plan. At 239 kt the abeam plan needs a cross track beyond the
         // gate of 4.9 NM, beyond the leg's 4.0 NM (#438): from 5.5 NM left 15 NM before WWW the aircraft converges at 20°
-        // and flies on parallel 3.5 NM left of the leg from about 9.5 NM before WWW, keeping the abeam plan. The abeam plan
-        // arms the bisector test, so WWW is sequenced where the aircraft crosses the inside bisector ray (275), 3.5 /
-        // tan 30° = 6.06 NM before WWW (the design, section 3.3: the test is a state; not observed in the trainer, whose
-        // one inside pass, T2, took the turn plan). The exact mirror of the abeam pass, converging from 8.5 NM left,
-        // cannot be flown: it starts past the bisector, closer to the leg to KBBB, so the plan would activate KBBB
+        // and flies on parallel 3.5 NM left of the leg from about 9.5 NM before WWW, keeping the abeam plan. WWW is
+        // sequenced where the aircraft crosses the inside bisector ray (275), 3.5 / tan 30° = 6.06 NM before WWW, before
+        // the abeam line and with no turn, as the trainer did in I3'a and I3'c (2026-10-29: sequenced at the crossing,
+        // 12.6 NM out). The exact mirror of the abeam pass, converging from 8.5 NM left, cannot be flown: it starts past
+        // the bisector, closer to the leg to KBBB, so the unit would activate KBBB
         let onParallel = false;
         const pilot: Pilot = {
             commandedBank: ({aircraft}) => {

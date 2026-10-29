@@ -706,15 +706,31 @@ describe('the leg-change marker (4-8, #434, #436)', () => {
         expect(records.map(r => r.delta).filter(d => d !== null)).toEqual([]);
     });
 
-    // 2 NM inside the turn the bisector of the turn at ABC lies 0.6 NM before the abeam line, behind the turn point (0.3
-    // NM), so the turn starts with the aircraft already past it and ABC is sequenced in the same calculation. The leg
-    // change is still marked once, on the new active leg
-    it('marks a turn start and a sequencing in the same calculation once', async () => {
+    // 2 NM inside the turn the bisector of the turn at ABC lies 0.6 NM before the abeam line, before the turn point (0.3
+    // NM): an aircraft flying there crosses the bisector first and is sequenced with no turn (#443, checked in the KLN 89
+    // trainer, 2026-10-29, I3'a to I3'c). That is a leg change, marked once, on the new active leg
+    it('marks the sequencing at the inside bisector before the turn point, with no turn, once (#443)', async () => {
         const {unit, kaaa, abc} = await onStandardRoute();
         const records = await flyPoints(unit, alongFirstLeg(kaaa, abc, 2, 1, -2));
 
+        expect(records.every(r => r.turnStack === 0)).toBe(true); // Preconditions: the turn plan, no turn, ABC sequenced
+        expect(records[0].plan).toBe(TurnPlan.AT_LEAD);
+        const sequenced = records.findIndex(r => r.active === 'KBBB');
+        expect(sequenced).toBeGreaterThan(0);
+        expect(records.filter(r => r.delta !== null)).toHaveLength(1);
+        // #407: in that calculation, with the DTK of the new active leg (checked in the KLN 89 trainer, 2026-10-27: no lag)
+        expect(records[sequenced].delta!).toBeCloseTo(angleBetween(records[sequenced - 1].dtk, records[sequenced].dtk!), 6);
+        expect(records[sequenced].delta!).toBeGreaterThan(30);
+    });
+
+    // An aircraft that comes within the turn point and past the bisector at once, here by a jump from the leg to 2 NM
+    // inside, 0.2 NM before the abeam line: the turn starts and ABC is sequenced in the same calculation (#404, #443)
+    it('marks a turn start and a sequencing in the same calculation once', async () => {
+        const {unit, kaaa, abc} = await onStandardRoute();
+        const records = await flyPoints(unit, [pointBefore(kaaa, abc, 1.5), ...alongFirstLeg(kaaa, abc, 0.2, 1, -2)]);
+
         const turnAt = records.findIndex(r => r.turnStack > 0);
-        expect(turnAt).toBeGreaterThan(0); // Preconditions: the turn plan, the turn started and ABC sequenced at once
+        expect(turnAt).toBe(1); // Preconditions: the turn plan, the turn started and ABC sequenced at once, after the jump
         expect(records[turnAt - 1].plan).toBe(TurnPlan.AT_LEAD);
         expect(records[turnAt - 1].active).toBe('ABC');
         expect(records[turnAt].active).toBe('KBBB');

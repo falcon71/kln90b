@@ -635,13 +635,17 @@ sim.
       replaces whatever is still on the stack. A leg shorter than the previous turn's lead plus this turn point otherwise
       delayed the turn, and the bisector sequencing it arms, until the previous circle ended (the final review of
       2026-10-21; no trainer evidence).
-    - On the leg it sequences when the aircraft is past the bisector of the turn (`bisectorSide >= 0`), armed by
-      `ownTurnStarted` or the plan `AT_ABEAM` (#375, checked in the KLN 89 trainer, 2026-10-20). On course that is the
-      middle of the turn; for a big turn it lies well before the waypoint. It is a state, not a crossing, so an aircraft
-      already past the line when the test arms sequences at once. On the inside of a turn on the abeam plan that can be
-      before the abeam line, with no turn started (the design's call; not observed in the trainer). It does not read the
-      waypoint alert, so a turn still on the stack from the previous waypoint cannot sequence the next one. Since a turn
-      ends only past the bisector, a turn's normal end comes in or after the calculation that sequences its waypoint.
+    - On the leg it sequences when the aircraft is past the bisector of the turn (`bisectorSide >= 0`), on every plan
+      (#375, checked in the KLN 89 trainer, 2026-10-20; the plan no longer arms it, #443). On course that is the middle
+      of the turn; for a big turn it lies well before the waypoint. It is a state, not a crossing, so an aircraft already
+      past the line sequences at once. On the inside of a turn that can be before the turn point and before the abeam
+      line, with no turn started and no alert (checked in the KLN 89 trainer, 2026-10-29, I3'a, I3'b and I3'c); on course
+      and on the outside the turn starts before the bisector is reached. Above 175° the unit does not anticipate the turn and does
+      not sequence at the inside bisector (checked in the KLN 89 trainer, 2026-10-29: lead turns at 173.5° and 175.0°,
+      fly-over from 175.3°; #444): there the test waits for the waypoint's own turn. It
+      does not read the waypoint alert, so a turn still on the stack from the previous waypoint cannot sequence the next
+      one. Since a turn ends only past the bisector, a turn's normal end comes in or after the calculation that
+      sequences its waypoint.
 - Without turn anticipation, it sequences on FROM.
 - **The MAP is never auto-sequenced.**
 - Waypoint alert thresholds: on the turn plan `WPT_ALERT_WITH_TURN_ANTI` (20 s) before the turn point at the

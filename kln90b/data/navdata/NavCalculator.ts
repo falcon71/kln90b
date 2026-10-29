@@ -96,6 +96,16 @@ export const WPT_ALERT_ABEAM_TURN: Seconds = 15;
  */
 export const WPT_ALERT_OFF_LEG: Seconds = 36;
 
+/**
+ * The largest turn angle (the course leaving the waypoint minus the course arriving at it) at which the unit anticipates
+ * the turn, so the largest one at which an aircraft is sequenced at the inside bisector before the waypoint's own turn
+ * (#443). Checked in the KLN 89 trainer, 2026-10-29: lead turns were flown at 173.5° and 175.0°, and turns of 175.3°,
+ * 175.5°, 176.1° and 180° were flown over the waypoint, with no sequencing at the inside bisector even 0.72 NM inside. The
+ * turns above it have no anticipation in the unit (#444). Until #444 is fixed the emulation still flies a lead turn
+ * there, but never sequences them at the bisector before that turn
+ */
+const MAX_ANTICIPATED_TURN_ANGLE: Degrees = 175;
+
 
 /**
  * The active leg as NavCalculator resolves it in a calculation
@@ -284,14 +294,18 @@ export class NavCalculator implements CalcTickable {
 
                     //#375: sequenced where the aircraft crosses the bisector of the turn, the line through the waypoint that
                     //halves the angle between the legs: on course the middle of the turn, for a big turn well before the
-                    //waypoint (3.2 NM for 171° at 239 kt, checked in the KLN 89 trainer, 2026-10-20). The test is a state,
-                    //armed once the waypoint's own turn has started or on the abeam plan, so an aircraft already past the line
-                    //then sequences at once. On the inside of a turn on the abeam plan that can be before the abeam line,
-                    //where no turn has started (the design, section 3.3, the maintainer's lead's call; not observed in the
-                    //trainer). It does not read the waypoint alert: a turn still on the stack from the previous waypoint keeps
-                    //the alert on, and the abeam test that read it sequenced a waypoint 13 NM away
+                    //waypoint (3.2 NM for 171° at 239 kt, checked in the KLN 89 trainer, 2026-10-20). #443: on every plan,
+                    //also before the turn has started: on the inside of a turn the aircraft crosses the bisector before
+                    //the turn point, and is sequenced there with no turn and no alert, on the abeam plan and on the turn
+                    //plan alike (checked in the KLN 89 trainer, 2026-10-29, passes I3'a, I3'b and I3'c of the inside check).
+                    //On course and on the outside of a turn the turn starts before the bisector is reached, so nothing
+                    //changes there. The test is a state, not a crossing, so an aircraft already past the line sequences
+                    //at once. It does not read the waypoint alert: a turn still on the stack from the previous waypoint
+                    //keeps the alert on, and the abeam test that read it sequenced a waypoint 13 NM away
+                    //Above MAX_ANTICIPATED_TURN_ANGLE the unit does not anticipate the turn and does not sequence at the
+                    //inside bisector (checked in the KLN 89 trainer, 2026-10-29): the test waits for the waypoint's own turn
                     if (toLeg.fixType !== KLNFixType.MAP //don't move missed approach waypoint!
-                        && (activeWaypoint.ownTurnStarted || activeWaypoint.turnPlan === TurnPlan.AT_ABEAM)
+                        && (activeWaypoint.ownTurnStarted || turnAngle <= MAX_ANTICIPATED_TURN_ANGLE)
                         && bisectorSide(toLeg.wpt, fromDtk, nextDtk, this.sensors.in.gps.coords) >= 0) {
                         this.sequenceToNextWaypoint();
                         console.log("moving to next wpt", toLeg.wpt, activeWaypoint.getActiveWpt());
