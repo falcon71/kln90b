@@ -53,8 +53,8 @@ describe('recordMap (harness)', () => {
 
         const lit = downsampled(canvasToAscii(document.querySelector('canvas') as HTMLCanvasElement)).split('\n')
             .flatMap((row, y) => [...row].map((c, x) => c === '#' ? `${x},${y}` : '')).filter(c => c !== '');
-        expect(lit).toEqual(['49,36', '48,37', '49,37', '50,37', '47,38', '48,38', '49,38', '50,38', '51,38', '47,39', '48,39',
-            '49,39', '50,39', '51,39', '48,40', '49,40', '50,40', '49,41']);
+        expect(lit).toEqual(['49,37', '48,38', '49,38', '50,38', '47,39', '48,39', '49,39', '50,39', '51,39', '48,40', '49,40',
+            '50,40', '49,41']);
     });
 
     it('forgets the last frame on reset until the map draws again', async () => {
@@ -117,16 +117,29 @@ describe('recordMap with a flight plan (harness)', () => {
 });
 
 describe('downsampled (harness)', () => {
-    it('gives one character per block, lit when any pixel of the block is, also for a cut-off block', () => {
-        expect(downsampled(['#.......', '........', '........', '........', '.....#..'].join('\n'))).toBe('#.\n.#\n');
+    it('gives one character per block, lit for a block whose pixels are all lit, as the lines and icons fill them', () => {
+        expect(downsampled(['####....', '####....', '####....', '####....'].join('\n'))).toBe('#.\n');
     });
 
-    // A block of 2 pixels: the lit pixel at x = 3, y = 2 lights the block at column 1, row 1, and nothing else
+    it('lights a block with exactly half of its pixels lit, and not one with fewer', () => {
+        expect(downsampled(['##..', '##..', '##..', '##..'].join('\n'))).toBe('#\n');
+        expect(downsampled(['##..', '##..', '##..', '#...'].join('\n'))).toBe('.\n');
+    });
+
+    // The top stroke of a label drawn one canvas row low, as @napi-rs/canvas 1.0 drew the map font: rows 1 to 4
+    it('draws a stroke one pixel thick that overhangs into the next block by one canvas row', () => {
+        const stroke = '############....';
+        const blank = '................';
+        expect(downsampled([blank, stroke, stroke, stroke, stroke, blank, blank, blank].join('\n'))).toBe('###.\n....\n');
+    });
+
+    // A block of 2 pixels: the lit pixels at x = 2..3, y = 2 light the block at column 1, row 1, and nothing else
     it('takes the block size as a parameter', () => {
-        expect(downsampled(['........', '........', '...#....', '........'].join('\n'), 2)).toBe('....\n.#..\n');
+        expect(downsampled(['........', '........', '..##....', '........'].join('\n'), 2)).toBe('....\n.#..\n');
     });
 
-    it('lights a block for a pixel in any of its rows, not only the first', () => {
-        expect(downsampled(['........', '........', '........', '...#....'].join('\n'))).toBe('#.\n');
+    it('counts a block cut off at the right or bottom edge by the pixels it has', () => {
+        expect(downsampled(['######', '######', '######', '######', '######'].join('\n'))).toBe('##\n##\n');
+        expect(downsampled(['....#.', '....#.', '....#.', '....#.', '#.....'].join('\n'))).toBe('.#\n..\n');
     });
 });

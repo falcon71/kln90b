@@ -466,6 +466,9 @@ export class CanvasDrawContext {
 
         //Our coordinate system uses x and y for top left!
 
+        //Text above ends on row y - 3. The middle row of a symbol is on y (drawIcon), so text below starts on row y + 3,
+        //as far from a symbol 5 pixels high as text above
+        const belowY = y + offsetY + 1;
         const checks = [
             [x - offsetX - width, y - offsetY - height], //top left
             [x - width / 2, y - offsetY - height], //top
@@ -473,9 +476,9 @@ export class CanvasDrawContext {
             [x - offsetX - width, y - height / 2], //left
             [x - width / 2, y - height / 2], //center
             [x + offsetX, y - height / 2], //right
-            [x - offsetX - width, y + offsetY], //bottom left
-            [x - width / 2, y + offsetY], //bottom
-            [x + offsetX, y + offsetY], //bottom right
+            [x - offsetX - width, belowY], //bottom left
+            [x - width / 2, belowY], //bottom
+            [x + offsetX, belowY], //bottom right
         ];
 
         const scores = checks.map(c => ({
@@ -499,7 +502,8 @@ export class CanvasDrawContext {
         //The canvas coordinate system uses x and y for bottom left
         const length = text.length;
         const leftX = centerX - (CHAR_WIDTH_MAP * length / 2);
-        const topY = centerY - CHAR_HEIGHT_MAP / 2;
+        //The glyphs are 7 pixels high. Their middle row goes on the center, so that they stay on whole display pixels
+        const topY = centerY - Math.floor(CHAR_HEIGHT_MAP / 2);
 
 
         //In the real device, the labels have an outline of one pixel. This here does not look exactly right, but is still quite convincing

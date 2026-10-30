@@ -560,16 +560,18 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   failure output rather than typing them.
 - The cursor and the blink phase change the mask. If a test is flaky on `B` or `F` cells, assert text only, or read the
   whole cycle with `blinkCycle`.
-- **Canvas pages** (NAV 5, Super NAV 5, APT 3 draw maps): `canvasToAscii(el)` returns the pixels as `#` and `.`. Snapshot
-  it with `toMatchInlineSnapshot` as `test/render/harness/canvas.test.ts` does for a tiny canvas. For a map that is too
-  large to read inline, `toMatchFileSnapshot('./__snapshots__/name.txt')` keeps it in a file. `downsampled()`
-  (`render/canvas.ts`) turns the output of `canvasToAscii` into one character per block of four pixels, the size the
-  maps draw in, which makes a map file snapshot readable. `recordMap(names)` (`render/mapRecorder.ts`), installed before
-  the boot, records per redraw what NAV 5, Super NAV 5 and APT 3 draw: `drawn` lists the symbols, labels and flight plan
-  lines of the last complete redraw by point, `pixels` the symbols by pixel, and `reset()` forgets the frame. A point is
-  named after the entry of `names` it equals, so pass the facilities of the test. The spies pass every call on, so the
-  canvas still draws. It records symbols, labels and straight lines (`icon`, `label`, `line`, `arrow`, `plain`); the
-  arcs of a DME arc leg (`drawArc`, `drawArcWithArrow`) are not recorded, so read them from the canvas.
+- **Canvas pages** (NAV 5, Super NAV 5, APT 3 draw maps): `canvasToAscii(el)` returns the pixels as `#` and `.`.
+  Snapshot it with `toMatchInlineSnapshot` as `test/render/harness/canvas.test.ts` does for a tiny canvas. For a map
+  that is too large to read inline, `toMatchFileSnapshot('./__snapshots__/name.txt')` keeps it in a file.
+  `downsampled()` (`render/canvas.ts`) turns the output of `canvasToAscii` into one character per block of four pixels,
+  the size the maps draw in, which makes a map file snapshot readable. A block is lit when at least half of its pixels
+  are, so a snapshot does not change when a Skia version draws the map font a canvas row lower. `recordMap(names)`
+  (`render/mapRecorder.ts`), installed before the boot, records per redraw what NAV 5, Super NAV 5 and APT 3 draw:
+  `drawn` lists the symbols, labels and flight plan lines of the last complete redraw by point, `pixels` the symbols by
+  pixel, and `reset()` forgets the frame. A point is named after the entry of `names` it equals, so pass the facilities
+  of the test. The spies pass every call on, so the canvas still draws. It records symbols, labels and straight lines
+  (`icon`, `label`, `line`, `arrow`, `plain`); the arcs of a DME arc leg (`drawArc`, `drawArcWithArrow`) are not
+  recorded, so read them from the canvas.
 - `Screen` skips `<canvas>` subtrees (their fallback text). It throws on Super NAV 5, a `SevenLinePage` made of
   CSS-positioned `<pre>` blocks: use `SuperNav5.read()` (`render/superNav5.ts`), which returns
   `{left, msg, range, right, directTo}`. `right` and `directTo` are `null` while hidden (the right cursor and the pulled

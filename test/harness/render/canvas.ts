@@ -44,9 +44,12 @@ export function canvasToAscii(el: HTMLCanvasElement, threshold = 128): string {
 }
 
 /**
- * The maps draw in blocks of ZOOM_FACTOR (4) canvas pixels (Canvas.tsx), so one character per block keeps every drawn
- * pixel and makes a map snapshot readable: a block is lit when any of its pixels is. Takes the output of canvasToAscii;
- * a block cut off at the right or bottom edge counts the pixels it has.
+ * The maps draw in blocks of ZOOM_FACTOR (4) canvas pixels (Canvas.tsx), so one character per block gives the pixels
+ * the pilot sees and makes a map snapshot readable. A block is lit when at least half of its pixels are: the lines and
+ * icons fill whole blocks, but where the map font lands within its block depends on the Skia version (@napi-rs/canvas
+ * 1.0 drew every label one canvas row low), and lighting a block for any lit pixel would then draw each stroke of a
+ * letter two pixels thick. Takes the output of canvasToAscii; a block cut off at the right or bottom edge counts the
+ * pixels it has.
  */
 export function downsampled(ascii: string, block = 4): string {
     const rows = ascii.split('\n');
@@ -54,11 +57,14 @@ export function downsampled(ascii: string, block = 4): string {
     for (let y = 0; y < rows.length; y += block) {
         let line = '';
         for (let x = 0; x < rows[y].length; x += block) {
-            let lit = false;
-            for (let dy = 0; dy < block && !lit; dy++) {
-                lit = rows[y + dy]?.slice(x, x + block).includes('#') === true;
+            let lit = 0;
+            let all = 0;
+            for (const row of rows.slice(y, y + block)) {
+                const cells = row.slice(x, x + block);
+                all += cells.length;
+                for (const cell of cells) if (cell === '#') lit++;
             }
-            line += lit ? '#' : '.';
+            line += 2 * lit >= all ? '#' : '.';
         }
         out.push(line);
     }
