@@ -19,12 +19,12 @@ describe('recordMap (harness)', () => {
     }
 
     // The map is 99 x 78 map pixels (the 396 x 312 canvas in blocks of 4); the aircraft at its center, rounded to a
-    // whole map pixel
+    // whole map pixel, a half pixel toward the top left (#446)
     it('records the symbols of the last complete redraw with their point and pixel', async () => {
         const map = await nav5();
 
         expect(map.drawn).toEqual(['icon $ 47.0000,8.0000']);
-        expect(map.pixels).toEqual([['$', 50, 39]]);
+        expect(map.pixels).toEqual([['$', 49, 39]]);
     });
 
     it('names a point after the entry of names it equals', async () => {
@@ -47,7 +47,8 @@ describe('recordMap (harness)', () => {
         expect(map.drawn).toEqual(['icon $ 47.0000,8.0000']);
     });
 
-    // The spies pass every call on: the canvas still shows the aircraft diamond around the center
+    // The spies pass every call on: the canvas still shows the aircraft diamond around the center. Its middle column is
+    // 49, the middle of the 99 columns, with 47 free columns on either side of it (#446)
     it('still draws: the canvas shows the aircraft symbol', async () => {
         await nav5();
 

@@ -354,11 +354,12 @@ describe('Super NAV 5 page', () => {
 
     // #431: the aircraft of a shaking parked airplane moves by a centimeter, far less than a map pixel at any range.
     // North up the map centered on a half pixel (y = 45.5 of 91), where such a move rounded the symbol one pixel up or
-    // down. The aircraft now sits on its point rounded to a whole pixel. Three quarters down (y = 68.25) was never a half
-    // pixel, so the other orientations held before the fix as well; they guard the rounding there. Track up needs 2 kt
-    // (3-35), so there the aircraft taxis north at 3 kt (1.39e-5 degrees a second) while it shakes.
+    // down. The aircraft now sits on its point rounded to a whole pixel, a half pixel up, so that row 45 has 45 rows on
+    // either side (#446). Three quarters down (y = 68.25) was never a half pixel, so the other orientations held before
+    // the fix as well; they guard the rounding there. Track up needs 2 kt (3-35), so there the aircraft taxis north at
+    // 3 kt (1.39e-5 degrees a second) while it shakes.
     for (const [orientation, name, symbol, pixel] of [
-        [0, 'north up', '$', [74, 46]],
+        [0, 'north up', '$', [74, 45]],
         [1, 'desired track up', '$', [74, 68]],
         [2, 'actual track up', '#', [74, 68]],
         [3, 'heading up', '#', [74, 68]],
@@ -672,8 +673,9 @@ describe('Super NAV 5 AUTO scale', () => {
 
     // 3-36: AUTO is the smallest scale that shows the active waypoint and the waypoint after it. Active A1 3 NM north,
     // A2 19.5 NM north: the smallest scale that reaches 19.5 NM north is 20. The map is drawn at the scale it shows:
-    // north up, the aircraft is in the middle of the map (148 x 91 map pixels, center 74, 45.5) and the range is the
-    // distance to the top, so A2 lies 19.5/20 of the 45.5 pixels above the center, at y = 45.5 - 44.36 = 1.14.
+    // north up, the aircraft is in the middle of the map (148 x 91 map pixels, center 74, 45.5, which the aircraft takes
+    // as row 45, #446) and the range is the distance to the top, so A2 lies 19.5/20 of the 45.5 pixels above the
+    // aircraft, at y = 45 - 44.36 = 0.64.
     it('takes the smallest scale that shows the waypoint after the active one (3-36)', async () => {
         const a0 = fix('AAAA', 180, 2), a1 = fix('AAAB', 0, 3), a2 = fix('AAAC', 0, 19.5);
         const map = recordMap();
@@ -689,12 +691,12 @@ describe('Super NAV 5 AUTO scale', () => {
         const squares = map.pixels.filter(p => p[0] === '@'); // the three waypoints of FPL 0, in order
         expect(squares).toHaveLength(3);
         expect(Math.abs(squares[2][1] - 74)).toBeLessThanOrEqual(1);
-        expect(Math.abs(squares[2][2] - 1.14)).toBeLessThanOrEqual(1);
+        expect(Math.abs(squares[2][2] - 0.64)).toBeLessThanOrEqual(1);
     });
 
     // 3-36: with no waypoint after the active one (a Direct To off the flight plan), AUTO shows the active waypoint:
     // 9.5 NM north takes the 10 NM scale. The map is drawn at that scale: the active waypoint ("%", the star of an
-    // off-plan Direct To) lies 9.5/10 of the 45.5 pixels above the center, at y = 45.5 - 43.2 = 2.3.
+    // off-plan Direct To) lies 9.5/10 of the 45.5 pixels above the aircraft (row 45, #446), at y = 45 - 43.2 = 1.8.
     it('takes the smallest scale that shows the Direct To waypoint (3-36)', async () => {
         const dct = fix('AAAD', 0, 9.5);
         const map = recordMap();
@@ -707,7 +709,7 @@ describe('Super NAV 5 AUTO scale', () => {
         expect(SuperNav5.read().range.trim()).toBe('10');
         const star = map.pixels.find(p => p[0] === '%')!;
         expect(Math.abs(star[1] - 74)).toBeLessThanOrEqual(1);
-        expect(Math.abs(star[2] - 2.3)).toBeLessThanOrEqual(1);
+        expect(Math.abs(star[2] - 1.8)).toBeLessThanOrEqual(1);
     });
 
     // 3-36: AUTO takes the smallest scale that shows the Direct To waypoint; figure 6-15 shows the 7 NM scale, which the

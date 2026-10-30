@@ -460,12 +460,17 @@ export class CanvasDrawContext {
     public drawLabel(x: number, y: number, text: string) {
         const width = text.length * CHAR_WIDTH_MAP;
         const height = CHAR_HEIGHT_MAP;
+        //The drawn text leaves out the spacing column of its last cell
+        const textWidth = width - 1;
         //Add a little bit of spacing for the symbol
         const offsetX = CHAR_WIDTH_MAP / 3;
         const offsetY = CHAR_HEIGHT_MAP / 3;
 
         //Our coordinate system uses x and y for top left!
 
+        //The cells are moved one column right, as in drawIcon, so that the drawn text is centered on x and keeps the
+        //same distance to the symbol on the left and on the right (#446)
+        x++;
         //Text above ends on row y - 3. The middle row of a symbol is on y (drawIcon), so text below starts on row y + 3,
         //as far from a symbol 5 pixels high as text above
         const belowY = y + offsetY + 1;
@@ -483,7 +488,7 @@ export class CanvasDrawContext {
 
         const scores = checks.map(c => ({
             pos: c,
-            score: this.getTextPositionScore(Math.round(c[0]), Math.round(c[1]), width, height),
+            score: this.getTextPositionScore(Math.round(c[0]), Math.round(c[1]), textWidth, height),
         })).sort((a, b) => b.score - a.score);
 
         const bestX = Math.round(scores[0].pos[0]);
@@ -494,14 +499,16 @@ export class CanvasDrawContext {
 
         this.ctx.fillText(text, bestX * ZOOM_FACTOR, bestY * ZOOM_FACTOR);
 
-        this.bitset.fillRect(bestX, bestY, width, height);
+        this.bitset.fillRect(bestX, bestY, textWidth, height);
 
     }
 
     public drawIcon(centerX: number, centerY: number, text: string) {
         //The canvas coordinate system uses x and y for bottom left
         const length = text.length;
-        const leftX = centerX - (CHAR_WIDTH_MAP * length / 2);
+        //A glyph fills columns 0 to 4 of its cell; the sixth is the spacing to the next one and is left out of the centering (#446).
+        //The NDB ( is 4 pixels wide and the aircraft # 4 pixels high, so those two cannot sit exactly on the center
+        const leftX = centerX - (CHAR_WIDTH_MAP * length / 2) + 1;
         //The glyphs are 7 pixels high. Their middle row goes on the center, so that they stay on whole display pixels
         const topY = centerY - Math.floor(CHAR_HEIGHT_MAP / 2);
 
@@ -511,7 +518,7 @@ export class CanvasDrawContext {
 
         this.ctx.fillText(text, leftX * ZOOM_FACTOR, topY * ZOOM_FACTOR);
 
-        this.bitset.fillRect(leftX, topY, CHAR_WIDTH_MAP * length, CHAR_HEIGHT_MAP);
+        this.bitset.fillRect(leftX, topY, CHAR_WIDTH_MAP * length - 1, CHAR_HEIGHT_MAP);
 
     }
 
@@ -711,8 +718,9 @@ export class Canvas implements UiElement {
     /**
      * The offset of the target from the center of the map, rounded onto a whole pixel. The target could land on a half
      * pixel (the middle of an odd width, or three quarters down the 78 pixels of NAV 5), where the aircraft of a parked,
-     * shaking airplane projects a hair to either side and is rounded one pixel back and forth (#431). Rounding the half
-     * pixel up centers the aircraft symbol of NAV 5: its 5 pixels sit one pixel left of the point.
+     * shaking airplane projects a hair to either side and is rounded one pixel back and forth (#431). It is rounded to the
+     * nearest pixel and a half pixel toward the top left, which puts the aircraft of NAV 5 on column 49 of 99 and that of
+     * Super NAV 5 north up on row 45 of 91: the middle pixels, with as many pixels on either side (#446).
      * @param ctx
      * @param offsetX
      * @param offsetY
@@ -720,8 +728,8 @@ export class Canvas implements UiElement {
      */
     private wholePixelOffset(ctx: CanvasDrawContext, offsetX: number, offsetY: number): Float64Array {
         const offset = new Float64Array(2);
-        offset[0] = Math.round(ctx.width / 2 + offsetX) - ctx.width / 2;
-        offset[1] = Math.round(ctx.height / 2 + offsetY) - ctx.height / 2;
+        offset[0] = Math.ceil(ctx.width / 2 + offsetX - 0.5) - ctx.width / 2;
+        offset[1] = Math.ceil(ctx.height / 2 + offsetY - 0.5) - ctx.height / 2;
         return offset;
     }
 

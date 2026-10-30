@@ -359,13 +359,14 @@ describe('NAV 5 page map', () => {
 
     // #431: the aircraft of a shaking parked airplane moves by a centimeter, far less than a map pixel at any range. The
     // map centered on a half pixel (x = 49.5, and y = 58.5 except north up), where such a move rounded the symbol one
-    // pixel to either side. The aircraft now sits on that point rounded to a whole pixel. Track up needs 2 kt (3-35), so
-    // there the aircraft taxis north at 3 kt (1.39e-5 degrees a second) while it shakes.
+    // pixel to either side. The aircraft now sits on that point rounded to a whole pixel, a half pixel toward the top
+    // left, so that north up column 49 has 49 columns on either side (#446). Track up needs 2 kt (3-35), so there the
+    // aircraft taxis north at 3 kt (1.39e-5 degrees a second) while it shakes.
     for (const [orientation, name, symbol, pixel] of [
-        [0, 'north up', '$', [50, 39]],
-        [1, 'desired track up', '$', [50, 59]],
-        [2, 'actual track up', '#', [50, 59]],
-        [3, 'heading up', '#', [50, 59]],
+        [0, 'north up', '$', [49, 39]],
+        [1, 'desired track up', '$', [49, 58]],
+        [2, 'actual track up', '#', [49, 58]],
+        [3, 'heading up', '#', [49, 58]],
     ] as const) {
         it(`keeps the aircraft on one pixel while the aircraft shakes, ${name} (#431)`, async () => {
             const w = standardRoute();
