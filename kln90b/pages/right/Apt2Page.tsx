@@ -418,7 +418,9 @@ export class Apt2UserPage extends WaypointPage<AirportFacility> {
             return null;
         }
 
+        // 5-17, figures 5-59 and 5-60: the pilot enters the elevation in single feet and the field shows them. The 10 ft
+        // rounding of 3-43 is the database airport's (#450)
         // @ts-ignore
-        return Math.round(UnitType.METER.convertTo(apt.altitude, UnitType.FOOT) / 10) * 10;
+        return Math.round(UnitType.METER.convertTo(apt.altitude, UnitType.FOOT));
     }
 }

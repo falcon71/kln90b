@@ -173,6 +173,23 @@ describe('APT 2 page of a user airport', () => {
         await unit.panel.inner('R', 1);
         expect(Screen.read().rows('R')[3]).toBe('ELV 01250ft');
     });
+
+    // #450: the user airport's elevation is a five-digit field taken in single feet (5-17, figures 5-59 and 5-60); the
+    // 10 ft rounding of 3-43 belongs to the database airport. The third-party KLN 90B trainer keeps 71 ft. The field
+    // shows the entry after ENT and again after a visit to APT 1
+    it('shows an entered elevation in whole feet (#450)', async () => {
+        const unit = await farmOnApt2();
+        await unit.panel.cursor('R');
+        await unit.panel.cursorTo('R', '_____');
+        await unit.panel.type('R', '00071');
+        await unit.panel.ent();
+        await unit.panel.cursor('R');
+        expect(Screen.read().rows('R')[3]).toBe('ELV 00071ft');
+
+        await unit.panel.inner('R', -1);
+        await unit.panel.inner('R', 1);
+        expect(Screen.read().rows('R')[3]).toBe('ELV 00071ft');
+    });
 });
 
 describe('APT 2 page of a stored user airport (characterization)', () => {

@@ -53,7 +53,7 @@ describe('ElevationEditor on APT 2 of a user airport (5-17)', () => {
     });
 
     // Figure 5-60: a stored elevation shows in the closed field with its leading zero. The save format holds 1250 ft as
-    // 381 m, which APT 2 shows rounded to 10 ft (3-43) as 1250 again
+    // 381 m, which are 1250.0 ft and show in whole feet (#450) as 1250 again
     it('shows a stored elevation with its leading zero (5-17, figure 5-60)', async () => {
         const unit = await bootUnit({
             storage: savedUserWaypoints([{kind: 'apt', ident: 'UAPT', lat: 47.0, lon: 8.0, elevationFt: 1250}]),
@@ -64,15 +64,16 @@ describe('ElevationEditor on APT 2 of a user airport (5-17)', () => {
             .toEqual([' UAPT      ', '           ', '           ', 'ELV 01250ft']);
     });
 
-    // Figure 5-60: each of the five cells of a stored elevation holds its own digit. 12350 ft are 3764 m (3764.28),
-    // which APT 2 shows rounded to 10 ft (3-43) as 12350 again; no digit of it equals the one beside it
+    // Figure 5-60: each of the five cells of a stored elevation holds its own digit. 12343 ft are saved as 3762 m
+    // (3762.15), which are 12342.5 ft and show in whole feet (#450) as 12343 again; no digit of it equals the one
+    // beside it
     it('shows each digit of a stored elevation in its own cell (5-17, figure 5-60)', async () => {
         const unit = await bootUnit({
-            storage: savedUserWaypoints([{kind: 'apt', ident: 'UAPT', lat: 47.0, lon: 8.0, elevationFt: 12350}]),
+            storage: savedUserWaypoints([{kind: 'apt', ident: 'UAPT', lat: 47.0, lon: 8.0, elevationFt: 12343}]),
         });
         await unit.panel.selectPage('R', 'APT 2');
 
-        expect(Screen.read().rows('R')[3]).toBe('ELV 12350ft');
+        expect(Screen.read().rows('R')[3]).toBe('ELV 12343ft');
     });
 });
 

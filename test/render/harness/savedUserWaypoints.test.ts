@@ -114,10 +114,10 @@ describe('savedUserWaypoints (harness)', () => {
         expect(vor.lon).toBeCloseTo(-70.5, 6);
     });
 
-    // APT 2 of a user airport rounds the stored altitude (meters) back to feet in steps of 10 (Apt2UserPage.formatElevation):
-    // 427 m are 1400.9 ft and show as 1400. Without the conversion the unit would show 4590 ft (1400 m), and a saved
-    // elevation of 80 ft (24 m, 78.7 ft) shows as 80
-    it.each([[1400, 'ELV 01400ft'], [80, 'ELV 00080ft']])('shows an elevation of %i ft on APT 2 as saved', async (elevationFt, row) => {
+    // APT 2 of a user airport shows the stored altitude (meters) in whole feet (Apt2UserPage.formatElevation, #450):
+    // 1400 ft are saved as 427 m, which are 1400.9 ft and show as 1401. Without the conversion the unit would show
+    // 4593 ft (1400 m). 80 ft are saved as 24 m, which are 78.7 ft and show as 79
+    it.each([[1400, 'ELV 01401ft'], [80, 'ELV 00079ft']])('shows an elevation of %i ft on APT 2 in the whole meters it is saved in', async (elevationFt, row) => {
         const unit = await bootUnit({storage: savedUserWaypoints([{kind: 'apt', ident: 'UAPT', lat: 47, lon: 8, elevationFt, runwayLengthFt: 3200}])});
         await settle(unit);
         await unit.panel.selectPage('R', 'APT 1');
