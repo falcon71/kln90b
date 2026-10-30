@@ -165,9 +165,10 @@ describe('APT 2 page of a user airport', () => {
         expect(Screen.read().rows('R')[3]).toBe('ELV 01250ft');
         // The elevation is saved with the user waypoint (a V2 string laid out by hand, docs/architecture.md Core 7): type A,
         // region XX, the ident padded to eight, latitude +4700.00, longitude +01200.00, the elevation in meters (1250 ft
-        // are 381 m), the unknown runway length -33 ft and no surface. The unit saves a moment after the change.
+        // are 381 m), the unknown runway length -33 ft, no surface and the elevation in feet (#449). The unit saves a
+        // moment after the change.
         await vi.advanceTimersByTimeAsync(1000);
-        expect(storedSetting(unit, 'wpt0')).toBe('AXX        FARM    +4700.00+01200.00+00381-00033-');
+        expect(storedSetting(unit, 'wpt0')).toBe('AXX        FARM    +4700.00+01200.00+00381-00033-+01250');
         // The elevation is kept: APT 2 shows it again after a visit to APT 1
         await unit.panel.inner('R', -1);
         await unit.panel.inner('R', 1);
@@ -222,5 +223,19 @@ describe('APT 2 page of a stored user airport (characterization)', () => {
             "...........",
           ]
         `);
+    });
+
+    // #449: an entry of 71 ft shows 71 (#450). The whole meters of the slot (22 m) are 72.18 ft and would show 72; the
+    // feet after the surface keep 71
+    it('shows a saved elevation of 71 ft as 71 (#449)', async () => {
+        const unit = await bootUnit({storage: {userDataFormat: 2, wpt0: 'AXX        UAPT    +4700.00+00800.00+00022-00033-+00071'}});
+        await unit.panel.selectPage('R', 'APT 1');
+        await unit.panel.cursor('R');
+        await unit.panel.enterIdent('R', 'UAPT');
+        await unit.panel.cursor('R');
+        await unit.panel.selectPage('R', 'APT 2');
+
+        expect(unit.errors).toEqual([]);
+        expect(Screen.read().rows('R')[3]).toBe('ELV 00071ft');
     });
 });

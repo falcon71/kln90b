@@ -110,7 +110,24 @@ export class UserWaypointPersistor {
         return ICAO.valueToStringV2(wpt.icaoStruct) + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon)
             // @ts-ignore
             + withSign(wpt.altitude, padInt(Math.abs(wpt.altitude), 5))
-            + this.serializeRunway(wpt.runways[0]);
+            + this.serializeRunway(wpt.runways[0])
+            + this.serializeElevationFeet(wpt);
+    }
+
+    /**
+     * The whole meters before the runway lose up to 1.6 ft of the whole feet APT 2 shows (#449, #450). The elevation is
+     * therefore also written in whole feet after the surface, where older versions do not read. They are rounded as
+     * APT 2 rounds them, so an airport restored from whole meters shows the same after the next save. An unknown
+     * elevation (-1 m) has no feet.
+     */
+    private serializeElevationFeet(wpt: AirportFacility): string {
+        // @ts-ignore
+        if (wpt.altitude === -1) {
+            return "";
+        }
+        // @ts-ignore
+        const feet = UnitType.METER.convertTo(wpt.altitude, UnitType.FOOT);
+        return withSign(feet, padInt(Math.abs(feet), 5));
     }
 
     private serializeRunway(rwy: AirportRunway): string {

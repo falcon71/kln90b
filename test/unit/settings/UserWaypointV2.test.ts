@@ -249,7 +249,8 @@ describe('user waypoint V2 format', () => {
             altitude: 1400,
             runways: [{...base.runways[0], length: UnitType.FOOT.convertTo(2500, UnitType.METER), surface: RunwaySurfaceType.Grass}],
         } as AirportFacility);
-        expect(storedSlot(0)).toBe('AXX        UAPT    +4700.00+00800.00+01400+02500S');
+        // After the surface the elevation in whole feet (#449): 1400 m are 4593.2 ft
+        expect(storedSlot(0)).toBe('AXX        UAPT    +4700.00+00800.00+01400+02500S+04593');
 
         removeAll();
         restoreFrom('AXX        UAPT    +4700.00+00800.00+01400+02500S');
@@ -272,19 +273,68 @@ describe('user waypoint V2 format', () => {
         return UnitType.METER.convertTo((repo.get(ICAO.value('A', 'XX', '', 'UAPT')) as AirportFacility).altitude, UnitType.FOOT);
     }
 
-    /** APT 2 shows the elevation in 10 ft steps */
-    const shownElevation = (feet: number): number => Math.round(feet / 10) * 10;
+    /** APT 2 of a user airport shows the elevation in whole feet (#450) */
+    const shownElevation = (feet: number): number => Math.round(feet);
 
-    // The sibling of the #449 pin: an elevation on a 10 ft step survives the whole meters of the record (1240 ft is
-    // 377.95 m, saved as 378 m, 1240.2 ft)
-    it('keeps the shown elevation of 1240 ft over a save and restore', () => {
-        expect(shownElevation(roundTripElevation(1240))).toBe(1240);
+    // #449: 71 ft (the elevation the third-party KLN 90B trainer kept, #450) is 21.64 m. The whole meters alone would
+    // save 22 m and restore 72.18 ft, which shows 72; the feet after the surface keep 71
+    it('keeps the shown elevation of 71 ft over a save and restore (#449)', () => {
+        expect(shownElevation(roundTripElevation(71))).toBe(71);
     });
 
-    // #449: 105 ft is 32.004 m and shows 110 (105.00000000000001 ft back), but is saved as 32 m and restores as
-    // 104.99 ft, which shows 100
-    it.fails('keeps the shown elevation of 105 ft over a save and restore (#449)', () => {
-        expect(shownElevation(roundTripElevation(105))).toBe(110);
+    // #449: after the surface comes the elevation in whole feet. The meters stay where they were, so a version without
+    // the feet still reads the slot
+    it('saves the elevation of a user airport in feet after the surface (#449)', () => {
+        repo.add({
+            ...airport('UAPT', 47, 8),
+            icaoStruct: ICAO.value('A', 'XX', '', 'UAPT'),
+            region: 'XX',
+            altitude: UnitType.FOOT.convertTo(71, UnitType.METER),
+        } as AirportFacility);
+
+        expect(storedSlot(0).slice(36)).toBe('+00022+05000H+00071');
+    });
+
+    // #449: the feet take precedence over the meters, which are 72.18 ft
+    it('restores the elevation from the feet after the surface (#449)', () => {
+        restoreFrom('AXX        UAPT    +4700.00+00800.00+00022+08000H+00071');
+        const apt = repo.get(ICAO.value('A', 'XX', '', 'UAPT')) as AirportFacility;
+
+        expect(UnitType.METER.convertTo(apt.altitude, UnitType.FOOT)).toBeCloseTo(71, 6);
+    });
+
+    // #449: the elevation is entered in whole feet (ElevationEditor). Every entry up to 2000 ft shows the same after a
+    // save and restore; with the whole meters alone, most did not (71 shows 72)
+    it('keeps the shown elevation of every whole foot from 0 to 1999 ft over a save and restore (#449)', () => {
+        const changed: number[] = [];
+        for (let feet = 0; feet < 2000; feet++) {
+            if (shownElevation(roundTripElevation(feet)) !== feet) {
+                changed.push(feet);
+            }
+            removeAll();
+        }
+        expect(changed).toEqual([]);
+    });
+
+    // #449: a slot saved before the feet holds whole meters. Saved again, it gets the whole feet APT 2 shows, so it
+    // shows the same as before. Checked for every whole meter up to 4600 m (15092 ft), above every airport
+    it('keeps the shown elevation of a slot without feet over a save and restore (#449)', () => {
+        const changed: number[] = [];
+        for (let meters = 0; meters <= 4600; meters++) {
+            restoreFrom(`AXX        UAPT    +4700.00+00800.00+${String(meters).padStart(5, '0')}+08000H`);
+            const fromMeters = repo.get(ICAO.value('A', 'XX', '', 'UAPT')) as AirportFacility;
+            const before = shownElevation(UnitType.METER.convertTo(fromMeters.altitude, UnitType.FOOT));
+            repo.update(fromMeters, fac => fac.name = 'SAVE'); // any change saves all slots again
+            const slot = storedSlot(0);
+            removeAll();
+            restoreFrom(slot);
+            const restored = repo.get(ICAO.value('A', 'XX', '', 'UAPT')) as AirportFacility;
+            if (slot.length === 49 || shownElevation(UnitType.METER.convertTo(restored.altitude, UnitType.FOOT)) !== before) {
+                changed.push(meters);
+            }
+            removeAll();
+        }
+        expect(changed).toEqual([]);
     });
 
     it('serializes and restores a negative magnetic variation of a VOR', () => {

@@ -22,6 +22,7 @@ interface SavedPosition {
  * A user waypoint as an earlier session saved it. `sup` is a user waypoint of the SUP page (type letter `U`), `int` a
  * user intersection (`W`).
  * - `apt`: `elevationFt` is stored in meters, rounded, as the format and the model hold it (1400 ft are saved as +00427).
+ *   The slot ends at the surface, as versions before #449 saved it; the unit now adds the elevation in feet after it.
  *   An unknown elevation is saved as -1 m (the unit's own value) and an unknown runway length as -33 ft (the unit's
  *   -10 m), with the surface `-`; give `runwayLengthFt` to get a surface of `H` (asphalt) unless `surface` says `S` (grass).
  * - `vor`: `magvar` is the whole-degree number the unit saves, as the model holds it (`VorOptions.magneticVariation`).

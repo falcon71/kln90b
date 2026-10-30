@@ -100,7 +100,7 @@ export class UserWaypointLoaderV2 implements UserWaypointLoader {
             departures: [],
             approaches: [],
             arrivals: [],
-            altitude: Number(str.substring(36, 42)),
+            altitude: this.deserializeElevation(str),
             loadedDataFlags: 0,
             holdingPatterns: [],
             transitionAlt: 0,
@@ -282,6 +282,17 @@ export class UserWaypointLoaderV2 implements UserWaypointLoader {
 
     private deserializeFrequency(str: string): number {
         return Number(str.substring(36, 43));
+    }
+
+    /**
+     * In meters. The feet after the surface take precedence over the whole meters before the runway (#449); a slot
+     * saved before the feet were added, or with an unknown elevation, has only the meters
+     */
+    private deserializeElevation(str: string): number {
+        if (str.length > 49) {
+            return UnitType.FOOT.convertTo(Number(str.substring(49, 55)), UnitType.METER);
+        }
+        return Number(str.substring(36, 42));
     }
 
     private deserializeSurface(str: string): RunwaySurfaceType {

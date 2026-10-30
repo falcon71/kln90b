@@ -918,7 +918,12 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       12-char V1 ICAOs.
     - Code: `UserWaypointLoaderV1`, `UserFlightplanLoaderV1`.
 - V2:
-    - The same layout but with the **19-char `ICAO.valueToStringV2`**, so all field offsets shift by 7.
+    - The same layout but with the **19-char `ICAO.valueToStringV2`**, so all field offsets shift by 7. The APT altitude
+      is in whole meters (offsets 36-41).
+    - Since #449 an APT with a known elevation also carries it in whole feet after the surface (`+00071`, offsets
+      49-54), because whole meters change the whole feet APT 2 shows (#450). The feet are rounded as APT 2 rounds
+      them. The loader takes the feet when the slot is longer than the surface and the meters otherwise; older versions
+      read by fixed offsets and ignore the feet. An unknown elevation (-1 m) has no feet.
     - `fpl{i}` stores FPL i for 0 to 25, **including FPL 0**. Only USER legs are stored.
     - Code: `UserWaypointLoaderV2`, `UserFlightplanLoaderV2`.
 - Migration in `KLN90BCore.asyncInit`: if the format is not 2, re-persist all waypoints and plans with the V2 writers, then

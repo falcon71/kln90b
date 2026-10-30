@@ -52,8 +52,9 @@ describe('user data conversion of every kind (#47)', () => {
             },
         });
 
+        // The V2 writer adds the airport elevation in whole feet after the surface (#449): 1400 m are 4593.2 ft
         expect([0, 1, 2, 3, 4].map(i => storedSetting(unit, `wpt${i}`))).toEqual([
-            'AXX        UAPT    +4700.00-00830.00+01400+03200H',
+            'AXX        UAPT    +4700.00-00830.00+01400+03200H+04593',
             'VXX        UVOR    +4730.00+00854.00+114.30-02',
             'NXX        UNDB    +4800.00-00915.00+0345.0',
             'WXX        UINT    +4730.00-00815.50',
