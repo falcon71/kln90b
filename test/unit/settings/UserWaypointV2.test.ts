@@ -258,6 +258,35 @@ describe('user waypoint V2 format', () => {
         expect(UnitType.METER.convertTo(apt.runways[0].length, UnitType.FOOT)).toBeCloseTo(2500, 3);
     });
 
+    /** a user airport with the elevation as APT 2 stores it (meters), saved and restored; returns the elevation in feet */
+    function roundTripElevation(feet: number): number {
+        repo.add({
+            ...airport('UAPT', 47, 8),
+            icaoStruct: ICAO.value('A', 'XX', '', 'UAPT'),
+            region: 'XX',
+            altitude: UnitType.FOOT.convertTo(feet, UnitType.METER),
+        } as AirportFacility);
+        const slot = storedSlot(0);
+        removeAll();
+        restoreFrom(slot);
+        return UnitType.METER.convertTo((repo.get(ICAO.value('A', 'XX', '', 'UAPT')) as AirportFacility).altitude, UnitType.FOOT);
+    }
+
+    /** APT 2 shows the elevation in 10 ft steps */
+    const shownElevation = (feet: number): number => Math.round(feet / 10) * 10;
+
+    // The sibling of the #449 pin: an elevation on a 10 ft step survives the whole meters of the record (1240 ft is
+    // 377.95 m, saved as 378 m, 1240.2 ft)
+    it('keeps the shown elevation of 1240 ft over a save and restore', () => {
+        expect(shownElevation(roundTripElevation(1240))).toBe(1240);
+    });
+
+    // #449: 105 ft is 32.004 m and shows 110 (105.00000000000001 ft back), but is saved as 32 m and restores as
+    // 104.99 ft, which shows 100
+    it.fails('keeps the shown elevation of 105 ft over a save and restore (#449)', () => {
+        expect(shownElevation(roundTripElevation(105))).toBe(110);
+    });
+
     it('serializes and restores a negative magnetic variation of a VOR', () => {
         repo.add({
             icao: '', icaoStruct: ICAO.value('V', 'XX', '', 'ABC'), name: '', lat: 47.5, lon: 8.9, region: 'XX', city: '',
