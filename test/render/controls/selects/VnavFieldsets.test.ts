@@ -66,6 +66,40 @@ describe('VNAV angle fieldset', () => {
         expect(storedSetting(unit, 'cal4Angle')).toBe(2.3);
     });
 
+    // #448: an angle that is not 0 but shows 0.0 (CAL 4 at 300 kt and 10 ft/min, atan(10 / 30380) = 0.019 degrees)
+    // takes a digit edit like any other angle (5-12)
+    it('takes 3.0 from the units digit of an angle that shows 0.0 (#448)', async () => {
+        const unit = await onAngle({cal4GS: 300, cal4Fpm: 10, cal4Angle: 0.019});
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE: 0.0°');
+        await unit.panel.inner('L', 3);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'cal4Angle')).toBe(3);
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE: 3.0°');
+    });
+
+    it('takes 0.3 from the tenths digit of an angle that shows 0.0 (#448)', async () => {
+        const unit = await onAngle({cal4GS: 300, cal4Fpm: 10, cal4Angle: 0.019});
+        await unit.panel.outer('L', 1);
+        await unit.panel.inner('L', 3);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'cal4Angle')).toBe(0.3);
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE: 0.3°');
+    });
+
+    // #448: a computed angle is rarely an exact tenth. The edit starts from the digits the pilot sees: 2.86 shows 2.9,
+    // and one click down on the units is 1.9
+    it('keeps the shown tenths of 2.86 when the units digit is turned (#448)', async () => {
+        const unit = await onAngle({cal4GS: 160, cal4Fpm: 800, cal4Angle: 2.86});
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE: 2.9°');
+        await unit.panel.inner('L', -1);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(storedSetting(unit, 'cal4Angle')).toBe(1.9);
+        expect(Screen.read().rows('L')[4]).toBe('ANGLE: 1.9°');
+    });
+
     // The sibling of the pin below: at 60 kt (6076 ft/min) a rate of 1100 ft/min is atan(1100 / 6076) = 10.3 degrees,
     // an angle the units digit cannot hold. 1000 ft/min (9.3 degrees) still fits.
     it('reaches an angle of 10.3 degrees at 60 kt and 1100 ft/min (5-12)', async () => {

@@ -116,13 +116,26 @@ export class VnavAngleFieldset implements UiElement {
     }
 
     private saveAngle1(newAngle1: number): void {
-        const oldAngle = format(this.angle ?? 0, "+0.0", {zeroFormat: "+0.0"});
-        this.save(Number(oldAngle.substring(0, 1) + newAngle1 + oldAngle.substring(2)));
+        this.saveDigits(newAngle1, this.oldTenths() % 10);
     }
 
     private saveAngle01(newAngle01: number): void {
-        const oldAngle = format(this.angle ?? 0, "+0.0", {zeroFormat: "+0.0"});
-        this.save(Number(oldAngle.substring(0, 3) + newAngle01));
+        this.saveDigits(Math.floor(this.oldTenths() / 10), newAngle01);
+    }
+
+    /**
+     * The shown angle in whole tenths, without its sign
+     */
+    private oldTenths(): number {
+        return Math.round(Math.abs(this.angle ?? 0) * 10);
+    }
+
+    /**
+     * #448: the edited angle keeps the sign of the old one, also when that one shows 0.0 without being 0
+     */
+    private saveDigits(units: number, tenths: number): void {
+        const sign = (this.angle ?? 0) < 0 ? -1 : 1;
+        this.save(sign * (units * 10 + tenths) / 10);
     }
 
     private save(angle: Degrees): void {
