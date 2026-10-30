@@ -41,9 +41,19 @@ describe('unhandled rejection collector (harness)', () => {
         expect(unit.takeRejections()).toEqual([noEfb]);
     });
 
-    // The strict check: a rejection nobody took fails the test when it ends. The sibling above holds the same setup.
-    // Not a bug pin: the failure is the behavior under test, so this it.fails names no issue and stays as it is
-    it.fails('fails a test that leaves a rejection untaken (harness self-test, not a bug pin)', async () => {
+    // The strict check: a rejection nobody took fails the test when it ends. Registered before the boot, the hook below
+    // runs after the check, finds the check's failure on the test and clears it, as Vitest's own it.fails does. Any
+    // other failure, or none, stays on the test
+    it('fails a test that leaves a rejection untaken', async ({task}) => {
+        onTestFinished(() => {
+            const result = task.result!;
+            expect(result.state).toBe('fail');
+            expect(result.errors?.map(e => e.message)).toEqual([
+                'unhandled rejection(s) during the test; take expected ones with unit.takeRejections():\nError: untaken',
+            ]);
+            result.state = 'pass';
+            result.errors = undefined;
+        });
         await bootUnit();
         void Promise.reject(new Error('untaken'));
         await vi.advanceTimersByTimeAsync(250);
