@@ -835,30 +835,54 @@ describe('ActiveWaypoint through an edit in front of the active waypoint (#440)'
 });
 
 // #445: a SID replaced by one of the same length, in one batch as Apt7Page.loadNow does it, leaves the active waypoint
-// at its index, so the early instance check of assertToMatchesFplIdx returns before the leg in front of it is looked at.
+// at its index, and only the leg in front of it shows the edit. assertToMatchesFplIdx compares that leg by instance too,
+// so the FROM gone is noticed as for a replacement of a different length, and the closest leg is activated, by analogy
+// with deleting the FROM (KLN 89 trainer, 3e); a batch that deletes the FROM and inserts procedure legs at once was not
+// flown in the trainer (the design's call).
 // FPL 0 is KAAA SIDA1 SIDA2 ABC DEF; the aircraft is 10 NM along the leg SIDA2 - ABC, so ABC (index 3) is active from
 // SIDA2. The new SID is SIDB1 SIDB2. SIDB2 lies 15° off SIDA2 as seen from ABC, so that the leg SIDB2 - ABC is the
-// closest leg after the batch, and a fix that activates the closest leg turns the pin red
-describe('ActiveWaypoint when the active SID is replaced by one of the same length (#445)', () => {
+// closest leg after the batch, and keeping the old FROM is told apart from activating the closest leg
+describe('ActiveWaypoint when the active SID or STAR is replaced by one of the same length (#445)', () => {
     const sid = (ident: string, p: { lat: number; lon: number }): KLNFlightplanLeg => ({wpt: intersection(ident, p.lat, p.lon), type: KLNLegType.SID});
+    const star = (ident: string, p: { lat: number; lon: number }): KLNFlightplanLeg => ({wpt: intersection(ident, p.lat, p.lon), type: KLNLegType.STAR});
+    const app = (wpt: Facility, fixType: KLNFixType): KLNFlightplanLeg => ({wpt, type: KLNLegType.APP, fixType});
     const sidA2 = pointFrom(B, 315, 20);
 
-    function replaceSid() {
-        const legs = [user(A), sid('SIDA1', pointFrom(A, 0, 10)), sid('SIDA2', sidA2), user(B), user(C)];
-        const {aw, fpl} = activeWaypointWith(legs, pointFrom(B, 315, 10));
-        aw.activateFpl0();
-        const before = {idx: aw.getActiveFplIdx(), from: aw.getFromWpt()!.icaoStruct.ident};
+    /** A turn entry of no particular geometry: the tests only follow the objects */
+    const anyTurn = () => {
+        const circle = GeoCircle.createGreatCircle(A, B);
+        return new TurnStackEntry(circle, new GeoPoint(B.lat, B.lon), circle);
+    };
+
+    /** The run-out of an abeam turn at ABC onto the leg to DEF (#406) */
+    const runOut = () => TurnStackEntry.runOut(TurnStackEntry.abeamTurn(B, GeoCircle.createGreatCircle(B, C), 'left'));
+
+    /** Replaces SIDA1 SIDA2 by SIDB1 SIDB2 in one batch, as Apt7Page.loadNow does it */
+    function swapSid(fpl: Flightplan, sidB1 = pointFrom(A, 180, 10), sidB2 = pointFrom(B, 300, 20)) {
         fpl.startBatchInsert();
         fpl.removeProcedure(KLNLegType.SID);
-        fpl.insertLeg(1, sid('SIDB1', pointFrom(A, 180, 10)));
-        fpl.insertLeg(2, sid('SIDB2', pointFrom(B, 300, 20)));
+        fpl.insertLeg(1, sid('SIDB1', sidB1));
+        fpl.insertLeg(2, sid('SIDB2', sidB2));
         fpl.finishBatchInsert();
+    }
+
+    /** The aircraft, 10 NM along the leg SIDA2 - ABC */
+    const aircraft = pointFrom(B, 315, 10);
+
+    /** ABC active from SIDA2, then `beforeBatch`, then the SID swapped */
+    function replaceSid(beforeBatch: (aw: ActiveWaypoint) => void = () => {}, sidB1?: { lat: number; lon: number }, sidB2?: { lat: number; lon: number }) {
+        const legs = [user(A), sid('SIDA1', pointFrom(A, 0, 10)), sid('SIDA2', sidA2), user(B), user(C)];
+        const {aw, fpl} = activeWaypointWith(legs, aircraft);
+        aw.activateFpl0();
+        const before = {idx: aw.getActiveFplIdx(), from: aw.getFromWpt()!.icaoStruct.ident};
+        beforeBatch(aw);
+        swapSid(fpl, sidB1, sidB2);
         return {aw, fpl, before};
     }
 
-    // The sibling that holds the preconditions of the pin: ABC was active from SIDA2, and after the batch it is still at
-    // index 3, with SIDB2 in front of it
-    it('leaves the active waypoint at its index with the new SID in front of it (control of the #445 pin)', () => {
+    // The sibling that holds the preconditions of the tests below: ABC was active from SIDA2, and after the batch it is
+    // still at index 3, with SIDB2 in front of it
+    it('leaves the active waypoint at its index with the new SID in front of it (control of the #445 tests)', () => {
         const {aw, fpl, before} = replaceSid();
         expect(before).toEqual({idx: 3, from: 'SIDA2'});
         expect(identsOf(fpl.getLegs())).toEqual(['KAAA', 'SIDB1', 'SIDB2', 'ABC', 'DEF']);
@@ -866,10 +890,97 @@ describe('ActiveWaypoint when the active SID is replaced by one of the same leng
         expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('ABC');
     });
 
-    it.fails('makes the new SID\'s last fix the FROM when the active SID is replaced by one of the same length (#445)', () => {
+    it('makes the new SID\'s last fix the FROM when the active SID is replaced by one of the same length (#445)', () => {
         const {aw} = replaceSid();
         // As NavCalculator.updateActiveLeg reads it: the active leg first, which runs assertToMatchesFplIdx, then the FROM
         expect(aw.getActiveLeg()!.wpt.icaoStruct.ident).toBe('ABC');
         expect(aw.getFromWpt()!.icaoStruct.ident).toBe('SIDB2');
+        expect(aw.getActiveFplIdx()).toBe(3);
+        // The path is the great circle SIDB2 - ABC: a point 10 NM from B toward SIDB2 lies on it
+        expect(Math.abs(aw.getFromLeg()!.path.distance(pointFrom(B, 300, 10)))).toBeLessThan(NM(0.01));
+    });
+
+    // The closest leg is taken also when it is not the leg into the active waypoint: the new SID's leg SIDB1 - SIDB2
+    // runs through the aircraft, 10 NM to either side of it, while the leg SIDB2 - ABC is about 7 NM away. The active
+    // waypoint does not stay at its index, as it would if only the FROM were made again
+    it('activates the closest leg also when it is a leg of the new SID (#445)', () => {
+        const {aw} = replaceSid(undefined, pointFrom(aircraft, 45, 10), pointFrom(aircraft, 225, 10));
+
+        expect(aw.getActiveFplIdx()).toBe(2);
+        expect(aw.getActiveWpt()!.icaoStruct.ident).toBe('SIDB2');
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('SIDB1');
+    });
+
+    it('clears the turn state, the run-out included, as a replacement of a different length does (#445)', () => {
+        const {aw} = replaceSid(aw => {
+            aw.turnStack.push(runOut());
+            aw.turnPlan = TurnPlan.AT_ABEAM;
+        });
+
+        expect(aw.getActiveFplIdx()).toBe(3);
+        expect(aw.turnStack).toEqual([]);
+        expect(aw.turnPlan).toBeNull();
+    });
+
+    // KAAA ABC STA1 STA2 DEF GHI, with DEF the IAF and GHI the FAF of the approach; the aircraft is 10 NM along STA2 - DEF,
+    // so DEF (index 4) is active from STA2. Apt7Page.loadNow inserts the new STAR in front of the approach, which keeps its
+    // legs. STB2 lies 15° off STA2 as seen from DEF, so that the leg STB2 - DEF is the closest leg after the batch
+    it('makes the new STAR\'s last fix the FROM when the STAR in front of the first approach fix is replaced by one of the same length (#445)', () => {
+        const legs = [user(A), user(B), star('STA1', pointFrom(C, 225, 30)), star('STA2', pointFrom(C, 180, 20)),
+            app(C, KLNFixType.IAF), app(D, KLNFixType.FAF)];
+        const {aw, fpl} = activeWaypointWith(legs, pointFrom(C, 180, 10));
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(4); // Precondition: DEF is active, from STA2
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('STA2');
+        const iaf = fpl.getLegs()[4];
+
+        fpl.startBatchInsert();
+        fpl.removeProcedure(KLNLegType.STAR);
+        fpl.insertLeg(2, star('STB1', pointFrom(B, 270, 20)));
+        fpl.insertLeg(3, star('STB2', pointFrom(C, 195, 20)));
+        fpl.finishBatchInsert();
+
+        expect(identsOf(fpl.getLegs())).toEqual(['KAAA', 'ABC', 'STB1', 'STB2', 'DEF', 'GHI']);
+        expect(aw.getActiveLeg()).toBe(iaf);
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('STB2');
+    });
+
+    // A Direct To flies from its own origin, so the leg in front of its target is not its FROM, and it follows its target
+    // as before
+    it('keeps a Direct To to the first en-route waypoint when the SID in front of it is replaced by one of the same length', () => {
+        const origin = fromHere(pointFrom(B, 315, 10));
+        const leftover = anyTurn();
+        const {aw} = replaceSid(aw => {
+            aw.directToFlightplanIndex(origin, 3);
+            aw.turnStack.push(leftover);
+            aw.turnPlan = TurnPlan.AT_LEAD;
+        });
+
+        expect(aw.getActiveFplIdx()).toBe(3);
+        expect(aw.isDctNavigation()).toBe(true);
+        expect(aw.getFromWpt()).toBe(origin);
+        expect(aw.turnStack).toEqual([leftover]);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
+    });
+
+    // KAAA SIDA1 SIDA2 ABC DEF GHI with the aircraft 20 NM along ABC - DEF: DEF (index 4) is active from ABC, and the
+    // same SID swap leaves the FROM's leg as it was
+    it('changes nothing when the SID is replaced while an en-route leg further down is active', () => {
+        const legs = [user(A), sid('SIDA1', pointFrom(A, 0, 10)), sid('SIDA2', sidA2), user(B), user(C), user(D)];
+        const {aw, fpl} = activeWaypointWith(legs, pointFrom(B, 0, 20));
+        aw.activateFpl0();
+        expect(aw.getActiveFplIdx()).toBe(4); // Precondition: DEF is active, from ABC
+        expect(aw.getFromWpt()!.icaoStruct.ident).toBe('ABC');
+        const leftover = anyTurn();
+        aw.turnStack.push(leftover);
+        aw.turnPlan = TurnPlan.AT_LEAD;
+        const from = aw.getFromLeg();
+
+        swapSid(fpl);
+
+        expect(aw.getActiveFplIdx()).toBe(4);
+        expect(aw.getFromLeg()).toBe(from);
+        expect(aw.turnStack).toEqual([leftover]);
+        expect(aw.turnPlan).toBe(TurnPlan.AT_LEAD);
     });
 });

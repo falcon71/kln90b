@@ -495,7 +495,12 @@ export class ActiveWaypoint {
 
 
         const legs = this.fpl0.getLegs();
-        if (this.fplIdx < legs.length && this.to === legs[this.fplIdx]) { //Yes, we really need to check the instance here. For example the user may remove the enroute waypoint with the same icao as the IAF
+        //Yes, we really need to check the instance here. For example the user may remove the enroute waypoint with the same
+        //icao as the IAF. #445: the leg the from waypoint was made from is compared by instance too: a SID or STAR replaced
+        //by one of the same length in one batch leaves the active waypoint at its index, and only the leg in front of it
+        //shows the edit. A Direct To never passes (fromPlanLeg is null) and goes to its branch below, which finds the
+        //target where it was
+        if (this.fplIdx < legs.length && this.to === legs[this.fplIdx] && legs[this.fplIdx - 1] === this.fromPlanLeg) {
             this.assertFollowingLegUnchanged(legs);
             return;
         }
