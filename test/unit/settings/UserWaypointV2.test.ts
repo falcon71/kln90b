@@ -271,6 +271,21 @@ describe('user waypoint V2 format', () => {
         expect((repo.get(ICAO.value('V', 'XX', '', 'ABC')) as VorFacility).magneticVariation).toBe(-5);
     });
 
+    // #447: numerable wrote a variation of exactly 0 as 00 without the sign; it is +00 now, the width of every other
+    // variation. It is the last field, read with Number(), so both forms restore as 0.
+    it('serializes a magnetic variation of 0 as +00 and restores it as 0 (#447)', () => {
+        repo.add({
+            icao: '', icaoStruct: ICAO.value('V', 'XX', '', 'ABC'), name: '', lat: 47.5, lon: 8.9, region: 'XX', city: '',
+            magvar: 0, freqMHz: 108.0, freqBCD16: 0, magneticVariation: 0, type: 0, vorClass: 0, navRange: 0,
+            dme: null, ils: null, tacan: null, trueReferenced: false, alt: 0,
+        } as unknown as VorFacility);
+        expect(storedSlot(0)).toBe('VXX        ABC     +4730.00+00854.00+108.00+00');
+
+        removeAll();
+        restoreFrom('VXX        ABC     +4730.00+00854.00+108.00+00');
+        expect((repo.get(ICAO.value('V', 'XX', '', 'ABC')) as VorFacility).magneticVariation).toBe(0);
+    });
+
     // The V1 half of this is #101
     it('serializes and restores a longitude of 100 degrees or more', () => {
         repo.add({

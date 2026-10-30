@@ -1,7 +1,7 @@
 import {SelectField} from "./SelectField";
 import {FSComponent, VNode} from "@microsoft/msfs-sdk";
 import {UiElement, UIElementChildren} from "../../pages/Page";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 
 
 type FpmFieldsetTypes = {
@@ -54,7 +54,7 @@ export class FpmFieldset implements UiElement {
             return;
         }
         this.fpm = rounded;
-        this.showDigits(format(rounded, "0000"));
+        this.showDigits(padInt(rounded, 4));
     }
 
     private showDigits(digits: string | null): void {
@@ -66,22 +66,22 @@ export class FpmFieldset implements UiElement {
     }
 
     private saveFpm1000(newFpm1000: number): void {
-        const oldFpm = format(this.fpm ?? 0, "0000");
+        const oldFpm = padInt(this.fpm ?? 0, 4);
         this.save(Number(newFpm1000 + oldFpm.substring(1)));
     }
 
     private saveFpm100(newFpm100: number): void {
-        const oldFpm = format(this.fpm ?? 0, "0000");
+        const oldFpm = padInt(this.fpm ?? 0, 4);
         this.save(Number(oldFpm.substring(0, 1) + newFpm100 + oldFpm.substring(2)));
     }
 
     private saveFpm10(newFpm10: number): void {
-        const oldFpm = format(this.fpm ?? 0, "0000");
+        const oldFpm = padInt(this.fpm ?? 0, 4);
         this.save(Number(oldFpm.substring(0, 2) + newFpm10 + oldFpm.substring(3)));
     }
 
     private saveFpm1(newFpm1: number): void {
-        const oldFpm = format(this.fpm ?? 0, "0000");
+        const oldFpm = padInt(this.fpm ?? 0, 4);
         this.save(Number(oldFpm.substring(0, 3) + newFpm1));
     }
 

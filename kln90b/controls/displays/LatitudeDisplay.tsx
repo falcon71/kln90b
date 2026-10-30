@@ -2,7 +2,7 @@ import {FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
 import {Latitude} from "../../data/Units";
-import {format} from "numerable";
+import {padFixed} from "../../data/NumberFormat";
 import {splitDegreesMinutes} from "../../data/Coordinates";
 
 /**
@@ -34,7 +34,7 @@ export class LatitudeDisplay implements UiElement {
         const northSount = this.latitude >= 0 ? "N" : "S";
         const {degrees, minutes} = splitDegreesMinutes(this.latitude);
         const degreesString = String(degrees).padStart(2, " "); //#230: a degree below 10 is padded with a blank
-        const minutesString = format(minutes, "00.00");
+        const minutesString = padFixed(minutes, 2, 2);
 
         return `${northSount} ${degreesString}°${minutesString}'`;
     }

@@ -31,7 +31,7 @@ import {Flightplan, KLNFixType, KLNFlightplanLeg, KLNLegType, ProcedureInformati
 import {Degrees, NauticalMiles} from "../Units";
 import {roundBearing} from "../Coordinates";
 import {KLNMagvar} from "./KLNMagvar";
-import {format} from "numerable";
+import {padInt} from "../NumberFormat";
 import {Sensors} from "../../Sensors";
 import {NavPageState} from "../VolatileMemory";
 import {buildIcao, buildIcaoStruct, TEMPORARY_WAYPOINT} from "./IcaoBuilder";
@@ -383,9 +383,9 @@ export class SidStar {
         if (rounded <= 26) {
             const ALPHABET = [' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
-            return `D${format(roundBearing(radial), "000")}${ALPHABET[rounded]}`;
+            return `D${padInt(roundBearing(radial), 3)}${ALPHABET[rounded]}`;
         } else { // 6-6: beyond 26 NM the first two letters of the DME ident and the radial
-            return `${navaid.substring(0, 2)}${format(roundBearing(radial), "000")}`;
+            return `${navaid.substring(0, 2)}${padInt(roundBearing(radial), 3)}`;
         }
 
     }

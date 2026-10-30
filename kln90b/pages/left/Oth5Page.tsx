@@ -3,7 +3,7 @@ import {SixLineHalfPage} from "../FiveSegmentPage";
 import {NO_CHILDREN, PageProps, UIElementChildren} from "../Page";
 import {CursorController, EnterResult, Field} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {Sensors} from "../../Sensors";
 import {TickController} from "../../TickController";
@@ -182,7 +182,7 @@ class FuelOnBoardSelect implements Field {
     }
 
     private getDisplayValue(): string {
-        return format(this.sensors.in.fuelComputer.fob, "0").padStart(5, " ")
+        return padInt(this.sensors.in.fuelComputer.fob, 1).padStart(5, " ")
     }
 
 

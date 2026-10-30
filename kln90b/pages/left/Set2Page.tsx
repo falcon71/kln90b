@@ -7,7 +7,7 @@ import {DateEditor} from "../../controls/editors/DateEditor";
 import {TimeEditor} from "../../controls/editors/TimeEditor";
 import {SelectField} from "../../controls/selects/SelectField";
 import {TimeStamp, TIMEZONES, UTC} from "../../data/Time";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {MagvarEditor} from "../../controls/editors/MagvarEditor";
 import {OneTimeMessage} from "../../data/MessageHandler";
 
@@ -156,7 +156,7 @@ export class Set2Page extends SixLineHalfPage {
     }
 
     private formatSeconds(date: TimeStamp): string {
-        return format(date.getSeconds(), "00");
+        return padInt(date.getSeconds(), 2);
     }
 
 

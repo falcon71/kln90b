@@ -1,4 +1,4 @@
-import {format} from "numerable";
+import {padFixed} from "../../data/NumberFormat";
 import {SelectField} from "./SelectField";
 import {NavMode, NavPageState} from "../../data/VolatileMemory";
 
@@ -30,7 +30,7 @@ function shownScale(nav: NavPageState): number {
     return nav.xtkScale < 5 ? 1 : 5;
 }
 
-const formatScale = (scale: number): string => format(scale, "0.00");
+const formatScale = (scale: number): string => padFixed(scale, 1, 2);
 
 /**
  * The CDI scale field of MOD 1 and MOD 2 (5-38)

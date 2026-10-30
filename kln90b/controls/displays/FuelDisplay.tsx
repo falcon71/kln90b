@@ -1,7 +1,7 @@
 import {FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
-import {format} from "numerable";
+import {padFixed, padInt} from "../../data/NumberFormat";
 
 /**
  * Displays fuel on the TRIP page
@@ -31,9 +31,9 @@ export class TripFuelDisplay implements UiElement {
         }
         //Compare the rounded value, 99.97 is shown as 100.0 otherwise
         if (Math.round(this.fuel * 10) / 10 >= 100) { //Number is too large for decimals
-            return format(this.fuel, "00").padStart(5, " ");
+            return padInt(this.fuel, 2).padStart(5, " ");
         } else {
-            return format(this.fuel, "0.0").padStart(5, " ");
+            return padFixed(this.fuel, 1, 1).padStart(5, " ");
         }
     }
 }
@@ -66,7 +66,7 @@ export class OthFuelDisplay implements UiElement {
 
         const actFuel = Math.max(Math.min(this.fuel, 99999), 0);
 
-        return format(actFuel, "0").padStart(5, " ");
+        return padInt(actFuel, 1).padStart(5, " ");
 
     }
 }
@@ -96,7 +96,7 @@ export class FuelFlowDisplay implements UiElement {
     private formatFuelFlow(): string {
         const actFuel = Math.min(this.fuelFlow, 9999);
 
-        return format(actFuel, "0").padEnd(4, " ");
+        return padInt(actFuel, 1).padEnd(4, " ");
 
     }
 }

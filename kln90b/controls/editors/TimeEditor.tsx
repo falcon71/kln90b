@@ -2,7 +2,7 @@ import {Editor, Rawvalue} from "./Editor";
 import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NumberEditorField} from "./EditorField";
 import {TimeStamp} from "../../data/Time";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {TickController} from "../../TickController";
 
 export class TimeEditor extends Editor<TimeStamp> {
@@ -24,7 +24,7 @@ export class TimeEditor extends Editor<TimeStamp> {
     }
 
     protected convertFromValue(value: TimeStamp): Rawvalue {
-        const stringMinutes = format(value.getMinutes(), "00");
+        const stringMinutes = padInt(value.getMinutes(), 2);
 
         return [
             value.getHours(),

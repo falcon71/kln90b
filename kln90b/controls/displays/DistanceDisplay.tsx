@@ -2,7 +2,7 @@ import {FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
 import {NauticalMiles} from "../../data/Units";
-import {format} from "numerable";
+import {padFixed, padInt} from "../../data/NumberFormat";
 
 /**
  * Displays a formatted distance
@@ -53,15 +53,15 @@ export class DistanceDisplay implements UiElement {
             return ".-".padStart(cells, "-").padStart(this.length, " ");
         }
         if (this.hundredthsBelowOne && Math.round(this.distance * 100) / 100 < 1) {
-            return format(this.distance, "0.00");
+            return padFixed(this.distance, 1, 2);
         }
 
         const cutoff = 10 ** (cells - 2);
         //Compare the rounded value, 99.97 is shown as 100.0 otherwise, one cell too long
         if (Math.round(this.distance * 10) / 10 >= cutoff) { //Number is too large for decimals
-            return format(this.distance, "00").padStart(this.length, " ");
+            return padInt(this.distance, 2).padStart(this.length, " ");
         } else {
-            return format(this.distance, this.leadingZero ? "00.0" : "0.0").padStart(this.length, " ");
+            return padFixed(this.distance, this.leadingZero ? 2 : 1, 1).padStart(this.length, " ");
         }
     }
 }

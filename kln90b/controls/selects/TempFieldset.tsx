@@ -1,7 +1,7 @@
 import {SelectField} from "./SelectField";
 import {FSComponent, VNode} from "@microsoft/msfs-sdk";
 import {UiElement, UIElementChildren} from "../../pages/Page";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {Celsius} from "../../data/Units";
 
 
@@ -50,14 +50,14 @@ export class TempFieldset implements UiElement {
         if (rounded >= -99 && rounded <= 99) { //rounded is NaN without a temperature
             this.temp = temp;
             this.children.get("TempSign").value = temp! >= 0 ? 1 : 0;
-            this.showDigits(format(Math.abs(temp!), "00"));
+            this.showDigits(padInt(Math.abs(temp!), 2));
             return;
         }
 
         this.temp = null;
         this.children.get("TempSign").value = 1;
         this.showDigits("00");
-        const override = rounded >= 100 && rounded <= 999 ? format(rounded, "000") : "---";
+        const override = rounded >= 100 && rounded <= 999 ? padInt(rounded, 3) : "---";
         this.fields().forEach((field, i) => field.displayOverride = override.substring(i, i + 1));
     }
 
@@ -80,18 +80,18 @@ export class TempFieldset implements UiElement {
     }
 
     private saveTemp10(newTemp10: number): void {
-        const oldTemp = format(Math.abs(this.temp ?? 0), "00");
+        const oldTemp = padInt(Math.abs(this.temp ?? 0), 2);
         this.save(this.sign() * Number(newTemp10 + oldTemp.substring(1)));
     }
 
     private saveTemp1(newTemp1: number): void {
-        const oldTemp = format(Math.abs(this.temp ?? 0), "00");
+        const oldTemp = padInt(Math.abs(this.temp ?? 0), 2);
         this.save(this.sign() * Number(oldTemp.substring(0, 1) + newTemp1));
     }
 
     private save(temp: Celsius): void {
         this.temp = temp;
-        this.showDigits(format(Math.abs(temp), "00"));
+        this.showDigits(padInt(Math.abs(temp), 2));
         this.callback(temp);
     }
 

@@ -1,7 +1,7 @@
 import {FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {TimeStamp} from "../../data/Time";
 
 /**
@@ -36,6 +36,6 @@ export class TimeDisplay implements UiElement {
             return "--:--";
         }
 
-        return `${format(this.time.getHours(), "00")}:${format(this.time.getMinutes(), "00")}`;
+        return `${padInt(this.time.getHours(), 2)}:${padInt(this.time.getMinutes(), 2)}`;
     }
 }

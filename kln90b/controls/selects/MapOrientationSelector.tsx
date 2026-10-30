@@ -2,7 +2,7 @@ import {FSComponent, UserSetting} from "@microsoft/msfs-sdk";
 import {SelectField} from "./SelectField";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {TickController} from "../../TickController";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {roundBearing} from "../../data/Coordinates";
 import {Sensors} from "../../Sensors";
 import {effectiveMapOrientation, Nav5Orientation} from "../../settings/KLN90BUserSettings";
@@ -64,6 +64,6 @@ export class MapOrientationSelector extends SelectField {
         if (degrees === null) {
             return "---°";
         }
-        return `${format(roundBearing(degrees), "000")}°`;
+        return `${padInt(roundBearing(degrees), 3)}°`;
     }
 }

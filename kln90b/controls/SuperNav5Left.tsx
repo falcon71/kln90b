@@ -8,7 +8,7 @@ import {SuperNav5Field2Selector} from "./selects/SuperNav5Field2Selector";
 import {SuperNav5Field3Selector} from "./selects/SuperNav5Field3Selector";
 import {SuperNav5RangeSelector} from "./selects/SuperNav5RangeSelector";
 import {NavMode} from "../data/VolatileMemory";
-import {format} from "numerable";
+import {padInt} from "../data/NumberFormat";
 import {roundBearing} from "../data/Coordinates";
 import {SidStar} from "../data/navdata/SidStar";
 import {isWaypointAlertSteady} from "../data/navdata/WaypointAlert";
@@ -109,12 +109,12 @@ export class SuperNav5Left implements UiElement {
             case NavMode.ENR_OBS:
                 //No colon on Super NAV 5, unlike the status line: by analogy with ARM (6-12, 6-14, figures 6-20 and
                 //6-22); ENR as the AVsoftech trainer (unreliable) shows it, #321
-                return `Ê${format(roundBearing(this.props.modeController.getObsMag()), "000")}`;
+                return `Ê${padInt(roundBearing(this.props.modeController.getObsMag()), 3)}`;
             case NavMode.ARM_LEG:
                 return "Í-Ë";
             case NavMode.ARM_OBS:
                 //6-12, 6-14 (figures 6-20, 6-22): no colon on Super NAV 5, unlike the status line (#321)
-                return `Í${format(roundBearing(this.props.modeController.getObsMag()), "000")}`;
+                return `Í${padInt(roundBearing(this.props.modeController.getObsMag()), 3)}`;
             case NavMode.APR_LEG:
                 return "Ì-Ë";
         }

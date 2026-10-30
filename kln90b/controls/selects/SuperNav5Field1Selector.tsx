@@ -2,7 +2,7 @@ import {UserSetting} from "@microsoft/msfs-sdk";
 import {SelectField} from "./SelectField";
 import {NavPageState} from "../../data/VolatileMemory";
 import {TickController} from "../../TickController";
-import {format} from "numerable";
+import {padFixed, padInt} from "../../data/NumberFormat";
 import {SuperNav5Field1} from "../../settings/KLN90BUserSettings";
 import {Vnav, VnavState} from "../../services/Vnav";
 import {Feet} from "../../data/Units";
@@ -90,7 +90,7 @@ export class SuperNav5Field1Selector extends SelectField {
 
         const minutes = totalMinutes % 60;
 
-        return `${hours.toString()}:${format(minutes, "00")}`;
+        return `${hours.toString()}:${padInt(minutes, 2)}`;
     }
 
     /**
@@ -106,11 +106,11 @@ export class SuperNav5Field1Selector extends SelectField {
         let xtkString;
         //Compare the rounded values, 0.996 would be cut to .00 and 9.97 would be 10.0, one cell too long
         if (Math.round(xtkDist * 10) / 10 >= 10) {
-            xtkString = format(xtkDist, "000");
+            xtkString = padInt(xtkDist, 3);
         } else if (Math.round(xtkDist * 100) / 100 >= 1) {
-            xtkString = format(xtkDist, "0.0");
+            xtkString = padFixed(xtkDist, 1, 1);
         } else {
-            xtkString = format(xtkDist, "0.00").substring(1); //doesn't work with just .00
+            xtkString = padFixed(xtkDist, 1, 2).substring(1); //doesn't work with just .00
         }
 
         let arrow;

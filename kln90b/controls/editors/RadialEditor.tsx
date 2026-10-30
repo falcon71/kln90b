@@ -1,7 +1,7 @@
 import {Editor, Rawvalue} from "./Editor";
 import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NumberEditorField} from "./EditorField";
-import {format} from "numerable";
+import {padFixed} from "../../data/NumberFormat";
 import {roundBearing} from "../../data/Coordinates";
 import {TickController} from "../../TickController";
 
@@ -26,7 +26,7 @@ export class RadialEditor extends Editor<number> {
     }
 
     protected convertFromValue(radial: number): Rawvalue {
-        const numberString = format(roundBearing(radial, 1), "000.0"); //#340: north is 000.0, never 360.0
+        const numberString = padFixed(roundBearing(radial, 1), 3, 1); //#340: north is 000.0, never 360.0
         return [
             Number(numberString.substring(0, 1)),
             Number(numberString.substring(1, 2)),

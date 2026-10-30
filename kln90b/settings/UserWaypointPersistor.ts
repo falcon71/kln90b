@@ -19,7 +19,7 @@ import {
     KLNFacilityRepository,
 } from "../data/navdata/KLNFacilityRepository";
 import {KLN90BUserWaypointsSettings, KLN90BUserWaypointsTypes, MAX_USER_WAYPOINTS} from "./KLN90BUserWaypoints";
-import {format} from "numerable";
+import {padFixed, padInt, withSign} from "../data/NumberFormat";
 import {UserWaypointLoaderV2} from "./UserWaypointLoaderV2";
 import {KLN90BUserSettings} from "./KLN90BUserSettings";
 import {UserWaypointLoaderV1} from "./UserWaypointLoaderV1";
@@ -109,12 +109,13 @@ export class UserWaypointPersistor {
     private serializeApt(wpt: AirportFacility): string {
         return ICAO.valueToStringV2(wpt.icaoStruct) + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon)
             // @ts-ignore
-            + format(wpt.altitude, "+00000", {zeroFormat: "+00000"})
+            + withSign(wpt.altitude, padInt(Math.abs(wpt.altitude), 5))
             + this.serializeRunway(wpt.runways[0]);
     }
 
     private serializeRunway(rwy: AirportRunway): string {
-        return format(UnitType.METER.convertTo(rwy.length, UnitType.FOOT), "+00000", {zeroFormat: "+00000"}) + this.serializeRunwaySurface(rwy.surface);
+        const lengthFeet = UnitType.METER.convertTo(rwy.length, UnitType.FOOT);
+        return withSign(lengthFeet, padInt(Math.abs(lengthFeet), 5)) + this.serializeRunwaySurface(rwy.surface);
     }
 
     private serializeRunwaySurface(surface: RunwaySurfaceType): string {
@@ -131,11 +132,11 @@ export class UserWaypointPersistor {
     }
 
     private serializeVor(wpt: VorFacility): string {
-        return ICAO.valueToStringV2(wpt.icaoStruct) + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon) + format(wpt.freqMHz, "+000.00") + format(wpt.magneticVariation, "+00");
+        return ICAO.valueToStringV2(wpt.icaoStruct) + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon) + withSign(wpt.freqMHz, padFixed(wpt.freqMHz, 3, 2)) + withSign(wpt.magneticVariation, padInt(Math.abs(wpt.magneticVariation), 2));
     }
 
     private serializeNdb(wpt: NdbFacility): string {
-        return ICAO.valueToStringV2(wpt.icaoStruct) + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon) + format(wpt.freqMHz, "+0000.0");
+        return ICAO.valueToStringV2(wpt.icaoStruct) + this.serializetLat(wpt.lat) + this.serializetLon(wpt.lon) + withSign(wpt.freqMHz, padFixed(wpt.freqMHz, 4, 1));
     }
 
     private serializeIntersection(wpt: IntersectionFacility): string {
@@ -152,10 +153,10 @@ export class UserWaypointPersistor {
      * @private
      */
     private serializetLat(lat: number): string {
-        const degreesString = format(lat, "+00", {rounding: "truncate", zeroFormat: "+00", signedZero: true});
+        const degreesString = withSign(lat, padInt(Math.trunc(Math.abs(lat)), 2));
 
         const minutes = (Math.abs(lat) % 1) * 60;
-        const minutesString = format(minutes, "00.00");
+        const minutesString = padFixed(minutes, 2, 2);
         return degreesString + minutesString;
     }
 
@@ -165,10 +166,10 @@ export class UserWaypointPersistor {
      * @private
      */
     private serializetLon(lon: number): string {
-        const degreesString = format(lon, "+000", {rounding: "truncate", zeroFormat: "+000", signedZero: true});
+        const degreesString = withSign(lon, padInt(Math.trunc(Math.abs(lon)), 3));
 
         const minutes = (Math.abs(lon) % 1) * 60;
-        const minutesString = format(minutes, "00.00");
+        const minutesString = padFixed(minutes, 2, 2);
         return degreesString + minutesString;
     }
 

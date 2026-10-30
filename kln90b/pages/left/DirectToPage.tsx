@@ -10,7 +10,7 @@ import {Fpl0Page} from "./FplPage";
 import {SuperNav5Page} from "./SuperNav5Page";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
 import {reportErrors} from "../../controls/ErrorPage";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {roundBearing} from "../../data/Coordinates";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {KLNFixType} from "../../data/flightplan/Flightplan";
@@ -125,7 +125,7 @@ export class DirectToPage extends SixLineHalfPage {
                         //aircraft on the waypoint (#426), in the variation of the new waypoint: the number the pilot would see
                         //once it is set. It is not set here, so it is converted only
                         const obsTrue = courseAtWaypoint(this.props.sensors.in.gps.coords, waypoint) ?? this.props.modeController.getObsTrue();
-                        this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", `d› CRS ${format(roundBearing(this.props.modeController.trueToObsMag(obsTrue)), "000")}°`);
+                        this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", `d› CRS ${padInt(roundBearing(this.props.modeController.trueToObsMag(obsTrue)), 3)}°`);
                     }
                 } else if (this.activateMode) {
                     //5-37: ACTIVATE keeps the course and lays it through the new waypoint, so the bar is not recentered (#154).
@@ -140,7 +140,7 @@ export class DirectToPage extends SixLineHalfPage {
                     this.props.modeController.setObsTrueOnUnit(courseAtWaypoint(this.props.sensors.in.gps.coords, waypoint) ?? this.props.modeController.getObsTrue(), true);
 
                     if (this.props.planeSettings.output.obsTarget === 0) {
-                        this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", `d› CRS ${format(roundBearing(this.props.modeController.getObsMag()), "000")}°`);
+                        this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", `d› CRS ${padInt(roundBearing(this.props.modeController.getObsMag()), 3)}°`);
                     }
                 }
 

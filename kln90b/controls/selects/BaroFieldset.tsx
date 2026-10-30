@@ -1,7 +1,7 @@
 import {SelectField} from "./SelectField";
 import {FSComponent, UnitType, VNode} from "@microsoft/msfs-sdk";
 import {UiElement, UIElementChildren} from "../../pages/Page";
-import {format} from "numerable";
+import {padFixed, padInt} from "../../data/NumberFormat";
 import {BARO_UNIT_INHG, KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Feet, Inhg} from "../../data/Units";
 
@@ -12,7 +12,7 @@ type BaroFieldsetTypes = {
     baro1: SelectField;
 }
 
-const INHG_BARO_100_SET = Array(31).fill(null).map((_, idx) => format(idx, "00"));
+const INHG_BARO_100_SET = Array(31).fill(null).map((_, idx) => padInt(idx, 2));
 const BARO_SET = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 export interface BaroFieldset extends UiElement {
@@ -28,7 +28,7 @@ class InhgBaroFieldset implements BaroFieldset {
     readonly children: UIElementChildren<BaroFieldsetTypes>;
 
     constructor(private baro: Inhg, private readonly callback: (alt: Feet) => void) {
-        const baroString = format(Utils.Clamp(baro, 0, 30.99), "00.00");
+        const baroString = padFixed(Utils.Clamp(baro, 0, 30.99), 2, 2);
 
         this.children = new UIElementChildren<BaroFieldsetTypes>({
             baro100: new SelectField(INHG_BARO_100_SET, INHG_BARO_100_SET.indexOf(baroString.substring(0, 2)), this.saveBaro100.bind(this)),
@@ -47,7 +47,7 @@ class InhgBaroFieldset implements BaroFieldset {
 
     public setBaro(baro: Inhg): void {
         this.baro = baro;
-        const baroString = format(Utils.Clamp(baro, 22, 30.99), "00.00");
+        const baroString = padFixed(Utils.Clamp(baro, 22, 30.99), 2, 2);
 
         this.children.get("baro100").value = INHG_BARO_100_SET.indexOf(baroString.substring(0, 2));
         this.children.get("baro10").value = Number(baroString.substring(3, 4));
@@ -62,19 +62,19 @@ class InhgBaroFieldset implements BaroFieldset {
 
     private saveBaro100(baro100Idx: number): void {
         const newBaro100 = INHG_BARO_100_SET[baro100Idx];
-        const oldBaro = format(this.baro, "00.00");
+        const oldBaro = padFixed(this.baro, 2, 2);
         this.baro = Number(newBaro100 + oldBaro.substring(2));
         this.callback(this.baro);
     }
 
     private saveBaro10(newBaro10: number): void {
-        const oldBaro = format(this.baro, "00.00");
+        const oldBaro = padFixed(this.baro, 2, 2);
         this.baro = Number(oldBaro.substring(0, 3) + newBaro10 + oldBaro.substring(4));
         this.callback(this.baro);
     }
 
     private saveBaro1(newBaro1: number): void {
-        const oldBaro = format(this.baro, "00.00");
+        const oldBaro = padFixed(this.baro, 2, 2);
         this.baro = Number(oldBaro.substring(0, 4) + newBaro1);
         this.callback(this.baro);
     }
@@ -88,7 +88,7 @@ const HPA_BARO_100_SET = [" 7", " 8", " 9", "10"];
  * The four digits of the setting in millibars, within the range of the fieldset, with a blank for the leading zero
  */
 function hpaString(baro: Inhg): string {
-    return format(Utils.Clamp(UnitType.IN_HG.convertTo(baro, UnitType.HPA), 700, 1099), "0000").replace(/^0/, " ");
+    return padInt(Utils.Clamp(UnitType.IN_HG.convertTo(baro, UnitType.HPA), 700, 1099), 4).replace(/^0/, " ");
 }
 
 
@@ -132,19 +132,19 @@ class HpaBaroFieldset implements BaroFieldset {
 
     private saveBaro100(baro100Idx: number): void {
         const newBaro100 = HPA_BARO_100_SET[baro100Idx];
-        const oldBaro = format(UnitType.IN_HG.convertTo(this.baro, UnitType.HPA), "0000");
+        const oldBaro = padInt(UnitType.IN_HG.convertTo(this.baro, UnitType.HPA), 4);
         this.baro = UnitType.HPA.convertTo(Number(newBaro100 + oldBaro.substring(2)), UnitType.IN_HG);
         this.callback(this.baro);
     }
 
     private saveBaro10(newBaro10: number): void {
-        const oldBaro = format(UnitType.IN_HG.convertTo(this.baro, UnitType.HPA), "0000");
+        const oldBaro = padInt(UnitType.IN_HG.convertTo(this.baro, UnitType.HPA), 4);
         this.baro = UnitType.HPA.convertTo(Number(oldBaro.substring(0, 2) + newBaro10 + oldBaro.substring(3)), UnitType.IN_HG);
         this.callback(this.baro);
     }
 
     private saveBaro1(newBaro1: number): void {
-        const oldBaro = format(UnitType.IN_HG.convertTo(this.baro, UnitType.HPA), "0000");
+        const oldBaro = padInt(UnitType.IN_HG.convertTo(this.baro, UnitType.HPA), 4);
         this.baro = UnitType.HPA.convertTo(Number(oldBaro.substring(0, 3) + newBaro1), UnitType.IN_HG);
         this.callback(this.baro);
     }

@@ -4,7 +4,7 @@ import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {SelectField} from "../../controls/selects/SelectField";
 import {SURFACE_HRD, SURFACE_HRD_SFT} from "../../settings/KLN90BUserSettings";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 
 
 type Set3PageTypes = {
@@ -28,7 +28,7 @@ export class Set3Page extends SixLineHalfPage {
 
         const lengthValueSet = [];
         for (let i = 1000; i <= 5000; i += 100) {
-            lengthValueSet.push(format(i, "0000"));
+            lengthValueSet.push(padInt(i, 4));
         }
         const lengthIndex = (this.props.userSettings.getSetting("nearestAptMinRunwayLength").get() - 1000) / 100;
         const surfaceIndex = this.props.userSettings.getSetting("nearestAptSurface").get() === SURFACE_HRD_SFT ? 0 : 1;

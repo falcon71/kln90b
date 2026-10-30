@@ -1,7 +1,7 @@
 import {Editor, Rawvalue} from "./Editor";
 import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NumberEditorField} from "./EditorField";
-import {format} from "numerable";
+import {padFixed} from "../../data/NumberFormat";
 import {TickController} from "../../TickController";
 
 export class DistanceEditor extends Editor<number> {
@@ -37,7 +37,7 @@ export class DistanceEditor extends Editor<number> {
     }
 
     protected convertFromValue(distance: number): Rawvalue {
-        const numberString = format(Math.min(distance, 999.9), "000.0"); //#341: the cells hold at most 999.9, idleText shows more
+        const numberString = padFixed(Math.min(distance, 999.9), 3, 1); //#341: the cells hold at most 999.9, idleText shows more
         return [
             Number(numberString.substring(0, 1)),
             Number(numberString.substring(1, 2)),

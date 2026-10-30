@@ -2,7 +2,7 @@ import {FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
 import {Seconds} from "../../data/Units";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 
 /**
  * Displays a duration in the format HH:MM. Below an hour the hours are left blank (":MM"), except in the trip form of the
@@ -51,8 +51,8 @@ export function formatDuration(duration: Seconds | null, tripForm: boolean = fal
     const minutes = totalMinutes % 60;
 
     if (hours === 0) {
-        return `${tripForm ? " 0" : "  "}:${format(minutes, "00")}`;
+        return `${tripForm ? " 0" : "  "}:${padInt(minutes, 2)}`;
     } else {
-        return `${hours.toString().padStart(2, " ")}:${format(minutes, "00")}`;
+        return `${hours.toString().padStart(2, " ")}:${padInt(minutes, 2)}`;
     }
 }

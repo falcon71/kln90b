@@ -1,7 +1,7 @@
 import {SelectField} from "./SelectField";
 import {FSComponent, VNode} from "@microsoft/msfs-sdk";
 import {UiElement, UIElementChildren} from "../../pages/Page";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 
 
 type VolumeFieldsetTypes = {
@@ -17,7 +17,7 @@ export class VolumeFieldset implements UiElement {
     readonly children: UIElementChildren<VolumeFieldsetTypes>;
 
     constructor(private volume: number, private readonly callback: (volume: number) => void) {
-        const VolumeString = format(volume, "00");
+        const VolumeString = padInt(volume, 2);
         this.children = new UIElementChildren<VolumeFieldsetTypes>({
             Volume10: new SelectField(CHAR_SET, Number(VolumeString.substring(0, 1)), this.saveVolume10.bind(this)),
             Volume1: new SelectField(CHAR_SET, Number(VolumeString.substring(1, 2)), this.saveVolume1.bind(this)),
@@ -34,13 +34,13 @@ export class VolumeFieldset implements UiElement {
 
 
     private saveVolume10(newVolume10: number): void {
-        const oldVolume = format(this.volume, "00");
+        const oldVolume = padInt(this.volume, 2);
         this.volume = Number(newVolume10 + oldVolume.substring(1));
         this.callback(this.volume);
     }
 
     private saveVolume1(newVolume1: number): void {
-        const oldVolume = format(this.volume, "00");
+        const oldVolume = padInt(this.volume, 2);
         this.volume = Number(oldVolume.substring(0, 1) + newVolume1);
         this.callback(this.volume);
 

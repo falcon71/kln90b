@@ -2,7 +2,7 @@ import {FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
 import {Longitude} from "../../data/Units";
-import {format} from "numerable";
+import {padFixed} from "../../data/NumberFormat";
 import {splitDegreesMinutes} from "../../data/Coordinates";
 
 
@@ -35,7 +35,7 @@ export class LongitudeDisplay implements UiElement {
         const eastWest = this.longitude >= 0 ? "E" : "W";
         const {degrees, minutes} = splitDegreesMinutes(this.longitude);
         const degreesString = String(degrees).padStart(3, " "); //#230
-        const minutesString = format(minutes, "00.00");
+        const minutesString = padFixed(minutes, 2, 2);
 
         return `${eastWest}${degreesString}°${minutesString}'`;
     }

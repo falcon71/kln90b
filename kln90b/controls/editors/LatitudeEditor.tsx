@@ -2,7 +2,7 @@ import {Editor, Rawvalue} from "./Editor";
 import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {LatitudeTensEditorField, NorthSouthEditorField, NumberEditorField} from "./EditorField";
 import {Latitude} from "../../data/Units";
-import {format} from "numerable";
+import {padFixed, padInt} from "../../data/NumberFormat";
 import {splitDegreesMinutes} from "../../data/Coordinates";
 import {TickController} from "../../TickController";
 
@@ -38,8 +38,8 @@ export class LatitudeEditor extends Editor<Latitude> {
     protected convertFromValue(value: Latitude): Rawvalue {
         const northSountIdx = value >= 0 ? 0 : 1;
         const {degrees, minutes} = splitDegreesMinutes(value);
-        const degreesString = format(degrees, "00");
-        const minutesString = format(minutes, "00.00");
+        const degreesString = padInt(degrees, 2);
+        const minutesString = padFixed(minutes, 2, 2);
 
         return [
             northSountIdx,

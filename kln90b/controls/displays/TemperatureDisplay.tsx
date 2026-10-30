@@ -2,7 +2,7 @@ import {FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
 import {Celsius} from "../../data/Units";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 
 
 export class TemperatureDisplay implements UiElement {
@@ -25,6 +25,6 @@ export class TemperatureDisplay implements UiElement {
     }
 
     private formatTemperature(): string {
-        return `${format(this.temperature, "-00").padStart(3, " ")}°C`;
+        return `${padInt(this.temperature, 2).padStart(3, " ")}°C`;
     }
 }

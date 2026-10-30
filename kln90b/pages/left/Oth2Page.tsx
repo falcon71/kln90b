@@ -3,7 +3,7 @@ import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {format} from "numerable";
+import {padFixed} from "../../data/NumberFormat";
 import {TICK_TIME_DISPLAY} from "../../TickController";
 import {ErrorEvent} from "../../controls/ErrorPage";
 
@@ -121,7 +121,7 @@ export class Oth2Page extends SixLineHalfPage {
         if (i >= this.centers.length) {
             return "";
         }
-        return format(this.centers[i].freqMHz, "000.00");
+        return padFixed(this.centers[i].freqMHz, 3, 2);
     }
 
     /**

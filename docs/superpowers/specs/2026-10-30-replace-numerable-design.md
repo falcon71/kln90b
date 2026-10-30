@@ -57,6 +57,10 @@ and assembles a mask on every call.
 - Signs for the persistence records (`UserWaypointPersistor`) and the APT 2 time zone are written by those callers:
   `+` or `-` by the sign of the raw value, then the magnitude; where numerable truncated (`rounding: "truncate"`) the
   caller truncates with `Math.trunc` first. A latitude of −0.4° keeps its `-00` (today's `signedZero`).
+- A second persisted form changes, found in the final review: a user airport's elevation is stored in meters, so an
+  elevation of ±1 ft (±0.3048 m) rounds to 0 without being 0. numerable dropped the forced sign there and wrote
+  `00000`, five characters, which shifted the rest of the fixed-width record for the V2 loader. The new code writes
+  `+00000`/`-00000` and the record stays intact. The rounding to whole meters itself is #449, which predates this.
 - One persisted form changes on purpose (my call, 2026-10-30): a user VOR's magnetic variation of exactly 0 was written
   as `00` (numerable drops the forced `+` on zero without `zeroFormat`) and is now `+00`, the width of every other
   variation. It is the record's last field and both V1 and V2 loaders read it with `Number()`, so old and new data,

@@ -12,7 +12,7 @@ import {Button} from "../../controls/Button";
 import {FourSegmentPage} from "../FourSegmentPage";
 import {AiracPage} from "../AiracPage";
 import {VFROnlyPage} from "../VFROnlyPage";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {Inhg} from "../../data/Units";
 import {ObswarningPage} from "../ObsWarningPage";
 import {isBaroTransmitted} from "../../settings/KLN90BPlaneSettings";
@@ -170,6 +170,6 @@ export class SelfTestRightPage extends SixLineHalfPage {
     }
 
     private formatSeconds(date: TimeStamp): string {
-        return format(date.getSeconds(), "00");
+        return padInt(date.getSeconds(), 2);
     }
 }

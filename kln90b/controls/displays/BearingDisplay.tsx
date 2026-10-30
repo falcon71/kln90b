@@ -2,7 +2,7 @@ import {FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
 import {Degrees} from "../../data/Units";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {roundBearing} from "../../data/Coordinates";
 
 /**
@@ -44,6 +44,6 @@ export class BearingDisplay implements UiElement {
         if (this.bearing === null) {
             return "---°";
         }
-        return `${format(roundBearing(this.bearing), "000")}°`;
+        return `${padInt(roundBearing(this.bearing), 3)}°`;
     }
 }

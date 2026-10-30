@@ -2,7 +2,7 @@ import {FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
 import {Knots} from "../../data/Units";
-import {format} from "numerable";
+import {padFixed} from "../../data/NumberFormat";
 
 /**
  * Displays a formatted speed
@@ -33,7 +33,7 @@ export class SpeedDisplay implements UiElement {
         if (!(rounded >= 0 && rounded <= 999)) {
             return "---"; //#257: a speed that does not fit shows dashes, it was clamped to 999
         }
-        return format(rounded, "0").padStart(3, " ");
+        return String(rounded).padStart(3, " ");
     }
 }
 
@@ -58,6 +58,6 @@ export class MachDisplay implements UiElement {
 
     private formatMach(): string {
         const clamped = Utils.Clamp(this.mach, 0, 0.99);
-        return format(clamped, "0.00").substring(1);
+        return padFixed(clamped, 1, 2).substring(1);
     }
 }

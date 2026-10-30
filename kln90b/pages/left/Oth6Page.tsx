@@ -3,7 +3,7 @@ import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {format} from "numerable";
+import {padFixed, padInt} from "../../data/NumberFormat";
 import {OthFuelFieldset, TripFuelFieldset} from "../../controls/selects/FuelFieldset";
 import {DurationDisplay} from "../../controls/displays/DurationDisplay";
 import {DistanceDisplay} from "../../controls/displays/DistanceDisplay";
@@ -76,9 +76,9 @@ export class Oth6Page extends SixLineHalfPage {
             const efficiency = this.props.sensors.in.gps.groundspeed / ff;
             //#337: compare the rounded value, so 9.95 to 9.99 take the three-digit form of 10 and keep the field's cells
             if (Math.round(efficiency * 10) / 10 >= 10) {
-                efficiencyString = format(Math.min(efficiency, 999), "000");
+                efficiencyString = padInt(Math.min(efficiency, 999), 3);
             } else {
-                efficiencyString = format(efficiency, "0.0");
+                efficiencyString = padFixed(efficiency, 1, 1);
             }
         }
 

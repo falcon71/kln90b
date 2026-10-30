@@ -30,7 +30,6 @@
   },
   "dependencies": {
     "@microsoft/msfs-sdk": "^2.3.3",
-    "@microsoft/msfs-types": "^1.14.6",
-    "numerable": "^0.3.15"
+    "@microsoft/msfs-types": "^1.14.6"
   }
 }

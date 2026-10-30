@@ -2,7 +2,7 @@ import {Editor, Rawvalue} from "./Editor";
 import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {EastWestEditorField, NumberEditorField} from "./EditorField";
 import {Longitude} from "../../data/Units";
-import {format} from "numerable";
+import {padFixed, padInt} from "../../data/NumberFormat";
 import {splitDegreesMinutes} from "../../data/Coordinates";
 import {TickController} from "../../TickController";
 
@@ -39,8 +39,8 @@ export class LongitudeEditor extends Editor<Longitude> {
     protected convertFromValue(value: Longitude): Rawvalue {
         const eastWestIndex = value >= 0 ? 0 : 1;
         const {degrees, minutes} = splitDegreesMinutes(value);
-        const degreesString = format(degrees, "000");
-        const minutesString = format(minutes, "00.00");
+        const degreesString = padInt(degrees, 3);
+        const minutesString = padFixed(minutes, 2, 2);
 
         return [
             eastWestIndex,

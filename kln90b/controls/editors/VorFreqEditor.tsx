@@ -1,7 +1,7 @@
 import {Editor, Rawvalue} from "./Editor";
 import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NumberEditorField} from "./EditorField";
-import {format} from "numerable";
+import {padFixed} from "../../data/NumberFormat";
 import {TickController} from "../../TickController";
 
 export class VorFreqEditor extends Editor<number> {
@@ -26,7 +26,7 @@ export class VorFreqEditor extends Editor<number> {
     }
 
     protected convertFromValue(value: number): Rawvalue {
-        const numberString = format(value, "000.00");
+        const numberString = padFixed(value, 3, 2);
 
         return [
             0,

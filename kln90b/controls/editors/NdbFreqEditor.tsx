@@ -1,7 +1,7 @@
 import {Editor, Rawvalue} from "./Editor";
 import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NumberEditorField} from "./EditorField";
-import {format} from "numerable";
+import {padFixed} from "../../data/NumberFormat";
 import {TickController} from "../../TickController";
 
 export class NdbFreqEditor extends Editor<number> {
@@ -34,7 +34,7 @@ export class NdbFreqEditor extends Editor<number> {
     }
 
     protected convertFromValue(value: number): Rawvalue {
-        const numberString = format(value, "0000.0");
+        const numberString = padFixed(value, 4, 1);
 
         return [
             Number(numberString.substring(0, 1)),

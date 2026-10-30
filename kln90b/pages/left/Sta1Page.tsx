@@ -11,7 +11,7 @@ import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {SearchMode} from "../../GpsSearch";
 
 
@@ -168,7 +168,7 @@ export class Sta1Page extends SixLineHalfPage {
         let used: string;
         let health: string;
         let snr: number;
-        const ele = row.ele === null ? "--" : format(row.ele, "00");
+        const ele = row.ele === null ? "--" : padInt(row.ele, 2);
         switch (state) {
             case GPSSatelliteState.InUse:
             case GPSSatelliteState.InUseDiffApplied:
@@ -195,6 +195,6 @@ export class Sta1Page extends SixLineHalfPage {
                 break;
 
         }
-        return `${used}${format(sv, "00")}${health} ${format(snr, "00")} ${ele}°`;
+        return `${used}${padInt(sv, 2)}${health} ${padInt(snr, 2)} ${ele}°`;
     }
 }

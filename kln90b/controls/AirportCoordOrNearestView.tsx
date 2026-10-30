@@ -21,7 +21,7 @@ import {isNearestWpt, isUserWaypoint, unpackFacility} from "../pages/right/Waypo
 import {Latitude} from "../data/Units";
 import {TextDisplay} from "./displays/TextDisplay";
 import {NearestUtils} from "../data/navdata/NearestUtils";
-import {format} from "numerable";
+import {padInt} from "../data/NumberFormat";
 import {getKLNLightingString, getKLNSurfaceString} from "../pages/right/Apt3ListPage";
 import {KLNMagvar} from "../data/navdata/KLNMagvar";
 
@@ -86,7 +86,7 @@ export class AirportCoordOrNearestView implements UiElement {
             lat: new LatitudeEditor(bus, unpacked ? unpacked.lat : null, setLatitude),
             lon: new LongitudeEditor(bus, unpacked ? unpacked.lon : null, setLongitude),
             airportType: new TextDisplay(this.formatAirportType([])),
-            longestRunwayLength: new TextDisplay(longestRunway ? format(UnitType.METER.convertTo(longestRunway.length, UnitType.FOOT), "0").padStart(5, " ") : "     "),
+            longestRunwayLength: new TextDisplay(longestRunway ? padInt(UnitType.METER.convertTo(longestRunway.length, UnitType.FOOT), 1).padStart(5, " ") : "     "),
             longestRunwaySurface: new TextDisplay(longestRunway ? getKLNSurfaceString(longestRunway) : "   "),
             longestRunwayLighting: new TextDisplay(longestRunway ? getKLNLightingString(longestRunway) : "   "),
             bearing: new BearingDisplay(),
@@ -149,7 +149,7 @@ export class AirportCoordOrNearestView implements UiElement {
                 this.children.get("longestRunwaySurface").text = "";
                 this.children.get("longestRunwayLighting").text = "";
             } else {
-                this.children.get("longestRunwayLength").text = format(UnitType.METER.convertTo(rwy.length, UnitType.FOOT), "0").padStart(5, " ");
+                this.children.get("longestRunwayLength").text = padInt(UnitType.METER.convertTo(rwy.length, UnitType.FOOT), 1).padStart(5, " ");
                 this.children.get("longestRunwaySurface").text = getKLNSurfaceString(rwy);
                 this.children.get("longestRunwayLighting").text = getKLNLightingString(rwy);
             }

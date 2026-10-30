@@ -1,7 +1,7 @@
 import {SelectField} from "./SelectField";
 import {FSComponent, VNode} from "@microsoft/msfs-sdk";
 import {UiElement, UIElementChildren} from "../../pages/Page";
-import {format} from "numerable";
+import {padFixed, padInt} from "../../data/NumberFormat";
 import {Degrees, NauticalMiles} from "../../data/Units";
 import {TextDisplay} from "../displays/TextDisplay";
 
@@ -19,7 +19,7 @@ export class VnavDistanceFieldset implements UiElement {
     readonly children: UIElementChildren<VnavDistanceFieldsetTypes>;
 
     constructor(private distance: NauticalMiles, private readonly callback: (distance: NauticalMiles) => void) {
-        const distanceString = format(distance, "00");
+        const distanceString = padInt(distance, 2);
         this.children = new UIElementChildren<VnavDistanceFieldsetTypes>({
             dist10: new SelectField(CHAR_SET, Number(distanceString.substring(0, 1)), this.saveDist10.bind(this)),
             dist1: new SelectField(CHAR_SET, Number(distanceString.substring(1, 2)), this.saveDist1.bind(this)),
@@ -36,19 +36,19 @@ export class VnavDistanceFieldset implements UiElement {
 
     public setValue(distance: NauticalMiles) {
         this.distance = distance;
-        const distanceString = format(distance, "00");
+        const distanceString = padInt(distance, 2);
         this.children.get("dist10").value = Number(distanceString.substring(0, 1));
         this.children.get("dist1").value = Number(distanceString.substring(1, 2));
     }
 
     private saveDist10(newDist10: number): void {
-        const oldDist = format(this.distance, "00");
+        const oldDist = padInt(this.distance, 2);
         this.distance = Number(newDist10 + oldDist.substring(1));
         this.callback(this.distance);
     }
 
     private saveDist1(newDist1: number): void {
-        const oldDist = format(this.distance, "00");
+        const oldDist = padInt(this.distance, 2);
         this.distance = Number(oldDist.substring(0, 1) + newDist1);
         this.callback(this.distance);
     }
@@ -97,7 +97,7 @@ export class VnavAngleFieldset implements UiElement {
             return;
         }
         this.angle = angle;
-        const angleString = format(tenths / 10, "0.0");
+        const angleString = padFixed(tenths / 10, 1, 1);
         this.children.get("sign").text = angle! >= 0 ? " " : "-";
         this.showDigits(angleString);
     }

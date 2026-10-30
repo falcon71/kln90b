@@ -2,7 +2,7 @@ import {FSComponent, UserSetting} from "@microsoft/msfs-sdk";
 import {SelectField} from "./SelectField";
 import {NavPageState} from "../../data/VolatileMemory";
 import {TickController} from "../../TickController";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {roundBearing} from "../../data/Coordinates";
 import {Sensors} from "../../Sensors";
 import {SuperNav5Field3} from "../../settings/KLN90BUserSettings";
@@ -80,6 +80,6 @@ export class SuperNav5Field3Selector extends SelectField {
         if (degrees === null) {
             return "---°";
         }
-        return `${format(roundBearing(degrees), "000")}°`;
+        return `${padInt(roundBearing(degrees), 3)}°`;
     }
 }

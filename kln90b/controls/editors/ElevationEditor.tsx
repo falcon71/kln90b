@@ -1,7 +1,7 @@
 import {Editor, Rawvalue} from "./Editor";
 import {EventBus, FSComponent, VNode} from "@microsoft/msfs-sdk";
 import {NumberEditorField} from "./EditorField";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 
 export class ElevationEditor extends Editor<number> {
 
@@ -22,7 +22,7 @@ export class ElevationEditor extends Editor<number> {
     }
 
     protected convertFromValue(altitude: number): Rawvalue {
-        const numberString = format(altitude, "00000");
+        const numberString = padInt(altitude, 5);
         return [
             Number(numberString.substring(0, 1)),
             Number(numberString.substring(1, 2)),

@@ -1702,7 +1702,8 @@ export class Set3Page extends SixLineHalfPage {
       (`data/MapRanges.ts`), where 3-35 gives only the end points, 1 and 1000 NM, and the steps between are those of
       the AVsoftech KLN 90B trainer (unreliable), which the maintainer adopted (#236). A saved range that is not in the
       list loads as 40 NM (`knownMapRange`, the default of both settings).
-- Formatting helpers: `format()` from npm `numerable` (`"000"`, `"0.0"`, `"00000"`, `"+00"`) plus `padStart`/`padEnd`.
+- Formatting helpers: `padInt` (`007`), `padFixed` (`0.25`, `128.08`) and `withSign` (`+00`) from `data/NumberFormat.ts`
+  (#447, they replace npm `numerable`) plus `padStart`/`padEnd`.
   The display classes own the formatting rules. `Utils.Clamp` and `Utils.Translate` are MSFS globals. Unit type aliases
   come from `data/Units.ts` (`Feet`, `NauticalMiles`, `Degrees`). Magnetic conversion goes through
   `props.magvar.trueToMag/magToTrue`.

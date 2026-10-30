@@ -136,7 +136,7 @@ change what they mean; add new ones instead:
 - Display text is uppercase, with only `A-Z 0-9 space -` from the database (`data/Text.ts`). Lowercase letters are small
   glyphs in the font (`nm`, `ft`, `ent`, `enr-leg`), so use them only where the real unit shows small text.
     - Page `name`s are exactly 5 characters.
-    - Fixed-width output uses `format()` from `numerable` plus `padStart`/`padEnd`.
+    - Fixed-width output uses `padInt`/`padFixed`/`withSign` from `data/NumberFormat.ts` plus `padStart`/`padEnd`.
     - A null display value renders as dashes.
 - Angles are stored **true** unless the name says `Mag`. Convert with `props.magvar`.
 - Transient errors go to the status line: publish `statusLineMessage` with a `StatusLineMessage` from the union in

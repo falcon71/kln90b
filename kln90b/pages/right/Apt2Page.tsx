@@ -17,7 +17,7 @@ import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {convertTextToKLNCharset} from "../../data/Text";
 import {ElevationDisplay} from "../../controls/displays/AltitudeDisplay";
 import {TimeZoneInfo, TimezoneService} from "../../services/TimezoneService";
-import {format} from "numerable";
+import {padInt, withSign} from "../../data/NumberFormat";
 import {TimeStamp} from "../../data/Time";
 
 
@@ -268,7 +268,7 @@ export class Apt2DBPage extends WaypointPage<AirportFacility> {
     }
 
     private formatTimezoneOffset(tz: number): string {
-        return format(tz, "+00", {rounding: "truncate", zeroFormat: "+00", signedZero: true});
+        return withSign(tz, padInt(Math.trunc(Math.abs(tz)), 2));
     }
 
     private formatApproach(apt: AirportFacility | null): string {

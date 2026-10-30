@@ -4,7 +4,7 @@ import {NO_CHILDREN, PageProps, UIElementChildren} from "../Page";
 import {CursorController, EnterResult, Field} from "../CursorController";
 import {CdiScaleField} from "../../controls/selects/CdiScaleField";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {roundBearing} from "../../data/Coordinates";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
 import {Sensors} from "../../Sensors";
@@ -179,7 +179,7 @@ class ModObsElement implements Field {
     }
 
     private getDisplayValue(): string {
-        return this.modeController.isObsModeActive() ? `${format(roundBearing(this.modeController.getObsMag()), "000")}°` : "---°";
+        return this.modeController.isObsModeActive() ? `${padInt(roundBearing(this.modeController.getObsMag()), 3)}°` : "---°";
     }
 
     private canObsBeEntered(): boolean {

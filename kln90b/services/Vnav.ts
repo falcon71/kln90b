@@ -5,7 +5,7 @@ import {Flightplan} from "../data/flightplan/Flightplan";
 import {Degrees, Feet, NauticalMiles, Seconds} from "../data/Units";
 import {Facility, GeoPoint, ICAO, UnitType} from "@microsoft/msfs-sdk";
 import {HOURS_TO_SECONDS} from "../data/navdata/NavCalculator";
-import {format} from "numerable";
+import {padInt} from "../data/NumberFormat";
 
 export const enum VnavState {
     Inactive,
@@ -141,9 +141,9 @@ export class Vnav implements CalcTickable {
         const seconds = totalSeconds % 60;
 
         if (minutes === 0) {
-            return `  :${format(seconds, "00")}`;
+            return `  :${padInt(seconds, 2)}`;
         } else {
-            return `${minutes.toString().padStart(2, " ")}:${format(seconds, "00")}`;
+            return `${minutes.toString().padStart(2, " ")}:${padInt(seconds, 2)}`;
         }
     }
 

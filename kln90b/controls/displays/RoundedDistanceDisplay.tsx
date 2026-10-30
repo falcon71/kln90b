@@ -2,7 +2,6 @@ import {FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {NO_CHILDREN, UiElement} from "../../pages/Page";
 import {TickController} from "../../TickController";
 import {NauticalMiles} from "../../data/Units";
-import {format} from "numerable";
 
 export const enum Alignment {
     left,
@@ -47,7 +46,7 @@ export class RoundedDistanceDisplay implements UiElement {
         if (!(rounded <= 9999)) {
             return this.align("----"); //#257: a distance that does not fit shows dashes, it overflowed the row
         }
-        return this.align(format(rounded, "0").padStart(3, " "));
+        return this.align(String(rounded).padStart(3, " "));
     }
 
     private align(value: string): string {

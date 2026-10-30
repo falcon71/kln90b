@@ -2,7 +2,7 @@ import {AirportFacility, FacilityFrequencyType, FSComponent, NodeReference, VNod
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {format} from "numerable";
+import {padFixed} from "../../data/NumberFormat";
 import {AirportSelector} from "../../controls/selects/AirportSelector";
 import {unpackFacility, WaypointPage} from "./WaypointPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
@@ -158,9 +158,9 @@ export class Apt4Page extends WaypointPage<AirportFacility> {
      */
     private freqString(freqMHz: number): string {
         if (freqMHz <= 30) {
-            return format(Math.round(freqMHz * 1000), "0");
+            return String(Math.round(freqMHz * 1000));
         }
-        return format(freqMHz, "000.00");
+        return padFixed(freqMHz, 3, 2);
     }
 
     private freqTypeString(type: FacilityFrequencyType): string {

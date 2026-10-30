@@ -2,7 +2,7 @@ import {DisplayComponent, FSComponent, NodeReference, Subscription, VNode} from 
 import {TICK_TIME_DISPLAY, TickController} from "../TickController";
 import {NO_CHILDREN, Page, PageProps, UiElement} from "../pages/Page";
 import {NavMode} from "../data/VolatileMemory";
-import {format} from "numerable";
+import {padInt} from "../data/NumberFormat";
 import {roundBearing} from "../data/Coordinates";
 import {ScratchpadMessage} from "../data/MessageHandler";
 import {isWptLightOn} from "../data/navdata/WaypointAlert";
@@ -266,11 +266,11 @@ export class StatusLine extends DisplayComponent<StatusLineProps> implements UiE
             case NavMode.ENR_LEG:
                 return "enr-leg";
             case NavMode.ENR_OBS:
-                return `enr:${format(roundBearing(this.props.modeController.getObsMag()), "000")}`;
+                return `enr:${padInt(roundBearing(this.props.modeController.getObsMag()), 3)}`;
             case NavMode.ARM_LEG:
                 return "arm-leg";
             case NavMode.ARM_OBS:
-                return `arm:${format(roundBearing(this.props.modeController.getObsMag()), "000")}`;
+                return `arm:${padInt(roundBearing(this.props.modeController.getObsMag()), 3)}`;
             case NavMode.APR_LEG:
                 return "apr-leg";
         }

@@ -1,7 +1,7 @@
 import {SelectField} from "./SelectField";
 import {FSComponent, VNode} from "@microsoft/msfs-sdk";
 import {UiElement, UIElementChildren} from "../../pages/Page";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {Knots} from "../../data/Units";
 
 
@@ -47,7 +47,7 @@ export class SpeedFieldset implements UiElement {
             return;
         }
         this.speed = speed;
-        this.showDigits(format(rounded, "000"));
+        this.showDigits(padInt(rounded, 3));
     }
 
     private showDigits(digits: string | null): void {
@@ -59,23 +59,23 @@ export class SpeedFieldset implements UiElement {
     }
 
     private saveSpeed100(newSpeed100: number): void {
-        const oldSpeed = format(this.speed ?? 0, "000");
+        const oldSpeed = padInt(this.speed ?? 0, 3);
         this.save(Number(newSpeed100 + oldSpeed.substring(1)));
     }
 
     private saveSpeed10(newSpeed10: number): void {
-        const oldSpeed = format(this.speed ?? 0, "000");
+        const oldSpeed = padInt(this.speed ?? 0, 3);
         this.save(Number(oldSpeed.substring(0, 1) + newSpeed10 + oldSpeed.substring(2)));
     }
 
     private saveSpeed1(newSpeed1: number): void {
-        const oldSpeed = format(this.speed ?? 0, "000");
+        const oldSpeed = padInt(this.speed ?? 0, 3);
         this.save(Number(oldSpeed.substring(0, 2) + newSpeed1));
     }
 
     private save(speed: Knots): void {
         this.speed = speed;
-        this.showDigits(format(speed, "000"));
+        this.showDigits(padInt(speed, 3));
         this.callback(speed);
     }
 }

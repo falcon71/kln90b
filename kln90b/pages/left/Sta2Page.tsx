@@ -3,7 +3,7 @@ import {SixLineHalfPage} from "../FiveSegmentPage";
 import {UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 
 
 type Sta2PageTypes = {
@@ -41,7 +41,7 @@ export class Sta2Page extends SixLineHalfPage {
     protected redraw(): void {
         if (this.props.sensors.in.gps.isValid()) {
             const posError = this.props.sensors.in.gps.gpsSatComputer.hdop * 4;
-            this.children.get("posError").text = `.${format(posError, "00")}`;
+            this.children.get("posError").text = `.${padInt(posError, 2)}`;
         } else {
             this.children.get("posError").text = ".--";
         }

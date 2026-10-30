@@ -1,7 +1,7 @@
 import {PageProps} from "../pages/Page";
 import {Sensors} from "../Sensors";
 import {ModeController} from "../services/ModeController";
-import {format} from "numerable";
+import {padInt} from "./NumberFormat";
 import {roundBearing} from "./Coordinates";
 import {NavMath} from "@microsoft/msfs-sdk";
 import {NavMode, NavPageState} from "./VolatileMemory";
@@ -106,7 +106,7 @@ class AdjustCourseToMessage implements Message {
             return false;
         }
 
-        this.message = [`ADJ NAV IND CRS TO ${format(roundBearing(dtk), "000")}°`];
+        this.message = [`ADJ NAV IND CRS TO ${padInt(roundBearing(dtk), 3)}°`];
 
         const obsMag = this.sensors.in.obsMag;
         if (obsMag === null) {

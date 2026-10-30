@@ -1,7 +1,7 @@
 import {Editor, Rawvalue} from "./Editor";
 import {EventBus, FSComponent, NodeReference, VNode} from "@microsoft/msfs-sdk";
 import {EastWestEditorField, NumberEditorField} from "./EditorField";
-import {format} from "numerable";
+import {padInt} from "../../data/NumberFormat";
 import {TickController} from "../../TickController";
 
 export class MagvarEditor extends Editor<number> {
@@ -28,13 +28,13 @@ export class MagvarEditor extends Editor<number> {
         let eastWestIndex;
 
         if (magvar >= 180) {
-            numberString = format(360 - magvar, "00");
+            numberString = padInt(360 - magvar, 2);
             eastWestIndex = 1;
         } else if (magvar < 0) {
-            numberString = format(Math.abs(magvar), "00");
+            numberString = padInt(Math.abs(magvar), 2);
             eastWestIndex = 1;
         } else {
-            numberString = format(magvar, "00");
+            numberString = padInt(magvar, 2);
             eastWestIndex = 0;
         }
 

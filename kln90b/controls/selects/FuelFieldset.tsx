@@ -1,7 +1,7 @@
 import {SelectField} from "./SelectField";
 import {FSComponent, VNode} from "@microsoft/msfs-sdk";
 import {UiElement, UIElementChildren} from "../../pages/Page";
-import {format} from "numerable";
+import {padFixed, padInt} from "../../data/NumberFormat";
 
 
 type TripFuelFieldsetTypes = {
@@ -21,7 +21,7 @@ export class TripFuelFieldset implements UiElement {
     readonly children: UIElementChildren<TripFuelFieldsetTypes>;
 
     constructor(private fuel: number, private readonly callback: (fuel: number) => void) {
-        const FuelString = format(fuel, "00000.0");
+        const FuelString = padFixed(fuel, 5, 1);
         this.children = new UIElementChildren<TripFuelFieldsetTypes>({
             Fuel10000: new SelectField(FUEL_SET, Number(FuelString.substring(0, 1)), this.saveFuel10000.bind(this)),
             Fuel1000: new SelectField(FUEL_SET, Number(FuelString.substring(1, 2)), this.saveFuel1000.bind(this)),
@@ -41,38 +41,38 @@ export class TripFuelFieldset implements UiElement {
     }
 
     private saveFuel10000(newFuel10000: number): void {
-        const oldFuel = format(this.fuel, "00000.0");
+        const oldFuel = padFixed(this.fuel, 5, 1);
         this.fuel = Number(newFuel10000 + oldFuel.substring(1));
         this.callback(this.fuel);
     }
 
     private saveFuel1000(newFuel1000: number): void {
-        const oldFuel = format(this.fuel, "00000.0");
+        const oldFuel = padFixed(this.fuel, 5, 1);
         this.fuel = Number(oldFuel.substring(0, 1) + newFuel1000 + oldFuel.substring(2));
         this.callback(this.fuel);
     }
 
     private saveFuel100(newFuel100: number): void {
-        const oldFuel = format(this.fuel, "00000.0");
+        const oldFuel = padFixed(this.fuel, 5, 1);
         this.fuel = Number(oldFuel.substring(0, 2) + newFuel100 + oldFuel.substring(3));
         this.callback(this.fuel);
     }
 
     private saveFuel10(newFuel10: number): void {
-        const oldFuel = format(this.fuel, "00000.0");
+        const oldFuel = padFixed(this.fuel, 5, 1);
         this.fuel = Number(oldFuel.substring(0, 3) + newFuel10 + oldFuel.substring(4));
         this.callback(this.fuel);
     }
 
     private saveFuel1(newFuel1: number): void {
-        const oldFuel = format(this.fuel, "00000.0");
+        const oldFuel = padFixed(this.fuel, 5, 1);
         this.fuel = Number(oldFuel.substring(0, 4) + newFuel1 + oldFuel.substring(5));
         this.callback(this.fuel);
 
     }
 
     private saveFuel01(newFuel01: number): void {
-        const oldFuel = format(this.fuel, "00000.0");
+        const oldFuel = padFixed(this.fuel, 5, 1);
         this.fuel = Number(oldFuel.substring(0, 6) + newFuel01);
         this.callback(this.fuel);
 
@@ -95,7 +95,7 @@ export class OthFuelFieldset implements UiElement {
     readonly children: UIElementChildren<OthFuelFieldsetTypes>;
 
     constructor(private fuel: number, private readonly callback: (fuel: number) => void) {
-        const FuelString = format(fuel, "00000");
+        const FuelString = padInt(fuel, 5);
         this.children = new UIElementChildren<TripFuelFieldsetTypes>({
             Fuel10000: new SelectField(FUEL_SET, Number(FuelString.substring(0, 1)), this.saveFuel10000.bind(this)),
             Fuel1000: new SelectField(FUEL_SET, Number(FuelString.substring(1, 2)), this.saveFuel1000.bind(this)),
@@ -114,31 +114,31 @@ export class OthFuelFieldset implements UiElement {
     }
 
     private saveFuel10000(newFuel10000: number): void {
-        const oldFuel = format(this.fuel, "00000.0");
+        const oldFuel = padFixed(this.fuel, 5, 1);
         this.fuel = Number(newFuel10000 + oldFuel.substring(1));
         this.callback(this.fuel);
     }
 
     private saveFuel1000(newFuel1000: number): void {
-        const oldFuel = format(this.fuel, "00000.0");
+        const oldFuel = padFixed(this.fuel, 5, 1);
         this.fuel = Number(oldFuel.substring(0, 1) + newFuel1000 + oldFuel.substring(2));
         this.callback(this.fuel);
     }
 
     private saveFuel100(newFuel100: number): void {
-        const oldFuel = format(this.fuel, "00000.0");
+        const oldFuel = padFixed(this.fuel, 5, 1);
         this.fuel = Number(oldFuel.substring(0, 2) + newFuel100 + oldFuel.substring(3));
         this.callback(this.fuel);
     }
 
     private saveFuel10(newFuel10: number): void {
-        const oldFuel = format(this.fuel, "00000.0");
+        const oldFuel = padFixed(this.fuel, 5, 1);
         this.fuel = Number(oldFuel.substring(0, 3) + newFuel10 + oldFuel.substring(4));
         this.callback(this.fuel);
     }
 
     private saveFuel1(newFuel1: number): void {
-        const oldFuel = format(this.fuel, "00000.0");
+        const oldFuel = padFixed(this.fuel, 5, 1);
         this.fuel = Number(oldFuel.substring(0, 4) + newFuel1 + oldFuel.substring(5));
         this.callback(this.fuel);
 
