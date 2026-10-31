@@ -153,12 +153,12 @@ class ModObsElement implements Field {
     }
 
     public innerLeft(): boolean {
-        this.modeController.setObs(NavMath.normalizeHeading(this.navState.obsMag - 1));
+        this.modeController.setObsOnUnit(NavMath.normalizeHeading(this.navState.obsMag - 1));
         return true;
     }
 
     public innerRight(): boolean {
-        this.modeController.setObs(NavMath.normalizeHeading(this.navState.obsMag + 1));
+        this.modeController.setObsOnUnit(NavMath.normalizeHeading(this.navState.obsMag + 1));
         return false;
     }
 

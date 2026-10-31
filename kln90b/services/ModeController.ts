@@ -161,7 +161,7 @@ export class ModeController implements CalcTickable {
         } else if (active !== null) {
             const obsTrue = this.navState.desiredTrack!;
             const magvar = this.getMagvarForObs(active);
-            this.setObs(this.magvar.trueToMag(obsTrue, magvar));
+            this.setObsOnUnit(this.magvar.trueToMag(obsTrue, magvar));
         }
     }
 
@@ -216,6 +216,16 @@ export class ModeController implements CalcTickable {
         toPoint.offset(bearing, UnitType.NMILE.convertTo(1000, UnitType.GA_RADIAN));
         const from = UserFacilityUtils.createFromLatLon("UXX         ", toPoint.lat, toPoint.lon, true);
         this.navState.activeWaypoint.directTo(from, active);
+    }
+
+    /**
+     * A course set on the unit: MOD 2, NAV 3, Super NAV 5, a Direct To in OBS, and the course the unit chooses on entering
+     * OBS with a driven indicator. 5-35, 5-37: a driven indicator is slewed to it, so the output is written at once;
+     * otherwise the indicator's old course is read back at the next tick and replaces it (#261)
+     */
+    public setObsOnUnit(obsMag: Degrees): void {
+        this.setObs(obsMag);
+        this.sensors.out.setObs(this.navState.obsMag);
     }
 
     public tick(): void {

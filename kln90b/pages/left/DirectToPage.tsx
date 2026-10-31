@@ -119,7 +119,7 @@ export class DirectToPage extends SixLineHalfPage {
                     const obsTrue = this.props.sensors.in.gps.coords.bearingTo(waypoint);
                     const magvar = this.props.modeController.getMagvarForObs(waypoint);
                     const obsMag = this.props.magvar.trueToMag(obsTrue, magvar);
-                    this.props.modeController.setObs(obsMag);
+                    this.props.modeController.setObsOnUnit(obsMag);
 
                     if (this.props.planeSettings.output.obsTarget === 0) {
                         this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", `d› CRS ${format(obsMag, "000")}` as any);
