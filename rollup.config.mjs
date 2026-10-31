@@ -19,6 +19,9 @@ function copyManifest(userConfig) {
 
 			let content = fs.readFileSync('manifest.json', 'utf8');
 			content = content.replace('[VI]{version}[/VI]', version);
+			if (!fs.existsSync(userConfig.outputPath)) {
+				fs.mkdirSync(userConfig.outputPath);
+			}
 			fs.writeFileSync(`${userConfig.outputPath}/manifest.json`, content);
 		}
 	}

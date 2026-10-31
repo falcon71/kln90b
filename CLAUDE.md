@@ -45,13 +45,8 @@ There is no `npm test` and no linter. `tsc` and the build are the only checks. T
   `registerInstrument`, …) come from `types/msfstypes/`, which is gitignored and exists only on the maintainer's machine.
   `tsconfig.json` has no `include`, so it picks the folder up. Without it `tsc` reports dozens of "Cannot find name"
   errors. A worktree needs a copy of it.
-- **The build has two known gaps on this branch**, both fixed on master by `fd984c18` and not backported:
-    - `tslib` is not a dev dependency, so after `npm install` or `npm ci` the build fails with "Could not find module
-      'tslib'". Run `npm install --no-save tslib` after each of them.
-    - The `build/` folder (or `buildTargetDir`) must exist before the build, or writing `manifest.json` fails with
-      ENOENT.
 - Set the env var `buildTargetDir` to build straight into the sim's community folder. Without it the output goes to
-  `build/`, which is gitignored.
+  `build/`, which is gitignored. The build creates that folder when it is missing.
 - **The build produces only part of the package**: `KLN90B.js` (+ map) and `KLN90B.css` in
   `html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B/`, and `manifest.json` with the version injected. It does
   not copy `KLN90B.html` or the fonts (both at the repo root here), the `Assets/` folder (fonts, `msa.json`) or

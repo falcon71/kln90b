@@ -25,11 +25,12 @@ Comments such as `3-29` in the code are page numbers in the KLN 90B Pilot's Guid
     - There is a lot of `console.log`.
     - The user setting `fastGpsAcquisition` (SET 10) **defaults to true** (`GPS_ACQUISITION_FAST`).
 - The branch split from master at `38ae708f` (2025-01-27). The commits after it are backports: #43, #49, #84 (master's
-  #76), #87, and the direct-to entry in the WT flight plan (`fccb21e8`).
+  #76), #87, the direct-to entry in the WT flight plan (`fccb21e8`), and the build fix `fd984c18` (`tslib` as a dev
+  dependency, the build folder created when missing).
 - Build: `rollup.config.mjs` compiles `kln90b/KLN90B.tsx` and `KLN90B.scss` and writes `manifest.json` with the version.
   It copies nothing else: `KLN90B.html` and `Fonts/` sit at the repo root, and the package's `Assets/` folder (the fonts
   the SCSS loads from `./Assets/`, and `msa.json`) and `layout.json` are not in the repo. `KLN90B.css` at the root is a
-  stale copy. See CLAUDE.md for the `tslib`, `build/` and `types/` caveats.
+  stale copy. See CLAUDE.md for the `types/` and `node_modules` caveats.
 
 ## Core 1. Startup and lifecycle
 
