@@ -89,8 +89,12 @@ export class WaypointEditor extends Editor<Facility | null> {
             await this.confirmValue(editedValue, facility);
             return EnterResult.Handled_Move_Focus;
         } else {
+            const mainPage = this.props.pageManager.getMainPage();
             const editedValue = this.editorFields.map(f => f.value ?? 0);
             const value = await this.convertToValue(editedValue);
+            if (!this.isStillShownOn(mainPage)) {
+                return EnterResult.Handled_Keep_Focus; //#452 the unit was turned off during the search: the entry is lost
+            }
             if (value === null) {
                 //#343: only the trailing blanks go, a blank inside the ident stays
                 const ident = editedValue.map((v, i) => this.editorFields[i].charset[v]).join("").replace(/ +$/, "");
@@ -285,15 +289,26 @@ export class WaypointEditor extends Editor<Facility | null> {
             val[i] = this.editorFields[i].charset[rawValue[i]];
         }
         const ident = val.join("").trim();
+        const mainPage = this.props.pageManager.getMainPage();
         const results = (await this.props.facilityLoader.findNearestFacilitiesByIdent(FacilitySearchType.All, ident, this.props.sensors.in.gps.coords.lat, this.props.sensors.in.gps.coords.lon, 99))
             .filter(wpt => wpt.icaoStruct.ident === ident); //We only want exact matches
         if (results.length === 0) {
             return null;
         } else if (results.length === 1) {
             return results[0];
+        } else if (!this.isStillShownOn(mainPage)) {
+            return null; //#452 the unit was turned off during the search: enter drops the entry
         } else {
             return await this.selectDuplicateWaypoint(ident, results);
         }
+    }
+
+    /**
+     * #452: false once the unit was turned off after the ident search started. A power-off replaces the main page, and
+     * a power-on creates a new one, so a page pushed now would go to a page that is not there
+     */
+    private isStillShownOn(mainPage: MainPage | null): boolean {
+        return mainPage !== null && this.props.pageManager.getCurrentPage() === mainPage;
     }
 
     /**

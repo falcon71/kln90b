@@ -506,9 +506,9 @@ describe('DIRECT TO page with an unknown identifier', () => {
 });
 
 // #452: WaypointEditor.enter awaits the ident search, and a power-off meanwhile replaces the main page. The step after
-// the search still treats the current page as the main page: the approval of a unique ident pushes the waypoint page
-// on the right, a duplicate ident pushes the DUPLICATE WAYPOINT page on the left, and both throw. Each pin has a control
-// that runs the same entry without the power-off, so a broken setup fails there and not invisibly inside the pin
+// the search pushes the waypoint page on the right (a unique ident) or the DUPLICATE WAYPOINT page on the left (a
+// duplicate ident), which threw on the page that replaced the main page. The entry is now lost with the power-off. Each
+// test has a control that runs the same entry without the power-off, so a broken setup fails there and not invisibly
 describe('DIRECT TO page turned off right after ENT on a typed ident (#452)', () => {
     const POSITION = {lat: 47.0, lon: 8.0};
     const unq = intersection('UNQ', 47.2, 8.1);
@@ -525,7 +525,7 @@ describe('DIRECT TO page turned off right after ENT on a typed ident (#452)', ()
         return unit;
     }
 
-    it('shows the waypoint page of a unique ident after ENT (control of the #452 pin)', async () => {
+    it('shows the waypoint page of a unique ident after ENT (control of #452)', async () => {
         const unit = await typed('UNQ', [unq]);
 
         unit.send(EVT_ENT);
@@ -536,7 +536,7 @@ describe('DIRECT TO page turned off right after ENT on a typed ident (#452)', ()
         expect(unit.errors).toEqual([]);
     });
 
-    it.fails('shows no error when the unit is turned off right after ENT on a unique ident (#452)', async () => {
+    it('shows no error when the unit is turned off right after ENT on a unique ident (#452)', async () => {
         const unit = await typed('UNQ', [unq]);
 
         unit.send(EVT_ENT);
@@ -546,7 +546,7 @@ describe('DIRECT TO page turned off right after ENT on a typed ident (#452)', ()
         expect(unit.errors).toEqual([]);
     });
 
-    it('shows the DUPLICATE WAYPOINT page of a duplicate ident after ENT (control of the #452 pin)', async () => {
+    it('shows the DUPLICATE WAYPOINT page of a duplicate ident after ENT (control of #452)', async () => {
         const unit = await typed('ABD', [abdNear, abdFar]);
 
         unit.send(EVT_ENT);
@@ -556,7 +556,7 @@ describe('DIRECT TO page turned off right after ENT on a typed ident (#452)', ()
         expect(unit.errors).toEqual([]);
     });
 
-    it.fails('shows no error when the unit is turned off right after ENT on a duplicate ident (#452)', async () => {
+    it('shows no error when the unit is turned off right after ENT on a duplicate ident (#452)', async () => {
         const unit = await typed('ABD', [abdNear, abdFar]);
 
         unit.send(EVT_ENT);
