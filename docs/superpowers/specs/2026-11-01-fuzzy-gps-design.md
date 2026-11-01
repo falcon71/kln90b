@@ -238,7 +238,8 @@ tests set the bounds; the builder adjusts q within them.
 - **Power-off and power-on:** all error and filter state is discarded. Nothing is persisted.
 - **Sim paused** (`dt` ≤ 0): no update, outputs held.
 - **Time acceleration:** the update uses the real `dt`; the Gauss-Markov step and the filter are exact for any `dt`.
-- **Large gaps** (`dt` above 30 s, my call): the filter restarts from the measurement.
+- **Large gaps** (`dt` above 30 s, my call): only the filter restarts from the measurement. The error processes step
+  over the real `dt` and are not redrawn. A sim time that goes backwards (a new flight) restarts everything.
 - **Slew, teleport, a new flight:** the truth moved much farther than its velocity explains. When the truth moved more
   than 1 NM beyond `v·dt` in one tick (my call), the filter restarts from the measurement. This uses only the truth
   inputs; no extra SimVar.
