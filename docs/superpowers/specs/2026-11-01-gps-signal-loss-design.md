@@ -73,7 +73,8 @@ SDK reduces time to the time of week, so a week covers every date) on a 5° grid
   sets at 01:50:35Z, the HDOP jumps from 1.05 to 4.64 with six satellites in use, and it falls back to 1.67 about 50 s
   later when a rising satellite is acquired. The fix stays valid. The case repeats every week. A similar case lies at
   64.5°S 128.5°E on 2026-11-07 near 13:41Z.
-- RAIM slopes for that case (section 5.2): the worst satellite's slope is 10.7 without the altitude and 4.4 with it. A
+- RAIM slopes for that case (section 5.2): the worst satellite's slope is 10.7 without the altitude and 4.4 with a full-weight altitude row (the σ_ALT weighting
+  of 5.1 gives less help). A
   normal sky over KMEM gives about 0.8.
 - At exactly 90°N the SDK reports no solution although 14 satellites are visible (a singularity of its local frame;
   89.999°N is fine). Not handled here.
